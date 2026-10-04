@@ -10,22 +10,22 @@ use varn_types::{value::ObjRef, VmArray};
 impl HeapInner {
     pub(crate) fn alloc_array_vm(&mut self, items: Vec<VmValue>) -> VmValue {
         let va = VmArray::from_items(items);
-        VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
+        VmValue::from_heap(self.alloc(HeapObj::Array(va)))
     }
 
     pub(crate) fn alloc_array_slice_vm(&mut self, items: &[VmValue]) -> VmValue {
         let va = VmArray::from_slice(items);
-        VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
+        VmValue::from_heap(self.alloc(HeapObj::Array(va)))
     }
 
     pub(crate) fn alloc_tuple_vm(&mut self, items: Vec<VmValue>) -> VmValue {
         let va = VmArray::from_items(items);
-        VmValue::from_heap_idx(self.alloc(HeapObj::Tuple(va)))
+        VmValue::from_heap(self.alloc(HeapObj::Tuple(va)))
     }
 
     pub(crate) fn alloc_object(&mut self) -> VmValue {
         let oref = ObjRef::empty();
-        VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
+        VmValue::from_heap(self.alloc(HeapObj::Object(oref)))
     }
 
     pub(crate) fn alloc_object_with_shape(
@@ -44,7 +44,7 @@ impl HeapInner {
         values: &[VmValue],
     ) -> VmValue {
         let oref = ObjRef::with_shape_slice(Rc::clone(shape), values);
-        VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
+        VmValue::from_heap(self.alloc(HeapObj::Object(oref)))
     }
 
     pub(crate) fn alloc_record_with_shape_slice(
@@ -53,7 +53,7 @@ impl HeapInner {
         values: &[VmValue],
     ) -> VmValue {
         let oref = ObjRef::with_shape_slice(Rc::clone(shape), values);
-        VmValue::from_heap_idx(self.alloc(HeapObj::Record(oref)))
+        VmValue::from_heap(self.alloc(HeapObj::Record(oref)))
     }
 
     pub(crate) fn alloc_empty_map_vm(&mut self) -> VmValue {
@@ -62,6 +62,6 @@ impl HeapInner {
 
     pub(crate) fn alloc_map_vm(&mut self, map: varn_types::value::ValueMap) -> VmValue {
         let mref = varn_types::value::MapRef::new(map);
-        VmValue::from_heap_idx(self.alloc(HeapObj::Map(mref)))
+        VmValue::from_heap(self.alloc(HeapObj::Map(mref)))
     }
 }

@@ -254,7 +254,7 @@ impl ExecCtx {
                 let v = self.stack.box_reg(base, src);
                 let is_arr = if v.is_heap() {
                     matches!(
-                        self.heap.get(v.as_heap_idx()),
+                        self.heap.get(v.as_heap()),
                         Some(crate::heap::HeapObj::Array(_))
                     )
                 } else {

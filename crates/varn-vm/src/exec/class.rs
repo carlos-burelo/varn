@@ -8,7 +8,7 @@ use varn_types::{ClassObj, Shape};
 
 pub(crate) fn op_class(name: &str, heap: &mut Heap) -> VmValue {
     let cls = ClassObj::new_rc(name);
-    VmValue::from_heap_idx(heap.alloc(HeapObj::Class(cls)))
+    VmValue::from_heap(heap.alloc(HeapObj::Class(cls)))
 }
 
 pub(crate) fn op_method(
@@ -32,7 +32,7 @@ pub(crate) fn op_define_static(
     // A variant template joins its enum here: every value built from it
     // finds its methods through this id, not through its name.
     if val_nv.is_heap() {
-        if let Some(HeapObj::EnumVariant(ev)) = heap.get_mut(val_nv.as_heap_idx()) {
+        if let Some(HeapObj::EnumVariant(ev)) = heap.get_mut(val_nv.as_heap()) {
             ev.enum_class_id = Some(cls.id);
         }
     }
@@ -47,7 +47,7 @@ pub(crate) fn op_inherit(
 ) -> VmResult<()> {
     let superclass = get_class_arc(superclass_nv, heap)?;
     if subclass_nv.is_heap() {
-        if let Some(HeapObj::Class(sub)) = heap.get_mut(subclass_nv.as_heap_idx()) {
+        if let Some(HeapObj::Class(sub)) = heap.get_mut(subclass_nv.as_heap()) {
             *sub.superclass.borrow_mut() = Some(superclass.clone());
 
             *sub.vtable.borrow_mut() = superclass.vtable.borrow().clone();
@@ -93,7 +93,7 @@ pub(crate) fn op_declare_field(
     heap: &mut Heap,
 ) -> VmResult<()> {
     if class_nv.is_heap() {
-        if let Some(HeapObj::Class(cls)) = heap.get_mut(class_nv.as_heap_idx()) {
+        if let Some(HeapObj::Class(cls)) = heap.get_mut(class_nv.as_heap()) {
             cls.declare_field(Arc::from(name), tag);
             return Ok(());
         }
@@ -173,7 +173,7 @@ pub(crate) fn op_get_super(
 
 fn get_class_arc(nv: VmValue, heap: &Heap) -> VmResult<Rc<ClassObj>> {
     if nv.is_heap() {
-        if let Some(HeapObj::Class(c)) = heap.get(nv.as_heap_idx()) {
+        if let Some(HeapObj::Class(c)) = heap.get(nv.as_heap()) {
             return Ok(c.clone());
         }
     }

@@ -17,7 +17,7 @@ fn closure_for(ctx: &mut ExecCtx, task: &LazyTask) -> Rc<VmClosure> {
             .get(&key)
             .map(|&(_, val)| val);
         if let Some(val) = cached {
-            if let Some(HeapObj::VmClosure(closure)) = ctx.heap.get(val.as_heap_idx()) {
+            if let Some(HeapObj::VmClosure(closure)) = ctx.heap.get(val.as_heap()) {
                 return Rc::clone(closure);
             }
         }

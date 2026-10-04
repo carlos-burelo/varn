@@ -25,14 +25,14 @@ fn bigint_of(v: VmValue, heap: &Heap) -> Option<BigInt> {
     if !v.is_heap() {
         return None;
     }
-    match heap.get(v.as_heap_idx()) {
+    match heap.get(v.as_heap()) {
         Some(HeapObj::BigInt(b)) => Some((**b).clone()),
         _ => None,
     }
 }
 
 fn is_bigint(v: VmValue, heap: &Heap) -> bool {
-    v.is_heap() && matches!(heap.get(v.as_heap_idx()), Some(HeapObj::BigInt(_)))
+    v.is_heap() && matches!(heap.get(v.as_heap()), Some(HeapObj::BigInt(_)))
 }
 
 fn alloc(heap: &mut Heap, v: BigInt) -> VmValue {

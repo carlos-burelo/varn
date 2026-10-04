@@ -12,7 +12,7 @@ use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlagsData, 
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
-use super::super::super::emit::{call_helper_void, heap_slot_addr, HEAP_KIND, KIND_MASK};
+use super::super::super::emit::{call_helper_void, HEAP_KIND, KIND_MASK};
 use super::super::super::native_abi::{NativeClass, NativeShape, NATIVE_FRAMELESS};
 use super::super::store::{clif_ty, drop_home_addrs, is_heap};
 use super::super::{heap, load_value, stack_exit, Ctx, Out};
@@ -63,13 +63,7 @@ pub(crate) fn emit(
     b.ins().brif(is_heap_ref, walk, &[], slow_blk, &[]);
 
     b.switch_to_block(walk);
-    let slot = heap_slot_addr(
-        b,
-        ectx,
-        cpayload,
-        &ctx.helpers.array_layout,
-        ctx.helpers.heap_field_offset,
-    );
+    let slot = cpayload;
     let slot_tag = b.ins().uload8(types::I64, m, slot, 0);
     let is_closure = b
         .ins()

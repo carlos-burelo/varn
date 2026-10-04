@@ -17,7 +17,7 @@ macro_rules! fill_tail {
             globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals),
             globals_store_offset: 2 * std::mem::size_of::<usize>()
                 + std::mem::offset_of!(crate::globals::GlobalStore, values)
-                + array_layout.slots_ptr_off,
+                + array_layout.vec_ptr_off,
             closure_module_base_offset: std::mem::offset_of!(
                 crate::closure::VmClosure,
                 module_base

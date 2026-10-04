@@ -2,7 +2,7 @@ use super::*;
 
 pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        let heap_idx = obj.as_heap_idx();
+        let heap_idx = obj.as_heap();
         let maybe_obj = match heap.get(heap_idx) {
             Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(o.clone()),
             _ => None,
@@ -29,7 +29,7 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 
 pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        let heap_idx = obj.as_heap_idx();
+        let heap_idx = obj.as_heap();
         let maybe_obj = match heap.get(heap_idx) {
             Some(HeapObj::Object(o)) => Some((false, o.clone())),
             Some(HeapObj::Record(o)) => Some((true, o.clone())),
@@ -47,7 +47,7 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
             } else {
                 HeapObj::Object(oref)
             };
-            return Ok(VmValue::from_heap_idx(heap.alloc(result_obj)));
+            return Ok(VmValue::from_heap(heap.alloc(result_obj)));
         }
         let maybe_map = match heap.get(heap_idx) {
             Some(HeapObj::Map(m)) => Some(m.clone()),
@@ -73,14 +73,14 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
     if !target.is_heap() {
         return Ok(target);
     }
-    let target_obj = match heap.get(target.as_heap_idx()) {
+    let target_obj = match heap.get(target.as_heap()) {
         Some(HeapObj::Object(o)) => o.clone(),
         _ => return Ok(target),
     };
     // An `Instance` has no `ObjData` to iterate: its fields live in a flat
     // payload addressed by the class layout, which is also their name order.
     if spread.is_heap() {
-        let spread_idx = spread.as_heap_idx();
+        let spread_idx = spread.as_heap();
         if let Some(HeapObj::Instance(inst)) = heap.get(spread_idx) {
             let inst = inst.clone();
             if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
@@ -107,7 +107,7 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
         }
     }
     if spread.is_heap() {
-        if let Some(HeapObj::Object(src) | HeapObj::Record(src)) = heap.get(spread.as_heap_idx()) {
+        if let Some(HeapObj::Object(src) | HeapObj::Record(src)) = heap.get(spread.as_heap()) {
             let pairs: Vec<(Arc<str>, VmValue)> = src.borrow().iter().collect();
             for (k, nv) in pairs {
                 target_obj.insert(k, nv);

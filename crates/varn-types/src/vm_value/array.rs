@@ -36,7 +36,7 @@ pub enum ArrayRepr {
 }
 
 /// The element buffer of a `Boxed` array plus the length of its leading run
-/// known to hold no nursery reference. The collector reads that run to skip
+/// known to hold no young reference. The collector reads that run to skip
 /// it: after a minor collection every element is old, and only a write below
 /// the run, a removal that shortens it, or a raw `&mut Vec` hand-out lowers
 /// it. `items` stays the first field so the JIT's raw reads of the `Vec`

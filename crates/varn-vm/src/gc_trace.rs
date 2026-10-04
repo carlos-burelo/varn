@@ -1,4 +1,4 @@
-//! Live trace of the minor (nursery) collector, one line per collection.
+//! Live trace of the minor collector, one line per collection.
 //!
 //! Existe porque el resumen de fin de proceso (`vn debug -p gc`) dice CUÁNTO
 //! se recolectó en total, pero no CUÁNDO ni CADA CUÁNTO — para eso hace falta
@@ -7,7 +7,7 @@
 //! apagado (una carga relajada que el predictor acierta siempre).
 //!
 //! Se enciende con `VARN_GC_TRACE=1`. La colección menor es rara — dispara
-//! cada ~49k asignaciones ([`crate::nursery::Nursery::FULL_THRESHOLD`]), no en
+//! cada ~49k asignaciones ([`crate::heap::young::YOUNG_THRESHOLD`]), no en
 //! el camino caliente de cada objeto — así que usa `Instant`, no `rdtsc`: el
 //! overhead de `Instant::now()` (~25 ns) es irrelevante frente al costo de la
 //! colección misma (miles de objetos escaneados).
@@ -50,12 +50,9 @@ pub fn note_start(objects_before: usize, promoted_before: u64) -> Before {
     }
 }
 
-/// Prints one line: collection number, objects that were live in the
-/// nursery going in, how many survived by being promoted, how many were
-/// garbage (reclaimed outright), and how long the collection took. The
-/// nursery is a copying collector — every collection empties it completely
-/// (`Nursery::collect` ends with `self.objects.clear()`), so there is no
-/// "survived in place" bucket: an object either gets promoted or it's gone.
+/// Prints one line: collection number, objects born since the previous
+/// minor collection, how many survived (and became old in place), how many
+/// were garbage, and how long the collection took.
 #[inline]
 pub fn note_end(before: Before, collection_no: u64, promoted_after: u64) {
     if !enabled() {

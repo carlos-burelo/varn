@@ -24,23 +24,21 @@ impl ExecCtx {
         let arg_count = args.len();
         let is_bound = method_nv.is_heap()
             && matches!(
-                self.heap.get(method_nv.as_heap_idx()),
+                self.heap.get(method_nv.as_heap()),
                 Some(crate::heap::HeapObj::BoundMethod(_))
             );
         let is_static = this_val.is_heap()
             && matches!(
-                self.heap.get(this_val.as_heap_idx()),
+                self.heap.get(this_val.as_heap()),
                 Some(crate::heap::HeapObj::Class(_))
             );
         let is_enum_variant = method_nv.is_heap()
             && matches!(
-                self.heap.get(method_nv.as_heap_idx()),
+                self.heap.get(method_nv.as_heap()),
                 Some(crate::heap::HeapObj::EnumVariant(_))
             );
         let is_plain_closure_no_this = method_nv.is_heap() && {
-            if let Some(crate::heap::HeapObj::VmClosure(nc)) =
-                self.heap.get(method_nv.as_heap_idx())
-            {
+            if let Some(crate::heap::HeapObj::VmClosure(nc)) = self.heap.get(method_nv.as_heap()) {
                 !nc.proto.has_this
             } else {
                 false
@@ -49,16 +47,16 @@ impl ExecCtx {
         let is_namespace_native = method_nv.is_heap()
             && this_val.is_heap()
             && matches!(
-                self.heap.get(method_nv.as_heap_idx()),
+                self.heap.get(method_nv.as_heap()),
                 Some(crate::heap::HeapObj::NativeFn(..))
             )
             && matches!(
-                self.heap.get(this_val.as_heap_idx()),
+                self.heap.get(this_val.as_heap()),
                 Some(crate::heap::HeapObj::Object(_))
             );
         let is_plain_native = method_nv.is_heap()
             && matches!(
-                self.heap.get(method_nv.as_heap_idx()),
+                self.heap.get(method_nv.as_heap()),
                 Some(crate::heap::HeapObj::NativeFn(..))
             );
 
@@ -103,7 +101,7 @@ impl ExecCtx {
                 if v.is_sso() {
                     ":sso"
                 } else if v.is_heap() {
-                    match self.heap.get(v.as_heap_idx()) {
+                    match self.heap.get(v.as_heap()) {
                         Some(crate::heap::HeapObj::Str(_)) => ":str",
                         Some(crate::heap::HeapObj::Array(_)) => ":array",
                         Some(crate::heap::HeapObj::Object(_)) => ":object",
@@ -208,7 +206,7 @@ impl ExecCtx {
                 } else {
                     vec![]
                 };
-                let rest_nv = VmValue::from_heap_idx(
+                let rest_nv = VmValue::from_heap(
                     self.heap
                         .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
                 );

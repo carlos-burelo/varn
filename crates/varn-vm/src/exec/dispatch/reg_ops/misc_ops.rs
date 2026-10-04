@@ -204,7 +204,7 @@ impl ExecCtx {
             return Ok(VmValue::from_int(v.sso_len() as i64));
         }
         if v.is_heap() {
-            if let Some(HeapObj::Str(s)) = self.heap.get(v.as_heap_idx()) {
+            if let Some(HeapObj::Str(s)) = self.heap.get(v.as_heap()) {
                 let len = if s.is_ascii() {
                     s.len()
                 } else {
@@ -218,7 +218,7 @@ impl ExecCtx {
 
     pub(crate) fn exec_str_slice(&mut self, s: VmValue, idx: VmValue) -> VmResult<VmValue> {
         if s.is_heap() {
-            if let Some(HeapObj::Str(st)) = self.heap.get(s.as_heap_idx()) {
+            if let Some(HeapObj::Str(st)) = self.heap.get(s.as_heap()) {
                 let start = idx.as_i32().max(0) as usize;
                 let sliced: String = st.chars().skip(start).collect();
                 return Ok(self.heap.alloc_str(sliced));

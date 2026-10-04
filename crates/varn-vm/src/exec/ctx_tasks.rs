@@ -15,7 +15,7 @@ pub(crate) enum Rejection {
 impl ExecCtx {
     pub fn settle_awaited(&mut self, value: VmValue) -> Result<VmValue, VmValue> {
         if value.is_heap() {
-            let cell = match self.heap.get_by_idx(value.as_heap_idx()) {
+            let cell = match self.heap.get(value.as_heap()) {
                 Some(HeapObj::Task(lazy)) => Some(self.run_lazy_task_sync(Rc::clone(lazy))),
                 Some(HeapObj::TaskHandle(cell)) => Some(Rc::clone(cell)),
                 _ => None,

@@ -22,7 +22,7 @@ pub(crate) fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
         return RuntimeKind::Str.name();
     }
     if val.is_heap() {
-        return match heap.get(val.as_heap_idx()) {
+        return match heap.get(val.as_heap()) {
             Some(obj) => obj.tag().name(),
             None => RuntimeKind::Object.name(),
         };
@@ -34,7 +34,7 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
     if !class_nv.is_heap() {
         return false;
     }
-    let cls = match heap.get(class_nv.as_heap_idx()) {
+    let cls = match heap.get(class_nv.as_heap()) {
         Some(HeapObj::Class(c)) => c.clone(),
         _ => return false,
     };
@@ -42,7 +42,7 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
     match cls.name.as_str() {
         n if n == varn_core::RuntimeKind::Str.name() => {
             return obj.is_sso()
-                || (obj.is_heap() && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Str(_))))
+                || (obj.is_heap() && matches!(heap.get(obj.as_heap()), Some(HeapObj::Str(_))))
         }
         n if n == varn_core::RuntimeKind::Int.name() => {
             return obj.is_int()
@@ -55,18 +55,17 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
         n if n == varn_core::RuntimeKind::Bool.name() => return obj.is_bool(),
         n if n == varn_core::RuntimeKind::Null.name() => return obj.is_null(),
         n if n == varn_core::RuntimeKind::Char.name() => {
-            return obj.is_heap() && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Char(_)))
+            return obj.is_heap() && matches!(heap.get(obj.as_heap()), Some(HeapObj::Char(_)))
         }
         n if n == varn_core::RuntimeKind::Decimal.name() => {
-            return obj.is_heap()
-                && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Decimal(_)))
+            return obj.is_heap() && matches!(heap.get(obj.as_heap()), Some(HeapObj::Decimal(_)))
         }
         _ => {}
     }
     if !obj.is_heap() {
         return false;
     }
-    let obj_class = match heap.get(obj.as_heap_idx()) {
+    let obj_class = match heap.get(obj.as_heap()) {
         Some(HeapObj::Instance(inst)) => ClassObj::find_by_id(inst.class_id),
         Some(HeapObj::Object(o) | HeapObj::Record(o)) => o.borrow().class().clone(),
         _ => return false,
@@ -86,7 +85,7 @@ pub(crate) fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
         return false;
     }
     let key_s = heap.str_repr(key);
-    match heap.get(obj.as_heap_idx()) {
+    match heap.get(obj.as_heap()) {
         Some(HeapObj::Object(o)) => o.borrow().contains_key(&key_s),
         Some(HeapObj::Array(a)) => {
             if let Ok(idx) = key_s.parse::<usize>() {
@@ -99,7 +98,7 @@ pub(crate) fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
 }
 
 pub(crate) fn is_array(val: VmValue, heap: &Heap) -> bool {
-    val.is_heap() && matches!(heap.get(val.as_heap_idx()), Some(HeapObj::Array(_)))
+    val.is_heap() && matches!(heap.get(val.as_heap()), Some(HeapObj::Array(_)))
 }
 
 pub(crate) fn assert_not_null(val: VmValue) -> VmResult<()> {
@@ -112,7 +111,7 @@ pub(crate) fn assert_not_null(val: VmValue) -> VmResult<()> {
 
 pub(crate) fn get_enum_tag(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     if val.is_heap() {
-        if let Some(HeapObj::EnumVariant(e)) = heap.get(val.as_heap_idx()) {
+        if let Some(HeapObj::EnumVariant(e)) = heap.get(val.as_heap()) {
             return Ok(VmValue::from_i32(e.variant_tag as i32));
         }
     }
@@ -127,7 +126,7 @@ pub(crate) fn get_symbol_property(
     let sym_str = symbol.to_string();
     let kind = obj
         .is_heap()
-        .then(|| heap.get(obj.as_heap_idx()))
+        .then(|| heap.get(obj.as_heap()))
         .flatten()
         .map(|o| match o {
             HeapObj::Array(_) => 1,
@@ -153,7 +152,7 @@ pub(crate) fn get_symbol_property(
         (3, RuntimeSymbol::Iterator | RuntimeSymbol::AsyncIterator) => {
             heap.alloc_bound_native(obj, generator_symbol_iterator, "[Symbol.iterator]")
         }
-        (4, _) => match heap.get(obj.as_heap_idx()) {
+        (4, _) => match heap.get(obj.as_heap()) {
             Some(HeapObj::Object(o)) => o.get(sym_str.as_str()).unwrap_or(VmValue::null()),
             _ => VmValue::null(),
         },

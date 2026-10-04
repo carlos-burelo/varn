@@ -35,7 +35,7 @@ pub(crate) fn build_with_shape_slice(
     if may_hold_closure {
         for &val_nv in vals {
             if val_nv.is_heap() {
-                if let Some(HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
+                if let Some(HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap()) {
                     for uv in &nc.upvalues {
                         uv.close(store);
                     }
@@ -59,12 +59,12 @@ pub(crate) fn build_with_shape_slice(
 fn alloc_timed(heap: &mut Heap, obj: HeapObj) -> VmValue {
     use crate::alloc_profile as prof;
     if !prof::detail() {
-        return VmValue::from_heap_idx(heap.alloc(obj));
+        return VmValue::from_heap(heap.alloc(obj));
     }
     let t0 = prof::read();
     let idx = heap.alloc(obj);
     prof::record(prof::Seg::HeapPush, t0, prof::read());
-    VmValue::from_heap_idx(idx)
+    VmValue::from_heap(idx)
 }
 
 /// Parte común de objeto y record: cerrar las upvalues de los valores que sean
@@ -94,7 +94,7 @@ fn build_shaped(
             if val_nv.is_heap() {
                 // Sin clonar el closure: sólo se leen sus upvalues, y `close`
                 // toca el almacén, no el heap.
-                if let Some(crate::heap::HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
+                if let Some(crate::heap::HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap()) {
                     for uv in &nc.upvalues {
                         uv.close(store);
                     }

@@ -11,7 +11,7 @@ fn make_iter_result(heap: &mut crate::heap::Heap, value: VmValue, done: bool) ->
         (Arc::from("value"), value),
         (Arc::from("done"), VmValue::from_bool(done)),
     ]);
-    VmValue::from_heap_idx(heap.alloc(crate::heap::HeapObj::Object(obj)))
+    VmValue::from_heap(heap.alloc(crate::heap::HeapObj::Object(obj)))
 }
 
 struct NanGenInner {
@@ -143,10 +143,8 @@ impl GeneratorDriver for NanGenDriver {
         for &nv in &inner.ctx.stack.dyn_ {
             callback(nv);
         }
-        for &h in &inner.ctx.stack.refs {
-            if h != crate::frame_store::REF_UNINIT {
-                callback(VmValue::from_heap_idx(h));
-            }
+        for &h in inner.ctx.stack.refs.iter().flatten() {
+            callback(VmValue::from_heap(h));
         }
 
         for frame in &inner.ctx.frames {

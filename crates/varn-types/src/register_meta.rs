@@ -85,16 +85,6 @@ pub struct RegisterMeta {
     pub kind: SlotKind,
 }
 
-/// Sentinel stored in a `Ref` slot that has never been written.
-///
-/// The interpreter over-dimensions `register_count`, so trailing `Ref` slots
-/// are allocated but never written; the GC skips this value and no reader
-/// reaches them before a write (the same discipline the old `null()` slot
-/// relied on). Lives here, next to the class projection, because the JIT's
-/// emitted ref stores/loads must use the exact same sentinel as the VM's
-/// `FrameStore` — a divergence would turn "unwritten" into a bogus heap index.
-pub const REF_UNINIT: u32 = u32::MAX;
-
 /// Static register → `(class, index-within-class)` mapping for one proto.
 ///
 /// A pure projection of [`FunctionProto::register_meta`] (via [`SlotClass`]),

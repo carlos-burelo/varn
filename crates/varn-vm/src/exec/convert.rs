@@ -36,7 +36,7 @@ fn numeric_of(v: VmValue, heap: &Heap) -> VmResult<Numeric> {
         return Ok(Numeric::Float(v.as_f64()));
     }
     let obj = if v.is_heap() {
-        heap.get(v.as_heap_idx())
+        heap.get(v.as_heap())
     } else {
         None
     };

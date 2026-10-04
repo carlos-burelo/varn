@@ -88,13 +88,12 @@ fn view(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &[Option<Value>],
-    exec_ctx: Value,
     object: u32,
     slow: Block,
 ) -> Result<(Value, Value, Value), String> {
     let Some(v) = ctx.views.of(object) else {
         let obj = heap::boxed_value(b, ctx, values, object)?;
-        return Ok(resolve(b, ctx, exec_ctx, obj, slow));
+        return Ok(resolve(b, ctx, obj, slow));
     };
     let data = b.use_var(v.data);
     let len = b.use_var(v.len);
@@ -114,7 +113,7 @@ fn view(
 
     b.switch_to_block(miss);
     let obj = heap::boxed_value(b, ctx, values, object)?;
-    let (d, l, di) = resolve(b, ctx, exec_ctx, obj, slow);
+    let (d, l, di) = resolve(b, ctx, obj, slow);
     b.def_var(v.data, d);
     b.def_var(v.len, l);
     b.def_var(v.disc, di);
@@ -133,12 +132,11 @@ fn view(
 fn resolve(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
-    exec_ctx: Value,
     obj: Value,
     slow: Block,
 ) -> (Value, Value, Value) {
     let lay = &ctx.helpers.array_layout;
-    let payload = emit_array_payload(b, exec_ctx, obj, lay, ctx.helpers.heap_field_offset, slow);
+    let payload = emit_array_payload(b, obj, lay, slow);
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let data = b
         .ins()
@@ -176,7 +174,7 @@ pub(super) fn emit_get(
     let merge = b.create_block();
     b.append_block_param(merge, want.clif_ty());
 
-    let (data, len, disc) = view(b, ctx, values, exec_ctx, object, slow)?;
+    let (data, len, disc) = view(b, ctx, values, object, slow)?;
     bounds(b, key, len, slow);
 
     let matched = b.create_block();
@@ -269,7 +267,7 @@ pub(super) fn emit_set(
     // the runtime's accessor applies: only scalars are stored inline.
     if src != Elem::Boxed {
         let raw = load_value(b, ctx, values, value)?;
-        let (data, len, disc) = view(b, ctx, values, exec_ctx, object, slow)?;
+        let (data, len, disc) = view(b, ctx, values, object, slow)?;
         bounds(b, key, len, slow);
 
         let matched = b.create_block();
@@ -332,14 +330,13 @@ pub(super) fn prefill(
     values: &[Option<Value>],
     objects: &[u32],
 ) -> Result<Block, String> {
-    let exec_ctx = heap::exec_ctx(ctx);
     let done = b.create_block();
     let mut slows = Vec::with_capacity(objects.len());
     for object in objects {
         let slow = b.create_block();
         b.set_cold_block(slow);
         slows.push(slow);
-        let _ = view(b, ctx, values, exec_ctx, *object, slow)?;
+        let _ = view(b, ctx, values, *object, slow)?;
     }
     b.ins().jump(done, &[]);
     for slow in slows {

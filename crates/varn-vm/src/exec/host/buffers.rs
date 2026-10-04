@@ -10,14 +10,14 @@ impl ExecCtx {
     }
     pub(super) fn host_is_buffer(&self, v: VmValue) -> bool {
         if v.is_heap() {
-            matches!(self.heap.get(v.as_heap_idx()), Some(HeapObj::Buffer(_)))
+            matches!(self.heap.get(v.as_heap()), Some(HeapObj::Buffer(_)))
         } else {
             false
         }
     }
     pub(super) fn host_buffer_len(&self, v: VmValue) -> usize {
         if v.is_heap() {
-            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap()) {
                 return b.len();
             }
         }
@@ -25,7 +25,7 @@ impl ExecCtx {
     }
     pub(super) fn host_buffer_get_byte(&self, v: VmValue, idx: usize) -> Option<u8> {
         if v.is_heap() {
-            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap()) {
                 return b.as_slice().get(idx).copied();
             }
         }
@@ -33,7 +33,7 @@ impl ExecCtx {
     }
     pub(super) fn host_buffer_set_byte(&mut self, v: VmValue, idx: usize, byte: u8) -> bool {
         if v.is_heap() {
-            if let Some(HeapObj::Buffer(b)) = self.heap.get_mut(v.as_heap_idx()) {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get_mut(v.as_heap()) {
                 let mut slice = b.as_mut_slice();
                 if idx < slice.len() {
                     slice[idx] = byte;
@@ -50,7 +50,7 @@ impl ExecCtx {
         end: usize,
     ) -> Option<VmValue> {
         if v.is_heap() {
-            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap()) {
                 let sub = b.slice(start, end);
                 return Some(self.heap.alloc_vm_buffer(sub));
             }
@@ -59,7 +59,7 @@ impl ExecCtx {
     }
     pub(super) fn host_buffer_to_string(&self, v: VmValue) -> Option<String> {
         if v.is_heap() {
-            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap()) {
                 let slice = b.as_slice();
                 return String::from_utf8(slice.to_vec()).ok();
             }
@@ -68,7 +68,7 @@ impl ExecCtx {
     }
     pub(super) fn host_buffer_to_bytes(&self, v: VmValue) -> Option<Vec<u8>> {
         if v.is_heap() {
-            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap()) {
                 return Some(b.as_slice().to_vec());
             }
         }

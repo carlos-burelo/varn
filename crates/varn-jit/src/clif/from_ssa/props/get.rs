@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{call_helper_void, heap_slot_addr, HEAP_KIND, KIND_MASK};
+use super::super::super::emit::{call_helper_void, HEAP_KIND, KIND_MASK};
 use super::super::heap::boxed_parts;
 use super::super::store::drop_home_addrs;
 use super::super::Ctx;
@@ -30,8 +30,6 @@ pub(crate) fn emit_get_property(
 
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let olay = &ctx.helpers.object_layout;
-    let alay = &ctx.helpers.array_layout;
-    let heap_off = ctx.helpers.heap_field_offset;
 
     let kind = b.ins().band_imm_u(ot, KIND_MASK);
     let is_heap = b.ins().icmp_imm_u(IntCC::Equal, kind, HEAP_KIND);
@@ -39,7 +37,7 @@ pub(crate) fn emit_get_property(
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
 
-    let slot_addr = heap_slot_addr(b, ectx, op, alay, heap_off);
+    let slot_addr = op;
 
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
     let is_obj = b

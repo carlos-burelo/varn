@@ -63,7 +63,7 @@ fn decimal_of(v: VmValue, heap: &Heap) -> Option<Decimal> {
     if !v.is_heap() {
         return None;
     }
-    match heap.get(v.as_heap_idx()) {
+    match heap.get(v.as_heap()) {
         Some(HeapObj::Decimal(d)) => Some((**d).clone()),
         _ => None,
     }
@@ -108,8 +108,8 @@ pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
         return Ok(crate::exec::strings::str_concat(a, b, heap));
     }
     if a.is_heap() || b.is_heap() {
-        let a_is_str = a.is_heap() && matches!(heap.get(a.as_heap_idx()), Some(HeapObj::Str(_)));
-        let b_is_str = b.is_heap() && matches!(heap.get(b.as_heap_idx()), Some(HeapObj::Str(_)));
+        let a_is_str = a.is_heap() && matches!(heap.get(a.as_heap()), Some(HeapObj::Str(_)));
+        let b_is_str = b.is_heap() && matches!(heap.get(b.as_heap()), Some(HeapObj::Str(_)));
         if a_is_str || b_is_str {
             return Ok(crate::exec::strings::str_concat(a, b, heap));
         }

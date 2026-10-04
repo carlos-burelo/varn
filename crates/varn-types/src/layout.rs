@@ -14,15 +14,15 @@ pub enum ScalarRepr {
     I64,
     /// `float`, a raw `f64`.
     F64,
-    /// A heap reference as its 8-byte index; [`COMPACT_REF_NULL`] is `null`
+    /// A heap reference as its 8-byte address; [`COMPACT_REF_NULL`] is `null`
     /// (the niche that makes `T?` over a reference free, spec §49).
     Ref,
     /// A whole two-word `VmValue` (tag + payload).
     Boxed,
 }
 
-/// The `null` niche of a [`ScalarRepr::Ref`] slot: no heap index is `u32::MAX`.
-pub const COMPACT_REF_NULL: u64 = u32::MAX as u64;
+/// The `null` niche of a [`ScalarRepr::Ref`] slot: no object lives at address 0.
+pub const COMPACT_REF_NULL: u64 = 0;
 
 impl ScalarRepr {
     /// Whether a slot of this representation can hold a GC reference.

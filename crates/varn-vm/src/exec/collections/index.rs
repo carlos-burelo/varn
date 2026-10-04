@@ -3,7 +3,7 @@ use super::*;
 #[inline(always)]
 pub(crate) fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        let heap_idx = obj.as_heap_idx();
+        let heap_idx = obj.as_heap();
         let idx = if key.is_int() {
             key.as_int() as usize
         } else if key.is_f64() {
@@ -22,7 +22,7 @@ pub(crate) fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> Vm
 #[inline(always)]
 pub(crate) fn map_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        let heap_idx = obj.as_heap_idx();
+        let heap_idx = obj.as_heap();
         if let Some(HeapObj::Map(m)) = heap.get(heap_idx) {
             let found = heap
                 .lookup_map_key(key)
@@ -41,7 +41,7 @@ pub(crate) fn map_set_index(
     heap: &mut Heap,
 ) -> VmResult<()> {
     if obj.is_heap() {
-        let heap_idx = obj.as_heap_idx();
+        let heap_idx = obj.as_heap();
         let maybe_m = match heap.get_mut(heap_idx) {
             Some(HeapObj::Map(mref)) => {
                 if std::rc::Rc::strong_count(&mref.0) > 1 {
@@ -70,7 +70,7 @@ pub(crate) fn array_set_index(
     heap: &mut Heap,
 ) -> VmResult<()> {
     if obj.is_heap() {
-        let heap_idx = obj.as_heap_idx();
+        let heap_idx = obj.as_heap();
         let idx = if key.is_int() {
             key.as_int() as usize
         } else if key.is_f64() {
@@ -102,7 +102,7 @@ pub(crate) fn array_set_index(
 
 pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get(obj.as_heap_idx()) {
+        if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get(obj.as_heap()) {
             let idx = if key.is_int() {
                 key.as_int() as usize
             } else {
@@ -111,7 +111,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
             let val = a.get_vm(idx).unwrap_or(VmValue::null());
             return Ok(val);
         }
-        if let Some(HeapObj::Buffer(b)) = heap.get(obj.as_heap_idx()) {
+        if let Some(HeapObj::Buffer(b)) = heap.get(obj.as_heap()) {
             let idx = if key.is_int() {
                 key.as_int() as usize
             } else {
@@ -137,13 +137,13 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
     if !obj.is_heap() {
         return Err(RuntimeError::new("OpGetIndex: not indexable"));
     }
-    match heap.get(obj.as_heap_idx()) {
+    match heap.get(obj.as_heap()) {
         Some(HeapObj::Object(o) | HeapObj::Record(o)) => {
             let mut buf = [0u8; 5];
             let key_str = if key.is_sso() {
                 key.sso_as_str(&mut buf)
             } else if key.is_heap() {
-                if let Some(HeapObj::Str(s)) = heap.get(key.as_heap_idx()) {
+                if let Some(HeapObj::Str(s)) = heap.get(key.as_heap()) {
                     s.as_str()
                 } else {
                     ""
@@ -197,7 +197,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
             let key_str: String = if key.is_sso() {
                 key.sso_as_str(&mut buf).to_string()
             } else if key.is_heap() {
-                match heap.get(key.as_heap_idx()) {
+                match heap.get(key.as_heap()) {
                     Some(HeapObj::Str(s)) => s.as_str().to_string(),
                     _ => heap.str_repr(key),
                 }
@@ -222,7 +222,7 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
     if !obj.is_heap() {
         return Err(RuntimeError::new("OpSetIndex: not indexable"));
     }
-    let heap_idx = obj.as_heap_idx();
+    let heap_idx = obj.as_heap();
     let idx_i = heap.as_int(key) as usize;
     match heap.get(heap_idx) {
         Some(HeapObj::Array(a)) => {
@@ -245,7 +245,7 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
             let key_str = if key.is_sso() {
                 key.sso_as_str(&mut buf)
             } else if key.is_heap() {
-                if let Some(HeapObj::Str(s)) = heap.get(key.as_heap_idx()) {
+                if let Some(HeapObj::Str(s)) = heap.get(key.as_heap()) {
                     s.as_str()
                 } else {
                     ""

@@ -1,12 +1,12 @@
-use super::major::MajorMarks;
+use super::cells::CellSpace;
 use super::obj::HeapObj;
-use super::slots::SlotTable;
 use super::young::YoungGen;
 use crate::profile::HotspotCounters;
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+use varn_types::HeapRef;
 use varn_types::{value::RuntimeSymbol, ClassObj, RuntimeString};
 
 pub struct HeapInner {
@@ -20,18 +20,18 @@ pub struct HeapInner {
     pub gc_total_freed: u64,
     pub gc_threshold: u64,
     pub(crate) young: YoungGen,
-    pub(crate) slots: SlotTable,
-    pub(super) string_interner: FxHashMap<RuntimeString, u32>,
-    pub(super) symbol_interner: FxHashMap<RuntimeSymbol, u32>,
+    pub(crate) cells: CellSpace,
+    pub(super) string_interner: FxHashMap<RuntimeString, HeapRef>,
+    pub(super) symbol_interner: FxHashMap<RuntimeSymbol, HeapRef>,
     pub(crate) young_cells: Vec<Rc<crate::task::TaskCell>>,
     pub(crate) young_lazies: Vec<Rc<crate::task::LazyTask>>,
-    pub(super) bigint_interner: FxHashMap<num_bigint::BigInt, u32>,
-    pub(super) decimal_interner: FxHashMap<bigdecimal::BigDecimal, u32>,
-    pub(super) char_interner: FxHashMap<char, u32>,
-    pub(super) major: MajorMarks,
+    pub(super) bigint_interner: FxHashMap<num_bigint::BigInt, HeapRef>,
+    pub(super) decimal_interner: FxHashMap<bigdecimal::BigDecimal, HeapRef>,
+    pub(super) char_interner: FxHashMap<char, HeapRef>,
+    pub(super) major_work: Vec<HeapRef>,
     pub hotspot: Option<Rc<RefCell<HotspotCounters>>>,
-    pub(super) scan_roots: Vec<u32>,
-    pub(super) identity_index: FxHashMap<usize, u32>,
+    pub(super) scan_roots: Vec<HeapRef>,
+    pub(super) identity_index: FxHashMap<usize, HeapRef>,
 }
 
 impl Drop for HeapInner {
@@ -44,7 +44,7 @@ impl HeapInner {
     pub(crate) fn new() -> Self {
         Self {
             jit_epoch: crate::clif_link::next_epoch(),
-            slots: SlotTable::with_capacity(4096),
+            cells: CellSpace::default(),
             intrinsic_classes: FxHashMap::default(),
             string_interner: FxHashMap::default(),
             symbol_interner: FxHashMap::default(),
@@ -53,7 +53,7 @@ impl HeapInner {
             bigint_interner: FxHashMap::default(),
             decimal_interner: FxHashMap::default(),
             char_interner: FxHashMap::default(),
-            major: MajorMarks::default(),
+            major_work: Vec::new(),
             gc_collections: 0,
             gc_total_freed: 0,
             gc_threshold: 65536,
@@ -143,12 +143,12 @@ impl HeapInner {
         self.intrinsic_classes.get(name).cloned()
     }
 
-    pub(crate) fn objects_len(&self) -> u32 {
-        self.slots.len()
+    pub(crate) fn objects_len(&self) -> usize {
+        self.cells.capacity()
     }
 
     pub(crate) fn alloc_count(&self) -> u64 {
-        self.slots.births
+        self.cells.births
     }
 }
 
@@ -201,6 +201,6 @@ impl std::ops::DerefMut for Heap {
 
 impl std::fmt::Debug for Heap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Heap {{ alloc_count: {} }}", self.slots.births)
+        write!(f, "Heap {{ alloc_count: {} }}", self.cells.births)
     }
 }

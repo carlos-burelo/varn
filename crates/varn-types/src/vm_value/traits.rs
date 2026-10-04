@@ -45,7 +45,7 @@ impl fmt::Debug for VmValue {
             let s = self.sso_as_str(&mut buf);
             write!(f, "sso({:?})", s)
         } else if self.is_heap() {
-            write!(f, "heap[{}]", self.as_heap_idx())
+            write!(f, "heap[{:#x}]", self.as_heap().addr())
         } else if self.is_ic_miss() {
             write!(f, "<ic-miss>")
         } else {

@@ -55,7 +55,7 @@ impl ExecCtx {
         if !v.is_heap() {
             return "unknown";
         }
-        match self.heap.get(v.as_heap_idx()) {
+        match self.heap.get(v.as_heap()) {
             Some(obj) => obj.tag().name(),
             None => "unknown",
         }

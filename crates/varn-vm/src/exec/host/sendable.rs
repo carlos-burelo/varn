@@ -29,7 +29,7 @@ pub(super) fn to_sendable(
         ));
     }
     if val.is_heap() {
-        match ctx.heap.get_by_idx(val.as_heap_idx()) {
+        match ctx.heap.get(val.as_heap()) {
             Some(HeapObj::Str(s)) => Ok(varn_types::value::SendValue::Str(s.to_string())),
             Some(HeapObj::Array(arr)) => {
                 let mut items = Vec::with_capacity(arr.len());

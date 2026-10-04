@@ -9,7 +9,7 @@
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
-use varn_types::register_meta::{FrameLayout, SlotClass, REF_UNINIT};
+use varn_types::register_meta::{FrameLayout, SlotClass};
 use varn_types::vm_value::{KIND_HEAP, KIND_INT, KIND_NULL};
 
 use crate::JitFrameLayout;
@@ -60,7 +60,7 @@ impl Homes<'_> {
     /// Write `value` to the precomputed home address `home` (see
     /// [`addr`][Self::addr]), converted to the home's class. `value`
     /// is a boxed `VmValue` (`I128`), or a bare `I64` payload: an `int` for a
-    /// `Gpr`/`Dyn` home, a heap index for a `Ref` one, raw `f64` bits for an
+    /// `Gpr`/`Dyn` home, an object address (0 = null) for a `Ref` one, raw `f64` bits for an
     /// `Fpr` one.
     pub(crate) fn store_at(&self, b: &mut FunctionBuilder, home: Value, reg: usize, value: Value) {
         let class = self.layout.class_of(reg);
@@ -104,13 +104,9 @@ impl Homes<'_> {
                     (b.ins().iconst(types::I64, KIND_HEAP as i64), value)
                 };
                 let is_null = b.ins().icmp_imm_u(IntCC::Equal, tag, KIND_NULL as i64);
-                let low = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
-                let uninit = b.ins().iconst(types::I64, REF_UNINIT as i64);
-                let v = b.ins().select(is_null, uninit, low);
-                // `Ref` homes are 4-byte `u32` heap indices (`FrameStore::refs`
-                // is `Vec<u32>`): `istore32` writes the low 32 bits and, unlike
-                // an 8-byte store, never clobbers the neighbouring slot.
-                b.ins().istore32(m, v, home, 0);
+                let zero = b.ins().iconst(types::I64, 0);
+                let v = b.ins().select(is_null, zero, payload);
+                b.ins().store(m, v, home, 0);
             }
         }
     }
@@ -136,14 +132,12 @@ impl Homes<'_> {
             }
             SlotClass::Dyn => b.ins().load(types::I128, m, home, 0),
             SlotClass::Ref => {
-                let idx = b.ins().uload32(m, home, 0);
-                let is_uninit = b.ins().icmp_imm_u(IntCC::Equal, idx, REF_UNINIT as i64);
+                let addr = b.ins().load(types::I64, m, home, 0);
+                let is_null = b.ins().icmp_imm_u(IntCC::Equal, addr, 0);
                 let null_tag = b.ins().iconst(types::I64, KIND_NULL as i64);
                 let heap_tag = b.ins().iconst(types::I64, KIND_HEAP as i64);
-                let zero = b.ins().iconst(types::I64, 0);
-                let tag = b.ins().select(is_uninit, null_tag, heap_tag);
-                let payload = b.ins().select(is_uninit, zero, idx);
-                b.ins().iconcat(tag, payload)
+                let tag = b.ins().select(is_null, null_tag, heap_tag);
+                b.ins().iconcat(tag, addr)
             }
         }
     }
@@ -153,7 +147,7 @@ impl Homes<'_> {
 fn elem_size(class: SlotClass) -> i64 {
     match class {
         SlotClass::Gpr | SlotClass::Fpr => 8,
-        SlotClass::Ref => 4,
+        SlotClass::Ref => 8,
         SlotClass::Dyn => 16,
     }
 }

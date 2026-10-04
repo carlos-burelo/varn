@@ -117,7 +117,7 @@ impl ExecCtx {
                     let k = if v.is_sso() {
                         ":sso"
                     } else if v.is_heap() {
-                        match self.heap.get(v.as_heap_idx()) {
+                        match self.heap.get(v.as_heap()) {
                             Some(crate::heap::HeapObj::Str(_)) => ":str",
                             Some(crate::heap::HeapObj::Array(_)) => ":array",
                             Some(crate::heap::HeapObj::Object(_)) => ":object",

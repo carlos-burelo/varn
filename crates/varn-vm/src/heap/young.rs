@@ -2,13 +2,15 @@
 //! collection, and which old slots were written a young reference since then.
 //! A young object that survives stays in its slot and becomes old in place.
 
+use varn_types::HeapRef;
+
 pub const YOUNG_THRESHOLD: usize = 49152;
 
 #[derive(Default)]
 pub struct YoungGen {
-    pub(crate) born: Vec<u32>,
-    pub(crate) remembered: Vec<u32>,
-    pub(super) worklist: Vec<u32>,
+    pub(crate) born: Vec<HeapRef>,
+    pub(crate) remembered: Vec<HeapRef>,
+    pub(super) worklist: Vec<HeapRef>,
     pub alloc_count: u64,
     pub minor_gc_count: u64,
     pub minor_gc_promoted: u64,

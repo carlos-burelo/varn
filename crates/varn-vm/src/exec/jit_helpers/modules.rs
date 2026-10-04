@@ -66,7 +66,7 @@ pub(crate) extern "C" fn jit_load_module_slot(
             ctx_ref.jit_native_result = VmValue::null();
             return;
         }
-        if let Some(crate::heap::HeapObj::Module(m)) = ctx_ref.heap.get(module_val.as_heap_idx()) {
+        if let Some(crate::heap::HeapObj::Module(m)) = ctx_ref.heap.get(module_val.as_heap()) {
             ctx_ref.jit_native_result = m.get_slot(slot_idx).unwrap_or(VmValue::null());
         } else {
             ctx_ref.jit_native_result = VmValue::null();
@@ -97,9 +97,7 @@ pub(crate) extern "C" fn jit_store_module_slot(
             panic!("OpStoreModuleSlot: active module object is not a heap object");
         }
 
-        if let Some(crate::heap::HeapObj::Module(m)) =
-            ctx_ref.heap.get_mut(exports_nv.as_heap_idx())
-        {
+        if let Some(crate::heap::HeapObj::Module(m)) = ctx_ref.heap.get_mut(exports_nv.as_heap()) {
             let m = std::rc::Rc::make_mut(m);
             m.set_slot(slot_idx, val_nv);
         } else {

@@ -53,7 +53,7 @@ impl ExecCtx {
         gen_ctx.frames.push(frame);
 
         let driver = crate::generator::NanGenDriver::new(gen_ctx, is_async);
-        VmValue::from_heap_idx(self.heap.alloc(crate::heap::HeapObj::Generator(
+        VmValue::from_heap(self.heap.alloc(crate::heap::HeapObj::Generator(
             varn_types::generator::GeneratorObj(driver),
         )))
     }

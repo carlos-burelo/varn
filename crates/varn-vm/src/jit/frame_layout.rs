@@ -74,7 +74,7 @@ mod tests {
         let mut store = crate::frame_store::FrameStore::new();
         store.gpr.push(7);
         store.fpr.push(1.5);
-        store.refs.push(9);
+        store.refs.push(None);
         store.dyn_.push(varn_types::VmValue::null());
 
         let lay = probe();
@@ -84,7 +84,8 @@ mod tests {
         unsafe {
             let gpr = *(base.add(lay.gpr_ptr_offset - stack_off) as *const *const i64);
             let fpr = *(base.add(lay.fpr_ptr_offset - stack_off) as *const *const f64);
-            let refs = *(base.add(lay.refs_ptr_offset - stack_off) as *const *const u32);
+            let refs = *(base.add(lay.refs_ptr_offset - stack_off)
+                as *const *const Option<varn_types::HeapRef>);
             let dyn_ =
                 *(base.add(lay.dyn_ptr_offset - stack_off) as *const *const varn_types::VmValue);
             assert_eq!(gpr, store.gpr.as_ptr());

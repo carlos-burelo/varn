@@ -11,7 +11,7 @@ pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
         return Some(VmValue::from_i32(val.sso_len() as i32));
     }
     if val.is_heap() {
-        match heap.get(val.as_heap_idx()) {
+        match heap.get(val.as_heap()) {
             Some(HeapObj::Str(s)) => {
                 return Some(VmValue::from_i32(s.char_len() as i32));
             }
@@ -41,7 +41,7 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     // Appending never disturbs shorter views of the same buffer, so this is
     // safe regardless of aliasing; the result is a longer view, O(1) amortized.
     if a.is_heap() {
-        if let Some(HeapObj::Str(hs)) = heap.get(a.as_heap_idx()) {
+        if let Some(HeapObj::Str(hs)) = heap.get(a.as_heap()) {
             if let HeapStr::Ext { buf, len, ascii } = hs {
                 if hs.is_tip() {
                     let buf = Rc::clone(buf);
@@ -121,7 +121,7 @@ pub(crate) fn to_string(val: VmValue, heap: &mut Heap) -> VmValue {
         return VmValue::try_from_sso("null").unwrap();
     }
     if val.is_heap() {
-        if let Some(HeapObj::Str(_)) = heap.get(val.as_heap_idx()) {
+        if let Some(HeapObj::Str(_)) = heap.get(val.as_heap()) {
             return val;
         }
     }

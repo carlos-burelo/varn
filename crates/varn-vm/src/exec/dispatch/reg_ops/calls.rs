@@ -17,7 +17,7 @@ impl ExecCtx {
         // en vía rápida): ocupa staging[0] al preparar.
         let mut pending_receiver: Option<VmValue> = None;
         if callee.is_heap() {
-            let heap_idx = callee.as_heap_idx();
+            let heap_idx = callee.as_heap();
             if let Some(crate::heap::HeapObj::VmClosure(nc)) = self.heap.get(heap_idx) {
                 if !nc.proto.is_generator && !nc.proto.is_async {
                     let arity = nc.proto.arity;
@@ -119,7 +119,7 @@ impl ExecCtx {
                 // `prepare_call` lo re-aplica de forma idempotente.
                 pending_receiver = Some(receiver);
             } else {
-                match self.heap.get(callee.as_heap_idx()) {
+                match self.heap.get(callee.as_heap()) {
                     Some(crate::heap::HeapObj::NativeFn(f, name)) => {
                         let f = *f;
                         let name_str = *name;
@@ -197,7 +197,7 @@ impl ExecCtx {
                                     vec![]
                                 };
                                 let rest_nv =
-                                    VmValue::from_heap_idx(self.heap.alloc(
+                                    VmValue::from_heap(self.heap.alloc(
                                         crate::heap::HeapObj::Array(VmArray::new(rest_items)),
                                     ));
                                 if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv)
@@ -336,7 +336,7 @@ impl ExecCtx {
                     } else {
                         vec![]
                     };
-                    let rest_nv = VmValue::from_heap_idx(
+                    let rest_nv = VmValue::from_heap(
                         self.heap
                             .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
                     );

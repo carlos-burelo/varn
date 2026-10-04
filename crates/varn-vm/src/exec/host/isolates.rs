@@ -119,7 +119,7 @@ impl ExecCtx {
         if !v.is_heap() {
             return None;
         }
-        match self.heap.get_by_idx(v.as_heap_idx()) {
+        match self.heap.get(v.as_heap()) {
             Some(HeapObj::TaskHandle(cell)) => Some(std::rc::Rc::clone(cell)),
             _ => None,
         }
@@ -129,7 +129,7 @@ impl ExecCtx {
         if !v.is_heap() {
             return None;
         }
-        match self.heap.get_by_idx(v.as_heap_idx()) {
+        match self.heap.get(v.as_heap()) {
             Some(HeapObj::Task(lazy)) => {
                 let lazy = std::rc::Rc::clone(lazy);
                 let output = crate::task::TaskCell::pending();
@@ -287,7 +287,7 @@ pub(super) fn spawn_isolate(
             match machine.ctx.call_vm(func_nv, &vm_args) {
                 Ok(res) => {
                     let lazy = if res.is_heap() {
-                        match machine.ctx.heap.get_by_idx(res.as_heap_idx()) {
+                        match machine.ctx.heap.get(res.as_heap()) {
                             Some(HeapObj::Task(lazy)) => Some(std::rc::Rc::clone(lazy)),
                             _ => None,
                         }

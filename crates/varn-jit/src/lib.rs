@@ -52,17 +52,17 @@ pub type JitFn = unsafe extern "C" fn(
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct JitArrayLayout {
-    /// RcBox base → the slot table's `objects` Vec's three words. A heap
-    /// handle is the slot index.
-    pub slots_vec_off: usize,
-    /// RcBox base → the slot table's per-slot generation bytes.
-    pub states_vec_off: usize,
-    /// The generation byte of a young slot.
+    /// Heap blocks are this many bytes, aligned to it: masking an object's
+    /// address with `!(block_bytes - 1)` gives its block.
+    pub block_bytes: usize,
+    /// Block base → its first cell; the cell-state bytes sit before it.
+    pub cells_offset: usize,
+    /// Bytes per cell.
+    pub cell_bytes: usize,
+    /// The state byte of a young cell.
     pub young_state: usize,
-    /// Word offset of the data pointer inside `Vec<Option<HeapObj>>`.
-    pub slots_ptr_off: usize,
-    /// `size_of::<Option<HeapObj>>()` — slot stride.
-    pub slot_size: usize,
+    /// Word offset of the data pointer inside a `Vec`.
+    pub vec_ptr_off: usize,
     /// Discriminant byte value of `HeapObj::Array` (niche-shared by the
     /// `Option` wrapper).
     pub array_tag: usize,

@@ -238,7 +238,7 @@ impl ExecCtx {
         ];
         for name in names {
             if let Some(nv) = self.globals_ref().get_by_name(name) {
-                if let Some(obj) = self.heap.get(nv.as_heap_idx()) {
+                if let Some(obj) = self.heap.get(nv.as_heap()) {
                     match obj {
                         crate::heap::HeapObj::Class(cls) => {
                             let cls = cls.clone();
@@ -248,7 +248,7 @@ impl ExecCtx {
                             let f = *f;
                             if let Ok(class_nv) = (f)(self as &mut dyn NativeCtx, &[]) {
                                 if let Some(crate::heap::HeapObj::Class(cls)) =
-                                    self.heap.get(class_nv.as_heap_idx())
+                                    self.heap.get(class_nv.as_heap())
                                 {
                                     let cls = cls.clone();
                                     self.heap.set_intrinsic_class(name, cls);

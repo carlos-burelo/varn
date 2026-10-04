@@ -104,7 +104,7 @@ impl NativeCtx for Heap {
     }
 
     fn is_array(&self, v: VmValue) -> bool {
-        v.is_heap() && matches!(self.get_by_idx(v.as_heap_idx()), Some(HeapObj::Array(_)))
+        v.is_heap() && matches!(self.get(v.as_heap()), Some(HeapObj::Array(_)))
     }
 
     fn str_repr(&self, v: VmValue) -> String {
@@ -125,7 +125,7 @@ impl NativeCtx for Heap {
             return Some(std::sync::Arc::from(v.sso_as_str(&mut buf)));
         }
         if v.is_heap() {
-            if let Some(HeapObj::Str(s)) = self.get_by_idx(v.as_heap_idx()) {
+            if let Some(HeapObj::Str(s)) = self.get(v.as_heap()) {
                 return Some(s.to_shared());
             }
         }
@@ -138,7 +138,7 @@ impl NativeCtx for Heap {
             return v.sso_as_str(&mut buf).is_ascii();
         }
         if v.is_heap() {
-            if let Some(HeapObj::Str(s)) = self.get_by_idx(v.as_heap_idx()) {
+            if let Some(HeapObj::Str(s)) = self.get(v.as_heap()) {
                 // `HeapStr::is_ascii` memoizes on the string itself (a `Cell`
                 // flag) — this is O(1) amortized, not a fresh scan.
                 return s.is_ascii();
@@ -173,7 +173,7 @@ impl NativeCtx for Heap {
 
     fn is_object(&self, v: VmValue) -> bool {
         if v.is_heap() {
-            matches!(self.get_by_idx(v.as_heap_idx()), Some(HeapObj::Object(_)))
+            matches!(self.get(v.as_heap()), Some(HeapObj::Object(_)))
         } else {
             false
         }
@@ -181,7 +181,7 @@ impl NativeCtx for Heap {
 
     fn object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
+            if let Some(HeapObj::Object(o)) = self.get(obj.as_heap()) {
                 let g = o.borrow();
                 for (k, v) in g.iter() {
                     f(k.as_ref(), v);
@@ -192,7 +192,7 @@ impl NativeCtx for Heap {
 
     fn get_object_shape(&self, obj: VmValue) -> Option<std::rc::Rc<varn_types::Shape>> {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
+            if let Some(HeapObj::Object(o)) = self.get(obj.as_heap()) {
                 return Some(Rc::clone(o.borrow().shape()));
             }
         }
@@ -201,10 +201,10 @@ impl NativeCtx for Heap {
 
     fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue> {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
+            if let Some(HeapObj::Object(o)) = self.get(obj.as_heap()) {
                 return o.borrow().get_field(key);
             }
-            if let Some(HeapObj::Module(m)) = self.get_by_idx(obj.as_heap_idx()) {
+            if let Some(HeapObj::Module(m)) = self.get(obj.as_heap()) {
                 let slot = m.export_map.get(key).copied()?;
                 return m.get_slot(slot);
             }
@@ -214,11 +214,11 @@ impl NativeCtx for Heap {
 
     fn set_field(&mut self, obj: VmValue, key: &str, val: VmValue) {
         if obj.is_heap() {
-            let raw_idx = obj.as_heap_idx();
-            if let Some(HeapObj::Object(o)) = self.get_by_idx(raw_idx) {
+            let raw_idx = obj.as_heap();
+            if let Some(HeapObj::Object(o)) = self.get(raw_idx) {
                 o.set_field(Arc::from(key), val);
                 self.write_barrier(raw_idx, val);
-            } else if let Some(HeapObj::Module(m)) = self.get_by_idx_mut(raw_idx) {
+            } else if let Some(HeapObj::Module(m)) = self.get_mut(raw_idx) {
                 if let Some(s) = m.export_map.get(key).copied() {
                     Rc::make_mut(m).set_slot(s, val);
                 } else {
@@ -317,7 +317,7 @@ impl NativeCtx for Heap {
 
     fn collection_write_barrier(&mut self, parent: VmValue, child: VmValue) {
         if parent.is_heap() {
-            self.deref_mut().write_barrier(parent.as_heap_idx(), child);
+            self.deref_mut().write_barrier(parent.as_heap(), child);
         }
     }
 

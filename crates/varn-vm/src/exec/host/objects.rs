@@ -11,7 +11,7 @@ impl ExecCtx {
     pub(super) fn host_is_object(&self, v: VmValue) -> bool {
         if v.is_heap() {
             matches!(
-                self.heap.get(v.as_heap_idx()),
+                self.heap.get(v.as_heap()),
                 Some(HeapObj::Object(_) | HeapObj::Record(_))
             )
         } else {
@@ -20,8 +20,7 @@ impl ExecCtx {
     }
     pub(super) fn host_object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap_idx())
-            {
+            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap()) {
                 for (k, v) in o.borrow().iter() {
                     f(k.as_ref(), v);
                 }
@@ -30,7 +29,7 @@ impl ExecCtx {
     }
     pub(super) fn host_map_for_each(&self, map: VmValue, f: &mut dyn FnMut(VmValue, VmValue)) {
         if map.is_heap() {
-            if let Some(HeapObj::Map(m)) = self.heap.get(map.as_heap_idx()) {
+            if let Some(HeapObj::Map(m)) = self.heap.get(map.as_heap()) {
                 for (k, v) in m.0.borrow().iter() {
                     f(k.0, *v);
                 }
@@ -42,8 +41,7 @@ impl ExecCtx {
         obj: VmValue,
     ) -> Option<std::rc::Rc<varn_types::Shape>> {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap_idx())
-            {
+            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap()) {
                 return Some(std::rc::Rc::clone(o.borrow().shape()));
             }
         }
@@ -51,19 +49,18 @@ impl ExecCtx {
     }
     pub(super) fn host_get_field(&self, obj: VmValue, key: &str) -> Option<VmValue> {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap_idx())
-            {
+            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap()) {
                 return o.borrow().get_field(key);
             }
 
-            if let Some(HeapObj::Instance(inst)) = self.heap.get(obj.as_heap_idx()) {
+            if let Some(HeapObj::Instance(inst)) = self.heap.get(obj.as_heap()) {
                 let cls = ClassObj::find_by_id(inst.class_id)?;
                 let layout = cls.get_or_compute_layout();
                 let f = layout.get_field(key)?;
                 return inst.read_field(f);
             }
 
-            if let Some(HeapObj::Module(m)) = self.heap.get(obj.as_heap_idx()) {
+            if let Some(HeapObj::Module(m)) = self.heap.get(obj.as_heap()) {
                 let slot = m.export_map.get(key).copied()?;
                 return m.get_slot(slot);
             }
@@ -72,7 +69,7 @@ impl ExecCtx {
     }
     pub(super) fn host_set_field(&mut self, obj: VmValue, key: &str, val: VmValue) {
         if obj.is_heap() {
-            let idx = obj.as_heap_idx();
+            let idx = obj.as_heap();
             if let Some(HeapObj::Object(o)) = self.heap.get(idx) {
                 o.set_field(std::sync::Arc::from(key), val);
                 self.heap.write_barrier(idx, val);
@@ -119,8 +116,7 @@ impl ExecCtx {
     pub(super) fn host_alloc_instance(&mut self, class_name: &str) -> Option<VmValue> {
         let class_obj = self.get_class(class_name)?;
         let instance_nv = self.heap.alloc_object();
-        if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get_mut(instance_nv.as_heap_idx())
-        {
+        if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get_mut(instance_nv.as_heap()) {
             o.set_class(class_obj);
         }
         Some(instance_nv)

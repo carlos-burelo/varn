@@ -34,15 +34,7 @@ pub(crate) fn load_compact(
     let cont = b.create_block();
     b.append_block_param(cont, types::I128);
 
-    let data_base = emit::emit_object_data_base(
-        b,
-        io.exec_ctx,
-        obj,
-        &io.helpers.object_layout,
-        &io.helpers.array_layout,
-        io.helpers.heap_field_offset,
-        slow,
-    );
+    let data_base = emit::emit_object_data_base(b, obj, &io.helpers.object_layout, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let pair = match TypeLayout::of_field(tag).repr {
@@ -97,7 +89,7 @@ pub(crate) fn load_compact(
 }
 
 /// Write boxed `value` into the compact field at `offset` of boxed receiver
-/// `obj`. Only a nursery receiver is written inline: an old-generation one
+/// `obj`. Only a young receiver is written inline: an old one
 /// needs the write barrier the `set_fixed_field` helper carries, and so does
 /// anything that is not a compact instance.
 #[allow(clippy::too_many_arguments)]
@@ -123,25 +115,11 @@ pub(crate) fn store_compact(
     let heap = b.create_block();
     b.ins().brif(heap_ok, heap, &[], slow, &[]);
     b.switch_to_block(heap);
-    let young = emit::is_young(
-        b,
-        io.exec_ctx,
-        obj_payload,
-        &io.helpers.array_layout,
-        io.helpers.heap_field_offset,
-    );
+    let young = emit::is_young(b, obj_payload, &io.helpers.array_layout);
     b.ins().brif(young, inline, &[], slow, &[]);
 
     b.switch_to_block(inline);
-    let data_base = emit::emit_object_data_base(
-        b,
-        io.exec_ctx,
-        obj,
-        &io.helpers.object_layout,
-        &io.helpers.array_layout,
-        io.helpers.heap_field_offset,
-        slow,
-    );
+    let data_base = emit::emit_object_data_base(b, obj, &io.helpers.object_layout, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::new();
     match TypeLayout::of_field(tag).repr {

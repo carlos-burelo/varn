@@ -74,7 +74,7 @@ impl ExecCtx {
         let cache_len = closure.ic_cache_len();
         let obj_is_heap_object = obj.is_heap()
             && matches!(
-                self.heap.get(obj.as_heap_idx()),
+                self.heap.get(obj.as_heap()),
                 Some(
                     crate::heap::HeapObj::Object(_)
                         | crate::heap::HeapObj::Record(_)
@@ -99,7 +99,7 @@ impl ExecCtx {
                     if entry.is_class == ICKind::INSTANCE_FIELD {
                         if obj.is_heap() {
                             if let Some(crate::heap::HeapObj::Instance(inst)) =
-                                self.heap.get(obj.as_heap_idx())
+                                self.heap.get(obj.as_heap())
                             {
                                 if inst.class_id == entry.id {
                                     if let Some(v) = inst.field_at(entry.slot as usize) {
@@ -114,7 +114,7 @@ impl ExecCtx {
                         if obj.is_heap() {
                             if let Some(
                                 crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o),
-                            ) = self.heap.get(obj.as_heap_idx())
+                            ) = self.heap.get(obj.as_heap())
                             {
                                 let guard = o.read();
                                 if guard.shape().id == entry.id {
@@ -179,7 +179,7 @@ impl ExecCtx {
                 if cs_idx < cache_len && !is_megamorphic {
                     let is_str = obj.is_sso()
                         || matches!(
-                            self.heap.get(obj.as_heap_idx()),
+                            self.heap.get(obj.as_heap()),
                             Some(crate::heap::HeapObj::Str(_))
                         );
                     if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
@@ -230,7 +230,7 @@ impl ExecCtx {
 
         if cs_idx < cache_len && !is_megamorphic {
             if obj.is_heap() {
-                match self.heap.get(obj.as_heap_idx()) {
+                match self.heap.get(obj.as_heap()) {
                     Some(crate::heap::HeapObj::Instance(inst)) => {
                         if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
                             let root = cls.root_shape.borrow();

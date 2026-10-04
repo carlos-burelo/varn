@@ -15,7 +15,7 @@ pub(crate) fn get_fixed_field_at(
     heap: &Heap,
 ) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap_idx()) {
+        if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap()) {
             if let Some(v) = inst.read_field_at(offset, tag) {
                 return Ok(v);
             }
@@ -34,9 +34,9 @@ pub(crate) fn set_fixed_field_at(
     heap: &mut Heap,
 ) -> VmResult<()> {
     if obj.is_heap() {
-        if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap_idx()) {
+        if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap()) {
             if inst.write_field_at(offset, tag, val).is_ok() {
-                heap.write_barrier(obj.as_heap_idx(), val);
+                heap.write_barrier(obj.as_heap(), val);
                 return Ok(());
             }
         }
@@ -48,7 +48,7 @@ pub(crate) fn set_fixed_field_at(
 
 pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        let found = match heap.get(obj.as_heap_idx()) {
+        let found = match heap.get(obj.as_heap()) {
             Some(HeapObj::Instance(inst)) => inst.field_at(slot),
             Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.field_at(slot),
             Some(HeapObj::EnumVariant(ev)) => {
@@ -67,7 +67,7 @@ pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmR
         }
     }
     let details = if obj.is_heap() {
-        match heap.get(obj.as_heap_idx()) {
+        match heap.get(obj.as_heap()) {
             Some(HeapObj::Object(o)) => format!(
                 "Object[inline_len={}, slot_count={}, props={:?}]",
                 o.inline_len(),
@@ -94,11 +94,11 @@ pub(crate) fn set_fixed_field(
     heap: &mut Heap,
 ) -> VmResult<()> {
     if obj.is_heap() {
-        let heap_idx = obj.as_heap_idx();
+        let heap_idx = obj.as_heap();
 
         enum Target {
             Instance(InstanceRef),
-            Obj(ObjRef, u32),
+            Obj(ObjRef, varn_types::HeapRef),
             Class(Rc<ClassObj>),
         }
 
@@ -106,7 +106,7 @@ pub(crate) fn set_fixed_field(
             Some(HeapObj::Instance(inst)) => Some(Target::Instance(inst.clone())),
             Some(HeapObj::Object(o)) => Some(Target::Obj(o.clone(), heap_idx)),
             Some(HeapObj::EnumVariant(ev)) => {
-                payload_object(heap, ev.payload).map(|o| Target::Obj(o, ev.payload.as_heap_idx()))
+                payload_object(heap, ev.payload).map(|o| Target::Obj(o, ev.payload.as_heap()))
             }
             Some(HeapObj::Class(cls)) => Some(Target::Class(cls.clone())),
             _ => None,

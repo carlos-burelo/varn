@@ -30,7 +30,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     }
 
     if a.is_sso() && b.is_heap() {
-        if let Some(HeapObj::Str(s)) = heap.get(b.as_heap_idx()) {
+        if let Some(HeapObj::Str(s)) = heap.get(b.as_heap()) {
             if s.byte_len() != a.sso_len() {
                 return false;
             }
@@ -39,7 +39,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         return false;
     }
     if b.is_sso() && a.is_heap() {
-        if let Some(HeapObj::Str(s)) = heap.get(a.as_heap_idx()) {
+        if let Some(HeapObj::Str(s)) = heap.get(a.as_heap()) {
             if s.byte_len() != b.sso_len() {
                 return false;
             }
@@ -48,8 +48,8 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         return false;
     }
     if a.is_heap() && b.is_heap() {
-        let ai = a.as_heap_idx();
-        let bi = b.as_heap_idx();
+        let ai = a.as_heap();
+        let bi = b.as_heap();
         if ai == bi {
             return true;
         }
@@ -103,7 +103,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     }
 
     if a.is_heap() && heap.is_int(b) {
-        match heap.get(a.as_heap_idx()) {
+        match heap.get(a.as_heap()) {
             Some(HeapObj::BigInt(av)) => {
                 let rhs = num_bigint::BigInt::from(heap.as_int(b));
                 return **av == rhs;
@@ -117,7 +117,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         }
     }
     if heap.is_int(a) && b.is_heap() {
-        match heap.get(b.as_heap_idx()) {
+        match heap.get(b.as_heap()) {
             Some(HeapObj::BigInt(bv)) => {
                 let lhs = num_bigint::BigInt::from(heap.as_int(a));
                 return **bv == lhs;
@@ -139,7 +139,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
 fn member_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if a.is_heap() && b.is_heap() {
         if let (Some(HeapObj::Array(x)), Some(HeapObj::Array(y))) =
-            (heap.get(a.as_heap_idx()), heap.get(b.as_heap_idx()))
+            (heap.get(a.as_heap()), heap.get(b.as_heap()))
         {
             return x.len() == y.len()
                 && (0..x.len()).all(|i| {
@@ -172,7 +172,7 @@ fn variant_eq(
 fn payload_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if a.is_heap() && b.is_heap() {
         if let (Some(HeapObj::Object(x)), Some(HeapObj::Object(y))) =
-            (heap.get(a.as_heap_idx()), heap.get(b.as_heap_idx()))
+            (heap.get(a.as_heap()), heap.get(b.as_heap()))
         {
             let keys: Vec<_> = x.keys().collect();
             return keys.len() == y.keys().count()
@@ -204,8 +204,8 @@ pub(crate) fn lt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         return a.as_f64() < (heap.as_int(b) as f64);
     }
     if a.is_heap() && b.is_heap() {
-        let ai = a.as_heap_idx();
-        let bi = b.as_heap_idx();
+        let ai = a.as_heap();
+        let bi = b.as_heap();
         match (heap.get(ai), heap.get(bi)) {
             (Some(HeapObj::BigInt(ba)), Some(HeapObj::BigInt(bb))) => return ba < bb,
             (Some(HeapObj::Decimal(da)), Some(HeapObj::Decimal(db))) => return da < db,
@@ -213,13 +213,13 @@ pub(crate) fn lt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         }
     }
     if a.is_heap() && heap.is_int(b) {
-        if let Some(HeapObj::Decimal(da)) = heap.get(a.as_heap_idx()) {
+        if let Some(HeapObj::Decimal(da)) = heap.get(a.as_heap()) {
             let rhs = bigdecimal::BigDecimal::from(heap.as_int(b));
             return **da < rhs;
         }
     }
     if heap.is_int(a) && b.is_heap() {
-        if let Some(HeapObj::Decimal(db)) = heap.get(b.as_heap_idx()) {
+        if let Some(HeapObj::Decimal(db)) = heap.get(b.as_heap()) {
             let lhs = bigdecimal::BigDecimal::from(heap.as_int(a));
             return lhs < **db;
         }

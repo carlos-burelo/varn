@@ -101,10 +101,8 @@ pub(in crate::clif) fn call_helper_void(
 /// builder is positioned in a fresh block where the payload is valid.
 pub(in crate::clif) fn emit_array_payload(
     b: &mut FunctionBuilder,
-    exec_ctx: cranelift_codegen::ir::Value,
     obj: cranelift_codegen::ir::Value,
     lay: &crate::JitArrayLayout,
-    heap_off: usize,
     slow: cranelift_codegen::ir::Block,
 ) -> cranelift_codegen::ir::Value {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
@@ -119,7 +117,7 @@ pub(in crate::clif) fn emit_array_payload(
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
 
-    let slot = heap_slot_addr(b, exec_ctx, obj_payload, lay, heap_off);
+    let slot = obj_payload;
     let tagb = b.ins().uload8(types::I64, m, slot, 0);
     let is_arr = b.ins().icmp_imm_u(IntCC::Equal, tagb, lay.array_tag as i64);
     let ok = b.create_block();
@@ -205,14 +203,11 @@ pub(in crate::clif) fn guard_overflow(
 }
 
 /// Resolve boxed object `obj` to its inline field base address (`objdata + values_off`),
-/// branching to `invalid` if it is not a valid nursery/old-gen object.
+/// branching to `invalid` if it is not an object or instance.
 pub(in crate::clif) fn emit_object_data_base(
     b: &mut FunctionBuilder,
-    exec_ctx: cranelift_codegen::ir::Value,
     obj: cranelift_codegen::ir::Value,
     olay: &crate::JitObjectLayout,
-    alay: &crate::JitArrayLayout,
-    heap_off: usize,
     invalid: cranelift_codegen::ir::Block,
 ) -> cranelift_codegen::ir::Value {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
@@ -229,8 +224,7 @@ pub(in crate::clif) fn emit_object_data_base(
     b.ins().brif(is_heap, chk, &[], invalid, &[]);
     b.switch_to_block(chk);
 
-    // 2. Heap index + generation select → slot address.
-    let slot_addr = heap_slot_addr(b, exec_ctx, obj_payload, alay, heap_off);
+    let slot_addr = obj_payload;
 
     // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
@@ -259,46 +253,19 @@ pub(in crate::clif) fn emit_object_data_base(
     b.ins().iadd(data_ptr, values_off)
 }
 
-/// Address of the heap slot `payload` (a heap value's payload word) indexes.
-pub(in crate::clif) fn heap_slot_addr(
-    b: &mut FunctionBuilder,
-    exec_ctx: cranelift_codegen::ir::Value,
-    payload: cranelift_codegen::ir::Value,
-    alay: &crate::JitArrayLayout,
-    heap_off: usize,
-) -> cranelift_codegen::ir::Value {
-    let m = cranelift_codegen::ir::MemFlagsData::trusted();
-    let idx = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
-    let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
-    let base = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
-    b.ins().iadd(base, byte_off)
-}
-
-/// Whether the heap object `payload` names is young: a store into it needs no
+/// Whether the heap object at `addr` is young: a store into it needs no
 /// write barrier, so an inline store path may skip the helper that carries it.
 pub(in crate::clif) fn is_young(
     b: &mut FunctionBuilder,
-    exec_ctx: cranelift_codegen::ir::Value,
-    payload: cranelift_codegen::ir::Value,
+    addr: cranelift_codegen::ir::Value,
     alay: &crate::JitArrayLayout,
-    heap_off: usize,
 ) -> cranelift_codegen::ir::Value {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
-    let idx = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
-    let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
-    let states = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.states_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let at = b.ins().iadd(states, idx);
+    let block = b.ins().band_imm_u(addr, !(alay.block_bytes as i64 - 1));
+    let within = b.ins().isub(addr, block);
+    let cells = b.ins().iadd_imm_u(within, -(alay.cells_offset as i64));
+    let index = b.ins().udiv_imm_u(cells, alay.cell_bytes as i64);
+    let at = b.ins().iadd(block, index);
     let state = b.ins().uload8(types::I64, m, at, 0);
     b.ins()
         .icmp_imm_u(IntCC::Equal, state, alay.young_state as i64)

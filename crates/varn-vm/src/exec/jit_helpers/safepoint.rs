@@ -7,8 +7,8 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
 /// Loop back-edge safepoint. Mirrors the interpreter's `OpCode::Loop`
-/// handler: collect the nursery (and pace the major GC) so long call-free
-/// allocating loops don't overflow the nursery into the old generation.
+/// handler: run the minor collection (and pace the major one) so long
+/// call-free allocating loops still collect.
 /// Takes no `VmValue` arguments by design — the caller has flushed every VM
 /// register to the stack, so all roots are visible and get reloaded after.
 /// v2 (§3.5): el colector arma `ctx.poll`; el código hace `test al,al;

@@ -44,7 +44,7 @@ impl ExecCtx {
         if !val.is_heap() {
             return Ok(val);
         }
-        let raw_idx = val.as_heap_idx();
+        let raw_idx = val.as_heap();
         match self.heap.get(raw_idx) {
             Some(crate::heap::HeapObj::Module(_)) => Ok(val),
             Some(crate::heap::HeapObj::Object(obj)) => {
@@ -104,7 +104,7 @@ impl ExecCtx {
 
         if let Some(&cached) = unsafe { &*self.modules.get() }.get(&resolved) {
             if cached.is_heap() {
-                if let Some(HeapObj::FrozenModule(frozen)) = self.heap.get(cached.as_heap_idx()) {
+                if let Some(HeapObj::FrozenModule(frozen)) = self.heap.get(cached.as_heap()) {
                     let frozen = frozen.clone();
                     let thawed = thaw_module(&frozen, &mut self.heap);
                     self.linker.set_done(resolved, thawed);
@@ -250,7 +250,7 @@ pub(crate) fn freeze_module(
     id: ModuleId,
     heap: &crate::heap::HeapInner,
 ) -> Option<Arc<FrozenModuleObj>> {
-    let raw_idx = module_val.as_heap_idx();
+    let raw_idx = module_val.as_heap();
     let m = match heap.get(raw_idx) {
         Some(HeapObj::Module(m)) => m.clone(),
         _ => return None,
@@ -279,7 +279,7 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
         return Some(FrozenExport::Primitive(val));
     }
 
-    match heap.get(val.as_heap_idx()) {
+    match heap.get(val.as_heap()) {
         Some(HeapObj::Str(s)) => Some(FrozenExport::Str(Arc::from(s.as_ref()))),
         Some(HeapObj::NativeFn(f, name)) => Some(FrozenExport::NativeFn(*f, name)),
         Some(HeapObj::Class(_)) => None, // Cannot freeze Class safely across VM instances
@@ -318,10 +318,10 @@ fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmVa
         FrozenExport::Primitive(v) => *v,
         FrozenExport::Str(s) => heap.alloc_str(s),
         FrozenExport::NativeFn(f, name) => heap.alloc_native_fn(*f, name),
-        FrozenExport::Class(cls) => VmValue::from_heap_idx(heap.alloc(HeapObj::Class(cls.clone()))),
+        FrozenExport::Class(cls) => VmValue::from_heap(heap.alloc(HeapObj::Class(cls.clone()))),
         FrozenExport::Nested(nested) => {
             let obj_val = heap.alloc_object();
-            let raw_idx = obj_val.as_heap_idx();
+            let raw_idx = obj_val.as_heap();
 
             let fields: Vec<(Arc<str>, FrozenExport)> = nested
                 .export_map
@@ -330,7 +330,7 @@ fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmVa
                 .collect();
             for (key, child_export) in fields {
                 let child_nv = thaw_export(&child_export, heap);
-                if let Some(HeapObj::Object(o)) = heap.get_by_idx_mut(raw_idx) {
+                if let Some(HeapObj::Object(o)) = heap.get_mut(raw_idx) {
                     o.set_field(std::sync::Arc::from(key.as_ref()), child_nv);
                 }
             }

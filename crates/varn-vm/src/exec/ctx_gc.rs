@@ -3,6 +3,7 @@
 
 use super::ctx::ExecCtx;
 use super::VmSuspend;
+use varn_types::HeapRef;
 
 impl ExecCtx {
     /// Loop back-edge GC safepoint shared by the interpreter and the JIT.
@@ -33,13 +34,13 @@ impl ExecCtx {
         self.heap.collect(&roots)
     }
 
-    /// Every heap index this context and every context sharing its heap
+    /// Every heap reference this context and every context sharing its heap
     /// hold: queued forks, frozen tasks, task cells and the global tables.
-    pub(crate) fn gc_roots(&self) -> Vec<u32> {
-        let mut roots: Vec<u32> = Vec::with_capacity(256);
-        let value = |roots: &mut Vec<u32>, v: crate::value::VmValue| {
+    pub(crate) fn gc_roots(&self) -> Vec<HeapRef> {
+        let mut roots: Vec<HeapRef> = Vec::with_capacity(256);
+        let value = |roots: &mut Vec<HeapRef>, v: crate::value::VmValue| {
             if v.is_heap() {
-                roots.push(v.as_heap_idx());
+                roots.push(v.as_heap());
             }
         };
         let scope = super::scheduler::gc_scope(self);
@@ -59,11 +60,7 @@ impl ExecCtx {
             }
             for sf in st.frames() {
                 sf.dyn_.iter().for_each(|&v| value(&mut roots, v));
-                for &h in &sf.refs {
-                    if h != crate::frame_store::REF_UNINIT {
-                        roots.push(h);
-                    }
-                }
+                roots.extend(sf.refs.iter().flatten());
             }
         }
         self.local_roots(&mut roots);
@@ -88,10 +85,10 @@ impl ExecCtx {
         roots
     }
 
-    fn local_roots(&self, roots: &mut Vec<u32>) {
+    fn local_roots(&self, roots: &mut Vec<HeapRef>) {
         let mut value = |v: crate::value::VmValue| {
             if v.is_heap() {
-                roots.push(v.as_heap_idx());
+                roots.push(v.as_heap());
             }
         };
         self.stage.iter().for_each(|&v| value(v));

@@ -50,15 +50,14 @@ impl ExecCtx {
         if !receiver.is_heap() {
             return None;
         }
-        let crate::heap::HeapObj::Class(cls) = self.heap.get(receiver.as_heap_idx())? else {
+        let crate::heap::HeapObj::Class(cls) = self.heap.get(receiver.as_heap())? else {
             return None;
         };
         let template = cls.statics.borrow().get(name).copied()?;
         if !template.is_heap() {
             return None;
         }
-        let Some(crate::heap::HeapObj::EnumVariant(t)) = self.heap.get(template.as_heap_idx())
-        else {
+        let Some(crate::heap::HeapObj::EnumVariant(t)) = self.heap.get(template.as_heap()) else {
             return None;
         };
         Some(EnumVariantTemplate {
@@ -91,7 +90,7 @@ impl ExecCtx {
                     (field_name.clone(), nv)
                 }),
             );
-            VmValue::from_heap_idx(self.heap.alloc(crate::heap::HeapObj::Object(obj)))
+            VmValue::from_heap(self.heap.alloc(crate::heap::HeapObj::Object(obj)))
         } else if arg_count == 1 {
             args.get(&self.stack, 0)
         } else if arg_count > 1 {
@@ -109,18 +108,14 @@ impl ExecCtx {
             fields: template.fields.clone(),
             payload,
         };
-        Some(VmValue::from_heap_idx(
+        Some(VmValue::from_heap(
             self.heap
                 .alloc(crate::heap::HeapObj::EnumVariant(Box::new(data))),
         ))
     }
 
     pub(in crate::exec::dispatch) fn exec_get_enum_tag(&mut self, v: VmValue) -> VmResult<VmValue> {
-        match v
-            .is_heap()
-            .then(|| self.heap.get(v.as_heap_idx()))
-            .flatten()
-        {
+        match v.is_heap().then(|| self.heap.get(v.as_heap())).flatten() {
             Some(crate::heap::HeapObj::EnumVariant(ev)) => {
                 Ok(VmValue::from_i32(ev.variant_tag as i32))
             }

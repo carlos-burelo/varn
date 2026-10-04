@@ -34,7 +34,7 @@ impl NativeCtx for ExecCtx {
 
     fn collection_write_barrier(&mut self, parent: VmValue, child: VmValue) {
         if parent.is_heap() {
-            self.heap.write_barrier(parent.as_heap_idx(), child);
+            self.heap.write_barrier(parent.as_heap(), child);
         }
     }
 
@@ -63,14 +63,13 @@ impl NativeCtx for ExecCtx {
     }
 
     fn is_string(&self, v: VmValue) -> bool {
-        v.is_sso()
-            || (v.is_heap() && matches!(self.heap.get(v.as_heap_idx()), Some(HeapObj::Str(_))))
+        v.is_sso() || (v.is_heap() && matches!(self.heap.get(v.as_heap()), Some(HeapObj::Str(_))))
     }
 
     fn is_array(&self, v: VmValue) -> bool {
         v.is_heap()
             && matches!(
-                self.heap.get(v.as_heap_idx()),
+                self.heap.get(v.as_heap()),
                 Some(HeapObj::Array(_) | HeapObj::Tuple(_))
             )
     }

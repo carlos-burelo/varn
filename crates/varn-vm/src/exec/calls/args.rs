@@ -14,7 +14,7 @@ pub(crate) fn bundle_rest_args(
             let start = staging.len() - num_to_bundle;
             let items: Vec<VmValue> = staging.drain(start..).collect();
             let va = VmArray::new(items);
-            let nv = VmValue::from_heap_idx(heap.alloc(crate::heap::HeapObj::Array(va)));
+            let nv = VmValue::from_heap(heap.alloc(crate::heap::HeapObj::Array(va)));
             staging.push(nv);
             *arg_count = rest_idx + 1;
         } else {
@@ -22,7 +22,7 @@ pub(crate) fn bundle_rest_args(
                 staging.push(VmValue::null());
             }
             let aref = VmArray::new(vec![]);
-            let nv = VmValue::from_heap_idx(heap.alloc(crate::heap::HeapObj::Array(aref)));
+            let nv = VmValue::from_heap(heap.alloc(crate::heap::HeapObj::Array(aref)));
             staging.push(nv);
             *arg_count = rest_idx + 1;
         }
@@ -40,11 +40,11 @@ pub(crate) fn expand_spread_args(
     out: &mut Vec<VmValue>,
 ) {
     for nv in args {
-        let inner = match heap.get_heap_idx(nv).and_then(|i| heap.get(i)) {
+        let inner = match heap.heap_ref(nv).and_then(|i| heap.get(i)) {
             Some(HeapObj::Spread(inner)) => *inner,
             _ => nv,
         };
-        match heap.get_heap_idx(inner).and_then(|i| heap.get(i)) {
+        match heap.heap_ref(inner).and_then(|i| heap.get(i)) {
             Some(HeapObj::Array(arr) | HeapObj::Tuple(arr)) => {
                 out.extend((0..arr.len()).filter_map(|i| arr.get_vm(i)));
             }

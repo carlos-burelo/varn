@@ -121,7 +121,7 @@ impl ExecCtx {
         let method_nv = crate::exec::props::get_property(this_val, &name, &mut self.heap)?;
 
         if method_nv.is_heap() {
-            if let Some(HeapObj::BoundMethod(bm)) = self.heap.get(method_nv.as_heap_idx()) {
+            if let Some(HeapObj::BoundMethod(bm)) = self.heap.get(method_nv.as_heap()) {
                 match &bm.target {
                     BoundMethodTarget::Native { func, .. } => {
                         let f = *func;

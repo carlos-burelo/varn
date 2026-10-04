@@ -39,5 +39,5 @@ pub use value::{
     OBJ_VALUES_OFF, SHAPE_ID_OFF,
 };
 pub use value::{InstanceData, InstanceRef};
-pub use vm_value::{ArrayRepr, BoxedElems, VmArray, VmValue};
+pub use vm_value::{ArrayRepr, BoxedElems, HeapRef, VmArray, VmValue};
 pub use wake::{WakeQueue, WakeToken};

@@ -51,7 +51,7 @@ pub(crate) fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
 
 fn extract_error_message(val: VmValue, heap: &Heap) -> String {
     if val.is_heap() {
-        if let Some(HeapObj::Instance(inst)) = heap.get(val.as_heap_idx()) {
+        if let Some(HeapObj::Instance(inst)) = heap.get(val.as_heap()) {
             if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
                 let layout = cls.get_or_compute_layout();
                 let message = layout
@@ -65,7 +65,7 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
                 };
             }
         }
-        if let Some(HeapObj::Object(obj_ref)) = heap.get(val.as_heap_idx()) {
+        if let Some(HeapObj::Object(obj_ref)) = heap.get(val.as_heap()) {
             let obj = obj_ref.borrow();
 
             if let Some(msg_nv) = obj.get_field("message") {
@@ -127,7 +127,7 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
     oref.set_field(std::sync::Arc::from("message"), msg);
     let name = heap.alloc_str_dynamic(class_name);
     oref.set_field(std::sync::Arc::from("name"), name);
-    VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
+    VmValue::from_heap(heap.alloc(HeapObj::Object(oref)))
 }
 
 /// Busca un handler para `thrown_val` y, si lo encuentra, deja el contexto

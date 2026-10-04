@@ -177,10 +177,10 @@ impl VmValue {
     }
 
     #[inline(always)]
-    pub fn from_heap_idx(idx: u32) -> Self {
+    pub fn from_heap(r: HeapRef) -> Self {
         Self {
             tag: KIND_HEAP,
-            payload: idx as u64,
+            payload: r.addr(),
         }
     }
 
@@ -290,9 +290,11 @@ impl VmValue {
         self.payload != 0
     }
 
+    /// The reference of a heap value. Only meaningful when `is_heap()`.
     #[inline(always)]
-    pub fn as_heap_idx(self) -> u32 {
-        self.payload as u32
+    pub fn as_heap(self) -> HeapRef {
+        debug_assert!(self.is_heap() && self.payload != 0);
+        unsafe { HeapRef::from_addr_unchecked(self.payload) }
     }
 
     #[inline(always)]
@@ -349,9 +351,11 @@ impl VmValue {
 }
 
 mod array;
+mod heap_ref;
 mod traits;
 mod vm_array;
 mod vm_array_access;
 
 pub use array::{ArrayRepr, BoxedElems};
+pub use heap_ref::HeapRef;
 pub use vm_array::VmArray;

@@ -115,15 +115,11 @@ impl Heap {
         );
 
         varn_jit::JitArrayLayout {
-            slots_vec_off: RCBOX_PREFIX
-                + std::mem::offset_of!(HeapInner, slots)
-                + super::slots::SlotTable::objects_vec_byte_offset(),
-            states_vec_off: RCBOX_PREFIX
-                + std::mem::offset_of!(HeapInner, slots)
-                + super::slots::SlotTable::states_vec_byte_offset(),
-            young_state: super::slots::SlotState::Young as usize,
-            slots_ptr_off,
-            slot_size: size,
+            block_bytes: super::cells::BLOCK_BYTES,
+            cells_offset: super::cells::CELLS_OFFSET,
+            cell_bytes: super::cells::CELL_BYTES,
+            young_state: super::cells::SlotState::Young as usize,
+            vec_ptr_off: slots_ptr_off,
             array_tag,
             str_tag,
             payload_off,

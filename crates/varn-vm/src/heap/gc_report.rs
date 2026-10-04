@@ -2,8 +2,8 @@
 //! split from `crate::gc_report` (the plain-data shape) because this is the
 //! one file that needs `pub(super)` access to the heap's private tables.
 
+use super::cells::SlotState;
 use super::obj::HeapObj;
-use super::slots::SlotState;
 use super::structs::Heap;
 use crate::gc_report::{GcReport, HistogramRow, InternerSizes, OldGenReport, YoungReport};
 use rustc_hash::FxHashMap;
@@ -22,13 +22,13 @@ impl Heap {
         };
 
         let old_gen_report = OldGenReport {
-            slots_total: inner.slots.len() as usize,
-            slots_live: inner.slots.live_count(),
-            free_list: inner.slots.free_len(),
-            alloc_count: inner.slots.births,
+            slots_total: inner.cells.capacity(),
+            slots_live: inner.cells.live_count(),
+            free_list: inner.cells.free_len(),
+            alloc_count: inner.cells.births,
             gc_collections: inner.gc_collections,
             gc_total_freed: inner.gc_total_freed,
-            gc_alloc_since_collect: inner.slots.old_growth,
+            gc_alloc_since_collect: inner.cells.old_growth,
             gc_threshold: inner.gc_threshold,
         };
 
@@ -41,11 +41,12 @@ impl Heap {
         };
 
         let mut counts: FxHashMap<&'static str, (usize, usize)> = FxHashMap::default();
-        for (_, obj, state) in inner.slots.iter() {
+        for (_, obj, state) in inner.cells.iter() {
             let row = counts.entry(type_name(obj)).or_default();
             match state {
                 SlotState::Young | SlotState::Marked => row.0 += 1,
                 SlotState::Old | SlotState::Remembered => row.1 += 1,
+                SlotState::Free => {}
             }
         }
         let mut histogram: Vec<HistogramRow> = counts

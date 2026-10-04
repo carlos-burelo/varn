@@ -175,7 +175,7 @@ impl ExecCtx {
                     receiver: obj_nv,
                     target,
                 };
-                let bound_nv = VmValue::from_heap_idx(
+                let bound_nv = VmValue::from_heap(
                     self.heap
                         .alloc(crate::heap::HeapObj::BoundMethod(Box::new(bound))),
                 );

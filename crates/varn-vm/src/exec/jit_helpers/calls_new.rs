@@ -57,7 +57,7 @@ pub(crate) extern "C" fn jit_new_window(
             .stage
             .extend_from_slice(std::slice::from_raw_parts(window, argc));
         if callee.is_heap() {
-            if let Some(crate::heap::HeapObj::Class(cls)) = ctx_ref.heap.get(callee.as_heap_idx()) {
+            if let Some(crate::heap::HeapObj::Class(cls)) = ctx_ref.heap.get(callee.as_heap()) {
                 let cls = cls.clone();
                 match try_trivial_construct(ctx_ref, &cls, argc) {
                     Ok(Some(instance)) => {
@@ -126,7 +126,7 @@ fn try_trivial_construct(
     let Some(plan) = plan else {
         // No constructor: the interpreter ignores the arguments.
         let inst = varn_types::value::InstanceRef::alloc(cls.clone());
-        return Ok(Some(VmValue::from_heap_idx(
+        return Ok(Some(VmValue::from_heap(
             ctx.heap.alloc(crate::heap::HeapObj::Instance(inst)),
         )));
     };
@@ -136,14 +136,14 @@ fn try_trivial_construct(
     }
     let inst = varn_types::value::InstanceRef::alloc(cls.clone());
     let instance_nv =
-        VmValue::from_heap_idx(ctx.heap.alloc(crate::heap::HeapObj::Instance(inst.clone())));
+        VmValue::from_heap(ctx.heap.alloc(crate::heap::HeapObj::Instance(inst.clone())));
     for (param_idx, offset, tag) in plan.iter() {
         let Some(&arg) = ctx.stage.get(1 + *param_idx) else {
             return Ok(None);
         };
         inst.write_field_at(*offset, *tag, arg)
             .map_err(crate::error::RuntimeError::new)?;
-        ctx.heap.write_barrier(instance_nv.as_heap_idx(), arg);
+        ctx.heap.write_barrier(instance_nv.as_heap(), arg);
     }
     Ok(Some(instance_nv))
 }
@@ -166,7 +166,7 @@ pub(crate) extern "C" fn jit_new_begin(
         if !callee.is_heap() {
             return 0;
         }
-        let Some(crate::heap::HeapObj::Class(cls)) = ctx_ref.heap.get(callee.as_heap_idx()) else {
+        let Some(crate::heap::HeapObj::Class(cls)) = ctx_ref.heap.get(callee.as_heap()) else {
             return 0;
         };
         let cls = cls.clone();
@@ -181,8 +181,7 @@ pub(crate) extern "C" fn jit_new_begin(
             return 0;
         }
         let inst = varn_types::value::InstanceRef::alloc(cls);
-        let instance =
-            VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)));
+        let instance = VmValue::from_heap(ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)));
         out.write(instance);
         out.add(1).write(ctor);
         1

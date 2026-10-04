@@ -38,14 +38,11 @@ impl InstanceData {
     /// Allocates an instance of `class`: scalars zero, references `null`.
     pub fn alloc(class: Rc<ClassObj>) -> Rc<InstanceData> {
         let layout = class.get_or_compute_layout();
-        let inst = Self::alloc_with_layout(class.id, layout.payload_size);
-        inst.null_references(&layout);
-        inst
+        Self::alloc_with_layout(class.id, layout.payload_size)
     }
 
-    /// Allocates a zero-filled payload. A zero `Ref` slot is heap index 0,
-    /// not `null`: the caller writes the `null` niche into every `Ref` slot
-    /// it does not initialise (the JIT's inline `new` bakes those stores).
+    /// Allocates a zero-filled payload: every `Ref` slot starts `null`, since
+    /// no object lives at address 0.
     #[inline]
     pub fn alloc_with_layout(class_id: u32, payload_size: u32) -> Rc<InstanceData> {
         let payload_bytes = payload_size as usize;
@@ -192,7 +189,7 @@ impl InstanceData {
                     if raw == COMPACT_REF_NULL {
                         VmValue::null()
                     } else {
-                        VmValue::from_heap_idx(raw as u32)
+                        VmValue::from_heap(crate::HeapRef::from_addr_unchecked(raw))
                     }
                 }
                 ScalarRepr::Boxed => self.read_vm_value(offset),
@@ -257,7 +254,7 @@ impl InstanceData {
                     if val.is_null() {
                         self.write_u64(offset, COMPACT_REF_NULL);
                     } else if val.is_heap() {
-                        self.write_u64(offset, val.as_heap_idx() as u64);
+                        self.write_u64(offset, val.as_heap().addr());
                     } else {
                         return Err("cannot store non-reference in a reference field");
                     }
@@ -268,19 +265,10 @@ impl InstanceData {
         Ok(())
     }
 
-    /// Writes the `null` niche into every `Ref` slot of `layout`.
-    fn null_references(&self, layout: &ClassLayout) {
-        for slot in &layout.gc.slots {
-            if slot.repr == ScalarRepr::Ref {
-                unsafe { self.write_u64(slot.offset as usize, COMPACT_REF_NULL) };
-            }
-        }
-    }
-
     // ── Collector access (spec §48) ─────────────────────────────────────
 
     /// Visits the references this instance holds: the slots of its
-    /// `GcLayout`, nothing else. A `Ref` slot is read as a heap index and its
+    /// `GcLayout`, nothing else. A `Ref` slot is read as an object address and its
     /// `null` niche is skipped; a `Boxed` slot is a whole `VmValue` that may
     /// or may not be a reference, which the visitor decides.
     pub fn for_each_reference(&self, mut f: impl FnMut(VmValue)) {
@@ -301,7 +289,7 @@ impl InstanceData {
             match repr {
                 ScalarRepr::Ref => {
                     let raw = self.read_u64(offset);
-                    (raw != COMPACT_REF_NULL).then(|| VmValue::from_heap_idx(raw as u32))
+                    crate::HeapRef::from_addr(raw).map(VmValue::from_heap)
                 }
                 ScalarRepr::Boxed => Some(self.read_vm_value(offset)),
                 ScalarRepr::Bool | ScalarRepr::I64 | ScalarRepr::F64 => {

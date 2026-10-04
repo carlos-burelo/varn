@@ -18,7 +18,7 @@ pub(crate) fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValu
     if !obj.is_heap() {
         return get_class(obj, heap)?.find_getter(key);
     }
-    match heap.get(obj.as_heap_idx()) {
+    match heap.get(obj.as_heap()) {
         Some(HeapObj::Object(o)) => o.borrow().class()?.find_getter(key),
         Some(HeapObj::Class(cls)) => cls.find_static_getter(key),
         _ => get_class(obj, heap)?.find_getter(key),
@@ -29,7 +29,7 @@ pub(crate) fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValu
     if !obj.is_heap() {
         return get_class(obj, heap)?.find_setter(key);
     }
-    match heap.get(obj.as_heap_idx()) {
+    match heap.get(obj.as_heap()) {
         Some(HeapObj::Object(o)) => o.borrow().class()?.find_setter(key),
         Some(HeapObj::Class(cls)) => cls.find_static_setter(key),
         _ => get_class(obj, heap)?.find_setter(key),
@@ -40,7 +40,7 @@ pub(crate) fn payload_object(heap: &Heap, payload: VmValue) -> Option<ObjRef> {
     if !payload.is_heap() {
         return None;
     }
-    match heap.get(payload.as_heap_idx()) {
+    match heap.get(payload.as_heap()) {
         Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(o.clone()),
         _ => None,
     }
@@ -48,7 +48,7 @@ pub(crate) fn payload_object(heap: &Heap, payload: VmValue) -> Option<ObjRef> {
 
 pub(crate) fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(HeapObj::Module(m)) = heap.get(obj.as_heap_idx()) {
+        if let Some(HeapObj::Module(m)) = heap.get(obj.as_heap()) {
             return Ok(m
                 .export_map
                 .get(key)
@@ -89,12 +89,12 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
         )));
     }
     if matches!(
-        heap.get(obj.as_heap_idx()),
+        heap.get(obj.as_heap()),
         Some(HeapObj::Module(_)) | Some(HeapObj::FrozenModule(_))
     ) {
         return Ok(());
     }
-    let idx = obj.as_heap_idx();
+    let idx = obj.as_heap();
     match heap.get(idx).cloned() {
         Some(HeapObj::Instance(inst)) => {
             let cls = ClassObj::find_by_id(inst.class_id);
@@ -120,7 +120,7 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
         Some(HeapObj::EnumVariant(ev)) => {
             if let Some(o) = payload_object(heap, ev.payload) {
                 o.set_field_str(key, val);
-                heap.write_barrier(ev.payload.as_heap_idx(), val);
+                heap.write_barrier(ev.payload.as_heap(), val);
             }
             Ok(())
         }
@@ -139,7 +139,7 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
     if !obj.is_heap() {
         return None;
     }
-    match heap.get(obj.as_heap_idx()).cloned() {
+    match heap.get(obj.as_heap()).cloned() {
         Some(HeapObj::Instance(inst)) => {
             let cls = ClassObj::find_by_id(inst.class_id)?;
             let layout = cls.get_or_compute_layout();
@@ -176,7 +176,7 @@ fn class_for_property(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     if !val.is_heap() {
         return None;
     }
-    let kind = match heap.get(val.as_heap_idx())? {
+    let kind = match heap.get(val.as_heap())? {
         HeapObj::Symbol(_) => varn_core::RuntimeKind::Symbol,
         HeapObj::BigInt(_) => varn_core::RuntimeKind::BigInt,
         HeapObj::Decimal(_) => varn_core::RuntimeKind::Decimal,
@@ -188,7 +188,7 @@ fn class_for_property(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
 
 fn resolve_intrinsic_method_property(obj: VmValue, key: &str, heap: &mut Heap) -> Option<VmValue> {
     if obj.is_heap() {
-        match heap.get(obj.as_heap_idx()) {
+        match heap.get(obj.as_heap()) {
             Some(HeapObj::Generator(_)) if key == MemberKey::IterNext.as_str() => {
                 return Some(heap.alloc_bound_native(
                     obj,
@@ -224,7 +224,7 @@ fn resolve_specialized_property(
     if !obj.is_heap() {
         return None;
     }
-    match heap.get(obj.as_heap_idx()).cloned() {
+    match heap.get(obj.as_heap()).cloned() {
         Some(HeapObj::Class(cls)) => cls.get_static(key).or_else(|| cls.find_method(key)).map(Ok),
         Some(HeapObj::Array(arr)) => {
             if key == MemberKey::Length.as_str() {
@@ -307,7 +307,7 @@ fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::Nati
 pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     if val.is_heap() {
         let intrinsic = |kind: varn_core::RuntimeKind| heap.get_intrinsic_class(kind.name());
-        return match heap.get(val.as_heap_idx()) {
+        return match heap.get(val.as_heap()) {
             Some(HeapObj::Instance(inst)) => ClassObj::find_by_id(inst.class_id),
             Some(HeapObj::Object(o) | HeapObj::Record(o)) => o.borrow().class(),
             Some(HeapObj::Class(cls)) => Some(cls.clone()),
@@ -347,7 +347,7 @@ pub(crate) fn bind_method_to_receiver(
     if !method.is_heap() {
         return method;
     }
-    match heap.get(method.as_heap_idx()) {
+    match heap.get(method.as_heap()) {
         Some(HeapObj::VmClosure(_)) => heap.alloc_bound_vm(receiver, method, owner),
         Some(HeapObj::NativeFn(f, name)) => {
             let (f, name) = (*f, *name);

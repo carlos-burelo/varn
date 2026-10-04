@@ -2,10 +2,10 @@ use super::*;
 
 pub(crate) fn array_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     if val.is_heap() {
-        if let Some(HeapObj::Array(a)) = heap.get(val.as_heap_idx()) {
+        if let Some(HeapObj::Array(a)) = heap.get(val.as_heap()) {
             return Ok(VmValue::from_i32(a.len() as i32));
         }
-        if let Some(HeapObj::Str(s)) = heap.get(val.as_heap_idx()) {
+        if let Some(HeapObj::Str(s)) = heap.get(val.as_heap()) {
             return Ok(VmValue::from_i32(s.chars().count() as i32));
         }
     }
@@ -14,7 +14,7 @@ pub(crate) fn array_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
 
 pub(crate) fn bytes_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     if val.is_heap() {
-        if let Some(HeapObj::Buffer(b)) = heap.get(val.as_heap_idx()) {
+        if let Some(HeapObj::Buffer(b)) = heap.get(val.as_heap()) {
             return Ok(VmValue::from_i32(b.len() as i32));
         }
     }
@@ -23,9 +23,9 @@ pub(crate) fn bytes_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
 
 pub(crate) fn array_push(arr: VmValue, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if arr.is_heap() {
-        if let Some(HeapObj::Array(a)) = heap.get(arr.as_heap_idx()) {
+        if let Some(HeapObj::Array(a)) = heap.get(arr.as_heap()) {
             a.push_vm(val);
-            heap.write_barrier(arr.as_heap_idx(), val);
+            heap.write_barrier(arr.as_heap(), val);
             return Ok(());
         }
     }
@@ -34,7 +34,7 @@ pub(crate) fn array_push(arr: VmValue, val: VmValue, heap: &mut Heap) -> VmResul
 
 pub(crate) fn array_pop(arr: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if arr.is_heap() {
-        if let Some(HeapObj::Array(a)) = heap.get(arr.as_heap_idx()) {
+        if let Some(HeapObj::Array(a)) = heap.get(arr.as_heap()) {
             let v = a.pop_vm().unwrap_or(VmValue::null());
             return Ok(v);
         }
@@ -45,7 +45,7 @@ pub(crate) fn array_pop(arr: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 pub(crate) fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<()> {
     if dst.is_heap() && src.is_heap() {
         if let (Some(HeapObj::Array(da)), Some(HeapObj::Array(sa))) =
-            (heap.get(dst.as_heap_idx()), heap.get(src.as_heap_idx()))
+            (heap.get(dst.as_heap()), heap.get(src.as_heap()))
         {
             // Snapshot source elements first (a copy, so dst == src is safe),
             // then append boxed into the destination.
@@ -59,7 +59,7 @@ pub(crate) fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<
             }
             let heap_mut = unsafe { heap.inner_mut() };
             for &item in &items {
-                heap_mut.write_barrier(dst.as_heap_idx(), item);
+                heap_mut.write_barrier(dst.as_heap(), item);
             }
             return Ok(());
         }

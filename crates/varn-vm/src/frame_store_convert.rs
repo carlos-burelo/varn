@@ -1,4 +1,4 @@
-use super::frame_store::{FrameStore, REF_UNINIT};
+use super::frame_store::FrameStore;
 use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
 use varn_types::register_meta::SlotClass;
@@ -82,14 +82,7 @@ impl FrameStore {
         match class {
             SlotClass::Gpr => VmValue::from_int(self.gpr[i]),
             SlotClass::Fpr => VmValue::from_f64(self.fpr[i]),
-            SlotClass::Ref => {
-                let h = self.refs[i];
-                if h == REF_UNINIT {
-                    VmValue::null()
-                } else {
-                    VmValue::from_heap_idx(h)
-                }
-            }
+            SlotClass::Ref => self.refs[i].map_or(VmValue::null(), VmValue::from_heap),
             SlotClass::Dyn => self.dyn_[i],
         }
     }
@@ -130,13 +123,13 @@ impl FrameStore {
                 }
             }
             SlotClass::Ref => {
-                // Simétrico con `box_slot`: `null` es `REF_UNINIT`, no un
+                // Simétrico con `box_slot`: `null` es `None`, no un
                 // error — un retorno `void` o una referencia nula son el
                 // valor, no basura a rechazar.
                 if v.is_null() {
-                    self.refs[i] = REF_UNINIT;
+                    self.refs[i] = None;
                 } else if v.is_heap() {
-                    self.refs[i] = v.as_heap_idx();
+                    self.refs[i] = Some(v.as_heap());
                 } else {
                     return Err(RuntimeError::new(format!(
                         "type mismatch: cannot store '{}' in a reference register",
@@ -177,13 +170,7 @@ impl FrameStore {
             match class {
                 SlotClass::Gpr => self.gpr[i] = if v.is_int() { v.as_int() } else { 0 },
                 SlotClass::Fpr => self.fpr[i] = if v.is_f64() { v.as_f64() } else { 0.0 },
-                SlotClass::Ref => {
-                    self.refs[i] = if v.is_heap() {
-                        v.as_heap_idx()
-                    } else {
-                        REF_UNINIT
-                    }
-                }
+                SlotClass::Ref => self.refs[i] = v.is_heap().then(|| v.as_heap()),
                 SlotClass::Dyn => self.dyn_[i] = v,
             }
         }

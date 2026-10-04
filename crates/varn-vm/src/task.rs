@@ -301,7 +301,7 @@ pub(crate) fn gather_one(
         Ok(value) => {
             let results = parent.value.get();
             if results.is_heap() {
-                let idx = results.as_heap_idx();
+                let idx = results.as_heap();
                 let array = match heap.get(idx) {
                     Some(HeapObj::Array(a)) => Some(a.clone()),
                     _ => None,
@@ -348,11 +348,11 @@ pub(crate) fn new_lazy(
         current_class,
     });
     track_lazy(heap, &lazy);
-    VmValue::from_heap_idx(heap.alloc(HeapObj::Task(lazy)))
+    VmValue::from_heap(heap.alloc(HeapObj::Task(lazy)))
 }
 
 pub(crate) fn alloc_handle(heap: &mut HeapInner, cell: Rc<TaskCell>) -> VmValue {
-    VmValue::from_heap_idx(heap.alloc(HeapObj::TaskHandle(cell)))
+    VmValue::from_heap(heap.alloc(HeapObj::TaskHandle(cell)))
 }
 
 pub(crate) fn outcome_of_cell(cell: &TaskCell) -> Outcome {

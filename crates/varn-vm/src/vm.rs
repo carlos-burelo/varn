@@ -73,7 +73,7 @@ impl Vm {
         self.ctx.heap.hotspot = Some(counters);
     }
 
-    /// Snapshot of nursery/old-gen counters, interner sizes, and a live-object
+    /// Snapshot of young/old-gen counters, interner sizes, and a live-object
     /// histogram — `vn debug -p gc`'s data. Read-only; taking it costs one
     /// pass over both generations to build the histogram, so it's meant for
     /// end-of-run reporting, not a per-iteration check.

@@ -6,6 +6,7 @@ use super::obj::HeapObj;
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
+use varn_types::HeapRef;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Reach {
@@ -15,13 +16,13 @@ pub(crate) enum Reach {
 
 pub(crate) fn for_each_child(
     obj: &HeapObj,
-    identity: &FxHashMap<usize, u32>,
+    identity: &FxHashMap<usize, HeapRef>,
     reach: Reach,
-    f: &mut impl FnMut(u32),
+    f: &mut impl FnMut(HeapRef),
 ) {
     let mut value = |v: VmValue| {
         if v.is_heap() {
-            f(v.as_heap_idx());
+            f(v.as_heap());
         }
     };
     match obj {
@@ -91,7 +92,7 @@ pub(crate) fn for_each_child(
             gen.0.trace_vm_values(&mut value);
             gen.0.trace_closures(&mut |ptr| {
                 if let Some(&idx) = identity.get(&ptr) {
-                    value(VmValue::from_heap_idx(idx));
+                    value(VmValue::from_heap(idx));
                 }
             });
         }
@@ -100,10 +101,10 @@ pub(crate) fn for_each_child(
 
 fn class_child(
     cls: &Rc<varn_types::ClassObj>,
-    identity: &FxHashMap<usize, u32>,
+    identity: &FxHashMap<usize, HeapRef>,
     value: &mut impl FnMut(VmValue),
 ) {
     if let Some(&idx) = identity.get(&(Rc::as_ptr(cls) as usize)) {
-        value(VmValue::from_heap_idx(idx));
+        value(VmValue::from_heap(idx));
     }
 }

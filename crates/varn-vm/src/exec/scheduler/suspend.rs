@@ -4,7 +4,7 @@ use std::sync::atomic::Ordering;
 use crate::closure::{VmClosure, VmUpvalue};
 use crate::exec::ctx::ExecCtx;
 use crate::frame::{CallFrame, TryHandler};
-use crate::frame_store::{FrameAlloc, SlotAddr, REF_UNINIT};
+use crate::frame_store::{FrameAlloc, SlotAddr};
 use crate::value::VmValue;
 use varn_types::register_meta::SlotClass;
 
@@ -16,7 +16,7 @@ pub(crate) struct FrozenFrame {
     compact: bool,
     gpr_len: u32,
     plain: Vec<u64>,
-    pub(crate) refs: Vec<u32>,
+    pub(crate) refs: Vec<Option<varn_types::HeapRef>>,
     pub(crate) dyn_: Vec<VmValue>,
 }
 
@@ -141,7 +141,7 @@ pub(crate) fn freeze(ctx: &mut ExecCtx, dest_reg: u16) -> Result<Box<Frozen>, &'
             }
         }
         let gpr_len = plain.len() as u32;
-        let mut refs: Vec<u32> = Vec::new();
+        let mut refs: Vec<Option<varn_types::HeapRef>> = Vec::new();
         let mut dyn_: Vec<VmValue> = Vec::new();
         for (r, &(class, idx)) in layout.slots.iter().enumerate() {
             if !keep.keeps(r, class, idx) {
@@ -154,8 +154,7 @@ pub(crate) fn freeze(ctx: &mut ExecCtx, dest_reg: u16) -> Result<Box<Frozen>, &'
                 SlotClass::Dyn => dyn_.push(ctx.stack.dyn_[(bases[3] + idx) as usize]),
             }
         }
-        has_refs =
-            has_refs || dyn_.iter().any(|v| v.is_heap()) || refs.iter().any(|&h| h != REF_UNINIT);
+        has_refs = has_refs || dyn_.iter().any(|v| v.is_heap()) || refs.iter().any(Option::is_some);
         let compact = regs.is_some();
         let frozen_frame = FrozenFrame {
             closure,
@@ -217,7 +216,7 @@ pub(crate) fn thaw(ctx: &mut ExecCtx, frozen: Frozen) {
             .resize(ctx.stack.fpr.len() + layout.counts[1] as usize, 0.0);
         ctx.stack
             .refs
-            .resize(ctx.stack.refs.len() + layout.counts[2] as usize, REF_UNINIT);
+            .resize(ctx.stack.refs.len() + layout.counts[2] as usize, None);
         ctx.stack.dyn_.resize(
             ctx.stack.dyn_.len() + layout.counts[3] as usize,
             VmValue::null(),

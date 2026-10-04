@@ -18,7 +18,7 @@ impl ExecCtx {
     }
     pub(super) fn host_get_function_location(&self, func_val: VmValue) -> Option<(String, String)> {
         if func_val.is_heap() {
-            match self.heap.get_by_idx(func_val.as_heap_idx()) {
+            match self.heap.get(func_val.as_heap()) {
                 Some(HeapObj::VmClosure(c)) => {
                     let source_file = c.proto.chunk.source_file.to_string();
                     let name = c.proto.name.as_ref()?.to_string();
@@ -74,7 +74,7 @@ impl ExecCtx {
 impl ExecCtx {
     pub(crate) fn target_meta_key(&self, v: VmValue) -> String {
         if v.is_heap() {
-            if let Some(obj) = self.heap.get(v.as_heap_idx()) {
+            if let Some(obj) = self.heap.get(v.as_heap()) {
                 match obj {
                     HeapObj::Class(ref cls) => format!("class:{:p}", std::rc::Rc::as_ptr(cls)),
                     HeapObj::VmClosure(ref c) => {
@@ -83,10 +83,10 @@ impl ExecCtx {
                     HeapObj::Object(ref oref) => {
                         format!("obj:{:p}", std::rc::Rc::as_ptr(&oref.0))
                     }
-                    _ => format!("heap:{:x}", v.as_heap_idx()),
+                    _ => format!("heap:{:x}", v.as_heap().addr()),
                 }
             } else {
-                format!("heap:{:x}", v.as_heap_idx())
+                format!("heap:{:x}", v.as_heap().addr())
             }
         } else if v.is_int() {
             format!("int:{}", v.as_int())

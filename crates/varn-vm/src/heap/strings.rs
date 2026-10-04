@@ -5,8 +5,8 @@
 //! string would otherwise be hashed in full and retained), and
 //! `alloc_str_view` stores an already-built `HeapStr` without copying.
 
+use super::cells::SlotState;
 use super::obj::HeapObj;
-use super::slots::SlotState;
 use super::str::{HeapStr, INLINE_STR_CAP};
 use super::structs::HeapInner;
 use crate::value::VmValue;
@@ -20,7 +20,7 @@ impl HeapInner {
             return sso;
         }
         if let Some(&idx) = self.string_interner.get(s_ref) {
-            return VmValue::from_heap_idx(idx);
+            return VmValue::from_heap(idx);
         }
         self.alloc_str_view(HeapStr::shared(Arc::from(s_ref)))
     }
@@ -31,14 +31,14 @@ impl HeapInner {
             return sso;
         }
         if let Some(&idx) = self.string_interner.get(s_ref) {
-            return VmValue::from_heap_idx(idx);
+            return VmValue::from_heap(idx);
         }
         let rs: RuntimeString = Arc::from(s_ref);
         let idx = self
-            .slots
+            .cells
             .alloc(HeapObj::Str(HeapStr::shared(rs.clone())), SlotState::Old);
         self.string_interner.insert(rs, idx);
-        VmValue::from_heap_idx(idx)
+        VmValue::from_heap(idx)
     }
 
     pub(crate) fn alloc_str_dynamic(&mut self, s: impl AsRef<str>) -> VmValue {
@@ -53,7 +53,7 @@ impl HeapInner {
     }
 
     pub(crate) fn alloc_str_view(&mut self, hs: HeapStr) -> VmValue {
-        VmValue::from_heap_idx(self.alloc(HeapObj::Str(hs)))
+        VmValue::from_heap(self.alloc(HeapObj::Str(hs)))
     }
 
     pub(crate) fn str_val(&self, nv: VmValue) -> Option<RuntimeString> {
@@ -65,7 +65,7 @@ impl HeapInner {
         if !nv.is_heap() {
             return None;
         }
-        if let Some(HeapObj::Str(s)) = self.get_by_idx(nv.as_heap_idx()) {
+        if let Some(HeapObj::Str(s)) = self.get(nv.as_heap()) {
             return Some(s.to_shared());
         }
         None
@@ -76,7 +76,7 @@ impl HeapInner {
             return true;
         }
         if nv.is_heap() {
-            return matches!(self.get_by_idx(nv.as_heap_idx()), Some(HeapObj::Str(_)));
+            return matches!(self.get(nv.as_heap()), Some(HeapObj::Str(_)));
         }
         false
     }
@@ -88,7 +88,7 @@ impl HeapInner {
             return Some(s.to_owned());
         }
         if nv.is_heap() {
-            if let Some(HeapObj::Str(s)) = self.get_by_idx(nv.as_heap_idx()) {
+            if let Some(HeapObj::Str(s)) = self.get(nv.as_heap()) {
                 return Some(s.to_string());
             }
         }
@@ -97,7 +97,7 @@ impl HeapInner {
 
     pub(crate) fn str_repr_borrowed<'a>(&'a self, nv: VmValue) -> std::borrow::Cow<'a, str> {
         if nv.is_heap() {
-            if let Some(HeapObj::Str(s)) = self.get_by_idx(nv.as_heap_idx()) {
+            if let Some(HeapObj::Str(s)) = self.get(nv.as_heap()) {
                 return std::borrow::Cow::Borrowed(s.as_ref());
             }
         }
@@ -125,7 +125,7 @@ impl HeapInner {
             let mut buf = [0u8; 5];
             let _ = out.write_str(nv.sso_as_str(&mut buf));
         } else if nv.is_heap() {
-            if let Some(HeapObj::Str(s)) = self.get_by_idx(nv.as_heap_idx()) {
+            if let Some(HeapObj::Str(s)) = self.get(nv.as_heap()) {
                 let _ = out.write_str(s.as_ref());
                 return;
             }
@@ -157,7 +157,7 @@ impl HeapInner {
             return nv.sso_as_str(&mut buf).to_owned();
         }
         if nv.is_heap() {
-            return match self.get_by_idx(nv.as_heap_idx()) {
+            return match self.get(nv.as_heap()) {
                 Some(HeapObj::Str(s)) => s.to_string(),
                 Some(HeapObj::Char(c)) => c.to_string(),
                 Some(HeapObj::Array(a)) => {

@@ -12,7 +12,7 @@ pub(crate) fn try_prepare_call_fast(
         return None;
     }
 
-    match heap.get(callee_nv.as_heap_idx())? {
+    match heap.get(callee_nv.as_heap())? {
         HeapObj::VmClosure(nc) => {
             if !nc.proto.is_generator && !nc.proto.is_async && !nc.proto.has_rest {
                 let frame = materialize_frame(store, nc, stage_window(staging, arg_count)).ok()?;
@@ -94,10 +94,7 @@ pub(crate) fn prepare_call(
     let mut arg_count = arg_count;
 
     if callee_nv.is_heap() {
-        match heap
-            .get(callee_nv.as_heap_idx())
-            .expect("invalid heap index")
-        {
+        match heap.get(callee_nv.as_heap()).expect("invalid heap index") {
             HeapObj::VmClosure(nc) => {
                 let nc = nc.clone();
                 bundle_rest_args(&nc.proto, &mut arg_count, staging, heap);
@@ -215,7 +212,7 @@ pub(crate) fn prepare_call(
             HeapObj::Class(cls) => {
                 let cls = cls.clone();
                 let inst = varn_types::value::InstanceRef::alloc(cls.clone());
-                let instance_nv = VmValue::from_heap_idx(heap.alloc(HeapObj::Instance(inst)));
+                let instance_nv = VmValue::from_heap(heap.alloc(HeapObj::Instance(inst)));
                 if let Some(ctor) = cls.constructor() {
                     let mut full_arg_count = arg_count;
                     if staging.is_empty() {
@@ -260,7 +257,7 @@ pub(crate) fn prepare_call(
                             (field_name.clone(), nv)
                         }),
                     );
-                    VmValue::from_heap_idx(heap.alloc(HeapObj::Object(obj)))
+                    VmValue::from_heap(heap.alloc(HeapObj::Object(obj)))
                 } else if args.len() == 1 {
                     args[0]
                 } else if args.len() > 1 {
@@ -271,7 +268,7 @@ pub(crate) fn prepare_call(
 
                 let mut new_data = *data;
                 new_data.payload = payload;
-                return Ok(PreparedCall::PushValue(VmValue::from_heap_idx(
+                return Ok(PreparedCall::PushValue(VmValue::from_heap(
                     heap.alloc(HeapObj::EnumVariant(Box::new(new_data))),
                 )));
             }

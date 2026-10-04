@@ -27,7 +27,7 @@ fn class_of(obj: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     if !obj.is_heap() {
         return None;
     }
-    match heap.get(obj.as_heap_idx())? {
+    match heap.get(obj.as_heap())? {
         HeapObj::Instance(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Class(_) => {
             get_class(obj, heap)
         }
@@ -51,7 +51,7 @@ pub(crate) fn type_name(obj: VmValue, heap: &Heap) -> String {
     if obj.is_null() {
         return RuntimeKind::Null.name().into();
     }
-    match obj.is_heap().then(|| heap.get(obj.as_heap_idx())).flatten() {
+    match obj.is_heap().then(|| heap.get(obj.as_heap())).flatten() {
         Some(HeapObj::Class(cls)) => cls.name.as_str().into(),
         Some(HeapObj::Instance(_) | HeapObj::Object(_) | HeapObj::Record(_)) => {
             class_of(obj, heap).map_or_else(|| "Object".into(), |c| c.name.as_str().into())
@@ -64,11 +64,11 @@ pub(crate) fn type_name(obj: VmValue, heap: &Heap) -> String {
 
 fn snapshot_object(heap: &mut Heap, pairs: Vec<(Arc<str>, VmValue)>) -> VmValue {
     let obj = ObjRef::from_pairs(pairs);
-    VmValue::from_heap_idx(heap.alloc(HeapObj::Object(obj)))
+    VmValue::from_heap(heap.alloc(HeapObj::Object(obj)))
 }
 
 fn instance_snapshot(obj: VmValue, cls: &ClassObj, heap: &mut Heap) -> VmValue {
-    let pairs = match heap.get(obj.as_heap_idx()) {
+    let pairs = match heap.get(obj.as_heap()) {
         Some(HeapObj::Instance(inst)) => cls
             .get_or_compute_layout()
             .fields
@@ -98,8 +98,8 @@ pub(crate) fn resolve_meta_property(
     };
     let cls = class_of(obj, heap);
     let is_instance =
-        obj.is_heap() && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Instance(_)));
-    let is_class = obj.is_heap() && matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Class(_)));
+        obj.is_heap() && matches!(heap.get(obj.as_heap()), Some(HeapObj::Instance(_)));
+    let is_class = obj.is_heap() && matches!(heap.get(obj.as_heap()), Some(HeapObj::Class(_)));
     match key {
         MemberKey::Type => {
             let name = type_name(obj, heap);
@@ -107,7 +107,7 @@ pub(crate) fn resolve_meta_property(
         }
         MemberKey::Name => {
             let name: Option<String> =
-                match obj.is_heap().then(|| heap.get(obj.as_heap_idx())).flatten() {
+                match obj.is_heap().then(|| heap.get(obj.as_heap())).flatten() {
                     Some(HeapObj::EnumVariant(ev)) => Some(ev.variant_name.to_string()),
                     Some(
                         HeapObj::Instance(_)
@@ -134,7 +134,7 @@ pub(crate) fn resolve_meta_property(
         MemberKey::Fields => {
             let names = match (
                 &cls,
-                obj.is_heap().then(|| heap.get(obj.as_heap_idx())).flatten(),
+                obj.is_heap().then(|| heap.get(obj.as_heap())).flatten(),
             ) {
                 (Some(c), Some(HeapObj::Instance(_) | HeapObj::Class(_))) => class_field_names(c),
                 (_, Some(HeapObj::Object(o) | HeapObj::Record(o))) => o.keys().collect(),

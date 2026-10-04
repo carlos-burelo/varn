@@ -54,7 +54,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
     };
     // Fast path: heap array or object
     if obj.is_heap() {
-        let heap_idx = obj.as_heap_idx();
+        let heap_idx = obj.as_heap();
         let ctx_ref = &*ctx;
         match ctx_ref.heap.get(heap_idx) {
             Some(crate::heap::HeapObj::Array(a)) => {
@@ -71,7 +71,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                 let key_str = if key.is_sso() {
                     Some(key.sso_as_str(&mut buf))
                 } else if key.is_heap() {
-                    match ctx_ref.heap.get(key.as_heap_idx()) {
+                    match ctx_ref.heap.get(key.as_heap()) {
                         Some(crate::heap::HeapObj::Str(s)) => Some(s.as_str()),
                         _ => None,
                     }
@@ -120,7 +120,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
     let val = VmValue::from_raw_parts(val_tag, val_payload);
     // Fast path: heap array or object or map
     if obj.is_heap() {
-        let heap_idx = obj.as_heap_idx();
+        let heap_idx = obj.as_heap();
         let ctx_ref = &mut *ctx;
         if let Some(crate::heap::HeapObj::Array(a)) = ctx_ref.heap.get_mut(heap_idx) {
             let idx = if key.is_int() {
@@ -161,7 +161,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
             let key_str = if key.is_sso() {
                 Some(key.sso_as_str(&mut buf))
             } else if key.is_heap() {
-                match ctx_ref.heap.get(key.as_heap_idx()) {
+                match ctx_ref.heap.get(key.as_heap()) {
                     Some(crate::heap::HeapObj::Str(s)) => Some(s.as_str()),
                     _ => None,
                 }

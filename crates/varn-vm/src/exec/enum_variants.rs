@@ -24,7 +24,7 @@ impl ExecCtx {
         } else {
             fields_part.split(',').map(Arc::from).collect()
         };
-        let payload = VmValue::from_heap_idx(
+        let payload = VmValue::from_heap(
             self.heap
                 .alloc(HeapObj::Object(varn_types::value::ObjRef::empty())),
         );

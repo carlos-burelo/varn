@@ -34,7 +34,7 @@ impl ExecCtx {
         let cache_len = closure.ic_cache_len();
         let obj_is_heap_object = obj.is_heap()
             && matches!(
-                self.heap.get(obj.as_heap_idx()),
+                self.heap.get(obj.as_heap()),
                 Some(crate::heap::HeapObj::Object(_) | crate::heap::HeapObj::Instance(_))
             );
         if obj_is_heap_object && cs_idx < cache_len && !is_megamorphic {
@@ -53,7 +53,7 @@ impl ExecCtx {
 
                     let slot = entry.slot as usize;
                     if obj.is_heap() {
-                        match self.heap.get(obj.as_heap_idx()) {
+                        match self.heap.get(obj.as_heap()) {
                             Some(crate::heap::HeapObj::Instance(inst)) => {
                                 if entry.is_class == ICKind::INSTANCE_FIELD
                                     && inst.class_id == entry.id
@@ -110,10 +110,10 @@ impl ExecCtx {
             if let Some((slot, kind)) = found_slot {
                 self.record_ic_hit_setprop();
                 if obj.is_heap() {
-                    match self.heap.get(obj.as_heap_idx()) {
+                    match self.heap.get(obj.as_heap()) {
                         Some(crate::heap::HeapObj::Instance(inst)) => {
                             inst.set_field_at(slot, val);
-                            self.heap.write_barrier(obj.as_heap_idx(), val);
+                            self.heap.write_barrier(obj.as_heap(), val);
                             return Ok(false);
                         }
                         Some(crate::heap::HeapObj::Object(o)) => {
@@ -123,7 +123,7 @@ impl ExecCtx {
                             } else {
                                 o.set_field_at(slot, val);
                             }
-                            self.heap.write_barrier(obj.as_heap_idx(), val);
+                            self.heap.write_barrier(obj.as_heap(), val);
                             return Ok(false);
                         }
                         _ => {}
@@ -157,7 +157,7 @@ impl ExecCtx {
         }
 
         if obj.is_heap() {
-            let inst_opt = match self.heap.get(obj.as_heap_idx()) {
+            let inst_opt = match self.heap.get(obj.as_heap()) {
                 Some(crate::heap::HeapObj::Instance(inst)) => Some(inst.clone()),
                 _ => None,
             };
@@ -166,7 +166,7 @@ impl ExecCtx {
                     let root = cls.root_shape.borrow();
                     if let Some(&slot) = root.property_names.get(name.as_ref()) {
                         if inst.set_field_at(slot, val) {
-                            self.heap.write_barrier(obj.as_heap_idx(), val);
+                            self.heap.write_barrier(obj.as_heap(), val);
                             if cs_idx < cache_len && !is_megamorphic {
                                 let entry = varn_types::chunk::CacheEntry {
                                     id: inst.class_id,
@@ -184,7 +184,7 @@ impl ExecCtx {
                 }
             }
 
-            if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+            if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap()) {
                 let o = o.clone();
                 if let Some(&slot) = o.shape().property_names.get(name.as_ref()) {
                     if slot < o.slot_count() {
@@ -197,7 +197,7 @@ impl ExecCtx {
                             class: None,
                         };
                         o.set_field_at(slot, val);
-                        self.heap.write_barrier(obj.as_heap_idx(), val);
+                        self.heap.write_barrier(obj.as_heap(), val);
                         if cs_idx < cache_len && !is_megamorphic {
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                             closure.feedback.borrow_mut().observe(cs_idx, shape_id);
@@ -212,7 +212,7 @@ impl ExecCtx {
                 o.insert(Arc::from(name.as_ref()), val);
                 let new_shape_id = o.shape().id;
                 let new_slot = o.shape().property_names[name.as_ref()];
-                self.heap.write_barrier(obj.as_heap_idx(), val);
+                self.heap.write_barrier(obj.as_heap(), val);
                 if cs_idx < cache_len && !is_megamorphic {
                     let mut ic = closure.ic_cache.borrow_mut();
 
@@ -257,7 +257,7 @@ impl ExecCtx {
         }
         let callable = setter_nv.is_heap()
             && matches!(
-                self.heap.get(setter_nv.as_heap_idx()),
+                self.heap.get(setter_nv.as_heap()),
                 Some(crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::BoundMethod(_))
             );
         if callable {
@@ -296,7 +296,7 @@ impl ExecCtx {
     ) -> VmResult<bool> {
         let callable = getter_nv.is_heap()
             && matches!(
-                self.heap.get(getter_nv.as_heap_idx()),
+                self.heap.get(getter_nv.as_heap()),
                 Some(crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::BoundMethod(_))
             );
         let result_opt: Option<VmValue> = if let Some((f, _)) = self.heap.native_of(getter_nv) {

@@ -55,7 +55,7 @@ impl ExecCtx {
         if !v.is_heap() {
             return None;
         }
-        match self.heap.get(v.as_heap_idx()) {
+        match self.heap.get(v.as_heap()) {
             Some(HeapObj::Instance(inst)) => Some(inst.class_id),
             _ => None,
         }
@@ -65,7 +65,7 @@ impl ExecCtx {
         let method = super::props::get_property(recv, name, &mut self.heap).ok()?;
         let callable = method.is_heap()
             && matches!(
-                self.heap.get(method.as_heap_idx()),
+                self.heap.get(method.as_heap()),
                 Some(HeapObj::BoundMethod(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..))
             );
         callable.then_some(method)

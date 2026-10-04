@@ -42,7 +42,7 @@ impl HeapInner {
         let a_bytes: &[u8] = if a.is_sso() {
             a.sso_as_str(&mut a_sso_buf).as_bytes()
         } else if a.is_heap() {
-            match self.get(a.as_heap_idx()) {
+            match self.get(a.as_heap()) {
                 Some(HeapObj::Str(HeapStr::Ext { .. })) => return None,
                 Some(HeapObj::Str(hs)) => hs.as_str().as_bytes(),
                 _ => return None,
@@ -62,7 +62,7 @@ impl HeapInner {
         } else if b.is_sso() {
             b.sso_as_str(&mut b_sso_buf).as_bytes()
         } else if b.is_heap() {
-            match self.get(b.as_heap_idx()) {
+            match self.get(b.as_heap()) {
                 Some(HeapObj::Str(HeapStr::Ext { .. })) => return None,
                 Some(HeapObj::Str(hs)) => hs.as_str().as_bytes(),
                 _ => return None,

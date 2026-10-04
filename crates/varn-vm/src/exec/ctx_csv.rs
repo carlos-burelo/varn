@@ -293,7 +293,7 @@ pub(crate) fn stringify_csv(
     let delim_char = delimiter as char;
     let mut out = String::new();
 
-    match ctx.heap.get(value.as_heap_idx()) {
+    match ctx.heap.get(value.as_heap()) {
         Some(HeapObj::Array(arr)) => {
             let repr = arr.repr();
             let items = match repr {
@@ -310,7 +310,7 @@ pub(crate) fn stringify_csv(
                 return Err("CSV items must be objects or array rows".to_string());
             }
 
-            match ctx.heap.get(first.as_heap_idx()) {
+            match ctx.heap.get(first.as_heap()) {
                 Some(HeapObj::Object(first_obj) | HeapObj::Record(first_obj)) => {
                     let shape = first_obj.borrow().shape().clone();
                     let prop_names: Vec<String> = {
@@ -338,7 +338,7 @@ pub(crate) fn stringify_csv(
                             continue;
                         }
                         if let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) =
-                            ctx.heap.get(item.as_heap_idx())
+                            ctx.heap.get(item.as_heap())
                         {
                             let o = obj.borrow();
                             let inline = o.inline_slice();
@@ -382,7 +382,7 @@ pub(crate) fn stringify_csv(
                         if !item.is_heap() {
                             continue;
                         }
-                        if let Some(HeapObj::Map(map)) = ctx.heap.get(item.as_heap_idx()) {
+                        if let Some(HeapObj::Map(map)) = ctx.heap.get(item.as_heap()) {
                             let m = map.borrow();
                             for (slot, (k, _)) in prop_names.iter().enumerate() {
                                 if slot > 0 {
@@ -400,7 +400,7 @@ pub(crate) fn stringify_csv(
                         if !item.is_heap() {
                             continue;
                         }
-                        if let Some(HeapObj::Array(row_arr)) = ctx.heap.get(item.as_heap_idx()) {
+                        if let Some(HeapObj::Array(row_arr)) = ctx.heap.get(item.as_heap()) {
                             match row_arr.repr() {
                                 varn_types::ArrayRepr::Boxed(row_items) => {
                                     let row_items = row_items.as_vec();
@@ -471,7 +471,7 @@ fn write_vm_value_csv(out: &mut String, ctx: &ExecCtx, val: VmValue, delimiter: 
         return;
     }
     if val.is_heap() {
-        if let Some(HeapObj::Str(h)) = ctx.heap.get(val.as_heap_idx()) {
+        if let Some(HeapObj::Str(h)) = ctx.heap.get(val.as_heap()) {
             write_csv_cell(out, h.as_str(), delimiter);
         }
     }

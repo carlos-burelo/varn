@@ -24,7 +24,7 @@ impl ExecCtx {
         ) {
             if needs_receiver && callee_nv.is_heap() {
                 let receiver_clone = if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
-                    self.heap.get(callee_nv.as_heap_idx())
+                    self.heap.get(callee_nv.as_heap())
                 {
                     Some(bm.receiver)
                 } else {

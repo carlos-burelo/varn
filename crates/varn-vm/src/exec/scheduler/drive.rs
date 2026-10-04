@@ -22,7 +22,7 @@ enum ParkAction {
 
 fn settle_for_park(ctx: &mut ExecCtx, value: VmValue) -> ParkAction {
     if value.is_heap() {
-        match ctx.heap.get_by_idx(value.as_heap_idx()) {
+        match ctx.heap.get(value.as_heap()) {
             Some(HeapObj::Task(lazy)) => {
                 let lazy = Rc::clone(lazy);
                 let output = TaskCell::pending();

@@ -6,7 +6,7 @@
 //! ```text
 //! GPR (i64)  ← SlotKind::Int
 //! FPR (f64)  ← SlotKind::Float
-//! REF (u32)  ← SlotKind::Ref      (índice heap; nunca null)
+//! REF (dirección) ← SlotKind::Ref  (`None` = null)
 //! DYN        ← SlotKind::{Dynamic, Bool, Str} (VmValue, como antes)
 //! ```
 //!
@@ -48,11 +48,11 @@ pub struct SlotAddr {
     pub idx: u32,
 }
 
-/// El layout registro→(clase, índice) y el sentinel `REF_UNINIT` viven en
+/// El layout registro→(clase, índice) vive en
 /// `varn-types` (contrato compartido VM+JIT); aquí solo se re-exportan para que
 /// los call-sites de la VM los sigan nombrando por este módulo. Ver
-/// `varn_types::register_meta::{FrameLayout, REF_UNINIT}`.
-pub use varn_types::register_meta::{FrameLayout, REF_UNINIT};
+/// `varn_types::register_meta::FrameLayout`.
+pub use varn_types::register_meta::FrameLayout;
 
 /// Reserva de una activación: bases por clase dentro del almacén.
 ///
@@ -76,7 +76,7 @@ pub struct FrameAlloc {
 pub struct FrameStore {
     pub gpr: Vec<i64>,
     pub fpr: Vec<f64>,
-    pub refs: Vec<u32>,
+    pub refs: Vec<Option<varn_types::HeapRef>>,
     pub dyn_: Vec<VmValue>,
     /// Reservas de activación, indexadas por el `act_id` que ve el JIT. Parte
     /// del ABI (el lowering lee `allocs[act_id].bases[clase]`), por eso es
@@ -123,7 +123,7 @@ impl FrameStore {
             layout.counts[SlotClass::Fpr.index()] as usize,
         ));
         self.refs.extend(std::iter::repeat_n(
-            REF_UNINIT,
+            None,
             layout.counts[SlotClass::Ref.index()] as usize,
         ));
         self.dyn_.extend(std::iter::repeat_n(
@@ -164,7 +164,7 @@ impl FrameStore {
         }
         if need(bases[2], counts[2], self.refs.len()) {
             self.refs
-                .resize(bases[2] as usize + counts[2] as usize, REF_UNINIT);
+                .resize(bases[2] as usize + counts[2] as usize, None);
         }
         if need(bases[3], counts[3], self.dyn_.len()) {
             self.dyn_
@@ -256,20 +256,6 @@ mod tests {
         assert_eq!(s.d(a, 0), VmValue::from_f64(2.5));
         s.mov(a, 2, 0).unwrap();
         assert_eq!(s.f(a, 2), 2.5);
-    }
-
-    #[test]
-    fn ref_slots_roundtrip_heap_idx() {
-        use SlotKind as K;
-        let mut s = FrameStore::new();
-        let p = proto_with(&[K::Ref], 1);
-        let a = s.push_frame(&p);
-        s.set_r(a, 0, 123);
-        assert_eq!(s.r(a, 0), 123);
-        assert_eq!(s.box_reg(a, 0), VmValue::from_heap_idx(123));
-        let mut roots = Vec::new();
-        s.collect_roots(0, 1, &mut roots);
-        assert_eq!(roots, vec![123]);
     }
 
     #[test]

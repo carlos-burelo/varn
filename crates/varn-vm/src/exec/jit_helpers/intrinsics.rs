@@ -91,7 +91,7 @@ pub(crate) extern "C" fn jit_str_char_code_at(
         }
 
         if receiver.is_heap() {
-            if let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
+            if let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap()) {
                 let s = h.as_str();
                 let code = if h.is_ascii_cached() {
                     s.as_bytes().get(idx).map(|&b| b as i64)
@@ -145,7 +145,7 @@ fn ascii_view(heap: &crate::heap::Heap, receiver: VmValue) -> Option<&str> {
     if !receiver.is_heap() {
         return None;
     }
-    let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) else {
+    let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap()) else {
         return None;
     };
     // `is_ascii()` computes and memoises; `is_ascii_cached()` alone would
@@ -159,7 +159,7 @@ unsafe fn borrow_str_fast<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) 
         return Some(v.sso_as_str(buf));
     }
     if v.is_heap() {
-        if let Some(HeapObj::Str(h)) = heap.get(v.as_heap_idx()) {
+        if let Some(HeapObj::Str(h)) = heap.get(v.as_heap()) {
             return Some(h.as_str());
         }
     }
@@ -201,7 +201,7 @@ pub(crate) extern "C" fn jit_str_starts_with(
             };
         }
         if receiver.is_heap() && search.is_sso() {
-            if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
+            if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap()) {
                 let n_len = search.sso_len();
                 let s_bytes = h.as_str().as_bytes();
                 if s_bytes.len() >= n_len {
@@ -217,10 +217,9 @@ pub(crate) extern "C" fn jit_str_starts_with(
             }
         }
         if receiver.is_heap() && search.is_heap() {
-            if let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) = (
-                heap.get(receiver.as_heap_idx()),
-                heap.get(search.as_heap_idx()),
-            ) {
+            if let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) =
+                (heap.get(receiver.as_heap()), heap.get(search.as_heap()))
+            {
                 return if h1.as_str().as_bytes().starts_with(h2.as_str().as_bytes()) {
                     1
                 } else {
@@ -284,7 +283,7 @@ pub(crate) extern "C" fn jit_str_ends_with(
             };
         }
         if receiver.is_heap() && search.is_sso() {
-            if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
+            if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap()) {
                 let n_len = search.sso_len();
                 let s_bytes = h.as_str().as_bytes();
                 if s_bytes.len() >= n_len {
@@ -300,10 +299,9 @@ pub(crate) extern "C" fn jit_str_ends_with(
             }
         }
         if receiver.is_heap() && search.is_heap() {
-            if let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) = (
-                heap.get(receiver.as_heap_idx()),
-                heap.get(search.as_heap_idx()),
-            ) {
+            if let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) =
+                (heap.get(receiver.as_heap()), heap.get(search.as_heap()))
+            {
                 return if h1.as_str().as_bytes().ends_with(h2.as_str().as_bytes()) {
                     1
                 } else {
@@ -457,7 +455,7 @@ pub(crate) extern "C" fn jit_str_split(
         }
         let arr = varn_types::VmArray::new(out);
         ctx_ref.jit_native_result =
-            VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Array(arr)));
+            VmValue::from_heap(ctx_ref.heap.alloc(crate::heap::HeapObj::Array(arr)));
     }
 }
 

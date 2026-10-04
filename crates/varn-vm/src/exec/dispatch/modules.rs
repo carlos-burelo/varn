@@ -55,7 +55,7 @@ impl ExecCtx {
             )));
         }
 
-        if let Some(crate::heap::HeapObj::Module(m)) = self.heap.get(module_val.as_heap_idx()) {
+        if let Some(crate::heap::HeapObj::Module(m)) = self.heap.get(module_val.as_heap()) {
             if let Some(val) = m.get_slot(slot_idx) {
                 self.stack.unbox_into_reg(base, dest_reg, val)?;
             } else {
@@ -103,7 +103,7 @@ impl ExecCtx {
             ));
         }
 
-        if let Some(crate::heap::HeapObj::Module(m)) = self.heap.get_mut(exports_nv.as_heap_idx()) {
+        if let Some(crate::heap::HeapObj::Module(m)) = self.heap.get_mut(exports_nv.as_heap()) {
             let m = std::rc::Rc::make_mut(m);
             m.set_slot(slot_idx, val_nv);
         } else {
