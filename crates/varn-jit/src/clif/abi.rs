@@ -13,9 +13,7 @@
 //! Se emitirá en compilación cuando el resume interpretado de callers JIT
 //! exista; hoy la lee nadie y no se graba nada especulativo.
 
-use cranelift_codegen::ir::{
-    types, AbiParam, Function, InstBuilder, MemFlags, Signature, UserFuncName,
-};
+use cranelift_codegen::ir::{types, AbiParam, Function, InstBuilder, Signature, UserFuncName};
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use varn_types::register_meta::SlotKind;
@@ -174,6 +172,7 @@ pub(super) fn build_wrapper(
         name: cranelift_codegen::ir::ExternalName::user(raw_name),
         signature: raw_sig,
         colocated: true,
+        patchable: false,
     });
 
     let mut fb_ctx = FunctionBuilderContext::new();
@@ -245,19 +244,25 @@ pub(super) fn build_wrapper(
         b.ins().call(raw_ref, &args);
         b.ins().load(
             types::I128,
-            MemFlags::trusted(),
+            cranelift_codegen::ir::MemFlagsData::trusted(),
             exec_ctx,
             helpers.jit_native_result_offset as i32,
         )
     };
     let (tag, payload) = b.ins().isplit(result);
     if let Some(sret) = sret_ptr {
-        b.ins().store(MemFlags::trusted(), tag, sret, 0);
-        b.ins().store(MemFlags::trusted(), payload, sret, 8);
+        b.ins()
+            .store(cranelift_codegen::ir::MemFlagsData::trusted(), tag, sret, 0);
+        b.ins().store(
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            payload,
+            sret,
+            8,
+        );
         b.ins().return_(&[]);
     } else {
         b.ins().return_(&[tag, payload]);
     }
-    b.finalize();
+    b.finalize(isa.frontend_config());
     compile_piece(func, isa)
 }

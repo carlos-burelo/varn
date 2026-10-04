@@ -2,7 +2,7 @@
 //! operator and a generic comparison through their runtime helpers.
 
 use super::emit::{call_helper, call_helper_void};
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::FunctionBuilder;
 
@@ -20,7 +20,7 @@ pub(crate) fn boxed_binop(
     call_helper_void(b, cc, helper, &[exec_ctx, a.0, a.1, c.0, c.1]);
     b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         exec_ctx,
         native_result_offset,
     )
@@ -53,8 +53,8 @@ pub(crate) fn boxed_compare(
     let pay_eq = b.ins().icmp(IntCC::Equal, a_payload, b_payload);
     let bits_eq = b.ins().band(tag_eq, pay_eq);
 
-    let a_kind = b.ins().band_imm(a_tag, 0xFF);
-    let not_float = b.ins().icmp_imm(
+    let a_kind = b.ins().band_imm_u(a_tag, 0xFF);
+    let not_float = b.ins().icmp_imm_u(
         IntCC::NotEqual,
         a_kind,
         varn_types::vm_value::KIND_FLOAT as i64,
@@ -63,11 +63,11 @@ pub(crate) fn boxed_compare(
 
     let a_is_sso = b
         .ins()
-        .icmp_imm(IntCC::Equal, a_kind, varn_types::vm_value::KIND_SSO as i64);
-    let b_kind = b.ins().band_imm(b_tag, 0xFF);
+        .icmp_imm_u(IntCC::Equal, a_kind, varn_types::vm_value::KIND_SSO as i64);
+    let b_kind = b.ins().band_imm_u(b_tag, 0xFF);
     let b_is_sso = b
         .ins()
-        .icmp_imm(IntCC::Equal, b_kind, varn_types::vm_value::KIND_SSO as i64);
+        .icmp_imm_u(IntCC::Equal, b_kind, varn_types::vm_value::KIND_SSO as i64);
     let both_sso = b.ins().band(a_is_sso, b_is_sso);
 
     let can_inline = b.ins().bor(same_non_float, both_sso);
@@ -81,7 +81,7 @@ pub(crate) fn boxed_compare(
 
     b.switch_to_block(fast_blk);
     let eq = b.ins().uextend(types::I64, bits_eq);
-    let fast_res = if is_eq { eq } else { b.ins().bxor_imm(eq, 1) };
+    let fast_res = if is_eq { eq } else { b.ins().bxor_imm_u(eq, 1) };
     b.ins().jump(merge_blk, &[fast_res.into()]);
 
     b.switch_to_block(slow_blk);

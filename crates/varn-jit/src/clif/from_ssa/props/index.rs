@@ -1,4 +1,4 @@
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::super::emit::call_helper_void;
@@ -37,7 +37,7 @@ pub(crate) fn emit_get_index(
     );
     Ok(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     ))

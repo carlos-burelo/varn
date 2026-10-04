@@ -2,7 +2,7 @@
 //! runtime-helper call shim, and the relocation patcher. The SSA lowering is
 //! the only consumer; the bytecode register-variable helpers died with it.
 
-use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, MemFlags, Signature};
+use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, Signature};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::SlotKind;
 
@@ -88,7 +88,9 @@ pub(super) fn box_f64(
     let tag = b
         .ins()
         .iconst(types::I64, varn_types::vm_value::KIND_FLOAT as i64);
-    let payload = b.ins().bitcast(types::I64, MemFlags::new(), v);
+    let payload = b
+        .ins()
+        .bitcast(types::I64, cranelift_codegen::ir::MemFlagsData::new(), v);
     b.ins().iconcat(tag, payload)
 }
 
@@ -109,12 +111,16 @@ pub(super) fn unbox_f64_coerce(
         v
     } else if ty == types::I128 {
         let (tag, payload) = b.ins().isplit(v);
-        let is_float = b.ins().icmp_imm(
+        let is_float = b.ins().icmp_imm_u(
             cranelift_codegen::ir::condcodes::IntCC::Equal,
             tag,
             varn_types::vm_value::KIND_FLOAT as i64,
         );
-        let f_direct = b.ins().bitcast(types::F64, MemFlags::new(), payload);
+        let f_direct = b.ins().bitcast(
+            types::F64,
+            cranelift_codegen::ir::MemFlagsData::new(),
+            payload,
+        );
         let f_from_int = b.ins().fcvt_from_sint(types::F64, payload);
         b.ins().select(is_float, f_direct, f_from_int)
     } else if ty == types::I64 {

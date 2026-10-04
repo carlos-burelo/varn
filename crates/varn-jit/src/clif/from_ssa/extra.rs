@@ -7,7 +7,7 @@
 //! to its home first — the interpreter resumes from homes — then trap, since
 //! the suspend helper never returns to compiled code.
 
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::{SsaObjectSpreadPart, SsaOp, SsaSpread};
 
@@ -37,7 +37,7 @@ pub(super) fn try_emit(
     let native = |b: &mut FunctionBuilder| {
         b.ins().load(
             types::I128,
-            MemFlags::trusted(),
+            cranelift_codegen::ir::MemFlagsData::trusted(),
             ectx,
             h.jit_native_result_offset as i32,
         )
@@ -356,8 +356,12 @@ fn emit_super_call(
     }
     let addr = super::call::scratch_addr(b, ctx, vals.len().max(1));
     for (i, v) in vals.iter().enumerate() {
-        b.ins()
-            .store(MemFlags::trusted(), *v, addr, (i * 16) as i32);
+        b.ins().store(
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            *v,
+            addr,
+            (i * 16) as i32,
+        );
     }
     let (ct, cp) = b.ins().isplit(ctor);
     Ok(super::call::emit_invoke(b, ctx, addr, (ct, cp), vals.len()))
@@ -367,10 +371,19 @@ fn emit_super_call(
 /// scratch window.
 fn stage_value(b: &mut FunctionBuilder, ctx: &Ctx<'_>, callee: Value, args: &[Value]) -> Value {
     let addr = super::call::scratch_addr(b, ctx, args.len() + 1);
-    b.ins().store(MemFlags::trusted(), callee, addr, 0);
+    b.ins().store(
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        callee,
+        addr,
+        0,
+    );
     for (i, v) in args.iter().enumerate() {
-        b.ins()
-            .store(MemFlags::trusted(), *v, addr, ((i + 1) * 16) as i32);
+        b.ins().store(
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            *v,
+            addr,
+            ((i + 1) * 16) as i32,
+        );
     }
     addr
 }
@@ -382,7 +395,7 @@ fn window_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize, vals: &[
     call_helper_void(b, ctx.cc, helper, &[ectx, addr, n]);
     b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     )
@@ -393,8 +406,12 @@ fn window_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize, vals: &[
 fn stage(b: &mut FunctionBuilder, ctx: &Ctx<'_>, vals: &[Value]) -> (Value, Value) {
     let addr = super::call::scratch_addr(b, ctx, vals.len().max(1));
     for (i, v) in vals.iter().enumerate() {
-        b.ins()
-            .store(MemFlags::trusted(), *v, addr, (i * 16) as i32);
+        b.ins().store(
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            *v,
+            addr,
+            (i * 16) as i32,
+        );
     }
     (addr, b.ins().iconst(types::I64, vals.len() as i64))
 }
@@ -420,7 +437,7 @@ fn emit_array_spread(
     let fresh = |b: &mut FunctionBuilder| {
         b.ins().load(
             types::I128,
-            MemFlags::trusted(),
+            cranelift_codegen::ir::MemFlagsData::trusted(),
             ectx,
             h.jit_native_result_offset as i32,
         )
@@ -458,7 +475,7 @@ fn emit_object_spread(
     let fresh = |b: &mut FunctionBuilder| {
         b.ins().load(
             types::I128,
-            MemFlags::trusted(),
+            cranelift_codegen::ir::MemFlagsData::trusted(),
             ectx,
             h.jit_native_result_offset as i32,
         )

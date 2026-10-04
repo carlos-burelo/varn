@@ -1,4 +1,4 @@
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::super::emit::call_helper_void;
@@ -16,7 +16,7 @@ pub(crate) fn emit_array_length(
     call_helper_void(b, ctx.cc, ctx.helpers.array_length, &[ectx, tag, payload]);
     Ok(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     ))
@@ -52,7 +52,7 @@ pub(crate) fn emit_bytes_length(
     call_helper_void(b, ctx.cc, ctx.helpers.bytes_length, &[ectx, tag, payload]);
     Ok(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     ))

@@ -206,6 +206,7 @@ pub(super) fn try_lower(
         name: ExternalName::user(self_name),
         signature: self_sig,
         colocated: true,
+        patchable: false,
     });
     let mut fb_ctx = FunctionBuilderContext::new();
     let mut b = FunctionBuilder::new(&mut func, &mut fb_ctx);
@@ -414,7 +415,7 @@ pub(super) fn try_lower(
     }
 
     b.seal_all_blocks();
-    b.finalize();
+    b.finalize(isa.frontend_config());
     super::debug::capture_ir(&mut debug, &func);
     super::debug::capture_kinds_ssa(&mut debug, ssa);
     Ok((compile_piece(func, isa)?, frame_aware))

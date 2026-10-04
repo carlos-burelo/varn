@@ -12,7 +12,7 @@
 //!   the bytecode lowering's `floats::emit_math_intrinsic_native` documents.
 //! * `int` → `float` is `fcvt_from_sint`, what `convert`'s `to_float` does.
 
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_core::intrinsic_ops::math::MathOp;
 use varn_core::NumConv;
@@ -29,7 +29,7 @@ fn exec_ctx(ctx: &Ctx<'_>) -> Value {
 fn native_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, ectx: Value) -> Value {
     b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     )

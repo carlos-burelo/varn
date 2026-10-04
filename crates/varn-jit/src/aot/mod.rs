@@ -69,7 +69,7 @@ pub fn compile_to_object(
         // Return 0 (success)
         let zero = builder.ins().iconst(types::I64, 0);
         builder.ins().return_(&[zero]);
-        builder.finalize();
+        builder.finalize(module.isa().frontend_config());
     }
 
     module
@@ -270,7 +270,7 @@ fn emit_module_body(
                 let src_r = (w1 >> 8) as usize;
                 let imm = (w1 & 0xFF) as i8 as i64;
                 let src = builder.use_var(vars[src_r].0);
-                let res = builder.ins().iadd_imm(src, imm);
+                let res = builder.ins().iadd_imm_u(src, imm);
                 builder.def_var(vars[first_reg].0, res);
                 let tag = builder.ins().iconst(types::I64, 1);
                 builder.def_var(vars[first_reg].1, tag);

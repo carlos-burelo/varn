@@ -1,4 +1,4 @@
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::super::emit::{call_helper_void, HEAP_KIND, KIND_MASK};
@@ -29,20 +29,20 @@ pub(crate) fn emit_set_property(
     b.set_cold_block(slow);
     let cont = b.create_block();
 
-    let m = MemFlags::trusted();
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let olay = &ctx.helpers.object_layout;
     let alay = &ctx.helpers.array_layout;
     let heap_off = ctx.helpers.heap_field_offset;
 
-    let kind = b.ins().band_imm(ot, KIND_MASK);
-    let is_heap = b.ins().icmp_imm(IntCC::Equal, kind, HEAP_KIND);
+    let kind = b.ins().band_imm_u(ot, KIND_MASK);
+    let is_heap = b.ins().icmp_imm_u(IntCC::Equal, kind, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
 
-    let raw = b.ins().band_imm(op, 0xFFFF_FFFF);
-    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
-    let is_nursery = b.ins().icmp_imm(IntCC::Equal, old_bit, 0);
+    let raw = b.ins().band_imm_u(op, 0xFFFF_FFFF);
+    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
+    let is_nursery = b.ins().icmp_imm_u(IntCC::Equal, old_bit, 0);
     let res = b.create_block();
     b.ins().brif(is_nursery, res, &[], slow, &[]);
     b.switch_to_block(res);
@@ -54,10 +54,12 @@ pub(crate) fn emit_set_property(
         rc,
         (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
     );
-    let byte_off = b.ins().imul_imm(raw, alay.slot_size as i64);
+    let byte_off = b.ins().imul_imm_u(raw, alay.slot_size as i64);
     let slot_addr = b.ins().iadd(base_nur, byte_off);
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
-    let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
+    let is_obj = b
+        .ins()
+        .icmp_imm_u(IntCC::Equal, tagb, olay.object_tag as i64);
     let ok = b.create_block();
     b.ins().brif(is_obj, ok, &[], slow, &[]);
     b.switch_to_block(ok);
@@ -72,7 +74,7 @@ pub(crate) fn emit_set_property(
     let shape_id = b.ins().uextend(types::I64, shape_id32);
     let len32 = b.ins().load(types::I32, m, data_ptr, olay.len_off as i32);
     let inline_len = b.ins().uextend(types::I64, len32);
-    let values_base = b.ins().iadd_imm(data_ptr, olay.values_off as i64);
+    let values_base = b.ins().iadd_imm_u(data_ptr, olay.values_off as i64);
 
     let ic_base = b.ins().load(
         types::I64,
@@ -80,7 +82,7 @@ pub(crate) fn emit_set_property(
         frame.closure,
         ctx.helpers.closure_ic_entries_offset as i32,
     );
-    let slot_base = b.ins().iadd_imm(
+    let slot_base = b.ins().iadd_imm_u(
         ic_base,
         (cs as i64) * (ctx.helpers.poly_ic_slot_size as i64),
     );
@@ -90,12 +92,12 @@ pub(crate) fn emit_set_property(
         b.switch_to_block(next);
         next = b.create_block();
         let hit = b.create_block();
-        let entry = b.ins().iadd_imm(slot_base, (i * 8) as i64);
+        let entry = b.ins().iadd_imm_u(slot_base, (i * 8) as i64);
         let id32 = b.ins().load(types::I32, m, entry, 0);
         let id = b.ins().uextend(types::I64, id32);
         let kc = b.ins().uload8(types::I64, m, entry, 6);
         let id_eq = b.ins().icmp(IntCC::Equal, id, shape_id);
-        let kind_ok = b.ins().icmp_imm(
+        let kind_ok = b.ins().icmp_imm_u(
             IntCC::Equal,
             kc,
             varn_types::chunk::ICKind::SHAPE_PROP as i64,
@@ -109,9 +111,10 @@ pub(crate) fn emit_set_property(
         let hok = b.create_block();
         b.ins().brif(in_bounds, hok, &[], slow, &[]);
         b.switch_to_block(hok);
-        let off = b.ins().ishl_imm(slot16, 4);
+        let off = b.ins().ishl_imm_u(slot16, 4);
         let addr = b.ins().iadd(values_base, off);
-        b.ins().store(MemFlags::trusted(), val, addr, 0);
+        b.ins()
+            .store(cranelift_codegen::ir::MemFlagsData::trusted(), val, addr, 0);
         b.ins().jump(cont, &[]);
     }
     b.switch_to_block(next);

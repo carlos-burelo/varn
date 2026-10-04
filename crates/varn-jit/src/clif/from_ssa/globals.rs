@@ -11,7 +11,7 @@
 //! this lowering addresses exactly what the interpreter does. Globals are GC
 //! roots: a write is a plain store, no barrier.
 
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::Ctx;
@@ -39,13 +39,13 @@ fn slot_addr(
     let helpers = ctx.helpers;
     let rcbox = b.ins().load(
         types::I64,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         frame.exec_ctx,
         helpers.globals_offset as i32,
     );
     let gbase = b.ins().load(
         types::I64,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         rcbox,
         helpers.globals_store_offset as i32,
     );
@@ -54,7 +54,7 @@ fn slot_addr(
         Region::Module => {
             let mb = b.ins().load(
                 types::I32,
-                MemFlags::trusted(),
+                cranelift_codegen::ir::MemFlagsData::trusted(),
                 frame.closure,
                 helpers.closure_module_base_offset as i32,
             );
@@ -63,7 +63,7 @@ fn slot_addr(
         }
         Region::Native => idx,
     };
-    let scaled = b.ins().imul_imm(eff, 16);
+    let scaled = b.ins().imul_imm_u(eff, 16);
     Ok(b.ins().iadd(gbase, scaled))
 }
 
@@ -75,7 +75,12 @@ pub(super) fn emit_load(
     region: Region,
 ) -> Result<Value, String> {
     let addr = slot_addr(b, ctx, slot, region)?;
-    Ok(b.ins().load(types::I128, MemFlags::trusted(), addr, 0))
+    Ok(b.ins().load(
+        types::I128,
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        addr,
+        0,
+    ))
 }
 
 /// Write boxed `value` to module global `slot`.
@@ -86,6 +91,11 @@ pub(super) fn emit_store(
     value: Value,
 ) -> Result<(), String> {
     let addr = slot_addr(b, ctx, slot, Region::Module)?;
-    b.ins().store(MemFlags::trusted(), value, addr, 0);
+    b.ins().store(
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        value,
+        addr,
+        0,
+    );
     Ok(())
 }

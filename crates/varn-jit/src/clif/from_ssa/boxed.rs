@@ -6,7 +6,7 @@
 //! the result into the live `ExecCtx` (`ctx.exec_ctx`, real en leaf y
 //! frame-aware).
 
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::SsaBinOp;
 
@@ -43,7 +43,7 @@ pub(super) fn emit_bin(
     call_helper_void(b, cc, helper, &[live, a_tag, a_payload, b_tag, b_payload]);
     let boxed = b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         live,
         helpers.jit_native_result_offset as i32,
     );

@@ -207,7 +207,7 @@ pub(super) fn emit(
         SsaOp::IsNull { operand } => {
             let a = load_value(b, ctx, values, *operand)?;
             let (tag, _) = b.ins().isplit(a);
-            let c = b.ins().icmp_imm(
+            let c = b.ins().icmp_imm_u(
                 cranelift_codegen::ir::condcodes::IntCC::Equal,
                 tag,
                 varn_types::vm_value::KIND_NULL as i64,

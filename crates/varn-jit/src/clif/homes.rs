@@ -7,7 +7,7 @@
 //! conversions exist once. Every access re-reads the vector pointer from
 //! `ExecCtx`, so a reallocation during a call never leaves a stale base.
 
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::{FrameLayout, SlotClass, REF_UNINIT};
 use varn_types::vm_value::{KIND_HEAP, KIND_INT, KIND_NULL};
@@ -40,20 +40,20 @@ impl Homes<'_> {
         let class = self.layout.class_of(reg);
         let idx = self.layout.idx_of(reg);
         let fl = self.offsets;
-        let m = MemFlags::trusted();
+        let m = cranelift_codegen::ir::MemFlagsData::trusted();
         let ptr = b
             .ins()
             .load(types::I64, m, self.exec_ctx, self.class_ptr_offset(class));
         let allocs = b
             .ins()
             .load(types::I64, m, self.exec_ctx, fl.allocs_ptr_offset as i32);
-        let byte = b.ins().imul_imm(self.base, fl.alloc_size as i64);
+        let byte = b.ins().imul_imm_u(self.base, fl.alloc_size as i64);
         let fap = b.ins().iadd(allocs, byte);
         let base_off = (fl.alloc_bases_offset + class.index() * 4) as i32;
         let base = b.ins().uload32(m, fap, base_off);
         let elem = elem_size(class);
-        let off = b.ins().imul_imm(base, elem);
-        let off = b.ins().iadd_imm(off, idx as i64 * elem);
+        let off = b.ins().imul_imm_u(base, elem);
+        let off = b.ins().iadd_imm_u(off, idx as i64 * elem);
         b.ins().iadd(ptr, off)
     }
 
@@ -64,7 +64,7 @@ impl Homes<'_> {
     /// `Fpr` one.
     pub(crate) fn store_at(&self, b: &mut FunctionBuilder, home: Value, reg: usize, value: Value) {
         let class = self.layout.class_of(reg);
-        let m = MemFlags::trusted();
+        let m = cranelift_codegen::ir::MemFlagsData::trusted();
         let boxed = b.func.dfg.value_type(value) == types::I128;
         match class {
             SlotClass::Gpr => {
@@ -81,7 +81,11 @@ impl Homes<'_> {
                 } else {
                     value
                 };
-                let f = b.ins().bitcast(types::F64, MemFlags::new(), payload);
+                let f = b.ins().bitcast(
+                    types::F64,
+                    cranelift_codegen::ir::MemFlagsData::new(),
+                    payload,
+                );
                 b.ins().store(m, f, home, 0);
             }
             SlotClass::Dyn => {
@@ -99,8 +103,8 @@ impl Homes<'_> {
                 } else {
                     (b.ins().iconst(types::I64, KIND_HEAP as i64), value)
                 };
-                let is_null = b.ins().icmp_imm(IntCC::Equal, tag, KIND_NULL as i64);
-                let low = b.ins().band_imm(payload, 0xFFFF_FFFF);
+                let is_null = b.ins().icmp_imm_u(IntCC::Equal, tag, KIND_NULL as i64);
+                let low = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
                 let uninit = b.ins().iconst(types::I64, REF_UNINIT as i64);
                 let v = b.ins().select(is_null, uninit, low);
                 // `Ref` homes are 4-byte `u32` heap indices (`FrameStore::refs`
@@ -120,7 +124,7 @@ impl Homes<'_> {
     /// [`load`] from a precomputed [`addr`][Self::addr].
     pub(crate) fn load_at(&self, b: &mut FunctionBuilder, home: Value, reg: usize) -> Value {
         let class = self.layout.class_of(reg);
-        let m = MemFlags::trusted();
+        let m = cranelift_codegen::ir::MemFlagsData::trusted();
         match class {
             SlotClass::Gpr => {
                 let i = b.ins().load(types::I64, m, home, 0);
@@ -133,7 +137,7 @@ impl Homes<'_> {
             SlotClass::Dyn => b.ins().load(types::I128, m, home, 0),
             SlotClass::Ref => {
                 let idx = b.ins().uload32(m, home, 0);
-                let is_uninit = b.ins().icmp_imm(IntCC::Equal, idx, REF_UNINIT as i64);
+                let is_uninit = b.ins().icmp_imm_u(IntCC::Equal, idx, REF_UNINIT as i64);
                 let null_tag = b.ins().iconst(types::I64, KIND_NULL as i64);
                 let heap_tag = b.ins().iconst(types::I64, KIND_HEAP as i64);
                 let zero = b.ins().iconst(types::I64, 0);

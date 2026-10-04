@@ -320,15 +320,15 @@ fn emit_bin(
         IntOr => b.ins().bor(a, c),
         IntXor => b.ins().bxor(a, c),
         IntShl => {
-            let sh = b.ins().band_imm(c, 0x3F);
+            let sh = b.ins().band_imm_u(c, 0x3F);
             b.ins().ishl(a, sh)
         }
         IntShr => {
-            let sh = b.ins().band_imm(c, 0x3F);
+            let sh = b.ins().band_imm_u(c, 0x3F);
             b.ins().sshr(a, sh)
         }
         IntUshr => {
-            let sh = b.ins().band_imm(c, 0x3F);
+            let sh = b.ins().band_imm_u(c, 0x3F);
             b.ins().ushr(a, sh)
         }
         IntEq => bool_i64(b, IntCC::Equal, a, c),
@@ -383,7 +383,7 @@ fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Res
             let cc = ctx.cc;
             let helpers = ctx.helpers;
             let neg = b.ins().ineg(a);
-            let fits = b.ins().icmp_imm(IntCC::NotEqual, a, i64::MIN);
+            let fits = b.ins().icmp_imm_u(IntCC::NotEqual, a, i64::MIN);
             let raise = b.create_block();
             let cont = b.create_block();
             b.ins().brif(fits, cont, &[], raise, &[]);
@@ -396,8 +396,8 @@ fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Res
             neg
         }
         SsaUnOp::NegFloat => b.ins().fneg(a),
-        SsaUnOp::Not => b.ins().bxor_imm(a, 1),
-        SsaUnOp::BitNotInt => b.ins().bxor_imm(a, -1),
+        SsaUnOp::Not => b.ins().bxor_imm_u(a, 1),
+        SsaUnOp::BitNotInt => b.ins().bxor_imm_u(a, -1),
         SsaUnOp::Dyn(_) => return Err("from_ssa: a Dyn operator is lowered by dynop".into()),
     })
 }

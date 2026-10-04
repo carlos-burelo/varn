@@ -1,5 +1,5 @@
 use cranelift_codegen::ir::{
-    condcodes::IntCC, types, InstBuilder, MemFlags, StackSlotData, StackSlotKind, Value,
+    condcodes::IntCC, types, InstBuilder, StackSlotData, StackSlotKind, Value,
 };
 use cranelift_frontend::FunctionBuilder;
 
@@ -22,7 +22,7 @@ pub(crate) fn run_entered_or(
     let declined = b.create_block();
     let merge = b.create_block();
     b.append_block_param(merge, types::I128);
-    let taken = b.ins().icmp_imm(IntCC::NotEqual, entry, 0);
+    let taken = b.ins().icmp_imm_u(IntCC::NotEqual, entry, 0);
     b.ins().brif(taken, entered, &[], declined, &[]);
 
     b.switch_to_block(entered);
@@ -33,7 +33,7 @@ pub(crate) fn run_entered_or(
     b.switch_to_block(declined);
     let fallback = b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ctx.exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
     );
@@ -45,7 +45,7 @@ pub(crate) fn run_entered_or(
 }
 
 fn run_entered(b: &mut FunctionBuilder, ctx: &Ctx<'_>, entry: Value, out: Value) -> Value {
-    let m = MemFlags::trusted();
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let closure = b.ins().load(types::I64, m, out, 0);
     let base = b.ins().load(types::I64, m, out, 8);
     let null = b.ins().iconst(types::I64, 0);

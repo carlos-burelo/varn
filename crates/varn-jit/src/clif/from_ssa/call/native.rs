@@ -1,4 +1,4 @@
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::super::emit::{box_bool, box_int, call_helper, call_helper_void};
@@ -92,7 +92,7 @@ pub(crate) fn emit_call_native_op(
         );
         return Ok(b.ins().load(
             types::I128,
-            MemFlags::trusted(),
+            cranelift_codegen::ir::MemFlagsData::trusted(),
             frame.exec_ctx,
             ctx.helpers.jit_native_result_offset as i32,
         ));
@@ -123,7 +123,7 @@ pub(crate) fn emit_call_native_op(
         );
         return Ok(b.ins().load(
             types::I128,
-            MemFlags::trusted(),
+            cranelift_codegen::ir::MemFlagsData::trusted(),
             frame.exec_ctx,
             ctx.helpers.jit_native_result_offset as i32,
         ));
@@ -141,7 +141,7 @@ pub(crate) fn emit_call_native_op(
     );
     Ok(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         frame.exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
     ))

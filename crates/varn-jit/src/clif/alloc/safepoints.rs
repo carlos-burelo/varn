@@ -6,7 +6,7 @@
 //! records) served the bytecode lowering's register model: heap values live
 //! in their homes by construction, so there is nothing to flush.
 
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
@@ -143,17 +143,17 @@ pub(crate) fn emit_gc_poll(
 ) {
     let rcbox = b.ins().load(
         types::I64,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         exec_ctx,
         h.heap_field_offset as i32,
     );
     let len = b.ins().load(
         types::I64,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         rcbox,
         h.nursery_len_offset as i32,
     );
-    let over = b.ins().icmp_imm(
+    let over = b.ins().icmp_imm_u(
         IntCC::UnsignedGreaterThanOrEqual,
         len,
         h.nursery_threshold as i64,

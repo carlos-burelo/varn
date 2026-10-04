@@ -155,21 +155,21 @@ pub(in crate::clif) fn emit_array_payload(
     // every access re-resolves from the (reloaded) receiver. The element
     // Vec's data/len words are never readonly — an out-of-bounds store's
     // append path reallocates them.
-    let ro = MemFlags::trusted();
+    let ro = cranelift_codegen::ir::MemFlagsData::trusted();
     let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
         b.ins().isplit(obj)
     } else {
         (b.ins().iconst(types::I64, HEAP_KIND), obj)
     };
-    let tag = b.ins().band_imm(obj_tag, KIND_MASK);
-    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
+    let tag = b.ins().band_imm_u(obj_tag, KIND_MASK);
+    let is_heap = b.ins().icmp_imm_u(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
 
-    let raw = b.ins().band_imm(obj_payload, 0xFFFF_FFFF);
+    let raw = b.ins().band_imm_u(obj_payload, 0xFFFF_FFFF);
     let rc = b.ins().load(types::I64, ro, exec_ctx, heap_off as i32);
-    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
 
     let (base, idx) = if nursery_only {
         let cont = b.create_block();
@@ -195,16 +195,16 @@ pub(in crate::clif) fn emit_array_payload(
             rc,
             (lay.nursery_slots_vec_off + lay.slots_ptr_off) as i32,
         );
-        let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+        let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
         let base = b.ins().select(old_bit, base_old, base_nur);
         let idx = b.ins().select(old_bit, idx_old, raw);
         (base, idx)
     };
 
-    let byte_off = b.ins().imul_imm(idx, lay.slot_size as i64);
+    let byte_off = b.ins().imul_imm_u(idx, lay.slot_size as i64);
     let slot = b.ins().iadd(base, byte_off);
     let tagb = b.ins().uload8(types::I64, ro, slot, 0);
-    let is_arr = b.ins().icmp_imm(IntCC::Equal, tagb, lay.array_tag as i64);
+    let is_arr = b.ins().icmp_imm_u(IntCC::Equal, tagb, lay.array_tag as i64);
     let ok = b.create_block();
     b.ins().brif(is_arr, ok, &[], slow, &[]);
     b.switch_to_block(ok);
@@ -234,7 +234,7 @@ pub(in crate::clif) fn array_disc(
 ) -> cranelift_codegen::ir::Value {
     b.ins().uload8(
         types::I64,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         payload,
         (16 + lay.disc_off) as i32,
     )
@@ -298,7 +298,7 @@ pub(in crate::clif) fn emit_object_data_base(
     heap_off: usize,
     invalid: cranelift_codegen::ir::Block,
 ) -> cranelift_codegen::ir::Value {
-    let m = MemFlags::trusted();
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
         b.ins().isplit(obj)
     } else {
@@ -306,16 +306,16 @@ pub(in crate::clif) fn emit_object_data_base(
     };
 
     // 1. Heap-pointer tag check.
-    let tag = b.ins().band_imm(obj_tag, KIND_MASK);
-    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
+    let tag = b.ins().band_imm_u(obj_tag, KIND_MASK);
+    let is_heap = b.ins().icmp_imm_u(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], invalid, &[]);
     b.switch_to_block(chk);
 
     // 2. Heap index + generation select → slot address.
-    let raw = b.ins().band_imm(obj_payload, 0xFFFF_FFFF);
+    let raw = b.ins().band_imm_u(obj_payload, 0xFFFF_FFFF);
     let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
-    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
     let base_old = b.ins().load(
         types::I64,
         m,
@@ -328,18 +328,20 @@ pub(in crate::clif) fn emit_object_data_base(
         rc,
         (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
     );
-    let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+    let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
     let base = b.ins().select(old_bit, base_old, base_nur);
     let idx = b.ins().select(old_bit, idx_old, raw);
-    let byte_off = b.ins().imul_imm(idx, alay.slot_size as i64);
+    let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
     let slot_addr = b.ins().iadd(base, byte_off);
 
     // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
     let is_inst = b
         .ins()
-        .icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
-    let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
+        .icmp_imm_u(IntCC::Equal, tagb, olay.instance_tag as i64);
+    let is_obj = b
+        .ins()
+        .icmp_imm_u(IntCC::Equal, tagb, olay.object_tag as i64);
     let is_valid = b.ins().bor(is_inst, is_obj);
     let ok = b.create_block();
     b.ins().brif(is_valid, ok, &[], invalid, &[]);

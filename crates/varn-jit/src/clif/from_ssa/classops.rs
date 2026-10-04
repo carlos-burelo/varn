@@ -47,7 +47,7 @@ pub(super) fn emit_make_class(
     );
     Ok(b.ins().load(
         types::I128,
-        cranelift_codegen::ir::MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     ))
@@ -107,14 +107,14 @@ pub(super) fn emit_define_member(
         48,
         3,
     ));
-    b.ins().stack_store(ct, slot, 0);
-    b.ins().stack_store(cp, slot, 8);
-    b.ins().stack_store(mt, slot, 16);
-    b.ins().stack_store(mp, slot, 24);
+    b.ins().stack_store(types::I64, ct, slot, 0);
+    b.ins().stack_store(types::I64, cp, slot, 8);
+    b.ins().stack_store(types::I64, mt, slot, 16);
+    b.ins().stack_store(types::I64, mp, slot, 24);
     let name_v = b.ins().iconst(types::I64, name_idx as i64);
-    b.ins().stack_store(name_v, slot, 32);
+    b.ins().stack_store(types::I64, name_v, slot, 32);
     let kind_v = b.ins().iconst(types::I64, kind);
-    b.ins().stack_store(kind_v, slot, 40);
+    b.ins().stack_store(types::I64, kind_v, slot, 40);
     let args = b.ins().stack_addr(types::I64, slot, 0);
 
     call_helper_void(
@@ -142,7 +142,7 @@ pub(super) fn emit_get_super(
     call_helper_void(b, ctx.cc, ctx.helpers.get_super, &[ectx, name_v]);
     Ok(b.ins().load(
         types::I128,
-        cranelift_codegen::ir::MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     ))
@@ -170,7 +170,7 @@ pub(super) fn emit_make_enum_variant(
     );
     Ok(b.ins().load(
         types::I128,
-        cranelift_codegen::ir::MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         frame.exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
     ))

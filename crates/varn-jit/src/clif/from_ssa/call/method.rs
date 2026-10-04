@@ -18,24 +18,26 @@ fn emit_is_str(
     yes: cranelift_codegen::ir::Block,
     no: cranelift_codegen::ir::Block,
 ) {
-    use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
-    let m = MemFlags::trusted();
-    let k = b.ins().band_imm(tag, super::super::super::emit::KIND_MASK);
+    use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
+    let k = b
+        .ins()
+        .band_imm_u(tag, super::super::super::emit::KIND_MASK);
     let is_sso = b
         .ins()
-        .icmp_imm(IntCC::Equal, k, varn_types::vm_value::KIND_SSO as i64);
+        .icmp_imm_u(IntCC::Equal, k, varn_types::vm_value::KIND_SSO as i64);
     let is_heap = b
         .ins()
-        .icmp_imm(IntCC::Equal, k, super::super::super::emit::HEAP_KIND);
+        .icmp_imm_u(IntCC::Equal, k, super::super::super::emit::HEAP_KIND);
     let walk = b.create_block();
     let not_sso = b.create_block();
     b.ins().brif(is_sso, yes, &[], not_sso, &[]);
     b.switch_to_block(not_sso);
     b.ins().brif(is_heap, walk, &[], no, &[]);
     b.switch_to_block(walk);
-    let raw = b.ins().band_imm(payload, 0xFFFF_FFFF);
+    let raw = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
     let rc = b.ins().load(types::I64, m, ectx, heap_off as i32);
-    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
     let base_old = b.ins().load(
         types::I64,
         m,
@@ -48,13 +50,13 @@ fn emit_is_str(
         rc,
         (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
     );
-    let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+    let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
     let base = b.ins().select(old_bit, base_old, base_nur);
     let idx = b.ins().select(old_bit, idx_old, raw);
-    let byte_off = b.ins().imul_imm(idx, alay.slot_size as i64);
+    let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
     let slot_addr = b.ins().iadd(base, byte_off);
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
-    let is_str = b.ins().icmp_imm(IntCC::Equal, tagb, str_tag as i64);
+    let is_str = b.ins().icmp_imm_u(IntCC::Equal, tagb, str_tag as i64);
     b.ins().brif(is_str, yes, &[], no, &[]);
 }
 
@@ -68,7 +70,7 @@ pub(crate) fn emit_method_call(
     cs: u16,
 ) -> Result<Value, String> {
     use cranelift_codegen::ir::condcodes::IntCC;
-    use cranelift_codegen::ir::{types, MemFlags};
+    use cranelift_codegen::ir::types;
     let frame = ctx
         .frame
         .as_ref()
@@ -89,7 +91,7 @@ pub(crate) fn emit_method_call(
     b.append_block_param(called, types::I64);
     let out = entry_out_slot(b);
 
-    let m = MemFlags::trusted();
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let olay = &ctx.helpers.object_layout;
     let alay = &ctx.helpers.array_layout;
     let heap_off = ctx.helpers.heap_field_offset;
@@ -148,16 +150,16 @@ pub(crate) fn emit_method_call(
     }
 
     let (rt, rp) = b.ins().isplit(receiver);
-    let kind = b.ins().band_imm(rt, super::super::super::emit::KIND_MASK);
+    let kind = b.ins().band_imm_u(rt, super::super::super::emit::KIND_MASK);
     let is_heap = b
         .ins()
-        .icmp_imm(IntCC::Equal, kind, super::super::super::emit::HEAP_KIND);
+        .icmp_imm_u(IntCC::Equal, kind, super::super::super::emit::HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
-    let raw = b.ins().band_imm(rp, 0xFFFF_FFFF);
+    let raw = b.ins().band_imm_u(rp, 0xFFFF_FFFF);
     let rc = b.ins().load(types::I64, m, ectx, heap_off as i32);
-    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
     let base_old = b.ins().load(
         types::I64,
         m,
@@ -170,15 +172,15 @@ pub(crate) fn emit_method_call(
         rc,
         (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
     );
-    let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+    let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
     let base = b.ins().select(old_bit, base_old, base_nur);
     let idx = b.ins().select(old_bit, idx_old, raw);
-    let byte_off = b.ins().imul_imm(idx, alay.slot_size as i64);
+    let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
     let slot_addr = b.ins().iadd(base, byte_off);
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
     let is_inst = b
         .ins()
-        .icmp_imm(IntCC::Equal, tagb, olay.instance_tag as i64);
+        .icmp_imm_u(IntCC::Equal, tagb, olay.instance_tag as i64);
     let ok = b.create_block();
     b.ins().brif(is_inst, ok, &[], slow, &[]);
     b.switch_to_block(ok);
@@ -196,7 +198,7 @@ pub(crate) fn emit_method_call(
         frame.closure,
         ctx.helpers.closure_ic_entries_offset as i32,
     );
-    let slot_base = b.ins().iadd_imm(
+    let slot_base = b.ins().iadd_imm_u(
         ic_base,
         i64::from(cs) * (ctx.helpers.poly_ic_slot_size as i64),
     );
@@ -206,17 +208,17 @@ pub(crate) fn emit_method_call(
         b.switch_to_block(next);
         next = b.create_block();
         let hit = b.create_block();
-        let entry = b.ins().iadd_imm(slot_base, (i * 8) as i64);
+        let entry = b.ins().iadd_imm_u(slot_base, (i * 8) as i64);
         let id32 = b.ins().load(types::I32, m, entry, 0);
         let id = b.ins().uextend(types::I64, id32);
         let kc = b.ins().uload8(types::I64, m, entry, 6);
         let id_eq = b.ins().icmp(IntCC::Equal, id, cid);
-        let is_native = b.ins().icmp_imm(
+        let is_native = b.ins().icmp_imm_u(
             IntCC::Equal,
             kc,
             varn_types::chunk::ICKind::NATIVE_VTABLE_METHOD as i64,
         );
-        let is_vm = b.ins().icmp_imm(
+        let is_vm = b.ins().icmp_imm_u(
             IntCC::Equal,
             kc,
             varn_types::chunk::ICKind::VM_VTABLE_METHOD as i64,
@@ -227,7 +229,7 @@ pub(crate) fn emit_method_call(
 
         b.switch_to_block(hit);
         let classp = b.ins().load(types::I64, m, entry, 8);
-        let has_class = b.ins().icmp_imm(IntCC::NotEqual, classp, 0);
+        let has_class = b.ins().icmp_imm_u(IntCC::NotEqual, classp, 0);
         let go = b.create_block();
         b.ins().brif(has_class, go, &[], next, &[]);
         b.switch_to_block(go);

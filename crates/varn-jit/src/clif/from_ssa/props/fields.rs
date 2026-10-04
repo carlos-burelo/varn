@@ -1,4 +1,4 @@
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::super::emit::{call_helper_void, emit_object_data_base};
@@ -63,7 +63,7 @@ pub(crate) fn emit_get_fixed_field(
     );
     Ok(Out::Boxed(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     )))
@@ -99,7 +99,7 @@ fn emit_get_fixed_field_native(
         slow,
     );
     let off = offset as i32;
-    let m = MemFlags::trusted();
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let v = match TypeLayout::of_field(tag).repr {
         ScalarRepr::I64 => b.ins().load(types::I64, m, data_base, off),
         ScalarRepr::F64 => b.ins().load(types::F64, m, data_base, off),
@@ -118,7 +118,7 @@ fn emit_get_fixed_field_native(
     call_helper_void(b, ctx.cc, h.get_fixed_field, &[ectx, ot, op, slot_v]);
     let boxed = b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         h.jit_native_result_offset as i32,
     );

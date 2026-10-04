@@ -3,7 +3,7 @@
 //! representation its `TypeLayout` gives. [`load_compact`] and
 //! [`store_compact`] are the one lowering of that access.
 
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::FunctionBuilder;
 use varn_types::layout::{ScalarRepr, TypeLayout, COMPACT_REF_NULL};
@@ -44,7 +44,7 @@ pub(crate) fn load_compact(
         slow,
     );
     let off = offset as i32;
-    let m = MemFlags::trusted();
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let pair = match TypeLayout::of_field(tag).repr {
         ScalarRepr::Bool => {
             let b8 = b.ins().load(types::I8, m, data_base, off);
@@ -61,7 +61,9 @@ pub(crate) fn load_compact(
         }
         ScalarRepr::Ref => {
             let raw = b.ins().load(types::I64, m, data_base, off);
-            let is_null = b.ins().icmp_imm(IntCC::Equal, raw, COMPACT_REF_NULL as i64);
+            let is_null = b
+                .ins()
+                .icmp_imm_u(IntCC::Equal, raw, COMPACT_REF_NULL as i64);
             let null_tag = b.ins().iconst(types::I64, KIND_NULL as i64);
             let heap_tag = b.ins().iconst(types::I64, KIND_HEAP as i64);
             let zero = b.ins().iconst(types::I64, 0);
@@ -84,7 +86,7 @@ pub(crate) fn load_compact(
     );
     let res = b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         io.exec_ctx,
         io.helpers.jit_native_result_offset as i32,
     );
@@ -116,11 +118,11 @@ pub(crate) fn store_compact(
     // path both read them.
     let (obj_tag, obj_payload) = b.ins().isplit(obj);
     let (value_tag, payload) = b.ins().isplit(value);
-    let kind = b.ins().band_imm(obj_tag, emit::KIND_MASK);
-    let heap_ok = b.ins().icmp_imm(IntCC::Equal, kind, KIND_HEAP as i64);
-    let raw = b.ins().band_imm(obj_payload, 0xFFFF_FFFF);
-    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
-    let not_old = b.ins().icmp_imm(IntCC::Equal, old_bit, 0);
+    let kind = b.ins().band_imm_u(obj_tag, emit::KIND_MASK);
+    let heap_ok = b.ins().icmp_imm_u(IntCC::Equal, kind, KIND_HEAP as i64);
+    let raw = b.ins().band_imm_u(obj_payload, 0xFFFF_FFFF);
+    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
+    let not_old = b.ins().icmp_imm_u(IntCC::Equal, old_bit, 0);
     let can_inline = b.ins().band(heap_ok, not_old);
     b.ins().brif(can_inline, inline, &[], slow, &[]);
 
@@ -135,7 +137,7 @@ pub(crate) fn store_compact(
         slow,
     );
     let off = offset as i32;
-    let m = MemFlags::new();
+    let m = cranelift_codegen::ir::MemFlagsData::new();
     match TypeLayout::of_field(tag).repr {
         ScalarRepr::Bool => {
             b.ins().istore8(m, payload, data_base, off);
@@ -148,7 +150,9 @@ pub(crate) fn store_compact(
             b.ins().store(m, f, data_base, off);
         }
         ScalarRepr::Ref => {
-            let is_null = b.ins().icmp_imm(IntCC::Equal, value_tag, KIND_NULL as i64);
+            let is_null = b
+                .ins()
+                .icmp_imm_u(IntCC::Equal, value_tag, KIND_NULL as i64);
             let null_niche = b.ins().iconst(types::I64, COMPACT_REF_NULL as i64);
             let stored = b.ins().select(is_null, null_niche, payload);
             b.ins().store(m, stored, data_base, off);

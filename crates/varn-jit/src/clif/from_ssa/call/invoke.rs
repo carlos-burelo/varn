@@ -1,4 +1,4 @@
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::super::emit::{call_helper, call_helper_void};
@@ -24,8 +24,12 @@ pub(crate) fn emit_new(
     }
     let addr = scratch_addr(b, ctx, vals.len().max(1));
     for (i, v) in vals.iter().enumerate() {
-        b.ins()
-            .store(MemFlags::trusted(), *v, addr, (i * 16) as i32);
+        b.ins().store(
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            *v,
+            addr,
+            (i * 16) as i32,
+        );
     }
     let argc = b.ins().iconst(types::I64, vals.len() as i64);
     call_helper_void(
@@ -36,7 +40,7 @@ pub(crate) fn emit_new(
     );
     Ok(Out::Boxed(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         frame.exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
     )))
@@ -50,11 +54,20 @@ pub(crate) fn boxed_window(
     args: &[u32],
 ) -> Result<Value, String> {
     let addr = scratch_addr(b, ctx, args.len() + 1);
-    b.ins().store(MemFlags::trusted(), callee, addr, 0);
+    b.ins().store(
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        callee,
+        addr,
+        0,
+    );
     for (i, v) in args.iter().enumerate() {
         let boxed = heap::boxed_value(b, ctx, values, *v)?;
-        b.ins()
-            .store(MemFlags::trusted(), boxed, addr, ((i + 1) * 16) as i32);
+        b.ins().store(
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            boxed,
+            addr,
+            ((i + 1) * 16) as i32,
+        );
     }
     Ok(addr)
 }

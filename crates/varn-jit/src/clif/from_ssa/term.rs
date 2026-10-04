@@ -2,7 +2,7 @@
 //! parallel argument windows that fill each target block's phi params.
 
 use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
-use cranelift_codegen::ir::{types, BlockArg, InstBuilder, MemFlags, TrapCode, Value};
+use cranelift_codegen::ir::{types, BlockArg, InstBuilder, TrapCode, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::SsaTerm;
@@ -21,7 +21,7 @@ fn store_boxed_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>, boxed: Value) -> R
         .as_ref()
         .ok_or("from_ssa: non-scalar return without a frame")?;
     b.ins().store(
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         boxed,
         frame.exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
@@ -42,7 +42,7 @@ fn truthy(
     let x = load_value(b, ctx, values, v)?;
     Ok(match ctx.ssa.value_ty(v) {
         SlotKind::Bool => x,
-        SlotKind::Int => b.ins().icmp_imm(IntCC::NotEqual, x, 0),
+        SlotKind::Int => b.ins().icmp_imm_u(IntCC::NotEqual, x, 0),
         SlotKind::Float => {
             let zero = b.ins().f64const(0.0);
             b.ins().fcmp(FloatCC::OrderedNotEqual, x, zero)

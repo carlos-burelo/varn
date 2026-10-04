@@ -7,7 +7,7 @@
 //! CLIF copy to keep in step. Creating a closure and a closure body's
 //! upvalue accesses run the runtime's one implementation of each.
 
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, StackSlotData, StackSlotKind, Value};
+use cranelift_codegen::ir::{types, InstBuilder, StackSlotData, StackSlotKind, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::{SsaUpvalue, UPVALUE_LOCAL};
 
@@ -30,7 +30,7 @@ fn captured_reg(ctx: &Ctx<'_>, var: u32) -> Result<u32, String> {
 fn native_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exec_ctx: Value) -> Value {
     b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
     )
@@ -66,7 +66,12 @@ pub(super) fn emit_make_closure(
         let addr = b.ins().stack_addr(types::I64, slot, 0);
         for (i, w) in words.iter().enumerate() {
             let w = b.ins().iconst(types::I64, *w as i64);
-            b.ins().store(MemFlags::trusted(), w, addr, (i * 8) as i32);
+            b.ins().store(
+                cranelift_codegen::ir::MemFlagsData::trusted(),
+                w,
+                addr,
+                (i * 8) as i32,
+            );
         }
         addr
     };

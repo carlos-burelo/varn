@@ -1,6 +1,6 @@
 //! String primitives shared with the SSA lowering.
 
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
 
 use super::emit::box_int;
@@ -20,10 +20,10 @@ pub(super) fn str_length_boxed(
 ) -> cranelift_codegen::ir::Value {
     let kind = b
         .ins()
-        .band_imm(tag, varn_types::vm_value::KIND_MASK as i64);
+        .band_imm_u(tag, varn_types::vm_value::KIND_MASK as i64);
     let is_sso = b
         .ins()
-        .icmp_imm(IntCC::Equal, kind, varn_types::vm_value::KIND_SSO as i64);
+        .icmp_imm_u(IntCC::Equal, kind, varn_types::vm_value::KIND_SSO as i64);
 
     let fast = b.create_block();
     let slow = b.create_block();
@@ -33,8 +33,8 @@ pub(super) fn str_length_boxed(
     b.ins().brif(is_sso, fast, &[], slow, &[]);
 
     b.switch_to_block(fast);
-    let s = b.ins().ushr_imm(tag, 8);
-    let sso_len = b.ins().band_imm(s, 0xFF);
+    let s = b.ins().ushr_imm_u(tag, 8);
+    let sso_len = b.ins().band_imm_u(s, 0xFF);
     let boxed_len = box_int(b, sso_len);
     b.ins().jump(merge, &[boxed_len.into()]);
 
@@ -42,7 +42,7 @@ pub(super) fn str_length_boxed(
     super::emit::call_helper_void(b, cc, helper, &[exec_ctx, tag, payload]);
     let res = b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         exec_ctx,
         native_result_offset,
     );

@@ -1,6 +1,4 @@
-use cranelift_codegen::ir::{
-    condcodes::IntCC, types, AbiParam, InstBuilder, MemFlags, Signature, Value,
-};
+use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, Signature, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::vm_value::KIND_HEAP;
@@ -63,8 +61,13 @@ pub(crate) fn emit_call(
     let same_tag = b.ins().icmp(IntCC::Equal, ctag, expected_tag);
     let same_payload = b.ins().icmp(IntCC::Equal, cpayload, expected_payload);
     let slot_addr = b.ins().iconst(types::I64, target.raw_slot as i64);
-    let raw = b.ins().load(types::I64, MemFlags::trusted(), slot_addr, 0);
-    let published = b.ins().icmp_imm(IntCC::NotEqual, raw, 0);
+    let raw = b.ins().load(
+        types::I64,
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        slot_addr,
+        0,
+    );
+    let published = b.ins().icmp_imm_u(IntCC::NotEqual, raw, 0);
     let both = b.ins().band(same_tag, same_payload);
     let take_direct = b.ins().band(both, published);
 

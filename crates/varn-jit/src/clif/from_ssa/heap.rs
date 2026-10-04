@@ -11,7 +11,7 @@
 //! Property/index/field access lives in [`super::props`]; this file owns
 //! constants, string/aggregate construction and type questions.
 
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::{load_value, Ctx};
@@ -98,7 +98,7 @@ pub(super) fn emit_unary_boxed(
     call_helper_void(b, ctx.cc, helper, &[ectx, tag, payload]);
     Ok(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     ))
@@ -119,7 +119,7 @@ pub(super) fn emit_str_concat(
     call_helper_void(b, ctx.cc, ctx.helpers.str_concat, &[ectx, at, ap, bt, bp]);
     Ok(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     ))
@@ -210,8 +210,12 @@ pub(super) fn emit_build_object(
     ));
     let addr = b.ins().stack_addr(types::I64, slot, 0);
     for (i, v) in vals.iter().enumerate() {
-        b.ins()
-            .store(MemFlags::trusted(), *v, addr, (i * 16) as i32);
+        b.ins().store(
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            *v,
+            addr,
+            (i * 16) as i32,
+        );
     }
     let count_v = b.ins().iconst(types::I64, count as i64);
     let shape_v = b.ins().iconst(types::I64, shape_ptr as i64);
@@ -227,7 +231,7 @@ pub(super) fn emit_build_object(
     );
     Ok(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     ))
@@ -246,14 +250,18 @@ fn emit_window_boxed(
     let ectx = exec_ctx(ctx);
     let addr = super::call::scratch_addr(b, ctx, vals.len().max(1));
     for (i, v) in vals.iter().enumerate() {
-        b.ins()
-            .store(MemFlags::trusted(), *v, addr, (i * 16) as i32);
+        b.ins().store(
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            *v,
+            addr,
+            (i * 16) as i32,
+        );
     }
     let count_v = b.ins().iconst(types::I64, count as i64);
     call_helper_void(b, ctx.cc, helper, &[ectx, addr, count_v]);
     Ok(b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
     ))

@@ -20,7 +20,7 @@
 //! The buffer, length and representation come from the receiver's cached
 //! view when one is set ([`super::views`]).
 
-use cranelift_codegen::ir::{condcodes::IntCC, types, Block, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{condcodes::IntCC, types, Block, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
@@ -148,7 +148,7 @@ fn resolve(
         None,
         false,
     );
-    let m = MemFlags::trusted();
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let data = b
         .ins()
         .load(types::I64, m, payload, (16 + lay.elems_ptr_off) as i32);
@@ -190,14 +190,19 @@ pub(super) fn emit_get(
 
     let matched = b.create_block();
     let other = b.create_block();
-    let is_match = b.ins().icmp_imm(IntCC::Equal, disc, want.disc());
+    let is_match = b.ins().icmp_imm_u(IntCC::Equal, disc, want.disc());
     b.ins().brif(is_match, matched, &[], other, &[]);
 
     b.switch_to_block(matched);
     let scale = if want == Elem::Boxed { 4 } else { 3 };
-    let off = b.ins().ishl_imm(key, scale);
+    let off = b.ins().ishl_imm_u(key, scale);
     let addr = b.ins().iadd(data, off);
-    let v = b.ins().load(want.clif_ty(), MemFlags::trusted(), addr, 0);
+    let v = b.ins().load(
+        want.clif_ty(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        addr,
+        0,
+    );
     b.ins().jump(merge, &[v.into()]);
 
     b.switch_to_block(other);
@@ -205,13 +210,18 @@ pub(super) fn emit_get(
         // A boxed destination only reads a `Boxed` buffer raw.
         b.ins().jump(slow, &[]);
     } else {
-        let is_boxed = b.ins().icmp_imm(IntCC::Equal, disc, 0);
+        let is_boxed = b.ins().icmp_imm_u(IntCC::Equal, disc, 0);
         let boxed_arm = b.create_block();
         b.ins().brif(is_boxed, boxed_arm, &[], slow, &[]);
         b.switch_to_block(boxed_arm);
-        let off = b.ins().ishl_imm(key, 4);
+        let off = b.ins().ishl_imm_u(key, 4);
         let addr = b.ins().iadd(data, off);
-        let raw = b.ins().load(types::I128, MemFlags::trusted(), addr, 0);
+        let raw = b.ins().load(
+            types::I128,
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            addr,
+            0,
+        );
         let v = want.unbox_elem(b, raw);
         b.ins().jump(merge, &[v.into()]);
     }
@@ -229,7 +239,7 @@ pub(super) fn emit_get(
     );
     let r = b.ins().load(
         types::I128,
-        MemFlags::trusted(),
+        cranelift_codegen::ir::MemFlagsData::trusted(),
         exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
     );
@@ -273,24 +283,30 @@ pub(super) fn emit_set(
 
         let matched = b.create_block();
         let other = b.create_block();
-        let is_match = b.ins().icmp_imm(IntCC::Equal, disc, src.disc());
+        let is_match = b.ins().icmp_imm_u(IntCC::Equal, disc, src.disc());
         b.ins().brif(is_match, matched, &[], other, &[]);
 
         b.switch_to_block(matched);
-        let off = b.ins().ishl_imm(key, 3);
+        let off = b.ins().ishl_imm_u(key, 3);
         let addr = b.ins().iadd(data, off);
-        b.ins().store(MemFlags::trusted(), raw, addr, 0);
+        b.ins()
+            .store(cranelift_codegen::ir::MemFlagsData::trusted(), raw, addr, 0);
         b.ins().jump(merge, &[]);
 
         b.switch_to_block(other);
-        let is_boxed = b.ins().icmp_imm(IntCC::Equal, disc, 0);
+        let is_boxed = b.ins().icmp_imm_u(IntCC::Equal, disc, 0);
         let boxed_arm = b.create_block();
         b.ins().brif(is_boxed, boxed_arm, &[], slow, &[]);
         b.switch_to_block(boxed_arm);
-        let off = b.ins().ishl_imm(key, 4);
+        let off = b.ins().ishl_imm_u(key, 4);
         let addr = b.ins().iadd(data, off);
         let boxed = src.box_elem(b, raw);
-        b.ins().store(MemFlags::trusted(), boxed, addr, 0);
+        b.ins().store(
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            boxed,
+            addr,
+            0,
+        );
         b.ins().jump(merge, &[]);
     } else {
         b.ins().jump(slow, &[]);

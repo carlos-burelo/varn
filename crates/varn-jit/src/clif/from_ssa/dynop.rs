@@ -5,7 +5,7 @@
 //! same thing compiled either way. The live `ExecCtx` es `ctx.exec_ctx`
 //! (entry param 0 en leaf, 3 en frame-aware).
 
-use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{DynBinOp, DynUnOp};
@@ -83,10 +83,12 @@ pub(super) fn emit_un(
     Ok(match op {
         DynUnOp::Neg => {
             call_helper_void(b, ctx.cc, h.negate, &[ectx, tag, payload]);
-            Out::Boxed(
-                b.ins()
-                    .load(types::I128, MemFlags::trusted(), ectx, result_off),
-            )
+            Out::Boxed(b.ins().load(
+                types::I128,
+                cranelift_codegen::ir::MemFlagsData::trusted(),
+                ectx,
+                result_off,
+            ))
         }
         DynUnOp::Not => {
             let cond = call_helper(b, ctx.cc, h.logical_not, &[ectx, tag, payload]);
