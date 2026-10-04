@@ -119,7 +119,7 @@ pub(super) fn emit(
             Out::Boxed(boxed)
         }
         SsaOp::This => {
-            let boxed = props::emit_this(b, ctx)?;
+            let boxed = props::emit_this(ctx)?;
             Out::Boxed(boxed)
         }
         SsaOp::Binary {

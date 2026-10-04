@@ -114,7 +114,7 @@ fn homes<'a>(ctx: &'a Ctx<'_>) -> Result<super::super::homes::Homes<'a>, String>
         .ok_or("from_ssa: home access without a frame")?;
     Ok(super::super::homes::Homes {
         exec_ctx: frame.exec_ctx,
-        base: frame.base,
+        base: frame.base.ok_or(super::NEEDS_ACTIVATION)?,
         layout: &frame.layout,
         offsets: &ctx.helpers.frame_layout,
     })

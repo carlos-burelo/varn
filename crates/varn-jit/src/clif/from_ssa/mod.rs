@@ -54,8 +54,9 @@ use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaOp, SsaProto, SsaTerm};
 use varn_types::{FunctionProto, VmValue};
 
-use super::abi::raw_signature;
+use super::abi::{raw_signature, Activation};
 use super::lower::ClifLinker;
+use super::native_abi::{NativeClass, NativeShape};
 use super::piece::{compile_piece, CompiledPiece};
 use crate::JitHelpers;
 
@@ -86,11 +87,13 @@ mod views;
 use store::{clif_ty, drop_home_addrs, home_load, home_store, is_heap, land, load_value, Out};
 
 /// Frame resources a frame-aware body needs for global access, calls and home
-/// storage. `base` is the activation id (raw ABI param 2).
+/// storage. `base` is the `FrameStore` activation id of a framed body; a
+/// native body has none, and reaching for a home there is
+/// [`NEEDS_ACTIVATION`].
 pub(super) struct FrameIo<'a> {
     pub exec_ctx: Value,
     pub closure: Value,
-    pub base: Value,
+    pub base: Option<Value>,
     pub linker: &'a dyn ClifLinker,
     /// Register → (class, index): where each register's home is.
     pub layout: varn_types::register_meta::FrameLayout,
@@ -113,6 +116,10 @@ pub(super) struct Ctx<'a> {
     pub exec_ctx: Value,
     /// `Some` iff this body is frame-aware (heap/globals/calls).
     pub frame: Option<FrameIo<'a>>,
+    pub activation: Activation,
+    /// Register 0 — `this`, or a plain call's callee placeholder — read once
+    /// at entry by any frame-aware body.
+    pub this: Option<Value>,
     /// Whether the host rounds in one instruction (`floor`/`ceil`, SSE4.1).
     pub has_round: bool,
     /// Each array receiver's view, valid until the next safepoint.
@@ -132,15 +139,27 @@ pub(super) struct Ctx<'a> {
     pub scratch: Option<call::ScratchWin>,
 }
 
-/// Attempt the SSA lowering. `Err` is the fallback signal, not a failure: the
-/// caller re-lowers from bytecode. On success returns the raw piece and whether
-/// it takes the frame-aware ABI.
+/// What a native lowering answers when the body reaches for a home: the body
+/// needs a `FrameStore` activation, so the caller lowers it framed instead.
+pub(super) const NEEDS_ACTIVATION: &str = "from_ssa: body needs a FrameStore activation";
+
+pub(super) struct Lowered {
+    pub piece: CompiledPiece,
+    /// The body never touches the VM frame — scalars only, no calls, globals
+    /// or throws — so a caller may enter it without pushing one.
+    pub frameless: bool,
+}
+
+/// Attempt the SSA lowering in `activation`'s ABI. `Err` leaves the function
+/// to the interpreter, except [`NEEDS_ACTIVATION`] from a native attempt,
+/// which the caller answers with a framed one.
 ///
 /// `osr_ip` selects the entry. `None` is a call: arguments in, execution from
 /// the entry block. `Some(ip)` is an on-stack-replacement entry into a running
 /// interpreted frame at the loop header starting at bytecode offset `ip`: no
 /// arguments, the header's parameters and live values read from their homes,
 /// and only the blocks reachable from the header compiled.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn try_lower(
     proto: &FunctionProto,
     ssa: &SsaProto,
@@ -149,8 +168,9 @@ pub(super) fn try_lower(
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
     osr_ip: Option<usize>,
+    activation: Activation,
     mut debug: Option<&mut super::debug::ClifDebugSink>,
-) -> Result<(CompiledPiece, bool), String> {
+) -> Result<Lowered, String> {
     let osr = match osr_ip {
         None => None,
         Some(ip) => Some(
@@ -158,6 +178,9 @@ pub(super) fn try_lower(
                 .ok_or_else(|| format!("from_ssa: no loop header at ip {ip}"))?,
         ),
     };
+    if osr.is_some() && activation == Activation::Native {
+        return Err(NEEDS_ACTIVATION.into());
+    }
     let nparams = proto.arity.saturating_sub(1);
     cfg::check_block_args(ssa)?;
     if proto.is_generator
@@ -165,43 +188,32 @@ pub(super) fn try_lower(
         || ssa.blocks.is_empty()
         || ssa.entry as usize >= ssa.blocks.len()
         || ssa.blocks[ssa.entry as usize].params.len() != nparams
+        || proto.param_kinds.len() != nparams
     {
         return Err("from_ssa: not a leaf-compatible proto".into());
     }
     let scalar = |k: SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
-    // A non-scalar parameter makes the body frame-aware: the raw ABI passes it
-    // as a bare payload, but the wrapper (the only way into a frame-aware
-    // body — its `clif_raw` stays 0, so no call site links it directly) has
-    // already left every argument in its home, register `1 + i`. The RETURN
-    // may be any class: a non-scalar return is written boxed to
-    // `jit_native_result` and the raw returns void, which is what the wrapper
-    // reads (see `build_wrapper`).
-    let heap_params = !proto.param_kinds.iter().all(|k| scalar(*k));
-
-    let has_heap = ssa.values.iter().any(|v| is_heap(v.ty));
-    let scalar_return = scalar(proto.return_kind);
-    // An OSR entry resumes a frame that exists: it reads the frame's homes.
-    let frame_aware = osr.is_some()
-        || has_heap
-        || heap_params
-        || !scalar_return
+    let frameless = !(ssa.values.iter().any(|v| is_heap(v.ty))
+        || !proto.param_kinds.iter().all(|k| scalar(*k))
+        || !scalar(proto.return_kind)
         || proto.has_this
         || ssa.has_this
         || proto.upvalue_count > 0
         || ssa.blocks.iter().any(|blk| {
             blk.insts.iter().any(|i| needs_frame(ssa, &i.op))
                 || matches!(blk.term, SsaTerm::Throw(_))
-        });
+        }));
+    let frame_aware = activation == Activation::Framed || !frameless;
 
     let cc = isa.default_call_conv();
     let abi_params = if osr.is_some() { 0 } else { nparams };
-    let mut func = Function::with_name_signature(
-        UserFuncName::user(0, 0),
-        raw_signature(proto, abi_params, isa, frame_aware),
-    );
-    // A self call in an OSR body goes through the runtime (it is frame-aware),
-    // never to this entry.
-    let self_sig = func.import_signature(raw_signature(proto, abi_params, isa, frame_aware));
+    let shape = NativeShape::of_proto(proto);
+    let signature = match activation {
+        Activation::Native => shape.signature(),
+        Activation::Framed => raw_signature(proto, abi_params, cc),
+    };
+    let mut func = Function::with_name_signature(UserFuncName::user(0, 0), signature.clone());
+    let self_sig = func.import_signature(signature);
     let self_name = func.declare_imported_user_function(UserExternalName::new(0, 0));
     let self_ref = func.import_function(ExtFuncData {
         name: ExternalName::user(self_name),
@@ -218,7 +230,6 @@ pub(super) fn try_lower(
     let entry = ssa.entry as usize;
     let call_entry = osr.is_none().then_some(entry);
     let start = osr.map_or(entry, |h| h.block as usize);
-    let preamble = if frame_aware { 4 } else { 1 };
     let mut blocks: Vec<Option<cranelift_codegen::ir::Block>> = vec![None; ssa.blocks.len()];
     let entry_blk = b.create_block();
     b.append_block_params_for_function_params(entry_blk);
@@ -253,29 +264,44 @@ pub(super) fn try_lower(
     b.switch_to_block(entry_blk);
     let views = views::Views::declare(&mut b, ssa);
 
-    // The frame-aware raw ABI prepends `stack, closure, base, exec_ctx`; a leaf
-    // abre con `exec_ctx` (param 0). Ambos reales, sin getters.
-    let frame = if frame_aware {
-        let params = b.block_params(entry_blk);
-        let abi_count = if osr.is_some() {
-            0
-        } else {
-            ssa.blocks[entry].params.len()
-        };
-        if params.len() != preamble + abi_count {
-            return Err("from_ssa: entry param count mismatch".into());
-        }
-        Some(FrameIo {
-            closure: params[1],
-            base: params[2],
-            exec_ctx: params[3],
-            linker,
-            layout: varn_types::register_meta::FrameLayout::for_proto(proto),
-        })
-    } else {
-        None
-    };
     let entry_params = b.block_params(entry_blk).to_vec();
+    let expected = match activation {
+        Activation::Native => 2 + shape.params.iter().map(|c| c.words()).sum::<usize>(),
+        Activation::Framed => 4 + abi_params,
+    };
+    if entry_params.len() != expected {
+        return Err("from_ssa: entry param count mismatch".into());
+    }
+    let (exec_ctx, closure, base) = match activation {
+        Activation::Native => (entry_params[0], entry_params[1], None),
+        Activation::Framed => (entry_params[3], entry_params[1], Some(entry_params[2])),
+    };
+    let frame = frame_aware.then(|| FrameIo {
+        exec_ctx,
+        closure,
+        base,
+        linker,
+        layout: varn_types::register_meta::FrameLayout::for_proto(proto),
+    });
+    let this = match (&frame, activation) {
+        (None, _) => None,
+        (Some(_), Activation::Native) => {
+            let v = b.ins().iconcat(entry_params[2], entry_params[3]);
+            b.declare_value_needs_stack_map(v);
+            Some(v)
+        }
+        (Some(f), Activation::Framed) => {
+            let homes = super::homes::Homes {
+                exec_ctx,
+                base: base.expect("a framed body has an activation"),
+                layout: &f.layout,
+                offsets: &helpers.frame_layout,
+            };
+            let v = homes.load(&mut b, 0);
+            b.declare_value_needs_stack_map(v);
+            Some(v)
+        }
+    };
     let scratch = call::ScratchWin::create(&mut b, call::scratch_max(ssa));
     let ctx = Ctx {
         cc,
@@ -284,12 +310,10 @@ pub(super) fn try_lower(
         proto,
         constants,
         self_ref,
-        exec_ctx: if frame_aware {
-            entry_params[3]
-        } else {
-            entry_params[0]
-        },
+        exec_ctx,
         frame,
+        activation,
+        this,
         has_round: super::floats::has_round_support(isa),
         views,
         in_range_steps: induction::in_range_steps(ssa, &preds, &rpo_pos, &reached),
@@ -347,25 +371,13 @@ pub(super) fn try_lower(
 
         let params: Vec<Value> = b.block_params(cb).to_vec();
         let is_call_entry = Some(i) == call_entry;
-        let base = if is_call_entry { preamble } else { 0 };
-        if is_call_entry && params.len() != base + blk.params.len() {
-            return Err("from_ssa: entry param count mismatch".into());
-        }
+        let mut word = 4;
         for (k, &p) in blk.params.iter().enumerate() {
-            let pv = params[base + k];
             let kind = ssa.value_ty(p);
-            // An entry parameter arrives as the ABI classifies it: a scalar
-            // `param_kinds` entry as its native value, anything else only in
-            // the home of register `1 + k` (see `heap_params`).
-            let pv = if is_call_entry && !scalar(proto.param_kinds[k]) {
-                store::load_home_value(&mut b, &ctx, 1 + k as u32, kind)?
-            } else if is_call_entry && proto.param_kinds[k] != kind {
-                return Err(format!(
-                    "from_ssa: parameter {k} is {kind:?} in the SSA but {:?} in the ABI",
-                    proto.param_kinds[k]
-                ));
+            let pv = if is_call_entry {
+                entry_param(&mut b, &ctx, &shape, &params, &mut word, k, kind)?
             } else {
-                pv
+                params[k]
             };
             store::define(&mut b, &ctx, &mut values, p, pv);
         }
@@ -409,7 +421,56 @@ pub(super) fn try_lower(
     b.finalize(isa.frontend_config());
     super::debug::capture_ir(&mut debug, &func);
     super::debug::capture_kinds_ssa(&mut debug, ssa);
-    Ok((compile_piece(func, isa)?, frame_aware))
+    Ok(Lowered {
+        piece: compile_piece(func, isa)?,
+        frameless,
+    })
+}
+
+/// SSA entry parameter `k` (register `1 + k`) as the ABI delivers it. A native
+/// body reads it in its class's form starting at entry word `*word`; a framed
+/// one takes a scalar-declared argument from its word and anything else from
+/// its home.
+fn entry_param(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    shape: &NativeShape,
+    params: &[Value],
+    word: &mut usize,
+    k: usize,
+    kind: SlotKind,
+) -> Result<Value, String> {
+    let declared = ctx.proto.param_kinds[k];
+    let mismatch =
+        || format!("from_ssa: parameter {k} is {kind:?} in the SSA but {declared:?} in the ABI");
+    match ctx.activation {
+        Activation::Native => {
+            let class = shape.params[1 + k];
+            let at = *word;
+            *word += class.words();
+            match class {
+                NativeClass::Boxed => {
+                    let boxed = b.ins().iconcat(params[at], params[at + 1]);
+                    if is_heap(kind) {
+                        Ok(boxed)
+                    } else {
+                        heap::unbox_dest(b, kind, boxed)
+                    }
+                }
+                NativeClass::Word | NativeClass::Float if declared == kind => Ok(params[at]),
+                NativeClass::Word | NativeClass::Float => Err(mismatch()),
+            }
+        }
+        Activation::Framed => {
+            if !matches!(declared, SlotKind::Int | SlotKind::Float | SlotKind::Bool) {
+                store::load_home_value(b, ctx, 1 + k as u32, kind)
+            } else if declared != kind {
+                Err(mismatch())
+            } else {
+                Ok(params[4 + k])
+            }
+        }
+    }
 }
 
 /// Whether `op` can push a VM frame (a real call, a module load, suspension

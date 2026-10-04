@@ -115,6 +115,8 @@ pub struct ClifInspection {
     pub clif_ir: Option<String>,
     pub code: Option<CodeBytes>,
     pub frame_aware: bool,
+    /// Lowered over a `FrameStore` activation rather than natively.
+    pub framed: bool,
     /// Which tests made it frame-aware — see `lower::frame_aware_reasons`.
     pub fa_reasons: Vec<&'static str>,
 }
@@ -137,9 +139,13 @@ pub fn inspect(
         None,
         Some(&mut sink),
     );
-    let (route, frame_aware) = match &result {
-        Ok(art) => (Ok(()), art.frame_aware),
-        Err(e) => (Err(e.clone()), false),
+    let (route, frame_aware, framed) = match &result {
+        Ok(art) => (
+            Ok(()),
+            !art.frameless,
+            art.activation == super::abi::Activation::Framed,
+        ),
+        Err(e) => (Err(e.clone()), false, false),
     };
     ClifInspection {
         name: proto.name.as_deref().unwrap_or("<top-level>").to_string(),
@@ -148,6 +154,7 @@ pub fn inspect(
         clif_ir: sink.clif_ir,
         code: sink.code,
         frame_aware,
+        framed,
         fa_reasons: super::lower::frame_aware_reasons(proto),
     }
 }

@@ -21,6 +21,7 @@ fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
 }
 
 fn captured_reg(ctx: &Ctx<'_>, var: u32) -> Result<u32, String> {
+    frame(ctx)?.base.ok_or(super::NEEDS_ACTIVATION)?;
     ctx.ssa
         .captured_reg(var)
         .ok_or_else(|| format!("from_ssa: captured variable {var} has no register"))
@@ -75,20 +76,17 @@ pub(super) fn emit_make_closure(
         }
         addr
     };
+    let base = match frame.base {
+        Some(base) => base,
+        None => b.ins().iconst(types::I64, 0),
+    };
     let proto_v = b.ins().iconst(types::I64, i64::from(proto));
     let count = b.ins().iconst(types::I64, words.len() as i64);
     call_helper_void(
         b,
         ctx.cc,
         ctx.helpers.make_closure_window,
-        &[
-            frame.exec_ctx,
-            frame.closure,
-            frame.base,
-            proto_v,
-            descs,
-            count,
-        ],
+        &[frame.exec_ctx, frame.closure, base, proto_v, descs, count],
     );
     Ok(native_result(b, ctx, frame.exec_ctx))
 }

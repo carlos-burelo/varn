@@ -1,7 +1,9 @@
-use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, Signature, Value};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
-use varn_types::vm_value::KIND_HEAP;
+use varn_types::vm_value::{KIND_HEAP, KIND_NULL};
+
+use super::super::super::native_abi::NativeShape;
 
 use super::super::super::emit::call_helper;
 use super::super::{heap, load_value, Ctx, Out};
@@ -78,25 +80,16 @@ pub(crate) fn emit_call(
     b.ins().brif(take_direct, fast, &[], slow, &[]);
 
     b.switch_to_block(fast);
-    let mut arg_values: Vec<Value> = args
-        .iter()
-        .map(|v| load_value(b, ctx, values, *v))
-        .collect::<Result<_, _>>()?;
-    arg_values.insert(0, ctx.exec_ctx);
+    let no_closure = b.ins().iconst(types::I64, 0);
+    let null_tag = b.ins().iconst(types::I64, KIND_NULL as i64);
+    let null_payload = b.ins().iconst(types::I64, 0);
+    let mut arg_values = vec![ctx.exec_ctx, no_closure, null_tag, null_payload];
+    for v in args {
+        arg_values.push(load_value(b, ctx, values, *v)?);
+    }
     let direct = {
-        let mut sig = Signature::new(ctx.cc);
-        sig.params.push(AbiParam::new(types::I64));
-        for k in &target.param_kinds {
-            sig.params.push(AbiParam::new(match k {
-                SlotKind::Float => types::F64,
-                _ => types::I64,
-            }));
-        }
-        sig.returns.push(AbiParam::new(match target.return_kind {
-            SlotKind::Float => types::F64,
-            _ => types::I64,
-        }));
-        let sig_ref = b.import_signature(sig);
+        let shape = NativeShape::new(&target.param_kinds, target.return_kind);
+        let sig_ref = b.import_signature(shape.signature());
         let call = b.ins().call_indirect(sig_ref, raw, &arg_values);
         b.inst_results(call)[0]
     };
@@ -126,7 +119,7 @@ pub(crate) fn emit_self_call_framed(
     if args.len() + 1 != ctx.proto.arity {
         return Err("from_ssa: self-call arity mismatch".into());
     }
-    let receiver = super::super::home_load(b, ctx, 0)?;
+    let receiver = super::super::props::emit_this(ctx)?;
     let window = boxed_window(b, ctx, values, receiver, args)?;
     let argc = b.ins().iconst(types::I64, (args.len() + 1) as i64);
     let out = entry_out_slot(b);

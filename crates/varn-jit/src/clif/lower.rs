@@ -39,7 +39,7 @@ use cranelift_codegen::isa::OwnedTargetIsa;
 use varn_types::register_meta::SlotKind;
 use varn_types::{FunctionProto, VmValue};
 
-use super::abi::build_wrapper;
+use super::abi::{build_wrapper, Activation};
 use super::alloc;
 use super::debug::ClifDebugSink;
 use super::emit::patch_rel32;
@@ -54,11 +54,11 @@ pub struct ClifArtifact {
     pub buffer: JitBuffer,
     pub entry: *const u8,
     pub raw: *const u8,
-    /// Whether `raw` takes the frame-aware ABI (extra base+closure params).
-    /// Such a function must NOT be called through the clif→clif fast path
-    /// (which assumes the bare `(exec_ctx, args)` ABI); the linker rejects it
-    /// so the call takes the wrapper-based fallback instead.
-    pub frame_aware: bool,
+    /// Which ABI `raw` takes; only a native one is callable compiled→compiled.
+    pub activation: Activation,
+    /// The native body never touches the VM frame, so a caller may enter it
+    /// without pushing one.
+    pub frameless: bool,
 }
 
 impl Drop for ClifArtifact {
@@ -282,7 +282,7 @@ pub fn try_compile(
     let Some(ssa) = proto.ssa.get() else {
         return Err("clif: from_ssa unavailable".into());
     };
-    match super::from_ssa::try_lower(
+    let lowered = match super::from_ssa::try_lower(
         proto,
         ssa,
         constants,
@@ -290,19 +290,39 @@ pub fn try_compile(
         isa,
         linker,
         osr_ip,
+        Activation::Native,
         debug.as_deref_mut(),
     ) {
-        Ok((raw, frame_aware)) if !super::emit::disabled_helper_hit() => {
+        Ok(lowered) => Ok((lowered, Activation::Native)),
+        Err(reason) if reason == super::from_ssa::NEEDS_ACTIVATION => {
+            super::emit::reset_disabled_helper_hit();
+            super::from_ssa::try_lower(
+                proto,
+                ssa,
+                constants,
+                helpers,
+                isa,
+                linker,
+                osr_ip,
+                Activation::Framed,
+                debug.as_deref_mut(),
+            )
+            .map(|lowered| (lowered, Activation::Framed))
+        }
+        Err(reason) => Err(reason),
+    };
+    match lowered {
+        Ok((lowered, activation)) if !super::emit::disabled_helper_hit() => {
             if super::trace() {
                 eprintln!(
-                    "clif: from_ssa {}{}{}",
+                    "clif: from_ssa {}{} ({activation:?}{})",
                     proto.name.as_deref().unwrap_or("<module>"),
                     osr_ip.map_or(String::new(), |ip| format!(" osr@{ip}")),
-                    if frame_aware { " (frame-aware)" } else { "" }
+                    if lowered.frameless { ", frameless" } else { "" }
                 );
             }
-            let wrapper = build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
-            finish_artifact(raw, wrapper, frame_aware, debug)
+            let wrapper = build_wrapper(proto, helpers, isa, activation, osr_ip.is_some())?;
+            finish_artifact(lowered, wrapper, activation, debug)
         }
         Ok(_) => Err("clif: uses a helper disabled in fase B".into()),
         Err(reason) => {
@@ -321,11 +341,12 @@ pub fn try_compile(
 /// the only two relocation targets admitted (self-recursion inside raw and the
 /// wrapper's call to raw) by hand, and hand back the executable artifact.
 fn finish_artifact(
-    raw: super::piece::CompiledPiece,
+    lowered: super::from_ssa::Lowered,
     wrapper: super::piece::CompiledPiece,
-    frame_aware: bool,
+    activation: Activation,
     mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<ClifArtifact, String> {
+    let raw = lowered.piece;
     let wrapper_off = (raw.code.len() + 15) & !15;
     let total = wrapper_off + wrapper.code.len();
     let mut buf = JitBuffer::new(total.max(16))?;
@@ -354,6 +375,7 @@ fn finish_artifact(
         buffer: buf,
         entry,
         raw: raw_ptr,
-        frame_aware,
+        activation,
+        frameless: lowered.frameless,
     })
 }

@@ -21,6 +21,7 @@ pub(crate) mod from_ssa;
 pub(crate) mod generic;
 pub(crate) mod homes;
 pub mod lower;
+pub(crate) mod native_abi;
 pub(crate) mod piece;
 pub(crate) mod strings;
 

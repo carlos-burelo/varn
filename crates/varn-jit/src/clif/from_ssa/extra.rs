@@ -358,7 +358,7 @@ fn emit_super_call(
     ctor: Value,
     args: &[u32],
 ) -> Result<Value, String> {
-    let this = home_load(b, ctx, 0)?;
+    let this = super::props::emit_this(ctx)?;
     let mut vals = Vec::with_capacity(args.len() + 1);
     vals.push(this);
     for a in args {

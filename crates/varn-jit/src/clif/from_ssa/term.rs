@@ -13,20 +13,25 @@ fn scalar_return(k: SlotKind) -> bool {
     matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool)
 }
 
-/// Write a non-scalar return to `jit_native_result` and return void — the
-/// convention the wrapper reads for a `Dynamic`/heap return class.
+/// Return a non-scalar value: a native body as its `(tag, payload)` words, a
+/// framed one through `jit_native_result` and a void return, which is what
+/// its wrapper reads.
 fn store_boxed_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>, boxed: Value) -> Result<(), String> {
-    let frame = ctx
-        .frame
-        .as_ref()
-        .ok_or("from_ssa: non-scalar return without a frame")?;
-    b.ins().store(
-        cranelift_codegen::ir::MemFlagsData::trusted(),
-        boxed,
-        frame.exec_ctx,
-        ctx.helpers.jit_native_result_offset as i32,
-    );
-    b.ins().return_(&[]);
+    match ctx.activation {
+        super::Activation::Native => {
+            let (tag, payload) = b.ins().isplit(boxed);
+            b.ins().return_(&[tag, payload]);
+        }
+        super::Activation::Framed => {
+            b.ins().store(
+                cranelift_codegen::ir::MemFlagsData::trusted(),
+                boxed,
+                ctx.exec_ctx,
+                ctx.helpers.jit_native_result_offset as i32,
+            );
+            b.ins().return_(&[]);
+        }
+    }
     Ok(())
 }
 

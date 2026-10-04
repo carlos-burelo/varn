@@ -1,11 +1,10 @@
 use cranelift_codegen::ir::Value;
-use cranelift_frontend::FunctionBuilder;
 
-use super::super::store::home_load;
 use super::super::Ctx;
 
-pub(crate) fn emit_this(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<Value, String> {
-    home_load(b, ctx, 0)
+pub(crate) fn emit_this(ctx: &Ctx<'_>) -> Result<Value, String> {
+    ctx.this
+        .ok_or_else(|| "from_ssa: `this` in a frameless body".into())
 }
 
 pub(crate) fn str_idx(ctx: &Ctx<'_>, s: &str) -> Result<usize, String> {

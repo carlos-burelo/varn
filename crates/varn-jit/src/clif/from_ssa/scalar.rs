@@ -122,12 +122,15 @@ pub(super) fn emit_inst(
                     b, ctx, values, args,
                 )?)));
             }
-            let mut a: Vec<Value> = args
-                .iter()
-                .map(|v| load_value(b, ctx, values, *v))
-                .collect::<Result<_, _>>()?;
-            // Leaf: el raw abre con exec_ctx; la recursión lo reenvía.
-            a.insert(0, ctx.exec_ctx);
+            let no_closure = b.ins().iconst(types::I64, 0);
+            let null_tag = b
+                .ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+            let null_payload = b.ins().iconst(types::I64, 0);
+            let mut a = vec![ctx.exec_ctx, no_closure, null_tag, null_payload];
+            for v in args {
+                a.push(load_value(b, ctx, values, *v)?);
+            }
             let call = b.ins().call(ctx.self_ref, &a);
             b.inst_results(call)[0]
         }

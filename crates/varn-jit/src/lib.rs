@@ -15,8 +15,6 @@ pub use loop_hoist::{
     diagnose_loops, is_alloc_free_op, CacheSource, HoistCandidate, LoopDiagnostic,
 };
 
-/// Side-table y firma única para el unwinder / tiering de la VM.
-pub use clif::abi::{raw_signature_v2, CallSite, CallSiteTable};
 /// Contrato ABI v2: única fuente del layout caliente (spec §1-§2).
 /// `varn-jit` y `varn-vm` lo nombran desde aquí; ninguno lo redefine.
 pub use varn_abi;
@@ -414,7 +412,11 @@ pub fn compile(
                         compile_ns: elapsed,
                     });
                     let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
-                    let raw = if art.frame_aware { 0 } else { art.raw as usize };
+                    let raw = if art.frameless && art.activation == clif::abi::Activation::Native {
+                        art.raw as usize
+                    } else {
+                        0
+                    };
                     return Ok(Compiled {
                         entry: jit_fn,
                         raw,

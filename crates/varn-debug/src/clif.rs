@@ -76,10 +76,10 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
         return;
     }
 
-    let fa = if insp.frame_aware {
-        " (frame-aware)"
-    } else {
-        ""
+    let fa = match (insp.frame_aware, insp.framed) {
+        (_, true) => " (framed)",
+        (true, false) => " (native)",
+        (false, false) => "",
     };
     terminal::log(format!("  {}{}", chalk(&insp.name).bold(), chalk(fa).dim()));
 

@@ -1,108 +1,42 @@
-//! Convenciones de llamada: v1 legado + v2 (§3 del spec).
+//! The two compiled-body ABIs and the wrapper that enters either from the VM.
 //!
-//! * v2 RAW — firma única `raw(ctx: *mut AbiCtx, frame: *mut AbiFrame)`.
-//!   Sin args en registros: el caller materializó el tramo del callee.
-//!   Retorno escalar unboxed en `rax`/`xmm0`, resto `void` + `ctx.result`.
-//!   JIT→JIT usa solo esta. Es el camino que en estado estable cuesta un
-//!   `call` directo con dirección horneada, cero stores.
-//! * `JitFn` (wrapper) — sobrevive SOLO como puerta VM→JIT (dispatch del
-//!   intérprete, top-level, OSR-entry). JIT→JIT nunca lo usa.
+//! * [`Activation::Native`] — the native activation ABI
+//!   ([`super::native_abi`]): arguments and result in registers, no VM
+//!   frame storage. Every body that never needs the interpreter to see its
+//!   registers compiles this way.
+//! * [`Activation::Framed`] — `raw(stack, closure, base, exec_ctx, args…)`
+//!   over a `FrameStore` activation: the body reads and writes homes the
+//!   interpreter also reads (captured variables, `try`, suspension, OSR).
 //!
-//! La side-table `{pc → (resume, dest)}` (§3.3) es el reemplazo designado de
-//! los stores por llamada del protocolo viejo (borrados: eran write-only).
-//! Se emitirá en compilación cuando el resume interpretado de callers JIT
-//! exista; hoy la lee nadie y no se graba nada especulativo.
+//! The wrapper (`JitFn`) is the only VM→compiled door: the interpreter has
+//! already pushed the frame and filled the argument homes.
 
-use cranelift_codegen::ir::{types, AbiParam, Function, InstBuilder, Signature, UserFuncName};
-use cranelift_codegen::isa::OwnedTargetIsa;
+use cranelift_codegen::ir::{
+    types, AbiParam, ExtFuncData, ExternalName, Function, InstBuilder, MemFlagsData, Signature,
+    UserExternalName, UserFuncName, Value,
+};
+use cranelift_codegen::isa::{CallConv, OwnedTargetIsa};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use varn_types::register_meta::SlotKind;
 use varn_types::FunctionProto;
 
 use super::emit::retag_raw_return;
+use super::native_abi::{NativeClass, NativeShape};
 use super::piece::{compile_piece, CompiledPiece};
 use crate::JitHelpers;
 
-pub use varn_abi::{AbiCtx, AbiFrame, CallSite};
-
-/// Firma única v2: `raw(ctx: *mut AbiCtx, frame: *mut AbiFrame)`.
-/// Retorno según `return_kind`: `Int`/`Bool` → `i64`, `Float` → `f64`,
-/// resto → `void` (boxed en `ctx.result`).
-pub fn raw_signature_v2(return_kind: SlotKind, isa: &OwnedTargetIsa) -> Signature {
-    let mut sig = Signature::new(isa.default_call_conv());
-    sig.params.push(AbiParam::new(types::I64)); // ctx
-    sig.params.push(AbiParam::new(types::I64)); // frame
-    match return_kind {
-        SlotKind::Int | SlotKind::Bool => {
-            sig.returns.push(AbiParam::new(types::I64));
-        }
-        SlotKind::Float => {
-            sig.returns.push(AbiParam::new(types::F64));
-        }
-        SlotKind::Ref | SlotKind::Str | SlotKind::Dynamic => {}
-    }
-    sig
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Activation {
+    Native,
+    Framed,
 }
 
-/// Side-table por función (§3.3): `{pc_llamada → (resume_ip, dest)}`.
-/// Reemplazo designado de los stores por llamada (borrados). Orden de
-/// inserción = orden de emisión (determinista, Ley 4); búsqueda lineal en
-/// frío, sin hash. Su primer consumidor será el unwinder cuando exista el
-/// resume interpretado de callers JIT.
-#[derive(Debug, Default)]
-pub struct CallSiteTable {
-    sites: Vec<CallSite>,
-}
-
-impl CallSiteTable {
-    pub fn new() -> Self {
-        Self { sites: Vec::new() }
-    }
-    pub fn record(&mut self, pc_offset: u32, resume_ip: u32, dest: u16) {
-        self.sites.push(CallSite {
-            pc_offset,
-            resume_ip,
-            dest,
-            _pad: 0,
-        });
-    }
-    pub fn lookup(&self, pc_offset: u32) -> Option<(u32, u16)> {
-        CallSite::lookup(&self.sites, pc_offset)
-    }
-    pub fn len(&self) -> usize {
-        self.sites.len()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.sites.is_empty()
-    }
-}
-
-/// Raw signature: leaf `fn(exec_ctx, arg × nparams)`; frame-aware
-/// `fn(stack_ptr, closure, base, exec_ctx, arg × nparams)`.
-/// Todo raw recibe `exec_ctx` (v2 §3.1: el contexto viaja explícito): el leaf
-/// en param 0, el frame-aware en param 3 como antes — ningún camino recupera
-/// el contexto por thread-local. Int-declared args arrive unboxed; everything
-/// else arrives as its boxed VmValue bits. `exec_ctx` is only dereferenced by
-/// the heap-walking ops and the slow helpers. Frame-aware functions (they
-/// allocate and/or take a `this` receiver) además reciben `stack_ptr`
-/// (unused, kept for arity), `closure` (this function's `VmClosure*`, needed
-/// by shape-driven object construction) y `base` (this frame's register-0
-/// index into `ctx.stack`, for flushing heap-typed registers to their home
-/// slots at a safepoint and for reading the receiver from `stack[base+0]`).
-pub(super) fn raw_signature(
-    proto: &FunctionProto,
-    nparams: usize,
-    isa: &OwnedTargetIsa,
-    frame_aware: bool,
-) -> Signature {
-    let mut sig = Signature::new(isa.default_call_conv());
-    if frame_aware {
-        for _ in 0..4 {
-            sig.params.push(AbiParam::new(types::I64));
-        }
-    } else {
-        // Leaf: solo ctx + args. El wrapper lo pasa siempre; la recursión
-        // directa lo reenvía; los call-sites directos lo anteponen.
+/// Framed raw signature: `fn(stack_ptr, closure, base, exec_ctx, arg × nparams)`.
+/// Scalar-declared arguments arrive in their machine form; anything else is
+/// read from its home, so its word here is unused.
+pub(super) fn raw_signature(proto: &FunctionProto, nparams: usize, cc: CallConv) -> Signature {
+    let mut sig = Signature::new(cc);
+    for _ in 0..4 {
         sig.params.push(AbiParam::new(types::I64));
     }
     for i in 0..nparams {
@@ -122,11 +56,11 @@ pub(super) fn raw_signature(
     sig
 }
 
-pub(crate) fn wrapper_returns_via_sret(cc: cranelift_codegen::isa::CallConv) -> bool {
-    cc == cranelift_codegen::isa::CallConv::WindowsFastcall
+pub(crate) fn wrapper_returns_via_sret(cc: CallConv) -> bool {
+    cc == CallConv::WindowsFastcall
 }
 
-pub(crate) fn wrapper_signature(cc: cranelift_codegen::isa::CallConv) -> Signature {
+pub(crate) fn wrapper_signature(cc: CallConv) -> Signature {
     let mut sig = Signature::new(cc);
     if wrapper_returns_via_sret(cc) {
         sig.params.push(AbiParam::special(
@@ -144,32 +78,32 @@ pub(crate) fn wrapper_signature(cc: cranelift_codegen::isa::CallConv) -> Signatu
     sig
 }
 
-/// Wrapper con ABI `JitFn`: `(stack_ptr, closure, base, exec_ctx)`.
-/// Puerta VM→JIT SOLO (dispatch intérprete, top-level, OSR-entry).
-/// JIT→JIT nunca lo usa: ese camino es `raw_signature_v2` directo.
+/// Wrapper with the `JitFn` ABI `(stack_ptr, closure, base, exec_ctx)`: reads
+/// the arguments the interpreter left in their homes and calls the raw body
+/// in its own ABI. An OSR raw takes no arguments.
 pub(super) fn build_wrapper(
     proto: &FunctionProto,
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
-    frame_aware: bool,
+    activation: Activation,
     osr: bool,
 ) -> Result<CompiledPiece, String> {
-    // Mirrors the raw body: the OSR raw takes no arguments, so the wrapper
-    // imports that signature and loads none from the stack.
+    let cc = isa.default_call_conv();
+    let is_windows = wrapper_returns_via_sret(cc);
+    let mut func = Function::with_name_signature(UserFuncName::user(0, 1), wrapper_signature(cc));
     let nparams = if osr {
         0
     } else {
         proto.arity.saturating_sub(1)
     };
-    let is_windows = wrapper_returns_via_sret(isa.default_call_conv());
-    let sig = wrapper_signature(isa.default_call_conv());
-
-    let mut func = Function::with_name_signature(UserFuncName::user(0, 1), sig);
-    let raw_sig = func.import_signature(raw_signature(proto, nparams, isa, frame_aware));
-    let raw_name =
-        func.declare_imported_user_function(cranelift_codegen::ir::UserExternalName::new(0, 0));
-    let raw_ref = func.import_function(cranelift_codegen::ir::ExtFuncData {
-        name: cranelift_codegen::ir::ExternalName::user(raw_name),
+    let shape = NativeShape::of_proto(proto);
+    let raw_sig = func.import_signature(match activation {
+        Activation::Native => shape.signature(),
+        Activation::Framed => raw_signature(proto, nparams, cc),
+    });
+    let raw_name = func.declare_imported_user_function(UserExternalName::new(0, 0));
+    let raw_ref = func.import_function(ExtFuncData {
+        name: ExternalName::user(raw_name),
         signature: raw_sig,
         colocated: true,
         patchable: false,
@@ -191,12 +125,6 @@ pub(super) fn build_wrapper(
         }
     };
 
-    // El caller empuja siempre (v2 §1): sin handshake, sin flag que consumir.
-    // Cada entrada llega con su CallFrame ya empujado (dispatch intérprete,
-    // `jit_prepare_static_call`, OSR sobre frame vivo, CallSelf vía helper).
-
-    // Args live in each parameter register's home slot (the frame is
-    // partitioned, so there is no contiguous `stack[base + 1 + i]`).
     let layout = varn_types::register_meta::FrameLayout::for_proto(proto);
     let homes = super::homes::Homes {
         exec_ctx,
@@ -204,65 +132,96 @@ pub(super) fn build_wrapper(
         layout: &layout,
         offsets: &helpers.frame_layout,
     };
-    let mut args = Vec::with_capacity(4 + nparams);
-    if frame_aware {
-        args.push(stack_ptr);
-        args.push(closure);
-        args.push(base);
-        args.push(exec_ctx);
-    } else {
-        // Leaf: el raw abre con exec_ctx (param 0). El wrapper lo tiene.
-        args.push(exec_ctx);
-    }
-    for i in 0..nparams {
-        let boxed = homes.load(&mut b, 1 + i);
-        if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
-            let un = super::emit::unbox_int(&mut b, boxed);
-            args.push(un);
-        } else if proto.param_kinds.get(i) == Some(&SlotKind::Float)
-            || super::emit::meta_is_float(&proto.register_meta, 1 + i)
-        {
-            let un = super::emit::unbox_f64_coerce(&mut b, boxed);
-            args.push(un);
-        } else if proto.param_kinds.get(i) == Some(&SlotKind::Bool) {
-            let un = super::emit::unbox_bool(&mut b, boxed);
-            args.push(un);
-        } else {
-            let (_tag, payload) = b.ins().isplit(boxed);
-            args.push(payload);
+    let result = match activation {
+        Activation::Native => {
+            let mut args = vec![exec_ctx, closure];
+            for (r, class) in shape.params.iter().enumerate() {
+                let boxed = homes.load(&mut b, r);
+                push_native_arg(&mut b, &mut args, *class, kind_of(proto, r), boxed);
+            }
+            let call = b.ins().call(raw_ref, &args);
+            let res = b.inst_results(call).to_vec();
+            native_result_boxed(&mut b, shape.ret, proto.return_kind, &res)
         }
-    }
-
-    let result = if proto.return_kind == SlotKind::Int
-        || proto.return_kind == SlotKind::Bool
-        || proto.return_kind == SlotKind::Float
-    {
-        let call = b.ins().call(raw_ref, &args);
-        let raw_res = b.inst_results(call)[0];
-        retag_raw_return(&mut b, raw_res, proto.return_kind)
-    } else {
-        b.ins().call(raw_ref, &args);
-        b.ins().load(
-            types::I128,
-            cranelift_codegen::ir::MemFlagsData::trusted(),
-            exec_ctx,
-            helpers.jit_native_result_offset as i32,
-        )
+        Activation::Framed => {
+            let mut args = vec![stack_ptr, closure, base, exec_ctx];
+            for i in 0..nparams {
+                let boxed = homes.load(&mut b, 1 + i);
+                let un = match proto.param_kinds.get(i) {
+                    Some(SlotKind::Int) => super::emit::unbox_int(&mut b, boxed),
+                    Some(SlotKind::Bool) => super::emit::unbox_bool(&mut b, boxed),
+                    _ if proto.param_kinds.get(i) == Some(&SlotKind::Float)
+                        || super::emit::meta_is_float(&proto.register_meta, 1 + i) =>
+                    {
+                        super::emit::unbox_f64_coerce(&mut b, boxed)
+                    }
+                    _ => b.ins().isplit(boxed).1,
+                };
+                args.push(un);
+            }
+            let call = b.ins().call(raw_ref, &args);
+            match proto.return_kind {
+                SlotKind::Int | SlotKind::Bool | SlotKind::Float => {
+                    let raw_res = b.inst_results(call)[0];
+                    retag_raw_return(&mut b, raw_res, proto.return_kind)
+                }
+                SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => b.ins().load(
+                    types::I128,
+                    MemFlagsData::trusted(),
+                    exec_ctx,
+                    helpers.jit_native_result_offset as i32,
+                ),
+            }
+        }
     };
     let (tag, payload) = b.ins().isplit(result);
     if let Some(sret) = sret_ptr {
-        b.ins()
-            .store(cranelift_codegen::ir::MemFlagsData::trusted(), tag, sret, 0);
-        b.ins().store(
-            cranelift_codegen::ir::MemFlagsData::trusted(),
-            payload,
-            sret,
-            8,
-        );
+        b.ins().store(MemFlagsData::trusted(), tag, sret, 0);
+        b.ins().store(MemFlagsData::trusted(), payload, sret, 8);
         b.ins().return_(&[]);
     } else {
         b.ins().return_(&[tag, payload]);
     }
     b.finalize(isa.frontend_config());
     compile_piece(func, isa)
+}
+
+fn kind_of(proto: &FunctionProto, reg: usize) -> SlotKind {
+    match reg {
+        0 => SlotKind::Dynamic,
+        r => proto.param_kinds[r - 1],
+    }
+}
+
+/// Append boxed value `boxed` to a native argument list in `class`'s form.
+pub(crate) fn push_native_arg(
+    b: &mut FunctionBuilder,
+    args: &mut Vec<Value>,
+    class: NativeClass,
+    kind: SlotKind,
+    boxed: Value,
+) {
+    match class {
+        NativeClass::Word if kind == SlotKind::Bool => args.push(super::emit::unbox_bool(b, boxed)),
+        NativeClass::Word => args.push(super::emit::unbox_int(b, boxed)),
+        NativeClass::Float => args.push(super::emit::unbox_f64_coerce(b, boxed)),
+        NativeClass::Boxed => {
+            let (tag, payload) = b.ins().isplit(boxed);
+            args.push(tag);
+            args.push(payload);
+        }
+    }
+}
+
+/// A native call's results as one boxed `VmValue`.
+pub(crate) fn native_result_boxed(
+    b: &mut FunctionBuilder,
+    class: NativeClass,
+    kind: SlotKind,
+    res: &[Value],
+) -> Value {
+    match class {
+        NativeClass::Word | NativeClass::Float => retag_raw_return(b, res[0], kind),
+        NativeClass::Boxed => b.ins().iconcat(res[0], res[1]),
+    }
 }

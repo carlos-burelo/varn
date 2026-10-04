@@ -36,6 +36,7 @@ pub struct TierRow {
     pub words: usize,
     pub tier: Tier,
     pub frame_aware: bool,
+    pub framed: bool,
     /// Which tests made it frame-aware — see `clif::lower::frame_aware_reasons`.
     pub fa_reasons: Vec<&'static str>,
 }
@@ -84,6 +85,7 @@ fn walk(
             words,
             tier: Tier::Gate(reason),
             frame_aware: false,
+            framed: false,
             fa_reasons: Vec::new(),
         });
     } else {
@@ -98,6 +100,7 @@ fn walk(
             words,
             tier,
             frame_aware: insp.frame_aware,
+            framed: insp.framed,
             fa_reasons: insp.fa_reasons,
         });
     }
@@ -160,7 +163,8 @@ pub fn debug_tiers(
     for r in &rows {
         let mut detail = r.reason().to_string();
         if r.frame_aware {
-            detail.push_str(&format!(" (frame-aware: {})", r.fa_reasons.join("+")));
+            let abi = if r.framed { "framed" } else { "native" };
+            detail.push_str(&format!(" ({abi}: {})", r.fa_reasons.join("+")));
         }
         table.row([
             truncate(&r.name, name_w).to_string(),
