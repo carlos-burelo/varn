@@ -43,19 +43,31 @@ impl FunctionProto {
         found
     }
 
-    pub fn has_try(&self) -> bool {
+    pub fn resumes_in_interpreter(&self) -> bool {
+        match self.resume_memo.get() {
+            1 => return true,
+            2 => return false,
+            _ => {}
+        }
         let code = &self.chunk.code;
         let mut ip = 0;
+        let mut found = false;
         while ip < code.len() {
             let Some(info) = crate::bytecode::decode(code, ip, &self.chunk.constants) else {
-                return true;
+                found = true;
+                break;
             };
-            if OpCode::from_u16(code[ip]) == Some(OpCode::Try) {
-                return true;
+            if matches!(
+                OpCode::from_u16(code[ip]),
+                Some(OpCode::Try | OpCode::Yield | OpCode::Await | OpCode::LoadModule)
+            ) {
+                found = true;
+                break;
             }
             ip += info.len.max(1);
         }
-        false
+        self.resume_memo.set(if found { 1 } else { 2 });
+        found
     }
 
     /// Checks if this constructor proto is a trivial field-initializer:

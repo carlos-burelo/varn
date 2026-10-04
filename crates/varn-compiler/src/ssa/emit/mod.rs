@@ -216,6 +216,7 @@ pub fn emit_function_meta(
         jit_epoch: Cell::new(0),
         jit_serial: Cell::new(0),
         backedge_memo: Cell::new(0),
+        resume_memo: Cell::new(0),
         ic_cache: Rc::new(RefCell::new(
             (0..ic.count()).map(|_| PolyICSlot::new()).collect(),
         )),

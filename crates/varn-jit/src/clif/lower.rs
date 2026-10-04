@@ -36,8 +36,6 @@
 //! GC pressure.
 
 use cranelift_codegen::isa::OwnedTargetIsa;
-use varn_core::OpCode;
-use varn_types::bytecode::decode;
 use varn_types::register_meta::SlotKind;
 use varn_types::{FunctionProto, VmValue};
 
@@ -174,22 +172,8 @@ pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
     if proto.is_async {
         r.push("async");
     }
-    let mut ip = 0usize;
-    while ip < code.len() {
-        let Some(info) = decode(code, ip, pool) else {
-            break;
-        };
-        if matches!(
-            OpCode::from_u8(code[ip] as u8),
-            Some(OpCode::Try)
-                | Some(OpCode::Yield)
-                | Some(OpCode::Await)
-                | Some(OpCode::LoadModule)
-        ) {
-            r.push("resume");
-            break;
-        }
-        ip += info.len;
+    if proto.resumes_in_interpreter() {
+        r.push("resume");
     }
     r
 }

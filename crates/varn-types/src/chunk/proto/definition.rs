@@ -169,6 +169,10 @@ pub struct FunctionProto {
     #[serde(default)]
     pub backedge_memo: std::cell::Cell<u8>,
 
+    #[serde(skip)]
+    #[serde(default)]
+    pub resume_memo: std::cell::Cell<u8>,
+
     #[serde(skip, default = "proto_ic_default")]
     pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
 
