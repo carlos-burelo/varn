@@ -92,7 +92,10 @@ pub(crate) fn emit_set_property(
         b.switch_to_block(next);
         next = b.create_block();
         let hit = b.create_block();
-        let entry = b.ins().iadd_imm_u(slot_base, (i * 8) as i64);
+        let entry = b.ins().iadd_imm_u(
+            slot_base,
+            (i * std::mem::size_of::<varn_types::chunk::CacheEntry>()) as i64,
+        );
         let id32 = b.ins().load(types::I32, m, entry, 0);
         let id = b.ins().uextend(types::I64, id32);
         let kc = b.ins().uload8(types::I64, m, entry, 6);
