@@ -20,16 +20,29 @@
 .PARAMETER CleanCache
     Limpia la caché de Varn (`vn cache clean`) antes de cada cuadrante.
 
+.PARAMETER Quick
+    Ciclo de iteración: compila con el perfil `quick` (sin LTO, codegen-units=16),
+    omite lint y benchmark, y corre solo el cuadrante 1 (dev-checkout + JIT).
+    No sustituye a la matriz completa antes de commitear.
+
 .EXAMPLE
     .\scripts\verify.ps1
     .\scripts\verify.ps1 -Fast
+    .\scripts\verify.ps1 -Quick
 #>
 
 param (
     [switch]$Fast,
     [switch]$SkipLint,
-    [switch]$CleanCache
+    [switch]$CleanCache,
+    [switch]$Quick
 )
+
+if ($Quick) {
+    $SkipLint = $true
+    $Fast = $true
+}
+$BuildProfile = if ($Quick) { "quick" } else { "release" }
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -107,18 +120,18 @@ if ($largeFiles) {
 }
 
 # 4. Compilacion en Modo Release
-Write-StepHeader "4/6: Compilacion de Produccion (cargo build --release --bin vn)"
-cargo build --release --bin vn
+Write-StepHeader "4/6: Compilacion (cargo build --profile $BuildProfile --bin vn)"
+cargo build --profile $BuildProfile --bin vn
 if ($LASTEXITCODE -ne 0) {
-    Write-Failure "Error al compilar el binario de produccion 'vn'."
-    $failedSteps += "cargo build --release"
+    Write-Failure "Error al compilar el binario 'vn' (perfil $BuildProfile)."
+    $failedSteps += "cargo build --profile $BuildProfile"
     exit 1
 }
-Write-Success "Binario 'vn' compilado exitosamente."
+Write-Success "Binario 'vn' compilado exitosamente (perfil $BuildProfile)."
 
-$vnBin = Join-Path $RootDir "target\release\vn.exe"
+$vnBin = Join-Path $RootDir "target\$BuildProfile\vn.exe"
 if (-not (Test-Path $vnBin)) {
-    $vnBin = Join-Path $RootDir "target\release\vn"
+    $vnBin = Join-Path $RootDir "target\$BuildProfile\vn"
 }
 
 # Helper para ejecutar un cuadrante
@@ -160,6 +173,10 @@ Write-StepHeader "5/6: Matriz Obligatoria de 4 Cuadrantes (tests/main.vn)"
 $q1 = Run-Quadrant "1/4: [dev-checkout] + [JIT Habilitado]" @{} @("run", "tests/main.vn")
 if (-not $q1) { $failedSteps += "Cuadrante 1 (dev-checkout + JIT)" }
 
+if ($Quick) {
+    Write-WarningMsg "Saltando cuadrantes 2-4 (-Quick activo): correr la matriz completa antes de commitear."
+} else {
+
 # Q2: dev-checkout + No-JIT (Interprete Pure)
 $q2 = Run-Quadrant "2/4: [dev-checkout] + [Interprete Pure (VARN_NO_JIT=1)]" @{ "VARN_NO_JIT" = "1" } @("run", "tests/main.vn")
 if (-not $q2) { $failedSteps += "Cuadrante 2 (dev-checkout + No-JIT)" }
@@ -171,6 +188,7 @@ if (-not $q3) { $failedSteps += "Cuadrante 3 (@embedded + JIT)" }
 # Q4: @embedded + No-JIT (Interprete Pure)
 $q4 = Run-Quadrant "4/4: [@embedded std] + [Interprete Pure (VARN_NO_JIT=1)]" @{ "VARN_STD" = "@embedded"; "VARN_NO_JIT" = "1" } @("run", "tests/main.vn")
 if (-not $q4) { $failedSteps += "Cuadrante 4 (@embedded + No-JIT)" }
+}
 
 # 6. Benchmark de Estabilidad
 if (-not $Fast) {
