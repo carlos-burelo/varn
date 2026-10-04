@@ -158,7 +158,7 @@ impl ExecCtx {
 
         if obj.is_heap() {
             let inst_opt = match self.heap.get(obj.as_heap()) {
-                Some(crate::heap::HeapObj::Instance(inst)) => Some(inst.clone()),
+                Some(crate::heap::HeapObj::Instance(inst)) => Some(*inst),
                 _ => None,
             };
             if let Some(inst) = inst_opt {

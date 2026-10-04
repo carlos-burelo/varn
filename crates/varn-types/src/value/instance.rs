@@ -6,7 +6,6 @@ use crate::class_layout::{ClassLayout, FieldLayout};
 use crate::layout::{ScalarRepr, TypeLayout, COMPACT_REF_NULL};
 use crate::vm_value::VmValue;
 use std::cell::UnsafeCell;
-use std::mem::MaybeUninit;
 use std::ptr;
 use std::rc::Rc;
 
@@ -32,38 +31,34 @@ pub const INST_CLASS_ID_OFF: usize =
 pub const INST_PAYLOAD_OFF: usize =
     std::mem::offset_of!(InstanceData<[UnsafeCell<u8>; 0]>, payload);
 
-const INSTANCE_HEADER_WORDS: usize = 1;
-
 impl InstanceData {
-    /// Allocates an instance of `class`: scalars zero, references `null`.
-    pub fn alloc(class: Rc<ClassObj>) -> Rc<InstanceData> {
-        let layout = class.get_or_compute_layout();
-        Self::alloc_with_layout(class.id, layout.payload_size)
+    /// The payload size an instance of `class` lays out.
+    pub fn payload_size_of(class: &ClassObj) -> u32 {
+        class.get_or_compute_layout().payload_size
     }
 
-    /// Allocates a zero-filled payload: every `Ref` slot starts `null`, since
-    /// no object lives at address 0.
+    /// Bytes an instance with a `payload_size` payload occupies, header included.
+    pub const fn bytes_for(payload_size: u32) -> usize {
+        INST_PAYLOAD_OFF + (payload_size as usize).div_ceil(8) * 8
+    }
+
+    /// Lays out an instance at `at`: scalars zero and every `Ref` slot `null`,
+    /// since no object lives at address 0.
+    ///
+    /// # Safety
+    /// `at` must be 8-aligned, point to [`Self::bytes_for`]`(payload_size)`
+    /// writable bytes, and outlive every use of the returned reference: the
+    /// heap cell that holds the instance owns that memory.
     #[inline]
-    pub fn alloc_with_layout(class_id: u32, payload_size: u32) -> Rc<InstanceData> {
+    pub unsafe fn init_at(at: *mut u8, class_id: u32, payload_size: u32) -> InstanceRef {
         let payload_bytes = payload_size as usize;
-        let payload_words = payload_bytes.div_ceil(8);
-        let total_words = INSTANCE_HEADER_WORDS + payload_words;
-
-        let backing: Rc<[MaybeUninit<u64>]> = Rc::new_uninit_slice(total_words);
-        let base = Rc::into_raw(backing) as *const MaybeUninit<u64> as *mut UnsafeCell<u8>;
-        let data = ptr::slice_from_raw_parts_mut(base, payload_bytes) as *mut InstanceData;
-
-        unsafe {
-            ptr::write(ptr::addr_of_mut!((*data).class_id), class_id);
-            ptr::write(ptr::addr_of_mut!((*data).payload_size), payload_size);
-
-            let payload_ptr = ptr::addr_of_mut!((*data).payload) as *mut u8;
-            if payload_bytes > 0 {
-                ptr::write_bytes(payload_ptr, 0, payload_bytes);
-            }
-
-            Rc::from_raw(data as *const InstanceData)
-        }
+        let data = ptr::slice_from_raw_parts_mut(at as *mut UnsafeCell<u8>, payload_bytes)
+            as *mut InstanceData;
+        ptr::write(ptr::addr_of_mut!((*data).class_id), class_id);
+        ptr::write(ptr::addr_of_mut!((*data).payload_size), payload_size);
+        let payload_ptr = ptr::addr_of_mut!((*data).payload) as *mut u8;
+        ptr::write_bytes(payload_ptr, 0, payload_bytes);
+        InstanceRef(ptr::NonNull::new_unchecked(data))
     }
 
     #[inline(always)]
@@ -332,24 +327,15 @@ impl InstanceData {
     }
 }
 
-/// Reference-counted wrapper around [`InstanceData`].
-#[derive(Clone)]
-pub struct InstanceRef(pub Rc<InstanceData>);
+/// An instance living in a heap cell: the cell owns the memory, so this is a
+/// plain pointer, valid for as long as the object is reachable.
+#[derive(Clone, Copy)]
+pub struct InstanceRef(ptr::NonNull<InstanceData>);
 
 impl InstanceRef {
-    #[inline]
-    pub fn alloc(class: Rc<ClassObj>) -> Self {
-        Self(InstanceData::alloc(class))
-    }
-
-    #[inline]
-    pub fn alloc_with_layout(class_id: u32, payload_size: u32) -> Self {
-        Self(InstanceData::alloc_with_layout(class_id, payload_size))
-    }
-
     #[inline(always)]
     pub fn read(&self) -> &InstanceData {
-        &self.0
+        unsafe { self.0.as_ref() }
     }
 }
 
@@ -357,7 +343,7 @@ impl std::ops::Deref for InstanceRef {
     type Target = InstanceData;
     #[inline(always)]
     fn deref(&self) -> &InstanceData {
-        &self.0
+        unsafe { self.0.as_ref() }
     }
 }
 
@@ -375,7 +361,7 @@ impl std::fmt::Debug for InstanceRef {
         write!(
             f,
             "InstanceRef(class_id={}, size={})",
-            self.0.class_id, self.0.payload_size
+            self.class_id, self.payload_size
         )
     }
 }
@@ -383,7 +369,7 @@ impl std::fmt::Debug for InstanceRef {
 impl PartialEq for InstanceRef {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        ptr::addr_eq(self.0.as_ptr(), other.0.as_ptr())
     }
 }
 
@@ -392,6 +378,6 @@ impl Eq for InstanceRef {}
 impl std::hash::Hash for InstanceRef {
     #[inline(always)]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
+        (self.0.as_ptr() as *const u8).hash(state);
     }
 }

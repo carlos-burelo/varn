@@ -6,6 +6,7 @@
 use super::obj::HeapObj;
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::ptr::NonNull;
+use varn_types::value::{InstanceData, InstanceRef};
 use varn_types::HeapRef;
 
 pub(crate) const HEADER_BYTES: usize = std::mem::size_of::<ObjHeader>();
@@ -129,7 +130,7 @@ pub(crate) struct NativeScope {
 
 pub(crate) struct CellSpace {
     classes: Vec<SizeClass>,
-    large: Vec<HeapRef>,
+    large: Vec<(HeapRef, usize)>,
     live: usize,
     native: bool,
     native_roots: Vec<HeapRef>,
@@ -164,7 +165,7 @@ impl CellSpace {
                 let ptr = NonNull::new(ptr)
                     .unwrap_or_else(|| std::alloc::handle_alloc_error(large_layout(bytes)));
                 let r = unsafe { HeapRef::from_addr_unchecked(ptr.as_ptr() as u64) };
-                self.large.push(r);
+                self.large.push((r, bytes));
                 (r, LARGE)
             }
         };
@@ -188,10 +189,32 @@ impl CellSpace {
 
     #[inline]
     pub(crate) fn alloc(&mut self, obj: HeapObj, state: SlotState) -> HeapRef {
-        let kind = unsafe { *(&obj as *const HeapObj as *const u8) };
-        let r = self.take_cell(std::mem::size_of::<HeapObj>(), kind, state);
-        unsafe { std::ptr::write(body::<HeapObj>(r), obj) };
+        let r = self.take_cell(std::mem::size_of::<HeapObj>(), 0, state);
+        Self::place(r, obj);
         r
+    }
+
+    /// An instance whose payload lives in the same cell, right after the
+    /// `HeapObj` that names it: one allocation, no separate body.
+    #[inline]
+    pub(crate) fn alloc_instance(
+        &mut self,
+        class_id: u32,
+        payload_size: u32,
+        state: SlotState,
+    ) -> (HeapRef, InstanceRef) {
+        let tail = std::mem::size_of::<HeapObj>();
+        let r = self.take_cell(tail + InstanceData::bytes_for(payload_size), 0, state);
+        let inst =
+            unsafe { InstanceData::init_at(body::<u8>(r).add(tail), class_id, payload_size) };
+        Self::place(r, HeapObj::Instance(inst));
+        (r, inst)
+    }
+
+    #[inline(always)]
+    fn place(r: HeapRef, obj: HeapObj) {
+        header(r).kind = unsafe { *(&obj as *const HeapObj as *const u8) };
+        unsafe { std::ptr::write(body::<HeapObj>(r), obj) };
     }
 
     /// Native code may hold what it allocates only in Rust locals, across a
@@ -267,8 +290,12 @@ impl CellSpace {
         h.state = SlotState::Free as u8;
         self.live -= 1;
         if class == LARGE {
-            let bytes = HEADER_BYTES + std::mem::size_of::<HeapObj>();
-            self.large.retain(|&l| l != r);
+            let at = self
+                .large
+                .iter()
+                .position(|&(l, _)| l == r)
+                .expect("a large cell");
+            let (_, bytes) = self.large.swap_remove(at);
             unsafe { dealloc(r.as_ptr::<u8>(), large_layout(bytes)) };
         } else {
             self.classes[class as usize].free.push(r);
@@ -319,7 +346,7 @@ impl CellSpace {
             .iter()
             .zip(CLASS_BYTES)
             .flat_map(|(c, cell)| c.cells(cell))
-            .chain(self.large.iter().copied())
+            .chain(self.large.iter().map(|&(r, _)| r))
             .filter(|&r| header(r).state != SlotState::Free as u8)
     }
 
@@ -357,8 +384,7 @@ impl Drop for CellSpace {
                 unsafe { dealloc(block.as_ptr(), block_layout()) };
             }
         }
-        let bytes = HEADER_BYTES + std::mem::size_of::<HeapObj>();
-        for &r in &self.large {
+        for &(r, bytes) in &self.large {
             unsafe { dealloc(r.as_ptr::<u8>(), large_layout(bytes)) };
         }
     }

@@ -103,7 +103,7 @@ pub(crate) fn set_fixed_field(
         }
 
         let target = match heap.get(heap_idx) {
-            Some(HeapObj::Instance(inst)) => Some(Target::Instance(inst.clone())),
+            Some(HeapObj::Instance(inst)) => Some(Target::Instance(*inst)),
             Some(HeapObj::Object(o)) => Some(Target::Obj(o.clone(), heap_idx)),
             Some(HeapObj::EnumVariant(ev)) => {
                 payload_object(heap, ev.payload).map(|o| Target::Obj(o, ev.payload.as_heap()))

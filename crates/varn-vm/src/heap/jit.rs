@@ -189,28 +189,34 @@ impl Heap {
         let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
         assert_ne!(object_tag, none_tag, "Option<HeapObj> niche probe failed");
 
-        // Probe HeapObj::Instance layout facts
-        let dummy_cls = varn_types::ClassObj::new_rc("__probe_class");
-        let inst_ref = varn_types::value::InstanceRef::alloc(dummy_cls);
-        let inst_rcbox = Rc::as_ptr(&inst_ref.0) as *const u8 as usize - RCBOX_PREFIX;
-        let inst_slot: Option<HeapObj> = Some(HeapObj::Instance(inst_ref.clone()));
+        // Probe HeapObj::Instance layout facts on an instance laid out in a
+        // local buffer, the way a heap cell lays one out after its HeapObj.
+        const PROBE_CLASS_ID: u32 = 0x005E_ED1D;
+        let mut probe = [0u64; 2];
+        let inst = unsafe {
+            varn_types::value::InstanceData::init_at(
+                probe.as_mut_ptr() as *mut u8,
+                PROBE_CLASS_ID,
+                0,
+            )
+        };
+        let data = probe.as_ptr() as usize;
+        let inst_slot: Option<HeapObj> = Some(HeapObj::Instance(inst));
         let inst_bytes =
             unsafe { std::slice::from_raw_parts(&inst_slot as *const _ as *const u8, size) };
         let instance_tag = inst_bytes[0] as usize;
         let instance_payload_off = (0..=size - 8)
-            .find(|&off| {
-                usize::from_ne_bytes(inst_bytes[off..off + 8].try_into().unwrap()) == inst_rcbox
-            })
+            .find(|&off| usize::from_ne_bytes(inst_bytes[off..off + 8].try_into().unwrap()) == data)
             .expect("instance payload probe failed")
             + super::cells::HEADER_BYTES;
 
-        // Derivado: prefijo control + offset propio (`INST_*`). Tripwire:
+        // Derivado: offsets propios (`INST_*`) desde el InstanceData. Tripwire:
         // class_id leído ahí debe coincidir.
-        let instance_values_off = RCBOX_PREFIX + varn_types::INST_PAYLOAD_OFF;
-        let instance_class_id_off = RCBOX_PREFIX + varn_types::INST_CLASS_ID_OFF;
+        let instance_values_off = varn_types::INST_PAYLOAD_OFF;
+        let instance_class_id_off = varn_types::INST_CLASS_ID_OFF;
         assert_eq!(
-            unsafe { *((inst_rcbox + instance_class_id_off) as *const u32) },
-            inst_ref.class_id,
+            unsafe { *((data + instance_class_id_off) as *const u32) },
+            PROBE_CLASS_ID,
             "instance class_id offset does not resolve to InstanceData.class_id"
         );
 
@@ -250,13 +256,7 @@ mod tests {
         assert_eq!(o.shape_off, RCBOX_PREFIX + varn_types::OBJ_SHAPE_OFF);
         assert_eq!(o.len_off, RCBOX_PREFIX + varn_types::OBJ_INLINE_LEN_OFF);
         assert_eq!(o.shape_id_off, RCBOX_PREFIX + varn_types::SHAPE_ID_OFF);
-        assert_eq!(
-            o.instance_values_off,
-            RCBOX_PREFIX + varn_types::INST_PAYLOAD_OFF
-        );
-        assert_eq!(
-            o.instance_class_id_off,
-            RCBOX_PREFIX + varn_types::INST_CLASS_ID_OFF
-        );
+        assert_eq!(o.instance_values_off, varn_types::INST_PAYLOAD_OFF);
+        assert_eq!(o.instance_class_id_off, varn_types::INST_CLASS_ID_OFF);
     }
 }

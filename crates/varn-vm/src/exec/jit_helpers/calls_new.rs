@@ -125,18 +125,14 @@ fn try_trivial_construct(
     };
     let Some(plan) = plan else {
         // No constructor: the interpreter ignores the arguments.
-        let inst = varn_types::value::InstanceRef::alloc(cls.clone());
-        return Ok(Some(VmValue::from_heap(
-            ctx.heap.alloc(crate::heap::HeapObj::Instance(inst)),
-        )));
+        return Ok(Some(VmValue::from_heap(ctx.heap.alloc_instance(&cls).0)));
     };
     let arity = arity.unwrap_or(0);
     if argc != arity {
         return Ok(None);
     }
-    let inst = varn_types::value::InstanceRef::alloc(cls.clone());
-    let instance_nv =
-        VmValue::from_heap(ctx.heap.alloc(crate::heap::HeapObj::Instance(inst.clone())));
+    let (instance, inst) = ctx.heap.alloc_instance(&cls);
+    let instance_nv = VmValue::from_heap(instance);
     for (param_idx, offset, tag) in plan.iter() {
         let Some(&arg) = ctx.stage.get(1 + *param_idx) else {
             return Ok(None);
@@ -180,8 +176,7 @@ pub(crate) extern "C" fn jit_new_begin(
         if proto.jit_native.get() == 0 || proto.jit_epoch.get() != ctx_ref.heap.jit_epoch() {
             return 0;
         }
-        let inst = varn_types::value::InstanceRef::alloc(cls);
-        let instance = VmValue::from_heap(ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)));
+        let instance = VmValue::from_heap(ctx_ref.heap.alloc_instance(&cls).0);
         out.write(instance);
         out.add(1).write(ctor);
         1

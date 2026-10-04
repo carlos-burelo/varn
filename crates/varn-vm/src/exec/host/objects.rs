@@ -74,7 +74,7 @@ impl ExecCtx {
                 o.set_field(std::sync::Arc::from(key), val);
                 self.heap.write_barrier(idx, val);
             } else if let Some(HeapObj::Instance(inst)) = self.heap.get(idx) {
-                let inst = inst.clone();
+                let inst = *inst;
                 let field = ClassObj::find_by_id(inst.class_id)
                     .map(|cls| cls.get_or_compute_layout())
                     .and_then(|layout| layout.get_field(key).cloned());

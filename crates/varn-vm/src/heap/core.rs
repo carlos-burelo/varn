@@ -8,7 +8,8 @@ use super::cells::SlotState;
 use super::obj::HeapObj;
 use super::structs::HeapInner;
 use crate::value::VmValue;
-use varn_types::{HeapRef, NativeFn};
+use varn_types::value::{InstanceData, InstanceRef};
+use varn_types::{ClassObj, HeapRef, NativeFn};
 
 impl HeapInner {
     #[inline]
@@ -27,6 +28,18 @@ impl HeapInner {
         self.young.born.push(idx);
         self.young.alloc_count += 1;
         idx
+    }
+
+    /// A new, zeroed instance of `class`, its payload in the same cell.
+    pub(crate) fn alloc_instance(&mut self, class: &ClassObj) -> (HeapRef, InstanceRef) {
+        if let Some(h) = &self.hotspot {
+            h.borrow_mut().record_alloc("instance");
+        }
+        let size = InstanceData::payload_size_of(class);
+        let (r, inst) = self.cells.alloc_instance(class.id, size, SlotState::Young);
+        self.young.born.push(r);
+        self.young.alloc_count += 1;
+        (r, inst)
     }
 
     fn alloc_old(&mut self, obj: HeapObj) -> HeapRef {
