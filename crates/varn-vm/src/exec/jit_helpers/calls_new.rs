@@ -147,3 +147,88 @@ fn try_trivial_construct(
     }
     Ok(Some(instance_nv))
 }
+
+/// `new Class(...)` in front of a constructor compiled natively for this
+/// context: allocates the instance and leaves it and the constructor's
+/// closure in `out[0]`, `out[1]` for the call site to enter directly. `0`
+/// declines (not a class, no VM constructor, constructor not native) and the
+/// site takes [`jit_new_window`].
+#[varn_op_macros::jit_slow(field = "jit_new_begin")]
+pub(crate) extern "C" fn jit_new_begin(
+    ctx: *mut ExecCtx,
+    callee_tag: u64,
+    callee_payload: u64,
+    out: *mut VmValue,
+) -> usize {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let callee = VmValue::from_raw_parts(callee_tag, callee_payload);
+        if !callee.is_heap() {
+            return 0;
+        }
+        let Some(crate::heap::HeapObj::Class(cls)) = ctx_ref.heap.get(callee.as_heap_idx()) else {
+            return 0;
+        };
+        let cls = cls.clone();
+        let Some(ctor) = cls.constructor() else {
+            return 0;
+        };
+        let Some(closure) = ctx_ref.heap.closure_of(ctor) else {
+            return 0;
+        };
+        let proto = &closure.proto;
+        if proto.jit_native.get() == 0 || proto.jit_epoch.get() != ctx_ref.heap.jit_epoch() {
+            return 0;
+        }
+        let inst = varn_types::value::InstanceRef::alloc(cls);
+        let instance =
+            VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Instance(inst)));
+        out.write(instance);
+        out.add(1).write(ctor);
+        1
+    }
+}
+
+/// Runs `instance`'s class constructor over it with the interpreter's own
+/// construction semantics (owner class on the frame, `null` return meaning
+/// the instance). `window` is `[instance, args…]`; the result lands in
+/// `jit_native_result`.
+#[varn_op_macros::jit_slow(field = "jit_run_constructor")]
+pub(crate) extern "C" fn jit_run_constructor(
+    ctx: *mut ExecCtx,
+    window: *const VmValue,
+    argc: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let caller_depth = ctx_ref.frames.len();
+        let window = std::slice::from_raw_parts(window, argc);
+        let instance = window[0];
+        let result = (|| {
+            let cls = crate::exec::props::get_class(instance, &ctx_ref.heap)
+                .ok_or_else(|| crate::error::RuntimeError::new("new: instance without class"))?;
+            let ctor = cls
+                .constructor()
+                .ok_or_else(|| crate::error::RuntimeError::new("new: class without constructor"))?;
+            let closure =
+                ctx_ref.heap.closure_of(ctor).cloned().ok_or_else(|| {
+                    crate::error::RuntimeError::new("new: constructor not a closure")
+                })?;
+            if ctx_ref.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                return Err(crate::error::RuntimeError::new(
+                    "stack overflow: call depth exceeded 10000",
+                ));
+            }
+            let mut frame =
+                crate::exec::calls::materialize_frame(&mut ctx_ref.stack, &closure, window)?;
+            frame.current_class = Some(cls);
+            ctx_ref.frames.push(frame);
+            ctx_ref.pending_constructors.push((caller_depth, instance));
+            ctx_ref.run_until(caller_depth)
+        })();
+        match result {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => fail_construct(ctx_ref, caller_depth, e),
+        }
+    }
+}
