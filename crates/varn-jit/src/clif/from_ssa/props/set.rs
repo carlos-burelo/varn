@@ -40,7 +40,7 @@ pub(crate) fn emit_set_property(
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
 
-    let young = is_young(b, op);
+    let young = is_young(b, ectx, op, alay, heap_off);
     let res = b.create_block();
     b.ins().brif(young, res, &[], slow, &[]);
     b.switch_to_block(res);

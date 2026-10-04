@@ -10,10 +10,10 @@ use varn_types::value::ObjRef;
 const RCBOX_PREFIX: usize = 2 * std::mem::size_of::<usize>();
 
 impl Heap {
-    pub(crate) fn nursery_len_byte_offset_from_rcbox() -> usize {
-        2 * std::mem::size_of::<usize>()
-            + std::mem::offset_of!(HeapInner, nursery)
-            + crate::nursery::Nursery::objects_len_byte_offset()
+    pub(crate) fn young_len_byte_offset_from_rcbox() -> usize {
+        RCBOX_PREFIX
+            + std::mem::offset_of!(HeapInner, young)
+            + super::young::YoungGen::born_len_byte_offset()
     }
 
     pub(crate) fn rcbox_ptr_for_validation(&self) -> *const u8 {
@@ -115,11 +115,13 @@ impl Heap {
         );
 
         varn_jit::JitArrayLayout {
-            slots_vec_off: 2 * std::mem::size_of::<usize>()
-                + std::mem::offset_of!(HeapInner, objects),
-            nursery_slots_vec_off: 2 * std::mem::size_of::<usize>()
-                + std::mem::offset_of!(HeapInner, nursery)
-                + crate::nursery::Nursery::objects_vec_byte_offset(),
+            slots_vec_off: RCBOX_PREFIX
+                + std::mem::offset_of!(HeapInner, slots)
+                + super::slots::SlotTable::objects_vec_byte_offset(),
+            states_vec_off: RCBOX_PREFIX
+                + std::mem::offset_of!(HeapInner, slots)
+                + super::slots::SlotTable::states_vec_byte_offset(),
+            young_state: super::slots::SlotState::Young as usize,
             slots_ptr_off,
             slot_size: size,
             array_tag,

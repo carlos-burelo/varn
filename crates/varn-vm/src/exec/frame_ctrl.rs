@@ -176,8 +176,7 @@ impl ExecCtx {
                 }
 
                 if !self.gc_inhibited && self.heap.needs_gc() {
-                    let roots = self.major_roots();
-                    let _ = self.heap.collect(&roots);
+                    self.trigger_gc();
                 }
             }
             PreparedCall::Constructor(frame, instance_nv) => {

@@ -5,11 +5,10 @@
 //! string would otherwise be hashed in full and retained), and
 //! `alloc_str_view` stores an already-built `HeapStr` without copying.
 
-use super::core::alloc_into;
 use super::obj::HeapObj;
+use super::slots::SlotState;
 use super::str::{HeapStr, INLINE_STR_CAP};
 use super::structs::HeapInner;
-use crate::nursery::{old_idx_raw, pack_old_idx};
 use crate::value::VmValue;
 use std::sync::Arc;
 use varn_types::RuntimeString;
@@ -20,40 +19,10 @@ impl HeapInner {
         if let Some(sso) = VmValue::try_from_sso(s_ref) {
             return sso;
         }
-
-        let rs: RuntimeString = Arc::from(s_ref);
-        if let Some(&packed) = self.string_interner.get(&rs) {
-            let raw = old_idx_raw(packed);
-            if self
-                .objects
-                .get(raw as usize)
-                .map(|o| o.is_some())
-                .unwrap_or(false)
-            {
-                return VmValue::from_heap_idx(packed);
-            }
-            self.string_interner.remove(&rs);
+        if let Some(&idx) = self.string_interner.get(s_ref) {
+            return VmValue::from_heap_idx(idx);
         }
-
-        let idx = match self
-            .nursery
-            .try_alloc(HeapObj::Str(HeapStr::shared(rs.clone())))
-        {
-            Ok(ni) => ni,
-            Err(obj) => {
-                let oi = alloc_into(
-                    &mut self.objects,
-                    &mut self.free,
-                    &mut self.alloc_count,
-                    &mut self.gc_alloc_since_collect,
-                    obj,
-                );
-                let packed = pack_old_idx(oi);
-                self.string_interner.insert(rs, packed);
-                packed
-            }
-        };
-        VmValue::from_heap_idx(idx)
+        self.alloc_str_view(HeapStr::shared(Arc::from(s_ref)))
     }
 
     pub(crate) fn alloc_str_interned(&mut self, s: impl AsRef<str>) -> VmValue {
@@ -61,29 +30,15 @@ impl HeapInner {
         if let Some(sso) = VmValue::try_from_sso(s_ref) {
             return sso;
         }
-        if let Some(&packed) = self.string_interner.get(s_ref) {
-            let raw = old_idx_raw(packed);
-            if self
-                .objects
-                .get(raw as usize)
-                .map(|o| o.is_some())
-                .unwrap_or(false)
-            {
-                return VmValue::from_heap_idx(packed);
-            }
-            self.string_interner.remove(s_ref);
+        if let Some(&idx) = self.string_interner.get(s_ref) {
+            return VmValue::from_heap_idx(idx);
         }
         let rs: RuntimeString = Arc::from(s_ref);
-        let oi = alloc_into(
-            &mut self.objects,
-            &mut self.free,
-            &mut self.alloc_count,
-            &mut self.gc_alloc_since_collect,
-            HeapObj::Str(HeapStr::shared(rs.clone())),
-        );
-        let packed = pack_old_idx(oi);
-        self.string_interner.insert(rs, packed);
-        VmValue::from_heap_idx(packed)
+        let idx = self
+            .slots
+            .alloc(HeapObj::Str(HeapStr::shared(rs.clone())), SlotState::Old);
+        self.string_interner.insert(rs, idx);
+        VmValue::from_heap_idx(idx)
     }
 
     pub(crate) fn alloc_str_dynamic(&mut self, s: impl AsRef<str>) -> VmValue {
@@ -94,33 +49,11 @@ impl HeapInner {
         if s_ref.len() <= INLINE_STR_CAP {
             return self.alloc_str_view(HeapStr::inline(s_ref));
         }
-
-        let rs: RuntimeString = Arc::from(s_ref);
-        let idx = match self.nursery.try_alloc(HeapObj::Str(HeapStr::shared(rs))) {
-            Ok(ni) => ni,
-            Err(obj) => pack_old_idx(alloc_into(
-                &mut self.objects,
-                &mut self.free,
-                &mut self.alloc_count,
-                &mut self.gc_alloc_since_collect,
-                obj,
-            )),
-        };
-        VmValue::from_heap_idx(idx)
+        self.alloc_str_view(HeapStr::shared(Arc::from(s_ref)))
     }
 
     pub(crate) fn alloc_str_view(&mut self, hs: HeapStr) -> VmValue {
-        let idx = match self.nursery.try_alloc(HeapObj::Str(hs)) {
-            Ok(ni) => ni,
-            Err(obj) => pack_old_idx(alloc_into(
-                &mut self.objects,
-                &mut self.free,
-                &mut self.alloc_count,
-                &mut self.gc_alloc_since_collect,
-                obj,
-            )),
-        };
-        VmValue::from_heap_idx(idx)
+        VmValue::from_heap_idx(self.alloc(HeapObj::Str(hs)))
     }
 
     pub(crate) fn str_val(&self, nv: VmValue) -> Option<RuntimeString> {

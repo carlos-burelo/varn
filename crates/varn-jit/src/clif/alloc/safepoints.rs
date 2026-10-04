@@ -130,7 +130,7 @@ pub(crate) fn has_alloc_scan(
     Ok(false)
 }
 
-/// The collector's poll at a loop back edge: when the nursery has reached its
+/// The collector's poll at a loop back edge: when the young generation reached its
 /// threshold, `collect` runs on the slow path (it must call the
 /// `gc_safepoint` helper, with whatever the lowering has to do around it).
 /// A call-free allocating loop depends on it, as the interpreter's `Loop`
@@ -151,12 +151,12 @@ pub(crate) fn emit_gc_poll(
         types::I64,
         cranelift_codegen::ir::MemFlagsData::trusted(),
         rcbox,
-        h.nursery_len_offset as i32,
+        h.young_len_offset as i32,
     );
     let over = b.ins().icmp_imm_u(
         IntCC::UnsignedGreaterThanOrEqual,
         len,
-        h.nursery_threshold as i64,
+        h.young_threshold as i64,
     );
     let slow = b.create_block();
     let cont = b.create_block();

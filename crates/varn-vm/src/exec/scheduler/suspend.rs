@@ -33,13 +33,6 @@ impl Frozen {
     pub(crate) fn frames(&self) -> impl Iterator<Item = &FrozenFrame> {
         std::iter::once(&self.first).chain(self.rest.iter())
     }
-
-    pub(crate) fn frame_mut(&mut self, index: usize) -> Option<&mut FrozenFrame> {
-        match index {
-            0 => Some(&mut self.first),
-            n => self.rest.get_mut(n - 1),
-        }
-    }
 }
 
 struct Keep<'a> {

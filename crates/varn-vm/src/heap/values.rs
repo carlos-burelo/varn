@@ -1,11 +1,10 @@
 //! Allocation for scalar and opaque heap values: symbols, ranges, decimals,
 //! closures, modules and buffers.
 
-use super::core::alloc_into;
 use super::obj::HeapObj;
+use super::slots::SlotState;
 use super::structs::HeapInner;
 use crate::closure::VmClosure;
-use crate::nursery::pack_old_idx;
 use crate::value::VmValue;
 use std::collections::hash_map::Entry;
 use std::rc::Rc;
@@ -19,20 +18,11 @@ impl HeapInner {
     }
 
     pub(crate) fn alloc_symbol(&mut self, s: RuntimeSymbol) -> VmValue {
-        let packed = match self.symbol_interner.entry(s.clone()) {
+        let idx = match self.symbol_interner.entry(s.clone()) {
             Entry::Occupied(e) => *e.get(),
-            Entry::Vacant(e) => {
-                let packed = pack_old_idx(alloc_into(
-                    &mut self.objects,
-                    &mut self.free,
-                    &mut self.alloc_count,
-                    &mut self.gc_alloc_since_collect,
-                    HeapObj::Symbol(s),
-                ));
-                *e.insert(packed)
-            }
+            Entry::Vacant(e) => *e.insert(self.slots.alloc(HeapObj::Symbol(s), SlotState::Old)),
         };
-        VmValue::from_heap_idx(packed)
+        VmValue::from_heap_idx(idx)
     }
 
     pub(crate) fn make_int(&mut self, n: i64) -> VmValue {

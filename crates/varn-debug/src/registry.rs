@@ -182,7 +182,7 @@ static CLIF: Info = Info {
 static GC: Info = Info {
     id: "gc",
     aliases: &[],
-    title: "nursery/old-gen/interners al terminar de correr",
+    title: "young/old-gen/interners al terminar de correr",
     stage: Stage::Exec,
     per_module: PerModule::No,
     in_all: false,

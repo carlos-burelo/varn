@@ -11,36 +11,29 @@
 //! For watching collections as they HAPPEN rather than a snapshot at exit,
 //! see [`crate::gc_trace`] (`VARN_GC_TRACE=1`).
 
-/// Nursery (young generation) counters at the moment the report is taken.
-pub struct NurseryReport {
-    /// Total slots the nursery ever has (`NURSERY_CAPACITY`), fixed at birth.
-    pub capacity: usize,
-    /// Fill level at which a minor collection triggers.
-    pub full_threshold: usize,
-    /// Objects alive in the nursery right now.
+/// Young generation counters at the moment the report is taken.
+pub struct YoungReport {
+    /// Births since the last minor collection at which the next one triggers.
+    pub threshold: usize,
+    /// Objects born since the last minor collection.
     pub live: usize,
-    /// Every `try_alloc` that has ever succeeded, this process.
+    /// Every young birth, this process.
     pub alloc_count: u64,
     /// Minor collections run so far.
     pub minor_gc_count: u64,
-    /// Objects promoted to old-gen across every minor collection so far.
+    /// Young objects that survived a minor collection and became old.
     pub minor_gc_promoted: u64,
 }
 
-impl NurseryReport {
-    /// Objects reclaimed (never promoted, never referenced again) across
-    /// every minor collection so far — everything the nursery has ever held
-    /// minus what's alive now minus what got promoted.
+impl YoungReport {
+    /// Young objects freed by a minor collection, this process.
     pub fn reclaimed(&self) -> u64 {
         self.alloc_count
             .saturating_sub(self.live as u64)
             .saturating_sub(self.minor_gc_promoted)
     }
 
-    /// Fraction of promoted objects that survived to old-gen, of everything
-    /// the nursery ever held. High means most allocations are long-lived
-    /// (the nursery isn't doing much filtering); low means most are garbage
-    /// by the time a collection runs (the common, cheap case).
+    /// Fraction of young births that survived to become old.
     pub fn promotion_rate(&self) -> f64 {
         if self.alloc_count == 0 {
             return 0.0;
@@ -49,22 +42,18 @@ impl NurseryReport {
     }
 }
 
-/// Old generation counters.
+/// Slot table and major-collection counters.
 pub struct OldGenReport {
     /// Length of the slot table — includes holes freed but not yet reused.
     pub slots_total: usize,
-    /// Slots actually holding an object right now.
+    /// Slots actually holding an object right now, young or old.
     pub slots_live: usize,
-    /// Freed slots pending reuse — old-gen fragmentation. High relative to
-    /// `slots_live` means a lot of the table is holes, not live data.
+    /// Freed slots pending reuse. High relative to `slots_live` means a lot
+    /// of the table is holes, not live data.
     pub free_list: usize,
-    /// Every direct old-gen allocation (nursery overflow, and anything
-    /// allocated straight into old-gen) — NOT nursery allocations later
-    /// promoted; see [`NurseryReport::alloc_count`] for those.
+    /// Every slot ever handed out, young or old.
     pub alloc_count: u64,
-    /// Old-gen collections run so far (rare — most work happens in the
-    /// nursery; a program that never fills old-gen shows 0 here, which is
-    /// healthy, not a bug).
+    /// Major collections run so far.
     pub gc_collections: u64,
     pub gc_total_freed: u64,
     pub gc_alloc_since_collect: u64,
@@ -84,33 +73,29 @@ pub struct InternerSizes {
     pub chars: usize,
 }
 
-/// Live-object count by type, nursery and old-gen counted separately — an
+/// Live-object count by type, young and old-gen counted separately — an
 /// object that's mostly ending up in one generation or the other is exactly
 /// what changes whether it's worth optimizing at all.
 pub struct HistogramRow {
     pub type_name: &'static str,
-    pub nursery: usize,
+    pub young: usize,
     pub old_gen: usize,
 }
 
 pub struct GcReport {
-    pub nursery: NurseryReport,
+    pub young: YoungReport,
     pub old_gen: OldGenReport,
     pub interners: InternerSizes,
-    /// Sorted by total (nursery + old_gen) descending.
+    /// Sorted by total (young + old_gen) descending.
     pub histogram: Vec<HistogramRow>,
 }
 
 impl std::fmt::Display for GcReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let n = &self.nursery;
+        let n = &self.young;
         writeln!(f, "gc ─────────────────────────────────────")?;
-        writeln!(f, "nursery")?;
-        writeln!(
-            f,
-            "  live={} / capacity={} (minor GC at {})",
-            n.live, n.capacity, n.full_threshold
-        )?;
+        writeln!(f, "young")?;
+        writeln!(f, "  live={} (minor GC at {})", n.live, n.threshold)?;
         writeln!(
             f,
             "  alloc_count={}  minor_gc_count={}  promoted={} ({:.1}%)  reclaimed={}",
@@ -151,16 +136,16 @@ impl std::fmt::Display for GcReport {
             i.strings, i.symbols, i.bigints, i.decimals, i.chars
         )?;
 
-        writeln!(f, "live objects by type (nursery / old-gen / total)")?;
+        writeln!(f, "live objects by type (young / old-gen / total)")?;
         for row in &self.histogram {
-            let total = row.nursery + row.old_gen;
+            let total = row.young + row.old_gen;
             if total == 0 {
                 continue;
             }
             writeln!(
                 f,
                 "  {:<12} {:>8} / {:>8} / {:>8}",
-                row.type_name, row.nursery, row.old_gen, total
+                row.type_name, row.young, row.old_gen, total
             )?;
         }
         Ok(())

@@ -97,7 +97,6 @@ pub struct ExecCtx {
     /// Map/Set key representatives of `Hashable & Equatable` instances, by
     /// `(class id, hash())` (see `hashable_keys.rs`). GC roots.
     pub(crate) hashable_keys: SharedHashableKeys,
-    pub gc_root_scratch: Vec<VmValue>,
     /// Staging para el protocolo lento de llamadas (P2): la ventana
     /// callee+args como `Vec<VmValue>` contiguo, reutilizado entre llamadas.
     /// `prepare_call` la consume de forma síncrona (adopta al frame o la
@@ -154,7 +153,6 @@ impl ExecCtx {
             capabilities: Rc::new(varn_types::capabilities::CapabilitySet::allow_all()),
             metadata: Rc::new(std::cell::UnsafeCell::new(FxHashMap::default())),
             hashable_keys: Rc::new(std::cell::UnsafeCell::new(FxHashMap::default())),
-            gc_root_scratch: Vec::with_capacity(1024),
             stage: Vec::with_capacity(32),
             task_queue: std::cell::OnceCell::new(),
         };
@@ -168,8 +166,8 @@ impl ExecCtx {
         ctx
     }
 
-    /// The JIT back-edge safepoint reads the nursery fill level through raw
-    /// offsets (ExecCtx.heap -> RcBox -> HeapInner.nursery.objects.len).
+    /// The JIT back-edge safepoint reads the young-birth count through raw
+    /// offsets (ExecCtx.heap -> RcBox -> HeapInner.young.born.len).
     /// They bake in Rc/Vec internal layout; verify the chain against the live
     /// heap so a std layout change fails loudly at startup instead of
     /// corrupting memory at runtime.
@@ -182,11 +180,11 @@ impl ExecCtx {
                 self.heap.rcbox_ptr_for_validation(),
                 "JIT safepoint: ExecCtx.heap does not point at the expected RcBox"
             );
-            let len = *(rcbox.add(Heap::nursery_len_byte_offset_from_rcbox()) as *const usize);
+            let len = *(rcbox.add(Heap::young_len_byte_offset_from_rcbox()) as *const usize);
             assert_eq!(
                 len,
-                self.heap.nursery.len(),
-                "JIT safepoint: nursery length offset chain is stale"
+                self.heap.young.len(),
+                "JIT safepoint: young length offset chain is stale"
             );
         }
     }
@@ -321,7 +319,6 @@ impl ExecCtx {
             capabilities: Rc::clone(&self.capabilities),
             metadata: Rc::clone(&self.metadata),
             hashable_keys: Rc::clone(&self.hashable_keys),
-            gc_root_scratch: Vec::new(),
             stage: Vec::new(),
             task_queue: std::cell::OnceCell::new(),
         }

@@ -52,11 +52,13 @@ pub type JitFn = unsafe extern "C" fn(
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct JitArrayLayout {
-    /// RcBox base → the old-gen `objects` Vec's three words inside HeapInner.
+    /// RcBox base → the slot table's `objects` Vec's three words. A heap
+    /// handle is the slot index.
     pub slots_vec_off: usize,
-    /// RcBox base → the nursery's `objects` Vec's three words. Heap indices
-    /// use bit 31 to distinguish old gen (set) from nursery (clear).
-    pub nursery_slots_vec_off: usize,
+    /// RcBox base → the slot table's per-slot generation bytes.
+    pub states_vec_off: usize,
+    /// The generation byte of a young slot.
+    pub young_state: usize,
     /// Word offset of the data pointer inside `Vec<Option<HeapObj>>`.
     pub slots_ptr_off: usize,
     /// `size_of::<Option<HeapObj>>()` — slot stride.
@@ -225,10 +227,10 @@ macro_rules! define_tail {
         pub object_layout: JitObjectLayout,
         /// Byte offset of the heap field (an Rc, i.e. one pointer) inside ExecCtx.
         pub heap_field_offset: usize,
-        /// Byte offset from the heap RcBox pointer to the nursery live-object count.
-        pub nursery_len_offset: usize,
-        /// Nursery fill level at which the safepoint must run.
-        pub nursery_threshold: usize,
+        /// Byte offset from the heap RcBox pointer to the young-birth count.
+        pub young_len_offset: usize,
+        /// Young births at which the safepoint must run a minor collection.
+        pub young_threshold: usize,
         pub jit_native_result_offset: usize,
         pub jit_exit_offset: usize,
         /// Byte offset of the `globals` field (an Rc, i.e. one pointer) inside

@@ -133,14 +133,13 @@ impl VmArray {
         }
     }
 
-    /// Visits every element of a `Boxed` array that may still hold a nursery
-    /// reference, then records the whole array as clean. For the collector
-    /// only: it must have made every visited reference old by the time `f`
-    /// returns for the last element.
-    pub fn scan_dirty(&self, mut f: impl FnMut(&mut VmValue)) {
+    /// Visits every element of a `Boxed` array that may still hold a young
+    /// reference, then records the whole array as clean. For the minor
+    /// collector only: every visited reference is old once it finishes.
+    pub fn scan_dirty(&self, mut f: impl FnMut(VmValue)) {
         if let ArrayRepr::Boxed(b) = self.repr_mut() {
             let from = (b.clean_prefix as usize).min(b.items.len());
-            for v in &mut b.items[from..] {
+            for &v in &b.items[from..] {
                 f(v);
             }
             b.clean_prefix = b.items.len() as u32;

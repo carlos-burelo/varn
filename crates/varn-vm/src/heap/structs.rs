@@ -1,6 +1,7 @@
+use super::major::MajorMarks;
 use super::obj::HeapObj;
-use crate::gc::GcCollector;
-use crate::nursery::Nursery;
+use super::slots::SlotTable;
+use super::young::YoungGen;
 use crate::profile::HotspotCounters;
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;
@@ -24,15 +25,12 @@ pub struct HeapInner {
     /// clones (the bench's runs) must never share, and the whole point of the
     /// epoch. Ordered oldest first; typically empty or one entry.
     pub jit_ancestry: Vec<(u64, u64)>,
-    pub alloc_count: u64,
     pub intrinsic_classes: FxHashMap<String, Rc<ClassObj>>,
     pub gc_collections: u64,
     pub gc_total_freed: u64,
-    pub gc_alloc_since_collect: u64,
     pub gc_threshold: u64,
-    pub nursery: Nursery,
-    pub(super) free: Vec<u32>,
-    pub(super) objects: Vec<Option<HeapObj>>,
+    pub(crate) young: YoungGen,
+    pub(crate) slots: SlotTable,
     pub(super) string_interner: FxHashMap<RuntimeString, u32>,
     pub(super) symbol_interner: FxHashMap<RuntimeSymbol, u32>,
     pub(crate) young_cells: Vec<Rc<crate::task::TaskCell>>,
@@ -40,7 +38,7 @@ pub struct HeapInner {
     pub(super) bigint_interner: FxHashMap<num_bigint::BigInt, u32>,
     pub(super) decimal_interner: FxHashMap<bigdecimal::BigDecimal, u32>,
     pub(super) char_interner: FxHashMap<char, u32>,
-    pub(super) gc_collector: Option<GcCollector>,
+    pub(super) major: MajorMarks,
     pub hotspot: Option<Rc<RefCell<HotspotCounters>>>,
     pub(super) scan_roots: Vec<u32>,
     pub(super) identity_index: FxHashMap<usize, u32>,
@@ -57,9 +55,7 @@ impl HeapInner {
         Self {
             jit_epoch: crate::clif_link::next_epoch(),
             jit_ancestry: Vec::new(),
-            objects: Vec::with_capacity(4096),
-            free: Vec::new(),
-            alloc_count: 0,
+            slots: SlotTable::with_capacity(4096),
             intrinsic_classes: FxHashMap::default(),
             string_interner: FxHashMap::default(),
             symbol_interner: FxHashMap::default(),
@@ -68,12 +64,11 @@ impl HeapInner {
             bigint_interner: FxHashMap::default(),
             decimal_interner: FxHashMap::default(),
             char_interner: FxHashMap::default(),
-            gc_collector: Some(GcCollector::new(4096)),
+            major: MajorMarks::default(),
             gc_collections: 0,
             gc_total_freed: 0,
-            gc_alloc_since_collect: 0,
             gc_threshold: 65536,
-            nursery: Nursery::new(),
+            young: YoungGen::default(),
             hotspot: None,
             scan_roots: Vec::new(),
             identity_index: FxHashMap::default(),
@@ -90,15 +85,13 @@ impl HeapInner {
         }
     }
 
-    /// Whether an object belongs in `scan_roots` — the set the minor collector
-    /// re-walks on EVERY collection, for as long as the object lives.
+    /// Whether an old object belongs in `scan_roots` — the set the minor
+    /// collector re-walks on every collection, until the next major one
+    /// rebuilds it.
     ///
     /// Only for kinds holding Rust-side `Value`s that no write barrier covers.
-    /// Containers are covered by the barrier and must not go here: `scan_roots`
-    /// is never pruned, so enrolling them permanently makes each minor
-    /// collection O(containers ever born). A container born already pointing
-    /// into the nursery is registered in the nursery's `remembered` set
-    /// instead, which is drained every collection — see `HeapInner::alloc`.
+    /// Containers are covered by the barrier and must not go here, or each
+    /// minor collection becomes O(containers alive).
     #[inline(always)]
     pub(super) fn needs_minor_scan(obj: &HeapObj) -> bool {
         matches!(
@@ -111,8 +104,21 @@ impl HeapInner {
         )
     }
 
-    pub(crate) fn scan_roots(&self) -> &[u32] {
-        &self.scan_roots
+    /// Runtime structures that live as long as the program in practice and
+    /// carry Rust-side state the barrier does not see: they skip the young
+    /// generation, exactly as they always have.
+    #[inline(always)]
+    pub(super) fn born_old(obj: &HeapObj) -> bool {
+        matches!(
+            obj,
+            HeapObj::Class(_)
+                | HeapObj::Module(_)
+                | HeapObj::FrozenModule(_)
+                | HeapObj::NativeFn(..)
+                | HeapObj::Generator(_)
+                | HeapObj::Task(_)
+                | HeapObj::TaskHandle(_)
+        )
     }
 
     #[inline(always)]
@@ -149,23 +155,11 @@ impl HeapInner {
     }
 
     pub(crate) fn objects_len(&self) -> u32 {
-        self.objects.len() as u32
+        self.slots.len()
     }
 
-    pub(crate) fn objects(&self) -> &Vec<Option<HeapObj>> {
-        &self.objects
-    }
-
-    pub(crate) fn objects_mut(&mut self) -> &mut Vec<Option<HeapObj>> {
-        &mut self.objects
-    }
-
-    pub(crate) fn free_list_mut(&mut self) -> &mut Vec<u32> {
-        &mut self.free
-    }
-
-    pub(crate) fn identity_index(&self) -> &FxHashMap<usize, u32> {
-        &self.identity_index
+    pub(crate) fn alloc_count(&self) -> u64 {
+        self.slots.births
     }
 }
 
@@ -234,6 +228,6 @@ impl std::ops::DerefMut for Heap {
 
 impl std::fmt::Debug for Heap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Heap {{ alloc_count: {} }}", self.alloc_count)
+        write!(f, "Heap {{ alloc_count: {} }}", self.slots.births)
     }
 }

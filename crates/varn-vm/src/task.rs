@@ -5,7 +5,6 @@ use std::rc::Rc;
 use varn_types::{ClassObj, FunctionProto, HostOpen, HostPromise};
 
 use crate::heap::{HeapInner, HeapObj};
-use crate::nursery::is_nursery_idx;
 use crate::value::VmValue;
 
 const INLINE_ARGS: usize = 3;
@@ -73,9 +72,9 @@ impl LazyTask {
         }
     }
 
-    fn holds_nursery_ref(&self) -> bool {
+    fn holds_young_ref(&self, heap: &HeapInner) -> bool {
         let mut found = false;
-        self.trace_cells(&mut |cell| found |= is_young(cell.get()));
+        self.trace_cells(&mut |cell| found |= heap.is_young(cell.get()));
         found
     }
 }
@@ -137,10 +136,6 @@ impl std::fmt::Debug for TaskCell {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "TaskCell({:?})", self.status.get())
     }
-}
-
-fn is_young(v: VmValue) -> bool {
-    v.is_heap() && is_nursery_idx(v.as_heap_idx())
 }
 
 impl TaskCell {
@@ -254,14 +249,14 @@ impl TaskCell {
 
 pub(crate) fn track_cell(heap: &mut HeapInner, cell: &Rc<TaskCell>) {
     let mut young = false;
-    cell.trace_cells(&mut |c| young |= is_young(c.get()));
+    cell.trace_cells(&mut |c| young |= heap.is_young(c.get()));
     if young {
         heap.young_cells.push(Rc::clone(cell));
     }
 }
 
 pub(crate) fn track_lazy(heap: &mut HeapInner, lazy: &Rc<LazyTask>) {
-    if lazy.holds_nursery_ref() {
+    if lazy.holds_young_ref(heap) {
         heap.young_lazies.push(Rc::clone(lazy));
     }
 }

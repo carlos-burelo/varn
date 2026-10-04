@@ -193,7 +193,7 @@ pub fn print_vm_profile(profile: &VmProfile, interp_frame_share: Option<f64>) {
     // The three allocation counters answer different questions and have been
     // read as contradicting each other. Each says which population it counts.
     terminal::log(row_note(
-        "nursery allocs",
+        "young allocs",
         fmt_num(profile.nursery_allocs),
         "todo objeto joven",
     ));
@@ -206,7 +206,7 @@ pub fn print_vm_profile(profile: &VmProfile, interp_frame_share: Option<f64>) {
     terminal::log(row_note(
         "minor gc promoted",
         fmt_num(profile.minor_gc_promoted),
-        "nursery → old",
+        "young → old",
     ));
     terminal::log(row("gc collections", fmt_num(profile.gc_collections)));
     terminal::log(row("gc freed", fmt_num(profile.gc_freed)));

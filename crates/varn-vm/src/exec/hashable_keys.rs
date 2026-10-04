@@ -4,8 +4,8 @@
 //! keys are, so the table itself keeps comparing keys by identity: the first
 //! instance seen with the same class and `hash()` that `equals` the new one
 //! stands for it. Only the context can run `hash()`/`equals()`, so the
-//! representatives live here (rooted in `ExecCtx::major_roots` and the minor
-//! collection), not in the heap's interners.
+//! representatives live here (rooted in `ExecCtx::gc_roots`), not in the
+//! heap's interners.
 
 use super::ctx::ExecCtx;
 use crate::error::{RuntimeError, VmResult};

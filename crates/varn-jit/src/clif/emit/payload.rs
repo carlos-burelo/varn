@@ -259,8 +259,7 @@ pub(in crate::clif) fn emit_object_data_base(
     b.ins().iadd(data_ptr, values_off)
 }
 
-/// Address of the heap slot `payload` (a heap value's payload word) indexes:
-/// the old-generation or nursery slot vector, by the old bit.
+/// Address of the heap slot `payload` (a heap value's payload word) indexes.
 pub(in crate::clif) fn heap_slot_addr(
     b: &mut FunctionBuilder,
     exec_ctx: cranelift_codegen::ir::Value,
@@ -269,24 +268,14 @@ pub(in crate::clif) fn heap_slot_addr(
     heap_off: usize,
 ) -> cranelift_codegen::ir::Value {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
-    let raw = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
+    let idx = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
     let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
-    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
-    let base_old = b.ins().load(
+    let base = b.ins().load(
         types::I64,
         m,
         rc,
         (alay.slots_vec_off + alay.slots_ptr_off) as i32,
     );
-    let base_nur = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
-    let base = b.ins().select(old_bit, base_old, base_nur);
-    let idx = b.ins().select(old_bit, idx_old, raw);
     let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
     b.ins().iadd(base, byte_off)
 }
@@ -295,8 +284,22 @@ pub(in crate::clif) fn heap_slot_addr(
 /// write barrier, so an inline store path may skip the helper that carries it.
 pub(in crate::clif) fn is_young(
     b: &mut FunctionBuilder,
+    exec_ctx: cranelift_codegen::ir::Value,
     payload: cranelift_codegen::ir::Value,
+    alay: &crate::JitArrayLayout,
+    heap_off: usize,
 ) -> cranelift_codegen::ir::Value {
-    let old_bit = b.ins().band_imm_u(payload, 0x8000_0000);
-    b.ins().icmp_imm_u(IntCC::Equal, old_bit, 0)
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
+    let idx = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
+    let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
+    let states = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.states_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let at = b.ins().iadd(states, idx);
+    let state = b.ins().uload8(types::I64, m, at, 0);
+    b.ins()
+        .icmp_imm_u(IntCC::Equal, state, alay.young_state as i64)
 }

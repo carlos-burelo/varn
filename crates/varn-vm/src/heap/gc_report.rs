@@ -3,33 +3,32 @@
 //! one file that needs `pub(super)` access to the heap's private tables.
 
 use super::obj::HeapObj;
+use super::slots::SlotState;
 use super::structs::Heap;
-use crate::gc_report::{GcReport, HistogramRow, InternerSizes, NurseryReport, OldGenReport};
-use crate::nursery::Nursery;
+use crate::gc_report::{GcReport, HistogramRow, InternerSizes, OldGenReport, YoungReport};
 use rustc_hash::FxHashMap;
 
 impl Heap {
     pub fn gc_report(&self) -> GcReport {
         let inner = unsafe { &*self.inner.get() };
-        let nursery = &inner.nursery;
+        let young = &inner.young;
 
-        let nursery_report = NurseryReport {
-            capacity: crate::nursery::NURSERY_CAPACITY,
-            full_threshold: Nursery::FULL_THRESHOLD,
-            live: nursery.len(),
-            alloc_count: nursery.alloc_count,
-            minor_gc_count: nursery.minor_gc_count,
-            minor_gc_promoted: nursery.minor_gc_promoted,
+        let young_report = YoungReport {
+            threshold: super::young::YOUNG_THRESHOLD,
+            live: young.len(),
+            alloc_count: young.alloc_count,
+            minor_gc_count: young.minor_gc_count,
+            minor_gc_promoted: young.minor_gc_promoted,
         };
 
         let old_gen_report = OldGenReport {
-            slots_total: inner.objects.len(),
-            slots_live: inner.objects.iter().filter(|o| o.is_some()).count(),
-            free_list: inner.free.len(),
-            alloc_count: inner.alloc_count,
+            slots_total: inner.slots.len() as usize,
+            slots_live: inner.slots.live_count(),
+            free_list: inner.slots.free_len(),
+            alloc_count: inner.slots.births,
             gc_collections: inner.gc_collections,
             gc_total_freed: inner.gc_total_freed,
-            gc_alloc_since_collect: inner.gc_alloc_since_collect,
+            gc_alloc_since_collect: inner.slots.old_growth,
             gc_threshold: inner.gc_threshold,
         };
 
@@ -42,24 +41,25 @@ impl Heap {
         };
 
         let mut counts: FxHashMap<&'static str, (usize, usize)> = FxHashMap::default();
-        for obj in nursery.iter() {
-            counts.entry(type_name(obj)).or_default().0 += 1;
-        }
-        for obj in inner.objects.iter().flatten() {
-            counts.entry(type_name(obj)).or_default().1 += 1;
+        for (_, obj, state) in inner.slots.iter() {
+            let row = counts.entry(type_name(obj)).or_default();
+            match state {
+                SlotState::Young | SlotState::Marked => row.0 += 1,
+                SlotState::Old | SlotState::Remembered => row.1 += 1,
+            }
         }
         let mut histogram: Vec<HistogramRow> = counts
             .into_iter()
-            .map(|(type_name, (nursery, old_gen))| HistogramRow {
+            .map(|(type_name, (young, old_gen))| HistogramRow {
                 type_name,
-                nursery,
+                young,
                 old_gen,
             })
             .collect();
-        histogram.sort_unstable_by_key(|r| std::cmp::Reverse(r.nursery + r.old_gen));
+        histogram.sort_unstable_by_key(|r| std::cmp::Reverse(r.young + r.old_gen));
 
         GcReport {
-            nursery: nursery_report,
+            young: young_report,
             old_gen: old_gen_report,
             interners,
             histogram,

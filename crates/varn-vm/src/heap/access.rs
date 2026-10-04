@@ -1,58 +1,29 @@
-//! Reading a heap slot back out.
-//!
-//! Indices are PACKED: the high bit distinguishes a nursery index from an
-//! old-generation one, so every accessor has to unpack before it indexes.
-//! `get_raw*` take an already-unpacked old index and skip that step.
+//! Reading a heap slot back out. A handle is the slot index itself.
 
 use super::obj::HeapObj;
 use super::structs::HeapInner;
-use crate::nursery::{is_nursery_idx, old_idx_raw};
 use crate::value::VmValue;
 use std::rc::Rc;
 
 impl HeapInner {
     #[inline(always)]
     pub(crate) fn get_by_idx(&self, idx: u32) -> Option<&HeapObj> {
-        if is_nursery_idx(idx) {
-            self.nursery.get(idx)
-        } else {
-            self.objects.get(old_idx_raw(idx) as usize)?.as_ref()
-        }
+        self.slots.get(idx)
     }
 
     #[inline(always)]
     pub(crate) fn get_by_idx_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
-        if is_nursery_idx(idx) {
-            self.nursery.get_mut(idx)
-        } else {
-            self.objects.get_mut(old_idx_raw(idx) as usize)?.as_mut()
-        }
+        self.slots.get_mut(idx)
     }
 
     #[inline(always)]
     pub(crate) fn get(&self, idx: u32) -> Option<&HeapObj> {
-        self.get_by_idx(idx)
+        self.slots.get(idx)
     }
 
     #[inline(always)]
     pub(crate) fn get_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
-        self.get_by_idx_mut(idx)
-    }
-
-    #[inline(always)]
-    pub(crate) fn get_raw(&self, raw_old_idx: u32) -> Option<&HeapObj> {
-        self.objects.get(raw_old_idx as usize)?.as_ref()
-    }
-
-    #[inline(always)]
-    pub(crate) fn get_raw_mut(&mut self, raw_old_idx: u32) -> Option<&mut HeapObj> {
-        self.objects.get_mut(raw_old_idx as usize)?.as_mut()
-    }
-
-    pub(crate) fn class_idx(&self, class: &Rc<varn_types::ClassObj>) -> Option<u32> {
-        self.identity_index
-            .get(&(Rc::as_ptr(class) as usize))
-            .copied()
+        self.slots.get_mut(idx)
     }
 
     pub(crate) fn closure_of(&self, v: VmValue) -> Option<&Rc<crate::closure::VmClosure>> {

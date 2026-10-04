@@ -174,53 +174,6 @@ impl GeneratorDriver for NanGenDriver {
         }
     }
 
-    fn trace_vm_values_mut(&self, callback: &mut dyn FnMut(&mut varn_types::VmValue)) {
-        let mut inner = self.inner.borrow_mut();
-        let ctx = &mut *inner.ctx;
-
-        for nv in ctx.stack.dyn_.iter_mut() {
-            callback(nv);
-        }
-        // REF redondea por boxeo: el callback solo reescribe índices heap in
-        // place (forwarding del minor). Los UNINIT se saltan (no son raíces).
-        // GPR/FPR nunca se visitan.
-        for h in ctx.stack.refs.iter_mut() {
-            if *h == crate::frame_store::REF_UNINIT {
-                continue;
-            }
-            let mut tmp = VmValue::from_heap_idx(*h);
-            callback(&mut tmp);
-            if tmp.is_heap() {
-                *h = tmp.as_heap_idx();
-            }
-        }
-
-        // Closure constants are interned (old gen) and never hold nursery
-        // indices; upvalues can.
-        for frame in &ctx.frames {
-            for uv in &frame.closure().upvalues {
-                if let Ok(mut upval_inner) = uv.inner.try_borrow_mut() {
-                    callback(&mut upval_inner.value);
-                }
-            }
-        }
-        for (_, uv) in &ctx.open_upvalues {
-            if let Ok(mut upval_inner) = uv.inner.try_borrow_mut() {
-                callback(&mut upval_inner.value);
-            }
-        }
-
-        for (_, nv) in ctx.pending_constructors.iter_mut() {
-            callback(nv);
-        }
-        for (_, nv) in ctx.pending_setters.iter_mut() {
-            callback(nv);
-        }
-        if let Some(VmSuspend::Yield { value, .. }) = &mut ctx.vm_suspend {
-            callback(value);
-        }
-    }
-
     fn trace_closures(&self, callback: &mut dyn FnMut(usize)) {
         let inner = self.inner.borrow();
         for frame in &inner.ctx.frames {

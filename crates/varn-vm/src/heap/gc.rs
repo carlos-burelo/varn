@@ -1,117 +1,71 @@
-use super::obj::HeapObj;
+use super::slots::SlotState;
 use super::structs::HeapInner;
-use crate::nursery::{is_nursery_idx, is_old_idx, old_idx_raw, Nursery};
 use crate::value::VmValue;
 
 impl HeapInner {
     pub(crate) fn rebuild_scan_roots(&mut self) {
         self.scan_roots.clear();
-        for (idx, obj) in self.objects.iter().enumerate() {
-            if let Some(obj) = obj {
-                if Self::needs_minor_scan(obj) {
-                    self.scan_roots.push(idx as u32);
-                }
+        for (idx, obj, _) in self.slots.iter() {
+            if Self::needs_minor_scan(obj) {
+                self.scan_roots.push(idx);
             }
         }
     }
 
     #[inline(always)]
     pub(crate) fn needs_minor_gc(&self) -> bool {
-        self.nursery.is_full()
+        self.young.is_full()
     }
 
     #[inline(always)]
-    pub(crate) fn write_barrier(&mut self, parent_packed_idx: u32, new_val: VmValue) {
-        if is_old_idx(parent_packed_idx)
-            && new_val.is_heap()
-            && is_nursery_idx(new_val.as_heap_idx())
-        {
-            self.nursery.remember(parent_packed_idx);
-        }
+    pub(crate) fn is_young(&self, v: VmValue) -> bool {
+        v.is_heap() && self.slots.state(v.as_heap_idx()) == SlotState::Young
     }
 
-    pub(crate) fn minor_gc(
-        &mut self,
-        dyn_: &mut [VmValue],
-        refs: &mut [u32],
-        extra_packed: &[u32],
-    ) {
-        let mut nursery = std::mem::replace(&mut self.nursery, Nursery::vacant());
-        nursery.collect(self, dyn_, refs, extra_packed);
-        self.nursery = nursery;
+    #[inline(always)]
+    pub(crate) fn write_barrier(&mut self, parent: u32, new_val: VmValue) {
+        if self.slots.state(parent) == SlotState::Old && self.is_young(new_val) {
+            self.slots.set_state(parent, SlotState::Remembered);
+            self.young.remembered.push(parent);
+        }
     }
 
     #[inline(always)]
     pub(crate) fn needs_gc(&self) -> bool {
-        self.gc_alloc_since_collect >= self.gc_threshold
+        self.slots.old_growth >= self.gc_threshold
     }
 
     pub(crate) fn compact_interners(&mut self) {
-        if !self.string_interner.is_empty() {
-            self.string_interner.retain(|_, &mut packed| {
-                let raw = old_idx_raw(packed);
-                self.objects
-                    .get(raw as usize)
-                    .map(|o| o.is_some())
-                    .unwrap_or(false)
-            });
-        }
-
-        let check = |packed: u32, objects: &Vec<Option<HeapObj>>| -> bool {
-            let raw = old_idx_raw(packed);
-            objects
-                .get(raw as usize)
-                .map(|o| o.is_some())
-                .unwrap_or(false)
-        };
-
-        if !self.symbol_interner.is_empty() {
-            self.symbol_interner
-                .retain(|_, &mut packed| check(packed, &self.objects));
-        }
-        if !self.char_interner.is_empty() {
-            self.char_interner
-                .retain(|_, &mut packed| check(packed, &self.objects));
-        }
-        if !self.bigint_interner.is_empty() {
-            self.bigint_interner
-                .retain(|_, &mut packed| check(packed, &self.objects));
-        }
-        if !self.decimal_interner.is_empty() {
-            self.decimal_interner
-                .retain(|_, &mut packed| check(packed, &self.objects));
-        }
-        if !self.identity_index.is_empty() {
-            self.identity_index
-                .retain(|_, &mut packed| check(packed, &self.objects));
-        }
+        let slots = &self.slots;
+        let live = |idx: &mut u32| slots.is_live(*idx);
+        self.string_interner.retain(|_, idx| live(idx));
+        self.symbol_interner.retain(|_, idx| live(idx));
+        self.char_interner.retain(|_, idx| live(idx));
+        self.bigint_interner.retain(|_, idx| live(idx));
+        self.decimal_interner.retain(|_, idx| live(idx));
+        self.identity_index.retain(|_, idx| live(idx));
     }
 
-    /// Run a full collection, returning how many slots were freed.
-    ///
-    /// Infallible: marking and sweeping walk structures the heap already owns
-    /// and have no failure mode. This used to return `Result<usize, GcError>`
-    /// with an error type none of the code could construct, which forced every
-    /// caller to handle an impossible case — `Vm::collect_gc` did it with
-    /// `.unwrap_or(0)`, which would have silently swallowed a real failure the
-    /// day one was introduced.
+    /// Run a full collection over every slot, young and old alike, returning
+    /// how many were freed. Every survivor ends it old, so the young
+    /// generation starts empty.
     pub(crate) fn collect(&mut self, roots: &[u32]) -> usize {
-        let Some(mut collector) = self.gc_collector.take() else {
-            return 0;
-        };
-        let freed = collector.collect(self, roots);
-        self.gc_collector = Some(collector);
+        let freed = self.mark_and_sweep(roots);
+        self.young.born.clear();
+        self.young.remembered.clear();
+        self.young_cells.clear();
+        self.young_lazies.clear();
         self.compact_interners();
         self.rebuild_scan_roots();
         self.gc_collections += 1;
         self.gc_total_freed += freed as u64;
-        self.gc_alloc_since_collect = 0;
+        self.slots.old_growth = 0;
         let live = self.live_count() as u64;
         self.gc_threshold = (live * 2).max(65536);
         freed
     }
 
     pub(crate) fn live_count(&self) -> usize {
-        self.objects.len().saturating_sub(self.free.len())
+        self.slots.live_count()
     }
 }

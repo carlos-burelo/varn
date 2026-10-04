@@ -132,14 +132,14 @@ impl Vm {
             let profile = VmProfile::from_counters(&arc);
             let tasks = crate::profile::TASK_STATS.snapshot();
             VmProfile {
-                heap_allocs: self.ctx.heap.alloc_count,
+                heap_allocs: self.ctx.heap.alloc_count(),
                 gc_collections: self.ctx.heap.gc_collections,
                 gc_freed: self.ctx.heap.gc_total_freed,
                 heap_live: self.ctx.heap.live_count() as u64,
                 heap_total: self.ctx.heap.objects_len() as u64,
-                nursery_allocs: self.ctx.heap.nursery.alloc_count,
-                minor_gc_count: self.ctx.heap.nursery.minor_gc_count,
-                minor_gc_promoted: self.ctx.heap.nursery.minor_gc_promoted,
+                nursery_allocs: self.ctx.heap.young.alloc_count,
+                minor_gc_count: self.ctx.heap.young.minor_gc_count,
+                minor_gc_promoted: self.ctx.heap.young.minor_gc_promoted,
                 task_parks: tasks.parks,
                 task_released: tasks.released,
                 task_prune_hit: tasks.prune_hit,
@@ -152,28 +152,7 @@ impl Vm {
     }
 
     pub fn collect_gc(&mut self) -> usize {
-        let mut roots: Vec<u32> = Vec::new();
-        let (dyn_len, ref_len) = (self.ctx.stack.dyn_.len(), self.ctx.stack.refs.len());
-        self.ctx.stack.collect_roots(dyn_len, ref_len, &mut roots);
-        roots.extend(
-            self.ctx
-                .globals_ref()
-                .values
-                .iter()
-                .filter(|v| v.is_heap())
-                .map(|v| v.as_heap_idx()),
-        );
-        for v in unsafe { &*self.ctx.modules.get() }.values() {
-            if v.is_heap() {
-                roots.push(v.as_heap_idx());
-            }
-        }
-        for v in self.ctx.module_exports.values() {
-            if v.is_heap() {
-                roots.push(v.as_heap_idx());
-            }
-        }
-        self.ctx.heap.collect(&roots)
+        self.ctx.trigger_gc()
     }
 
     pub fn take_opcode_counts(&mut self) -> Vec<(OpCode, u64)> {
