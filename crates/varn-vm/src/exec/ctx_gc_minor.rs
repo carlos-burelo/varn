@@ -32,6 +32,7 @@ fn gather_minor_roots(
     refs: &mut Vec<u32>,
     segs: &mut Vec<MinorSeg>,
     refsegs: &mut Vec<MinorRefSeg>,
+    slots: &mut Vec<*mut VmValue>,
 ) {
     macro_rules! seg {
         ($kind:expr, $aux:expr, $body:block) => {{
@@ -130,6 +131,13 @@ fn gather_minor_roots(
     seg!(12, 0, {
         vals.push(ctx.jit_native_result);
     });
+    let slots_start = slots.len();
+    seg!(13, slots_start, {
+        ctx.for_each_jit_slot(|slot| {
+            vals.push(unsafe { *slot });
+            slots.push(slot);
+        });
+    });
     let ref_start = refs.len();
     refs.extend_from_slice(&ctx.stack.refs);
     refsegs.push(MinorRefSeg {
@@ -139,7 +147,7 @@ fn gather_minor_roots(
     });
 }
 
-fn write_minor_seg(ctx: &mut ExecCtx, seg: &MinorSeg, vals: &[VmValue]) {
+fn write_minor_seg(ctx: &mut ExecCtx, seg: &MinorSeg, vals: &[VmValue], slots: &[*mut VmValue]) {
     let slice = &vals[seg.start..seg.start + seg.len];
     match seg.kind {
         0 => ctx.stack.dyn_.copy_from_slice(slice),
@@ -208,6 +216,11 @@ fn write_minor_seg(ctx: &mut ExecCtx, seg: &MinorSeg, vals: &[VmValue]) {
                 }
             }
         }
+        13 => {
+            for (slot, v) in slots[seg.aux..seg.aux + seg.len].iter().zip(slice) {
+                unsafe { **slot = *v };
+            }
+        }
         _ => {
             ctx.jit_native_result = slice[0];
         }
@@ -229,6 +242,7 @@ impl ExecCtx {
         let mut all_refs: Vec<u32> = Vec::new();
         let mut segs: Vec<MinorSeg> = Vec::new();
         let mut refsegs: Vec<MinorRefSeg> = Vec::new();
+        let mut slots: Vec<*mut VmValue> = Vec::new();
         let mut stash_segs: Vec<StashSeg> = Vec::new();
         for (owner_idx, owner_ptr) in owners.iter().enumerate() {
             // Shared borrow only; no mutation happens during gather, and no
@@ -241,6 +255,7 @@ impl ExecCtx {
                 &mut all_refs,
                 &mut segs,
                 &mut refsegs,
+                &mut slots,
             );
         }
         let mut sowners = scope.frozen;
@@ -291,7 +306,7 @@ impl ExecCtx {
             // Each owner is written back sequentially and exclusively; no
             // borrows overlap because only one `&mut` exists at a time.
             let ctx: &mut ExecCtx = unsafe { &mut *owners[seg.owner] };
-            write_minor_seg(ctx, seg, &all_vals);
+            write_minor_seg(ctx, seg, &all_vals, &slots);
         }
         for refseg in refsegs.iter() {
             let ctx: &mut ExecCtx = unsafe { &mut *owners[refseg.owner] };

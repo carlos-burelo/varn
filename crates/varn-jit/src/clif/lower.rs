@@ -61,6 +61,12 @@ pub struct ClifArtifact {
     pub frame_aware: bool,
 }
 
+impl Drop for ClifArtifact {
+    fn drop(&mut self) {
+        crate::stack_roots::unregister(self.raw as usize);
+    }
+}
+
 /// A statically linkable call target: the CURRENT closure a global slot
 /// holds, bound to that closure's proto.
 pub struct ClifTarget {
@@ -337,6 +343,12 @@ fn finish_artifact(
     super::debug::capture_code(&mut debug, &mut buf, raw.code.len(), wrapper_off, total);
     buf.make_executable()?;
     let raw_ptr = buf.as_ptr();
+    let mut safepoints = raw.safepoints;
+    for mut site in wrapper.safepoints {
+        site.return_offset += wrapper_off as u32;
+        safepoints.push(site);
+    }
+    crate::stack_roots::register(raw_ptr as usize, total, safepoints);
     let entry = unsafe { buf.as_ptr().add(wrapper_off) };
     Ok(ClifArtifact {
         buffer: buf,

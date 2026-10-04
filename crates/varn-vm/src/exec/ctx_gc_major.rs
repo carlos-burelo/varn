@@ -125,6 +125,12 @@ impl ExecCtx {
         if self.jit_native_result.is_heap() {
             roots.push(self.jit_native_result.as_heap_idx());
         }
+        self.for_each_jit_slot(|slot| {
+            let v = unsafe { *slot };
+            if v.is_heap() {
+                roots.push(v.as_heap_idx());
+            }
+        });
         for frame in &self.frames {
             for c in frame.closure().constants.iter() {
                 if c.is_heap() {

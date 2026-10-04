@@ -11,6 +11,7 @@ use cranelift_codegen::isa::OwnedTargetIsa;
 
 pub(super) struct CompiledPiece {
     pub code: Vec<u8>,
+    pub safepoints: Vec<crate::stack_roots::SafepointMap>,
     /// Offsets of rel32 call displacements that must resolve to raw@0.
     pub call_reloc_offsets: Vec<usize>,
 }
@@ -31,8 +32,23 @@ pub(super) fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<Comp
                 other => return Err(format!("clif: unsupported reloc target {other:?}")),
             }
         }
+        let mut safepoints = Vec::new();
+        for (return_offset, _span, map) in compiled.buffer.user_stack_maps() {
+            let mut slots = Vec::new();
+            for (ty, offset) in map.entries() {
+                if ty != cranelift_codegen::ir::types::I128 {
+                    return Err(format!("clif: stack map slot of type {ty}"));
+                }
+                slots.push(offset);
+            }
+            safepoints.push(crate::stack_roots::SafepointMap {
+                return_offset: *return_offset,
+                slots: slots.into_boxed_slice(),
+            });
+        }
         Ok(CompiledPiece {
             code: compiled.code_buffer().to_vec(),
+            safepoints,
             call_reloc_offsets,
         })
     })

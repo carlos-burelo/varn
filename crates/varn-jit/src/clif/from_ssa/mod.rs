@@ -78,6 +78,7 @@ mod pinned;
 mod pool;
 mod props;
 mod scalar;
+mod stack_exit;
 mod store;
 mod term;
 mod views;
@@ -300,6 +301,9 @@ pub(super) fn try_lower(
         },
     };
 
+    if let Some(frame) = &ctx.frame {
+        stack_exit::publish(&mut b, helpers, frame.exec_ctx);
+    }
     let mut values: Vec<Option<Value>> = vec![None; ssa.values.len()];
     if let Some(h) = osr {
         let header = blocks[h.block as usize].expect("block created");

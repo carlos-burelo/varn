@@ -69,6 +69,8 @@ pub struct ExecCtx {
     pub jit_panic_exception_err_obj: Option<crate::error::RuntimeError>,
     pub jit_panic_suspend_resume_ip: Option<usize>,
     pub jit_native_result: VmValue,
+    pub jit_exit: varn_jit::stack_roots::JitExit,
+    pub jit_exits_saved: Vec<varn_jit::stack_roots::JitExit>,
     /// An ON-STACK REPLACEMENT request raised by `OpCode::Loop` when a proto's
     /// back edges crossed the threshold, holding the loop-header ip to resume
     /// at. The opcode cannot service it itself — entering compiled code means
@@ -143,6 +145,8 @@ impl ExecCtx {
             jit_panic_exception_error: None,
             jit_panic_exception_err_obj: None,
             jit_panic_suspend_resume_ip: None,
+            jit_exit: varn_jit::stack_roots::JitExit::default(),
+            jit_exits_saved: Vec::new(),
             jit_native_result: VmValue::null(),
             osr_request: None,
             resources: Rc::new(std::cell::UnsafeCell::new(varn_types::ResourceStore::new())),
@@ -334,6 +338,8 @@ impl ExecCtx {
             jit_panic_exception_error: None,
             jit_panic_exception_err_obj: None,
             jit_panic_suspend_resume_ip: None,
+            jit_exit: varn_jit::stack_roots::JitExit::default(),
+            jit_exits_saved: Vec::new(),
             jit_native_result: VmValue::null(),
             osr_request: None,
             resources: Rc::clone(&self.resources),

@@ -65,6 +65,9 @@ unsafe fn execute_jit_frame(
 ) -> Result<VmValue, i32> {
     let saved = (*ctx).jit_jmp_buf;
     let is_outer = saved.is_null();
+    let exits_len = (*ctx).jit_exits_saved.len();
+    (*ctx).jit_exits_saved.push((*ctx).jit_exit);
+    (*ctx).jit_exit = varn_jit::stack_roots::JitExit::default();
     let mut jmp_buf = crate::exec::ctx::JmpBuf::default();
     let jmp_res = std::hint::black_box(crate::exec::ctx::my_setjmp(&mut jmp_buf));
 
@@ -80,18 +83,26 @@ unsafe fn execute_jit_frame(
             ctx as *mut std::ffi::c_void,
         );
         std::hint::black_box(ctx);
+        restore_exit(ctx, exits_len);
         (*ctx).jit_jmp_buf = saved;
         if is_outer {
             (*ctx).jit_suspend_buf = std::ptr::null_mut();
         }
         Ok(val)
     } else {
+        restore_exit(ctx, exits_len);
         (*ctx).jit_jmp_buf = saved;
         if is_outer {
             (*ctx).jit_suspend_buf = std::ptr::null_mut();
         }
         Err(jmp_res)
     }
+}
+
+unsafe fn restore_exit(ctx: *mut ExecCtx, exits_len: usize) {
+    let ctx = &mut *ctx;
+    ctx.jit_exit = ctx.jit_exits_saved[exits_len];
+    ctx.jit_exits_saved.truncate(exits_len);
 }
 
 /// Enter `jit_fn` for the frame at `frame_idx` and reconcile whatever comes

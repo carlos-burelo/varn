@@ -14,6 +14,7 @@ macro_rules! fill_tail {
             nursery_len_offset: crate::heap::Heap::nursery_len_byte_offset_from_rcbox(),
             nursery_threshold: crate::nursery::Nursery::FULL_THRESHOLD,
             jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
+            jit_exit_offset: std::mem::offset_of!(ctx::ExecCtx, jit_exit),
             globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals),
             globals_store_offset: 2 * std::mem::size_of::<usize>()
                 + std::mem::offset_of!(crate::globals::GlobalStore, values)

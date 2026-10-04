@@ -2,6 +2,7 @@ pub mod aot;
 pub mod clif;
 pub(crate) mod loop_hoist;
 pub mod mem;
+pub mod stack_roots;
 pub mod stats;
 
 pub use stats::{CompileOutcome, CompileRecord, JitStats, JitStatsSnapshot, JIT_STATS};
@@ -263,6 +264,7 @@ macro_rules! define_tail {
         /// Nursery fill level at which the safepoint must run.
         pub nursery_threshold: usize,
         pub jit_native_result_offset: usize,
+        pub jit_exit_offset: usize,
         /// Byte offset of the `globals` field (an Rc, i.e. one pointer) inside
         /// ExecCtx. The store itself is shared across task forks; chase it
         /// with `globals_store_offset` (same two-link shape as the heap

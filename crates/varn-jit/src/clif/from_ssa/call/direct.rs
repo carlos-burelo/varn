@@ -64,6 +64,7 @@ fn run_entered(b: &mut FunctionBuilder, ctx: &Ctx<'_>, entry: Value, out: Value)
         let parts = b.inst_results(call).to_vec();
         b.ins().iconcat(parts[0], parts[1])
     };
+    super::super::stack_exit::publish(b, ctx.helpers, ctx.exec_ctx);
     call_helper_void(b, ctx.cc, ctx.helpers.jit_call_leave, &[ctx.exec_ctx, base]);
     result
 }
