@@ -118,8 +118,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             quote! {
                 if let Some(parent) = ctx.get_class(#parent) {
                     *cls.superclass.borrow_mut() = Some(parent.clone());
-                    *cls.root_shape.borrow_mut() =
-                        parent.root_shape.borrow().with_class(Some(cls.clone()));
+                    cls.inherit_fields(&parent);
                 }
             }
         } else {

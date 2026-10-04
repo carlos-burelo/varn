@@ -129,6 +129,30 @@ impl ClassObj {
         (shape, n)
     }
 
+    pub fn inherit_fields(self: &Rc<Self>, parent: &ClassObj) {
+        *self.instance_shape_cache.borrow_mut() = None;
+        *self.layout.borrow_mut() = None;
+        let mut properties = parent.root_shape.borrow().property_names.clone();
+        let mut tags = parent.field_tags.borrow().clone();
+        tags.resize(properties.len(), None);
+        let own_tags = self.field_tags.borrow().clone();
+        let mut own: Vec<(RuntimeString, usize)> = self
+            .root_shape
+            .borrow()
+            .property_names
+            .iter()
+            .filter(|(name, _)| !properties.contains_key(name.as_ref()))
+            .map(|(k, &v)| (k.clone(), v))
+            .collect();
+        own.sort_unstable_by_key(|(_, slot)| *slot);
+        for (name, old_slot) in own {
+            properties.insert(name, tags.len());
+            tags.push(own_tags.get(old_slot).copied().flatten());
+        }
+        *self.root_shape.borrow_mut() = super::shape::Shape::create(Some(self.clone()), properties);
+        *self.field_tags.borrow_mut() = tags;
+    }
+
     pub fn declare_field(&self, name: RuntimeString, tag: Option<varn_core::RuntimeKind>) -> usize {
         *self.instance_shape_cache.borrow_mut() = None;
         *self.layout.borrow_mut() = None;

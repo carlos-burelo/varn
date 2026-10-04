@@ -54,6 +54,28 @@ class InitDerived extends InitBase {
     }
 }
 
+interface HasZW {
+    z: int
+    w: int
+}
+class ViewBase {
+    z: int
+    constructor() {
+        this.z = 1
+    }
+}
+class ViewDerived extends ViewBase {
+    w: int
+    constructor() {
+        super()
+        this.w = 2
+    }
+}
+function bumpView(o: HasZW) {
+    o.w = o.w + 20
+    o.z = o.z + 10
+}
+
 const horse = new Horse("h")
 const initDerived = new InitDerived()
 const alpha = new Alpha()
@@ -71,6 +93,13 @@ await describe("137 class build order", async () => {
     await it("field initializers keep their slots across inheritance", async () => {
         expect(initDerived.z).toBe(1);
         expect(initDerived.w).toBe(2);
+    });
+
+    await it("interface access sees inherited field slots", async () => {
+        const view = new ViewDerived()
+        bumpView(view)
+        expect(view.z).toBe(11);
+        expect(view.w).toBe(22);
     });
 
 

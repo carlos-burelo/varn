@@ -4,7 +4,7 @@ use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_types::{ClassObj, Shape};
+use varn_types::ClassObj;
 
 pub(crate) fn op_class(name: &str, heap: &mut Heap) -> VmValue {
     let cls = ClassObj::new_rc(name);
@@ -54,21 +54,7 @@ pub(crate) fn op_inherit(
             *sub.vtable_owners.borrow_mut() = superclass.vtable_owners.borrow().clone();
             *sub.method_map.borrow_mut() = superclass.method_map.borrow().clone();
 
-            let mut properties = superclass.root_shape.borrow().property_names.clone();
-            let mut own_fields: Vec<(varn_types::RuntimeString, usize)> = sub
-                .root_shape
-                .borrow()
-                .property_names
-                .iter()
-                .filter(|(name, _)| !properties.contains_key(name.as_ref()))
-                .map(|(k, &v)| (k.clone(), v))
-                .collect();
-            own_fields.sort_unstable_by_key(|(_, slot)| *slot);
-            for (name, _) in own_fields {
-                let slot = properties.len();
-                properties.insert(name, slot);
-            }
-            *sub.root_shape.borrow_mut() = Shape::create(Some(sub.clone()), properties);
+            sub.inherit_fields(&superclass);
 
             *sub.getter_map.borrow_mut() = superclass.getter_map.borrow().clone();
             *sub.getter_vtable.borrow_mut() = superclass.getter_vtable.borrow().clone();

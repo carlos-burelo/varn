@@ -125,10 +125,6 @@ impl Shape {
         new_props.insert(key, slot);
         Shape::create(self.class.clone(), new_props)
     }
-
-    pub fn with_class(&self, class: Option<Rc<crate::value::ClassObj>>) -> Rc<Shape> {
-        Shape::create(class, self.property_names.clone())
-    }
 }
 
 thread_local! {
