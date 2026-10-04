@@ -21,6 +21,7 @@ fn module_with_point() -> TirModule {
                 ("x".into(), BackendTy::Int),
                 ("label".into(), BackendTy::Str),
             ],
+            &varn_tir::TyTable::default(),
         )],
         enums: vec![],
         signatures: vec![Signature {
@@ -130,8 +131,18 @@ fn int_argument_widens_to_a_float_parameter() {
 #[test]
 fn a_subclass_is_assignable_to_its_parent() {
     // ClassId(0) = Animal, ClassId(1) = Dog extends Animal.
-    let animal = ClassInfo::new(Arc::from("Animal"), varn_tir::Ancestry::Root, vec![]);
-    let mut dog = ClassInfo::new(Arc::from("Dog"), varn_tir::Ancestry::Root, vec![]);
+    let animal = ClassInfo::new(
+        Arc::from("Animal"),
+        varn_tir::Ancestry::Root,
+        vec![],
+        &varn_tir::TyTable::default(),
+    );
+    let mut dog = ClassInfo::new(
+        Arc::from("Dog"),
+        varn_tir::Ancestry::Root,
+        vec![],
+        &varn_tir::TyTable::default(),
+    );
     dog.parent = Some(ClassId(0));
     let mut m = module_with_point();
     m.classes = vec![animal, dog];
@@ -313,6 +324,7 @@ fn method_call_arity_mismatch_is_rejected() {
             varn_tir::Ancestry::Root,
             vec![],
             vec![("move".into(), SigId(0))],
+            &varn_tir::TyTable::default(),
         )],
         enums: vec![],
         signatures: vec![
@@ -382,6 +394,7 @@ fn method_call_with_correct_arity_verifies() {
             varn_tir::Ancestry::Root,
             vec![],
             vec![("move".into(), SigId(0))],
+            &varn_tir::TyTable::default(),
         )],
         enums: vec![],
         signatures: vec![
@@ -866,6 +879,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
             varn_tir::Ancestry::Root,
             vec![],
             vec![("move".into(), SigId(0))],
+            &varn_tir::TyTable::default(),
         )],
         enums: vec![],
         signatures: vec![
@@ -931,6 +945,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
             varn_tir::Ancestry::Root,
             vec![],
             vec![("move".into(), SigId(0))],
+            &varn_tir::TyTable::default(),
         )],
         enums: vec![],
         signatures: vec![

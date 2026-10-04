@@ -17,6 +17,7 @@ fn empty_module() -> TirModule {
             Arc::from("P"),
             varn_tir::Ancestry::Root,
             vec![("x".into(), BackendTy::Int)],
+            &varn_tir::TyTable::default(),
         )],
         enums: vec![],
         signatures: vec![Signature {
@@ -396,7 +397,8 @@ fn a_dangling_vtable_sig_is_rejected() {
         Arc::from("P"),
         varn_tir::Ancestry::Root,
         vec![("x".into(), BackendTy::Int)],
-        vec![("m".into(), SigId(99))], // no entry 99 in m.signatures
+        vec![("m".into(), SigId(99))],
+        &varn_tir::TyTable::default(),
     )];
     let errs = verify_module(&m).unwrap_err();
     assert!(

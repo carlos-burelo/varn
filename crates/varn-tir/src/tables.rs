@@ -1,12 +1,8 @@
 //! Per-module tables: classes with their layout and vtable, enums, signatures.
-//!
-//! This is the ONLY authority on where a field lives. Four sites compute that
-//! today and two of them disagree; the packed offset the checker computes has
-//! no consumer, which is the only reason the divergence has not yet produced a
-//! misaligned read.
 
-use crate::ty::{BackendTy, ClassId, SigId};
+use crate::ty::{BackendTy, ClassId, SigId, TyTable};
 use std::sync::Arc;
+use varn_core::layout::ClassLayout;
 
 /// One field of a class instance.
 #[derive(Debug, Clone, PartialEq)]
@@ -15,8 +11,6 @@ pub struct FieldInfo {
     pub ty: BackendTy,
     /// Dense index, counting the parent's fields first.
     pub slot: u16,
-    /// Byte offset within the instance payload.
-    pub offset: u32,
 }
 
 /// One entry of a class vtable. Its index IS the dispatch target, so the
@@ -36,17 +30,11 @@ pub struct ClassInfo {
     pub fields: Vec<FieldInfo>,
     pub inherited_fields: u16,
     pub vtable: Vec<VtableEntry>,
-    pub payload_size: u32,
+    pub layout: ClassLayout,
     /// The signature of the class's own constructor, when it declares one.
     /// Not a vtable entry: a constructor is reached by `new`, not dispatch.
     pub constructor: Option<SigId>,
 }
-
-/// Bytes one field slot occupies today. Every read and write path still moves
-/// a whole VmValue, so this is 16 and the offsets are `slot * 16`. It is a
-/// single constant in a single file precisely so that packing later is one
-/// change here, not four changes that have to agree.
-const SLOT_SIZE: u32 = 16;
 
 pub enum Ancestry<'a> {
     Root,
@@ -60,8 +48,13 @@ impl ClassInfo {
     /// `parent` is the id AND the info: the id goes into the record, the info
     /// supplies the prefix. Taking only one of the two is what leaves a
     /// `parent` field that never gets filled.
-    pub fn new(name: Arc<str>, parent: Ancestry<'_>, fields: Vec<(Arc<str>, BackendTy)>) -> Self {
-        Self::new_with_methods(name, parent, fields, Vec::new())
+    pub fn new(
+        name: Arc<str>,
+        parent: Ancestry<'_>,
+        fields: Vec<(Arc<str>, BackendTy)>,
+        types: &TyTable,
+    ) -> Self {
+        Self::new_with_methods(name, parent, fields, Vec::new(), types)
     }
 
     /// A class with fields and methods, laid out against its parent.
@@ -70,6 +63,7 @@ impl ClassInfo {
         parent: Ancestry<'_>,
         fields: Vec<(Arc<str>, BackendTy)>,
         methods: Vec<(Arc<str>, SigId)>,
+        types: &TyTable,
     ) -> Self {
         let (parent_id, parent_info, foreign) = match parent {
             Ancestry::Root => (None, None, Vec::new()),
@@ -83,7 +77,6 @@ impl ClassInfo {
                 name: fname,
                 ty: fty,
                 slot,
-                offset: slot as u32 * SLOT_SIZE,
             });
         }
         let first_slot = out.len() as u16;
@@ -92,10 +85,13 @@ impl ClassInfo {
                 name: fname,
                 ty: fty,
                 slot,
-                offset: slot as u32 * SLOT_SIZE,
             });
         }
-        let payload_size = out.len() as u32 * SLOT_SIZE;
+        let kinds: Vec<(Arc<str>, Option<varn_core::RuntimeKind>)> = out
+            .iter()
+            .map(|f| (f.name.clone(), f.ty.field_kind(types)))
+            .collect();
+        let layout = ClassLayout::from_fields(name.clone(), 0, &kinds);
 
         // Vtable: the parent's entries, then the new ones. A method the parent
         // already has keeps its index — that is what makes the index a valid
@@ -123,7 +119,7 @@ impl ClassInfo {
             inherited_fields: first_slot,
             fields: out,
             vtable,
-            payload_size,
+            layout,
             constructor: None,
         }
     }

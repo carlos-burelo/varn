@@ -90,6 +90,7 @@ mod tests {
                 Arc::from("Point"),
                 varn_tir::Ancestry::Root,
                 vec![],
+                &varn_tir::TyTable::default(),
             )],
             enums: vec![],
             signatures: vec![Signature {

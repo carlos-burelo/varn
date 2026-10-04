@@ -17,6 +17,7 @@ fn module() -> TirModule {
             Arc::from("P"),
             varn_tir::Ancestry::Root,
             vec![("x".into(), BackendTy::Int)],
+            &varn_tir::TyTable::default(),
         )],
         enums: vec![],
         signatures: vec![Signature {

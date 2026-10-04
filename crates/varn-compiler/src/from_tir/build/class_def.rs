@@ -52,7 +52,7 @@ impl<'m> Builder<'m> {
             self.emit_effect(InstKind::DeclareField {
                 class: class_v,
                 name: fname,
-                tag: super::ops::field_kind(fty, &self.tir.types),
+                tag: fty.field_kind(&self.tir.types),
             });
         }
 

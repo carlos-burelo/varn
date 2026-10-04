@@ -88,6 +88,35 @@ pub enum BackendTy {
 }
 
 impl BackendTy {
+    pub fn field_kind(self, types: &TyTable) -> Option<varn_core::RuntimeKind> {
+        use varn_core::RuntimeKind as T;
+        match self {
+            BackendTy::Int => Some(T::Int),
+            BackendTy::Float => Some(T::Float),
+            BackendTy::Bool => Some(T::Bool),
+            BackendTy::Str => Some(T::Str),
+            BackendTy::Bytes => Some(T::Bytes),
+            BackendTy::Char => Some(T::Char),
+            BackendTy::Decimal => Some(T::Decimal),
+            BackendTy::BigInt => Some(T::BigInt),
+            BackendTy::Array(_) => Some(T::Array),
+            BackendTy::Set(_) => Some(T::Set),
+            BackendTy::Map(..) => Some(T::Map),
+            BackendTy::Class(_) => Some(T::Class),
+            BackendTy::Nullable(_) => {
+                let kind = self.non_nullable(types).field_kind(types)?;
+                let repr = varn_core::layout::TypeLayout::of_field(Some(kind)).repr;
+                (repr == varn_core::layout::ScalarRepr::Ref).then_some(kind)
+            }
+            BackendTy::Tuple(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => None,
+        }
+    }
+
     /// The type with nullability stripped, for consumers that guard null
     /// separately. Needs the table because the payload is behind a handle.
     pub fn non_nullable(self, t: &TyTable) -> BackendTy {

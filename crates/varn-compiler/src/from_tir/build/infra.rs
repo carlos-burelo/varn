@@ -36,19 +36,11 @@ impl<'m> Builder<'m> {
         let BackendTy::Class(c) = obj_ty.non_nullable(&self.tir.types) else {
             return None;
         };
-        let ci = self.tir.class(c)?;
-        let fields: Vec<(std::sync::Arc<str>, Option<varn_core::RuntimeKind>)> = ci
-            .fields
-            .iter()
-            .map(|f| {
-                (
-                    f.name.clone(),
-                    super::ops::field_kind(f.ty, &self.tir.types),
-                )
-            })
-            .collect();
-        let layout = varn_core::layout::ClassLayout::from_fields(ci.name.as_ref(), 0, &fields);
-        let f = layout.get_field_by_index(slot as usize)?;
+        let f = self
+            .tir
+            .class(c)?
+            .layout
+            .get_field_by_index(slot as usize)?;
         Some((f.offset, f.kind))
     }
 

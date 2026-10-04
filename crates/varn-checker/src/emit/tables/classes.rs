@@ -181,7 +181,7 @@ fn build_one_class(
         None if !foreign_prefix.is_empty() => Ancestry::Foreign(foreign_prefix),
         None => Ancestry::Root,
     };
-    let mut info = ClassInfo::new_with_methods(name.clone(), ancestry, fields, methods);
+    let mut info = ClassInfo::new_with_methods(name.clone(), ancestry, fields, methods, tt);
     info.constructor = constructor;
     info
 }

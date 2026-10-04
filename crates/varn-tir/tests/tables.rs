@@ -19,11 +19,13 @@ fn inheritance_lays_out_by_prefix() {
         Arc::from("Base"),
         varn_tir::Ancestry::Root,
         vec![("a".into(), BackendTy::Int), ("b".into(), BackendTy::Bool)],
+        &varn_tir::TyTable::default(),
     );
     let derived = ClassInfo::new(
         Arc::from("Derived"),
         varn_tir::Ancestry::Local(ClassId(0), &base),
         vec![("c".into(), BackendTy::Float)],
+        &varn_tir::TyTable::default(),
     );
 
     assert_eq!(derived.field("a").map(|f| f.slot), Some(0));
@@ -49,6 +51,7 @@ fn slots_are_dense_and_ordered() {
             ("y".into(), BackendTy::Int),
             ("z".into(), BackendTy::Str),
         ],
+        &varn_tir::TyTable::default(),
     );
     let slots: Vec<u16> = c.fields.iter().map(|f| f.slot).collect();
     assert_eq!(slots, vec![0, 1, 2]);
@@ -62,6 +65,7 @@ fn declared_types_reach_the_layout() {
         Arc::from("P"),
         varn_tir::Ancestry::Root,
         vec![("n".into(), BackendTy::Int), ("s".into(), BackendTy::Str)],
+        &varn_tir::TyTable::default(),
     );
     assert_eq!(c.field("n").map(|f| f.ty), Some(BackendTy::Int));
     assert_eq!(c.field("s").map(|f| f.ty), Some(BackendTy::Str));
@@ -76,12 +80,14 @@ fn override_reuses_the_parent_slot() {
         varn_tir::Ancestry::Root,
         vec![],
         vec![("speak".into(), SigId(0)), ("name".into(), SigId(1))],
+        &varn_tir::TyTable::default(),
     );
     let derived = ClassInfo::new_with_methods(
         Arc::from("Dog"),
         varn_tir::Ancestry::Local(ClassId(0), &base),
         vec![],
         vec![("speak".into(), SigId(2)), ("fetch".into(), SigId(3))],
+        &varn_tir::TyTable::default(),
     );
 
     assert_eq!(base.method_slot("speak"), Some(0));

@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+varn-core = { path = "../varn-core" }
 rustc-hash = { workspace = true }
 
 [lints]
