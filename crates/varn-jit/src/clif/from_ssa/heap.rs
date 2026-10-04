@@ -35,12 +35,22 @@ pub(super) fn boxed_value(
     v: u32,
 ) -> Result<Value, String> {
     let x = load_value(b, ctx, values, v)?;
-    Ok(match ctx.ssa.value_ty(v) {
-        varn_types::register_meta::SlotKind::Int => box_int(b, x),
-        varn_types::register_meta::SlotKind::Float => box_f64(b, x),
-        varn_types::register_meta::SlotKind::Bool => box_bool(b, x),
-        _ => x,
-    })
+    Ok(box_native(b, ctx.ssa.value_ty(v), x))
+}
+
+/// A value of class `kind`, in that class's native form, as a boxed `VmValue`.
+pub(super) fn box_native(
+    b: &mut FunctionBuilder,
+    kind: varn_types::register_meta::SlotKind,
+    x: Value,
+) -> Value {
+    use varn_types::register_meta::SlotKind;
+    match kind {
+        SlotKind::Int => box_int(b, x),
+        SlotKind::Float => box_f64(b, x),
+        SlotKind::Bool => box_bool(b, x),
+        SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => x,
+    }
 }
 
 /// A value split into its `(tag, payload)` halves, boxing scalars first.

@@ -141,7 +141,7 @@ pub(super) fn emit_inst(
             cs,
         } => {
             return Ok(Some(Out::Boxed(call::emit_method_call(
-                b, ctx, values, *recv, name, args, *cs,
+                b, ctx, values, *recv, name, args, *cs, dest,
             )?)))
         }
         SsaOp::CallNativeOp {

@@ -71,6 +71,15 @@ pub(crate) fn probe() -> varn_jit::JitCallLayout {
     drop(slot);
 
     let (vec_ptr_off, vec_len_off, vec_cap_off) = super::frame_layout::probe_vec_words();
+    let class = varn_types::ClassObj::new_rc("__probe_vtable");
+    let class_addr = Rc::as_ptr(&class) as usize;
+    let vtable_vec_off = class.vtable.as_ptr() as usize - class_addr;
+    class.vtable.borrow_mut().push(varn_types::VmValue::null());
+    assert_eq!(
+        word_at(class_addr, vtable_vec_off + vec_ptr_off),
+        class.vtable.borrow().as_ptr() as usize,
+        "ClassObj vtable data pointer probe failed"
+    );
     let frames_off = std::mem::offset_of!(ExecCtx, frames)
         + crate::frame_stack::FrameStack::frames_field_offset();
 
@@ -93,6 +102,9 @@ pub(crate) fn probe() -> varn_jit::JitCallLayout {
         frame_base_off: std::mem::offset_of!(CallFrame, base),
         frame_class_off,
         frame_return_reg_off: std::mem::offset_of!(CallFrame, return_reg),
+        class_vtable_ptr_off: vtable_vec_off + vec_ptr_off,
+        class_vtable_len_off: vtable_vec_off + vec_len_off,
+        class_vtable_version_off: std::mem::offset_of!(varn_types::ClassObj, vtable_version),
         no_activation: CallFrame::NO_ACTIVATION,
         no_return_reg: CallFrame::NO_RETURN_REG as usize,
         max_call_depth: crate::frame::MAX_CALL_DEPTH,

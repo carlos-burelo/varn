@@ -232,6 +232,11 @@ pub struct JitCallLayout {
     pub frame_base_off: usize,
     pub frame_class_off: usize,
     pub frame_return_reg_off: usize,
+    /// `ClassObj` value → its vtable `Vec`'s data pointer and length, and
+    /// `vtable_version`.
+    pub class_vtable_ptr_off: usize,
+    pub class_vtable_len_off: usize,
+    pub class_vtable_version_off: usize,
     pub no_activation: usize,
     pub no_return_reg: usize,
     pub max_call_depth: usize,
