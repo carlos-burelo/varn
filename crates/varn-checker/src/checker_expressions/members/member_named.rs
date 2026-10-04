@@ -181,7 +181,7 @@ impl<'r> Checker<'r> {
         }
         if let Some(parent) = bind.class_parents.get(&name) {
             let parent = parent.clone();
-            let named = Type::named(parent, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+            let named = self.parent_type(&parent);
             return self.find_member_info_uncached(&named, key, bind);
         }
 

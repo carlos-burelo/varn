@@ -40,7 +40,7 @@ pub(crate) use binding_types::ParamSite;
 pub use inference_utils::build_fn_type;
 pub use type_inference::{infer_expr_type, pattern_lead_name, widen_literal};
 pub use type_resolution::{resolve_primitive, resolve_type_node};
-pub use types::{BindResult, BindView, Extensions, PendingEnrich, TypeMembers};
+pub use types::{BindResult, BindView, ClassParent, Extensions, PendingEnrich, TypeMembers};
 
 pub struct Binder<'r> {
     /// How this binder reaches other modules. Borrowed, not owned: the
@@ -58,7 +58,7 @@ pub struct Binder<'r> {
     pub(crate) current: ScopeId,
     pub(crate) class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
     pub(crate) type_members: TypeMembers,
-    pub(crate) class_parents: FxHashMap<Arc<str>, Arc<str>>,
+    pub(crate) class_parents: FxHashMap<Arc<str>, ClassParent>,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
     pub(crate) interner: varn_core::AtomInterner,
     pub(crate) deps: Vec<Arc<str>>,

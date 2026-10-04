@@ -55,7 +55,7 @@ fn build_with_parents(
     while let Some(p) = bind
         .class_parents
         .get(&class_names[cur])
-        .and_then(|p| names.class_id(p))
+        .and_then(|p| names.class_id(&p.name))
         .map(|id| id.0 as usize)
     {
         if built[p].is_some() || chain.contains(&p) {
@@ -93,7 +93,7 @@ fn build_one_class(
     built: &[Option<ClassInfo>],
 ) -> ClassInfo {
     let parent_name = bind.class_parents.get(name);
-    let parent_id = parent_name.and_then(|p| names.class_id(p));
+    let parent_id = parent_name.and_then(|p| names.class_id(&p.name));
     let parent_info = parent_id.and_then(|id| built.get(id.0 as usize)?.as_ref());
     let mut inherited_fields: FxHashMap<Arc<str>, ()> = parent_info
         .map(|p| p.fields.iter().map(|f| (f.name.clone(), ())).collect())

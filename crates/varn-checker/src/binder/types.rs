@@ -65,6 +65,12 @@ pub struct Extensions {
     pub setters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ClassParent {
+    pub name: Arc<str>,
+    pub origin: Option<Arc<str>>,
+}
+
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct BindResult {
     pub arena: SymbolArena,
@@ -83,7 +89,7 @@ pub struct BindResult {
     pub match_arm_scopes: FxHashMap<varn_core::ast::AstId, Vec<ScopeId>>,
     pub class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
     pub type_members: TypeMembers,
-    pub class_parents: FxHashMap<Arc<str>, Arc<str>>,
+    pub class_parents: FxHashMap<Arc<str>, ClassParent>,
     pub source_file: Arc<str>,
     pub sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,
     pub sum_variant_parent: FxHashMap<Arc<str>, Arc<str>>,
@@ -162,16 +168,10 @@ impl BindResult {
             .or_else(|| self.core.as_ref().and_then(|b| b.class_methods.get(name)))
     }
 
-    pub fn get_class_parent(&self, name: &str) -> Option<&str> {
+    pub fn get_class_parent(&self, name: &str) -> Option<&ClassParent> {
         self.class_parents
             .get(name)
-            .map(|s| s.as_ref())
-            .or_else(|| {
-                self.core
-                    .as_ref()
-                    .and_then(|b| b.class_parents.get(name))
-                    .map(|s| s.as_ref())
-            })
+            .or_else(|| self.core.as_ref().and_then(|b| b.class_parents.get(name)))
     }
 
     pub fn get_flattened_members(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {

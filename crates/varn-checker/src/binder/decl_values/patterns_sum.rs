@@ -82,10 +82,8 @@ impl<'r> super::super::Binder<'r> {
                             let name: Arc<str> = Arc::from(self.interner.resolve(name_atom));
                             let origin: Option<Arc<str>> =
                                 origin_atom.map(|o| Arc::from(self.interner.resolve(o)));
-                            self.get_class_members(name.as_ref(), origin.as_deref())
-                                .or_else(|| {
-                                    self.get_interface_members(name.as_ref(), origin.as_deref())
-                                })
+                            self.local_class_members(name.as_ref())
+                                .or_else(|| self.local_interface_members(name.as_ref()))
                                 .and_then(|members| {
                                     members
                                         .iter()

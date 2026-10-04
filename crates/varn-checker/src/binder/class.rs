@@ -67,10 +67,22 @@ impl<'r> super::Binder<'r> {
 
         let mut final_members = members.clone();
         if let Some((parent_name, parent_origin)) = extends {
-            self.class_parents
-                .insert(name.clone(), Arc::from(parent_name.as_ref()));
-            if let Some(parent_members) =
-                self.get_class_members(parent_name.as_ref(), parent_origin.as_deref())
+            let parent_is_local = parent_origin
+                .as_deref()
+                .is_none_or(|o| o == self.source_file.as_ref());
+            self.class_parents.insert(
+                name.clone(),
+                super::types::ClassParent {
+                    name: Arc::from(parent_name.as_ref()),
+                    origin: parent_origin
+                        .as_deref()
+                        .filter(|_| !parent_is_local)
+                        .map(Arc::from),
+                },
+            );
+            if let Some(parent_members) = parent_is_local
+                .then(|| self.local_class_members(parent_name.as_ref()))
+                .flatten()
             {
                 for pm in parent_members {
                     if !members.iter().any(|m| m.name == pm.name) {
@@ -104,43 +116,11 @@ impl<'r> super::Binder<'r> {
         self.current = saved;
     }
 
-    pub(crate) fn get_class_members(
-        &self,
-        name: &str,
-        origin: Option<&str>,
-    ) -> Option<&Vec<ClassMemberInfo>> {
-        if let Some(res) = self.type_members.classes.get(name) {
-            return Some(&res.members);
-        }
-        if let Some(origin) = origin {
-            let mut visiting = Vec::new();
-            let exports = self.resolver.module_exports(origin, &mut visiting);
-            if let Some(sym) = exports.get(name) {
-                if sym.kind == SymbolKind::Class {
-                    return self.type_members.classes.get(name).map(|e| &e.members);
-                }
-            }
-        }
-        None
+    pub(crate) fn local_class_members(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {
+        self.type_members.classes.get(name).map(|e| &e.members)
     }
 
-    pub(crate) fn get_interface_members(
-        &self,
-        name: &str,
-        origin: Option<&str>,
-    ) -> Option<&Vec<ClassMemberInfo>> {
-        if let Some(res) = self.type_members.interfaces.get(name) {
-            return Some(res);
-        }
-        if let Some(origin) = origin {
-            let mut visiting = Vec::new();
-            let exports = self.resolver.module_exports(origin, &mut visiting);
-            if let Some(sym) = exports.get(name) {
-                if sym.kind == SymbolKind::Interface {
-                    return self.type_members.interfaces.get(name);
-                }
-            }
-        }
-        None
+    pub(crate) fn local_interface_members(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {
+        self.type_members.interfaces.get(name)
     }
 }

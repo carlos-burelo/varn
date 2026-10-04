@@ -1,4 +1,5 @@
 import { describe, it, expect } from "std:test";
+import { ImportedBase } from "./helpers/imported-base.vn";
 
 // A class is laid out after its parent whatever their names: `Zebra` sorts
 // after `Horse`, which extends it, and `Horse` must still inherit Zebra's
@@ -76,6 +77,14 @@ function bumpView(o: HasZW) {
     o.z = o.z + 10
 }
 
+class FromImported extends ImportedBase {
+    w: int
+    constructor() {
+        super()
+        this.w = 9
+    }
+}
+
 const horse = new Horse("h")
 const initDerived = new InitDerived()
 const alpha = new Alpha()
@@ -100,6 +109,13 @@ await describe("137 class build order", async () => {
         bumpView(view)
         expect(view.z).toBe(11);
         expect(view.w).toBe(22);
+    });
+
+    await it("subclass of an imported class sees its fields", async () => {
+        const sub = new FromImported()
+        expect(sub.a).toBe(1);
+        expect(sub.b == "b").toBeTruthy();
+        expect(sub.w).toBe(9);
     });
 
 

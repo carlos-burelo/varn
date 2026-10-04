@@ -14,7 +14,7 @@ pub struct CoreMembers {
     pub enum_members: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
     pub namespace_members: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
     pub flattened_members: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
-    pub class_parents: FxHashMap<Arc<str>, Arc<str>>,
+    pub class_parents: FxHashMap<Arc<str>, crate::binder::ClassParent>,
     pub class_type_params: FxHashMap<Arc<str>, Vec<Arc<str>>>,
     pub table: Arc<CheckerTyTable>,
 }

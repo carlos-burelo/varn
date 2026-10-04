@@ -78,7 +78,7 @@ pub(super) fn compatible_named(
                 return true;
             }
             match bind.bind.get_class_parent(current) {
-                Some(parent) => current = parent,
+                Some(parent) => current = parent.name.as_ref(),
                 None => return false,
             }
         }

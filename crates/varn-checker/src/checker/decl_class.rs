@@ -26,11 +26,11 @@ impl<'r> Checker<'r> {
         let mut parent =
             c.id.as_ref()
                 .and_then(|cls_id| bind.class_parents.get(bind.interner.resolve(*cls_id)));
-        while let Some(parent_name) = parent {
-            if let Some(m) = bind.get_class_entry(parent_name).map(|e| e.members.clone()) {
+        while let Some(p) = parent {
+            if let Some(m) = bind.get_class_entry(&p.name).map(|e| e.members.clone()) {
                 superclass_members.extend(m);
             }
-            parent = bind.class_parents.get(parent_name);
+            parent = bind.class_parents.get(&p.name);
         }
 
         self.check_class_decorators(c, bind);

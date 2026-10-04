@@ -1,0 +1,12 @@
+export class ImportedBase {
+    a: int
+    b: str
+    c: float
+    d: int
+    constructor() {
+        this.a = 1
+        this.b = "b"
+        this.c = 2.5
+        this.d = 4
+    }
+}

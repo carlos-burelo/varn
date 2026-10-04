@@ -48,12 +48,8 @@ impl<'r> Checker<'r> {
                 .current_class
                 .as_ref()
                 .and_then(|cn| bind.class_parents.get(cn))
-                .map(|parent| {
-                    Type::named(
-                        parent.clone(),
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    )
-                })
+                .cloned()
+                .map(|parent| self.parent_type(&parent))
                 .unwrap_or(Type::Dynamic),
             ExprKind::New {
                 callee, type_args, ..

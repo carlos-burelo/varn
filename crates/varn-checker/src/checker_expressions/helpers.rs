@@ -84,13 +84,16 @@ impl<'r> Checker<'r> {
         target: &str,
         bind: &crate::binder::BindResult,
     ) -> bool {
-        let mut visited: Vec<String> = Vec::new();
-        let mut current = candidate.to_string();
+        let mut visited: Vec<crate::binder::ClassParent> = Vec::new();
+        let mut current = crate::binder::ClassParent {
+            name: std::sync::Arc::from(candidate),
+            origin: None,
+        };
         loop {
-            if current == target {
+            if current.name.as_ref() == target {
                 return true;
             }
-            if visited.iter().any(|v| v == &current) {
+            if visited.contains(&current) {
                 return false;
             }
             visited.push(current.clone());
@@ -101,14 +104,35 @@ impl<'r> Checker<'r> {
         }
     }
 
-    fn class_parent_step(&self, name: &str, bind: &crate::binder::BindResult) -> Option<String> {
-        if let Some(parent) = bind.get_class_parent(name) {
-            return Some(parent.to_string());
+    fn class_parent_step(
+        &self,
+        class: &crate::binder::ClassParent,
+        bind: &crate::binder::BindResult,
+    ) -> Option<crate::binder::ClassParent> {
+        if let Some(owner) = class.origin.as_deref().and_then(|o| {
+            self.resolver
+                .module_bind(o)
+                .or_else(|| self.resolver.stdlib_bind(o))
+        }) {
+            let parent = owner.get_class_parent(&class.name)?;
+            return Some(crate::binder::ClassParent {
+                name: parent.name.clone(),
+                origin: parent.origin.clone().or_else(|| class.origin.clone()),
+            });
+        }
+        if let Some(parent) = bind.get_class_parent(&class.name) {
+            return Some(parent.clone());
         }
         for spec in varn_modules::std_module_ids() {
             if let Some(rb) = self.resolver.stdlib_bind(spec) {
-                if let Some(parent) = rb.class_parents.get(name) {
-                    return Some(parent.to_string());
+                if let Some(parent) = rb.class_parents.get(class.name.as_ref()) {
+                    return Some(crate::binder::ClassParent {
+                        name: parent.name.clone(),
+                        origin: parent
+                            .origin
+                            .clone()
+                            .or_else(|| Some(rb.source_file.clone())),
+                    });
                 }
             }
         }

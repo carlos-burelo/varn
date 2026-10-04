@@ -13,6 +13,17 @@ impl Checker<'_> {
     /// types without declaring them), and for `bind` itself reached again
     /// through the resolver's cache, so a redirected lookup never redirects
     /// twice.
+    pub(crate) fn parent_type(
+        &mut self,
+        parent: &crate::binder::ClassParent,
+    ) -> crate::types::Type {
+        crate::types::Type::named_with_origin(
+            parent.name.clone(),
+            parent.origin.clone(),
+            std::sync::Arc::make_mut(&mut self.ty_table),
+        )
+    }
+
     pub(super) fn foreign_owner(
         &self,
         bind: &BindResult,
