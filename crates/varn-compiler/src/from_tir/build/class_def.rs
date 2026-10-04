@@ -37,24 +37,13 @@ impl<'m> Builder<'m> {
             });
         }
 
-        let inherited = def
-            .parent
-            .or_else(|| {
-                def.class_id
-                    .and_then(|c| self.tir.class(c))
-                    .and_then(|ci| ci.parent)
-            })
-            .and_then(|p| self.tir.class(p))
-            .map(|p| p.fields.len())
-            .or_else(|| (def.super_class.is_some() && def.parent.is_none()).then_some(3))
-            .unwrap_or(0);
         let fields: Vec<(Arc<str>, BackendTy)> = def
             .class_id
             .and_then(|cid| self.tir.class(cid))
             .map(|ci| {
                 ci.fields
                     .iter()
-                    .skip(inherited)
+                    .skip(ci.inherited_fields as usize)
                     .map(|f| (f.name.clone(), f.ty))
                     .collect()
             })

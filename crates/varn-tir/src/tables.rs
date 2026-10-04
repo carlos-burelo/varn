@@ -34,6 +34,7 @@ pub struct ClassInfo {
     pub name: Arc<str>,
     pub parent: Option<ClassId>,
     pub fields: Vec<FieldInfo>,
+    pub inherited_fields: u16,
     pub vtable: Vec<VtableEntry>,
     pub payload_size: u32,
     /// The signature of the class's own constructor, when it declares one.
@@ -47,31 +48,44 @@ pub struct ClassInfo {
 /// change here, not four changes that have to agree.
 const SLOT_SIZE: u32 = 16;
 
+pub enum Ancestry<'a> {
+    Root,
+    Local(ClassId, &'a ClassInfo),
+    Foreign(Vec<(Arc<str>, BackendTy)>),
+}
+
 impl ClassInfo {
     /// A class with fields and no methods.
     ///
     /// `parent` is the id AND the info: the id goes into the record, the info
     /// supplies the prefix. Taking only one of the two is what leaves a
     /// `parent` field that never gets filled.
-    pub fn new(
-        name: Arc<str>,
-        parent: Option<(ClassId, &ClassInfo)>,
-        fields: Vec<(Arc<str>, BackendTy)>,
-    ) -> Self {
+    pub fn new(name: Arc<str>, parent: Ancestry<'_>, fields: Vec<(Arc<str>, BackendTy)>) -> Self {
         Self::new_with_methods(name, parent, fields, Vec::new())
     }
 
     /// A class with fields and methods, laid out against its parent.
     pub fn new_with_methods(
         name: Arc<str>,
-        parent: Option<(ClassId, &ClassInfo)>,
+        parent: Ancestry<'_>,
         fields: Vec<(Arc<str>, BackendTy)>,
         methods: Vec<(Arc<str>, SigId)>,
     ) -> Self {
-        let parent_info = parent.map(|(_, info)| info);
+        let (parent_id, parent_info, foreign) = match parent {
+            Ancestry::Root => (None, None, Vec::new()),
+            Ancestry::Local(id, info) => (Some(id), Some(info), Vec::new()),
+            Ancestry::Foreign(prefix) => (None, None, prefix),
+        };
 
-        // Fields: the parent's prefix, then this class's own, dense.
         let mut out: Vec<FieldInfo> = parent_info.map(|p| p.fields.clone()).unwrap_or_default();
+        for (slot, (fname, fty)) in (out.len() as u16..).zip(foreign) {
+            out.push(FieldInfo {
+                name: fname,
+                ty: fty,
+                slot,
+                offset: slot as u32 * SLOT_SIZE,
+            });
+        }
         let first_slot = out.len() as u16;
         for (slot, (fname, fty)) in (first_slot..).zip(fields) {
             out.push(FieldInfo {
@@ -105,7 +119,8 @@ impl ClassInfo {
 
         ClassInfo {
             name,
-            parent: parent.map(|(id, _)| id),
+            parent: parent_id,
+            inherited_fields: first_slot,
             fields: out,
             vtable,
             payload_size,

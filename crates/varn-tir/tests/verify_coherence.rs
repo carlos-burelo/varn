@@ -16,7 +16,7 @@ fn module_with_point() -> TirModule {
         types,
         classes: vec![ClassInfo::new(
             Arc::from("Point"),
-            None,
+            varn_tir::Ancestry::Root,
             vec![
                 ("x".into(), BackendTy::Int),
                 ("label".into(), BackendTy::Str),
@@ -130,8 +130,8 @@ fn int_argument_widens_to_a_float_parameter() {
 #[test]
 fn a_subclass_is_assignable_to_its_parent() {
     // ClassId(0) = Animal, ClassId(1) = Dog extends Animal.
-    let animal = ClassInfo::new(Arc::from("Animal"), None, vec![]);
-    let mut dog = ClassInfo::new(Arc::from("Dog"), None, vec![]);
+    let animal = ClassInfo::new(Arc::from("Animal"), varn_tir::Ancestry::Root, vec![]);
+    let mut dog = ClassInfo::new(Arc::from("Dog"), varn_tir::Ancestry::Root, vec![]);
     dog.parent = Some(ClassId(0));
     let mut m = module_with_point();
     m.classes = vec![animal, dog];
@@ -310,7 +310,7 @@ fn method_call_arity_mismatch_is_rejected() {
         types: TyTable::default(),
         classes: vec![ClassInfo::new_with_methods(
             Arc::from("Point"),
-            None,
+            varn_tir::Ancestry::Root,
             vec![],
             vec![("move".into(), SigId(0))],
         )],
@@ -379,7 +379,7 @@ fn method_call_with_correct_arity_verifies() {
         types: TyTable::default(),
         classes: vec![ClassInfo::new_with_methods(
             Arc::from("Point"),
-            None,
+            varn_tir::Ancestry::Root,
             vec![],
             vec![("move".into(), SigId(0))],
         )],
@@ -863,7 +863,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
         types,
         classes: vec![ClassInfo::new_with_methods(
             Arc::from("Point"),
-            None,
+            varn_tir::Ancestry::Root,
             vec![],
             vec![("move".into(), SigId(0))],
         )],
@@ -928,7 +928,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
         types,
         classes: vec![ClassInfo::new_with_methods(
             Arc::from("Point"),
-            None,
+            varn_tir::Ancestry::Root,
             vec![],
             vec![("move".into(), SigId(0))],
         )],

@@ -40,11 +40,8 @@ pub struct Tables {
     pub names: NameIndex,
 }
 
-pub fn build(
-    bind: &BindResult,
-    foreign: &[crate::checker::ForeignEnum],
-    tt: &mut TyTable,
-) -> Tables {
+pub fn build(bind: &BindResult, desugar: &crate::checker::Desugarings, tt: &mut TyTable) -> Tables {
+    let foreign = &desugar.foreign_enums;
     let mut class_names: Vec<Arc<str>> = bind.type_members.classes.keys().cloned().collect();
     class_names.sort();
     class_names.retain(|n| !bind.type_members.enums.contains_key(n));
@@ -85,6 +82,7 @@ pub fn build(
         tt,
         &names,
         &class_names,
+        &desugar.foreign_inherited_fields,
         &mut signatures,
     );
     let mut enums = build_enums(

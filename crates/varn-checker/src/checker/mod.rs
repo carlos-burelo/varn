@@ -1,7 +1,9 @@
 pub(crate) mod compat;
 pub(crate) mod completion;
 pub(crate) mod decorator_receiver;
+mod foreign_classes;
 mod foreign_enums;
+pub use foreign_classes::InheritedField;
 pub use foreign_enums::ForeignEnum;
 mod decl_class;
 mod decl_enum;
@@ -185,6 +187,7 @@ impl<'r> Checker<'r> {
             checker.project_expr_types(&bind);
         }
 
+        checker.desugar.foreign_inherited_fields = checker.collect_foreign_inherited_fields(&bind);
         bind.ty_table = checker.ty_table.clone();
         bind.interner.absorb(checker.ty_table.names());
 

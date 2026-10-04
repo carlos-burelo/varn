@@ -15,7 +15,7 @@ fn empty_module() -> TirModule {
         types: TyTable::default(),
         classes: vec![ClassInfo::new(
             Arc::from("P"),
-            None,
+            varn_tir::Ancestry::Root,
             vec![("x".into(), BackendTy::Int)],
         )],
         enums: vec![],
@@ -394,7 +394,7 @@ fn a_dangling_vtable_sig_is_rejected() {
     let mut m = empty_module();
     m.classes = vec![ClassInfo::new_with_methods(
         Arc::from("P"),
-        None,
+        varn_tir::Ancestry::Root,
         vec![("x".into(), BackendTy::Int)],
         vec![("m".into(), SigId(99))], // no entry 99 in m.signatures
     )];

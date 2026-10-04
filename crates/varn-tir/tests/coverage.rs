@@ -15,7 +15,7 @@ fn module() -> TirModule {
         types: TyTable::default(),
         classes: vec![ClassInfo::new(
             Arc::from("P"),
-            None,
+            varn_tir::Ancestry::Root,
             vec![("x".into(), BackendTy::Int)],
         )],
         enums: vec![],

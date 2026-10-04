@@ -6,7 +6,9 @@ use crate::types::{CheckerTyTable, ClassMemberKind};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::AtomInterner;
-use varn_tir::{BackendTy, ClassInfo, Signature, TyTable};
+use varn_tir::{Ancestry, BackendTy, ClassInfo, Signature, TyTable};
+
+type ForeignFields = std::collections::BTreeMap<Arc<str>, Vec<crate::checker::InheritedField>>;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn build_classes(
@@ -16,6 +18,7 @@ pub(super) fn build_classes(
     tt: &mut TyTable,
     names: &NameIndex,
     class_names: &[Arc<str>],
+    foreign: &ForeignFields,
     signatures: &mut Vec<Signature>,
 ) -> Vec<ClassInfo> {
     let mut built: Vec<Option<ClassInfo>> = vec![None; class_names.len()];
@@ -27,6 +30,7 @@ pub(super) fn build_classes(
             tt,
             names,
             class_names,
+            foreign,
             i,
             signatures,
             &mut built,
@@ -46,6 +50,7 @@ fn build_with_parents(
     tt: &mut TyTable,
     names: &NameIndex,
     class_names: &[Arc<str>],
+    foreign: &ForeignFields,
     i: usize,
     signatures: &mut Vec<Signature>,
     built: &mut [Option<ClassInfo>],
@@ -73,6 +78,7 @@ fn build_with_parents(
                 tt,
                 names,
                 &class_names[c],
+                foreign.get(&class_names[c]).map(Vec::as_slice),
                 signatures,
                 built,
             );
@@ -89,6 +95,7 @@ fn build_one_class(
     tt: &mut TyTable,
     names: &NameIndex,
     name: &Arc<str>,
+    foreign: Option<&[crate::checker::InheritedField]>,
     signatures: &mut Vec<Signature>,
     built: &[Option<ClassInfo>],
 ) -> ClassInfo {
@@ -99,13 +106,18 @@ fn build_one_class(
         .map(|p| p.fields.iter().map(|f| (f.name.clone(), ())).collect())
         .unwrap_or_default();
 
+    let foreign_prefix: Vec<(Arc<str>, BackendTy)> = foreign
+        .filter(|_| parent_name.is_some() && parent_id.is_none())
+        .unwrap_or_default()
+        .iter()
+        .map(|f| {
+            inherited_fields.insert(f.name.clone(), ());
+            let ty = field_backend_ty(f.ty, f.optional, table, interner, tt, names);
+            (f.name.clone(), ty)
+        })
+        .collect();
+
     let mut fields: Vec<(Arc<str>, BackendTy)> = Vec::new();
-    if parent_name.is_some() && parent_id.is_none() {
-        for f in ["message", "name", "stack"] {
-            fields.push((Arc::from(f), BackendTy::Str));
-            inherited_fields.insert(Arc::from(f), ());
-        }
-    }
     let members = bind
         .type_members
         .classes
@@ -133,12 +145,8 @@ fn build_one_class(
                 if !inherited_fields.contains_key(&m.name)
                     && seen_field.insert(m.name.clone(), ()).is_none()
                 {
-                    let inner = lower_type(&m.ty, table, interner, tt, names);
-                    let field_bt = if m.is_optional && !matches!(inner, BackendTy::Nullable(_)) {
-                        BackendTy::Nullable(tt.intern(inner))
-                    } else {
-                        inner
-                    };
+                    let field_bt =
+                        field_backend_ty(m.ty, m.is_optional, table, interner, tt, names);
                     fields.push((m.name.clone(), field_bt));
                 }
             }
@@ -168,8 +176,28 @@ fn build_one_class(
         .map(|n| (n.clone(), method_sig[&n]))
         .collect();
 
-    let parent_arg = parent_id.zip(parent_info);
-    let mut info = ClassInfo::new_with_methods(name.clone(), parent_arg, fields, methods);
+    let ancestry = match parent_id.zip(parent_info) {
+        Some((id, info)) => Ancestry::Local(id, info),
+        None if !foreign_prefix.is_empty() => Ancestry::Foreign(foreign_prefix),
+        None => Ancestry::Root,
+    };
+    let mut info = ClassInfo::new_with_methods(name.clone(), ancestry, fields, methods);
     info.constructor = constructor;
     info
+}
+
+fn field_backend_ty(
+    ty: crate::types::Type,
+    optional: bool,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &NameIndex,
+) -> BackendTy {
+    let inner = lower_type(&ty, table, interner, tt, names);
+    if optional && !matches!(inner, BackendTy::Nullable(_)) {
+        BackendTy::Nullable(tt.intern(inner))
+    } else {
+        inner
+    }
 }

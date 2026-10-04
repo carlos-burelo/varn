@@ -17,12 +17,12 @@ use varn_tir::{BackendTy, ClassId, ClassInfo, SigId};
 fn inheritance_lays_out_by_prefix() {
     let base = ClassInfo::new(
         Arc::from("Base"),
-        None,
+        varn_tir::Ancestry::Root,
         vec![("a".into(), BackendTy::Int), ("b".into(), BackendTy::Bool)],
     );
     let derived = ClassInfo::new(
         Arc::from("Derived"),
-        Some((ClassId(0), &base)),
+        varn_tir::Ancestry::Local(ClassId(0), &base),
         vec![("c".into(), BackendTy::Float)],
     );
 
@@ -43,7 +43,7 @@ fn inheritance_lays_out_by_prefix() {
 fn slots_are_dense_and_ordered() {
     let c = ClassInfo::new(
         Arc::from("P"),
-        None,
+        varn_tir::Ancestry::Root,
         vec![
             ("x".into(), BackendTy::Int),
             ("y".into(), BackendTy::Int),
@@ -60,7 +60,7 @@ fn slots_are_dense_and_ordered() {
 fn declared_types_reach_the_layout() {
     let c = ClassInfo::new(
         Arc::from("P"),
-        None,
+        varn_tir::Ancestry::Root,
         vec![("n".into(), BackendTy::Int), ("s".into(), BackendTy::Str)],
     );
     assert_eq!(c.field("n").map(|f| f.ty), Some(BackendTy::Int));
@@ -73,13 +73,13 @@ fn declared_types_reach_the_layout() {
 fn override_reuses_the_parent_slot() {
     let base = ClassInfo::new_with_methods(
         Arc::from("Animal"),
-        None,
+        varn_tir::Ancestry::Root,
         vec![],
         vec![("speak".into(), SigId(0)), ("name".into(), SigId(1))],
     );
     let derived = ClassInfo::new_with_methods(
         Arc::from("Dog"),
-        Some((ClassId(0), &base)),
+        varn_tir::Ancestry::Local(ClassId(0), &base),
         vec![],
         vec![("speak".into(), SigId(2)), ("fetch".into(), SigId(3))],
     );

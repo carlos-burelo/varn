@@ -86,7 +86,11 @@ mod tests {
             imports: vec![],
             exports: vec![],
             types,
-            classes: vec![ClassInfo::new(Arc::from("Point"), None, vec![])],
+            classes: vec![ClassInfo::new(
+                Arc::from("Point"),
+                varn_tir::Ancestry::Root,
+                vec![],
+            )],
             enums: vec![],
             signatures: vec![Signature {
                 params: vec![],

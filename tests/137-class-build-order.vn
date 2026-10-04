@@ -118,5 +118,13 @@ await describe("137 class build order", async () => {
         expect(sub.w).toBe(9);
     });
 
+    await it("own fields of a subclass of an imported class keep their own slots", async () => {
+        const sub = new FromImported()
+        const asBase: ImportedBase = sub
+        expect(asBase.d).toBe(4);
+        expect(asBase.c).toBe(2.5);
+        expect(sub.w).toBe(9);
+    });
+
 
 });

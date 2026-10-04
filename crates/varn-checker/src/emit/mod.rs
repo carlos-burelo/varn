@@ -62,7 +62,7 @@ pub fn emit_module(
         enums,
         mut signatures,
         names,
-    } = tables::build(bind, &desugar.foreign_enums, &mut types);
+    } = tables::build(bind, desugar, &mut types);
 
     let mut declared = module_globals::collect_declared(program, ast_arena, interner);
     let prelude = prelude::prelude_imports(&program.filename, &declared, ast_arena, interner);

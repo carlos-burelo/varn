@@ -25,7 +25,7 @@ pub use module::{
 };
 
 mod tables;
-pub use tables::{ClassInfo, EnumInfo, FieldInfo, Signature, VariantInfo, VtableEntry};
+pub use tables::{Ancestry, ClassInfo, EnumInfo, FieldInfo, Signature, VariantInfo, VtableEntry};
 
 mod verify;
 pub use verify::{verify_module, VerifyError};

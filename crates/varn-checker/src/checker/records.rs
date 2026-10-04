@@ -1,3 +1,4 @@
+use super::foreign_classes::InheritedField;
 use super::foreign_enums::ForeignEnum;
 use crate::binder::BindResult;
 use crate::scope::ScopeId;
@@ -38,6 +39,7 @@ pub struct Desugarings {
     pub extension_set_members: FxHashMap<u32, Arc<str>>,
     pub operator_calls: FxHashSet<varn_core::ast::AstId>,
     pub foreign_enums: Vec<ForeignEnum>,
+    pub foreign_inherited_fields: std::collections::BTreeMap<Arc<str>, Vec<InheritedField>>,
     pub match_arm_subjects: FxHashMap<varn_core::ast::AstId, Vec<crate::types::Type>>,
 }
 
