@@ -156,6 +156,9 @@ impl EnumInfo {
 pub struct Signature {
     pub params: Vec<BackendTy>,
     pub return_ty: BackendTy,
+    /// The last parameter is `...rest`: its type is the array the trailing
+    /// arguments are packed into, each of them its element.
+    pub has_rest: bool,
 }
 
 impl Signature {

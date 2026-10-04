@@ -168,6 +168,7 @@ pub(super) fn fresh_sig(signatures: &mut Vec<Signature>, arity: usize) -> SigId 
     signatures.push(Signature {
         params: vec![BackendTy::Dynamic(DynReason::NotYetSupported); arity],
         return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+        has_rest: false,
     });
     id
 }
@@ -297,6 +298,7 @@ pub(super) fn emit_function(
     signatures.push(Signature {
         params: param_tys.clone(),
         return_ty,
+        has_rest: f.params.last().is_some_and(|p| p.is_rest),
     });
 
     let param_names: Vec<Arc<str>> = f

@@ -14,10 +14,7 @@ pub(crate) fn try_prepare_call_fast(
 
     match heap.get(callee_nv.as_heap_idx())? {
         HeapObj::VmClosure(nc) => {
-            if !nc.proto.is_generator
-                && !nc.proto.is_async
-                && (!nc.proto.has_rest || arg_count <= nc.proto.arity)
-            {
+            if !nc.proto.is_generator && !nc.proto.is_async && !nc.proto.has_rest {
                 let frame = materialize_frame(store, nc, stage_window(staging, arg_count)).ok()?;
                 return Some((PreparedCall::Frame(frame), false));
             }

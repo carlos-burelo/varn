@@ -30,31 +30,9 @@ pub(super) fn check_direct_call(
     if !is_positional(args) {
         return;
     }
-    if args.len() != sig.arity() {
-        errors.push(VerifyError::new(
-            format!(
-                "call to `{}` passes {} arguments, signature takes {}",
-                func.name,
-                args.len(),
-                sig.arity()
-            ),
-            e.span,
-        ));
+    let label = format!("call to `{}`", func.name);
+    if !check_args(m, sig, args, &label, e, errors) {
         return;
-    }
-    // Each argument must be assignable TO its parameter
-    for (i, (a, p)) in args.iter().zip(&sig.params).enumerate() {
-        if !assignable(m, a.value().ty, *p) {
-            errors.push(VerifyError::new(
-                format!(
-                    "call to `{}`: argument {i} is {:?}, parameter is {:?}",
-                    func.name,
-                    a.value().ty,
-                    p
-                ),
-                e.span,
-            ));
-        }
     }
     // The signature's return type must be assignable TO what the node claims
     if !assignable(m, sig.return_ty, e.ty) {
@@ -94,32 +72,8 @@ pub(super) fn check_method_call(
     if !is_positional(args) {
         return;
     }
-
-    // Check arity
-    if args.len() != sig.arity() {
-        errors.push(VerifyError::new(
-            format!(
-                "method call passes {} arguments, signature takes {}",
-                args.len(),
-                sig.arity()
-            ),
-            e.span,
-        ));
+    if !check_args(m, sig, args, "method call", e, errors) {
         return;
-    }
-
-    // Each argument must be assignable TO its parameter
-    for (i, (a, p)) in args.iter().zip(&sig.params).enumerate() {
-        if !assignable(m, a.value().ty, *p) {
-            errors.push(VerifyError::new(
-                format!(
-                    "method call: argument {i} is {:?}, parameter is {:?}",
-                    a.value().ty,
-                    p
-                ),
-                e.span,
-            ));
-        }
     }
 
     // The signature's return type must be assignable TO what the node claims
@@ -132,4 +86,63 @@ pub(super) fn check_method_call(
             e.span,
         ));
     }
+}
+
+/// Arity and per-argument assignability against `sig`. A rest signature takes
+/// at least its fixed parameters, and each trailing argument is one element of
+/// the rest array. `false` when the arity is wrong: nothing else is checked.
+fn check_args(
+    m: &TirModule,
+    sig: &crate::tables::Signature,
+    args: &[TirArg],
+    label: &str,
+    e: &TirExpr,
+    errors: &mut Vec<VerifyError>,
+) -> bool {
+    let fixed = if sig.has_rest {
+        sig.arity().saturating_sub(1)
+    } else {
+        sig.arity()
+    };
+    let arity_ok = if sig.has_rest {
+        args.len() >= fixed
+    } else {
+        args.len() == fixed
+    };
+    if !arity_ok {
+        errors.push(VerifyError::new(
+            format!(
+                "{label} passes {} arguments, signature takes {}",
+                args.len(),
+                sig.arity()
+            ),
+            e.span,
+        ));
+        return false;
+    }
+    let element = match sig.params.get(fixed) {
+        Some(BackendTy::Array(elem)) if sig.has_rest => Some(m.types.get(*elem)),
+        _ => None,
+    };
+    for (i, a) in args.iter().enumerate() {
+        let expected = if i < fixed {
+            Some(sig.params[i])
+        } else {
+            element
+        };
+        let Some(p) = expected else {
+            continue;
+        };
+        if !assignable(m, a.value().ty, p) {
+            errors.push(VerifyError::new(
+                format!(
+                    "{label}: argument {i} is {:?}, parameter is {:?}",
+                    a.value().ty,
+                    p
+                ),
+                e.span,
+            ));
+        }
+    }
+    true
 }

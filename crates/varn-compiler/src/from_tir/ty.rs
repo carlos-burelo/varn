@@ -91,6 +91,7 @@ mod tests {
             signatures: vec![Signature {
                 params: vec![],
                 return_ty: B::Void,
+                has_rest: false,
             }],
             functions: vec![],
             globals: vec![],

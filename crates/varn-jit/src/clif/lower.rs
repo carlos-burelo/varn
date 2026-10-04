@@ -64,7 +64,7 @@ impl ClifArtifact {
     /// The native entry and its published shape, or `(0, 0)` when the body
     /// is framed or its shape has no id.
     pub fn native_entry(&self, proto: &FunctionProto) -> (usize, u64) {
-        if self.activation != Activation::Native {
+        if self.activation != Activation::Native || proto.has_rest {
             return (0, 0);
         }
         let Some(id) = super::native_abi::NativeShape::of_proto(proto).id() else {

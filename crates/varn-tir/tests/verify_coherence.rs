@@ -26,6 +26,7 @@ fn module_with_point() -> TirModule {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Void,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -70,6 +71,7 @@ fn bare_null_returns_from_any_nullable_function() {
     m.signatures.push(Signature {
         params: vec![],
         return_ty: BackendTy::Nullable(int_id),
+        has_rest: false,
     });
     m.functions.push(TirFunction {
         name: Arc::from("first"),
@@ -98,6 +100,7 @@ fn int_argument_widens_to_a_float_parameter() {
     m.signatures.push(Signature {
         params: vec![BackendTy::Float],
         return_ty: BackendTy::Void,
+        has_rest: false,
     });
     m.functions.push(TirFunction {
         name: Arc::from("takesFloat"),
@@ -135,6 +138,7 @@ fn a_subclass_is_assignable_to_its_parent() {
     m.signatures.push(Signature {
         params: vec![BackendTy::Class(ClassId(0))],
         return_ty: BackendTy::Void,
+        has_rest: false,
     });
     m.functions.push(TirFunction {
         name: Arc::from("greet"),
@@ -315,10 +319,12 @@ fn method_call_arity_mismatch_is_rejected() {
             Signature {
                 params: vec![BackendTy::Int],
                 return_ty: BackendTy::Void,
+                has_rest: false,
             },
             Signature {
                 params: vec![],
                 return_ty: BackendTy::Void,
+                has_rest: false,
             },
         ],
         functions: vec![],
@@ -382,10 +388,12 @@ fn method_call_with_correct_arity_verifies() {
             Signature {
                 params: vec![BackendTy::Int],
                 return_ty: BackendTy::Void,
+                has_rest: false,
             },
             Signature {
                 params: vec![],
                 return_ty: BackendTy::Void,
+                has_rest: false,
             },
         ],
         functions: vec![],
@@ -544,6 +552,7 @@ fn return_with_correct_type_verifies() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Int,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -588,6 +597,7 @@ fn bare_return_in_non_void_function_is_rejected() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Int,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -632,6 +642,7 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Void,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -675,6 +686,7 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Void,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -724,6 +736,7 @@ fn return_of_never_type_is_valid_anywhere() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Int,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -766,6 +779,7 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Nullable(int_id),
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -804,6 +818,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Int,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -857,10 +872,12 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
             Signature {
                 params: vec![BackendTy::Nullable(int_id)],
                 return_ty: BackendTy::Void,
+                has_rest: false,
             },
             Signature {
                 params: vec![],
                 return_ty: BackendTy::Void,
+                has_rest: false,
             },
         ],
         functions: vec![],
@@ -920,10 +937,12 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
             Signature {
                 params: vec![BackendTy::Int],
                 return_ty: BackendTy::Void,
+                has_rest: false,
             },
             Signature {
                 params: vec![],
                 return_ty: BackendTy::Void,
+                has_rest: false,
             },
         ],
         functions: vec![],
@@ -987,6 +1006,7 @@ fn let_declared_nullable_int_init_str_should_fail() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Void,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -1041,6 +1061,7 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Void,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -1113,6 +1134,7 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Void,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],

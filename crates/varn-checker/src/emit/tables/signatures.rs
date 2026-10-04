@@ -8,6 +8,7 @@ pub(super) fn seed_signatures() -> Vec<Signature> {
     vec![Signature {
         params: vec![],
         return_ty: BackendTy::Void,
+        has_rest: false,
     }]
 }
 
@@ -19,7 +20,7 @@ pub(crate) fn intern_signature(
     names: &NameIndex,
     signatures: &mut Vec<Signature>,
 ) -> varn_tir::SigId {
-    let (params, return_ty) = match table.get(ty.0) {
+    let (params, return_ty, has_rest) = match table.get(ty.0) {
         TypeKind::Fn(fid) => {
             let ft = table.get_function(fid);
             let p_tys: Vec<BackendTy> = ft
@@ -35,14 +36,20 @@ pub(crate) fn intern_signature(
                 })
                 .collect();
             let return_ty = lower_type(&Type::resolved(ft.return_type), table, interner, tt, names);
-            (p_tys, return_ty)
+            let has_rest = ft.params.last().is_some_and(|p| p.is_rest);
+            (p_tys, return_ty, has_rest)
         }
         _ => (
             vec![],
             BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported),
+            false,
         ),
     };
     let id = signatures.len() as u32;
-    signatures.push(Signature { params, return_ty });
+    signatures.push(Signature {
+        params,
+        return_ty,
+        has_rest,
+    });
     varn_tir::SigId(id)
 }

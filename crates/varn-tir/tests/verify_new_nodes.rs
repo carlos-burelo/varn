@@ -48,6 +48,7 @@ fn module(top_level: TirFunction) -> TirModule {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Void,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
@@ -150,6 +151,7 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Void,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],

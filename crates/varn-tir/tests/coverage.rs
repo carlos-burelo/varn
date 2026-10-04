@@ -22,6 +22,7 @@ fn module() -> TirModule {
         signatures: vec![Signature {
             params: vec![],
             return_ty: BackendTy::Void,
+            has_rest: false,
         }],
         functions: vec![],
         globals: vec![],
