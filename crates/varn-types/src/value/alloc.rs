@@ -4,9 +4,7 @@ use std::sync::Arc;
 
 pub type RuntimeString = Arc<str>;
 
-pub use super::map::{MapKey, MapRef, ValueMap};
-
-pub type ValueSet = rustc_hash::FxHashSet<MapKey>;
+pub use super::map::{MapKey, MapRef, ValueMap, ValueSet};
 
 /// Handle to a property object. The fields live inside this same allocation
 /// (see `ObjData`), so there is no inner `RefCell` and no second buffer:

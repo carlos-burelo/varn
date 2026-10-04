@@ -5,6 +5,7 @@ mod instance;
 mod map;
 mod module;
 mod object;
+mod ordered;
 mod sendable;
 mod shape;
 pub use crate::native::NativeFn;
