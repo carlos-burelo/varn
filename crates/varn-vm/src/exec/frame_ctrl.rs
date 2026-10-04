@@ -8,7 +8,6 @@ use super::calls::PreparedCall;
 use super::ctx::ExecCtx;
 use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
-use varn_types::NativeCtx;
 
 impl ExecCtx {
     /// Give a generator body its own execution context.
@@ -207,9 +206,9 @@ impl ExecCtx {
                 let result = if args.len() <= 16 {
                     let mut buf = [VmValue::null(); 16];
                     buf[..args.len()].copy_from_slice(&args);
-                    (f)(self as &mut dyn NativeCtx, &buf[..args.len()])
+                    self.invoke_native(f, &buf[..args.len()])
                 } else {
-                    (f)(self as &mut dyn NativeCtx, &args)
+                    self.invoke_native(f, &args)
                 }
                 .map_err(RuntimeError::from)?;
 
@@ -222,14 +221,14 @@ impl ExecCtx {
                 let start = self.stage.len() - take;
                 let args: Vec<VmValue> = self.stage.drain(start..).collect();
                 let slice = if args.len() > 1 { &args[1..] } else { &[] };
-                let result = (f)(self as &mut dyn NativeCtx, slice).map_err(RuntimeError::from)?;
+                let result = self.invoke_native(f, slice).map_err(RuntimeError::from)?;
 
                 self.stage.clear();
                 self.stage.push(result);
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
                 self.record_call_native(f, None);
-                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(RuntimeError::from)?;
+                let result = self.invoke_native(f, &args).map_err(RuntimeError::from)?;
                 let nv = if result.is_null() {
                     instance_nv
                 } else {

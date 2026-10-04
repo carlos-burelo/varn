@@ -104,7 +104,7 @@ impl ExecCtx {
     }
 
     #[inline(always)]
-    pub(crate) fn invoke_native(
+    pub(super) fn timed_native(
         &mut self,
         f: varn_types::NativeFn,
         args: &[VmValue],

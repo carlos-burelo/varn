@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use varn_core::ModuleId;
-use varn_types::{FunctionProto, NativeCtx};
+use varn_types::FunctionProto;
 
 use crate::linker::Linker;
 
@@ -246,7 +246,7 @@ impl ExecCtx {
                         }
                         crate::heap::HeapObj::NativeFn(f, _) => {
                             let f = *f;
-                            if let Ok(class_nv) = (f)(self as &mut dyn NativeCtx, &[]) {
+                            if let Ok(class_nv) = self.invoke_native(f, &[]) {
                                 if let Some(crate::heap::HeapObj::Class(cls)) =
                                     self.heap.get(class_nv.as_heap())
                                 {

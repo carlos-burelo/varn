@@ -39,10 +39,19 @@ impl ExecCtx {
         callee: VmValue,
         window: &[VmValue],
     ) -> crate::error::VmResult<VmValue> {
-        match self.invoke_pushing(callee, window)? {
-            Invoked::Value(v) => Ok(v),
-            Invoked::Pushed(depth) => self.run_until(depth),
-        }
+        let was_native = self.heap.cells.suspend_native();
+        let result = match self.invoke_pushing(callee, window) {
+            Ok(Invoked::Value(v)) => Ok(v),
+            Ok(Invoked::Pushed(depth)) => self.run_until(depth),
+            Err(e) => Err(e),
+        };
+        let returned = result
+            .as_ref()
+            .ok()
+            .filter(|v| v.is_heap())
+            .map(|v| v.as_heap());
+        self.heap.cells.resume(was_native, returned);
+        result
     }
 
     pub(crate) fn invoke_pushing(
@@ -67,7 +76,8 @@ impl ExecCtx {
                 let start = self.stage.len() - take;
                 let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
                 self.stage.clear();
-                (f)(self as &mut dyn NativeCtx, &vm_args).map_err(crate::error::RuntimeError::from)
+                self.invoke_native(f, &vm_args)
+                    .map_err(crate::error::RuntimeError::from)
             }
             PreparedCall::RawNativeImmediate(f, arg_count) => {
                 let take = arg_count.min(self.stage.len());
@@ -79,7 +89,8 @@ impl ExecCtx {
                 } else {
                     &vm_args[..]
                 };
-                (f)(self as &mut dyn NativeCtx, slice).map_err(crate::error::RuntimeError::from)
+                self.invoke_native(f, slice)
+                    .map_err(crate::error::RuntimeError::from)
             }
             PreparedCall::Frame(frame) => {
                 let depth = self.frames.len();
@@ -101,7 +112,8 @@ impl ExecCtx {
                 Ok(instance_nv)
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
-                let result = (f)(self as &mut dyn NativeCtx, &args)
+                let result = self
+                    .invoke_native(f, &args)
                     .map_err(crate::error::RuntimeError::from)?;
                 let nv = if result.is_null() {
                     instance_nv

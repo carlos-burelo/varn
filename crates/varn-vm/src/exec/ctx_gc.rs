@@ -21,6 +21,21 @@ impl ExecCtx {
         }
     }
 
+    /// The one way into native code. What a native allocates, and what a
+    /// callback hands back to it, stays a root until it returns: it may hold
+    /// those only in Rust locals across a callback that collects.
+    #[inline(always)]
+    pub(crate) fn invoke_native(
+        &mut self,
+        f: varn_types::NativeFn,
+        args: &[crate::value::VmValue],
+    ) -> varn_types::NativeFnResult {
+        let scope = self.heap.cells.enter_native();
+        let result = self.timed_native(f, args);
+        self.heap.cells.exit_native(scope);
+        result
+    }
+
     pub fn run_minor_gc(&mut self) {
         let roots = self.gc_roots();
         self.heap.minor_gc(&roots);
@@ -64,6 +79,7 @@ impl ExecCtx {
             }
         }
         self.local_roots(&mut roots);
+        roots.extend_from_slice(self.heap.cells.native_roots());
         for &v in &self.globals_ref().values {
             value(&mut roots, v);
         }

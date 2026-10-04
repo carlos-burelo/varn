@@ -251,7 +251,7 @@ impl ExecCtx {
     ) -> VmResult<()> {
         if let Some((f, _)) = self.heap.native_of(setter_nv) {
             let args = [receiver, value];
-            f(self as &mut dyn varn_types::NativeCtx, &args)
+            self.invoke_native(f, &args)
                 .map_err(crate::error::RuntimeError::from)?;
             return Ok(());
         }
@@ -301,7 +301,8 @@ impl ExecCtx {
             );
         let result_opt: Option<VmValue> = if let Some((f, _)) = self.heap.native_of(getter_nv) {
             let args = [receiver];
-            let nv = f(self as &mut dyn varn_types::NativeCtx, &args)
+            let nv = self
+                .invoke_native(f, &args)
                 .map_err(crate::error::RuntimeError::from)?;
             Some(nv)
         } else {

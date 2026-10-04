@@ -42,8 +42,7 @@ impl ExecCtx {
             PropRead::Value(v) => Ok(v),
             PropRead::Getter(g) => {
                 if let Some((f, _)) = self.heap.native_of(g) {
-                    return f(self as &mut dyn varn_types::NativeCtx, &[obj])
-                        .map_err(RuntimeError::from);
+                    return self.invoke_native(f, &[obj]).map_err(RuntimeError::from);
                 }
                 self.invoke(g, &[obj])
             }
