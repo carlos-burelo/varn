@@ -149,8 +149,18 @@ impl ExecCtx {
 
     /// Cierra los upvalues abiertos dentro de la activación `alloc`
     /// (retornos y unwind: cerrar ANTES de liberar, el close lee el slot).
+    /// Releases a popped frame's `FrameStore` activation, closing its upvalues
+    /// first: the close reads the live slot. A native activation owns none.
+    pub(crate) fn drop_frame_storage(&mut self, alloc: usize) {
+        if alloc == crate::frame::CallFrame::NO_ACTIVATION {
+            return;
+        }
+        self.close_upvalues_in(alloc);
+        self.stack.pop_frame();
+    }
+
     pub(crate) fn close_upvalues_in(&mut self, alloc: usize) {
-        if self.open_upvalues.is_empty() {
+        if self.open_upvalues.is_empty() || alloc == crate::frame::CallFrame::NO_ACTIVATION {
             return;
         }
         let bases = self.stack.alloc_bases(alloc);

@@ -9,7 +9,7 @@ use crate::frame_store::FrameStore;
 
 /// `Vec<T>`'s raw (ptr, len, cap) word offsets. Element-type-independent, so
 /// one run covers every class vector plus `allocs`.
-fn probe_vec_words() -> (usize, usize, usize) {
+pub(super) fn probe_vec_words() -> (usize, usize, usize) {
     let mut v: Vec<u64> = Vec::with_capacity(7);
     v.extend([0, 0, 0]);
     let words: [usize; 3] = unsafe { std::mem::transmute_copy(&v) };

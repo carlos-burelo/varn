@@ -29,6 +29,7 @@ macro_rules! fill_tail {
             ),
             poly_ic_slot_size: varn_types::chunk::POLY_IC_SLOT_SIZE,
             frame_layout: super::frame_layout::probe(),
+            call_layout: super::call_layout::probe(),
         }
     }};
 }

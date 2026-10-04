@@ -126,7 +126,8 @@ pub(super) fn emit_define_member(
     Ok(())
 }
 
-/// `GetSuper name` — a heap result.
+/// `GetSuper name` — a heap result. The helper reads `this` from home r0 and
+/// the owner class from the running frame, so only a framed body has them.
 pub(super) fn emit_get_super(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -136,6 +137,7 @@ pub(super) fn emit_get_super(
         .frame
         .as_ref()
         .ok_or("from_ssa: GetSuper without a frame")?;
+    frame.base.ok_or(super::NEEDS_ACTIVATION)?;
     let name_idx = str_idx(ctx, name)?;
     let ectx = frame.exec_ctx;
     let name_v = b.ins().iconst(types::I64, name_idx as i64);

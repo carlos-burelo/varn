@@ -42,6 +42,10 @@ impl CallFrame {
     /// so no real register slot can ever reach it.
     pub const NO_RETURN_REG: u16 = u16::MAX;
 
+    /// The `base` of a frame a compiled caller pushed for a native activation:
+    /// it owns no `FrameStore` storage.
+    pub const NO_ACTIVATION: usize = usize::MAX;
+
     pub(crate) fn new(closure: &VmClosure, base: usize) -> Self {
         Self {
             closure_ptr: closure as *const VmClosure,

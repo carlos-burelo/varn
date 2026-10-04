@@ -200,6 +200,43 @@ impl Default for JitStrLayout {
     }
 }
 
+/// What a compiled call site needs to enter a native activation without the
+/// runtime: walk a callee value to its closure and proto, read the published
+/// native entry, and push and pop the `CallFrame` by hand.
+#[derive(Debug, Clone, Copy, Default)]
+#[repr(C)]
+pub struct JitCallLayout {
+    /// Discriminant byte of `HeapObj::VmClosure` in a heap slot.
+    pub closure_tag: usize,
+    /// Slot base → the closure's `Rc` control pointer.
+    pub closure_payload_off: usize,
+    /// `Rc` control pointer → its value.
+    pub rc_value_off: usize,
+    /// `Rc` control pointer → its strong count.
+    pub rc_strong_off: usize,
+    /// `VmClosure` → its proto's `Rc` control pointer.
+    pub closure_proto_off: usize,
+    /// `FunctionProto` → `jit_native`, `jit_native_sig`, `jit_epoch`.
+    pub proto_native_off: usize,
+    pub proto_native_sig_off: usize,
+    pub proto_epoch_off: usize,
+    /// `ExecCtx` → the frame `Vec`'s data pointer, length and capacity.
+    pub frames_ptr_off: usize,
+    pub frames_len_off: usize,
+    pub frames_cap_off: usize,
+    /// `CallFrame` size and fields.
+    pub frame_size: usize,
+    pub frame_closure_ptr_off: usize,
+    pub frame_owned_off: usize,
+    pub frame_ip_off: usize,
+    pub frame_base_off: usize,
+    pub frame_class_off: usize,
+    pub frame_return_reg_off: usize,
+    pub no_activation: usize,
+    pub no_return_reg: usize,
+    pub max_call_depth: usize,
+}
+
 /// Home-slot addressing for the frame-aware lowering (`homes.rs`): the four
 /// `FrameStore` class-vector data pointers plus the activation-bases vector.
 /// The only `Vec` walks left on the hot path (data-pointer reload after a
@@ -283,6 +320,7 @@ macro_rules! define_tail {
         /// `size_of::<PolyICSlot>()`, the stride between poly slots.
         pub poly_ic_slot_size: usize,
         pub frame_layout: JitFrameLayout,
+        pub call_layout: JitCallLayout,
         }
     };
 }
@@ -319,16 +357,13 @@ fn fn_name(proto: &FunctionProto) -> String {
     proto.name.as_deref().unwrap_or("<module>").to_owned()
 }
 
-/// What a successful compilation hands back to the VM.
-///
-/// `raw` is the direct clif→clif entry, or `0` when the function took the
-/// frame-aware lowering — such a raw expects `(stack_ptr, closure, base, …)`,
-/// a callee frame no caller can supply, so only the wrapper may invoke it.
-/// The VM publishes `raw` in `FunctionProto::clif_raw` for other functions'
-/// call sites to load.
+/// What a successful compilation hands back to the VM: the wrapper entry, and
+/// the native entry with its ABI shape (`0`/`0` for a framed body), which the
+/// VM publishes in `FunctionProto::jit_native` for other call sites to load.
 pub struct Compiled {
     pub entry: JitFn,
-    pub raw: usize,
+    pub native: usize,
+    pub native_sig: u64,
     pub code: Rc<dyn Any>,
 }
 
@@ -412,14 +447,11 @@ pub fn compile(
                         compile_ns: elapsed,
                     });
                     let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
-                    let raw = if art.frameless && art.activation == clif::abi::Activation::Native {
-                        art.raw as usize
-                    } else {
-                        0
-                    };
+                    let (native, native_sig) = art.native_entry(proto);
                     return Ok(Compiled {
                         entry: jit_fn,
-                        raw,
+                        native,
+                        native_sig,
                         code: Rc::new(art) as Rc<dyn Any>,
                     });
                 }

@@ -7,9 +7,7 @@ impl ExecCtx {
         let val = self.stack.box_reg(base, src);
         let returning_frame_idx = self.frames.len().saturating_sub(1);
         let frame = self.frames.pop().unwrap();
-        // Cerrar ANTES de liberar: el close lee el valor vivo del slot.
-        self.close_upvalues_in(frame.base);
-        self.stack.pop_frame();
+        self.drop_frame_storage(frame.base);
 
         let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
             && !frame.closure().proto.chunk.source_file.is_empty();

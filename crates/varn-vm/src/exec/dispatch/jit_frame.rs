@@ -187,8 +187,7 @@ pub(super) unsafe fn run_compiled_frame(
     // a helper popped it itself. Read it live.
     let returning_frame_idx = (*ctx).frames.len().saturating_sub(1);
     let frame = (*ctx).frames.pop().unwrap();
-    (*ctx).close_upvalues_in(frame.base);
-    (*ctx).stack.pop_frame();
+    (*ctx).drop_frame_storage(frame.base);
     let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
         && !frame.closure().proto.chunk.source_file.is_empty();
 

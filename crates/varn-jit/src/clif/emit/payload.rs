@@ -360,3 +360,37 @@ pub(in crate::clif) fn emit_object_data_base(
     let values_off = b.ins().select(is_inst, c_inst_val, c_obj_val);
     b.ins().iadd(data_ptr, values_off)
 }
+
+/// Address of the heap slot `payload` (a heap value's payload word) indexes:
+/// the old-generation or nursery slot vector, by the old bit.
+pub(in crate::clif) fn heap_slot_addr(
+    b: &mut FunctionBuilder,
+    helpers: &crate::JitHelpers,
+    exec_ctx: cranelift_codegen::ir::Value,
+    payload: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
+    let alay = &helpers.array_layout;
+    let raw = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
+    let rc = b
+        .ins()
+        .load(types::I64, m, exec_ctx, helpers.heap_field_offset as i32);
+    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
+    let base_old = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let base_nur = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
+    let base = b.ins().select(old_bit, base_old, base_nur);
+    let idx = b.ins().select(old_bit, idx_old, raw);
+    let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
+    b.ins().iadd(base, byte_off)
+}

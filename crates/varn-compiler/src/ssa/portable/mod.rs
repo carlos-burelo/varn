@@ -80,18 +80,6 @@ pub(crate) fn project(
 ) -> Result<SsaProto, String> {
     let value_tys: Vec<HirType> = ssa.values.iter().map(|v| v.ty).collect();
 
-    // Module-relative global slot each value was loaded from, so a `Call` can
-    // tell the linker what to resolve. Only `LoadGlobalIdx` has this provenance;
-    // a callee reached any other way stays `None` and the JIT declines it.
-    let mut global_of: Vec<Option<u32>> = vec![None; ssa.values.len()];
-    for block in &ssa.blocks {
-        for inst in &block.insts {
-            if let (Some(d), InstKind::LoadGlobalIdx(slot)) = (inst.dest, &inst.kind) {
-                global_of[d.0 as usize] = Some(*slot);
-            }
-        }
-    }
-
     let lv = emitted.liveness;
     let handlers = crate::ssa::suspend::try_handlers(ssa);
 
@@ -146,7 +134,7 @@ pub(crate) fn project(
                     _ => Vec::new(),
                 },
             };
-            let projected = project_inst(inst, &value_tys, &global_of, site, &mut captured)
+            let projected = project_inst(inst, &value_tys, site, &mut captured)
                 .ok_or_else(|| why_not(&inst.kind, &value_tys))?;
             insts.push(projected);
         }

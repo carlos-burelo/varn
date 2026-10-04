@@ -82,3 +82,35 @@ impl NativeShape {
         sig
     }
 }
+
+/// Set in a published [`NativeShape::id`] when the body never touches the VM
+/// frame: a caller may enter it without pushing a `CallFrame`.
+pub const NATIVE_FRAMELESS: u64 = 1 << 63;
+
+const MAX_ID_PARAMS: usize = 27;
+
+impl NativeClass {
+    fn code(self) -> u64 {
+        match self {
+            NativeClass::Word => 0,
+            NativeClass::Float => 1,
+            NativeClass::Boxed => 2,
+        }
+    }
+}
+
+impl NativeShape {
+    /// The shape as one word, so a call site can compare the ABI it emits
+    /// against the one a callee published. `None` past
+    /// [`MAX_ID_PARAMS`] registers: such a body is never entered natively.
+    pub(crate) fn id(&self) -> Option<u64> {
+        if self.params.len() > MAX_ID_PARAMS {
+            return None;
+        }
+        let mut id = self.ret.code() | ((self.params.len() as u64) << 2);
+        for (i, c) in self.params.iter().enumerate() {
+            id |= c.code() << (8 + 2 * i);
+        }
+        Some(id)
+    }
+}

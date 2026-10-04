@@ -24,7 +24,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use rustc_hash::FxHashMap;
-use varn_jit::clif::lower::{ClifLinker, ClifTarget};
+use varn_jit::clif::lower::ClifLinker;
 use varn_types::FunctionProto;
 
 use crate::exec::ExecCtx;
@@ -157,7 +157,8 @@ pub(crate) fn invalidate_epoch(epoch: u64) {
             continue;
         }
         proto.jit_entry.set(0);
-        proto.clif_raw.set(0);
+        proto.jit_native.set(0);
+        proto.jit_native_sig.set(0);
         proto.jit_code.replace(None);
         proto.jit_epoch.set(0);
         proto.jit_entry_count.set(0);
@@ -190,112 +191,10 @@ impl Drop for CtxGuard {
     }
 }
 
-/// Linker bound to whatever context is current on this thread. `module_base`
-/// is the compiling proto's module global region — `K::Global` slots are
-/// module-relative, so it is added before indexing the store.
-pub struct CtxLinker {
-    ctx: *const ExecCtx,
-    module_base: usize,
-}
-
-impl CtxLinker {
-    pub(crate) fn for_module(module_base: u32) -> Self {
-        CtxLinker {
-            ctx: CURRENT_CTX.with(|c| c.get()),
-            module_base: module_base as usize,
-        }
-    }
-}
+/// Linker bound to whatever context is current on this thread.
+pub struct CtxLinker;
 
 impl ClifLinker for CtxLinker {
-    fn static_target(&self, global_idx: usize) -> Option<ClifTarget> {
-        if self.ctx.is_null() {
-            return None;
-        }
-        // Safety: the pointer is valid for the lifetime of the CtxGuard that
-        // set it; clif compilation runs synchronously inside that run.
-        let ctx = unsafe { &*self.ctx };
-        let gv = *ctx
-            .globals_ref()
-            .values
-            .get(self.module_base + global_idx)?;
-        if !gv.is_heap() {
-            return None;
-        }
-        let closure = match ctx.heap.get(gv.as_heap_idx()) {
-            Some(crate::heap::HeapObj::VmClosure(c)) => c,
-            _ => return None,
-        };
-        let proto = &closure.proto;
-        // The proto lives in an `Rc` for as long as any closure over it does,
-        // and compiled code outlives neither — so the cell's address stays
-        // valid for the lifetime of every call site that embeds it. The cell
-        // stays `0` for a proto that fails to compile or takes the
-        // frame-aware lowering; the call site checks it on every call.
-        Some(ClifTarget {
-            raw_slot: &proto.clif_raw as *const std::cell::Cell<usize> as usize,
-            // Identity of the closure the call site was linked against. For a
-            // heap value that is the payload word; the tag is constant across
-            // every value this can hold.
-            expected_bits: gv.raw_payload(),
-            param_kinds: proto.param_kinds.clone(),
-            return_kind: proto.return_kind,
-        })
-    }
-
-    fn static_class_target(
-        &self,
-        global_idx: usize,
-    ) -> Option<varn_jit::clif::lower::ClifClassTarget> {
-        if self.ctx.is_null() {
-            return None;
-        }
-        let ctx = unsafe { &*self.ctx };
-        let gv = *ctx
-            .globals_ref()
-            .values
-            .get(self.module_base + global_idx)?;
-        if !gv.is_heap() {
-            return None;
-        }
-        let cls = match ctx.heap.get(gv.as_heap_idx()) {
-            Some(crate::heap::HeapObj::Class(c)) => c,
-            _ => return None,
-        };
-        let layout = cls.get_or_compute_layout();
-        let trivial_plan = if let Some(ctor_val) = cls.constructor() {
-            match ctx.heap.closure_of(ctor_val) {
-                Some(closure) => closure.proto.trivial_field_init_plan().map(|p| {
-                    p.iter()
-                        .map(
-                            |&(param_idx, offset, tag)| varn_jit::clif::lower::ClifFieldInit {
-                                param_idx,
-                                offset,
-                                repr: varn_types::layout::TypeLayout::of_field(tag).repr,
-                            },
-                        )
-                        .collect()
-                }),
-                None => None,
-            }
-        } else {
-            Some(Vec::new())
-        };
-        Some(varn_jit::clif::lower::ClifClassTarget {
-            class_id: cls.id,
-            expected_bits: gv.raw_payload(),
-            payload_size: layout.payload_size,
-            ref_slots: layout
-                .gc
-                .slots
-                .iter()
-                .filter(|s| s.repr == varn_types::layout::ScalarRepr::Ref)
-                .map(|s| s.offset)
-                .collect(),
-            trivial_plan,
-        })
-    }
-
     fn current_epoch(&self) -> u64 {
         // Same value `compile_jit` stamps into `proto.jit_epoch` right after
         // this compilation finishes — read here, at lowering time, so the

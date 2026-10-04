@@ -37,13 +37,10 @@ pub enum SsaOp {
         args: Vec<u32>,
     },
 
-    /// Cross-function call. `callee` is a `Ref`/`Dyn` value (a closure) and
-    /// `callee_global` is the module-relative global slot it was loaded from,
-    /// when known — what the linker resolves a static target by. The fallback
-    /// is always the canonical `ExecCtx::invoke`.
+    /// Cross-function call. `callee` is a `Ref`/`Dyn` value (a closure); the
+    /// fallback is always the canonical `ExecCtx::invoke`.
     Call {
         callee: u32,
-        callee_global: Option<u32>,
         args: Vec<u32>,
     },
 
@@ -55,7 +52,6 @@ pub enum SsaOp {
     /// emitted with spread arguments (`CallSpread` covers those).
     New {
         callee: u32,
-        callee_global: Option<u32>,
         args: Vec<u32>,
     },
 

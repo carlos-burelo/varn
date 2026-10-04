@@ -36,7 +36,6 @@
 //! GC pressure.
 
 use cranelift_codegen::isa::OwnedTargetIsa;
-use varn_types::register_meta::SlotKind;
 use varn_types::{FunctionProto, VmValue};
 
 use super::abi::{build_wrapper, Activation};
@@ -61,80 +60,47 @@ pub struct ClifArtifact {
     pub frameless: bool,
 }
 
+impl ClifArtifact {
+    /// The native entry and its published shape, or `(0, 0)` when the body
+    /// is framed or its shape has no id.
+    pub fn native_entry(&self, proto: &FunctionProto) -> (usize, u64) {
+        if self.activation != Activation::Native {
+            return (0, 0);
+        }
+        let Some(id) = super::native_abi::NativeShape::of_proto(proto).id() else {
+            return (0, 0);
+        };
+        let frameless = if self.frameless {
+            super::native_abi::NATIVE_FRAMELESS
+        } else {
+            0
+        };
+        (self.raw as usize, id | frameless)
+    }
+}
+
 impl Drop for ClifArtifact {
     fn drop(&mut self) {
         crate::stack_roots::unregister(self.raw as usize);
     }
 }
 
-/// A statically linkable call target: the CURRENT closure a global slot
-/// holds, bound to that closure's proto.
-pub struct ClifTarget {
-    /// Address of the callee proto's `clif_raw` cell — NOT the entry itself.
-    /// The call site loads it on every call, so a callee compiled after its
-    /// caller still gets called directly. `0` means "no direct entry yet"
-    /// (uncompiled, failed, or frame-aware) and selects the fallback.
-    pub raw_slot: usize,
-    /// The exact boxed `VmValue` bits of the closure the link was made
-    /// against. The call site guards on equality: a rebound (or GC-moved)
-    /// global mismatches and takes the generic fallback — never a wrong
-    /// call, at worst a slow one.
-    pub expected_bits: u64,
-    pub param_kinds: Vec<SlotKind>,
-    pub return_kind: SlotKind,
-}
-
-#[derive(Clone, Debug)]
-pub struct ClifClassTarget {
-    pub class_id: u32,
-    pub expected_bits: u64,
-    pub payload_size: u32,
-    /// Offsets of the class's `Ref` slots. A fresh payload is zero-filled,
-    /// so the inline `new` writes the `null` niche into each of them before
-    /// the constructor's own stores, as `InstanceData::alloc` does.
-    pub ref_slots: Vec<u32>,
-    pub trivial_plan: Option<Vec<ClifFieldInit>>,
-}
-
-/// One field initialised by a trivial constructor, at its COMPACT layout —
-/// `(param, offset, repr)` from the class's `ClassLayout`, so
-/// the inline `new X()` path writes the same bytes `InstanceData::write_field`
-/// would (`varn-types/src/value/instance.rs`).
-#[derive(Clone, Copy, Debug)]
-pub struct ClifFieldInit {
-    /// Argument register is `arg_start + 1 + param_idx` (the callee placeholder
-    /// occupies `arg_start`).
-    pub param_idx: usize,
-    /// Byte offset from the instance payload start.
-    pub offset: u32,
-    pub repr: varn_types::layout::ScalarRepr,
-}
-
-/// VM-side resolver for clif→clif static calls. Implemented over the live
-/// `ExecCtx` at compile time (globals are runtime state, so the JIT crate
-/// cannot see them itself).
+/// What a compilation needs from the live VM. Implemented over the running
+/// `ExecCtx` (the JIT crate cannot see it).
 pub trait ClifLinker {
-    fn static_target(&self, global_idx: usize) -> Option<ClifTarget>;
-    fn static_class_target(&self, _global_idx: usize) -> Option<ClifClassTarget> {
-        None
-    }
-    /// The VM epoch THIS compilation is happening under, baked into the
-    /// lowered body as an `iconst` for the inline frame-aware `Call` fast
-    /// path's callee-epoch guard. `0` —
-    /// the default, and `NoLinker`'s only answer — can never match a real
-    /// callee's `jit_epoch` (a published `jit_entry` always stamps a nonzero
-    /// one), so a linker with no real epoch to report just makes that guard
-    /// permanently decline, same as it declining for any other reason.
-    fn current_epoch(&self) -> u64 {
-        0
-    }
+    /// The VM epoch THIS compilation is happening under, baked into the body
+    /// as the callee-epoch guard of every native call: compiled code bakes
+    /// handles into one heap, so a callee built for another must not run.
+    /// `0` — `NoLinker`'s answer — never matches a published callee, so the
+    /// guard always declines.
+    fn current_epoch(&self) -> u64;
 }
 
-/// Linker that never links — used by paths without a VM context.
+/// Linker with no VM context.
 pub struct NoLinker;
 impl ClifLinker for NoLinker {
-    fn static_target(&self, _global_idx: usize) -> Option<ClifTarget> {
-        None
+    fn current_epoch(&self) -> u64 {
+        0
     }
 }
 

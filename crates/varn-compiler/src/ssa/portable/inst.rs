@@ -10,7 +10,6 @@ use super::{Captured, Site};
 pub(super) fn project_inst(
     inst: &Inst,
     value_tys: &[HirType],
-    global_of: &[Option<u32>],
     site: Site,
     captured: &mut Captured,
 ) -> Option<SsaInst> {
@@ -45,12 +44,10 @@ pub(super) fn project_inst(
         },
         InstKind::Call { callee, args } => SsaOp::Call {
             callee: callee.0,
-            callee_global: global_of.get(callee.0 as usize).copied().flatten(),
             args: args.iter().map(|v| v.0).collect(),
         },
         InstKind::NewInstance { callee, args } => SsaOp::New {
             callee: callee.0,
-            callee_global: global_of.get(callee.0 as usize).copied().flatten(),
             args: args.iter().map(|v| v.0).collect(),
         },
         InstKind::Binary { op, lhs, rhs, ty } => {

@@ -249,7 +249,7 @@ impl VmClosure {
             None
         };
         let helpers = super::helpers::build_jit_helpers();
-        let linker = crate::clif_link::CtxLinker::for_module(self.module_base);
+        let linker = crate::clif_link::CtxLinker;
         match varn_jit::compile(&self.proto, &self.constants, helpers, &linker, None) {
             Ok(compiled) => {
                 let entry_usize: usize = compiled.entry as usize;
@@ -259,15 +259,17 @@ impl VmClosure {
                     .set(crate::clif_link::stamp_compile_serial());
                 self.proto.jit_entry.set(entry_usize);
                 *self.proto.jit_code.borrow_mut() = Some(compiled.code);
-                // Publish the direct entry LAST: a call site that observes a
-                // non-zero `clif_raw` must find fully installed code behind it.
-                self.proto.clif_raw.set(compiled.raw);
+                // Publish the native entry LAST: a call site that observes a
+                // non-zero `jit_native` must find fully installed code behind it.
+                self.proto.jit_native_sig.set(compiled.native_sig);
+                self.proto.jit_native.set(compiled.native);
                 crate::clif_link::register_compiled(&self.proto, previous);
             }
             Err(_) => {
                 self.proto.jit_failed.set(true);
                 self.proto.jit_entry.set(0);
-                self.proto.clif_raw.set(0);
+                self.proto.jit_native.set(0);
+                self.proto.jit_native_sig.set(0);
                 self.proto.jit_epoch.set(0);
                 if let Some((old_epoch, code)) = previous {
                     crate::clif_link::retire_code(old_epoch, code);
@@ -328,7 +330,7 @@ impl VmClosure {
         }
 
         let helpers = super::helpers::build_jit_helpers();
-        let linker = crate::clif_link::CtxLinker::for_module(self.module_base);
+        let linker = crate::clif_link::CtxLinker;
         match varn_jit::compile(proto, &self.constants, helpers, &linker, Some(osr_ip)) {
             Ok(compiled) => {
                 let entry_usize: usize = compiled.entry as usize;
@@ -336,11 +338,12 @@ impl VmClosure {
                 proto.jit_osr_ip.set(osr_ip);
                 proto.jit_osr_entry.set(Some(entry_usize));
                 *proto.jit_osr_code.borrow_mut() = Some(compiled.code);
-                // `compiled.raw` is 0 for every OSR lowering (they are forced
-                // frame-aware), so there is deliberately nothing to publish in
-                // `clif_raw`: a resume prologue must never become a call
-                // target.
-                debug_assert_eq!(compiled.raw, 0, "osr lowering must not publish a raw entry");
+                // An OSR lowering is always framed, so there is no native entry
+                // to publish: a resume prologue must never become a call target.
+                debug_assert_eq!(
+                    compiled.native, 0,
+                    "osr lowering must not publish a native entry"
+                );
                 // Registered so the epoch holds the proto — and therefore the
                 // buffer — alive for as long as code from it can run.
                 crate::clif_link::register_compiled(proto, None);

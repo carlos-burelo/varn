@@ -56,8 +56,7 @@ pub(crate) extern "C" fn jit_call_leave(ctx: *mut ExecCtx, alloc: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         ctx_ref.frames.pop();
-        ctx_ref.close_upvalues_in(alloc);
-        ctx_ref.stack.pop_frame();
+        ctx_ref.drop_frame_storage(alloc);
     }
 }
 
@@ -87,4 +86,31 @@ pub(crate) extern "C" fn jit_call_self_window(
         let handoff = hand_off(ctx_ref, caller_depth, out);
         settle(ctx_ref, handoff)
     }
+}
+
+/// The out-of-line half of a compiled call site's inline `CallFrame` push:
+/// the frame stack is at capacity (grow it) or at the depth limit (throw).
+#[varn_op_macros::jit_slow(field = "jit_push_native_frame")]
+pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *const VmClosure) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        if ctx_ref.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("stack overflow: call depth exceeded 10000"),
+            );
+        }
+        std::rc::Rc::increment_strong_count(closure);
+        let owned = std::rc::Rc::from_raw(closure);
+        ctx_ref
+            .frames
+            .push(CallFrame::new_owned(owned, CallFrame::NO_ACTIVATION));
+    }
+}
+
+/// The out-of-line half of the inline `CallFrame` pop: the frame held the
+/// closure's last strong reference.
+#[varn_op_macros::jit_slow(field = "jit_release_closure")]
+pub(crate) extern "C" fn jit_release_closure(closure: *const VmClosure) {
+    unsafe { drop(std::rc::Rc::from_raw(closure)) }
 }

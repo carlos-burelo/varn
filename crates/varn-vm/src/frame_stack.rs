@@ -30,6 +30,10 @@ pub struct FrameStack {
 }
 
 impl FrameStack {
+    pub(crate) fn frames_field_offset() -> usize {
+        std::mem::offset_of!(FrameStack, frames)
+    }
+
     pub(crate) fn with_capacity(cap: usize) -> Self {
         Self {
             frames: Vec::with_capacity(cap),

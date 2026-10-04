@@ -153,35 +153,11 @@ pub(super) fn emit_inst(
                 b, ctx, values, *object, args, *op_id,
             )?)))
         }
-        SsaOp::Call {
-            callee,
-            callee_global,
-            args,
-        } => {
-            return Ok(Some(call::emit_call(
-                b,
-                ctx,
-                values,
-                *callee,
-                *callee_global,
-                args,
-                dest,
-            )?))
+        SsaOp::Call { callee, args } => {
+            return Ok(Some(call::emit_call(b, ctx, values, *callee, args, dest)?))
         }
-        SsaOp::New {
-            callee,
-            callee_global,
-            args,
-        } => {
-            return Ok(Some(call::emit_new(
-                b,
-                ctx,
-                values,
-                *callee,
-                *callee_global,
-                args,
-                dest,
-            )?))
+        SsaOp::New { callee, args } => {
+            return Ok(Some(call::emit_new(b, ctx, values, *callee, args)?))
         }
 
         SsaOp::MakeClosure { proto, upvalues } => {

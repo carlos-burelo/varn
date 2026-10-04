@@ -1,109 +1,41 @@
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
+use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
-use varn_types::register_meta::SlotKind;
-use varn_types::vm_value::{KIND_HEAP, KIND_NULL};
-
-use super::super::super::native_abi::NativeShape;
 
 use super::super::super::emit::call_helper;
-use super::super::{heap, load_value, Ctx, Out};
+use super::super::{load_value, Ctx, Out};
 use super::direct::{entry_out_slot, run_entered_or};
 use super::invoke::{boxed_window, emit_invoke};
-
-fn is_scalar(k: SlotKind) -> bool {
-    matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool)
-}
+use super::native_entry::{self, NativeCall};
 
 pub(crate) fn emit_call(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &[Option<Value>],
     callee: u32,
-    callee_global: Option<u32>,
     args: &[u32],
     dest: Option<u32>,
 ) -> Result<Out, String> {
-    let frame = ctx
-        .frame
-        .as_ref()
-        .ok_or("from_ssa: call in a frame-less body")?;
-
+    if !super::super::store::is_heap(ctx.ssa.value_ty(callee)) {
+        return Err("from_ssa: call through a scalar callee".into());
+    }
     let callee_v = load_value(b, ctx, values, callee)?;
-    let arg_kinds: Vec<SlotKind> = args.iter().map(|v| ctx.ssa.value_ty(*v)).collect();
-
-    let dest_ty = dest.map(|d| ctx.ssa.value_ty(d));
-    let direct = callee_global
-        .and_then(|slot| frame.linker.static_target(slot as usize))
-        .filter(|t| {
-            dest_ty.is_some_and(is_scalar)
-                && is_scalar(t.return_kind)
-                && t.param_kinds == arg_kinds
-                && arg_kinds.iter().all(|k| is_scalar(*k))
-        });
-    let Some(target) = direct else {
+    let call = NativeCall {
+        callee: callee_v,
+        receiver: callee_v,
+        args,
+        dest,
+    };
+    native_entry::emit(b, ctx, values, call, |b| {
         let window = boxed_window(b, ctx, values, callee_v, args)?;
         let (ctag, cpayload) = b.ins().isplit(callee_v);
-        return Ok(Out::Boxed(emit_invoke(
+        Ok(emit_invoke(
             b,
             ctx,
             window,
             (ctag, cpayload),
             args.len() + 1,
-        )));
-    };
-    let dest_ty = dest_ty.expect("filtered to a scalar destination");
-    let merge_ty = match dest_ty {
-        SlotKind::Float => types::F64,
-        _ => types::I64,
-    };
-
-    let (ctag, cpayload) = b.ins().isplit(callee_v);
-    let expected_tag = b.ins().iconst(types::I64, KIND_HEAP as i64);
-    let expected_payload = b.ins().iconst(types::I64, target.expected_bits as i64);
-    let same_tag = b.ins().icmp(IntCC::Equal, ctag, expected_tag);
-    let same_payload = b.ins().icmp(IntCC::Equal, cpayload, expected_payload);
-    let slot_addr = b.ins().iconst(types::I64, target.raw_slot as i64);
-    let raw = b.ins().load(
-        types::I64,
-        cranelift_codegen::ir::MemFlagsData::trusted(),
-        slot_addr,
-        0,
-    );
-    let published = b.ins().icmp_imm_u(IntCC::NotEqual, raw, 0);
-    let both = b.ins().band(same_tag, same_payload);
-    let take_direct = b.ins().band(both, published);
-
-    let fast = b.create_block();
-    let slow = b.create_block();
-    let merge = b.create_block();
-    b.append_block_param(merge, merge_ty);
-    b.ins().brif(take_direct, fast, &[], slow, &[]);
-
-    b.switch_to_block(fast);
-    let no_closure = b.ins().iconst(types::I64, 0);
-    let null_tag = b.ins().iconst(types::I64, KIND_NULL as i64);
-    let null_payload = b.ins().iconst(types::I64, 0);
-    let mut arg_values = vec![ctx.exec_ctx, no_closure, null_tag, null_payload];
-    for v in args {
-        arg_values.push(load_value(b, ctx, values, *v)?);
-    }
-    let direct = {
-        let shape = NativeShape::new(&target.param_kinds, target.return_kind);
-        let sig_ref = b.import_signature(shape.signature());
-        let call = b.ins().call_indirect(sig_ref, raw, &arg_values);
-        b.inst_results(call)[0]
-    };
-    b.ins().jump(merge, &[direct.into()]);
-
-    b.switch_to_block(slow);
-    let window = boxed_window(b, ctx, values, callee_v, args)?;
-    let res = emit_invoke(b, ctx, window, (ctag, cpayload), args.len() + 1);
-    let fallback = heap::unbox_dest(b, dest_ty, res)?;
-    super::super::store::drop_home_addrs(ctx);
-    b.ins().jump(merge, &[fallback.into()]);
-
-    b.switch_to_block(merge);
-    Ok(Out::Native(b.block_params(merge)[0]))
+        ))
+    })
 }
 
 pub(crate) fn emit_self_call_framed(

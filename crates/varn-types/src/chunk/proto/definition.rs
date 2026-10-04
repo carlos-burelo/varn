@@ -115,22 +115,24 @@ pub struct FunctionProto {
     #[serde(default)]
     pub jit_entry: std::cell::Cell<usize>,
 
-    /// Address of this proto's Cranelift RAW entry — the unboxed
-    /// `fn(exec_ctx, args…) -> i64` body, callable clif→clif without going
-    /// back through the VM frame loop. `0` means "no direct entry": either
-    /// the proto is not compiled yet, its compilation failed, or it took the
-    /// frame-aware lowering (whose raw needs a callee frame the caller cannot
-    /// supply).
+    /// This proto's compiled body in the native activation ABI, callable
+    /// compiled→compiled with no VM frame storage, or `0`: not compiled yet,
+    /// compiled over a `FrameStore` activation, or failed.
     ///
-    /// Call sites embed the ADDRESS OF THIS CELL and load it at run time
-    /// rather than baking the entry in. Callers compile before their callees
-    /// — a caller reaches its tier threshold first, by definition — so a
-    /// compile-time snapshot would be `None` for essentially every call and
-    /// would never be revisited. The extra load is what makes the direct call
-    /// reachable at all.
+    /// Call sites load it at run time rather than baking it in: callers
+    /// compile before their callees — a caller reaches its tier threshold
+    /// first — so a compile-time snapshot would be `0` for essentially every
+    /// call and never revisited.
     #[serde(skip)]
     #[serde(default)]
-    pub clif_raw: std::cell::Cell<usize>,
+    pub jit_native: std::cell::Cell<usize>,
+
+    /// The ABI shape of [`Self::jit_native`] as one word, which a call site
+    /// compares against the shape it emits, with the frameless bit set when
+    /// the body never touches the VM frame.
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_native_sig: std::cell::Cell<u64>,
 
     #[serde(skip)]
     #[serde(default)]
@@ -140,7 +142,7 @@ pub struct FunctionProto {
     #[serde(default)]
     pub jit_failed: std::cell::Cell<bool>,
 
-    /// Which `ExecCtx` the code in `jit_entry`/`clif_raw` was compiled for.
+    /// Which `ExecCtx` the code in `jit_entry`/`jit_native` was compiled for.
     ///
     /// Compiled code is NOT context-independent: `LoadConst` bakes the
     /// constant's `VmValue` — a handle into one heap — as an immediate, and the

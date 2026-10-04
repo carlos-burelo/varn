@@ -161,8 +161,7 @@ pub(crate) unsafe fn dispatch_to_handler(
             .map(|r| (r.catch_ip as usize, r.err_reg as usize));
         let Some((catch_ip, err_reg)) = hit else {
             let popped = (*ctx).frames.pop().unwrap();
-            (*ctx).close_upvalues_in(popped.base);
-            (*ctx).stack.pop_frame();
+            (*ctx).drop_frame_storage(popped.base);
             continue;
         };
         let f2 = (*ctx).frames.len() - 1;

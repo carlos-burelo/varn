@@ -5,6 +5,7 @@ mod direct;
 mod invoke;
 mod method;
 mod native;
+mod native_entry;
 mod scratch;
 
 pub(super) use base::{emit_call, emit_self_call_framed};

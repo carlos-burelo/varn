@@ -126,8 +126,7 @@ pub fn unwind_to_handler(
     // Cerrar ANTES de liberar: el close lee el valor vivo del slot.
     while ctx.frames.len() > handler.frame_depth {
         let f = ctx.frames.pop().unwrap();
-        ctx.close_upvalues_in(f.base);
-        ctx.stack.pop_frame();
+        ctx.drop_frame_storage(f.base);
     }
 
     // El frame receptor queda arriba con su región intacta (el pop solo

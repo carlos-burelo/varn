@@ -11,9 +11,7 @@ pub(crate) fn emit_new(
     ctx: &Ctx<'_>,
     values: &[Option<Value>],
     callee: u32,
-    _callee_global: Option<u32>,
     args: &[u32],
-    _dest: Option<u32>,
 ) -> Result<Out, String> {
     let frame = ctx.frame.as_ref().ok_or("from_ssa: new without a frame")?;
     let callee_v = load_value(b, ctx, values, callee)?;
