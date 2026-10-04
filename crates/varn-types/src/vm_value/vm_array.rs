@@ -52,44 +52,23 @@ impl VmArray {
     /// exact: `from_int(as_int())` and `from_f64(as_f64())` are the identity
     /// on values that pass `is_int` / `is_f64`, so reading a typed element
     /// back reproduces the original `VmValue` bit for bit.
-    ///
-    /// The scan is one pass over data already being moved into the array, so
-    /// it costs no allocation and no extra traversal order of growth.
     pub fn from_items(items: Vec<VmValue>) -> Self {
-        if items.is_empty() {
-            return Self::new(items);
+        Self::unboxed(&items).unwrap_or_else(|| Self::new(items))
+    }
+
+    pub fn from_slice(items: &[VmValue]) -> Self {
+        Self::unboxed(items).unwrap_or_else(|| Self::new(items.to_vec()))
+    }
+
+    fn unboxed(items: &[VmValue]) -> Option<Self> {
+        let first = *items.first()?;
+        if first.is_int() && items.iter().all(|v| v.is_int()) {
+            return Some(Self::new_i64(items.iter().map(|v| v.as_int()).collect()));
         }
-        let first = items[0];
-        if first.is_int() {
-            let mut ints = Vec::with_capacity(items.len());
-            let mut all_ints = true;
-            for &v in &items {
-                if v.is_int() {
-                    ints.push(v.as_int());
-                } else {
-                    all_ints = false;
-                    break;
-                }
-            }
-            if all_ints {
-                return Self::new_i64(ints);
-            }
-        } else if first.is_f64() {
-            let mut floats = Vec::with_capacity(items.len());
-            let mut all_floats = true;
-            for &v in &items {
-                if v.is_f64() {
-                    floats.push(v.as_f64());
-                } else {
-                    all_floats = false;
-                    break;
-                }
-            }
-            if all_floats {
-                return Self::new_f64(floats);
-            }
+        if first.is_f64() && items.iter().all(|v| v.is_f64()) {
+            return Some(Self::new_f64(items.iter().map(|v| v.as_f64()).collect()));
         }
-        Self::new(items)
+        None
     }
 
     // ---- repr access (internal) ------------------------------------------

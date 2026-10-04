@@ -27,7 +27,7 @@ pub(crate) extern "C" fn jit_build_array_window(
     unsafe {
         let ctx_ref = &mut *ctx;
         let parts = std::slice::from_raw_parts(parts_ptr, count);
-        ctx_ref.jit_native_result = ctx_ref.heap.alloc_array_vm(parts.to_vec());
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_array_slice_vm(parts);
     }
 }
 

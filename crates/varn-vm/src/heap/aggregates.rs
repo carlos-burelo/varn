@@ -13,6 +13,11 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
     }
 
+    pub(crate) fn alloc_array_slice_vm(&mut self, items: &[VmValue]) -> VmValue {
+        let va = VmArray::from_slice(items);
+        VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
+    }
+
     pub(crate) fn alloc_tuple_vm(&mut self, items: Vec<VmValue>) -> VmValue {
         let va = VmArray::from_items(items);
         VmValue::from_heap_idx(self.alloc(HeapObj::Tuple(va)))
