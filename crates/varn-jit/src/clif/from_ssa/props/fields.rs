@@ -26,7 +26,7 @@ pub(crate) fn emit_get_fixed_field(
     access: varn_core::FieldAccess,
     dest: Option<u32>,
 ) -> Result<Out, String> {
-    use varn_types::layout::{ScalarRepr, TypeLayout};
+    use varn_core::layout::{ScalarRepr, TypeLayout};
     use varn_types::register_meta::SlotKind;
     let obj = boxed_value(b, ctx, values, object)?;
     if let (Some(d), varn_core::FieldAccess::Compact(tag)) = (dest, access) {
@@ -79,7 +79,7 @@ fn emit_get_fixed_field_native(
     dest: varn_types::register_meta::SlotKind,
 ) -> Result<Value, String> {
     use super::super::heap::unbox_dest;
-    use varn_types::layout::{ScalarRepr, TypeLayout};
+    use varn_core::layout::{ScalarRepr, TypeLayout};
     let h = ctx.helpers;
     let ectx = exec_ctx(ctx);
     let merge_ty = match dest {

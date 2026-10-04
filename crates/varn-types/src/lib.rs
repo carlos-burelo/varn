@@ -1,9 +1,7 @@
 pub mod bytecode;
 pub mod capabilities;
 pub mod chunk;
-pub mod class_layout;
 pub mod generator;
-pub mod layout;
 pub mod loop_analysis;
 pub mod marshal;
 pub mod module_graph;
@@ -21,7 +19,6 @@ pub mod wake;
 pub use chunk::{
     Chunk, FunctionProto, Literal, PoolEntry, FIRST_RESUME, STATE_DONE, STATE_YIELDED,
 };
-pub use class_layout::{ClassLayout, FieldLayout};
 pub use generator::{GeneratorDriver, GeneratorObj};
 pub use marshal::{FromVm, IntoVm, VnArray, VnStr};
 pub use module_graph::{ModuleGraphArtifact, PackageNode};

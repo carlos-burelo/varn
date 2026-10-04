@@ -9,6 +9,7 @@ pub mod intrinsic_ops;
 pub mod intrinsics;
 pub mod kinds;
 pub mod lang_type;
+pub mod layout;
 pub mod module_id;
 pub mod numeric;
 pub mod numeric_big;

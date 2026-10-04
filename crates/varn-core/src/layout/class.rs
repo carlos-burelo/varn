@@ -4,9 +4,9 @@
 //! offsets, alignments, and sizes are known and immutable. This module provides
 //! the compile-time and runtime descriptor representing that static memory layout.
 
-use crate::layout::{GcLayout, GcSlot, TypeLayout};
+use super::{GcLayout, GcSlot, TypeLayout};
+use crate::RuntimeKind;
 use std::sync::Arc;
-use varn_core::RuntimeKind;
 
 /// Layout and representation of a single field within a class instance.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

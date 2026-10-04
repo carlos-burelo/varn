@@ -46,7 +46,7 @@ pub struct ClassObj {
     /// fixed, immutable field layouts once declared.
     pub instance_shape_cache: RefCell<Option<(Rc<super::shape::Shape>, usize)>>,
     /// Static memory layout of instances of this class.
-    pub layout: RefCell<Option<Rc<crate::class_layout::ClassLayout>>>,
+    pub layout: RefCell<Option<Rc<varn_core::layout::ClassLayout>>>,
     /// Declared static type of each instance field, by slot. Comes down with
     /// the declaration; the layout is built from it rather than from a guess.
     pub field_tags: RefCell<Vec<Option<varn_core::RuntimeKind>>>,
@@ -171,7 +171,7 @@ impl ClassObj {
     }
 
     /// Returns the static memory layout of this class, computing it if not yet cached.
-    pub fn get_or_compute_layout(&self) -> Rc<crate::class_layout::ClassLayout> {
+    pub fn get_or_compute_layout(&self) -> Rc<varn_core::layout::ClassLayout> {
         if let Some(ref lay) = *self.layout.borrow() {
             return Rc::clone(lay);
         }
@@ -192,7 +192,7 @@ impl ClassObj {
             })
             .collect();
 
-        let layout = Rc::new(crate::class_layout::ClassLayout::from_fields(
+        let layout = Rc::new(varn_core::layout::ClassLayout::from_fields(
             &*self.name,
             self.id,
             &fields_in,

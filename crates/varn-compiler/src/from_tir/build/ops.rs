@@ -81,8 +81,8 @@ pub(super) fn field_kind(
         BackendTy::Class(_) => Some(T::Class),
         BackendTy::Nullable(_) => {
             let kind = field_kind(bt.non_nullable(types), types)?;
-            let repr = varn_types::layout::TypeLayout::of_field(Some(kind)).repr;
-            (repr == varn_types::layout::ScalarRepr::Ref).then_some(kind)
+            let repr = varn_core::layout::TypeLayout::of_field(Some(kind)).repr;
+            (repr == varn_core::layout::ScalarRepr::Ref).then_some(kind)
         }
         BackendTy::Tuple(_)
         | BackendTy::Enum(_)

@@ -3,7 +3,10 @@
 //! runtime (instance payloads, the collector) and the JIT (compact field
 //! access). Nobody re-derives a representation from a kind.
 
-use varn_core::RuntimeKind;
+use crate::RuntimeKind;
+
+mod class;
+pub use class::{ClassLayout, FieldLayout};
 
 /// The bytes a stored value is made of.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

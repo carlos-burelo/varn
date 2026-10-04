@@ -6,7 +6,7 @@
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::FunctionBuilder;
-use varn_types::layout::{ScalarRepr, TypeLayout, COMPACT_REF_NULL};
+use varn_core::layout::{ScalarRepr, TypeLayout, COMPACT_REF_NULL};
 use varn_types::vm_value::{KIND_HEAP, KIND_NULL};
 
 use super::super::emit::{self, call_helper_void, unbox_f64_coerce};

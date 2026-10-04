@@ -47,8 +47,7 @@ impl<'m> Builder<'m> {
                 )
             })
             .collect();
-        let layout =
-            varn_types::class_layout::ClassLayout::from_fields(ci.name.as_ref(), 0, &fields);
+        let layout = varn_core::layout::ClassLayout::from_fields(ci.name.as_ref(), 0, &fields);
         let f = layout.get_field_by_index(slot as usize)?;
         Some((f.offset, f.kind))
     }

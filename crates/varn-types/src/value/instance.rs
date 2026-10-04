@@ -2,12 +2,11 @@
 //! `ClassLayout` (spec §47–§48).
 
 use super::ClassObj;
-use crate::class_layout::{ClassLayout, FieldLayout};
-use crate::layout::{ScalarRepr, TypeLayout, COMPACT_REF_NULL};
 use crate::vm_value::VmValue;
 use std::cell::UnsafeCell;
 use std::ptr;
 use std::rc::Rc;
+use varn_core::layout::{ClassLayout, FieldLayout, ScalarRepr, TypeLayout, COMPACT_REF_NULL};
 
 /// Native static struct representation of a user class instance.
 ///
