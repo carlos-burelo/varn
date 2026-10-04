@@ -1,8 +1,9 @@
 use cranelift_codegen::ir::{types, InstBuilder, MemFlags, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::call_helper_void;
+use super::super::super::emit::{call_helper, call_helper_void};
 use super::super::{heap, load_value, Ctx, Out};
+use super::direct::{entry_out_slot, run_entered_or};
 use super::scratch::scratch_addr;
 
 pub(crate) fn emit_new(
@@ -68,16 +69,12 @@ pub(crate) fn emit_invoke(
     let frame = ctx.frame.as_ref().expect("a call has a frame");
     let (ctag, cpayload) = callee;
     let argc_v = b.ins().iconst(types::I64, argc as i64);
-    call_helper_void(
+    let out = entry_out_slot(b);
+    let entry = call_helper(
         b,
         ctx.cc,
         ctx.helpers.jit_invoke_window,
-        &[frame.exec_ctx, ctag, cpayload, window, argc_v],
+        &[frame.exec_ctx, ctag, cpayload, window, argc_v, out],
     );
-    b.ins().load(
-        types::I128,
-        MemFlags::trusted(),
-        frame.exec_ctx,
-        ctx.helpers.jit_native_result_offset as i32,
-    )
+    run_entered_or(b, ctx, entry, out)
 }

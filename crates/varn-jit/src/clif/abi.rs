@@ -124,6 +124,28 @@ pub(super) fn raw_signature(
     sig
 }
 
+pub(crate) fn wrapper_returns_via_sret(cc: cranelift_codegen::isa::CallConv) -> bool {
+    cc == cranelift_codegen::isa::CallConv::WindowsFastcall
+}
+
+pub(crate) fn wrapper_signature(cc: cranelift_codegen::isa::CallConv) -> Signature {
+    let mut sig = Signature::new(cc);
+    if wrapper_returns_via_sret(cc) {
+        sig.params.push(AbiParam::special(
+            types::I64,
+            cranelift_codegen::ir::ArgumentPurpose::StructReturn,
+        ));
+    }
+    for _ in 0..4 {
+        sig.params.push(AbiParam::new(types::I64));
+    }
+    if !wrapper_returns_via_sret(cc) {
+        sig.returns.push(AbiParam::new(types::I64));
+        sig.returns.push(AbiParam::new(types::I64));
+    }
+    sig
+}
+
 /// Wrapper con ABI `JitFn`: `(stack_ptr, closure, base, exec_ctx)`.
 /// Puerta VM→JIT SOLO (dispatch intérprete, top-level, OSR-entry).
 /// JIT→JIT nunca lo usa: ese camino es `raw_signature_v2` directo.
@@ -141,21 +163,8 @@ pub(super) fn build_wrapper(
     } else {
         proto.arity.saturating_sub(1)
     };
-    let is_windows = isa.default_call_conv() == cranelift_codegen::isa::CallConv::WindowsFastcall;
-    let mut sig = Signature::new(isa.default_call_conv());
-    if is_windows {
-        sig.params.push(AbiParam::special(
-            types::I64,
-            cranelift_codegen::ir::ArgumentPurpose::StructReturn,
-        ));
-    }
-    for _ in 0..4 {
-        sig.params.push(AbiParam::new(types::I64));
-    }
-    if !is_windows {
-        sig.returns.push(AbiParam::new(types::I64));
-        sig.returns.push(AbiParam::new(types::I64));
-    }
+    let is_windows = wrapper_returns_via_sret(isa.default_call_conv());
+    let sig = wrapper_signature(isa.default_call_conv());
 
     let mut func = Function::with_name_signature(UserFuncName::user(0, 1), sig);
     let raw_sig = func.import_signature(raw_signature(proto, nparams, isa, frame_aware));

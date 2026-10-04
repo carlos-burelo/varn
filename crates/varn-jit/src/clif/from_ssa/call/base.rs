@@ -5,8 +5,9 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::vm_value::KIND_HEAP;
 
-use super::super::super::emit::call_helper_void;
+use super::super::super::emit::call_helper;
 use super::super::{heap, load_value, Ctx, Out};
+use super::direct::{entry_out_slot, run_entered_or};
 use super::invoke::{boxed_window, emit_invoke};
 
 fn is_scalar(k: SlotKind) -> bool {
@@ -125,16 +126,12 @@ pub(crate) fn emit_self_call_framed(
     let receiver = super::super::use_heap(b, ctx, 0)?;
     let window = boxed_window(b, ctx, values, receiver, args)?;
     let argc = b.ins().iconst(types::I64, (args.len() + 1) as i64);
-    call_helper_void(
+    let out = entry_out_slot(b);
+    let entry = call_helper(
         b,
         ctx.cc,
         ctx.helpers.jit_call_self_window,
-        &[frame.exec_ctx, window, argc],
+        &[frame.exec_ctx, window, argc, out],
     );
-    Ok(b.ins().load(
-        types::I128,
-        MemFlags::trusted(),
-        frame.exec_ctx,
-        ctx.helpers.jit_native_result_offset as i32,
-    ))
+    Ok(run_entered_or(b, ctx, entry, out))
 }

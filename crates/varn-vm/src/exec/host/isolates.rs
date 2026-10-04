@@ -11,6 +11,11 @@ use crate::heap::HeapObj;
 use crate::value::VmValue;
 use varn_types::NativeCtx;
 
+pub(crate) enum Invoked {
+    Value(VmValue),
+    Pushed(usize),
+}
+
 impl ExecCtx {
     /// THE canonical VM invocation: run `callee` to completion with a boxed
     /// `window` whose first slot is the callee's placeholder (the register the
@@ -34,6 +39,17 @@ impl ExecCtx {
         callee: VmValue,
         window: &[VmValue],
     ) -> crate::error::VmResult<VmValue> {
+        match self.invoke_pushing(callee, window)? {
+            Invoked::Value(v) => Ok(v),
+            Invoked::Pushed(depth) => self.run_until(depth),
+        }
+    }
+
+    pub(crate) fn invoke_pushing(
+        &mut self,
+        callee: VmValue,
+        window: &[VmValue],
+    ) -> crate::error::VmResult<Invoked> {
         self.stage.clear();
         self.stage.extend_from_slice(window);
         let arg_count = window.len();
@@ -66,11 +82,10 @@ impl ExecCtx {
                 (f)(self as &mut dyn NativeCtx, slice).map_err(crate::error::RuntimeError::from)
             }
             PreparedCall::Frame(frame) => {
-                // El frame ya trae su región tipada (`materialize_frame`):
-                // solo entra en la lista.
                 let depth = self.frames.len();
                 self.frames.push(frame);
-                self.run_until(depth)
+                self.stage.clear();
+                return Ok(Invoked::Pushed(depth));
             }
             PreparedCall::PushValue(nv) => Ok(nv),
             PreparedCall::Generator {
@@ -97,7 +112,7 @@ impl ExecCtx {
             }
         };
         self.stage.clear();
-        res
+        res.map(Invoked::Value)
     }
 
     pub(super) fn task_cell(&self, v: VmValue) -> Option<std::rc::Rc<crate::task::TaskCell>> {

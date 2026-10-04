@@ -1,8 +1,9 @@
 use cranelift_codegen::ir::{InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{box_bool, box_int, call_helper, call_helper_void};
+use super::super::super::emit::{box_bool, box_int, call_helper};
 use super::super::{heap, props, store, Ctx};
+use super::direct::{entry_out_slot, run_entered_or};
 use super::invoke::boxed_window;
 
 #[allow(clippy::too_many_arguments)]
@@ -84,6 +85,9 @@ pub(crate) fn emit_method_call(
     b.set_cold_block(slow);
     let merge = b.create_block();
     b.append_block_param(merge, types::I128);
+    let called = b.create_block();
+    b.append_block_param(called, types::I64);
+    let out = entry_out_slot(b);
 
     let m = MemFlags::trusted();
     let olay = &ctx.helpers.object_layout;
@@ -229,43 +233,34 @@ pub(crate) fn emit_method_call(
         b.switch_to_block(go);
         let slot16 = b.ins().uload16(types::I64, m, entry, 4);
         let ver8 = b.ins().uload8(types::I64, m, entry, 7);
-        call_helper_void(
+        let entry = call_helper(
             b,
             ctx.cc,
             ctx.helpers.jit_call_method_cached_window,
             &[
-                ectx, classp, id, slot16, kc, ver8, name_v, cs_v, window, total,
+                ectx, classp, id, slot16, kc, ver8, name_v, cs_v, window, total, out,
             ],
         );
         store::drop_home_addrs(ctx);
-        let hit_res = b.ins().load(
-            types::I128,
-            MemFlags::trusted(),
-            ectx,
-            ctx.helpers.jit_native_result_offset as i32,
-        );
-        store::drop_home_addrs(ctx);
-        b.ins().jump(merge, &[hit_res.into()]);
+        b.ins().jump(called, &[entry.into()]);
     }
     b.switch_to_block(next);
     b.ins().jump(slow, &[]);
 
     b.switch_to_block(slow);
-    call_helper_void(
+    let entry = call_helper(
         b,
         ctx.cc,
         ctx.helpers.jit_call_method_window,
-        &[frame.exec_ctx, name_v, cs_v, window, total],
+        &[frame.exec_ctx, name_v, cs_v, window, total, out],
     );
     store::drop_home_addrs(ctx);
-    let slow_res = b.ins().load(
-        types::I128,
-        MemFlags::trusted(),
-        ectx,
-        ctx.helpers.jit_native_result_offset as i32,
-    );
-    store::drop_home_addrs(ctx);
-    b.ins().jump(merge, &[slow_res.into()]);
+    b.ins().jump(called, &[entry.into()]);
+
+    b.switch_to_block(called);
+    let entry = b.block_params(called)[0];
+    let res = run_entered_or(b, ctx, entry, out);
+    b.ins().jump(merge, &[res.into()]);
 
     b.switch_to_block(merge);
     Ok(b.block_params(merge)[0])

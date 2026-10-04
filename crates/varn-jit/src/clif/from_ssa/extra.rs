@@ -15,7 +15,7 @@ use super::heap::{boxed_value, exec_ctx};
 use super::store::{def_heap, use_heap, Out};
 use super::{load_value, Ctx};
 
-use super::super::emit::call_helper_void;
+use super::super::emit::{call_helper, call_helper_void};
 
 /// Try to emit `op`. `Ok(None)` means it is not an extra op and the caller
 /// (scalar/heapvalue) must handle it. `Ok(Some(out))` carries the result;
@@ -325,12 +325,14 @@ pub(super) fn try_emit(
             let csv = b.ins().iconst(types::I64, i64::from(*cs));
             let w = super::call::boxed_window(b, ctx, values, recv, &[])?;
             let total = b.ins().iconst(types::I64, 1);
-            call_helper_void(
+            let out = super::call::entry_out_slot(b);
+            let entry = call_helper(
                 b,
                 ctx.cc,
                 h.jit_call_method_window,
-                &[ectx, niv, csv, w, total],
+                &[ectx, niv, csv, w, total, out],
             );
+            super::call::run_entered_or(b, ctx, entry, out);
             Ok(Some(None))
         }
         _ => Ok(None),

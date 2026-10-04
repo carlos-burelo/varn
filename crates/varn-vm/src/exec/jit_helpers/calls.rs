@@ -1,6 +1,6 @@
 //! Calling VM code from compiled code.
 
-use super::construct::jit_propagate_error;
+use super::calls_static::{hand_off, settle, Handoff};
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
@@ -32,7 +32,8 @@ pub(crate) extern "C" fn jit_call_method_cached_window(
     cs: usize,
     window: *const VmValue,
     total: usize,
-) {
+    out: *mut usize,
+) -> usize {
     use std::sync::atomic::Ordering;
     use varn_types::chunk::ICKind;
     unsafe {
@@ -124,42 +125,38 @@ pub(crate) extern "C" fn jit_call_method_cached_window(
                     name_idx,
                     cs,
                     args,
+                    out,
                 )
             }
         };
-        finish_method_outcome(ctx_ref, caller_depth, outcome);
+        finish_method_outcome(ctx_ref, caller_depth, outcome, out)
     }
 }
 
-/// The canonical tail every windowed method helper shares: a value lands in
-/// `jit_native_result`, a pushed VM frame runs to completion, an error unwinds
-/// exactly like the slow path's.
-fn finish_method_outcome(
+unsafe fn finish_method_outcome(
     ctx_ref: &mut ExecCtx,
     caller_depth: usize,
     outcome: Result<crate::exec::method_args::MethodOutcome, crate::error::RuntimeError>,
-) {
-    let result = match outcome {
-        Ok(crate::exec::method_args::MethodOutcome::Value(v)) => Ok(v),
-        Ok(crate::exec::method_args::MethodOutcome::FramePushed) => ctx_ref.run_until(caller_depth),
-        Err(e) => Err(e),
+    out: *mut usize,
+) -> usize {
+    let handoff = match outcome {
+        Ok(crate::exec::method_args::MethodOutcome::Value(v)) => Handoff::Ran(Ok(v)),
+        Ok(crate::exec::method_args::MethodOutcome::FramePushed) => {
+            hand_off(ctx_ref, caller_depth, out)
+        }
+        Err(e) => Handoff::Ran(Err(e)),
     };
-    match result {
-        Ok(v) => ctx_ref.jit_native_result = v,
-        Err(e) => unsafe {
-            while ctx_ref.frames.len() > caller_depth {
-                let f = ctx_ref.frames.pop().unwrap();
-                ctx_ref.close_upvalues_in(f.base);
-            }
-            jit_propagate_error(ctx_ref, e);
-        },
+    if let Handoff::Ran(Err(_)) = handoff {
+        while ctx_ref.frames.len() > caller_depth {
+            let f = ctx_ref.frames.pop().unwrap();
+            ctx_ref.close_upvalues_in(f.base);
+        }
     }
+    settle(ctx_ref, handoff)
 }
 
-/// Full-resolution fallback for the cached lane: the interpreter's own
-/// `call_method`, with the same epilogue as [`jit_call_method_window`].
 #[allow(clippy::too_many_arguments)]
-fn fallback_method_call(
+unsafe fn fallback_method_call(
     ctx_ref: &mut ExecCtx,
     caller_depth: usize,
     frame_idx: usize,
@@ -168,17 +165,12 @@ fn fallback_method_call(
     name_idx: usize,
     cs: usize,
     args: crate::exec::method_args::MethodArgs<'_>,
-) {
+    out: *mut usize,
+) -> usize {
     let outcome = ctx_ref.call_method(this_val, name_idx, cs, args, frame_idx, closure_ref);
-    finish_method_outcome(ctx_ref, caller_depth, outcome);
+    finish_method_outcome(ctx_ref, caller_depth, outcome, out)
 }
 
-/// A method call out of the lowering from typed SSA: `window` holds the
-/// receiver then the arguments, boxed, and `name_idx` / `cs` are the calling
-/// function's constant and cache slot. It runs the interpreter's own
-/// [`ExecCtx::call_method`] (one resolution, one inline cache) on those
-/// values and runs a VM method it pushes to completion. Every heap value in
-/// the window is also in its SSA value's home, a GC root, for the call.
 #[varn_op_macros::jit_slow(field = "jit_call_method_window")]
 pub(crate) extern "C" fn jit_call_method_window(
     ctx: *mut ExecCtx,
@@ -186,7 +178,8 @@ pub(crate) extern "C" fn jit_call_method_window(
     cs: usize,
     window: *const VmValue,
     total: usize,
-) {
+    out: *mut usize,
+) -> usize {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
@@ -195,22 +188,6 @@ pub(crate) extern "C" fn jit_call_method_window(
         let window = std::slice::from_raw_parts(window, total);
         let args = crate::exec::method_args::MethodArgs::Boxed(&window[1..]);
         let outcome = ctx_ref.call_method(window[0], name_idx, cs, args, frame_idx, closure_ref);
-        let result = match outcome {
-            Ok(crate::exec::method_args::MethodOutcome::Value(v)) => Ok(v),
-            Ok(crate::exec::method_args::MethodOutcome::FramePushed) => {
-                ctx_ref.run_until(caller_depth)
-            }
-            Err(e) => Err(e),
-        };
-        match result {
-            Ok(v) => ctx_ref.jit_native_result = v,
-            Err(e) => {
-                while ctx_ref.frames.len() > caller_depth {
-                    let f = ctx_ref.frames.pop().unwrap();
-                    ctx_ref.close_upvalues_in(f.base);
-                }
-                jit_propagate_error(ctx_ref, e);
-            }
-        }
+        finish_method_outcome(ctx_ref, caller_depth, outcome, out)
     }
 }
