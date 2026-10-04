@@ -3,7 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use super::super::super::emit::{call_helper_void, HEAP_KIND, KIND_MASK};
 use super::super::heap::boxed_parts;
-use super::super::store::{drop_home_addrs, home_load};
+use super::super::store::drop_home_addrs;
 use super::super::Ctx;
 use super::shared::str_idx;
 
@@ -14,7 +14,6 @@ pub(crate) fn emit_get_property(
     object: u32,
     name: &str,
     cs: u16,
-    dest_reg: u32,
 ) -> Result<Value, String> {
     let (ot, op) = boxed_parts(b, ctx, values, object)?;
     let frame = ctx
@@ -127,27 +126,20 @@ pub(crate) fn emit_get_property(
     b.switch_to_block(slow);
     let name_v = b.ins().iconst(types::I64, name_idx as i64);
     let cs_v = b.ins().iconst(types::I64, cs as i64);
-    let dest_v = b.ins().iconst(types::I64, dest_reg as i64);
     let ip_v = b.ins().iconst(types::I64, 0);
     call_helper_void(
         b,
         ctx.cc,
         ctx.helpers.get_property_flat,
-        &[
-            ectx,
-            frame.closure,
-            frame.base,
-            ot,
-            op,
-            name_v,
-            cs_v,
-            dest_v,
-            ip_v,
-        ],
+        &[ectx, frame.closure, ot, op, name_v, cs_v, ip_v],
     );
     drop_home_addrs(ctx);
-    let slow_val = home_load(b, ctx, dest_reg)?;
-    drop_home_addrs(ctx);
+    let slow_val = b.ins().load(
+        types::I128,
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        ectx,
+        ctx.helpers.jit_native_result_offset as i32,
+    );
     b.ins().jump(merge, &[slow_val.into()]);
 
     b.switch_to_block(merge);

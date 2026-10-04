@@ -8,92 +8,28 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow(field = "get_property")]
-pub(crate) extern "C" fn jit_get_property(
-    ctx: *mut ExecCtx,
-    closure: *const crate::closure::VmClosure,
-    args: *const varn_jit::JitGetPropertyArgs,
-) -> VmValue {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let closure_ref = &*closure;
-        let args = &*args;
-        let caller_depth = ctx_ref.frames.len();
-        let frame_idx = caller_depth - 1;
-        let base = ctx_ref.frames[frame_idx].base;
-
-        ctx_ref.frames[frame_idx].ip = args.ip;
-
-        let res = ctx_ref.exec_get_property_reg(
-            args.obj,
-            args.name_idx,
-            args.cs_idx,
-            args.dest,
-            base,
-            frame_idx,
-            closure_ref,
-        );
-
-        match res {
-            Ok(true) => {
-                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
-                    jit_propagate_error(ctx_ref, e);
-                }
-            }
-            Ok(false) => {}
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
-
-        ctx_ref.stack.box_reg(base, args.dest)
-    }
-}
-
-/// Flat-argument shim over [`jit_get_property`] so the CLIF backend can call
-/// it with plain scalars instead of building a `JitGetPropertyArgs` struct in
-/// a stack slot. Same semantics (may run a getter, hence may GC).
-#[allow(clippy::too_many_arguments)]
+/// A property read out of compiled code: the IC lookup the interpreter runs,
+/// with a getter run to completion; the value lands in `jit_native_result`.
 #[varn_op_macros::jit_slow(field = "get_property_flat")]
 pub(crate) extern "C" fn jit_get_property_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
-    base: usize,
     obj_tag: u64,
     obj_payload: u64,
     name_idx: usize,
     cs_idx: usize,
-    dest: usize,
     ip: usize,
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
-        let caller_depth = ctx_ref.frames.len();
-        let frame_idx = caller_depth - 1;
         let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
-
+        let frame_idx = ctx_ref.frames.len() - 1;
         ctx_ref.frames[frame_idx].ip = ip;
-
-        let res = ctx_ref.exec_get_property_reg(
-            obj,
-            name_idx,
-            cs_idx,
-            dest,
-            base,
-            frame_idx,
-            closure_ref,
-        );
-
-        match res {
-            Ok(true) => {
-                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
-                    jit_propagate_error(ctx_ref, e);
-                }
-            }
-            Ok(false) => {}
+        match ctx_ref.get_property_value(obj, name_idx, cs_idx, closure_ref) {
+            Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
-
-        ctx_ref.jit_native_result = ctx_ref.stack.box_reg(base, dest);
     }
 }
 

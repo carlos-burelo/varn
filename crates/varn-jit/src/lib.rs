@@ -446,16 +446,6 @@ pub fn compile(
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-pub struct JitGetPropertyArgs {
-    pub obj: VmValue,
-    pub name_idx: usize,
-    pub cs_idx: usize,
-    pub dest: usize,
-    pub ip: usize,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
 pub struct JitSetPropertyArgs {
     pub obj: VmValue,
     pub val: VmValue,

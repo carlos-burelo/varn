@@ -6,6 +6,11 @@ use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use varn_types::chunk::ICKind;
 
+pub(crate) enum PropRead {
+    Value(VmValue),
+    Getter(VmValue),
+}
+
 impl ExecCtx {
     pub(crate) fn exec_get_property_reg(
         &mut self,
@@ -17,6 +22,41 @@ impl ExecCtx {
         frame_idx: usize,
         closure: &VmClosure,
     ) -> VmResult<bool> {
+        match self.read_property(obj, name_idx, cs_idx, closure)? {
+            PropRead::Value(v) => {
+                self.stack.unbox_into_reg(base, dest, v)?;
+                Ok(false)
+            }
+            PropRead::Getter(g) => self.call_getter_sync(g, obj, dest, base, frame_idx),
+        }
+    }
+
+    pub(crate) fn get_property_value(
+        &mut self,
+        obj: VmValue,
+        name_idx: usize,
+        cs_idx: usize,
+        closure: &VmClosure,
+    ) -> VmResult<VmValue> {
+        match self.read_property(obj, name_idx, cs_idx, closure)? {
+            PropRead::Value(v) => Ok(v),
+            PropRead::Getter(g) => {
+                if let Some((f, _)) = self.heap.native_of(g) {
+                    return f(self as &mut dyn varn_types::NativeCtx, &[obj])
+                        .map_err(RuntimeError::from);
+                }
+                self.invoke(g, &[obj])
+            }
+        }
+    }
+
+    fn read_property(
+        &mut self,
+        obj: VmValue,
+        name_idx: usize,
+        cs_idx: usize,
+        closure: &VmClosure,
+    ) -> VmResult<PropRead> {
         let name_nv = closure.constants[name_idx];
         let name = self
             .heap
@@ -122,23 +162,20 @@ impl ExecCtx {
 
             if let Some(v) = found_slot_val {
                 self.record_ic_hit_getprop();
-                self.stack.unbox_into_reg(base, dest, v)?;
-                return Ok(false);
+                return Ok(PropRead::Value(v));
             } else if let Some((method, owner)) = found_method {
                 self.record_ic_hit_getprop();
                 let bound_nv =
                     crate::exec::props::bind_method_to_receiver(&mut self.heap, obj, method, owner);
-                self.stack.unbox_into_reg(base, dest, bound_nv)?;
-                return Ok(false);
+                return Ok(PropRead::Value(bound_nv));
             } else if let Some(getter_val) = found_getter {
                 self.record_ic_hit_getprop();
-                return self.call_getter_sync(getter_val, obj, dest, base, frame_idx);
+                return Ok(PropRead::Getter(getter_val));
             }
         }
 
         if name.as_ref() == varn_core::MemberKey::Length.as_str() {
             if let Some(v) = crate::exec::strings::fast_length(obj, &self.heap) {
-                self.stack.unbox_into_reg(base, dest, v)?;
                 if cs_idx < cache_len && !is_megamorphic {
                     let is_str = obj.is_sso()
                         || matches!(
@@ -161,7 +198,7 @@ impl ExecCtx {
                         closure.feedback.borrow_mut().observe(cs_idx, cls.id);
                     }
                 }
-                return Ok(false);
+                return Ok(PropRead::Value(v));
             }
         }
 
@@ -181,18 +218,15 @@ impl ExecCtx {
                     }
                 }
             }
-            return self.call_getter_sync(getter_val, obj, dest, base, frame_idx);
+            return Ok(PropRead::Getter(getter_val));
         }
 
-        let val_res = crate::exec::props::get_property(obj, &name, &mut self.heap);
-        match val_res {
-            Ok(val) => {
-                self.stack.unbox_into_reg(base, dest, val)?;
-            }
+        let val = match crate::exec::props::get_property(obj, &name, &mut self.heap) {
+            Ok(val) => val,
             Err(e) => {
                 return Err(crate::error::RuntimeError::new(format!("{}", e)));
             }
-        }
+        };
 
         if cs_idx < cache_len && !is_megamorphic {
             if obj.is_heap() {
@@ -210,7 +244,7 @@ impl ExecCtx {
                                 };
                                 closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                                 closure.feedback.borrow_mut().observe(cs_idx, inst.class_id);
-                                return Ok(false);
+                                return Ok(PropRead::Value(val));
                             }
                         }
                     }
@@ -228,7 +262,7 @@ impl ExecCtx {
                                 };
                                 closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                                 closure.feedback.borrow_mut().observe(cs_idx, shape_id);
-                                return Ok(false);
+                                return Ok(PropRead::Value(val));
                             }
                         }
                     }
@@ -250,6 +284,6 @@ impl ExecCtx {
             }
         }
 
-        Ok(false)
+        Ok(PropRead::Value(val))
     }
 }

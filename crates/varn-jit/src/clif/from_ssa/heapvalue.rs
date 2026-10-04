@@ -159,14 +159,9 @@ pub(super) fn emit(
             offset,
             access,
         } => props::emit_get_fixed_field(b, ctx, values, *object, *slot, *offset, *access, dest)?,
-        SsaOp::GetProperty { object, name, cs } => {
-            let d = dest.ok_or("from_ssa: get_property without dest")?;
-            let dest_reg = ctx.ssa.reg(d);
-            // The IC helper writes the destination's home itself.
-            Out::Boxed(props::emit_get_property(
-                b, ctx, values, *object, name, *cs, dest_reg,
-            )?)
-        }
+        SsaOp::GetProperty { object, name, cs } => Out::Boxed(props::emit_get_property(
+            b, ctx, values, *object, name, *cs,
+        )?),
         SsaOp::MakeClass { name, super_class } => {
             let boxed = classops::emit_make_class(b, ctx, values, name, *super_class)?;
             Out::Boxed(boxed)
