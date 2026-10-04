@@ -3,7 +3,6 @@ use crate::exec::props::bind_method_to_receiver;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
-use std::sync::Arc;
 use varn_types::ClassObj;
 
 pub(crate) fn op_class(name: &str, heap: &mut Heap) -> VmValue {
@@ -54,7 +53,7 @@ pub(crate) fn op_inherit(
             *sub.vtable_owners.borrow_mut() = superclass.vtable_owners.borrow().clone();
             *sub.method_map.borrow_mut() = superclass.method_map.borrow().clone();
 
-            sub.inherit_fields(&superclass);
+            sub.set_layout(superclass.layout());
 
             *sub.getter_map.borrow_mut() = superclass.getter_map.borrow().clone();
             *sub.getter_vtable.borrow_mut() = superclass.getter_vtable.borrow().clone();
@@ -72,22 +71,31 @@ pub(crate) fn op_inherit(
     Err(RuntimeError::new("OpInherit: not a class"))
 }
 
-pub(crate) fn op_declare_field(
+pub(crate) fn op_declare_layout(
     class_nv: VmValue,
-    name: &str,
-    tag: Option<varn_core::RuntimeKind>,
+    layout: Rc<varn_core::layout::ClassLayout>,
     heap: &mut Heap,
 ) -> VmResult<()> {
     if class_nv.is_heap() {
         if let Some(HeapObj::Class(cls)) = heap.get_mut(class_nv.as_heap()) {
-            cls.declare_field(Arc::from(name), tag);
+            cls.set_layout(layout);
             return Ok(());
         }
     }
     Err(RuntimeError::new(format!(
-        "OpDeclareField: expected class, got {}",
+        "OpDeclareLayout: expected class, got {}",
         crate::exec::props::meta::type_name(class_nv, heap)
     )))
+}
+
+pub(crate) fn pool_layout(
+    proto: &varn_types::FunctionProto,
+    idx: usize,
+) -> VmResult<Rc<varn_core::layout::ClassLayout>> {
+    match proto.chunk.constants.get(idx) {
+        Some(varn_types::PoolEntry::Layout(layout)) => Ok(Rc::clone(layout)),
+        _ => Err(RuntimeError::new("DeclareLayout: not a layout constant")),
+    }
 }
 
 pub(crate) fn op_define_getter(

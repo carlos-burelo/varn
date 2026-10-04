@@ -36,10 +36,6 @@ impl FieldLayout {
 /// Static memory layout for an entire class instance.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ClassLayout {
-    /// Class name.
-    pub name: Arc<str>,
-    /// Unique class id.
-    pub class_id: u32,
     /// Total instance payload size in bytes (excluding GC object header), padded to struct alignment.
     pub payload_size: u32,
     /// Maximum alignment requirement across all fields (at least 8 for 64-bit alignment).
@@ -51,29 +47,13 @@ pub struct ClassLayout {
 }
 
 impl ClassLayout {
-    /// Creates a new empty class layout with default alignment of 8.
-    pub fn new(name: impl Into<Arc<str>>, class_id: u32) -> Self {
-        Self {
-            name: name.into(),
-            class_id,
-            payload_size: 0,
-            alignment: 8,
-            fields: Vec::new(),
-            gc: GcLayout::default(),
-        }
-    }
-
     /// Builds a static memory layout from a list of field (name, kind) declarations.
     ///
     /// Each field takes the size, alignment and representation
     /// [`TypeLayout::of_field`] gives its kind, at the next offset aligned to
     /// it; the payload is padded to the widest alignment (at least 8). The
     /// reference slots, in field order, are the class's [`GcLayout`].
-    pub fn from_fields(
-        name: impl Into<Arc<str>>,
-        class_id: u32,
-        fields_in: &[(Arc<str>, Option<RuntimeKind>)],
-    ) -> Self {
+    pub fn from_fields(fields_in: &[(Arc<str>, Option<RuntimeKind>)]) -> Self {
         let mut fields = Vec::with_capacity(fields_in.len());
         let mut cur_offset = 0u32;
         let mut max_align = 8u32;
@@ -107,8 +87,6 @@ impl ClassLayout {
         let payload_size = cur_offset + end_padding;
 
         Self {
-            name: name.into(),
-            class_id,
             payload_size,
             alignment: max_align,
             fields,

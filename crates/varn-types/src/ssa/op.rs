@@ -2,7 +2,6 @@
 //! closure op names.
 
 use serde::{Deserialize, Serialize};
-use varn_core::RuntimeKind;
 
 use super::operators::{SsaBinOp, SsaUnOp};
 
@@ -324,11 +323,10 @@ pub enum SsaOp {
         super_class: Option<u32>,
     },
 
-    /// `DeclareField` on a class; no result.
-    DeclareField {
+    /// The complete instance layout of a class; no result.
+    DeclareLayout {
         class: u32,
-        name: Box<str>,
-        tag: Option<RuntimeKind>,
+        layout: std::sync::Arc<varn_core::layout::ClassLayout>,
     },
 
     /// A class member definition (`Method`/`DefineStatic`/accessors). `kind` is

@@ -53,7 +53,7 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
     if val.is_heap() {
         if let Some(HeapObj::Instance(inst)) = heap.get(val.as_heap()) {
             if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
-                let layout = cls.get_or_compute_layout();
+                let layout = cls.layout();
                 let message = layout
                     .get_field("message")
                     .and_then(|f| inst.read_field(f))

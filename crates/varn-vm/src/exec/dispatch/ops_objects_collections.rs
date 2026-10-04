@@ -147,15 +147,14 @@ impl ExecCtx {
                 self.exec_assert_not_null(v)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
-            OpCode::DeclareField => {
+            OpCode::DeclareLayout => {
                 let w1 = code[*ip];
                 *ip += 1;
-                let name_idx = code[*ip] as usize;
+                let layout_idx = code[*ip] as usize;
                 *ip += 1;
-                let obj_reg = hi(w1);
-                let obj = self.stack.box_reg(base, obj_reg);
-                let tag = varn_core::RuntimeKind::from_u8(lo(w1) as u8);
-                self.exec_declare_field(obj, name_idx, tag, frame_idx, closure)?;
+                let class = self.stack.box_reg(base, hi(w1));
+                let layout = crate::exec::class::pool_layout(&closure.proto, layout_idx)?;
+                crate::exec::class::op_declare_layout(class, layout, &mut self.heap)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::GetIndex => {

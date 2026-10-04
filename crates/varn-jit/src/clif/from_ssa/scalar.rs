@@ -240,7 +240,7 @@ pub(super) fn emit_inst(
         | SsaOp::ArrayPush { .. }
         | SsaOp::SetFixedField { .. }
         | SsaOp::MakeClass { .. }
-        | SsaOp::DeclareField { .. }
+        | SsaOp::DeclareLayout { .. }
         | SsaOp::DefineMethod { .. }
         | SsaOp::GetSuper { .. }
         | SsaOp::LoadGlobal(_)

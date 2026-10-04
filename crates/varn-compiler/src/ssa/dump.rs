@@ -301,11 +301,16 @@ pub fn inst_kind(kind: &InstKind) -> String {
         InstKind::MakeClass { name, super_class } => {
             format!("makeclass {name} super={:?}", super_class.map(val))
         }
-        InstKind::DeclareField { class, name, tag } => {
+        InstKind::DeclareLayout { class, layout } => {
             format!(
-                "declarefield {}.{name}: {}",
+                "declarelayout {} {{{}}}",
                 val(*class),
-                tag.map_or("dynamic", |k| k.name())
+                layout
+                    .fields
+                    .iter()
+                    .map(|f| format!("{}@{}", f.name, f.offset))
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )
         }
         InstKind::DefineStatic { class, name, value } => {

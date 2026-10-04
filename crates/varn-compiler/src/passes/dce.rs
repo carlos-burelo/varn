@@ -238,7 +238,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
 
         // Class construction mutates the class object being built.
         MakeClass { .. }
-        | DeclareField { .. }
+        | DeclareLayout { .. }
         | DefineStatic { .. }
         | DefineMethod { .. }
         | DefineAccessor { .. } => false,

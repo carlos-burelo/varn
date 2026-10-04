@@ -2,7 +2,7 @@ use super::context::{Builder, Result};
 use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
-use varn_tir::{BackendTy, TirClassDef};
+use varn_tir::TirClassDef;
 
 impl<'m> Builder<'m> {
     pub(super) fn build_class_def(&mut self, def: &TirClassDef) -> Result<()> {
@@ -37,22 +37,10 @@ impl<'m> Builder<'m> {
             });
         }
 
-        let fields: Vec<(Arc<str>, BackendTy)> = def
-            .class_id
-            .and_then(|cid| self.tir.class(cid))
-            .map(|ci| {
-                ci.fields
-                    .iter()
-                    .skip(ci.inherited_fields as usize)
-                    .map(|f| (f.name.clone(), f.ty))
-                    .collect()
-            })
-            .unwrap_or_default();
-        for (fname, fty) in fields {
-            self.emit_effect(InstKind::DeclareField {
+        if let Some(ci) = def.class_id.and_then(|cid| self.tir.class(cid)) {
+            self.emit_effect(InstKind::DeclareLayout {
                 class: class_v,
-                name: fname,
-                tag: fty.field_kind(&self.tir.types),
+                layout: Arc::new(ci.layout.clone()),
             });
         }
 

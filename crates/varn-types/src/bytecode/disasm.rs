@@ -152,6 +152,15 @@ pub fn constant_text(entry: &PoolEntry) -> String {
         },
         PoolEntry::Function(f) => format!("fn {}", f.name.as_deref().unwrap_or("<anonymous>")),
         PoolEntry::Shape(keys) => format!("shape {{{}}}", keys.join(", ")),
+        PoolEntry::Layout(layout) => format!(
+            "layout {{{}}}",
+            layout
+                .fields
+                .iter()
+                .map(|f| format!("{}@{}", f.name, f.offset))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
     }
 }
 

@@ -74,7 +74,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | StoreCaptured { value, .. }
         | StoreModuleSlot { value, .. } => f(*value),
 
-        DeclareField { class, .. } => f(*class),
+        DeclareLayout { class, .. } => f(*class),
         CatchParam { try_val } => f(*try_val),
         MakeClass { super_class, .. } => {
             if let Some(sc) = super_class {
@@ -238,7 +238,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         | StoreCaptured { value, .. }
         | StoreModuleSlot { value, .. } => f(value),
 
-        DeclareField { class, .. } => f(class),
+        DeclareLayout { class, .. } => f(class),
         CatchParam { try_val } => f(try_val),
         MakeClass { super_class, .. } => {
             if let Some(sc) = super_class {

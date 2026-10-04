@@ -81,6 +81,7 @@ pub enum ConstKind {
     Name,
     Function,
     Shape,
+    Layout,
     /// A module specifier.
     Module,
     /// A native op id (an integer).

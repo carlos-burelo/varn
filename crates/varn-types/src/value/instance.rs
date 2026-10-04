@@ -33,7 +33,7 @@ pub const INST_PAYLOAD_OFF: usize =
 impl InstanceData {
     /// The payload size an instance of `class` lays out.
     pub fn payload_size_of(class: &ClassObj) -> u32 {
-        class.get_or_compute_layout().payload_size
+        class.layout().payload_size
     }
 
     /// Bytes an instance with a `payload_size` payload occupies, header included.
@@ -97,15 +97,9 @@ impl InstanceData {
         ptr.read()
     }
 
-    /// Resolves this instance's `ClassLayout` through the class registry.
-    /// `InstanceData` itself only knows the header word (`class_id` /
-    /// `payload_size`) needed for zero-copy allocation — the field table
-    /// lives on `ClassObj` (one per class, not per instance) and is cached
-    /// there (`get_or_compute_layout`), so this is a registry lookup plus a
-    /// cached `Rc` clone, not a recomputation.
     #[inline]
     fn layout(&self) -> Option<Rc<ClassLayout>> {
-        ClassObj::find_by_id(self.class_id).map(|c| c.get_or_compute_layout())
+        ClassObj::find_by_id(self.class_id).map(|c| c.layout())
     }
 
     /// Number of declared fields — the one authority on how far a payload

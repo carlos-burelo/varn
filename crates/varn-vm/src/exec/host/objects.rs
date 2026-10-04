@@ -55,7 +55,7 @@ impl ExecCtx {
 
             if let Some(HeapObj::Instance(inst)) = self.heap.get(obj.as_heap()) {
                 let cls = ClassObj::find_by_id(inst.class_id)?;
-                let layout = cls.get_or_compute_layout();
+                let layout = cls.layout();
                 let f = layout.get_field(key)?;
                 return inst.read_field(f);
             }
@@ -76,7 +76,7 @@ impl ExecCtx {
             } else if let Some(HeapObj::Instance(inst)) = self.heap.get(idx) {
                 let inst = *inst;
                 let field = ClassObj::find_by_id(inst.class_id)
-                    .map(|cls| cls.get_or_compute_layout())
+                    .map(|cls| cls.layout())
                     .and_then(|layout| layout.get_field(key).cloned());
                 if let Some(f) = field {
                     if inst.write_field(&f, val).is_ok() {

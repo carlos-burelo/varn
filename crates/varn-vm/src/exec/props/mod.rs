@@ -98,7 +98,7 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
     match heap.get(idx).cloned() {
         Some(HeapObj::Instance(inst)) => {
             let cls = ClassObj::find_by_id(inst.class_id);
-            let layout = cls.as_ref().map(|c| c.get_or_compute_layout());
+            let layout = cls.as_ref().map(|c| c.layout());
             let field = layout.as_ref().and_then(|l| l.get_field(key));
             if let Some(f) = field {
                 if inst.write_field(f, val).is_ok() {
@@ -142,7 +142,7 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
     match heap.get(obj.as_heap()).cloned() {
         Some(HeapObj::Instance(inst)) => {
             let cls = ClassObj::find_by_id(inst.class_id)?;
-            let layout = cls.get_or_compute_layout();
+            let layout = cls.layout();
             let f = layout.get_field(key)?;
             inst.read_field(f)
         }

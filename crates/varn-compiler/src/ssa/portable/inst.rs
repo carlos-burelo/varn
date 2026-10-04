@@ -159,10 +159,9 @@ pub(super) fn project_inst(
             name: name.as_ref().into(),
             super_class: super_class.map(|v| v.0),
         },
-        InstKind::DeclareField { class, name, tag } => SsaOp::DeclareField {
+        InstKind::DeclareLayout { class, layout } => SsaOp::DeclareLayout {
             class: class.0,
-            name: name.as_ref().into(),
-            tag: *tag,
+            layout: layout.clone(),
         },
         InstKind::DefineStatic { class, name, value } => SsaOp::DefineMethod {
             class: class.0,

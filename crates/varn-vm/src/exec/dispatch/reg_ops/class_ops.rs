@@ -132,21 +132,6 @@ impl ExecCtx {
                     .ok_or_else(|| RuntimeError::new("DefineStaticSetter: non-string const"))?;
                 crate::exec::class::op_define_static_setter(class_nv, &key, fn_nv, &mut self.heap)?;
             }
-            OpCode::DeclareField => {
-                let w1 = code[*ip];
-                *ip += 1;
-                let name_idx = code[*ip] as usize;
-                *ip += 1;
-                let class_reg = (w1 >> 8) as usize;
-                let class_nv = self.stack.box_reg(base, class_reg);
-                let key_nv = closure.constants[name_idx];
-                let key = self
-                    .heap
-                    .str_val(key_nv)
-                    .ok_or_else(|| RuntimeError::new("DeclareField: non-string const"))?;
-                let tag = varn_core::RuntimeKind::from_u8((w1 & 0xFF) as u8);
-                crate::exec::class::op_declare_field(class_nv, &key, tag, &mut self.heap)?;
-            }
             OpCode::BindMethod => {
                 let w1 = code[*ip];
                 *ip += 1;

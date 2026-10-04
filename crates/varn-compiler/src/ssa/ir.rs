@@ -331,11 +331,9 @@ pub enum InstKind {
         name: Arc<str>,
         super_class: Option<Value>,
     },
-    DeclareField {
+    DeclareLayout {
         class: Value,
-        name: Arc<str>,
-        /// Static type the runtime lays this field out by.
-        tag: Option<varn_core::RuntimeKind>,
+        layout: Arc<varn_core::layout::ClassLayout>,
     },
     DefineStatic {
         class: Value,

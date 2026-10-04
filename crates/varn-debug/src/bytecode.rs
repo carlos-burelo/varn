@@ -21,7 +21,7 @@ fn op_color(op: OpCode) -> &'static str {
 
         MakeClass | MakeClosure | LoadStaticFn | BuildArray | BuildObject
         | BuildObjectWithShape | BuildStr | Method | DefineStatic | DefineGetter | DefineSetter
-        | DefineStaticGetter | DefineStaticSetter | DeclareField | Inherit | BindMethod
+        | DefineStaticGetter | DefineStaticSetter | DeclareLayout | Inherit | BindMethod
         | MakeEnumVariant => BLUE,
 
         Add | Sub | Mul | Div | Mod | Pow | Eq | Neq | Lt | Lte | Gt | Gte | BitAnd | BitOr
@@ -73,6 +73,7 @@ fn const_hint(entry: &PoolEntry) -> String {
             format!("{BLUE}fn {fname}{R}(arity={})", f.arity)
         }
         PoolEntry::Shape(keys) => format!("{DIM}shape[{}]{R}", keys.len()),
+        PoolEntry::Layout(layout) => format!("{DIM}layout[{}]{R}", layout.fields.len()),
     }
 }
 

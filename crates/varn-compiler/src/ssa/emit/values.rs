@@ -285,7 +285,7 @@ pub(super) fn emit_value(
         | InstKind::CloseUpvalues { .. }
         | InstKind::Dispose { .. }
         | InstKind::PopTry
-        | InstKind::DeclareField { .. }
+        | InstKind::DeclareLayout { .. }
         | InstKind::DefineStatic { .. }
         | InstKind::DefineMethod { .. }
         | InstKind::DefineAccessor { .. } => {

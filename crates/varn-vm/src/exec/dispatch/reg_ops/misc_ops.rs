@@ -88,22 +88,6 @@ impl ExecCtx {
         }
     }
 
-    pub(in crate::exec::dispatch) fn exec_declare_field(
-        &mut self,
-        obj: VmValue,
-        name_idx: usize,
-        tag: Option<varn_core::RuntimeKind>,
-        _frame_idx: usize,
-        closure: &VmClosure,
-    ) -> VmResult<()> {
-        let name_nv = closure.constants[name_idx];
-        let name = self
-            .heap
-            .str_val(name_nv)
-            .ok_or_else(|| RuntimeError::new("DeclareField: non-string const"))?;
-        crate::exec::class::op_declare_field(obj, &name, tag, &mut self.heap)
-    }
-
     pub(in crate::exec::dispatch) fn exec_get_index(
         &mut self,
         obj: VmValue,

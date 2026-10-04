@@ -99,7 +99,7 @@ macro_rules! object_ops {
             | OpCode::GetSuper
             | OpCode::GetSymbol
             | OpCode::AssertNotNull
-            | OpCode::DeclareField
+            | OpCode::DeclareLayout
             | OpCode::GetIndex
             | OpCode::SetIndex
             | OpCode::ArrayGetIndex

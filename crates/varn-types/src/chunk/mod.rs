@@ -189,6 +189,10 @@ impl Chunk {
         self.add_constant(PoolEntry::Shape(keys))
     }
 
+    pub fn add_layout(&mut self, layout: std::rc::Rc<varn_core::layout::ClassLayout>) -> u16 {
+        self.add_constant(PoolEntry::Layout(layout))
+    }
+
     pub fn add_int(&mut self, n: i64) -> u16 {
         self.add_constant(PoolEntry::Literal(Literal::Int(n)))
     }

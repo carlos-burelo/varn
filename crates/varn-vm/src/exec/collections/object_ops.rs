@@ -79,7 +79,7 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
         if let Some(HeapObj::Instance(inst)) = heap.get(spread_idx) {
             let inst = *inst;
             if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
-                for field in &cls.get_or_compute_layout().fields {
+                for field in &cls.layout().fields {
                     if let Some(v) = inst.read_field(field) {
                         target_obj.insert(field.name.clone(), v);
                     }

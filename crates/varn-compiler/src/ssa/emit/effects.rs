@@ -193,15 +193,12 @@ pub(super) fn emit_effect(
             chunk.emit(OpCode::PopTry, line);
             return Ok(true);
         }
-        InstKind::DeclareField { class, name, tag } => {
+        InstKind::DeclareLayout { class, layout } => {
             let class_reg = reg[class.0 as usize];
-            let key_idx = chunk.add_str(name);
-            chunk.emit(OpCode::DeclareField, line);
-            chunk.write(
-                Chunk::pack(class_reg, varn_core::RuntimeKind::encode(*tag)),
-                line,
-            );
-            chunk.write(key_idx, line);
+            let layout_idx = chunk.add_layout(std::rc::Rc::new(layout.as_ref().clone()));
+            chunk.emit(OpCode::DeclareLayout, line);
+            chunk.write(Chunk::pack(class_reg, 0), line);
+            chunk.write(layout_idx, line);
             return Ok(true);
         }
         InstKind::DefineStatic { class, name, value } => {

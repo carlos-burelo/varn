@@ -57,8 +57,8 @@ pub(super) fn emit(
             props::emit_set_property(b, ctx, values, *object, *value, name, *cs)?;
             return Ok(Some(None));
         }
-        SsaOp::DeclareField { class, name, tag } => {
-            classops::emit_declare_field(b, ctx, values, *class, name, *tag)?;
+        SsaOp::DeclareLayout { class, layout } => {
+            classops::emit_declare_layout(b, ctx, values, *class, layout)?;
             return Ok(Some(None));
         }
         SsaOp::DefineMethod {

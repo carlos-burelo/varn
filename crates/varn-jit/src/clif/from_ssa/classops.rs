@@ -1,5 +1,5 @@
 //! Class-construction lowering for the SSA backend: `MakeClass`, the member
-//! definitions (`Method`/`DefineStatic`/accessors), `DeclareField` and
+//! definitions (`Method`/`DefineStatic`/accessors), `DeclareLayout` and
 //! `GetSuper`.
 //!
 //! The runtime helpers are the same the bytecode lowering uses; because a
@@ -53,31 +53,32 @@ pub(super) fn emit_make_class(
     ))
 }
 
-/// `DeclareField class, name` — no result.
-pub(super) fn emit_declare_field(
+pub(super) fn emit_declare_layout(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &[Option<cranelift_codegen::ir::Value>],
     class: u32,
-    name: &str,
-    tag: Option<varn_core::RuntimeKind>,
+    layout: &varn_core::layout::ClassLayout,
 ) -> Result<(), String> {
     let frame = ctx
         .frame
         .as_ref()
-        .ok_or("from_ssa: DeclareField without a frame")?;
+        .ok_or("from_ssa: DeclareLayout without a frame")?;
     let (ct, cp) = boxed_parts(b, ctx, values, class)?;
-    let name_idx = str_idx(ctx, name)?;
+    let layout_idx = ctx
+        .proto
+        .chunk
+        .constants
+        .iter()
+        .position(|e| matches!(e, varn_types::PoolEntry::Layout(l) if l.as_ref() == layout))
+        .ok_or("from_ssa: class layout not in pool")?;
     let ectx = frame.exec_ctx;
-    let name_v = b.ins().iconst(types::I64, name_idx as i64);
-    let tag_v = b
-        .ins()
-        .iconst(types::I64, varn_core::RuntimeKind::encode(tag) as i64);
+    let idx_v = b.ins().iconst(types::I64, layout_idx as i64);
     call_helper_void(
         b,
         ctx.cc,
-        ctx.helpers.declare_field,
-        &[ectx, frame.closure, ct, cp, name_v, tag_v],
+        ctx.helpers.declare_layout,
+        &[ectx, frame.closure, ct, cp, idx_v],
     );
     Ok(())
 }

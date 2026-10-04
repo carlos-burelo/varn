@@ -69,7 +69,7 @@ fn snapshot_object(heap: &mut Heap, pairs: Vec<(Arc<str>, VmValue)>) -> VmValue 
 fn instance_snapshot(obj: VmValue, cls: &ClassObj, heap: &mut Heap) -> VmValue {
     let pairs = match heap.get(obj.as_heap()) {
         Some(HeapObj::Instance(inst)) => cls
-            .get_or_compute_layout()
+            .layout()
             .fields
             .iter()
             .filter_map(|f| inst.read_field(f).map(|v| (Arc::clone(&f.name), v)))

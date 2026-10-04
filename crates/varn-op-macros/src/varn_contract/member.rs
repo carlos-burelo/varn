@@ -38,7 +38,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
     if m.kind == Kind::Property {
         let tag = mapped_tag_path(&m.ret);
         out.setup_calls.push(quote! {
-            cls.declare_field(::std::sync::Arc::from(#sym), #tag);
+            cls.extend_layout(&[(::std::sync::Arc::from(#sym), #tag)]);
         });
         return;
     }

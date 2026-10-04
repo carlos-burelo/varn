@@ -82,7 +82,7 @@ pub enum OpCode {
 
     DefineStaticSetter,
 
-    DeclareField,
+    DeclareLayout,
 
     BindMethod,
 

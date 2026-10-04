@@ -28,7 +28,6 @@ pub struct ClassInfo {
     pub name: Arc<str>,
     pub parent: Option<ClassId>,
     pub fields: Vec<FieldInfo>,
-    pub inherited_fields: u16,
     pub vtable: Vec<VtableEntry>,
     pub layout: ClassLayout,
     /// The signature of the class's own constructor, when it declares one.
@@ -91,7 +90,7 @@ impl ClassInfo {
             .iter()
             .map(|f| (f.name.clone(), f.ty.field_kind(types)))
             .collect();
-        let layout = ClassLayout::from_fields(name.clone(), 0, &kinds);
+        let layout = ClassLayout::from_fields(&kinds);
 
         // Vtable: the parent's entries, then the new ones. A method the parent
         // already has keeps its index — that is what makes the index a valid
@@ -116,7 +115,6 @@ impl ClassInfo {
         ClassInfo {
             name,
             parent: parent_id,
-            inherited_fields: first_slot,
             fields: out,
             vtable,
             layout,

@@ -45,11 +45,7 @@ pub struct ClassObj {
     /// Cached instance shape and inline field count. In Varn, classes have
     /// fixed, immutable field layouts once declared.
     pub instance_shape_cache: RefCell<Option<(Rc<super::shape::Shape>, usize)>>,
-    /// Static memory layout of instances of this class.
-    pub layout: RefCell<Option<Rc<varn_core::layout::ClassLayout>>>,
-    /// Declared static type of each instance field, by slot. Comes down with
-    /// the declaration; the layout is built from it rather than from a guess.
-    pub field_tags: RefCell<Vec<Option<varn_core::RuntimeKind>>>,
+    pub layout: RefCell<Rc<varn_core::layout::ClassLayout>>,
 }
 
 pub type CtorRtCacheEntry = (u32, Option<Rc<dyn std::any::Any>>);
@@ -79,8 +75,7 @@ impl ClassObj {
             ctor_cache: RefCell::new(None),
             ctor_rt_cache: RefCell::new(None),
             instance_shape_cache: RefCell::new(None),
-            layout: RefCell::new(None),
-            field_tags: RefCell::new(Vec::new()),
+            layout: RefCell::new(Rc::new(varn_core::layout::ClassLayout::from_fields(&[]))),
         }
     }
     pub fn new_native(name: impl Into<String>) -> Self {
@@ -129,76 +124,33 @@ impl ClassObj {
         (shape, n)
     }
 
-    pub fn inherit_fields(self: &Rc<Self>, parent: &ClassObj) {
-        *self.instance_shape_cache.borrow_mut() = None;
-        *self.layout.borrow_mut() = None;
-        let mut properties = parent.root_shape.borrow().property_names.clone();
-        let mut tags = parent.field_tags.borrow().clone();
-        tags.resize(properties.len(), None);
-        let own_tags = self.field_tags.borrow().clone();
-        let mut own: Vec<(RuntimeString, usize)> = self
-            .root_shape
-            .borrow()
-            .property_names
+    pub fn layout(&self) -> Rc<varn_core::layout::ClassLayout> {
+        Rc::clone(&self.layout.borrow())
+    }
+
+    pub fn set_layout(self: &Rc<Self>, layout: Rc<varn_core::layout::ClassLayout>) {
+        let properties: HashMap<RuntimeString, usize> = layout
+            .fields
             .iter()
-            .filter(|(name, _)| !properties.contains_key(name.as_ref()))
-            .map(|(k, &v)| (k.clone(), v))
+            .enumerate()
+            .map(|(slot, f)| (f.name.clone(), slot))
             .collect();
-        own.sort_unstable_by_key(|(_, slot)| *slot);
-        for (name, old_slot) in own {
-            properties.insert(name, tags.len());
-            tags.push(own_tags.get(old_slot).copied().flatten());
-        }
         *self.root_shape.borrow_mut() = super::shape::Shape::create(Some(self.clone()), properties);
-        *self.field_tags.borrow_mut() = tags;
-    }
-
-    pub fn declare_field(&self, name: RuntimeString, tag: Option<varn_core::RuntimeKind>) -> usize {
         *self.instance_shape_cache.borrow_mut() = None;
-        *self.layout.borrow_mut() = None;
-        let mut root = self.root_shape.borrow_mut();
-        if let Some(&slot) = root.property_names.get(&name) {
-            self.field_tags.borrow_mut()[slot] = tag;
-            return slot;
-        }
-        let new_shape = root.extend_property(name);
-        let slot = new_shape.property_names.len() - 1;
-        *root = new_shape;
-        let mut tags = self.field_tags.borrow_mut();
-        tags.resize(slot + 1, None);
-        tags[slot] = tag;
-        slot
+        *self.layout.borrow_mut() = layout;
     }
 
-    /// Returns the static memory layout of this class, computing it if not yet cached.
-    pub fn get_or_compute_layout(&self) -> Rc<varn_core::layout::ClassLayout> {
-        if let Some(ref lay) = *self.layout.borrow() {
-            return Rc::clone(lay);
-        }
-        let shape = self.root_shape.borrow();
-        let mut ordered: Vec<(usize, RuntimeString)> = shape
-            .property_names
+    pub fn extend_layout(self: &Rc<Self>, own: &[(RuntimeString, Option<varn_core::RuntimeKind>)]) {
+        let mut fields: Vec<(RuntimeString, Option<varn_core::RuntimeKind>)> = self
+            .layout()
+            .fields
             .iter()
-            .map(|(k, &slot)| (slot, Arc::clone(k)))
+            .map(|f| (f.name.clone(), f.kind))
             .collect();
-        ordered.sort_unstable_by_key(|(slot, _)| *slot);
-
-        let tags = self.field_tags.borrow();
-        let fields_in: Vec<(Arc<str>, Option<varn_core::RuntimeKind>)> = ordered
-            .into_iter()
-            .map(|(slot, name)| {
-                let tag = tags.get(slot).copied().flatten();
-                (Arc::from(name.as_ref()), tag)
-            })
-            .collect();
-
-        let layout = Rc::new(varn_core::layout::ClassLayout::from_fields(
-            &*self.name,
-            self.id,
-            &fields_in,
-        ));
-        *self.layout.borrow_mut() = Some(Rc::clone(&layout));
-        layout
+        fields.extend(own.iter().cloned());
+        self.set_layout(Rc::new(varn_core::layout::ClassLayout::from_fields(
+            &fields,
+        )));
     }
 
     pub fn for_each_value_mut(&self, f: &mut dyn FnMut(&mut VmValue)) {

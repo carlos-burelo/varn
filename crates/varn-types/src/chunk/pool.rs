@@ -11,6 +11,7 @@ pub enum PoolEntry {
     Literal(Literal),
     Function(std::rc::Rc<FunctionProto>),
     Shape(Vec<std::sync::Arc<str>>),
+    Layout(Rc<varn_core::layout::ClassLayout>),
 }
 
 impl std::fmt::Debug for PoolEntry {
@@ -23,6 +24,7 @@ impl std::fmt::Debug for PoolEntry {
                 .field("arity", &proto.arity)
                 .finish_non_exhaustive(),
             Self::Shape(keys) => f.debug_tuple("Shape").field(keys).finish(),
+            Self::Layout(layout) => f.debug_tuple("Layout").field(layout).finish(),
         }
     }
 }
@@ -36,6 +38,13 @@ impl std::hash::Hash for PoolEntry {
                 std::rc::Rc::as_ptr(f).hash(state);
             }
             Self::Shape(keys) => keys.hash(state),
+            Self::Layout(layout) => {
+                layout.payload_size.hash(state);
+                for field in &layout.fields {
+                    field.name.hash(state);
+                    field.offset.hash(state);
+                }
+            }
         }
     }
 }
@@ -45,6 +54,7 @@ impl PartialEq for PoolEntry {
         match (self, other) {
             (Self::Literal(l1), Self::Literal(l2)) => l1 == l2,
             (Self::Shape(k1), Self::Shape(k2)) => k1 == k2,
+            (Self::Layout(l1), Self::Layout(l2)) => l1 == l2,
             (Self::Function(f1), Self::Function(f2)) => std::rc::Rc::ptr_eq(f1, f2),
             _ => false,
         }
@@ -63,6 +73,9 @@ impl serde::Serialize for PoolEntry {
             PoolEntry::Shape(keys) => {
                 let strs: Vec<&str> = keys.iter().map(|s| s.as_ref()).collect();
                 ser.serialize_newtype_variant("PoolEntry", 2, "Shape", &strs)
+            }
+            PoolEntry::Layout(layout) => {
+                ser.serialize_newtype_variant("PoolEntry", 3, "Layout", layout.as_ref())
             }
         }
     }
@@ -91,9 +104,12 @@ impl<'de> serde::Deserialize<'de> for PoolEntry {
                         let strs = variant.newtype_variant::<Vec<String>>()?;
                         Ok(PoolEntry::Shape(strs.into_iter().map(Arc::from).collect()))
                     }
+                    3 => Ok(PoolEntry::Layout(Rc::new(
+                        variant.newtype_variant::<varn_core::layout::ClassLayout>()?,
+                    ))),
                     _ => Err(de::Error::unknown_variant(
                         &idx.to_string(),
-                        &["0", "1", "2"],
+                        &["0", "1", "2", "3"],
                     )),
                 }
             }
@@ -101,7 +117,7 @@ impl<'de> serde::Deserialize<'de> for PoolEntry {
 
         de.deserialize_enum(
             "PoolEntry",
-            &["Literal", "Function", "Shape"],
+            &["Literal", "Function", "Shape", "Layout"],
             PoolEntryVisitor,
         )
     }

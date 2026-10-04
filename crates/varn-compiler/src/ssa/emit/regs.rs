@@ -128,7 +128,7 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 | InstKind::LoadCaptured { .. }
                 | InstKind::StoreCaptured { .. }
                 | InstKind::MakeClass { .. }
-                | InstKind::DeclareField { .. }
+                | InstKind::DeclareLayout { .. }
                 | InstKind::DefineStatic { .. }
                 | InstKind::DefineMethod { .. }
                 | InstKind::DefineAccessor { .. }
