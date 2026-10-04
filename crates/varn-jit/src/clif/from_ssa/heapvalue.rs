@@ -163,7 +163,7 @@ pub(super) fn emit(
             let d = dest.ok_or("from_ssa: get_property without dest")?;
             let dest_reg = ctx.ssa.reg(d);
             // The IC helper writes the destination's home itself.
-            Out::Landed(props::emit_get_property(
+            Out::Boxed(props::emit_get_property(
                 b, ctx, values, *object, name, *cs, dest_reg,
             )?)
         }

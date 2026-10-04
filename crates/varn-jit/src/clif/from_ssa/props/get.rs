@@ -3,7 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use super::super::super::emit::{call_helper_void, HEAP_KIND, KIND_MASK};
 use super::super::heap::boxed_parts;
-use super::super::store::{def_heap, drop_home_addrs, use_heap};
+use super::super::store::{drop_home_addrs, home_load};
 use super::super::Ctx;
 use super::shared::str_idx;
 
@@ -119,8 +119,6 @@ pub(crate) fn emit_get_property(
         let off = b.ins().ishl_imm_u(slot16, 4);
         let addr = b.ins().iadd(values_base, off);
         let val = b.ins().load(types::I128, m, addr, 0);
-        def_heap(b, ctx, dest_reg, val)?;
-        drop_home_addrs(ctx);
         b.ins().jump(merge, &[val.into()]);
     }
     b.switch_to_block(next);
@@ -148,7 +146,7 @@ pub(crate) fn emit_get_property(
         ],
     );
     drop_home_addrs(ctx);
-    let slow_val = use_heap(b, ctx, dest_reg)?;
+    let slow_val = home_load(b, ctx, dest_reg)?;
     drop_home_addrs(ctx);
     b.ins().jump(merge, &[slow_val.into()]);
 

@@ -377,6 +377,7 @@ pub(super) fn project_inst(
         InstKind::LoadModule { source } => SsaOp::LoadModule {
             source: source.as_ref().into(),
             own_ip: site.own_ip,
+            live: site.resume_live,
         },
         InstKind::ModuleSlot { object, slot } => SsaOp::ModuleSlot {
             object: object.0,
@@ -389,11 +390,13 @@ pub(super) fn project_inst(
         InstKind::Await { operand } => SsaOp::Await {
             operand: operand.0,
             resume_ip: site.next_ip,
+            live: site.resume_live,
         },
         InstKind::Spawn { operand } => SsaOp::Spawn { operand: operand.0 },
         InstKind::Yield { operand } => SsaOp::Yield {
             operand: operand.0,
             resume_ip: site.next_ip,
+            live: site.resume_live,
         },
         InstKind::Dispose { target, is_await } => SsaOp::Dispose {
             var: captured.index(crate::ssa::ir::VarId::Local(*target)),

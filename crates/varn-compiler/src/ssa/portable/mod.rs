@@ -93,6 +93,7 @@ pub(crate) fn project(
     }
 
     let lv = emitted.liveness;
+    let handlers = crate::ssa::suspend::try_handlers(ssa);
 
     let mut captured = Captured {
         vars: Vec::new(),
@@ -133,6 +134,17 @@ pub(crate) fn project(
                 },
                 own_ip: u32::try_from(own).unwrap_or(u32::MAX),
                 next_ip: u32::try_from(next).unwrap_or(u32::MAX),
+                resume_live: match &inst.kind {
+                    InstKind::LoadModule { .. }
+                    | InstKind::Await { .. }
+                    | InstKind::Yield { .. } => {
+                        crate::ssa::suspend::resume_live(ssa, lv, &handlers, b, i)
+                            .into_iter()
+                            .map(|v| v.0)
+                            .collect()
+                    }
+                    _ => Vec::new(),
+                },
             };
             let projected = project_inst(inst, &value_tys, &global_of, site, &mut captured)
                 .ok_or_else(|| why_not(&inst.kind, &value_tys))?;
@@ -208,7 +220,6 @@ fn loop_headers(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaLoopHeader> {
 }
 
 /// What the bytecode baked for one instruction.
-#[derive(Clone, Copy)]
 struct Site<'a> {
     /// Its inline-cache slot (`ssa::ic`).
     ic_slot: Option<u8>,
@@ -220,6 +231,8 @@ struct Site<'a> {
     own_ip: u32,
     /// The bytecode offset right after it (a suspension's resume point).
     next_ip: u32,
+    /// What the interpreter reads when it resumes after a suspension.
+    resume_live: Vec<u32>,
 }
 
 fn project_term(term: &Terminator) -> SsaTerm {

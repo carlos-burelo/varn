@@ -44,17 +44,7 @@ pub fn suspend_live_regs(
     inst_next: &[Vec<usize>],
 ) -> Vec<(u32, Vec<u16>)> {
     let lv = Liveness::analyze(ssa);
-    let mut handlers: Vec<usize> = Vec::new();
-    for block in &ssa.blocks {
-        for inst in &block.insts {
-            if let InstKind::Try { handler } = &inst.kind {
-                let h = handler.0 as usize;
-                if !handlers.contains(&h) {
-                    handlers.push(h);
-                }
-            }
-        }
-    }
+    let handlers = try_handlers(ssa);
     let mut table = Vec::new();
     for (b, block) in ssa.blocks.iter().enumerate() {
         for (i, inst) in block.insts.iter().enumerate() {
@@ -62,16 +52,7 @@ pub fn suspend_live_regs(
                 InstKind::Await { .. } | InstKind::Yield { .. } => {}
                 _ => continue,
             }
-            let mut live = lv.live_after(ssa, b, i);
-            for &h in &handlers {
-                if let Some(live_in) = lv.live_in.get(h) {
-                    for &v in live_in {
-                        live.push(Value(v));
-                    }
-                }
-            }
-            live.sort_unstable_by_key(|v| v.0);
-            live.dedup();
+            let live = resume_live(ssa, &lv, &handlers, b, i);
             let mut regs: Vec<u16> = Vec::with_capacity(live.len());
             let mut ok = true;
             for v in &live {
@@ -105,4 +86,44 @@ pub fn suspend_live_regs(
     }
     table.sort_by_key(|(ip, _)| *ip);
     table
+}
+
+/// Every block a `Try` hands control to.
+pub fn try_handlers(ssa: &SsaFunc) -> Vec<usize> {
+    let mut handlers: Vec<usize> = Vec::new();
+    for block in &ssa.blocks {
+        for inst in &block.insts {
+            if let InstKind::Try { handler } = &inst.kind {
+                let h = handler.0 as usize;
+                if !handlers.contains(&h) {
+                    handlers.push(h);
+                }
+            }
+        }
+    }
+    handlers
+}
+
+/// The values the interpreter reads when it resumes after instruction `i` of
+/// block `b`: those live after it, plus every handler's `live_in`, since an
+/// exception delivered into a parked frame resumes at a handler no CFG edge
+/// from the suspension reaches. Sorted, deduplicated.
+pub fn resume_live(
+    ssa: &SsaFunc,
+    lv: &Liveness,
+    handlers: &[usize],
+    b: usize,
+    i: usize,
+) -> Vec<Value> {
+    let mut live = lv.live_after(ssa, b, i);
+    for &h in handlers {
+        if let Some(live_in) = lv.live_in.get(h) {
+            for &v in live_in {
+                live.push(Value(v));
+            }
+        }
+    }
+    live.sort_unstable_by_key(|v| v.0);
+    live.dedup();
+    live
 }

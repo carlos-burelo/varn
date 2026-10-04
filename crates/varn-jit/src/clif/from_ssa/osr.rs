@@ -5,12 +5,11 @@
 //! live into it in their registers — the register allocator keeps a value's
 //! register while it is live, and the compiler lists those values with the
 //! header ([`varn_types::ssa::SsaLoopHeader`]). The entry reads them from
-//! their homes: heap values need nothing (they live there anyway), scalars
-//! are loaded into their native representation, and the header's
+//! their homes into their native representation, and the header's
 //! parameters become the jump's arguments. The body is the ordinary lowering
 //! of the blocks reachable from the header.
 //!
-//! A scalar live into the header whose definition the resumed body executes
+//! A value live into the header whose definition the resumed body executes
 //! again — an outer loop's counter when the header is an inner loop's — has
 //! two sources: the entry for the first iteration, the body afterwards. It is
 //! a Cranelift variable, defined by both, so the header merges them.
@@ -21,23 +20,8 @@ use cranelift_codegen::ir::{Block, BlockArg, InstBuilder, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::ssa::{SsaLoopHeader, SsaProto};
 
-use super::store::{clif_ty, define_scalar, is_heap, load_home_value, use_heap};
-use super::{heap, Ctx};
-
-/// The block defining each value: a block parameter's block, or the block of
-/// the instruction producing it.
-fn def_blocks(ssa: &SsaProto) -> Vec<Option<usize>> {
-    let mut def = vec![None; ssa.values.len()];
-    for (b, blk) in ssa.blocks.iter().enumerate() {
-        for &p in &blk.params {
-            def[p as usize] = Some(b);
-        }
-        for d in blk.insts.iter().filter_map(|i| i.dest) {
-            def[d as usize] = Some(b);
-        }
-    }
-    def
-}
+use super::store::{clif_ty, define, is_heap, load_home_value};
+use super::Ctx;
 
 /// The scalars live into `header` that the resumed body redefines, each with
 /// its variable. `reached` is what the body compiles: the blocks reachable
@@ -48,14 +32,18 @@ pub(super) fn carried(
     header: &SsaLoopHeader,
     reached: &[bool],
 ) -> HashMap<u32, Variable> {
-    let def = def_blocks(ssa);
+    let def = super::cfg::def_blocks(ssa);
     let mut carried = HashMap::new();
     for &v in &header.live {
         let kind = ssa.value_ty(v);
         let redefined = def[v as usize].is_some_and(|blk| reached[blk]);
-        if redefined && !is_heap(kind) {
+        if redefined {
             if let Some(ty) = clif_ty(kind) {
-                carried.insert(v, b.declare_var(ty));
+                let var = b.declare_var(ty);
+                if is_heap(kind) {
+                    b.declare_var_needs_stack_map(var);
+                }
+                carried.insert(v, var);
             }
         }
     }
@@ -73,21 +61,12 @@ pub(super) fn emit_entry(
 ) -> Result<(), String> {
     let ssa = ctx.ssa;
     for &v in &header.live {
-        let kind = ssa.value_ty(v);
-        if !is_heap(kind) {
-            let x = load_home_value(b, ctx, ssa.reg(v), kind)?;
-            define_scalar(b, ctx, values, v, x);
-        }
+        let x = load_home_value(b, ctx, ssa.reg(v), ssa.value_ty(v))?;
+        define(b, ctx, values, v, x);
     }
     let mut args = Vec::new();
     for &p in &ssa.blocks[header.block as usize].params {
-        let kind = ssa.value_ty(p);
-        let boxed = use_heap(b, ctx, ssa.reg(p))?;
-        let arg = if is_heap(kind) {
-            boxed
-        } else {
-            heap::unbox_dest(b, kind, boxed)?
-        };
+        let arg = load_home_value(b, ctx, ssa.reg(p), ssa.value_ty(p))?;
         args.push(BlockArg::from(arg));
     }
     b.ins().jump(header_blk, &args);

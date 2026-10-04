@@ -15,7 +15,7 @@ use cranelift_codegen::ir::{types, InstBuilder, TrapCode, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::emit::call_helper_void;
-use super::{def_heap, heap, is_heap, Ctx, FrameIo};
+use super::{heap, home_store, Ctx, FrameIo};
 
 fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
     ctx.frame
@@ -23,7 +23,7 @@ fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
         .ok_or_else(|| "from_ssa: try/throw without a frame".into())
 }
 
-/// Open a `try` region: the landing pad's live scalars to their homes, then
+/// Open a `try` region: the landing pad's live values to their homes, then
 /// the handler, whose thrown value lands in `catch_value`'s register.
 pub(super) fn emit_try(
     b: &mut FunctionBuilder,
@@ -35,10 +35,8 @@ pub(super) fn emit_try(
 ) -> Result<(), String> {
     let frame = frame(ctx)?;
     for &v in live {
-        if !is_heap(ctx.ssa.value_ty(v)) {
-            let boxed = heap::boxed_value(b, ctx, values, v)?;
-            def_heap(b, ctx, ctx.ssa.reg(v), boxed)?;
-        }
+        let boxed = heap::boxed_value(b, ctx, values, v)?;
+        home_store(b, ctx, ctx.ssa.reg(v), boxed)?;
     }
     let ip = b.ins().iconst(types::I64, i64::from(catch_ip));
     let reg = b

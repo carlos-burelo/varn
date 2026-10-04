@@ -12,7 +12,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::{SsaUpvalue, UPVALUE_LOCAL};
 
 use super::super::emit::call_helper_void;
-use super::{def_heap, heap, use_heap, Ctx, FrameIo};
+use super::{heap, home_load, home_store, Ctx, FrameIo};
 
 fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
     ctx.frame
@@ -99,7 +99,7 @@ pub(super) fn emit_load_captured(
     ctx: &Ctx<'_>,
     var: u32,
 ) -> Result<Value, String> {
-    use_heap(b, ctx, captured_reg(ctx, var)?)
+    home_load(b, ctx, captured_reg(ctx, var)?)
 }
 
 /// Write `value` to captured variable `var`'s home, in the home's class.
@@ -111,7 +111,7 @@ pub(super) fn emit_store_captured(
     value: u32,
 ) -> Result<(), String> {
     let boxed = heap::boxed_value(b, ctx, values, value)?;
-    def_heap(b, ctx, captured_reg(ctx, var)?, boxed)
+    home_store(b, ctx, captured_reg(ctx, var)?, boxed)
 }
 
 /// This closure's upvalue `index`, boxed.

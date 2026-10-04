@@ -1,19 +1,16 @@
 //! Where SSA values live and how an instruction's result gets there.
 //!
-//! One rule for the whole lowering: a **scalar** value is a CLIF register; a
-//! **heap** value is its VM home, the GC root, so it survives a collection
-//! that moves it. A scalar's home is only written where the interpreter will
-//! read it: when a `try` region opens, for the values its landing pad reads
-//! ([`super::exceptions`]). A captured variable is not an SSA value and
-//! always lives in its home ([`super::closures`]). An OSR entry reads the
-//! scalars live into its loop header from their homes, where the interpreter
-//! left them; one the resumed body also redefines — an outer loop's counter,
-//! say — is a Cranelift variable instead of a fixed CLIF value, so the
-//! header merges the entry's value with the body's ([`Ctx::carried`]).
+//! One rule for the whole lowering: every SSA value is a CLIF value. A heap
+//! value (`Str`/`Ref`/`Dyn`, an `I128` `VmValue`) is declared to Cranelift as
+//! a GC reference, so at every call it is spilled to a stack-map slot that
+//! the collector reads and rewrites (`crate::stack_roots`) and reloaded after.
 //!
-//! An instruction emitter never stores its own result: it hands back an
-//! [`Out`] saying which representation it produced, and [`land`] puts it
-//! where the destination's class says it lives.
+//! A home is written only where the interpreter will read it — a `try`
+//! landing pad ([`super::exceptions`]), a suspension point
+//! ([`super::extra`]) — and read only where the interpreter left a value:
+//! the arguments and `this` at entry, an OSR entry ([`super::osr`]), a
+//! helper that lands its result there. A captured variable is not an SSA
+//! value and always lives in its home ([`super::closures`]).
 
 use cranelift_codegen::ir::{types, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -28,13 +25,10 @@ pub(super) enum Out {
     Native(Value),
     /// A whole `VmValue`, whatever the destination class.
     Boxed(Value),
-    /// A `VmValue` the emitter's helper already wrote to the destination's
-    /// home.
-    Landed(Value),
 }
 
-/// Put `out` where `dest` lives: a heap destination in its home, a scalar in
-/// the CLIF map. A result nobody reads (`dest` is `None`) is dropped.
+/// Define `dest` from `out`, converted to the destination's class. A result
+/// nobody reads (`dest` is `None`) is dropped.
 pub(super) fn land(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -46,35 +40,23 @@ pub(super) fn land(
         return Ok(());
     };
     let kind = ctx.ssa.value_ty(d);
-    if is_heap(kind) {
-        return match out {
-            Out::Native(v) | Out::Boxed(v) => def_heap(b, ctx, ctx.ssa.reg(d), v),
-            Out::Landed(_) => Ok(()),
-        };
-    }
     let native = match out {
         Out::Native(v) => v,
-        Out::Boxed(v) | Out::Landed(v) => heap::unbox_dest(b, kind, v)?,
+        Out::Boxed(v) if is_heap(kind) => v,
+        Out::Boxed(v) => heap::unbox_dest(b, kind, v)?,
     };
-    define_scalar(b, ctx, values, d, native);
+    define(b, ctx, values, d, native);
     Ok(())
 }
 
-/// Whether an SSA value is stored in a home rather than a CLIF register.
+/// Whether an SSA value is a boxed `VmValue` the collector must see.
 pub(super) fn is_heap(kind: SlotKind) -> bool {
     matches!(kind, SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic)
 }
 
-fn get(values: &[Option<Value>], v: u32) -> Result<Value, String> {
-    values
-        .get(v as usize)
-        .copied()
-        .flatten()
-        .ok_or_else(|| format!("from_ssa: value {v} used before definition"))
-}
-
-/// Define scalar value `v`: in its carried variable, or the CLIF map.
-pub(super) fn define_scalar(
+/// Define value `v`: in its carried variable, or the CLIF map. A heap value
+/// becomes a GC root for every call it lives across.
+pub(super) fn define(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &mut [Option<Value>],
@@ -83,25 +65,30 @@ pub(super) fn define_scalar(
 ) {
     match ctx.carried.get(&v) {
         Some(var) => b.def_var(*var, x),
-        None => values[v as usize] = Some(x),
+        None => {
+            if is_heap(ctx.ssa.value_ty(v)) {
+                b.declare_value_needs_stack_map(x);
+            }
+            values[v as usize] = Some(x);
+        }
     }
 }
 
-/// Read a value: scalars from the CLIF map, heap values from their home.
+/// Read value `v` in its class's native representation.
 pub(super) fn load_value(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &[Option<Value>],
     v: u32,
 ) -> Result<Value, String> {
-    let kind = ctx.ssa.value_ty(v);
-    if is_heap(kind) {
-        load_home_value(b, ctx, ctx.ssa.reg(v), kind)
-    } else if let Some(var) = ctx.carried.get(&v) {
-        Ok(b.use_var(*var))
-    } else {
-        get(values, v)
+    if let Some(var) = ctx.carried.get(&v) {
+        return Ok(b.use_var(*var));
     }
+    values
+        .get(v as usize)
+        .copied()
+        .flatten()
+        .ok_or_else(|| format!("from_ssa: value {v} used before definition"))
 }
 
 /// Read `reg`'s home and unbox it into `kind`'s native representation.
@@ -111,8 +98,12 @@ pub(super) fn load_home_value(
     reg: u32,
     kind: SlotKind,
 ) -> Result<Value, String> {
-    let boxed = use_heap(b, ctx, reg)?;
-    heap::unbox_dest(b, kind, boxed)
+    let boxed = home_load(b, ctx, reg)?;
+    if is_heap(kind) {
+        Ok(boxed)
+    } else {
+        heap::unbox_dest(b, kind, boxed)
+    }
 }
 
 /// Inline access to this activation's homes.
@@ -120,7 +111,7 @@ fn homes<'a>(ctx: &'a Ctx<'_>) -> Result<super::super::homes::Homes<'a>, String>
     let frame = ctx
         .frame
         .as_ref()
-        .ok_or("from_ssa: heap value without a frame")?;
+        .ok_or("from_ssa: home access without a frame")?;
     Ok(super::super::homes::Homes {
         exec_ctx: frame.exec_ctx,
         base: frame.base,
@@ -143,10 +134,9 @@ pub(super) fn drop_home_addrs(ctx: &Ctx<'_>) {
 /// Machine address of `reg`'s home, memoized within the current block: the
 /// FrameStore vectors only reallocate when a frame is pushed (a real call),
 /// so between may-push points the same address Value serves every access
-/// and Cranelift folds what recomputation kept separate. Keyed by register,
-/// not value: a register's home never moves under a value that lives in it.
-/// The driver clears the map at each block (cross-block reuse would need a
-/// dominance proof) and after any instruction that may push a frame (see
+/// and Cranelift folds what recomputation kept separate. The driver clears
+/// the map at each block (cross-block reuse would need a dominance proof)
+/// and after any instruction that may push a frame (see
 /// [`super::may_push_frame`]).
 fn home_addr(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, String> {
     if let Some(&a) = ctx.home_addrs.borrow().get(&reg) {
@@ -157,8 +147,8 @@ fn home_addr(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, 
     Ok(a)
 }
 
-/// Write a boxed heap value to `reg`'s home (the GC root).
-pub(super) fn def_heap(
+/// Write a boxed value to `reg`'s home, where the interpreter reads it.
+pub(super) fn home_store(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     reg: u32,
@@ -170,8 +160,8 @@ pub(super) fn def_heap(
     Ok(())
 }
 
-/// Read a boxed heap value back from `reg`'s home.
-pub(super) fn use_heap(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, String> {
+/// Read a boxed value from `reg`'s home, where the interpreter left it.
+pub(super) fn home_load(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, String> {
     let h = homes(ctx)?;
     let addr = home_addr(b, ctx, reg)?;
     Ok(h.load_at(b, addr, reg as usize))

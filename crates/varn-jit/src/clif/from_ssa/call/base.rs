@@ -126,7 +126,7 @@ pub(crate) fn emit_self_call_framed(
     if args.len() + 1 != ctx.proto.arity {
         return Err("from_ssa: self-call arity mismatch".into());
     }
-    let receiver = super::super::use_heap(b, ctx, 0)?;
+    let receiver = super::super::home_load(b, ctx, 0)?;
     let window = boxed_window(b, ctx, values, receiver, args)?;
     let argc = b.ins().iconst(types::I64, (args.len() + 1) as i64);
     let out = entry_out_slot(b);

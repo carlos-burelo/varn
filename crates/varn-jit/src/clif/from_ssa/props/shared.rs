@@ -1,11 +1,11 @@
 use cranelift_codegen::ir::Value;
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::store::use_heap;
+use super::super::store::home_load;
 use super::super::Ctx;
 
 pub(crate) fn emit_this(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<Value, String> {
-    use_heap(b, ctx, 0)
+    home_load(b, ctx, 0)
 }
 
 pub(crate) fn str_idx(ctx: &Ctx<'_>, s: &str) -> Result<usize, String> {

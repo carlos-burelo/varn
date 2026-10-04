@@ -168,3 +168,18 @@ pub(super) fn loop_body(
     }
     body
 }
+
+/// The block defining each value: a block parameter's block, or the block of
+/// the instruction producing it.
+pub(super) fn def_blocks(ssa: &SsaProto) -> Vec<Option<usize>> {
+    let mut def = vec![None; ssa.values.len()];
+    for (b, blk) in ssa.blocks.iter().enumerate() {
+        for &p in &blk.params {
+            def[p as usize] = Some(b);
+        }
+        for d in blk.insts.iter().filter_map(|i| i.dest) {
+            def[d as usize] = Some(b);
+        }
+    }
+    def
+}

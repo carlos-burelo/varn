@@ -3,16 +3,16 @@
 //!
 //! Each arm mirrors the interpreter's own helper (same `jit_*` entry the
 //! bytecode lowering calls), so there is one runtime per fact (Ley 6). Ops
-//! that can suspend (`Await`/`Yield`/`LoadModule`) spill every defined scalar
-//! to its home first — the interpreter resumes from homes — then trap, since
-//! the suspend helper never returns to compiled code.
+//! that can suspend (`Await`/`Yield`/`LoadModule`) spill the values live at
+//! the resume point to their homes first — the interpreter resumes from
+//! homes — then trap, since the suspend helper never returns to compiled code.
 
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::{SsaObjectSpreadPart, SsaOp, SsaSpread};
 
 use super::heap::{boxed_value, exec_ctx};
-use super::store::{def_heap, use_heap, Out};
+use super::store::{home_load, home_store, Out};
 use super::{load_value, Ctx};
 
 use super::super::emit::{call_helper, call_helper_void};
@@ -89,8 +89,6 @@ pub(super) fn try_emit(
             let (at, ap) = b.ins().isplit(a);
             let (ct, cp) = b.ins().isplit(c);
             call_helper_void(b, ctx.cc, h.object_merge, &[ectx, at, ap, ct, cp]);
-            let r = native(b);
-            def_heap(b, ctx, ctx.ssa.reg(*target), r)?;
             Ok(Some(None))
         }
         SsaOp::ObjectRest { object, skip_keys } => {
@@ -256,9 +254,13 @@ pub(super) fn try_emit(
             );
             Ok(Some(Some(Out::Boxed(native(b)))))
         }
-        SsaOp::LoadModule { source, own_ip } => {
+        SsaOp::LoadModule {
+            source,
+            own_ip,
+            live,
+        } => {
             let f = frame()?;
-            spill_all(b, ctx, values)?;
+            spill(b, ctx, values, live)?;
             let idx = super::props::str_idx(ctx, source)? as i64;
             let siv = b.ins().iconst(types::I64, idx);
             let oiv = b.ins().iconst(types::I64, i64::from(*own_ip));
@@ -279,9 +281,13 @@ pub(super) fn try_emit(
             call_helper_void(b, ctx.cc, h.store_module_slot, &[ectx, siv, t, p]);
             Ok(Some(None))
         }
-        SsaOp::Await { operand, resume_ip } => {
+        SsaOp::Await {
+            operand,
+            resume_ip,
+            live,
+        } => {
             let d = dest.ok_or("from_ssa: await without dest")?;
-            spill_all(b, ctx, values)?;
+            spill(b, ctx, values, live)?;
             let v = boxed_value(b, ctx, values, *operand)?;
             let (t, p) = b.ins().isplit(v);
             let dv = b.ins().iconst(types::I64, i64::from(ctx.ssa.reg(d)));
@@ -299,9 +305,13 @@ pub(super) fn try_emit(
             call_helper_void(b, ctx.cc, h.spawn, &[ectx, t, p]);
             Ok(Some(Some(Out::Boxed(native(b)))))
         }
-        SsaOp::Yield { operand, resume_ip } => {
+        SsaOp::Yield {
+            operand,
+            resume_ip,
+            live,
+        } => {
             let d = dest.ok_or("from_ssa: yield without dest")?;
-            spill_all(b, ctx, values)?;
+            spill(b, ctx, values, live)?;
             let v = boxed_value(b, ctx, values, *operand)?;
             let (t, p) = b.ins().isplit(v);
             let dv = b.ins().iconst(types::I64, i64::from(ctx.ssa.reg(d)));
@@ -317,7 +327,7 @@ pub(super) fn try_emit(
                 .ssa
                 .captured_reg(*var)
                 .ok_or("from_ssa: dispose unknown var")?;
-            let recv = use_heap(b, ctx, reg)?;
+            let recv = home_load(b, ctx, reg)?;
             let name = if *is_await { "disposeAsync" } else { "dispose" };
             let niv = b
                 .ins()
@@ -348,7 +358,7 @@ fn emit_super_call(
     ctor: Value,
     args: &[u32],
 ) -> Result<Value, String> {
-    let this = use_heap(b, ctx, 0)?;
+    let this = home_load(b, ctx, 0)?;
     let mut vals = Vec::with_capacity(args.len() + 1);
     vals.push(this);
     for a in args {
@@ -518,17 +528,15 @@ fn emit_object_spread(
     Ok(fresh(b))
 }
 
-/// Every defined scalar to its home, so a suspending helper's interpreter
-/// resume reads the same registers compiled code held natively.
-fn spill_all(
+/// The values the interpreter reads on resume to their homes. One not yet
+/// defined here — the suspending instruction's own result — is skipped.
+fn spill(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &[Option<Value>],
+    live: &[u32],
 ) -> Result<(), String> {
-    for v in 0..ctx.ssa.values.len() as u32 {
-        if super::store::is_heap(ctx.ssa.value_ty(v)) {
-            continue;
-        }
+    for &v in live {
         let Ok(x) = load_value(b, ctx, values, v) else {
             continue;
         };
@@ -536,9 +544,11 @@ fn spill_all(
             varn_types::register_meta::SlotKind::Int => super::super::emit::box_int(b, x),
             varn_types::register_meta::SlotKind::Float => super::super::emit::box_f64(b, x),
             varn_types::register_meta::SlotKind::Bool => super::super::emit::box_bool(b, x),
-            _ => continue,
+            varn_types::register_meta::SlotKind::Str
+            | varn_types::register_meta::SlotKind::Ref
+            | varn_types::register_meta::SlotKind::Dynamic => x,
         };
-        def_heap(b, ctx, ctx.ssa.reg(v), boxed)?;
+        home_store(b, ctx, ctx.ssa.reg(v), boxed)?;
     }
     Ok(())
 }

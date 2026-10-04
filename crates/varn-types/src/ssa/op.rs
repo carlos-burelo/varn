@@ -468,9 +468,11 @@ pub enum SsaOp {
     /// `import source`; a heap module-namespace result (may suspend).
     /// `own_ip` is the bytecode offset of the emitting instruction: a suspend
     /// rewinds the frame to re-execute the load once the import resolves.
+    /// `live` is what the interpreter reads from the homes when it resumes.
     LoadModule {
         source: Box<str>,
         own_ip: u32,
+        live: Vec<u32>,
     },
 
     /// `module[slot]` namespace read; a heap result.
@@ -487,9 +489,11 @@ pub enum SsaOp {
 
     /// `await operand`; its value (may suspend, resumes interpreted at
     /// `resume_ip`, the bytecode offset of the next instruction).
+    /// `live` is what the interpreter reads from the homes when it resumes.
     Await {
         operand: u32,
         resume_ip: u32,
+        live: Vec<u32>,
     },
 
     /// `spawn operand`; a heap task handle (never suspends the caller).
@@ -499,9 +503,11 @@ pub enum SsaOp {
 
     /// `yield operand`; its value (suspends, resumes interpreted at
     /// `resume_ip`, the bytecode offset of the next instruction).
+    /// `live` is what the interpreter reads from the homes when it resumes.
     Yield {
         operand: u32,
         resume_ip: u32,
+        live: Vec<u32>,
     },
 
     /// `using`/`await using` disposal of captured variable `var`; no result.

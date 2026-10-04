@@ -83,7 +83,7 @@ mod store;
 mod term;
 mod views;
 
-use store::{clif_ty, def_heap, drop_home_addrs, is_heap, land, load_value, use_heap, Out};
+use store::{clif_ty, drop_home_addrs, home_load, home_store, is_heap, land, load_value, Out};
 
 /// Frame resources a frame-aware body needs for global access, calls and home
 /// storage. `base` is the activation id (raw ABI param 2).
@@ -358,16 +358,7 @@ pub(super) fn try_lower(
             // `param_kinds` entry as its native value, anything else only in
             // the home of register `1 + k` (see `heap_params`).
             let pv = if is_call_entry && !scalar(proto.param_kinds[k]) {
-                let arg_reg = 1 + k as u32;
-                if is_heap(kind) {
-                    if ssa.reg(p) != arg_reg {
-                        let boxed = use_heap(&mut b, &ctx, arg_reg)?;
-                        def_heap(&mut b, &ctx, ssa.reg(p), boxed)?;
-                    }
-                    continue;
-                }
-                let boxed = use_heap(&mut b, &ctx, arg_reg)?;
-                heap::unbox_dest(&mut b, kind, boxed)?
+                store::load_home_value(&mut b, &ctx, 1 + k as u32, kind)?
             } else if is_call_entry && proto.param_kinds[k] != kind {
                 return Err(format!(
                     "from_ssa: parameter {k} is {kind:?} in the SSA but {:?} in the ABI",
@@ -376,11 +367,7 @@ pub(super) fn try_lower(
             } else {
                 pv
             };
-            if is_heap(kind) {
-                def_heap(&mut b, &ctx, ssa.reg(p), pv)?;
-            } else {
-                store::define_scalar(&mut b, &ctx, &mut values, p, pv);
-            }
+            store::define(&mut b, &ctx, &mut values, p, pv);
         }
 
         for inst in &blk.insts {
