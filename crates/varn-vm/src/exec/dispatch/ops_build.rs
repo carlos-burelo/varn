@@ -54,7 +54,7 @@ impl ExecCtx {
                         .unbox_into_reg(base, dest, self.heap.alloc_empty_map_vm())?;
                     return Ok(Some(ObjectFlow::ContinueInstruction));
                 }
-                let mut map = varn_types::value::ValueMap::with_capacity(count as usize);
+                let mut map = varn_types::value::ValueMap::with_capacity(count);
                 for i in 0..count {
                     let k_nv = self.stack.box_reg(base, start_reg + i * 2);
                     let v_nv = self.stack.box_reg(base, start_reg + i * 2 + 1);
