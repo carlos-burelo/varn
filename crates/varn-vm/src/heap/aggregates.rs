@@ -5,7 +5,7 @@ use super::obj::HeapObj;
 use super::structs::HeapInner;
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::{value::ObjRef, VmArray};
+use varn_types::VmArray;
 
 impl HeapInner {
     pub(crate) fn alloc_array_vm(&mut self, items: Vec<VmValue>) -> VmValue {
@@ -24,8 +24,7 @@ impl HeapInner {
     }
 
     pub(crate) fn alloc_object(&mut self) -> VmValue {
-        let oref = ObjRef::empty();
-        VmValue::from_heap(self.alloc(HeapObj::Object(oref)))
+        self.alloc_object_cell(false, varn_types::root_shape(), 0, &[])
     }
 
     pub(crate) fn alloc_object_with_shape(
@@ -43,8 +42,7 @@ impl HeapInner {
         shape: &Rc<varn_types::Shape>,
         values: &[VmValue],
     ) -> VmValue {
-        let oref = ObjRef::with_shape_slice(Rc::clone(shape), values);
-        VmValue::from_heap(self.alloc(HeapObj::Object(oref)))
+        self.alloc_object_cell(false, Rc::clone(shape), values.len(), values)
     }
 
     pub(crate) fn alloc_record_with_shape_slice(
@@ -52,8 +50,7 @@ impl HeapInner {
         shape: &Rc<varn_types::Shape>,
         values: &[VmValue],
     ) -> VmValue {
-        let oref = ObjRef::with_shape_slice(Rc::clone(shape), values);
-        VmValue::from_heap(self.alloc(HeapObj::Record(oref)))
+        self.alloc_object_cell(true, Rc::clone(shape), values.len(), values)
     }
 
     pub(crate) fn alloc_empty_map_vm(&mut self) -> VmValue {

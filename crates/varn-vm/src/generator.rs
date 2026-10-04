@@ -7,11 +7,10 @@ use crate::exec::{ExecCtx, VmSuspend};
 use crate::value::VmValue;
 
 fn make_iter_result(heap: &mut crate::heap::Heap, value: VmValue, done: bool) -> VmValue {
-    let obj = varn_types::value::ObjRef::from_pairs([
+    heap.alloc_object_pairs([
         (Arc::from("value"), value),
         (Arc::from("done"), VmValue::from_bool(done)),
-    ]);
-    VmValue::from_heap(heap.alloc(crate::heap::HeapObj::Object(obj)))
+    ])
 }
 
 struct NanGenInner {

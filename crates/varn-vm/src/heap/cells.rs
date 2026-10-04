@@ -6,7 +6,8 @@
 use super::obj::HeapObj;
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::ptr::NonNull;
-use varn_types::value::{InstanceData, InstanceRef};
+use std::rc::Rc;
+use varn_types::value::{InstanceData, InstanceRef, ObjData, Shape};
 use varn_types::HeapRef;
 
 pub(crate) const HEADER_BYTES: usize = std::mem::size_of::<ObjHeader>();
@@ -211,6 +212,40 @@ impl CellSpace {
         (r, inst)
     }
 
+    /// A property object (`record` for a record) whose fields live in the
+    /// same cell, right after the `HeapObj` that names it.
+    #[inline]
+    pub(crate) fn alloc_object(
+        &mut self,
+        record: bool,
+        shape: Rc<Shape>,
+        n: usize,
+        values: &[varn_types::VmValue],
+        state: SlotState,
+    ) -> HeapRef {
+        let tail = std::mem::size_of::<HeapObj>();
+        let r = self.take_cell(tail + ObjData::bytes_for(n), 0, state);
+        let obj = unsafe { ObjData::init_at(body::<u8>(r).add(tail), shape, n, values) };
+        Self::place(
+            r,
+            if record {
+                HeapObj::Record(obj)
+            } else {
+                HeapObj::Object(obj)
+            },
+        );
+        r
+    }
+
+    /// Drops the object in `r` and what its cell owns beyond it.
+    unsafe fn drop_object(r: HeapRef) {
+        let obj = body::<HeapObj>(r);
+        if let HeapObj::Object(o) | HeapObj::Record(o) = &*obj {
+            ObjData::drop_at(*o);
+        }
+        std::ptr::drop_in_place(obj);
+    }
+
     #[inline(always)]
     fn place(r: HeapRef, obj: HeapObj) {
         header(r).kind = unsafe { *(&obj as *const HeapObj as *const u8) };
@@ -286,7 +321,7 @@ impl CellSpace {
     pub(crate) fn release(&mut self, r: HeapRef) {
         let h = header(r);
         let class = h.class;
-        unsafe { std::ptr::drop_in_place(body::<HeapObj>(r)) };
+        unsafe { Self::drop_object(r) };
         h.state = SlotState::Free as u8;
         self.live -= 1;
         if class == LARGE {
@@ -377,7 +412,7 @@ impl Drop for CellSpace {
     fn drop(&mut self) {
         let live: Vec<HeapRef> = self.refs().collect();
         for r in live {
-            unsafe { std::ptr::drop_in_place(body::<HeapObj>(r)) };
+            unsafe { Self::drop_object(r) };
         }
         for class in &self.classes {
             for block in &class.blocks {

@@ -2,7 +2,6 @@ use super::obj::HeapObj;
 use super::structs::{Heap, HeapInner};
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::value::ObjRef;
 
 /// Prefijo control del `RcBox` (`strong` + `weak`): el `Rc` guarda el puntero
 /// control y `Rc::as_ptr` deriva el valor como control+16. Supuesto
@@ -136,23 +135,27 @@ impl Heap {
         let shape = varn_types::Shape::create(None, rustc_hash::FxHashMap::default());
         let shape_id = shape.id;
         // Both words carry the sentinel, so the tripwire below lands on the
-        // tail whichever half it reads first.
-        let oref = ObjRef::with_shape(
-            Rc::clone(&shape),
-            vec![VmValue::from_raw_parts(SENTINEL_FIELD, SENTINEL_FIELD); TAIL],
-        );
-
-        let rcbox = Rc::as_ptr(&oref.0) as *const u8 as usize - RCBOX_PREFIX;
+        // tail whichever half it reads first. The object is laid out in a
+        // local buffer the way a heap cell lays one out after its HeapObj.
+        let mut probe = vec![0u64; varn_types::ObjData::bytes_for(TAIL) / 8];
+        let oref = unsafe {
+            varn_types::ObjData::init_at(
+                probe.as_mut_ptr() as *mut u8,
+                Rc::clone(&shape),
+                TAIL,
+                &[VmValue::from_raw_parts(SENTINEL_FIELD, SENTINEL_FIELD); TAIL],
+            )
+        };
+        let data = probe.as_ptr() as usize;
         let shape_ptr = Rc::as_ptr(&shape) as *const u8 as usize - RCBOX_PREFIX;
 
-        // Derivado, no escaneado: el slot guarda el puntero CONTROL del `Rc`
-        // (`Rc::as_ptr` deriva el valor como control+16), así que el frame es
-        // rcbox-relativo: prefijo control + offset propio (`OBJ_*`,
-        // `SHAPE_ID_OFF`). Tripwires sobre un valor real.
-        let values_off = RCBOX_PREFIX + varn_types::OBJ_VALUES_OFF;
-        let shape_off = RCBOX_PREFIX + varn_types::OBJ_SHAPE_OFF;
-        let len_off = RCBOX_PREFIX + varn_types::OBJ_INLINE_LEN_OFF;
-        let block = unsafe { std::slice::from_raw_parts(rcbox as *const u8, 80) };
+        // Derivado, no escaneado: offsets propios (`OBJ_*`) desde el ObjData;
+        // la forma sigue siendo un `Rc`, así que su id se alcanza desde el
+        // puntero control. Tripwires sobre un valor real.
+        let values_off = varn_types::OBJ_VALUES_OFF;
+        let shape_off = varn_types::OBJ_SHAPE_OFF;
+        let len_off = varn_types::OBJ_INLINE_LEN_OFF;
+        let block = unsafe { std::slice::from_raw_parts(data as *const u8, 64) };
         let word_at =
             |off: usize| -> u64 { u64::from_ne_bytes(block[off..off + 8].try_into().unwrap()) };
         assert_eq!(
@@ -177,14 +180,15 @@ impl Heap {
             "shape id offset does not resolve to Shape.id"
         );
 
-        let slot: Option<HeapObj> = Some(HeapObj::Object(oref.clone()));
+        let slot: Option<HeapObj> = Some(HeapObj::Object(oref));
         let size = std::mem::size_of::<Option<HeapObj>>();
         let bytes = unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
         let object_tag = bytes[0] as usize;
         let payload_off = (0..=size - 8)
-            .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == rcbox)
+            .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == data)
             .expect("object payload probe failed")
             + super::cells::HEADER_BYTES;
+        unsafe { varn_types::ObjData::drop_at(oref) };
 
         let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
         assert_ne!(object_tag, none_tag, "Option<HeapObj> niche probe failed");
@@ -252,9 +256,9 @@ mod tests {
         assert!(a.elems_len_off >= ArrayRepr::ELEMS_UNION_OFF);
         assert_ne!(a.elems_ptr_off, a.elems_len_off);
         let o = Heap::jit_object_layout();
-        assert_eq!(o.values_off, RCBOX_PREFIX + varn_types::OBJ_VALUES_OFF);
-        assert_eq!(o.shape_off, RCBOX_PREFIX + varn_types::OBJ_SHAPE_OFF);
-        assert_eq!(o.len_off, RCBOX_PREFIX + varn_types::OBJ_INLINE_LEN_OFF);
+        assert_eq!(o.values_off, varn_types::OBJ_VALUES_OFF);
+        assert_eq!(o.shape_off, varn_types::OBJ_SHAPE_OFF);
+        assert_eq!(o.len_off, varn_types::OBJ_INLINE_LEN_OFF);
         assert_eq!(o.shape_id_off, RCBOX_PREFIX + varn_types::SHAPE_ID_OFF);
         assert_eq!(o.instance_values_off, varn_types::INST_PAYLOAD_OFF);
         assert_eq!(o.instance_class_id_off, varn_types::INST_CLASS_ID_OFF);

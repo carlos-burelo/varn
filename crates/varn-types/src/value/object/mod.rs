@@ -1,14 +1,13 @@
 use super::shape::{root_shape, Shape};
-use super::{ClassObj, RuntimeString};
+use super::{ObjRef, RuntimeString};
 use crate::vm_value::VmValue;
 use std::cell::{Cell, UnsafeCell};
-use std::mem::MaybeUninit;
 use std::ptr;
 use std::rc::Rc;
 use std::sync::Arc;
 
-/// A property object, stored as a single allocation: the header and the
-/// object's fields share one `Rc` block, with the fields as a DST tail sized
+/// A property object, stored in one heap cell: the header and the object's
+/// fields share the cell, with the fields as a DST tail sized
 /// to the shape the object was built with (V8's in-object slots).
 ///
 /// Fields added *after* construction — the object grew past its original
@@ -63,74 +62,45 @@ const _: () = {
 };
 
 impl ObjData {
-    /// Allocates an object with `n` inline field slots, all null.
+    /// Bytes an object with `n` inline field slots occupies, header included.
+    pub const fn bytes_for(n: usize) -> usize {
+        (HEADER_WORDS + n * WORDS_PER_VALUE) * size_of::<u64>()
+    }
+
+    /// Lays out an object at `at` with `n` inline slots: the first
+    /// `values.len()` hold `values`, the rest `null`.
     ///
-    /// The only unsafe construction in the object model. `Rc` cannot be handed
-    /// a runtime-sized DST directly, so we allocate a `u64` slice whose block
-    /// is byte-identical to `RcBox<ObjData<[Cell<VmValue>; n]>>` — header
-    /// (24 bytes) plus `n` slots of [`WORDS_PER_VALUE`] words each — and
-    /// re-point the fat pointer at it. The static asserts above are what make
-    /// "byte-identical" true; `Rc`'s own drop then deallocates with
-    /// `Layout::for_value`, which recomputes exactly this size from the tail
-    /// length.
-    pub fn alloc(shape: Rc<Shape>, n: usize) -> Rc<ObjData> {
-        let backing: Rc<[MaybeUninit<u64>]> =
-            Rc::new_uninit_slice(HEADER_WORDS + n * WORDS_PER_VALUE);
-        let base = Rc::into_raw(backing) as *const MaybeUninit<u64> as *mut Cell<VmValue>;
-        let data = ptr::slice_from_raw_parts_mut(base, n) as *mut ObjData;
-
-        unsafe {
-            ptr::write(ptr::addr_of_mut!((*data).shape), UnsafeCell::new(shape));
-            ptr::write(ptr::addr_of_mut!((*data).inline_len), n as u32);
-            ptr::write(ptr::addr_of_mut!((*data)._pad), 0);
-            ptr::write(ptr::addr_of_mut!((*data).overflow), UnsafeCell::new(None));
-
-            let vals = ptr::addr_of_mut!((*data).values) as *mut Cell<VmValue>;
-            if n > 0 {
-                // VmValue::null() is bitwise identical to all-zeros (tag: 0, payload: 0).
-                ptr::write_bytes(vals, 0, n);
-            }
-
-            Rc::from_raw(data as *const ObjData)
-        }
-    }
-
-    /// Empty object on the root shape. Every field it later receives overflows.
-    pub fn new() -> Rc<ObjData> {
-        Self::alloc(root_shape(), 0)
-    }
-
-    /// Instance of `class`: the tail is sized to the class's declared fields,
-    /// so a constructor's writes all land inline. This is the path the object
-    /// allocation benchmark exercises.
-    pub fn new_instance(class: &ClassObj) -> Rc<ObjData> {
-        let (shape, n) = class.instance_shape();
-        Self::alloc(shape, n)
-    }
-
-    /// Object literal with a statically known shape: one allocation, fields
-    /// copied straight into the tail.
-    pub fn with_shape(shape: Rc<Shape>, values: Vec<VmValue>) -> Rc<ObjData> {
-        Self::with_shape_slice(shape, &values)
-    }
-
-    /// As [`Self::with_shape`], for callers that already hold the values in a
-    /// buffer they own. The `Vec` form copies into the object's inline storage
-    /// and then drops the `Vec`, so building one just to pass it here is a
-    /// whole allocation with no purpose — which is what `JSON.parse` was doing
-    /// once per object.
-    pub fn with_shape_slice(shape: Rc<Shape>, values: &[VmValue]) -> Rc<ObjData> {
-        let obj = Self::alloc(shape, values.len());
+    /// # Safety
+    /// `at` must be 8-aligned, point to [`Self::bytes_for`]`(n)` writable
+    /// bytes, and outlive every use of the returned reference: the heap cell
+    /// that holds the object owns that memory and runs [`Self::drop_at`].
+    pub unsafe fn init_at(at: *mut u8, shape: Rc<Shape>, n: usize, values: &[VmValue]) -> ObjRef {
+        debug_assert!(values.len() <= n);
+        let data = ptr::slice_from_raw_parts_mut(at as *mut Cell<VmValue>, n) as *mut ObjData;
+        ptr::write(ptr::addr_of_mut!((*data).shape), UnsafeCell::new(shape));
+        ptr::write(ptr::addr_of_mut!((*data).inline_len), n as u32);
+        ptr::write(ptr::addr_of_mut!((*data)._pad), 0);
+        ptr::write(ptr::addr_of_mut!((*data).overflow), UnsafeCell::new(None));
+        let vals = ptr::addr_of_mut!((*data).values) as *mut Cell<VmValue>;
+        ptr::write_bytes(vals, 0, n);
         for (i, v) in values.iter().enumerate() {
-            obj.values[i].set(*v);
+            (*vals.add(i)).set(*v);
         }
-        obj
+        ObjRef(ptr::NonNull::new_unchecked(data))
     }
 
-    /// Builds from key/value pairs, deriving the shape first so the whole
-    /// object still fits in one allocation. Later duplicate keys overwrite
-    /// earlier ones, as in an object literal.
-    pub fn from_pairs<I>(pairs: I) -> Rc<ObjData>
+    /// Releases what an object owns outside its cell: its shape and its
+    /// overflow store.
+    ///
+    /// # Safety
+    /// `obj` must have come from [`Self::init_at`] and never be used again.
+    pub unsafe fn drop_at(obj: ObjRef) {
+        ptr::drop_in_place(obj.0.as_ptr());
+    }
+
+    /// The shape and values an object literal with these key/value pairs has.
+    /// Later duplicate keys overwrite earlier ones, as in an object literal.
+    pub fn pairs_layout<I>(pairs: I) -> (Rc<Shape>, Vec<VmValue>)
     where
         I: IntoIterator<Item = (RuntimeString, VmValue)>,
     {
@@ -145,7 +115,7 @@ impl ObjData {
                 }
             }
         }
-        Self::with_shape(shape, values)
+        (shape, values)
     }
 }
 

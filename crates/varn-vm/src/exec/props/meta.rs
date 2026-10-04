@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use varn_core::{MemberKey, RuntimeKind};
-use varn_types::value::{ClassObj, ObjRef};
+use varn_types::value::ClassObj;
 use varn_types::NativeCtx;
 
 use super::get_class;
@@ -63,8 +63,7 @@ pub(crate) fn type_name(obj: VmValue, heap: &Heap) -> String {
 }
 
 fn snapshot_object(heap: &mut Heap, pairs: Vec<(Arc<str>, VmValue)>) -> VmValue {
-    let obj = ObjRef::from_pairs(pairs);
-    VmValue::from_heap(heap.alloc(HeapObj::Object(obj)))
+    heap.alloc_object_pairs(pairs)
 }
 
 fn instance_snapshot(obj: VmValue, cls: &ClassObj, heap: &mut Heap) -> VmValue {

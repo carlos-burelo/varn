@@ -81,7 +81,7 @@ impl ExecCtx {
                         format!("fn:{:p}", std::rc::Rc::as_ptr(&c.proto))
                     }
                     HeapObj::Object(ref oref) => {
-                        format!("obj:{:p}", std::rc::Rc::as_ptr(&oref.0))
+                        format!("obj:{:p}", oref.read() as *const _ as *const u8)
                     }
                     _ => format!("heap:{:x}", v.as_heap().addr()),
                 }

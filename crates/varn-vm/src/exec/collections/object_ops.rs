@@ -4,7 +4,7 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
         let maybe_obj = match heap.get(heap_idx) {
-            Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(o.clone()),
+            Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(*o),
             _ => None,
         };
         if let Some(o) = maybe_obj {
@@ -31,8 +31,8 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
         let maybe_obj = match heap.get(heap_idx) {
-            Some(HeapObj::Object(o)) => Some((false, o.clone())),
-            Some(HeapObj::Record(o)) => Some((true, o.clone())),
+            Some(HeapObj::Object(o)) => Some((false, *o)),
+            Some(HeapObj::Record(o)) => Some((true, *o)),
             _ => None,
         };
         if let Some((is_record, o)) = maybe_obj {
@@ -41,13 +41,8 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
                 .iter()
                 .filter(|(k, _)| !exclude.iter().any(|e| e.as_str() == k.as_ref()))
                 .collect();
-            let oref = ObjRef::from_pairs(kept);
-            let result_obj = if is_record {
-                HeapObj::Record(oref)
-            } else {
-                HeapObj::Object(oref)
-            };
-            return Ok(VmValue::from_heap(heap.alloc(result_obj)));
+            let (shape, values) = varn_types::value::ObjData::pairs_layout(kept);
+            return Ok(heap.alloc_object_cell(is_record, shape, values.len(), &values));
         }
         let maybe_map = match heap.get(heap_idx) {
             Some(HeapObj::Map(m)) => Some(m.clone()),
@@ -74,7 +69,7 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
         return Ok(target);
     }
     let target_obj = match heap.get(target.as_heap()) {
-        Some(HeapObj::Object(o)) => o.clone(),
+        Some(HeapObj::Object(o)) => *o,
         _ => return Ok(target),
     };
     // An `Instance` has no `ObjData` to iterate: its fields live in a flat

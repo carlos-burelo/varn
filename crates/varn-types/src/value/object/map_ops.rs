@@ -1,4 +1,5 @@
 use super::*;
+use crate::value::ClassObj;
 
 impl ObjData<[Cell<VmValue>]> {
     #[inline]

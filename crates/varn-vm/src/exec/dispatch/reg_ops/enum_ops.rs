@@ -80,17 +80,20 @@ impl ExecCtx {
         }
 
         let payload = if !template.fields.is_empty() {
-            let obj = varn_types::value::ObjRef::from_pairs(
-                template.fields.iter().enumerate().map(|(idx, field_name)| {
+            let fields: Vec<(varn_types::RuntimeString, VmValue)> = template
+                .fields
+                .iter()
+                .enumerate()
+                .map(|(idx, field_name)| {
                     let nv = if idx < arg_count {
                         args.get(&self.stack, idx)
                     } else {
                         VmValue::null()
                     };
                     (field_name.clone(), nv)
-                }),
-            );
-            VmValue::from_heap(self.heap.alloc(crate::heap::HeapObj::Object(obj)))
+                })
+                .collect();
+            self.heap.alloc_object_pairs(fields)
         } else if arg_count == 1 {
             args.get(&self.stack, 0)
         } else if arg_count > 1 {

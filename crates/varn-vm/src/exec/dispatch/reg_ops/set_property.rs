@@ -117,7 +117,7 @@ impl ExecCtx {
                             return Ok(false);
                         }
                         Some(crate::heap::HeapObj::Object(o)) => {
-                            let o = o.clone();
+                            let o = *o;
                             if kind == ICKind::SHAPE_TRANSITION {
                                 o.insert(Arc::from(name.as_ref()), val);
                             } else {
@@ -185,7 +185,7 @@ impl ExecCtx {
             }
 
             if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap()) {
-                let o = o.clone();
+                let o = *o;
                 if let Some(&slot) = o.shape().property_names.get(name.as_ref()) {
                     if slot < o.slot_count() {
                         let shape_id = o.shape().id;

@@ -41,7 +41,7 @@ pub(crate) fn payload_object(heap: &Heap, payload: VmValue) -> Option<ObjRef> {
         return None;
     }
     match heap.get(payload.as_heap()) {
-        Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(o.clone()),
+        Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(*o),
         _ => None,
     }
 }

@@ -250,13 +250,12 @@ pub(crate) fn prepare_call(
                 }
 
                 let payload = if !data.fields.is_empty() {
-                    let obj = varn_types::value::ObjRef::from_pairs(
-                        data.fields.iter().enumerate().map(|(idx, field_name)| {
+                    heap.alloc_object_pairs(data.fields.iter().enumerate().map(
+                        |(idx, field_name)| {
                             let nv = args.get(idx).copied().unwrap_or(VmValue::null());
                             (field_name.clone(), nv)
-                        }),
-                    );
-                    VmValue::from_heap(heap.alloc(HeapObj::Object(obj)))
+                        },
+                    ))
                 } else if args.len() == 1 {
                     args[0]
                 } else if args.len() > 1 {

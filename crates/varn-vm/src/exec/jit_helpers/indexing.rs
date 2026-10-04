@@ -156,7 +156,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
             return;
         }
         if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(heap_idx) {
-            let o = o.clone();
+            let o = *o;
             let mut buf = [0u8; 5];
             let key_str = if key.is_sso() {
                 Some(key.sso_as_str(&mut buf))

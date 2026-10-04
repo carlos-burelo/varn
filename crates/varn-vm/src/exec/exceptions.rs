@@ -123,11 +123,14 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         // el mensaje suelto sigue siendo capturable e imprimible.
         return msg;
     };
-    let oref = varn_types::value::ObjRef::instance(&cls);
-    oref.set_field(std::sync::Arc::from("message"), msg);
     let name = heap.alloc_str_dynamic(class_name);
-    oref.set_field(std::sync::Arc::from("name"), name);
-    VmValue::from_heap(heap.alloc(HeapObj::Object(oref)))
+    let (shape, n) = cls.instance_shape();
+    let err_obj = heap.alloc_object_cell(false, shape, n, &[]);
+    if let Some(HeapObj::Object(oref)) = heap.get(err_obj.as_heap()) {
+        oref.set_field(std::sync::Arc::from("message"), msg);
+        oref.set_field(std::sync::Arc::from("name"), name);
+    }
+    err_obj
 }
 
 /// Busca un handler para `thrown_val` y, si lo encuentra, deja el contexto

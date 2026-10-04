@@ -3,7 +3,6 @@
 //! lowerings.
 
 use crate::exec::ctx::ExecCtx;
-use crate::heap::HeapObj;
 use crate::value::VmValue;
 use std::sync::Arc;
 
@@ -24,10 +23,7 @@ impl ExecCtx {
         } else {
             fields_part.split(',').map(Arc::from).collect()
         };
-        let payload = VmValue::from_heap(
-            self.heap
-                .alloc(HeapObj::Object(varn_types::value::ObjRef::empty())),
-        );
+        let payload = self.heap.alloc_object();
         self.heap
             .alloc_enum_variant_vm(varn_types::value::EnumVariantData {
                 enum_class_id: None,

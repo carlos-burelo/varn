@@ -42,6 +42,36 @@ impl HeapInner {
         (r, inst)
     }
 
+    /// A new property object (`record` for a record) of `shape` with `n`
+    /// inline slots, the first `values.len()` of them filled.
+    pub(crate) fn alloc_object_cell(
+        &mut self,
+        record: bool,
+        shape: std::rc::Rc<varn_types::Shape>,
+        n: usize,
+        values: &[VmValue],
+    ) -> VmValue {
+        if let Some(h) = &self.hotspot {
+            h.borrow_mut()
+                .record_alloc(if record { "record" } else { "object" });
+        }
+        let r = self
+            .cells
+            .alloc_object(record, shape, n, values, SlotState::Young);
+        self.young.born.push(r);
+        self.young.alloc_count += 1;
+        VmValue::from_heap(r)
+    }
+
+    /// An object literal with these key/value pairs.
+    pub(crate) fn alloc_object_pairs<I>(&mut self, pairs: I) -> VmValue
+    where
+        I: IntoIterator<Item = (varn_types::RuntimeString, VmValue)>,
+    {
+        let (shape, values) = varn_types::value::ObjData::pairs_layout(pairs);
+        self.alloc_object_cell(false, shape, values.len(), &values)
+    }
+
     fn alloc_old(&mut self, obj: HeapObj) -> HeapRef {
         let track = Self::needs_minor_scan(&obj);
         let identity = Self::identity_key(&obj);
