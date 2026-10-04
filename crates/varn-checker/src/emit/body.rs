@@ -126,6 +126,7 @@ impl<'a> FnEmitter<'a> {
                     *is_async,
                     *is_generator,
                     ty,
+                    Some(e),
                     span,
                 )
             }
@@ -139,7 +140,7 @@ impl<'a> FnEmitter<'a> {
                     varn_core::ast::ArrowBody::Expr(e) => ClosureBody::Expr(*e),
                     varn_core::ast::ArrowBody::Block(s) => ClosureBody::Stmt(*s),
                 };
-                return self.lower_closure(params, cb, *is_async, false, ty, span);
+                return self.lower_closure(params, cb, *is_async, false, ty, Some(e), span);
             }
 
             ExprKind::Await { argument } => {

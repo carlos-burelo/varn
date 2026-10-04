@@ -27,6 +27,7 @@ impl<'a> FnEmitter<'a> {
                 f.modifiers.is_async,
                 f.modifiers.is_generator,
                 dyn_ty,
+                None,
                 Span::EMPTY,
             );
             return vec![TirStmt::Let {
@@ -51,6 +52,7 @@ impl<'a> FnEmitter<'a> {
                         f.modifiers.is_async,
                         f.modifiers.is_generator,
                         dyn_ty,
+                        None,
                         Span::EMPTY,
                     );
                     entries.push(varn_tir::TirObjectEntry::Field {

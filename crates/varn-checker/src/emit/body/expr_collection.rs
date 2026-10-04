@@ -102,6 +102,7 @@ impl<'a> FnEmitter<'a> {
                             *is_async,
                             *is_generator,
                             BackendTy::Dynamic(DynReason::NotYetSupported),
+                            None,
                             span,
                         );
                         entries.push(TirObjectEntry::Field {

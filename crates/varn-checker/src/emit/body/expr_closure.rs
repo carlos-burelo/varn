@@ -19,9 +19,12 @@ impl<'a> FnEmitter<'a> {
         is_async: bool,
         is_generator: bool,
         ty: BackendTy,
+        source: Option<ExprId>,
         span: Span,
     ) -> TirExpr {
         let func_id = varn_tir::FnId(self.closure_base + self.out_closures.len() as u32);
+        let (sig, param_tys, return_ty) =
+            self.closure_signature(source, params.len(), is_async || is_generator);
 
         self.out_closures.push(TirFunction {
             name: Arc::from("<closure>"),
@@ -42,8 +45,6 @@ impl<'a> FnEmitter<'a> {
             .iter()
             .map(|p| pattern_lead(&p.pattern, self.m.interner))
             .collect();
-        let param_tys = vec![BackendTy::Dynamic(DynReason::NotYetSupported); params.len()];
-
         let mut outer_names = self.outer_names.clone();
         for scope in &self.scopes {
             outer_names.extend(scope.keys().cloned());
@@ -76,9 +77,9 @@ impl<'a> FnEmitter<'a> {
 
         self.out_closures[slot] = TirFunction {
             name: Arc::from("<closure>"),
-            sig: SigId(0),
+            sig,
             params: param_tys,
-            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            return_ty,
             locals,
             body: stmts,
             has_this: false,
@@ -107,6 +108,52 @@ impl<'a> FnEmitter<'a> {
             ty,
             res: Resolution::None,
             span,
+        }
+    }
+}
+
+impl FnEmitter<'_> {
+    /// A closure's signature from its checked function type: the parameter and
+    /// return types the checker proved. A coroutine keeps a dynamic return —
+    /// what it returns is its handle, not the body's value — and a type that
+    /// is not a function of this arity leaves everything dynamic.
+    fn closure_signature(
+        &mut self,
+        source: Option<ExprId>,
+        arity: usize,
+        coroutine: bool,
+    ) -> (SigId, Vec<BackendTy>, BackendTy) {
+        let dynamic = BackendTy::Dynamic(DynReason::NotYetSupported);
+        let fn_ty = source
+            .and_then(|e| self.expr_table.get(&e.index()))
+            .map(|entry| entry.ty)
+            .filter(|t| matches!(self.m.checker_table.get(t.0), varn_core::TypeKind::Fn(_)));
+        let sig = fn_ty.map(|t| {
+            crate::emit::tables::intern_signature(
+                &t,
+                self.m.checker_table,
+                self.m.interner,
+                self.tt,
+                self.m.names,
+                self.signatures,
+            )
+        });
+        let checked = sig.and_then(|sig| {
+            self.signatures
+                .get(sig.0 as usize)
+                .filter(|s| s.params.len() == arity)
+                .map(|s| (sig, s))
+        });
+        match checked {
+            Some((sig, s)) => {
+                let ret = if coroutine {
+                    dynamic
+                } else {
+                    s.return_ty.clone()
+                };
+                (sig, s.params.clone(), ret)
+            }
+            None => (SigId(0), vec![dynamic.clone(); arity], dynamic),
         }
     }
 }
