@@ -139,7 +139,7 @@ pub(in crate::clif) fn emit_array_payload(
 ///
 /// This load DEREFERENCES `payload`, so it must be plain `trusted()` — NOT
 /// `readonly`/`can_move`. `can_move` would let the mid-end speculate the deref
-/// above the resolve's `is_arr` guard, reading `[payload + 16]` for a
+/// above the resolve's `is_arr` guard, reading `[payload + disc_off]` for a
 /// non-array receiver (bogus payload) → segfault. The element loads keyed off
 /// this discriminant use `trusted()` for the same reason.
 pub(in crate::clif) fn array_disc(
@@ -151,7 +151,7 @@ pub(in crate::clif) fn array_disc(
         types::I64,
         cranelift_codegen::ir::MemFlagsData::trusted(),
         payload,
-        (16 + lay.disc_off) as i32,
+        lay.disc_off as i32,
     )
 }
 

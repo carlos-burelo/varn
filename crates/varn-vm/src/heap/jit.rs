@@ -91,16 +91,23 @@ impl Heap {
             (ArrayRepr::DISC_OFF, ptr_off, len_off)
         };
 
-        let arr = varn_types::vm_value::VmArray::new(vec![VmValue::null()]);
-        let rcbox = Rc::as_ptr(&arr.0) as usize - RCBOX_PREFIX;
+        let mut repr_cell = std::mem::MaybeUninit::<varn_types::vm_value::ArrayRepr>::uninit();
+        let arr = unsafe {
+            varn_types::VmArray::init_at(
+                repr_cell.as_mut_ptr(),
+                varn_types::vm_value::ArrayRepr::boxed(vec![VmValue::null()]),
+            )
+        };
+        let data = repr_cell.as_ptr() as usize;
         let slot: Option<HeapObj> = Some(HeapObj::Array(arr));
         let size = std::mem::size_of::<Option<HeapObj>>();
         let bytes = unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
         let array_tag = bytes[0] as usize;
         let payload_off = (0..=size - 8)
-            .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == rcbox)
+            .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == data)
             .expect("array payload probe failed")
             + super::cells::HEADER_BYTES;
+        unsafe { arr.drop_at() };
 
         let none_slot: Option<HeapObj> = None;
         let none_tag = unsafe { *(&none_slot as *const _ as *const u8) } as usize;

@@ -63,6 +63,22 @@ impl HeapInner {
         VmValue::from_heap(r)
     }
 
+    /// A new array (`tuple` for a tuple) holding `repr`.
+    pub(crate) fn alloc_array_repr(
+        &mut self,
+        tuple: bool,
+        repr: varn_types::vm_value::ArrayRepr,
+    ) -> VmValue {
+        if let Some(h) = &self.hotspot {
+            h.borrow_mut()
+                .record_alloc(if tuple { "tuple" } else { "array" });
+        }
+        let r = self.cells.alloc_array(tuple, repr, SlotState::Young);
+        self.young.born.push(r);
+        self.young.alloc_count += 1;
+        VmValue::from_heap(r)
+    }
+
     /// An object literal with these key/value pairs.
     pub(crate) fn alloc_object_pairs<I>(&mut self, pairs: I) -> VmValue
     where

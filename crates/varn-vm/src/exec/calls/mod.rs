@@ -7,7 +7,7 @@ use crate::value::VmValue;
 
 use std::rc::Rc;
 use varn_types::value::BoundMethodTarget;
-use varn_types::{FunctionProto, Literal, PoolEntry, VmArray};
+use varn_types::{FunctionProto, Literal, PoolEntry};
 
 pub(crate) fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<VmValue> {
     proto

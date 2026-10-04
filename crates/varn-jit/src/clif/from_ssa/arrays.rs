@@ -140,10 +140,10 @@ fn resolve(
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let data = b
         .ins()
-        .load(types::I64, m, payload, (16 + lay.elems_ptr_off) as i32);
+        .load(types::I64, m, payload, lay.elems_ptr_off as i32);
     let len = b
         .ins()
-        .load(types::I64, m, payload, (16 + lay.elems_len_off) as i32);
+        .load(types::I64, m, payload, lay.elems_len_off as i32);
     let disc = array_disc(b, payload, lay);
     (data, len, disc)
 }

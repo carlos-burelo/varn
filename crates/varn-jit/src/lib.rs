@@ -68,7 +68,7 @@ pub struct JitArrayLayout {
     pub str_tag: usize,
     /// Slot base → the array payload's Rc pointer.
     pub payload_off: usize,
-    /// Byte offset, from the `ArrayRepr` base (i.e. from payload RcBox + 16),
+    /// Byte offset, from the `ArrayRepr` base (the address the payload holds),
     /// of the `#[repr(C, u8)]` discriminant. `0` in practice; the inline fast
     /// paths load this byte and take the generic helper unless it is
     /// `ArrayRepr::Boxed` (0). `ArrayRepr` now also has `I64`/`F64` and 7
@@ -78,8 +78,8 @@ pub struct JitArrayLayout {
     /// up at this offset.
     pub disc_off: usize,
     /// Byte offsets of (data ptr, len) of the element `Vec`, measured **from
-    /// the `ArrayRepr` base** (payload RcBox + 16). They already include the
-    /// discriminant tag + alignment padding, so `payload + 16 + off` lands
+    /// the `ArrayRepr` base** (the address the payload holds). They already
+    /// include the discriminant tag + alignment padding, so `payload + off` lands
     /// directly on the `Vec`'s words for the `Boxed` variant.
     pub elems_ptr_off: usize,
     pub elems_len_off: usize,

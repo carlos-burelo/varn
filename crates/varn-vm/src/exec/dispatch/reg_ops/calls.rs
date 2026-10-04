@@ -1,7 +1,6 @@
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-use varn_types::VmArray;
 
 impl ExecCtx {
     pub(crate) fn exec_call_reg(
@@ -196,10 +195,10 @@ impl ExecCtx {
                                 } else {
                                     vec![]
                                 };
-                                let rest_nv =
-                                    VmValue::from_heap(self.heap.alloc(
-                                        crate::heap::HeapObj::Array(VmArray::new(rest_items)),
-                                    ));
+                                let rest_nv = self.heap.alloc_array_repr(
+                                    false,
+                                    varn_types::vm_value::ArrayRepr::boxed(rest_items),
+                                );
                                 if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv)
                                 {
                                     failed = Some(e);
@@ -336,9 +335,9 @@ impl ExecCtx {
                     } else {
                         vec![]
                     };
-                    let rest_nv = VmValue::from_heap(
-                        self.heap
-                            .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
+                    let rest_nv = self.heap.alloc_array_repr(
+                        false,
+                        varn_types::vm_value::ArrayRepr::boxed(rest_items),
                     );
                     if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv) {
                         failed = Some(e);

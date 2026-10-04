@@ -13,16 +13,15 @@ pub(crate) fn bundle_rest_args(
             let num_to_bundle = *arg_count - rest_idx;
             let start = staging.len() - num_to_bundle;
             let items: Vec<VmValue> = staging.drain(start..).collect();
-            let va = VmArray::new(items);
-            let nv = VmValue::from_heap(heap.alloc(crate::heap::HeapObj::Array(va)));
+            let nv = heap.alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(items));
             staging.push(nv);
             *arg_count = rest_idx + 1;
         } else {
             for _ in *arg_count..rest_idx {
                 staging.push(VmValue::null());
             }
-            let aref = VmArray::new(vec![]);
-            let nv = VmValue::from_heap(heap.alloc(crate::heap::HeapObj::Array(aref)));
+            let nv =
+                heap.alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(Vec::new()));
             staging.push(nv);
             *arg_count = rest_idx + 1;
         }

@@ -1,44 +1,21 @@
 use std::cell::UnsafeCell;
-use std::rc::Rc;
+use std::ptr::NonNull;
 
 use super::{ArrayRepr, BoxedElems, VmValue};
 use crate::register_meta::SlotKind;
 
-/// A reference-counted, interior-mutable array whose element storage is one
-/// of three representations (see [`ArrayRepr`]). Identity is the `Rc` address;
-/// see the type-level docs on `ArrayRepr` for the single-cell / migration
-/// invariant.
-#[derive(Clone, Debug)]
-pub struct VmArray(pub Rc<UnsafeCell<ArrayRepr>>);
+/// An interior-mutable array living in a heap cell, whose element storage is
+/// one of three representations (see [`ArrayRepr`]). The cell owns the repr,
+/// so this is a plain pointer, valid for as long as the array is reachable;
+/// identity is that address.
+#[derive(Clone, Copy, Debug)]
+pub struct VmArray(NonNull<UnsafeCell<ArrayRepr>>);
 
-impl VmArray {
-    // ---- constructors -----------------------------------------------------
-
-    /// Boxed array from `VmValue`s. This is the ubiquitous constructor every
-    /// current call site uses; it keeps building `Boxed` arrays.
+impl ArrayRepr {
+    /// Boxed array from `VmValue`s, kept boxed whatever they hold.
     #[inline(always)]
-    pub fn new(items: Vec<VmValue>) -> Self {
-        Self(Rc::new(UnsafeCell::new(ArrayRepr::Boxed(BoxedElems::new(
-            items,
-        )))))
-    }
-
-    /// Empty `Boxed` array.
-    #[inline(always)]
-    pub fn empty() -> Self {
-        Self::new(Vec::new())
-    }
-
-    /// `Array<int>` backed by a raw `i64` buffer.
-    #[inline(always)]
-    pub fn new_i64(items: Vec<i64>) -> Self {
-        Self(Rc::new(UnsafeCell::new(ArrayRepr::I64(items))))
-    }
-
-    /// `Array<float>` backed by a raw `f64` buffer. See [`Self::new_i64`].
-    #[inline(always)]
-    pub fn new_f64(items: Vec<f64>) -> Self {
-        Self(Rc::new(UnsafeCell::new(ArrayRepr::F64(items))))
+    pub fn boxed(items: Vec<VmValue>) -> Self {
+        ArrayRepr::Boxed(BoxedElems::new(items))
     }
 
     /// Array from boxed values, choosing the narrowest repr the values admit:
@@ -53,22 +30,43 @@ impl VmArray {
     /// on values that pass `is_int` / `is_f64`, so reading a typed element
     /// back reproduces the original `VmValue` bit for bit.
     pub fn from_items(items: Vec<VmValue>) -> Self {
-        Self::unboxed(&items).unwrap_or_else(|| Self::new(items))
+        Self::unboxed(&items).unwrap_or_else(|| Self::boxed(items))
     }
 
     pub fn from_slice(items: &[VmValue]) -> Self {
-        Self::unboxed(items).unwrap_or_else(|| Self::new(items.to_vec()))
+        Self::unboxed(items).unwrap_or_else(|| Self::boxed(items.to_vec()))
     }
 
     fn unboxed(items: &[VmValue]) -> Option<Self> {
         let first = *items.first()?;
         if first.is_int() && items.iter().all(|v| v.is_int()) {
-            return Some(Self::new_i64(items.iter().map(|v| v.as_int()).collect()));
+            return Some(ArrayRepr::I64(items.iter().map(|v| v.as_int()).collect()));
         }
         if first.is_f64() && items.iter().all(|v| v.is_f64()) {
-            return Some(Self::new_f64(items.iter().map(|v| v.as_f64()).collect()));
+            return Some(ArrayRepr::F64(items.iter().map(|v| v.as_f64()).collect()));
         }
         None
+    }
+}
+
+impl VmArray {
+    /// Places `repr` at `at` and names it.
+    ///
+    /// # Safety
+    /// `at` must be aligned for and point to `size_of::<ArrayRepr>()` writable
+    /// bytes owned by the heap cell, which drops the repr when it frees.
+    #[inline(always)]
+    pub unsafe fn init_at(at: *mut ArrayRepr, repr: ArrayRepr) -> Self {
+        std::ptr::write(at, repr);
+        Self(NonNull::new_unchecked(at as *mut UnsafeCell<ArrayRepr>))
+    }
+
+    /// Drops the repr a cell holds: its element buffer.
+    ///
+    /// # Safety
+    /// `self` must have come from [`Self::init_at`] and never be used again.
+    pub unsafe fn drop_at(self) {
+        std::ptr::drop_in_place(self.0.as_ptr());
     }
 
     // ---- repr access (internal) ------------------------------------------
@@ -81,7 +79,7 @@ impl VmArray {
     /// live read, so this holds by construction.
     #[inline(always)]
     pub fn repr(&self) -> &ArrayRepr {
-        unsafe { &*self.0.get() }
+        unsafe { &*(*self.0.as_ptr()).get() }
     }
 
     /// Exclusive view of the repr. SAFETY: see [`Self::repr`]; no other live
@@ -89,7 +87,7 @@ impl VmArray {
     #[inline(always)]
     #[allow(clippy::mut_from_ref)]
     pub(super) fn repr_mut(&self) -> &mut ArrayRepr {
-        unsafe { &mut *self.0.get() }
+        unsafe { &mut *(*self.0.as_ptr()).get() }
     }
 
     // ---- generic queries --------------------------------------------------
@@ -174,7 +172,7 @@ fn unreachable_typed(op: &str) -> ! {
 
 impl PartialEq for VmArray {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        self.0 == other.0
     }
 }
 
@@ -182,6 +180,6 @@ impl Eq for VmArray {}
 
 impl std::hash::Hash for VmArray {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
+        self.0.as_ptr().hash(state);
     }
 }

@@ -8,7 +8,6 @@ use crate::exec::ctx::ExecCtx;
 use crate::exec::method_args::{MethodArgs, MethodOutcome};
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::VmArray;
 
 impl ExecCtx {
     /// The generic tail of [`Self::call_method`]: lay the callee and
@@ -206,10 +205,9 @@ impl ExecCtx {
                 } else {
                     vec![]
                 };
-                let rest_nv = VmValue::from_heap(
-                    self.heap
-                        .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
-                );
+                let rest_nv = self
+                    .heap
+                    .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(rest_items));
                 if let Err(e) = self.stack.unbox_into_reg(alloc, 1 + rest_idx, rest_nv) {
                     failed = Some(e);
                 }

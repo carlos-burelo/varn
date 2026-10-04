@@ -453,9 +453,9 @@ pub(crate) extern "C" fn jit_str_split(
                 }
             }
         }
-        let arr = varn_types::VmArray::new(out);
-        ctx_ref.jit_native_result =
-            VmValue::from_heap(ctx_ref.heap.alloc(crate::heap::HeapObj::Array(arr)));
+        ctx_ref.jit_native_result = ctx_ref
+            .heap
+            .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(out));
     }
 }
 

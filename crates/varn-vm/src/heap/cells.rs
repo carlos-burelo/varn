@@ -237,11 +237,37 @@ impl CellSpace {
         r
     }
 
+    /// An array (`tuple` for a tuple) whose repr lives in the same cell,
+    /// right after the `HeapObj` that names it.
+    #[inline]
+    pub(crate) fn alloc_array(
+        &mut self,
+        tuple: bool,
+        repr: varn_types::vm_value::ArrayRepr,
+        state: SlotState,
+    ) -> HeapRef {
+        let tail = std::mem::size_of::<HeapObj>();
+        let bytes = std::mem::size_of::<varn_types::vm_value::ArrayRepr>();
+        let r = self.take_cell(tail + bytes, 0, state);
+        let arr = unsafe { varn_types::VmArray::init_at(body::<u8>(r).add(tail).cast(), repr) };
+        Self::place(
+            r,
+            if tuple {
+                HeapObj::Tuple(arr)
+            } else {
+                HeapObj::Array(arr)
+            },
+        );
+        r
+    }
+
     /// Drops the object in `r` and what its cell owns beyond it.
     unsafe fn drop_object(r: HeapRef) {
         let obj = body::<HeapObj>(r);
-        if let HeapObj::Object(o) | HeapObj::Record(o) = &*obj {
-            ObjData::drop_at(*o);
+        match &*obj {
+            HeapObj::Object(o) | HeapObj::Record(o) => ObjData::drop_at(*o),
+            HeapObj::Array(a) | HeapObj::Tuple(a) => a.drop_at(),
+            _ => {}
         }
         std::ptr::drop_in_place(obj);
     }

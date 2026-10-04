@@ -303,7 +303,7 @@ pub(crate) fn gather_one(
             if results.is_heap() {
                 let idx = results.as_heap();
                 let array = match heap.get(idx) {
-                    Some(HeapObj::Array(a)) => Some(a.clone()),
+                    Some(HeapObj::Array(a)) => Some(*a),
                     _ => None,
                 };
                 if let Some(array) = array {

@@ -5,22 +5,19 @@ use super::obj::HeapObj;
 use super::structs::HeapInner;
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::VmArray;
+use varn_types::vm_value::ArrayRepr;
 
 impl HeapInner {
     pub(crate) fn alloc_array_vm(&mut self, items: Vec<VmValue>) -> VmValue {
-        let va = VmArray::from_items(items);
-        VmValue::from_heap(self.alloc(HeapObj::Array(va)))
+        self.alloc_array_repr(false, ArrayRepr::from_items(items))
     }
 
     pub(crate) fn alloc_array_slice_vm(&mut self, items: &[VmValue]) -> VmValue {
-        let va = VmArray::from_slice(items);
-        VmValue::from_heap(self.alloc(HeapObj::Array(va)))
+        self.alloc_array_repr(false, ArrayRepr::from_slice(items))
     }
 
     pub(crate) fn alloc_tuple_vm(&mut self, items: Vec<VmValue>) -> VmValue {
-        let va = VmArray::from_items(items);
-        VmValue::from_heap(self.alloc(HeapObj::Tuple(va)))
+        self.alloc_array_repr(true, ArrayRepr::from_items(items))
     }
 
     pub(crate) fn alloc_object(&mut self) -> VmValue {
