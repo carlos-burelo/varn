@@ -216,10 +216,7 @@ impl Heap {
         let inst_bytes =
             unsafe { std::slice::from_raw_parts(&inst_slot as *const _ as *const u8, size) };
         let instance_tag = inst_bytes[0] as usize;
-        let instance_payload_off = (0..=size - 8)
-            .find(|&off| usize::from_ne_bytes(inst_bytes[off..off + 8].try_into().unwrap()) == data)
-            .expect("instance payload probe failed")
-            + super::cells::HEADER_BYTES;
+        let instance_data_off = super::cells::INSTANCE_DATA_OFF;
 
         // Derivado: offsets propios (`INST_*`) desde el InstanceData. Tripwire:
         // class_id leído ahí debe coincidir.
@@ -235,7 +232,7 @@ impl Heap {
             object_tag,
             instance_tag,
             payload_off,
-            instance_payload_off,
+            instance_data_off,
             len_off,
             values_off,
             instance_values_off,

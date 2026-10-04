@@ -34,7 +34,7 @@ pub(crate) fn load_compact(
     let cont = b.create_block();
     b.append_block_param(cont, types::I128);
 
-    let data_base = emit::emit_object_data_base(
+    let data_base = emit::emit_instance_payload(
         b,
         obj,
         &io.helpers.object_layout,
@@ -125,7 +125,7 @@ pub(crate) fn store_compact(
     b.ins().brif(young, inline, &[], slow, &[]);
 
     b.switch_to_block(inline);
-    let data_base = emit::emit_object_data_base(
+    let data_base = emit::emit_instance_payload(
         b,
         obj,
         &io.helpers.object_layout,

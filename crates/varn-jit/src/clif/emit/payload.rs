@@ -202,9 +202,10 @@ pub(in crate::clif) fn guard_overflow(
     r
 }
 
-/// Resolve boxed object `obj` to its inline field base address (`objdata + values_off`),
-/// branching to `invalid` if it is not an object or instance.
-pub(in crate::clif) fn emit_object_data_base(
+/// Resolve boxed `obj` to the base of its instance payload, where compact
+/// field offsets apply, branching to `invalid` unless it is an instance. The
+/// payload shares the object's cell, so the base is a constant offset away.
+pub(in crate::clif) fn emit_instance_payload(
     b: &mut FunctionBuilder,
     obj: cranelift_codegen::ir::Value,
     olay: &crate::JitObjectLayout,
@@ -217,43 +218,25 @@ pub(in crate::clif) fn emit_object_data_base(
     } else {
         (b.ins().iconst(types::I64, HEAP_KIND), obj)
     };
-
-    // 1. Heap-pointer tag check.
     let tag = b.ins().band_imm_u(obj_tag, KIND_MASK);
     let is_heap = b.ins().icmp_imm_u(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], invalid, &[]);
     b.switch_to_block(chk);
 
-    let slot_addr = obj_payload;
-
-    // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
-    let tagb = b
+    let kind = b
         .ins()
-        .uload8(types::I64, m, slot_addr, alay.kind_off as i32);
+        .uload8(types::I64, m, obj_payload, alay.kind_off as i32);
     let is_inst = b
         .ins()
-        .icmp_imm_u(IntCC::Equal, tagb, olay.instance_tag as i64);
-    let is_obj = b
-        .ins()
-        .icmp_imm_u(IntCC::Equal, tagb, olay.object_tag as i64);
-    let is_valid = b.ins().bor(is_inst, is_obj);
+        .icmp_imm_u(IntCC::Equal, kind, olay.instance_tag as i64);
     let ok = b.create_block();
-    b.ins().brif(is_valid, ok, &[], invalid, &[]);
+    b.ins().brif(is_inst, ok, &[], invalid, &[]);
     b.switch_to_block(ok);
-
-    // 4. Load the payload pointer:
-    let c_inst_pay = b.ins().iconst(types::I64, olay.instance_payload_off as i64);
-    let c_obj_pay = b.ins().iconst(types::I64, olay.payload_off as i64);
-    let payload_off = b.ins().select(is_inst, c_inst_pay, c_obj_pay);
-    let obj_ptr = b.ins().iadd(slot_addr, payload_off);
-    let data_ptr = b.ins().load(types::I64, m, obj_ptr, 0);
-
-    // 5. Compute the inline values base: data_ptr + values_off
-    let c_inst_val = b.ins().iconst(types::I64, olay.instance_values_off as i64);
-    let c_obj_val = b.ins().iconst(types::I64, olay.values_off as i64);
-    let values_off = b.ins().select(is_inst, c_inst_val, c_obj_val);
-    b.ins().iadd(data_ptr, values_off)
+    b.ins().iadd_imm_u(
+        obj_payload,
+        (olay.instance_data_off + olay.instance_values_off) as i64,
+    )
 }
 
 /// Whether the heap object at `addr` is young: a store into it needs no

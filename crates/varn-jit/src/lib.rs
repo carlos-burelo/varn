@@ -107,9 +107,9 @@ pub struct JitObjectLayout {
     /// pointer, so the slot also carries a length word; the fast paths read the
     /// tail length from the header instead and ignore it.
     pub payload_off: usize,
-    /// Slot base → the instance's `Rc<InstanceData>` pointer. `InstanceRef` is
-    /// a thin pointer (Rc<InstanceData>), so offset in the slot matches payload_off.
-    pub instance_payload_off: usize,
+    /// Object address → its `InstanceData`, for an instance: a constant, since
+    /// the instance lives in the same cell as the object.
+    pub instance_data_off: usize,
     /// Data pointer → `ObjData.inline_len` (u32): how many fields live in the
     /// tail. Fields past it spilled to the overflow store, which the JIT does
     /// not know how to read — the bounds check against this value is what sends
@@ -117,10 +117,10 @@ pub struct JitObjectLayout {
     pub len_off: usize,
     /// Data pointer → `ObjData.values[0]`. Constant, because the tail is inline.
     pub values_off: usize,
-    /// Data pointer → `InstanceData.payload`.
+    /// `InstanceData` → its payload.
     pub instance_values_off: usize,
-    /// Data pointer → `InstanceData.class_id` (u32). The 8-byte header sits
-    /// right before the payload.
+    /// `InstanceData` → its `class_id` (u32). The 8-byte header sits right
+    /// before the payload.
     pub instance_class_id_off: usize,
     /// Data pointer → `ObjData.shape` (an `Rc<Shape>`).
     pub shape_off: usize,

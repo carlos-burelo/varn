@@ -13,6 +13,7 @@ use varn_types::HeapRef;
 pub(crate) const HEADER_BYTES: usize = std::mem::size_of::<ObjHeader>();
 pub(crate) const STATE_OFF: usize = std::mem::offset_of!(ObjHeader, state);
 pub(crate) const KIND_OFF: usize = std::mem::offset_of!(ObjHeader, kind);
+pub(crate) const INSTANCE_DATA_OFF: usize = HEADER_BYTES + std::mem::size_of::<HeapObj>();
 const BLOCK_BYTES: usize = 256 * 1024;
 const CELL_ALIGN: usize = 16;
 const MAJOR_MARK: u8 = 0x80;
@@ -204,10 +205,10 @@ impl CellSpace {
         payload_size: u32,
         state: SlotState,
     ) -> (HeapRef, InstanceRef) {
-        let tail = std::mem::size_of::<HeapObj>();
+        let tail = INSTANCE_DATA_OFF - HEADER_BYTES;
         let r = self.take_cell(tail + InstanceData::bytes_for(payload_size), 0, state);
-        let inst =
-            unsafe { InstanceData::init_at(body::<u8>(r).add(tail), class_id, payload_size) };
+        let data = (r.addr() as usize + INSTANCE_DATA_OFF) as *mut u8;
+        let inst = unsafe { InstanceData::init_at(data, class_id, payload_size) };
         Self::place(r, HeapObj::Instance(inst));
         (r, inst)
     }

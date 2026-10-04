@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{call_helper_void, emit_object_data_base};
+use super::super::super::emit::{call_helper_void, emit_instance_payload};
 use super::super::super::fields::{load_compact, store_compact, FieldIo};
 use super::super::heap::{boxed_value, exec_ctx};
 use super::super::store::Out;
@@ -89,7 +89,7 @@ fn emit_get_fixed_field_native(
     let slow = b.create_block();
     let cont = b.create_block();
     b.append_block_param(cont, merge_ty);
-    let data_base = emit_object_data_base(b, obj, &h.object_layout, &h.array_layout, slow);
+    let data_base = emit_instance_payload(b, obj, &h.object_layout, &h.array_layout, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let v = match TypeLayout::of_field(tag).repr {

@@ -132,12 +132,12 @@ pub(crate) fn emit_method_call(
     let ok = b.create_block();
     b.ins().brif(is_inst, ok, &[], slow, &[]);
     b.switch_to_block(ok);
-    let data_ptr = b
-        .ins()
-        .load(types::I64, m, slot_addr, olay.instance_payload_off as i32);
-    let cid32 = b
-        .ins()
-        .load(types::I32, m, data_ptr, olay.instance_class_id_off as i32);
+    let cid32 = b.ins().load(
+        types::I32,
+        m,
+        slot_addr,
+        (olay.instance_data_off + olay.instance_class_id_off) as i32,
+    );
     let cid = b.ins().uextend(types::I64, cid32);
 
     let ic_base = b.ins().load(
