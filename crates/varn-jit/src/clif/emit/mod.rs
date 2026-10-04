@@ -3,7 +3,7 @@
 //! the only consumer; the bytecode register-variable helpers died with it.
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, Signature};
-use cranelift_frontend::{FunctionBuilder, Variable};
+use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
 mod payload;

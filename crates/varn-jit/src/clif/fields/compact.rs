@@ -120,10 +120,8 @@ pub(crate) fn store_compact(
     let (value_tag, payload) = b.ins().isplit(value);
     let kind = b.ins().band_imm_u(obj_tag, emit::KIND_MASK);
     let heap_ok = b.ins().icmp_imm_u(IntCC::Equal, kind, KIND_HEAP as i64);
-    let raw = b.ins().band_imm_u(obj_payload, 0xFFFF_FFFF);
-    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
-    let not_old = b.ins().icmp_imm_u(IntCC::Equal, old_bit, 0);
-    let can_inline = b.ins().band(heap_ok, not_old);
+    let young = emit::is_young(b, obj_payload);
+    let can_inline = b.ins().band(heap_ok, young);
     b.ins().brif(can_inline, inline, &[], slow, &[]);
 
     b.switch_to_block(inline);

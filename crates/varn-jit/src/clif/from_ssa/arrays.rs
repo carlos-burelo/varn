@@ -25,7 +25,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
 use super::super::emit::{
-    array_disc, box_f64, box_int, cached_payload, call_helper_void, unbox_f64_coerce, unbox_int,
+    array_disc, box_f64, box_int, call_helper_void, emit_array_payload, unbox_f64_coerce, unbox_int,
 };
 use super::{heap, load_value, Ctx, Out};
 
@@ -138,16 +138,7 @@ fn resolve(
     slow: Block,
 ) -> (Value, Value, Value) {
     let lay = &ctx.helpers.array_layout;
-    let payload = cached_payload(
-        b,
-        exec_ctx,
-        obj,
-        lay,
-        ctx.helpers.heap_field_offset,
-        slow,
-        None,
-        false,
-    );
+    let payload = emit_array_payload(b, exec_ctx, obj, lay, ctx.helpers.heap_field_offset, slow);
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let data = b
         .ins()

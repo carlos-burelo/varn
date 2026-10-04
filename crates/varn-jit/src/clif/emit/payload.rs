@@ -95,46 +95,10 @@ pub(in crate::clif) fn call_helper_void(
     let ptr = b.ins().iconst(types::I64, helper as i64);
     b.ins().call_indirect(sig_ref, ptr, args);
 }
-
-/// Payload via the loop cache when one exists for this access: cache != 0
-/// short-circuits the whole guard walk (one test + branch, perfectly
-/// predicted after iteration one); cache == 0 — or no cache — takes the
-/// full resolve.
-#[allow(clippy::too_many_arguments)]
-pub(in crate::clif) fn cached_payload(
-    b: &mut FunctionBuilder,
-    exec_ctx: cranelift_codegen::ir::Value,
-    obj: cranelift_codegen::ir::Value,
-    lay: &crate::JitArrayLayout,
-    heap_off: usize,
-    slow: cranelift_codegen::ir::Block,
-    cache: Option<Variable>,
-    readonly: bool,
-) -> cranelift_codegen::ir::Value {
-    match cache {
-        Some(cv) => {
-            let c = b.use_var(cv);
-            let full = b.create_block();
-            let ready = b.create_block();
-            b.append_block_param(ready, types::I64);
-            b.ins().brif(c, ready, &[c.into()], full, &[]);
-            b.switch_to_block(full);
-            let p = emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false, readonly);
-            b.ins().jump(ready, &[p.into()]);
-            b.switch_to_block(ready);
-            b.block_params(ready)[0]
-        }
-        None => emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false, readonly),
-    }
-}
-
 /// Resolve a boxed receiver down to its array payload pointer (the three
-/// `Vec<VmValue>` words live at payload+16). Mirrors the template's
-/// `emit_resolve_array_payload`: heap-tag check, generation select on bit
-/// 31 of the index, slot tag check. Any rejection branches to `slow`; on
-/// return the builder is positioned in a fresh block where the payload is
-/// valid.
-#[allow(clippy::too_many_arguments)]
+/// `Vec<VmValue>` words live at payload+16). Any rejection — not a heap
+/// value, or a slot that is not an array — branches to `slow`; on return the
+/// builder is positioned in a fresh block where the payload is valid.
 pub(in crate::clif) fn emit_array_payload(
     b: &mut FunctionBuilder,
     exec_ctx: cranelift_codegen::ir::Value,
@@ -142,20 +106,8 @@ pub(in crate::clif) fn emit_array_payload(
     lay: &crate::JitArrayLayout,
     heap_off: usize,
     slow: cranelift_codegen::ir::Block,
-    nursery_only: bool,
-    _readonly: bool,
 ) -> cranelift_codegen::ir::Value {
-    // The chain down to the payload pointer is `readonly` FOR THE DURATION
-    // OF ONE ROUTED ACTIVATION: heap indices only get rebound by a GC
-    // move or slot reuse, and in the ALLOC-FREE subset no op can allocate
-    // on the VM heap, so no collection can run underneath us — marking the
-    // chain readonly lets Cranelift's mid-end hoist the whole resolve out
-    // of loops. In an ALLOCATING function a back-edge safepoint CAN move
-    // these indices and grow the old-gen Vec, so `readonly` is false there:
-    // every access re-resolves from the (reloaded) receiver. The element
-    // Vec's data/len words are never readonly — an out-of-bounds store's
-    // append path reallocates them.
-    let ro = cranelift_codegen::ir::MemFlagsData::trusted();
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let (obj_tag, obj_payload) = if b.func.dfg.value_type(obj) == types::I128 {
         b.ins().isplit(obj)
     } else {
@@ -167,48 +119,13 @@ pub(in crate::clif) fn emit_array_payload(
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
 
-    let raw = b.ins().band_imm_u(obj_payload, 0xFFFF_FFFF);
-    let rc = b.ins().load(types::I64, ro, exec_ctx, heap_off as i32);
-    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
-
-    let (base, idx) = if nursery_only {
-        let cont = b.create_block();
-        b.ins().brif(old_bit, slow, &[], cont, &[]);
-        b.switch_to_block(cont);
-        let base = b.ins().load(
-            types::I64,
-            ro,
-            rc,
-            (lay.nursery_slots_vec_off + lay.slots_ptr_off) as i32,
-        );
-        (base, raw)
-    } else {
-        let base_old = b.ins().load(
-            types::I64,
-            ro,
-            rc,
-            (lay.slots_vec_off + lay.slots_ptr_off) as i32,
-        );
-        let base_nur = b.ins().load(
-            types::I64,
-            ro,
-            rc,
-            (lay.nursery_slots_vec_off + lay.slots_ptr_off) as i32,
-        );
-        let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
-        let base = b.ins().select(old_bit, base_old, base_nur);
-        let idx = b.ins().select(old_bit, idx_old, raw);
-        (base, idx)
-    };
-
-    let byte_off = b.ins().imul_imm_u(idx, lay.slot_size as i64);
-    let slot = b.ins().iadd(base, byte_off);
-    let tagb = b.ins().uload8(types::I64, ro, slot, 0);
+    let slot = heap_slot_addr(b, exec_ctx, obj_payload, lay, heap_off);
+    let tagb = b.ins().uload8(types::I64, m, slot, 0);
     let is_arr = b.ins().icmp_imm_u(IntCC::Equal, tagb, lay.array_tag as i64);
     let ok = b.create_block();
     b.ins().brif(is_arr, ok, &[], slow, &[]);
     b.switch_to_block(ok);
-    b.ins().load(types::I64, ro, slot, lay.payload_off as i32)
+    b.ins().load(types::I64, m, slot, lay.payload_off as i32)
 }
 
 /// The `ArrayRepr` discriminant (0 = `Boxed`, 1 = `I64`, 2 = `F64`) of an
@@ -313,26 +230,7 @@ pub(in crate::clif) fn emit_object_data_base(
     b.switch_to_block(chk);
 
     // 2. Heap index + generation select → slot address.
-    let raw = b.ins().band_imm_u(obj_payload, 0xFFFF_FFFF);
-    let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
-    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
-    let base_old = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let base_nur = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
-    let base = b.ins().select(old_bit, base_old, base_nur);
-    let idx = b.ins().select(old_bit, idx_old, raw);
-    let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
-    let slot_addr = b.ins().iadd(base, byte_off);
+    let slot_addr = heap_slot_addr(b, exec_ctx, obj_payload, alay, heap_off);
 
     // 3. Slot discriminant must be HeapObj::Instance or HeapObj::Object.
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
@@ -365,16 +263,14 @@ pub(in crate::clif) fn emit_object_data_base(
 /// the old-generation or nursery slot vector, by the old bit.
 pub(in crate::clif) fn heap_slot_addr(
     b: &mut FunctionBuilder,
-    helpers: &crate::JitHelpers,
     exec_ctx: cranelift_codegen::ir::Value,
     payload: cranelift_codegen::ir::Value,
+    alay: &crate::JitArrayLayout,
+    heap_off: usize,
 ) -> cranelift_codegen::ir::Value {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
-    let alay = &helpers.array_layout;
     let raw = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
-    let rc = b
-        .ins()
-        .load(types::I64, m, exec_ctx, helpers.heap_field_offset as i32);
+    let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
     let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
     let base_old = b.ins().load(
         types::I64,
@@ -393,4 +289,14 @@ pub(in crate::clif) fn heap_slot_addr(
     let idx = b.ins().select(old_bit, idx_old, raw);
     let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
     b.ins().iadd(base, byte_off)
+}
+
+/// Whether the heap object `payload` names is young: a store into it needs no
+/// write barrier, so an inline store path may skip the helper that carries it.
+pub(in crate::clif) fn is_young(
+    b: &mut FunctionBuilder,
+    payload: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let old_bit = b.ins().band_imm_u(payload, 0x8000_0000);
+    b.ins().icmp_imm_u(IntCC::Equal, old_bit, 0)
 }

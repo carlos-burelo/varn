@@ -63,7 +63,13 @@ pub(crate) fn emit(
     b.ins().brif(is_heap_ref, walk, &[], slow_blk, &[]);
 
     b.switch_to_block(walk);
-    let slot = heap_slot_addr(b, ctx.helpers, ectx, cpayload);
+    let slot = heap_slot_addr(
+        b,
+        ectx,
+        cpayload,
+        &ctx.helpers.array_layout,
+        ctx.helpers.heap_field_offset,
+    );
     let slot_tag = b.ins().uload8(types::I64, m, slot, 0);
     let is_closure = b
         .ins()

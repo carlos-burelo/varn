@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{box_bool, box_int, call_helper};
+use super::super::super::emit::{box_bool, box_int, call_helper, heap_slot_addr};
 use super::super::{heap, props, store, Ctx, Out};
 use super::direct::{entry_out_slot, run_entered_or};
 use super::invoke::boxed_window;
@@ -36,26 +36,7 @@ fn emit_is_str(
     b.switch_to_block(not_sso);
     b.ins().brif(is_heap, walk, &[], no, &[]);
     b.switch_to_block(walk);
-    let raw = b.ins().band_imm_u(payload, 0xFFFF_FFFF);
-    let rc = b.ins().load(types::I64, m, ectx, heap_off as i32);
-    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
-    let base_old = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let base_nur = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
-    let base = b.ins().select(old_bit, base_old, base_nur);
-    let idx = b.ins().select(old_bit, idx_old, raw);
-    let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
-    let slot_addr = b.ins().iadd(base, byte_off);
+    let slot_addr = heap_slot_addr(b, ectx, payload, alay, heap_off);
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
     let is_str = b.ins().icmp_imm_u(IntCC::Equal, tagb, str_tag as i64);
     b.ins().brif(is_str, yes, &[], no, &[]);
@@ -157,26 +138,7 @@ pub(crate) fn emit_method_call(
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
-    let raw = b.ins().band_imm_u(rp, 0xFFFF_FFFF);
-    let rc = b.ins().load(types::I64, m, ectx, heap_off as i32);
-    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
-    let base_old = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let base_nur = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
-    let base = b.ins().select(old_bit, base_old, base_nur);
-    let idx = b.ins().select(old_bit, idx_old, raw);
-    let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
-    let slot_addr = b.ins().iadd(base, byte_off);
+    let slot_addr = heap_slot_addr(b, ectx, rp, alay, heap_off);
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
     let is_inst = b
         .ins()

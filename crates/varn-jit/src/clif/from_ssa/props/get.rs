@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{call_helper_void, HEAP_KIND, KIND_MASK};
+use super::super::super::emit::{call_helper_void, heap_slot_addr, HEAP_KIND, KIND_MASK};
 use super::super::heap::boxed_parts;
 use super::super::store::drop_home_addrs;
 use super::super::Ctx;
@@ -39,26 +39,7 @@ pub(crate) fn emit_get_property(
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
 
-    let raw = b.ins().band_imm_u(op, 0xFFFF_FFFF);
-    let rc = b.ins().load(types::I64, m, ectx, heap_off as i32);
-    let old_bit = b.ins().band_imm_u(raw, 0x8000_0000);
-    let base_old = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let base_nur = b.ins().load(
-        types::I64,
-        m,
-        rc,
-        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
-    );
-    let idx_old = b.ins().band_imm_u(raw, 0x7FFF_FFFF);
-    let base = b.ins().select(old_bit, base_old, base_nur);
-    let idx = b.ins().select(old_bit, idx_old, raw);
-    let byte_off = b.ins().imul_imm_u(idx, alay.slot_size as i64);
-    let slot_addr = b.ins().iadd(base, byte_off);
+    let slot_addr = heap_slot_addr(b, ectx, op, alay, heap_off);
 
     let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
     let is_obj = b
