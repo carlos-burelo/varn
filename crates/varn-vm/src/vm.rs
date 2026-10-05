@@ -102,7 +102,7 @@ impl Vm {
                 gc_freed: self.ctx.heap.gc_total_freed,
                 heap_live: self.ctx.heap.live_count() as u64,
                 heap_total: self.ctx.heap.objects_len() as u64,
-                nursery_allocs: self.ctx.heap.young.alloc_count,
+                nursery_allocs: self.ctx.heap.young.alloc_count(),
                 minor_gc_count: self.ctx.heap.young.minor_gc_count,
                 minor_gc_promoted: self.ctx.heap.young.minor_gc_promoted,
                 task_parks: tasks.parks,

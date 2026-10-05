@@ -86,6 +86,7 @@ impl HeapInner {
                 SlotState::Old | SlotState::Remembered | SlotState::Free => {}
             }
         }
+        self.young.retired += born.len() as u64;
         born.clear();
         self.young.born = born;
     }

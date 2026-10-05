@@ -52,6 +52,7 @@ impl HeapInner {
     /// generation starts empty.
     pub(crate) fn collect(&mut self, roots: &[HeapRef]) -> usize {
         let freed = self.mark_and_sweep(roots);
+        self.young.retired += self.young.born.len() as u64;
         self.young.born.clear();
         self.young.remembered.clear();
         self.young_cells.clear();
@@ -61,7 +62,7 @@ impl HeapInner {
         self.gc_collections += 1;
         self.gc_total_freed += freed as u64;
         self.cells.old_growth = 0;
-        let live = self.live_count() as u64;
+        let live = self.cells.survivors as u64;
         self.gc_threshold = (live * 2).max(65536);
         freed
     }

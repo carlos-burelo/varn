@@ -21,11 +21,23 @@ pub(super) fn large_layout(bytes: usize) -> Layout {
     Layout::from_size_align(bytes, CELL_ALIGN).expect("large cell layout")
 }
 
+#[repr(C)]
+#[derive(Default)]
+pub(crate) struct AllocLane {
+    pub(crate) free: u64,
+    pub(crate) bump: u64,
+    pub(crate) end: u64,
+}
+
 #[derive(Default)]
 pub(super) struct SizeClass {
     pub(super) blocks: Vec<NonNull<u8>>,
-    used_in_last: usize,
-    pub(super) free: Vec<HeapRef>,
+    pub(super) lane: AllocLane,
+}
+
+#[inline(always)]
+fn next_free(r: u64) -> *mut u64 {
+    (r as usize + super::HEADER_BYTES) as *mut u64
 }
 
 impl SizeClass {
@@ -33,32 +45,53 @@ impl SizeClass {
         BLOCK_BYTES / cell
     }
 
+    #[inline]
     pub(super) fn take(&mut self, cell: usize) -> HeapRef {
-        if let Some(r) = self.free.pop() {
-            return r;
+        let lane = &mut self.lane;
+        if lane.free != 0 {
+            let r = lane.free;
+            lane.free = unsafe { *next_free(r) };
+            return unsafe { HeapRef::from_addr_unchecked(r) };
         }
-        if self.blocks.is_empty() || self.used_in_last == Self::cells_per_block(cell) {
+        if lane.bump + cell as u64 > lane.end {
             let block = unsafe { alloc_zeroed(block_layout()) };
             let block = NonNull::new(block)
                 .unwrap_or_else(|| std::alloc::handle_alloc_error(block_layout()));
             self.blocks.push(block);
-            self.used_in_last = 0;
+            let base = block.as_ptr() as u64;
+            lane.bump = base;
+            lane.end = base + (Self::cells_per_block(cell) * cell) as u64;
         }
-        let base = self.blocks.last().expect("a block").as_ptr() as usize;
-        let addr = base + self.used_in_last * cell;
-        self.used_in_last += 1;
-        unsafe { HeapRef::from_addr_unchecked(addr as u64) }
+        let r = lane.bump;
+        lane.bump += cell as u64;
+        unsafe { HeapRef::from_addr_unchecked(r) }
+    }
+
+    #[inline]
+    pub(super) fn give_back(&mut self, r: HeapRef) {
+        unsafe { *next_free(r.addr()) = self.lane.free };
+        self.lane.free = r.addr();
+    }
+
+    pub(super) fn free_len(&self) -> usize {
+        let mut n = 0;
+        let mut r = self.lane.free;
+        while r != 0 {
+            n += 1;
+            r = unsafe { *next_free(r) };
+        }
+        n
     }
 
     pub(super) fn cells(&self, cell: usize) -> impl Iterator<Item = HeapRef> + '_ {
         let last = self.blocks.len().saturating_sub(1);
         self.blocks.iter().enumerate().flat_map(move |(bi, block)| {
+            let base = block.as_ptr() as usize;
             let used = if bi == last {
-                self.used_in_last
+                (self.lane.bump as usize - base) / cell
             } else {
                 Self::cells_per_block(cell)
             };
-            let base = block.as_ptr() as usize;
             (0..used)
                 .map(move |i| unsafe { HeapRef::from_addr_unchecked((base + i * cell) as u64) })
         })

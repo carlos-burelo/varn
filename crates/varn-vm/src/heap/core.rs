@@ -26,7 +26,6 @@ impl HeapInner {
         }
         let idx = self.cells.alloc(obj, SlotState::Young);
         self.young.born.push(idx);
-        self.young.alloc_count += 1;
         idx
     }
 
@@ -38,7 +37,6 @@ impl HeapInner {
         let size = InstanceData::payload_size_of(class);
         let (r, inst) = self.cells.alloc_instance(class.id, size, SlotState::Young);
         self.young.born.push(r);
-        self.young.alloc_count += 1;
         (r, inst)
     }
 
@@ -59,7 +57,6 @@ impl HeapInner {
             .cells
             .alloc_object(record, shape, n, values, SlotState::Young);
         self.young.born.push(r);
-        self.young.alloc_count += 1;
         VmValue::from_heap(r)
     }
 
@@ -75,7 +72,6 @@ impl HeapInner {
         }
         let r = self.cells.alloc_array(tuple, repr, SlotState::Young);
         self.young.born.push(r);
-        self.young.alloc_count += 1;
         VmValue::from_heap(r)
     }
 

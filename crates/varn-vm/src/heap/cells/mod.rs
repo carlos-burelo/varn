@@ -68,11 +68,11 @@ pub(in crate::heap) fn body<T>(r: HeapRef) -> *mut T {
 pub(crate) struct CellSpace {
     classes: Vec<SizeClass>,
     large: Vec<(HeapRef, usize)>,
-    live: usize,
     pub(in crate::heap) native: bool,
     pub(in crate::heap) native_roots: Vec<HeapRef>,
-    pub(crate) births: u64,
+    pub(crate) old_births: u64,
     pub(crate) old_growth: u64,
+    pub(crate) survivors: usize,
 }
 
 impl Default for CellSpace {
@@ -80,11 +80,11 @@ impl Default for CellSpace {
         Self {
             classes: CLASS_BYTES.iter().map(|_| SizeClass::default()).collect(),
             large: Vec::new(),
-            live: 0,
             native: false,
             native_roots: Vec::new(),
-            births: 0,
+            old_births: 0,
             old_growth: 0,
+            survivors: 0,
         }
     }
 }
@@ -118,11 +118,10 @@ impl CellSpace {
             _pad: 0,
             _aux: 0,
         };
-        self.births += 1;
         if state == SlotState::Old {
+            self.old_births += 1;
             self.old_growth += 1;
         }
-        self.live += 1;
         if self.native {
             self.native_roots.push(r);
         }
@@ -163,7 +162,6 @@ impl CellSpace {
         let class = h.class;
         unsafe { Self::drop_object(r) };
         h.state = SlotState::Free as u8;
-        self.live -= 1;
         if class == LARGE {
             let at = self
                 .large
@@ -173,7 +171,7 @@ impl CellSpace {
             let (_, bytes) = self.large.swap_remove(at);
             unsafe { dealloc(r.as_ptr::<u8>(), large_layout(bytes)) };
         } else {
-            self.classes[class as usize].free.push(r);
+            self.classes[class as usize].give_back(r);
         }
     }
 
@@ -199,11 +197,11 @@ impl CellSpace {
     }
 
     pub(crate) fn live_count(&self) -> usize {
-        self.live
+        self.refs().count()
     }
 
     pub(crate) fn free_len(&self) -> usize {
-        self.classes.iter().map(|c| c.free.len()).sum()
+        self.classes.iter().map(SizeClass::free_len).sum()
     }
 
     pub(crate) fn capacity(&self) -> usize {
@@ -233,14 +231,17 @@ impl CellSpace {
     /// rest and leaves them old. Returns how many were freed.
     pub(crate) fn sweep_major(&mut self) -> usize {
         let mut dead: Vec<HeapRef> = Vec::new();
+        let mut survivors = 0;
         for r in self.refs() {
             let h = header(r);
             if h.state & MAJOR_MARK != 0 {
                 h.state = SlotState::Old as u8;
+                survivors += 1;
             } else {
                 dead.push(r);
             }
         }
+        self.survivors = survivors;
         for &r in &dead {
             self.release(r);
         }

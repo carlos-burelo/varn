@@ -148,7 +148,7 @@ impl HeapInner {
     }
 
     pub(crate) fn alloc_count(&self) -> u64 {
-        self.cells.births
+        self.young.alloc_count() + self.cells.old_births
     }
 }
 
@@ -201,6 +201,6 @@ impl std::ops::DerefMut for Heap {
 
 impl std::fmt::Debug for Heap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Heap {{ alloc_count: {} }}", self.cells.births)
+        write!(f, "Heap {{ alloc_count: {} }}", self.alloc_count())
     }
 }
