@@ -61,12 +61,18 @@ impl<'r> Checker<'r> {
             let scope = bind.scopes.get(self.current_scope);
             if let Some(id) = scope.resolve(name, &bind.scopes) {
                 let sym = bind.arena.get(id);
-                if sym.kind == crate::symbol::SymbolKind::Const {
+                let what = match sym.kind {
+                    crate::symbol::SymbolKind::Const => Some("constant"),
+                    crate::symbol::SymbolKind::Class => Some("class"),
+                    crate::symbol::SymbolKind::Enum => Some("enum"),
+                    _ => None,
+                };
+                if let Some(what) = what {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::NotAssignable,
                             format!(
-                                "cannot reassign to constant '{}'",
+                                "cannot reassign to {what} '{}'",
                                 bind.interner.resolve(name)
                             ),
                         )

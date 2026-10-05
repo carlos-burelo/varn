@@ -1,0 +1,13 @@
+// expect: error[VN3005]
+class C {
+    x: int
+    constructor(x: int) {
+        this.x = x
+    }
+}
+class D extends C {
+    constructor(x: int) {
+        super(x + 10)
+    }
+}
+C = D

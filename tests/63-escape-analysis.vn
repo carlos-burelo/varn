@@ -85,42 +85,6 @@ class EaGetter {
 }
 function eaGetterRead(): int { const g = new EaGetter(21); return g.doubled }
 
-// --- the reassignment guard ---------------------------------------------
-//
-// This is the one that matters. `EaSwapped` is declared as one class and then
-// rebound to another; every `new EaSwapped(..)` after the rebinding must build
-// the SECOND class. A pass that resolved the global at compile time would
-// answer with the first one's field map and silently return 5.
-
-class EaSwapA {
-  v: int
-  constructor(v: int) { this.v = v }
-}
-class EaSwapped {
-  v: int
-  constructor(v: int) { this.v = v }
-}
-class EaSwapB extends EaSwapped {
-  constructor(v: int) {
-    super(v)
-    this.v = v * 1000
-  }
-}
-function eaSwappedRead(n: int): int { const s = new EaSwapped(n); return s.v }
-
-// The same, but the rebinding sits inside a nested block — the scan has to
-// descend into statement bodies, not just the top level.
-class EaNested {
-  v: int
-  constructor(v: int) { this.v = v }
-}
-class EaNestedSwap extends EaNested {
-  constructor(v: int) {
-    super(v)
-    this.v = v * 1000
-  }
-}
-function eaNestedRead(n: int): int { const s = new EaNested(n); return s.v }
 await describe("63 escape analysis", async () => {
     await it("tests", async () => {
         expect(eaSum(1000)).toBe(1000000)
@@ -135,11 +99,6 @@ await describe("63 escape analysis", async () => {
         expect((new EaPartial(4)).a).toBe(4)
         expect(eaDerivedSum()).toBe(7)
         expect(eaGetterRead()).toBe(42)
-        EaSwapped = EaSwapB
-        expect(eaSwappedRead(5)).toBe(5000)
-        let eaFlag = true
-        if (eaFlag) { EaNested = EaNestedSwap }
-        expect(eaNestedRead(7)).toBe(7000)
         
         
     });
