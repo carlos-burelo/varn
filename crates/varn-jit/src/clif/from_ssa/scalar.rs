@@ -285,9 +285,10 @@ fn emit_bin(
     in_range: bool,
 ) -> Result<Value, String> {
     use SsaBinOp::*;
-    // Integer division/mod/power and float mod/power keep the VM's exact
-    // semantics, faults included, through a runtime helper.
-    if matches!(op, IntDiv | IntMod | IntPow | FloatMod | FloatPow) {
+    if matches!(op, IntDiv | IntMod) {
+        return Ok(super::int_div::emit(b, ctx, op, a, c));
+    }
+    if matches!(op, IntPow | FloatMod | FloatPow) {
         let dest_float = matches!(op, FloatMod | FloatPow);
         return boxed::emit_bin(b, ctx, op, a, c, dest_float);
     }
@@ -330,7 +331,7 @@ fn emit_bin(
 
         Dyn(_) => return Err("from_ssa: a Dyn operator is lowered by dynop".into()),
         StrConcat => return Err("from_ssa: concat is a heap op".into()),
-        IntDiv | IntMod | IntPow | FloatMod | FloatPow => unreachable!("delegated to boxed"),
+        IntDiv | IntMod | IntPow | FloatMod | FloatPow => unreachable!("lowered above"),
     })
 }
 

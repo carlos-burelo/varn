@@ -1,6 +1,6 @@
 //! Ops whose semantics live behind a boxed runtime helper.
 //!
-//! Integer division/modulo/power and float modulo/power are not native ISA
+//! Integer power and float modulo/power are not native ISA
 //! operations with Varn's exact semantics (division by zero, `int` overflow,
 //! `f64` rounding): the VM owns them as helpers over boxed `VmValue`s, writing
 //! the result into the live `ExecCtx` (`ctx.exec_ctx`, real en leaf y
@@ -29,8 +29,6 @@ pub(super) fn emit_bin(
     let helpers = ctx.helpers;
     let cc = ctx.cc;
     let (helper, operand_float) = match op {
-        IntDiv => (helpers.div, false),
-        IntMod => (helpers.modulo, false),
         IntPow => (helpers.pow, false),
         FloatMod => (helpers.modulo, true),
         FloatPow => (helpers.pow, true),

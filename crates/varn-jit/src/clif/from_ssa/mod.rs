@@ -73,6 +73,7 @@ mod globals;
 mod heap;
 mod heapvalue;
 mod induction;
+mod int_div;
 mod numeric;
 mod osr;
 mod pinned;
