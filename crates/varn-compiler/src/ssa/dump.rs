@@ -81,9 +81,7 @@ pub fn inst_kind(kind: &InstKind) -> String {
             format!("storeupvalue #{index} = {}", val(*value))
         }
         InstKind::Call { callee, args } => format!("call {}{}", val(*callee), args_list(args)),
-        InstKind::NewInstance { callee, args } => {
-            format!("new {}{}", val(*callee), args_list(args))
-        }
+        InstKind::AllocInstance { class } => format!("alloc {}", val(*class)),
         InstKind::SelfCall { args } => format!("callself{}", args_list(args)),
         InstKind::GetProperty { object, name } => format!("getprop {}.{name}", val(*object)),
         InstKind::GetFixedField { object, slot, .. } => {

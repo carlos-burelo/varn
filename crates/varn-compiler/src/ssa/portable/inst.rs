@@ -46,10 +46,7 @@ pub(super) fn project_inst(
             callee: callee.0,
             args: args.iter().map(|v| v.0).collect(),
         },
-        InstKind::NewInstance { callee, args } => SsaOp::New {
-            callee: callee.0,
-            args: args.iter().map(|v| v.0).collect(),
-        },
+        InstKind::AllocInstance { class } => SsaOp::AllocInstance { class: class.0 },
         InstKind::Binary { op, lhs, rhs, ty } => {
             let lhs_ty = value_tys.get(lhs.0 as usize).copied();
             let rhs_ty = value_tys.get(rhs.0 as usize).copied();

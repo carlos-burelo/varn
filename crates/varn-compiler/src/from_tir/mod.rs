@@ -5,7 +5,6 @@
 
 pub mod build;
 pub mod compile;
-pub(crate) mod ctor_summary;
 mod pinning;
 mod tir_children;
 pub mod ty;

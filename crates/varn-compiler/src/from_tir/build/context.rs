@@ -31,10 +31,15 @@ pub(crate) struct Builder<'m> {
     pub(super) pinned: FxHashSet<VarId>,
     pub(super) next_synthetic: u32,
     pub(super) current: BlockId,
-    pub(super) inlining_params: Vec<Vec<Value>>,
-    pub(super) inlining_stack: Vec<varn_tir::FnId>,
+    pub(super) inlining: Vec<InlineFrame>,
     pub(super) locals_bt: Vec<BackendTy>,
     pub(super) return_bt: Option<BackendTy>,
+}
+
+pub(super) struct InlineFrame {
+    pub(super) func: varn_tir::FnId,
+    pub(super) params: Vec<Value>,
+    pub(super) this: Option<Value>,
 }
 
 impl<'m> Builder<'m> {
@@ -55,8 +60,7 @@ impl<'m> Builder<'m> {
             pinned,
             next_synthetic: 0,
             current: BlockId(0),
-            inlining_params: Vec::new(),
-            inlining_stack: Vec::new(),
+            inlining: Vec::new(),
             locals_bt: Vec::new(),
             return_bt: None,
         };

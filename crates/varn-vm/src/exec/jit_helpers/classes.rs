@@ -38,6 +38,18 @@ pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
     }
 }
 
+#[varn_op_macros::jit_slow(field = "alloc_instance")]
+pub(crate) extern "C" fn jit_alloc_instance(ctx: *mut ExecCtx, class_tag: u64, class_payload: u64) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let class_val = VmValue::from_raw_parts(class_tag, class_payload);
+        match crate::exec::class::op_alloc_instance(class_val, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
 #[varn_op_macros::jit_slow(field = "declare_layout")]
 pub(crate) extern "C" fn jit_declare_layout(
     ctx: *mut ExecCtx,

@@ -88,6 +88,19 @@ pub(crate) fn op_declare_layout(
     )))
 }
 
+pub(crate) fn op_alloc_instance(class_nv: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if class_nv.is_heap() {
+        if let Some(HeapObj::Class(cls)) = heap.get(class_nv.as_heap()) {
+            let cls = cls.clone();
+            return Ok(VmValue::from_heap(heap.alloc_instance(&cls).0));
+        }
+    }
+    Err(RuntimeError::new(format!(
+        "new: expected a class, got {}",
+        crate::exec::props::meta::type_name(class_nv, heap)
+    )))
+}
+
 pub(crate) fn pool_layout(
     proto: &varn_types::FunctionProto,
     idx: usize,

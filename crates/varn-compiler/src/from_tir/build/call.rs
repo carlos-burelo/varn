@@ -1,4 +1,4 @@
-use super::context::{Builder, Result};
+use super::context::{Builder, InlineFrame, Result};
 use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use crate::OptError;
@@ -60,7 +60,7 @@ impl<'m> Builder<'m> {
         args: &[varn_tir::TirArg],
         call_ty: HirType,
     ) -> Result<Option<Value>> {
-        if self.inlining_stack.len() >= 4 || self.inlining_stack.contains(&f) {
+        if self.inlining.len() >= 4 || self.inlining.iter().any(|frame| frame.func == f) {
             return Ok(None);
         }
         if Some(f) == self.self_fn {
@@ -100,13 +100,13 @@ impl<'m> Builder<'m> {
             argv.push(self.widen_exact(v, e.ty, pty));
         }
 
-        self.inlining_stack.push(f);
-        self.inlining_params.push(argv);
-
+        self.inlining.push(InlineFrame {
+            func: f,
+            params: argv,
+            this: None,
+        });
         let res = self.lower_expr(ret_expr);
-
-        self.inlining_params.pop();
-        self.inlining_stack.pop();
+        self.inlining.pop();
 
         let v = res?;
         let coerced = self.coerce(v, call_ty);

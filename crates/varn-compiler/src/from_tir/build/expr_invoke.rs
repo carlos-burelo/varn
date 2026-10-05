@@ -101,35 +101,6 @@ impl<'m> Builder<'m> {
         ))
     }
 
-    pub(super) fn lower_new_expr(
-        &mut self,
-        class: varn_tir::ClassId,
-        args: &[varn_tir::TirArg],
-        ty: HirType,
-    ) -> Result<Value> {
-        let name = self
-            .tir
-            .class(class)
-            .map(|ci| ci.name.clone())
-            .ok_or(OptError::Unsupported("from_tir: New class out of range"))?;
-        let cv = self.emit(self.global_load(&name), HirType::Ref);
-        if args
-            .iter()
-            .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))
-        {
-            self.lower_call(cv, args, ty)
-        } else {
-            let argv = self.lower_args(args)?;
-            Ok(self.emit(
-                InstKind::NewInstance {
-                    callee: cv,
-                    args: argv,
-                },
-                ty,
-            ))
-        }
-    }
-
     pub(super) fn lower_make_variant(
         &mut self,
         args: &[varn_tir::TirArg],

@@ -110,8 +110,8 @@ impl<'m> Builder<'m> {
         match res {
             Resolution::Local(id) => self.load_var(VarId::Local(LocalId(id.0)), ty),
             Resolution::Param(i) => {
-                if let Some(args) = self.inlining_params.last() {
-                    if let Some(&arg_v) = args.get(*i as usize) {
+                if let Some(frame) = self.inlining.last() {
+                    if let Some(&arg_v) = frame.params.get(*i as usize) {
                         return Ok(arg_v);
                     }
                 }
@@ -132,7 +132,10 @@ impl<'m> Builder<'m> {
                     .ok_or(OptError::Unsupported("from_tir: DirectFn var out of range"))?;
                 Ok(self.emit(self.global_load(&name), ty))
             }
-            Resolution::None => Ok(self.emit(InstKind::This, ty)),
+            Resolution::None => match self.inlining.last().and_then(|frame| frame.this) {
+                Some(this) => Ok(this),
+                None => Ok(self.emit(InstKind::This, ty)),
+            },
             _ => Err(OptError::Unsupported("from_tir: var resolution")),
         }
     }

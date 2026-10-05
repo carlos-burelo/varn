@@ -164,15 +164,10 @@ pub enum InstKind {
         args: Vec<Value>,
     },
 
-    /// `new Class(...args)` with a statically-known class callee. Same
-    /// calling convention as [`InstKind::Call`] (the interpreter runs the
-    /// constructor through the identical path), but the class identity
-    /// survives into the portable SSA so the JIT can route construction
-    /// through its dedicated helper instead of a generic invoke. With
-    /// spread arguments this is never emitted (`CallSpread` covers those).
-    NewInstance {
-        callee: Value,
-        args: Vec<Value>,
+    /// A fresh instance of `class`, laid out by the class's layout, its
+    /// constructor not yet applied.
+    AllocInstance {
+        class: Value,
     },
 
     SelfCall {

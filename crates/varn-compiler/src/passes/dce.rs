@@ -82,7 +82,6 @@ pub(crate) fn dest_droppable(kind: &InstKind) -> bool {
     matches!(
         kind,
         Call { .. }
-            | NewInstance { .. }
             | SelfCall { .. }
             | MethodCall { .. }
             | SuperCall { .. }
@@ -145,7 +144,8 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         // incluso con el resultado descartado).
 
         // Allocation with no observable effect.
-        BuildArray { .. }
+        AllocInstance { .. }
+        | BuildArray { .. }
         | BuildTuple { .. }
         | BuildObject { .. }
         | BuildRecord { .. }
@@ -212,7 +212,6 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
 
         // Calls, in every shape.
         Call { .. }
-        | NewInstance { .. }
         | SelfCall { .. }
         | MethodCall { .. }
         | SuperCall { .. }

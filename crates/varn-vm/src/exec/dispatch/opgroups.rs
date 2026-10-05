@@ -100,6 +100,7 @@ macro_rules! object_ops {
             | OpCode::GetSymbol
             | OpCode::AssertNotNull
             | OpCode::DeclareLayout
+            | OpCode::AllocInstance
             | OpCode::GetIndex
             | OpCode::SetIndex
             | OpCode::ArrayGetIndex

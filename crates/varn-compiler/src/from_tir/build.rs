@@ -19,6 +19,7 @@ mod assign;
 mod call;
 mod class_def;
 mod classdef_methods;
+mod construct;
 mod context;
 mod exports;
 mod expr_access;

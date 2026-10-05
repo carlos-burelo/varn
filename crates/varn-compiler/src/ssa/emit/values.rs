@@ -12,6 +12,7 @@ mod scalars;
 use super::super::ir::{BlockId, Inst, InstKind};
 use crate::OptError;
 use std::sync::Arc;
+use varn_core::OpCode;
 use varn_types::chunk::Chunk;
 type Result<T> = std::result::Result<T, OptError>;
 
@@ -53,8 +54,12 @@ pub(super) fn emit_value(
         }
         InstKind::LoadUpvalue(uv) => access::emit_load_upvalue(chunk, d, *uv, line),
 
-        InstKind::Call { callee, args } | InstKind::NewInstance { callee, args } => {
+        InstKind::Call { callee, args } => {
             calls::emit_call(chunk, d, *callee, args, reg, call_base, line);
+        }
+        InstKind::AllocInstance { class } => {
+            chunk.write(Chunk::pack_op(OpCode::AllocInstance, d), line);
+            chunk.write(Chunk::pack(reg[class.0 as usize], 0), line);
         }
 
         InstKind::SelfCall { args } => {

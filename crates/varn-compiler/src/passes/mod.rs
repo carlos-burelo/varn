@@ -10,10 +10,9 @@ pub mod monomorphize;
 pub mod redundant_guards;
 pub mod state_machine;
 
-use crate::from_tir::ctor_summary::CtorSummaries;
 use crate::ssa::ir::SsaFunc;
 
-pub fn optimize_with(func: &mut SsaFunc, summaries: &CtorSummaries) {
+pub fn optimize(func: &mut SsaFunc) {
     let mut iterations = 0;
     loop {
         let mut changed = false;
@@ -36,11 +35,7 @@ pub fn optimize_with(func: &mut SsaFunc, summaries: &CtorSummaries) {
 
         changed |= fixed_fields::run(func);
 
-        // After `fixed_fields` (same disqualification shape, and a literal
-        // stored into a field is one fewer escaping use to reason about) and
-        // before DCE, which deletes the `global` load the deleted call leaves
-        // behind.
-        changed |= escape::run(func, summaries);
+        changed |= escape::run(func);
 
         changed |= licm::run(func);
 

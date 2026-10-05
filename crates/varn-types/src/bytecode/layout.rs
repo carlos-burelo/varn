@@ -295,6 +295,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         | O::DefineStaticGetter
         | O::DefineStaticSetter => (3, vec![r(hi(1)), k(2, K::Name), r(lo(1))]),
         O::DeclareLayout => (3, vec![r(hi(1)), k(2, K::Layout)]),
+        O::AllocInstance => (2, vec![w(hi(0)), r(hi(1))]),
         // The tag is a register.
         O::MakeEnumVariant => (3, vec![w(hi(1)), k(2, K::Name), r(lo(1))]),
 

@@ -484,7 +484,6 @@ fn entry_param(
 fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
     match op {
         SsaOp::Call { .. }
-        | SsaOp::New { .. }
         | SsaOp::CallNativeOp { .. }
         | SsaOp::MethodCall { .. }
         | SsaOp::IterCall { .. }
@@ -515,7 +514,7 @@ fn needs_frame(ssa: &SsaProto, op: &SsaOp) -> bool {
     matches!(
         op,
         SsaOp::Call { .. }
-            | SsaOp::New { .. }
+            | SsaOp::AllocInstance { .. }
             | SsaOp::CallNativeOp { .. }
             | SsaOp::MethodCall { .. }
             | SsaOp::LoadGlobalIdx(_)

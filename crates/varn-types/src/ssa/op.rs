@@ -43,15 +43,9 @@ pub enum SsaOp {
         args: Vec<u32>,
     },
 
-    /// `new Class(...args)` with a statically-known class callee. Same
-    /// calling convention as [`SsaOp::Call`] — the interpreter runs the
-    /// constructor through the identical path — but the class identity
-    /// survives into the portable SSA so the JIT can route construction
-    /// through its dedicated helper instead of a generic invoke. Never
-    /// emitted with spread arguments (`CallSpread` covers those).
-    New {
-        callee: u32,
-        args: Vec<u32>,
+    /// A fresh instance of `class`, its constructor not yet applied.
+    AllocInstance {
+        class: u32,
     },
 
     /// Module-relative global read (`GlobalStore[closure.module_base + slot]`),

@@ -230,7 +230,6 @@ pub fn emit_function_meta(
         jit_osr_ip: Cell::new(0),
         jit_osr_code: RefCell::new(None),
         jit_osr_failed: Cell::new(false),
-        trivial_init_memo: RefCell::new(None),
         ssa: ssa_proto,
         suspend_live,
     })

@@ -6,8 +6,6 @@ use super::super::inline_cache::{FeedbackVector, PolyICSlot};
 use super::super::literal::opt_rc_str_serde;
 use super::super::Chunk;
 
-pub type TrivialInitPlan = Rc<[(usize, u32, Option<varn_core::RuntimeKind>)]>;
-
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct FunctionProto {
     #[serde(with = "opt_rc_str_serde")]
@@ -245,11 +243,6 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub jit_osr_failed: std::cell::Cell<bool>,
-
-    /// Cached plan for trivial field initialization constructors.
-    #[serde(skip)]
-    #[serde(default)]
-    pub trivial_init_memo: std::cell::RefCell<Option<Option<TrivialInitPlan>>>,
 
     /// Portable typed SSA, attached after regalloc, or why the body has none
     /// (the JIT then lowers it from bytecode).

@@ -1,6 +1,6 @@
 //! Transformación de funciones suspendibles en máquinas de estados.
 //!
-//! Corre FUERA del bucle a punto fijo de `optimize_with`, después de él y
+//! Corre FUERA del bucle a punto fijo de `optimize`, después de él y
 //! antes de la asignación de registros: transforma una función en otra de
 //! forma distinta, y volver a pasarle `licm`/`cse`/`cfg` por encima sería
 //! reoptimizar una máquina de estados como si fuera código normal.

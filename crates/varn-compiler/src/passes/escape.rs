@@ -1,109 +1,74 @@
 //! Scalar replacement of class instances that never escape.
 //!
-//! The sibling of `fixed_fields`, one level harder. That pass forwards reads
-//! of an object literal whose contents are already in SSA form; here the
-//! contents are produced by a *constructor call*, so the values have to come
-//! from a cross-function summary (`hir::ctor_summary`) instead of from the
-//! instruction itself.
-//!
-//! ```text
-//!   v6 = global M::Box              v6 = global M::Box   (DCE removes)
-//!   v7 = call v6(v3)          -->   (deleted)
-//!   v9 = getfixed v7[0]             v9 forwarded to v3
-//! ```
-//!
-//! Once every read is forwarded the call has no uses left, and THIS pass
-//! deletes it — DCE cannot, because a `Call` is an effect as far as it knows
-//! and it has no way to tell that this particular callee only fills in a
-//! fresh object nobody can reach.
-//!
-//! Disqualification mirrors `fixed_fields` and is conservative: any use of
-//! the instance other than a `GetFixedField` on it — call argument, store,
-//! return, branch argument, `SetFixedField`, `GetProperty` — keeps the
-//! allocation. Object identity is observable here (`===` is the `Rc`
-//! address), and every one of those uses can leak it.
-//!
-//! The summary's own soundness argument — why a class global may be resolved
-//! at compile time at all, when `Box = Other` is legal — is in
-//! `hir::ctor_summary`.
+//! An `AllocInstance` whose only uses are field stores into it, made in its
+//! own block before anything reads it and at most once per slot, followed by
+//! field reads, holds exactly the values stored: each read is forwarded to its
+//! stored value, and the allocation and its stores are deleted. Any other use
+//! (call argument, store into another object, return, branch argument,
+//! property access) can leak the identity `===` observes, and keeps it.
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::from_tir::ctor_summary::{CtorSummaries, SlotInit};
 use crate::ssa::ir::{InstKind, SsaFunc, Terminator, Value};
 use crate::ssa::verify::inst_uses;
 
-pub fn run(func: &mut SsaFunc, summaries: &CtorSummaries) -> bool {
-    if summaries.is_empty() {
-        return false;
-    }
+struct Site {
+    stores: FxHashMap<u16, Value>,
+    store_block: usize,
+}
 
-    // Class global loads, by name or by numbered slot, so a call's callee can
-    // be resolved to a class.
-    let mut globals: FxHashMap<u32, &Vec<SlotInit>> = FxHashMap::default();
-    for block in &func.blocks {
-        for inst in &block.insts {
-            let Some(dest) = inst.dest else { continue };
-            let found = match &inst.kind {
-                InstKind::LoadGlobal(name) => summaries.by_name(name),
-                InstKind::LoadGlobalIdx(slot) => summaries.by_slot(*slot),
-                _ => None,
-            };
-            if let Some(slots) = found {
-                globals.insert(dest.0, slots);
-            }
-        }
-    }
-    if globals.is_empty() {
-        return false;
-    }
+pub fn run(func: &mut SsaFunc) -> bool {
+    let mut sites: FxHashMap<u32, Site> = FxHashMap::default();
+    let mut escaped: FxHashSet<u32> = FxHashSet::default();
+    let mut reads: Vec<(Value, u32, u16)> = Vec::new();
 
-    // Construction sites: instance value → (constructor args, slot summary).
-    let mut sites: FxHashMap<u32, (Vec<Value>, &Vec<SlotInit>)> = FxHashMap::default();
-    for block in &func.blocks {
+    for (bi, block) in func.blocks.iter().enumerate() {
+        let mut read_here: FxHashSet<u32> = FxHashSet::default();
         for inst in &block.insts {
-            let (Some(dest), inst) = (inst.dest, &inst.kind) else {
-                continue;
-            };
-            let (callee, args) = match inst {
-                InstKind::Call { callee, args } | InstKind::NewInstance { callee, args } => {
-                    (callee, args)
-                }
-                _ => continue,
-            };
-            let Some(&slots) = globals.get(&callee.0) else {
-                continue;
-            };
-            // The summary indexes PARAMETERS; a call passing fewer arguments
-            // than the constructor declares is not the shape it describes.
-            if slots
-                .iter()
-                .any(|s| matches!(s, SlotInit::Param(p) if *p as usize >= args.len()))
-            {
-                continue;
-            }
-            sites.insert(dest.0, (args.clone(), slots));
-        }
-    }
-    if sites.is_empty() {
-        return false;
-    }
-
-    // Anything that could observe the instance itself disqualifies it.
-    for block in &func.blocks {
-        for inst in &block.insts {
-            if let InstKind::GetFixedField { object, .. } = &inst.kind {
-                if sites.contains_key(&object.0) {
+            match (&inst.kind, inst.dest) {
+                (InstKind::AllocInstance { .. }, Some(d)) => {
+                    sites.insert(
+                        d.0,
+                        Site {
+                            stores: FxHashMap::default(),
+                            store_block: bi,
+                        },
+                    );
                     continue;
                 }
+                (
+                    InstKind::SetFixedField {
+                        object,
+                        value,
+                        slot,
+                        ..
+                    },
+                    _,
+                ) if sites.contains_key(&object.0) => {
+                    escaped.insert(value.0);
+                    let site = sites.get_mut(&object.0).expect("a site");
+                    let in_order = site.store_block == bi && !read_here.contains(&object.0);
+                    if !in_order || site.stores.insert(*slot, *value).is_some() {
+                        escaped.insert(object.0);
+                    }
+                    continue;
+                }
+                (InstKind::GetFixedField { object, slot, .. }, Some(d))
+                    if sites.contains_key(&object.0) =>
+                {
+                    read_here.insert(object.0);
+                    reads.push((d, object.0, *slot));
+                    continue;
+                }
+                _ => {}
             }
             for u in inst_uses(&inst.kind) {
-                sites.remove(&u.0);
+                escaped.insert(u.0);
             }
         }
         match &block.term {
             Terminator::Return(Some(v)) | Terminator::Throw(v) => {
-                sites.remove(&v.0);
+                escaped.insert(v.0);
             }
             Terminator::Branch {
                 cond,
@@ -111,83 +76,54 @@ pub fn run(func: &mut SsaFunc, summaries: &CtorSummaries) -> bool {
                 else_args,
                 ..
             } => {
-                sites.remove(&cond.0);
-                for a in then_args.iter().chain(else_args) {
-                    sites.remove(&a.0);
-                }
+                escaped.insert(cond.0);
+                escaped.extend(then_args.iter().chain(else_args).map(|a| a.0));
             }
-            Terminator::Jump { args, .. } => {
-                for a in args {
-                    sites.remove(&a.0);
-                }
-            }
+            Terminator::Jump { args, .. } => escaped.extend(args.iter().map(|a| a.0)),
             _ => {}
+        }
+    }
+    sites.retain(|v, _| !escaped.contains(v));
+
+    let mut forwards: Vec<(Value, Value, u32)> = Vec::new();
+    for &(dest, site, slot) in &reads {
+        let Some(s) = sites.get(&site) else { continue };
+        match s.stores.get(&slot) {
+            Some(&stored) if func.value_ty(stored) == func.value_ty(dest) => {
+                forwards.push((dest, stored, site))
+            }
+            _ => {
+                sites.remove(&site);
+            }
         }
     }
     if sites.is_empty() {
         return false;
     }
-
-    // Collect the forwards, and note any instance with a read this pass
-    // cannot answer: a slot the constructor left null (whose SSA type would
-    // then disagree with the value) or one outside the summary. Such an
-    // instance keeps its allocation — the reads that DID resolve are still
-    // forwarded, which is correct, just not a win on its own.
-    let mut forwards: Vec<(Value, Value)> = Vec::new();
-    let mut unresolved: FxHashSet<u32> = FxHashSet::default();
-    for block in &func.blocks {
-        for inst in &block.insts {
-            let (Some(dest), InstKind::GetFixedField { object, slot, .. }) =
-                (inst.dest, &inst.kind)
-            else {
-                continue;
-            };
-            let Some((args, slots)) = sites.get(&object.0) else {
-                continue;
-            };
-            match slots.get(*slot as usize) {
-                Some(SlotInit::Param(p)) => forwards.push((dest, args[*p as usize])),
-                _ => {
-                    unresolved.insert(object.0);
-                }
-            }
-        }
-    }
-    if forwards.is_empty() {
-        return false;
-    }
-
-    // Chained forwards resolve transitively (a constructor argument can be
-    // another forwarded field read whose call is deleted below — capturing it
-    // stale would leave a use of an undefined value; same hazard as
-    // `fixed_fields`, same fix).
-    let mut fwd_map: FxHashMap<Value, Value> = forwards.into_iter().collect();
-    let keys: Vec<Value> = fwd_map.keys().copied().collect();
-    for k in keys {
-        let mut v = fwd_map[&k];
-        loop {
-            match fwd_map.get(&v) {
-                Some(&w) if w != v => v = w,
-                _ => break,
-            }
-        }
-        fwd_map.insert(k, v);
-    }
-    for (dest, value) in fwd_map {
-        func.replace_all_uses(dest, value);
-    }
-
-    // Delete the constructions whose every read was answered. Sound by the
-    // summary: the callee writes nothing but fields of an object that, per
-    // the disqualification above, nothing else in this function can reach.
-    let dead: FxHashSet<u32> = sites
-        .keys()
-        .copied()
-        .filter(|v| !unresolved.contains(v))
+    let mut to: FxHashMap<Value, Value> = forwards
+        .into_iter()
+        .filter(|(_, _, site)| sites.contains_key(site))
+        .map(|(dest, stored, _)| (dest, stored))
         .collect();
+    let keys: Vec<Value> = to.keys().copied().collect();
+    for k in keys {
+        let mut v = to[&k];
+        while let Some(&w) = to.get(&v) {
+            if w == v {
+                break;
+            }
+            v = w;
+        }
+        to.insert(k, v);
+    }
+    for (dest, stored) in to {
+        func.replace_all_uses(dest, stored);
+    }
     for block in &mut func.blocks {
-        block.insts.retain(|inst| match (inst.dest, &inst.kind) {
-            (Some(d), InstKind::Call { .. } | InstKind::NewInstance { .. }) => !dead.contains(&d.0),
+        block.insts.retain(|inst| match (&inst.kind, inst.dest) {
+            (InstKind::AllocInstance { .. }, Some(d)) => !sites.contains_key(&d.0),
+            (InstKind::SetFixedField { object, .. }, _)
+            | (InstKind::GetFixedField { object, .. }, _) => !sites.contains_key(&object.0),
             _ => true,
         });
     }

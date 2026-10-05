@@ -21,7 +21,7 @@ type Result<T> = std::result::Result<T, OptError>;
 
 // The `TirModule` currently being compiled, so `ssa/emit`'s `ClosureBody::Tir`
 // arm can call back to compile the referenced body. Same raw-pointer scope
-// guard pattern as `hir::ctor_summary::Scope` / the VM's `clif_link::CtxGuard`
+// guard pattern as the VM's `clif_link::CtxGuard`
 // — the pointer is only live for the duration of `with_module`, which owns
 // the borrow.
 thread_local! {
@@ -105,7 +105,7 @@ fn compile_one(
         build_function(tir, f, self_fn)?
     };
     crate::ssa::verify::recompute_preds(&mut ssa);
-    crate::passes::optimize_with(&mut ssa, &super::ctor_summary::current());
+    crate::passes::optimize(&mut ssa);
     let state_size = crate::passes::state_machine::run(&mut ssa);
     crate::ssa::verify::recompute_preds(&mut ssa);
     if let Err(why) = crate::ssa::verify::verify(&ssa) {
@@ -154,8 +154,6 @@ pub fn compile_module(tir: &TirModule, export_names: Vec<Arc<str>>) -> Result<Fu
         )
     })?;
     let _scope = enter_module(tir);
-    let summaries = super::ctor_summary::collect(tir);
-    let _ctor_scope = super::ctor_summary::Scope::enter(summaries);
     let source_file = tir.source_file.clone();
     let mut proto = compile_one(tir, &tir.top_level, true, source_file, &export_names, None)?;
     proto.export_names = export_names

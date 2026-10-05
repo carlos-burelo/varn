@@ -147,6 +147,13 @@ impl ExecCtx {
                 self.exec_assert_not_null(v)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
+            OpCode::AllocInstance => {
+                let class = self.stack.box_reg(base, hi(code[*ip]));
+                *ip += 1;
+                let instance = crate::exec::class::op_alloc_instance(class, &mut self.heap)?;
+                self.stack.unbox_into_reg(base, first_reg, instance)?;
+                Ok(Some(ObjectFlow::ContinueInstruction))
+            }
             OpCode::DeclareLayout => {
                 let w1 = code[*ip];
                 *ip += 1;

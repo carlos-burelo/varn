@@ -156,8 +156,10 @@ pub(super) fn emit_inst(
         SsaOp::Call { callee, args } => {
             return Ok(Some(call::emit_call(b, ctx, values, *callee, args, dest)?))
         }
-        SsaOp::New { callee, args } => {
-            return Ok(Some(call::emit_new(b, ctx, values, *callee, args)?))
+        SsaOp::AllocInstance { class } => {
+            return Ok(Some(Out::Boxed(super::classops::emit_alloc_instance(
+                b, ctx, values, *class,
+            )?)))
         }
 
         SsaOp::MakeClosure { proto, upvalues } => {

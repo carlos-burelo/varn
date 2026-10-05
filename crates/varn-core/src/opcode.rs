@@ -84,6 +84,8 @@ pub enum OpCode {
 
     DeclareLayout,
 
+    AllocInstance,
+
     BindMethod,
 
     Typeof,

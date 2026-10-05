@@ -53,6 +53,27 @@ pub(super) fn emit_make_class(
     ))
 }
 
+pub(super) fn emit_alloc_instance(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<cranelift_codegen::ir::Value>],
+    class: u32,
+) -> Result<cranelift_codegen::ir::Value, String> {
+    let frame = ctx
+        .frame
+        .as_ref()
+        .ok_or("from_ssa: AllocInstance without a frame")?;
+    let (ct, cp) = boxed_parts(b, ctx, values, class)?;
+    let ectx = frame.exec_ctx;
+    call_helper_void(b, ctx.cc, ctx.helpers.alloc_instance, &[ectx, ct, cp]);
+    Ok(b.ins().load(
+        types::I128,
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        ectx,
+        ctx.helpers.jit_native_result_offset as i32,
+    ))
+}
+
 pub(super) fn emit_declare_layout(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
