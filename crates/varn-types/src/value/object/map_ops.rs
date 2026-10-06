@@ -18,17 +18,17 @@ impl ObjData<[Cell<VmValue>]> {
         self.field_at(slot)
     }
 
-    /// Sets `name`, growing the object if it is not already in the shape.
-    /// Growth spills to the overflow store: the allocation must not move,
-    /// because `Value::Object` identity is its address.
+    
+    
+    
     pub fn insert(&self, name: RuntimeString, value: VmValue) {
         if let Some(&slot) = self.shape().property_names.get(&name) {
             if self.set_field_at(slot, value) {
                 return;
             }
-            // Shape says the slot exists but no store backs it yet: the field
-            // was added to the shape by a sibling object. Fall through and
-            // extend the overflow up to it.
+            
+            
+            
             let overflow = self.overflow_mut();
             overflow.resize(slot - self.inline_len() + 1, VmValue::null());
             overflow[slot - self.inline_len()] = value;
@@ -51,14 +51,14 @@ impl ObjData<[Cell<VmValue>]> {
         overflow[slot - base] = value;
     }
 
-    /// `delete obj.x`: rebuilds the shape without `name` and repacks the
-    /// remaining fields into the same allocation.
+    
+    
     pub fn remove(&self, name: &str) -> Option<VmValue> {
         let removed_slot = *self.shape().property_names.get(name)?;
         let removed = self.field_at(removed_slot)?;
 
-        // Kept in original slot order so the repacked object preserves the
-        // field order the language exposes through `keys()`.
+        
+        
         let mut ordered: Vec<(RuntimeString, usize)> = self
             .shape()
             .property_names
@@ -79,8 +79,8 @@ impl ObjData<[Cell<VmValue>]> {
         }
         self.set_shape(new_shape);
 
-        // Repack. The tail cannot shrink, so trailing slots are nulled rather
-        // than left holding values the GC would keep alive.
+        
+        
         let base = self.inline_len();
         let overflow = self.overflow_mut();
         overflow.clear();
@@ -108,8 +108,8 @@ impl ObjData<[Cell<VmValue>]> {
         shape.property_names.contains_key(name)
     }
 
-    /// Number of fields the object exposes — the shape is the authority, not
-    /// the tail, which keeps its size after a `remove`.
+    
+    
     #[inline]
     pub fn len(&self) -> usize {
         self.shape().property_names.len()
@@ -135,16 +135,16 @@ impl ObjData<[Cell<VmValue>]> {
             .into_iter()
     }
 
-    /// The fields in declaration order, as owned pairs.
-    ///
-    /// Field order comes from [`Shape::ordered_names`], which the shape
-    /// computed once. This used to sort a `Vec` built from the property
-    /// HashMap and then collect it into a second `Vec` — two allocations, N
-    /// `Rc` clones and a sort for every object visited, which `JSON.stringify`
-    /// paid a million times over a 50 000-record document.
-    ///
-    /// Readers on a hot path should prefer walking `shape().ordered_names()`
-    /// with [`Self::field_at`] directly: that allocates nothing at all.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub fn iter(&self) -> std::vec::IntoIter<(RuntimeString, VmValue)> {
         let names = self.shape().ordered_names();
         let mut pairs = Vec::with_capacity(names.len());

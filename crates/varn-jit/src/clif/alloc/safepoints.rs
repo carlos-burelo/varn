@@ -1,32 +1,32 @@
-//! The allocation scan and the back-edge poll shared by the lowering.
-//!
-//! The whole-function scan (`has_alloc`) feeds the size gate's leaf-safe
-//! rule; the poll keeps an allocating loop collecting. Everything else that
-//! lived here (activation contexts, home flushes, live sets, stack-map
-//! records) served the bytecode lowering's register model: heap values live
-//! in their homes by construction, so there is nothing to flush.
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 
-/// How precisely an allocation scan reads `OpCode::Intrinsic`.
-///
-/// A whole FUNCTION is scanned to decide whether it needs the size gate's
-/// protection, and there the cost of a false `true` is a missed compilation
-/// while the cost of a false `false` is an unresumable frame — so it stays
-/// conservative.
+
+
+
+
+
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum IntrinsicScan {
-    /// Every `Intrinsic` counts as allocating.
+    
     Conservative,
-    /// No `Intrinsic` counts: every one is a `std:math` op on scalars
-    /// (`varn_core::intrinsic_ops`), which never touches the heap.
+    
+    
     ByWireByte,
 }
 
-/// Conservative whole-function scan; see [`IntrinsicScan`].
+
 pub(crate) fn has_alloc(
     code: &[u16],
     pool: &[varn_types::chunk::PoolEntry],
@@ -130,11 +130,11 @@ pub(crate) fn has_alloc_scan(
     Ok(false)
 }
 
-/// The collector's poll at a loop back edge: when the young generation reached its
-/// threshold, `collect` runs on the slow path (it must call the
-/// `gc_safepoint` helper, with whatever the lowering has to do around it).
-/// A call-free allocating loop depends on it, as the interpreter's `Loop`
-/// does on `gc_backedge_safepoint`: nothing else would ever collect.
+
+
+
+
+
 pub(crate) fn emit_gc_poll(
     b: &mut FunctionBuilder,
     h: &crate::JitHelpers,

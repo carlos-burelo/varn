@@ -1,8 +1,8 @@
-//! Natural-loop analysis shared by backend register allocation (live-range
-//! widening across back-edges) and the JIT's loop-invariant guard hoisting.
-//! Back-edge detection lives here ONLY — see [`crate::bytecode::decode`]'s
-//! docstring: every walker over `chunk.code` advances with the shared
-//! decoder, and loop-boundary detection is no exception.
+
+
+
+
+
 
 use rustc_hash::FxHashSet as HashSet;
 
@@ -11,8 +11,8 @@ use varn_core::OpCode;
 use crate::bytecode::decode;
 use crate::chunk::PoolEntry;
 
-/// `(header_instr, latch_instr)` pairs, one per `Loop` opcode. Both are
-/// instruction indices (not code-word offsets).
+
+
 pub fn collect_back_edges(code: &[u16], constants: &[PoolEntry]) -> Vec<(usize, usize)> {
     let mut word_to_instr: rustc_hash::FxHashMap<usize, usize> = rustc_hash::FxHashMap::default();
     let mut offset = 0usize;
@@ -51,22 +51,22 @@ pub fn collect_back_edges(code: &[u16], constants: &[PoolEntry]) -> Vec<(usize, 
     edges
 }
 
-/// A reducible natural loop: body = instructions `[header, latch]`
-/// (inclusive), one back-edge per header — Varn's loop emitter never
-/// produces irreducible control flow.
+
+
+
 pub struct NaturalLoop {
     pub header: usize,
     pub latch: usize,
-    /// Registers written anywhere in the body. A register NOT in this set
-    /// is loop-invariant: every iteration observes the same value.
+    
+    
     def_set: HashSet<u8>,
-    /// Body contains a call-shaped instruction. A call may trigger GC,
-    /// which can move or promote a heap object — any cached raw pointer
-    /// into the heap must not survive one.
+    
+    
+    
     pub has_calls: bool,
-    /// Body contains `ArrayPush`/`ArrayPop`/`ArrayExtend` — array length or
-    /// backing capacity may change, invalidating a cached length or a
-    /// cached payload pointer (capacity growth reallocates).
+    
+    
+    
     pub mutates_arrays: bool,
 }
 
@@ -76,9 +76,9 @@ impl NaturalLoop {
     }
 }
 
-/// Code-word offset of every instruction, indexed by instruction number —
-/// the shared `instr_idx -> offset` table walkers need to translate
-/// [`NaturalLoop`]'s instruction-index bounds into `chunk.code` offsets.
+
+
+
 pub fn instr_offsets(code: &[u16], constants: &[PoolEntry]) -> Vec<usize> {
     let mut offsets = Vec::new();
     let mut offset = 0usize;
@@ -92,8 +92,8 @@ pub fn instr_offsets(code: &[u16], constants: &[PoolEntry]) -> Vec<usize> {
     offsets
 }
 
-/// Natural loops in `code`, built from [`collect_back_edges`] plus a
-/// per-body scan for def-set / call / array-mutation facts.
+
+
 pub fn natural_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<NaturalLoop> {
     let back_edges = collect_back_edges(code, constants);
     if back_edges.is_empty() {

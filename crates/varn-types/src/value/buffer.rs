@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// A high-performance, zero-copy byte buffer with sub-slice support.
+
 #[derive(Clone, Debug)]
 pub struct VmBuffer {
     data: Rc<RefCell<Vec<u8>>>,

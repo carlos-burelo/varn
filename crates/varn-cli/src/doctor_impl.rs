@@ -38,9 +38,9 @@ pub fn run_doctor() -> CliResult<()> {
         None => println!("  std: none resolved"),
     }
 
-    // The only genuinely broken state: a std was found and is unusable. Every
-    // other tier falls through to the bundle compiled into this binary, which
-    // is fingerprint-matched by construction.
+    
+    
+    
     match varn_builtins::std_load_error() {
         Some(reason) => {
             println!("  status: BROKEN");

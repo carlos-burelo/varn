@@ -161,8 +161,8 @@ fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineRes
 }
 
 fn read_source(path: &str) -> PipelineResult<String> {
-    // Single door: even the entry file is read through the canonical loader, so
-    // there is no second file-reading path that can disagree with it.
+    
+    
     use varn_modules::loader::ModuleLoader;
     let id = varn_core::ModuleId::local_str(path);
     varn_modules::loader::default_registry()

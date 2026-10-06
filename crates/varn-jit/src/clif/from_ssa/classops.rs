@@ -1,12 +1,12 @@
-//! Class-construction lowering for the SSA backend: `MakeClass`, the member
-//! definitions (`Method`/`DefineStatic`/accessors), `DeclareLayout` and
-//! `GetSuper`.
-//!
-//! The runtime helpers are the same the bytecode lowering uses; because a
-//! frame-aware SSA body keeps every value in its home, no explicit
-//! flush/reload list is needed around them. The member-definition helper takes
-//! a small `[class, member, name_idx, kind]` struct, staged on the native
-//! stack exactly as the bytecode lowering does.
+
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{types, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
@@ -17,7 +17,7 @@ use super::Ctx;
 
 use super::super::emit::{box_null, call_helper_void};
 
-/// `MakeClass name [super]` — a heap class object.
+
 pub(super) fn emit_make_class(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -104,8 +104,8 @@ pub(super) fn emit_declare_layout(
     Ok(())
 }
 
-/// A member definition (`Method`=0, `DefineStatic`=1, `DefineGetter`=2,
-/// `DefineSetter`=3, `DefineStaticGetter`=4, `DefineStaticSetter`=5).
+
+
 pub(super) fn emit_define_member(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -148,8 +148,8 @@ pub(super) fn emit_define_member(
     Ok(())
 }
 
-/// `GetSuper name` — a heap result. The helper reads `this` from home r0 and
-/// the owner class from the running frame, so only a framed body has them.
+
+
 pub(super) fn emit_get_super(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -172,8 +172,8 @@ pub(super) fn emit_get_super(
     ))
 }
 
-/// The enum variant with discriminant `tag` described by `meta` — a heap
-/// result, built by the runtime's one `make_enum_variant`.
+
+
 pub(super) fn emit_make_enum_variant(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,

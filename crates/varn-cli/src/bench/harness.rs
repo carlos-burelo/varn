@@ -1,4 +1,4 @@
-//! Sample collection and the VM construction shared by every measured run.
+
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -12,12 +12,12 @@ use varn_vm::Vm;
 
 use crate::error::CliError;
 
-/// Everything needed to stand up an identical VM for one run.
-///
-/// The four call sites that used to build this inline (timed run, e2e run, and
-/// two profiling runs) drifted apart in exactly the way that makes a benchmark
-/// lie — one measured a path no user hits — so they share this factory. Every
-/// run initializes its own heap: a run never sees what an earlier one built.
+
+
+
+
+
+
 pub struct VmFactory {
     precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     builtins: Vec<Rc<FunctionProto>>,
@@ -27,8 +27,8 @@ pub struct VmFactory {
 }
 
 impl VmFactory {
-    /// Builds one VM up front so a failing initialization surfaces here, as
-    /// an error, rather than inside a timed run.
+    
+    
     pub fn new(
         precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
         builtins: Vec<FunctionProto>,
@@ -47,8 +47,8 @@ impl VmFactory {
         Ok(factory)
     }
 
-    /// A fresh VM with the builtins initialized and the entry module
-    /// registered, ready to run [`Self::entry_proto`].
+    
+    
     pub fn build(&self) -> Vm {
         self.try_build()
             .expect("initialization already succeeded in VmFactory::new")
@@ -95,7 +95,7 @@ impl VmFactory {
         self.proto.clone()
     }
 
-    /// Build, run to completion, and hand the machine back for inspection.
+    
     pub fn run_once(&self) -> Result<Vm, String> {
         let mut machine = self.build();
         run_vm_to_completion(&mut machine, self.entry_proto())?;
@@ -173,7 +173,7 @@ fn compiled_keys() -> std::collections::BTreeSet<(String, usize)> {
         .collect()
 }
 
-/// Run `f` once untimed to warm caches, then `runs` timed iterations.
+
 pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Duration>, CliError> {
     f().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
 
@@ -186,8 +186,8 @@ pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Du
     Ok(samples)
 }
 
-/// [`time_n_freq_setup`] with an optional progress callback invoked after
-/// each timed run. Callback receives `(completed_runs, samples_so_far)`.
+
+
 pub fn time_n_freq_setup_progress<T, S, F, P>(
     runs: usize,
     setup: S,
@@ -219,21 +219,21 @@ where
     Ok((samples, peak, tiered))
 }
 
-/// [`time_n`], sampling CPU frequency right after each run and keeping the
-/// peak, with a per-run SETUP step that is deliberately left out of the
-/// measurement.
-///
-/// The execute phase builds a fresh VM per run, and that build deep-clones the
-/// heap — whose cost scales with `NURSERY_CAPACITY`. Timing it made the harness
-/// structurally biased against exactly the change an allocation-heavy workload
-/// needs: growing the nursery from 16K to 256K slots measured 1.34x FASTER on
-/// `bench_gc_alloc`'s own internal clock while this phase reported it 3x
-/// slower, because each timed run was copying ~12 MB more before doing any
-/// work. A benchmark that punishes a real improvement is worse than no
-/// benchmark.
-///
-/// The setup still runs once per iteration, so each run starts from the same
-/// fresh state it always did; only the clock moved.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 pub fn time_n_freq_setup<T, S, F>(
     runs: usize,
     setup: S,

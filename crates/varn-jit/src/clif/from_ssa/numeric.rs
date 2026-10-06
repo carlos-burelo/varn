@@ -1,16 +1,16 @@
-//! `std:math` intrinsics and numeric conversions (`as`) for the SSA lowering.
-//!
-//! Each runs the runtime's one implementation through a helper —
-//! `intrinsics::dispatch` over a boxed window, `convert::convert` — except
-//! where a single instruction is provably the same function:
-//!
-//! * `abs`/`sqrt`/`floor`/`ceil` on a **float** argument are
-//!   `fabs`/`sqrt`/`floor`/`ceil` (the latter two only with SSE4.1, which
-//!   Cranelift needs for `roundsd`). An int argument keeps the helper, which
-//!   re-boxes an integral result as `int`; `round`/`min`/`max` disagree with
-//!   the ISA (ties, NaN) and the rest have no instruction. The same proof
-//!   the bytecode lowering's `floats::emit_math_intrinsic_native` documents.
-//! * `int` → `float` is `fcvt_from_sint`, what `convert`'s `to_float` does.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -35,7 +35,7 @@ fn native_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, ectx: Value) -> Value {
     )
 }
 
-/// The single instruction a unary math op on a float is, if it is one.
+
 fn float_instruction(b: &mut FunctionBuilder, ctx: &Ctx<'_>, wire: u8, x: Value) -> Option<Value> {
     Some(match wire {
         w if w == MathOp::Abs as u8 => b.ins().fabs(x),
@@ -46,7 +46,7 @@ fn float_instruction(b: &mut FunctionBuilder, ctx: &Ctx<'_>, wire: u8, x: Value)
     })
 }
 
-/// `wire(object, args...)`.
+
 pub(super) fn emit_intrinsic(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -83,12 +83,12 @@ pub(super) fn emit_intrinsic(
     Ok(Out::Boxed(native_result(b, ctx, ectx)))
 }
 
-/// Whether `operand as T` is the one instruction rather than the helper.
+
 pub(super) fn is_inline_convert(ssa: &SsaProto, operand: u32, conv: NumConv) -> bool {
     conv == NumConv::IntToFloat && ssa.value_ty(operand) == SlotKind::Int
 }
 
-/// `operand as T` for numeric conversion `conv`.
+
 pub(super) fn emit_convert(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,

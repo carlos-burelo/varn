@@ -1,4 +1,4 @@
-//! std.json manifest of a std source tree.
+
 
 use std::path::Path;
 
@@ -45,7 +45,7 @@ fn scan_std_tree(root: &Path) -> Option<StdManifest> {
         } else {
             continue;
         };
-        // If it's a file `foo.vn` but `foo/mod.vn` also exists, `mod.vn` represents `std:foo`.
+        
         let full_path = root.join(&rel_path);
         let pure = if let Ok(source) = std::fs::read_to_string(&full_path) {
             !source.contains("\"runtime:") && !source.contains("'runtime:")

@@ -18,7 +18,7 @@ pub(super) fn fast_path(
     let prefix = cx.prefix;
     let trait_ident = cx.trait_ident;
     let self_ty = cx.self_ty;
-    // Fast path wrapper generation
+    
     let is_fast = is_fast_eligible(m);
     if is_fast {
         let mut fast_sig_params = Vec::new();

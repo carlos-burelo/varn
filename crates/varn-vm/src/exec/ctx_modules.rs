@@ -151,9 +151,9 @@ impl ExecCtx {
 
         if let Some(proto) = self.precompiled.get(&resolved).cloned() {
             let result = self.eval_module_proto(resolved.clone(), proto);
-            // For pure modules, also run native class builders so that classes
-            // declared via `export declare class` (methods defined in Rust, not
-            // in Varn source) get their method tables populated.
+            
+            
+            
             if is_pure {
                 varn_builtins::build_module(&spec_str, &mut self.heap);
             }
@@ -179,9 +179,9 @@ impl ExecCtx {
         resolved: ModuleId,
         proto: std::rc::Rc<varn_types::FunctionProto>,
     ) -> VmResult<VmValue> {
-        // Reserve this module's own contiguous global-slot region. `module_base`
-        // rides on the closure below; `LoadGlobalIdx` / `StoreGlobalIdx` are
-        // relative to it. Every eval gets a fresh region in its own store.
+        
+        
+        
         let module_base = self.globals_mut().reserve_region(proto.global_count);
 
         debug_assert!(
@@ -282,8 +282,8 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
     match heap.get(val.as_heap()) {
         Some(HeapObj::Str(s)) => Some(FrozenExport::Str(Arc::from(s.as_ref()))),
         Some(HeapObj::NativeFn(f, name)) => Some(FrozenExport::NativeFn(*f, name)),
-        Some(HeapObj::Class(_)) => None, // Cannot freeze Class safely across VM instances
-        Some(HeapObj::VmClosure(_)) => None, // Cannot freeze VmClosure safely across VM instances
+        Some(HeapObj::Class(_)) => None, 
+        Some(HeapObj::VmClosure(_)) => None, 
         Some(HeapObj::Object(obj_ref)) => {
             let guard = obj_ref.borrow();
             let mut nested = FrozenModuleObj::new(ModuleId::local_str("<nested>"));

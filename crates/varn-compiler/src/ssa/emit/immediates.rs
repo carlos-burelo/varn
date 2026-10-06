@@ -1,18 +1,18 @@
-//! Which `ConstInt` values ride inside an arithmetic opcode instead of taking a
-//! register of their own.
+
+
 
 use super::super::ir::{InstKind, SsaFunc, Value};
 
-/// Which `ConstInt`s can ride along inside an arithmetic opcode.
-///
-/// `AddImm`/`SubImm` carry a signed 8-bit operand, so `i + 1` needs no
-/// register for the `1` and no `LoadInt` to put it there. Both opcodes were
-/// fully supported by the VM, the Cranelift lowering, the disassembler and
-/// register allocation, and emitted by nothing.
+
+
+
+
+
+
 pub(super) struct Immediates {
-    /// The immediate a value can be folded to, if it is a small `ConstInt`.
+    
     pub(super) imm: Vec<Option<i8>>,
-    /// Values whose every use folds, so their `LoadInt` is never emitted.
+    
     elided: Vec<bool>,
 }
 
@@ -22,9 +22,9 @@ impl Immediates {
     }
 }
 
-/// An `Add`/`Sub` on proven ints is the only place an immediate can land.
-/// `Add` is commutative so either side may carry it; `Sub` only the right,
-/// since there is no reverse-subtract opcode.
+
+
+
 pub(super) fn immediate_operand(kind: &InstKind, imm: &[Option<i8>]) -> Option<(Value, Value, i8)> {
     let InstKind::Binary {
         op,
@@ -62,9 +62,9 @@ pub(super) fn plan_immediates(ssa: &SsaFunc) -> Immediates {
         }
     }
 
-    // A constant only disappears if *every* read of it folds. `c + c` reads
-    // the same value twice and can only fold one side, so it keeps its
-    // register — hence counting rather than a boolean.
+    
+    
+    
     let mut total = vec![0u32; n];
     let mut folded = vec![0u32; n];
     for block in &ssa.blocks {

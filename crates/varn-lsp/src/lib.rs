@@ -10,8 +10,8 @@ pub mod query;
 pub mod util;
 pub mod workspace;
 
-/// Provider first, then the source mirror it feeds: `materialize` reads the
-/// active std through the provider, so registering has to come first.
+
+
 fn init_std() -> Option<&'static str> {
     varn_builtins::register_provider();
     workspace::std_sources::materialize();

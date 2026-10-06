@@ -32,7 +32,7 @@ pub(super) fn check_binary(
     let l = lhs.ty.non_nullable(&m.types);
     let r = rhs.ty.non_nullable(&m.types);
 
-    // Dynamic operands make the operation generic; nothing to prove.
+    
     if matches!(l, BackendTy::Dynamic(_)) || matches!(r, BackendTy::Dynamic(_)) {
         return;
     }
@@ -48,7 +48,7 @@ pub(super) fn check_binary(
         return;
     }
 
-    // Arithmetic keeps the operand class (`varn_core::numeric`, spec §10).
+    
     let expected = l;
 
     if e.ty != expected {
@@ -72,14 +72,14 @@ pub(super) fn check_field(
         return;
     };
     let BackendTy::Class(c) = object.ty.non_nullable(&m.types) else {
-        return; // well-formedness already reported this
+        return; 
     };
     let Some(field) = m.class(c).and_then(|ci| ci.field_at(*slot)) else {
-        return; // ditto
+        return; 
     };
-    // Equality is deliberate here: a field read produces exactly the field's
-    // declared type. If the node claims a different type, the nullability or
-    // type itself was lost, and that is a real error to report.
+    
+    
+    
     if e.ty != field.ty {
         errors.push(VerifyError::new(
             format!(
@@ -111,7 +111,7 @@ pub(super) fn check_index(
     }
 }
 
-/// A payload read produces exactly the variant field's declared type.
+
 pub(super) fn check_variant_payload(
     m: &TirModule,
     e: &TirExpr,
@@ -121,7 +121,7 @@ pub(super) fn check_variant_payload(
     errors: &mut Vec<VerifyError>,
 ) {
     let BackendTy::Enum(id) = value.ty.non_nullable(&m.types) else {
-        return; // wellformed already reported this
+        return; 
     };
     let Some(variant) = m.enum_info(id).and_then(|ei| ei.variant_at(tag)) else {
         errors.push(VerifyError::new(

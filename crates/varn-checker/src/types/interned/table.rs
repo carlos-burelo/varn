@@ -4,16 +4,16 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::{LangPrimitive, TypeKind};
 
-/// How many new entries any of `CheckerTyTable`'s four delta maps may hold
-/// before the next mutation folds all four into a fresh frozen base. Bounds
-/// the cost of every `Clone` regardless of session length — see
-/// `docs/plans/2026-09-25-shared-atom-type-tables.md` §3 (Enfoque B). Ids here
-/// are content-addressed (ADR-0012), so freezing at any point can never
-/// change what id a shape gets.
+
+
+
+
+
+
 const FREEZE_THRESHOLD: usize = 2048;
 
-/// Frozen, immutable half of a `CheckerTyTable`. Shared via `Arc`, so cloning
-/// a `CheckerTyTable` never copies this: only the (bounded) delta is copied.
+
+
 #[derive(Debug, Default)]
 pub(super) struct CheckerTyBase {
     pub(super) entries: FxHashMap<CheckerTyId, super::ids::InternedTypeKind>,
@@ -22,13 +22,13 @@ pub(super) struct CheckerTyBase {
     pub(super) object_members: FxHashMap<ObjectMembersId, Vec<ObjectTypeMember>>,
 }
 
-/// Content-addressed store: a memo `id -> shape`. Identity never depends on
-/// insertion order, so this is a pure cache — two tables with the same shapes
-/// agree on every id, and merging them is a set union.
-///
-/// Internally split into a frozen `base` (shared via `Arc`, O(1) to clone)
-/// and four small delta maps holding what was interned since the last
-/// freeze.
+
+
+
+
+
+
+
 #[derive(Debug, Clone)]
 pub struct CheckerTyTable {
     pub(super) base: Arc<CheckerTyBase>,
@@ -48,8 +48,8 @@ impl Default for CheckerTyTable {
 impl CheckerTyTable {
     pub fn new() -> Self {
         let mut base = CheckerTyBase::default();
-        // Seed the reserved intrinsic ids. `intern` maps these shapes back to
-        // the same ids, so the seed is only so `get` is total over them.
+        
+        
         for (id, kind) in [
             (CheckerTyId::INT, TypeKind::Primitive(LangPrimitive::Int)),
             (
@@ -91,9 +91,9 @@ impl CheckerTyTable {
         }
     }
 
-    /// Fold every delta map into a fresh frozen `base`. O(n) in the total
-    /// table size, but only runs once every `FREEZE_THRESHOLD` new entries
-    /// across all four maps combined, not once per caller.
+    
+    
+    
     pub(super) fn freeze(&mut self) {
         if self.delta_entries.is_empty()
             && self.delta_lists.is_empty()
@@ -177,14 +177,14 @@ mod tests {
         assert_eq!(union1, union2);
     }
 
-    /// The whole point of content addressing: two tables that grew in any
-    /// order agree on every shape's id, so `absorb` is a plain union.
+    
+    
     #[test]
     fn ids_are_order_independent_across_tables() {
         let mut left = CheckerTyTable::default();
         let mut right = CheckerTyTable::default();
 
-        // Same shapes, opposite insertion order.
+        
         let l_int = left.intern(TypeKind::Primitive(LangPrimitive::Int));
         let l_arr = left.intern(TypeKind::Array(l_int));
         let r_int = right.intern(TypeKind::Primitive(LangPrimitive::Int));
@@ -251,10 +251,10 @@ mod tests {
         );
     }
 
-    /// `absorb`'s `Arc::ptr_eq` shortcut must never skip content that is
-    /// genuinely new: when `other` shares `self`'s frozen base but has grown
-    /// its own delta since the clone, that delta is exactly what `self` is
-    /// missing and must still be copied over.
+    
+    
+    
+    
     #[test]
     fn absorb_with_shared_base_still_picks_up_the_other_deltas_new_entries() {
         let mut local = CheckerTyTable::default();

@@ -12,22 +12,22 @@ pub const CAP_ALL: u64 = u64::MAX;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilitySet {
-    /// Bitmask fast-path: 1 CPU instruction check for unrestricted rights
+    
     pub mask: u64,
 
-    /// Whitelist for fs:read paths (None = any path allowed if CAP_FS_READ is set)
+    
     pub fs_read_paths: Option<Vec<PathBuf>>,
 
-    /// Whitelist for fs:write paths (None = any path allowed if CAP_FS_WRITE is set)
+    
     pub fs_write_paths: Option<Vec<PathBuf>>,
 
-    /// Whitelist for outgoing network domains/hosts (None = any host allowed)
+    
     pub net_hosts: Option<Vec<String>>,
 
-    /// Whitelist for listening ports (None = any port allowed)
+    
     pub net_ports: Option<Vec<i64>>,
 
-    /// Whitelist for environment variables (None = any env var allowed)
+    
     pub env_vars: Option<Vec<String>>,
 }
 

@@ -72,9 +72,9 @@ pub fn build_call_argument_completions(
                     .filter_map(|p| p.name.as_deref().map(str::to_owned)),
             );
         } else if let TypeKind::Named(name, _) = state.db.ty_kind(&info.ty) {
-            // Straight off the checker's class entry. `ResolvedMemberKind` has no
-            // `Constructor` — it flattens one to `Property` — so the summary API
-            // cannot answer this; the class entry can.
+            
+            
+            
             push_constructor_params(state, state.name(name), &mut fn_params);
         }
     } else if callee_tok.kind == TokenKind::Identifier || callee_tok.kind.can_be_identifier() {
@@ -130,11 +130,11 @@ pub fn build_call_argument_completions(
     }
 }
 
-/// Append the parameter names of `class_name`'s constructor.
-///
-/// Read from the checker's own class entry rather than from a mirrored member
-/// table: `ResolvedMemberKind` flattens a constructor to `Property`, so the
-/// summary API genuinely cannot answer this one.
+
+
+
+
+
 fn push_constructor_params(state: &DocumentState, class_name: &str, out: &mut Vec<String>) {
     let Some(entry) = state.db.bind.get_class_entry(class_name) else {
         return;

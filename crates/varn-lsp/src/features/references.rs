@@ -24,13 +24,13 @@ pub fn build_references(
     let mut locs: Vec<Location> = Vec::new();
     let mut checked_uris = rustc_hash::FxHashSet::default();
 
-    // 1. If target is Local, it is scoped to this file only.
+    
     if matches!(target, SymbolTarget::Local { .. }) {
         collect_references_in_document(state, &target, target_name, &mut locs);
         return if locs.is_empty() { None } else { Some(locs) };
     }
 
-    // 2. Global or Member: search open documents in workspace.files first.
+    
     let open_entries: Vec<(String, std::sync::Arc<DocumentState>)> = workspace
         .iter()
         .map(|entry| (entry.key().clone(), std::sync::Arc::clone(entry.value())))
@@ -41,7 +41,7 @@ pub fn build_references(
         collect_references_in_document(file_state, &target, target_name, &mut locs);
     }
 
-    // 3. Search unopened files known to the project index on-demand without keeping them in memory.
+    
     let all_uris: Vec<String> = {
         let idx = workspace.index.read().unwrap();
         idx.module_exports.keys().cloned().collect()

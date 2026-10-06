@@ -1,5 +1,5 @@
-//! Allocation for arrays, tuples, objects and records — the values whose
-//! representation is chosen at runtime from their contents.
+
+
 
 use super::obj::HeapObj;
 use super::structs::HeapInner;
@@ -32,8 +32,8 @@ impl HeapInner {
         self.alloc_object_with_shape_slice(shape, &values)
     }
 
-    /// As [`Self::alloc_object_with_shape`], without requiring the caller to
-    /// own a `Vec` it only builds to have it copied out and dropped.
+    
+    
     pub(crate) fn alloc_object_with_shape_slice(
         &mut self,
         shape: &Rc<varn_types::Shape>,

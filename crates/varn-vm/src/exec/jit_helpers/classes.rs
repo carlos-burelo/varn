@@ -1,12 +1,12 @@
-//! Class construction and the class member protocol: field declaration,
-//! inheritance, and static/instance member installation.
+
+
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-/// Argument block for [`jit_class_member_op`], passed by pointer because the
-/// CLIF backend cannot spread four mixed-width values across registers here.
+
+
 #[repr(C)]
 pub struct JitClassMemberArgs {
     pub class_val: VmValue,

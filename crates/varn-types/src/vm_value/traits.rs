@@ -16,12 +16,12 @@ impl PartialEq for VmValue {
 
 impl Eq for VmValue {}
 
-/// Hashes the value's representation, not its numeric meaning.
-///
-/// This is deliberately *narrower* than [`PartialEq`] above, which coerces
-/// int/float. Every keyed container in the VM canonicalizes through
-/// `Heap::canonical_map_key` before hashing, so two keys that compare equal
-/// arrive here with identical bits.
+
+
+
+
+
+
 impl std::hash::Hash for VmValue {
     #[inline(always)]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {

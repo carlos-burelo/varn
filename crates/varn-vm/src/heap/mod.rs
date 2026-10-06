@@ -1,10 +1,10 @@
-//! The heap: one slot table, the generation of each slot, and everything that
-//! puts a value into a slot or reads one back out.
-//!
-//! `alloc.rs` used to be all of that in one 830-line file. It is now split by
-//! what is being allocated or read; the methods are still inherent methods on
-//! `HeapInner`, since Rust lets one inherent impl span modules of a crate, so
-//! nothing outside this directory had to change.
+
+
+
+
+
+
+
 
 pub(crate) mod access;
 pub(crate) mod aggregates;

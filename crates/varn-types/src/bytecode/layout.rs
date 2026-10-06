@@ -1,12 +1,12 @@
-//! The operand layout of every instruction: which byte or word of it holds
-//! what.
-//!
-//! This is the one description of the instruction encoding outside the
-//! emitter and the interpreter. [`super::decode`] (length, defined and used
-//! registers, call windows), [`super::remap_registers`] (register
-//! renumbering) and [`super::disasm`] (listings) are all read off it, so
-//! they cannot disagree with one another; each entry states what the
-//! interpreter's handler for that opcode reads (`varn-vm`, `exec/dispatch`).
+
+
+
+
+
+
+
+
+
 
 use varn_core::OpCode;
 
@@ -67,10 +67,10 @@ fn jump(word: usize, backward: bool) -> Operand {
     Operand::Jump { word, backward }
 }
 
-/// The layout of the instruction at `offset`, or `None` when that word is
-/// not an opcode. Lengths that depend on the instruction (a closure's
-/// captures, an object's pairs) are read from it, and a shape's size from
-/// `constants`.
+
+
+
+
 pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<Layout> {
     use ConstKind as K;
     use ImmKind as I;
@@ -99,7 +99,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         O::StoreGlobalIdx | O::DefineGlobalIdx => (3, vec![r(hi(1)), imm_word(2, I::GlobalSlot)]),
         O::LoadUpvalue => (2, vec![w(hi(1)), imm(lo(1), I::Upvalue)]),
         O::StoreUpvalue => (2, vec![imm(hi(1), I::Upvalue), r(lo(1))]),
-        // Closes every open upvalue from this register up.
+        
         O::CloseUpvalue => (2, vec![r(hi(1))]),
         O::LoadModule => (2, vec![w(hi(0)), k(1, K::Module)]),
         O::LoadModuleSlot => (3, vec![w(hi(0)), r(hi(1)), imm_word(2, I::ModuleSlot)]),
@@ -174,9 +174,9 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         | O::GetIndex
         | O::ArrayGetIndex
         | O::MapGetIndex => (2, vec![w(hi(0)), r(hi(1)), r(lo(1))]),
-        // Object, index, value.
+        
         O::SetIndex | O::ArraySetIndex | O::MapSetIndex => (2, vec![r(hi(0)), r(hi(1)), r(lo(1))]),
-        // The array is mutated in place; its register is not written.
+        
         O::ArrayPush | O::ArrayExtend => (2, vec![r(hi(0)), r(hi(1))]),
         O::ObjectMerge => (
             2,
@@ -190,13 +190,13 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         ),
         O::AssertNotNull | O::Throw => (2, vec![r(hi(1))]),
         O::Return => (2, vec![r(lo(1))]),
-        // The resumed value lands in `hi(1)`.
+        
         O::Yield => (2, vec![w(hi(1)), r(lo(1))]),
 
         O::Jump => (3, vec![jump(1, false)]),
         O::Loop => (3, vec![jump(1, true)]),
         O::JumpIfFalse | O::JumpIfTrue => (3, vec![r(hi(0)), jump(1, false)]),
-        // The error register, then the catch handler.
+        
         O::Try => (4, vec![w(hi(1)), jump(2, false)]),
 
         O::Call | O::CallSpread => (
@@ -221,7 +221,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
                 imm(hi(0), I::CallSite),
             ],
         ),
-        // The receiver and arguments are a window from the destination.
+        
         O::Intrinsic => (
             2,
             vec![
@@ -238,7 +238,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
                 run(hi(0), word(2), RunKind::CallArgs),
             ],
         ),
-        // Only ever a range: `start` and `end`, `flag` for inclusive.
+        
         O::InvokeRuntimeStatic => (
             5,
             vec![
@@ -257,7 +257,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         ),
         O::GetPropertyMaybe => (3, vec![w(hi(0)), r(hi(1)), k(2, K::Name)]),
         O::GetSymbol => (3, vec![w(hi(0)), r(hi(1)), k(2, K::Symbol)]),
-        // Object, value.
+        
         O::SetProperty => (
             3,
             vec![r(hi(0)), r(hi(1)), k(2, K::Name), imm(lo(1), I::CallSite)],
@@ -283,11 +283,11 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         ),
         O::BindMethod => (3, vec![w(hi(1)), r(lo(1)), k(2, K::Name)]),
 
-        // `hi(1)` is the superclass, `r0` when there is none.
+        
         O::MakeClass => (3, vec![w(hi(0)), k(2, K::Name), r(hi(1))]),
-        // Class, superclass.
+        
         O::Inherit => (2, vec![r(hi(1)), r(lo(1))]),
-        // Class, function.
+        
         O::Method
         | O::DefineStatic
         | O::DefineGetter
@@ -296,14 +296,14 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         | O::DefineStaticSetter => (3, vec![r(hi(1)), k(2, K::Name), r(lo(1))]),
         O::DeclareLayout => (3, vec![r(hi(1)), k(2, K::Layout)]),
         O::AllocInstance => (2, vec![w(hi(0)), r(hi(1))]),
-        // The tag is a register.
+        
         O::MakeEnumVariant => (3, vec![w(hi(1)), k(2, K::Name), r(lo(1))]),
 
         O::MakeClosure => {
             let captures = byte(lo(1));
             let mut ops = vec![w(hi(1)), k(2, K::Function), imm(lo(1), I::Count)];
-            // Each capture is `[is_local][index]`: a register of this frame,
-            // or an upvalue of this closure passed down.
+            
+            
             for i in 0..captures {
                 ops.push(if byte(hi(3 + i)) == 1 {
                     r(lo(3 + i))
@@ -321,7 +321,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
                 imm(hi(2), I::Count),
             ],
         ),
-        // `hi(2)` pairs, keys and values interleaved.
+        
         O::BuildMap => (
             3,
             vec![
@@ -344,7 +344,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
                 ],
             )
         }
-        // `lo(1)` pairs of `[key const][value reg]`.
+        
         O::BuildObject => {
             let pairs = byte(lo(1));
             let mut ops = vec![w(hi(1)), imm(lo(1), I::Count)];
@@ -354,14 +354,14 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
             }
             (2 + 2 * pairs, ops)
         }
-        // The keys to leave out follow, one constant each.
+        
         O::ObjectRest => {
             let skipped = byte(hi(2));
             let mut ops = vec![w(hi(1)), r(lo(1)), imm(hi(2), I::Count)];
             ops.extend((0..skipped).map(|i| k(3 + i, K::Name)));
             (3 + skipped, ops)
         }
-        // `hi(1)` parts, one register per word.
+        
         O::BuildStr => {
             let parts = byte(hi(1));
             let mut ops = vec![w(hi(0)), imm(hi(1), I::Count)];

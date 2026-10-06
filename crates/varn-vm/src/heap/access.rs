@@ -1,5 +1,5 @@
-//! Reading a heap object back out through its reference. `None` means the
-//! cell is free: a reference that outlived its object, never a live one.
+
+
 
 use super::cells::SlotState;
 use super::obj::HeapObj;

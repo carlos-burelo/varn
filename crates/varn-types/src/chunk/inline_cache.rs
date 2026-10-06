@@ -1,28 +1,28 @@
-//! Inline-cache slots and the per-site feedback the JIT reads: shape ids,
-//! polymorphic slots, and call-site profiles.
 
-/// Classification flags for Inline Cache (IC) slot entries (`CacheEntry.is_class`).
+
+
+
 pub struct ICKind;
 impl ICKind {
-    /// Object / Record field access by shape ID
+    
     pub const SHAPE_PROP: u8 = 1;
-    /// Class instance method on vtable (GetProperty)
+    
     pub const CLASS_METHOD: u8 = 2;
-    /// Class getter accessor on vtable (GetProperty)
+    
     pub const CLASS_GETTER: u8 = 3;
-    /// Class setter accessor on vtable (SetProperty)
+    
     pub const CLASS_SETTER: u8 = 4;
-    /// Object shape transition (SetProperty)
+    
     pub const SHAPE_TRANSITION: u8 = 5;
-    /// Native function on class / intrinsic vtable (CallMethod)
+    
     pub const NATIVE_VTABLE_METHOD: u8 = 6;
-    /// VM closure on class / intrinsic vtable (CallMethod)
+    
     pub const VM_VTABLE_METHOD: u8 = 7;
-    /// Array `.length` property access
+    
     pub const ARRAY_LENGTH: u8 = 8;
-    /// String `.length` property access
+    
     pub const STR_LENGTH: u8 = 9;
-    /// Class instance field access by slot (GetProperty / SetProperty)
+    
     pub const INSTANCE_FIELD: u8 = 10;
 }
 
@@ -33,18 +33,18 @@ pub struct CacheEntry {
     pub slot: u16,
     pub is_class: u8,
     pub vtable_ver: u8,
-    /// Owning pointer to the class this entry was recorded against, present
-    /// only for vtable kinds (`CLASS_METHOD`, `CLASS_GETTER`,
-    /// `CLASS_SETTER`, `NATIVE_VTABLE_METHOD`, `VM_VTABLE_METHOD`). Lets
-    /// generated code go from entry to vtable without touching the class
-    /// registry: the `Rc` keeps the class alive exactly as long as the site
-    /// that cached it, so the pointer can never dangle. Shape/instance-field
-    /// and length kinds carry `None` — their fast paths key off the shape id
-    /// or class id alone and never read a vtable.
-    ///
-    /// Appended last on purpose: the JIT bakes the offsets of the first four
-    /// fields (`id`@0, `slot`@4, `is_class`@6, `vtable_ver`@7) and must not
-    /// shift when this grows.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     #[serde(skip)]
     pub class: Option<std::rc::Rc<crate::value::ClassObj>>,
 }
@@ -56,8 +56,8 @@ impl CacheEntry {
     }
 }
 
-/// `#[repr(C)]` so the JIT can index the entries array directly: `entries` is
-/// at offset 0, one slot is `POLY_IC_SLOT_SIZE` bytes.
+
+
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct PolyICSlot {
@@ -68,8 +68,8 @@ pub struct PolyICSlot {
     last_hit: u8,
 }
 
-/// `size_of::<PolyICSlot>()` — the stride the JIT uses to reach slot `cs`.
-/// 8 entries of 16 bytes plus the two trailing `u8`s, padded to alignment 8.
+
+
 pub const POLY_IC_SLOT_SIZE: usize = 136;
 
 impl Default for PolyICSlot {
@@ -81,9 +81,9 @@ impl Default for PolyICSlot {
 impl PolyICSlot {
     pub fn new() -> Self {
         const _: () = assert!(std::mem::size_of::<PolyICSlot>() == POLY_IC_SLOT_SIZE);
-        // JIT-baked entry offsets (see `CacheEntry::class`): id@0, slot@4,
-        // is_class@6, vtable_ver@7, class@8. If a field moves, the inline
-        // guards in `varn-jit` read garbage — fail here, not in production.
+        
+        
+        
         const _: () = assert!(std::mem::offset_of!(CacheEntry, id) == 0);
         const _: () = assert!(std::mem::offset_of!(CacheEntry, slot) == 4);
         const _: () = assert!(std::mem::offset_of!(CacheEntry, is_class) == 6);
@@ -163,8 +163,8 @@ impl FeedbackVector {
 mod tests {
     use super::*;
 
-    /// Contrato del consumidor JIT: offsets horneados + stride + puntero de
-    /// clase en entradas vtable. Si esto falla, los guards inline leen basura.
+    
+    
     #[test]
     fn jit_entry_contract() {
         assert_eq!(std::mem::offset_of!(CacheEntry, id), 0);
@@ -175,7 +175,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<CacheEntry>(), 16);
         assert_eq!(std::mem::size_of::<PolyICSlot>(), POLY_IC_SLOT_SIZE);
 
-        // Una entrada vtable retiene su clase; una de shape no carga ninguna.
+        
         let cls = std::rc::Rc::new(crate::value::ClassObj::new("Probe"));
         let mut slot = PolyICSlot::new();
         slot.find_or_insert(CacheEntry {

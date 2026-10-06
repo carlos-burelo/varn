@@ -53,9 +53,9 @@ pub fn prepare_call_hierarchy(
                 uri: url,
                 range,
                 selection_range,
-                // Nada: `incoming/outgoing` resuelven por `(uri, name)`, nunca
-                // leen `data`. El `global_key` que viajaba aquí no tenía
-                // lector en ningún lado.
+                
+                
+                
                 data: None,
             };
             return Some(vec![item]);
@@ -147,8 +147,8 @@ pub fn outgoing_calls(
     }
 }
 
-/// The functions and methods `file` declares at its top level, by name,
-/// with their ranges.
+
+
 fn callables(file: &DocumentState) -> Vec<(String, SourceRange)> {
     let body = file
         .ast
@@ -181,8 +181,8 @@ fn callables(file: &DocumentState) -> Vec<(String, SourceRange)> {
     out
 }
 
-/// Every call in `file` whose callee is named — `f(..)`, `x.f(..)` — with
-/// that name and the call's range.
+
+
 fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)> + '_ {
     let arena = &file.ast_arena;
     let name_of = move |id: ExprId| match &arena.expr(id).kind {
@@ -210,14 +210,14 @@ fn encloses(outer: &SourceRange, inner: &SourceRange) -> bool {
     outer.start.offset <= inner.start.offset && inner.end.offset <= outer.end.offset
 }
 
-/// The calls of `target_callee` in `file`, each with the function or method
-/// it is made from.
+
+
 fn find_calls_to(file: &DocumentState, target_callee: &str) -> Vec<(String, Range, Range)> {
     let callers = callables(file);
     calls_in(file)
         .filter(|(callee, _)| callee == target_callee)
         .filter_map(|(_, call)| {
-            // The innermost caller: a method's range lies inside its class's.
+            
             let (name, range) = callers
                 .iter()
                 .filter(|(_, r)| encloses(r, &call))

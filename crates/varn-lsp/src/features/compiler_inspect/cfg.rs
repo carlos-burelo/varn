@@ -1,4 +1,4 @@
-//! The document's SSA as a control-flow graph, for the editor's CFG view.
+
 
 use varn_compiler::ssa::dump;
 use varn_compiler::ssa::ir::Terminator;
@@ -67,7 +67,7 @@ pub fn compile_and_get_cfg_json(state: &DocumentState) -> Result<serde_json::Val
     }))
 }
 
-/// The edges out of a block, for the graph view.
+
 fn successors_json(term: &Terminator) -> Vec<serde_json::Value> {
     match term {
         Terminator::Jump { target, args } => vec![serde_json::json!({

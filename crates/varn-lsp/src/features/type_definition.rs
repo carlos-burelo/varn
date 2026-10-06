@@ -13,7 +13,7 @@ pub fn build_goto_type_definition(
 ) -> Option<GotoDefinitionResponse> {
     let token = state.identifier_token_at(line, col)?;
 
-    // 1. Resolve symbol or expression type at offset
+    
     let target_type = if let Some(sid) = state.checker_symbol_id_at_token(token) {
         state
             .db
@@ -27,7 +27,7 @@ pub fn build_goto_type_definition(
 
     let type_name = extract_type_identifier(state, &target_type)?;
 
-    // 2. Search for the type definition in the current document
+    
     for sym in state.symbols() {
         if sym.name() == type_name
             && matches!(
@@ -58,7 +58,7 @@ pub fn build_goto_type_definition(
         }
     }
 
-    // 3. Search in ProjectIndex across workspace
+    
     if let Some(idx) = index {
         let defs = idx.definitions_of(&type_name);
         let locs: Vec<Location> = defs
@@ -93,8 +93,8 @@ pub fn build_goto_type_definition(
     None
 }
 
-/// The declaration `ty` names: a named or generic type's own, an array's
-/// element type's, the one named member of an optional (`Foo | null`).
+
+
 fn extract_type_identifier(state: &DocumentState, ty: &varn_checker::Type) -> Option<String> {
     match state.db.ty_kind(ty) {
         TypeKind::Named(name, _) | TypeKind::Generic(name, _, _) => {

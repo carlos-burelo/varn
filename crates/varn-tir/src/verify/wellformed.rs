@@ -1,4 +1,4 @@
-//! Every handle points at something that exists; every slot is in range.
+
 
 mod handles;
 
@@ -18,7 +18,7 @@ pub(super) fn check(m: &TirModule, errors: &mut Vec<VerifyError>) {
 }
 
 fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
-    // Check globals
+    
     let dummy_expr = TirExpr {
         kind: TirExprKind::NullLit,
         ty: BackendTy::Void,
@@ -29,14 +29,14 @@ fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
         check_ty(m, *ty, &dummy_expr, errors);
     }
 
-    // Check class fields
+    
     for class in &m.classes {
         for field in &class.fields {
             check_ty(m, field.ty, &dummy_expr, errors);
         }
-        // Every vtable entry must name a real signature — a dangling SigId
-        // here silently disables check_method_call's arity/type coherence
-        // rule (it looks up the signature and just returns if absent).
+        
+        
+        
         for entry in &class.vtable {
             if m.signature(entry.sig).is_none() {
                 errors.push(VerifyError::new(
@@ -50,7 +50,7 @@ fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
         }
     }
 
-    // Check enum variants
+    
     for enum_info in &m.enums {
         for variant in &enum_info.variants {
             for ty in &variant.payload {
@@ -59,7 +59,7 @@ fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
         }
     }
 
-    // Check signatures
+    
     for sig in &m.signatures {
         for param_ty in &sig.params {
             check_ty(m, *param_ty, &dummy_expr, errors);
@@ -79,7 +79,7 @@ fn check_function(m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>)
         ));
     }
 
-    // Check function's own type declarations
+    
     let dummy_expr = TirExpr {
         kind: TirExprKind::NullLit,
         ty: BackendTy::Void,

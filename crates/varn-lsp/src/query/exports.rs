@@ -35,7 +35,7 @@ impl ModuleExports {
         }
     }
 
-    /// Firewall check: returns true if public exports remain identical
+    
     pub fn is_unchanged_from(&self, other: &Self) -> bool {
         self.fingerprint == other.fingerprint && self.exports == other.exports
     }

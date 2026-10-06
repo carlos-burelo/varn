@@ -1,5 +1,5 @@
-//! `-p scope`: static scope tree (DEBUG_PLAN §4.8). Only the root proto and its
-//! constant-pool strings, no recursion to nested functions (preserved today).
+
+
 
 use std::io::Write;
 
@@ -10,7 +10,7 @@ use crate::fmt::Format;
 use crate::render::{basename, BLUE, BOLD, DIM, MAGENTA, RESET};
 use crate::report::Report;
 
-/// Rows: `["fn", depth, name, upvalues]` or `["consts", depth, joined-ids]`.
+
 pub fn collect(proto: &FunctionProto) -> Report {
     let mut rows = Vec::new();
     let name = proto.name.as_deref().unwrap_or("<anonymous>");

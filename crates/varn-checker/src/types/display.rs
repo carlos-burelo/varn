@@ -1,12 +1,12 @@
 use super::*;
 
-/// Renders a `Type` to text. `Type` itself no longer implements
-/// `fmt::Display` — same reasoning as `varn_core::Atom`, which never has: a
-/// bare `CheckerTyId` (or, inside a `Named`/`Generic`, a bare `Atom`) cannot
-/// print itself without the table/interner that gave it meaning. Every call
-/// site that used to write `{ty}`/`ty.to_string()` now writes
-/// `ty.display(table, interner)` (or, in contexts with a combined view,
-/// whatever convenience wrapper that call site's task adds around this).
+
+
+
+
+
+
+
 pub struct TypeDisplay<'t> {
     ty: Type,
     table: &'t CheckerTyTable,
@@ -36,11 +36,11 @@ impl<'t> TypeDisplay<'t> {
         }
     }
 
-    /// Never panics on cross-module staleness: a `Named`/`Generic` name minted
-    /// by a sibling module after this view's interner was snapshotted has no
-    /// text in this table. Diagnostics must degrade, not crash the compiler —
-    /// the `<stale:Atom(N)>` marker names the dangling id so the resync gap
-    /// stays visible instead of silently printing a wrong name.
+    
+    
+    
+    
+    
     fn name(&self, atom: varn_core::Atom) -> std::borrow::Cow<'t, str> {
         match self.interner.try_resolve(atom) {
             Some(s) => std::borrow::Cow::Borrowed(s),

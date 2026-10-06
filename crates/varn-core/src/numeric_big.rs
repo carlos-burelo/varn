@@ -1,13 +1,13 @@
-//! `bigint` semantics (spec §6–§7, ADR-0016): literals, and the division
-//! rules shared with `int` (truncating `/`, dividend-signed `%`).
+
+
 
 use crate::IntDivFault;
 use bigdecimal::{BigDecimal, RoundingMode};
 use num_bigint::BigInt;
 use num_traits::{Num, Zero};
 
-/// The value of a `bigint` literal's digits (without the `n` suffix):
-/// decimal, or `0x`/`0o`/`0b` prefixed, `_` separators allowed.
+
+
 pub fn parse_bigint_literal(text: &str) -> Option<BigInt> {
     let clean: String = text.chars().filter(|c| *c != '_').collect();
     let (neg, body) = match clean.strip_prefix('-') {
@@ -24,7 +24,7 @@ pub fn parse_bigint_literal(text: &str) -> Option<BigInt> {
     Some(if neg { -v } else { v })
 }
 
-/// `a / b` truncated toward zero.
+
 pub fn div_big(a: &BigInt, b: &BigInt) -> Result<BigInt, IntDivFault> {
     if b.is_zero() {
         return Err(IntDivFault::DivisionByZero);
@@ -32,7 +32,7 @@ pub fn div_big(a: &BigInt, b: &BigInt) -> Result<BigInt, IntDivFault> {
     Ok(a / b)
 }
 
-/// Remainder with the dividend's sign.
+
 pub fn rem_big(a: &BigInt, b: &BigInt) -> Result<BigInt, IntDivFault> {
     if b.is_zero() {
         return Err(IntDivFault::DivisionByZero);
@@ -40,11 +40,11 @@ pub fn rem_big(a: &BigInt, b: &BigInt) -> Result<BigInt, IntDivFault> {
     Ok(a % b)
 }
 
-/// Significant digits a `decimal` quotient keeps (IEEE decimal128).
+
 pub const DECIMAL_DIV_DIGITS: u64 = 34;
 
-/// `a / b` for `decimal`: exact when the quotient terminates within
-/// [`DECIMAL_DIV_DIGITS`] significant digits, rounded half-even otherwise.
+
+
 pub fn div_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivFault> {
     if b.is_zero() {
         return Err(IntDivFault::DivisionByZero);
@@ -55,7 +55,7 @@ pub fn div_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivF
         .normalized_if_exact(a, b))
 }
 
-/// Remainder of `decimal` division, exact, with the dividend's sign.
+
 pub fn rem_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivFault> {
     if b.is_zero() {
         return Err(IntDivFault::DivisionByZero);
@@ -63,7 +63,7 @@ pub fn rem_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivF
     Ok(a % b)
 }
 
-/// Keeps a terminating quotient free of the trailing zeros rounding pads in.
+
 trait NormalizedIfExact {
     fn normalized_if_exact(self, a: &BigDecimal, b: &BigDecimal) -> BigDecimal;
 }

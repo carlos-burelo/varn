@@ -1,5 +1,5 @@
-//! Object-level operations that are not field access: key enumeration,
-//! `in`, merge and rest.
+
+
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
@@ -17,7 +17,7 @@ pub(crate) extern "C" fn jit_object_keys(ctx: *mut ExecCtx, val_tag: u64, val_pa
     }
 }
 
-/// `a in b`, returned as `0`/`1` like every comparison helper.
+
 #[varn_op_macros::jit_slow(field = "op_in")]
 pub(crate) extern "C" fn jit_op_in(
     ctx: *mut ExecCtx,
@@ -89,9 +89,9 @@ pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) {
     }
 }
 
-/// `extern "C" fn(ctx, obj_tag, obj_payload, keys: *const VmValue, nkeys)` —
-/// the SSA lowering's `ObjectRest`: `keys[0..nkeys]` are boxed strings staged
-/// on the caller's native stack (the bytecode form reads them from code).
+
+
+
 #[varn_op_macros::jit_slow(field = "object_rest_window")]
 pub(crate) extern "C" fn jit_object_rest_window(
     ctx: *mut ExecCtx,

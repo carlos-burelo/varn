@@ -8,7 +8,7 @@ fn get_range(ctx: &dyn NativeCtx, this: VmValue) -> Option<RangeData> {
     ctx.as_range(this)
 }
 
-/// Every element of `r`, in order.
+
 fn elements(ctx: &mut dyn NativeCtx, r: &RangeData) -> Vec<VmValue> {
     (0..r.len())
         .filter_map(|i| r.nth(i))
@@ -16,7 +16,7 @@ fn elements(ctx: &mut dyn NativeCtx, r: &RangeData) -> Vec<VmValue> {
         .collect()
 }
 
-/// The raw bound `val` stands for in `r`'s domain, if it belongs to it.
+
 fn raw_of(ctx: &dyn NativeCtx, r: &RangeData, val: VmValue) -> Option<i64> {
     match r.elem {
         RangeElem::Int => ctx.is_int(val).then(|| ctx.as_int(val)),

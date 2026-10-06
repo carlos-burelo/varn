@@ -27,8 +27,8 @@ fn not_decimal() -> NativeError {
     NativeError::from("decimal: receiver is not a decimal")
 }
 
-/// `d^exp`, exact for `exp >= 0`; a negative exponent divides with the
-/// `decimal` quotient rule.
+
+
 fn pow_decimal(d: &BigDecimal, exp: i64) -> Result<BigDecimal, NativeError> {
     let mut result = BigDecimal::one();
     let mut base = d.clone();

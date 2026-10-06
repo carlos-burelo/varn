@@ -1,18 +1,18 @@
-//! `vn run --compare-tiers` — run one program on every execution tier and say
-//! where they stop agreeing.
-//!
-//! A Varn program must produce identical output on every tier. When it does
-//! not, the bug is in code generation or the JIT — the class of defect
-//! `cargo test` structurally cannot see, because the two tiers compile the same
-//! source and only one of them is wrong.
-//!
-//! Finding *which file* diverges is a loop around `vn run`. What costs the
-//! hours is finding *where inside it*, and that is what this reports: the first
-//! output line the tiers disagree on, with the lines that led to it.
-//!
-//! Each tier runs as its own process. Sharing one is not worth the risk: the
-//! JIT publishes compiled entries into protos, so a second run in the same
-//! process is no longer a clean interpreter run.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::path::Path;
 use std::process::Command;
@@ -21,14 +21,14 @@ use varn_core::term::chalk::chalk;
 
 use crate::error::CliError;
 
-/// One execution tier, named by the environment that selects it.
+
 struct Tier {
     label: &'static str,
     env: &'static [(&'static str, &'static str)],
 }
 
-/// The baseline is the interpreter: it is the definition of what the program
-/// means, so a disagreement is always the other tier being wrong.
+
+
 const TIERS: &[Tier] = &[
     Tier {
         label: "interpreter",
@@ -50,9 +50,9 @@ struct Outcome {
     output: String,
 }
 
-/// Run `file` on every tier and report the first disagreement. Returns the
-/// number of tiers that diverged from the interpreter, so a caller can use it
-/// as an exit code.
+
+
+
 pub fn execute(file: &str, script_args: &[String]) -> Result<(), CliError> {
     if !Path::new(file).exists() {
         return Err(CliError::usage(format!("no such file: {file}")));
@@ -73,8 +73,8 @@ pub fn execute(file: &str, script_args: &[String]) -> Result<(), CliError> {
         if !script_args.is_empty() {
             cmd.arg("--").args(script_args);
         }
-        // A tier is selected by environment, so the child must not inherit a
-        // selection the parent happens to be running under.
+        
+        
         cmd.env_remove("VARN_NO_CLIF").env_remove("VARN_JIT_TIER");
         for (k, v) in tier.env {
             cmd.env(k, v);
@@ -143,9 +143,9 @@ pub fn execute(file: &str, script_args: &[String]) -> Result<(), CliError> {
     )))
 }
 
-/// Print the first line the two tiers disagree on, with the lines that led up
-/// to it. The lines before the split are what both tiers still agreed on, which
-/// is usually what names the function to look at.
+
+
+
 fn report_first_difference(baseline: &Outcome, tier: &Outcome) {
     const CONTEXT: usize = 3;
     let base: Vec<&str> = baseline.output.lines().collect();
@@ -191,7 +191,7 @@ fn describe_status(status: &std::process::ExitStatus) -> String {
     match status.code() {
         Some(0) => "ok".to_owned(),
         Some(c) => format!("exit {c}"),
-        // A tier killed by a signal is the strongest divergence there is.
+        
         None => "killed".to_owned(),
     }
 }

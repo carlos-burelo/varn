@@ -1,24 +1,24 @@
-//! Calling VM code from compiled code.
+
 
 use super::calls_static::{hand_off, settle, Handoff};
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-/// Fast lane for a JIT-guarded method call on a class instance.
-///
-/// The compiled caller already proved `receiver.class_id == entry_id` with an
-/// inline heap walk and loaded this entry's `(class_ptr, slot, kind, ver)`
-/// from its own cache slot — no name lookup, no registry, no string work.
-/// This re-verifies the cheap parts (class pointer liveness is structural:
-/// the entry's `Rc` keeps it alive; the id/version/slot checks below close
-/// the eviction race) and dispatches the vtable method directly. Anything
-/// unexpected — a stale entry, a generator/async method, an arity mismatch,
-/// a vtable shape this lane does not serve — degrades to the canonical
-/// [`ExecCtx::call_method`], so the observable semantics are exactly the
-/// slow path's by construction.
-///
-/// `window[0]` is the receiver, `window[1..]` the arguments, boxed; the
-/// result lands in `jit_native_result` like every other windowed helper.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "jit_call_method_cached_window")]
 pub(crate) extern "C" fn jit_call_method_cached_window(
@@ -45,17 +45,17 @@ pub(crate) extern "C" fn jit_call_method_cached_window(
         let args = crate::exec::method_args::MethodArgs::Boxed(&window[1..]);
         let this_val = window[0];
 
-        // Fast lane: instance receiver, live class entry, current version.
-        // Enum variants and intrinsics never apply to instances (the
-        // interpreter's own `intrinsic_method` answers `None` for them), so
-        // skipping those checks here changes nothing observable.
-        //
-        // `class_ptr` is the entry's `Option<Rc<ClassObj>>` payload — the
-        // `ClassObj` value pointer, non-null exactly when the entry carries
-        // a class. The entry's own `Rc` keeps the allocation alive for the
-        // whole helper (single-threaded runtime, entry owned by the running
-        // closure's cache), so borrowing through it is sound; an owned `Rc`
-        // for the callee frame is rebuilt with a balanced retain below.
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         let fast = (|| {
             if class_ptr == 0
                 || (kind != ICKind::NATIVE_VTABLE_METHOD && kind != ICKind::VM_VTABLE_METHOD)
@@ -85,9 +85,9 @@ pub(crate) extern "C" fn jit_call_method_cached_window(
                 if nc.proto.is_generator || nc.proto.is_async || args.len() > nc.proto.arity {
                     return None;
                 }
-                // Balanced retain: `from_raw` borrows the entry's share and
-                // `forget` suppresses its release, so the clone nets exactly
-                // +1 with no leak and no registry round-trip.
+                
+                
+                
                 let owned: std::rc::Rc<varn_types::value::ClassObj> = {
                     let rc = std::rc::Rc::from_raw(class_ptr as *const varn_types::value::ClassObj);
                     let out = std::rc::Rc::clone(&rc);

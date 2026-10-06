@@ -1,9 +1,9 @@
 #![allow(unused_crate_dependencies)]
-//! The nodes added as the entry condition of stage 2: `await` / `yield`,
-//! `IsNull`, the enum discriminant and payload accessors, `TypeTest`, and
-//! spread in argument and element lists. Each test builds malformed TIR by
-//! hand and pins that the verifier rejects it — the only instrument that
-//! works before there is a language to run.
+
+
+
+
+
 
 use std::sync::Arc;
 use varn_tir::*;
@@ -109,7 +109,7 @@ fn is_null_must_produce_bool() {
             op: TirUnOp::IsNull,
             operand: Box::new(int(1)),
         },
-        BackendTy::Int, // wrong: an IsNull is a Bool
+        BackendTy::Int, 
         Resolution::None,
     ))];
     let m = module(func("<module>", false, false, body));
@@ -176,7 +176,7 @@ fn variant_payload_with_the_wrong_type_is_rejected() {
             tag: 0,
             field: 0,
         },
-        BackendTy::Str, // the Circle payload field is Int
+        BackendTy::Str, 
         Resolution::EnumVariant {
             enum_id: EnumId(0),
             tag: 0,
@@ -231,7 +231,7 @@ fn type_test_naming_a_missing_class_is_rejected() {
 
 #[test]
 fn a_spread_argument_suppresses_the_arity_check() {
-    // fn takes 0 params (SigId 0); the call passes a spread, so no arity error.
+    
     let mut top = func("<module>", false, false, vec![]);
     top.body = vec![TirStmt::Expr(expr(
         TirExprKind::Call {
@@ -243,7 +243,7 @@ fn a_spread_argument_suppresses_the_arity_check() {
     ))];
     let mut m = module(top);
     m.functions = vec![func("f", false, false, vec![])];
-    // FnId(0)'s signature is SigId(0), arity 0; a positional [x] would error,
-    // but a spread must not.
+    
+    
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }

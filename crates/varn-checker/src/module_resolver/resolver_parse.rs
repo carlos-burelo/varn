@@ -28,7 +28,7 @@ impl DiskResolver {
         })
     }
 
-    /// True while `key`'s bind is in progress; see [`DiskResolver::in_flight`].
+    
     pub(super) fn is_binding(&self, key: &str) -> bool {
         self.in_flight.lock().contains(key)
     }
@@ -65,7 +65,7 @@ impl DiskResolver {
         bind
     }
 
-    /// Collect a program's exports, resolving its own imports through `self`.
+    
     pub(super) fn collect(
         &self,
         program: &varn_core::ast::Program,

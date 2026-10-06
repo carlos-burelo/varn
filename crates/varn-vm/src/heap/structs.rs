@@ -10,10 +10,10 @@ use varn_types::HeapRef;
 use varn_types::{value::RuntimeSymbol, ClassObj, RuntimeString};
 
 pub struct HeapInner {
-    /// Identity of this object table, and therefore of every `VmValue` handle
-    /// into it. Compiled code bakes those handles as immediates, so it is only
-    /// valid while this heap is: see `FunctionProto::jit_epoch`. Shared by
-    /// `Heap::clone`, since a nested context reaches the same objects.
+    
+    
+    
+    
     pub jit_epoch: u64,
     pub intrinsic_classes: FxHashMap<String, Rc<ClassObj>>,
     pub gc_collections: u64,
@@ -74,13 +74,13 @@ impl HeapInner {
         }
     }
 
-    /// Whether an old object belongs in `scan_roots` — the set the minor
-    /// collector re-walks on every collection, until the next major one
-    /// rebuilds it.
-    ///
-    /// Only for kinds holding Rust-side `Value`s that no write barrier covers.
-    /// Containers are covered by the barrier and must not go here, or each
-    /// minor collection becomes O(containers alive).
+    
+    
+    
+    
+    
+    
+    
     #[inline(always)]
     pub(super) fn needs_minor_scan(obj: &HeapObj) -> bool {
         matches!(
@@ -93,9 +93,9 @@ impl HeapInner {
         )
     }
 
-    /// Runtime structures that live as long as the program in practice and
-    /// carry Rust-side state the barrier does not see: they skip the young
-    /// generation, exactly as they always have.
+    
+    
+    
     #[inline(always)]
     pub(super) fn born_old(obj: &HeapObj) -> bool {
         matches!(
@@ -169,14 +169,14 @@ impl Heap {
         unsafe { (*self.inner.get()).jit_epoch }
     }
 
-    /// `&mut` out of `&self`, which is the `UnsafeCell` contract the heap is
-    /// built on: the heap is shared by `Rc` across the VM and mutated through
-    /// shared handles, and the safety argument is single-threaded execution,
-    /// not the borrow checker. The `unsafe` on the signature is what carries
-    /// that obligation to the caller.
-    ///
-    /// Allowed at the site rather than for the workspace, so a new
-    /// `&mut`-from-`&self` that has NOT made this argument still fails.
+    
+    
+    
+    
+    
+    
+    
+    
     #[allow(clippy::mut_from_ref)]
     #[inline(always)]
     pub(crate) unsafe fn inner_mut(&self) -> &mut HeapInner {

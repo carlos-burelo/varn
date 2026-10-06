@@ -14,10 +14,10 @@ pub struct DebugFlags {
     pub types_range: Option<(u32, u32)>,
     pub expr: bool,
     pub expr_range: Option<(u32, u32)>,
-    /// `check:types` — deterministic, diffable dump of the checker's type
-    /// table and the annotations that reach codegen. The baseline the checker
-    /// refactor is verified against, so it is deliberately NOT part of
-    /// `check` or `all`: those are for reading, this one is for diffing.
+    
+    
+    
+    
     pub check_types: bool,
     pub errors: bool,
     pub trace: bool,
@@ -36,9 +36,9 @@ pub struct DebugFlags {
     pub lsp_colorize: bool,
     pub lsp_hints: bool,
 
-    /// `tir` — dump the typed IR the checker emits. `tir:check`
-    /// verifies it and reports coverage over the module, like `clif:check`
-    /// sweeps a module rather than reading one function.
+    
+    
+    
     pub tir: bool,
     pub tir_check: bool,
 
@@ -47,34 +47,34 @@ pub struct DebugFlags {
     pub clif_kinds: bool,
     pub clif_ir: bool,
     pub clif_asm: bool,
-    /// `clif:check` — reports only functions that refuse to route, so silence
-    /// is the healthy answer. Deliberately NOT part of `clif:all`: the other
-    /// sub-phases are for reading one function, this one is for sweeping a
-    /// module.
+    
+    
+    
+    
     pub clif_check: bool,
 
     pub tiers: bool,
     pub bails: bool,
     pub summary: bool,
-    /// `typeloss` — where a statically typed program stops being one: generic
-    /// opcodes that had a typed counterpart, and member reads the checker typed
-    /// but never published a slot for.
+    
+    
+    
     pub typeloss: bool,
 
-    /// `gc` — post-mortem nursery/old-gen/interner snapshot, printed once the
-    /// program finishes running. Unlike every other phase, this one needs an
-    /// actual run: there is no heap state to report before the program has
-    /// allocated anything. See [`Self::needs_execution`].
+    
+    
+    
+    
     pub gc: bool,
 
-    /// Substring filter applied to function names by the per-function dumps.
-    /// Without it, `-p bytecode` on a real module prints every function.
+    
+    
     pub fn_filter: Option<String>,
 }
 
-/// Valid phase spellings for `-p`: every registry id plus the non-phase names
-/// the parser also accepts (`check`/`all` groups, CLI-only `types`/`lsp`, and
-/// the `trace` toggle).
+
+
+
 fn valid_names() -> Vec<&'static str> {
     let mut names: Vec<&'static str> = crate::registry::ALL.iter().map(|p| p.id()).collect();
     names.extend(["check", "all", "types", "lsp", "trace"]);
@@ -265,15 +265,15 @@ impl DebugFlags {
                         flags.types = true;
                         flags.types_all = true;
                     }
-                    // CLI-only views (consumed by `inspect_lsp`), not registry
-                    // phases.
+                    
+                    
                     "lsp" => flags.lsp = true,
                     "types" => flags.types = true,
-                    // Not a phase: execution trace, consumed by the pipeline.
+                    
                     "trace" => flags.trace = true,
-                    // `all` is derived from the registry's `in_all` membership,
-                    // so it cannot go stale (the old manual list already had:
-                    // it dropped typeloss/roots/tir and kept dead `expr`/`info`).
+                    
+                    
+                    
                     "all" => {
                         for p in crate::registry::in_all() {
                             apply_registered(&mut flags, p.id());
@@ -284,8 +284,8 @@ impl DebugFlags {
                         flags.lsp = true;
                         flags.lsp_all();
                     }
-                    // Dead flags: still parsed for one more step, removed in
-                    // DEBUG_PLAN §7.
+                    
+                    
                     "binds" => flags.binds = true,
                     "expr" => flags.expr = true,
                     "errors" => flags.errors = true,
@@ -310,22 +310,22 @@ impl DebugFlags {
         Ok(flags)
     }
 
-    /// Every other phase reads the compiled program (AST/bytecode/CLIF/...)
-    /// without running it — `vn debug` always sets `no_run: true`. `gc` is
-    /// the one phase that needs the program to have actually executed (there
-    /// is no heap to report on before it has allocated anything), so this is
-    /// what `vn debug`'s command handler checks to override that.
+    
+    
+    
+    
+    
     pub fn needs_execution(&self) -> bool {
         self.gc
     }
 
-    /// Whether any phase is on.
-    ///
-    /// Derived from the whole value rather than from a list of fields. The list
-    /// was a second source of truth: a flag added after it was written silently
-    /// fell out, and the cost of falling out is total — `pipeline::run` takes
-    /// the cached compile path, which carries no flags, so the phase never runs
-    /// and prints nothing at all.
+    
+    
+    
+    
+    
+    
+    
     pub fn any(&self) -> bool {
         *self != Self::default()
     }
@@ -347,16 +347,16 @@ impl DebugFlags {
         self.clif_asm = true;
     }
 
-    /// Bare `clif` = the phase plus all four views.
+    
     pub fn clif_all_on(&mut self) {
         self.clif = true;
         self.clif_all();
     }
 }
 
-/// Set the `DebugFlags` field(s) for a registry phase id. The registry owns
-/// which names are accepted, aliases, titles and `-p all` membership; this is
-/// the single id → flag mapping.
+
+
+
 fn apply_registered(flags: &mut DebugFlags, id: &str) {
     match id {
         "tokens" => flags.tokens = true,

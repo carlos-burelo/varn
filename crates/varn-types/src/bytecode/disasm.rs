@@ -1,9 +1,9 @@
-//! Bytecode listings, read off the layout table.
-//!
-//! One disassembler for every host: `vn debug` colours [`instructions`], the
-//! editor shows [`render`]. Each instruction's length and operands come from
-//! [`super::layout`], so a listing walks the stream exactly as the
-//! interpreter does and names each operand for what it is.
+
+
+
+
+
+
 
 use std::fmt::Write;
 
@@ -13,24 +13,24 @@ use super::{layout, Access, At, Byte, ImmKind, Layout, Operand};
 use crate::chunk::{Chunk, Literal, PoolEntry};
 use crate::FunctionProto;
 
-/// One line of a listing.
+
 #[derive(Clone, Debug)]
 pub struct Instr {
     pub offset: usize,
-    /// The source line, 0 when unknown.
+    
     pub line: u32,
-    /// `None` for a word that is not an opcode; the listing resumes at the
-    /// next word.
+    
+    
     pub op: Option<OpCode>,
     pub len: usize,
-    /// The operands: `r3 = r1 + r2`, `r4 = #2`, `r5 → 0031`.
+    
     pub text: String,
-    /// The constant-pool entries the instruction names, in operand order,
-    /// for a listing to annotate ([`constant_text`]).
+    
+    
     pub constants: Vec<usize>,
 }
 
-/// The instructions of `chunk`, in order.
+
 pub fn instructions(chunk: &Chunk) -> impl Iterator<Item = Instr> + '_ {
     let code = &chunk.code;
     let mut offset = 0;
@@ -71,7 +71,7 @@ pub fn instructions(chunk: &Chunk) -> impl Iterator<Item = Instr> + '_ {
     })
 }
 
-/// A listing of `proto` and every function nested in its constants.
+
 pub fn render(proto: &FunctionProto) -> String {
     let mut out = String::new();
     render_into(proto, &mut out);
@@ -135,8 +135,8 @@ fn render_into(proto: &FunctionProto, out: &mut String) {
     }
 }
 
-/// A constant as a listing annotates it: `"text"`, `42`, `fn name`,
-/// `shape {a, b}`.
+
+
 pub fn constant_text(entry: &PoolEntry) -> String {
     match entry {
         PoolEntry::Literal(lit) => match lit {
@@ -164,8 +164,8 @@ pub fn constant_text(entry: &PoolEntry) -> String {
     }
 }
 
-/// The operands of the instruction at `offset`: what it writes, `=`, then
-/// what it reads and names.
+
+
 pub fn operands_text(layout: &Layout, code: &[u16], offset: usize) -> String {
     let reg = |at: Byte| format!("r{}", at.read(code, offset));
     let mut dest = None;
@@ -228,7 +228,7 @@ fn imm_text(at: At, kind: ImmKind, code: &[u16], offset: usize) -> Option<String
             At::Byte(_) => (v as u8 as i8).to_string(),
             At::Word(_) => (v as i16).to_string(),
         },
-        // The list it counts is spelled out.
+        
         ImmKind::Count => return None,
         ImmKind::Upvalue => format!("uv{v}"),
         ImmKind::CallSite => format!("ic{v}"),
@@ -250,7 +250,7 @@ fn imm_text(at: At, kind: ImmKind, code: &[u16], offset: usize) -> Option<String
     })
 }
 
-/// The value an operand-less load puts in its register.
+
 fn implied(op: OpCode) -> Option<&'static str> {
     Some(match op {
         OpCode::LoadNull => "null",
@@ -263,7 +263,7 @@ fn implied(op: OpCode) -> Option<&'static str> {
     })
 }
 
-/// The operator a two-operand instruction applies.
+
 fn infix(op: OpCode) -> Option<&'static str> {
     use OpCode as O;
     Some(match op {
@@ -291,7 +291,7 @@ fn infix(op: OpCode) -> Option<&'static str> {
     })
 }
 
-/// The operator a one-operand instruction applies.
+
 fn prefix(op: OpCode) -> Option<&'static str> {
     Some(match op {
         OpCode::Negate => "-",

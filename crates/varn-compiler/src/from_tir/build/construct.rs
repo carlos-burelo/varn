@@ -1,8 +1,8 @@
-//! `new C(..)` for a class the checker resolved. The instance is allocated
-//! from the class's own layout and its constructor applied to it: inlined
-//! when the body is only field stores, called as the method it is otherwise.
-//! A class whose ancestry leaves this module, or whose value a decorator may
-//! replace, is constructed by calling the class value.
+
+
+
+
+
 
 use super::context::{Builder, InlineFrame, Result};
 use crate::hir::HirType;

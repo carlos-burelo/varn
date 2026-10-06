@@ -48,14 +48,14 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    // The SSA allocator (ssa/emit) keeps each `SlotKind` in its own register
-    // pool so the backend can route native f64. This coalescing pass used to
-    // re-colour by liveness alone and could re-pack a float register with a
-    // non-float one — meeting `register_meta` to Dynamic and erasing the
-    // float type — so it skipped every function owning a float register.
-    // `color_with_base` is now kind-aware (kind compatibility is a hard
-    // constraint, like interference): no merge can degrade a kind, so float
-    // functions get their Moves coalesced too instead of being skipped.
+    
+    
+    
+    
+    
+    
+    
+    
     let kinds: Vec<varn_types::register_meta::SlotKind> = (0..proto.register_count as usize)
         .map(|r| {
             proto
@@ -97,19 +97,19 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         .filter(|&&r| r >= base)
         .map(|&r| r as u16)
         .collect();
-    // `scan.defs` es un `rustc_hash::FxHashMap`, así que usa `RandomState`:
-    // su orden de iteración se siembra al azar en CADA arranque de proceso.
-    //
-    // Ese orden no se queda aquí. Llega intacto a `ranges` (el analizador
-    // recorre `vregs_used` en orden y empuja los `LiveRange` en ese mismo
-    // orden), y `color_with_base` ordena con `sort_by`, que es ESTABLE y sólo
-    // desempata por `start`. Dos vregs definidos en el mismo punto empatan, el
-    // empate conserva el orden de entrada, y quien va primero se lleva el color
-    // más bajo.
-    //
-    // Resultado sin este `sort`: dos compilaciones del mismo binario sobre la
-    // misma fuente producen bytecode con los registros físicos permutados
-    // (mismos opcodes, mismo recuento). Ordenar hace la asignación reproducible.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     all_regs.sort_unstable();
 
     if all_regs.is_empty() {
@@ -183,11 +183,11 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         proto.register_count = new_register_count;
     }
 
-    // register_meta was derived per pre-coalescing register (ssa/emit);
-    // permute it through the same mapping, meeting kinds when two old
-    // registers merge into one. The meet is now unreachable — the colourer
-    // only shares a colour between equal kinds — but stays as defence in
-    // depth: a `Dynamic` here is always safe, just less precise.
+    
+    
+    
+    
+    
     if !proto.register_meta.is_empty() {
         use varn_types::register_meta::{RegisterMeta, SlotKind};
         let mut merged: Vec<Option<SlotKind>> = vec![None; new_register_count as usize];
@@ -213,10 +213,10 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
 
     proto.register_count = new_register_count;
 
-    // The portable SSA addresses homes by the same register numbers the
-    // bytecode uses, so it must follow the same permutation. Without this,
-    // `from_ssa` would write a heap value into the pre-coalescing register,
-    // whose post-coalescing class is a different (possibly scalar) slot.
+    
+    
+    
+    
     if let Some(ssa) = proto.ssa.get_mut() {
         ssa.map_registers(|r| {
             let old = r as u8;

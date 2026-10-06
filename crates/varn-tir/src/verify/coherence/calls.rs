@@ -5,9 +5,9 @@ use crate::ty::BackendTy;
 use crate::verify::VerifyError;
 use crate::TirModule;
 
-/// Arity and per-argument types can only be checked against a positional list
-/// with no spread. A spread contributes an unknown count; a named argument is
-/// matched by label, not position — both are left to a later rule.
+
+
+
 fn is_positional(args: &[TirArg]) -> bool {
     args.iter().all(|a| matches!(a, TirArg::Expr(_)))
 }
@@ -34,7 +34,7 @@ pub(super) fn check_direct_call(
     if !check_args(m, sig, args, &label, e, errors) {
         return;
     }
-    // The signature's return type must be assignable TO what the node claims
+    
     if !assignable(m, sig.return_ty, e.ty) {
         errors.push(VerifyError::new(
             format!(
@@ -57,16 +57,16 @@ pub(super) fn check_method_call(
         return;
     };
     let BackendTy::Class(c) = recv.ty.non_nullable(&m.types) else {
-        return; // well-formedness already reported this
+        return; 
     };
     let Some(class_info) = m.class(c) else {
-        return; // ditto
+        return; 
     };
     let Some(vtable_entry) = class_info.method_at(*slot) else {
-        return; // ditto
+        return; 
     };
     let Some(sig) = m.signature(vtable_entry.sig) else {
-        return; // ditto
+        return; 
     };
 
     if !is_positional(args) {
@@ -76,7 +76,7 @@ pub(super) fn check_method_call(
         return;
     }
 
-    // The signature's return type must be assignable TO what the node claims
+    
     if !assignable(m, sig.return_ty, e.ty) {
         errors.push(VerifyError::new(
             format!(
@@ -88,9 +88,9 @@ pub(super) fn check_method_call(
     }
 }
 
-/// Arity and per-argument assignability against `sig`. A rest signature takes
-/// at least its fixed parameters, and each trailing argument is one element of
-/// the rest array. `false` when the arity is wrong: nothing else is checked.
+
+
+
 fn check_args(
     m: &TirModule,
     sig: &crate::tables::Signature,

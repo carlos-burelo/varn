@@ -206,8 +206,8 @@ impl ExecCtx {
                     }
                 }
 
-                // The field is new: `insert` transitions the shape and spills
-                // the value into the overflow store if the tail is full.
+                
+                
                 let old_shape_id = o.shape().id;
                 o.insert(Arc::from(name.as_ref()), val);
                 let new_shape_id = o.shape().id;

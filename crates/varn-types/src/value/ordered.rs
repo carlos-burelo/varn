@@ -1,7 +1,7 @@
-//! The one keyed table behind `Map` and `Set`: entries in insertion order,
-//! looked up linearly while small and through a position index once large.
-//! Iteration order is the order keys were first inserted — never the order of
-//! their bit patterns, which for heap keys differs from run to run.
+
+
+
+
 
 use super::map::MapKey;
 use crate::vm_value::VmValue;

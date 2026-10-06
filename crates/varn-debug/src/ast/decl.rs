@@ -1,4 +1,4 @@
-//! Declarations in the `vn debug ast` outline.
+
 
 use varn_core::ast::{
     AstArena, ClassMember, Decl, ExportDecl, ExportDefaultDecl, InterfaceMember, VarKind,

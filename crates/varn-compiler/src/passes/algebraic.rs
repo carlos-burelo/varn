@@ -1,23 +1,23 @@
-//! Identity simplification: arithmetic whose result is already one of its
-//! operands, or a constant, independent of the other operand's value.
-//!
-//! `const_fold` only fires when *both* operands are known. This pass covers
-//! the case where one is: `i + 0`, `x * 1`, `n - n`. Hand-written code rarely
-//! contains these, but desugaring and constant propagation produce them, and
-//! each one costs a whole instruction plus the register holding the literal.
-//!
-//! Every rule here has to hold for **all** values of the surviving operand,
-//! which is why the float set is so much smaller than the integer one:
-//!
-//! * `x + 0.0` is not `x` — for `x = -0.0` it yields `+0.0`.
-//! * `x * 0.0` is not `0.0` — for `NaN` or an infinity it yields `NaN`.
-//! * `x - x` is not `0.0` — again `NaN` and the infinities.
-//!
-//! Multiplying or dividing a float by one *is* exact for every value
-//! including `NaN`, the infinities and both zeros, so those two stay.
-//!
-//! Rewrites are collected and applied in one traversal; the instructions they
-//! orphan are deleted by DCE on the same fixpoint round.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use rustc_hash::FxHashMap;
 
@@ -26,9 +26,9 @@ use crate::ssa::ir::{Inst, InstKind, SsaFunc, Value};
 use crate::ssa::uses::replace_uses_with_map;
 
 pub fn run(func: &mut SsaFunc) -> bool {
-    // Known integer constants, and known float constants, by value id. SSA
-    // guarantees a single definition, so one map over the whole function is
-    // enough regardless of block order.
+    
+    
+    
     let mut int_const: FxHashMap<Value, i64> = FxHashMap::default();
     let mut float_const: FxHashMap<Value, f64> = FxHashMap::default();
     for block in &func.blocks {
@@ -45,8 +45,8 @@ pub fn run(func: &mut SsaFunc) -> bool {
         }
     }
 
-    // `dest -> existing value` rewrites, plus instructions that collapse to a
-    // fresh constant and are rewritten in place.
+    
+    
     let mut rewrites: FxHashMap<Value, Value> = FxHashMap::default();
     let mut to_const: Vec<(usize, usize, InstKind)> = Vec::new();
 
@@ -54,13 +54,13 @@ pub fn run(func: &mut SsaFunc) -> bool {
         for (i, inst) in block.insts.iter().enumerate() {
             match simplify(inst, &int_const, &float_const) {
                 Some(Simplified::Use(v)) => {
-                    // `ty` on a `Binary` is the *result* type, and it need not
-                    // match its operands': `1.0 * n` for an integer `n` is
-                    // Float. Forwarding the surviving
-                    // operand is only valid when it already has the type the
-                    // result had, or every consumer downstream — including
-                    // `register_meta` and the JIT's unboxing — would be
-                    // reading an int where a float was promised.
+                    
+                    
+                    
+                    
+                    
+                    
+                    
                     let dest = inst.dest.expect("simplified inst defines a value");
                     if func.value_ty(v) == func.value_ty(dest) {
                         rewrites.insert(dest, v);
@@ -86,9 +86,9 @@ pub fn run(func: &mut SsaFunc) -> bool {
 }
 
 enum Simplified {
-    /// The instruction's result is exactly this already-computed value.
+    
     Use(Value),
-    /// The instruction's result is this literal, whatever the operands hold.
+    
     Const(InstKind),
 }
 
@@ -124,20 +124,20 @@ fn simplify(
                 HirBinOp::Mul => match (li, ri) {
                     (_, Some(1)) => Some(Simplified::Use(l)),
                     (Some(1), _) => Some(Simplified::Use(r)),
-                    // Sound for integers precisely because there is no NaN.
+                    
                     (_, Some(0)) | (Some(0), _) => Some(Simplified::Const(InstKind::ConstInt(0))),
                     _ => None,
                 },
-                // Deliberately nothing for the bitwise and shift operators.
-                // They lower as `bor.dyn` and friends — the compiler types
-                // them `Dynamic` even when both operands are `int`, and under
-                // `Dynamic` `x | 0` is not an identity, since a non-integer
-                // operand coerces instead of passing through. They would
-                // belong here the day those ops get typed variants.
-                //
-                // `x ** 1` is left alone too: `Pow` raises on a negative
-                // exponent so DCE cannot delete it, and forwarding the result
-                // while the instruction still executes saves nothing.
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
                 _ => None,
             }
         }

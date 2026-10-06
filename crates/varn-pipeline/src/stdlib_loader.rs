@@ -9,20 +9,20 @@ use varn_modules::loader::ModuleLoader as CanonicalLoader;
 use varn_types::FunctionProto;
 use varn_vm::loader::{ModuleError, ModuleLoader};
 
-// ---------------------------------------------------------------------------
-// Compiled-proto caches shared by FileLoader and StdlibLoader.
-//
-// Per-thread materialized protos plus process-wide postcard bytes:
-// `Rc<FunctionProto>` is not `Send`, and isolate workers each run a fresh VM
-// on a fresh thread, so cross-thread reuse shares the serialized form and
-// deserializes once per thread instead of recompiling. Every VM instance
-// still evaluates the module body itself; only lexing/parsing/checking/
-// compiling is shared.
-//
-// Entries carry a source fingerprint: local files invalidate when their
-// content changes; stdlib specs use `STD_FINGERPRINT` because the active std
-// is process-fixed (see `std_root::resolve`).
-// ---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 thread_local! {
     static PROTO_CACHE: RefCell<FxHashMap<String, (u64, Rc<FunctionProto>)>> =
@@ -77,8 +77,8 @@ pub struct FileLoader;
 
 impl ModuleLoader for FileLoader {
     fn resolve(&self, spec: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
-        // One resolution: the same `ModuleResolver` every other consumer uses.
-        // This loader only ROUTES by scheme (local files), it does not resolve.
+        
+        
         varn_modules::resolver::ModuleResolver::new()
             .resolve(spec, from)
             .map_err(ModuleError::new)
@@ -95,7 +95,7 @@ impl ModuleLoader for FileLoader {
             ModuleId::Local(p) => p.as_ref(),
             _ => return Ok(None),
         };
-        // Source through the canonical registry (single door), not `fs` here.
+        
         let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)
             .map_err(|e| ModuleError::new(e.to_string()))?
             .text;
@@ -116,7 +116,7 @@ pub struct StdlibLoader;
 
 impl ModuleLoader for StdlibLoader {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
-        // One resolution (shared); this loader only routes by scheme.
+        
         varn_modules::resolver::ModuleResolver::new()
             .resolve(specifier, from)
             .map_err(ModuleError::new)
@@ -135,7 +135,7 @@ impl ModuleLoader for StdlibLoader {
             _ => return Ok(None),
         };
 
-        // Same key scheme as every other per-module cache (ADR-0011).
+        
         let key = varn_modules::artifact::module_key(id, STD_FINGERPRINT);
         if let Some(hit) = cached_proto(&key, STD_FINGERPRINT) {
             return Ok(Some(hit));
@@ -147,8 +147,8 @@ impl ModuleLoader for StdlibLoader {
 }
 
 fn load_uncached(id: &ModuleId, spec: &str) -> Result<FunctionProto, ModuleError> {
-    // Same single door as the checker: the registry gives the text (and the
-    // precompiled bytecode when the bundle ships it).
+    
+    
     let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)
         .map_err(|e| ModuleError::new(e.to_string()))?;
 
@@ -161,19 +161,19 @@ fn load_uncached(id: &ModuleId, spec: &str) -> Result<FunctionProto, ModuleError
         .map_err(|e| ModuleError::new(format!("stdlib compile error in {spec}: {e}")))
 }
 
-/// Compile one module source to a FunctionProto. Used by StdlibLoader, which
-/// also loads user modules.
+
+
 pub fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
     compile_source_inner(source, path, false)
 }
 
-/// Same, but rejects a module whose types do not check.
-///
-/// Only the bundle build validates: it compiles every stdlib module once, in
-/// manifest order, so its diagnostics are complete. The on-demand loader
-/// resolves modules in import order and would re-litigate types that were
-/// already validated — and a load-time `Err` on a module the program needs
-/// deadlocks rather than reporting.
+
+
+
+
+
+
+
 pub fn compile_source_checked(source: &str, path: &str) -> Result<FunctionProto, String> {
     compile_source_inner(source, path, true)
 }
@@ -188,10 +188,10 @@ fn compile_source_inner(
         varn_checker::Checker::check(&program, &arena, interner, r)
     });
     if reject_type_errors && check.diagnostics.has_errors() {
-        // The stdlib goes through the same checker as user code. Silently
-        // dropping these diagnostics let `std/*.vn` carry types the backend
-        // then trusted — e.g. an `int`-declared function returning a whole
-        // float, which clif then reinterprets as an int.
+        
+        
+        
+        
         let mut msg = String::new();
         for d in check.diagnostics.errors() {
             msg.push_str(&format!(
@@ -223,11 +223,11 @@ fn compile_source_inner(
     varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
 }
 
-/// std modules obey the layer rule (ADR-0018): `std:*` and `runtime:*` only.
-///
-/// Parser-based (not string-scanning): lex + parse the module, then reuse the
-/// same import collector the pipeline uses for cache invalidation. Avoids the
-/// false positives/negatives of matching import syntax inside string literals.
+
+
+
+
+
 fn validate_imports(id: &str, source: &str) -> Result<(), String> {
     let (program, arena, interner) = crate::quiet_parse::parse_only(source, id, "")?;
     for spec in crate::import_collector::collect_imports(&program, &arena, &interner) {
@@ -237,9 +237,9 @@ fn validate_imports(id: &str, source: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Compiles the entire stdlib directory into a single serialized VNB bytes buffer.
-/// Sole producer of `.vnb`: `crates/varn-cli/build.rs` calls it to embed the
-/// stdlib into `vn`, which then serves every host (CLI, LSP, isolates).
+
+
+
 pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, String> {
     #[derive(serde::Deserialize)]
     struct ManifestModule {
@@ -301,8 +301,8 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
         };
 
     let mut modules = Vec::new();
-    // Report every failing module in one pass: fixing the stdlib one build
-    // round-trip at a time is not worth the four-minute rebuild.
+    
+    
     let mut failures = String::new();
     for m in &manifest.modules {
         let rel_id = m.id.strip_prefix("std:").ok_or("invalid std: prefix")?;

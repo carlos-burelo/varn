@@ -1,9 +1,9 @@
-//! Renders `varn_jit::diagnose_loops`' report as part of `vn debug -p
-//! bytecode`. Built for agents investigating why a loop isn't as fast as
-//! expected: shows every natural loop the JIT sees, whether its
-//! array-guard hoisting fast path (see `varn-jit`'s `loop_hoist` module)
-//! engages, and — when it doesn't — which specific check rejected it,
-//! instead of requiring a manual trace through the JIT's analysis passes.
+
+
+
+
+
+
 
 use varn_core::term::terminal;
 use varn_core::OpCode;
@@ -11,11 +11,11 @@ use varn_jit::CacheSource;
 
 use varn_core::term::colors::{DIM, GREEN, R, RED, YELLOW};
 
-/// The compiler emits the indexed global opcodes directly, so
-/// `is_alloc_free_op` already covers them. A name-keyed `LoadGlobal` /
-/// `StoreGlobal` / `DefineGlobal` only survives for a genuinely dynamic name
-/// now; it is still a hash lookup, not an allocation, so a loop whose only
-/// disqualifying instructions are those stays alloc-free.
+
+
+
+
+
 fn alloc_free_ignoring_global_resolution(
     code: &[u16],
     constants: &[varn_types::PoolEntry],
@@ -48,8 +48,8 @@ fn alloc_free_ignoring_global_resolution(
     true
 }
 
-/// `code`/`constants` must be the same slices the bytecode dump above just
-/// printed — no separate compile step.
+
+
 pub fn print_loop_diagnostics(code: &[u16], constants: &[varn_types::PoolEntry], indent: &str) {
     let loops = varn_jit::diagnose_loops(code, constants);
     if loops.is_empty() {
@@ -62,9 +62,9 @@ pub fn print_loop_diagnostics(code: &[u16], constants: &[varn_types::PoolEntry],
         if loops.len() == 1 { "" } else { "s" }
     ));
 
-    // Either kind of masking below stems from the same cause (this view
-    // predates global-slot resolution) — flag it once at the end rather
-    // than repeating the explanation per loop.
+    
+    
+    
     let mut masked_by_resolution = false;
 
     for lp in &loops {

@@ -4,7 +4,7 @@ use varn_core::TypeKind;
 use super::contexts::AliasSubstitutionContext;
 use super::resolve_type_node;
 
-/// Expand `name<args>` when `name` is a generic alias declared in `core:types`.
+
 pub(super) fn try_stdlib_generic_alias(
     name: &str,
     args: &[Type],

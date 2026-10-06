@@ -76,7 +76,7 @@ pub(crate) fn normalize_for_binary(
 ) -> Type {
     let ty = &ty.apparent(table);
     if let TypeKind::Named(name, _) = table.get(ty.0) {
-        // A sibling module can mint the atom after this bind's snapshot.
+        
         match interner.try_resolve(name).unwrap_or_default() {
             n if n == varn_core::LangPrimitive::Str.name() => return Type::Str,
             n if n == varn_core::LangPrimitive::Int.name() => return Type::Int,

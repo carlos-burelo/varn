@@ -1,4 +1,4 @@
-//! `-p symbols`: symbol table with inferred types (DEBUG_PLAN §4.4).
+
 
 use std::io::Write;
 
@@ -8,7 +8,7 @@ use crate::fmt::Format;
 use crate::render::{basename, BLUE, BOLD, DIM, RESET, YELLOW};
 use crate::report::Report;
 
-/// Rows `[loc, kind, tag, name, ty]`.
+
 pub fn collect(check_result: &CheckResult) -> Report {
     let mut rows = Vec::new();
     for (id, sym) in check_result.bind.arena.all().iter().enumerate() {

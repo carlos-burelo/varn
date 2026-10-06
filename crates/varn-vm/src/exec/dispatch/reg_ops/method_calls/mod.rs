@@ -1,6 +1,6 @@
-//! A method call — `this.name(args)` — wherever its arguments are: the
-//! interpreter's `CallMethod` / `InvokeVirtual` and compiled code's
-//! `jit_call_method_window` share [`ExecCtx::call_method`].
+
+
+
 
 mod ic;
 mod intrinsic;
@@ -18,10 +18,10 @@ use varn_types::chunk::ICKind;
 use varn_types::value::{BoundMethodTarget, ClassObj};
 
 impl ExecCtx {
-    /// The interpreter's `CallMethod` / `InvokeVirtual`: the arguments are
-    /// registers `arg_start..` of activation `base`, the result goes to
-    /// register `dest`. `Ok(true)` means a VM method's frame was pushed and
-    /// the dispatch loop continues into it.
+    
+    
+    
+    
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn exec_call_method_reg(
         &mut self,
@@ -52,11 +52,11 @@ impl ExecCtx {
         }
     }
 
-    /// The one resolution and invocation of a method call, in order: an enum
-    /// variant's construction, the intrinsic fast paths, the site's inline
-    /// cache, the receiver class's methods, and property lookup. `closure` is
-    /// the calling function's, whose constant `name_idx` names the method and
-    /// whose cache slot `cs` (or `usize::MAX`: none) serves the site.
+    
+    
+    
+    
+    
     pub(crate) fn call_method(
         &mut self,
         this_val: VmValue,
@@ -72,12 +72,12 @@ impl ExecCtx {
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("CallMethod: non-string name"))?;
 
-        // `Enum.Variant(args)` reaches the VM as a method call on the enum's own
-        // class object. It has to be answered before anything else: the inline
-        // cache below can never help, because a variant is not in the class's
-        // `method_map`, and the generic path underneath allocates the variant
-        // template into the heap on every construction just to hand it to
-        // `prepare_call`. See `ExecCtx::construct_enum_variant`.
+        
+        
+        
+        
+        
+        
         if let Some(template) = self.enum_variant_template(this_val, name.as_ref()) {
             if let Some(built) = self.construct_enum_variant(&template, args) {
                 return Ok(MethodOutcome::Value(built));
@@ -157,9 +157,9 @@ impl ExecCtx {
         self.finish_generic_method_call(method_nv, this_val, args, frame_idx)
     }
 
-    /// `name` looked up in receiver class `cls` and its ancestors: a VM
-    /// method with a plain frame, or a native, is invoked (and cached);
-    /// `None` leaves the call to property lookup.
+    
+    
+    
     fn call_class_method(
         &mut self,
         cls: &Rc<ClassObj>,
@@ -188,9 +188,9 @@ impl ExecCtx {
         Ok(None)
     }
 
-    /// Native method `f` called on `this_val`, counted for the profile.
-    /// `pub(crate)` for the JIT's cached lane, which dispatches a
-    /// version-checked vtable hit without re-resolving.
+    
+    
+    
     pub(crate) fn call_native_method(
         &mut self,
         f: varn_types::NativeFn,

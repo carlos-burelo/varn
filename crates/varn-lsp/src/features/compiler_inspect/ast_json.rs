@@ -1,7 +1,7 @@
-//! The document's syntax tree as JSON, for the editor's tree view.
-//!
-//! Names are resolved through the document's interner; patterns and types
-//! are shown as the source that wrote them.
+
+
+
+
 
 use serde_json::Value;
 use varn_core::ast::{

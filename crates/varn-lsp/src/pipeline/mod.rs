@@ -11,9 +11,9 @@ use varn_core::{DiagnosticKind, TokenKind};
 pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     varn_builtins::register_provider();
     let path = uri_to_path(&uri);
-    // `scan_with_trivia`, not `scan`: the editor has to reproduce the source
-    // (comment folding today, formatting later), and comments are the one part
-    // the scanner would otherwise drop unrecoverably.
+    
+    
+    
     let (raw_tokens, lexeme_buf, lex_errs, trivia) = varn_lexer::scan_with_trivia(&source, &path);
 
     let mut diagnostics: Vec<LspDiag> = Vec::new();
@@ -31,9 +31,9 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         });
     }
 
-    // Inicios de línea una sola vez: el `rfind('\n')` por token re-escaneaba
-    // la línea desde cada token (O(tokens × largo-línea)). Con la tabla +
-    // búsqueda binaria cada token cuesta O(log líneas) y el scan total es O(n).
+    
+    
+    
     let mut line_starts: Vec<usize> = vec![0];
     for (i, b) in source.bytes().enumerate() {
         if b == b'\n' {
@@ -121,10 +121,10 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         });
     }
 
-    // `cannot resolve module 'std:*'` on every stdlib import usually means no
-    // active std was found at all (missing std/, corrupt bundle, bad install)
-    // rather than N unrelated typos — surface that as one clear diagnostic
-    // instead of leaving the user to guess from the per-import spam.
+    
+    
+    
+    
     if diagnostics
         .iter()
         .any(|d| d.message.starts_with("cannot resolve module 'std:"))
@@ -151,11 +151,11 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         );
     }
 
-    // The one type map (Ley 6): the type recorded at the symbol's own offset
-    // when it is not `dynamic`, else the declared type. The checker's own
-    // `symbol_types` output is NOT merged: `Checker::check` already folded its
-    // finalize pass into `bind.arena` (`sym.ty`), so `recorded.or(sym.ty)`
-    // below carries it. Keeping the second map only doubled lookups.
+    
+    
+    
+    
+    
     let mut resolved_types: rustc_hash::FxHashMap<varn_checker::SymbolId, varn_checker::Type> =
         rustc_hash::FxHashMap::default();
     let mut all_symbols: Vec<varn_checker::SymbolId> = Vec::new();
@@ -176,9 +176,9 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         symbol_map.entry(name).or_insert(sym.kind);
     }
 
-    // Type-parameter names: the token scan, plus every `TypeParameter` the
-    // checker bound. Feeds semantic tokens, which has no other way to know a
-    // bare name in a type annotation is a parameter.
+    
+    
+    
     let (_type_param_map, mut type_param_names) = params::collect_type_params(&source, &tokens);
     for &id in &all_symbols {
         let sym = result.bind.arena.get(id);

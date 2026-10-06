@@ -1,34 +1,34 @@
-//! How a value occupies memory (spec §47–§48, §101): one table for size,
-//! alignment and representation, read by the compiler (field offsets), the
-//! runtime (instance payloads, the collector) and the JIT (compact field
-//! access). Nobody re-derives a representation from a kind.
+
+
+
+
 
 use crate::RuntimeKind;
 
 mod class;
 pub use class::{ClassLayout, FieldLayout};
 
-/// The bytes a stored value is made of.
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ScalarRepr {
-    /// `bool`, one byte.
+    
     Bool,
-    /// `int`, a raw `i64`.
+    
     I64,
-    /// `float`, a raw `f64`.
+    
     F64,
-    /// A heap reference as its 8-byte address; [`COMPACT_REF_NULL`] is `null`
-    /// (the niche that makes `T?` over a reference free, spec §49).
+    
+    
     Ref,
-    /// A whole two-word `VmValue` (tag + payload).
+    
     Boxed,
 }
 
-/// The `null` niche of a [`ScalarRepr::Ref`] slot: no object lives at address 0.
+
 pub const COMPACT_REF_NULL: u64 = 0;
 
 impl ScalarRepr {
-    /// Whether a slot of this representation can hold a GC reference.
+    
     pub const fn holds_reference(self) -> bool {
         match self {
             ScalarRepr::Ref | ScalarRepr::Boxed => true,
@@ -51,13 +51,13 @@ impl TypeLayout {
         Self { size, align, repr }
     }
 
-    /// The layout of a class field laid out by `kind`.
-    ///
-    /// A boxed field (`None`, or a kind with no unboxed form) is a whole
-    /// `VmValue`. So are `str` — it can be `KIND_SSO`, an inline `VmValue`
-    /// with no heap object — and `char`, which is always `HeapObj::Char` and
-    /// would need heap access `InstanceData` does not have. Every other
-    /// reference is always `KIND_HEAP`, so it compacts to an 8-byte index.
+    
+    
+    
+    
+    
+    
+    
     pub const fn of_field(kind: Option<RuntimeKind>) -> Self {
         match kind {
             Some(RuntimeKind::Bool) => Self::new(1, 1, ScalarRepr::Bool),
@@ -92,8 +92,8 @@ impl TypeLayout {
     }
 }
 
-/// Where the references of a laid-out value are (spec §48): the collector
-/// visits these slots and nothing else.
+
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GcLayout {
     pub slots: Vec<GcSlot>,
@@ -102,7 +102,7 @@ pub struct GcLayout {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GcSlot {
     pub offset: u32,
-    /// [`ScalarRepr::Ref`] or [`ScalarRepr::Boxed`].
+    
     pub repr: ScalarRepr,
 }
 

@@ -1,48 +1,48 @@
-//! CLIF lowering from the portable typed SSA (`varn_types::ssa`).
-//!
-//! The primary lowering of the same SSA the interpreter runs: each
-//! [`varn_types::ssa::SsaValue`] becomes one CLIF `Value` of its declared
-//! physical type, and each typed `SsaOp` becomes the native instruction the
-//! checker already proved — no re-derivation from operand types, no flow
-//! lattice. It covers the whole portable family (scalars, aggregates, calls,
-//! modules, suspension); anything still outside it returns `Err`, and the
-//! function runs interpreted. The fallback is a missing optimization, never
-//! a wrong result (Ley 10).
-//!
-//! Storage model (one rule, no re-derivation):
-//! * **scalar** values (`Int`/`Float`/`Bool`) live in CLIF registers;
-//! * **heap** values (`Str`/`Ref`/`Dyn`) live in their VM **home** slot, and
-//!   every read loads from the home. Homes are the roots the GC knows about,
-//!   so a heap value survives an allocation or a call by construction — this
-//!   is the interpreter's own model, not a new one. A home's *address* is
-//!   memoized per register and reused until something may push a frame (see
-//!   [`store::home_addr`]); only the *value* is reloaded per read.
-//!
-//! Shapes admitted (see `docs/plans/2026-09-20-PLAN-PENDIENTE.md`):
-//! * **leaf** — only scalars, no `this`/upvalues/alloc: raw `(exec_ctx, args…)
-//!   -> scalar`;
-//! * **frame-aware** — the body has heap values, module globals or calls, so it
-//!   needs `(stack, closure, base, exec_ctx, args…)`.
-//!
-//! Module split by domain (each file owns one invariant):
-//! * this file — driver, eligibility, block/phi plumbing;
-//! * [`cfg`] — the compiled CFG: reachable blocks, order, loops;
-//! * [`store`] — where a value lives and how a result lands there;
-//! * [`scalar`] — native scalar ops (arith/compare/bitwise/negate);
-//! * [`arrays`] — inline element access on proven arrays;
-//! * [`boxed`] — ops whose semantics live behind a boxed runtime helper;
-//! * [`globals`] — module-relative global reads;
-//! * [`call`] — self-recursion and cross-proto calls;
-//! * [`numeric`] — `std:math` intrinsics and numeric conversions;
-//! * [`pool`] — constant-pool literals;
-//! * [`closures`] — closure creation, captured variables and upvalues;
-//! * [`exceptions`] — `try` regions (resumed interpreted) and `throw`;
-//! * [`views`] — array views cached between safepoints;
-//! * [`induction`] — loop counters whose step cannot overflow;
-//! * [`extra`] — full-family ops outside the scalar/heap core (spreads,
-//!   names, super/extension, modules, suspension, disposal);
-//! * [`osr`] — resuming a running frame at a loop header;
-//! * [`term`] — terminators and the branch/jump argument windows.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{
     ExtFuncData, ExternalName, FuncRef, Function, InstBuilder, UserExternalName, UserFuncName,
@@ -87,79 +87,79 @@ mod views;
 
 use store::{clif_ty, drop_home_addrs, home_load, home_store, is_heap, land, load_value, Out};
 
-/// Frame resources a frame-aware body needs for global access, calls and home
-/// storage. `base` is the `FrameStore` activation id of a framed body; a
-/// native body has none, and reaching for a home there is
-/// [`NEEDS_ACTIVATION`].
+
+
+
+
 pub(super) struct FrameIo<'a> {
     pub exec_ctx: Value,
     pub closure: Value,
     pub base: Option<Value>,
     pub linker: &'a dyn ClifLinker,
-    /// Register → (class, index): where each register's home is.
+    
     pub layout: varn_types::register_meta::FrameLayout,
 }
 
-/// Everything an instruction emission needs that is not the builder or the
-/// value map, so each domain module takes one context instead of a drifting
-/// argument list.
+
+
+
 pub(super) struct Ctx<'a> {
     pub cc: CallConv,
     pub helpers: &'a JitHelpers,
     pub ssa: &'a SsaProto,
     pub proto: &'a FunctionProto,
-    /// Resolved constant pool of the proto, indexed like the bytecode's.
+    
     pub constants: &'a [VmValue],
     pub self_ref: FuncRef,
-    /// Live `ExecCtx`, always real: entry param 0 in a leaf, param 3 in a
-    /// frame-aware body (same value `frame.exec_ctx` carries there). Ningún
-    /// camino lo recupera por thread-local.
+    
+    
+    
     pub exec_ctx: Value,
-    /// `Some` iff this body is frame-aware (heap/globals/calls).
+    
     pub frame: Option<FrameIo<'a>>,
     pub activation: Activation,
-    /// Register 0 — `this`, or a plain call's callee placeholder — read once
-    /// at entry by any frame-aware body.
+    
+    
     pub this: Option<Value>,
-    /// Whether the host rounds in one instruction (`floor`/`ceil`, SSE4.1).
+    
     pub has_round: bool,
-    /// Each array receiver's view, valid until the next safepoint.
+    
     pub views: views::Views,
-    /// The `int` steps proven unable to overflow ([`induction`]).
+    
     pub in_range_steps: std::collections::HashSet<u32>,
-    /// In an OSR lowering, the scalars live into the loop header that the
-    /// resumed body also redefines, each held in a Cranelift variable so the
-    /// header merges the entry's value with the body's (see [`store`]).
+    
+    
+    
     pub carried: std::collections::HashMap<u32, cranelift_frontend::Variable>,
-    /// Memoized home-slot addresses by VM register (see
-    /// [`store::home_addr`]). The driver clears it at each block and after
-    /// any instruction that may push a frame; everything else leaves
-    /// FrameStore vectors (hence every home address) in place.
+    
+    
+    
+    
     pub home_addrs: std::cell::RefCell<std::collections::HashMap<u32, Value>>,
-    /// One reusable native-stack staging window (see [`call::ScratchWin`]).
+    
     pub scratch: Option<call::ScratchWin>,
 }
 
-/// What a native lowering answers when the body reaches for a home: the body
-/// needs a `FrameStore` activation, so the caller lowers it framed instead.
+
+
 pub(super) const NEEDS_ACTIVATION: &str = "from_ssa: body needs a FrameStore activation";
 
 pub(super) struct Lowered {
     pub piece: CompiledPiece,
-    /// The body never touches the VM frame — scalars only, no calls, globals
-    /// or throws — so a caller may enter it without pushing one.
+    
+    
     pub frameless: bool,
 }
 
-/// Attempt the SSA lowering in `activation`'s ABI. `Err` leaves the function
-/// to the interpreter, except [`NEEDS_ACTIVATION`] from a native attempt,
-/// which the caller answers with a framed one.
-///
-/// `osr_ip` selects the entry. `None` is a call: arguments in, execution from
-/// the entry block. `Some(ip)` is an on-stack-replacement entry into a running
-/// interpreted frame at the loop header starting at bytecode offset `ip`: no
-/// arguments, the header's parameters and live values read from their homes,
-/// and only the blocks reachable from the header compiled.
+
+
+
+
+
+
+
+
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn try_lower(
     proto: &FunctionProto,
@@ -225,9 +225,9 @@ pub(super) fn try_lower(
     let mut fb_ctx = FunctionBuilderContext::new();
     let mut b = FunctionBuilder::new(&mut func, &mut fb_ctx);
 
-    // One CLIF block per SSA block. For a call the SSA entry block *is* the
-    // function entry and receives the raw function parameters directly; an
-    // OSR entry is a block of its own that jumps to the loop header.
+    
+    
+    
     let entry = ssa.entry as usize;
     let call_entry = osr.is_none().then_some(entry);
     let start = osr.map_or(entry, |h| h.block as usize);
@@ -249,10 +249,10 @@ pub(super) fn try_lower(
         blocks[i] = Some(cb);
     }
 
-    // The compiled CFG: blocks in reverse postorder from the entry, their
-    // predecessors, and which blocks compiled code reaches at all. A jump to
-    // a block at or before its own position in reverse postorder is a loop
-    // back edge.
+    
+    
+    
+    
     let rpo = cfg::order(ssa, start);
     let preds = cfg::predecessors(ssa);
     let mut rpo_pos = vec![0usize; ssa.blocks.len()];
@@ -354,20 +354,20 @@ pub(super) fn try_lower(
         let i = *i;
         let blk = &ssa.blocks[i];
         let cb = blocks[i].expect("block created");
-        // `Views::declare` above already emitted the initial clear into the
-        // entry block, so on the first iteration the builder is both current
-        // and partial there: re-switching to it trips Cranelift's
-        // "fill your block before switching" (debug-only, but the release
-        // build silently keeps the stray instructions). A self-switch is a
-        // no-op anyway, so it is skipped; every later switch leaves a block
-        // its terminator just filled.
+        
+        
+        
+        
+        
+        
+        
         if !(n == 0 && Some(i) == call_entry) {
             b.switch_to_block(cb);
         }
-        // Home addresses memoize per block only: reusing an address across
-        // blocks needs a dominance proof the map does not carry (a use
-        // reachable around the defining block reads garbage). Within one
-        // block every definition textually precedes its uses.
+        
+        
+        
+        
         drop_home_addrs(&ctx);
 
         let params: Vec<Value> = b.block_params(cb).to_vec();
@@ -398,7 +398,7 @@ pub(super) fn try_lower(
                 drop_home_addrs(&ctx);
             }
         }
-        // A back edge polls the collector only when its loop can allocate.
+        
         let polls = |target: u32| {
             rpo_pos[target as usize] <= rpo_pos[i]
                 && cfg::loop_may_collect(ssa, &preds, target as usize, i)
@@ -409,7 +409,7 @@ pub(super) fn try_lower(
         term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, polls)?;
     }
 
-    // Nothing compiled jumps to the rest; each still needs a body.
+    
     for (i, cb) in blocks.iter().enumerate() {
         if !reached[i] {
             b.switch_to_block(cb.expect("block created"));
@@ -428,10 +428,10 @@ pub(super) fn try_lower(
     })
 }
 
-/// SSA entry parameter `k` (register `1 + k`) as the ABI delivers it. A native
-/// body reads it in its class's form starting at entry word `*word`; a framed
-/// one takes a scalar-declared argument from its word and anything else from
-/// its home.
+
+
+
+
 fn entry_param(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -474,13 +474,13 @@ fn entry_param(
     }
 }
 
-/// Whether `op` can push a VM frame (a real call, a module load, suspension
-/// or user code behind a dynamic access): after it, memoized home addresses
-/// are stale. Pure heap allocation does NOT push — the FrameStore vectors
-/// only reallocate on frame push — so builders and readers stay cached
-/// across it. Conservative on doubt: `CallNativeOp` stays `true` because a
-/// higher-order native could call back, and every dynamic access may run
-/// user code.
+
+
+
+
+
+
+
 fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
     match op {
         SsaOp::Call { .. }
@@ -508,8 +508,8 @@ fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
     }
 }
 
-/// Whether `op` reaches the activation, the running closure or the runtime
-/// even when every value it touches is a scalar.
+
+
 fn needs_frame(ssa: &SsaProto, op: &SsaOp) -> bool {
     matches!(
         op,

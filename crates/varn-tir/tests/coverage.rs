@@ -1,8 +1,8 @@
 #![allow(unused_crate_dependencies)]
-//! The counter that says whether the work is advancing, as opposed to the
-//! verifier, which says whether it is broken. A receiver whose class IS known
-//! but which resolves by name is legal — it is an opportunity lost, not a
-//! miscompile — so it is counted, not rejected.
+
+
+
+
 
 use std::sync::Arc;
 use varn_tir::*;
@@ -54,8 +54,8 @@ fn expr(kind: TirExprKind, ty: BackendTy, res: Resolution) -> TirExpr {
     }
 }
 
-/// Dynamics are counted per reason, not as one number. An honest host
-/// boundary and an inference hole read identically in a total.
+
+
 #[test]
 fn dynamics_are_counted_by_reason() {
     let mut m = module();
@@ -76,8 +76,8 @@ fn dynamics_are_counted_by_reason() {
     assert_eq!(c.dynamic_by_reason(DynReason::Union), 0);
 }
 
-/// A known class resolved by name is legal and counted — that is the
-/// difference between the verifier and this report.
+
+
 #[test]
 fn name_dispatch_on_a_known_class_is_counted_not_rejected() {
     let mut m = module();
@@ -106,7 +106,7 @@ fn name_dispatch_on_a_known_class_is_counted_not_rejected() {
     assert_eq!(c.name_dispatch, 1);
 }
 
-/// The ratio is what a regression gate compares across commits.
+
 #[test]
 fn the_static_ratio_is_reported() {
     let mut m = module();

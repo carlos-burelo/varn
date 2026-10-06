@@ -50,14 +50,14 @@ mod sys {
     pub const MAP_PRIVATE: i32 = 0x02;
     pub const MAP_FAILED: *mut c_void = !0 as *mut c_void;
 
-    // MAP_ANONYMOUS differs between Linux (0x20) and macOS (MAP_ANON = 0x1000).
+    
     #[cfg(target_os = "macos")]
     pub const MAP_ANON: i32 = 0x1000;
     #[cfg(not(target_os = "macos"))]
     pub const MAP_ANON: i32 = 0x20;
 
-    // Apple Silicon requires MAP_JIT for any mapping that will be made
-    // executable. Without it, mprotect(PROT_EXEC) returns ENOTSUP.
+    
+    
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     pub const MAP_JIT: i32 = 0x0800;
     #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
@@ -78,8 +78,8 @@ mod sys {
         pub fn munmap(addr: *mut c_void, length: usize) -> i32;
     }
 
-    // Apple Silicon W^X: before writing JIT code, disable execute protection;
-    // after writing, re-enable it. Other platforms never call it.
+    
+    
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     extern "C" {
         pub fn pthread_jit_write_protect_np(enabled: i32);
@@ -123,8 +123,8 @@ impl JitBuffer {
 
         #[cfg(not(target_os = "windows"))]
         {
-            // On Apple Silicon, MAP_JIT is required for executable mappings.
-            // On other Unix systems, MAP_JIT == 0 (no-op OR).
+            
+            
             let flags = sys::MAP_PRIVATE | sys::MAP_ANON | sys::MAP_JIT;
             let ptr = unsafe {
                 sys::mmap(
@@ -149,9 +149,9 @@ impl JitBuffer {
 
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         assert!(!self.executable, "Cannot modify an executable JIT buffer");
-        // On Apple Silicon, MAP_JIT memory starts write-protected; disable
-        // the guard for the duration of the write, then re-enable in
-        // make_executable() via pthread_jit_write_protect_np(1).
+        
+        
+        
         #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
         unsafe {
             sys::pthread_jit_write_protect_np(0);
@@ -193,9 +193,9 @@ impl JitBuffer {
 
         #[cfg(not(target_os = "windows"))]
         {
-            // On Apple Silicon: re-enable write-execute protection (was disabled
-            // in as_mut_slice), then invalidate the instruction cache.
-            // On other platforms: mprotect to PROT_READ|PROT_EXEC.
+            
+            
+            
             #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
             {
                 unsafe {
@@ -271,19 +271,19 @@ impl Drop for JitBuffer {
     }
 }
 
-// ── ABI v2: stacks estables por clase (§1, §5) ────────────────────────────
-// Mismo mecanismo que el código (`JitBuffer`), segundo uso (Ley 8): una sola
-// reserva virtual por clase. La base no se mueve jamás en el proceso; el JIT
-// la lee una vez por función y la conserva en registros. Cero recargas tras
-// llamada que pudo realojar — esa categoría desaparece por construcción.
-//
-// `FrameStore` (Vecs) sigue vivo hasta migrar la VM; estas arenas son el
-// camino nuevo que el lowering v2 direcciona vía `AbiStacks`.
 
-/// Capacidad virtual por defecto por clase (overcommit, no commit).
+
+
+
+
+
+
+
+
+
 pub const STACK_RESERVE_BYTES: usize = 64 << 20;
 
-/// Arenas bump por clase con bases estables.
+
 pub struct StackArenas {
     gpr: JitBuffer,
     fpr: JitBuffer,
@@ -296,7 +296,7 @@ pub struct StackArenas {
 }
 
 impl StackArenas {
-    /// Reserva virtual por clase. `bytes` se redondea a página en `JitBuffer`.
+    
     pub fn new(bytes: usize) -> Result<Self, String> {
         Ok(Self {
             gpr: JitBuffer::new(bytes)?,
@@ -310,13 +310,13 @@ impl StackArenas {
         })
     }
 
-    /// Vista que el JIT hornea: bases estables + topes bump.
+    
     pub fn abi_stacks(&self) -> varn_abi::AbiStacks {
         let gpr = self.gpr.as_ptr() as *mut i64;
         let fpr = self.fpr.as_ptr() as *mut f64;
         let refs = self.refs.as_ptr() as *mut u32;
         let dyn_ = self.dyn_.as_ptr() as *mut varn_abi::AbiValue;
-        // SAFETY: aritmética sobre reservas propias, acotada por capacidad.
+        
         unsafe {
             varn_abi::AbiStacks {
                 gpr,
@@ -331,8 +331,8 @@ impl StackArenas {
         }
     }
 
-    /// Un solo check de capacidad por llamada (branch predecible). Reserva el
-    /// tramo y devuelve sus bases. `None` = slow path (GC / crecer / error).
+    
+    
     pub fn alloc(&mut self, counts: [u32; 4]) -> Option<varn_abi::ActBases> {
         let cap = |bytes: usize, elem: usize| (bytes / elem) as u64;
         let ok = (self.top_gpr as u64 + counts[0] as u64) <= cap(self.gpr.size(), 8)
@@ -352,7 +352,7 @@ impl StackArenas {
         Some(bases)
     }
 
-    /// Trunca por encima de `bases` (retorno / unwind LIFO).
+    
     pub fn truncate(&mut self, bases: varn_abi::ActBases) {
         self.top_gpr = bases.bases[0];
         self.top_fpr = bases.bases[1];
@@ -370,7 +370,7 @@ impl StackArenas {
 
 use core::mem::size_of;
 
-/// Arena bump de activaciones de tamaño fijo: el caller empuja siempre.
+
 pub struct FrameArena {
     buf: JitBuffer,
     len: u32,
@@ -389,13 +389,13 @@ impl FrameArena {
         (self.buf.size() / size_of::<varn_abi::AbiFrame>()) as u32
     }
 
-    /// Un check por llamada; `None` = slow path.
+    
     pub fn push(&mut self, frame: varn_abi::AbiFrame) -> Option<u32> {
         if self.len >= self.cap() {
             return None;
         }
         let id = self.len;
-        // SAFETY: `id < cap`, escritura dentro de la reserva propia.
+        
         unsafe {
             let base = self.buf.as_ptr() as *mut varn_abi::AbiFrame;
             base.add(id as usize).write(frame);

@@ -1,6 +1,6 @@
-//! The young generation: which slots were born since the last minor
-//! collection, and which old slots were written a young reference since then.
-//! A young object that survives stays in its slot and becomes old in place.
+
+
+
 
 use varn_types::HeapRef;
 
@@ -31,9 +31,9 @@ impl YoungGen {
         self.born.len()
     }
 
-    /// Byte offset of the born-count (`born.len()`) inside `YoungGen`, for the
-    /// JIT back-edge safepoint. Relies on Vec's (cap, ptr, len) word layout,
-    /// validated against a live heap in `ExecCtx::new`.
+    
+    
+    
     pub(crate) fn born_len_byte_offset() -> usize {
         std::mem::offset_of!(YoungGen, born) + 2 * std::mem::size_of::<usize>()
     }

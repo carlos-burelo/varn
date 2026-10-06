@@ -1,5 +1,5 @@
-//! Benchmarking a precompiled `.vnc` bundle: no source phases, just load and
-//! execute.
+
+
 
 use std::rc::Rc;
 use std::time::Duration;
@@ -62,9 +62,9 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let total_p50: Duration = phases.iter().map(|p| p.p50).sum();
     let execute = phases.iter().find(|p| p.name == "execute (warm)");
 
-    // One instrumented run supplies every JIT figure, so compile time stays
-    // comparable to a single execute p50. See `source.rs` for why averaging a
-    // multi-run snapshot is wrong.
+    
+    
+    
     let (exec_jit, records) = {
         varn_vm::varn_jit::JIT_STATS.reset();
         varn_vm::varn_jit::stats::start_recording();
@@ -152,6 +152,6 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);
 
-    // Same placement as `source::run`: report first, verdict after.
+    
     super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
 }

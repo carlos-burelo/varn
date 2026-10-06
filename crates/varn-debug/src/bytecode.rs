@@ -33,10 +33,10 @@ fn op_color(op: OpCode) -> &'static str {
     }
 }
 
-/// Global keys are `<module path>::<symbol>`, and the module part is an
-/// absolute path that buries the symbol the reader came for. Keep the module's
-/// file name so cross-module globals stay distinguishable, drop the rest.
-/// A string that is not a qualified key is left exactly as it is.
+
+
+
+
 fn short_global_key(s: &str) -> &str {
     let Some((module, symbol)) = s.rsplit_once("::") else {
         return s;
@@ -50,7 +50,7 @@ fn short_global_key(s: &str) -> &str {
         .next()
         .filter(|f| !f.is_empty())
         .unwrap_or(module);
-    // `s` is contiguous, so the tail starting at the file name covers both.
+    
     &s[s.len() - (file.len() + 2 + symbol.len())..]
 }
 

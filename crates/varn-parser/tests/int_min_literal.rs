@@ -1,11 +1,11 @@
-//! `int` is an i64, so its lower bound must be writable. The sign is not part
-//! of the literal token — the lexer sees only the magnitude, and
-//! `9223372036854775808` does not fit in an i64 — so folding the minus into
-//! the literal is the parser's job, and it is the only way i64::MIN can be
-//! spelled.
 
-/// Lex and parse one source string. `varn-lexer` is already a dev-dependency
-/// of this crate.
+
+
+
+
+
+
+
 fn parses(src: &str) -> bool {
     let (tokens, buf, lex_diags) = varn_lexer::scan(src, "test.vn");
     if !lex_diags.is_empty() {
@@ -14,7 +14,7 @@ fn parses(src: &str) -> bool {
     varn_parser::parse(tokens, buf, "test.vn", varn_core::AtomInterner::new()).is_ok()
 }
 
-/// The lower bound of `int` parses.
+
 #[test]
 fn i64_min_parses_as_a_literal() {
     assert!(
@@ -23,7 +23,7 @@ fn i64_min_parses_as_a_literal() {
     );
 }
 
-/// One past the lower bound is still an error — the fold must not widen the type.
+
 #[test]
 fn one_below_i64_min_is_rejected() {
     assert!(
@@ -32,7 +32,7 @@ fn one_below_i64_min_is_rejected() {
     );
 }
 
-/// The magnitude without a sign stays an error: it is above i64::MAX.
+
 #[test]
 fn unsigned_magnitude_is_still_rejected() {
     assert!(
@@ -41,8 +41,8 @@ fn unsigned_magnitude_is_still_rejected() {
     );
 }
 
-/// Everything that parses today keeps parsing, and a plain negation is
-/// untouched by the fold.
+
+
 #[test]
 fn ordinary_negation_still_parses() {
     assert!(parses("let x: int = -5"));

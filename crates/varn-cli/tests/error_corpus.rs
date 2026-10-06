@@ -1,13 +1,13 @@
-//! Corpus negativo: cada `tests/errors/*.vn` declara en su primera línea qué
-//! debe rechazarlo. Sin este runner los fixtures eran documentación, no tests.
-//!
-//! - `// expect: error[VNxxxx]` / `// expect: warning[VNxxxx]`: `vn check`
-//!   imprime ese token (y, si es error, sale con código distinto de 0).
-//! - `// expect: error[<texto>]` sin `VN`: fallo de una fase sin código
-//!   (emisión, runtime); `vn check` o, si compila, `vn run` falla imprimiendo
-//!   `<texto>`.
 
-// Un test de integración no usa las dependencias de la librería.
+
+
+
+
+
+
+
+
+
 #![allow(unused_crate_dependencies)]
 
 use std::path::{Path, PathBuf};

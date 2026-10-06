@@ -3,9 +3,9 @@ use varn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct Int;
 
-// Taken from `varn_core`, not restated: these used to say `2^47` while the
-// arithmetic checked `i64`, so `int.MAX_VALUE + 1` wrapped in silence instead
-// of raising.
+
+
+
 const INT_MAX: i64 = varn_core::INT_MAX;
 const INT_MIN: i64 = varn_core::INT_MIN;
 

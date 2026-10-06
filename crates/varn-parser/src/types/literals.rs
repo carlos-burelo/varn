@@ -2,8 +2,8 @@ use crate::stream::TokenStream;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
 
-/// `"GET"`, `200`, `-1`, `true`, `'c'` in type position (spec §29). The
-/// literal is parsed as an expression so escapes and radixes agree with it.
+
+
 pub(crate) fn parse_literal_type(
     s: &mut TokenStream,
     range: varn_core::SourceRange,

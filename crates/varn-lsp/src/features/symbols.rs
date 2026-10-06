@@ -16,27 +16,27 @@ pub fn build_document_symbols(state: &DocumentState) -> DocumentSymbolResponse {
     DocumentSymbolResponse::Nested(nest_symbols(state, &sorted))
 }
 
-/// Whether a symbol belongs in the outline the user reads.
-///
-/// The binder puts more than declarations into scope: an `extension` block
-/// lowers each member to a mangled global (`__ext_str_shout`) and binds the
-/// receiver as a parameter named `this`. Both are real symbols and neither is
-/// something the author wrote, so an outline listing them is showing its own
-/// implementation.
+
+
+
+
+
+
+
 fn is_outlinable(name: &str, kind: SymbolKind) -> bool {
     if name.starts_with("__ext_") {
         return false;
     }
     !matches!(
         kind,
-        // Part of their function's signature, not siblings of it.
+        
         SymbolKind::Parameter
             | SymbolKind::TypeParameter
-            // A type's members are supplied by `members_of`, from the checker's
-            // own member table. They used to *also* appear at the top level,
-            // because nesting was done by line range and a class carries no end
-            // line — so every field showed up twice, once inside its class and
-            // once beside it.
+            
+            
+            
+            
+            
             | SymbolKind::Property
             | SymbolKind::Method
             | SymbolKind::EnumMember
@@ -92,12 +92,12 @@ fn insert_at_depth(nodes: &mut Vec<DocumentSymbol>, depth: usize, sym: DocumentS
         nodes.push(sym);
     }
 }
-/// One member of a type, as an outline node.
-///
-/// Built from the checker's summary. Only members the checker located are
-/// shown: one with no `def_line` has no source of its own — read out of a
-/// precompiled interface, or synthesised — and an outline entry that jumps
-/// nowhere is worse than no entry.
+
+
+
+
+
+
 fn summary_to_doc(
     state: &DocumentState,
     m: &varn_checker::ResolvedMemberSummary,
@@ -107,7 +107,7 @@ fn summary_to_doc(
     let kind = summary_to_symbol_kind(m.kind);
     let range = range_on_line(line, m.def_col, name_end);
 
-    // See the note in `sym_to_doc` for why the deprecated field is named.
+    
     #[allow(deprecated)]
     Some(DocumentSymbol {
         name: m.name.to_string(),
@@ -157,9 +157,9 @@ fn sym_to_doc(state: &DocumentState, sym: SymbolView<'_>) -> DocumentSymbol {
         Some(sym.type_str())
     };
 
-    // Only a container nests. A `const w: Widget` is one entry in the outline,
-    // not a folder holding every member of `Widget` — and a `const s: str`
-    // would otherwise hang all forty-odd methods of `str` under itself.
+    
+    
+    
     let members: Vec<DocumentSymbol> = if is_container(sym.kind()) {
         state
             .members_of(sym)
@@ -175,7 +175,7 @@ fn sym_to_doc(state: &DocumentState, sym: SymbolView<'_>) -> DocumentSymbol {
         Some(members)
     };
 
-    // See `member_to_doc` for why the deprecated field is still named here.
+    
     #[allow(deprecated)]
     let symbol = DocumentSymbol {
         name: sym.name().to_owned(),

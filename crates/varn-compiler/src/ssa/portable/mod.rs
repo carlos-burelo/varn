@@ -1,14 +1,14 @@
-//! Project the compiler's internal SSA onto the portable, serializable
-//! [`varn_types::ssa::SsaProto`] that rides inside a `FunctionProto`.
-//!
-//! The projection covers the whole instruction family: scalars, aggregates,
-//! properties, classes, closures, calls (including spread/super/extension),
-//! modules, suspension (`await`/`yield`/`spawn`) and disposal. A `None` is not
-//! an error — it is the fallback contract for a body the JIT cannot lower yet
-//! (a missing cache slot, closure constant or landing pad, or an operator with
-//! no portable form): the function keeps its bytecode lowering. A wrong SSA
-//! would be a miscompile, while a missing SSA is only a missed optimization
-//! (Ley 10: no gain without correctness).
+
+
+
+
+
+
+
+
+
+
+
 
 use std::sync::Arc;
 
@@ -23,28 +23,28 @@ mod ops;
 
 use inst::project_inst;
 
-/// What emitting the bytecode decided that the portable SSA must agree with.
+
 pub(crate) struct Emitted<'a> {
-    /// Each value's register.
+    
     pub reg: &'a [u8],
     pub register_count: u16,
     pub nparams: usize,
-    /// Each site's inline-cache slot.
+    
     pub ic: &'a crate::ssa::ic::IcSlots,
-    /// The function constant each `MakeClosure` was emitted with.
+    
     pub closure_consts: &'a [Vec<Option<u16>>],
-    /// The bytecode offset each block was emitted at.
+    
     pub block_offset: &'a [usize],
-    /// The bytecode offset of each instruction (before it).
+    
     pub inst_off: &'a [Vec<usize>],
-    /// The bytecode offset right after each instruction (its successor).
+    
     pub inst_next: &'a [Vec<usize>],
-    /// The liveness the registers were assigned by.
+    
     pub liveness: &'a Liveness,
 }
 
-/// The captured variables of a function, numbered in first-use order: the
-/// index the closure ops name one by, and its frame register.
+
+
 struct Captured {
     vars: Vec<VarId>,
     nparams: usize,
@@ -69,9 +69,9 @@ impl Captured {
     }
 }
 
-/// Build the portable SSA for `ssa` (phi-split, register-assigned, and just
-/// emitted as bytecode). Returns why not when any instruction or terminator
-/// is outside the projected family.
+
+
+
 pub(crate) fn project(
     ssa: &SsaFunc,
     emitted: &Emitted<'_>,
@@ -171,8 +171,8 @@ pub(crate) fn project(
     })
 }
 
-/// Every block a back edge enters — a jump from a block emitted at or after
-/// it — with its bytecode offset and the values live into it.
+
+
 fn loop_headers(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaLoopHeader> {
     let off = |b: usize| emitted.block_offset.get(b).copied().unwrap_or(usize::MAX);
     let mut is_header = vec![false; ssa.blocks.len()];
@@ -207,19 +207,19 @@ fn loop_headers(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaLoopHeader> {
         .collect()
 }
 
-/// What the bytecode baked for one instruction.
+
 struct Site<'a> {
-    /// Its inline-cache slot (`ssa::ic`).
+    
     ic_slot: Option<u8>,
-    /// The function constant of a `MakeClosure`.
+    
     closure_const: Option<u16>,
-    /// A `Try`'s landing pad: its bytecode offset and the values live into it.
+    
     landing: Option<(u32, &'a FxHashSet<u32>)>,
-    /// This instruction's own bytecode offset.
+    
     own_ip: u32,
-    /// The bytecode offset right after it (a suspension's resume point).
+    
     next_ip: u32,
-    /// What the interpreter reads when it resumes after a suspension.
+    
     resume_live: Vec<u32>,
 }
 
@@ -248,8 +248,8 @@ fn project_term(term: &Terminator) -> SsaTerm {
     }
 }
 
-/// Why an instruction has no portable form: its name, and for an operator
-/// the operand types it was asked for.
+
+
 fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
     let ty = |v: &crate::ssa::ir::Value| value_tys.get(v.0 as usize).copied();
     match kind {

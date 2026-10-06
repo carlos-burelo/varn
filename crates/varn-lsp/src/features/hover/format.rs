@@ -99,8 +99,8 @@ fn format_enum_member_sym(sym: SymbolView<'_>) -> String {
     }
 }
 
-/// Whether `name` is a primitive's class: its members are the whole
-/// standard library surface, too long for a hover.
+
+
 fn is_primitive_class_name(name: &str) -> bool {
     varn_core::LangPrimitive::from_str(name).is_some()
 }
@@ -154,12 +154,12 @@ fn format_binding(keyword: &str, sym: SymbolView<'_>) -> String {
     }
 }
 
-/// Render one member of a class, interface or namespace body, from the
-/// checker's summary of it.
-///
-/// The signature is derived from `m.ty` at render time rather than read out of
-/// a pre-formatted `String`, so what the hover shows is what the checker
-/// decided — generics substituted, extensions included.
+
+
+
+
+
+
 pub fn format_summary_member(state: &DocumentState, m: &ResolvedMemberSummary) -> String {
     let indent = "  ";
     let static_prefix = if m.is_static { "static " } else { "" };

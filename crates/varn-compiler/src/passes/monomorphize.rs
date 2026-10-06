@@ -1,8 +1,8 @@
-//! Generic monomorphization and type-specialization pass.
-//!
-//! Specializes generic container indexing (`GetIndex`/`SetIndex`) to monomorphic
-//! array operations (`ArrayGetIndex`/`ArraySetIndex`) when static type metadata or
-//! SSA allocation sources confirm array layout.
+
+
+
+
+
 
 use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, SsaFunc};
@@ -13,7 +13,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
     let mut array_values: FxHashSet<u32> = FxHashSet::default();
     let mut map_values: FxHashSet<u32> = FxHashSet::default();
 
-    // 1. Collect all SSA values that are known arrays or maps via type or constructor
+    
     for (i, vdef) in func.values.iter().enumerate() {
         if matches!(vdef.ty, HirType::Array(_)) {
             array_values.insert(i as u32);
@@ -38,7 +38,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
         return false;
     }
 
-    // 2. Promote generic GetIndex/SetIndex to specialized ArrayGetIndex/ArraySetIndex or MapGetIndex/MapSetIndex
+    
     for block in &mut func.blocks {
         for inst in &mut block.insts {
             match &inst.kind {

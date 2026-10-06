@@ -3,11 +3,11 @@ use varn_core::TokenKind;
 
 use super::{ChainResult, DocumentState, TokenRecord};
 
-/// The checker's verdict on a member access, as a summary.
-///
-/// A pass-through, not a translation: every field is read off
-/// [`varn_checker::MemberResolution`]. This used to build a parallel
-/// `MemberRecord` with the signature pre-flattened into `String`s.
+
+
+
+
+
 fn summary_from_resolution(
     res: &varn_checker::MemberResolution,
 ) -> varn_checker::ResolvedMemberSummary {
@@ -26,9 +26,9 @@ fn summary_from_resolution(
     }
 }
 
-/// A member as the checker's own type tables declare it.
-///
-/// Used at the declaration site, where no member *access* was resolved.
+
+
+
 fn summary_from_class_member(
     m: &varn_checker::types::ClassMemberInfo,
 ) -> varn_checker::ResolvedMemberSummary {
@@ -58,8 +58,8 @@ fn summary_from_class_member(
     }
 }
 
-/// A summary for a member the checker typed but recorded no *access* for — a
-/// member read off a `dynamic` value, or named at its own declaration.
+
+
 fn summary_of(
     name: std::sync::Arc<str>,
     ty: varn_checker::Type,
@@ -81,16 +81,16 @@ fn summary_of(
     }
 }
 
-/// What `dynamic` prints as, where a caller wants some receiver name.
+
 const DYNAMIC: &str = varn_core::LangPrimitive::Dynamic.name();
 
 impl DocumentState {
-    /// Byte offset of a cursor position.
-    ///
-    /// Delegates to [`crate::document::position`] so that a cursor and an
-    /// incremental edit range resolve through the same walk — the version that
-    /// lived here counted `char`s, which disagrees with the UTF-16 units the
-    /// protocol sends as soon as a line holds an astral character.
+    
+    
+    
+    
+    
+    
     pub fn offset_at_line_col(&self, line: u32, col: u32) -> u32 {
         crate::document::position::byte_offset(
             &self.source,
@@ -112,14 +112,14 @@ impl DocumentState {
             })
             .unwrap_or(false);
 
-        // The checker resolved this member access: report what it decided.
-        //
-        // This used to consult a hand-written table of builtin signatures
-        // (`Map.set`, `Range.toArray`, `Array.length`, …) *before* asking the
-        // checker, so for every type it covered the table won — and the table
-        // was a transcription of `std/` kept in sync by hand, matched by string
-        // surgery on the receiver's printed type (`split('<')`, `ends_with("[]")`).
-        // Any drift from the real stdlib surfaced as a confidently wrong hover.
+        
+        
+        
+        
+        
+        
+        
+        
         if after_dot {
             if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
                 return Some(ChainResult::Member {
@@ -250,7 +250,7 @@ impl DocumentState {
         None
     }
 
-    /// The name of the type `tok`'s member access is reading from.
+    
     pub fn resolve_receiver_type_name_at(&self, tok: &TokenRecord) -> String {
         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
             if let Some(name) = self.db.decl_name(&res.receiver_ty) {
@@ -295,7 +295,7 @@ impl DocumentState {
         DYNAMIC.to_string()
     }
 
-    /// The member the cursor sits on, and the type it belongs to.
+    
     pub fn member_at_pos(
         &self,
         line: u32,
@@ -303,7 +303,7 @@ impl DocumentState {
     ) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
         let tok = self.identifier_token_at(line, col)?;
 
-        // A member *access*: the checker recorded the receiver and the member.
+        
         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
             let parent = self
                 .db
@@ -312,17 +312,17 @@ impl DocumentState {
             return Some((parent, summary_from_resolution(res)));
         }
 
-        // A member *declaration*. There is no access here, so nothing was
-        // resolved — but the cursor still sits on a member, and callers that
-        // key by member (references, rename) must get the same answer at the
-        // declaration as at every use, or they silently match nothing.
+        
+        
+        
+        
         self.declared_member_at(tok)
     }
 
-    /// The member a declaration-site token declares, and its owning type.
-    ///
-    /// Found by asking which type's member table claims this symbol, which is
-    /// the checker's own record of ownership — not a mirror of it.
+    
+    
+    
+    
     fn declared_member_at(
         &self,
         tok: &TokenRecord,

@@ -23,19 +23,19 @@ pub(super) fn write_int(n: i64, out: &mut String) {
     out.push_str(s);
 }
 
-/// Serialize one VM value.
-///
-/// Scalars are decided from the NaN-box tag alone; everything else takes
-/// **one** heap lookup and matches the object it found. The chain this
-/// replaced asked `is_string`, then `is_array`, then `is_object`, and each of
-/// those resolved the heap slot on its own before the branch body resolved it
-/// a fourth time — four walks per object where the value's own tag already
-/// says which one can succeed.
-///
-/// Matching the variant directly also removes a silent hole: `is_array`
-/// accepts `Tuple` and `is_object` accepts `Record`, but the branch bodies
-/// only destructured `Array` and `Object`, so a tuple serialized as `[]` and a
-/// record as `{}` — valid JSON that had lost its contents.
+
+
+
+
+
+
+
+
+
+
+
+
+
 pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
     if val.is_null() {
         out.push_str("null");
@@ -151,8 +151,8 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
 pub(super) fn write_json_str(s: &str, out: &mut String) {
     out.push('"');
     let bytes = s.as_bytes();
-    // Fast path: for strings without quotes, backslashes or control characters (< 0x20),
-    // append directly in one operation without per-byte branch scanning.
+    
+    
     if !bytes.iter().any(|&b| b == b'"' || b == b'\\' || b < 0x20) {
         out.push_str(s);
         out.push('"');

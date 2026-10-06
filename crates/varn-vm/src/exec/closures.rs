@@ -1,5 +1,5 @@
-//! Creating a closure: the one implementation behind the interpreter's
-//! `MakeClosure` / `LoadStaticFn` and both JIT lowerings.
+
+
 
 use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
@@ -8,18 +8,18 @@ use crate::value::VmValue;
 use std::rc::Rc;
 use varn_types::FunctionProto;
 
-/// Where one of a new closure's upvalues comes from.
+
 #[derive(Clone, Copy)]
 pub(crate) enum UpvalueSrc {
-    /// Register `reg` of the creating activation: captured (shared while the
-    /// activation lives, closed when it leaves).
+    
+    
     Local(usize),
-    /// The creating closure's own upvalue `idx`.
+    
     Inherited(usize),
 }
 
 impl UpvalueSrc {
-    /// The bytecode descriptor word: `is_local << 8 | index`.
+    
     pub(crate) fn from_bytecode(word: u16) -> Self {
         let index = (word & 0xFF) as usize;
         if word >> 8 != 0 {
@@ -29,8 +29,8 @@ impl UpvalueSrc {
         }
     }
 
-    /// The word compiled code passes (`varn_types::ssa::UPVALUE_LOCAL` set
-    /// for a register, the index in the low 32 bits).
+    
+    
     pub(crate) fn from_word(word: u64) -> Self {
         let index = (word & 0xFFFF_FFFF) as usize;
         if word & varn_types::ssa::UPVALUE_LOCAL != 0 {
@@ -56,9 +56,9 @@ impl ExecCtx {
         )
     }
 
-    /// The closure of `parent`'s function constant `proto_idx`, capturing
-    /// `upvalues` from activation `base` and `parent`. A closure without
-    /// upvalues is created once per function and reused.
+    
+    
+    
     pub(crate) fn make_closure(
         &mut self,
         parent: &VmClosure,
@@ -90,7 +90,7 @@ impl ExecCtx {
         let constants = self.shared_constants(&proto);
         let mut closure =
             VmClosure::with_upvalues(proto.clone(), captured, constants, self.settings);
-        // A nested closure runs against its defining module's globals.
+        
         closure.module_base = parent.module_base;
         let val = self.heap.alloc_vm_closure(Rc::new(closure));
         if is_static {

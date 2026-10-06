@@ -1,5 +1,5 @@
-//! Block terminators: the jumps, the branch, and the register copies that
-//! realize phi nodes on the edge into a successor.
+
+
 
 use super::super::ir::{BlockId, SsaFunc, Terminator, Value};
 use crate::OptError;

@@ -12,8 +12,8 @@ use varn_types::{
     ClassObj, NativeFn, VmArray,
 };
 
-// `repr(u8)` pins the discriminant to the first byte with a defined layout
-// (RFC 2195), so JIT code can type-check a heap slot with one byte load.
+
+
 #[derive(Debug, Clone)]
 #[repr(u8)]
 pub enum HeapObj {
@@ -47,10 +47,10 @@ pub enum HeapObj {
 }
 
 impl HeapObj {
-    /// The single canonical [`RuntimeKind`] of this heap object. Callables
-    /// (closure / native fn / bound method) coalesce to `Function`; modules
-    /// present as `Object`; spreads as `Array`; opaque host payloads as `Opaque`.
-    /// All value-kind name rendering flows through this — see [`RuntimeKind::name`].
+    
+    
+    
+    
     pub(crate) fn tag(&self) -> varn_core::RuntimeKind {
         use varn_core::RuntimeKind;
         match self {

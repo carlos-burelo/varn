@@ -1,26 +1,26 @@
-//! A checker symbol, viewed as the editor needs it.
+
 
 use varn_checker::{SymbolKind, Type};
 
 use super::SemanticDB;
 
-/// A symbol the checker bound, viewed as the editor needs it.
-///
-/// Borrows `varn_checker::Symbol` — it does not copy it. What used to sit here
-/// was `SymbolView<'_>`: the same twenty fields *materialized* for every symbol on
-/// every keystroke, with the signature pre-flattened into `String`s and the type
-/// cloned. Everything below the first two fields is derived on demand, so the
-/// editor always reports what the checker currently holds.
+
+
+
+
+
+
+
 #[derive(Clone, Copy)]
 pub struct SymbolView<'a> {
     pub id: varn_checker::SymbolId,
     pub sym: &'a varn_checker::symbol::Symbol,
     pub(super) ty: &'a Type,
-    /// The atom and type tables the symbol's names and type index into.
+    
     pub(super) db: &'a SemanticDB,
 }
 
-/// `dynamic`, for symbols the checker left untyped.
+
 pub(super) static DYNAMIC_TY: Type = Type::resolved(varn_checker::types::CheckerTyId::DYNAMIC);
 
 impl std::fmt::Debug for SymbolView<'_> {
@@ -45,13 +45,13 @@ impl<'a> SymbolView<'a> {
     pub fn ty(&self) -> &'a Type {
         self.ty
     }
-    /// This symbol's type as source text — never format the handle itself
-    /// (Ley 2: a `Type` only means something inside the table that interned
-    /// it).
+    
+    
+    
     pub fn ty_text(&self) -> String {
         self.db.ty_text(self.ty)
     }
-    /// 0-based, as LSP positions are; the checker counts from 1.
+    
     pub fn line(&self) -> u32 {
         self.sym.line.saturating_sub(1)
     }
@@ -97,7 +97,7 @@ impl<'a> SymbolView<'a> {
             .map(|a| self.text(*a).to_owned())
             .collect()
     }
-    /// The function shape of this symbol's type, if it is a function.
+    
     fn fn_shape(&self) -> Option<varn_checker::types::FunctionType> {
         self.db.fn_shape(self.ty)
     }
@@ -109,7 +109,7 @@ impl<'a> SymbolView<'a> {
             m.starts_with("std:") || m.starts_with("core:") || m.starts_with("runtime:")
         })
     }
-    /// A function reads as its return type; everything else as its own.
+    
     pub fn type_str(&self) -> String {
         match (self.fn_shape(), self.kind()) {
             (Some(ft), SymbolKind::Function | SymbolKind::Method) => {

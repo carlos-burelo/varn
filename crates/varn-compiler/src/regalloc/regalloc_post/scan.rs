@@ -26,7 +26,7 @@ pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult
             None => break,
         };
 
-        // A captured register is read for as long as the closure lives.
+        
         if let Some(l) = layout(code, offset, constants).filter(|l| l.op == OpCode::MakeClosure) {
             open_captures.extend(l.read_registers(code, offset));
         }
@@ -65,9 +65,9 @@ pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult
     }
 }
 
-/// Every run of registers an instruction reads together — a call's
-/// arguments, a collection's elements — as `(first, count)`, when it spans
-/// more than one register: the colouring must keep each contiguous.
+
+
+
 pub(crate) fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) -> Vec<(u8, u8)> {
     let mut blocks = Vec::new();
     let mut offset = 0;

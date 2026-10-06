@@ -10,7 +10,7 @@ pub(super) fn check_condition(
     cond: &TirExpr,
     errors: &mut Vec<VerifyError>,
 ) {
-    // Skip if condition is Dynamic
+    
     if matches!(cond.ty, BackendTy::Dynamic(_)) {
         return;
     }
@@ -29,7 +29,7 @@ pub(super) fn check_let(
     init: &TirExpr,
     errors: &mut Vec<VerifyError>,
 ) {
-    // The initializer must be assignable TO the declared type
+    
     if !assignable(m, init.ty, declared_ty) {
         errors.push(VerifyError::new(
             format!(
@@ -47,7 +47,7 @@ pub(super) fn check_return(
     returned: &TirExpr,
     errors: &mut Vec<VerifyError>,
 ) {
-    // The returned value must be assignable TO the function's return_ty
+    
     if !assignable(m, returned.ty, f.return_ty) {
         errors.push(VerifyError::new(
             format!(
@@ -60,7 +60,7 @@ pub(super) fn check_return(
 }
 
 pub(super) fn check_return_none(_m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>) {
-    // Skip if function return type is Dynamic
+    
     if matches!(f.return_ty, BackendTy::Dynamic(_)) {
         return;
     }

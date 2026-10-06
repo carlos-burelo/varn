@@ -2,11 +2,11 @@ use varn_core::OpCode;
 
 use crate::hir::{HirBinOp, HirType};
 
-/// The opcode a binary instruction is emitted as: `+` with an operand
-/// statically typed `str` is concatenation — what `arith::add` would work out
-/// at run time, one type test at a time — and anything else is
-/// [`bin_opcode`] for its type. The one decision: the bytecode emitter and the
-/// portable SSA both read it.
+
+
+
+
+
 pub(crate) fn binary_opcode(
     op: HirBinOp,
     ty: HirType,
@@ -22,7 +22,7 @@ pub(crate) fn binary_opcode(
     }
 }
 
-/// Pick the typed binary opcode for an operand type the SSA emitter proved.
+
 fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
     use HirBinOp::*;
     match ty {

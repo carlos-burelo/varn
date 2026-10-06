@@ -1,11 +1,11 @@
-//! Closures for the SSA lowering: creating one, the creating function's
-//! captured variables, and a closure body's own upvalues.
-//!
-//! A captured variable is not an SSA value. It lives in its frame register
-//! (`SsaProto::captured`) for its whole life, the register an open upvalue
-//! points at, so every read and write goes to that home and there is no
-//! CLIF copy to keep in step. Creating a closure and a closure body's
-//! upvalue accesses run the runtime's one implementation of each.
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{types, InstBuilder, StackSlotData, StackSlotKind, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -27,7 +27,7 @@ fn captured_reg(ctx: &Ctx<'_>, var: u32) -> Result<u32, String> {
         .ok_or_else(|| format!("from_ssa: captured variable {var} has no register"))
 }
 
-/// The boxed value a helper left in `jit_native_result`.
+
 fn native_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exec_ctx: Value) -> Value {
     b.ins().load(
         types::I128,
@@ -37,9 +37,9 @@ fn native_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exec_ctx: Value) -> Val
     )
 }
 
-/// The closure of function constant `proto`, capturing `upvalues`: their
-/// sources as a window of words (`UpvalueSrc::from_word`), handed to
-/// `jit_make_closure_window` with this activation. The boxed closure.
+
+
+
 pub(super) fn emit_make_closure(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -91,7 +91,7 @@ pub(super) fn emit_make_closure(
     Ok(native_result(b, ctx, frame.exec_ctx))
 }
 
-/// Captured variable `var`, boxed, from its home.
+
 pub(super) fn emit_load_captured(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -100,7 +100,7 @@ pub(super) fn emit_load_captured(
     home_load(b, ctx, captured_reg(ctx, var)?)
 }
 
-/// Write `value` to captured variable `var`'s home, in the home's class.
+
 pub(super) fn emit_store_captured(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -112,7 +112,7 @@ pub(super) fn emit_store_captured(
     home_store(b, ctx, captured_reg(ctx, var)?, boxed)
 }
 
-/// This closure's upvalue `index`, boxed.
+
 pub(super) fn emit_load_upvalue(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -129,7 +129,7 @@ pub(super) fn emit_load_upvalue(
     Ok(native_result(b, ctx, frame.exec_ctx))
 }
 
-/// Write `value` to this closure's upvalue `index`.
+
 pub(super) fn emit_store_upvalue(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -149,7 +149,7 @@ pub(super) fn emit_store_upvalue(
     Ok(())
 }
 
-/// Close the open upvalues from the lowest register of captured `vars` up.
+
 pub(super) fn emit_close_upvalues(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,

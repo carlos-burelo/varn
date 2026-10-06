@@ -25,7 +25,7 @@ pub fn build_code_action(
     let cursor_line = params.range.start.line;
     let cursor_col = params.range.start.character;
 
-    // 1. Diagnostic suggestions and Quickfixes
+    
     for diag in &params.context.diagnostics {
         if let Some(data) = &diag.data {
             if let Some(suggestions) = data.get("suggestions").and_then(|s| s.as_array()) {
@@ -104,14 +104,14 @@ pub fn build_code_action(
             }
         }
 
-        // Auto-Import suggestion for undefined variables
+        
         if let Some(st) = state {
             let auto_imports = auto_import::generate_auto_imports_action(st, index, uri, diag);
             actions.extend(auto_imports);
         }
     }
 
-    // 2. Semantic Code Actions (Match arms, Interface Implementation, Organize Imports)
+    
     if let Some(st) = state {
         if let Some(match_action) =
             match_arms::generate_match_arms_action(st, uri, cursor_line, cursor_col)

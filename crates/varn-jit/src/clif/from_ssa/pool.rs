@@ -1,5 +1,5 @@
-//! Literals of the proto's constant pool, embedded as the value the pool
-//! resolved them to — the same value the interpreter's `LoadConst` reads.
+
+
 
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -7,8 +7,8 @@ use varn_types::{Literal, PoolEntry};
 
 use super::Ctx;
 
-/// The resolved pool literal `matches` selects, as a boxed value; `what`
-/// names it in the error when the pool has none.
+
+
 pub(super) fn literal(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,

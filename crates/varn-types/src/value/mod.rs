@@ -21,8 +21,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 pub use varn_core::RuntimeKind;
 
-/// The element domain of a `Range<T>`: bounds are stored as `i64` either
-/// way (a `char` as its code point).
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RangeElem {
     Int,
@@ -57,7 +57,7 @@ impl RangeData {
         }
     }
 
-    /// Number of elements, `step` included.
+    
     pub fn len(&self) -> i64 {
         let span = self.end_exclusive() - self.start;
         if span <= 0 {
@@ -71,7 +71,7 @@ impl RangeData {
         self.len() == 0
     }
 
-    /// The raw bound of element `i`, or `None` past the end.
+    
     pub fn nth(&self, i: i64) -> Option<i64> {
         (0..self.len())
             .contains(&i)
@@ -82,7 +82,7 @@ impl RangeData {
         raw >= self.start && raw < self.end_exclusive() && (raw - self.start) % self.step == 0
     }
 
-    /// The character a raw bound of a `char` range stands for.
+    
     pub fn char_of(raw: i64) -> char {
         u32::try_from(raw)
             .ok()
@@ -140,9 +140,9 @@ impl std::fmt::Display for RuntimeSymbol {
 
 #[derive(Debug, Clone)]
 pub struct EnumVariantData {
-    /// The enum's class (`ClassObj::id`), set when the variant is attached to
-    /// it; methods and identity come from here, never from `enum_name`. `None`
-    /// only for a value rebuilt on the far side of an isolate channel.
+    
+    
+    
     pub enum_class_id: Option<u32>,
     pub enum_name: Arc<str>,
     pub variant_name: Arc<str>,

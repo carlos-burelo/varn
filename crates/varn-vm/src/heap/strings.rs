@@ -1,9 +1,9 @@
-//! String allocation and rendering.
-//!
-//! Three allocation paths, and the difference between them is not cosmetic:
-//! `alloc_str` interns, `alloc_str_dynamic` does not (a runtime-produced
-//! string would otherwise be hashed in full and retained), and
-//! `alloc_str_view` stores an already-built `HeapStr` without copying.
+
+
+
+
+
+
 
 use super::cells::SlotState;
 use super::obj::HeapObj;

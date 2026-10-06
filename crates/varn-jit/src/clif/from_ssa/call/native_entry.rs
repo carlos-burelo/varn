@@ -1,12 +1,12 @@
-//! Entering a callee's native activation straight from compiled code.
-//!
-//! The guard walks the callee value to its proto and reads what the VM
-//! published there: a native entry, its ABI shape and the epoch it was built
-//! for. When all three match what this site emits, the call is a
-//! `call_indirect` in the native ABI, bracketed by a `CallFrame` pushed and
-//! popped inline — skipped for a frameless callee, which never reads it. The
-//! frame owns a strong reference to the closure and no `FrameStore` storage.
-//! Anything else takes `slow`, the runtime's generic invoke.
+
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::FunctionBuilder;

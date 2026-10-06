@@ -1,6 +1,6 @@
-//! A reference to a heap object is the object's address. An absent reference
-//! is `Option<HeapRef>`, whose `None` is the zero word — the same null native
-//! code reads.
+
+
+
 
 use std::num::NonZeroU64;
 
@@ -14,8 +14,8 @@ impl HeapRef {
         NonZeroU64::new(addr).map(Self)
     }
 
-    /// # Safety
-    /// `addr` must be the non-zero address of a live heap object.
+    
+    
     #[inline(always)]
     pub unsafe fn from_addr_unchecked(addr: u64) -> Self {
         Self(NonZeroU64::new_unchecked(addr))

@@ -3,8 +3,8 @@ use crate::types::{FunctionType, ObjectTypeMember};
 use std::hash::Hash;
 use xxhash_rust::xxh3::Xxh3;
 
-/// Top bit of a non-intrinsic content id. Reserved intrinsic ids are `0..=THIS`
-/// (all far below this bit), so content ids can never collide with them.
+
+
 pub(super) const CONTENT_FLAG: u128 = 1u128 << 127;
 
 pub(super) fn hash128<T: Hash + ?Sized>(value: &T) -> u128 {

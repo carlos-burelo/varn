@@ -1,11 +1,11 @@
-//! AArch64 / ARM64 (Linux, macOS Apple Silicon, Windows on ARM) setjmp/longjmp.
-//!
-//! AArch64 AAPCS ABI:
-//! - Callee-saved general-purpose registers: X19-X28, X29 (FP), X30 (LR).
-//! - Callee-saved floating-point registers: D8-D15.
-//! - First argument (_buf) in X0.
-//! - Second argument (_val) in W1/X1.
-//! - Return value in W0/X0.
+
+
+
+
+
+
+
+
 
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, align(16))]
@@ -20,8 +20,8 @@ pub struct JmpBuf {
     pub x26: u64,
     pub x27: u64,
     pub x28: u64,
-    pub fp: u64, // x29
-    pub lr: u64, // x30
+    pub fp: u64, 
+    pub lr: u64, 
     pub sp: u64,
     pub d8: u64,
     pub d9: u64,

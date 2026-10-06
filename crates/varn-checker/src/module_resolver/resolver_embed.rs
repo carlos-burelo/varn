@@ -55,7 +55,7 @@ impl DiskResolver {
         )
     }
 
-    // ── carga de stdlib (a través del loader único) ──────────────────────
+    
 
     pub(super) fn exports_from_embedded(
         &self,

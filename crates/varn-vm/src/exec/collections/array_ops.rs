@@ -47,8 +47,8 @@ pub(crate) fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<
         if let (Some(HeapObj::Array(da)), Some(HeapObj::Array(sa))) =
             (heap.get(dst.as_heap()), heap.get(src.as_heap()))
         {
-            // Snapshot source elements first (a copy, so dst == src is safe),
-            // then append boxed into the destination.
+            
+            
             let n = sa.len();
             let mut items: Vec<VmValue> = Vec::with_capacity(n);
             for i in 0..n {

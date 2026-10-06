@@ -61,8 +61,8 @@ impl Vm {
 
     pub fn enable_profiling(&mut self) {
         let counters = ProfileCounters::new();
-        // The frame stack counts its own pushes and pops, so it needs the same
-        // handle — see `crate::frame_stack`.
+        
+        
         self.ctx.frames.set_counters(Some(counters.clone()));
         self.ctx.profile_counters = Some(counters);
     }
@@ -73,10 +73,10 @@ impl Vm {
         self.ctx.heap.hotspot = Some(counters);
     }
 
-    /// Snapshot of young/old-gen counters, interner sizes, and a live-object
-    /// histogram — `vn debug -p gc`'s data. Read-only; taking it costs one
-    /// pass over both generations to build the histogram, so it's meant for
-    /// end-of-run reporting, not a per-iteration check.
+    
+    
+    
+    
     pub fn gc_report(&self) -> crate::gc_report::GcReport {
         self.ctx.heap.gc_report()
     }

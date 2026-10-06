@@ -1,4 +1,4 @@
-//! Document synchronization: keeping the server's text equal to the editor's.
+
 
 pub mod edits;
 
@@ -9,15 +9,15 @@ use tower_lsp::lsp_types::*;
 use crate::backend::Backend;
 use crate::features::diagnostics::convert_diagnostics;
 
-/// How long an edit waits before it is analysed, so that a burst of keystrokes
-/// costs one analysis rather than one per key.
+
+
 const DEBOUNCE_MS: u64 = 150;
 
-/// Re-analyse `uri` and publish its diagnostics.
-///
-/// The debounce stays here, on the async side. Waiting costs nothing before
-/// submitting, whereas waiting *on* the analysis thread would park every other
-/// request behind a keystroke.
+
+
+
+
+
 pub async fn analyze_and_publish(backend: &Backend, uri: Url, source: String, is_eager: bool) {
     let uri_str = uri.to_string();
 
@@ -41,8 +41,8 @@ pub async fn analyze_and_publish(backend: &Backend, uri: Url, source: String, is
     }
 
     let start = Instant::now();
-    // Everything that touches `DocumentState` happens inside this closure; only
-    // the report — plain LSP types and counts — comes back out.
+    
+    
     let report = backend
         .analysis
         .run({
@@ -97,14 +97,14 @@ pub async fn did_open(backend: &Backend, params: DidOpenTextDocumentParams) {
     .await;
 }
 
-/// An edit in the editor.
-///
-/// Under incremental sync the notification carries ranges, not a document, so
-/// the new text has to be built from the text the server already holds. That
-/// happens *on the analysis thread*, against the database that owns it: mirroring
-/// document text on the async side would be a second copy of the one thing the
-/// whole server is a projection of, and the two copies would diverge exactly
-/// when an edit races an analysis.
+
+
+
+
+
+
+
+
 pub async fn did_change(backend: &Backend, params: DidChangeTextDocumentParams) {
     let uri = params.text_document.uri;
     let uri_str = uri.to_string();
@@ -120,17 +120,17 @@ pub async fn did_change(backend: &Backend, params: DidChangeTextDocumentParams) 
         .await
         .flatten();
 
-    // No stored text means no `didOpen` for this document: there is nothing the
-    // ranges could be relative to, so there is nothing to salvage.
+    
+    
     let Some(source) = updated else {
         return;
     };
     analyze_and_publish(backend, uri, source, false).await;
 }
 
-/// A save. The server declares `includeText: false`, so the text is normally
-/// absent and the buffer is already current from `didChange`; a client that
-/// sends it anyway is honoured rather than ignored.
+
+
+
 pub async fn did_save(backend: &Backend, params: DidSaveTextDocumentParams) {
     if let Some(text) = params.text {
         analyze_and_publish(backend, params.text_document.uri, text, true).await;
@@ -144,15 +144,15 @@ pub async fn did_close(backend: &Backend, params: DidCloseTextDocumentParams) {
         .submit(move |a| a.workspace.close_file(&uri));
 }
 
-/// A `.vn` file changed outside the editor.
-///
-/// The client has always registered a `**/*.vn` watcher, but this handler did
-/// not exist — so a `git checkout`, a rebase, or an edit from another tool left
-/// the server answering from the version it had read at startup, with nothing
-/// to say it was stale.
-///
-/// Deletions evict; creations and changes re-read from disk and re-analyse,
-/// which also invalidates every module that imports the file.
+
+
+
+
+
+
+
+
+
 pub async fn did_change_watched_files(backend: &Backend, params: DidChangeWatchedFilesParams) {
     for event in params.changes {
         let uri = event.uri.clone();
@@ -165,7 +165,7 @@ pub async fn did_change_watched_files(backend: &Backend, params: DidChangeWatche
             continue;
         }
 
-        // Reading is I/O, so it stays off the analysis thread.
+        
         let Ok(path) = uri.to_file_path() else {
             continue;
         };
@@ -175,8 +175,8 @@ pub async fn did_change_watched_files(backend: &Backend, params: DidChangeWatche
             continue;
         };
 
-        // Eager: the change already happened on disk, so there is no keystroke
-        // to debounce against.
+        
+        
         analyze_and_publish(backend, uri, source, true).await;
     }
 }

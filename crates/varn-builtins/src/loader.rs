@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 use crate::registry::{is_known, spec_for};
 use varn_modules::spec::{ModuleKind, ModuleSpec};
 
-/// Registry lookups over `core:`/`runtime:` modules.
-///
-/// `core:`/`runtime:` sources are `include_str!`-embedded, so nothing here
-/// needs the filesystem — [`Self::vn_source_path`] exists only for the
-/// checkout, where `vn_source` is a repo-relative path. A released binary
-/// serves these through [`Self::embedded_source`], and the editor through
-/// the mirror `vn lsp` writes.
+
+
+
+
+
+
+
 pub struct CoreSourceLocator {
     stdlib_root: PathBuf,
 }
@@ -19,8 +19,8 @@ impl CoreSourceLocator {
         Self { stdlib_root }
     }
 
-    /// Rooted at the working directory: `vn_source` fields are
-    /// `crates/varn-builtins/src/...`, which only resolve from a checkout.
+    
+    
     pub fn from_checkout() -> Self {
         Self::new(PathBuf::from("."))
     }

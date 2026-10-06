@@ -1,16 +1,16 @@
-//! Cranelift backend seam (phase 5a spike).
-//!
-//! Proves the toolchain end-to-end on this host: build CLIF in memory,
-//! compile it with the native ISA (regalloc2, isel, mid-end), copy the
-//! code bytes into our own W^X `JitBuffer`, and execute. No
-//! `cranelift-jit`/`cranelift-module` — Varn owns code memory.
-//!
-//! Frame pointers are forced on: the native-frame call protocol resolves
-//! stack walks (errors, debugger, GC) through an RBP chain plus a
-//! return-address side table.
 
-/// Contrato de llamada v2 (firma única + side-table): público porque el
-/// unwinder de la VM lo consume. El resto del lowering sigue interno.
+
+
+
+
+
+
+
+
+
+
+
+
 pub mod abi;
 pub(crate) mod alloc;
 pub mod debug;
@@ -33,39 +33,39 @@ use cranelift_codegen::Context;
 use std::sync::atomic::Ordering;
 use std::sync::OnceLock;
 
-/// Escape hatch while the backend matures: `VARN_NO_CLIF=1` routes
-/// everything back through the template JIT. Read once per process.
+
+
 pub fn enabled() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var("VARN_NO_CLIF").is_err())
 }
 
-/// `VARN_CLIF_TRACE=1` logs each route/bail decision with its reason.
+
 pub fn trace() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var("VARN_CLIF_TRACE").is_ok())
 }
 
-/// The host ISA is immutable for the process lifetime; build it once.
+
 pub fn shared_isa() -> Result<&'static OwnedTargetIsa, String> {
     static ISA: OnceLock<Result<OwnedTargetIsa, String>> = OnceLock::new();
     ISA.get_or_init(host_isa).as_ref().map_err(|e| e.clone())
 }
 
-/// Host ISA configured for Varn: speed-optimized, frame pointers kept.
-///
-/// Two knobs are env-overridable because their right value is a measurement,
-/// not a constant: `VARN_CLIF_OPT` (`none`|`speed`|`speed_and_size`) trades
-/// compile time against code quality, and `VARN_CLIF_VERIFY=1` puts back the
-/// IR verifier, which Cranelift enables by default and which we pay for on
-/// every compile in a shipped binary.
+
+
+
+
+
+
+
 pub fn host_isa() -> Result<OwnedTargetIsa, String> {
     let mut flags = settings::builder();
     let opt = std::env::var("VARN_CLIF_OPT").unwrap_or_else(|_| "speed".to_owned());
     flags.set("opt_level", &opt).map_err(|e| e.to_string())?;
-    // Default-on in Cranelift and meant for compiler development: it re-walks
-    // the whole function at several points per compile. Our lowering is fixed
-    // at build time, so shipping it means paying a debug check per run.
+    
+    
+    
     let verify = std::env::var("VARN_CLIF_VERIFY").is_ok() || cfg!(debug_assertions);
     flags
         .set("enable_verifier", if verify { "true" } else { "false" })
@@ -80,25 +80,25 @@ pub fn host_isa() -> Result<OwnedTargetIsa, String> {
 }
 
 thread_local! {
-    /// Cranelift's own guidance: reuse one `Context` across compilations so the
-    /// per-pass arenas it owns are allocated once instead of per function. We
-    /// compile one function at a time per thread, so a thread-local is enough.
+    
+    
+    
     static CTX: std::cell::RefCell<Context> = std::cell::RefCell::new(Context::new());
 }
 
-/// Compile `func` on the thread's reused `Context` and hand the result to
-/// `take` while the Context still owns it. Every Cranelift compilation in the
-/// crate goes through here: it is the one place that reuses the arenas and the
-/// one place that accounts for backend time.
+
+
+
+
 pub(crate) fn with_ctx<R>(
     func: Function,
     isa: &dyn TargetIsa,
     take: impl FnOnce(&cranelift_codegen::CompiledCode) -> Result<R, String>,
 ) -> Result<R, String> {
     CTX.with(|cell| {
-        // `try_borrow_mut` rather than `borrow_mut`: a re-entrant compile would
-        // otherwise panic. Falling back to a fresh Context keeps correctness
-        // independent of the optimisation.
+        
+        
+        
         match cell.try_borrow_mut() {
             Ok(mut ctx) => {
                 ctx.clear();

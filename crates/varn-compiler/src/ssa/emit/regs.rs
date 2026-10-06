@@ -1,5 +1,5 @@
-//! SSA value -> machine register assignment, and the fixed frame layout the
-//! rest of emission assumes (params first, then locals, then temporaries).
+
+
 
 use super::super::ir::{InstKind, SsaFunc, VarId};
 use super::slot_kind_of;
@@ -7,16 +7,16 @@ use crate::OptError;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-/// Where every value lives, and the liveness that decided it.
+
 pub(super) struct Assignment {
-    /// Each value's register.
+    
     pub reg: Vec<u8>,
     pub scratch: u8,
     pub null_reg: u8,
     pub call_base: u8,
     pub register_count: u16,
-    /// A value keeps its register for as long as this says it is live — what
-    /// lets a resumed frame find a value where it was left.
+    
+    
     pub liveness: crate::ssa::liveness::Liveness,
 }
 
@@ -63,17 +63,17 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 InstKind::BuildArray { elements, .. } => elements.len() as u32,
                 InstKind::BuildTuple { elements } => elements.len() as u32,
                 InstKind::BuildMap { pairs } => (pairs.len() * 2) as u32,
-                // Object and record literals stage non-contiguous values into
-                // the call area before building with a shape.
+                
+                
                 InstKind::BuildObject { pairs } | InstKind::BuildRecord { pairs } => {
                     pairs.len() as u32
                 }
 
-                // Reserved unconditionally, including for calls that end up on
-                // the windowless `IntrinsicDirect` form. The reservation must
-                // be an UPPER bound on what emission uses: over-reserving
-                // wastes a frame slot, under-reserving would hand the emitted
-                // window registers that overlap live values.
+                
+                
+                
+                
+                
                 InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
                 InstKind::CallNativeOp { args, .. } => args.len() as u32 + 1,
 
@@ -85,7 +85,7 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 InstKind::ExtensionCall { args, .. } => args.len() as u32 + 2,
                 InstKind::CallSpread { args, .. } => args.len() as u32 + 1,
 
-                // `BuildArraySpread` names `call_base` only as an empty window.
+                
                 InstKind::BuildArraySpread { .. }
                 | InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
@@ -161,38 +161,38 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
         }
     }
 
-    // Kind-aware linear scan: each `SlotKind` draws from its own free-register
-    // pool, so a physical register is not shared between values of different
-    // kinds while there is room to avoid it.
-    //
-    // The reason is `derive_register_meta`, which meets the kinds of every SSA
-    // value assigned to a register and yields `Dynamic` the moment two differ.
-    // Live ranges being disjoint, a kind-agnostic allocator packs them freely --
-    // and one such packing is enough to erase the kind for the whole function.
-    // It cost real time: a matmul's `b[k * n + col]` landed the loop's `Bool`
-    // comparison and the load's `Int` destination in one register, the meet
-    // returned `Dynamic`, and the JIT lost the repr specialisation that lets a
-    // loop body skip the per-access representation branch. 15 ms against 3 ms
-    // for the identical loop whose registers happened not to collide.
-    //
-    // This generalises a split that was already here for `Float` alone, for
-    // exactly the same reason.
-    //
-    // Where it differs from that one: the split is a preference, not a rule.
-    // Separate pools mean a value that finds its own pool empty takes a fresh
-    // register, so total pressure grows -- and a function over 255 registers is
-    // rejected outright by the caller, which is a far worse outcome than a lost
-    // kind. So a fresh register is only taken while one fits under the ceiling
-    // the call window leaves; past that, the scan falls back to reusing another
-    // kind's register and accepts the `Dynamic` meet, exactly as before.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     let kind_of_v = |v: usize| slot_kind_of(ssa.values[v].ty);
-    // Highest register the frame can hand out: `total` below is
-    // `next + 2 + max_call`, and the caller rejects the function past 256.
+    
+    
     let ceiling = 256u32.saturating_sub(2 + max_call);
     let mut next: u32 = base;
-    // One free list per `SlotKind`, indexed by `pool_index`.
+    
     let mut free: [Vec<u32>; POOLS] = Default::default();
-    // (interval end, register, kind index)
+    
     let mut active: Vec<(u32, u32, usize)> = Vec::new();
     for &v in &order {
         let d = def[v];
@@ -215,8 +215,8 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
             next += 1;
             r
         } else {
-            // Out of room: reuse the lowest register any other kind has freed,
-            // losing that register's kind rather than the whole function.
+            
+            
             let borrowed = free
                 .iter()
                 .enumerate()
@@ -271,10 +271,10 @@ pub(crate) fn var_reg(var: VarId, nparams: usize) -> u8 {
     }
 }
 
-/// Number of `SlotKind` variants, and so of free-register pools.
+
 const POOLS: usize = 6;
 
-/// Dense index of a `SlotKind`, for the per-kind free lists.
+
 fn pool_index(k: varn_types::register_meta::SlotKind) -> usize {
     use varn_types::register_meta::SlotKind;
     match k {

@@ -1,9 +1,9 @@
-//! `vn debug -p summary` — one page describing what was compiled.
-//!
-//! Exists because the other phases are all firehoses: `-p bytecode` on a real
-//! module prints everything and answers nothing about proportion. This answers
-//! "how big is it and where is the weight" first, so you know which function to
-//! then dump.
+
+
+
+
+
+
 
 use varn_types::{FunctionProto, PoolEntry};
 

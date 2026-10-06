@@ -12,8 +12,8 @@ impl CellSpace {
         r
     }
 
-    /// An instance whose payload lives in the same cell, right after the
-    /// `HeapObj` that names it: one allocation, no separate body.
+    
+    
     #[inline]
     pub(crate) fn alloc_instance(
         &mut self,
@@ -29,8 +29,8 @@ impl CellSpace {
         (r, inst)
     }
 
-    /// A property object (`record` for a record) whose fields live in the
-    /// same cell, right after the `HeapObj` that names it.
+    
+    
     #[inline]
     pub(crate) fn alloc_object(
         &mut self,
@@ -54,8 +54,8 @@ impl CellSpace {
         r
     }
 
-    /// An array (`tuple` for a tuple) whose repr lives in the same cell,
-    /// right after the `HeapObj` that names it.
+    
+    
     #[inline]
     pub(crate) fn alloc_array(
         &mut self,
@@ -78,7 +78,7 @@ impl CellSpace {
         r
     }
 
-    /// Drops the object in `r` and what its cell owns beyond it.
+    
     pub(super) unsafe fn drop_object(r: HeapRef) {
         let obj = body::<HeapObj>(r);
         match &*obj {

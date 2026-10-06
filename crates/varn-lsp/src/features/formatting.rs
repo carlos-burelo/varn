@@ -19,7 +19,7 @@ pub fn build_formatting(source: &str, options: FormattingOptions) -> Option<Vec<
     for (line_idx, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
-            // If the empty line has trailing whitespace, clear it
+            
             if !line.is_empty() {
                 edits.push(TextEdit {
                     range: Range {
@@ -50,7 +50,7 @@ pub fn build_formatting(source: &str, options: FormattingOptions) -> Option<Vec<
             continue;
         }
 
-        // Count leading closing tokens on this line to dedent before printing
+        
         let starts_closing =
             trimmed.starts_with('}') || trimmed.starts_with(']') || trimmed.starts_with(')');
 
@@ -80,7 +80,7 @@ pub fn build_formatting(source: &str, options: FormattingOptions) -> Option<Vec<
             });
         }
 
-        // Update indent level for following lines by scanning tokens ignoring strings and line comments
+        
         let delta = compute_line_indent_delta(trimmed);
         if delta > 0 {
             current_indent += delta as usize;
@@ -125,7 +125,7 @@ fn compute_line_indent_delta(line: &str) -> i32 {
             continue;
         }
 
-        // Ignore line comments
+        
         if b == b'/' && i + 1 < bytes.len() && bytes[i + 1] == b'/' {
             break;
         }

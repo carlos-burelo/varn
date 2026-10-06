@@ -1,10 +1,10 @@
-//! The closure value model: captured variables and the runtime closure the
-//! interpreter and compiled code both execute.
-//!
-//! A `VmClosure` binds a `FunctionProto` (shared, immutable code) to one
-//! activation's captured state. The JIT tiering that decides whether that
-//! proto gets compiled lives in [`crate::jit::tiering`] — it is policy about
-//! code, not part of the value.
+
+
+
+
+
+
+
 
 use crate::frame_store::{FrameStore, SlotAddr};
 use crate::value::VmValue;
@@ -78,16 +78,16 @@ pub struct VmClosure {
     pub constants: Rc<Vec<VmValue>>,
     pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
     pub feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
-    /// Raw data pointer of `ic_cache`'s `Vec<PolyICSlot>`, cached for the JIT to
-    /// index a poly slot inline (`base + cs * POLY_IC_SLOT_SIZE`). The vec is
-    /// fixed-size for a proto's life so this never dangles; the VM already
-    /// reads the cache unsynchronised via `ic_cache.as_ptr()`.
+    
+    
+    
+    
     pub ic_entries: *const PolyICSlot,
-    /// Start of this closure's module's global-slot region in the `GlobalStore`.
-    /// `LoadGlobalIdx` / `StoreGlobalIdx` carry a slot relative to this. Set
-    /// when the module is evaluated (top-level closure) and inherited by every
-    /// nested closure at `MakeClosure`. `0` for the entry proto's own module
-    /// and for protos with no module globals.
+    
+    
+    
+    
+    
     pub module_base: u32,
 }
 
@@ -110,11 +110,11 @@ impl VmClosure {
             ic_entries,
             module_base: 0,
         };
-        // No compilation here: the compiled entry lives on the proto and is
-        // produced lazily by `hot_jit_fn` once the function proves hot (see
-        // `FunctionProto::jit_entry_count`). `settings.no_jit` is honoured at
-        // that point, so a run meant to isolate a codegen bug never invokes
-        // codegen.
+        
+        
+        
+        
+        
         let _ = settings;
         closure
     }
@@ -138,11 +138,11 @@ impl VmClosure {
             ic_entries,
             module_base: 0,
         };
-        // No compilation here: the compiled entry lives on the proto and is
-        // produced lazily by `hot_jit_fn` once the function proves hot (see
-        // `FunctionProto::jit_entry_count`). `settings.no_jit` is honoured at
-        // that point, so a run meant to isolate a codegen bug never invokes
-        // codegen.
+        
+        
+        
+        
+        
         let _ = settings;
         closure
     }

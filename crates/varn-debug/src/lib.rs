@@ -29,13 +29,13 @@ pub mod walk;
 pub use cap_trace::debug_cap_trace;
 pub use flags::{print_phases, DebugFlags};
 
-/// A copy of `proto` in the shape the JIT sees at runtime.
-///
-/// The compiler now emits the indexed global opcodes directly
-/// (`LoadGlobalIdx` / `StoreGlobalIdx` / `LoadNativeGlobalIdx`), so the
-/// JIT-facing views (`-p tiers`, `-p bails`, `-p clif`) already see
-/// the production shape and this is a plain clone. Kept as the single call
-/// point in case that changes again.
+
+
+
+
+
+
+
 pub fn resolved_copy(proto: &varn_types::FunctionProto) -> varn_types::FunctionProto {
     proto.clone()
 }

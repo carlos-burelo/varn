@@ -37,13 +37,13 @@ pub struct JitExit {
     pub fp: usize,
 }
 
-/// Visits every GC slot of the compiled frames that `exit` opens, youngest
-/// first, stopping at the first return address that is not compiled code.
-///
-/// # Safety
-///
-/// `exit` must be the record a compiled frame left while it is suspended in
-/// a call: its stack, and every compiled caller above it, still live.
+
+
+
+
+
+
+
 pub unsafe fn for_each_slot(exit: JitExit, mut visit: impl FnMut(*mut VmValue)) {
     if exit.sp == 0 {
         return;

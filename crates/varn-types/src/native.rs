@@ -61,29 +61,29 @@ impl SignatureDescriptor {
     }
 }
 
-/// Where a `CallNativeOp` op-id actually points, resolved at lowering time.
-///
-/// Named fields rather than a tuple on purpose: the two pointers are both
-/// `usize` and mean completely different things, so a positional return type
-/// lets them be swapped silently. That mistake compiles, and its symptom is a
-/// jump to the wrong address from generated code at runtime.
+
+
+
+
+
+
 #[derive(Debug, Copy, Clone)]
 pub struct NativeOpTarget {
-    /// Boxed entry point: takes and returns `VmValue`. `0` means the op-id is
-    /// unknown, and codegen must keep the dynamic form so the runtime helper
-    /// raises the proper error.
+    
+    
+    
     pub func_ptr: usize,
-    /// Unboxed entry point, present only for ops whose signature is fully
-    /// described. This is what lets codegen emit a direct typed call instead of
-    /// boxing every argument. `0` means there is none.
+    
+    
+    
     pub raw_func_ptr: usize,
-    /// Parameter and return types for the raw entry point. Meaningless when
-    /// `raw_func_ptr` is 0.
+    
+    
     pub signature: SignatureDescriptor,
 }
 
 impl NativeOpTarget {
-    /// The op-id is not in the table.
+    
     pub const fn unknown() -> Self {
         Self {
             func_ptr: 0,

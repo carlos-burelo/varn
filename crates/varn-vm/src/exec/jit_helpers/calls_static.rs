@@ -88,8 +88,8 @@ pub(crate) extern "C" fn jit_call_self_window(
     }
 }
 
-/// The out-of-line half of a compiled call site's inline `CallFrame` push:
-/// the frame stack is at capacity (grow it) or at the depth limit (throw).
+
+
 #[varn_op_macros::jit_slow(field = "jit_push_native_frame")]
 pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *const VmClosure) {
     unsafe {
@@ -108,8 +108,8 @@ pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *cons
     }
 }
 
-/// The out-of-line half of the inline `CallFrame` pop: the frame held the
-/// closure's last strong reference.
+
+
 #[varn_op_macros::jit_slow(field = "jit_release_closure")]
 pub(crate) extern "C" fn jit_release_closure(closure: *const VmClosure) {
     unsafe { drop(std::rc::Rc::from_raw(closure)) }

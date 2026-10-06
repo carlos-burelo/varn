@@ -1,6 +1,6 @@
-//! Content-interned scalars: a `char`, `bigint` or `decimal` with the same
-//! value always lives in one heap slot, which is what lets map and set keys
-//! compare by identity.
+
+
+
 
 use super::cells::SlotState;
 use super::obj::HeapObj;

@@ -1,5 +1,5 @@
-//! Terminators of the SSA lowering: returns, jumps and branches, and the
-//! parallel argument windows that fill each target block's phi params.
+
+
 
 use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::ir::{types, BlockArg, InstBuilder, TrapCode, Value};
@@ -13,9 +13,9 @@ fn scalar_return(k: SlotKind) -> bool {
     matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool)
 }
 
-/// Return a non-scalar value: a native body as its `(tag, payload)` words, a
-/// framed one through `jit_native_result` and a void return, which is what
-/// its wrapper reads.
+
+
+
 fn store_boxed_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>, boxed: Value) -> Result<(), String> {
     match ctx.activation {
         super::Activation::Native => {
@@ -35,9 +35,9 @@ fn store_boxed_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>, boxed: Value) -> R
     Ok(())
 }
 
-/// Value `v` as a branch condition (non-zero taken), by the interpreter's one
-/// rule (`VmValue::is_truthy`): a `bool` as is, an `int` when non-zero, a
-/// `float` when non-zero and not NaN, anything boxed through `jit_truthy`.
+
+
+
 fn truthy(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -59,12 +59,12 @@ fn truthy(
     })
 }
 
-/// Emit `term`. `polls(target)` tells whether jumping to `target` closes a
-/// loop that can allocate: before such a jump a frame-aware body polls the
-/// collector, since an allocating loop has no other point where one could
-/// run. Its heap
-/// values live in their homes, which the collector sees and rewrites, and
-/// its scalars cannot move, so nothing is flushed or reloaded around it.
+
+
+
+
+
+
 pub(super) fn emit_term(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -90,7 +90,7 @@ pub(super) fn emit_term(
                     ctx.helpers.gc_safepoint,
                     &[exec_ctx],
                 );
-                // A collection may have moved any array.
+                
                 ctx.views.clear(b);
             });
         }
@@ -99,9 +99,9 @@ pub(super) fn emit_term(
         SsaTerm::Return(Some(v)) => {
             let ret = ctx.proto.return_kind;
             if scalar_return(ret) {
-                // The value is converted from its class to the function's
-                // return class: a boxed value (a `dynamic` sum returned as
-                // `int`) is unboxed; a scalar must already be of that class.
+                
+                
+                
                 let kind = ctx.ssa.value_ty(*v);
                 let x = if super::is_heap(kind) {
                     let boxed = load_value(b, ctx, values, *v)?;

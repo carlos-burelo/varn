@@ -139,9 +139,9 @@ impl<'r> Checker<'r> {
         None
     }
 
-    /// A value may be thrown only when it is (or could be) an `Error`
-    /// subclass. `dynamic` stays throwable so untyped values (FFI, isolate
-    /// payloads) don't cascade into throw errors.
+    
+    
+    
     pub(crate) fn is_throwable(&self, ty: &Type, bind: &crate::binder::BindResult) -> bool {
         match self.ty_table.get(ty.0) {
             varn_core::TypeKind::Named(name, _) => {

@@ -6,8 +6,8 @@ use super::table::CheckerTyTable;
 use crate::types::{FunctionType, ObjectTypeMember};
 
 impl CheckerTyTable {
-    /// Intern `kind`, returning its content-addressed id. Idempotent and
-    /// order-independent: the same shape always yields the same id.
+    
+    
     pub fn intern(&mut self, kind: InternedTypeKind) -> CheckerTyId {
         if let Some(id) = seeded_id(&kind) {
             return id;

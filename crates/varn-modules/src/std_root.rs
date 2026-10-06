@@ -1,9 +1,9 @@
-//! Resolution of the "active std": which bundle or source tree serves
-//! `std:` imports. One mechanism, two storage forms (spec §4).
-//!
-//! Order: project varn.json `"std"` override → VARN_STD env (dev/CI) →
-//! this checkout's `std/` tree (any binary built under `target/`, however
-//! it's launched) → `std.vnb` next to the executable.
+
+
+
+
+
+
 
 use std::path::{Path, PathBuf};
 
@@ -12,26 +12,26 @@ pub const STD_MANIFEST_FILE: &str = "std.json";
 pub const STD_BUNDLE_FILE: &str = "std.vnb";
 pub const STD_DIR_NAME: &str = "std";
 
-/// `VARN_STD=@embedded` forces the std the binary was built with, skipping
-/// every filesystem tier.
-///
-/// Without it the embedded bundle is unreachable from this checkout: the
-/// dev-checkout tier always finds `std/` first, so the path that every
-/// released binary actually takes is the one never exercised by the local
-/// test suite. This sentinel makes it runnable in place.
+
+
+
+
+
+
+
 pub const STD_EMBEDDED_SENTINEL: &str = "@embedded";
 
-/// Where `std:` comes from. Two forms only, and the override is always
-/// source: a `.vnb` is gated on schema equality by its envelope, so the only
-/// bundle a given `vn` accepts is one built from the same artifact schema —
-/// in practice the embedded one. A loose bundle file could never be anything
-/// but a copy of it, so there is no tier for one.
+
+
+
+
+
 #[derive(Debug, Clone)]
 pub enum StdSource {
     SourceTree(PathBuf),
-    /// The bundle compiled into this binary at build time. Always available,
-    /// always fingerprint-matched — it cannot be stale relative to the
-    /// compiler that loads it.
+    
+    
+    
     Embedded,
 }
 
@@ -39,24 +39,24 @@ pub enum StdSource {
 pub enum StdProvenance {
     ProjectOverride,
     Env,
-    /// This checkout's own `std/` tree, found by walking up from the running
-    /// binary's location. Covers any launcher (editor, debugger, direct exe)
-    /// without needing cargo to inject `VARN_STD` — that only reaches
-    /// `cargo run`/`test`, not a subprocess spawned straight off disk.
+    
+    
+    
+    
     DevCheckout,
-    /// Compiled into the binary. The floor every other tier falls through to,
-    /// and the provenance of every released `vn`.
+    
+    
     Embedded,
 }
 
-/// A directory holding `std.json` or `math/mod.vn` is a std source tree.
+
 pub fn classify(path: &Path) -> Option<StdSource> {
     (path.is_dir()
         && (path.join(STD_MANIFEST_FILE).is_file() || path.join("math/mod.vn").is_file()))
     .then(|| StdSource::SourceTree(path.to_path_buf()))
 }
 
-/// `"std"` key in the project's varn.toml, resolved relative to the manifest.
+
 pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
     let manifest_path = if project_root
         .join(crate::artifact::PACKAGE_MANIFEST_FILE)
@@ -86,13 +86,13 @@ pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
     })
 }
 
-/// The active std is process-fixed (same contract as the provider's
-/// `ACTIVE_STD` OnceLock): resolution walks the filesystem once and the
-/// result is cached. Callers on hot paths (binder, resolver) may call this
-/// freely.
-///
-/// Always resolves: every filesystem tier falls through to the embedded
-/// bundle, so "no std at all" is not a reachable state.
+
+
+
+
+
+
+
 pub fn resolve() -> (StdSource, StdProvenance) {
     static RESOLVED: std::sync::OnceLock<(StdSource, StdProvenance)> = std::sync::OnceLock::new();
     RESOLVED.get_or_init(resolve_uncached).clone()
@@ -120,10 +120,10 @@ fn resolve_uncached() -> (StdSource, StdProvenance) {
     (StdSource::Embedded, StdProvenance::Embedded)
 }
 
-/// True when `file` sits inside the active std source tree (tree mode only;
-/// embedded mode is always false). Grants stdlib context — `core:` imports —
-/// to files compiled straight from the tree. Canonicalized tree root is
-/// cached; per-file verdicts are memoized per thread.
+
+
+
+
 pub fn in_source_tree(file: &str) -> bool {
     static TREE_ROOT: std::sync::OnceLock<Option<(PathBuf, Option<PathBuf>)>> =
         std::sync::OnceLock::new();
@@ -153,10 +153,10 @@ pub fn in_source_tree(file: &str) -> bool {
     verdict
 }
 
-/// Walks up from the running binary looking for a sibling `std/` tree
-/// (`std/std.json`) — the layout of this repo's own `target/<profile>/`.
-/// Released binaries ship without a `std/` dir next to them, so this is a
-/// no-op there and resolution falls through to the embedded bundle.
+
+
+
+
 fn dev_checkout_std() -> Option<StdSource> {
     let exe = std::env::current_exe().ok()?;
     find_dev_std_from(&exe)

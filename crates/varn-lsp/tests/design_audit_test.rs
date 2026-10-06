@@ -1,8 +1,8 @@
-//! Tests que fundamentan la auditoría de diseño (memoria + indexado).
-//!
-//! Cada test mide un hecho estructural sobre el código actual, no el
-//! comportamiento deseado: si el diseño cambia, estos tests deben cambiar
-//! con él. Referencian `docs` de arquitectura por hipótesis.
+
+
+
+
+
 
 #![allow(unused_crate_dependencies)]
 
@@ -31,27 +31,27 @@ acc.balance = 100;
 const b = acc.balance;
 "#;
 
-/// H1 — los tokens no retienen lexemas: el texto vive solo en `source`.
-///
-/// `TokenRecord` guarda offsets de byte (`offset`/`end`); el lexema se
-/// resuelve on-demand (`token_lexeme` / `DocumentState::lexeme`). Si alguien
-/// reintroduce `lexeme: String`, este test no compila (campo inexistente) y
-/// el assert de tamaño lo delata.
+
+
+
+
+
+
 #[test]
 fn h1_tokens_hold_no_lexeme_strings() {
     let uri = "file:///test/h1.vn".to_string();
     let state = run_pipeline(ACCOUNT_SRC.to_string(), uri);
     assert!(!state.tokens.is_empty(), "la muestra debe producir tokens");
 
-    // Cero bytes de texto por token: 6×u32 (kind repr(u32) + 5 offsets),
-    // sin `String` (24B c/u antes).
+    
+    
     assert_eq!(
         size_of::<varn_lsp::document::TokenRecord>(),
         6 * size_of::<u32>(),
         "TokenRecord = 6×u32, sin heap propio"
     );
 
-    // Resolución exacta contra la fuente para cada token.
+    
     for t in &state.tokens {
         let lex = state.lexeme(t);
         assert_eq!(lex.len(), (t.end - t.offset) as usize);
@@ -61,11 +61,11 @@ fn h1_tokens_hold_no_lexeme_strings() {
     eprintln!("tokens={} lexemes_resolved_on_demand", state.tokens.len());
 }
 
-/// H2 — un documento retiene UNA sola copia de arenas.
-///
-/// El dueño canónico es `db.bind` (`bind.arena` + `bind.scopes`). El clon
-/// separado (`db.arena`/`db.scopes`) se eliminó: si existiera, este test no
-/// compilaría al acceder solo vía `bind`.
+
+
+
+
+
 #[test]
 fn h2_document_keeps_single_arena_copy() {
     let uri = "file:///test/h2.vn".to_string();
@@ -75,7 +75,7 @@ fn h2_document_keeps_single_arena_copy() {
         !state.db.bind.arena.all().is_empty(),
         "la muestra debe declarar símbolos"
     );
-    // Toda id declarada resuelve en el arena único: no hay segunda tabla.
+    
     for id in &state.symbols {
         assert!(
             *id < state.db.bind.arena.len(),
@@ -89,13 +89,13 @@ fn h2_document_keeps_single_arena_copy() {
     );
 }
 
-/// H3 — un solo mapa `Id → Type` (Ley 6).
-///
-/// `DocumentState.resolved_types` se eliminó: `SemanticDB.symbol_types` es la
-/// única tabla, con la regla recorded-else-declared. El mapa esparso que el
-/// checker devolvía no se fusiona porque `Checker::check` ya plegó su
-/// finalize en `bind.arena` (`sym.ty`), que la regla consume. Si
-/// `resolved_types` volviera, este test no compila: garantía estructural.
+
+
+
+
+
+
+
 #[test]
 fn h3_single_id_to_type_map() {
     let uri = "file:///test/h3.vn".to_string();
@@ -103,14 +103,14 @@ fn h3_single_id_to_type_map() {
 
     let stored: HashSet<usize> = state.db.symbol_types.keys().copied().collect();
     assert!(!stored.is_empty(), "debe haber tipos resueltos");
-    // Cobertura total del arena: cada símbolo declarado tiene su tipo en la
-    // única tabla (el mapa esparso del checker cubría 2 de 73).
+    
+    
     assert_eq!(
         stored.len(),
         state.db.bind.arena.len(),
         "una tabla, cobertura total"
     );
-    // Y cada vista de símbolo resuelve por ella.
+    
     for id in &state.symbols {
         let _ = state.symbol(*id);
     }
@@ -121,10 +121,10 @@ fn h3_single_id_to_type_map() {
     );
 }
 
-/// H4 — un solo `Arc<str>` de uri por archivo, compartido por sus N entradas.
-///
-/// Antes: `uri.to_owned()` por símbolo (medido N×len(uri) bytes: 448×26B en
-/// la muestra). Ahora un alloc por archivo y refcount por entrada.
+
+
+
+
 #[test]
 fn h4_index_shares_one_uri_per_file() {
     let uri = "file:///test/h4_account.vn".to_string();
@@ -148,10 +148,10 @@ fn h4_index_shares_one_uri_per_file() {
     eprintln!("entries={} uri_allocs=1", entries.len());
 }
 
-/// H5 — `db.sources` sobrevive a `close_file` y `remove_file`.
-///
-/// Las fuentes (`Arc<str>`) y los uris del interner nunca se evictan:
-/// retención efectiva tras cerrar/borrar.
+
+
+
+
 #[test]
 fn h5_sources_survive_close_and_remove() {
     let uri = "file:///test/h5.vn".to_string();
@@ -173,12 +173,12 @@ fn h5_sources_survive_close_and_remove() {
     );
 }
 
-/// H10 — `evict_heavy` suelta artefactos, conserva exports y re-deriva.
-///
-/// El grafo memoiza binds+programs+arenas de cada dependencia (el grueso de
-/// la RSS tras indexar el repo). Todo lector los reconstruye en miss
-/// (`module_bind`/`module_exports` reparsean + re-bindean, con caché en disco
-/// primero), así que evictar cambia pico de memoria, no respuestas.
+
+
+
+
+
+
 #[test]
 fn h10_evict_heavy_keeps_exports_drops_artifacts() {
     use varn_lsp::workspace::resolver::with_resolver;
@@ -197,7 +197,7 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
     assert_eq!((b2, p2, a2), (0, 0, 0), "artefactos evictados");
     assert_eq!(e2, e, "exports sobreviven a la evicción");
 
-    // El índice del proyecto sigue respondiendo sin los artefactos…
+    
     {
         let idx = workspace.index.read().unwrap();
         assert!(
@@ -206,8 +206,8 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
         );
     }
 
-    // …y el estado post-evict es estable: re-analizar lo ya exportado no
-    // re-infla las tablas pesadas (el caché de exports responde sin bindear).
+    
+    
     workspace.index_file("file:///test/h10b.vn".to_string(), ACCOUNT_SRC.to_string());
     let (b3, p3, a3, e3) = with_resolver(|r| r.graph_stats());
     assert_eq!(
@@ -218,10 +218,10 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
     assert!(e3 >= e2, "los exports siguen acumulándose");
 }
 
-/// H10b — en miss real, `module_bind` re-deriva tras evictar.
-///
-/// Prueba la otra mitad del contrato: sin exports cacheados, el resolver
-/// reconstruye desde fuente (o artefacto en disco) y vuelve a memoizar.
+
+
+
+
 #[test]
 fn h10b_module_bind_rederives_after_evict() {
     use varn_checker::module_resolver::{DiskResolver, ImportResolver};
@@ -260,10 +260,10 @@ fn h10b_module_bind_rederives_after_evict() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// H7 — los tipos pequeños son `Copy`; los caros son `String` por entrada.
-///
-/// Fija el presupuesto de memoria por elemento: identidad y tipos cuestan
-/// bytes, cada `String` dueña cuesta 24B + heap.
+
+
+
+
 #[test]
 fn h7_small_types_are_copy_sized() {
     fn is_copy<T: Copy>() {}
@@ -279,7 +279,7 @@ fn h7_small_types_are_copy_sized() {
         size_of::<varn_core::Token>() <= 64,
         "Token = kind + rango + offsets, lexema zero-copy"
     );
-    // Contrapartida: cada ExportEntry carga 4+ Strings dueñas.
+    
     assert!(
         size_of::<varn_lsp::index::ExportEntry>() >= 4 * size_of::<String>(),
         "ExportEntry retiene name/global_key/uri/type_str como Strings"
@@ -291,11 +291,11 @@ fn h7_small_types_are_copy_sized() {
     );
 }
 
-/// H8 — re-indexar no acumula entradas (guarda del fast-path O(N²)).
-///
-/// `update_file` sobre un módulo ya indexado debe evictar antes de insertar;
-/// sobre uno nuevo puede insertar directo. En ambos casos, una sola
-/// definición visible.
+
+
+
+
+
 #[test]
 fn h8_reindex_does_not_accumulate_entries() {
     let src = "function compute_something(): int { return 42; }";
@@ -316,14 +316,14 @@ fn h8_reindex_does_not_accumulate_entries() {
     );
 }
 
-/// H9 — identidad de miembros estructural, sin claves formateadas.
-///
-/// `ExportEntry.parent` + `name` identifican; el `global_key: String`
-/// (`m:{uri}#{kind}:{name}` / `member:{parent}:{member}`) se eliminó junto a
-/// `stable_global_key`, `SymbolView::global_key`, `symbol_global_key_for_id`
-/// y `token_global_key` (este último ya no tenía lectores). El payload
-/// opaco de call hierarchy viaja en `None`: `incoming/outgoing` resuelven
-/// por `(uri, name)` y nunca leyeron `data`.
+
+
+
+
+
+
+
+
 #[test]
 fn h9_member_identity_is_structural() {
     use varn_lsp::features::call_hierarchy::prepare_call_hierarchy;
@@ -348,8 +348,8 @@ fn h9_member_identity_is_structural() {
         );
     }
 
-    // Goto-definition de miembro por vía estructural, end-to-end.
-    // `acc.balance = 100;` vive en la línea 14 (0-based) de la muestra.
+    
+    
     workspace.update_file(uri.clone(), ACCOUNT_SRC.to_string());
     let doc = workspace.get(&uri).unwrap();
     let usage = doc
@@ -371,7 +371,7 @@ fn h9_member_identity_is_structural() {
         );
     }
 
-    // Sin claves en el payload de call hierarchy.
+    
     let func = doc
         .tokens
         .iter()

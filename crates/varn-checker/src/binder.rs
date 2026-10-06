@@ -43,15 +43,15 @@ pub use type_resolution::{resolve_primitive, resolve_type_node};
 pub use types::{BindResult, BindView, ClassParent, Extensions, PendingEnrich, TypeMembers};
 
 pub struct Binder<'r> {
-    /// How this binder reaches other modules. Borrowed, not owned: the
-    /// resolver constructs binders while binding a module's imports, so an
-    /// owning handle would make the ownership circular.
+    
+    
+    
     pub(crate) resolver: &'r dyn ImportResolver,
-    /// The parsed program's expression/statement nodes (fase1-componente2:
-    /// `Expr`/`Stmt` are no longer owned trees — every AST node the binder
-    /// visits is an `ExprId`/`StmtId` resolved against this arena). Named
-    /// `ast_arena` (not `arena`) to avoid colliding with the symbol arena
-    /// below, which every binder method already calls `self.arena`.
+    
+    
+    
+    
+    
     pub(crate) ast_arena: &'r AstArena,
     pub(crate) arena: SymbolArena,
     pub(crate) scopes: ScopeArena,
@@ -74,9 +74,9 @@ pub struct Binder<'r> {
     reported_type_forms: rustc_hash::FxHashSet<u32>,
     reported_params: rustc_hash::FxHashSet<u32>,
     pub(crate) array_watch: Vec<array_evolve::ArrayCandidate>,
-    /// Optimization-only element types proved for evolving empty-array
-    /// locals (Task A0.3'); moved into `BindResult::evolved_array_types`.
+    
+    
     pub(crate) evolved_array_types: FxHashMap<u32, Type>,
-    /// Where each class and enum name was first declared (see `type_names`).
+    
     pub(crate) type_decls: FxHashMap<Arc<str>, (crate::scope::ScopeId, varn_core::SourceRange)>,
 }

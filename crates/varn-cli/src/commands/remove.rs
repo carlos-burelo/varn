@@ -36,7 +36,7 @@ pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
     let deps = manifest.parsed_deps().map_err(CliError::fatal)?;
 
     if deps.is_empty() {
-        // No dependencies, no lockfile.
+        
         if lock_path.exists() {
             std::fs::remove_file(&lock_path)
                 .map_err(|e| CliError::fatal(format!("cannot remove lockfile: {e}")))?;

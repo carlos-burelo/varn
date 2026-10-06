@@ -1,7 +1,7 @@
-//! Whether a statement can complete normally, i.e. let control fall through
-//! to the next statement. `false` only when every path leaves by `return`,
-//! `throw`, `break` or `continue`; loops, `switch` and labels are assumed to
-//! complete, so an answer of `false` is always sound.
+
+
+
+
 
 use varn_core::ast::{AstArena, StmtId, StmtKind};
 

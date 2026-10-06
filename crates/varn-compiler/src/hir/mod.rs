@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-/// Interned handle to a nested `HirType` in the module's [`TyTable`].
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TyId(pub u32);
 
-/// Interned handle to a class name in the module's [`TyTable`].
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClassId(pub u32);
 
@@ -16,19 +16,19 @@ pub enum HirType {
     Str,
     Ref,
     Dynamic,
-    /// `Array<T>`; element type behind a [`TyId`] to keep `HirType` `Copy`.
+    
     Array(TyId),
     Map(TyId, TyId),
     Set(TyId),
-    /// Instance of a source-declared class.
+    
     Class(ClassId),
-    /// `T?` — payload type plus null.
+    
     Nullable(TyId),
 }
 
-/// Module-wide intern table resolving the [`TyId`]/[`ClassId`] handles that
-/// structured [`HirType`]s carry. One per lowered module; shared onward so
-/// SSA passes and emission can resolve nesting.
+
+
+
 #[derive(Debug, Default)]
 pub struct TyTable {
     entries: Vec<HirType>,
@@ -106,9 +106,9 @@ pub enum HirBinOp {
     In,
 }
 
-/// Result type of a `Binary` node whose `ty` field holds the OPERAND class.
-/// Comparisons produce `Bool`; arithmetic keeps the operand class
-/// (`varn_core::numeric`).
+
+
+
 pub(crate) fn binary_result_ty(op: HirBinOp, operand_ty: HirType) -> HirType {
     use HirBinOp::*;
     match op {

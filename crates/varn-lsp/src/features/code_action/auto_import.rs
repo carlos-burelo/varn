@@ -55,7 +55,7 @@ pub fn generate_auto_imports_action(
         return actions;
     }
 
-    // Check stdlib common exports
+    
     for &(exp, module) in STDLIB_COMMON_EXPORTS {
         if exp == sym_name {
             if let Some(action) = create_import_action(uri, diag, sym_name, module) {
@@ -64,7 +64,7 @@ pub fn generate_auto_imports_action(
         }
     }
 
-    // Check project index for workspace definitions
+    
     if let Some(idx) = index {
         let defs = idx.definitions_of(sym_name);
         for entry in defs {
@@ -77,7 +77,7 @@ pub fn generate_auto_imports_action(
         }
     }
 
-    // Fallback: check symbols in DocumentState stdlib symbols
+    
     if actions.is_empty() {
         for s in state.symbols() {
             if s.is_from_stdlib() && s.name() == sym_name {

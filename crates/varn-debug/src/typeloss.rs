@@ -1,15 +1,15 @@
-//! `vn debug -p typeloss` — where a statically typed program stops being one.
-//!
-//! Varn knows the type of nearly everything it compiles, and every generic
-//! opcode is a place that knowledge did not survive to codegen. A type has to
-//! get through six stages, and reading any one of them alone gives the wrong
-//! answer: a hover can say `dynamic` for a loop whose bytecode is already
-//! `AddInt`, and a `for…of` can look perfectly typed at the checker and lose
-//! everything at HIR.
-//!
-//! This walks the two stages that can be attributed exactly — what the checker
-//! published, and what the emitter produced — and reports only where they
-//! disagree with what the language already knew.
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::fmt::Write as _;
 
@@ -25,9 +25,9 @@ use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_core::term::terminal::{Align, Section};
 
-/// A typed opcode and the generic one it replaces. The pair is the unit of
-/// measurement: `Add` alone says nothing, `Add` next to `AddInt` says the
-/// emitter had a choice and took the dynamic one.
+
+
+
 const PAIRS: &[(OpCode, OpCode)] = &[
     (OpCode::AddInt, OpCode::Add),
     (OpCode::SubInt, OpCode::Sub),
@@ -46,20 +46,20 @@ const PAIRS: &[(OpCode, OpCode)] = &[
 struct Counts {
     typed: usize,
     generic: usize,
-    /// Generic opcodes by name, worst first, for the detail column.
+    
     by_op: Vec<(String, usize)>,
-    /// The members that stayed name-keyed, read off the instruction's own
-    /// constant rather than guessed from an annotation — the emitted opcode is
-    /// the only thing that actually decides whether an access is dynamic.
+    
+    
+    
     members: Vec<String>,
 }
 
-/// `-p typeloss`.
-///
-/// `module` labels a non-entry module and is printed only when that module
-/// has generic opcodes, so a whole-program run reads as a punch list instead
-/// of a trail of clean banners. The entry call passes `None` and keeps the
-/// historical always-print behavior.
+
+
+
+
+
+
 pub fn debug_typeloss(proto: &FunctionProto, flags: &DebugFlags, module: Option<&str>) {
     let mut rows: Vec<(String, Counts)> = Vec::new();
     collect(proto, flags, &mut rows);

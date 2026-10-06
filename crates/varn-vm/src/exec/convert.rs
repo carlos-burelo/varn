@@ -1,5 +1,5 @@
-//! `OpCode::Convert`: the one place an explicit numeric `as` changes
-//! representation at run time. The rules live in `varn_core::numeric_conv`.
+
+
 
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};

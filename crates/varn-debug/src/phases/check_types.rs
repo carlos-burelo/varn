@@ -1,6 +1,6 @@
-//! `-p check:types`: deterministic, diffable checker type dump
-//! (DEBUG_PLAN §4.5). `Plain` and `Text` are the same bytes (this phase was
-//! always colorless and line-oriented).
+
+
+
 
 use std::io::Write;
 

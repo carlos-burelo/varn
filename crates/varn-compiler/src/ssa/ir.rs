@@ -30,19 +30,19 @@ pub struct SsaFunc {
 
     pub values: Vec<ValueDef>,
 
-    // Forma DECLARADA de la función, propagada desde HIR (`is_async` e
-    // `is_generator` debajo) — no dice si el cuerpo suspende de verdad. El
-    // top-level de un módulo (`<module>`) es SIEMPRE `is_async: false` aunque
-    // contenga `await` de nivel superior: HIR no le da forma `async` al
-    // top-level, así que este campo no lo refleja. Un consumidor que use
-    // `is_async`/`is_generator` como puerta para decidir si un cuerpo puede
-    // suspender se saltaría ese caso. La fuente de verdad sobre suspensión
-    // real, con los puntos concretos, es `crate::ssa::suspend::analyze`.
-    /// Si la función se DECLARÓ `async`. No implica que el cuerpo suspenda
-    /// (ver nota arriba) ni lo contrario. Ver también `is_generator`.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub is_async: bool,
-    /// Si la función se DECLARÓ `function*` (generadora). Misma salvedad que
-    /// `is_async` arriba: forma declarada, no comportamiento real del cuerpo.
+    
+    
     pub is_generator: bool,
 }
 
@@ -74,10 +74,10 @@ impl SsaFunc {
         self.values[v.0 as usize].ty
     }
 
-    /// Rewrites every read of `old` to `new`.
-    ///
-    /// Walks the whole function, so a pass with many rewrites should batch
-    /// them through [`crate::ssa::uses::replace_uses_with_map`] instead.
+    
+    
+    
+    
     pub fn replace_all_uses(&mut self, old: Value, new: Value) {
         let mut sub = |v: &mut Value| {
             if *v == old {
@@ -118,7 +118,7 @@ pub enum InstKind {
     ConstStr(Arc<str>),
     ConstChar(char),
     ConstDecimal(Decimal),
-    /// Canonical base-10 digits of a `bigint` constant.
+    
     ConstBigInt(Arc<str>),
     ConstNull,
     Binary {
@@ -135,10 +135,10 @@ pub enum InstKind {
 
     LoadGlobal(Arc<str>),
 
-    /// Module-global read at a region-relative slot the checker numbered.
+    
     LoadGlobalIdx(u32),
 
-    /// Prelude / host global read at its absolute native-layout index.
+    
     LoadNativeGlobalIdx(u32),
 
     LoadUpvalue(u32),
@@ -148,7 +148,7 @@ pub enum InstKind {
         value: Value,
     },
 
-    /// Module-global write at a region-relative slot the checker numbered.
+    
     StoreGlobalIdx {
         slot: u32,
         value: Value,
@@ -164,8 +164,8 @@ pub enum InstKind {
         args: Vec<Value>,
     },
 
-    /// A fresh instance of `class`, laid out by the class's layout, its
-    /// constructor not yet applied.
+    
+    
     AllocInstance {
         class: Value,
     },
@@ -182,9 +182,9 @@ pub enum InstKind {
     GetFixedField {
         object: Value,
         slot: u16,
-        /// Compact byte offset of the field from the instance payload start
-        /// (`ClassLayout`), baked by the compiler. `0` for a `Slot` access
-        /// (a dynamic/enum-payload field).
+        
+        
+        
         offset: u32,
         tag: varn_core::FieldAccess,
     },
@@ -214,9 +214,9 @@ pub enum InstKind {
         object: Value,
         value: Value,
         slot: u16,
-        /// Compact byte offset of the field from the instance payload start.
+        
         offset: u32,
-        /// The field's kind (width for codegen); always a compact class field.
+        
         tag: Option<varn_core::RuntimeKind>,
     },
 
@@ -238,9 +238,9 @@ pub enum InstKind {
         value: Value,
     },
 
-    /// `arr.push(v)` con receptor probado como array y resultado descartado.
-    /// La nativa `push` no devuelve nada, así que como sentencia siempre
-    /// puede tomar el opcode dedicado.
+    
+    
+    
     ArrayPush {
         array: Value,
         value: Value,
@@ -266,7 +266,7 @@ pub enum InstKind {
         ty: HirType,
     },
 
-    /// Explicit numeric conversion (`as`) that changes representation.
+    
     Convert {
         operand: Value,
         conv: varn_core::NumConv,
@@ -305,13 +305,13 @@ pub enum InstKind {
         parts: Vec<Value>,
     },
 
-    /// Las capturas se describen SÓLO por origen (`upvalues_src`): el
-    /// descriptor emitido nombra el slot canónico del frame padre
-    /// (`var_reg`) o un índice de upvalue heredada, nunca un `Value`.
-    /// Listar aquí los valores capturados creaba operandos fantasma que el
-    /// backend materializaba en `Move` que nadie lee.
+    
+    
+    
+    
+    
     MakeClosure {
-        /// Index into `varn_tir::TirModule::functions` — the closure body.
+        
         func: u32,
         upvalues_src: Vec<HirUpvalueSrc>,
     },
@@ -417,20 +417,20 @@ pub enum InstKind {
         operand: Value,
     },
 
-    /// `s.length` on a receiver statically typed `str`: an `int`. The one
-    /// place a `length` read is specialised; every later stage maps it 1:1.
+    
+    
     StrLength {
         operand: Value,
     },
 
-    /// `a.length` on a receiver statically typed as an array: an `int`.
+    
     ArrayLength {
         operand: Value,
     },
 
-    /// `b.length` on a receiver statically typed `Bytes`: an `int`. Buffers
-    /// are mutable, so like `ArrayLength` (and unlike `StrLength`) this is
-    /// transparent but not loop-invariant and has no CSE key.
+    
+    
+    
     BytesLength {
         operand: Value,
     },
@@ -472,8 +472,8 @@ pub enum InstKind {
 
     ExtensionCall {
         func: Arc<str>,
-        /// Module-global slot of the mangled function, when it was numbered
-        /// (always, for a well-formed module). `None` falls back to a name load.
+        
+        
         slot: Option<u32>,
         recv: Value,
         args: Vec<Value>,

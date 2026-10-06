@@ -1,12 +1,12 @@
 fn main() {
-    // Rebuild std.vnb with readLines array return
+    
     println!("cargo:rerun-if-changed=../../std");
     println!("cargo:rerun-if-changed=../../crates/varn-builtins");
 
     let std_dir = std::path::Path::new("../../std");
 
-    // The checker's module resolver needs the stdlib provider registered
-    // so it can resolve type bindings for std: modules during compilation.
+    
+    
     std::env::set_var(varn_modules::std_root::ENV_VARN_STD, std_dir);
     varn_builtins::register_provider();
     if let Some(reason) = varn_builtins::std_load_error() {

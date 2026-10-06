@@ -1,19 +1,19 @@
-//! Shared `FunctionProto` walking and heap-free constant resolution
-//! (DEBUG_PLAN §7).
-//!
-//! The nested-function walk and the constant mapping were copied across the
-//! per-function phases. This is the single definition they import.
+
+
+
+
+
 
 use varn_types::{FunctionProto, Literal, PoolEntry, VmValue};
 
-/// Heap-free constant resolution for inspection. Only `is_int()` fidelity
-/// matters to the lowering's kind classification, so scalar literals map
-/// exactly (mirroring `varn_vm::exec::calls::resolve_constants`) and heap
-/// literals (strings, bigints, symbols, chars) plus function/shape entries
-/// become `null` placeholders — they are non-int, which is the correct kind,
-/// and their real heap bits are irrelevant to a static, non-executing view.
-/// (Consequence: a string constant shows as `null` in the IR/disasm — see the
-/// phase limitations.)
+
+
+
+
+
+
+
+
 pub fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
     proto
         .chunk
@@ -24,14 +24,14 @@ pub fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
             PoolEntry::Literal(Literal::Bool(b)) => VmValue::from_bool(*b),
             PoolEntry::Literal(Literal::Int(n)) => VmValue::from_int(*n),
             PoolEntry::Literal(Literal::Float(f)) => VmValue::from_f64(*f),
-            // Heap literals + function/shape entries: non-int placeholder.
+            
             _ => VmValue::null(),
         })
         .collect()
 }
 
-/// Visit `root` and every `FunctionProto` nested in its constant pool, depth
-/// first, passing the nesting depth (root = 0).
+
+
 pub fn for_each_fn(root: &FunctionProto, f: &mut impl FnMut(usize, &FunctionProto)) {
     visit(root, 0, f);
 }

@@ -1,5 +1,5 @@
-//! A user class instance: a class id and a payload laid out by the class's
-//! `ClassLayout` (spec §47–§48).
+
+
 
 use super::ClassObj;
 use crate::vm_value::VmValue;
@@ -8,13 +8,13 @@ use std::ptr;
 use std::rc::Rc;
 use varn_core::layout::{ClassLayout, FieldLayout, ScalarRepr, TypeLayout, COMPACT_REF_NULL};
 
-/// Native static struct representation of a user class instance.
-///
-/// Unlike dynamic `ObjData`, an `InstanceData`:
-/// - Has NO `Shape` pointer (classes have static layout).
-/// - Has NO `overflow` store (no dynamic property additions).
-/// - Has a compact 8-byte header (`class_id: u32`, `payload_size: u32`).
-/// - Stores primitive fields packed at native offsets without 16-byte VmValue boxing.
+
+
+
+
+
+
+
 #[repr(C, align(8))]
 pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
     pub class_id: u32,
@@ -22,32 +22,32 @@ pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
     payload: T,
 }
 
-/// Layout facts the JIT's inline instance paths address directly. Derived
-/// with `offset_of!` from this owned definition (exact by construction),
-/// never re-measured by a scan.
+
+
+
 pub const INST_CLASS_ID_OFF: usize =
     std::mem::offset_of!(InstanceData<[UnsafeCell<u8>; 0]>, class_id);
 pub const INST_PAYLOAD_OFF: usize =
     std::mem::offset_of!(InstanceData<[UnsafeCell<u8>; 0]>, payload);
 
 impl InstanceData {
-    /// The payload size an instance of `class` lays out.
+    
     pub fn payload_size_of(class: &ClassObj) -> u32 {
         class.layout().payload_size
     }
 
-    /// Bytes an instance with a `payload_size` payload occupies, header included.
+    
     pub const fn bytes_for(payload_size: u32) -> usize {
         INST_PAYLOAD_OFF + (payload_size as usize).div_ceil(8) * 8
     }
 
-    /// Lays out an instance at `at`: scalars zero and every `Ref` slot `null`,
-    /// since no object lives at address 0.
-    ///
-    /// # Safety
-    /// `at` must be 8-aligned, point to [`Self::bytes_for`]`(payload_size)`
-    /// writable bytes, and outlive every use of the returned reference: the
-    /// heap cell that holds the instance owns that memory.
+    
+    
+    
+    
+    
+    
+    
     #[inline]
     pub unsafe fn init_at(at: *mut u8, class_id: u32, payload_size: u32) -> InstanceRef {
         let payload_bytes = payload_size as usize;
@@ -65,7 +65,7 @@ impl InstanceData {
         self.payload.as_ptr() as *mut u8
     }
 
-    // ── Field Read Methods ──────────────────────────────────────────────
+    
 
     #[inline(always)]
     unsafe fn read_i64(&self, offset: usize) -> i64 {
@@ -102,10 +102,10 @@ impl InstanceData {
         ClassObj::find_by_id(self.class_id).map(|c| c.layout())
     }
 
-    /// Number of declared fields — the one authority on how far a payload
-    /// walk may go. Was `payload_size / 16` back when every field WAS
-    /// exactly 16 bytes; now that fields pack at their real `FieldLayout`
-    /// size, only the layout's own field count says how many there are.
+    
+    
+    
+    
     #[inline]
     pub fn slot_count(&self) -> usize {
         self.layout().map(|l| l.field_count()).unwrap_or(0)
@@ -118,9 +118,9 @@ impl InstanceData {
         self.read_field(f)
     }
 
-    /// Read a field by its BAKED compact `(offset, tag)` — no runtime layout
-    /// lookup. Mirrors [`Self::read_field`] with the `FieldLayout` derived from
-    /// the tag.
+    
+    
+    
     #[inline]
     pub fn read_field_at(
         &self,
@@ -130,8 +130,8 @@ impl InstanceData {
         self.read_scalar(offset, &TypeLayout::of_field(tag))
     }
 
-    /// Write a field by its BAKED compact `(offset, tag)` — no runtime layout
-    /// lookup.
+    
+    
     #[inline]
     pub fn write_field_at(
         &self,
@@ -153,15 +153,15 @@ impl InstanceData {
         self.write_field(f, val).is_ok()
     }
 
-    /// Reads one field by its representation (`TypeLayout`); a `Ref` slot
-    /// decodes the `null` niche back to `null`, symmetric with the write.
+    
+    
     pub fn read_field(&self, f: &FieldLayout) -> Option<VmValue> {
         self.read_scalar(f.offset, &f.layout)
     }
 
-    /// The read behind [`Self::read_field`], keyed by the field's offset and
-    /// representation alone: baked accesses carry no name to build a
-    /// `FieldLayout` from.
+    
+    
+    
     pub fn read_scalar(&self, offset: u32, layout: &TypeLayout) -> Option<VmValue> {
         let offset = offset as usize;
         if offset + layout.size as usize > self.payload_size as usize {
@@ -185,20 +185,20 @@ impl InstanceData {
         }
     }
 
-    /// Writes one field at its own `FieldLayout`, converting the same way
-    /// `varn_vm::frame_store`'s `Fpr`/`Ref` slot writes do: `int` widens into
-    /// a `float` field the checker proved compatible, and `null` into a
-    /// compact GC-ref field is the `null` niche, not an error — a `class`
-    /// -typed field genuinely can be unset before the constructor assigns it
-    /// (`tests/63-escape-analysis.vn`'s "unassigned field still reads null"
-    /// pattern applies here exactly as it does to registers). Anything else
-    /// wrong for the slot's class is a real type error, surfaced instead of
-    /// silently reinterpreted.
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub fn write_field(&self, f: &FieldLayout, val: VmValue) -> Result<(), &'static str> {
         self.write_scalar(f.offset, &f.layout, val)
     }
 
-    /// The write behind [`Self::write_field`]; see [`Self::read_scalar`].
+    
     pub fn write_scalar(
         &self,
         offset: u32,
@@ -224,10 +224,10 @@ impl InstanceData {
                     self.write_i64(offset, val.as_int());
                 }
                 ScalarRepr::F64 => {
-                    // Symmetric with `frame_store`'s `Fpr`: `int` widens,
-                    // `null` (a NaN result — `VmValue::from_f64` already
-                    // folds NaN to `null`) round-trips through a real NaN
-                    // bit pattern instead of being rejected.
+                    
+                    
+                    
+                    
                     if val.is_f64() {
                         self.write_f64(offset, val.as_f64());
                     } else if val.is_int() {
@@ -253,12 +253,12 @@ impl InstanceData {
         Ok(())
     }
 
-    // ── Collector access (spec §48) ─────────────────────────────────────
+    
 
-    /// Visits the references this instance holds: the slots of its
-    /// `GcLayout`, nothing else. A `Ref` slot is read as an object address and its
-    /// `null` niche is skipped; a `Boxed` slot is a whole `VmValue` that may
-    /// or may not be a reference, which the visitor decides.
+    
+    
+    
+    
     pub fn for_each_reference(&self, mut f: impl FnMut(VmValue)) {
         let Some(layout) = self.layout() else {
             return;
@@ -270,8 +270,8 @@ impl InstanceData {
         }
     }
 
-    /// The value of one `GcLayout` slot; `None` for a `Ref` slot holding the
-    /// `null` niche.
+    
+    
     fn read_gc_slot(&self, offset: usize, repr: ScalarRepr) -> Option<VmValue> {
         unsafe {
             match repr {
@@ -287,7 +287,7 @@ impl InstanceData {
         }
     }
 
-    // ── Field Write Methods ─────────────────────────────────────────────
+    
 
     #[inline(always)]
     unsafe fn write_i64(&self, offset: usize, val: i64) {
@@ -320,8 +320,8 @@ impl InstanceData {
     }
 }
 
-/// An instance living in a heap cell: the cell owns the memory, so this is a
-/// plain pointer, valid for as long as the object is reachable.
+
+
 #[derive(Clone, Copy)]
 pub struct InstanceRef(ptr::NonNull<InstanceData>);
 

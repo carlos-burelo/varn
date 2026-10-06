@@ -1,5 +1,5 @@
-//! Critical-edge splitting: gives every phi predecessor a block of its own so
-//! the edge copies emitted for it cannot land in a block another edge shares.
+
+
 
 use super::super::ir::{Block, BlockId, SsaFunc, Terminator};
 

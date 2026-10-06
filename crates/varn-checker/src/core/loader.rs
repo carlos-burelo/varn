@@ -29,9 +29,9 @@ pub fn is_core_file(filename: &str) -> bool {
     filename.contains("varn-builtins") || filename.starts_with(CORE_PREFIX)
 }
 
-/// The core globals a module binds against: every module but the core ones
-/// themselves, whichever path binds it (the checker, or the resolver reading
-/// an import's interface) — one environment per module.
+
+
+
 pub(crate) fn module_globals(
     filename: &str,
     resolver: &dyn ImportResolver,
@@ -46,10 +46,10 @@ pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) 
     bind.core = Some(core);
 }
 
-/// Build the prelude's global symbols from `resolver`'s stdlib.
-///
-/// Memoized by the resolver, not here: the result is a function of which
-/// stdlib is active, so it must not outlive a change of stdlib.
+
+
+
+
 pub(crate) fn build_core_exports(resolver: &dyn ImportResolver) -> CoreExports {
     let mut core = CoreExports::default();
     for spec in varn_modules::core_module_ids() {

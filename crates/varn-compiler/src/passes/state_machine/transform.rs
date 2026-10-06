@@ -1,52 +1,52 @@
-//! CFG partitioning and state machine transformation for all suspendible functions.
-//!
-//! Transforms suspendible functions (`async function`, `function*`, `async function*`)
-//! containing suspension points (`InstKind::Await`, `InstKind::Yield`) across linear
-//! control flow, loops, and try/catch blocks.
-//!
-//! Splits blocks at suspension sites, introduces continuation blocks, computes exact
-//! predecessors, and reorders blocks in canonical RPO order so that linear scan register
-//! allocation preserves live ranges.
+
+
+
+
+
+
+
+
+
 
 use crate::ssa::ir::{Block, BlockId, InstKind, SsaFunc, Terminator, Value};
 use crate::ssa::suspend::SuspendPoint;
 
 use super::layout::StateLayout;
 
-/// Transforms a suspendible function into partitioned states.
-/// Returns the calculated `state_size` in words.
+
+
 pub fn transform_suspend_func(func: &mut SsaFunc, points: &[SuspendPoint]) -> u16 {
     let layout = StateLayout::compute(points);
 
-    // Split blocks for each suspension point.
+    
     for (k, pt) in points.iter().enumerate() {
         split_at_suspend_point(func, k, pt);
     }
 
-    // Recompute exact CFG predecessors for all blocks after splitting.
+    
     compute_preds(func);
 
-    // Reorder blocks in topological RPO order so that newly allocated continuation
-    // blocks precede their successors in linear indexing. This guarantees that
-    // `Liveness::analyze` and `assign_registers` linear scan correctly compute
-    // live intervals and do not clobber registers across suspension points.
+    
+    
+    
+    
     reorder_blocks_rpo(func);
 
     layout.state_size
 }
 
-/// Splits the block containing suspension point `k` into two blocks:
-/// the prefix ending in the suspend instruction jumping to continuation `C_k`,
-/// and the continuation `C_k` containing the suffix instructions and original terminator.
+
+
+
 fn split_at_suspend_point(func: &mut SsaFunc, _k: usize, pt: &SuspendPoint) {
-    // 1. Locate the block and instruction containing this suspension point.
+    
     let (target_bid, inst_idx) = find_suspend_inst(func, pt.operand)
         .expect("suspend point instruction must exist in func blocks");
 
-    // 2. Allocate the continuation block C_k.
+    
     let cont_bid = func.alloc_block();
 
-    // 3. Move suffix instructions [inst_idx + 1..] and the terminator from target_bid to cont_bid.
+    
     let (suffix_insts, original_term) = {
         let block = func.block_mut(target_bid);
         let suffix = block.insts.split_off(inst_idx + 1);
@@ -54,14 +54,14 @@ fn split_at_suspend_point(func: &mut SsaFunc, _k: usize, pt: &SuspendPoint) {
         (suffix, term)
     };
 
-    // 4. Populate cont_bid with suffix instructions and original terminator.
+    
     {
         let cont_block = func.block_mut(cont_bid);
         cont_block.insts = suffix_insts;
         cont_block.term = original_term;
     }
 
-    // 5. Set target_bid's terminator to Jump { target: cont_bid, args: [] }.
+    
     func.block_mut(target_bid).term = Terminator::Jump {
         target: cont_bid,
         args: Vec::new(),

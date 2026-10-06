@@ -97,29 +97,29 @@ varn_contract! {
     class: "IsolateHandle",
     contract: "src/modules/runtime/task/task_runtime.vn",
     impl IsolateHandleImpl {
-        // `join()` yields the worker's join task (resolves `Null` on normal
-        // completion, rejects a typed `Error` if the worker threw). `_done`
-        // holds that task, so `await handle.join()` drives it.
+        
+        
+        
         fn join(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
             ctx.get_field(this, "_done").unwrap_or(VmValue::null())
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Typed channels: Sender / Receiver / Channel / ChannelClosed (runtime:task).
-// ---------------------------------------------------------------------------
+
+
+
 
 pub struct SenderImpl;
 pub struct ReceiverImpl;
 pub struct ChannelImpl;
 pub struct ChannelClosedImpl;
 
-/// Allocate a `Sender`/`Receiver` instance holding only the channel `_chan` id.
-/// A `Receiver` also gets a self-returning `Symbol.asyncIterator` so `for await`
-/// drives it directly through its own `next()`. Shared with the VM's
-/// `host_values::mint_endpoint` (cross-isolate materialization) so both minting
-/// paths produce identical instances.
+
+
+
+
+
 pub fn alloc_endpoint(
     ctx: &mut dyn NativeCtx,
     class_name: &str,
@@ -130,8 +130,8 @@ pub fn alloc_endpoint(
         .ok_or_else(|| format!("channel: {class_name} class not registered"))?;
     ctx.set_field(nv, "_chan", VmValue::from_int(id as i64));
     if class_name == "Receiver" {
-        // for-await: Symbol.asyncIterator returns the receiver itself
-        // (self-iterator), whose `next()` yields `{value, done}`.
+        
+        
         let iter_nv = ctx.alloc_bound_native(nv, receiver_self_iterator, "[Symbol.asyncIterator]");
         ctx.set_field(nv, "Symbol.asyncIterator", iter_nv);
     }

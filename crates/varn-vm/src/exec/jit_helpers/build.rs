@@ -1,4 +1,4 @@
-//! Aggregate construction from compiled code: array and string literals.
+
 
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
@@ -16,8 +16,8 @@ pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmVa
     }
 }
 
-/// `extern "C" fn(*mut ExecCtx, parts: *const VmValue, count)` — build an array
-/// from a boxed window staged on the caller's native stack.
+
+
 #[varn_op_macros::jit_slow(field = "build_array_window")]
 pub(crate) extern "C" fn jit_build_array_window(
     ctx: *mut ExecCtx,
@@ -31,8 +31,8 @@ pub(crate) extern "C" fn jit_build_array_window(
     }
 }
 
-/// Empty object for spread literals (`{...a}` with no keyed prefix): the SSA
-/// lowering then sets/merges each part through the property helpers.
+
+
 #[varn_op_macros::jit_slow(field = "build_empty_object")]
 pub(crate) extern "C" fn jit_build_empty_object(ctx: *mut ExecCtx) {
     unsafe {
@@ -41,8 +41,8 @@ pub(crate) extern "C" fn jit_build_empty_object(ctx: *mut ExecCtx) {
     }
 }
 
-/// `extern "C" fn(*mut ExecCtx, pairs: *const VmValue, count)` — build a map
-/// from a boxed `[k0, v0, k1, v1, …]` window on the caller's native stack.
+
+
 #[varn_op_macros::jit_slow(field = "build_map_window")]
 pub(crate) extern "C" fn jit_build_map_window(
     ctx: *mut ExecCtx,
@@ -121,10 +121,10 @@ unsafe fn build_shaped_from_ptr(
     )
 }
 
-/// `extern "C" fn(*mut ExecCtx, vals: *const VmValue, count, shape: *const Shape,
-/// is_record, may_hold_closure)` — build an object/record from a boxed window on
-/// the caller's native stack. The window-taking sibling of
-/// `jit_build_object_with_shape` (which reads homes).
+
+
+
+
 #[varn_op_macros::jit_slow(field = "build_object_window")]
 pub(crate) extern "C" fn jit_build_object_window(
     ctx: *mut ExecCtx,

@@ -1,10 +1,10 @@
-//! Tablas, secciones y avisos de los volcados `vn debug`.
-//!
-//! El render (ancho visible, truncado, relleno) y la escritura a stderr van
-//! por [`console`]: `measure_text_width` entiende ANSI + Unicode ancho
-//! (CJK/emoji), `pad_str`/`truncate_str` alinean sin romper secuencias, y
-//! `Term::stderr` habilita ANSI en Windows. La API pública (`Table`,
-//! `Section`, `log/warn/error/info`) no cambia.
+
+
+
+
+
+
+
 
 use crate::term::chalk::{chalk, Chalk};
 use std::fmt::Display;
@@ -113,9 +113,9 @@ impl Table {
     }
 }
 
-/// Ancho visible en terminal: ignora secuencias ANSI y cuenta los caracteres
-/// anchos (CJK/emoji) como 2. La versión anterior contaba `chars()` (todo = 1)
-/// y desalineaba tablas con contenido no ASCII.
+
+
+
 fn display_width(s: &str) -> usize {
     console::measure_text_width(s)
 }
@@ -163,8 +163,8 @@ impl Section {
     }
 }
 
-/// Una línea a stderr. Va por `Term::stderr` para habilitar ANSI en Windows;
-/// si falla (stderr cerrado), cae a `eprintln!` para no perder el volcado.
+
+
 fn write_line(line: String) {
     let term = console::Term::stderr();
     if term.write_line(&line).is_err() {
@@ -176,8 +176,8 @@ pub fn log(msg: impl Display) {
     write_line(msg.to_string());
 }
 
-/// Avisos humanos (no volcados): con detección automática de color.
-/// Respetan `NO_COLOR`, `CLICOLOR` y TTY; en tuberías salen sin ANSI.
+
+
 pub fn warn(msg: impl Display) {
     let tag = console::style("warn")
         .yellow()

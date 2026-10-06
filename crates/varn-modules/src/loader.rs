@@ -1,19 +1,19 @@
-//! The canonical module system: one identity, one resolution, one load.
-//!
-//! "Find a module from a specifier and read it" used to exist four times — the
-//! checker's `ImportResolver` + `Carrier`, the VM's `ModuleLoader`, the
-//! `provider` blob accessors, and ad-hoc CLI/LSP resolution — each able to pick
-//! a different representation for the same module (the checker once served a
-//! `std:` module from a precompiled blob while the VM compiled its source, so
-//! the same module had two different type sets). See
-//! `docs/decisions/ADR-0011-canonical-module-system.md`.
-//!
-//! This module is that single door. `ModuleId` is the only identity;
-//! `ModuleLoader::resolve` is the only resolution; `ModuleLoader::source` is the
-//! only read. Representations (file, embedded bundle, builtins provider,
-//! in-memory buffer) are *backends* behind a [`ModuleRegistry`], tried in one
-//! explicit order. Loading never compiles: `interface`/`bytecode` ride along as
-//! optional precomputed artifacts.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use rustc_hash::FxHashMap as HashMap;
 use std::fmt::{self, Display};
@@ -22,32 +22,32 @@ use std::sync::Arc;
 
 use varn_core::ModuleId;
 
-/// Where a module's text came from. Carried for diagnostics and cache keys; it
-/// is deliberately NOT a branching key (that would reintroduce the divergence
-/// this module exists to remove).
+
+
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Provenance {
-    /// An in-memory buffer (editor's unsaved document).
+    
     Memory,
-    /// A file on disk (already canonicalized).
+    
     File(PathBuf),
-    /// The embedded std bundle (text and/or precomputed artifacts).
+    
     Bundle,
-    /// A builtins provider entry (`core:`/`runtime:`) resolved without a file.
+    
     Native,
 }
 
-/// A module as the loader hands it over: always the source text, optionally a
-/// precompiled checker interface and/or `FunctionProto` from a bundle. No phase
-/// reads a module any other way.
+
+
+
 #[derive(Clone)]
 pub struct ModuleSource {
     pub id: ModuleId,
     pub text: Arc<str>,
     pub provenance: Provenance,
-    /// Precompiled checker interface (postcard), if the carrier ships one.
+    
     pub interface: Option<Arc<[u8]>>,
-    /// Precompiled `FunctionProto` (postcard), if the carrier ships one.
+    
     pub bytecode: Option<Arc<[u8]>>,
 }
 
@@ -87,13 +87,13 @@ impl fmt::Debug for ModuleSource {
 
 #[derive(Debug)]
 pub enum LoadError {
-    /// No backend had the module.
+    
     NotFound { id: ModuleId },
-    /// A backend had it but the read failed.
+    
     Io { path: PathBuf, message: String },
-    /// The specifier could not be turned into a `ModuleId`.
+    
     Resolve { specifier: String, message: String },
-    /// The backend had it but the payload was unusable.
+    
     Invalid { id: ModuleId, message: String },
 }
 
@@ -116,11 +116,11 @@ impl Display for LoadError {
 
 impl std::error::Error for LoadError {}
 
-/// One resolution rule for the whole compiler.
-///
-/// `resolve` has a default implementation over `varn_modules::resolver` so every
-/// backend agrees by construction; a backend only overrides it if it genuinely
-/// resolves differently (none does today).
+
+
+
+
+
 pub trait ModuleLoader: Send + Sync {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, LoadError> {
         crate::resolver::ModuleResolver::new()
@@ -134,12 +134,12 @@ pub trait ModuleLoader: Send + Sync {
     fn source(&self, id: &ModuleId) -> Result<ModuleSource, LoadError>;
 }
 
-/// Builtins/std provider backend for `ModuleId::Core`/`Std`/`Runtime`.
-///
-/// This is the ONLY place that talks to `varn_modules::provider`. It prefers
-/// the module's SOURCE text (so the checker and the VM see the same bytes) and
-/// attaches the precompiled `interface`/`bytecode` when the bundle ships them —
-/// artifacts ride along, they don't replace the source as a second truth.
+
+
+
+
+
+
 pub struct ProviderLoader;
 
 impl ProviderLoader {
@@ -196,19 +196,19 @@ impl ModuleLoader for ProviderLoader {
     }
 }
 
-/// The registry every consumer uses by default: filesystem + builtins/std
-/// provider, in that order. Cheap to construct (it holds no state); consumers
-/// that need an in-memory overlay build their own and push a `MemoryLoader`
-/// first.
+
+
+
+
 pub fn default_registry() -> ModuleRegistry {
     ModuleRegistry::new()
         .with(Box::new(FilesystemLoader))
         .with(Box::new(ProviderLoader))
 }
 
-/// The single ordered list of representations. Order is the contract: an
-/// in-memory overlay beats the filesystem, which beats the bundle, which beats
-/// the builtins provider.
+
+
+
 pub struct ModuleRegistry {
     backends: Vec<Box<dyn ModuleLoader>>,
 }
@@ -226,7 +226,7 @@ impl ModuleRegistry {
         }
     }
 
-    /// Register a backend at the end of the order.
+    
     pub fn push(&mut self, backend: Box<dyn ModuleLoader>) -> &mut Self {
         self.backends.push(backend);
         self
@@ -262,9 +262,9 @@ impl ModuleLoader for ModuleRegistry {
         for backend in &self.backends {
             match backend.source(id) {
                 Ok(src) => return Ok(src),
-                // A backend that doesn't carry this id is skipped; a backend
-                // that DOES carry it and fails hard-stops the registry (a
-                // broken file must not silently fall through to a stale copy).
+                
+                
+                
                 Err(LoadError::NotFound { .. }) => {
                     last = Some(LoadError::NotFound { id: id.clone() })
                 }
@@ -275,9 +275,9 @@ impl ModuleLoader for ModuleRegistry {
     }
 }
 
-/// Filesystem backend for `ModuleId::Local`. `std:`/`core:`/`runtime:` are not
-/// its business (it reports `NotFound` so the bundle/provider backends handle
-/// them).
+
+
+
 pub struct FilesystemLoader;
 
 impl ModuleLoader for FilesystemLoader {
@@ -304,9 +304,9 @@ impl ModuleLoader for FilesystemLoader {
     }
 }
 
-/// In-memory overlay, highest priority. The editor registers open documents
-/// here so the checker sees the buffer, not the stale file on disk — through
-/// the same loader every other consumer uses.
+
+
+
 #[derive(Default)]
 pub struct MemoryLoader {
     files: HashMap<ModuleId, Arc<str>>,
@@ -352,22 +352,22 @@ mod tests {
         let loader = FilesystemLoader;
         let from = local("C:/proj/main.vn");
 
-        // Relative → normalized local path.
+        
         let rel = loader.resolve("./util.vn", &from).unwrap();
         assert_eq!(rel, local("C:/proj/util.vn"));
 
-        // Parent traversal.
+        
         let up = loader.resolve("../lib/x.vn", &from).unwrap();
         assert_eq!(up, local("C:/lib/x.vn"));
 
-        // std from anywhere.
+        
         assert_eq!(
             loader.resolve("std:math", &from).unwrap(),
             ModuleId::stdlib("std:math")
         );
 
-        // Resolution maps ids; which layer may import which is checked on
-        // source imports (`layer::check_import`), not here.
+        
+        
         assert_eq!(
             loader.resolve("core:types/int", &from).unwrap(),
             ModuleId::core("core:types/int")

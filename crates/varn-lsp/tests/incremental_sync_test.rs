@@ -8,7 +8,7 @@ use varn_lsp::document::position::byte_offset;
 fn test_incremental_edit_application() {
     let mut doc = "function hello() {\n    return 42;\n}\n".to_string();
 
-    // Replace `42` with `100` on line 1 (0-indexed), cols 11..13
+    
     let change = TextDocumentContentChangeEvent {
         range: Some(Range {
             start: Position {
@@ -30,10 +30,10 @@ fn test_incremental_edit_application() {
 
 #[test]
 fn test_position_with_utf16_astral_characters() {
-    // A string with an emoji (4 bytes in UTF-8, 2 code units in UTF-16)
+    
     let source = "const emoji = \"😀\";\nconst next = 1;\n";
 
-    // Start of line 1 (second line)
+    
     let offset_line1 = byte_offset(
         source,
         Position {

@@ -113,10 +113,10 @@ impl<'a> FnEmitter<'a> {
 }
 
 impl FnEmitter<'_> {
-    /// A closure's signature from its checked function type: the parameter and
-    /// return types the checker proved. A coroutine keeps a dynamic return —
-    /// what it returns is its handle, not the body's value — and a type that
-    /// is not a function of this arity leaves everything dynamic.
+    
+    
+    
+    
     fn closure_signature(
         &mut self,
         source: Option<ExprId>,

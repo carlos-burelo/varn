@@ -1,9 +1,9 @@
-//! Instructions emitted for their effect: stores, property writes, class
-//! member definitions, scope teardown.
-//!
-//! Returns whether the instruction was handled here. Every arm of the match
-//! terminates the instruction, so a `false` means "not an effect instruction"
-//! and sends the caller on to `values`.
+
+
+
+
+
+
 
 use super::super::ir::{Inst, InstKind, VarId};
 use super::regs::var_reg;
@@ -46,9 +46,9 @@ pub(super) fn emit_effect(
             offset,
             tag,
         } => {
-            // `w1` low = the encoded `FieldAccess` (always `Compact` here — a
-            // class field); `w2` = the dynamic `slot` (fallback); `w3` = the
-            // compact byte offset.
+            
+            
+            
             chunk.write(
                 Chunk::pack_op(OpCode::SetFixedField, reg[object.0 as usize]),
                 line,

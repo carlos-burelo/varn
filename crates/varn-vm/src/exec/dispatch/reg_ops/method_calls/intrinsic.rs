@@ -1,6 +1,6 @@
-//! The intrinsic methods a method call answers before any lookup: `push` /
-//! `pop` on an array and `startsWith` / `endsWith` / `indexOf` on a string —
-//! no method table, no bound method, no indirect call.
+
+
+
 
 use crate::exec::ctx::ExecCtx;
 use crate::exec::method_args::MethodArgs;
@@ -9,14 +9,14 @@ use crate::value::VmValue;
 use varn_core::MemberKey;
 use varn_types::vm_value::SSO_MAX_LEN;
 
-/// The string methods answered directly; each takes one string argument.
+
 enum StrOp {
     StartsWith,
     EndsWith,
     IndexOf,
 }
 
-/// The text of `v` when it is a string: inline (into `buf`) or on the heap.
+
 fn str_of<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; SSO_MAX_LEN]) -> Option<&'a str> {
     if v.is_sso() {
         return Some(v.sso_as_str(buf));
@@ -30,8 +30,8 @@ fn str_of<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; SSO_MAX_LEN]) -> Opt
 }
 
 impl ExecCtx {
-    /// The value of `this_val.name(args)` when it is an intrinsic the call
-    /// answers directly; `None` sends the call on to the general resolution.
+    
+    
     pub(super) fn intrinsic_method(
         &mut self,
         this_val: VmValue,
@@ -84,7 +84,7 @@ impl ExecCtx {
     }
 }
 
-/// `s.indexOf(p)` in characters: `0` for an empty `p`, `-1` when absent.
+
 fn char_index_of(s: &str, p: &str) -> i64 {
     if p.is_empty() {
         return 0;

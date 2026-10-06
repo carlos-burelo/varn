@@ -1,4 +1,4 @@
-//! Generic portable fallback for setjmp/longjmp using libc / C runtime.
+
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]

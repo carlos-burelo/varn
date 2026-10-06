@@ -198,10 +198,10 @@ pub fn build_module_graph(
                 varn_checker::CheckOptions::compile(),
             )
         });
-        // The source was already sitting here, bound to `_`, while the
-        // diagnostics this produced went unread — which is what made a type
-        // error invisible as soon as the file was reached through `import`
-        // instead of being run directly.
+        
+        
+        
+        
         crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)
             .map_err(|e| e.message)?;
         let exports = if program.filename.starts_with("std:")

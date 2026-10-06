@@ -5,7 +5,7 @@ use crate::ty::{BackendTy, TyId, TyListId};
 use crate::{TirFunction, TirModule};
 use rustc_hash::FxHashSet as HashSet;
 
-/// Every handle inside a type points at an entry that exists, and types do not form cycles.
+
 pub(super) fn check_ty(m: &TirModule, ty: BackendTy, e: &TirExpr, errors: &mut Vec<VerifyError>) {
     let mut visited = HashSet::default();
     let mut visited_lists = HashSet::default();
@@ -36,11 +36,11 @@ fn check_ty_recursive(
             if !m.types.contains(t) {
                 bad(&format!("TyId({})", t.0), errors);
             } else if visited.insert(t) {
-                // First time seeing this TyId, recurse into it
+                
                 let inner_ty = m.types.get(t);
                 check_ty_recursive(m, inner_ty, e, errors, visited, visited_lists);
             }
-            // If already visited, stop to break cycles
+            
         }
         BackendTy::Map(k, v) => {
             if !m.types.contains(k) {
@@ -60,22 +60,22 @@ fn check_ty_recursive(
             if !m.types.contains_list(l) {
                 bad(&format!("TyListId({})", l.0), errors);
             } else if visited_lists.insert(l) {
-                // First time seeing this TyListId — recurse into its
-                // elements. A Tuple can point back at its own TyListId
-                // (e.g. `intern_list(&[Tuple(TyListId(0))])` on an empty
-                // table), which is a genuine self-reference distinct from
-                // any TyId cycle, so it needs its own visited set.
+                
+                
+                
+                
+                
                 for &elem_ty in m.types.get_list(l) {
                     check_ty_recursive(m, elem_ty, e, errors, visited, visited_lists);
                 }
             }
-            // If already visited, stop to break cycles
+            
         }
         _ => {}
     }
 }
 
-/// Every slot is in range of the table it claims to index.
+
 pub(super) fn check_res(
     m: &TirModule,
     f: &TirFunction,

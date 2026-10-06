@@ -1,9 +1,9 @@
-//! `xtask` - Cargo task automation for Varn.
-//!
-//! Provides the native Rust benchmark comparison harness (`cargo xtask compare` / `cargo xtask bench`).
-//! Measures process wall-clock time with sub-millisecond precision, calibrates startup, isolates
-//! bytecode caches, interleaves executions round-robin to mitigate thermal drift, and validates output
-//! integrity across runtimes.
+
+
+
+
+
+
 
 use std::collections::HashMap;
 use std::path::PathBuf;

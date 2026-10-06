@@ -61,22 +61,22 @@ pub fn run(func: &mut SsaFunc) -> bool {
     changed
 }
 
-/// Whether an instruction that must RUN can still give up its destination
-/// when nothing reads it.
-///
-/// A call to a `void` function is the common case, and in a test corpus it is
-/// most of the code: `assert(...)`, `print(...)`. The call has to happen, but
-/// its result is nobody's — and while it kept a destination it kept an SSA
-/// value, a live range, a register the allocator had to colour and, since
-/// `void` has no value type, a `Dynamic` one at that.
-///
-/// Restricted to the call family on purpose. Everything else that defines a
-/// value either has its destination read (or the pass above would have
-/// deleted it) or uses it as part of a protocol the emitter depends on —
-/// `Try`'s landing value, `CatchParam`, the suspension points. A `false` here
-/// costs a register; a wrong `true` loses an instruction, because
-/// `emit_inst` hands a destination-less instruction to `emit_effect` and
-/// drops whatever that does not recognize.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 pub(crate) fn dest_droppable(kind: &InstKind) -> bool {
     use InstKind::*;
     matches!(
@@ -92,23 +92,23 @@ pub(crate) fn dest_droppable(kind: &InstKind) -> bool {
     )
 }
 
-/// Whether an instruction can be deleted when its result is unused.
-///
-/// Deliberately an **allow-list, written as an exhaustive match**: a new
-/// `InstKind` must be classified by hand or this stops compiling. The
-/// previous deny-list had the opposite default, so anything it forgot was
-/// silently deletable — that is how `GetProperty` on a side-effecting getter
-/// came to be dropped.
-///
-/// "Pure" here means: runs no user code, writes nothing observable, and
-/// cannot throw. Allocation alone is fine — an unobserved allocation is
-/// exactly what we want gone. Trap behaviour was measured, not assumed: an
-/// out-of-bounds array read yields `null`, while `/ 0`, `% 0` and a negative
-/// integer exponent all raise, and `int` `+ - *` and `-x` overflow, so they stay.
+
+
+
+
+
+
+
+
+
+
+
+
+
 pub(crate) fn is_pure(kind: &InstKind) -> bool {
     use InstKind::*;
     match kind {
-        // Values and plain memory reads.
+        
         ConstInt(_)
         | ConstFloat(_)
         | ConstBool(_)
@@ -126,24 +126,24 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | This
         | CatchParam { .. } => true,
 
-        // Fixed slots and statically-typed array elements are plain memory:
-        // the checker proved the receiver's shape, so no accessor can run.
+        
+        
         GetFixedField { .. } | ArrayGetIndex { .. } | MapGetIndex { .. } => true,
 
-        // Type tests and tag reads inspect the value, never dispatch.
+        
         IsNull { .. } | Cast { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => {
             true
         }
-        // A length of a receiver statically typed `str` / array / bytes: a
-        // read, no getter can run.
+        
+        
         StrLength { .. } | ArrayLength { .. } | BytesLength { .. } => true,
         Convert { conv, .. } => !conv.can_fault(),
 
-        // Puede lanzar si el valor no cabe en el ancho declarado (mismo
-        // motivo que Div/Mod/Pow abajo: el panic ES el efecto observable,
-        // incluso con el resultado descartado).
+        
+        
+        
 
-        // Allocation with no observable effect.
+        
         AllocInstance { .. }
         | BuildArray { .. }
         | BuildTuple { .. }
@@ -158,7 +158,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
             let typed = matches!(ty, HirType::Int | HirType::Float | HirType::Bool);
             let int_can_overflow =
                 *ty == HirType::Int && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
-            // Div/Mod/Pow raise on zero divisor and negative exponent.
+            
             let never_traps = matches!(
                 op,
                 HirBinOp::Add
@@ -187,30 +187,30 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
             }
         },
 
-        // `GetProperty` runs a getter when the class declares one — the
-        // regression this list exists to prevent. The other property-shaped
-        // reads do not reach accessors today, but they resolve names through
-        // the same runtime path, so they are classified with it rather than
-        // on an incidental current behaviour.
+        
+        
+        
+        
+        
         GetProperty { .. }
         | GetPropertyMaybe { .. }
         | GetIndex { .. }
         | GetSuper { .. }
         | GetSymbol { .. } => false,
 
-        // Stringifying a class instance yields `[object Object]` today — no
-        // user `toString` dispatch — but that is the contract most likely to
-        // grow one, and dead interpolations are too rare for the distinction
-        // to buy anything.
+        
+        
+        
+        
         ToString { .. } | BuildStr { .. } => false,
 
-        // Spread iterates the operand, which runs its iterator.
+        
         BuildArraySpread { .. }
         | BuildObjectSpread { .. }
         | CallSpread { .. }
         | ObjectRest { .. } => false,
 
-        // Calls, in every shape.
+        
         Call { .. }
         | SelfCall { .. }
         | MethodCall { .. }
@@ -222,7 +222,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | CallNativeOp { .. }
         | ArrayPush { .. } => false,
 
-        // Stores and other observable writes.
+        
         StoreGlobal { .. }
         | StoreGlobalIdx { .. }
         | StoreUpvalue { .. }
@@ -235,14 +235,14 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | MapSetIndex { .. }
         | ObjectMerge { .. } => false,
 
-        // Class construction mutates the class object being built.
+        
         MakeClass { .. }
         | DeclareLayout { .. }
         | DefineStatic { .. }
         | DefineMethod { .. }
         | DefineAccessor { .. } => false,
 
-        // Control-flow and runtime state.
+        
         Try { .. }
         | PopTry
         | CloseUpvalues { .. }

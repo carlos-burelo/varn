@@ -3,9 +3,9 @@ use crate::heap::HeapObj;
 use crate::value::VmValue;
 use varn_types::NativeCtx;
 
-/// Body of [`NativeCtx::to_sendable`]: a heap handle means nothing on the
-/// other side of an isolate boundary, so every value has to be copied out
-/// into a heap-independent `SendValue` before it can cross.
+
+
+
 pub(super) fn to_sendable(
     ctx: &ExecCtx,
     val: VmValue,
@@ -34,17 +34,17 @@ pub(super) fn to_sendable(
             Some(HeapObj::Array(arr)) => {
                 let mut items = Vec::with_capacity(arr.len());
                 for i in 0..arr.len() {
-                    // `get_vm` boxes on read for typed reprs — a typed
-                    // array crossing an isolate boundary serializes the
-                    // same as a Boxed one; no migration, read-only.
+                    
+                    
+                    
                     items.push(ctx.to_sendable(arr.get_vm(i).unwrap())?);
                 }
                 Ok(varn_types::value::SendValue::Array(items))
             }
             Some(HeapObj::Object(obj)) => {
                 let borrow = obj.borrow();
-                // Channel endpoints (Sender/Receiver instances) transfer by
-                // reference — detected once, in `SendValue::endpoint_for`.
+                
+                
                 if let Some(cls) = borrow.class() {
                     let chan_id = borrow
                         .get("_chan")

@@ -1,5 +1,5 @@
-//! Formato en disco de la interfaz de un módulo: símbolos y tipos tal cual
-//! (ids por contenido), más la porción de tabla y los nombres que alcanzan.
+
+
 
 mod cache_decode;
 mod cache_encode;

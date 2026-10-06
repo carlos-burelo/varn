@@ -126,13 +126,13 @@ impl<'r> super::super::Binder<'r> {
                     self.bind_pattern(&prop.value, prop_kind, line, doc.clone(), prop_ty, false);
                 }
                 if let Some(r) = rest {
-                    // El rest-object NO hereda el tipo del objeto fuente: sus
-                    // miembros son solo los NO excluidos, y el runtime devuelve
-                    // `null` para los excluidos. Tipar `restObj.alpha` como el
-                    // `int` del fuente es afirmar algo que el runtime no cumple
-                    // (misma mentira que K1 corrigió para `char`): se tipa
-                    // dinámico para que los accesos a excluidos sigan siendo
-                    // legales y viajen por un registro DYN, no por uno `Int`.
+                    
+                    
+                    
+                    
+                    
+                    
+                    
                     let _ = &ty;
                     self.bind_pattern(r, kind, line, doc.clone(), None, false);
                 }
@@ -165,17 +165,17 @@ impl<'r> super::super::Binder<'r> {
         );
         let mut pe_sym =
             Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(alias_ty);
-        // Expose the alias' generic parameters so consumers (e.g. match-variant
-        // payload typing) can substitute them with concrete type arguments.
+        
+        
         pe_sym.type_params = t.type_params.iter().map(|tp| tp.name).collect();
         self.define(t.id, pe_sym);
 
-        // `sum_type_variants`/`sum_variant_parent`/`sum_variant_fields` are
-        // consumed well outside this cluster (`emit::tables`,
-        // `checker_expressions::members::{member_exists,member_type}`,
-        // `checker_expressions::patterns`, `checker_expressions::check::exhaustiveness`)
-        // and stay `Arc<str>`-keyed; text is resolved from the `Atom` here at
-        // the point of insertion rather than migrating those consumers too.
+        
+        
+        
+        
+        
+        
         let mut variant_names = Vec::new();
 
         for v in &t.variants {

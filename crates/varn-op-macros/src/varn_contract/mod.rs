@@ -34,13 +34,13 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     };
 
     let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan(&source, &input.contract);
-    // This proc-macro parses the contract itself, right here, in its own
-    // execution (a proc-macro body is ordinary Rust code that happens to run
-    // during another crate's build — not const-eval), so the `AtomInterner`
-    // `varn_parser::parse` now returns is a normal local value for the rest
-    // of `expand`, not a runtime value reaching across a compile-time
-    // boundary. No design gap here: propagating it from Part A resolves
-    // every `Atom`-to-text site below directly.
+    
+    
+    
+    
+    
+    
+    
     let (program, interner, arena) = match varn_parser::parse(
         tokens,
         lexeme_buf,
@@ -79,13 +79,13 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let module = &input.module;
     let ns = "";
 
-    // Class name for the `namespace_path` of per-method dispatch entries; empty
-    // for function-modules (whose members are all `Kind::Function`).
+    
+    
     let class_name_str: String = input.class.clone().unwrap_or_default();
 
-    // Per-method `NativeOpEntry`s so core-type methods/getters are addressable by
-    // a stable op-id (`module::class::symbol`) for direct dispatch — in addition
-    // to living in the class vtable via `setup_calls`.
+    
+    
+    
 
     let cx = member::Cx {
         prefix: &prefix,

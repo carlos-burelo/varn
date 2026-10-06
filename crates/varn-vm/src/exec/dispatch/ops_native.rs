@@ -20,18 +20,18 @@ impl ExecCtx {
                 let wire_byte = (w1 >> 8) as u8;
 
                 let arg_count = (w1 & 0xFF) as usize;
-                // `base` es el id de la activación en `FrameStore`
-                // (índice pequeño), no un offset de stack plano: los
-                // registros se indexan directo dentro del frame, sin
-                // sumarle `base`. `base + first_reg` era el cálculo
-                // correcto en el `Vec<VmValue>` universal de antes de
-                // la migración; sobrevivió aquí sin actualizarse y
-                // desplazaba la ventana por el id de la activación
-                // (`args_start` crecía con cada frame anidado hasta
-                // salirse de `register_count`).
+                
+                
+                
+                
+                
+                
+                
+                
+                
                 let args_start = first_reg;
-                // La ventana ya no es contigua (frame por clases): se
-                // boxea a un buffer propio antes de invocar.
+                
+                
                 let result = if arg_count <= 16 {
                     let mut buf = [VmValue::null(); 16];
                     for (i, slot) in buf.iter_mut().take(arg_count).enumerate() {
@@ -59,8 +59,8 @@ impl ExecCtx {
                 let cidx = code[*ip] as usize;
                 let total = code[*ip + 1] as usize;
                 *ip += 2;
-                // op-id is stored as a full i64 constant (NOT the
-                // NaN-boxed `closure.constants` cache, which truncates).
+                
+                
                 let op_id = match closure.proto.chunk.constants.get(cidx) {
                     Some(varn_types::chunk::PoolEntry::Literal(
                         varn_types::chunk::Literal::Int(i),
@@ -75,8 +75,8 @@ impl ExecCtx {
                     crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}"))
                 }))?;
                 let receiver = self.stack.box_reg(base, first_reg);
-                // Reuse the exact native-call path the inline cache uses,
-                // so error and profiling semantics are identical.
+                
+                
                 let result = (self.call_native_with_receiver(
                     f,
                     receiver,

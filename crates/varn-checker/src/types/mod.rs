@@ -54,17 +54,17 @@ impl Default for Type {
     }
 }
 
-/// `FunctionParam`/`FunctionType`/`ObjectTypeMember` recursive type fields
-/// (`ty`, `return_type`, `key_ty`, `value_ty`) reference `CheckerTyId`
-/// directly rather than `Type` — the `tainted` bool is a property of a
-/// specific expression occurrence, not of a function signature or object
-/// shape's declared members, so it has nothing to attach to here (matches
-/// the plan's Task 21 Step 2 example). `name` fields use `Arc<str>` (not
-/// `Arc<str>`): these names live inside `CheckerTyTable`, so `Rc` would make
-/// the whole table `!Send + !Sync` and block parallel module checking.
-/// `Arc<str>` keeps the `.as_ref()` / `PartialEq<str>` ergonomics that
-/// `Atom` would have forced the interner through every comparison to
-/// provide (ADR-0012).
+
+
+
+
+
+
+
+
+
+
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FunctionParam {
     pub name: Option<Arc<str>>,

@@ -9,11 +9,11 @@ use varn_core::Atom;
 
 pub use crate::types::TypeContext;
 
-// Node identity used to be a raw pointer into a heap-allocated `Expr`/`Stmt`
-// (fragile: the pointee's address was only valid while that `Box` lived).
-// Now that expressions/statements live in an `AstArena` addressed by id
-// (fase1-componente2), the natural — and inherently `Send`/`Sync` — handle
-// is the id itself; no `unsafe impl` needed anymore.
+
+
+
+
+
 #[derive(Clone)]
 pub enum PendingEnrich {
     Var {
@@ -26,9 +26,9 @@ pub enum PendingEnrich {
         is_async: bool,
     },
     Method {
-        // `class_name`/`key` forward the class/member name `Atom`s the
-        // binder already resolved from the AST — no synthetic text here,
-        // so this stays a handle instead of re-wrapping into `Arc<str>`.
+        
+        
+        
         class_name: Atom,
         key: Atom,
         body: StmtId,
@@ -99,17 +99,17 @@ pub struct BindResult {
     pub core: Option<Arc<CoreMembers>>,
     #[serde(skip)]
     pub pending_enrich: Vec<PendingEnrich>,
-    /// Advisory element types for evolving empty-array locals (Task A0.3'),
-    /// keyed by the declarator identifier's source offset → the proved
-    /// `Array<T>`. This is an OPTIMIZATION-ONLY channel: it feeds codegen
-    /// type annotations (`collect_type_annotations`) and NOTHING ELSE —
-    /// never `symbol_types`, `resolved_expr_types`, `types_compatible`, or
-    /// member-existence reads. Keeping it out of the diagnostic path is what
-    /// guarantees design rule 4 ("zero new type errors"): narrowing an
-    /// `x[i]` read from `Dynamic` to `int` can never make a previously-valid
-    /// program fail `vn check`. Not serialized — it is consumed in-process
-    /// immediately after binding, and function-local evolved arrays are
-    /// never exported, so a reloaded (cached) `BindResult` needs no entries.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     #[serde(skip, default)]
     pub evolved_array_types: FxHashMap<u32, Type>,
 }
@@ -127,8 +127,8 @@ impl BindResult {
             .or_else(|| self.core.as_ref().and_then(|b| b.class_members.get(name)))
     }
 
-    /// Determines whether `name` identifies a user-defined class or struct with fixed field
-    /// slot layout in the VM heap (excluding intrinsic / primitive built-in types).
+    
+    
     #[inline]
     pub fn is_user_class(&self, name: &str) -> bool {
         if varn_core::is_lang_type_name(name) {
@@ -182,10 +182,10 @@ impl BindResult {
         })
     }
 
-    /// Wire byte if `name` resolves (in global scope) to a free-function
-    /// intrinsic import — e.g. `abs` imported from `std:math`. Lets bare
-    /// `abs(x)` calls lower to `OpCode::Intrinsic`, the same path as the
-    /// method form. Returns `None` for locals or non-intrinsic imports.
+    
+    
+    
+    
     pub fn intrinsic_import_wire(&self, name: &str) -> Option<u8> {
         let scope = self.scopes.get(self.global_scope);
         let atom = self.interner.get(name)?;
@@ -193,10 +193,10 @@ impl BindResult {
         self.arena.get(id).intrinsic_wire
     }
 
-    /// The alias `name` declares in *this* module, if any.
-    ///
-    /// The `_local` suffix marks it as resolution-free, like its siblings
-    /// above: following an alias declared elsewhere needs a [`BindView`].
+    
+    
+    
+    
     pub fn get_alias_node_local(&self, name: &str) -> Option<(Vec<String>, TypeNode)> {
         let scope = self.scopes.get(self.global_scope);
         let atom = self.interner.get(name)?;
@@ -230,17 +230,17 @@ impl BindResult {
     }
 }
 
-/// A bound module paired with the capability to follow its imports.
-///
-/// [`BindResult`] is **data**: cached as `Arc<BindResult>`, serialized to the
-/// interface blobs on disk, shared between modules. Reaching another module is
-/// a **capability**. Fusing the two — which is what `impl TypeContext for
-/// BindResult` used to do — meant a serializable data structure carried the
-/// power to read the filesystem, and could only exercise it through ambient
-/// global state, because a `'static` cached value cannot hold a resolver.
-///
-/// Splitting them lets the same bound module be viewed under different
-/// resolvers, and keeps the lifetime off the type that gets serialized.
+
+
+
+
+
+
+
+
+
+
+
 pub struct BindView<'r> {
     pub bind: &'r BindResult,
     pub resolver: &'r dyn crate::module_resolver::ImportResolver,
@@ -254,7 +254,7 @@ impl<'r> BindView<'r> {
         Self { bind, resolver }
     }
 
-    /// The bind for `origin`, when it names a module other than this one.
+    
     fn foreign(&self, origin: Option<&str>) -> Option<Arc<BindResult>> {
         let origin = origin?;
         if origin == self.bind.source_file.as_ref() {

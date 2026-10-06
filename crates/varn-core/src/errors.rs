@@ -1,5 +1,5 @@
-//! Clase de plataforma de un error nacido en el runtime. Se decide donde nace
-//! el error y viaja con él; el `catch` la materializa sin re-derivarla del texto.
+
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RuntimeErrorKind {
@@ -7,7 +7,7 @@ pub enum RuntimeErrorKind {
     Error,
     IntegerOverflow,
     DivisionByZero,
-    /// A `match` used as a value where no arm matched.
+    
     MatchError,
 }
 

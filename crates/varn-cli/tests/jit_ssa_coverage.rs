@@ -1,14 +1,14 @@
-//! Every function the suite compiles is lowered from typed SSA.
-//!
-//! The bytecode lowering is still there as a fallback, so a function that
-//! loses its portable SSA — a new instruction without a portable form, a
-//! merge whose values disagree in representation — keeps passing every
-//! behavioural test while silently leaving the SSA lowering. This runs
-//! `tests/main.vn` with the lowering traced and fails on any function that
-//! declined (`from_ssa unavailable`) or bailed (`from_ssa bail`), by name and
-//! reason.
 
-// Un test de integración no usa las dependencias de la librería.
+
+
+
+
+
+
+
+
+
+
 #![allow(unused_crate_dependencies)]
 
 use std::path::{Path, PathBuf};

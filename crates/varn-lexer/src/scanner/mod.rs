@@ -7,11 +7,11 @@ mod templates;
 #[derive(Clone, Copy, Debug)]
 pub struct LexerConfig {
     pub emit_doc_comments: bool,
-    /// Record `//` and `/* */` comments on the trivia stream instead of
-    /// dropping them.
-    ///
-    /// Off by default so the compile path pays nothing: only tooling that has
-    /// to reproduce the source (formatting, comment folding) needs them.
+    
+    
+    
+    
+    
     pub emit_trivia: bool,
 }
 
@@ -35,7 +35,7 @@ pub(crate) struct Scanner<'a> {
     pub diagnostics: varn_core::DiagnosticBag,
     pub(super) cur_line: u32,
     pub(super) cur_col: u32,
-    /// Comments, in source order. Stays empty unless `config.emit_trivia`.
+    
     pub(super) trivia: Vec<varn_core::Trivia>,
 }
 
@@ -63,10 +63,10 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Record a comment that spans `start..self.pos`, called once the scanner
-    /// has consumed it. `start` points at the opening `//` or `/*`, which the
-    /// caller has already stepped past — hence the two-byte rewind at the call
-    /// sites rather than here.
+    
+    
+    
+    
     pub(super) fn push_trivia(&mut self, kind: varn_core::TriviaKind, start: usize) {
         if !self.config.emit_trivia {
             return;

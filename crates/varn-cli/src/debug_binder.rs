@@ -1,4 +1,4 @@
-#![allow(unused_crate_dependencies)] // dev-tool bin: uses a slice of the crate deps
+#![allow(unused_crate_dependencies)] 
 
 use std::fs::read_to_string;
 
@@ -11,7 +11,7 @@ fn main() {
     let source = read_to_string(filename).expect("Cannot read test file");
     let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, filename);
     println!("Lex errors: {:?}", lex_errs);
-    // TODO(fase1-componente2): dev-tool bin, unmigrated; arena dropped for now.
+    
     let (program, _interner, _ast_arena) =
         varn_parser::parse(tokens, lexeme_buf, filename, varn_core::AtomInterner::new())
             .expect("Parse error");

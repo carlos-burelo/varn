@@ -33,7 +33,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             return None;
         }
 
-        // Handle 'this' keyword via Checker scope resolution
+        
         if tok.kind == TokenKind::This {
             if let Some((_, ty)) = state.db.resolve_at("this", tok.offset) {
                 if !state.db.is_dynamic(&ty) {
@@ -43,7 +43,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             return Some(make_lang_hover("this".to_owned()));
         }
 
-        // Handle decorators e.g. @inline, @deprecated
+        
         let prev_is_at = idx
             .checked_sub(1)
             .and_then(|j| state.tokens.get(j))
@@ -55,7 +55,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             }
         }
 
-        // Direct semantic MemberResolution from Checker
+        
         if let Some(mem_res) = state.db.member_resolutions.get(&tok.offset) {
             let sig = member_resolution_sig(state, mem_res);
             return Some(make_lang_hover(sig));
@@ -100,8 +100,8 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     }
 
     if let Some((parent_name, member)) = query::member_at(state, line, col) {
-        // The member's own kind decides; the parent's kind was only ever a
-        // proxy for it, and the checker states it outright.
+        
+        
         let sig = if member.kind == varn_checker::ResolvedMemberKind::EnumMember {
             format_enum_member(&parent_name, &member.name, "")
         } else {
@@ -121,7 +121,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         return Some(make_lang_hover(sig));
     }
 
-    // Fallback: Check for primitive types, literals, and language intrinsics
+    
     if let Some((_, tok)) = tok_any {
         if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
             return Some(h);
@@ -141,7 +141,7 @@ pub(crate) fn make_lang_hover(value: String) -> Hover {
     }
 }
 
-/// The hover for a member access the checker resolved.
+
 fn member_resolution_sig(state: &DocumentState, res: &varn_checker::MemberResolution) -> String {
     use varn_checker::ResolvedMemberKind as R;
     let parent = state.ty_text(&res.receiver_ty);
@@ -170,8 +170,8 @@ fn member_resolution_sig(state: &DocumentState, res: &varn_checker::MemberResolu
             "(constructor) {parent}({})",
             format_member_params(state, &res.member_ty)
         ),
-        // A nested type reads as the declaration it is — `class A.B`, not
-        // `(property) A.B: B`.
+        
+        
         R::NestedType(k) => format!("{} {parent}.{name}", k.label()),
     }
 }
@@ -193,7 +193,7 @@ fn format_fn_params(
         .join(", ")
 }
 
-/// The parameter list of a member whose type is a function, else empty.
+
 fn format_member_params(state: &DocumentState, ty: &varn_checker::Type) -> String {
     state
         .db

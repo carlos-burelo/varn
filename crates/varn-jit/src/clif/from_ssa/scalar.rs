@@ -1,11 +1,11 @@
-//! Native scalar ops of the SSA lowering.
-//!
-//! Operations whose semantics map 1:1 onto a Cranelift instruction: integer/
-//! float arithmetic (with the mandatory `int` overflow guard), bitwise/shift,
-//! comparisons, negation, casts, and the two call forms. Heap instructions —
-//! constants, aggregates, indexing, fields, strings, type questions — are
-//! routed to [`super::heapvalue`] first; this file owns only the register-file
-//! scalar domain.
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{
     condcodes::{FloatCC, IntCC},
@@ -20,8 +20,8 @@ use super::{
     load_value, numeric, Ctx, Out,
 };
 
-/// Emit one instruction; `Ok(None)` means it produces no result. The driver
-/// lands a result where `dest`'s class says it lives ([`super::store::land`]).
+
+
 pub(super) fn emit_inst(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -64,10 +64,10 @@ pub(super) fn emit_inst(
                 b, ctx, values, *object, args, *wire, dest,
             )?))
         }
-        // Representation-neutral: every real conversion is a `Convert`. What a
-        // cast may change is the storage class — a scalar entering a heap
-        // (`Dynamic`) value is boxed, a heap value entering a scalar one is
-        // unboxed, heap to heap is the same `VmValue`.
+        
+        
+        
+        
         SsaOp::Cast { operand } => {
             let from = ctx.ssa.value_ty(*operand);
             let to = dest_ty.ok_or("from_ssa: cast without dest")?;
@@ -115,8 +115,8 @@ pub(super) fn emit_inst(
             emit_un(b, ctx, *op, a)?
         }
         SsaOp::SelfCall { args } => {
-            // A frame-aware body cannot hand its own frame to the callee:
-            // the recursion gets a fresh activation from the runtime.
+            
+            
             if ctx.frame.is_some() {
                 return Ok(Some(Out::Boxed(call::emit_self_call_framed(
                     b, ctx, values, args,
@@ -197,7 +197,7 @@ pub(super) fn emit_inst(
             exceptions::emit_pop_try(b, ctx)?;
             return Ok(None);
         }
-        // Only a landing pad reads it, and the driver never compiles one.
+        
         SsaOp::CatchParam { .. } => {
             return Err("from_ssa: a landing pad reached compiled code".into())
         }
@@ -211,7 +211,7 @@ pub(super) fn emit_inst(
             return Ok(None);
         }
 
-        // Handled by `heapvalue` or `extra` above.
+        
         SsaOp::ConstNull
         | SsaOp::ConstStr(_)
         | SsaOp::ConstChar(_)
@@ -283,7 +283,7 @@ fn emit_bin(
     op: SsaBinOp,
     a: Value,
     c: Value,
-    // Proven unable to overflow ([`super::induction`]).
+    
     in_range: bool,
 ) -> Result<Value, String> {
     use SsaBinOp::*;
@@ -354,7 +354,7 @@ fn checked_int(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaBinOp, a: Value, c
             (r, o, helpers.mul)
         }
     };
-    // `exec_ctx` es param 0 del raw: el raise lo usa directo.
+    
     guard_overflow(b, ctx.cc, ctx.exec_ctx, helper, r, ovf, a, c)
 }
 

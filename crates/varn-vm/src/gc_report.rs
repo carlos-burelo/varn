@@ -1,39 +1,39 @@
-//! Post-mortem heap/GC snapshot for `vn debug -p gc`.
-//!
-//! Lives here (not in `varn-debug`, home to every other `-p` phase's
-//! formatting) because `varn-debug` deliberately does not depend on
-//! `varn-vm` — the Etapa 4 globals rework cut that edge to break a cycle.
-//! `Display` is this crate's own concern to own, so `vn debug -p gc` just
-//! calls `Vm::gc_report()` and prints it; `crate::heap::Heap::gc_report` is
-//! the one place that actually reads `HeapInner`, kept separate so this file
-//! stays plain data plus formatting.
-//!
-//! For watching collections as they HAPPEN rather than a snapshot at exit,
-//! see [`crate::gc_trace`] (`VARN_GC_TRACE=1`).
 
-/// Young generation counters at the moment the report is taken.
+
+
+
+
+
+
+
+
+
+
+
+
+
 pub struct YoungReport {
-    /// Births since the last minor collection at which the next one triggers.
+    
     pub threshold: usize,
-    /// Objects born since the last minor collection.
+    
     pub live: usize,
-    /// Every young birth, this process.
+    
     pub alloc_count: u64,
-    /// Minor collections run so far.
+    
     pub minor_gc_count: u64,
-    /// Young objects that survived a minor collection and became old.
+    
     pub minor_gc_promoted: u64,
 }
 
 impl YoungReport {
-    /// Young objects freed by a minor collection, this process.
+    
     pub fn reclaimed(&self) -> u64 {
         self.alloc_count
             .saturating_sub(self.live as u64)
             .saturating_sub(self.minor_gc_promoted)
     }
 
-    /// Fraction of young births that survived to become old.
+    
     pub fn promotion_rate(&self) -> f64 {
         if self.alloc_count == 0 {
             return 0.0;
@@ -42,28 +42,28 @@ impl YoungReport {
     }
 }
 
-/// Slot table and major-collection counters.
+
 pub struct OldGenReport {
-    /// Length of the slot table — includes holes freed but not yet reused.
+    
     pub slots_total: usize,
-    /// Slots actually holding an object right now, young or old.
+    
     pub slots_live: usize,
-    /// Freed slots pending reuse. High relative to `slots_live` means a lot
-    /// of the table is holes, not live data.
+    
+    
     pub free_list: usize,
-    /// Every slot ever handed out, young or old.
+    
     pub alloc_count: u64,
-    /// Major collections run so far.
+    
     pub gc_collections: u64,
     pub gc_total_freed: u64,
     pub gc_alloc_since_collect: u64,
     pub gc_threshold: u64,
 }
 
-/// Sizes of the content-addressed interning tables. These only ever grow
-/// (nothing evicts them) — a table much larger than expected for the
-/// program's actual distinct-value count is a real leak, not the GC's
-/// concern but visible right here.
+
+
+
+
 #[derive(Default)]
 pub struct InternerSizes {
     pub strings: usize,
@@ -73,9 +73,9 @@ pub struct InternerSizes {
     pub chars: usize,
 }
 
-/// Live-object count by type, young and old-gen counted separately — an
-/// object that's mostly ending up in one generation or the other is exactly
-/// what changes whether it's worth optimizing at all.
+
+
+
 pub struct HistogramRow {
     pub type_name: &'static str,
     pub young: usize,
@@ -86,7 +86,7 @@ pub struct GcReport {
     pub young: YoungReport,
     pub old_gen: OldGenReport,
     pub interners: InternerSizes,
-    /// Sorted by total (young + old_gen) descending.
+    
     pub histogram: Vec<HistogramRow>,
 }
 

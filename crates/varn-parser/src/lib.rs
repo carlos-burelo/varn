@@ -17,9 +17,9 @@ use varn_core::{
     Token,
 };
 
-/// `AstArena` is never shared across files — unlike `interner`, it is always
-/// created fresh inside `Parser::new` and simply handed back here once this
-/// parse is done owning it.
+
+
+
 pub fn parse(
     tokens: Vec<Token>,
     lexeme_buf: Arc<[u8]>,
@@ -44,13 +44,13 @@ pub fn parse_with_profile(
     Ok((program, profile, parser.stream.interner, arena))
 }
 
-/// Never shares state with another parse: partial parses back the LSP's
-/// incremental single-file path, which does not carry an `Atom` table forward
-/// between edits.
-/// As [`parse`], but error-tolerant: the program parsed so far comes back
-/// with the diagnostics instead of in place of them. Like `parse`, it takes
-/// the interner to mint into — the caller's shared table, so its atoms are
-/// comparable with every other module's — and returns it grown.
+
+
+
+
+
+
+
 pub fn parse_partial(
     tokens: Vec<Token>,
     lexeme_buf: Arc<[u8]>,

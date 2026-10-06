@@ -1,8 +1,8 @@
-//! The language's own type vocabulary (spec §13, §39), separate from
-//! `RuntimeKind`, which classifies runtime values.
 
-/// A primitive type of the language. `Void`, `Never` and `Dynamic` are the
-/// special types: they classify no value of their own.
+
+
+
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -56,8 +56,8 @@ impl LangPrimitive {
         Self::ALL.into_iter().find(|p| p.name() == name)
     }
 
-    /// The core module declaring this primitive's class (ADR-0018); `None`
-    /// for a primitive without members.
+    
+    
     pub const fn core_module(self) -> Option<&'static str> {
         match self {
             Self::Bool => Some("core:types/bool"),
@@ -71,7 +71,7 @@ impl LangPrimitive {
         }
     }
 
-    /// Numeric domains (spec §2).
+    
     pub const fn is_numeric(self) -> bool {
         matches!(self, Self::Int | Self::Float | Self::BigInt | Self::Decimal)
     }
@@ -83,8 +83,8 @@ impl std::fmt::Display for LangPrimitive {
     }
 }
 
-/// A platform collection named without type arguments (`Bytes`, a bare
-/// `Map`): nominal types the checker knows structurally.
+
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -129,7 +129,7 @@ impl BuiltinType {
         Self::ALL.into_iter().find(|b| b.name() == name)
     }
 
-    /// The core module declaring this type (ADR-0018).
+    
     pub const fn core_module(self) -> &'static str {
         match self {
             Self::Array => "core:types/array",
@@ -148,9 +148,9 @@ impl std::fmt::Display for BuiltinType {
     }
 }
 
-/// The closed sums the language itself gives meaning to (`try`, iteration).
-/// Identified by the core module declaring them, never by a name a user may
-/// reuse: a user's own `enum Result` is not one of these.
+
+
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CoreSum {
     Option,
@@ -172,7 +172,7 @@ impl CoreSum {
         }
     }
 
-    /// The core sum a type named `name`, declared in `origin`, is.
+    
     pub fn identify(name: &str, origin: Option<&str>) -> Option<Self> {
         [Self::Option, Self::Result]
             .into_iter()
@@ -180,8 +180,8 @@ impl CoreSum {
     }
 }
 
-/// `true` when `name` is part of the language's type vocabulary rather than a
-/// user or platform declaration.
+
+
 pub fn is_lang_type_name(name: &str) -> bool {
     LangPrimitive::from_str(name).is_some() || BuiltinType::from_str(name).is_some()
 }

@@ -5,11 +5,11 @@ use bigdecimal::BigDecimal as Decimal;
 use num_traits::Zero;
 use varn_core::{add_int, mul_int, neg_int, pow_int, sub_int, INT_MAX, INT_MIN};
 
-/// The `integer overflow` error, naming the operands so the message points at
-/// the actual computation rather than just the line.
-///
-/// `int` is 64 bits with hardware-checked overflow. Leaving that range
-/// raises an integer overflow error.
+
+
+
+
+
 #[cold]
 #[inline(never)]
 fn overflow(op: &str, a: i64, b: i64) -> RuntimeError {
@@ -26,7 +26,7 @@ fn overflow_neg(a: i64) -> RuntimeError {
     ))
 }
 
-/// The fault of an integer `/` or `%`, as the platform error it raises.
+
 #[cold]
 #[inline(never)]
 pub(crate) fn int_div_fault(
@@ -45,19 +45,19 @@ pub(crate) fn int_div_fault(
     }
 }
 
-/// The `decimal` payload of `v`, or `None`.
-///
-/// A decimal lives ONLY as a `HeapObj::Decimal`, so the heap tag test alone
-/// rejects every int, float, bool, null and inline (SSO) string without ever
-/// touching the heap.
-///
-/// This replaces a pair of `Heap::extract_val` calls that every non-int
-/// arithmetic path used to make just to ask "is either side a decimal?".
-/// `extract_val` builds a full `varn_types::Value` — a 24-variant enum — and
-/// for `HeapObj::Array` it DEEP-COPIES the whole array into a fresh
-/// `Vec<Value>` (see `heap::intern::extract_val`). Every `float - float` was
-/// paying two enum constructions, and every `array + x` a full array copy, to
-/// answer a question a single tag test answers.
+
+
+
+
+
+
+
+
+
+
+
+
+
 #[inline(always)]
 fn decimal_of(v: VmValue, heap: &Heap) -> Option<Decimal> {
     if !v.is_heap() {
@@ -69,15 +69,15 @@ fn decimal_of(v: VmValue, heap: &Heap) -> Option<Decimal> {
     }
 }
 
-/// Both operands as decimals, when this is a decimal operation at all.
-///
-/// `int` absorbs into `decimal` and a `decimal`/`float` mix is a checker error
-/// that never reaches the VM — see `varn_core::numeric::binary_operand_kind`,
-/// the single source of truth these arms mirror.
-///
-/// Cold and outlined: callers reach it only after the int/int fast path has
-/// missed AND at least one side is a heap value, so the hot numeric paths do
-/// not carry its code.
+
+
+
+
+
+
+
+
+
 #[cold]
 fn decimal_pair(a: VmValue, b: VmValue, heap: &Heap) -> Option<(Decimal, Decimal)> {
     match (decimal_of(a, heap), decimal_of(b, heap)) {
@@ -97,9 +97,9 @@ pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
             None => Err(overflow("+", x, y)),
         };
     }
-    // Both sides numeric → float add. A bare `is_f64() || is_f64()` here is
-    // wrong: `str + float` must fall through to the concat checks below, not
-    // coerce the string operand to 0.0.
+    
+    
+    
     if (a.is_f64() || heap.is_int(a)) && (b.is_f64() || heap.is_int(b)) {
         return Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)));
     }

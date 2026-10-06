@@ -5,9 +5,9 @@ use varn_types::chunk::PoolEntry;
 use super::scan::ScanResult;
 use crate::regalloc::liveness::LiveRange;
 
-/// The colouring contract, re-checked against the mapping that is about to be
-/// written: two registers whose live ranges overlap must not land on the same
-/// physical register.
+
+
+
 pub(crate) fn verify_interference(ranges: &[LiveRange], mapping: &HashMap<u8, u8>) -> bool {
     let m = |r: u8| mapping.get(&r).copied().unwrap_or(r);
     ranges.iter().all(|range| {
@@ -16,8 +16,8 @@ pub(crate) fn verify_interference(ranges: &[LiveRange], mapping: &HashMap<u8, u8
     })
 }
 
-/// Every run of registers an instruction reads together (a call's
-/// arguments, a collection's elements) is still contiguous under `mapping`.
+
+
 pub(crate) fn verify_run_constraints(
     code: &[u16],
     constants: &[PoolEntry],

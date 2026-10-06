@@ -3,8 +3,8 @@ use varn_core::ast::{Arg, ExprId, ExprKind};
 
 use crate::document::DocumentState;
 
-/// A hint naming the parameter each argument of a call binds, for every call
-/// in the document.
+
+
 pub fn build_parameter_hints(state: &DocumentState) -> Vec<InlayHint> {
     let mut hints = Vec::new();
     for expr in state.spatial_index.exprs() {
@@ -22,15 +22,15 @@ fn call_hints(state: &DocumentState, callee: ExprId, args: &[Arg], hints: &mut V
     let param_names = resolve_callee_params(state, callee);
     for (arg, param_name) in args.iter().zip(&param_names) {
         let arg_expr = match arg {
-            // A named argument already says which parameter it binds; a
-            // spread binds several.
+            
+            
             Arg::Named { .. } | Arg::Spread(_) => continue,
             Arg::Positional(e) => arena.expr(*e),
         };
         if param_name.is_empty() || param_name.starts_with('_') {
             continue;
         }
-        // An argument that is already the parameter's own name says it.
+        
         if let ExprKind::Identifier { name } = &arg_expr.kind {
             if state.name(*name) == param_name {
                 continue;
@@ -53,7 +53,7 @@ fn call_hints(state: &DocumentState, callee: ExprId, args: &[Arg], hints: &mut V
     }
 }
 
-/// The parameter names of the function `callee` calls, in order.
+
 fn resolve_callee_params(state: &DocumentState, callee: ExprId) -> Vec<String> {
     let node = state.ast_arena.expr(callee);
     let names = |f: varn_checker::types::FunctionType| {
@@ -63,7 +63,7 @@ fn resolve_callee_params(state: &DocumentState, callee: ExprId) -> Vec<String> {
             .collect()
     };
 
-    // The checker's own resolution of the call.
+    
     if let Some(call_res) = state.db.call_resolutions.get(&node.range.start.offset) {
         return call_res
             .params
@@ -72,14 +72,14 @@ fn resolve_callee_params(state: &DocumentState, callee: ExprId) -> Vec<String> {
             .collect();
     }
 
-    // The type the checker gave the callee.
+    
     if let Some(entry) = state.db.expr_table.get(&callee.index()) {
         if let Some(f) = state.db.callable_shape(&entry.ty) {
             return names(f);
         }
     }
 
-    // A name, resolved in its scope.
+    
     if let ExprKind::Identifier { name } = &node.kind {
         if let Some((_, ty)) = state
             .db

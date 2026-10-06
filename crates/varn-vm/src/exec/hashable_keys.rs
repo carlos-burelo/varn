@@ -1,11 +1,11 @@
-//! `Hashable & Equatable` instances as Map/Set keys (spec §25).
-//!
-//! A key is canonicalized to a representative the way `str` and `bigint`
-//! keys are, so the table itself keeps comparing keys by identity: the first
-//! instance seen with the same class and `hash()` that `equals` the new one
-//! stands for it. Only the context can run `hash()`/`equals()`, so the
-//! representatives live here (rooted in `ExecCtx::gc_roots`), not in the
-//! heap's interners.
+
+
+
+
+
+
+
+
 
 use super::ctx::ExecCtx;
 use crate::error::{RuntimeError, VmResult};
@@ -13,9 +13,9 @@ use crate::heap::HeapObj;
 use crate::value::VmValue;
 
 impl ExecCtx {
-    /// The representative `key` stands for, or `key` itself when it is not an
-    /// instance declaring both `hash()` and `equals()`. An exception either
-    /// method throws propagates to the Map/Set operation's caller.
+    
+    
+    
     pub(crate) fn hashable_key(&mut self, key: VmValue) -> VmResult<VmValue> {
         let Some(class_id) = self.instance_class_id(key) else {
             return Ok(key);

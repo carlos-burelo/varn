@@ -1,10 +1,10 @@
-//! Heap-producing instructions of the SSA lowering.
-//!
-//! Every arm hands back its result as an [`Out`] for the driver to land (a
-//! heap destination in its home, the GC root), or writes through its operands
-//! with no result. They are split from [`super::scalar`]
-//! so each file owns one invariant (scalar register file vs heap homes) and
-//! neither crosses the file-size limit.
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -15,8 +15,8 @@ use varn_types::Literal;
 
 use super::{classops, globals, heap, load_value, pool, props, Ctx, Out};
 
-/// Emit a heap instruction. `Ok(None)` means `op` is not a heap instruction
-/// and the caller's scalar path must handle it.
+
+
 pub(super) fn emit(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -24,7 +24,7 @@ pub(super) fn emit(
     op: &SsaOp,
     dest: Option<u32>,
 ) -> Result<Option<Option<Out>>, String> {
-    // Void heap ops: no result.
+    
     match op {
         SsaOp::SetIndex {
             object,

@@ -12,8 +12,8 @@ impl<'r> Checker<'r> {
         match &arena.expr(expr).kind {
             ExprKind::Identifier { name } => {
                 let name_str = bind.interner.resolve(*name);
-                // Pipeline placeholder `_` stands for the piped value, so it
-                // carries that value's type (`x |> f(_, y)` ⇒ `_` has `x`'s type).
+                
+                
                 if name_str == "_" && self.in_pipeline_rhs {
                     return self.pipeline_value_type.unwrap_or(Type::Dynamic);
                 }
@@ -241,9 +241,9 @@ impl<'r> Checker<'r> {
                     _ => res,
                 }
             }
-            // A hole the parser left where the source had no expression. The
-            // syntax error is already reported; typing it as `Dynamic` lets the
-            // enclosing declaration still bind and still answer editor queries.
+            
+            
+            
             ExprKind::Missing => Type::Dynamic,
             _ => Type::Dynamic,
         }

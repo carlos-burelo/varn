@@ -11,16 +11,16 @@ pub struct Shape {
     pub id: u32,
     pub class: Option<Rc<crate::value::ClassObj>>,
     pub property_names: HashMap<RuntimeString, usize>,
-    /// [`Self::property_names`] in slot order: `ordered[i]` names slot `i`.
+    
     ordered: Vec<RuntimeString>,
-    /// Rendered JSON property prefix per slot. Only object literals
-    /// serialize through a shape, so building these eagerly charged every
-    /// class root shape for strings nothing ever reads.
+    
+    
+    
     json_prefixes: OnceCell<Vec<String>>,
     transitions: RefCell<HashMap<RuntimeString, Rc<Shape>>>,
 }
 
-/// Offset of `Shape.id`, derived from the owned definition. First field.
+
 pub const SHAPE_ID_OFF: usize = std::mem::offset_of!(Shape, id);
 
 impl std::fmt::Debug for Shape {
@@ -54,8 +54,8 @@ impl Shape {
         })
     }
 
-    /// The property names in slot order. `ordered_names()[i]` is the name of
-    /// the field `ObjRef::field_at(i)` returns.
+    
+    
     #[inline]
     pub fn ordered_names(&self) -> &[RuntimeString] {
         &self.ordered

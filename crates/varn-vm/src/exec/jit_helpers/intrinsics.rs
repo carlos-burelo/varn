@@ -1,14 +1,14 @@
-//! Intrinsic dispatch, and the string fast paths compiled code calls
-//! directly, without the stack-window flush and reload a generic call needs.
+
+
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 
-/// Fase B: the compiled caller has flushed `[receiver, args...]` to the home
-/// slots of registers `reg_start..reg_start + arg_count` in activation
-/// `act_id`; this gathers them back through `FrameStore` and dispatches.
+
+
+
 #[varn_op_macros::jit_slow(field = "dispatch_intrinsic")]
 pub(crate) extern "C" fn jit_dispatch_intrinsic(
     ctx: *mut ExecCtx,
@@ -38,9 +38,9 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
     }
 }
 
-/// An intrinsic out of the lowering from typed SSA: `[receiver, args...]`
-/// as a boxed `window` of `count` values, dispatched as the interpreter's
-/// `Intrinsic` dispatches them.
+
+
+
 #[varn_op_macros::jit_slow(field = "intrinsic_window")]
 pub(crate) extern "C" fn jit_intrinsic_window(
     ctx: *mut ExecCtx,
@@ -58,12 +58,12 @@ pub(crate) extern "C" fn jit_intrinsic_window(
     }
 }
 
-/// Dedicated fast path for `charCodeAt(pos)` / `codePointAt(pos)`.
-/// Takes the receiver and position directly — no stack-window staging,
-/// no flush/reload of all live boxed registers.
-///
-/// A negative `pos` is out of range, not position zero, as in the native
-/// `str.charCodeAt` the interpreter runs.
+
+
+
+
+
+
 #[varn_op_macros::jit_slow(field = "str_char_code_at")]
 pub(crate) extern "C" fn jit_str_char_code_at(
     ctx: *mut ExecCtx,
@@ -83,7 +83,7 @@ pub(crate) extern "C" fn jit_str_char_code_at(
         }
         let idx = signed as usize;
 
-        // SSO string — always ASCII, bytes packed in the VmValue itself.
+        
         if receiver.is_sso() {
             let mut buf = [0u8; 5];
             let len = receiver.sso_copy_bytes(&mut buf);
@@ -96,7 +96,7 @@ pub(crate) extern "C" fn jit_str_char_code_at(
                 let code = if h.is_ascii_cached() {
                     s.as_bytes().get(idx).map(|&b| b as i64)
                 } else {
-                    // Ensure the ASCII cache is populated for next call.
+                    
                     h.is_ascii();
                     if h.is_ascii_cached() {
                         s.as_bytes().get(idx).map(|&b| b as i64)
@@ -138,8 +138,8 @@ pub(crate) extern "C" fn jit_str_ascii_len(
     }
 }
 
-/// The shared decision behind both accessors, so they cannot disagree about
-/// which receivers are byte-indexable.
+
+
 #[inline]
 fn ascii_view(heap: &crate::heap::Heap, receiver: VmValue) -> Option<&str> {
     if !receiver.is_heap() {
@@ -148,8 +148,8 @@ fn ascii_view(heap: &crate::heap::Heap, receiver: VmValue) -> Option<&str> {
     let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap()) else {
         return None;
     };
-    // `is_ascii()` computes and memoises; `is_ascii_cached()` alone would
-    // answer "no" for a string nobody has classified yet.
+    
+    
     h.is_ascii().then(|| h.as_str())
 }
 
@@ -166,7 +166,7 @@ unsafe fn borrow_str_fast<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) 
     None
 }
 
-/// Dedicated fast path for `startsWith(search)`.
+
 #[varn_op_macros::jit_slow(field = "str_starts_with")]
 pub(crate) extern "C" fn jit_str_starts_with(
     ctx: *mut ExecCtx,
@@ -246,7 +246,7 @@ pub(crate) extern "C" fn jit_str_starts_with(
     }
 }
 
-/// Dedicated fast path for `endsWith(search)`.
+
 #[varn_op_macros::jit_slow(field = "str_ends_with")]
 pub(crate) extern "C" fn jit_str_ends_with(
     ctx: *mut ExecCtx,
@@ -328,9 +328,9 @@ pub(crate) extern "C" fn jit_str_ends_with(
     }
 }
 
-/// Dedicated fast path for `indexOf(search)`: the contract's own body (`0`
-/// for an empty pattern, byte search then character translation, `-1` when
-/// absent), reached directly because the op-id already proved both sides.
+
+
+
 #[varn_op_macros::jit_slow(field = "str_index_of")]
 pub(crate) extern "C" fn jit_str_index_of(
     ctx: *mut ExecCtx,
@@ -365,9 +365,9 @@ pub(crate) extern "C" fn jit_str_index_of(
     }
 }
 
-/// Dedicated fast path for `includes(search)`: the contract's own body
-/// (`find_bytes(...).is_some()`), reached directly because the op-id already
-/// proved both sides.
+
+
+
 #[varn_op_macros::jit_slow(field = "str_includes")]
 pub(crate) extern "C" fn jit_str_includes(
     ctx: *mut ExecCtx,
@@ -396,8 +396,8 @@ pub(crate) extern "C" fn jit_str_includes(
     }
 }
 
-/// Dedicated fast path for `split(separator?)`: the contract's own body.
-/// `argc` is 0 (no separator) or 1; the separator halves are ignored when 0.
+
+
 #[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "str_split")]
 pub(crate) extern "C" fn jit_str_split(
@@ -418,7 +418,7 @@ pub(crate) extern "C" fn jit_str_split(
                 crate::error::RuntimeError::new("split: receiver must be a string"),
             );
         };
-        // The text borrows the heap; copy it out before interning pieces.
+        
         let text = text.to_owned();
         let sep: Option<String> = if argc == 0 {
             None
@@ -459,10 +459,10 @@ pub(crate) extern "C" fn jit_str_split(
     }
 }
 
-/// Dedicated fast path for the native `slice(start, end?)`: negative
-/// normalization, ASCII fast path, character translation otherwise — the
-/// contract's body over the shared `str_util` primitives. `has_end` selects
-/// the one- and two-argument forms.
+
+
+
+
 #[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "str_slice_range")]
 pub(crate) extern "C" fn jit_str_slice_range(
@@ -525,7 +525,7 @@ pub(crate) extern "C" fn jit_str_slice_range(
     }
 }
 
-/// Negative-index normalization shared with the native `slice` contract.
+
 #[inline]
 fn normalize_idx(idx: i64, len: i64) -> usize {
     if idx < 0 {

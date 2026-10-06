@@ -1,13 +1,13 @@
-//! When the collectors run and what they start from. Both collections share
-//! one root set: objects never move, so a root is only ever read.
+
+
 
 use super::ctx::ExecCtx;
 use super::VmSuspend;
 use varn_types::HeapRef;
 
 impl ExecCtx {
-    /// Loop back-edge GC safepoint shared by the interpreter and the JIT.
-    /// Only nested contexts (`gc_inhibited`) never initiate a collection.
+    
+    
     pub(crate) fn gc_backedge_safepoint(&mut self) {
         debug_assert!(crate::frame_store_abi::debug_check_stacks(&self.stack));
         if self.gc_inhibited {
@@ -21,9 +21,9 @@ impl ExecCtx {
         }
     }
 
-    /// The one way into native code. What a native allocates, and what a
-    /// callback hands back to it, stays a root until it returns: it may hold
-    /// those only in Rust locals across a callback that collects.
+    
+    
+    
     #[inline(always)]
     pub(crate) fn invoke_native(
         &mut self,
@@ -49,8 +49,8 @@ impl ExecCtx {
         self.heap.collect(&roots)
     }
 
-    /// Every heap reference this context and every context sharing its heap
-    /// hold: queued forks, frozen tasks, task cells and the global tables.
+    
+    
     pub(crate) fn gc_roots(&self) -> Vec<HeapRef> {
         let mut roots: Vec<HeapRef> = Vec::with_capacity(256);
         let value = |roots: &mut Vec<HeapRef>, v: crate::value::VmValue| {

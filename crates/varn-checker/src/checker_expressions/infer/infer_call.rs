@@ -67,8 +67,8 @@ impl<'r> Checker<'r> {
             ret
         };
 
-        // No `async` patch-up here: the callee's type already says `Task<R>`
-        // if it is async — see `crate::types::async_fn_return`.
+        
+        
         ret
     }
 
@@ -142,12 +142,12 @@ impl<'r> Checker<'r> {
             })
             .collect();
 
-        // Seed the parameter types into the arrow's scope BEFORE inferring the
-        // body's return type, so a block body that returns a parameter
-        // (`(n) => { return n }`) resolves it to its contextual type instead of
-        // `dynamic` (which would be dropped, collapsing the return type to
-        // `void`). Mirrors `infer_arrow_with_context` used by generic inference,
-        // keeping the two paths consistent.
+        
+        
+        
+        
+        
+        
         let arrow_scope =
             crate::checker_generics::find_arrow_scope(self.current_scope, params, bind);
         let saved_scope = self.current_scope;

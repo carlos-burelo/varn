@@ -1,7 +1,7 @@
 #![allow(unused_crate_dependencies)]
 
-//! Features that answer from what the checker decided, over every node the
-//! program reaches — not from a walk of a few statement kinds.
+
+
 
 use tower_lsp::lsp_types::{CodeActionOrCommand, InlayHintLabel, Url};
 use varn_lsp::features::code_action::match_arms::generate_match_arms_action;

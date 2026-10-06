@@ -1,14 +1,14 @@
-//! Building a payload-less-shaped enum variant from its descriptor: the one
-//! implementation behind the interpreter's `MakeEnumVariant` and both JIT
-//! lowerings.
+
+
+
 
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use std::sync::Arc;
 
 impl ExecCtx {
-    /// The variant with discriminant `tag` described by `meta`,
-    /// `Enum.Variant[:field,field...]`.
+    
+    
     pub(crate) fn make_enum_variant(&mut self, tag: i64, meta: &str) -> VmValue {
         let (name_part, fields_part) = match meta.find(':') {
             Some(idx) => (&meta[..idx], &meta[idx + 1..]),

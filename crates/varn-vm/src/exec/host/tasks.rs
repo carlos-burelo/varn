@@ -6,9 +6,9 @@ impl ExecCtx {
         callee: VmValue,
         args: &[VmValue],
     ) -> Result<VmValue, varn_types::NativeError> {
-        // The window is `[callee, args...]`, the exact shape the interpreter's
-        // callee slot + arguments and the compiled caller's flushed staging
-        // produce; `invoke` is the single run-to-completion entry.
+        
+        
+        
         let mut window = Vec::with_capacity(args.len() + 1);
         window.push(callee);
         window.extend_from_slice(args);

@@ -1,4 +1,4 @@
-//! Math and comparison opcode dispatch.
+
 mod arith_float;
 mod arith_generic;
 mod arith_int;

@@ -1,24 +1,24 @@
 #![allow(unused_crate_dependencies)]
-//! Golden tests for `vn debug` plain output (DEBUG_PLAN §8.1, Paso 0).
-//!
-//! The refactor promise is **byte-for-byte identical `plain` output**, so this
-//! captures the current output per fixture × phase, normalizes the
-//! environment-dependent bits (absolute fixture paths, CRLF), and freezes it.
-//! The refactor must keep every golden green.
-//!
-//! Regenerate with:
-//!   `UPDATE_DEBUG_GOLDENS=1 cargo test -p varn-cli --test debug_golden`
-//!
-//! The harness runs the `vn` binary as a subprocess because, at HEAD, the debug
-//! phases print straight to stderr (`terminal::log`/`Section::print`); there is
-//! no in-process sink until DEBUG_PLAN §5 lands. Running the real binary is also
-//! the strongest end-to-end check.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Phases with stable, diffable output. `lsp:*`/`types` live in `inspect_lsp`
-/// (CLI-only) and are out of this harness; the JIT phases are gated by arch.
+
+
 const PHASES: &[&str] = &[
     "tokens",
     "ast",
@@ -48,12 +48,12 @@ fn golden_name(case: &str, phase: &str) -> String {
     format!("{case}.{}.golden.txt", phase.replace(':', "_"))
 }
 
-/// Replace environment-dependent text with stable placeholders:
-/// - `\\?\` verbatim prefix stripped,
-/// - the fixtures directory (canonical and relative, both slash styles) and the
-///   absolute fixture file path folded to `<fixtures>` / basename, followed
-///   by `/` whatever the platform,
-/// - CRLF → LF.
+
+
+
+
+
+
 fn normalize(raw: &str, fixtures: &Path) -> String {
     let mut s = raw.replace("\r\n", "\n");
 
@@ -62,7 +62,7 @@ fn normalize(raw: &str, fixtures: &Path) -> String {
     let canon_verbatim = canon_s.replace("\\\\?\\", "");
     let canon_fwd = canon_s.replace('\\', "/");
     let canon_verbatim_fwd = canon_verbatim.replace('\\', "/");
-    // As a `{:?}` dump prints them (the TIR's `source_file`): backslashes doubled.
+    
     let canon_escaped = canon_s.replace('\\', "\\\\");
     let canon_verbatim_escaped = canon_verbatim.replace('\\', "\\\\");
 
@@ -82,8 +82,8 @@ fn normalize(raw: &str, fixtures: &Path) -> String {
             s = s.replace(p, "<fixtures>");
         }
     }
-    // One separator after the placeholder, so a golden reads the same on
-    // every platform.
+    
+    
     s.replace("<fixtures>\\\\", "<fixtures>/")
         .replace("<fixtures>\\", "<fixtures>/")
 }
@@ -117,7 +117,7 @@ fn check_or_update(case: &str, fixture: &Path, phase: &str) {
 
     if std::env::var_os("UPDATE_DEBUG_GOLDENS").is_some() {
         std::fs::create_dir_all(&dir).unwrap();
-        // Force LF regardless of the platform to keep goldens portable.
+        
         std::fs::write(&golden_path, got.replace("\r\n", "\n")).unwrap();
         return;
     }

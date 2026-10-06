@@ -2,9 +2,9 @@ use crate::checker::Checker;
 use crate::types::Type;
 use varn_core::ast::{ArrowBody, StmtId, StmtKind};
 
-/// The type an arrow's body returns, its parameters already in scope. A
-/// `return` whose type is not known yet makes the whole body `dynamic`: it
-/// returns a value, so it is never `Never`.
+
+
+
 pub(crate) fn arrow_body_return_type(
     body: ArrowBody,
     checker: &mut Checker,

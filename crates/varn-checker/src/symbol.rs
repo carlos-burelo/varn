@@ -69,9 +69,9 @@ pub struct Symbol {
     #[serde(skip)]
     pub alias_node: Option<Box<TypeNode>>,
     pub slot_idx: Option<usize>,
-    /// Intrinsic wire byte when this symbol is a free-function intrinsic import
-    /// (e.g. `abs` from `std:math`). Set at import-bind time where the module
-    /// specifier is known; lets bare calls lower to `OpCode::Intrinsic`.
+    
+    
+    
     #[serde(default)]
     pub intrinsic_wire: Option<u8>,
 }

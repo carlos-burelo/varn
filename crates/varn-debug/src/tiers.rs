@@ -1,12 +1,12 @@
-//! `vn debug -p tiers` and `-p bails` — which functions reach Cranelift, and
-//! what stops the rest.
-//!
-//! This is a *static* view: it runs the real lowering via
-//! [`varn_jit::clif::debug::inspect`] without executing the program, so it
-//! answers "would this route" rather than "did this run".
-//!
-//! The size gate is asked through `lower::gate_reason`, the same authority
-//! production compiles through, so the two cannot disagree.
+
+
+
+
+
+
+
+
+
 
 use varn_jit::clif::debug::inspect;
 use varn_jit::clif::lower::{gate_reason, NoLinker};
@@ -21,13 +21,13 @@ use crate::flags::DebugFlags;
 use varn_core::term::terminal;
 use varn_core::term::terminal::{Align, Section};
 
-/// Why a function is not compiled, in the order production decides it.
+
 #[derive(PartialEq, Eq)]
 pub enum Tier {
     Clif,
-    /// Refused before Cranelift was asked.
+    
     Gate(String),
-    /// Cranelift was asked and refused.
+    
     Bail(String),
 }
 
@@ -37,7 +37,7 @@ pub struct TierRow {
     pub tier: Tier,
     pub frame_aware: bool,
     pub framed: bool,
-    /// Which tests made it frame-aware — see `clif::lower::frame_aware_reasons`.
+    
     pub fa_reasons: Vec<&'static str>,
 }
 
@@ -58,7 +58,7 @@ impl TierRow {
     }
 }
 
-/// Classify `proto` and every nested function proto.
+
 pub fn classify(proto: &FunctionProto, helpers: &JitHelpers) -> Vec<TierRow> {
     let Ok(isa) = varn_jit::clif::shared_isa() else {
         return Vec::new();
@@ -78,7 +78,7 @@ fn walk(
     let name = proto.name.as_deref().unwrap_or("<module>").to_owned();
     let words = proto.chunk.code.len();
 
-    // Mirror production order: the gate fires before Cranelift is consulted.
+    
     if let Some(reason) = gate_reason(proto) {
         out.push(TierRow {
             name,
@@ -119,8 +119,8 @@ fn matches_filter(row: &TierRow, flags: &DebugFlags) -> bool {
     }
 }
 
-/// `header` labels the module and is printed only when there is something to
-/// show, so a `--fn` filter does not leave a trail of empty module banners.
+
+
 pub fn debug_tiers(
     proto: &FunctionProto,
     flags: &DebugFlags,
@@ -177,8 +177,8 @@ pub fn debug_tiers(
     Section::new("tiers").close();
 }
 
-/// Only prints when something is blocked. A clean module producing no output
-/// is what lets `-p bails` over a whole program read as a punch list.
+
+
 pub fn debug_bails(
     proto: &FunctionProto,
     flags: &DebugFlags,

@@ -1,9 +1,9 @@
-//! Cross-isolate value transfer and the VM-call window.
-//!
-//! An isolate boundary cannot pass a heap handle: the other side has its own
-//! heap and the same index means a different object there. Everything here
-//! exists to turn a live `VmValue` into something that survives that crossing
-//! to run VM code in a controlled stack window.
+
+
+
+
+
+
 
 use crate::exec::calls::PreparedCall;
 use crate::exec::ctx::ExecCtx;
@@ -17,23 +17,23 @@ pub(crate) enum Invoked {
 }
 
 impl ExecCtx {
-    /// THE canonical VM invocation: run `callee` to completion with a boxed
-    /// `window` whose first slot is the callee's placeholder (the register the
-    /// interpreter's callee slot / the compiled caller's staging register
-    /// occupies), followed by the arguments.
-    ///
-    /// Every run-to-completion entry into VM code goes through here:
-    /// `jit_invoke_dynamic` (compiled caller), `NativeCtx::call_vm` (host →
-    /// VM), `spawn_internal`, and isolates. The window is adopted as staging,
-    /// so it materialises through the SAME `prepare_call`/`materialize_frame`
-    /// as the interpreter's slow path — one argument convention, not two.
-    ///
-    /// Fase A del frame por clases: el llamador compilado ya no puede exponer
-    /// su ventana de argumentos como tramo contiguo del almacén — los home
-    /// slots viven en los vectores por clase (`FrameStore`) y solo el valor
-    /// completo tiene sentido fuera del frame. La ventana llega entonces
-    /// boxeada en `window`, con el callee/placeholder en el primer slot, y se
-    /// trata como staging.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub(crate) fn invoke(
         &mut self,
         callee: VmValue,
@@ -71,7 +71,7 @@ impl ExecCtx {
         };
         let res = match prepared {
             PreparedCall::NativeImmediate(f, arg_count) => {
-                // La ventana vive al FINAL de staging (ver dispatch_prepared_call).
+                
                 let take = arg_count.min(self.stage.len());
                 let start = self.stage.len() - take;
                 let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
@@ -203,19 +203,19 @@ pub(super) fn gather_tasks(ctx: &mut ExecCtx, tasks: VmValue) -> Result<VmValue,
     Ok(handle)
 }
 
-/// Body of [`NativeCtx::spawn_isolate`]. Lives here rather than in the trait
-/// impl because starting an isolate is the isolate domain, not the shape of
-/// the host boundary.
+
+
+
 pub(super) fn spawn_isolate(
     ctx: &mut ExecCtx,
     module_path: &str,
     export_name: &str,
     args: Vec<varn_types::value::SendValue>,
 ) -> Result<varn_types::HostPromise, String> {
-    // Heap-independent typed reject payload; the parent's await-resume hook
-    // (`host_values::open_rejected`) mints it into a real `Error` on the
-    // parent heap so `instanceof Error` works and the message survives (a
-    // bare ObjData cannot embed non-SSO strings — see `HostError`).
+    
+    
+    
+    
     fn worker_error(msg: &str) -> varn_types::value::SendValue {
         varn_types::value::SendValue::Error {
             class: "Error".to_string(),
@@ -227,14 +227,14 @@ pub(super) fn spawn_isolate(
 
     let module_path_str = module_path.to_string();
     let export_name_str = export_name.to_string();
-    // The worker gets a fresh VM, so it must be handed this VM's settings;
-    // otherwise an interpreter-only run is not actually interpreter-only
-    // inside isolates.
+    
+    
+    
     let settings = ctx.settings;
 
-    // Join task: resolves `Null` when the worker finishes, rejects with a
-    // typed error if it threw. Returned to the caller (wrapped in an
-    // `IsolateHandle`); no port is injected into the worker.
+    
+    
+    
     let done = varn_types::HostPromise::pending();
     let done_t = done.clone();
 
@@ -281,12 +281,12 @@ pub(super) fn spawn_isolate(
                 }
             };
 
-            // Endpoints arrive as `SendValue::Channel{Sender,Receiver}`;
-            // `to_value_ctx` emits `__chanEndpoint` markers, which
-            // `host_values::open_resolved` mints into real Sender/Receiver
-            // instances (one minting definition, shared with the same-thread
-            // await-resume path). std:task is already loaded above, so the
-            // endpoint classes exist on this worker's heap.
+            
+            
+            
+            
+            
+            
             let mut vm_args = Vec::new();
             for arg in args {
                 let v_nv = arg.to_value_ctx(&mut machine.ctx);

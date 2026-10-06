@@ -1,9 +1,9 @@
 use super::*;
 
 impl ExecCtx {
-    // Map keys MUST canonicalize through the content interner —
-    // `alloc_str_dynamic` (and the trait default's `intern`) would mint a
-    // fresh index per call and break key equality.
+    
+    
+    
     pub(super) fn host_str_map_key(&mut self, s: &str) -> varn_types::value::MapKey {
         match VmValue::try_from_sso(s) {
             Some(v) => varn_types::value::MapKey(v),

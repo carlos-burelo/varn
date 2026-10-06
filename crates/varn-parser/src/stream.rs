@@ -19,18 +19,18 @@ pub struct TokenStream {
     split_count: u8,
     next_ast_id: AstId,
 
-    /// Owns the dedup table for every name the parser mints: identifiers,
-    /// raw literal text, labels, property keys. Lives here rather than on
-    /// `Parser` because the whole recursive-descent parser is a tree of free
-    /// functions threaded with `&mut TokenStream`, not `&mut Parser` —
-    /// exactly why `errors` and `pending_doc` live here too. `Parser`
-    /// derefs to `TokenStream`, so `parser.interner` still resolves.
+    
+    
+    
+    
+    
+    
     pub interner: varn_core::AtomInterner,
 
-    /// Owns every `Expr`/`Stmt` node this parse allocates. Lives here for the
-    /// same reason `interner` does: the parser is a tree of free functions
-    /// threaded with `&mut TokenStream`. Unlike `interner`, this is never
-    /// shared across files — each parse gets a fresh arena, created below.
+    
+    
+    
+    
     pub arena: AstArena,
 }
 
@@ -115,9 +115,9 @@ impl TokenStream {
         }
     }
 
-    /// Cursor into the token vector. Used by error recovery to detect that a
-    /// pass made no progress, which is what keeps the program loop from
-    /// spinning on a token it just failed to parse.
+    
+    
+    
     #[inline]
     pub fn pos(&self) -> usize {
         self.pos
@@ -137,11 +137,11 @@ impl TokenStream {
         }
     }
 
-    /// Zero-width range at the end of the previous token.
-    ///
-    /// Where a diagnostic belongs when the offending thing is the *absence* of
-    /// a token: anchoring it to the current token would underline whatever
-    /// followed — often the next, perfectly valid, line.
+    
+    
+    
+    
+    
     #[inline]
     pub fn prev_end_range(&self) -> SourceRange {
         if self.pos == 0 {
@@ -286,10 +286,10 @@ impl TokenStream {
         }
     }
 
-    /// Interns the current token's lexeme and advances past it. The
-    /// canonical source of `Atom`s during parsing — every identifier, raw
-    /// literal, label and property key that ends up in the AST is minted
-    /// here, so any two occurrences of the same text share one `Atom`.
+    
+    
+    
+    
     pub fn consume_lexeme(&mut self) -> varn_core::Atom {
         let tok = self.token().clone();
         let text = tok.get_lexeme(&self.lexeme_buf);

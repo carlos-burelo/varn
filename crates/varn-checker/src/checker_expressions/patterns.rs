@@ -48,12 +48,12 @@ impl<'r> Checker<'r> {
                     self.check_pattern(&prop.value, &prop_ty, bind);
                 }
                 if let Some(r) = rest {
-                    // El rest-object solo contiene los miembros NO excluidos:
-                    // leer un excluido devuelve `null` en runtime. Heredar el
-                    // tipo del fuente afirmaría miembros que no existen (el
-                    // acceso caería en un registro del tipo del miembro y la
-                    // VM tipada rechazaría el null). Dynamic mantiene la
-                    // lectura legal y honesta.
+                    
+                    
+                    
+                    
+                    
+                    
                     self.check_pattern(r, &Type::Dynamic, bind);
                 }
             }
@@ -141,16 +141,16 @@ impl<'r> Checker<'r> {
         }
     }
 
-    /// Resolve a sum-type variant's field types plus a generic substitution
-    /// derived from the matched value's concrete type arguments.
-    ///
-    /// Variant metadata is looked up in this module's bind first, then in the
-    /// module that defines the type (via the scrutinee type's origin), so
-    /// imported sum types such as `Result`/`Option` resolve. When the scrutinee
-    /// is a generic instantiation (`Result<str, int>`), the enum's type
-    /// parameters are mapped to the concrete arguments so `Ok(v)` binds
-    /// `v: str` instead of the unsubstituted parameter (which surfaces as
-    /// `dynamic`).
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     fn variant_fields_with_subst(
         &mut self,
         variant: &str,
@@ -179,7 +179,7 @@ impl<'r> Checker<'r> {
             _ => (None, Vec::new(), None),
         };
 
-        // Fields: this module first, then the module that defines the type.
+        
         let mut fields = bind.sum_variant_fields.get(variant).cloned();
         let mut def_bind: Option<std::sync::Arc<BindResult>> = None;
         if fields.is_none() {
@@ -196,7 +196,7 @@ impl<'r> Checker<'r> {
         }
         let fields = fields?;
 
-        // {type-param -> concrete arg}, e.g. {T: str, E: int} for Result<str, int>.
+        
         let mut mapping = rustc_hash::FxHashMap::default();
         if !args.is_empty() {
             if let Some(p) = &parent {

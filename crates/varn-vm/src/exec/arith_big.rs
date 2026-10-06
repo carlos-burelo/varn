@@ -1,6 +1,6 @@
-//! `bigint` arithmetic (spec §6–§7): exact, with `int` operands widening
-//! exactly into `bigint`. Division follows `int` (truncating `/`,
-//! dividend-signed `%`), faults included.
+
+
+
 
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
@@ -50,8 +50,8 @@ fn fault(f: varn_core::IntDivFault, op: &str) -> RuntimeError {
     }
 }
 
-/// `a op b` when at least one side is a `bigint` and the other is a
-/// `bigint` or an `int`; `None` hands the operation back to the caller.
+
+
 #[cold]
 pub(crate) fn binary(
     op: BigOp,
@@ -83,7 +83,7 @@ pub(crate) fn binary(
     Some(r.map(|v| alloc(heap, v)))
 }
 
-/// `-a` for a `bigint`, `None` otherwise.
+
 #[cold]
 pub(crate) fn negate(a: VmValue, heap: &mut Heap) -> Option<VmValue> {
     if !is_bigint(a, heap) {

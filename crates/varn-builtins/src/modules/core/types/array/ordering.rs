@@ -1,13 +1,13 @@
-//! How `Array.sort` orders values: by the natural order of their domain, a
-//! `Comparable` instance by its own `compare`, or a caller's comparator. A
-//! comparator's exception propagates; a comparator that is not a consistent
-//! order can shuffle elements but never crash the sort.
+
+
+
+
 
 use std::cmp::Ordering;
 use varn_types::{NativeCtx, NativeError, VmValue};
 
-/// `a` against `b` with no comparator: numbers numerically, text and chars by
-/// code point, booleans `false < true`, a `Comparable` by `a.compare(b)`.
+
+
 pub(super) fn natural_cmp(
     ctx: &mut dyn NativeCtx,
     a: VmValue,
@@ -27,7 +27,7 @@ pub(super) fn natural_cmp(
     }
 }
 
-/// The ordering a comparator's `int` result stands for.
+
 pub(super) fn sign(
     ctx: &mut dyn NativeCtx,
     compare: VmValue,
@@ -40,9 +40,9 @@ pub(super) fn sign(
     Ok(result.as_int().cmp(&0))
 }
 
-/// Stable merge sort, O(n log n). Hand-written because `slice::sort_by`
-/// may panic on a comparator that is not a total order — and this one runs
-/// user code.
+
+
+
 pub(super) fn merge_sort(
     items: &mut Vec<VmValue>,
     cmp: &mut dyn FnMut(VmValue, VmValue) -> Result<Ordering, NativeError>,

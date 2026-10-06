@@ -1,6 +1,6 @@
-//! Fields a local class inherits from a class declared elsewhere (an imported
-//! class, a core one). The backend lays the subclass out after them; it gets
-//! them from the declaring module's members, reinterned here, never guessed.
+
+
+
 
 use super::Checker;
 use crate::binder::{BindResult, ClassParent};

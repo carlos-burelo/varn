@@ -11,8 +11,8 @@ impl<'r> super::Binder<'r> {
         use varn_modules::layer::{check_import, Layer};
         if let Err(message) = check_import(Layer::of_module(&self.source_file), &source_str) {
             self.emit(Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(i.range));
-            // Core names are already in scope, so their uses still resolve;
-            // any other import keeps binding so its uses do not cascade.
+            
+            
             if Layer::of_module(&source_str) == Layer::Core {
                 return;
             }
@@ -131,14 +131,14 @@ impl<'r> super::Binder<'r> {
                             s.full_range = resolved.full_range;
                             s.name = local;
                             s.line = line;
-                            // The rehydrated symbol keeps the declaring
-                            // module's alias NODE, not just its expanded
-                            // `ty`: an imported alias (`Json` from
-                            // `std:encoding`) must still be expandable in
-                            // THIS module's context, so its body's names are
-                            // resolved against — and interned into — the
-                            // local type table instead of being read out of
-                            // the exporter's, where the ids are foreign.
+                            
+                            
+                            
+                            
+                            
+                            
+                            
+                            
                             s.alias_node = resolved.alias_node.clone();
                             s.original_name = Some(self.intern_local(&imported));
                             s.origin_module = s.origin_module.or(module_path_atom);
@@ -149,11 +149,11 @@ impl<'r> super::Binder<'r> {
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 );
                             }
-                            // Free-function intrinsic import (e.g. `abs` from
-                            // `std:math`): stamp the wire byte now, while the
-                            // module specifier is in hand. `origin_module` is the
-                            // resolved file path, so the call site can't rebuild
-                            // the `std:math/abs` key on its own.
+                            
+                            
+                            
+                            
+                            
                             if let Some(mp) = &module_path {
                                 s.intrinsic_wire = varn_core::intrinsic_ops::intrinsic_lookup(
                                     &format!("{}/{}", mp, imported),
@@ -191,10 +191,10 @@ impl<'r> super::Binder<'r> {
         match e {
             ExportDecl::Decl { declaration, .. } => {
                 self.bind_decl(declaration);
-                // An exported binding leaves this file's scan, so its
-                // element type can no longer be proved from this file alone
-                // (`binder::array_evolve`, rule 1). Escaping after binding
-                // is enough: candidates finalize at scope exit, never here.
+                
+                
+                
+                
                 if let Decl::Variable(v) = declaration.as_ref() {
                     for d in &v.declarators {
                         if let Pattern::Identifier { name, .. } = &d.id {
@@ -206,12 +206,12 @@ impl<'r> super::Binder<'r> {
             ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
                 ExportDefaultDecl::Function(f) => self.bind_function(f),
                 ExportDefaultDecl::Class(c) => self.bind_class(c),
-                // The expression is not bound here, so an array candidate
-                // named in it would never be seen as a use. Escape the lot.
+                
+                
                 ExportDefaultDecl::Expr(_) => self.escape_all_open_array_candidates(),
             },
-            // `export { a, b }` names locals without producing identifier
-            // expressions the binder would otherwise visit.
+            
+            
             ExportDecl::Named {
                 specifiers, source, ..
             } => {

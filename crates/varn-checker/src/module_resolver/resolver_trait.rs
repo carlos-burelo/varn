@@ -21,13 +21,13 @@ impl ImportResolver for DiskResolver {
         }
 
         let canonical = varn_modules::canonical_or_original(Path::new(abs_path));
-        // Look again under the canonical key. Callers reach this with whatever
-        // spelling the type's `origin` carries -- on Windows that is the
-        // extended form, `\\?\C:\...\m.vn`, while every store below writes
-        // `C:/.../m.vn`. Checking only `abs_path` made the memo permanently
-        // cold for those callers: each one re-read the file and re-hashed the
-        // on-disk cache to rebuild a `BindResult` already sitting in the graph.
-        // `module_exports` has always done this; `module_bind` had not.
+        
+        
+        
+        
+        
+        
+        
         if canonical != abs_path {
             if let Some(cached) = self.cached_bind(&canonical) {
                 return Some(cached);
@@ -85,8 +85,8 @@ impl ImportResolver for DiskResolver {
             return Arc::new(ExportMap::default());
         }
 
-        // Publish an empty map before recursing: a cycle that reaches this
-        // module again finds the sentinel instead of recursing forever.
+        
+        
         self.store_exports(canonical.clone(), Arc::new(ExportMap::default()));
 
         visiting.push(canonical.clone());
@@ -108,9 +108,9 @@ impl ImportResolver for DiskResolver {
 
         let source = self.load_source(&ModuleId::stdlib(specifier))?;
         let carrier = super::CarrierKind::from(source.provenance);
-        // SOURCE es la verdad; la interfaz precompilada es una optimización
-        // (ver ADR-0011). Se carga desde texto siempre que exista, para que el
-        // checker y el VM vean las mismas bytes para el mismo `ModuleId`.
+        
+        
+        
         self.bind_from_embedded(specifier, source.text.as_ref(), carrier)
     }
 
@@ -159,8 +159,8 @@ impl ImportResolver for DiskResolver {
         if let Some(hit) = self.core_exports.lock().as_ref() {
             return Arc::clone(hit);
         }
-        // Built with the borrow released: building resolves stdlib modules
-        // through `self`, which takes the same borrows.
+        
+        
         let built = Arc::new(crate::core::loader::build_core_exports(self));
         *self.core_exports.lock() = Some(Arc::clone(&built));
         built

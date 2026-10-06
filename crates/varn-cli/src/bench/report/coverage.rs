@@ -1,17 +1,17 @@
-//! Cranelift coverage — the section that replaces `JIT Compiler & Execution
-//! Stats`.
-//!
-//! The number it exists to report honestly is what fraction of the program
-//! runs as compiled code. Two things make that easy to overstate, and both are
-//! handled here:
-//!
-//! * A function turned away by the size gate never reaches Cranelift, so it
-//!   appears in neither `compile_fail` nor any `CLIF BAIL` trace. `routed +
-//!   gated + bailed` is printed as an explicit total so a missing category is
-//!   visible rather than silent.
-//! * Function counts and frame counts are different denominators. One function
-//!   left interpreted can account for most frame entries, or almost none. They
-//!   are reported as separate blocks, never mixed into one ratio.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -24,15 +24,15 @@ use super::fmt::{fmt_bytes, fmt_dur, fmt_num, fmt_pct, row, LABEL_WIDTH, VALUE_W
 
 const TOP_N: usize = 3;
 
-/// Highest-impact blocker: the reason keeping the most functions out of clif.
+
 pub fn top_blocker(records: &[CompileRecord]) -> Option<(String, String)> {
     let mut worst: Option<&CompileRecord> = None;
     for r in records {
         if r.outcome.is_routed() {
             continue;
         }
-        // Prefer the largest offender; size is the proxy for how much work is
-        // stranded outside clif.
+        
+        
         if worst.is_none_or(|w| r.words > w.words) {
             worst = Some(r);
         }
@@ -125,13 +125,13 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
         row("frames clif", fmt_num(jit.jit_runs)),
         chalk(frame_pct(jit.jit_runs)).dim()
     ));
-    // An OSR frame is one of the interpreter frames: it STARTED interpreted and
-    // was rescued mid-loop. Reporting the two as one number said that a
-    // top-level loop runs interpreted when it does not — measured on a 3M
-    // iteration loop at module top level, 88.87 ms with `VARN_NO_JIT=1` against
-    // 7.78 ms with OSR, and the frame counted as "interpreter" either way.
-    // Split them, so the line that reads as a defect only counts frames that
-    // really did run to the end on the interpreter.
+    
+    
+    
+    
+    
+    
+    
     let never_compiled = jit.never_compiled_frames();
     terminal::log(format!(
         "{}  {}",
@@ -210,8 +210,8 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
     }
 }
 
-/// Group everything not routed by reason, so the output names causes rather
-/// than listing symptoms one function at a time.
+
+
 fn print_blockers(records: &[CompileRecord]) {
     let mut groups: BTreeMap<String, Vec<&CompileRecord>> = BTreeMap::new();
     for r in records {

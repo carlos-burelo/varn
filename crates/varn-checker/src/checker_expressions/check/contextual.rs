@@ -51,10 +51,10 @@ impl<'r> Checker<'r> {
                     self.with_expected(elem_expected, |c| c.check_expr(*e, bind));
                     if let Some(expected) = &elem_expected {
                         let actual = self.infer_type(*e, bind);
-                        // `value_assignable_to`, not `types_compatible`: a narrow
-                        // element type (`Array<i8>`) can only accept an `int`
-                        // literal by checking the literal's value, exactly like a
-                        // scalar `let x: i8 = 42` does.
+                        
+                        
+                        
+                        
                         if !actual.is_dynamic()
                             && !self.value_assignable_to(expected, &actual, Some(*e), Some(bind))
                         {
@@ -101,14 +101,14 @@ impl<'r> Checker<'r> {
                     }
                     TypeKind::Named(name_atom, origin_atom)
                     | TypeKind::Generic(name_atom, _, origin_atom) => {
-                        // `bind.interner` is a snapshot from when *this*
-                        // module started checking — `name_atom`/`origin_atom`
-                        // can come from a `Type` a cross-module lookup built
-                        // from a sibling module's (possibly later, bigger)
-                        // table. `try_resolve` degrades to a fresh live
-                        // snapshot instead of indexing out of bounds; the
-                        // live table is guaranteed to have anything ever
-                        // actually minted this compilation.
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
                         let resolve_atom = |a: varn_core::Atom| -> String {
                             bind.interner
                                 .try_resolve(a)
@@ -227,10 +227,10 @@ impl<'r> Checker<'r> {
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;
                 }
-                // Accessors parse inside an object literal, but the compiler has
-                // no `HirObjectProp` for them: they are lowered away, and the
-                // property reads back as `null`. Silently dropping a written
-                // accessor is worse than not having them, so say so.
+                
+                
+                
+                
                 ObjectProp::Getter { body, range, .. } | ObjectProp::Setter { body, range, .. } => {
                     self.emit(
                         Diagnostic::error(

@@ -33,8 +33,8 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
         .join(", ");
     let _ = writeln!(out, "  b{id}({params}):");
     for inst in &block.insts {
-        // Non-Dynamic result types are printed so typed-value coverage is
-        // verifiable from the dump.
+        
+        
         let lhs = match inst.dest {
             Some(v) => match func.value_ty(v) {
                 HirType::Dynamic => format!("{} = ", val(v)),
@@ -47,7 +47,7 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
     let _ = writeln!(out, "    {}", terminator(&block.term));
 }
 
-/// One instruction, without its destination.
+
 pub fn inst_kind(kind: &InstKind) -> String {
     match kind {
         InstKind::ConstInt(n) => format!("int {n}"),
@@ -351,7 +351,7 @@ pub fn inst_kind(kind: &InstKind) -> String {
     }
 }
 
-/// A block terminator.
+
 pub fn terminator(term: &Terminator) -> String {
     match term {
         Terminator::Return(Some(v)) => format!("return {}", val(*v)),
@@ -397,8 +397,8 @@ fn ty(t: HirType) -> &'static str {
         HirType::Str => varn_core::LangPrimitive::Str.name(),
         HirType::Ref => "ref",
         HirType::Dynamic => "dyn",
-        // Nested TyIds need the module's TyTable to render; the dump shows
-        // the shape only.
+        
+        
         HirType::Array(_) => "array",
         HirType::Map(_, _) => "map",
         HirType::Set(_) => "set",

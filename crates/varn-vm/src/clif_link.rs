@@ -1,23 +1,23 @@
-//! VM side of the Cranelift static-call linker.
-//!
-//! When a function clif-compiles a cross-function `Call`, it asks this
-//! linker which closure the global slot holds, so the call site can bind
-//! directly to that closure's proto. The answer is derived from the live
-//! `ExecCtx`: clif compilation happens during execution, so a thread-local
-//! records the executing context for the duration of a run.
-//!
-//! The link does NOT require the callee to be compiled yet. Callers reach
-//! their tier threshold before their callees do — a caller must be entered
-//! for its callee to be entered at all — so demanding compiled code here
-//! would decline essentially every call and never revisit it. Instead the
-//! link carries the ADDRESS of the callee proto's `clif_raw` cell, which the
-//! call site loads at run time: `0` until the callee compiles, the direct
-//! entry afterwards.
-//!
-//! Every link is only a runtime HINT — the generated call site guards on
-//! the callee's exact `VmValue` bits and on a non-zero entry, taking the
-//! interpreter fallback on any mismatch (rebind, GC move, uncompiled) — so a
-//! stale or wrong context here can only cost speed, never correctness.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -31,43 +31,43 @@ use crate::exec::ExecCtx;
 
 thread_local! {
     static CURRENT_CTX: Cell<*const ExecCtx> = const { Cell::new(std::ptr::null()) };
-    /// Epoch of the context in `CURRENT_CTX`. Kept beside it rather than read
-    /// through the pointer so the hot `jit_fn` check is one TLS load.
+    
+    
     static CURRENT_EPOCH: Cell<u64> = const { Cell::new(0) };
-    /// Per epoch: the protos that compiled under it, and the code buffers it
-    /// retired. Both are released when the epoch ends.
+    
+    
     static COMPILED: RefCell<FxHashMap<u64, EpochCode>> =
         RefCell::new(FxHashMap::default());
 }
 
 #[derive(Default)]
 struct EpochCode {
-    /// Protos whose `jit_entry` points at code built for this epoch. Held by
-    /// `Rc` so the proto — and therefore the `clif_raw` cell whose ADDRESS
-    /// sibling call sites baked — cannot be freed while that code can run.
+    
+    
+    
     protos: Vec<Rc<FunctionProto>>,
-    /// Code this epoch built and then replaced. A nested context can recompile
-    /// a proto that an outer, still-live clif frame is executing, so the buffer
-    /// is retired rather than dropped, and only freed with the epoch.
+    
+    
+    
     retired: Vec<Rc<dyn std::any::Any>>,
 }
 
 static NEXT_EPOCH: AtomicU64 = AtomicU64::new(1);
 
-/// A fresh identity for one heap's compiled code. `0` means "no context",
-/// which no compiled entry ever matches.
+
+
 pub(crate) fn next_epoch() -> u64 {
     NEXT_EPOCH.fetch_add(1, Ordering::Relaxed)
 }
 
-/// The epoch of the context executing on this thread, `0` outside a run.
+
 #[inline(always)]
 pub(crate) fn current_epoch() -> u64 {
     CURRENT_EPOCH.with(|e| e.get())
 }
 
-/// Record that `proto` now holds code built for the running context, retiring
-/// whatever code it held before.
+
+
 pub(crate) fn register_compiled(
     proto: &Rc<FunctionProto>,
     previous: Option<(u64, Rc<dyn std::any::Any>)>,
@@ -82,22 +82,22 @@ pub(crate) fn register_compiled(
     });
 }
 
-/// Park `code` under `epoch` so it stays mapped until that epoch ends.
+
 pub(crate) fn retire_code(epoch: u64, code: Rc<dyn std::any::Any>) {
     COMPILED.with(|m| m.borrow_mut().entry(epoch).or_default().retired.push(code));
 }
 
-/// End `epoch`: strip every entry it compiled and free its buffers. Called when
-/// the context that produced them is dropped, so nothing can reach code that
-/// was baked against a dead heap.
+
+
+
 pub(crate) fn invalidate_epoch(epoch: u64) {
     let entry = COMPILED.with(|m| m.borrow_mut().remove(&epoch));
     let Some(entry) = entry else { return };
     for proto in &entry.protos {
-        // The two entries carry their own epochs and are cleared
-        // independently: a proto can hold a normal entry recompiled for a live
-        // context while its OSR variant still belongs to the dying one, or the
-        // reverse.
+        
+        
+        
+        
         if proto.jit_osr_epoch.get() == epoch {
             proto.jit_osr_entry.set(None);
             proto.jit_osr_epoch.set(0);
@@ -107,7 +107,7 @@ pub(crate) fn invalidate_epoch(epoch: u64) {
             proto.backedge_count.set(0);
         }
         if proto.jit_epoch.get() != epoch {
-            // Already recompiled for a live context; that owner clears it.
+            
             continue;
         }
         proto.jit_entry.set(0);
@@ -119,8 +119,8 @@ pub(crate) fn invalidate_epoch(epoch: u64) {
     }
 }
 
-/// Records `ctx` as the linking context for the duration of the guard,
-/// restoring the previous one on drop (so nested runs compose).
+
+
 pub struct CtxGuard(*const ExecCtx, u64);
 
 impl CtxGuard {
@@ -128,8 +128,8 @@ impl CtxGuard {
         let epoch = if ctx.is_null() {
             0
         } else {
-            // Safety: same contract as `CtxLinker` — the caller keeps `ctx`
-            // alive for the guard's lifetime.
+            
+            
             unsafe { (*ctx).heap.jit_epoch() }
         };
         let prev = CURRENT_CTX.with(|c| c.replace(ctx));
@@ -145,16 +145,16 @@ impl Drop for CtxGuard {
     }
 }
 
-/// Linker bound to whatever context is current on this thread.
+
 pub struct CtxLinker;
 
 impl ClifLinker for CtxLinker {
     fn current_epoch(&self) -> u64 {
-        // Same value `compile_jit` stamps into `proto.jit_epoch` right after
-        // this compilation finishes — read here, at lowering time, so the
-        // inline fast path can bake it as an immediate instead of needing a
-        // live epoch source at runtime (which `varn-jit` has none of; it
-        // does not depend on `varn-vm`).
+        
+        
+        
+        
+        
         current_epoch()
     }
 }

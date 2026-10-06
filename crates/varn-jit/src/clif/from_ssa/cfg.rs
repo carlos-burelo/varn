@@ -1,12 +1,12 @@
-//! The compiled control-flow graph: which blocks compiled code reaches, in
-//! what order, from where, and which loops can reach a safepoint.
+
+
 
 use varn_types::ssa::{SsaProto, SsaTerm};
 
 use super::store::clif_ty;
 use super::views;
 
-/// Each block's predecessors through terminators.
+
 pub(super) fn predecessors(ssa: &SsaProto) -> Vec<Vec<usize>> {
     let mut preds = vec![Vec::new(); ssa.blocks.len()];
     for (b, blk) in ssa.blocks.iter().enumerate() {
@@ -24,11 +24,11 @@ pub(super) fn predecessors(ssa: &SsaProto) -> Vec<Vec<usize>> {
     preds
 }
 
-/// Whether the loop closed by the back edge `latch -> header` can reach a
-/// safepoint: an instruction outside [`views::keeps_views`]' allowlist in any
-/// block of its body (the blocks that reach `latch` without passing
-/// `header`). A loop that cannot allocate has nothing to collect, so its back
-/// edge needs no poll.
+
+
+
+
+
 pub(super) fn loop_may_collect(
     ssa: &SsaProto,
     preds: &[Vec<usize>],
@@ -54,11 +54,11 @@ pub(super) fn loop_may_collect(
     })
 }
 
-/// The blocks compiled code can reach — through terminators from `entry`,
-/// the function's entry block or an OSR entry's loop header — in reverse
-/// postorder, so every value is defined before its uses. A block reachable
-/// only through a `try` handler is a landing pad or the catch path behind it,
-/// which runs interpreted (see [`super::exceptions`]).
+
+
+
+
+
 pub(super) fn order(ssa: &SsaProto, entry: usize) -> Vec<usize> {
     let n = ssa.blocks.len();
     let mut visited = vec![false; n];
@@ -90,10 +90,10 @@ pub(super) fn order(ssa: &SsaProto, entry: usize) -> Vec<usize> {
     post.into_iter().rev().collect()
 }
 
-/// Every jump argument has its parameter's representation. The compiler
-/// brings each value reaching a merge to the merge's type; a body where one
-/// does not is declined here, by name, rather than handed to Cranelift — which
-/// only checks this when its verifier runs, and it does not in release.
+
+
+
+
 pub(super) fn check_block_args(ssa: &SsaProto) -> Result<(), String> {
     let check = |from: usize, target: u32, args: &[u32]| -> Result<(), String> {
         let params = &ssa.blocks[target as usize].params;
@@ -169,8 +169,8 @@ pub(super) fn loop_body(
     body
 }
 
-/// The block defining each value: a block parameter's block, or the block of
-/// the instruction producing it.
+
+
 pub(super) fn def_blocks(ssa: &SsaProto) -> Vec<Option<usize>> {
     let mut def = vec![None; ssa.values.len()];
     for (b, blk) in ssa.blocks.iter().enumerate() {

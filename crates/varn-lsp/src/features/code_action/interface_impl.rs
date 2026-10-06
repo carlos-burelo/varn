@@ -160,7 +160,7 @@ fn find_class_at_line<'a>(
         })
 }
 
-/// The interface `name` this document declares at its top level.
+
 fn find_interface(
     state: &DocumentState,
     program: &varn_core::ast::Program,

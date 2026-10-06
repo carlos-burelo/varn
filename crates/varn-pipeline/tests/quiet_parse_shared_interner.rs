@@ -1,32 +1,32 @@
 #![allow(unused_crate_dependencies)]
-//! Task 7e follow-up regression test: `quiet_parse::parse_module` (used by
-//! `module_precompile::build_module_graph`, the real multi-module compile
-//! path behind `vn run`/`vn build`) used to mint its own throwaway
-//! `AtomInterner` per module instead of sharing the resolver's table.
-//!
-//! `build_module_graph` re-parses and re-checks every *imported* module
-//! (`quiet_parse::parse_module` + `Checker::check_with`) to emit its own
-//! bytecode, separately from the checker's own import resolution
-//! (`DiskResolver::parse_and_cache`, already fixed under Task 7e and shared
-//! through the whole compilation). When a re-parsed module itself imports a
-//! *named* symbol from a third module, `binder/imports.rs` does:
-//!
-//!   s.origin_module = resolved.origin_module.or(module_path_atom);
-//!   ...
-//!   let origin_rc: Arc<str> = Arc::from(self.interner.resolve(*origin));
-//!
-//! `resolved.origin_module` is an `Atom` mint by the *exporting* module's own
-//! bind (reached through the resolver's shared, growing table), while
-//! `self.interner` here is the *importing* module's own binder interner —
-//! before this fix, `quiet_parse::parse_module`'s isolated, freshly-created
-//! table. Resolving a shared-table index (already large, after everything the
-//! resolver has interned so far) against a tiny isolated table indexes out of
-//! bounds and panics inside `AtomInterner::resolve`.
-//!
-//! This test builds a three-module chain — entry -> mid -> leaf, where `mid`
-//! imports a *named* export from `leaf` and both re-exports and calls it — so
-//! `build_module_graph`'s re-check of `mid.vn` exercises exactly that path,
-//! and confirms the whole graph compiles without panicking or erroring.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::fs;
 use std::path::PathBuf;
@@ -60,12 +60,12 @@ fn build_module_graph_resolves_named_reexport_origin_module_without_panicking() 
     )
     .expect("write leaf.vn");
 
-    // A *named* import (not `* as`) of a symbol whose `origin_module` was
-    // already stamped by `leaf.vn`'s own export map — this is what forces
-    // `binder/imports.rs`'s `resolved.origin_module.or(module_path_atom)` and
-    // the subsequent `self.interner.resolve(*origin)` to run against
-    // `mid.vn`'s own (pre-fix: isolated) interner while re-checked inside
-    // `build_module_graph`.
+    
+    
+    
+    
+    
+    
     fs::write(
         &mid_path,
         "import { leafValue } from \"./leaf.vn\"\nexport function midValue(): int {\n  return leafValue()\n}\n",

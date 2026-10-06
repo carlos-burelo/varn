@@ -4,8 +4,8 @@ use varn_core::ast::{
 };
 use varn_core::{Diagnostic, ErrorCode};
 
-/// Whether a declaration occupies only the type namespace. Classes, enums and
-/// structs live in both, so they are not type-only.
+
+
 fn type_only(kind: crate::symbol::SymbolKind) -> bool {
     use crate::symbol::SymbolKind as K;
     matches!(kind, K::Interface | K::TypeAlias)
@@ -43,19 +43,19 @@ impl<'r> super::Binder<'r> {
                 self.scopes.get_mut(self.current).define(name, id);
                 return id;
             }
-            // A prelude symbol (`core:global`, or anything reaching us from
-            // another module) sits in this scope only as an implementation
-            // shortcut; conceptually it is an outer scope. Any local
-            // declaration is allowed to shadow it — that is how `std:io`
-            // declares the `print` the prelude also exposes.
+            
+            
+            
+            
+            
             if existing_from_extern && (new_is_import || sym.origin_module.is_none()) {
                 let id = self.arena.push(sym);
                 self.scopes.get_mut(self.current).define(name, id);
                 return id;
             }
-            // Type space and value space are separate: `type TaskGroup<T> = …`
-            // and `function TaskGroup<T>()` are two declarations of one name in
-            // two namespaces, not a redeclaration.
+            
+            
+            
             if type_only(existing_sym.kind) != type_only(sym.kind) {
                 let id = self.arena.push(sym);
                 self.scopes.get_mut(self.current).define(name, id);
@@ -104,9 +104,9 @@ impl<'r> super::Binder<'r> {
     pub(super) fn bind_expr(&mut self, id: ExprId) {
         let arena = self.ast_arena;
         match &arena.expr(id).kind {
-            // A hole binds nothing, but its parent still binds normally — that
-            // is the whole point of keeping the node instead of dropping the
-            // statement that contains it.
+            
+            
+            
             ExprKind::Missing => {}
             ExprKind::Arrow {
                 params,
@@ -230,10 +230,10 @@ impl<'r> super::Binder<'r> {
                             );
                         }
                         ObjectProp::Getter { body, .. } => {
-                            // Getter/setter bodies don't route through
-                            // `bind_inline_function` (no dedicated Function
-                            // scope is created for them), so the closure
-                            // escape has to be applied here explicitly too.
+                            
+                            
+                            
+                            
                             self.escape_all_open_array_candidates();
                             self.bind_stmt(*body);
                         }
@@ -315,14 +315,14 @@ impl<'r> super::Binder<'r> {
             }
 
             ExprKind::Identifier { name } => {
-                // Any bare reference to a watched array-literal candidate
-                // that reaches this generic path is, by construction, NOT
-                // one of the whitelisted patterns (those are intercepted
-                // and return early before recursing into a plain
-                // `bind_expr` of the identifier — see
-                // `bind_array_push_call` / `bind_array_index_write` /
-                // `bind_array_whitelisted_member`). Default-deny: escape
-                // it (array_evolve rule 3). A no-op for every other name.
+                
+                
+                
+                
+                
+                
+                
+                
                 self.escape_array_candidate(*name);
                 let range = arena.expr(id).range;
                 self.check_local_class_capture(*name, range);

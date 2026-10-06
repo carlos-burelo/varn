@@ -1,9 +1,9 @@
-//! Object construction reached from compiled code, and the error escape.
-//!
-//! `new X(...)` is the one call shape that must allocate before it can call,
-//! so it does not fit the ordinary call helpers. `jit_propagate_error` sits
-//! alongside it because it is the exit every helper in this tree takes when
-//! it cannot return normally.
+
+
+
+
+
+
 
 use crate::exec::ctx::ExecCtx;
 

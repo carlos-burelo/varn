@@ -143,12 +143,12 @@ pub(crate) fn get_symbol_property(
         (2, RuntimeSymbol::Iterator) => {
             heap.alloc_bound_native(obj, range_symbol_iterator, "[Symbol.iterator]")
         }
-        // A generator is its own iterator under both protocols. `for await`
-        // asks for `Symbol.asyncIterator`, and an `async function*` has to
-        // answer it — but a plain `function*` answers it too, exactly as it
-        // answers `Symbol.iterator`: `next()` settles its awaits before
-        // returning, so the two protocols are the same object here and
-        // `for await` over a sync generator is simply a no-op await per step.
+        
+        
+        
+        
+        
+        
         (3, RuntimeSymbol::Iterator | RuntimeSymbol::AsyncIterator) => {
             heap.alloc_bound_native(obj, generator_symbol_iterator, "[Symbol.iterator]")
         }

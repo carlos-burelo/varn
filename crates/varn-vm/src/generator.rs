@@ -26,20 +26,20 @@ impl std::fmt::Debug for NanGenInner {
     }
 }
 
-/// Drives a generator body: runs it until it suspends, hands back
-/// `{ value, done }`, and resumes it on the next call.
-///
-/// One driver serves both `function*` and `async function*`. They differ in a
-/// single arm: what happens when the body suspends on `await`. A sync
-/// generator has nothing to suspend into and says so; an async one settles the
-/// awaited value and keeps running until the body reaches a `yield` or
-/// finishes. Everything else — resume protocol, done bookkeeping, and the four
-/// GC tracing walks — is identical, so it is written once.
+
+
+
+
+
+
+
+
+
 #[derive(Debug)]
 pub struct NanGenDriver {
     inner: RefCell<NanGenInner>,
-    /// `async function*`: `await` inside the body is settled here rather than
-    /// rejected.
+    
+    
     is_async: bool,
 }
 
@@ -73,8 +73,8 @@ impl GeneratorDriver for NanGenDriver {
                     let nregs = frame.closure().proto.register_count as usize;
                     inner.ctx.stack.ensure_frame_size(base, nregs);
                     if (dest_reg as usize) < nregs {
-                        // No puede fallar en programas bien tipados; si el
-                        // input no encaja, el error sale como fallo del `next`.
+                        
+                        
                         let _ = inner
                             .ctx
                             .stack
@@ -85,8 +85,8 @@ impl GeneratorDriver for NanGenDriver {
         }
         inner.started = true;
 
-        // One `next()` can suspend several times: every `await` on the way to
-        // the next `yield` comes back through here.
+        
+        
         loop {
             let result = inner.ctx.run_until(0);
 
@@ -137,8 +137,8 @@ impl GeneratorDriver for NanGenDriver {
     fn trace_vm_values(&self, callback: &mut dyn FnMut(varn_types::VmValue)) {
         let inner = self.inner.borrow();
 
-        // Solo DYN y REF son raíces: GPR/FPR nunca alojan heap por
-        // construcción y el colector ni los mira.
+        
+        
         for &nv in &inner.ctx.stack.dyn_ {
             callback(nv);
         }

@@ -1,5 +1,5 @@
-//! "Fill missing match arms": the arms the checker found a `match` lacks
-//! (`CheckResult::match_gaps`), added after its last arm.
+
+
 
 use std::collections::HashMap;
 use tower_lsp::lsp_types::{
@@ -25,14 +25,14 @@ pub fn generate_match_arms_action(
     let ExprKind::Match { cases, .. } = &node.kind else {
         return None;
     };
-    // After the last arm, or inside the braces of a `match` with none.
+    
     let end = cases.last().map_or(node.range.start, |c| c.range.end);
     let insert_pos = Position {
         line: end.line.saturating_sub(1),
         character: end.column,
     };
 
-    // The existing arms' indentation, or one level past the `match` line's.
+    
     let indent_cols = cases.first().map_or_else(
         || {
             let line = state
@@ -78,7 +78,7 @@ pub fn generate_match_arms_action(
     }))
 }
 
-/// The innermost `match` spanning `line` (0-based).
+
 fn match_at_line(state: &DocumentState, line: u32) -> Option<ExprId> {
     let line = line + 1;
     state

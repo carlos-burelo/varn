@@ -80,39 +80,39 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
         Ok(self.0.alloc_array(items))
     }
 
-    /// Reads an object's fields straight into a fixed buffer, checking each key
-    /// against the cached shape as it arrives.
-    ///
-    /// This used to collect keys and values into two `Vec`s, then compare the
-    /// whole key list against the cache — two throwaway allocations per object,
-    /// plus a third inside `alloc_object_with_shape`, which copies the values
-    /// into the object's inline storage and drops the `Vec` again. A document
-    /// of 50 000 objects paid that 50 000 times per parse.
-    ///
-    /// Matching incrementally means a hit never materialises the keys at all:
-    /// the keys that matched ARE the cached ones. Only a mismatch has to
-    /// recover them, and it recovers the matched prefix from the cache rather
-    /// than from the parse.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: MapAccess<'de>,
     {
-        /// Fields held without allocating. Objects wider than this fall back to
-        /// the growable path; JSON documents in the shape this matters for
-        /// (records in an array) are far narrower.
+        
+        
+        
         const INLINE_FIELDS: usize = 16;
 
         let mut inline = [VmValue::null(); INLINE_FIELDS];
         let mut spilled: Vec<VmValue> = Vec::new();
         let mut n = 0usize;
 
-        // Taken once: the loop below parses nested values, which can replace
-        // the cache underneath it.
+        
+        
         let cached = cache_snapshot();
         let cached_keys = |k: usize| cached.as_ref().and_then(|(keys, _)| keys.get(k));
 
-        // How many keys so far are the snapshot's, in order. `None` once a key
-        // has diverged — from then on keys are collected as owned strings.
+        
+        
         let mut matched: Option<usize> = Some(0);
         let mut owned_keys: Vec<String> = Vec::new();
 
@@ -133,7 +133,7 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
                     matched = Some(k + 1);
                 }
                 Some(k) => {
-                    // Diverged at `k`: the first `k` keys are the snapshot's.
+                    
                     owned_keys = key_prefix(&cached, k);
                     owned_keys.push(key.into_owned());
                     matched = None;
@@ -148,8 +148,8 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
             &spilled
         };
 
-        // A prefix match is not a match: the object must also have ENDED where
-        // the snapshot's key list does.
+        
+        
         if matched == Some(n) {
             if let Some((keys, shape)) = &cached {
                 if keys.len() == n {
@@ -158,9 +158,9 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
             }
         }
 
-        // No cached shape, or this object has a different one: build the object
-        // field by field so the shape is derived, then cache it for the objects
-        // that follow.
+        
+        
+        
         if let Some(k) = matched {
             owned_keys = key_prefix(&cached, k);
         }

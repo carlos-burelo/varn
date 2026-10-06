@@ -1,26 +1,26 @@
-//! The one place that knows which fields of an [`InstKind`] are operands.
-//!
-//! There used to be three hand-written copies of this traversal — the
-//! substitution in `SsaFunc::replace_all_uses`, the collection in
-//! `verify::inst_uses`, and a partial one in `passes::licm::operands` that
-//! silently returned "no operands" for anything it had not been taught. A new
-//! `InstKind` had to be added to all three, and the third failing open meant
-//! a pass could hoist an instruction past the definition of an operand it did
-//! not know existed.
-//!
-//! Both visitors below are **exhaustive matches with no wildcard arm**, so a
-//! new variant stops the build until it is classified. Everything else in the
-//! crate is expressed on top of them.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use rustc_hash::FxHashMap;
 
 use super::ir::{InstKind, SsaFunc, Terminator, Value};
 
-/// Calls `f` on every value `kind` reads, in operand order.
+
 pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
     use InstKind::*;
     match kind {
-        // No operands.
+        
         ConstInt(_)
         | ConstFloat(_)
         | ConstBool(_)
@@ -44,7 +44,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | This
         | GetSuper { .. } => {}
 
-        // One operand.
+        
         Unary { operand, .. }
         | IsNull { operand }
         | Cast { operand, .. }
@@ -82,7 +82,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             }
         }
 
-        // Two operands.
+        
         Binary { lhs, rhs, .. } => {
             f(*lhs);
             f(*rhs);
@@ -128,7 +128,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             f(*accessor);
         }
 
-        // Three operands.
+        
         SetIndex {
             object,
             index,
@@ -149,7 +149,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             f(*value);
         }
 
-        // Variadic.
+        
         SelfCall { args } | SuperCall { args } | SuperMethodCall { args, .. } => {
             args.iter().for_each(|a| f(*a))
         }
@@ -183,7 +183,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
     }
 }
 
-/// Mutable twin of [`visit_uses`], for substitution.
+
 pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
     use InstKind::*;
     match kind {
@@ -345,7 +345,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
     }
 }
 
-/// Calls `f` on every value a terminator reads.
+
 pub fn visit_term_uses(term: &Terminator, f: &mut impl FnMut(Value)) {
     match term {
         Terminator::Return(Some(v)) | Terminator::Throw(v) => f(*v),
@@ -364,7 +364,7 @@ pub fn visit_term_uses(term: &Terminator, f: &mut impl FnMut(Value)) {
     }
 }
 
-/// Mutable twin of [`visit_term_uses`].
+
 pub fn visit_term_uses_mut(term: &mut Terminator, mut f: impl FnMut(&mut Value)) {
     match term {
         Terminator::Return(Some(v)) | Terminator::Throw(v) => f(v),
@@ -391,20 +391,20 @@ pub fn visit_term_uses_mut(term: &mut Terminator, mut f: impl FnMut(&mut Value))
     }
 }
 
-/// Applies many substitutions in a single traversal.
-///
-/// The per-value [`SsaFunc::replace_all_uses`] walks every instruction in the
-/// function, so a pass with `n` rewrites pays `n` full passes. Rewrites are
-/// chased transitively, so a map containing both `a -> b` and `b -> c`
-/// resolves uses of `a` to `c` regardless of insertion order.
+
+
+
+
+
+
 pub fn replace_uses_with_map(func: &mut SsaFunc, map: &FxHashMap<Value, Value>) -> bool {
     if map.is_empty() {
         return false;
     }
     let mut changed = false;
     let mut sub = |v: &mut Value| {
-        // Bounded by the map size: each hop consumes a distinct entry, and
-        // `insert_rewrite` refuses to create a cycle.
+        
+        
         let mut hops = 0;
         while let Some(&next) = map.get(v) {
             if next == *v || hops > map.len() {

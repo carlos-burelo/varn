@@ -23,9 +23,9 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
     #[cfg(feature = "lsp")]
     crate::inspect_lsp::run_for(&file_path, eval.as_deref(), &debug);
 
-    // Every phase but `gc` reads the compiled program without running it.
-    // `gc` needs the program to have actually executed — there's no heap
-    // state to report before it has allocated anything.
+    
+    
+    
     let no_run = !debug.needs_execution();
 
     pipeline::run(&RunOpts {

@@ -1,15 +1,15 @@
-//! Property get and set, in the four shapes codegen emits.
-//!
-//! The `_flat` variants take their arguments unpacked instead of through a
-//! struct, which is what lets the CLIF backend call them without building an
-//! argument block first.
+
+
+
+
+
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-/// A property read out of compiled code: the IC lookup the interpreter runs,
-/// with a getter run to completion; the value lands in `jit_native_result`.
+
+
 #[varn_op_macros::jit_slow(field = "get_property_flat")]
 pub(crate) extern "C" fn jit_get_property_flat(
     ctx: *mut ExecCtx,
@@ -33,8 +33,8 @@ pub(crate) extern "C" fn jit_get_property_flat(
     }
 }
 
-/// Flat-argument shim over [`jit_set_property`] for the CLIF backend (may run
-/// a setter, hence may GC).
+
+
 #[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "set_property_flat")]
 pub(crate) extern "C" fn jit_set_property_flat(

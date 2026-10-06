@@ -1,14 +1,14 @@
-//! Minimal static runtime for Varn AOT compiled binaries.
-//!
-//! Provides:
-//! - Entry point `main` which initializes standard handles and invokes `_varn_main`.
-//! - Native runtime helpers: `varn_rt_print`, `varn_rt_print_int`, `varn_rt_print_bool`,
-//!   `varn_rt_str_concat`, and `varn_rt_panic`.
+
+
+
+
+
+
 
 use std::io::Write;
 
 extern "C" {
-    /// Generated entry point emitted by the AOT compiler into the object file.
+    
     fn _varn_main() -> i64;
 }
 
@@ -19,11 +19,11 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     code as i32
 }
 
-/// Print a string slice directly to stdout, followed by a newline.
-///
-/// # Safety
-///
-/// `ptr` must point to a valid, readable block of memory of at least `len` bytes.
+
+
+
+
+
 #[no_mangle]
 pub unsafe extern "C" fn varn_rt_print(ptr: *const u8, len: usize) {
     if !ptr.is_null() && len > 0 {
@@ -34,13 +34,13 @@ pub unsafe extern "C" fn varn_rt_print(ptr: *const u8, len: usize) {
     let _ = std::io::stdout().flush();
 }
 
-/// Print an integer directly to stdout, followed by a newline.
+
 #[no_mangle]
 pub extern "C" fn varn_rt_print_int(val: i64) {
     println!("{val}");
 }
 
-/// Print a boolean directly to stdout, followed by a newline.
+
 #[no_mangle]
 pub extern "C" fn varn_rt_print_bool(val: i64) {
     if val != 0 {
@@ -50,20 +50,20 @@ pub extern "C" fn varn_rt_print_bool(val: i64) {
     }
 }
 
-/// Concatenate two strings and return a pointer and length packed in a struct / pair.
-/// Note: caller expects (ptr: i64, len: i64).
+
+
 #[repr(C)]
 pub struct StrResult {
     pub ptr: *const u8,
     pub len: usize,
 }
 
-/// Concatenates two string buffers.
-///
-/// # Safety
-///
-/// `a_ptr` and `b_ptr` must point to valid readable blocks of memory of at least
-/// `a_len` and `b_len` bytes, respectively.
+
+
+
+
+
+
 #[no_mangle]
 pub unsafe extern "C" fn varn_rt_str_concat(
     a_ptr: *const u8,
@@ -83,11 +83,11 @@ pub unsafe extern "C" fn varn_rt_str_concat(
     StrResult { ptr, len }
 }
 
-/// Panic with an error message and exit non-zero.
-///
-/// # Safety
-///
-/// If `ptr` is non-null, it must point to readable memory of at least `len` bytes.
+
+
+
+
+
 #[no_mangle]
 pub unsafe extern "C" fn varn_rt_panic(ptr: *const u8, len: usize) -> ! {
     if !ptr.is_null() && len > 0 {

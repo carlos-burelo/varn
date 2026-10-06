@@ -1,13 +1,13 @@
-//! Boxed-operator primitives shared with the SSA lowering: a generic binary
-//! operator and a generic comparison through their runtime helpers.
+
+
 
 use super::emit::{call_helper, call_helper_void};
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::FunctionBuilder;
 
-/// A generic binary operator on two boxed operands (as `(tag, payload)`)
-/// through its runtime helper; the boxed result.
+
+
 pub(crate) fn boxed_binop(
     b: &mut FunctionBuilder,
     cc: CallConv,
@@ -26,10 +26,10 @@ pub(crate) fn boxed_binop(
     )
 }
 
-/// A generic comparison of two boxed operands (as `(tag, payload)`) through
-/// its runtime helper; `0`/`1`. For `==` (`equality: Some(true)`) and `!=`
-/// (`Some(false)`), operands with identical bits that are not floats (a
-/// `NaN` is not equal to itself), or two inline strings, are decided inline.
+
+
+
+
 pub(crate) fn boxed_compare(
     b: &mut FunctionBuilder,
     cc: CallConv,

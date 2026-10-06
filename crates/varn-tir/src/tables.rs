@@ -1,22 +1,22 @@
-//! Per-module tables: classes with their layout and vtable, enums, signatures.
+
 
 use crate::ty::{BackendTy, ClassId, SigId, TyTable};
 use std::sync::Arc;
 use varn_core::layout::ClassLayout;
 
-/// One field of a class instance.
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldInfo {
     pub name: Arc<str>,
     pub ty: BackendTy,
-    /// Dense index, counting the parent's fields first.
+    
     pub slot: u16,
 }
 
-/// One entry of a class vtable. Its index IS the dispatch target, so the
-/// position in this vector is the whole payload — the name is kept for
-/// diagnostics and for the emitter to match overrides against. The signature
-/// is what a call through that slot will actually reach.
+
+
+
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct VtableEntry {
     pub name: Arc<str>,
@@ -30,8 +30,8 @@ pub struct ClassInfo {
     pub fields: Vec<FieldInfo>,
     pub vtable: Vec<VtableEntry>,
     pub layout: ClassLayout,
-    /// The signature of the class's own constructor, when it declares one.
-    /// Not a vtable entry: a constructor is reached by `new`, not dispatch.
+    
+    
     pub constructor: Option<SigId>,
 }
 
@@ -42,11 +42,11 @@ pub enum Ancestry<'a> {
 }
 
 impl ClassInfo {
-    /// A class with fields and no methods.
-    ///
-    /// `parent` is the id AND the info: the id goes into the record, the info
-    /// supplies the prefix. Taking only one of the two is what leaves a
-    /// `parent` field that never gets filled.
+    
+    
+    
+    
+    
     pub fn new(
         name: Arc<str>,
         parent: Ancestry<'_>,
@@ -56,7 +56,7 @@ impl ClassInfo {
         Self::new_with_methods(name, parent, fields, Vec::new(), types)
     }
 
-    /// A class with fields and methods, laid out against its parent.
+    
     pub fn new_with_methods(
         name: Arc<str>,
         parent: Ancestry<'_>,
@@ -92,19 +92,19 @@ impl ClassInfo {
             .collect();
         let layout = ClassLayout::from_fields(&kinds);
 
-        // Vtable: the parent's entries, then the new ones. A method the parent
-        // already has keeps its index — that is what makes the index a valid
-        // dispatch target for a base-typed receiver. The overriding class's
-        // signature wins, and that is the signature a call through that slot
-        // will actually reach when the receiver is that class.
+        
+        
+        
+        
+        
         let mut vtable: Vec<VtableEntry> =
             parent_info.map(|p| p.vtable.clone()).unwrap_or_default();
         for (m_name, m_sig) in methods {
             if let Some(entry) = vtable.iter_mut().find(|e| e.name == m_name) {
-                // Override: reuse the index but update the signature
+                
                 entry.sig = m_sig;
             } else {
-                // New method: append a new entry
+                
                 vtable.push(VtableEntry {
                     name: m_name,
                     sig: m_sig,
@@ -165,8 +165,8 @@ impl EnumInfo {
 pub struct Signature {
     pub params: Vec<BackendTy>,
     pub return_ty: BackendTy,
-    /// The last parameter is `...rest`: its type is the array the trailing
-    /// arguments are packed into, each of them its element.
+    
+    
     pub has_rest: bool,
 }
 

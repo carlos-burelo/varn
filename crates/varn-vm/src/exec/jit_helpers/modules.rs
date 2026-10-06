@@ -1,18 +1,18 @@
-//! Module loading and module-slot access from compiled code.
-//!
-//! `jit_load_module` has to be able to SUSPEND: an imported module may hit a
-//! top-level await, and the frame that asked for it must be parked and
-//! resumed later, with its ip rewound to re-run the load.
+
+
+
+
+
 
 use super::construct::jit_propagate_error;
 use super::suspend::jit_suspend_at;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-/// `own_ip` is this `LoadModule` instruction's own offset, not the next one:
-/// an imported module that suspends on a top-level `await` leaves the import
-/// unfinished, so the frame rewinds to re-execute the load once the awaited
-/// task resolves — the same rewind `op_load_module` performs interpreted.
+
+
+
+
 #[varn_op_macros::jit_slow(field = "load_module")]
 pub(crate) extern "C" fn jit_load_module(
     ctx: *mut ExecCtx,
@@ -31,15 +31,15 @@ pub(crate) extern "C" fn jit_load_module(
                 return;
             }
         };
-        // Our own frame, taken BEFORE the load: a module that suspends leaves
-        // its frame on top of ours, so `frames.last()` is no longer us.
+        
+        
         let self_idx = ctx_ref.frames.len() - 1;
-        // A failed import is the user's problem, not ours: a missing file or a
-        // module that throws while evaluating must surface as a catchable Varn
-        // error, exactly as it does interpreted (`op_load_module` propagates
-        // with `?`). Panicking here killed the host process instead, so the
-        // same `import` was catchable or fatal depending on whether the
-        // importing function happened to be compiled.
+        
+        
+        
+        
+        
+        
         let loaded =
             match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
                 Ok(v) => v,

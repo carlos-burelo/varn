@@ -1,25 +1,25 @@
-//! Running one frame as COMPILED code, and everything that can come back out
-//! of it.
-//!
-//! Extracted from `run_until_inner_raw` because it is a different job from
-//! interpreting bytecode: the interpreter loop steps opcodes, this steps a
-//! whole activation and then has to reconcile four possible endings —
-//! returned normally, threw and was caught below, threw and was not, or
-//! suspended. That reconciliation is ~120 lines that ran once per frame entry
-//! and had nothing to do with the per-opcode dispatch it was wedged inside.
-//!
-//! It cannot simply be a function that returns a value: the original code
-//! reached `continue 'frame_loop` and two different `return`s from inside a
-//! labelled loop, and control flow like that does not cross a function
-//! boundary. [`JitFrameOutcome`] carries the decision back out instead, so the
-//! caller performs the jump and this module stays honest about the fact that
-//! there are four endings, not one.
-//!
-//! Fase B: the register file is a partitioned [`crate::frame_store::FrameStore`],
-//! so the compiled entry no longer receives a contiguous stack pointer; each
-//! register's home is addressed by `FrameStore` (the activation id travels as
-//! the JIT's `base`). The frame pop/push reconciliation goes through
-//! `FrameStore::pop_frame` and `unbox_into_reg`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use super::ExecCtx;
 use crate::closure::VmClosure;
@@ -27,15 +27,15 @@ use crate::error::{RuntimeError, VmResult};
 use crate::exec::frame_ctrl::{resolve_constructor_return, unwind_to_handler};
 use crate::value::VmValue;
 
-/// How a compiled frame ended, as an instruction to the frame loop.
+
 pub(super) enum JitFrameOutcome {
-    /// Go round the frame loop again. Either the frame returned and a caller
-    /// is still running, or an exception was caught and its handler's frame is
-    /// now on top with its ip already set to the catch block.
+    
+    
+    
     Continue,
-    /// The run this call started is over; this is its value.
+    
     Done(VmValue),
-    /// Nothing below caught it.
+    
     Failed(RuntimeError),
 }
 
@@ -50,12 +50,12 @@ impl JitFrameOutcome {
     }
 }
 
-/// Run one clif frame under its OWN jump buffer.
-///
-/// `base` is the `FrameStore` activation id of the running frame. The JIT's
-/// first ABI word (`stack_ptr`) is unused by the lowering now and is passed
-/// null; the frame's registers live in `FrameStore`, reached from the entry
-/// helpers.
+
+
+
+
+
+
 #[inline(never)]
 unsafe fn execute_jit_frame(
     ctx: *mut ExecCtx,
@@ -105,14 +105,14 @@ unsafe fn restore_exit(ctx: *mut ExecCtx, exits_len: usize) {
     ctx.jit_exits_saved.truncate(exits_len);
 }
 
-/// Enter `jit_fn` for the frame at `frame_idx` and reconcile whatever comes
-/// back.
-///
-/// # Safety
-///
-/// `ctx` and `closure_ptr` must be valid, and `frame_idx` must be the index of
-/// the top frame — the caller reads it back after the compiled code has had a
-/// chance to push and pop frames of its own.
+
+
+
+
+
+
+
+
 #[allow(clippy::too_many_arguments)]
 #[allow(dangerous_implicit_autorefs)]
 pub(super) unsafe fn run_compiled_frame(
@@ -131,9 +131,9 @@ pub(super) unsafe fn run_compiled_frame(
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
     if is_osr {
-        // Not counted in `jit_runs`: this frame already counted as an
-        // interpreted entry when it started, and it is the same frame.
-        // `osr_entries` is what says the rescue happened.
+        
+        
+        
         varn_jit::JIT_STATS
             .osr_entries
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -167,9 +167,9 @@ pub(super) unsafe fn run_compiled_frame(
                     return JitFrameOutcome::Failed(err_obj.unwrap());
                 }
             } else if code == 2 {
-                // Absent when the suspending helper parked a frame other than
-                // the top one itself (see `jit_suspend_at`): a module that
-                // suspends on a top-level await leaves its frame above ours.
+                
+                
+                
                 if let Some(resume_ip) = (*ctx).jit_panic_suspend_resume_ip.take() {
                     let frame_idx2 = (*ctx).frames.len() - 1;
                     (*ctx).frames[frame_idx2].ip = resume_ip;
@@ -181,10 +181,10 @@ pub(super) unsafe fn run_compiled_frame(
         }
     };
 
-    // A compiled frame that executed a non-tail call pushed caller frames
-    // beneath its own callee(s); the frame that just returned is the one
-    // at the top of the stack NOW, which is not necessarily `frame_idx` if
-    // a helper popped it itself. Read it live.
+    
+    
+    
+    
     let returning_frame_idx = (*ctx).frames.len().saturating_sub(1);
     let frame = (*ctx).frames.pop().unwrap();
     (*ctx).drop_frame_storage(frame.base);

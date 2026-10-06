@@ -104,14 +104,14 @@ pub fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> Ru
     }
 }
 
-/// El valor que verá el `catch`.
-///
-/// Un `throw` del usuario ya trae el suyo. Un error nacido en el runtime
-/// —división por cero, una nativa que falla— no traía ninguno porque nunca
-/// llegaba a un `catch`: la búsqueda de handler vivía dentro del brazo del
-/// opcode `Throw`, así que todo `Err(RuntimeError)` salía del bucle sin mirar
-/// la tabla de excepciones. Se materializa como una instancia de `Error` para
-/// que `e.message` funcione igual que con uno lanzado a mano.
+
+
+
+
+
+
+
+
 pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
     if let Some(v) = err.thrown {
         return v;
@@ -119,8 +119,8 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
     let msg = heap.alloc_str_dynamic(&err.message);
     let class_name = err.kind.class_name();
     let Some(cls) = heap.get_intrinsic_class(class_name) else {
-        // Sin la clase registrada (arranque temprano, isolate sin globals):
-        // el mensaje suelto sigue siendo capturable e imprimible.
+        
+        
         return msg;
     };
     let name = heap.alloc_str_dynamic(class_name);
@@ -133,12 +133,12 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
     err_obj
 }
 
-/// Busca un handler para `thrown_val` y, si lo encuentra, deja el contexto
-/// listo para reanudar dentro del `catch`. Devuelve si lo manejó.
-///
-/// `depth` es el fondo de la invocación actual de la máquina: por debajo hay
-/// frames de un llamador de Rust, que no puede reanudarse desde aquí, así que
-/// el error tiene que propagarse como `Err` en vez de desmontarlos.
+
+
+
+
+
+
 #[allow(dangerous_implicit_autorefs)]
 pub(crate) unsafe fn dispatch_to_handler(
     ctx: *mut crate::exec::ExecCtx,
@@ -146,14 +146,14 @@ pub(crate) unsafe fn dispatch_to_handler(
     depth: usize,
 ) -> bool {
     if let Some(handler) = (*ctx).try_handlers.pop_if(|h| h.frame_depth > depth) {
-        // En programas bien tipados no falla (`err_reg` es `Dynamic`); si
-        // fallara, el error prosigue sin manejar en vez de perderse.
+        
+        
         if crate::exec::frame_ctrl::unwind_to_handler(&mut *ctx, handler, thrown_val).is_err() {
             return false;
         }
         return true;
     }
-    // Tabla lateral: coste cero mientras no se lanza nada.
+    
     while (*ctx).frames.len() > depth {
         let cur_ip = (*ctx).frames.last().unwrap().ip as u32;
         let proto = &(*ctx).frames.last().unwrap().closure().proto;

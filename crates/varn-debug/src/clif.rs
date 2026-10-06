@@ -1,4 +1,4 @@
-//! `vn debug -p clif` — Cranelift backend introspection, per function.
+
 
 #[cfg(target_arch = "x86_64")]
 use iced_x86::{Decoder, DecoderOptions, Formatter, Instruction, IntelFormatter};
@@ -14,7 +14,7 @@ use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_core::term::terminal::Section;
 
-/// Entry point: render the clif views for `proto` and every nested proto.
+
 pub fn debug_clif(proto: &FunctionProto, flags: &DebugFlags, helpers: &JitHelpers) {
     Section::new("clif")
         .subtitle(proto.name.as_deref().unwrap_or("<top-level>"))
@@ -28,7 +28,7 @@ pub fn debug_clif(proto: &FunctionProto, flags: &DebugFlags, helpers: &JitHelper
             return;
         }
     };
-    // Same shape production lowers — see `crate::resolved_copy`.
+    
     let resolved = crate::resolved_copy(proto);
     render_recursive(&resolved, flags, helpers, isa);
     Section::new("clif").close();
@@ -40,8 +40,8 @@ fn render_recursive(
     helpers: &JitHelpers,
     isa: &varn_jit::OwnedTargetIsa,
 ) {
-    // The filter selects which functions are *rendered*, never which are
-    // walked: a match can be nested inside a function that does not match.
+    
+    
     if flags.fn_filter.as_ref().is_none_or(|needle| {
         proto
             .name
@@ -61,11 +61,11 @@ fn render_recursive(
 }
 
 fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
-    // Asked for `clif:check` alone, the phase reports only what is broken and a
-    // clean module prints nothing — the same contract as `-p bails`, and what
-    // makes it usable as a sweep over every function in the corpus. With the
-    // bytecode lowering gone there are no lowering invariants left to check,
-    // so "broken" is a function that refuses to route.
+    
+    
+    
+    
+    
     let check_only = flags.clif_check
         && !(flags.clif_route || flags.clif_kinds || flags.clif_ir || flags.clif_asm);
     if check_only {
@@ -122,10 +122,10 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
 
     if flags.clif_asm {
         if let Some(code) = &insp.code {
-            // Decode the raw fn and the ABI wrapper in two independent passes.
-            // They are separate code ranges with alignment padding between
-            // them; decoding the whole buffer linearly lets the padding
-            // desync the decoder and corrupt the wrapper's instructions.
+            
+            
+            
+            
             let n = code.bytes.len();
             let raw_end = (code.raw_off + code.raw_len).min(n);
             let entry = code.entry_off.min(n);
@@ -152,7 +152,7 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
     }
 }
 
-/// Decode `bytes` (x86-64) into Intel-syntax text, one instruction per line.
+
 #[cfg(target_arch = "x86_64")]
 fn disasm(bytes: &[u8], rip: u64) -> String {
     let mut decoder = Decoder::with_ip(64, bytes, rip, DecoderOptions::NONE);
@@ -169,7 +169,7 @@ fn disasm(bytes: &[u8], rip: u64) -> String {
     out
 }
 
-/// Portable byte dump for non-x86 architectures.
+
 #[cfg(not(target_arch = "x86_64"))]
 fn disasm(bytes: &[u8], rip: u64) -> String {
     let mut out = String::new();

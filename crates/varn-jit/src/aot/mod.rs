@@ -1,10 +1,10 @@
-//! Ahead-Of-Time compiler: emits a native object file (`.obj` / `.o`) from a
-//! Varn module's `FunctionProto` tree using `cranelift-object`.
-//!
-//! Unlike the JIT path, which embeds helper addresses as immediates and writes
-//! to W^X pages, AOT declares every runtime helper as an external symbol and
-//! emits standard relocations that the system linker resolves against
-//! `varn-rt` (the minimal static runtime library).
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{types, AbiParam, InstBuilder, UserFuncName};
 use cranelift_codegen::isa::OwnedTargetIsa;
@@ -15,19 +15,19 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use rustc_hash::FxHashMap as HashMap;
 use varn_types::chunk::{Literal, PoolEntry};
 
-/// The result of an AOT compilation: raw bytes of the object file ready to be
-/// written to disk and linked.
+
+
 pub struct AotOutput {
     pub object_bytes: Vec<u8>,
 }
 
-/// Compiles a minimal Varn program to an object file.
-///
-/// Phase 1 supports:
-/// - `print(str)` and `print(int)` calls via the runtime helpers
-/// - Integer arithmetic (`+`, `-`, `*`, `/`, `%`)
-/// - String constants from pool
-/// - Function entry point exported as `_varn_main`
+
+
+
+
+
+
+
 pub fn compile_to_object(
     proto: &varn_types::FunctionProto,
     isa: &OwnedTargetIsa,
@@ -36,13 +36,13 @@ pub fn compile_to_object(
         .map_err(|e| format!("aot: ObjectBuilder: {e}"))?;
     let mut module = ObjectModule::new(obj_builder);
 
-    // --- Declare external runtime helpers ---
+    
     let rt_helpers = declare_rt_helpers(&mut module)?;
 
-    // --- Declare and define _varn_main ---
+    
     let main_sig = {
         let mut sig = module.make_signature();
-        // _varn_main() -> i64  (exit code)
+        
         sig.returns.push(AbiParam::new(types::I64));
         sig
     };
@@ -50,7 +50,7 @@ pub fn compile_to_object(
         .declare_function("_varn_main", Linkage::Export, &main_sig)
         .map_err(|e| format!("aot: declare _varn_main: {e}"))?;
 
-    // Build the function body
+    
     let mut ctx = module.make_context();
     ctx.func.signature = main_sig;
     ctx.func.name = UserFuncName::user(0, 0);
@@ -63,10 +63,10 @@ pub fn compile_to_object(
         builder.switch_to_block(entry_block);
         builder.seal_block(entry_block);
 
-        // Walk the bytecode and emit CLIF IR for the module body
+        
         emit_module_body(&mut builder, &mut module, main_id, proto, &rt_helpers)?;
 
-        // Return 0 (success)
+        
         let zero = builder.ins().iconst(types::I64, 0);
         builder.ins().return_(&[zero]);
         builder.finalize(module.isa().frontend_config());
@@ -76,7 +76,7 @@ pub fn compile_to_object(
         .define_function(main_id, &mut ctx)
         .map_err(|e| format!("aot: define _varn_main: {e}"))?;
 
-    // Finalize and emit
+    
     let product = module.finish();
     let bytes = product.emit().map_err(|e| format!("aot: emit: {e}"))?;
 
@@ -85,8 +85,8 @@ pub fn compile_to_object(
     })
 }
 
-/// External runtime helper function IDs, declared as imports so the linker
-/// resolves them against `varn-rt`.
+
+
 struct RtHelpers {
     print: FuncId,
     str_concat: FuncId,
@@ -95,22 +95,22 @@ struct RtHelpers {
 fn declare_rt_helpers(module: &mut ObjectModule) -> Result<RtHelpers, String> {
     let map_err = |e: cranelift_module::ModuleError| format!("aot: declare helper: {e}");
 
-    // void varn_rt_print(const char* ptr, usize len)
+    
     let mut print_sig = module.make_signature();
-    print_sig.params.push(AbiParam::new(types::I64)); // ptr
-    print_sig.params.push(AbiParam::new(types::I64)); // len
+    print_sig.params.push(AbiParam::new(types::I64)); 
+    print_sig.params.push(AbiParam::new(types::I64)); 
     let print = module
         .declare_function("varn_rt_print", Linkage::Import, &print_sig)
         .map_err(map_err)?;
 
-    // i64 varn_rt_str_concat(i64 a_ptr, i64 a_len, i64 b_ptr, i64 b_len) -> ptr,len packed
+    
     let mut sc_sig = module.make_signature();
     sc_sig.params.push(AbiParam::new(types::I64));
     sc_sig.params.push(AbiParam::new(types::I64));
     sc_sig.params.push(AbiParam::new(types::I64));
     sc_sig.params.push(AbiParam::new(types::I64));
-    sc_sig.returns.push(AbiParam::new(types::I64)); // ptr
-    sc_sig.returns.push(AbiParam::new(types::I64)); // len
+    sc_sig.returns.push(AbiParam::new(types::I64)); 
+    sc_sig.returns.push(AbiParam::new(types::I64)); 
     let str_concat = module
         .declare_function("varn_rt_str_concat", Linkage::Import, &sc_sig)
         .map_err(map_err)?;
@@ -118,7 +118,7 @@ fn declare_rt_helpers(module: &mut ObjectModule) -> Result<RtHelpers, String> {
     Ok(RtHelpers { print, str_concat })
 }
 
-/// Walk the top-level module bytecode and emit CLIF IR for each instruction.
+
 fn emit_module_body(
     builder: &mut FunctionBuilder,
     module: &mut ObjectModule,
@@ -133,21 +133,21 @@ fn emit_module_body(
     let constants = &proto.chunk.constants;
     let nregs = proto.register_count as usize;
 
-    // Declare CLIF variables for each register (each holds i64)
+    
     let mut vars = Vec::with_capacity(nregs * 2);
     for _ in 0..nregs {
-        // Even index = value (i64), odd index = metadata/len for strings
+        
         let v_val = builder.declare_var(types::I64);
         let v_meta = builder.declare_var(types::I64);
         vars.push((v_val, v_meta));
 
-        // Initialize to zero
+        
         let z = builder.ins().iconst(types::I64, 0);
         builder.def_var(v_val, z);
         builder.def_var(v_meta, z);
     }
 
-    // String constant data: we'll store (ptr, len) pairs for each string const
+    
     let mut data_ids: HashMap<usize, cranelift_module::DataId> = HashMap::default();
 
     let mut ip = 0usize;
@@ -294,13 +294,13 @@ fn emit_module_body(
                 builder.def_var(vars[first_reg].1, res_len);
             }
             OpCode::Call => {
-                // OpCode::Call: w1 has [dest][fn_reg], w2 has [argc][arg_start]
+                
                 let w2 = code[ip + 2];
                 let argc = (w2 >> 8) as usize;
                 let arg_start = (w2 & 0xFF) as usize;
 
                 if argc == 2 {
-                    let arg_r = arg_start + 1; // skip null self
+                    let arg_r = arg_start + 1; 
                     let val = builder.use_var(vars[arg_r].0);
                     let meta = builder.use_var(vars[arg_r].1);
 
@@ -320,7 +320,7 @@ fn emit_module_body(
     Ok(())
 }
 
-/// Get or create a data object for a string constant in the object module.
+
 fn get_or_create_string_data(
     module: &mut ObjectModule,
     cache: &mut HashMap<usize, cranelift_module::DataId>,

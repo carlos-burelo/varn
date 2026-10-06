@@ -1,7 +1,7 @@
-//! The prelude (ADR-0018): a module outside `core:` links the exports of the
-//! core modules holding Varn code that it names, as imports no source text
-//! writes. They land in module slots, so a use is a slot load, never a name
-//! lookup; a module naming none of them loads nothing.
+
+
+
+
 
 use rustc_hash::FxHashSet;
 use std::sync::Arc;
@@ -10,8 +10,8 @@ use varn_core::AtomInterner;
 use varn_modules::layer::Layer;
 use varn_tir::{TirImport, TirImportKind, TirImportSpec};
 
-/// The prelude imports of `module`: the prelude names it uses as values,
-/// minus those it declares itself (a local declaration shadows the prelude).
+
+
 pub(super) fn prelude_imports(
     module: &str,
     declared: &FxHashSet<Arc<str>>,

@@ -126,10 +126,10 @@ fn check_use(
     }
 }
 
-/// Rebuild every block's `preds` from the current terminators and `Try`
-/// handlers. The optimizer rewrites terminators without always keeping `preds`
-/// in step; callers that need an accurate pred set (the verifier, dominance)
-/// run this first.
+
+
+
+
 pub(crate) fn recompute_preds(func: &mut SsaFunc) {
     let n = func.blocks.len();
     let mut preds = vec![Vec::new(); n];
@@ -488,7 +488,7 @@ fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
     Ok(())
 }
 
-/// SSA type a `Convert` defines. `bigint`/`decimal` have no scalar `HirType`.
+
 pub(crate) fn convert_result_ty(conv: varn_core::NumConv) -> HirType {
     use varn_core::NumConv::*;
     match conv {
@@ -499,11 +499,11 @@ pub(crate) fn convert_result_ty(conv: varn_core::NumConv) -> HirType {
     }
 }
 
-/// SSA type a `Convert` reads, when it is a scalar the verifier can hold it to.
+
 fn convert_operand_ty(conv: varn_core::NumConv) -> Option<HirType> {
     use varn_core::NumConv::*;
     match conv {
-        // Widening into bigint/decimal also normalises a value already there.
+        
         IntToFloat => Some(HirType::Int),
         FloatToInt | FloatToBigInt | FloatToDecimal => Some(HirType::Float),
         IntToBigInt | IntToDecimal | BigIntToInt | DecimalToInt | DynToInt | DynToFloat

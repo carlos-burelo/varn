@@ -1,12 +1,12 @@
-//! Per-phase sample statistics.
+
 
 use std::time::Duration;
 
-/// Coefficient of variation above which a measurement is too noisy to compare
-/// against another binary without a paired methodology.
+
+
 pub const CV_NOISY: f64 = 0.05;
 
-/// Above this, loose A/B comparison is meaningless.
+
 pub const CV_UNRELIABLE: f64 = 0.10;
 
 pub struct PhaseStats {
@@ -61,9 +61,9 @@ impl PhaseStats {
         self.total / self.runs as u32
     }
 
-    /// Coefficient of variation: σ divided by p50. The scale-free noise
-    /// measure, so it is comparable across phases spanning microseconds to
-    /// milliseconds.
+    
+    
+    
     pub fn cv(&self) -> f64 {
         if self.p50.as_nanos() == 0 {
             return 0.0;
@@ -71,7 +71,7 @@ impl PhaseStats {
         self.stddev.as_nanos() as f64 / self.p50.as_nanos() as f64
     }
 
-    /// Spread as a fraction of the minimum — how far the worst run strayed.
+    
     pub fn spread(&self) -> f64 {
         if self.min.as_nanos() == 0 {
             return 0.0;

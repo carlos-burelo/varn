@@ -1,11 +1,11 @@
-//! Constant-pool literals and the serde plumbing for the interned strings they
-//! hold.
+
+
 
 use std::sync::Arc;
 
-/// Serde variant labels for [`Literal`], one per kind, sourced from the single
-/// canonical `RuntimeKind` names. Round-trip keys on the numeric index, so
-/// these are identifiers only — but they stay the one canonical representation.
+
+
+
 static LITERAL_VARIANTS: [&str; 9] = [
     varn_core::RuntimeKind::Null.name(),
     varn_core::RuntimeKind::Bool.name(),
@@ -62,11 +62,11 @@ impl PartialEq for Literal {
             (Self::Null, Self::Null) => true,
             (Self::Bool(a), Self::Bool(b)) => a == b,
             (Self::Int(a), Self::Int(b)) => a == b,
-            // Bit identity: `-0.0` and `0.0` are distinct constants (IEEE 754).
+            
             (Self::Float(a), Self::Float(b)) => a.to_bits() == b.to_bits(),
             (Self::Str(a), Self::Str(b)) => a == b,
             (Self::BigInt(a), Self::BigInt(b)) => a == b,
-            // Representation identity: `1.0d` and `1.00d` print differently.
+            
             (Self::Decimal(a), Self::Decimal(b)) => {
                 a.as_bigint_and_scale() == b.as_bigint_and_scale()
             }

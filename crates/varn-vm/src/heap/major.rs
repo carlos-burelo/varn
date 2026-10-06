@@ -1,6 +1,6 @@
-//! Major collection: mark everything reachable from the roots across every
-//! cell, young and old alike, then free every unmarked cell and leave every
-//! survivor old.
+
+
+
 
 use super::cells::CellSpace;
 use super::children::{for_each_child, Reach};

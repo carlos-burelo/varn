@@ -9,9 +9,9 @@ use crate::backend::{capabilities, lifecycle, sync};
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> LspResult<InitializeResult> {
-        // Honour settings from the handshake too, not only from a later change:
-        // otherwise a client that starts with hints disabled still gets them
-        // until it happens to send a configuration notification.
+        
+        
+        
         if let Some(opts) = &params.initialization_options {
             self.settings.apply(opts);
         }
@@ -80,9 +80,9 @@ impl LanguageServer for Backend {
         sync::did_close(self, params).await;
     }
 
-    /// Settings changed. Take whatever the notification carries — some clients
-    /// send the whole payload — and then pull, for the ones that send `null`
-    /// and expect to be asked.
+    
+    
+    
     async fn did_change_configuration(&self, params: DidChangeConfigurationParams) {
         self.settings.apply(&params.settings);
         self.pull_configuration().await;

@@ -1,9 +1,9 @@
-//! `TirModule` -> `FunctionProto` (step 3.4 wiring).
-//!
-//! Runs each `SsaFunc` from `build_module` through the same optimisation,
-//! state-machine and emission pipeline the HIR path uses. Closures reference
-//! their body by TIR index (`ClosureBody::Tir`); `ssa/emit` calls back here
-//! to compile them.
+
+
+
+
+
+
 
 use std::sync::Arc;
 
@@ -19,11 +19,11 @@ use super::ty::lower as lower_ty;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-// The `TirModule` currently being compiled, so `ssa/emit`'s `ClosureBody::Tir`
-// arm can call back to compile the referenced body. Same raw-pointer scope
-// guard pattern as the VM's `clif_link::CtxGuard`
-// — the pointer is only live for the duration of `with_module`, which owns
-// the borrow.
+
+
+
+
+
 thread_local! {
     static CUR_TIR: std::cell::Cell<*const TirModule> = const { std::cell::Cell::new(std::ptr::null()) };
 }
@@ -39,18 +39,18 @@ fn enter_module(tir: &TirModule) -> ModuleScope {
     ModuleScope(prev)
 }
 
-/// Compile the closure body a `ClosureBody::Tir(idx)` names, using the module
-/// set by the enclosing `enter_module`. Panics if called outside one — that
-/// only happens if a `from_tir` SSA function reached emission without going
-/// through `compile_module` / `compile_closure`.
+
+
+
+
 pub(crate) fn emit_tir_closure(idx: u32, source_file: Arc<str>) -> Result<FunctionProto> {
     let ptr = CUR_TIR.with(|c| c.get());
     assert!(
         !ptr.is_null(),
         "from_tir: closure emitted outside a module scope"
     );
-    // SAFETY: `ptr` was set by `enter_module` from a live `&TirModule` whose
-    // borrow outlives this call (it is on the stack of `compile_module`).
+    
+    
     let tir: &TirModule = unsafe { &*ptr };
     compile_closure(tir, idx, source_file)
 }
@@ -58,13 +58,13 @@ pub(crate) fn emit_tir_closure(idx: u32, source_file: Arc<str>) -> Result<Functi
 fn fn_meta(tir: &TirModule, f: &TirFunction) -> FnMeta {
     let mut tt = SsaTyTable::default();
     let mut ty = |bt: BackendTy| -> HirType { lower_ty(bt, tir, &mut tt) };
-    // A defaulted param's home register is `Dynamic` (see
-    // `build::defaulted_param_mask` / `build_inner`): it must arrive able to
-    // hold `null` before the prologue applies the default. `derive_register_meta`
-    // would converge on `Dynamic` for it anyway once it meets that entry
-    // value's kind against this one, but declaring it here too keeps the
-    // ABI-facing `param_kinds` honest instead of relying on the meet to paper
-    // over a kind this function already knows is wrong.
+    
+    
+    
+    
+    
+    
+    
     let defaulted = super::build::defaulted_param_mask(&f.body, f.params.len());
     FnMeta {
         name: f.name.clone(),
@@ -114,15 +114,15 @@ fn compile_one(
     let mut proto = emit_function_meta(ssa, &fn_meta(tir, f), source_file)?;
     proto.state_size = state_size;
     if is_top_level {
-        // The module owns this many global slots; the VM reserves a contiguous
-        // region for them and the indexed global opcodes are region-relative.
+        
+        
         proto.global_count = tir.global_names.len() as u32;
     }
     Ok(proto)
 }
 
-/// Compile the body a `ClosureBody::Tir(idx)` refers to. Called from
-/// `ssa/emit` while emitting a `MakeClosure`.
+
+
 pub(crate) fn compile_closure(
     tir: &TirModule,
     idx: u32,
@@ -137,8 +137,8 @@ pub(crate) fn compile_closure(
     compile_one(tir, f, false, source_file, &[], Some(varn_tir::FnId(idx)))
 }
 
-/// Compile a whole module: the top-level proto, with every free function and
-/// method stored as a global by name (the HIR path's convention).
+
+
 pub fn compile_module(tir: &TirModule, export_names: Vec<Arc<str>>) -> Result<FunctionProto> {
     varn_tir::verify_module(tir).map_err(|errors| {
         crate::OptError::InvalidTir(
@@ -160,7 +160,7 @@ pub fn compile_module(tir: &TirModule, export_names: Vec<Arc<str>>) -> Result<Fu
         .into_iter()
         .map(|s| Arc::from(s.as_ref()))
         .collect();
-    // Coalescing + register-count validation, recursing into nested protos.
+    
     crate::regalloc::run_post_passes(&mut proto);
     Ok(proto)
 }

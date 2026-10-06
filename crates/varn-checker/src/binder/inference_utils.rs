@@ -85,10 +85,10 @@ pub fn infer_object_member_type(
     }
 }
 
-/// Renders a synthetic display name for a pattern (used for function-type
-/// parameter names / diagnostics). `interner` is `None` only for the rare
-/// caller with no `TypeContext` on hand; identifiers then fall back to `_`
-/// rather than panicking on an unresolved `Atom`.
+
+
+
+
 pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>) -> Arc<str> {
     match p {
         Pattern::Identifier { name, .. } => match interner {

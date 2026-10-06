@@ -39,15 +39,15 @@ use crate::semantic_info::{CallResolution, MemberResolution};
 pub(crate) type MemberTypeCacheEntry = Option<(Type, Option<usize>)>;
 
 pub struct Checker<'r> {
-    /// How this checker reaches other modules. Borrowed for the duration of one
-    /// check, so the checker owns no module cache and nothing it holds can go
-    /// stale behind another thread's invalidation.
+    
+    
+    
     pub(crate) resolver: &'r dyn crate::module_resolver::ImportResolver,
-    /// The parsed program's expression/statement nodes (fase1-componente2:
-    /// `Expr`/`Stmt` are no longer owned trees). Same field name and same
-    /// reused lifetime `'r` as `Binder<'r>::ast_arena` — the checker is a
-    /// second, later borrower of the identical arena the binder already
-    /// walked, not a distinct mechanism.
+    
+    
+    
+    
+    
     pub(crate) ast_arena: &'r AstArena,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
     pub(crate) source_file: std::sync::Arc<str>,
@@ -65,7 +65,7 @@ pub struct Checker<'r> {
     pub(crate) symbol_type_params_cache: FxHashMap<(Arc<str>, u8), Vec<Arc<str>>>,
     pub(crate) symbol_types: FxHashMap<SymbolId, Type>,
     pub(crate) expr_table: FxHashMap<varn_core::ast::AstId, TypeEntry>,
-    /// Counter behind [`TypeEntry::seq`].
+    
     pub(crate) expr_seq: u32,
     pub(crate) current_class: Option<Arc<str>>,
     pub(crate) active_type_params: FxHashSet<Arc<str>>,
@@ -77,9 +77,9 @@ pub struct Checker<'r> {
     pub(crate) member_exists_cache: FxHashMap<(Type, Arc<str>), bool>,
     pub(crate) member_type_cache: FxHashMap<(Type, Arc<str>), MemberTypeCacheEntry>,
     pub(crate) expected_type: Option<Type>,
-    /// Filled by `validate_named_call_arguments`: for a call with named args,
-    /// `[param_pos] = Some(arg_idx)` or `None` (omitted, use the default). The
-    /// TIR emitter reads it to lay named arguments out positionally.
+    
+    
+    
     pub(crate) call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
@@ -98,12 +98,12 @@ pub struct Checker<'r> {
 }
 
 impl<'r> Checker<'r> {
-    /// Check `program` for a compile. See [`Checker::check_with`] for tooling.
-    ///
-    /// `resolver` supplies the modules `program` imports. It is a parameter
-    /// rather than ambient state so that a check is a function of its
-    /// arguments: two callers with different module graphs cannot interfere,
-    /// and nothing the checker consults can be invalidated behind its back.
+    
+    
+    
+    
+    
+    
     pub fn check(
         program: &Program,
         ast_arena: &'r AstArena,

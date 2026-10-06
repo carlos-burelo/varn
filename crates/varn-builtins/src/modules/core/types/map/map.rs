@@ -29,8 +29,8 @@ varn_contract! {
             if let Some(m) = get_map(ctx, this) {
                 let k = ctx.map_key(key)?;
                 m.borrow_mut().insert(k, value);
-                // Interior-mutability store: no opcode barrier sees it. A
-                // non-string key can be a nursery object too.
+                
+                
                 ctx.collection_write_barrier(this, k.0);
                 ctx.collection_write_barrier(this, value);
             }

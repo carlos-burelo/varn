@@ -52,10 +52,10 @@ pub const MOD_ASYNC: u32 = 1 << 2;
 pub const MOD_STATIC: u32 = 1 << 3;
 pub const MOD_ABSTRACT: u32 = 1 << 4;
 
-/// Build the LSP semantic-token stream. Every identifier-bearing token is
-/// classified by [`classify::resolve_token`], which is driven entirely by the
-/// checker (`expr_types` + lexical `resolve_at`); there are no token-scanned
-/// heuristics here anymore.
+
+
+
+
 pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
     let tokens = &state.tokens;
     let mut result = Vec::with_capacity(tokens.len() * 5);
@@ -63,7 +63,7 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
     let mut prev_col: u32 = 0;
 
     for (i, tok) in tokens.iter().enumerate() {
-        // Only real source tokens carry colour.
+        
         let colorable = tok.kind == TokenKind::Identifier
             || tok.kind.is_keyword()
             || tok.kind.is_literal()
@@ -84,18 +84,18 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             .and_then(|j| tokens.get(j))
             .map(|t| t.kind == TokenKind::Dot)
             .unwrap_or(false);
-        // `name:` — object-literal key position. (Declared fields/params, incl.
-        // optional `name?:`, resolve via their recorded symbol, so this only
-        // needs to catch unrecorded object-literal keys.)
+        
+        
+        
         let next_is_colon = tokens
             .get(i + 1)
             .map(|t| t.kind == TokenKind::Colon)
             .unwrap_or(false);
 
-        // Receiver of a `recv.member` access is an enum *type* — marks the
-        // member as an enum variant (`Shape.Circle`), distinct from a field
-        // access on an enum *value* (`ok.code`). Sourced from the checker's
-        // symbol kinds, not a token scan.
+        
+        
+        
+        
         let prev2_is_enum = prev_is_dot
             && i >= 2
             && matches!(
@@ -103,9 +103,9 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                 Some(SymbolKind::Enum)
             );
 
-        // `get`/`set` are keywords only as accessor declarations (`get name()`),
-        // i.e. immediately followed by the accessor name. Everywhere else they
-        // are ordinary identifiers and must be resolved as such.
+        
+        
+        
         let getset_as_ident = matches!(tok.kind, TokenKind::Get | TokenKind::Set)
             && !prev_is_dot
             && tokens
@@ -135,8 +135,8 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             continue;
         }
 
-        // `readonly` modifier for `this` and `const` bindings — derived from the
-        // checker's symbol kind, not a name table.
+        
+        
         let modifier = if tok.kind == TokenKind::This
             || state
                 .db

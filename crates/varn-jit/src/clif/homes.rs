@@ -1,11 +1,11 @@
-//! Inline access to a register's home slot in the partitioned `FrameStore`.
-//!
-//! A home is the register's slot in its class vector (`gpr`, `fpr`, `refs`,
-//! `dyn_`): `vec_ptr + (base[class] + idx) * elem_size`, read straight out of
-//! the live `ExecCtx`. Both lowerings — from bytecode and from typed SSA —
-//! reach homes through here, so the address arithmetic and the per-class
-//! conversions exist once. Every access re-reads the vector pointer from
-//! `ExecCtx`, so a reallocation during a call never leaves a stale base.
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -14,8 +14,8 @@ use varn_types::vm_value::{KIND_HEAP, KIND_INT, KIND_NULL};
 
 use crate::JitFrameLayout;
 
-/// What an inline home access needs: the live `ExecCtx`, this activation's
-/// id, the register-to-class map, and the `FrameStore` field offsets.
+
+
 pub(crate) struct Homes<'a> {
     pub exec_ctx: Value,
     pub base: Value,
@@ -24,7 +24,7 @@ pub(crate) struct Homes<'a> {
 }
 
 impl Homes<'_> {
-    /// Byte offset (from `ExecCtx`) of `class`'s vector data pointer.
+    
     fn class_ptr_offset(&self, class: SlotClass) -> i32 {
         let fl = self.offsets;
         (match class {
@@ -35,7 +35,7 @@ impl Homes<'_> {
         }) as i32
     }
 
-    /// Machine address of register `reg`'s home slot.
+    
     pub(crate) fn addr(&self, b: &mut FunctionBuilder, reg: usize) -> Value {
         let class = self.layout.class_of(reg);
         let idx = self.layout.idx_of(reg);
@@ -57,11 +57,11 @@ impl Homes<'_> {
         b.ins().iadd(ptr, off)
     }
 
-    /// Write `value` to the precomputed home address `home` (see
-    /// [`addr`][Self::addr]), converted to the home's class. `value`
-    /// is a boxed `VmValue` (`I128`), or a bare `I64` payload: an `int` for a
-    /// `Gpr`/`Dyn` home, an object address (0 = null) for a `Ref` one, raw `f64` bits for an
-    /// `Fpr` one.
+    
+    
+    
+    
+    
     pub(crate) fn store_at(&self, b: &mut FunctionBuilder, home: Value, reg: usize, value: Value) {
         let class = self.layout.class_of(reg);
         let m = cranelift_codegen::ir::MemFlagsData::trusted();
@@ -111,13 +111,13 @@ impl Homes<'_> {
         }
     }
 
-    /// Read `reg`'s home as a boxed `VmValue` (`I128`).
+    
     pub(crate) fn load(&self, b: &mut FunctionBuilder, reg: usize) -> Value {
         let home = self.addr(b, reg);
         self.load_at(b, home, reg)
     }
 
-    /// [`load`] from a precomputed [`addr`][Self::addr].
+    
     pub(crate) fn load_at(&self, b: &mut FunctionBuilder, home: Value, reg: usize) -> Value {
         let class = self.layout.class_of(reg);
         let m = cranelift_codegen::ir::MemFlagsData::trusted();
@@ -143,7 +143,7 @@ impl Homes<'_> {
     }
 }
 
-/// Element size of a class vector.
+
 fn elem_size(class: SlotClass) -> i64 {
     match class {
         SlotClass::Gpr | SlotClass::Fpr => 8,

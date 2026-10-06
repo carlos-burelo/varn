@@ -8,27 +8,27 @@ use varn_core::ast::{ExprId, ExprKind};
 use varn_core::SourceRange;
 use varn_core::TokenKind;
 
-/// Parse the property name introduced by `.` or `?.`, called with the dot
-/// already consumed.
-///
-/// A property always sits on the same line as its dot: multi-line chains lead
-/// with the dot (`\n  .bar()`), never trail it. So a token on a later line is
-/// the *next statement*, not this member's name.
-///
-/// Taking it anyway — which is what an unconditional `consume()` did — ate the
-/// following declaration whole. `const n = g.` followed by `const m = 42`
-/// parsed as `Member(g, "const")` plus a bare assignment `m = 42`: `m` was
-/// never declared, and the user got `property 'const' does not exist on type
-/// 'str'` for code they had not written yet.
-///
-/// Yields [`ExprKind::Missing`] **without consuming** when there is no name, so
-/// the enclosing declaration still parses and still binds its symbols. That is
-/// what lets the editor answer `g.<cursor>` from the checker rather than from a
-/// token-stream heuristic.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 fn parse_property_name(s: &mut TokenStream) -> ExprId {
     if s.is_eof() || s.line() > s.prev_line() {
-        // Anchor at the dot, not at the current token: the current token is on
-        // the next line and is usually valid code the user did not write wrong.
+        
+        
         let range = s.prev_end_range();
         s.push_error("expected a property name after `.`".to_owned(), range);
         return s.expr(range, ExprKind::Missing);
@@ -61,20 +61,20 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
         TokenKind::Bang => prefix_unary!(UnaryOp::Not),
         TokenKind::Tilde => prefix_unary!(UnaryOp::BitNot),
         TokenKind::Minus => {
-            // The lexer sees a magnitude, never a sign, so the magnitude of
-            // i64::MIN (2^63) does not fit the i64 it parses into and the
-            // literal is rejected before the minus is ever considered. Folding
-            // the sign here is what makes the lower bound of `int` writable.
-            //
-            // Deliberately narrow: only the one magnitude that is unspellable
-            // otherwise is folded, so every program that parses today keeps the
-            // exact same AST.
+            
+            
+            
+            
+            
+            
+            
+            
             const I64_MIN_MAGNITUDE: &str = "9223372036854775808";
-            s.advance(); // consume the `-`
+            s.advance(); 
             if s.kind() == TokenKind::IntegerLiteral
                 && s.lexeme().replace('_', "") == I64_MIN_MAGNITUDE
             {
-                s.advance(); // consume the magnitude lexeme
+                s.advance(); 
                 let full_range = s.span_from(start_range);
                 let raw = s.interner.intern(&format!("-{}", I64_MIN_MAGNITUDE));
                 return Ok(s.expr(
@@ -85,8 +85,8 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                     },
                 ));
             }
-            // Not the special case: the same body `prefix_unary!` has, minus
-            // the `advance` already done above.
+            
+            
             let o = parse_unary_expr(s)?;
             let full_range = s.span_from(start_range);
             Ok(s.expr(

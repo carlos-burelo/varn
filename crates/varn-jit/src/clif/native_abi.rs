@@ -1,11 +1,11 @@
-//! The native activation ABI: how one compiled body calls another without a
-//! VM frame between them.
-//!
-//! `raw(ctx, closure, r0, r1, …) -> ret` in Cranelift's `tail` convention.
-//! Each register travels in its class's machine form — an `int`/`bool` as
-//! one `i64`, a `float` as one `f64`, anything boxed as its `(tag, payload)`
-//! words — and so does the return. `r0` is the receiver slot (`this`, or the
-//! callee placeholder of a plain call) and is always boxed.
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{types, AbiParam, Signature};
 use cranelift_codegen::isa::CallConv;
@@ -49,7 +49,7 @@ impl NativeClass {
 
 pub(crate) const CALL_CONV: CallConv = CallConv::Tail;
 
-/// The machine shape of one body: its registers `r0..arity` and its return.
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NativeShape {
     pub params: Vec<NativeClass>,
@@ -83,8 +83,8 @@ impl NativeShape {
     }
 }
 
-/// Set in a published [`NativeShape::id`] when the body never touches the VM
-/// frame: a caller may enter it without pushing a `CallFrame`.
+
+
 pub const NATIVE_FRAMELESS: u64 = 1 << 63;
 
 const MAX_ID_PARAMS: usize = 27;
@@ -100,9 +100,9 @@ impl NativeClass {
 }
 
 impl NativeShape {
-    /// The shape as one word, so a call site can compare the ABI it emits
-    /// against the one a callee published. `None` past
-    /// [`MAX_ID_PARAMS`] registers: such a body is never entered natively.
+    
+    
+    
     pub(crate) fn id(&self) -> Option<u64> {
         if self.params.len() > MAX_ID_PARAMS {
             return None;

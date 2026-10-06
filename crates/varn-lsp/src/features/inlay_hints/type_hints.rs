@@ -100,8 +100,8 @@ fn find_rparen_col_on_line(state: &DocumentState, line: u32, after_col: u32) -> 
     last_rparen_col
 }
 
-/// Whether a hint showing `ty` tells the reader anything: `dynamic` and
-/// `void` do not.
+
+
 fn worth_hinting(state: &DocumentState, ty: &varn_checker::Type) -> bool {
     !matches!(
         state.db.ty_kind(ty),
@@ -109,7 +109,7 @@ fn worth_hinting(state: &DocumentState, ty: &varn_checker::Type) -> bool {
     )
 }
 
-/// A hint after each pipeline stage: the type of the value it produces.
+
 fn collect_pipeline_hints(state: &DocumentState, hints: &mut Vec<InlayHint>) {
     let arena = &state.ast_arena;
     for expr in state.spatial_index.exprs() {

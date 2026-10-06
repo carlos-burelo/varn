@@ -10,13 +10,13 @@ pub fn varn_contract(input: TokenStream) -> TokenStream {
     varn_contract::expand(input)
 }
 
-/// Marca un slow-path JIT (spec §4). Valida forma, pasa función intacta.
+
 #[proc_macro_attribute]
 pub fn jit_slow(attr: TokenStream, input: TokenStream) -> TokenStream {
     jit_slow::expand(attr, input)
 }
 
-/// Genera la tabla de helpers desde las anotaciones `#[jit_slow(field)]`.
+
 #[proc_macro]
 pub fn jit_helper_table(input: TokenStream) -> TokenStream {
     jit_helper_table::expand(input)

@@ -1,5 +1,5 @@
-//! String operations compiled code calls directly: concatenation,
-//! slicing and length.
+
+
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;

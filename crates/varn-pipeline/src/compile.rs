@@ -126,11 +126,11 @@ pub fn compile(
     }
 
     if debug.bytecode {
-        // `graph_build.modules` es un `rustc_hash::FxHashMap`: su orden de
-        // iteración se siembra al azar en cada arranque de proceso, así que sin
-        // ordenar aquí el volcado sale con los módulos barajados de una corrida
-        // a otra. El bytecode en sí no cambia — sólo su presentación —, pero eso
-        // basta para que `diff` sobre dos volcados sea inservible como oráculo.
+        
+        
+        
+        
+        
         let mut paths: Vec<&String> = graph_build.modules.keys().collect();
         paths.sort_unstable();
         for path in paths {
@@ -151,9 +151,9 @@ pub fn compile(
         }
     }
 
-    // Coverage is a whole-program property, so the imported modules matter as
-    // much as the entry one: a metric that stops at the entry module reports
-    // a number that looks like coverage and is not.
+    
+    
+    
     if debug.tiers || debug.bails || debug.summary {
         let helpers = varn_vm::jit::helpers::build_jit_helpers();
         for (path, module_proto) in graph_build.modules.iter() {
@@ -164,8 +164,8 @@ pub fn compile(
                 eprintln!("\n=== MODULE: {} ===", path);
                 varn_debug::summary::debug_summary(module_proto);
             }
-            // These two print their own header only when they have content, so
-            // a filtered run does not emit a banner per silent module.
+            
+            
             if debug.tiers {
                 varn_debug::tiers::debug_tiers(module_proto, debug, &helpers, Some(path));
             }
@@ -175,11 +175,11 @@ pub fn compile(
         }
     }
 
-    // `typeloss` is a whole-program property like `bytecode`: the entry module
-    // of a multi-file program is usually just imports, so stopping at it
-    // reports a coverage that looks whole-program and is not. Paths are sorted
-    // for the same reason as the bytecode dump above: `FxHashMap` iteration is
-    // seeded per process, and module sections must come out in a stable order.
+    
+    
+    
+    
+    
     if debug.typeloss {
         let mut paths: Vec<&String> = graph_build.modules.keys().collect();
         paths.sort_unstable();

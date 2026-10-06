@@ -66,8 +66,8 @@ pub fn core_module_ids() -> Vec<&'static str> {
     module_ids_of_kind(ModuleKind::Core)
 }
 
-/// The core modules holding Varn code, in registry order: the prelude every
-/// module links (ADR-0018).
+
+
 pub fn prelude_modules() -> Vec<&'static ModuleSpec> {
     provider::get()
         .map(|p| {
@@ -200,7 +200,7 @@ fn resolve_export_target(
         format!("./{sub}")
     };
 
-    // 1. Exact match in exports
+    
     if let Some(target) = manifest.exports.get(&export_key) {
         let entry = package_root.join(target.trim_start_matches(RELATIVE_EXPORT_PREFIX));
         if entry.exists() {
@@ -208,7 +208,7 @@ fn resolve_export_target(
         }
     }
 
-    // 2. Wildcard pattern matching in exports (e.g. "./*" -> "./src/*.vn")
+    
     for (key, val) in &manifest.exports {
         if key.contains('*') {
             let prefix = key.trim_end_matches('*');
@@ -223,7 +223,7 @@ fn resolve_export_target(
         }
     }
 
-    // 3. Fallback convention resolution
+    
     if sub.is_empty() {
         if let Some(ref main_field) = manifest.main {
             let main_path =
@@ -274,7 +274,7 @@ fn find_package_root(base_dir: &Path, package_name: &str) -> Option<PathBuf> {
             return Some(env_modules);
         }
 
-        // Check if dir itself is the requested package
+        
         if let Ok(manifest) = load_package_manifest(dir) {
             if manifest.name.as_deref() == Some(package_name) {
                 return Some(dir.to_path_buf());

@@ -57,18 +57,18 @@ impl FromVm for String {
     }
 }
 
-/// Borrowed-string marshaling for native params: SSO payloads decode into an
-/// inline buffer and heap strings clone their `Arc<str>` — no allocation, no
-/// byte copy. The `Rc` keeps the string alive independently of the heap
-/// slot, so callee-side heap mutation (allocation, GC) cannot invalidate it.
-///
-/// Carries the source's ascii-ness alongside the bytes, read once at marshal
-/// time from `NativeCtx::str_is_ascii` (O(1) amortized — a cached flag on the
-/// heap string, not a fresh scan). This is what lets `str`-receiver methods
-/// answer "is this ascii" for free instead of re-deriving it, which mattered
-/// for exactly one shape of bug: a method called once per index in a loop
-/// (`charCodeAt`) re-scanning the string from byte 0 on every call turns an
-/// O(n) walk into O(n²).
+
+
+
+
+
+
+
+
+
+
+
+
 pub enum VnStr {
     Sso { buf: [u8; 5], len: u8, ascii: bool },
     Shared(std::sync::Arc<str>, bool),
@@ -78,8 +78,8 @@ impl VnStr {
     #[inline]
     pub fn as_str(&self) -> &str {
         match self {
-            // Valid UTF-8 by construction: the buffer was produced by
-            // `sso_as_str` at marshal time.
+            
+            
             VnStr::Sso { buf, len, .. } => unsafe {
                 std::str::from_utf8_unchecked(&buf[..*len as usize])
             },
@@ -95,12 +95,12 @@ impl VnStr {
         }
     }
 
-    /// `charCodeAt`/`codePointAt`: char-index semantics (matches `.length`,
-    /// which also counts chars, not bytes). O(1) when the string is ascii
-    /// (byte index == char index, straight to `as_bytes()`); the general
-    /// case is an honest O(pos) UTF-8 walk, same as `.chars().nth(pos)`
-    /// anywhere else in the language — that cost is real for non-ascii text,
-    /// not a bug. A negative position is out of range, not position zero.
+    
+    
+    
+    
+    
+    
     #[inline]
     pub fn char_code_at(&self, pos: i64) -> i64 {
         if pos < 0 {

@@ -12,8 +12,8 @@ impl ExecCtx {
         dest: usize,
         frame_idx: usize,
     ) -> VmResult<bool> {
-        // Receiver pendiente para el camino lento (bound-method que no entró
-        // en vía rápida): ocupa staging[0] al preparar.
+        
+        
         let mut pending_receiver: Option<VmValue> = None;
         if callee.is_heap() {
             let heap_idx = callee.as_heap();
@@ -32,10 +32,10 @@ impl ExecCtx {
                                 "stack overflow: call depth exceeded 10000",
                             ));
                         }
-                        // La ventana ya trae [pad, args...] en el frame
-                        // llamante: se mueve directo a los registros del
-                        // callee (conversión por clase, sin boxeo intermedio
-                        // cuando las clases coinciden).
+                        
+                        
+                        
+                        
                         let alloc = self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
                         let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                         frame.return_reg = dest as u16;
@@ -88,9 +88,9 @@ impl ExecCtx {
                                         "stack overflow: call depth exceeded 10000",
                                     ));
                                 }
-                                // Ventana: [receiver?, args...] → regs
-                                // [r0=receiver, r1..]. Con placeholder, el
-                                // receiver lo sustituye; sin él va delante.
+                                
+                                
+                                
                                 let first_arg = if arg_count == arity { 1 } else { 0 };
                                 let alloc = self.push_call_frame_with_this(
                                     &nc.proto,
@@ -112,10 +112,10 @@ impl ExecCtx {
                     }
                 }
 
-                // El receiver se estampa en staging[0] para el camino lento:
-                // el código anterior lo hacía siempre (con placeholder lo
-                // sustituía; sin él ocupaba el primer slot pusheado) y
-                // `prepare_call` lo re-aplica de forma idempotente.
+                
+                
+                
+                
                 pending_receiver = Some(receiver);
             } else {
                 match self.heap.get(callee.as_heap()) {
@@ -178,7 +178,7 @@ impl ExecCtx {
                             }
                             if failed.is_none() {
                                 for i in regular_count..rest_idx {
-                                    // `null` de relleno (igual que antes).
+                                    
                                     if let Err(e) =
                                         self.stack.unbox_into_reg(alloc, i, VmValue::null())
                                     {
@@ -220,8 +220,8 @@ impl ExecCtx {
             }
         }
 
-        // Camino lento: la ventana se prepara en staging y `prepare_call` la
-        // adopta (frames), la drena (nativas/generadores/async) o la empaqueta.
+        
+        
         self.stage.clear();
         for i in 0..arg_count {
             self.stage.push(self.stack.box_reg(base, arg_start + i));
@@ -259,14 +259,14 @@ impl ExecCtx {
         let closure_ptr = parent_frame.closure_ptr;
         let closure_ref = unsafe { &*closure_ptr };
 
-        // Vía lenta: el callee es el propio closure. El código anterior lo
-        // leía de `stack[base-1]` (el slot bajo el frame), que no contiene el
-        // callee en ningún protocolo de staging: con frames del camino rápido
-        // es el último registro del llamante y con frames lentos el primer
-        // slot pusheado. La vía rápida (la única que los tests ejercitan) ni
-        // lo miraba. Aquí se materializa del `Rc` retenido (o null limpio si
-        // el frame es prestado, que `prepare_call` convierte en "not callable"
-        // en vez de basura reinterpretada).
+        
+        
+        
+        
+        
+        
+        
+        
         let callee = match &parent_frame._owned_closure {
             Some(rc) => self.heap.alloc_vm_closure(rc.clone()),
             None => VmValue::null(),

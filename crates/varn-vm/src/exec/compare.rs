@@ -133,9 +133,9 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     false
 }
 
-/// Equality of a member of a value type (a record field, a tuple element,
-/// a variant payload): deep, so a nested array compares by its elements.
-/// A mutable array at top level is still compared by identity.
+
+
+
 fn member_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if a.is_heap() && b.is_heap() {
         if let (Some(HeapObj::Array(x)), Some(HeapObj::Array(y))) =
@@ -154,8 +154,8 @@ fn member_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     eq(a, b, heap)
 }
 
-/// Two enum values are equal when they are the same variant of the same enum
-/// with equal payloads.
+
+
 fn variant_eq(
     a: &varn_types::value::EnumVariantData,
     b: &varn_types::value::EnumVariantData,
@@ -163,7 +163,7 @@ fn variant_eq(
 ) -> bool {
     let same_enum = match (a.enum_class_id, b.enum_class_id) {
         (Some(x), Some(y)) => x == y,
-        // A value that crossed an isolate channel carries only the name.
+        
         _ => a.enum_name == b.enum_name,
     };
     same_enum && a.variant_tag == b.variant_tag && payload_eq(a.payload, b.payload, heap)

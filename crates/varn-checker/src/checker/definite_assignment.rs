@@ -1,11 +1,11 @@
-//! Definite-assignment analysis (D-2 of the TIR redesign).
-//!
-//! A local declared without an initializer and then read on a path where no
-//! assignment reached it is an error: the interpreter returns `null` there and
-//! the JIT returns `0`, so "what an unassigned binding is worth" was undefined
-//! behaviour. The analysis is deliberately shallow — it tracks straight-line
-//! flow, two-armed `if`, `match` and `switch`, and treats loop bodies as
-//! "may not run". It never looks inside a nested function or closure.
+
+
+
+
+
+
+
+
 
 use super::Checker;
 use crate::binder::BindResult;
@@ -15,12 +15,12 @@ use varn_core::{Atom, Diagnostic, ErrorCode};
 
 #[derive(Clone, Default)]
 struct Flow {
-    /// Locals declared without an initializer and still in scope.
+    
     pending: FxHashSet<Atom>,
-    /// Locals definitely assigned at this point.
+    
     assigned: FxHashSet<Atom>,
-    /// Every path to here has already left the block (`return` / `throw` /
-    /// `break` / `continue`).
+    
+    
     diverged: bool,
 }
 
@@ -28,7 +28,7 @@ impl Flow {
     fn assign(&mut self, name: &Atom) {
         self.assigned.insert(*name);
     }
-    /// Merge two branch outcomes back into `self` (the pre-branch state).
+    
     fn merge(&mut self, a: Flow, b: Flow) {
         match (a.diverged, b.diverged) {
             (true, true) => self.diverged = true,
@@ -56,7 +56,7 @@ impl<'r> Checker<'r> {
             }
             self.da_stmt(s, flow, bind);
         }
-        // Locals declared in this block leave scope.
+        
         flow.pending.retain(|n| outer_pending.contains(n));
     }
 
@@ -87,7 +87,7 @@ impl<'r> Checker<'r> {
                         }
                     }
                 }
-                // Function / class / enum declarations: analysed on their own.
+                
                 self.da_nested_decl(&decl, bind);
             }
 
@@ -266,13 +266,13 @@ impl<'r> Checker<'r> {
                         )
                         .with_range(arena.expr(e).range),
                     );
-                    // Report once per binding.
+                    
                     flow.assigned.insert(name);
                 }
             }
 
-            // An assignment to a bare identifier makes it assigned; the value
-            // is analysed first.
+            
+            
             ExprKind::Assign { target, value, .. } => {
                 let (target, value) = (*target, *value);
                 self.da_expr(value, flow, bind);
@@ -283,7 +283,7 @@ impl<'r> Checker<'r> {
                 }
             }
 
-            // Nested functions have their own flow; do not walk into them here.
+            
             ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::ClassExpr { .. } => {}
 
             _ => walk_expr_children(e, arena, &mut |c| self.da_expr(c, flow, bind)),
@@ -353,9 +353,9 @@ fn pattern_names(p: &varn_core::ast::Pattern) -> Vec<Atom> {
     out
 }
 
-/// Apply `f` to every direct sub-expression id of `e`. Deliberately
-/// structural — it does not need to know what each node means, only where
-/// the children are.
+
+
+
 fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(ExprId)) {
     use varn_core::ast::{Arg, ArrayEl, ObjectProp, TemplatePart};
     match &arena.expr(e).kind {

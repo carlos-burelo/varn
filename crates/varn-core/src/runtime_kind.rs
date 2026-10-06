@@ -86,20 +86,20 @@ impl RuntimeKind {
 }
 
 impl RuntimeKind {
-    /// The kind whose discriminant is `raw`, or `None` (a boxed `VmValue`)
-    /// when `raw` names none — the conservative reading, and the one a
-    /// truncated or forward-version operand must get.
+    
+    
+    
     pub const fn from_u8(raw: u8) -> Option<Self> {
         if raw <= Self::Bytes as u8 {
-            // SAFETY: `RuntimeKind` is `#[repr(u8)]` with contiguous discriminants
-            // from `Null = 0` through `Bytes`, and `raw` is inside that range.
+            
+            
             Some(unsafe { std::mem::transmute::<u8, Self>(raw) })
         } else {
             None
         }
     }
 
-    /// Operand byte for a field kind; `None` (boxed) encodes out of range.
+    
     pub const fn encode(kind: Option<Self>) -> u8 {
         match kind {
             Some(k) => k as u8,
@@ -108,9 +108,9 @@ impl RuntimeKind {
     }
 }
 
-/// How a fixed-field access addresses its field: by dynamic `slot` (enum
-/// payloads, records), or at a compact offset laid out by the field's kind
-/// (`None` = a boxed `VmValue`).
+
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum FieldAccess {
     Slot,
@@ -118,7 +118,7 @@ pub enum FieldAccess {
 }
 
 impl FieldAccess {
-    /// Operand byte: `0` is `Slot` — no class field is laid out as `Null`.
+    
     pub fn encode(self) -> u8 {
         match self {
             Self::Slot => 0,

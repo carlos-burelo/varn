@@ -104,18 +104,18 @@ pub trait NativeCtx {
         Cow::Owned(self.str_repr(v))
     }
     fn str_owned(&self, v: VmValue) -> Option<String>;
-    /// Zero-copy string access: a refcount bump for heap strings instead of
-    /// an allocation + byte copy. Implementations back it with their shared
-    /// representation; the default falls back to copying.
+    
+    
+    
     fn str_shared(&self, v: VmValue) -> Option<std::sync::Arc<str>> {
         self.str_owned(v).map(std::sync::Arc::from)
     }
-    /// Whether `v`'s string is entirely ASCII. Backed by a per-string cached
-    /// flag where the representation has one (`HeapStr`'s ascii bit) — O(1)
-    /// amortized, not a fresh scan — so callers that need this per element of
-    /// a sequential scan (`charCodeAt` in a loop, say) don't pay O(n) per
-    /// call and turn an O(n) walk into O(n²). The default here (a fresh scan)
-    /// is correct but only cheap for callers that don't hammer it in a loop.
+    
+    
+    
+    
+    
+    
     fn str_is_ascii(&self, v: VmValue) -> bool {
         self.str_repr_borrowed(v).is_ascii()
     }
@@ -139,13 +139,13 @@ pub trait NativeCtx {
         obj
     }
 
-    /// Run a VM callable. An exception it throws comes back as the error,
-    /// thrown value included: a native propagates it with `?`, never drops it.
+    
+    
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue])
         -> Result<VmValue, crate::NativeError>;
 
-    /// `recv.name` as a callable bound to `recv`, when `recv` has such a
-    /// method (how a native reaches a capability like `Comparable.compare`).
+    
+    
     fn method(&mut self, _recv: VmValue, _name: &str) -> Option<VmValue> {
         None
     }
@@ -258,17 +258,17 @@ pub trait NativeCtx {
         }
     }
 
-    /// Canonicalize a value for use as a `Map`/`Set` key (see
-    /// `varn_types::value::MapKey`). The default is bit-identity — correct
-    /// for SSO/int/bool/null/symbol; heap-backed contexts override it to
-    /// content-intern heap strings/chars/decimals/bigints and to normalize
-    /// `-0.0`.
+    
+    
+    
+    
+    
     fn map_key(&mut self, v: VmValue) -> Result<crate::value::MapKey, crate::NativeError> {
         Ok(crate::value::MapKey(v))
     }
 
-    /// Canonical map key for a borrowed string: SSO when short-ASCII,
-    /// content-interned otherwise (`intern(Value::Str)` is content-unique).
+    
+    
     fn str_map_key(&mut self, s: &str) -> crate::value::MapKey {
         match VmValue::try_from_sso(s) {
             Some(v) => crate::value::MapKey(v),
@@ -276,9 +276,9 @@ pub trait NativeCtx {
         }
     }
 
-    /// Record an old→young edge after storing `child` inside `parent`
-    /// (collections mutated through interior mutability, which no opcode
-    /// barrier sees). No-op for heap-less contexts.
+    
+    
+    
     fn collection_write_barrier(&mut self, _parent: VmValue, _child: VmValue) {}
 
     fn alloc_obj(&mut self) -> VmValue {
@@ -297,10 +297,10 @@ pub trait NativeCtx {
         None
     }
 
-    /// Spawn the worker isolate and return a join task. The task resolves
-    /// `Null` when the worker finishes, or rejects with a heap-independent
-    /// typed error (`HostError`) if the worker threw. No port is injected —
-    /// endpoints are passed in `args` and transfer by reference.
+    
+    
+    
+    
     fn spawn_isolate(
         &mut self,
         _module_path: &str,

@@ -1,36 +1,36 @@
-//! Loop-invariant code motion over typed SSA.
-//!
-//! Scope is deliberately conservative — a hoist must be a pure win with no
-//! semantic risk:
-//!
-//! * Hoisted instructions are non-throwing and allocation-free: `Binary`
-//!   add/sub/mul and comparisons on proven `Int`/`Float` operand classes,
-//!   and `Unary` neg/not on the same. A test-at-top loop can run zero
-//!   iterations, so anything that could throw (div/mod/pow, dynamic ops)
-//!   or allocate must stay put.
-//! * Literals are deliberately NOT hoisted. Rematerializing one is a single
-//!   cheap dispatch, while holding it in a register across the loop competes
-//!   with everything else live there. Measured on `tests/main.vn`, 20 runs,
-//!   interleaved A/B: hoisting literals cost ~12% (127.9 ms vs 114.6 ms p50
-//!   e2e) and bought nothing measurable on an object-field loop that load
-//!   hoisting alone already sped up 1.4x.
-//! * `LoadGlobalIdx` hoists only out of "transparent" loops — no calls, no
-//!   global stores, no opaque effects anywhere in the loop — since any call
-//!   can rebind a global.
-//! * `GetFixedField` and `ArrayGetIndex` hoist only out of loops where every
-//!   instruction is pure ([`super::dce::is_pure`]) — no store of any kind and
-//!   no user code, so a repeat read is guaranteed to see the same value.
-//!   Neither can throw from the preheader: the checker only emits
-//!   `GetFixedField` for a receiver it proved is a non-nullable class (a
-//!   nullable one lowers to `GetPropertyMaybe`), and an out-of-range
-//!   `ArrayGetIndex` yields null rather than raising.
-//! * The destination is the loop's unique entry predecessor, and only when
-//!   that predecessor ends in an unconditional jump to the header: it runs
-//!   exactly when the loop is entered, and it dominates every loop block.
-//!
-//! Loops are natural loops of back-edges (`P → H` where `H` dominates `P`).
-//! The pass-manager fixpoint reruns this pass, so invariants cascade
-//! outward through nested loops without inner/outer ordering logic here.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use super::cfg::{dominates, dominators};
 use crate::hir::{HirBinOp, HirType, HirUnOp};
@@ -45,9 +45,9 @@ pub fn run(func: &mut SsaFunc) -> bool {
     let dom = dominators(func);
     let mut changed = false;
 
-    // Back-edges grouped by header: a loop with several `continue` latches
-    // is ONE natural loop (the union over its back-edges) — flooding from a
-    // single latch would under-approximate membership and mis-hoist.
+    
+    
+    
     let mut loops: rustc_hash::FxHashMap<BlockId, Vec<BlockId>> = rustc_hash::FxHashMap::default();
     for b in 0..n {
         for succ in successors(&func.blocks[b].term) {
@@ -70,8 +70,8 @@ pub fn run(func: &mut SsaFunc) -> bool {
 fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool {
     let n = func.blocks.len();
 
-    // Natural loop: header + everything that reaches a latch without
-    // passing through the header.
+    
+    
     let mut in_loop = vec![false; n];
     in_loop[header.0 as usize] = true;
     let mut stack = latches.to_vec();
@@ -85,7 +85,7 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
         }
     }
 
-    // Unique entry predecessor that unconditionally jumps to the header.
+    
     let entries: Vec<BlockId> = func.blocks[header.0 as usize]
         .preds
         .iter()
@@ -103,7 +103,7 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
         return false;
     }
 
-    // Values defined inside the loop (params and inst dests).
+    
     let mut def_in_loop = vec![false; func.values.len()];
     let mut facts = LoopFacts {
         globals_stable: true,
@@ -129,7 +129,7 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
         }
     }
 
-    // Iterate to a fixpoint so chains of invariants hoist together.
+    
     let mut changed = false;
     loop {
         let mut moved_any = false;
@@ -164,19 +164,19 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
     changed
 }
 
-/// What the loop body as a whole guarantees, which decides how much of it a
-/// single instruction is allowed to leave.
+
+
 #[derive(Debug, Clone, Copy)]
 struct LoopFacts {
-    /// Nothing in the loop can rebind a global.
+    
     globals_stable: bool,
-    /// Nothing in the loop writes memory or runs user code, so a repeated
-    /// load reads the same value on every iteration.
+    
+    
     memory_stable: bool,
 }
 
-/// Non-throwing, allocation-free, effect-free — safe to run even when the
-/// loop body executes zero times.
+
+
 fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
     match kind {
         InstKind::GetFixedField { .. }
@@ -206,8 +206,8 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
         InstKind::LoadGlobal(_) | InstKind::LoadGlobalIdx(_) | InstKind::LoadNativeGlobalIdx(_) => {
             facts.globals_stable
         }
-        // A `str` is immutable, so its length is invariant with its operand;
-        // an array's is not (a push in the loop changes it).
+        
+        
         InstKind::IsNull { .. }
         | InstKind::IsArray { .. }
         | InstKind::GetEnumTag { .. }
@@ -217,11 +217,11 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
     }
 }
 
-/// Whether an instruction is incapable of rebinding a global, so
-/// `LoadGlobal` stays invariant across it. Whitelist, not blacklist:
-/// anything that can run user code (calls, property access — getters and
-/// setters — generic indexing) or store a global is opaque. Fixed fields
-/// and typed array slots are plain memory, never accessors.
+
+
+
+
+
 fn is_transparent(kind: &InstKind) -> bool {
     matches!(
         kind,

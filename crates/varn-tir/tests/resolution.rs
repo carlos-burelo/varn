@@ -1,16 +1,16 @@
 #![allow(unused_crate_dependencies)]
-//! What the checker proved about *which* entity an expression refers to.
-//! Today the backend re-derives this at runtime: InvokeVirtual resolves a
-//! method by name, globals are patched from name-keyed to index-keyed before
-//! execution, and the method dispatcher strcmps against `push` and `pop`.
-//! None of that is information the runtime has and the checker lacks.
+
+
+
+
+
 
 use std::sync::Arc;
 use varn_tir::{DynReason, FnId, LocalId, Resolution};
 
-/// A resolution is in exactly one of three states: it resolves to nothing, it
-/// resolves to a known entity, or it defers to a runtime name lookup. The
-/// coverage report counts the last two and must not count the first.
+
+
+
 #[test]
 fn the_three_dispatch_states_are_distinguishable() {
     let by_name = Resolution::ByName {
@@ -18,7 +18,7 @@ fn the_three_dispatch_states_are_distinguishable() {
         why: DynReason::IndexSignature,
     };
 
-    // Resolves to a known entity.
+    
     for r in [
         Resolution::FieldSlot(3),
         Resolution::StaticField(1),
@@ -36,17 +36,17 @@ fn the_three_dispatch_states_are_distinguishable() {
         assert!(!r.is_dynamic_dispatch(), "{r:?} is not by-name");
     }
 
-    // Resolves to nothing: a literal carries this, and it is neither.
+    
     assert!(!Resolution::None.is_static_dispatch());
     assert!(!Resolution::None.is_dynamic_dispatch());
 
-    // Deferred to a runtime name lookup.
+    
     assert!(!by_name.is_static_dispatch());
     assert!(by_name.is_dynamic_dispatch());
 }
 
-/// A by-name resolution always says why, so 1037 name-keyed reads can be
-/// split into the ones that are honest and the ones that are bugs.
+
+
 #[test]
 fn by_name_carries_its_reason() {
     let r = Resolution::ByName {

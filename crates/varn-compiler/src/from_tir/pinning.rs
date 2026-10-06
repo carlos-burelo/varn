@@ -4,10 +4,10 @@ use varn_tir::{Resolution, TirExpr, TirExprKind, TirStmt};
 use super::tir_children::{child_exprs, seq_bodies};
 use crate::ssa::ir::VarId;
 
-/// Parent locals / params captured by a nested closure. They must be pinned to
-/// a fixed frame slot and read / written through `LoadCaptured` /
-/// `StoreCaptured` so the linear-scan allocator never reuses their register
-/// while an open upvalue still points at it.
+
+
+
+
 pub(super) fn captured_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> {
     use crate::hir::LocalId;
     use varn_tir::TirUpvalue;
@@ -65,11 +65,11 @@ pub(super) fn captured_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> {
     out
 }
 
-/// Locals / params assigned anywhere inside a `try` region (its guarded body,
-/// a `catch` body, or a spliced `finally` copy that landed in either). SSA
-/// construction only threads the try-entry's values into a landing pad, so a
-/// value mutated on a path that reaches the pad by exception unwinding is lost
-/// unless it lives in a fixed frame slot. Mirrors HIR's `scan_pinned_vars`.
+
+
+
+
+
 pub(super) fn try_pinned_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> {
     let mut out = FxHashSet::default();
     fn note_target(e: &TirExpr, out: &mut FxHashSet<VarId>) {
@@ -92,8 +92,8 @@ pub(super) fn try_pinned_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> 
                     scan_expr_assigns(e, out)
                 }
                 TirStmt::Let { local, .. } => {
-                    // a `let` inside the region also needs a stable slot if a
-                    // later exception path reads it
+                    
+                    
                     out.insert(VarId::Local(crate::hir::LocalId(local.0)));
                 }
                 TirStmt::If {
@@ -147,7 +147,7 @@ pub(super) fn try_pinned_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> 
                 } => {
                     scan_assigns(body, out);
                     scan_assigns(catch_body, out);
-                    // nested trys inside
+                    
                     walk(body, out);
                     walk(catch_body, out);
                 }

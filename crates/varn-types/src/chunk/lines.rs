@@ -1,4 +1,4 @@
-//! Bytecode offset -> source line mapping, run-length encoded.
+
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub struct LineEntry {

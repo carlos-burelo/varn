@@ -21,9 +21,9 @@ impl GlobalStore {
     }
 
     pub(crate) fn with_native_layout(heap: &mut Heap) -> Self {
-        // `native_global_layout()` is the authority on ORDER (and the checker
-        // emits `LoadNativeGlobalIdx` against it); `register_globals_vm` only
-        // supplies the values.
+        
+        
+        
         let mut native_map = varn_builtins::register_globals_vm(heap);
         let order = varn_builtins::native_global_layout();
 
@@ -39,9 +39,9 @@ impl GlobalStore {
             values.push(val);
         }
 
-        // Anything the value map carried that the layout did not name (should be
-        // nothing) is appended sorted — it stays reachable by name, just not at
-        // a compile-time-known index.
+        
+        
+        
         let mut leftover: Vec<(Arc<str>, VmValue)> = native_map.into_iter().collect();
         leftover.sort_by(|(a, _), (b, _)| a.as_ref().cmp(b.as_ref()));
         for (name, val) in leftover {
@@ -57,15 +57,15 @@ impl GlobalStore {
         }
     }
 
-    /// Reserve a contiguous region of `count` fresh (null) slots for a module's
-    /// globals and return its base index. `LoadGlobalIdx` / `StoreGlobalIdx`
-    /// carry slots relative to this base; the running closure carries the base.
-    ///
-    /// The region is anonymous — `idx_to_name` gets placeholder entries so the
-    /// two vecs stay the same length; a later `define` of the same name (a
-    /// module top-level `DefineGlobal` for a name that also needs a string key,
-    /// e.g. a re-export) still appends rather than reusing the slot, which is
-    /// fine: the indexed ops never consult `idx_to_name`.
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub(crate) fn reserve_region(&mut self, count: u32) -> u32 {
         let base = self.values.len() as u32;
         let empty: Arc<str> = Arc::from("");

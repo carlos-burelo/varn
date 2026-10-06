@@ -34,16 +34,16 @@ pub struct ClassObj {
     pub setter_vtable_owners: RefCell<Vec<Option<Rc<ClassObj>>>>,
     pub static_getter_map: RefCell<HashMap<RuntimeString, VmValue>>,
     pub static_setter_map: RefCell<HashMap<RuntimeString, VmValue>>,
-    /// Cached `constructor` lookup keyed by vtable_version, so hot `new`
-    /// paths skip the method_map hash lookup on every instantiation.
+    
+    
     pub ctor_cache: RefCell<Option<(u32, Option<VmValue>)>>,
-    /// VM-owned constructor cache keyed by vtable_version: the VM stores its
-    /// resolved closure here (`Rc<VmClosure>` as `Rc<dyn Any>`) so hot `new`
-    /// paths skip the `VmValue` box clone + downcast. `Some((v, None))` means
-    /// "class has no constructor". varn-types only provides the slot.
+    
+    
+    
+    
     pub ctor_rt_cache: RefCell<Option<CtorRtCacheEntry>>,
-    /// Cached instance shape and inline field count. In Varn, classes have
-    /// fixed, immutable field layouts once declared.
+    
+    
     pub instance_shape_cache: RefCell<Option<(Rc<super::shape::Shape>, usize)>>,
     pub layout: RefCell<Rc<varn_core::layout::ClassLayout>>,
 }
@@ -321,7 +321,7 @@ impl ClassObj {
         None
     }
 
-    /// Cached `find_method("constructor")`, invalidated by vtable_version.
+    
     pub fn constructor(&self) -> Option<VmValue> {
         let ver = self.vtable_version.load(Ordering::Relaxed);
         if let Some((cached_ver, ctor)) = self.ctor_cache.borrow().as_ref() {

@@ -1,6 +1,6 @@
-//! Operand validity of binary operators: numeric domains meet only through
-//! `varn_core::numeric` (with exact literals adopting the other side),
-//! strings concatenate and compare, bitwise operators take `int`.
+
+
+
 
 use super::super::helpers::{base_type, op_str};
 use super::super::infer::member_binary::normalize_for_binary;
@@ -71,8 +71,8 @@ impl<'r> Checker<'r> {
                     if both_numeric {
                         same_numeric
                     } else {
-                        // Values of types with nothing in common are never
-                        // equal: comparing them is a type error, not `false`.
+                        
+                        
                         l_ty == Type::Null
                             || r_ty == Type::Null
                             || self.value_assignable_to(&l_ty, &r_ty, Some(right), Some(bind))

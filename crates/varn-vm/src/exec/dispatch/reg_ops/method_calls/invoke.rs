@@ -1,6 +1,6 @@
-//! The invocations a resolved method call ends in: a native with its
-//! receiver, a VM method's activation, or the generic call of whatever the
-//! property lookup produced.
+
+
+
 
 use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
@@ -10,9 +10,9 @@ use crate::value::VmValue;
 use std::rc::Rc;
 
 impl ExecCtx {
-    /// The generic tail of [`Self::call_method`]: lay the callee and
-    /// arguments out on the stack and dispatch, for every method shape that has
-    /// no shorter path.
+    
+    
+    
     pub(super) fn finish_generic_method_call(
         &mut self,
         method_nv: VmValue,
@@ -149,8 +149,8 @@ impl ExecCtx {
         Ok(result)
     }
 
-    /// Push the activation of VM method `nc` with `this_val` in `r0` and the
-    /// arguments after it; the caller decides what to do with the frame.
+    
+    
     pub(crate) fn invoke_vm_method_fast(
         &mut self,
         nc: Rc<VmClosure>,
@@ -170,19 +170,19 @@ impl ExecCtx {
             let is_jit = nc.jit_fn().is_some();
             self.record_hotspot_method(&method_key, is_jit);
         }
-        // `arity` counts register 0 (the receiver here) plus the declared
-        // params. Missing trailing args keep the frame defaults (DYN slots
-        // read `null`, exactly as the old null-padding; static classes read
-        // their zero value — only reachable when the caller under-applies,
-        // which the checker rejects for required params).
+        
+        
+        
+        
+        
         if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
             return Err(crate::error::RuntimeError::new(
                 "stack overflow: call depth exceeded 10000",
             ));
         }
         let alloc = if !nc.proto.has_rest {
-            // Receiver in r0 + typed args in r1.. — one materialisation,
-            // shared with `exec_call_reg`'s bound-method fast path.
+            
+            
             self.push_call_frame_with_this(&nc.proto, this_val, args)?
         } else {
             let alloc = self.stack.push_frame(&nc.proto);

@@ -3,9 +3,9 @@ use crate::strbuf::StrBuf;
 use crate::value::VmValue;
 use std::rc::Rc;
 
-/// `.length` for the property fast paths: str (char count) and Array
-/// (element count), matching the native getters in varn-builtins. `None`
-/// for any other receiver, which then takes the generic getter path.
+
+
+
 pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
     if val.is_sso() {
         return Some(VmValue::from_i32(val.sso_len() as i32));
@@ -25,8 +25,8 @@ pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
 }
 
 pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    // Fast path: two SSO strings whose combined length fits in SSO (<= 5 bytes).
-    // Assembles the bytes in CPU registers with 0 allocations, 0 memory access.
+    
+    
     if a.is_sso() && b.is_sso() {
         let la = a.sso_len();
         let lb = b.sso_len();
@@ -37,9 +37,9 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         }
     }
 
-    // Accumulation fast path: `a` is the tip view of an extensible buffer.
-    // Appending never disturbs shorter views of the same buffer, so this is
-    // safe regardless of aliasing; the result is a longer view, O(1) amortized.
+    
+    
+    
     if a.is_heap() {
         if let Some(HeapObj::Str(hs)) = heap.get(a.as_heap()) {
             if let HeapStr::Ext { buf, len, ascii } = hs {
@@ -47,11 +47,11 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
                     let buf = Rc::clone(buf);
                     let len = *len;
                     let a_ascii = ascii.get();
-                    // Own `b` first: it may be a view of the same buffer, and
-                    // push_str may reallocate it.
+                    
+                    
                     let sb = heap.str_repr(b);
-                    // Carry the ASCII cache forward: the new view is the old
-                    // prefix plus `sb`, so its state derives from both.
+                    
+                    
                     let flag = match a_ascii {
                         crate::heap::ascii_flag::NO => crate::heap::ascii_flag::NO,
                         crate::heap::ascii_flag::YES if sb.is_ascii() => {
@@ -73,10 +73,10 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         }
     }
 
-    // The `"prefix" + <int>` shape, built once instead of staged through a
-    // `StrBuf` and a zeroed `[u8; INLINE_STR_CAP]`. Declines to anything it
-    // cannot serve, including an `Ext` left operand — but the accumulation
-    // path above has already claimed those.
+    
+    
+    
+    
     if let Some(v) = heap.alloc_str_concat_inline(a, b) {
         return v;
     }

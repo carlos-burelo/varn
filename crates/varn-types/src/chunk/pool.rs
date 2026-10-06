@@ -1,4 +1,4 @@
-//! Constant-pool entries: literals, nested function protos, class definitions.
+
 
 use std::rc::Rc;
 use std::sync::Arc;

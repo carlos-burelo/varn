@@ -1,11 +1,11 @@
 use super::*;
 
 impl Type {
-    /// `Bytes` has no fixed `CheckerTyId` (only the seeded intrinsics do),
-    /// so this reads the shape via the table — unlike `is_str`/`is_bool`
-    /// which compare fixed ids directly. Ported from main's `is_bytes`
-    /// (canonical bytes, ADR-0008); main callers using `is_bytes()` with no
-    /// args must pass the table.
+    
+    
+    
+    
+    
     pub fn is_bytes(&self, table: &CheckerTyTable) -> bool {
         matches!(
             table.get(self.0),

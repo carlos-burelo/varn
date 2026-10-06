@@ -1,15 +1,15 @@
 use super::table::CheckerTyTable;
 
 impl CheckerTyTable {
-    /// Union every shape in `other` into `self`. Commutative and idempotent:
-    /// content-addressed ids mean a shape present in both tables has the same
-    /// id, so this is a set union with no remap. This replaces the old
-    /// `reintern`-based `absorb` (ADR-0012).
+    
+    
+    
+    
     pub fn absorb(&mut self, other: &CheckerTyTable) {
-        // Skip the (redundant) base-vs-base walk when both tables already
-        // share the same frozen base: every entry `other.base` could offer
-        // is already in `self.base` by definition of sharing the `Arc`, so
-        // only `other`'s delta can possibly be new to `self`.
+        
+        
+        
+        
         let shared_base = std::sync::Arc::ptr_eq(&self.base, &other.base);
         if !shared_base {
             for (k, v) in &other.base.entries {

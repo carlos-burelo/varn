@@ -1,19 +1,19 @@
-//! Completion of the members a receiver offers: `x.|`, `Foo.|`, `{ | } = x`.
-//!
-//! Every receiver comes down to a type and whether the static or the
-//! instance side is being read; the checker lists that type's members
-//! (`get_members_of_type`: classes, generics substituted, primitives through
-//! their core classes, structural objects, tuples, extensions).
+
+
+
+
+
+
 
 use crate::document::{DocumentState, TokenRecord};
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
 use varn_checker::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary, SymbolKind, Type};
 use varn_core::{LangPrimitive, TokenKind};
 
-/// What a member completion reads from.
+
 pub struct ReceiverInfo {
     pub ty: Type,
-    /// `x.` reads the instance side, `Foo.` the static one.
+    
     pub is_instance: bool,
 }
 
@@ -33,7 +33,7 @@ pub fn build_member_completions(
         .collect()
 }
 
-/// A completion item straight from the checker's summary of a member.
+
 fn summary_to_completion_item(
     state: &DocumentState,
     m: &ResolvedMemberSummary,
@@ -99,8 +99,8 @@ fn completion_kind(kind: ResolvedMemberKind) -> CompletionItemKind {
     }
 }
 
-/// Whether a symbol of `kind` names a type, so that a member access on it
-/// reads the static side.
+
+
 fn names_a_type(kind: SymbolKind) -> bool {
     matches!(
         kind,
@@ -166,7 +166,7 @@ pub fn dot_receiver(
     literal_receiver(state, before)
 }
 
-/// A literal's own primitive: `"a".|`, `1.|`.
+
 fn literal_receiver(state: &DocumentState, tok: &TokenRecord) -> Option<ReceiverInfo> {
     let p = match tok.kind {
         TokenKind::Str => LangPrimitive::Str,
@@ -187,8 +187,8 @@ fn literal_receiver(state: &DocumentState, tok: &TokenRecord) -> Option<Receiver
     })
 }
 
-/// The receiver of a `.` the parser could not make an expression of yet (the
-/// member name is still missing): the name before it, resolved in scope.
+
+
 fn dot_receiver_source_fallback(
     state: &DocumentState,
     line: u32,
@@ -231,7 +231,7 @@ fn dot_receiver_source_fallback(
     })
 }
 
-/// The value a destructuring pattern `{ | } = x` reads fields from.
+
 pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<ReceiverInfo> {
     let line_toks: Vec<_> = state.tokens.iter().filter(|t| t.line == line).collect();
 

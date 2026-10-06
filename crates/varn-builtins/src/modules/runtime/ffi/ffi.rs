@@ -26,7 +26,7 @@ varn_contract! {
                 || path.starts_with("libc.")
                 || path == "libSystem.B.dylib"
                 || path.eq_ignore_ascii_case("kernel32.dll");
-            // INVARIANT: path is loaded via platform dynamic linker; if successful, handle is retained in ctx resources.
+            
             unsafe {
                 let lib = libloading::Library::new(path)
                     .map_err(|e| format!("ffi.dlopen: failed to load '{path}': {e}"))?;
@@ -57,7 +57,7 @@ varn_contract! {
             let handle_id = libHandle as u32;
             let res = ctx.resources().get::<LoadedLib>(handle_id)
                 .ok_or_else(|| "ffi.dlsym: invalid library handle".to_string())?;
-            // INVARIANT: handle points to active LoadedLib; symbol query null-terminated.
+            
             unsafe {
                 let c_str = std::ffi::CString::new(symbol)
                     .map_err(|e| format!("ffi.dlsym: invalid symbol name: {e}"))?;
@@ -207,7 +207,7 @@ varn_contract! {
             if ptr == 0 {
                 return Err("ffi.readInt: null pointer dereference".to_string());
             }
-            // INVARIANT: addr is checked non-null and read_unaligned prevents alignment faults across architectures.
+            
             unsafe {
                 let addr = (ptr + offset) as *const u8;
                 match size {
@@ -227,7 +227,7 @@ varn_contract! {
             if ptr == 0 {
                 return Err("ffi.writeInt: null pointer dereference".to_string());
             }
-            // INVARIANT: addr is checked non-null and write_unaligned prevents alignment faults across architectures.
+            
             unsafe {
                 let addr = (ptr + offset) as *mut u8;
                 match size {
@@ -248,7 +248,7 @@ varn_contract! {
             if ptr == 0 {
                 return Err("ffi.readFloat: null pointer dereference".to_string());
             }
-            // INVARIANT: addr is checked non-null and read_unaligned prevents alignment faults for f32/f64.
+            
             unsafe {
                 let addr = (ptr + offset) as *const u8;
                 if isDouble {
@@ -266,7 +266,7 @@ varn_contract! {
             if ptr == 0 {
                 return Err("ffi.writeFloat: null pointer dereference".to_string());
             }
-            // INVARIANT: addr is checked non-null and write_unaligned prevents alignment faults for f32/f64.
+            
             unsafe {
                 let addr = (ptr + offset) as *mut u8;
                 if isDouble {

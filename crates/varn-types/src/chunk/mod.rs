@@ -1,5 +1,5 @@
-//! Bytecode container types: the chunk itself, its constant pool, the line
-//! table, per-function metadata and the inline caches hanging off it.
+
+
 
 #![allow(clippy::mutable_key_type)]
 

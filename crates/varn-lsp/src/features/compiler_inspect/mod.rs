@@ -1,10 +1,10 @@
-//! The compiler's views of a document, for the editor's inspection
-//! commands: its syntax tree, its SSA (as text and as a control-flow graph)
-//! and its bytecode.
-//!
-//! Each view lowers the document the way a compile does — the checker's
-//! types, named-argument layouts and desugarings into TIR, then SSA and
-//! bytecode — so what the editor shows is what would run.
+
+
+
+
+
+
+
 
 mod ast_json;
 mod cfg;
@@ -46,18 +46,18 @@ pub fn execute_command(
     }
 }
 
-/// Everything this server can say about its own memory without an external
-/// tool: the OS's own number for this process, plus the internal counts a
-/// spike in that number would be explained by.
+
+
+
 fn memory_stats(workspace: &Workspace) -> serde_json::Value {
     let (graph_binds, graph_programs, graph_arenas, graph_exports) =
         crate::workspace::resolver::with_resolver(|r| r.graph_stats());
 
-    // Approximate bytes actually retained per cached document — not exact
-    // (ignores allocator/hashmap bucket overhead, nested Vec/String payloads
-    // inside e.g. CheckerScope), but real enough to rank which field a
-    // memory spike is coming from, rather than guessing from source reading
-    // alone.
+    
+    
+    
+    
+    
     let mut source_bytes: u64 = 0;
     let mut token_count: u64 = 0;
     let mut token_lexeme_bytes: u64 = 0;
@@ -134,7 +134,7 @@ fn memory_stats(workspace: &Workspace) -> serde_json::Value {
     })
 }
 
-/// The document lowered to TIR, as a compile lowers it.
+
 fn emit_tir(state: &DocumentState) -> Result<TirModule, String> {
     let program = state
         .ast
@@ -150,7 +150,7 @@ fn emit_tir(state: &DocumentState) -> Result<TirModule, String> {
     ))
 }
 
-/// The document's SSA functions: the top level first, then each function.
+
 fn build_ssa(state: &DocumentState) -> Result<Vec<varn_compiler::ssa::ir::SsaFunc>, String> {
     varn_compiler::from_tir::build_module(&emit_tir(state)?)
         .map_err(|e| format!("SSA build failed: {e:?}"))

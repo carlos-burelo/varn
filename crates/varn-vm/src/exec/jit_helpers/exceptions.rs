@@ -1,5 +1,5 @@
-//! Exception handling from compiled code: pushing and popping try handlers,
-//! and throwing.
+
+
 
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;

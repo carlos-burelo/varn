@@ -139,8 +139,8 @@ impl NativeCtx for Heap {
         }
         if v.is_heap() {
             if let Some(HeapObj::Str(s)) = self.get(v.as_heap()) {
-                // `HeapStr::is_ascii` memoizes on the string itself (a `Cell`
-                // flag) — this is O(1) amortized, not a fresh scan.
+                
+                
                 return s.is_ascii();
             }
         }

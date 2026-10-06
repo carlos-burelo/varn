@@ -1,13 +1,13 @@
-//! `TirFunction` -> `SsaFunc` (step 3.3).
-//!
-//! The block / value / phi / variable machinery is a copy of `ssa/build`'s
-//! `Builder` core — that one is HIR-coupled through `open_try_regions` and its
-//! `expr` / `stmt` submodules and is deleted with HIR in step 3.4; this one
-//! survives. Only the SSA-agnostic core is duplicated; the lowering below is
-//! written fresh against the flat TIR.
 
-//! (`emit_effect` and other core helpers are unused until the lowering below
-//! grows to cover calls, field stores and closures.)
+
+
+
+
+
+
+
+
+
 
 use std::sync::Arc;
 
@@ -36,21 +36,21 @@ mod stmt;
 pub(super) use context::{Builder, Result};
 
 impl<'m> Builder<'m> {
-    // ---- TIR lowering ----------------------------------------------------
+    
 
     fn lower_expr(&mut self, e: &TirExpr) -> Result<Value> {
         let ty = self.ty(e.ty);
         match &e.kind {
-            // Constants take their canonical SSA type — `ssa/verify` checks it
-            // exactly (the TIR node type can be wider, e.g. a template piece).
+            
+            
             TirExprKind::IntLit(n) => Ok(self.emit(InstKind::ConstInt(*n), HirType::Int)),
             TirExprKind::FloatLit(f) => Ok(self.emit(InstKind::ConstFloat(*f), HirType::Float)),
             TirExprKind::BoolLit(b) => Ok(self.emit(InstKind::ConstBool(*b), HirType::Bool)),
             TirExprKind::StrLit(s) => Ok(self.emit(InstKind::ConstStr(s.clone()), HirType::Str)),
-            // `char` vive como `HeapObj::Char` internado (ver `calls.rs`:
-            // `Literal::Char -> heap.intern`), así que su tipo honesto es
-            // `Ref`, no `Int`: `Int` le mentía al regalloc (clase GPR sin flush
-            // GC) y al JIT sobre un valor que en runtime es una referencia.
+            
+            
+            
+            
             TirExprKind::CharLit(c) => Ok(self.emit(InstKind::ConstChar(*c), HirType::Ref)),
             TirExprKind::NullLit => Ok(self.emit(InstKind::ConstNull, HirType::Dynamic)),
             TirExprKind::DecimalLit(s) => {

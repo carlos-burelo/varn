@@ -1,4 +1,4 @@
-//! `vn bench` — phase timing, Cranelift coverage, runtime profile.
+
 
 pub mod compiled;
 pub mod harness;
@@ -8,13 +8,13 @@ pub mod stats;
 
 use crate::error::CliError;
 
-/// Knobs that change what the report shows, not what it measures.
+
 pub struct BenchOpts {
     pub runs: usize,
     pub show_output: bool,
     pub verbose: bool,
     pub all_rows: bool,
-    /// `--min-clif-coverage`: floor, in percent of observed frames.
+    
     pub min_clif_coverage: Option<f64>,
 }
 
@@ -25,13 +25,13 @@ pub fn run_bench(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(),
     source::run(path, eval, opts)
 }
 
-/// Turn `--min-clif-coverage` into an exit code.
-///
-/// Shared by both bench entry points so the threshold means one thing. The
-/// numerator is `machine_code_frames` — frames that executed machine code,
-/// OSR rescues included — which is the same figure the headline prints; a
-/// guard that measured something else than the report would be worse than no
-/// guard.
+
+
+
+
+
+
+
 pub fn enforce_coverage_floor(
     jit: &varn_vm::varn_jit::JitStatsSnapshot,
     min_pct: Option<f64>,

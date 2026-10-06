@@ -1,11 +1,11 @@
-//! The layout table (`varn_types::bytecode::layout`) describes the bytecode
-//! the compiler really emits: checked over every program of the test suite.
-//!
-//! For each instruction of every function: the stream is walked exactly
-//! (lengths add up to the code), every register operand is a register of the
-//! frame, every constant operand names a pool entry of the kind the table
-//! says, every jump lands on an instruction, the listing decodes it, and
-//! renaming registers touches exactly the bytes the table calls registers.
+
+
+
+
+
+
+
+
 
 #![allow(unused_crate_dependencies)]
 
@@ -59,7 +59,7 @@ fn const_matches(kind: ConstKind, entry: &PoolEntry) -> bool {
     )
 }
 
-/// Check one function; returns the opcodes it uses.
+
 fn check(file: &str, proto: &FunctionProto, seen: &mut BTreeSet<String>) {
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
     let at = |offset: usize| format!("{file} fn {name} @{offset:04}");
@@ -84,7 +84,7 @@ fn check(file: &str, proto: &FunctionProto, seen: &mut BTreeSet<String>) {
             match *operand {
                 Operand::Reg { at: b, .. } => {
                     let reg = b.read(code, offset) as u16;
-                    // `MakeClass` names `r0` for "no superclass".
+                    
                     assert!(
                         reg < proto.register_count.max(1),
                         "{}: {:?} r{reg}",
@@ -127,7 +127,7 @@ fn check(file: &str, proto: &FunctionProto, seen: &mut BTreeSet<String>) {
         "{file} fn {name}: lengths do not add up"
     );
 
-    // Jumps land on instructions.
+    
     for &start in &starts {
         let l = layout(code, start, pool).unwrap();
         if let Some(target) = l.jump_target(code, start) {
@@ -140,10 +140,10 @@ fn check(file: &str, proto: &FunctionProto, seen: &mut BTreeSet<String>) {
         }
     }
 
-    // The listing decodes every instruction.
+    
     assert!(disasm::instructions(&proto.chunk).all(|i| i.op.is_some()));
 
-    // Renaming touches exactly the register bytes, and undoes.
+    
     let flip = |r: u8| r ^ 0x5a;
     let mut renamed = code.clone();
     bytecode::remap_registers(&mut renamed, pool, flip);

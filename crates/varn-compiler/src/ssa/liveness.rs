@@ -1,52 +1,52 @@
-//! Liveness sobre valores SSA: único dueño del dataflow.
-//!
-//! Dos consumidores: la asignación de registros (`emit::regs`) y el pase de
-//! máquinas de estados. Tenerlo dos veces es como se separan.
-//!
-//! ## Numeración de puntos
-//!
-//! Los índices de `def`/`end` numeran puntos en el orden del vector
-//! `ssa.blocks` — NO en orden de emisión: `emit/mod.rs` recorre los bloques
-//! con `emission_order`, un RPO consciente de bucles que puede reordenar
-//! bloques respecto a `ssa.blocks`. Un consumidor que asuma orden de emisión
-//! leería mal los índices.
-//!
-//! Dentro de un bloque cuyos params ocupan el punto `P`: la instrucción `i`
-//! ocupa el punto `P + 1 + i`, y el terminador ocupa el punto `P + 1 + n`
-//! (`n` = número de instrucciones del bloque).
-//!
-//! ## `end` es un intervalo lineal
-//!
-//! `end` es un intervalo LINEAL, no liveness exacta por punto: un valor
-//! definido *fuera* de un bucle y usado *dentro* de él fuerza que la
-//! propagación `live_out -> term_idx` extienda su `end` hasta el terminador
-//! del bloque de retorno (el latch), así que el intervalo abarca todo el
-//! bucle aunque el valor no se use en absoluto entre la cabecera y ese
-//! punto. Es una sobre-aproximación conservadora — nunca declara muerto algo
-//! vivo — así que es correcta para asignar registros y correcta para elegir
-//! campos de estado, a costa de guardar de más en bucles.
-//!
-//! Disparador del clamp final de `analyze` (`end[v] = def[v]` cuando
-//! `end[v] < def[v]`): dispara exactamente para definiciones sin ningún
-//! uso. Si `v` tiene algún uso, entonces `v ∈ live_out[def_block]`, luego
-//! `end[v] >= term_idx[def_block] > def[v]` y el clamp no llega a
-//! dispararse. Para una def muerta el clamp colapsa el intervalo a un
-//! punto, que es el comportamiento correcto.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use super::ir::{InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashSet;
 
 #[derive(Debug)]
 pub struct Liveness {
-    /// Valor -> punto de definición. `u32::MAX` si el valor nunca se
-    /// define; todo consumidor debe comprobar este centinela antes de
-    /// usar el índice.
+    
+    
+    
     pub def: Vec<u32>,
-    /// Valor -> último punto donde el valor sigue vivo.
+    
     pub end: Vec<u32>,
-    /// Bloque -> conjunto de valores vivos a la salida del bloque.
+    
     pub live_out: Vec<FxHashSet<u32>>,
-    /// Bloque -> conjunto de valores vivos a la entrada del bloque.
+    
     pub live_in: Vec<FxHashSet<u32>>,
 }
 
@@ -175,23 +175,23 @@ impl Liveness {
         }
     }
 
-    /// Valores vivos DESPUÉS de ejecutar la instrucción `i` del bloque `b`.
-    ///
-    /// Es el conjunto que debe sobrevivir a una suspensión situada en `i`: lo
-    /// que el objeto de estado de una máquina de estados tiene que guardar.
-    ///
-    /// A diferencia de la numeración lineal de puntos, esto **no depende del
-    /// orden del vector `ssa.blocks`**: parte de `live_out[b]`, le une lo que
-    /// usa el terminador del bloque (se ejecuta después de toda instrucción,
-    /// así que sus usos ya están vivos en este punto), y desde ahí camina
-    /// hacia atrás por las instrucciones aplicando la transferencia
-    /// `live = (live - def(inst)) ∪ uses(inst)`. Sólo usa información local al
-    /// bloque más su `live_out`, ambos independientes del orden del vector.
-    ///
-    /// El resultado viene ordenado por índice de valor, para que dos
-    /// invocaciones sobre el mismo IR den la misma respuesta en el mismo orden
-    /// — un consumidor que derive de aquí el layout de un objeto necesita esa
-    /// estabilidad.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub fn live_after(&self, ssa: &SsaFunc, b: usize, i: usize) -> Vec<Value> {
         let block = &ssa.blocks[b];
         debug_assert!(
@@ -201,12 +201,12 @@ impl Liveness {
         );
         let mut live: FxHashSet<u32> = self.live_out[b].clone();
 
-        // El terminador se ejecuta después de todas las instrucciones del
-        // bloque, así que arranca el recorrido hacia atrás: lo que usa
-        // (el `cond` de un Branch, el valor de Return/Throw, los args de
-        // Jump/Branch hacia sus sucesores) tiene que estar vivo en el punto
-        // que sigue a la última instrucción. El terminador no define nada,
-        // así que aquí sólo hay unión, nunca resta.
+        
+        
+        
+        
+        
+        
         for u in crate::ssa::verify::term_value_uses(&block.term) {
             live.insert(u.0);
         }
@@ -216,8 +216,8 @@ impl Liveness {
             }
         }
 
-        // Recorre hacia atrás hasta pasar la instrucción i+1: el estado que
-        // queda es "vivo justo después de i".
+        
+        
         for inst in block.insts[i + 1..].iter().rev() {
             if let Some(d) = inst.dest {
                 live.remove(&d.0);

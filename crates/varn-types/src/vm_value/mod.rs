@@ -1,22 +1,22 @@
-/// A VM value: an explicit tag word plus a full 64-bit payload.
-///
-/// Not a NaN-box: Varn knows its types before it emits an opcode, so it has
-/// no need for a dynamic engine's one-word encoding and its 48-bit payload
-/// limit. `int` is a native `i64`, `float` a real `f64`, and a heap
-/// reference gets a whole word (room for a direct pointer later). Two
-/// 64-bit registers cost the same as one on x86-64 and aarch64; the masking
-/// a NaN-box needs did not.
-///
-/// `#[repr(C)]` with two `u64`s — not `u128` — keeps the alignment at 8, so
-/// the DST tail of [`crate::value::ObjData`] still starts on a word boundary
-/// and the JIT can address a stack slot as two adjacent words.
-///
-/// Both fields are PRIVATE. Every producer and consumer goes through the
-/// constructors and accessors below, so a further change of representation is
-/// a change to this file. The escape hatches
-/// [`VmValue::from_raw_parts`]/[`VmValue::raw_tag`]/[`VmValue::raw_payload`]
-/// exist for the JIT, which re-emits the encoding inline; they move bits and
-/// never interpret them.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct VmValue {
@@ -24,70 +24,70 @@ pub struct VmValue {
     payload: u64,
 }
 
-// ── Tag word ────────────────────────────────────────────────────────────
-//
-// The low byte is the kind. The bytes above it are per-kind metadata, used
-// today only by SSO for its length. A whole word for a 3-bit answer is
-// deliberate: comparing a tag is now one `cmp` against a small immediate,
-// where the NaN-box needed a mask, a shift and a 64-bit constant that would
-// not fit in an instruction and had to be loaded from a constant pool.
-//
-// Values are dense from 0 so a `match` on the kind lowers to a jump table.
 
-/// Kind of a value: the low byte of the tag word.
+
+
+
+
+
+
+
+
+
+
 pub const KIND_MASK: u64 = 0xFF;
 
 pub const KIND_NULL: u64 = 0;
 pub const KIND_BOOL: u64 = 1;
 pub const KIND_INT: u64 = 2;
 pub const KIND_FLOAT: u64 = 3;
-/// Heap reference. Payload is the heap-table index today, and has room for a
-/// direct pointer when that table goes away.
+
+
 pub const KIND_HEAP: u64 = 4;
-/// Small string stored inline in the payload; length in the tag above the
-/// kind byte.
+
+
 pub const KIND_SSO: u64 = 5;
 pub const KIND_SYMBOL: u64 = 6;
 
-/// Bit position, inside the tag word, of the SSO length.
+
 const SSO_LEN_SHIFT: u32 = 8;
 
 pub const SSO_MAX_LEN: usize = 5;
 
 impl VmValue {
-    /// Assemble a value from its two words. Only for code that received them
-    /// *from* [`Self::raw_tag`]/[`Self::raw_payload`] — JIT-produced values,
-    /// safepoint spills, layout probes. Never to synthesize an encoding by
-    /// hand: use a constructor.
+    
+    
+    
+    
     #[inline(always)]
     pub const fn from_raw_parts(tag: u64, payload: u64) -> Self {
         Self { tag, payload }
     }
 
-    /// The tag word, for code that round-trips it through
-    /// [`Self::from_raw_parts`]. Not for inspection — every question about a
-    /// value has an accessor.
+    
+    
+    
     #[inline(always)]
     pub const fn raw_tag(self) -> u64 {
         self.tag
     }
 
-    /// The payload word. Same contract as [`Self::raw_tag`].
+    
     #[inline(always)]
     pub const fn raw_payload(self) -> u64 {
         self.payload
     }
 
-    /// This value's kind, as one of the `KIND_*` constants.
+    
     #[inline(always)]
     pub const fn kind(self) -> u64 {
         self.tag & KIND_MASK
     }
 
-    /// The "no answer" sentinel the inline-cache fast paths return on a miss.
-    ///
-    /// A tag no constructor produces, so it can never collide with a real
-    /// result the helper could have found.
+    
+    
+    
+    
     #[inline(always)]
     pub const fn ic_miss() -> Self {
         Self {
@@ -96,15 +96,15 @@ impl VmValue {
         }
     }
 
-    /// Whether this is the [`Self::ic_miss`] sentinel.
+    
     #[inline(always)]
     pub const fn is_ic_miss(self) -> bool {
         self.tag == u64::MAX
     }
 
-    /// Whether two values have the *same representation*. Narrower than `==`,
-    /// which coerces int and float; this is what SSO string comparison and
-    /// identity checks want.
+    
+    
+    
     #[inline(always)]
     pub fn bits_eq(self, other: Self) -> bool {
         self.tag == other.tag && self.payload == other.payload
@@ -142,9 +142,9 @@ impl VmValue {
         }
     }
 
-    /// Carry an `i64`. Every `i64` is a valid `int` and the payload is a full
-    /// word, so this is exact for the whole range — no mask, no truncation,
-    /// no range preconditions on the caller.
+    
+    
+    
     #[inline(always)]
     pub fn from_int(n: i64) -> Self {
         Self {
@@ -153,9 +153,9 @@ impl VmValue {
         }
     }
 
-    /// Kept as the name shift operations use to say their result width is
-    /// part of the operation. Nothing wraps any more: the payload holds
-    /// every `i64`.
+    
+    
+    
     #[inline(always)]
     pub fn from_int_wrapping(n: i64) -> Self {
         Self::from_int(n)
@@ -166,8 +166,8 @@ impl VmValue {
         Self::from_int(n as i64)
     }
 
-    /// Carry an `f64`, NaN included: the tag is its own word, so the payload
-    /// is just the IEEE bits (spec §4).
+    
+    
     #[inline(always)]
     pub fn from_f64(n: f64) -> Self {
         Self {
@@ -290,7 +290,7 @@ impl VmValue {
         self.payload != 0
     }
 
-    /// The reference of a heap value. Only meaningful when `is_heap()`.
+    
     #[inline(always)]
     pub fn as_heap(self) -> HeapRef {
         debug_assert!(self.is_heap() && self.payload != 0);

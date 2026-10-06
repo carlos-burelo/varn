@@ -9,8 +9,8 @@ use crate::document::{import::uri_to_path, DocumentState};
 use super::{ExportEntry, ProjectIndex};
 
 pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
-    // Un solo `Arc<str>` por archivo: sus N entradas lo comparten en vez de
-    // clonar el uri en N `String`s (H4 medía N×len(uri) bytes).
+    
+    
     let uri_shared: Arc<str> = Arc::from(uri);
     let mut exports: Vec<Arc<ExportEntry>> = state
         .symbols()
@@ -49,12 +49,12 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
         .map(|p| p.to_path_buf());
 
     for specifier in &state.import_paths {
-        // `std:`/`core:`/`runtime:` resuelven igual desde cualquier archivo.
-        // Son los imports más repetidos (casi todo archivo trae std), y cada
-        // resolución cuesta `ModuleResolver::new()` + FS. Reutilizar el
-        // mapeo evita pagarla cientos de veces. Los relativos se resuelven
-        // siempre: la caché global por specifier no distingue base_dir y un
-        // `./x` significa algo distinto por directorio.
+        
+        
+        
+        
+        
+        
         if is_stable_specifier(specifier) {
             if let Some(cached) = index.module_cache.get(specifier) {
                 index
@@ -80,19 +80,19 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
     }
 }
 
-/// Index the members `sym` declares, so a cross-file lookup can reach them.
-///
-/// Asked of the checker rather than read from a mirrored member tree. Only
-/// members the checker located are indexed: one with no `def_line` has no
-/// source of its own, and an index entry pointing nowhere is worse than none.
+
+
+
+
+
 fn collect_member_exports(
     state: &crate::document::DocumentState,
     uri: &Arc<str>,
     sym: SymbolView<'_>,
     out: &mut Vec<Arc<ExportEntry>>,
 ) {
-    // `parent` perezoso: la mayoría de símbolos no tiene miembros indexables
-    // y no debe pagar ni un alloc por ellos.
+    
+    
     let mut parent: Option<Arc<str>> = None;
     for m in state.members_of(sym) {
         let Some(line) = m.def_line else { continue };
@@ -121,8 +121,8 @@ fn summary_to_symbol_kind(k: varn_checker::ResolvedMemberKind) -> varn_checker::
 }
 
 fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) -> Option<String> {
-    // One resolution (shared with checker/VM): specifier -> canonical ModuleId.
-    // No second path-joining rule lives here.
+    
+    
     let from = match doc_dir {
         Some(dir) => varn_core::ModuleId::local(dir.join("__doc__.vn")),
         None => varn_core::ModuleId::local_str("__doc__.vn"),

@@ -3,7 +3,7 @@ use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
 use varn_types::register_meta::SlotClass;
 
-/// Nombre de la clase de un valor boxeado, para errores de conversión.
+
 pub(crate) fn value_kind_name(v: VmValue) -> &'static str {
     use varn_types::vm_value::*;
     match v.kind() {
@@ -19,11 +19,11 @@ pub(crate) fn value_kind_name(v: VmValue) -> &'static str {
 }
 
 impl FrameStore {
-    // ── Movimiento entre registros (el `Move` del bytecode) ──────────
+    
 
-    /// Mueve `src` a `dst` dentro de la misma activación, convirtiendo entre
-    /// clases: misma clase copia cruda; hacia DYN boxea; desde DYN chequea el
-    /// tag (nunca reinterpreta).
+    
+    
+    
     #[inline(always)]
     pub fn mov(&mut self, id: usize, dst: usize, src: usize) -> VmResult<()> {
         let (sc, si) = self.slot(id, src);
@@ -41,7 +41,7 @@ impl FrameStore {
         self.unbox_into(dc, di, v)
     }
 
-    /// Mueve entre activaciones (retornos, throws, staging de llamadas).
+    
     #[inline(always)]
     pub fn mov_cross(
         &mut self,
@@ -100,15 +100,15 @@ impl FrameStore {
                 self.gpr[i] = v.as_int();
             }
             SlotClass::Fpr => {
-                // Ensanchado `int` → `float` en llamadas (`coherence` lo
-                // permite) y la misma coerción perezosa que el intérprete
-                // aplicaba en cada uso (`as_int as f64`).
-                //
-                // Simétrico con `box_slot`: `VmValue::from_f64` ya convierte
-                // NaN a `null` (`vm_value.rs`), así que un `float` cuyo
-                // resultado fue NaN (`inf * 0.0`, `x - x` con `x` infinito)
-                // llega aquí como `null`, no como el NaN crudo — guardar NaN
-                // de vuelta deja que `box_slot` lo recupere como `null`.
+                
+                
+                
+                
+                
+                
+                
+                
+                
                 if v.is_f64() {
                     self.fpr[i] = v.as_f64();
                 } else if v.is_int() {
@@ -123,9 +123,9 @@ impl FrameStore {
                 }
             }
             SlotClass::Ref => {
-                // Simétrico con `box_slot`: `null` es `None`, no un
-                // error — un retorno `void` o una referencia nula son el
-                // valor, no basura a rechazar.
+                
+                
+                
                 if v.is_null() {
                     self.refs[i] = None;
                 } else if v.is_heap() {
@@ -142,27 +142,27 @@ impl FrameStore {
         Ok(())
     }
 
-    /// Boxea un registro a `VmValue` (fronteras: heap, nativas, suspensión).
+    
     #[inline(always)]
     pub fn box_reg(&self, id: usize, reg: usize) -> VmValue {
         let (class, i) = self.slot(id, reg);
         self.box_slot(class, i)
     }
 
-    /// Escribe un `VmValue` convirtiendo a la clase del registro.
+    
     #[inline(always)]
     pub fn unbox_into_reg(&mut self, id: usize, reg: usize, v: VmValue) -> VmResult<()> {
         let (class, i) = self.slot(id, reg);
         self.unbox_into(class, i, v)
     }
 
-    /// Boxea un rango de registros (ventanas de llamadas nativas).
+    
     pub fn box_range(&self, id: usize, start: usize, count: usize) -> Vec<VmValue> {
         (0..count).map(|k| self.box_reg(id, start + k)).collect()
     }
 
-    /// Adopta valores boxeados en registros (retornos host→VM, generadores).
-    /// Rellena con defaults de clase si faltan; ignora sobrantes duplicados.
+    
+    
     pub fn adopt_values(&mut self, id: usize, start: usize, vals: &[VmValue], nregs: usize) {
         for r in start..start + nregs {
             let v = vals.get(r - start).copied().unwrap_or_else(VmValue::null);

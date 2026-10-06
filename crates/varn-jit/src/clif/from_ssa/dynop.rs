@@ -1,9 +1,9 @@
-//! Operators on boxed values (`SsaBinOp::Dyn`, `SsaUnOp::Dyn`): the
-//! bytecode's generic opcodes, for operands no type proves native. They run
-//! the same runtime helpers through the same lowering as the bytecode path
-//! (`clif::generic::{boxed_binop, boxed_compare}`), so an operator means the
-//! same thing compiled either way. The live `ExecCtx` es `ctx.exec_ctx`
-//! (entry param 0 en leaf, 3 en frame-aware).
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -15,7 +15,7 @@ use super::super::generic::{boxed_binop, boxed_compare};
 use super::heap::boxed_parts;
 use super::{Ctx, Out};
 
-/// A comparison's `0`/`1` as the destination holds it.
+
 fn bool_out(b: &mut FunctionBuilder, cond: Value, dest: Option<SlotKind>) -> Out {
     match dest {
         Some(SlotKind::Bool) => Out::Native(cond),
@@ -94,7 +94,7 @@ pub(super) fn emit_un(
             let cond = call_helper(b, ctx.cc, h.logical_not, &[ectx, tag, payload]);
             bool_out(b, cond, dest)
         }
-        // `~x` is `x ^ -1`, as the bytecode emits it.
+        
         DynUnOp::BitNot => {
             let minus_one = b.ins().iconst(types::I64, -1);
             let boxed = box_int(b, minus_one);

@@ -94,7 +94,7 @@ pub fn colon_colon_receiver(
         return None;
     }
 
-    // Extract identifier before ::
+    
     let receiver_ident = receiver_str
         .rsplit(|c: char| !c.is_alphanumeric() && c != '_')
         .next()?
@@ -114,7 +114,7 @@ pub fn build_reflection_completions(
     let mut items = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
-    // 1. Meta Reflection properties (name, fields, methods, type, etc.)
+    
     for (idx, meta) in META_PROPERTIES.iter().enumerate() {
         seen.insert(meta.name.to_string());
         let (insert_text, insert_text_format) = match meta.snippet {
@@ -137,10 +137,10 @@ pub fn build_reflection_completions(
         });
     }
 
-    // 2. Static members, Enum variants & constructors on the target receiver
+    
     for sym in state.symbols() {
         if sym.name() == receiver_name {
-            // If receiver is an Enum, add its variants
+            
             if sym.kind() == varn_checker::SymbolKind::Enum {
                 let members = state.members_of(sym);
                 for m in members {
@@ -156,7 +156,7 @@ pub fn build_reflection_completions(
                     }
                 }
             } else if sym.kind() == varn_checker::SymbolKind::Class {
-                // If receiver is a Class, add static members
+                
                 let members = state.members_of(sym);
                 for m in members {
                     let m_name = m.name.to_string();

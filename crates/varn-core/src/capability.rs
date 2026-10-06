@@ -1,19 +1,19 @@
-//! Operators a user type answers through a capability method (spec §33–§34).
-//! One table: the checker reads it to type the operator, the emitter to
-//! lower it to the method call.
+
+
+
 
 use crate::ast::operators::{BinaryOp, UnaryOp};
 
-/// How the method's result becomes the operator's value.
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OperatorShape {
-    /// `a + b` is `a.add(b)`.
+    
     Value,
-    /// `a < b` is `a.compare(b) < 0` (same comparison against zero).
+    
     CompareToZero(BinaryOp),
-    /// `a == b` is `a.equals(b)`.
+    
     Equals,
-    /// `a != b` is `!a.equals(b)`.
+    
     NotEquals,
 }
 

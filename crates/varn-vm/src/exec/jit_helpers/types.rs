@@ -1,5 +1,5 @@
-//! Runtime type questions: `typeof`, `instanceof`, array-ness, and enum
-//! tag extraction.
+
+
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
@@ -48,9 +48,9 @@ pub(crate) extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val_tag: u64, val_p
     }
 }
 
-/// Whether a boxed value is truthy: the interpreter's branch condition
-/// (`VmValue::is_truthy`), for compiled code branching on a value that is not
-/// a `bool`.
+
+
+
 #[varn_op_macros::jit_slow(field = "truthy")]
 pub(crate) extern "C" fn jit_truthy(tag: u64, payload: u64) -> u64 {
     u64::from(VmValue::from_raw_parts(tag, payload).is_truthy())
@@ -69,8 +69,8 @@ pub(crate) extern "C" fn jit_is_array(ctx: *mut ExecCtx, val_tag: u64, val_paylo
     }
 }
 
-/// `MakeEnumVariant` out of the lowering from bytecode: the operands follow
-/// the opcode at `ip_before` of the running closure's code.
+
+
 #[varn_op_macros::jit_slow(field = "make_enum_variant")]
 pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) {
     unsafe {
@@ -87,8 +87,8 @@ pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usi
     }
 }
 
-/// `MakeEnumVariant` out of the lowering from typed SSA: discriminant `tag`
-/// and the running closure's string constant `meta_idx` as the descriptor.
+
+
 #[varn_op_macros::jit_slow(field = "make_enum_variant_const")]
 pub(crate) extern "C" fn jit_make_enum_variant_const(
     ctx: *mut ExecCtx,
@@ -105,8 +105,8 @@ pub(crate) extern "C" fn jit_make_enum_variant_const(
     }
 }
 
-/// A numeric conversion (`as`) of a boxed value by the runtime's one
-/// `convert`; a failed conversion throws.
+
+
 #[varn_op_macros::jit_slow(field = "convert")]
 pub(crate) extern "C" fn jit_convert(ctx: *mut ExecCtx, conv: u64, tag: u64, payload: u64) {
     unsafe {

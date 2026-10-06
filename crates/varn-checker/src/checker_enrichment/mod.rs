@@ -9,11 +9,11 @@ use std::sync::Arc;
 use traverse::{collect_inferred_return_types_raw, enrich_stmts_for_vars};
 use varn_core::ast::AstArena;
 
-/// `Type` is a hash-consed id now, so a function's return type cannot be
-/// mutated in place the way the old owned-tree `Type` allowed — this builds
-/// the replacement `Type` (same params/is_arrow/type_params, new return
-/// type) instead. Non-`Fn` types pass through unchanged: enrichment only
-/// ever reaches this once it already knows the symbol is a function.
+
+
+
+
+
 fn with_new_return_type(
     old: Type,
     new_ret: Type,
@@ -28,8 +28,8 @@ fn with_new_return_type(
     }
 }
 
-/// `resolver` is threaded in rather than reached for ambiently: enrichment
-/// infers call return types, which means resolving imported signatures.
+
+
 pub fn enrich_call_returns(
     bind: &mut BindResult,
     ast_arena: &AstArena,
@@ -123,13 +123,13 @@ pub fn enrich_call_returns(
                 body,
                 is_async,
             } => {
-                // `class_name`/`key` forward the AST `Atom`s recorded in
-                // `PendingEnrich` (Task 4); every map consulted here
-                // (`class_methods`, `type_members.classes`) is still
-                // `Arc<str>`-keyed (out of this task's scope). Resolved to an
-                // owned `String` (not a borrow of `bind.interner`) because
-                // several call sites below take `bind: &mut BindResult` as a
-                // whole, which a live borrow of `bind.interner` would block.
+                
+                
+                
+                
+                
+                
+                
                 let class_name_str = bind.interner.resolve(*class_name).to_string();
                 let key_str = bind.interner.resolve(*key).to_string();
                 let stmt: varn_core::ast::StmtId = *body;
@@ -281,8 +281,8 @@ pub fn enrich_call_returns(
     }
 }
 
-/// A body with no `return` that cannot complete normally (it always throws)
-/// returns `never`, not `void`.
+
+
 fn never_when_diverging(
     inferred: Vec<Type>,
     body: varn_core::ast::StmtId,

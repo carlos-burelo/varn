@@ -17,7 +17,7 @@ pub fn build_selection_ranges(
 fn build_single_selection_range(state: &DocumentState, pos: Position) -> SelectionRange {
     let mut ranges = Vec::new();
 
-    // 1. Innermost token range
+    
     if let Some(tok) = state
         .tokens
         .iter()
@@ -35,7 +35,7 @@ fn build_single_selection_range(state: &DocumentState, pos: Position) -> Selecti
         });
     }
 
-    // 2. AST expression & statement hierarchy
+    
     if let Some(program) = &state.ast {
         collect_enclosing_ranges(
             program,
@@ -46,7 +46,7 @@ fn build_single_selection_range(state: &DocumentState, pos: Position) -> Selecti
         );
     }
 
-    // 3. Whole file fallback
+    
     if let Some(last_tok) = state.tokens.last() {
         let full_range = Range {
             start: Position {
@@ -61,10 +61,10 @@ fn build_single_selection_range(state: &DocumentState, pos: Position) -> Selecti
         ranges.push(full_range);
     }
 
-    // Deduplicate identical consecutive ranges
+    
     ranges.dedup();
 
-    // Fold ranges into nested SelectionRange
+    
     let mut current: Option<SelectionRange> = None;
     for r in ranges.into_iter().rev() {
         current = Some(SelectionRange {

@@ -1,5 +1,5 @@
-//! Every binder diagnostic names the file it belongs to, so a report never
-//! renders without a location.
+
+
 
 use varn_core::Diagnostic;
 

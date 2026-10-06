@@ -1,8 +1,8 @@
-//! Host architecture abstraction layer.
-//!
-//! Encapsulates platform- and architecture-specific low-level primitives:
-//! stack jump buffers (`JmpBuf`, `vm_setjmp`, `vm_longjmp`) for JIT panic recovery
-//! and async coroutine suspension.
+
+
+
+
+
 
 #[cfg(all(target_arch = "x86_64", target_os = "windows"))]
 mod x86_64_windows;

@@ -1,31 +1,31 @@
-//! Global reads and writes for the SSA lowering.
-//!
-//! Globals live in the store shared across task forks (`ExecCtx.globals`, an
-//! Rc to a `GlobalStore`); its `values` Vec data pointer is chased per
-//! access: Rc field at `globals_offset`, then the buffer word at
-//! `globals_store_offset` (Rc control prefix + `values` field + Vec word).
-//! A module global's slot is RELATIVE to
-//! the running closure's module region (`closure.module_base`, at
-//! `closure_module_base_offset`); a native (prelude) global's index is
-//! absolute. Both offsets come from the one probed `JitHelpers` table, so
-//! this lowering addresses exactly what the interpreter does. Globals are GC
-//! roots: a write is a plain store, no barrier.
+
+
+
+
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::Ctx;
 
-/// Which region of the global store a slot indexes.
+
 #[derive(Clone, Copy)]
 pub(super) enum Region {
-    /// The running closure's module: `module_base + slot`.
+    
     Module,
-    /// The prelude / host globals: `slot` itself.
+    
     Native,
 }
 
-/// Machine address of global `slot` of `region`.
+
 fn slot_addr(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -67,7 +67,7 @@ fn slot_addr(
     Ok(b.ins().iadd(gbase, scaled))
 }
 
-/// Global `slot` of `region`, boxed.
+
 pub(super) fn emit_load(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -83,7 +83,7 @@ pub(super) fn emit_load(
     ))
 }
 
-/// Write boxed `value` to module global `slot`.
+
 pub(super) fn emit_store(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,

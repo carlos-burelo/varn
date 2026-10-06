@@ -23,20 +23,20 @@ impl<'r> Checker<'r> {
         let range = arena.expr(expr).range;
         let start = range.start.offset;
         let end = range.end.offset.saturating_sub(1);
-        // By BYTE OFFSET, like the 18 `record_scope` sites, and only when a
-        // caller asked for the table. This line used to key by `expr.id` —
-        // mixing AST ids into a map whose only consumers (`scope_at_offset`
-        // and the LSP's `PositionalIndex`) read every key as an offset, so the
-        // ids landed in the positional index as positions that do not exist.
-        // It also ran unconditionally, building that map on the compile path
-        // for nobody to read.
+        
+        
+        
+        
+        
+        
+        
         if self.record_expr_types {
             self.node_scopes.insert(start, self.current_scope);
         }
         let ty = self.infer_type(expr, bind);
 
-        // Resolving the identifier's symbol costs a scope walk and only tooling
-        // reads it, so it is not paid for on a compile.
+        
+        
         let symbol_id = match (&arena.expr(expr).kind, self.record_expr_types) {
             (ExprKind::Identifier { name }, true) => {
                 let scope = bind.scopes.get(self.current_scope);
@@ -45,12 +45,12 @@ impl<'r> Checker<'r> {
             _ => None,
         };
 
-        // ONE write, into the one table. The positional map the editor reads is
-        // projected from this after the check (`project_positional_types`);
-        // writing both here is how they came to disagree.
-        // The refinement lane: what a prover established beyond what the
-        // checker committed to. Computed here, once, so nothing downstream
-        // has to re-derive it from a different engine. See `checker::refine`.
+        
+        
+        
+        
+        
+        
         let refined = self.refine(expr, bind);
         debug_assert!(
             refined.as_ref().is_none_or(|r| !r.is_dynamic()),
@@ -59,11 +59,11 @@ impl<'r> Checker<'r> {
 
         let seq = self.expr_seq;
         self.expr_seq += 1;
-        // `expr_table` is keyed by `ExprId::index()` — the arena position of
-        // an EXPRESSION node. `ExprId` and `StmtId` are separate counters,
-        // each starting at 0 in its own arena `Vec`, so a `StmtId::index()`
-        // of the same value would collide here undetected. This is the only
-        // insertion site: never key this table with a `StmtId`.
+        
+        
+        
+        
+        
         self.expr_table.insert(
             expr.index(),
             crate::checker::TypeEntry {
@@ -81,9 +81,9 @@ impl<'r> Checker<'r> {
         let arena = self.ast_arena;
         let range = arena.expr(expr).range;
         match &arena.expr(expr).kind {
-            // Nothing to check: the parser already reported the syntax error.
-            // Emitting a second diagnostic here would paint the file red for
-            // code the user is still in the middle of typing.
+            
+            
+            
             ExprKind::Missing => {}
             ExprKind::Arrow {
                 params,

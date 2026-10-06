@@ -12,10 +12,10 @@ pub struct SpatialEntry {
     pub expr: ExprId,
 }
 
-/// O(log N) Spatial Index over all AST nodes in a document.
-///
-/// Replaces the legacy offset-keying maps and linear scans.
-/// Translates cursor byte offset into the most specific (innermost) `AstId`.
+
+
+
+
 #[derive(Clone, Debug, Default)]
 pub struct SpatialIndex {
     entries: Vec<SpatialEntry>,
@@ -29,7 +29,7 @@ impl SpatialIndex {
             collect_stmt(a, stmt, &mut entries);
         }
         entries.shrink_to_fit();
-        // Sort by start ASC; for identical start, sort by span length DESC (larger/outer spans first)
+        
         entries.sort_by(|a, b| {
             a.start
                 .cmp(&b.start)
@@ -38,13 +38,13 @@ impl SpatialIndex {
         Self { entries }
     }
 
-    /// Finds the innermost AST expression/node containing `offset`.
+    
     pub fn innermost_at(&self, offset: u32) -> Option<AstId> {
         if self.entries.is_empty() {
             return None;
         }
 
-        // Find boundary of entries where start <= offset
+        
         let upper = match self.entries.binary_search_by(|e| e.start.cmp(&offset)) {
             Ok(idx) => {
                 let mut i = idx;
@@ -73,8 +73,8 @@ impl SpatialIndex {
         best.map(|(_, id)| id)
     }
 
-    /// Every expression of the program, in source order: the nodes its
-    /// statements reach, never one the parser built and backtracked over.
+    
+    
     pub fn exprs(&self) -> impl Iterator<Item = ExprId> + '_ {
         self.entries.iter().map(|e| e.expr)
     }

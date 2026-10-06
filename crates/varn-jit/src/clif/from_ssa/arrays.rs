@@ -1,24 +1,24 @@
-//! Element access on a proven array with an `int` index, inline.
-//!
-//! An array's elements live in one of its `ArrayRepr`s; `Boxed` (`VmValue`s),
-//! `I64` and `F64` are read and written here without a helper. The access
-//! resolves the receiver to its payload (heap tag, generation, slot tag —
-//! `emit::cached_payload`), checks the index against the length, and
-//! branches on the representation, re-read per access because a write can
-//! change it:
-//!
-//! * the representation matching the value's class (`I64` for an `int`,
-//!   `F64` for a `float`) is a bare 8-byte load or store — a raw number is
-//!   never a heap reference, so no write barrier;
-//! * `Boxed` converts between the `VmValue` and the value's class; a boxed
-//!   store of a scalar needs no barrier either;
-//! * anything else — a narrow representation, a boxed store of a heap value
-//!   (it needs the barrier), an index out of range, a receiver that is not an
-//!   array after all — takes `jit_array_get_fast` / `jit_array_set_fast`,
-//!   the runtime's own accessors.
-//!
-//! The buffer, length and representation come from the receiver's cached
-//! view when one is set ([`super::views`]).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, Block, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -29,13 +29,13 @@ use super::super::emit::{
 };
 use super::{heap, load_value, Ctx, Out};
 
-/// How a value side exchanges elements: raw with the matching
-/// representation, converted with `Boxed`.
+
+
 #[derive(Clone, Copy, PartialEq)]
 enum Elem {
     Int,
     Float,
-    /// Any other class: a whole `VmValue`.
+    
     Boxed,
 }
 
@@ -48,7 +48,7 @@ impl Elem {
         }
     }
 
-    /// The `ArrayRepr` discriminant read and written raw.
+    
     fn disc(self) -> i64 {
         match self {
             Elem::Boxed => 0,
@@ -82,8 +82,8 @@ impl Elem {
     }
 }
 
-/// The receiver's element buffer, length and representation — its cached
-/// view when one is set, resolved (and cached) otherwise — or `slow`.
+
+
 fn view(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -117,8 +117,8 @@ fn view(
     b.def_var(v.data, d);
     b.def_var(v.len, l);
     b.def_var(v.disc, di);
-    // The re-box above memoized an address inside this arm; it must not
-    // leak past the join (see `store::drop_home_addrs`).
+    
+    
     super::store::drop_home_addrs(ctx);
     b.ins().jump(ready, &[d.into(), l.into(), di.into()]);
 
@@ -127,8 +127,8 @@ fn view(
     Ok((p[0], p[1], p[2]))
 }
 
-/// Resolve boxed receiver `obj` to its buffer, length and representation,
-/// or branch to `slow` when it is not an array.
+
+
 fn resolve(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -148,7 +148,7 @@ fn resolve(
     (data, len, disc)
 }
 
-/// Branch to `slow` unless `key < len`, continuing in a fresh block.
+
 fn bounds(b: &mut FunctionBuilder, key: Value, len: Value, slow: Block) {
     let in_bounds = b.ins().icmp(IntCC::UnsignedLessThan, key, len);
     let hit = b.create_block();
@@ -156,7 +156,7 @@ fn bounds(b: &mut FunctionBuilder, key: Value, len: Value, slow: Block) {
     b.switch_to_block(hit);
 }
 
-/// `object[index]`, in the destination's class.
+
 pub(super) fn emit_get(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -196,7 +196,7 @@ pub(super) fn emit_get(
 
     b.switch_to_block(other);
     if want == Elem::Boxed {
-        // A boxed destination only reads a `Boxed` buffer raw.
+        
         b.ins().jump(slow, &[]);
     } else {
         let is_boxed = b.ins().icmp_imm_u(IntCC::Equal, disc, 0);
@@ -233,8 +233,8 @@ pub(super) fn emit_get(
         ctx.helpers.jit_native_result_offset as i32,
     );
     let r = want.unbox_elem(b, r);
-    // Home addresses memoized while re-boxing above live in this arm only
-    // (see `super::store::drop_home_addrs`).
+    
+    
     super::store::drop_home_addrs(ctx);
     b.ins().jump(merge, &[r.into()]);
 
@@ -246,7 +246,7 @@ pub(super) fn emit_get(
     })
 }
 
-/// `object[index] = value`.
+
 pub(super) fn emit_set(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -263,8 +263,8 @@ pub(super) fn emit_set(
     b.set_cold_block(slow);
     let merge = b.create_block();
 
-    // A heap value stored into a boxed buffer needs the write barrier, which
-    // the runtime's accessor applies: only scalars are stored inline.
+    
+    
     if src != Elem::Boxed {
         let raw = load_value(b, ctx, values, value)?;
         let (data, len, disc) = view(b, ctx, values, object, slow)?;
@@ -313,10 +313,10 @@ pub(super) fn emit_set(
         ctx.helpers.jit_array_set_fast,
         &[exec_ctx, ot, op, kt, kp, vt, vp],
     );
-    // The runtime's accessor may have reshaped this array or any alias of it.
+    
     ctx.views.clear(b);
-    // Same arm-locality rule as above: the re-boxing memoized addresses
-    // this join is reachable around.
+    
+    
     super::store::drop_home_addrs(ctx);
     b.ins().jump(merge, &[]);
 

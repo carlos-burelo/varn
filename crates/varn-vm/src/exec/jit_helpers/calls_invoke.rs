@@ -4,12 +4,12 @@ use crate::exec::ctx::ExecCtx;
 use crate::exec::host::isolates::Invoked;
 use crate::value::VmValue;
 
-/// `extern "C" fn(ctx, callee_tag, callee_payload, window: *const VmValue, argc)`
-/// — the SSA lowering's spread call. `window[0..argc]` holds the (already
-/// `WrapSpread`-marked) arguments; each `Spread` wrapper — and, as the
-/// interpreter's `exec_call_spread_reg` does, each bare array — expands into
-/// the callee's argument list. Runs through the same [`ExecCtx::invoke`] as
-/// `jit_invoke_window`, so there is still one invocation.
+
+
+
+
+
+
 #[varn_op_macros::jit_slow(field = "jit_call_spread_window")]
 pub(crate) extern "C" fn jit_call_spread_window(
     ctx: *mut ExecCtx,

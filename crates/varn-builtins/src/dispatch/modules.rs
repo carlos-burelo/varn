@@ -64,9 +64,9 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
         let val = match entry.entry_kind {
             0x09 => ctx.call_static(entry.func()),
             0x10 => (entry.func())(ctx, &[]).unwrap_or(VmValue::null()),
-            // Class-qualified members (instance/static method, getter, setter)
-            // belong to a class built by its ClassDef (0x10), not to the module
-            // object. They exist only to be op-id-addressable for direct dispatch.
+            
+            
+            
             0x03 | 0x04 | 0x05 | 0x06 | 0x11 | 0x12 | 0x13 | 0x14 | 0x15 => continue,
             _ => ctx.alloc_fn(entry.func(), symbol),
         };
@@ -77,8 +77,8 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
     Some(ctx.finalize(root))
 }
 
-/// `globals.vn` declares these as `const`; the contract macro binds only
-/// functions and classes, so their values are supplied here.
+
+
 const FLOAT_CONSTANTS: &[(&str, f64)] = &[("Infinity", f64::INFINITY), ("NaN", f64::NAN)];
 
 pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Arc<str>, VmValue> {
@@ -97,20 +97,20 @@ pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Arc
     out
 }
 
-/// The ordered names of the native / prelude global region — the layout
-/// `GlobalStore::with_native_layout` builds, computed WITHOUT a heap so the
-/// compiler can emit `LoadNativeGlobalIdx` against it directly.
-///
-/// Order: `"print"` (only if registered) followed by every other
-/// name sorted. The name set mirrors `register_globals_vm`: `isIsolate`, the
-/// `globals` module's own fields (the entry kinds `build_module` materialises),
-/// and `core` when a `core` module exists. Frozen on first call.
+
+
+
+
+
+
+
+
 pub fn native_global_layout() -> &'static [&'static str] {
     static LAYOUT: OnceLock<Vec<&'static str>> = OnceLock::new();
     LAYOUT.get_or_init(|| {
-        // Entry kinds `build_module` skips for the `globals` module object —
-        // class-qualified members that exist only for op-id dispatch. Keep in
-        // sync with the `continue` arm in `build_module`.
+        
+        
+        
         const SKIP_KINDS: &[u8] = &[0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14, 0x15];
 
         let mut names: Vec<&'static str> = vec!["isIsolate"];
@@ -144,8 +144,8 @@ pub fn native_global_layout() -> &'static [&'static str] {
     })
 }
 
-/// Index of a name in [`native_global_layout`], or `None` when it is not a
-/// prelude symbol.
+
+
 pub fn native_global_index(name: &str) -> Option<u32> {
     native_global_layout()
         .iter()

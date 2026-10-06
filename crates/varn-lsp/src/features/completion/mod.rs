@@ -88,7 +88,7 @@ pub fn build_completion_response(
         return (None, Some(log));
     }
 
-    // 1. Reflection & Static Operator `::`
+    
     if let Some(receiver_name) = reflection::colon_colon_receiver(state, line, col, trigger_char) {
         let items = reflection::build_reflection_completions(state, &receiver_name);
         let log = format!(
@@ -101,7 +101,7 @@ pub fn build_completion_response(
         return (Some(CompletionResponse::Array(items)), Some(log));
     }
 
-    // 2. Member Access `.` and `?.`
+    
     if let Some(info) = members::dot_receiver(state, line, col, trigger_char) {
         let mut items = build_member_completions(state, info, true);
         let postfix_items = build_postfix_completions(state, line, col);

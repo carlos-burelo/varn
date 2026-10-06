@@ -1,4 +1,4 @@
-//! `-p modules`: import/export linkage (DEBUG_PLAN §4.3).
+
 
 use std::io::Write;
 
@@ -8,8 +8,8 @@ use crate::fmt::Format;
 use crate::render::{basename, BLUE, BOLD, CYAN, DIM, RESET, YELLOW};
 use crate::report::Report;
 
-/// Rows `[kind, a, b]` where kind is `"import"` (`[_, specifiers, source]`) or
-/// `"export"` (`[_, repr]`).
+
+
 pub fn collect(program: &Program, arena: &AstArena) -> Report {
     let mut rows = Vec::new();
     for &stmt in &program.body {

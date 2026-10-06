@@ -1,8 +1,8 @@
-//! Redundant Guard and Null-Check Elimination Pass.
-//!
-//! Eliminates redundant `IsNull` instructions and simplifies branches by propagating
-//! non-null and null facts along single-predecessor control-flow branches and from
-//! non-null constructor/literal definitions.
+
+
+
+
+
 
 use crate::hir::HirBinOp;
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
@@ -17,7 +17,7 @@ enum NullFact {
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;
 
-    // 1. Identify inherently non-null SSA values (allocations, constants, `this`)
+    
     let mut inherently_non_null: FxHashSet<Value> = FxHashSet::default();
     let mut null_literals: FxHashSet<Value> = FxHashSet::default();
 
@@ -53,7 +53,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
         }
     }
 
-    // 2. Fold block-local IsNull on known inherently non-null or null values
+    
     for block in &mut func.blocks {
         for inst in &mut block.insts {
             if let InstKind::IsNull { operand } = &inst.kind {
@@ -68,7 +68,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
         }
     }
 
-    // 3. Map each Value to its defining InstKind
+    
     let mut defs: FxHashMap<Value, InstKind> = FxHashMap::default();
     for block in &func.blocks {
         for inst in &block.insts {
@@ -78,7 +78,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
         }
     }
 
-    // 4. Collect branch facts from Terminator::Branch
+    
     let mut block_facts: FxHashMap<BlockId, FxHashMap<Value, NullFact>> = FxHashMap::default();
 
     for (b_idx, block) in func.blocks.iter().enumerate() {
@@ -148,7 +148,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
         }
     }
 
-    // 5. Apply block_facts to rewrite downstream IsNull checks
+    
     for (b_id, facts) in &block_facts {
         let block = &mut func.blocks[b_id.0 as usize];
         for inst in &mut block.insts {

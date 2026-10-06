@@ -1,11 +1,11 @@
 use rustc_hash::FxHashMap as HashMap;
 
-/// Puntos extremos de escritura de un registro dentro de la función.
-///
-/// Una escritura ocupa el registro en ese instante igual que una lectura: si el
-/// rango terminase en el último USO, un registro reescrito más tarde parecería
-/// libre entre medias y el coloreado podría entregar su slot a un valor que
-/// sigue vivo ahí. Guardar `last` mantiene el rango cubriendo cada escritura.
+
+
+
+
+
+
 #[derive(Debug, Clone, Copy)]
 pub struct DefSites {
     pub first: usize,

@@ -5,7 +5,7 @@ use crate::value::VmValue;
 use std::sync::Arc;
 use varn_core::OpCode;
 
-/// See [`ExecCtx::enum_variant_template`].
+
 pub(crate) struct EnumVariantTemplate {
     pub enum_class_id: Option<u32>,
     pub enum_name: Arc<str>,
@@ -15,33 +15,33 @@ pub(crate) struct EnumVariantTemplate {
 }
 
 impl ExecCtx {
-    /// Build `Enum.Variant(args...)` straight from the variant template.
-    ///
-    /// A variant constructor reaches the VM as a method call on the enum's class
-    /// object, so it used to take the generic `CallMethod` path: resolve the
-    /// property (a hash lookup returning a CLONE of the template), `heap.intern`
-    /// that clone into a fresh heap object, hand it to `prepare_call`, which
-    /// clones the box a second time, drains the arguments into a `Vec`, and
-    /// finally allocates the variant that was wanted all along. Two heap
-    /// allocations, two deep clones and a `Vec` per construction — and no inline
-    /// cache could shorten it, because a variant is not in the class's
-    /// `method_map` and so was never cacheable.
-    ///
-    /// Measured on 2M constructions: 3.015 s through the generic path against
-    /// 181 ms for the equivalent `new Class(i)`, a 16.6x gap.
-    ///
-    /// Arguments are read in place from `stack[base + arg_start ..][..arg_count]`
-    /// — the same window `call_native_with_receiver` reads.
-    ///
-    /// Returns `None` for a fieldless variant called with no arguments: that
-    /// case yields the template value itself rather than a new object, and only
-    /// the generic path holds the `VmValue` identity to return.
-    /// The part of a variant template that a construction needs: everything but
-    /// the payload, which is rebuilt from the arguments anyway.
-    ///
-    /// Lifted out from under the heap borrow so the build below can take
-    /// `&mut self`. All three fields are cheap to copy — two `Arc<str>` bumps and
-    /// a field-name list that is empty for tuple-shaped variants.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub(crate) fn enum_variant_template(
         &self,
         receiver: VmValue,

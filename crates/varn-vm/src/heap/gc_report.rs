@@ -1,6 +1,6 @@
-//! Builds [`crate::gc_report::GcReport`] by actually reading `HeapInner` —
-//! split from `crate::gc_report` (the plain-data shape) because this is the
-//! one file that needs `pub(super)` access to the heap's private tables.
+
+
+
 
 use super::cells::SlotState;
 use super::obj::HeapObj;

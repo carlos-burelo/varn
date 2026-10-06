@@ -1,7 +1,7 @@
-//! Heap memory: every object is a cell that starts with an 8-byte header —
-//! generation state, kind, size class — followed by its body. A reference is
-//! the cell's address. Cells come from blocks segregated by size class, or
-//! from their own allocation when larger than the largest class.
+
+
+
+
 
 mod blocks;
 mod native;
@@ -90,8 +90,8 @@ impl Default for CellSpace {
 }
 
 impl CellSpace {
-    /// A cell of at least `body_bytes` after the header, its header written
-    /// and its body left for the caller to fill.
+    
+    
     #[inline]
     pub(in crate::heap) fn take_cell(
         &mut self,
@@ -128,7 +128,7 @@ impl CellSpace {
         r
     }
 
-    /// The object `r` names. `r` must come from this space and still be live.
+    
     #[inline(always)]
     pub(crate) fn get(&self, r: HeapRef) -> &HeapObj {
         debug_assert_ne!(self.state(r), SlotState::Free, "reference to a freed cell");
@@ -156,7 +156,7 @@ impl CellSpace {
         self.old_growth += 1;
     }
 
-    /// Drops the object where it stands and frees its cell.
+    
     pub(crate) fn release(&mut self, r: HeapRef) {
         let h = header(r);
         let class = h.class;
@@ -175,7 +175,7 @@ impl CellSpace {
         }
     }
 
-    /// Marks a young object reached by a minor collection, queueing it once.
+    
     #[inline(always)]
     pub(crate) fn mark_young(r: HeapRef, work: &mut Vec<HeapRef>) {
         let h = header(r);
@@ -185,7 +185,7 @@ impl CellSpace {
         }
     }
 
-    /// Sets the major-collection mark, answering whether it was clear.
+    
     #[inline(always)]
     pub(crate) fn mark_major(r: HeapRef) -> bool {
         let h = header(r);
@@ -213,7 +213,7 @@ impl CellSpace {
             + self.large.len()
     }
 
-    /// Every live cell.
+    
     pub(crate) fn refs(&self) -> impl Iterator<Item = HeapRef> + '_ {
         self.classes
             .iter()
@@ -227,8 +227,8 @@ impl CellSpace {
         self.refs().map(move |r| (r, self.get(r), self.state(r)))
     }
 
-    /// Frees every live cell without the major mark, clears the mark on the
-    /// rest and leaves them old. Returns how many were freed.
+    
+    
     pub(crate) fn sweep_major(&mut self) -> usize {
         let mut dead: Vec<HeapRef> = Vec::new();
         let mut survivors = 0;

@@ -8,10 +8,10 @@ use varn_core::{Atom, TypeKind};
 
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_class(&mut self, c: &ClassDecl) {
-        // `name_atom` forwards the class identifier's `Atom` for fields that
-        // stay `Atom`-keyed (`PendingEnrich`); `name` is the `Arc<str>` text
-        // resolved from it, needed everywhere this still feeds an unmigrated
-        // `Arc<str>`-typed API (`Symbol::new`, `ClassMemberInfo`, `Type`).
+        
+        
+        
+        
         let name_atom: Atom = c.id.unwrap_or_else(|| self.intern_local("<anon>"));
         let name: Arc<str> = Arc::from(self.interner.resolve(name_atom));
         let line = c.range.start.line;

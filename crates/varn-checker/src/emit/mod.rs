@@ -1,17 +1,17 @@
-//! The checker emits TIR.
-//!
-//! The replacement for `checker_annotations/`: instead of walking the AST and
-//! noting types in a side map, it builds a `varn_tir::TirModule` whose every
-//! node carries its type and resolution as mandatory fields. See
-//! `docs/TIR_CONTRATO_TIPADO.md`.
-//!
-//! The whole executable AST lowers: literals, `Var` (local / param / global /
-//! upvalue), every operator, member and index access, calls (direct / vtable /
-//! by-name), `new`, enum construction and matching, collections, closures,
-//! `async` / generators, all loop forms, `switch`, `try`, destructuring,
-//! templates. A construct with no precise TIR shape (a host intrinsic, a
-//! spread the arity rule can't see, an iterator-protocol `for…of`) still emits
-//! real nodes typed `Dynamic(NotYetSupported)` — never a bare hole.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 mod body;
 mod class_members;
@@ -42,9 +42,9 @@ use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, Program};
 use varn_tir::{BackendTy, SigId, TirFunction, TirModule, TyTable};
 
-/// Build the TIR for one module from the same four inputs
-/// `collect_type_annotations` consumes. Nothing else: a datum the checker does
-/// not expose here is a gap in the checker, to be closed there.
+
+
+
 pub fn emit_module(
     program: &Program,
     ast_arena: &AstArena,

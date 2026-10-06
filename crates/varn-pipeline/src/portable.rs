@@ -1,9 +1,9 @@
-//! El `.vnc` portable: la salida de `vn build`, que el usuario copia y
-//! ejecuta en otra máquina con otro binario.
-//!
-//! Se sella como [`ArtifactClass::Distributable`], así que sólo exige que el
-//! esquema case. Las entradas de caché son la otra clase y viven en
-//! `cache.rs`; comparten payload pero no reglas de validez.
+
+
+
+
+
+
 
 use crate::PipelineError;
 use varn_modules::artifact::{

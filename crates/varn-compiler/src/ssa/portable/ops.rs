@@ -1,13 +1,13 @@
-//! Operators projected onto the physical domain their operand types prove.
+
 
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use varn_core::OpCode;
 use varn_types::ssa::{DynBinOp, DynUnOp, SsaBinOp, SsaUnOp};
 
-/// The opcode the emitter selects ([`crate::lower::binary_opcode`]), mapped to
-/// its portable mirror: a typed opcode to its native op, a generic one to the
-/// same operator on boxed values. The bitwise opcodes serve every type, so
-/// they are native only when the operands are `int`.
+
+
+
+
 pub(super) fn project_bin(
     op: HirBinOp,
     lhs_ty: Option<HirType>,
@@ -72,9 +72,9 @@ pub(super) fn project_bin(
     })
 }
 
-/// A unary operator, native only on an operand of the type it is native for
-/// (`!` on a `bool`, `-`/`~` on an `int`, `-` on a `float`); otherwise the
-/// operator on the boxed value, as the bytecode's generic opcode runs it.
+
+
+
 pub(super) fn project_un(op: HirUnOp, operand_ty: Option<HirType>) -> Option<SsaUnOp> {
     Some(match (op, operand_ty) {
         (HirUnOp::Neg, Some(HirType::Int)) => SsaUnOp::NegInt,
@@ -84,7 +84,7 @@ pub(super) fn project_un(op: HirUnOp, operand_ty: Option<HirType>) -> Option<Ssa
         (HirUnOp::Not, _) => SsaUnOp::Dyn(DynUnOp::Not),
         (HirUnOp::BitNot, Some(HirType::Int)) => SsaUnOp::BitNotInt,
         (HirUnOp::BitNot, _) => SsaUnOp::Dyn(DynUnOp::BitNot),
-        // `typeof` has its own op (`SsaOp::Typeof`).
+        
         (HirUnOp::Typeof, _) => return None,
     })
 }

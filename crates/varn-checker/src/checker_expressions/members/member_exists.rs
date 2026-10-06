@@ -10,10 +10,10 @@ fn check_in_bind(name: &Arc<str>, key: &str, ext_bind: &crate::binder::BindResul
             return true;
         }
     }
-    // `type_members.classes` and `get_class_entry` are two views of a class:
-    // the latter is what `TypeContext::get_class_members` returns (the one
-    // `find_member_info`/`infer_member` consult), and for some binds only it
-    // carries every member. Check both, or existence and typing disagree.
+    
+    
+    
+    
     if let Some(entry) = ext_bind.get_class_entry(name) {
         if entry.members.iter().any(|m| m.name.as_ref() == key) {
             return true;
@@ -283,15 +283,15 @@ impl<'r> Checker<'r> {
                 .get_object_members(mid)
                 .iter()
                 .any(|m| m.name() == key),
-            // Mirrors the `TypeKind::Tuple` arm of `find_member_info_uncached`.
-            //
-            // Having to say it twice is the defect, not the answer: "which
-            // members does this type have" is walked once here for existence
-            // and once there for the type, and the two can disagree — as they
-            // did, which is why adding it in one place left the diagnostic
-            // still firing. Collapsing `member_exists` into
-            // `find_member_info(..).is_some()` is the real fix; it is a change
-            // across a 15k-line crate and does not belong in this one.
+            
+            
+            
+            
+            
+            
+            
+            
+            
             TypeKind::Tuple(_) => key == varn_core::MemberKey::Length.as_str(),
             TypeKind::Array(_) => {
                 if let Some(b) = &bind.core {

@@ -1,10 +1,10 @@
-//! x86_64 System V ABI (Linux, macOS, BSD) setjmp/longjmp.
-//!
-//! System V AMD64 ABI:
-//! - Callee-saved general-purpose registers: RBX, RBP, R12, R13, R14, R15.
-//! - First argument (_buf) in RDI.
-//! - Second argument (_val) in ESI/RSI.
-//! - Return value in EAX/RAX.
+
+
+
+
+
+
+
 
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C)]

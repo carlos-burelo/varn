@@ -1,15 +1,15 @@
-//! Stable op-ids for native operations.
-//!
-//! An op-id is a build-stable FNV-1a hash over the operation's identity
-//! (`module::symbol`, or `module::class::symbol` for class members). It is the
-//! single identity shared by the compiler (which embeds it in bytecode) and the
-//! runtime dispatch table (which looks it up). Because it is a pure function of
-//! fixed strings it is identical across builds and platforms, so it is safe to
-//! serialize into cached `.vnc` bytecode.
-//!
-//! This lives in `varn-core` so both the `varn-compiler` crate and the
-//! `varn-builtins` runtime compute the exact same id (neither can depend on the
-//! other).
+
+
+
+
+
+
+
+
+
+
+
+
 
 use crate::runtime_kind::RuntimeKind;
 
@@ -25,14 +25,14 @@ fn fnv1a(segments: &[&[u8]]) -> u64 {
     h
 }
 
-/// Stable op-id for a module-level symbol: `module::symbol`.
+
 pub fn compound_op_id(module_id: &str, symbol: &str) -> u64 {
     fnv1a(&[module_id.as_bytes(), b"::", symbol.as_bytes()])
 }
 
-/// Stable op-id for a class-qualified member: `module::class::symbol`.
-/// The extra `::class` segment guarantees these ids never collide with the
-/// 2-segment [`compound_op_id`] space.
+
+
+
 pub fn compound_op_id3(module_id: &str, class: &str, symbol: &str) -> u64 {
     fnv1a(&[
         module_id.as_bytes(),
@@ -43,24 +43,24 @@ pub fn compound_op_id3(module_id: &str, class: &str, symbol: &str) -> u64 {
     ])
 }
 
-/// The native module under which all core-type classes (Array, str, int, Map,
-/// …) are registered. See the `varn_contract!` invocations in
-/// `varn-builtins/src/modules/core/types/*`.
+
+
+
 pub const CORE_MODULE: &str = "globals";
 
-/// op-id for a core-type method/getter, given its class name and member name.
+
 pub fn core_method_op_id(class: &str, method: &str) -> u64 {
     compound_op_id3(CORE_MODULE, class, method)
 }
 
-/// Op-id de `Array::push`, el método nativo más ejecutado del lenguaje: en los
-/// benchmarks de colecciones es el 97 % de todas las llamadas nativas. El
-/// lowering lo compara para bajarlo al opcode dedicado `ArrayPush` en vez de
-/// cruzar la frontera nativa, que exige stagear receptor y argumento en una
-/// ventana contigua y volcar los registros a sus home slots.
-///
-/// Cacheado porque el id es un FNV-1a sobre tres segmentos y la comparación
-/// ocurre una vez por sentencia lowerada.
+
+
+
+
+
+
+
+
 pub fn array_push_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Array.name(), "push"))
@@ -96,9 +96,9 @@ pub fn str_split_op_id() -> u64 {
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "split"))
 }
 
-/// Op-id de `str::charCodeAt` / `str::codePointAt`. El lowering los inlinea
-/// (byte-load sobre una vista de bytes hoistada de la región) en vez de cruzar
-/// la frontera nativa, y el scan de regiones los trata como no-alloc.
+
+
+
 pub fn str_char_code_at_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "charCodeAt"))
@@ -109,20 +109,20 @@ pub fn str_code_point_at_op_id() -> u64 {
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "codePointAt"))
 }
 
-/// Whether `op_id` is a char-indexing `str` method the CLIF lowering inlines.
+
 pub fn is_str_char_index_op_id(op_id: u64) -> bool {
     op_id == str_char_code_at_op_id() || op_id == str_code_point_at_op_id()
 }
 
-/// The core builtin classes whose instance methods are natively registered
-/// (via the `varn_contract!` invocations in `varn-builtins/src/modules/
-/// core/types/*`) and are therefore op-id-addressable.
-///
-/// This is the **single source of truth** for "is this a core type with a
-/// native method table". Adding a primitive = add its [`RuntimeKind`] here and
-/// nothing else in the dispatch layer. Distinct from the VM's intrinsic-class
-/// registry (which also carries `Error`/`TypeError`/`RangeError` for property
-/// fallback) — these are the op-id-dispatched primitives.
+
+
+
+
+
+
+
+
+
 pub const CORE_CLASSES: [RuntimeKind; 13] = [
     RuntimeKind::Array,
     RuntimeKind::Str,
@@ -139,35 +139,35 @@ pub const CORE_CLASSES: [RuntimeKind; 13] = [
     RuntimeKind::BigInt,
 ];
 
-/// Whether `tag` is a core class with a natively registered method table.
+
 #[inline]
 pub fn is_core_class(tag: RuntimeKind) -> bool {
     CORE_CLASSES.contains(&tag)
 }
 
-/// The class-registration name for a core class, i.e. the exact string used as
-/// the `class:` key in `varn_contract!` and in the `.vn` contracts. This is the
-/// string that feeds [`core_method_op_id`], so it must match the registration
-/// byte-for-byte — and it is the single canonical [`RuntimeKind::name`].
+
+
+
+
 pub fn core_class_name(tag: RuntimeKind) -> Option<&'static str> {
     is_core_class(tag).then(|| tag.name())
 }
 
-/// Exact inverse of [`core_class_name`]: a registration name back to its
-/// [`RuntimeKind`], restricted to core classes. Only the canonical registration
-/// name resolves (e.g. `"Symbol"`, not the surface `"symbol"`), so this never
-/// admits a name that wouldn't round-trip through [`core_class_name`]. Returns
-/// `None` for user classes / unknown names.
+
+
+
+
+
 pub fn core_class_tag(name: &str) -> Option<RuntimeKind> {
     CORE_CLASSES
         .into_iter()
         .find(|&tag| core_class_name(tag) == Some(name))
 }
 
-/// Maps a core class name to `Some(class)` when it is one whose methods are
-/// natively registered (and therefore op-id-addressable). Returns `None` for
-/// user classes / unknown receivers, so the compiler only emits a direct
-/// `CallNativeOp` when the dispatch is guaranteed to resolve.
+
+
+
+
 pub fn core_class(name: &str) -> Option<&'static str> {
     core_class_tag(name).and_then(core_class_name)
 }

@@ -1,6 +1,6 @@
 pub use varn_types::chunk::FunctionProto;
 
-/// Varn typed-IR-to-bytecode compilation pipeline.
+
 pub mod from_tir;
 pub mod hir;
 pub mod lower;

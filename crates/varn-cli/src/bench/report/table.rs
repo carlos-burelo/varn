@@ -1,14 +1,14 @@
-//! The phase table.
-//!
-//! Two correctness rules govern this table, both violated by the layout it
-//! replaces:
-//!
-//! 1. **`e2e` is not a phase.** It re-measures the whole pipeline, so its
-//!    share of "the sum of phases" exceeds 100% and means nothing. It belongs
-//!    below the rule, reported as an absolute with the overhead it reveals.
-//! 2. **`total` has no min or max.** Summing per-phase minima answers "what if
-//!    every phase hit its best in the same run", which no run did. Without
-//!    paired per-run samples the honest cell is empty.
+
+
+
+
+
+
+
+
+
+
+
 
 use std::time::Duration;
 
@@ -18,12 +18,12 @@ use varn_core::term::terminal;
 use super::fmt::{fmt_dur, fmt_pct, DurScale};
 use crate::bench::stats::{PhaseStats, CV_NOISY};
 
-/// Phases quieter than this share of the total are folded into one row unless
-/// the caller asks for everything.
+
+
 const FOLD_BELOW: f64 = 0.01;
 
 pub struct TableOpts {
-    /// Show every phase, including those folded as negligible.
+    
     pub all_rows: bool,
 }
 
@@ -39,8 +39,8 @@ pub fn print_table(phases: &[PhaseStats], e2e: Option<&PhaseStats>, opts: &Table
         }
     };
 
-    // One unit for the whole table: every duration cell is comparable at a
-    // glance instead of carrying its own suffix.
+    
+    
     let scale = DurScale::for_column(
         phases
             .iter()
@@ -98,7 +98,7 @@ pub fn print_table(phases: &[PhaseStats], e2e: Option<&PhaseStats>, opts: &Table
 
     table.rule();
 
-    // No min/max: they are not derivable from unpaired per-phase samples.
+    
     table.row([
         chalk("total").green().bold().to_string(),
         chalk("—").dim().to_string(),
@@ -120,12 +120,12 @@ pub fn print_table(phases: &[PhaseStats], e2e: Option<&PhaseStats>, opts: &Table
         ));
     }
 
-    // `e2e` sits outside the table: it is a second measurement of the same
-    // work, not a component of it.
+    
+    
     if let Some(e) = e2e {
-        // The delta is signed. Clamping it at zero would hide the case that
-        // matters most: e2e coming out *below* the sum of phases, which means
-        // the phases are double-counting work.
+        
+        
+        
         let delta = if e.p50 >= total_p50 {
             format!("+{}", fmt_dur(e.p50 - total_p50))
         } else {

@@ -1,6 +1,6 @@
 use crate::lang_type::{BuiltinType, LangPrimitive};
 
-/// A singleton type: the one value a literal denotes (spec §29).
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -12,7 +12,7 @@ pub enum TypeLiteral<N> {
 }
 
 impl<N> TypeLiteral<N> {
-    /// The primitive every value of this literal type also belongs to.
+    
     pub const fn base(&self) -> LangPrimitive {
         match self {
             TypeLiteral::Int(_) => LangPrimitive::Int,
@@ -86,7 +86,7 @@ impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
         matches!(self, TypeKind::Primitive(_) | TypeKind::This)
     }
 
-    /// The language-vocabulary name of a primitive or builtin kind.
+    
     pub fn lang_name(&self) -> Option<&'static str> {
         match self {
             TypeKind::Primitive(p) => Some(p.name()),
@@ -96,8 +96,8 @@ impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
         }
     }
 
-    /// The kind a bare type name denotes when it is part of the language
-    /// vocabulary (`int`, `Bytes`), before any user declaration is consulted.
+    
+    
     pub fn of_lang_name(name: &str) -> Option<Self> {
         LangPrimitive::from_str(name)
             .map(TypeKind::Primitive)

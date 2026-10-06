@@ -60,9 +60,9 @@ impl ExecCtx {
             OpCode::Move => {
                 let w1 = code[*ip];
                 *ip += 1;
-                // Los registros siempre están dentro de `register_count` (el
-                // compilador los dimensiona); el `resize` anterior era defensa
-                // muerta. `mov` convierte entre clases con chequeo.
+                
+                
+                
                 self.stack.mov(base, first_reg, hi(w1))?;
             }
             OpCode::LoadGlobalIdx => {

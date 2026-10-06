@@ -1,18 +1,18 @@
-//! GC safepoints and the scope-exit obligations compiled code owes the
-//! interpreter: closing upvalues, and the null assertion a non-null type
-//! still has to prove at runtime.
+
+
+
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-/// Loop back-edge safepoint. Mirrors the interpreter's `OpCode::Loop`
-/// handler: run the minor collection (and pace the major one) so long
-/// call-free allocating loops still collect.
-/// Takes no `VmValue` arguments by design — the caller has flushed every VM
-/// register to the stack, so all roots are visible and get reloaded after.
-/// v2 (§3.5): el colector arma `ctx.poll`; el código hace `test al,al;
-/// jnz slow` (un byte, branch predecible) en vez de comparar longitudes inline.
+
+
+
+
+
+
+
 #[varn_op_macros::jit_slow(field = "gc_safepoint")]
 pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
     unsafe {
@@ -36,9 +36,9 @@ pub(crate) extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        // Fase A: `lowest` es un registro del frame actual, no un índice
-        // absoluto del almacén; `close_upvalues_from_reg` traduce cada
-        // upvalue abierto a registro dentro de la activación.
+        
+        
+        
         let alloc = ctx_ref.frames[frame_idx].base;
         ctx_ref.close_upvalues_from_reg(alloc, lowest);
     }

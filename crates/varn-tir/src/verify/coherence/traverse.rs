@@ -33,7 +33,7 @@ fn walk_stmt(m: &TirModule, f: &TirFunction, s: &TirStmt, errors: &mut Vec<Verif
                 walk_expr(m, f, e, errors);
                 check_return(m, f, e, errors);
             } else {
-                // Bare Return(None) requires function to return Void
+                
                 check_return_none(m, f, errors);
             }
         }

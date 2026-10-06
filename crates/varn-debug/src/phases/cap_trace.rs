@@ -1,5 +1,5 @@
-//! `-p caps` (aliases `cap`, `cap-trace`): required capabilities
-//! (DEBUG_PLAN §4.9).
+
+
 
 use std::io::Write;
 

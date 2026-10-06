@@ -1,16 +1,16 @@
-//! Class and enum declarations nested in a function body (or a block).
-//!
-//! The checker's type tables are keyed by name at module scope: a class or
-//! enum declared inside a function is the same kind of nominal type as one
-//! declared at the top level, with one `ClassId` / `EnumId`, one runtime class
-//! object held in a module global, and every use loading that global. What
-//! differs is only when it comes into existence: a top-level declaration
-//! builds its class where it stands in the module body, a nested one where it
-//! stands in its function — the first time that declaration runs. So each
-//! nested type gets its global slot up front, and its declaration lowers to
-//! "build it unless that global already holds it"; its class definition takes
-//! the next ordinal after the top-level ones, in the order the declarations
-//! are met.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -21,21 +21,21 @@ use varn_tir::{BackendTy, DynReason, Resolution, Span, TirExpr, TirExprKind, Tir
 
 use crate::binder::BindResult;
 
-/// The nested types of a module, and the declarations met so far.
+
 pub(super) struct NestedTypes {
-    /// Each nested type's module global.
+    
     slots: FxHashMap<Arc<str>, u32>,
-    /// The `class_defs` ordinal the first nested type takes.
+    
     first_ordinal: u32,
-    /// Declarations met, by the ordinal they took.
+    
     met: RefCell<Vec<(Arc<str>, StmtId)>>,
 }
 
 impl NestedTypes {
-    /// Every class and enum the module declares that is not at its top level
-    /// or in a namespace (`top_level`). Each is given a global slot after
-    /// `next_slot`; the new slots are returned in order for the caller to
-    /// register.
+    
+    
+    
+    
     pub(super) fn collect(
         bind: &BindResult,
         top_level: &FxHashSet<Arc<str>>,
@@ -73,7 +73,7 @@ impl NestedTypes {
         }
     }
 
-    /// The new globals, `(name, slot)`, in slot order.
+    
     pub(super) fn new_globals(&self, taken: &FxHashMap<Arc<str>, u32>) -> Vec<(Arc<str>, u32)> {
         let mut out: Vec<(Arc<str>, u32)> = self
             .slots
@@ -85,8 +85,8 @@ impl NestedTypes {
         out
     }
 
-    /// The statement a nested declaration `stmt` of type `name` lowers to:
-    /// build the class once, where the declaration runs.
+    
+    
     pub(super) fn declare(&self, name: &str, stmt: StmtId) -> Option<TirStmt> {
         let slot = *self.slots.get(name)?;
         let mut met = self.met.borrow_mut();
@@ -119,8 +119,8 @@ impl NestedTypes {
         })
     }
 
-    /// The declarations met, in ordinal order, to emit their class
-    /// definitions after the top-level ones.
+    
+    
     pub(super) fn met<'a>(&self, arena: &'a AstArena) -> Vec<&'a Decl> {
         self.met
             .borrow()
@@ -133,8 +133,8 @@ impl NestedTypes {
     }
 }
 
-/// The class and enum names declared at the module's top level, directly or
-/// in a namespace.
+
+
 pub(super) fn top_level_types(
     program: &Program,
     arena: &AstArena,

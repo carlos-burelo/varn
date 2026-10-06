@@ -1,4 +1,4 @@
-//! Property, index and field access for the SSA lowering.
+
 mod fields;
 mod get;
 mod index;

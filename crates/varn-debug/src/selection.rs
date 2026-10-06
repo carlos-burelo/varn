@@ -1,11 +1,11 @@
-//! Phase selection and filters — the data half of `DebugFlags`
-//! (DEBUG_PLAN §3.3).
-//!
-//! `PhaseSel` is a `u64` bitflags set with one bit per registered phase; the
-//! bit assignment is derived from [`crate::registry::ALL`], never hand-written.
-//! `Filters` and `SubModes` carry the non-phase knobs the parser produces.
 
-/// One bit per phase, stored densely. Empty means "no phase selected".
+
+
+
+
+
+
+
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub struct PhaseSel(u64);
 
@@ -37,16 +37,16 @@ impl PhaseSel {
     }
 }
 
-/// `--fn` and line-range filters, shared by the per-function dumps and the
-/// line-oriented views.
+
+
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Filters {
     pub fn_filter: Option<String>,
     pub line_range: Option<(u32, u32)>,
 }
 
-/// Sub-views a phase can be asked for with `phase:sub+sub`. Modeled as booleans
-/// because several can be active at once (`clif:route+kinds`).
+
+
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub struct SubModes {
     pub clif_route: bool,
@@ -69,7 +69,7 @@ pub struct SubModes {
     pub lsp_hints: bool,
 }
 
-/// Everything `-p` produced: which phases, which sub-views, which filters.
+
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Selection {
     pub sel: PhaseSel,

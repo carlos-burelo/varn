@@ -1,5 +1,5 @@
-//! Allocation for scalar and opaque heap values: symbols, ranges, decimals,
-//! closures, modules and buffers.
+
+
 
 use super::cells::SlotState;
 use super::obj::HeapObj;

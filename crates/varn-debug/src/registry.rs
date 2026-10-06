@@ -1,15 +1,15 @@
-//! The static phase registry (DEBUG_PLAN §3.1).
-//!
-//! Single source of truth for accepted phase ids, aliases, titles, stages and
-//! `-p all` membership. Adding a phase is one entry here (a real `Phase`
-//! implementation once it moves into `phases/`); the parser and
-//! `--list-phases` are derived, so they cannot drift.
+
+
+
+
+
+
 
 use crate::phase::{PerModule, Phase, Stage};
 
-/// A metadata-only phase. Phases that have not migrated to a real
-/// implementation yet use this so the registry is complete and the parser can
-/// be generated. `collect`/`render` are added to `Phase` in the next steps.
+
+
+
 pub struct Info {
     pub id: &'static str,
     pub aliases: &'static [&'static str],
@@ -189,7 +189,7 @@ static GC: Info = Info {
     groups: &[],
 };
 
-/// Every registered phase, in `Stage` order.
+
 pub static ALL: &[&dyn Phase] = &[
     &TOKENS,
     &AST,
@@ -209,14 +209,14 @@ pub static ALL: &[&dyn Phase] = &[
     &GC,
 ];
 
-/// Find a phase by canonical id or alias.
+
 pub fn lookup(name: &str) -> Option<&'static dyn Phase> {
     ALL.iter()
         .copied()
         .find(|p| p.id() == name || p.aliases().contains(&name))
 }
 
-/// Phases that are members of `-p all`.
+
 pub fn in_all() -> impl Iterator<Item = &'static dyn Phase> {
     ALL.iter().copied().filter(|p| p.in_all())
 }

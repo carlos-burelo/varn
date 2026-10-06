@@ -23,7 +23,7 @@ pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<VmValue,
         ""
     };
 
-    // 1. Build the headers object in the VM
+    
     let headers_obj = ctx.alloc_object();
     for header in req.headers.iter() {
         let name = header.name.to_lowercase();
@@ -32,7 +32,7 @@ pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<VmValue,
         ctx.set_field(headers_obj, &name, val_nv);
     }
 
-    // 2. Build the result RawRequest object
+    
     let result_obj = ctx.alloc_object();
     let method_nv = ctx.alloc_str(method);
     let path_nv = ctx.alloc_str(path);

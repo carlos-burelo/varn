@@ -1,8 +1,8 @@
 #![allow(unused_crate_dependencies)]
-//! Well-formedness: every handle points at something that exists, and every
-//! slot is in range of the table it claims to index. These are the checks
-//! that make a dangling ClassId or an out-of-range vtable slot impossible
-//! rather than improbable.
+
+
+
+
 
 use std::sync::Arc;
 use varn_tir::*;
@@ -54,13 +54,13 @@ fn expr(kind: TirExprKind, ty: BackendTy, res: Resolution) -> TirExpr {
     }
 }
 
-/// A module with nothing wrong passes.
+
 #[test]
 fn an_empty_module_verifies() {
     assert!(verify_module(&empty_module()).is_ok());
 }
 
-/// A ClassId with no entry is rejected. Today nothing checks this.
+
 #[test]
 fn a_dangling_class_id_is_rejected() {
     let mut m = empty_module();
@@ -80,7 +80,7 @@ fn a_dangling_class_id_is_rejected() {
     );
 }
 
-/// A field slot past the end of the class's layout is rejected.
+
 #[test]
 fn an_out_of_range_field_slot_is_rejected() {
     let mut m = empty_module();
@@ -96,7 +96,7 @@ fn an_out_of_range_field_slot_is_rejected() {
             name: "nope".into(),
         },
         BackendTy::Int,
-        Resolution::FieldSlot(7), // the class has one field
+        Resolution::FieldSlot(7), 
     )));
     let errs = verify_module(&m).unwrap_err();
     assert!(
@@ -106,7 +106,7 @@ fn an_out_of_range_field_slot_is_rejected() {
     );
 }
 
-/// A field slot on a non-class receiver is rejected.
+
 #[test]
 fn a_field_slot_on_non_class_receiver_is_rejected() {
     let mut m = empty_module();
@@ -132,7 +132,7 @@ fn a_field_slot_on_non_class_receiver_is_rejected() {
     );
 }
 
-/// A vtable slot past the end of the class's vtable is rejected.
+
 #[test]
 fn an_out_of_range_vtable_slot_is_rejected() {
     let mut m = empty_module();
@@ -149,7 +149,7 @@ fn an_out_of_range_vtable_slot_is_rejected() {
             args: vec![],
         },
         BackendTy::Void,
-        Resolution::VtableSlot(3), // the class has no methods
+        Resolution::VtableSlot(3), 
     )));
     let errs = verify_module(&m).unwrap_err();
     assert!(
@@ -159,7 +159,7 @@ fn an_out_of_range_vtable_slot_is_rejected() {
     );
 }
 
-/// A vtable slot on a non-class receiver is rejected.
+
 #[test]
 fn a_vtable_slot_on_non_class_receiver_is_rejected() {
     let mut m = empty_module();
@@ -186,35 +186,35 @@ fn a_vtable_slot_on_non_class_receiver_is_rejected() {
     );
 }
 
-/// Self-referential types do not cause the verifier to hang.
+
 #[test]
 fn cyclic_types_are_handled() {
     let mut m = empty_module();
-    // Create a cyclic type: TyId(0) = Array(TyId(1)), TyId(1) = Nullable(TyId(0))
+    
     let mut types = TyTable::default();
     let _ = types.intern(BackendTy::Array(TyId(1)));
     let _ = types.intern(BackendTy::Nullable(TyId(0)));
     m.types = types;
 
-    // Expression with the cyclic type
+    
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::IntLit(42),
         BackendTy::Array(TyId(1)),
         Resolution::None,
     )));
 
-    // Should complete without hanging; the error doesn't matter for this test
+    
     let _ = verify_module(&m);
 }
 
-/// Local resolution is validated against the function's locals.
+
 #[test]
 fn out_of_range_local_is_rejected() {
     let mut m = empty_module();
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::Var,
         BackendTy::Int,
-        Resolution::Local(LocalId(5)), // out of range
+        Resolution::Local(LocalId(5)), 
     )));
     let errs = verify_module(&m).unwrap_err();
     assert!(
@@ -225,14 +225,14 @@ fn out_of_range_local_is_rejected() {
     );
 }
 
-/// Parameter resolution is validated against the function's parameters.
+
 #[test]
 fn out_of_range_param_is_rejected() {
     let mut m = empty_module();
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::Var,
         BackendTy::Int,
-        Resolution::Param(5), // out of range
+        Resolution::Param(5), 
     )));
     let errs = verify_module(&m).unwrap_err();
     assert!(
@@ -243,17 +243,17 @@ fn out_of_range_param_is_rejected() {
     );
 }
 
-/// Tuple elements are checked for dangling types.
+
 #[test]
 fn dangling_type_in_tuple_is_rejected() {
     let mut m = empty_module();
     let mut types = TyTable::default();
-    // Create a tuple containing a dangling class: Tuple([Class(ClassId(99))])
+    
     let list_id = types.intern_list(&[BackendTy::Class(ClassId(99))]);
     let _ = types.intern(BackendTy::Tuple(list_id));
     m.types = types;
 
-    // Expression with the tuple type
+    
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::IntLit(42),
         BackendTy::Tuple(list_id),
@@ -269,37 +269,37 @@ fn dangling_type_in_tuple_is_rejected() {
     );
 }
 
-/// Cyclic tuples do not cause the verifier to hang.
+
 #[test]
 fn cyclic_tuple_does_not_hang() {
     let mut m = empty_module();
-    // Create a cycle through indirection:
-    // TyId(0) = Array(TyId(1))
-    // TyId(1) = Tuple([Array(TyId(1))])
-    // This cycles because Tuple's element is Array(TyId(1)), which is TyId(0)
+    
+    
+    
+    
     let mut types = TyTable::default();
-    let _ = types.intern(BackendTy::Array(TyId(1))); // TyId(0)
-    let list_id = types.intern_list(&[BackendTy::Array(TyId(1))]); // TyListId(0)
-    let _ = types.intern(BackendTy::Tuple(list_id)); // TyId(1)
+    let _ = types.intern(BackendTy::Array(TyId(1))); 
+    let list_id = types.intern_list(&[BackendTy::Array(TyId(1))]); 
+    let _ = types.intern(BackendTy::Tuple(list_id)); 
     m.types = types;
 
-    // Expression with a type that eventually cycles back
+    
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::IntLit(42),
-        BackendTy::Array(TyId(1)), // Array(Tuple([Array(TyId(1))]))... cycles
+        BackendTy::Array(TyId(1)), 
         Resolution::None,
     )));
 
-    // Should complete without hanging
+    
     let _ = verify_module(&m);
 }
 
-/// A `Field` expression whose object type is a dangling nullable handle
-/// (`Nullable(TyId(999))` with no entry at 999) used to panic the verifier:
-/// `wellformed` reports the dangling handle, but `coherence` runs
-/// unconditionally afterwards and `non_nullable`/`assignable_with_depth`
-/// indexed the table without checking `contains` first. This asserts it now
-/// reports an error instead of panicking.
+
+
+
+
+
+
 #[test]
 fn a_dangling_type_handle_on_a_field_object_does_not_panic() {
     let mut m = empty_module();
@@ -317,7 +317,7 @@ fn a_dangling_type_handle_on_a_field_object_does_not_panic() {
         BackendTy::Int,
         Resolution::FieldSlot(0),
     )));
-    // Must return an error, not panic.
+    
     let errs = verify_module(&m).unwrap_err();
     assert!(
         errs.iter().any(|e| e.message.contains("TyId(999)")),
@@ -326,13 +326,13 @@ fn a_dangling_type_handle_on_a_field_object_does_not_panic() {
     );
 }
 
-/// A genuine self-reference through `TyListId` alone (no `TyId` involved):
-/// `intern_list(&[Tuple(TyListId(0))])` on an empty table produces
-/// `TyListId(0)` holding a `Tuple` that points back at itself. Distinct from
-/// `cyclic_tuple_does_not_hang` above, which cycles through a `TyId`
-/// indirection and never re-visits the same `TyListId` — this one hits the
-/// same `TyListId` on the very first recursive step, and `wellformed` used
-/// to track only `TyId` in its `visited` set, overflowing the stack.
+
+
+
+
+
+
+
 #[test]
 fn self_referential_tuple_list_does_not_overflow() {
     let mut m = empty_module();
@@ -347,16 +347,16 @@ fn self_referential_tuple_list_does_not_overflow() {
         Resolution::None,
     )));
 
-    // Should complete without stack-overflowing.
+    
     let _ = verify_module(&m);
 }
 
-/// `TirStmt::Let`'s bound local must be in range of the function's locals.
+
 #[test]
 fn out_of_range_let_local_is_rejected() {
     let mut m = empty_module();
     m.top_level.body.push(TirStmt::Let {
-        local: LocalId(5), // top_level has no locals
+        local: LocalId(5), 
         ty: BackendTy::Int,
         init: None,
     });
@@ -369,13 +369,13 @@ fn out_of_range_let_local_is_rejected() {
     );
 }
 
-/// `TirStmt::Try`'s bound catch local must be in range of the function's locals.
+
 #[test]
 fn out_of_range_try_catch_local_is_rejected() {
     let mut m = empty_module();
     m.top_level.body.push(TirStmt::Try {
         body: vec![],
-        catch_local: LocalId(5), // top_level has no locals
+        catch_local: LocalId(5), 
         catch_body: vec![],
     });
     let errs = verify_module(&m).unwrap_err();
@@ -387,9 +387,9 @@ fn out_of_range_try_catch_local_is_rejected() {
     );
 }
 
-/// A vtable entry naming a dangling `SigId` is rejected: `check_method_call`
-/// silently returns when the signature lookup fails, which disabled the
-/// arity/type coherence rule for any class whose vtable got corrupted.
+
+
+
 #[test]
 fn a_dangling_vtable_sig_is_rejected() {
     let mut m = empty_module();

@@ -32,18 +32,18 @@ impl Workspace {
         }
     }
 
-    /// Fast O(1) source text update (<0.5ms). Returns (FileId, Revision, CancellationToken)
+    
     pub fn update_source(&self, uri: &str, source: &str) -> (FileId, u64, CancellationToken) {
         let file_id = self.db.intern(uri);
         let (rev, token) = self.db.set_source(file_id, source.to_string());
         (file_id, rev, token)
     }
 
-    /// The current text of `uri`, if the server holds any.
-    ///
-    /// Incremental edits are stated against this text, so it is the one that
-    /// must answer — not the source stored on the last analysed
-    /// `DocumentState`, which lags by a debounce.
+    
+    
+    
+    
+    
     pub fn source_of(&self, uri: &str) -> Option<String> {
         let file_id = self.db.intern(uri);
         self.db
@@ -51,26 +51,26 @@ impl Workspace {
             .map(|(_, text)| text.to_string())
     }
 
-    /// Re-analyse one file, evicting only what its change can invalidate.
-    ///
-    /// Two firewalls, at different scopes:
-    ///
-    /// 1. **Module graph.** Only the edited module and its transitive importers
-    ///    are evicted from the resolver. Everything else — the whole stdlib
-    ///    above all — keeps its bind. This used to be a blanket `reset()` of
-    ///    the entire graph on every keystroke.
-    /// 2. **Dependents.** Their re-analysis is gated on the edited file's
-    ///    *exports* changing. Editing a function body leaves the export map
-    ///    identical, so nothing downstream is touched.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub fn update_file(&self, uri: String, source: String) {
         resolver::invalidate(&Self::module_id_of(&uri));
 
         let file_id = self.db.intern(&uri);
-        // Only store text that is actually new. `set_source` cancels the
-        // file's outstanding token, and the caller that ran `update_source`
-        // first is holding that very token to detect being superseded — so
-        // re-storing identical text here would make every analysis cancel
-        // itself before it could publish anything.
+        
+        
+        
+        
+        
         let already_current = self
             .db
             .get_source(file_id)
@@ -108,8 +108,8 @@ impl Workspace {
         self.files.insert(uri.clone(), state);
 
         for (dep_uri, dep_source) in dependents {
-            // No eviction needed here: invalidating the edited module above
-            // already evicted everything that transitively imports it.
+            
+            
             let dep_state = Arc::new(run_pipeline(dep_source, dep_uri.clone()));
             {
                 let mut idx = self.index.write().unwrap();
@@ -124,16 +124,16 @@ impl Workspace {
         }
     }
 
-    /// The module id a document URI denotes, canonicalized the same way the
-    /// resolver keys its graph — otherwise an invalidation silently misses.
+    
+    
     fn module_id_of(uri: &str) -> varn_core::ModuleId {
         let path = crate::document::uri_to_path(uri);
         let canonical = varn_modules::canonical_or_original(std::path::Path::new(&path));
         varn_core::ModuleId::local_str(&canonical)
     }
 
-    /// Index a file into the workspace symbol index without retaining its full
-    /// DocumentState in memory. Used during startup workspace scanning.
+    
+    
     pub fn index_file(&self, uri: String, source: String) {
         resolver::invalidate(&Self::module_id_of(&uri));
         let file_id = self.db.intern(&uri);
@@ -146,9 +146,9 @@ impl Workspace {
         }
     }
 
-    /// Close an open document in the editor.
-    /// Drops the heavy DocumentState from memory while keeping the file's
-    /// exports and project index entries intact.
+    
+    
+    
     pub fn close_file(&self, uri: &str) {
         self.files.remove(uri);
     }

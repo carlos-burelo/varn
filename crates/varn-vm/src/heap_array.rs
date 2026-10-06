@@ -1,20 +1,20 @@
-//! Single shared implementation of `NativeCtx` array element access.
-//!
-//! `impl NativeCtx for Heap` (heap.rs) and `impl NativeCtx for ExecCtx`
-//! (exec/frame_ctrl.rs) both need `array_len/get/set/push/pop/for_each`.
-//! Production only ever dispatches through the `ExecCtx` impl, while the
-//! `Heap` impl is what the unit tests exercise directly — two copies of the
-//! same logic meant an edit to one twin could pass every test while still
-//! breaking production. Both impls now delegate here so there is exactly
-//! one place that knows the barrier semantics.
-//!
-//! Barrier semantics (preserved exactly, do not change per-caller):
-//! - `array_set`: barrier only when `VmArray::set_vm` reports the slot was
-//!   written (in-bounds); an out-of-bounds `set` is a silent no-op with no
-//!   barrier.
-//! - `array_push`: barrier unconditionally — a push always writes a slot.
-//! - `array_pop`: no barrier — removing a value can't introduce a new
-//!   old-gen -> nursery edge.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;

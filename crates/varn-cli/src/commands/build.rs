@@ -51,7 +51,7 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
 
         link_native_executable(&obj_path, Path::new(&out_path))?;
 
-        // Clean up intermediate .obj file
+        
         let _ = std::fs::remove_file(&obj_path);
     } else {
         pipeline::portable::write_portable(&out_path, &compiled.graph_artifact)?;

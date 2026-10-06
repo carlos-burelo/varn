@@ -1,6 +1,6 @@
-//! The host boundary: how the VM answers `NativeCtx`. Cross-isolate value
-//! transfer and the VM-call window live in [`isolates`]; per-domain method
-//! bodies live in the sibling modules.
+
+
+
 
 mod alloc;
 mod buffers;

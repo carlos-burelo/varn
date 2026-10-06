@@ -77,12 +77,12 @@ impl<'r> super::super::Binder<'r> {
                 } else if !has_explicit_ann
                     && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty())
                 {
-                    // Task A0.3': `let`/`const x = []` (empty literal, no
-                    // annotation) — register as a candidate for evolving
-                    // element-type inference (see `binder::array_evolve`).
-                    // Module top-level qualifies too: what a single-file
-                    // scan cannot account for is a binding that LEAVES the
-                    // file, and that is exactly what `bind_export` escapes.
+                    
+                    
+                    
+                    
+                    
+                    
                     if let Pattern::Identifier { name, .. } = &d.id {
                         let scope = self.scopes.get(self.current);
                         if let Some(sym_id) = scope.lookup(*name) {

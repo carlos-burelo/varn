@@ -187,42 +187,42 @@ pub enum OpCode {
     ArrayGetIndex,
     ArraySetIndex,
 
-    /// Direct dispatch of a statically-typed core-type method by stable op-id.
-    /// Operands: `[op_id_const_idx: u16][arg_count: u16]` where `arg_count`
-    /// includes the receiver. The receiver sits at the packed `call_base`
-    /// register, args contiguous above it; the result is written back to
-    /// `call_base`. Bypasses the string method name + inline-cache lookup.
+    
+    
+    
+    
+    
     CallNativeOp,
 
-    /// A unary `std:math` intrinsic with direct operands, bypassing the call
-    /// window `Intrinsic` needs. Operands: `[src: u8][wire_byte: u8]` packed
-    /// into one word, result into the packed `dest` register.
-    ///
-    /// `Intrinsic` writes its result to the SAME register that stages the
-    /// call receiver, so that register can never be float-typed — every
-    /// argument gets boxed on the way in and the result unboxed on the way
-    /// out, around ops that are a single IEEE instruction. This form has no
-    /// receiver and no window, so both ends stay in their natural
-    /// representation. Only unary math ops qualify: every other domain
-    /// actually reads its receiver.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     IntrinsicDirect,
 
-    /// Read a global from the native/prelude region of the `GlobalStore` — a
-    /// fixed, deterministic layout the runtime rewrite of a name-keyed
-    /// `LoadGlobal` produces. Operand: `[abs_slot: u16]`, dest in the opcode
-    /// word. Unlike `LoadGlobalIdx` (module-relative, `module_base` added at
-    /// run time) this index is absolute.
+    
+    
+    
+    
+    
     LoadNativeGlobalIdx,
 
     BuildMap,
     MapGetIndex,
     MapSetIndex,
 
-    /// `dst = convert(src)` per the `NumConv` in the next word (`as`).
+    
     Convert,
 
-    /// `b.length` on a receiver statically typed `Bytes`: an `int`.
-    /// Appended last so every existing discriminant stays stable.
+    
+    
     BytesLength,
 }
 

@@ -120,9 +120,9 @@ fn fold_convert(conv: varn_core::NumConv, operand: &InstKind) -> Option<InstKind
 
 fn fold_unary(op: HirUnOp, operand: &InstKind, _ty: HirType) -> Option<InstKind> {
     match (op, operand) {
-        // `-INT_MIN` has no `int` form. Declining to fold leaves the negation in
-        // the IR, where the interpreter/JIT raise `integer overflow` with a
-        // line number — never folding to a wrong constant.
+        
+        
+        
         (HirUnOp::Neg, InstKind::ConstInt(x)) => neg_int(*x).map(InstKind::ConstInt),
         (HirUnOp::Neg, InstKind::ConstFloat(x)) => Some(InstKind::ConstFloat(-x)),
         (HirUnOp::Not, InstKind::ConstBool(x)) => Some(InstKind::ConstBool(!x)),
@@ -135,21 +135,21 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
     use HirBinOp::*;
     match (lhs, rhs) {
         (InstKind::ConstInt(x), InstKind::ConstInt(y)) => match op {
-            // Integer arithmetic that leaves the `int` range RAISES
-            // (varn_core::numeric), so an overflowing expression must not be
-            // folded to a value: `None` keeps the operation in the IR and the
-            // interpreter/JIT raise it at run time, pointing at the line.
-            // Folding it — as this did — baked a wrong constant into the pool.
-            //
-            // A compile-time diagnostic would be better than a run-time one,
-            // but it belongs in the checker, which has spans; this pass has
-            // neither spans nor an error channel.
+            
+            
+            
+            
+            
+            
+            
+            
+            
             Add => add_int(*x, *y).map(InstKind::ConstInt),
             Sub => sub_int(*x, *y).map(InstKind::ConstInt),
             Mul => mul_int(*x, *y).map(InstKind::ConstInt),
             Div => varn_core::div_int(*x, *y).ok().map(InstKind::ConstInt),
             Mod => varn_core::rem_int(*x, *y).ok().map(InstKind::ConstInt),
-            // Negative exponents raise at runtime; never fold them.
+            
             Pow => {
                 if *y >= 0 && *y <= 30 {
                     pow_int(*x, *y as u32).map(InstKind::ConstInt)
@@ -247,8 +247,8 @@ fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
         InstKind::ConstFloat(_) => Some(HirType::Float),
         InstKind::ConstBool(_) => Some(HirType::Bool),
         InstKind::ConstStr(_) => Some(HirType::Str),
-        // Boxed en heap hoy: `char` es `Ref` (sin ensanchado hacia él);
-        // `decimal`/`bigint` aceptan `int` por ensanchado, así que `Dynamic`.
+        
+        
         InstKind::ConstChar(_) => Some(HirType::Ref),
         InstKind::ConstDecimal(_) | InstKind::ConstBigInt(_) => Some(HirType::Dynamic),
         InstKind::ConstNull => Some(HirType::Dynamic),
@@ -256,8 +256,8 @@ fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
     }
 }
 
-/// Folds `bigint ⊕ bigint` exactly; a fault (`/ 0`, `% 0`) stays in the IR so
-/// the runtime raises it with a line.
+
+
 fn fold_bigint(op: HirBinOp, x: &str, y: &str) -> Option<InstKind> {
     use HirBinOp::*;
     let (a, b): (num_bigint::BigInt, num_bigint::BigInt) = (x.parse().ok()?, y.parse().ok()?);

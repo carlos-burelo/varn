@@ -1,17 +1,17 @@
-//! Class and enum names are module-wide.
-//!
-//! A class or enum declared inside a function is still one nominal type of the
-//! module: the type tables, the backend's class definitions and the runtime
-//! global holding its class object are all keyed by its name. So two such
-//! declarations of one name — in two functions, or a function and the top
-//! level — are one name declared twice, even though neither scope sees the
-//! other. The scope-local duplicate check cannot see that; this does.
-//!
-//! For the same reason such a class cannot use the values of the function it
-//! is declared in: its methods belong to the one module-wide class, built once,
-//! not to a call of that function, so "that call's `x`" has no meaning inside
-//! them. A reference that reaches a local, parameter or local function across
-//! the class boundary is reported; types stay visible, being module-wide.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::sync::Arc;
 
@@ -21,10 +21,10 @@ use crate::scope::{ScopeId, ScopeKind};
 use crate::symbol::SymbolKind;
 
 impl super::Binder<'_> {
-    /// Record that `name` is declared as a class or enum at `range`, in
-    /// `scope`. A same-named type from another scope is reported; one from the
-    /// same scope is the ordinary duplicate the scope check reports, and one at
-    /// the same position is this declaration bound again.
+    
+    
+    
+    
     pub(crate) fn note_type_decl(&mut self, name: &Arc<str>, scope: ScopeId, range: SourceRange) {
         let Some(&(first_scope, first)) = self.type_decls.get(name) else {
             self.type_decls.insert(name.clone(), (scope, range));
@@ -44,8 +44,8 @@ impl super::Binder<'_> {
         self.emit(diag);
     }
 
-    /// Report `name`, used at `range`, when it resolves across a class
-    /// boundary to a value of an enclosing function (see the module docs).
+    
+    
     pub(crate) fn check_local_class_capture(&mut self, name: Atom, range: SourceRange) {
         let mut scope = self.current;
         let mut crossed_class = false;

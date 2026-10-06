@@ -2,33 +2,33 @@ use std::rc::Rc;
 use std::sync::Arc;
 use varn_types::RuntimeString;
 
-/// Lazily-computed ASCII cache for a `HeapStr`. The viewed content of a
-/// `HeapStr` is immutable (a `Shared` string is frozen; an `Ext` prefix view
-/// never changes once created), so once computed the answer is stable for the
-/// lifetime of the instance.
+
+
+
+
 pub(crate) mod ascii_flag {
     pub const UNKNOWN: u8 = 0;
     pub const YES: u8 = 1;
     pub const NO: u8 = 2;
 }
 
-/// Bytes a short dynamic string keeps inside its heap object instead of behind
-/// an `Rc`.
-///
-/// Measured, not chosen: 37 is the largest value that leaves
-/// `size_of::<HeapObj>()` at 48. 38 takes it to 64, and that number is the slot
-/// stride every heap type shares — a third more memory per object of every kind
-/// to help strings would be a bad trade nothing in a string benchmark would
-/// show. Pinned by `heap_obj_slot_stride_is_unchanged`.
+
+
+
+
+
+
+
+
 pub const INLINE_STR_CAP: usize = 37;
 
-/// Heap string payload. `Shared` is an immutable interned/frozen string;
-/// `Ext` is a prefix view (`buf[..len]`) of a shared growable buffer, the
-/// representation `str_concat` produces for accumulation patterns. Appending
-/// to the buffer's tip never changes an existing prefix, so older views stay
-/// valid without any aliasing analysis; a view that is no longer the tip is
-/// copied out before growing. Single-threaded interior mutability via
-/// `UnsafeCell` mirrors `ArrayRef`.
+
+
+
+
+
+
+
 #[derive(Clone)]
 pub enum HeapStr {
     Shared(RuntimeString, std::cell::Cell<u8>),
@@ -37,17 +37,17 @@ pub enum HeapStr {
         len: usize,
         ascii: std::cell::Cell<u8>,
     },
-    /// A short dynamic string stored IN the heap object, with no `Rc` behind
-    /// it. `alloc_str_dynamic`'s `Arc::from` is a malloc plus a copy for every
-    /// string over the 5-byte SSO limit, and the common `"prefix" + <small
-    /// int>` result lands just past it. Capacity is chosen so
-    /// `size_of::<HeapObj>()` does not change — the slot stride is shared with
-    /// every other heap type, so widening it to help strings would tax every
-    /// other allocation.
-    ///
-    /// Not sliceable in place: a `Slice` view borrows an `Rc` buffer that
-    /// outlives any collection, whereas these bytes live in the heap slot and
-    /// move with it. `alloc_substring` copies out of one instead.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     Inline {
         len: u8,
         ascii: std::cell::Cell<u8>,
@@ -75,8 +75,8 @@ impl HeapStr {
         }
     }
 
-    /// Store `s` inside the heap object. Caller guarantees
-    /// `s.len() <= INLINE_STR_CAP`.
+    
+    
     #[inline]
     pub(crate) fn inline(s: &str) -> Self {
         debug_assert!(s.len() <= INLINE_STR_CAP);
@@ -98,12 +98,12 @@ impl HeapStr {
     pub(crate) fn as_str(&self) -> &str {
         match self {
             HeapStr::Shared(s, _) => s,
-            // Safety: single-threaded VM; the buffer is only appended to (via
-            // `str_concat`), never while a borrow from this view is live.
+            
+            
             HeapStr::Ext { buf, len, .. } => unsafe { &(&*buf.get())[..*len] },
-            // Safety: `Inline` is only ever built from a `&str` in
-            // `alloc_str_dynamic`, which copies whole bytes, so the prefix is
-            // valid UTF-8 by construction.
+            
+            
+            
             HeapStr::Inline { len, bytes, .. } => unsafe {
                 std::str::from_utf8_unchecked(&bytes[..*len as usize])
             },
@@ -179,8 +179,8 @@ impl HeapStr {
         }
     }
 
-    /// True when this view ends exactly at the buffer tip, i.e. appending to
-    /// the buffer extends this string without disturbing any other view.
+    
+    
     #[inline]
     pub(crate) fn is_tip(&self) -> bool {
         match self {

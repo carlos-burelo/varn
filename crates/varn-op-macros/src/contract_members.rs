@@ -1,5 +1,5 @@
-//! The contract's member model: which methods, functions and fields a
-//! `.vn` contract declares, with the marshalling class of every parameter.
+
+
 
 use crate::varn_contract::{classify, Mapped};
 use varn_core::ast::{
@@ -30,8 +30,8 @@ pub(crate) struct Member {
     pub(crate) kind: Kind,
     pub(crate) params: Vec<ParamInfo>,
     pub(crate) ret: Mapped,
-    /// `@fallible` in the contract: the impl returns `Result<T, NativeError>`,
-    /// so it can raise a typed platform error.
+    
+    
     pub(crate) fallible: bool,
 }
 

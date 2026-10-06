@@ -1,6 +1,6 @@
-//! Arithmetic, unary and bitwise operators that compiled code calls out
-//! for rather than inlining — the cases that can allocate (decimals), can
-//! fail (division by zero) or need the full numeric tower.
+
+
+
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;

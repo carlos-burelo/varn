@@ -1,12 +1,12 @@
-/// Cada objeto de Varn es una asignación del allocator global (`ObjData` es un
-/// DST detrás de un `Rc`), así que el allocator está en el camino caliente de
-/// todo programa que construya objetos. El de Windows (`HeapAlloc`) es la razón
-/// medida de que alocar cueste ~90 ns por objeto frente a los ~24 ns de Bun.
-///
-/// `--features dhat-heap` swaps this for dhat's own allocator instead: mimalloc
-/// retains freed pages rather than returning them to the OS, so its RSS
-/// includes allocator slack a heap profiler needs to see past. Mutually
-/// exclusive — only one binary can own `#[global_allocator]`.
+
+
+
+
+
+
+
+
+
 #[cfg(not(feature = "dhat-heap"))]
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -30,22 +30,22 @@ mod tester;
 
 use clap::Parser;
 use cli::{Cli, Commands};
-// `varn-lexer` belongs to the crate for the `debug_binder` bin, not to `vn`.
-// The anchor keeps `unused_crate_dependencies` honest for this target.
+
+
 use std::process;
 use varn_core::term::terminal;
 use varn_lexer as _;
-// Anchor: only used via the #[global_allocator] static when dhat-heap is
-// off, which `unused_crate_dependencies` can't see through a #[cfg] on a
-// static item.
+
+
+
 #[cfg(feature = "dhat-heap")]
 use mimalloc as _;
 
 fn main() {
-    // Held for the whole process; dropping it (on a clean exit — Ctrl+C,
-    // the LSP's shutdown/exit sequence, a CLI command finishing normally)
-    // writes dhat-heap.json next to the working directory. View at
-    // https://nnethercote.github.io/dh_view/dh_view.html.
+    
+    
+    
+    
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -58,10 +58,10 @@ fn main() {
 }
 
 fn run_cli() {
-    // Lo primero, antes de registrar la stdlib o tocar argumentos: si el
-    // proyecto trae `.env`/`.env.local`, sus claves quedan puestas en el
-    // entorno del proceso para todo lo que sigue (`RUST_BACKTRACE`,
-    // `VARN_NO_JIT`, `VARN_GC_TRACE`, …), sin pisar lo que el shell ya trae.
+    
+    
+    
+    
     env_file::load();
 
     const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));
@@ -93,15 +93,15 @@ fn run_cli() {
 
     let cli = Cli::parse_from(effective);
 
-    // Resolving the std is lazy; force it here so an unusable one fails at
-    // startup with a readable message instead of mid-compile (spec §3: never
-    // a silent fallback to the embedded registry).
-    //
-    // Two exceptions, both decided after parsing. `lsp`: an editor opened on
-    // a half-recompiled checkout is routine, and exiting there gives the
-    // client an EPIPE instead of a diagnostic — the server reports the same
-    // reason through `window/showMessage` and keeps serving. `doctor`: its
-    // whole job is explaining a broken install, so it must survive one.
+    
+    
+    
+    
+    
+    
+    
+    
+    
     if !matches!(cli.command, Commands::Lsp(_) | Commands::Doctor) {
         if let Some(reason) = varn_builtins::std_load_error() {
             let e = error::CliError::fatal(reason);

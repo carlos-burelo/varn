@@ -20,23 +20,23 @@ pub(crate) fn try_prepare_call_fast(
             }
             None
         }
-        // A bound method is the hot shape for every stdlib method call
-        // (`arr.push`, `Map.get`, …). Dropping it to the slow `prepare_call`
-        // turns 21k immediate native returns into 10k frame pushes — measured
-        // 3.8x on tests/main.vn — so both targets keep their fast path. The
-        // receiver fills the staged callee slot (`stack[frame.base]`) in
-        // `ExecCtx::prepare_call`, which is why the flag comes back `true`.
-        // Only the NATIVE target. It is the hot shape for every stdlib method
-        // call (`arr.push`, `Map.get`, …) and returns immediately with no frame
-        // — dropping it to the slow `prepare_call` turned 21k immediate native
-        // returns into 10k frame pushes, measured 3.8x on tests/main.vn.
-        //
-        // The VM target deliberately stays slow: staging a `CallFrame` here
-        // skips the receiver bookkeeping that `super.method()` needs and fails
-        // tests/48-opt-unsupported-phase1.vn with "super write via method".
-        //
-        // The receiver fills the staged callee slot in `ExecCtx::prepare_call`,
-        // which is why the flag comes back `true`.
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         HeapObj::BoundMethod(bm) => match &bm.target {
             BoundMethodTarget::Native { func, .. } => {
                 Some((PreparedCall::NativeImmediate(*func, arg_count), true))
@@ -50,10 +50,10 @@ pub(crate) fn try_prepare_call_fast(
     }
 }
 
-/// Take the generator's arguments off the stack and package its closure, so
-/// the caller's context can build the generator's own context by forking
-/// itself. Shared by the bare-closure and bound-method paths — writing it
-/// twice is what let the empty-globals bug live in both.
+
+
+
+
 fn describe_generator(
     nc: &Rc<VmClosure>,
     arg_count: usize,
@@ -66,8 +66,8 @@ fn describe_generator(
     let args_start = staging.len() - arg_count;
     let args: Vec<VmValue> = staging.drain(args_start..).collect();
     let constants = resolve_constants(&nc.proto, heap);
-    // Leer DESPUÉS del drain con el store (los upvalues abiertos apuntan a
-    // slots del frame, no a staging).
+    
+    
     let upvalues = nc
         .upvalues
         .iter()
@@ -131,10 +131,10 @@ pub(crate) fn prepare_call(
                     BoundMethodTarget::Native { func, .. } => {
                         let recv_nv = bm.receiver;
                         let mut final_count = arg_count;
-                        // El placeholder de callee es el PRIMER valor de la
-                        // ventana (los últimos `arg_count` de staging), no
-                        // `staging[0]`: los caminos de método anteponen el
-                        // `method_nv` fuera de la ventana.
+                        
+                        
+                        
+                        
                         if staging.is_empty() {
                             staging.push(recv_nv);
                             final_count = 1;
@@ -156,10 +156,10 @@ pub(crate) fn prepare_call(
                                 "BoundMethod(Vm): invalid closure payload",
                             ));
                         };
-                        // `arity` ya cuenta el registro 0 — el slot de callee
-                        // que el llamante prepara como placeholder null — más
-                        // los params declarados: el receiver RELLENA ese slot
-                        // en staging[0] en vez de desplazar.
+                        
+                        
+                        
+                        
                         let mut full_arg_count = arg_count;
                         if staging.is_empty() {
                             staging.push(recv_nv);

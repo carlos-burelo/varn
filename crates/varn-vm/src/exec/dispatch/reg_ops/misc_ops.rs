@@ -21,7 +21,7 @@ impl ExecCtx {
                 return Ok(v);
             }
         }
-        // Dynamic object / record / fallback.
+        
         crate::exec::props::get_fixed_field(obj, slot, &mut self.heap)
     }
 

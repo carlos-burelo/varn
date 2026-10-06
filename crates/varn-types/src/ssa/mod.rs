@@ -1,31 +1,31 @@
-//! Portable, serializable typed SSA: the contract the JIT lowers from.
-//!
-//! The JIT lowers from this SSA directly: each value's physical class,
-//! decided once by the compiler, with the same typed operations it already
-//! emits as opcodes. The old flow-lattice reconstruction over `register_meta`
-//! survives only as the bytecode fallback for the few protos without portable
-//! SSA (declared generators/async) and for the debug inspectors.
-//!
-//! Design rules (Ley 2/6/8):
-//!
-//! * **No internal ids cross the boundary.** Values are dense `u32` indices
-//!   into [`SsaProto::values`]; there is no `HirType`, `CheckerTyId` or
-//!   `LocalId`. The physical projection is [`SsaTy`] = [`SlotClass`], the very
-//!   same `(Gpr/Fpr/Ref/Dyn)` both execution tiers already lower against.
-//! * **One fact, carried once.** Whether a `+` is integer or float is a
-//!   [`SsaBinOp`] variant, not something the backend re-derives from operand
-//!   types. `Serde`-stable and `postcard`-friendly (no `Arc`, no `Rc`, no
-//!   cell): the artifact must round-trip through `.vnc` unchanged.
-//! * **Extensible by family.** The op set mirrors the compiler SSA families the
-//!   JIT lowers (scalars, aggregates, properties, classes, closures, calls,
-//!   modules, suspension). A function the projection cannot carry simply does
-//!   not get an [`SsaProto`] and keeps the bytecode lowering (the fallback is
-//!   a missing SSA, never a wrong one).
-//!
-//! A proto is attached **after regalloc**, so [`SsaProto::regs`] maps every
-//! value to the VM register the interpreter holds it in; a lowering that keeps
-//! values in native registers can ignore it, a lowering that must spill to the
-//! frame (calls, safepoints) reads the same coordinates the interpreter does.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use serde::{Deserialize, Serialize};
 
@@ -37,30 +37,30 @@ mod operators;
 pub use op::{SsaObjectSpreadPart, SsaOp, SsaSpread, SsaUpvalue, UPVALUE_LOCAL};
 pub use operators::{DynBinOp, DynUnOp, SsaBinOp, SsaUnOp};
 
-/// The static kind of a value, exactly the checker's proof projected onto the
-/// register file. It is the same [`SlotKind`] the JIT already reads from
-/// `register_meta` — but *per value* rather than met across a register's whole
-/// live range, so two disjoint values sharing a register can no longer erase
-/// each other's type. [`SlotKind::class`] is the physical projection
-/// (`Gpr/Fpr/Ref/Dyn`) both tiers lower against (Ley 6).
+
+
+
+
+
+
 pub type SsaTy = SlotKind;
 
-/// A typed SSA value.
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SsaValue {
     pub ty: SsaTy,
 }
 
 impl SsaValue {
-    /// Physical storage class of this value.
+    
     #[inline]
     pub fn class(&self) -> SlotClass {
         SlotClass::of_kind(self.ty)
     }
 }
 
-/// One basic block. `params` are the block's phi values (filled by each
-/// predecessor's terminator args); `insts` define new values; `term` exits.
+
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsaBlock {
     pub params: Vec<u32>,
@@ -68,7 +68,7 @@ pub struct SsaBlock {
     pub term: SsaTerm,
 }
 
-/// A defining instruction. `dest` is the value it defines, if any.
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsaInst {
     pub dest: Option<u32>,
@@ -76,7 +76,7 @@ pub struct SsaInst {
     pub line: u32,
 }
 
-/// A terminator. Jump/branch args fill the target block's `params`.
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SsaTerm {
     Return(Option<u32>),
@@ -95,12 +95,12 @@ pub enum SsaTerm {
     Unreachable,
 }
 
-/// A whole function's portable typed SSA.
-///
-/// `regs[v]` is the VM register value `v` resides in after regalloc;
-/// `register_count` is the frame size both tiers agree on. The mapping is
-/// redundant with the bytecode on purpose — it is what lets the JIT place a
-/// value without re-walking the opcode stream.
+
+
+
+
+
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsaProto {
     pub name: Box<str>,
@@ -111,24 +111,24 @@ pub struct SsaProto {
     pub regs: Vec<u32>,
     pub register_count: u16,
     pub has_this: bool,
-    /// The frame register of each captured variable, by the index the
-    /// closure ops name it with.
+    
+    
     pub captured: Vec<u32>,
-    /// The loop headers an on-stack-replacement entry can resume at.
+    
     pub loop_headers: Vec<SsaLoopHeader>,
 }
 
-/// A loop header, where a running interpreted frame can continue compiled.
-///
-/// The interpreter reaches the header at bytecode offset `ip` with the
-/// header's parameters and every value in `live` in their registers — the
-/// register allocator keeps a value's register for as long as it is live —
-/// so a resumed body reads them from their homes and continues at `block`.
+
+
+
+
+
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsaLoopHeader {
     pub block: u32,
     pub ip: u32,
-    /// The values live into the header, its parameters aside.
+    
     pub live: Vec<u32>,
 }
 
@@ -148,20 +148,20 @@ impl SsaProto {
         self.regs.get(v as usize).copied().unwrap_or(0)
     }
 
-    /// The loop header at bytecode offset `ip`, if one starts there.
+    
     pub fn loop_header_at(&self, ip: usize) -> Option<&SsaLoopHeader> {
         self.loop_headers.iter().find(|h| h.ip as usize == ip)
     }
 
-    /// The frame register of captured variable `var`.
+    
     #[inline]
     pub fn captured_reg(&self, var: u32) -> Option<u32> {
         self.captured.get(var as usize).copied()
     }
 
-    /// Renumber every register this SSA names — the values' homes and the
-    /// captured variables — through `f`, as a pass that renumbers the
-    /// bytecode's registers must. The one place a register field is listed.
+    
+    
+    
     pub fn map_registers(&mut self, f: impl Fn(u32) -> u32) {
         for r in self.regs.iter_mut().chain(self.captured.iter_mut()) {
             *r = f(*r);
@@ -169,9 +169,9 @@ impl SsaProto {
     }
 }
 
-/// A function's portable SSA, or why it has none. The JIT lowers a function
-/// without one from bytecode, and `VARN_CLIF_TRACE` reports the reason — a
-/// function never falls back silently.
+
+
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PortableSsa {
     Available(std::sync::Arc<SsaProto>),
@@ -199,7 +199,7 @@ impl PortableSsa {
         }
     }
 
-    /// Why there is no portable SSA, when there is none.
+    
     pub fn unavailable(&self) -> Option<&str> {
         match self {
             Self::Available(_) => None,

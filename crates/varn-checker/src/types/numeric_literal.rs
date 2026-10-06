@@ -1,14 +1,14 @@
-//! An exact integer literal adopts the numeric type of its context (spec §5).
-//! It is the only implicit conversion into `float`; variables never convert.
+
+
 
 use super::{CheckerTyTable, Type};
 use varn_core::ast::{AstArena, ExprId, ExprKind, UnaryOp};
 use varn_core::TypeKind;
 
-/// Largest magnitude every integer up to which `f64` represents exactly.
+
 const F64_EXACT_INT: i64 = 1 << 53;
 
-/// The value of an integer literal, sign and parentheses folded.
+
 pub(crate) fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
     match &arena.expr(expr).kind {
         ExprKind::IntLiteral { value, .. } => Some(*value),
@@ -29,7 +29,7 @@ pub(crate) fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
     }
 }
 
-/// Whether the integer `value` can take `target`'s numeric type exactly.
+
 pub(crate) fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTable) -> bool {
     match table.get(target.0) {
         TypeKind::Primitive(varn_core::LangPrimitive::Float) => {
@@ -46,8 +46,8 @@ pub(crate) fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTab
     }
 }
 
-/// `other` when `expr` is an integer literal that can take `other`'s numeric
-/// type (`f * 2`, `d + 1`).
+
+
 pub(crate) fn literal_operand_class(
     arena: &AstArena,
     expr: ExprId,

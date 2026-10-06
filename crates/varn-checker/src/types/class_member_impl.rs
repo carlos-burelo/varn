@@ -1,8 +1,8 @@
 use super::*;
 
 impl ClassMemberInfo {
-    /// This member as a member of a structural object type: a method keeps
-    /// its signature, everything else is a property.
+    
+    
     pub fn as_object_member(&self, table: &CheckerTyTable) -> ObjectTypeMember {
         if let (ClassMemberKind::Method, TypeKind::Fn(fid)) = (self.kind, table.get(self.ty.0)) {
             let ft = table.get_function(fid);

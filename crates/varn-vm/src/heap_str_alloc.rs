@@ -1,43 +1,43 @@
-//! `"prefix" + <int>` built once instead of three times.
-//!
-//! Split out of `heap.rs` (already over the project's file-size ceiling)
-//! rather than added to it. `HeapInner`, `HeapObj`, `HeapStr`,
-//! `INLINE_STR_CAP` and `ascii_flag` are all already `pub` within the crate,
-//! so this module needs no visibility widening — it is an ordinary
-//! `impl HeapInner` block living in a second file, which Rust allows freely
-//! within one crate.
+
+
+
+
+
+
+
+
 
 use crate::heap::{ascii_flag, HeapInner, HeapObj, HeapStr, INLINE_STR_CAP};
 use crate::value::VmValue;
 
 impl HeapInner {
-    /// Concatenate string `a` and integer `b` straight into one byte array,
-    /// handed to the nursery once.
-    ///
-    /// `str_concat`'s general path copies the payload three times — into a
-    /// `StrBuf`, into the zeroed `[u8; INLINE_STR_CAP]` that
-    /// `HeapStr::inline` builds, and again moving the `HeapObj` into the
-    /// slot — plus a `try_from_sso` scan of the assembled result. This writes
-    /// the bytes once and knows the length before it starts.
-    ///
-    /// `None` means "not my shape, use the general path":
-    ///
-    /// * `b` is not an int — the digit fast path is the whole point;
-    /// * `a` is `Ext` — it **must** fall through, or `str_concat`'s
-    ///   accumulation path is bypassed and `s = s + x` goes quadratic;
-    /// * the result exceeds `INLINE_STR_CAP` — it needs an `Rc`.
-    ///
-    /// A result that fits SSO is handed back as an SSO value directly rather
-    /// than declined: the bytes are already assembled by the time the length
-    /// is known, so returning them beats making `str_concat`'s general path
-    /// re-render both operands into a `StrBuf` from scratch. Non-ASCII bytes
-    /// can never be SSO (`try_from_sso` refuses anything over 127) and fall
-    /// through to the heap-inline representation below instead.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub(crate) fn alloc_str_concat_inline(&mut self, a: VmValue, b: VmValue) -> Option<VmValue> {
         use crate::strbuf::{itoa, INT_MAX_DIGITS};
 
-        // Resolve `a`'s bytes. SSO materializes into a local; a heap string
-        // borrows. `Ext` declines here, before anything is written.
+        
+        
         let mut a_sso_buf = [0u8; 5];
         let a_bytes: &[u8] = if a.is_sso() {
             a.sso_as_str(&mut a_sso_buf).as_bytes()

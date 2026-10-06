@@ -9,18 +9,18 @@ pub(crate) const SLOW_REQUEST_MS: u128 = 30;
 
 pub struct Backend {
     pub client: Client,
-    /// The analysis thread. `Backend` holds no analysis state of its own —
-    /// none of it is `Send`, so it cannot live next to the request handlers.
+    
+    
     pub(crate) analysis: AnalysisHandle,
-    /// Why the active std is unusable, if it is. Reported once on
-    /// `initialized`; until it is fixed, `std:` imports resolve to nothing.
+    
+    
     pub(crate) std_error: Option<&'static str>,
-    /// Client settings the server honours, refreshed on
-    /// `workspace/didChangeConfiguration`.
+    
+    
     pub(crate) settings: super::settings::Settings,
-    /// Whether the client can render `$/progress`, learned at the handshake.
+    
     pub(crate) progress_supported: std::sync::atomic::AtomicBool,
-    /// Whether the client answers `workspace/configuration`, learned likewise.
+    
     pub(crate) configuration_supported: std::sync::atomic::AtomicBool,
 }
 
@@ -36,16 +36,16 @@ impl Backend {
         }
     }
 
-    /// Ask the client for the `Varn` configuration section.
-    ///
-    /// A push notification is not enough on its own: `vscode-languageclient`
-    /// sends `didChangeConfiguration` with `settings: null` and expects the
-    /// server to pull what it needs. Handling only the push means the setting
-    /// changes in the editor and never reaches here — which is the failure this
-    /// whole path exists to fix, one step further along.
-    ///
-    /// The reply for a named section is that section's contents, so
-    /// `{ "inlayHints": { "enabled": false } }` is what arrives.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub(crate) async fn pull_configuration(&self) {
         if !self
             .configuration_supported
@@ -64,13 +64,13 @@ impl Backend {
         }
     }
 
-    /// Run a query on the analysis thread and time it.
-    ///
-    /// Goes on `AnalysisHandle`'s foreground queue (`run`, not
-    /// `run_background`) — every interactive request takes priority over the
-    /// initial workspace index; see [`crate::analysis`]. The `Send` bound on
-    /// `T` is what keeps state that must stay on the analysis thread from
-    /// leaving it.
+    
+    
+    
+    
+    
+    
+    
     pub(crate) async fn query<T, F>(&self, op: &str, f: F) -> Option<T>
     where
         F: FnOnce(&mut Analyzer) -> Option<T> + Send + 'static,
@@ -82,8 +82,8 @@ impl Backend {
         result
     }
 
-    /// Surfaces slow LSP operations in the client's output channel as they
-    /// happen, instead of only being visible via external profiling.
+    
+    
     pub(crate) async fn log_slow(&self, op: &str, elapsed: std::time::Duration) {
         if elapsed.as_millis() >= SLOW_REQUEST_MS {
             self.client
@@ -96,8 +96,8 @@ impl Backend {
     }
 }
 
-/// The URI and position of a request, in the form the analysis closures want:
-/// an owned URI string and a plain position, neither borrowing the request.
+
+
 pub(crate) fn at(params: TextDocumentPositionParams) -> (String, Position) {
     (params.text_document.uri.to_string(), params.position)
 }

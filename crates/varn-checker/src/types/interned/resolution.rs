@@ -3,8 +3,8 @@ use super::table::CheckerTyTable;
 use crate::types::{FunctionType, ObjectTypeMember};
 
 impl CheckerTyTable {
-    /// The shape `id` names. Panics if `id` was never interned into this table
-    /// (the same invariant the old positional `Vec` index enforced).
+    
+    
     pub fn get(&self, id: CheckerTyId) -> InternedTypeKind {
         *self
             .base
@@ -14,7 +14,7 @@ impl CheckerTyTable {
             .unwrap_or_else(|| panic!("CheckerTyId {id:?} is not present in this table"))
     }
 
-    /// True when this table can resolve `id` to a shape.
+    
     pub fn contains(&self, id: CheckerTyId) -> bool {
         self.base.entries.contains_key(&id) || self.delta_entries.contains_key(&id)
     }
@@ -45,10 +45,10 @@ impl CheckerTyTable {
             .unwrap_or_else(|| panic!("ObjectMembersId {id:?} is not present in this table"))
     }
 
-    /// True when this table can resolve `id` to a member vector. Read-only
-    /// counterpart to `contains`, for the same reason: callers that must not
-    /// panic on a foreign id (and must not intern one either) need a way to
-    /// ask first.
+    
+    
+    
+    
     pub fn contains_object_members(&self, id: ObjectMembersId) -> bool {
         self.base.object_members.contains_key(&id) || self.delta_object_members.contains_key(&id)
     }

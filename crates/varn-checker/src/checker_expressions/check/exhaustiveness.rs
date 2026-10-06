@@ -7,8 +7,8 @@ use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeLiteral};
 
 impl<'r> Checker<'r> {
-    /// Report `expr` non-exhaustive, missing the arms `missing` (each the
-    /// pattern that would cover it, as source).
+    
+    
     fn report_gap(
         &mut self,
         expr: ExprId,
@@ -21,8 +21,8 @@ impl<'r> Checker<'r> {
             .insert(expr.index(), crate::semantic_info::MatchGap { missing });
     }
 
-    /// An open type (`int`, `str`, a class, `dynamic`) has no finite set of
-    /// values to cover: only a catch-all arm makes the match exhaustive.
+    
+    
     fn require_catch_all(
         &mut self,
         expr: ExprId,
@@ -75,9 +75,9 @@ impl<'r> Checker<'r> {
             if !uncovered.is_empty() {
                 let text = |t: &Type| t.display(&self.ty_table, &bind.interner).to_string();
                 let names: Vec<String> = uncovered.iter().map(text).collect();
-                // A literal or `null` is its own pattern; a class in the union
-                // has none (`MatchPattern::Type` is not in the surface syntax),
-                // so only a catch-all covers it.
+                
+                
+                
                 let mut missing: Vec<String> = uncovered
                     .iter()
                     .filter(|t| is_literal_pattern(t, &self.ty_table))
@@ -102,8 +102,8 @@ impl<'r> Checker<'r> {
             return;
         };
         let type_name: std::sync::Arc<str> = self.resolve_bind_atom(bind, type_name_atom);
-        // An enum declared in another module lists its variants in that
-        // module's bind.
+        
+        
         let foreign = origin_atom.and_then(|o| {
             let origin = self.resolve_bind_atom(bind, o);
             self.resolver
@@ -161,7 +161,7 @@ impl<'r> Checker<'r> {
                 .map(|v| v.to_string())
                 .collect();
             if !uncovered.is_empty() {
-                // A variant with a payload is matched with its fields bound.
+                
                 let missing = uncovered
                     .iter()
                     .map(|v| match owner.sum_variant_fields.get(v.as_str()) {
@@ -241,9 +241,9 @@ impl<'r> Checker<'r> {
     }
 }
 
-/// The members a closed subject splits into: union members, with `bool`
-/// (alone or inside a union) split into `true | false`. `None` for an open
-/// type, where only a catch-all arm can be exhaustive.
+
+
+
 fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type>> {
     let split_bool = |t: Type, out: &mut Vec<Type>, table: &mut CheckerTyTable| {
         if t == Type::Bool {
@@ -268,8 +268,8 @@ fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type
     Some(out)
 }
 
-/// Whether a member of a closed subject is written as a literal pattern:
-/// a literal type (`true`, `"a"`, `1`) or `null`.
+
+
 fn is_literal_pattern(t: &Type, table: &CheckerTyTable) -> bool {
     matches!(
         table.get(t.0),

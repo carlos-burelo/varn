@@ -197,9 +197,9 @@ impl<'r> super::super::Binder<'r> {
                             body,
                         });
                     }
-                    // See array_evolve rule 3: getters/setters are closures
-                    // but don't create their own Function scope, so the
-                    // escape has to be applied explicitly.
+                    
+                    
+                    
                     self.escape_all_open_array_candidates();
                     self.bind_stmt(body);
                 }

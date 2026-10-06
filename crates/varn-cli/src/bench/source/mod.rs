@@ -1,4 +1,4 @@
-//! Benchmarking a `.vn` source file through the full pipeline.
+
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -111,11 +111,11 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    // The COMPILE configuration, deliberately. This used to call
-    // `check_with_profile`, which was `check_for_lsp` under another name: the
-    // reported breakdown described a check that also built the per-expression
-    // type table, which a real compile never builds. `profile` is filled by
-    // every check, so nothing is lost by asking for the right one.
+    
+    
+    
+    
+    
     let check_result = varn_pipeline::resolver::with_resolver(|r| {
         Checker::check_with(
             &program,
@@ -227,10 +227,10 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     let total_p50: Duration = phases.iter().map(|p| p.p50).sum();
     let execute = phases.iter().find(|p| p.name == "execute (warm)");
 
-    // One instrumented run supplies every JIT figure. Taking them from the
-    // timed window instead would mix per-run quantities (compile time, which
-    // must be comparable to one execute p50) with cumulative ones (function
-    // counts across warmup plus every iteration).
+    
+    
+    
+    
     let (exec_jit, records) = {
         varn_vm::varn_jit::JIT_STATS.reset();
         varn_vm::varn_jit::stats::start_recording();
@@ -300,7 +300,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);
 
-    // Last, so the report is on screen even when the guard fails: a threshold
-    // breach is something to read the numbers about, not instead of.
+    
+    
     super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
 }

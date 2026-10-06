@@ -6,9 +6,9 @@ pub type RuntimeString = Arc<str>;
 
 pub use super::map::{MapKey, MapRef, ValueMap, ValueSet};
 
-/// An object living in a heap cell: its fields share the cell, and mutation
-/// goes through `ObjData`'s cells on `&self`. A plain pointer, valid for as
-/// long as the object is reachable.
+
+
+
 #[derive(Clone, Copy)]
 pub struct ObjRef(pub(crate) std::ptr::NonNull<super::ObjData>);
 

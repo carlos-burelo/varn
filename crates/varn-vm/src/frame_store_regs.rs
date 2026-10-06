@@ -5,9 +5,9 @@ use crate::value::VmValue;
 use varn_types::register_meta::SlotClass;
 
 impl FrameStore {
-    // ── Accesores por clase ──────────────────────────────────────────
-    // Cada uno afirma en debug la clase del slot: un acceso con clase
-    // equivocada es un bug del emisor, nunca un dato a reinterpretar.
+    
+    
+    
 
     #[inline(always)]
     pub fn g(&self, id: usize, reg: usize) -> i64 {
@@ -51,7 +51,7 @@ impl FrameStore {
         self.dyn_[i] = v;
     }
 
-    /// Dirección estable del slot (para upvalues abiertos).
+    
     #[inline(always)]
     pub fn addr_of(&self, id: usize, reg: usize) -> SlotAddr {
         let (class, i) = self.slot(id, reg);
@@ -61,7 +61,7 @@ impl FrameStore {
         }
     }
 
-    // ── Lectura/escritura por dirección (upvalues, GC, debug) ────────
+    
 
     #[inline(always)]
     pub fn get_addr(&self, a: SlotAddr) -> VmValue {
@@ -88,17 +88,17 @@ impl FrameStore {
                 self.gpr[i] = v.as_int();
             }
             SlotClass::Fpr => {
-                // Ensanchado `int` → `float` en llamadas (`coherence` lo
-                // permite) y la misma coerción perezosa que el intérprete
-                // aplicaba en cada uso (`as_int as f64`).
-                //
-                // `null` es representable aquí igual que en Ref, pero sin
-                // sentinel aparte: `VmValue::from_f64` YA convierte NaN a
-                // `null` (`vm_value.rs`), así que un `float` cuyo resultado
-                // fue NaN (`inf * 0.0`, `x - x` con `x` infinito) llega a
-                // este punto como `null`, no como el NaN crudo. Guardar un
-                // NaN de vuelta es lo simétrico: `box_slot` lo vuelve a leer
-                // como `null` a través del mismo `from_f64`.
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
                 if v.is_f64() {
                     self.fpr[i] = v.as_f64();
                 } else if v.is_int() {
@@ -113,9 +113,9 @@ impl FrameStore {
                 }
             }
             SlotClass::Ref => {
-                // `null` es representable en un registro Ref (`None`,
-                // simétrico con `get_addr`/`box_slot`): un retorno `void` o
-                // una referencia nula no son "basura", son el valor.
+                
+                
+                
                 if v.is_null() {
                     self.refs[i] = None;
                 } else if v.is_heap() {

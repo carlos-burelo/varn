@@ -1,11 +1,11 @@
-//! Paleta única de los volcados `Plain`.
-//!
-//! Los bytes están congelados por los goldens (`vn debug` debe emitirlos
-//! haya o no TTY), así que las constantes se conservan tal cual: son la única
-//! fuente de verdad para la interpolación en `format!` (`"{GREEN}…{R}"`).
-//! Lo que cambia es el mecanismo: `header`/`footer` escriben por
-//! `console::Term` (ANSI en Windows) y `colored`/`Color` delegan en
-//! `console::Style` con estilo forzado (mismos bytes, sin código propio).
+
+
+
+
+
+
+
+
 
 pub const RESET: &str = "\x1b[0m";
 pub const BOLD: &str = "\x1b[1m";
@@ -32,8 +32,8 @@ pub const C_CONSTS: &str = YELLOW;
 
 pub const R: &str = RESET;
 
-/// Cabecera de volcado (banners `Plain`). Bytes idénticos a los históricos;
-/// solo cambia el sumidero (`Term::stderr` habilita ANSI en Windows).
+
+
 pub fn header(color: &str, title: &str, path: &str) {
     let padding = "─".repeat((50_isize - title.len() as isize - 1).max(0) as usize);
     let line = format!("\n {color}{title} {R}{DIM}{padding} {path}{RESET}");
@@ -97,8 +97,8 @@ impl Display for Color {
     }
 }
 
-/// Envuelve `text` con el color dado y reset. Forzado (mismos bytes que
-/// antes) porque se usa en volcados `Plain` deterministas.
+
+
 pub fn colored<D: Display>(text: D, color: Color) -> String {
     style_for(color)
         .force_styling(true)

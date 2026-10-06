@@ -155,9 +155,9 @@ fn parse_variant_record_pattern(
 ) -> Result<MatchPattern, String> {
     use varn_core::ast::MatchBinding;
     s.advance();
-    // `Variant { x, y }` — a variant pattern whose payload is destructured by
-    // field name. Bindings are collected in written order, which matches the
-    // variant's declared field order for the common case.
+    
+    
+    
     let mut bindings: Vec<MatchBinding> = Vec::new();
     let mut rest = false;
     while !s.check(TokenKind::RBrace) && !s.is_eof() {

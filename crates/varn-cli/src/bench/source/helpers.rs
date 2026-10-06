@@ -1,6 +1,6 @@
 use super::*;
 
-/// Compile through the TIR path — the same route the pipeline takes.
+
 pub(super) fn compile_via_tir(
     program: &varn_core::ast::Program,
     ast_arena: &varn_core::ast::AstArena,
@@ -111,8 +111,8 @@ pub(super) fn verbose_sections(
     Ok(())
 }
 
-/// Parse the benchmarked program into the resolver's atom space, with the
-/// parser's timing profile.
+
+
 pub(super) fn parse_shared(
     tokens: Vec<varn_core::Token>,
     lexeme_buf: std::sync::Arc<[u8]>,

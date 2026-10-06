@@ -34,8 +34,8 @@ impl ExecCtx {
                     let recv_nv = receiver;
                     match prepared {
                         PreparedCall::Frame(ref frame) => {
-                            // El frame ya se materializó (r0 es DYN por
-                            // construcción): el receiver ocupa su slot.
+                            
+                            
                             self.stack.unbox_into_reg(frame.base, 0, recv_nv)?;
                         }
                         PreparedCall::NativeImmediate(_, _)
@@ -76,22 +76,22 @@ impl ExecCtx {
         Ok(())
     }
 
-    /// Saca el resultado de staging (lo deja `prepare_call`/`dispatch` en los
-    /// caminos sin frame: nativas, `PushValue`, generadores).
+    
+    
     pub(crate) fn stage_pop(&mut self) -> VmValue {
         self.stage.pop().unwrap_or(VmValue::null())
     }
 
-    /// THE frame materialisation for a non-rest VM call with typed arguments:
-    /// push a fresh activation for `nc` and copy the `arg_count`-slot window
-    /// from activation `src_base` (registers `src_start..`) into the callee's
-    /// `r0..`, converting per register class (`mov_cross`) with no boxing.
-    ///
-    /// Shared by the interpreter fast paths (`exec_call_reg`,
-    /// `exec_call_self`), the compiled caller's static-call fast path
-    /// (`jit_prepare_static_call`) and self-recursion (`clif_call_self`) — one
-    /// materialisation, not one per caller. On error the pushed activation is
-    /// popped before returning.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub(crate) fn push_call_frame(
         &mut self,
         proto: &Rc<varn_types::FunctionProto>,
@@ -109,14 +109,14 @@ impl ExecCtx {
         Ok(alloc)
     }
 
-    /// Method shape of [`Self::push_call_frame`]: write `this_val` into the
-    /// callee's `r0` and the arguments into `r1..`, per class, wherever they
-    /// are ([`MethodArgs`]). Same pop-on-error discipline, so a bad
-    /// receiver/arg tears the activation down instead of leaving it pushed.
-    ///
-    /// Used by `exec_call_reg`'s bound-method fast path and
-    /// `invoke_vm_method_fast`; the method form is `r0 == this`, which the
-    /// closure form ([`Self::push_call_frame`]) cannot express.
+    
+    
+    
+    
+    
+    
+    
+    
     pub(crate) fn push_call_frame_with_this(
         &mut self,
         proto: &Rc<varn_types::FunctionProto>,
@@ -147,10 +147,10 @@ impl ExecCtx {
         up
     }
 
-    /// Cierra los upvalues abiertos dentro de la activación `alloc`
-    /// (retornos y unwind: cerrar ANTES de liberar, el close lee el slot).
-    /// Releases a popped frame's `FrameStore` activation, closing its upvalues
-    /// first: the close reads the live slot. A native activation owns none.
+    
+    
+    
+    
     pub(crate) fn drop_frame_storage(&mut self, alloc: usize) {
         if alloc == crate::frame::CallFrame::NO_ACTIVATION {
             return;
@@ -173,8 +173,8 @@ impl ExecCtx {
             .retain(|(s, _)| s.idx < bases[s.class.index()]);
     }
 
-    /// Cierra los upvalues de la activación `alloc` desde el registro
-    /// `lowest` (`CloseUpvalue`: cierres de ámbito de bloque).
+    
+    
     pub(crate) fn close_upvalues_from_reg(&mut self, alloc: usize, lowest: usize) {
         if self.open_upvalues.is_empty() {
             return;

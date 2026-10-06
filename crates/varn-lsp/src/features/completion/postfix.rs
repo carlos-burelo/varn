@@ -110,7 +110,7 @@ pub fn build_postfix_completions(
         return Vec::new();
     }
 
-    // Find the start column of the expression on this line
+    
     let expr_start_col = find_expr_start(prefix, dot_pos);
     let target_expr = prefix[expr_start_col..dot_pos].trim();
     if target_expr.is_empty() {
@@ -195,7 +195,7 @@ fn find_expr_start(prefix: &str, dot_pos: usize) -> usize {
         }
     }
 
-    // Skip leading whitespace
+    
     while i < dot_pos && bytes[i].is_ascii_whitespace() {
         i += 1;
     }

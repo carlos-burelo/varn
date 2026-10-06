@@ -1,24 +1,24 @@
-//! The module layers of ADR-0018 and the one rule for which layer may import
-//! which. The rule governs import *statements*, so it is checked where source
-//! is read (binder, std bundle builder); resolving and loading only map ids,
-//! which is what lets the prelude link core modules into user code.
 
-/// A module's layer, from its id (`core:`, `runtime:`, `std:`) or, for a file
-/// of the std source tree, from where it lives.
+
+
+
+
+
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Layer {
-    /// Language builtins: always in scope, never imported by name.
+    
     Core,
-    /// Host natives backing the standard library.
+    
     Runtime,
-    /// The standard library: imported explicitly.
+    
     Std,
-    /// User code and packages.
+    
     User,
 }
 
 impl Layer {
-    /// The layer a module named by id or file path belongs to.
+    
     pub fn of_module(module: &str) -> Layer {
         if module.starts_with(crate::spec::CORE_PREFIX) {
             Layer::Core
@@ -34,9 +34,9 @@ impl Layer {
     }
 }
 
-/// Whether a module of layer `from` may import `specifier`; `Err` carries the
-/// diagnostic message. A relative import stays inside its importer's tree, so
-/// it never crosses a layer.
+
+
+
 pub fn check_import(from: Layer, specifier: &str) -> Result<(), String> {
     if matches!(
         varn_core::ImportSpecifier::parse(specifier),

@@ -1,11 +1,11 @@
-//! Scalar replacement of class instances that never escape.
-//!
-//! An `AllocInstance` whose only uses are field stores into it, made in its
-//! own block before anything reads it and at most once per slot, followed by
-//! field reads, holds exactly the values stored: each read is forwarded to its
-//! stored value, and the allocation and its stores are deleted. Any other use
-//! (call argument, store into another object, return, branch argument,
-//! property access) can leak the identity `===` observes, and keeps it.
+
+
+
+
+
+
+
+
 
 use rustc_hash::{FxHashMap, FxHashSet};
 

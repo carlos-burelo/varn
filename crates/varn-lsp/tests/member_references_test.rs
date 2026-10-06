@@ -29,20 +29,20 @@ const b = acc.balance;
 
     let doc = workspace.get(&uri).unwrap();
 
-    // Find references for `balance` property (line 2, col 5)
+    
     let refs = build_references(&doc, &workspace, 2, 5);
     assert!(
         refs.is_some(),
         "Should find references for property balance"
     );
     let locs = refs.unwrap();
-    // balance appears at:
-    // 1. declaration: line 2, balance
-    // 2. this.balance: line 5
-    // 3. this.balance = ...: line 9
-    // 4. ... + amount: line 9
-    // 5. acc.balance = 100: line 14
-    // 6. acc.balance: line 15
+    
+    
+    
+    
+    
+    
+    
     assert_eq!(
         locs.len(),
         6,
@@ -50,7 +50,7 @@ const b = acc.balance;
         locs
     );
 
-    // Test rename on balance property
+    
     let edit = build_rename(&doc, &workspace, None, 2, 5, "total_balance".to_string());
     assert!(edit.is_some(), "Rename should produce WorkspaceEdit");
     let ws_edit = edit.unwrap();
@@ -68,7 +68,7 @@ fn test_workspace_indexing_memory_lifecycle() {
     let uri = "file:///test/compute.vn".to_string();
     let workspace = Workspace::new();
 
-    // 1. Indexing a workspace file must NOT keep DocumentState in workspace.files:
+    
     workspace.index_file(uri.clone(), source.to_string());
     assert_eq!(
         workspace.file_count(),
@@ -80,7 +80,7 @@ fn test_workspace_indexing_memory_lifecycle() {
         "workspace.get must return None for un-opened indexed files"
     );
 
-    // But definitions must be in the project index:
+    
     {
         let idx = workspace.index.read().unwrap();
         let defs = idx.definitions_of("compute_something");
@@ -88,7 +88,7 @@ fn test_workspace_indexing_memory_lifecycle() {
         assert_eq!(defs[0].name, "compute_something");
     }
 
-    // 2. Opening the file (update_file) puts it into workspace.files:
+    
     workspace.update_file(uri.clone(), source.to_string());
     assert_eq!(
         workspace.file_count(),
@@ -97,7 +97,7 @@ fn test_workspace_indexing_memory_lifecycle() {
     );
     assert!(workspace.get(&uri).is_some());
 
-    // 3. Closing the file (close_file) evicts it from workspace.files, but keeps ProjectIndex:
+    
     workspace.close_file(&uri);
     assert_eq!(
         workspace.file_count(),
@@ -114,7 +114,7 @@ fn test_workspace_indexing_memory_lifecycle() {
         );
     }
 
-    // 4. Deleting the file (remove_file) removes from both:
+    
     workspace.remove_file(&uri);
     {
         let idx = workspace.index.read().unwrap();

@@ -1,4 +1,4 @@
-//! Interpreter, IC, GC and phase-breakdown sections.
+
 
 use std::time::Duration;
 
@@ -12,16 +12,16 @@ use super::fmt::{fmt_dur, fmt_num, fmt_pct, row, row_note, DurScale};
 const TOP_OPCODES: usize = 12;
 
 pub struct BreakdownOpts {
-    /// Print rows that measured exactly zero.
+    
     pub all_rows: bool,
 }
 
-/// A phase breakdown, reconciled against the phase's own measured p50.
-///
-/// The components come from a separate instrumented run, so they never sum to
-/// the timed phase exactly. Printing them without that residual invites the
-/// reader to conclude the phase is fully accounted for — in practice ~30% of
-/// `check` was unattributed and invisible.
+
+
+
+
+
+
 pub fn print_breakdown(
     title: &str,
     colour: fn(varn_core::term::chalk::Chalk) -> varn_core::term::chalk::Chalk,
@@ -80,11 +80,11 @@ pub fn print_breakdown(
     }
 }
 
-/// Opcode counts, which only the interpreter increments.
-///
-/// With most frames running as machine code these numbers describe a small
-/// slice of the program. The header says which slice, because the bare title
-/// reads as a profile of the whole run.
+
+
+
+
+
 pub fn print_opcode_hotspots(rows: &[(OpCode, u64)], interp_frame_share: Option<f64>) {
     let total: u64 = rows.iter().map(|(_, count)| *count).sum();
     if total == 0 {
@@ -190,8 +190,8 @@ pub fn print_vm_profile(profile: &VmProfile, interp_frame_share: Option<f64>) {
 
     terminal::blank();
     terminal::log(chalk("GC").cyan().bold());
-    // The three allocation counters answer different questions and have been
-    // read as contradicting each other. Each says which population it counts.
+    
+    
     terminal::log(row_note(
         "young allocs",
         fmt_num(profile.nursery_allocs),

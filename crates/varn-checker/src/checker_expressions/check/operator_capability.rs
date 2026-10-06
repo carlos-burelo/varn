@@ -1,6 +1,6 @@
-//! Operators on user types (spec §34): `a + b` where `a`'s type declares the
-//! capability method is `a.add(b)`, resolved here and recorded in
-//! `Desugarings::operator_calls` for the emitter.
+
+
+
 
 use crate::binder::BindResult;
 use crate::checker::Checker;
@@ -9,18 +9,18 @@ use varn_core::ast::ExprId;
 use varn_core::capability::{OperatorMethod, OperatorShape};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
-/// What a capability method makes of an operator.
+
 pub(crate) struct ResolvedOperator {
-    /// The method's parameter, for a binary operator.
+    
     pub param: Option<Type>,
-    /// The operator's value: the method's return, or `bool` for comparisons.
+    
     pub result: Type,
 }
 
 impl Checker<'_> {
-    /// The capability method `recv` answers `op` with, when `recv` is a user
-    /// type (class, interface, object) declaring it. Primitives, unions and
-    /// `dynamic` keep their built-in operators.
+    
+    
+    
     pub(crate) fn resolve_operator(
         &mut self,
         recv: &Type,
@@ -65,8 +65,8 @@ impl Checker<'_> {
         Some(ResolvedOperator { param, result })
     }
 
-    /// Resolve `left <op> right` through `left`'s capability method. Returns
-    /// whether it did; the built-in operator rules then do not apply.
+    
+    
     pub(super) fn check_binary_capability(
         &mut self,
         expr: ExprId,
@@ -80,7 +80,7 @@ impl Checker<'_> {
         };
         let l_ty = self.infer_type(left, bind);
         let r_ty = self.infer_type(right, bind);
-        // `x == null` stays the null test.
+        
         if matches!(
             method.shape,
             OperatorShape::Equals | OperatorShape::NotEquals
@@ -112,7 +112,7 @@ impl Checker<'_> {
         true
     }
 
-    /// `-x` through `x`'s `neg()`.
+    
     pub(super) fn check_unary_capability(
         &mut self,
         expr: ExprId,

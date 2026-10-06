@@ -64,36 +64,36 @@ pub struct RunArgs {
     #[arg(long)]
     pub trace: bool,
 
-    /// Grant all permissions (bypasses security sandbox)
+    
     #[arg(short = 'A', long = "allow-all")]
     pub allow_all: bool,
 
-    /// Allow reading files (optional comma-separated paths: --allow-read=./data,./config)
+    
     #[arg(long = "allow-read", value_name = "PATHS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
     pub allow_read: Option<String>,
 
-    /// Allow writing files (optional comma-separated paths: --allow-write=./tmp)
+    
     #[arg(long = "allow-write", value_name = "PATHS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
     pub allow_write: Option<String>,
 
-    /// Allow network connections (optional comma-separated hosts: --allow-net=api.stripe.com)
+    
     #[arg(long = "allow-net", value_name = "HOSTS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
     pub allow_net: Option<String>,
 
-    /// Allow reading environment variables (optional comma-separated names)
+    
     #[arg(long = "allow-env", value_name = "VARS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
     pub allow_env: Option<String>,
 
-    /// Allow FFI native C library calls
+    
     #[arg(long = "allow-ffi")]
     pub allow_ffi: bool,
 
-    /// Restrict execution in a pure zero-permission sandbox (no fs, no net, no env, no ffi)
+    
     #[arg(long = "sandbox")]
     pub sandbox: bool,
 
-    /// Run the program on every execution tier and report the first output
-    /// they disagree on. A disagreement is a code-generation bug.
+    
+    
     #[arg(long = "compare-tiers")]
     pub compare_tiers: bool,
 }
@@ -108,11 +108,11 @@ pub struct DebugArgs {
     #[arg(short, long, value_name = "PHASE", default_value = "all")]
     pub phase: String,
 
-    /// Only dump functions whose name contains NAME.
+    
     #[arg(long = "fn", value_name = "NAME")]
     pub fn_filter: Option<String>,
 
-    /// List every phase `-p` accepts and exit.
+    
     #[arg(long)]
     pub list_phases: bool,
 }
@@ -155,15 +155,15 @@ pub struct BenchArgs {
     #[arg(short, long)]
     pub verbose: bool,
 
-    /// Show phase and breakdown rows that measured zero or negligible time.
+    
     #[arg(long)]
     pub all_rows: bool,
 
-    /// Exit non-zero when clif coverage falls below this percentage of frames.
-    ///
-    /// The regression guard PLAN.md asks for by hand. Reading it off the
-    /// printed headline would mean parsing a localized, digit-grouped string;
-    /// the comparison belongs where the number is computed.
+    
+    
+    
+    
+    
     #[arg(long, value_name = "PCT")]
     pub min_clif_coverage: Option<f64>,
 }
@@ -192,11 +192,11 @@ pub struct LspArgs {
     )]
     pub tcp: Option<String>,
 
-    /// Accepted and ignored: stdio is already the default when no TCP option
-    /// is given. LSP clients pass it unprompted — vscode-languageclient
-    /// appends `--stdio` for any `TransportKind.stdio` executable, and editor
-    /// configs write it by convention — so rejecting it kills the server at
-    /// startup with nothing but an EPIPE on the client side.
+    
+    
+    
+    
+    
     #[arg(
         long,
         help = "Servir sobre stdio (por defecto; aceptado por convención)"
@@ -214,7 +214,7 @@ pub struct BuildArgs {
     #[arg(short, long, default_value = "bytecode", value_name = "TARGET")]
     pub target: String,
 
-    /// Compilar a ejecutable nativo puro (código máquina AOT)
+    
     #[arg(long)]
     pub native: bool,
 
@@ -268,36 +268,36 @@ pub enum Shell {
 
 #[derive(Args)]
 pub struct TestArgs {
-    /// Target file, directory, or pattern (default: "./tests" if exists, or current directory)
+    
     pub path: Option<String>,
 
-    /// Filter test names or file names matching this pattern
+    
     #[arg(short, long)]
     pub filter: Option<String>,
 
-    /// Run tests in parallel across N isolates/worker threads
+    
     #[arg(short = 'j', long)]
     pub jobs: Option<usize>,
 
-    /// Stop execution on first test failure
+    
     #[arg(long)]
     pub fail_fast: bool,
 
-    /// Show detailed execution log and outputs for every test
+    
     #[arg(short, long)]
     pub verbose: bool,
 }
 
 #[derive(Args)]
 pub struct FmtArgs {
-    /// File or directory to format (default: current directory)
+    
     pub path: Option<String>,
 
-    /// Check if files are formatted without modifying them
+    
     #[arg(long)]
     pub check: bool,
 
-    /// Show formatted file names
+    
     #[arg(short, long)]
     pub verbose: bool,
 }

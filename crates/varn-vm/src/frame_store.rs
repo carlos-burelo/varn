@@ -1,29 +1,29 @@
-//! Frame por clases: el registro deja de ser un `VmValue` universal.
-//!
-//! Cada registro vive en el almacén de su clase, derivada de `register_meta`
-//! (la prueba del checker que el backend ya serializa por función):
-//!
-//! ```text
-//! GPR (i64)  ← SlotKind::Int
-//! FPR (f64)  ← SlotKind::Float
-//! REF (dirección) ← SlotKind::Ref  (`None` = null)
-//! DYN        ← SlotKind::{Dynamic, Bool, Str} (VmValue, como antes)
-//! ```
-//!
-//! `Bool` y `Str` se quedan en DYN a propósito: hoy no existe desempaquetado
-//! para ellos en ningún camino (comparaciones, `JumpIfFalse`, SSO/heap-str),
-//! y moverlos a GPR cambiaría la semántica de truthiness. Son el siguiente
-//! paso, no este.
-//!
-//! La traducción registro → (clase, índice) la calcula [`FrameLayout`] una vez
-//! por proto y vive en el propio proto (`FunctionProto::frame_layout`): ningún
-//! almacén de frames la duplica. Cada activación reserva su tramo en los 4 vectores
-//! ([`FrameStore::push_frame`]) y lo libera al retornar ([`FrameStore::pop_frame`]).
-//!
-//! Todo movimiento entre clases pasa por [`FrameStore::mov`]: misma clase es
-//! copia cruda; hacia DYN es boxeo; desde DYN es unbox chequeado (un valor que
-//! el checker probó estático siempre trae su tag; si no, es `type mismatch`,
-//! no basura reinterpretada).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::rc::Rc;
 
@@ -31,34 +31,34 @@ use varn_types::FunctionProto;
 
 use crate::value::VmValue;
 
-/// La clase física vive en `varn-types` (contrato único VM+JIT); aquí solo se
-/// re-exporta para que los call-sites de la VM la sigan nombrando por este
-/// módulo. Ver `varn_types::register_meta::SlotClass` para la proyección.
+
+
+
 pub use varn_types::register_meta::SlotClass;
 
-/// Dirección estable de un slot dentro del almacén.
-///
-/// A diferencia del antiguo índice absoluto en un único `Vec`, no caduca al
-/// crecer otros vectores: cada vector solo crece por el final y solo se
-/// trunca la región de frames ya retornados (cuyos upvalues se cerraron
-/// antes, por disciplina existente).
+
+
+
+
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SlotAddr {
     pub class: SlotClass,
     pub idx: u32,
 }
 
-/// El layout registro→(clase, índice) vive en
-/// `varn-types` (contrato compartido VM+JIT); aquí solo se re-exportan para que
-/// los call-sites de la VM los sigan nombrando por este módulo. Ver
-/// `varn_types::register_meta::FrameLayout`.
+
+
+
+
 pub use varn_types::register_meta::FrameLayout;
 
-/// Reserva de una activación: bases por clase dentro del almacén.
-///
-/// `#[repr(C)]`: `bases` va primero y a offset fijo, porque el ABI del JIT
-/// direcciona `allocs[act_id].bases[clase]` desde código generado. Ver el
-/// contrato de fase B en `docs/plans/2026-09-20-PLAN-PENDIENTE.md`.
+
+
+
+
+
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct FrameAlloc {
@@ -66,11 +66,11 @@ pub struct FrameAlloc {
     pub layout: Rc<FrameLayout>,
 }
 
-/// Pila de activaciones partida por clases.
-///
-/// `#[repr(C)]`: los cuatro vectores por clase van primero y en orden, porque
-/// el ABI del JIT carga los punteros de datos de cada clase desde código
-/// generado (ver `JitFrameLayout`). El orden de campos es parte del contrato.
+
+
+
+
+
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct FrameStore {
@@ -78,9 +78,9 @@ pub struct FrameStore {
     pub fpr: Vec<f64>,
     pub refs: Vec<Option<varn_types::HeapRef>>,
     pub dyn_: Vec<VmValue>,
-    /// Reservas de activación, indexadas por el `act_id` que ve el JIT. Parte
-    /// del ABI (el lowering lee `allocs[act_id].bases[clase]`), por eso es
-    /// `pub(crate)` en vez de privado.
+    
+    
+    
     pub(crate) allocs: Vec<FrameAlloc>,
 }
 
@@ -105,7 +105,7 @@ impl FrameStore {
         }
     }
 
-    /// Reserva una activación y devuelve su id (el nuevo `base`).
+    
     pub fn push_frame(&mut self, proto: &Rc<FunctionProto>) -> usize {
         let layout = proto.frame_layout();
         let id = self.allocs.len();
@@ -134,7 +134,7 @@ impl FrameStore {
         id
     }
 
-    /// Libera la activación superior (disciplina LIFO, como antes).
+    
     pub fn pop_frame(&mut self) {
         if let Some(alloc) = self.allocs.pop() {
             self.gpr
@@ -148,8 +148,8 @@ impl FrameStore {
         }
     }
 
-    /// Asegura que la activación `id` direcciona `register_count` registros
-    /// (extiende con defaults si un trailing nunca se escribió).
+    
+    
     pub fn ensure_frame_size(&mut self, id: usize, register_count: usize) {
         let (bases, counts) = {
             let a = &self.allocs[id];
@@ -237,20 +237,20 @@ mod tests {
     fn mov_converts_between_classes() {
         use SlotKind as K;
         let mut s = FrameStore::new();
-        // r0=Dyn, r1=Int, r2=Float, r3=Ref
+        
         let p = proto_with(&[K::Dynamic, K::Int, K::Float, K::Ref], 4);
         let a = s.push_frame(&p);
         s.set_g(a, 1, 42);
         s.mov(a, 0, 1).unwrap();
         assert_eq!(s.d(a, 0), VmValue::from_int(42));
-        // Dyn(int) -> Int: chequeado, pasa.
+        
         s.mov(a, 1, 0).unwrap();
         assert_eq!(s.g(a, 1), 42);
-        // Dyn(bool) -> Int: error de tipos, no basura.
+        
         s.set_d(a, 0, VmValue::from_bool(true));
         assert!(s.mov(a, 1, 0).is_err());
         assert_eq!(s.g(a, 1), 42);
-        // Float <-> Dyn ida y vuelta exacta.
+        
         s.set_f(a, 2, 2.5);
         s.mov(a, 0, 2).unwrap();
         assert_eq!(s.d(a, 0), VmValue::from_f64(2.5));

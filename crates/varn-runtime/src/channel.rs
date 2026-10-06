@@ -63,7 +63,7 @@ pub fn send(id: u64, val: SendValue) -> SendOutcome {
     if st.closed {
         return SendOutcome::Closed;
     }
-    // Entrega directa a un receiver parkeado (la cola está vacía si hay waiters).
+    
     if let Some(w) = st.recv_waiters.pop_front() {
         drop(st);
         w.resolve(val);
@@ -84,7 +84,7 @@ pub fn try_receive(id: u64) -> RecvOutcome {
     };
     let mut st = core.state.lock().unwrap();
     if let Some(v) = st.queue.pop_front() {
-        // liberó hueco: promover un send parkeado
+        
         if let Some((pv, ptask)) = st.send_waiters.pop_front() {
             st.queue.push_back(pv);
             drop(st);
@@ -114,7 +114,7 @@ pub fn close(id: u64) {
         w.reject(SendValue::Null);
     }
     for (_, w) in sends {
-        // el valor parkeado NO entra a la cola: send(...) tras close = false
+        
         w.resolve(SendValue::Bool(false));
     }
 }

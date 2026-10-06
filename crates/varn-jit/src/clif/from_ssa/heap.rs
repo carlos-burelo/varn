@@ -1,15 +1,15 @@
-//! Heap operations of the SSA lowering: the boxed runtime helpers for strings,
-//! aggregates and type questions, plus the shared boxing helpers.
-//!
-//! Every one needs the live `exec_ctx` (they allocate and/or inspect the heap),
-//! so they only appear in a frame-aware body. Operands are read from their
-//! homes and results are boxed `VmValue`s; the caller lands a heap result in its
-//! home (`def_heap`) or unboxes a scalar result. Because the homes are the GC
-//! roots, an operand survives the helper's own allocation by construction — no
-//! flush/reload list is needed.
-//!
-//! Property/index/field access lives in [`super::props`]; this file owns
-//! constants, string/aggregate construction and type questions.
+
+
+
+
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -20,14 +20,14 @@ use super::super::emit::{
     box_bool, box_f64, box_int, call_helper, call_helper_void, unbox_f64_coerce, unbox_int,
 };
 
-/// The live `ExecCtx`: entry param 0 in a leaf, param 3 in a frame-aware body.
-/// Siempre real — ningún camino lo recupera por thread-local.
+
+
 pub(super) fn exec_ctx(ctx: &Ctx<'_>) -> Value {
     ctx.exec_ctx
 }
 
-/// A value as a boxed `VmValue` (`I128`): scalars are boxed by their class,
-/// heap values are already one.
+
+
 pub(super) fn boxed_value(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -38,7 +38,7 @@ pub(super) fn boxed_value(
     Ok(box_native(b, ctx.ssa.value_ty(v), x))
 }
 
-/// A value of class `kind`, in that class's native form, as a boxed `VmValue`.
+
 pub(super) fn box_native(
     b: &mut FunctionBuilder,
     kind: varn_types::register_meta::SlotKind,
@@ -53,7 +53,7 @@ pub(super) fn box_native(
     }
 }
 
-/// A value split into its `(tag, payload)` halves, boxing scalars first.
+
 pub(super) fn boxed_parts(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -64,7 +64,7 @@ pub(super) fn boxed_parts(
     Ok(b.ins().isplit(boxed))
 }
 
-/// Unbox a helper's boxed result into the class `dest` expects.
+
 pub(super) fn unbox_dest(
     b: &mut FunctionBuilder,
     dest: varn_types::register_meta::SlotKind,
@@ -78,7 +78,7 @@ pub(super) fn unbox_dest(
     })
 }
 
-/// `IsArray x` — a `bool` result (no allocation).
+
 pub(super) fn emit_is_array(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -95,7 +95,7 @@ pub(super) fn emit_is_array(
     ))
 }
 
-/// `helper(ctx, value) -> VmValue` — the result lands in `jit_native_result`.
+
 pub(super) fn emit_unary_boxed(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -114,8 +114,8 @@ pub(super) fn emit_unary_boxed(
     ))
 }
 
-/// `StrConcat a b` — a heap string result. Operands are boxed first: a mixed
-/// `"a" + 1` has a scalar operand the helper stringifies.
+
+
 pub(super) fn emit_str_concat(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -135,7 +135,7 @@ pub(super) fn emit_str_concat(
     ))
 }
 
-/// `BuildStr parts…` — a heap string result, from a native window.
+
 pub(super) fn emit_build_str(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -149,7 +149,7 @@ pub(super) fn emit_build_str(
     emit_window_boxed(b, ctx, ctx.helpers.build_str, &vals, vals.len())
 }
 
-/// `BuildArray elems…` — a heap array result, from a native window.
+
 pub(super) fn emit_build_array(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -163,7 +163,7 @@ pub(super) fn emit_build_array(
     emit_window_boxed(b, ctx, ctx.helpers.build_array_window, &vals, vals.len())
 }
 
-/// `BuildMap k0 v0 …` — a heap map result, from a native window.
+
 pub(super) fn emit_build_map(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -178,9 +178,9 @@ pub(super) fn emit_build_map(
     emit_window_boxed(b, ctx, ctx.helpers.build_map_window, &vals, pairs.len())
 }
 
-/// `BuildObject`/`BuildRecord` — a heap result. The shape is resolved from the
-/// proto's pool by key match (the same keys the bytecode `add_shape` used), so
-/// the baked `Shape` pointer is the one the runtime already interned.
+
+
+
 pub(super) fn emit_build_object(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -230,8 +230,8 @@ pub(super) fn emit_build_object(
     let count_v = b.ins().iconst(types::I64, count as i64);
     let shape_v = b.ins().iconst(types::I64, shape_ptr as i64);
     let rec_v = b.ins().iconst(types::I64, is_record as i64);
-    // A value may be a closure whose upvalues must be closed; scanning is
-    // always safe (a non-closure is skipped).
+    
+    
     let mhc_v = b.ins().iconst(types::I64, 1);
     call_helper_void(
         b,
@@ -247,9 +247,9 @@ pub(super) fn emit_build_object(
     ))
 }
 
-/// Call a `helper(ctx, ptr, count)` void helper with `vals` staged as a boxed
-/// window, returning its `jit_native_result`. Stages in the function's
-/// shared scratch window (see [`super::call::ScratchWin`]).
+
+
+
 fn emit_window_boxed(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,

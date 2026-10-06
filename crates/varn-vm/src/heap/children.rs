@@ -1,6 +1,6 @@
-//! Every heap reference an object holds, for both collectors. One visitor so
-//! the minor and the major collection can never disagree on what an object
-//! keeps alive.
+
+
+
 
 use super::obj::HeapObj;
 use crate::value::VmValue;

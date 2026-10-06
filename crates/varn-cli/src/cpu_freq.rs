@@ -1,13 +1,13 @@
-//! Best-effort current CPU frequency, sampled during a benchmark run so the
-//! output can show whether the CPU was turboing or throttled to base. There is
-//! deliberately **no temperature**: on Windows the ACPI thermal zone is not
-//! exposed without a kernel driver, so a portable, dependency-free reading is
-//! not possible. Frequency, however, already reveals throttling (it collapses
-//! toward the base clock under sustained load).
 
-/// A frequency sample in MHz. `cur_mhz` is the (peak) current clock; `max_mhz`
-/// is the processor's rated/base clock as the OS reports it (on Intel this is
-/// typically the *base*, so `cur_mhz` can exceed it while turboing).
+
+
+
+
+
+
+
+
+
 #[derive(Clone, Copy)]
 pub struct CpuFreq {
     pub cur_mhz: u32,
@@ -16,7 +16,7 @@ pub struct CpuFreq {
 
 #[cfg(windows)]
 pub fn sample() -> Option<CpuFreq> {
-    // PROCESSOR_POWER_INFORMATION, one entry per logical processor.
+    
     #[repr(C)]
     #[derive(Clone, Copy)]
     struct Ppi {
@@ -27,7 +27,7 @@ pub fn sample() -> Option<CpuFreq> {
         max_idle_state: u32,
         current_idle_state: u32,
     }
-    // ProcessorInformation = 11.
+    
     #[link(name = "powrprof")]
     extern "system" {
         fn CallNtPowerInformation(
@@ -54,7 +54,7 @@ pub fn sample() -> Option<CpuFreq> {
         n
     ];
     let out_len = (core::mem::size_of::<Ppi>() * n) as u32;
-    // Returns STATUS_SUCCESS (0) on success.
+    
     let status = unsafe {
         CallNtPowerInformation(
             11,
@@ -81,7 +81,7 @@ pub fn sample() -> Option<CpuFreq> {
 
 #[cfg(target_os = "linux")]
 pub fn sample() -> Option<CpuFreq> {
-    // Peak scaling_cur_freq across cores (kHz → MHz).
+    
     let mut cur = 0u32;
     for i in 0.. {
         let p = format!("/sys/devices/system/cpu/cpu{i}/cpufreq/scaling_cur_freq");
@@ -95,7 +95,7 @@ pub fn sample() -> Option<CpuFreq> {
         }
     }
     if cur == 0 {
-        // Fallback: /proc/cpuinfo "cpu MHz".
+        
         if let Ok(txt) = std::fs::read_to_string("/proc/cpuinfo") {
             for line in txt.lines() {
                 if line.starts_with("cpu MHz") {
@@ -128,7 +128,7 @@ pub fn sample() -> Option<CpuFreq> {
     None
 }
 
-/// Merge two samples keeping the higher current clock (the peak under load).
+
 pub fn keep_peak(a: Option<CpuFreq>, b: Option<CpuFreq>) -> Option<CpuFreq> {
     match (a, b) {
         (Some(x), Some(y)) => Some(if y.cur_mhz > x.cur_mhz { y } else { x }),

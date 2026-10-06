@@ -2,9 +2,9 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-/// A module's id is its place in the tree (ADR-0018): the directory
-/// `src/modules/<layer>/<path>/` holding one `.vn` contract is `<layer>:<path>`.
-/// No manifest restates it.
+
+
+
 fn main() {
     println!("cargo:rerun-if-changed=src/modules");
 
@@ -81,8 +81,8 @@ fn emit_spec_entry(out: &mut impl Write, id: &str, kind_expr: &str, contract: &P
     .unwrap();
 }
 
-/// A contract exporting anything but native declarations, types and
-/// interfaces carries Varn code that must be compiled and run.
+
+
 fn has_code(source: &str) -> bool {
     source.lines().any(|line| {
         line.strip_prefix("export ").is_some_and(|rest| {

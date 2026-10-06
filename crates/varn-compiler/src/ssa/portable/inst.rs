@@ -1,4 +1,4 @@
-//! One instruction of the compiler's SSA, projected onto its portable form.
+
 
 use crate::hir::{HirType, HirUnOp, HirUpvalueSrc};
 use crate::ssa::ir::{Inst, InstKind, VarId};
@@ -264,8 +264,8 @@ pub(super) fn project_inst(
         InstKind::CloseUpvalues { targets } => SsaOp::CloseUpvalues {
             vars: targets.iter().map(|t| captured.index(*t)).collect(),
         },
-        // The landing pad writes the thrown value to the `Try`'s value at run
-        // time; the op itself defines nothing.
+        
+        
         InstKind::Try { .. } => {
             let (catch_ip, live) = site.landing?;
             let mut live: Vec<u32> = live.iter().copied().collect();
@@ -404,7 +404,7 @@ pub(super) fn project_inst(
     })
 }
 
-/// Whether `v` is a native `int` in the portable SSA.
+
 fn is_int(value_tys: &[HirType], v: crate::ssa::ir::Value) -> bool {
     value_tys.get(v.0 as usize).is_some_and(|t| {
         crate::ssa::emit::slot_kind_of(*t) == varn_types::register_meta::SlotKind::Int

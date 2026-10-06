@@ -1,6 +1,6 @@
-//! State object size for the state machine transformation.
-//!
-//! Calculates the total `state_size` in words (1 word for discriminant + max live slots).
+
+
+
 
 use crate::ssa::suspend::SuspendPoint;
 

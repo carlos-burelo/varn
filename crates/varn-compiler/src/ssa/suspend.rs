@@ -1,8 +1,8 @@
-//! Localiza los puntos de suspensión de una función y qué los cruza.
-//!
-//! Sólo lectura: no transforma el IR. El pase de máquinas de estados consume
-//! este análisis en vez de recalcularlo, para que "qué es un punto de
-//! suspensión" y "qué debe guardar el estado" tengan una sola definición.
+
+
+
+
+
 
 use super::ir::{InstKind, SsaFunc, Value};
 use super::liveness::Liveness;
@@ -32,12 +32,12 @@ pub fn analyze(ssa: &SsaFunc) -> Vec<SuspendPoint> {
     out
 }
 
-/// Live physical registers per suspension resume point, sorted by resume
-/// ip. Same `live_after` sets as [`analyze`], mapped through `reg`, plus
-/// every `Try` handler's `live_in`: an exception delivered into a parked
-/// frame resumes at a handler that no CFG edge from the suspend point
-/// reaches, so handler-read values must survive every park. Omits a point
-/// if any value lacks a register: absence means full roots.
+
+
+
+
+
+
 pub fn suspend_live_regs(
     ssa: &SsaFunc,
     reg: &[u8],
@@ -88,7 +88,7 @@ pub fn suspend_live_regs(
     table
 }
 
-/// Every block a `Try` hands control to.
+
 pub fn try_handlers(ssa: &SsaFunc) -> Vec<usize> {
     let mut handlers: Vec<usize> = Vec::new();
     for block in &ssa.blocks {
@@ -104,10 +104,10 @@ pub fn try_handlers(ssa: &SsaFunc) -> Vec<usize> {
     handlers
 }
 
-/// The values the interpreter reads when it resumes after instruction `i` of
-/// block `b`: those live after it, plus every handler's `live_in`, since an
-/// exception delivered into a parked frame resumes at a handler no CFG edge
-/// from the suspension reaches. Sorted, deduplicated.
+
+
+
+
 pub fn resume_live(
     ssa: &SsaFunc,
     lv: &Liveness,

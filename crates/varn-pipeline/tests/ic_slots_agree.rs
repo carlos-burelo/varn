@@ -1,11 +1,11 @@
 #![allow(unused_crate_dependencies)]
-//! The bytecode and the portable SSA name the same inline-cache slot for every
-//! property site: the JIT lowering from SSA reads and fills the `ic_cache`
-//! entry the interpreter's opcode uses. The slots are numbered once
-//! (`varn_compiler::ssa::ic`); this pins that both sides read that numbering.
-//!
-//! The source branches, so the emitter's block order (it walks `else` before
-//! `then`) differs from the SSA's block order.
+
+
+
+
+
+
+
 
 use std::collections::BTreeMap;
 use varn_core::OpCode;
@@ -30,7 +30,7 @@ function walk(o: dynamic, n: int): dynamic {
 print(walk({ start: 0, flag: true, result: 1 }, 3))
 "#;
 
-/// Property sites as `(name, slot) -> count`.
+
 type Sites = BTreeMap<(String, u16), usize>;
 
 fn bytecode_sites(proto: &FunctionProto) -> Sites {
@@ -69,8 +69,8 @@ fn ssa_sites(proto: &FunctionProto) -> Option<Sites> {
     Some(sites)
 }
 
-/// Sites numbered in SSA block-index order — what a projection counting on
-/// its own would assign.
+
+
 fn index_order_slots(proto: &FunctionProto) -> Vec<u16> {
     let ssa = proto.ssa.get().expect("portable SSA");
     ssa.blocks

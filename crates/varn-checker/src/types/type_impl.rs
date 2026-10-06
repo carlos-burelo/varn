@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 #[allow(non_upper_case_globals)]
 impl Type {
-    // ── Intrinsic constants ──────────────────────────────────────────────
-    //
-    // `CheckerTyTable::new` pre-seeds every one of these shapes at a FIXED
-    // `CheckerTyId` (see `interned.rs`), so these stay `const` even though
-    // `Type` now wraps a hash-consed id instead of an owned tree: no table
-    // access is needed to produce them, only to look one up later.
+    
+    
+    
+    
+    
+    
     pub const Int: Type = Type::resolved(CheckerTyId::INT);
     pub const Float: Type = Type::resolved(CheckerTyId::FLOAT);
     pub const Decimal: Type = Type::resolved(CheckerTyId::DECIMAL);
@@ -23,14 +23,14 @@ impl Type {
     pub const Error: Type = Type(CheckerTyId::DYNAMIC, Origin::Error);
     pub const This: Type = Type::resolved(CheckerTyId::THIS);
 
-    /// Primitives have fixed ids (the constants above); interning goes through
-    /// the table so every spelling of one lands on the same id.
+    
+    
     pub fn primitive(p: varn_core::LangPrimitive, table: &mut CheckerTyTable) -> Self {
         Type::resolved(table.intern(TypeKind::Primitive(p)))
     }
 
-    /// The type operators and member lookup see: a literal type (or a union
-    /// of literals sharing one base) behaves as its base primitive.
+    
+    
     pub fn apparent(&self, table: &CheckerTyTable) -> Type {
         fn base(p: varn_core::LangPrimitive) -> Type {
             use varn_core::LangPrimitive as P;
@@ -64,8 +64,8 @@ impl Type {
         }
     }
 
-    /// `Range<T>` over the domain of a range bound: `char` bounds make a
-    /// `Range<char>`, every other bound a `Range<int>`.
+    
+    
     pub fn range_over(bound: &Type, table: &mut CheckerTyTable) -> Self {
         let elem = if bound.apparent(table) == Type::Char {
             Type::Char
@@ -75,7 +75,7 @@ impl Type {
         Type::generic(varn_core::BuiltinType::Range.name(), vec![elem], table)
     }
 
-    /// `Range` or `Range<T>`.
+    
     pub fn is_range(&self, table: &CheckerTyTable, interner: &varn_core::AtomInterner) -> bool {
         match table.get(self.0) {
             TypeKind::Builtin(varn_core::BuiltinType::Range) => true,
@@ -94,14 +94,14 @@ impl Type {
         Type::resolved(table.intern(TypeKind::Builtin(b)))
     }
 
-    /// Content-addressed ids are portable, so there is nothing to sanitize:
-    /// a foreign id names the same shape here as there (ADR-0012). Kept as a
-    /// no-op so callers that still express the old intent keep compiling.
+    
+    
+    
     pub fn sanitize_foreign(self) -> Type {
         self
     }
 
-    // ── Constructors that build a new shape (need `&mut CheckerTyTable`) ──
+    
 
     pub fn get_array_element_type(&self, table: &CheckerTyTable) -> Type {
         match table.get(self.0) {
@@ -142,13 +142,13 @@ impl Type {
         Type::named_with_origin_atom(name_atom, origin_atom, table)
     }
 
-    /// String-name convenience over [`Self::generic_atom`], no origin.
+    
     pub fn generic(name: impl Into<Arc<str>>, args: Vec<Type>, table: &mut CheckerTyTable) -> Self {
         let atom = table.intern_name(&name.into());
         Type::generic_atom(atom, args, None, table)
     }
 
-    /// String-name convenience over [`Self::generic_atom`], with origin.
+    
     pub fn generic_with_origin(
         name: impl Into<Arc<str>>,
         args: Vec<Type>,
@@ -230,7 +230,7 @@ impl Type {
         }
     }
 
-    // ── Predicates on the fixed intrinsic set (no table access needed) ────
+    
 
     pub fn is_dynamic(&self) -> bool {
         self.0 == CheckerTyId::DYNAMIC
@@ -260,7 +260,7 @@ impl Type {
         self.0 == CheckerTyId::NEVER
     }
 
-    // ── Everything else needs to read the shape via the table ─────────────
+    
 
     pub fn stdlib_key<'t>(&self, table: &'t CheckerTyTable) -> Option<&'t str> {
         match table.get(self.0) {

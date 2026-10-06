@@ -1,11 +1,11 @@
-//! Full-family extension of the SSA lowering: every portable op outside the
-//! scalar/heap core.
-//!
-//! Each arm mirrors the interpreter's own helper (same `jit_*` entry the
-//! bytecode lowering calls), so there is one runtime per fact (Ley 6). Ops
-//! that can suspend (`Await`/`Yield`/`LoadModule`) spill the values live at
-//! the resume point to their homes first — the interpreter resumes from
-//! homes — then trap, since the suspend helper never returns to compiled code.
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -17,9 +17,9 @@ use super::{load_value, Ctx};
 
 use super::super::emit::{call_helper, call_helper_void};
 
-/// Try to emit `op`. `Ok(None)` means it is not an extra op and the caller
-/// (scalar/heapvalue) must handle it. `Ok(Some(out))` carries the result;
-/// `Ok(Some(None))` is an effect op with no result.
+
+
+
 pub(super) fn try_emit(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -292,10 +292,10 @@ pub(super) fn try_emit(
             let (t, p) = b.ins().isplit(v);
             let dv = b.ins().iconst(types::I64, i64::from(ctx.ssa.reg(d)));
             let rv = b.ins().iconst(types::I64, i64::from(*resume_ip));
-            // No trap: the helper never returns to compiled code (it parks
-            // the frame and longjmps to the interpreter), but this is a
-            // mid-block instruction — later instructions still need a home.
-            // The block's own terminator closes it, as with any helper call.
+            
+            
+            
+            
             call_helper_void(b, ctx.cc, h.await_helper, &[ectx, t, p, dv, rv]);
             Ok(Some(None))
         }
@@ -316,8 +316,8 @@ pub(super) fn try_emit(
             let (t, p) = b.ins().isplit(v);
             let dv = b.ins().iconst(types::I64, i64::from(ctx.ssa.reg(d)));
             let rv = b.ins().iconst(types::I64, i64::from(*resume_ip));
-            // No trap, as for `Await` above: a mid-block instruction must
-            // leave the block open for its terminator.
+            
+            
             call_helper_void(b, ctx.cc, h.yield_helper, &[ectx, t, p, dv, rv]);
             Ok(Some(None))
         }
@@ -349,8 +349,8 @@ pub(super) fn try_emit(
     }
 }
 
-/// `super(...args)`: the constructor through `GetSuper`, called with this
-/// (home 0) then `args` — the bytecode's own window.
+
+
 fn emit_super_call(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -377,8 +377,8 @@ fn emit_super_call(
     Ok(super::call::emit_invoke(b, ctx, addr, (ct, cp), vals.len()))
 }
 
-/// Native-stack window with `callee` first, then `args`, in the shared
-/// scratch window.
+
+
 fn stage_value(b: &mut FunctionBuilder, ctx: &Ctx<'_>, callee: Value, args: &[Value]) -> Value {
     let addr = super::call::scratch_addr(b, ctx, args.len() + 1);
     b.ins().store(
@@ -398,7 +398,7 @@ fn stage_value(b: &mut FunctionBuilder, ctx: &Ctx<'_>, callee: Value, args: &[Va
     addr
 }
 
-/// Spread-free array build shared by `BuildTuple`.
+
 fn window_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize, vals: &[Value]) -> Value {
     let ectx = exec_ctx(ctx);
     let (addr, n) = stage(b, ctx, vals);
@@ -411,8 +411,8 @@ fn window_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize, vals: &[
     )
 }
 
-/// Native-stack window of boxed values: `(addr, count)`, staged in the
-/// function's shared scratch window (see [`super::call::ScratchWin`]).
+
+
 fn stage(b: &mut FunctionBuilder, ctx: &Ctx<'_>, vals: &[Value]) -> (Value, Value) {
     let addr = super::call::scratch_addr(b, ctx, vals.len().max(1));
     for (i, v) in vals.iter().enumerate() {
@@ -426,8 +426,8 @@ fn stage(b: &mut FunctionBuilder, ctx: &Ctx<'_>, vals: &[Value]) -> (Value, Valu
     (addr, b.ins().iconst(types::I64, vals.len() as i64))
 }
 
-/// Empty array then push/extend per element; the running array stays rooted
-/// in `jit_native_result` across the element helpers.
+
+
 fn emit_array_spread(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -466,8 +466,8 @@ fn emit_array_spread(
     Ok(fresh(b))
 }
 
-/// Empty object then set/merge per part; keyed parts use consecutive cache
-/// slots from `cs_base`.
+
+
 fn emit_object_spread(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -511,8 +511,8 @@ fn emit_object_spread(
                     h.set_property_flat,
                     &[ectx, frame.closure, ot, op_, vt, vp, niv, csv, ipv],
                 );
-                // Setters are user code: frames may have moved underneath
-                // the next part's home reads.
+                
+                
                 super::store::drop_home_addrs(ctx);
                 keyed += 1;
             }
@@ -528,8 +528,8 @@ fn emit_object_spread(
     Ok(fresh(b))
 }
 
-/// The values the interpreter reads on resume to their homes. One not yet
-/// defined here — the suspending instruction's own result — is skipped.
+
+
 fn spill(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,

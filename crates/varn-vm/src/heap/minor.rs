@@ -1,7 +1,7 @@
-//! Minor collection: mark the young objects reachable from the roots, from
-//! old objects the barrier remembered and from old objects whose children no
-//! barrier covers, then free the unmarked young cells. Survivors become old
-//! where they stand; no reference is rewritten.
+
+
+
+
 
 use super::cells::{CellSpace, SlotState};
 use super::children::{for_each_child, Reach};

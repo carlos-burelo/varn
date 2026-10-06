@@ -1,4 +1,4 @@
-//! Runtime hotspots: functions, natives, globals, allocations.
+
 
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
@@ -17,7 +17,7 @@ pub fn print_hotspots(h: &HotspotCounters) {
     terminal::blank();
     terminal::log(chalk("Runtime Hotspots").cyan().bold());
 
-    // ── Interpreted frames: functions that ran as interpreter, most first ──
+    
     let mut interp_only: Vec<_> = h
         .fn_calls
         .iter()
@@ -112,11 +112,11 @@ pub fn print_hotspots(h: &HotspotCounters) {
 
     if !h.native_calls.is_empty() {
         section("Llamadas nativas");
-        // By time, not count: a count alone can't tell a cheap-and-frequent
-        // op from an expensive-and-frequent one, and the expensive one is
-        // the one worth looking at. `native_ns` is missing an entry (name
-        // resolved to nothing, or the op never actually ran through the
-        // timed path) for a count that has one — falls back to 0, not hidden.
+        
+        
+        
+        
+        
         let mut entries: Vec<_> = h.native_calls.iter().collect();
         entries.sort_by_key(|(name, count)| {
             std::cmp::Reverse(h.native_ns.get(*name).copied().unwrap_or(0).max(**count))
@@ -149,9 +149,9 @@ pub fn print_hotspots(h: &HotspotCounters) {
         let mut entries: Vec<_> = h.global_accesses.iter().collect();
         entries.sort_by(|a, b| b.1.cmp(a.1));
         for (name, count) in entries.iter().take(TOP_N) {
-            // Globals carry their defining module as an absolute path; printed
-            // raw they are ~70 chars against a 26-wide column and shear the
-            // whole block apart.
+            
+            
+            
             terminal::log(row(&short_global(name), fmt_num(**count)));
         }
     }

@@ -1,15 +1,15 @@
-//! The two compiled-body ABIs and the wrapper that enters either from the VM.
-//!
-//! * [`Activation::Native`] — the native activation ABI
-//!   ([`super::native_abi`]): arguments and result in registers, no VM
-//!   frame storage. Every body that never needs the interpreter to see its
-//!   registers compiles this way.
-//! * [`Activation::Framed`] — `raw(stack, closure, base, exec_ctx, args…)`
-//!   over a `FrameStore` activation: the body reads and writes homes the
-//!   interpreter also reads (captured variables, `try`, suspension, OSR).
-//!
-//! The wrapper (`JitFn`) is the only VM→compiled door: the interpreter has
-//! already pushed the frame and filled the argument homes.
+
+
+
+
+
+
+
+
+
+
+
+
 
 use cranelift_codegen::ir::{
     types, AbiParam, ExtFuncData, ExternalName, Function, InstBuilder, MemFlagsData, Signature,
@@ -31,9 +31,9 @@ pub enum Activation {
     Framed,
 }
 
-/// Framed raw signature: `fn(stack_ptr, closure, base, exec_ctx, arg × nparams)`.
-/// Scalar-declared arguments arrive in their machine form; anything else is
-/// read from its home, so its word here is unused.
+
+
+
 pub(super) fn raw_signature(proto: &FunctionProto, nparams: usize, cc: CallConv) -> Signature {
     let mut sig = Signature::new(cc);
     for _ in 0..4 {
@@ -78,9 +78,9 @@ pub(crate) fn wrapper_signature(cc: CallConv) -> Signature {
     sig
 }
 
-/// Wrapper with the `JitFn` ABI `(stack_ptr, closure, base, exec_ctx)`: reads
-/// the arguments the interpreter left in their homes and calls the raw body
-/// in its own ABI. An OSR raw takes no arguments.
+
+
+
 pub(super) fn build_wrapper(
     proto: &FunctionProto,
     helpers: &JitHelpers,
@@ -193,7 +193,7 @@ fn kind_of(proto: &FunctionProto, reg: usize) -> SlotKind {
     }
 }
 
-/// Append boxed value `boxed` to a native argument list in `class`'s form.
+
 pub(crate) fn push_native_arg(
     b: &mut FunctionBuilder,
     args: &mut Vec<Value>,
@@ -213,7 +213,7 @@ pub(crate) fn push_native_arg(
     }
 }
 
-/// A native call's results as one boxed `VmValue`.
+
 pub(crate) fn native_result_boxed(
     b: &mut FunctionBuilder,
     class: NativeClass,

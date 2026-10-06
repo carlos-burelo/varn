@@ -1,8 +1,8 @@
-//! Map key canonicalization.
-//!
-//! Two values that are `==` must hash to the same key, which for heap values
-//! means resolving them to something representation-independent before they
-//! are used to index a Map or Set.
+
+
+
+
+
 
 use super::obj::HeapObj;
 use super::structs::HeapInner;

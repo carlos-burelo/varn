@@ -1,7 +1,7 @@
-//! Error of a native function: carries its platform error class to the
-//! `catch`, the way a VM-born `RuntimeError` does — and, when a callback the
-//! native ran threw, the thrown value itself, so the exception reaches the
-//! caller's `catch` unchanged instead of being swallowed or flattened to text.
+
+
+
+
 
 use crate::VmValue;
 use varn_core::RuntimeErrorKind;
@@ -30,7 +30,7 @@ impl NativeError {
         Self::of_kind(RuntimeErrorKind::DivisionByZero, message)
     }
 
-    /// An exception a VM callback threw, rethrown as is.
+    
     pub fn rethrow(
         kind: RuntimeErrorKind,
         message: impl Into<String>,

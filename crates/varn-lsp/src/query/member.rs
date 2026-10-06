@@ -1,6 +1,6 @@
 use crate::document::DocumentState;
 
-/// The member at `line`/`col`, and the name of the type it belongs to.
+
 pub fn member_at(
     state: &DocumentState,
     line: u32,

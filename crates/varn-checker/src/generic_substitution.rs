@@ -20,8 +20,8 @@ pub(crate) fn map_generics_cached(
         return *base;
     }
 
-    // Atom-keyed view of `mapping`, since `Type::map_generics` compares
-    // against `TypeKind::Named`'s own `Atom` slot, not a source-text name.
+    
+    
     let atom_mapping: FxHashMap<varn_core::Atom, Type> = mapping
         .iter()
         .map(|(k, v)| (varn_core::Atom::of(k), *v))

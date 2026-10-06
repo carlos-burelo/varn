@@ -1,6 +1,6 @@
-//! Probes [`varn_jit::JitCallLayout`]: every offset a compiled call site walks
-//! to enter a native activation and to push and pop its `CallFrame` by hand.
-//! Each one is measured on a real value, not assumed.
+
+
+
 
 use std::rc::Rc;
 

@@ -47,9 +47,9 @@ impl HeapInner {
         self.identity_index.retain(|_, idx| live(idx));
     }
 
-    /// Run a full collection over every slot, young and old alike, returning
-    /// how many were freed. Every survivor ends it old, so the young
-    /// generation starts empty.
+    
+    
+    
     pub(crate) fn collect(&mut self, roots: &[HeapRef]) -> usize {
         let freed = self.mark_and_sweep(roots);
         self.young.retired += self.young.born.len() as u64;

@@ -1,26 +1,26 @@
-//! Loop counters whose step cannot overflow.
-//!
-//! `k + 1` normally carries the `int` overflow guard. It cannot overflow when
-//! `k` is a loop header's parameter and the header enters the loop only on
-//! `k < limit` (the other edge leaving it): every block of the body — each
-//! reached from the header only through that edge — runs with
-//! `k < limit <= INT_MAX`, so `k + 1 <= INT_MAX`. `k - 1` under `k > limit`
-//! is the mirror case. Such a step is a plain add; nothing else changes.
+
+
+
+
+
+
+
+
 
 use std::collections::HashSet;
 
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaProto, SsaTerm};
 
-/// Which way a guard bounds the header parameter.
+
 #[derive(Clone, Copy, PartialEq)]
 enum Bound {
-    /// `k < limit`: `k + 1` stays in range.
+    
     Below,
-    /// `k > limit`: `k - 1` stays in range.
+    
     Above,
 }
 
-/// The values defined by an `int` step that cannot overflow.
+
 pub(super) fn in_range_steps(
     ssa: &SsaProto,
     preds: &[Vec<usize>],
@@ -49,7 +49,7 @@ pub(super) fn in_range_steps(
         else {
             continue;
         };
-        // The guard must be computed in the header itself, on its parameter.
+        
         let in_header = blk.insts.iter().any(|i| i.dest == Some(*cond));
         let Some(SsaOp::Binary { op, lhs, rhs }) = def[*cond as usize] else {
             continue;
@@ -62,7 +62,7 @@ pub(super) fn in_range_steps(
         let (k, bound) = if blk.params.contains(&k) {
             (k, bound)
         } else {
-            // `limit > k` is `k < limit`, and `limit < k` is `k > limit`.
+            
             let flipped = match bound {
                 Bound::Below => Bound::Above,
                 Bound::Above => Bound::Below,

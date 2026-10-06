@@ -13,11 +13,11 @@ pub fn scan(
     (tokens, buf, diags)
 }
 
-/// [`scan`] plus the comments it would otherwise drop.
-///
-/// Separate entry point rather than a fourth element on `scan`: only tooling
-/// that reproduces source needs trivia, and every other caller — the whole
-/// compile path — would pay the churn for a value it discards.
+
+
+
+
+
 pub fn scan_with_trivia(
     source: &str,
     filename: &str,

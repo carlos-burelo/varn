@@ -1,35 +1,35 @@
-//! `varn_tir::BackendTy` -> the SSA IR's type (`crate::hir::HirType`).
-//!
-//! The SSA IR keeps its current type enum through stage 3 (it is renamed off
-//! `Hir` once HIR is deleted). `BackendTy`'s structured handles index the TIR
-//! module's own `TyTable`; here they are re-interned into the SSA-side
-//! `TyTable`, which is keyed by class *name*.
-//!
-//! Kinds the SSA type has no slot for (`char`, `decimal`, `bigint`, `enum`,
-//! `fn`, `map`, `set`, `tuple`) map to `Ref` — a heap value with no further
-//! static shape. That is conservative, never wrong; the precise opcodes those
-//! types unlock are stage 4/5.
+
+
+
+
+
+
+
+
+
+
+
 
 use crate::hir::{HirType, TyTable as SsaTyTable};
 use varn_tir::{BackendTy, TirModule};
 
-/// Lower one `BackendTy`, re-interning any nested handles into `out`.
+
 pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
     match bt {
         BackendTy::Int => HirType::Int,
         BackendTy::Float => HirType::Float,
         BackendTy::Bool => HirType::Bool,
         BackendTy::Str => HirType::Str,
-        // `char` es `HeapObj::Char` internado: `Ref` es la
-        // proyección honesta (clase REF, con flush GC). `Dynamic` era
-        // conservador pero perdía la clase; `Int` (que usaba `build.rs` para
-        // el literal) era directamente falso.
+        
+        
+        
+        
         BackendTy::Char => HirType::Ref,
-        // `decimal`/`bigint` son heap PERO con ensanchado `int` en llamadas
-        // (`coherence::assignable`: `Int` → `Decimal`/`BigInt`) y tolerancia
-        // `dynamic`: un registro REF no puede alojar el `int` sin allocar.
-        // `Dynamic` los aloja tal cual (igual que hoy el stack universal) y
-        // los opcodes genéricos ya los resuelven por tag.
+        
+        
+        
+        
+        
         BackendTy::Decimal | BackendTy::BigInt => HirType::Dynamic,
 
         BackendTy::Bytes | BackendTy::Tuple(_) | BackendTy::Enum(_) | BackendTy::Fn(_) => {
@@ -141,10 +141,10 @@ mod tests {
 
     #[test]
     fn heap_boxed_scalars_are_ref() {
-        // `char` es `HeapObj::Char` internado: `Ref`, nunca `Int` (mentía al
-        // regalloc/GC) ni `Dynamic` (degradaba la clase sin motivo).
-        // `decimal`/`bigint`, en cambio, aceptan `int` por ensanchado:
-        // `Dynamic` los aloja sin allocar.
+        
+        
+        
+        
         let m = empty_module();
         let mut out = SsaTyTable::default();
         assert_eq!(lower(B::Char, &m, &mut out), HirType::Ref);

@@ -1,8 +1,8 @@
-//! `-p tokens`: lexer token stream (DEBUG_PLAN §4.1).
-//!
-//! Split into `collect` (data) and `render` (Plain byte-identical / Text
-//! diffable) so the byte contract is frozen by a golden and `Text` comes for
-//! free.
+
+
+
+
+
 
 use std::io::Write;
 
@@ -12,7 +12,7 @@ use crate::fmt::Format;
 use crate::render::{basename, DIM, MAGENTA, RESET, YELLOW};
 use crate::report::Report;
 
-/// One row per token: `[index, loc, kind, lexeme]`.
+
 pub fn collect(tokens: &[Token], lexeme_buf: &[u8]) -> Report {
     Report::Rows(
         tokens

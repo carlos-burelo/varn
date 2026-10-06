@@ -23,7 +23,7 @@ pub fn build_autoimport_completions(
         .map(|p| p.to_lowercase())
         .filter(|p| !p.is_empty());
 
-    // If no prefix filter is typed, do not flood completion with 50,000+ external symbols
+    
     if filter_lower.is_none() {
         return items;
     }

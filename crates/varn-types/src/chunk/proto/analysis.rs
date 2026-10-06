@@ -3,20 +3,20 @@ use varn_core::OpCode;
 use super::definition::FunctionProto;
 
 impl FunctionProto {
-    /// Whether the body contains a back edge (`OpCode::Loop`).
-    ///
-    /// Tiering counts FRAME ENTRIES, which says nothing about a function that
-    /// is entered once and then spins a million iterations: it never reaches
-    /// any threshold, and without on-stack replacement there is no second
-    /// chance to compile it. So a looping function is compiled on its first
-    /// entry and only straight-line code is made to prove itself by being
-    /// called again — for that shape the entry count is exactly the right
-    /// evidence. Measured: a flat threshold of 8 is 5.6x on the test suite and
-    /// 2.4x WORSE on `bench_matrix`; splitting the two recovers both.
-    ///
-    /// Walked through the shared decoder so operand words can never be
-    /// mistaken for an opcode, and memoised — the answer is a property of the
-    /// bytecode, which never changes.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub fn has_backedge(&self) -> bool {
         match self.backedge_memo.get() {
             1 => return true,
@@ -28,8 +28,8 @@ impl FunctionProto {
         let mut found = false;
         while ip < code.len() {
             let Some(info) = crate::bytecode::decode(code, ip, &self.chunk.constants) else {
-                // Undecodable: assume the worst and compile eagerly, which is
-                // the pre-existing behaviour.
+                
+                
                 found = true;
                 break;
             };

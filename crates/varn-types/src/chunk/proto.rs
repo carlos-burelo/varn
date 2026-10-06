@@ -1,5 +1,5 @@
-//! `FunctionProto`: one compiled function -- its chunk, register layout,
-//! upvalues, exception ranges and the caches attached to it.
+
+
 
 mod analysis;
 mod caches;

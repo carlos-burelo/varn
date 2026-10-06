@@ -20,12 +20,12 @@ pub struct Parser {
     pub diagnostics: varn_core::DiagnosticBag,
 }
 
-// The entire recursive-descent parser is a tree of free functions threaded
-// with `&mut TokenStream` (see `stream.rs`), so the atom interner physically
-// lives on `TokenStream` alongside `errors`/`pending_doc`. `Deref`/`DerefMut`
-// make `parser.interner` resolve to `parser.stream.interner` so callers
-// outside this crate can use the field path the task interface promises,
-// without a second, unsynced interner living on `Parser` itself.
+
+
+
+
+
+
 impl std::ops::Deref for Parser {
     type Target = TokenStream;
     fn deref(&self) -> &TokenStream {
@@ -94,16 +94,16 @@ impl Parser {
                     self.diagnostics
                         .error(ErrorCode::InvalidStatement, msg, self.stream.range());
                     self.recover(stmt_start);
-                    // Forward progress, guaranteed here rather than inside
-                    // `recover`: recovery legitimately stops without consuming
-                    // when the cursor already sits on the next statement's
-                    // keyword, and advancing there would eat that statement.
-                    // Only a round that consumed *nothing at all* can spin.
+                    
+                    
+                    
+                    
+                    
                     if self.stream.pos() == loop_entry && !self.stream.is_eof() {
                         self.stream.advance();
                     }
-                    // Preserve the unparseable span instead of dropping it, so
-                    // every byte of source stays reachable from the tree.
+                    
+                    
                     let recovered = self.stream.span_from(stmt_start);
                     let stmt = self.stream.stmt(recovered, varn_core::ast::StmtKind::Error);
                     body.push(stmt);
@@ -128,16 +128,16 @@ impl Parser {
         (prog, errors, profile)
     }
 
-    /// Skip to the next plausible statement boundary and return the span that
-    /// was skipped, for the caller to preserve as [`StmtKind::Error`].
-    ///
-    /// Recovery used to discard that span outright, which is why a half-typed
-    /// statement disappeared from the tree together with every symbol it would
-    /// have bound — and why the editor had nothing to answer from.
-    ///
-    /// Stopping without consuming anything is correct and expected: the cursor
-    /// may already be parked on the next statement's keyword. Forward progress
-    /// is therefore the *caller's* obligation — see `parse_program_partial`.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     fn recover(&mut self, start: varn_core::SourceRange) -> varn_core::SourceRange {
         #[cfg(feature = "profiling")]
         let started = Instant::now();

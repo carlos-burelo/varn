@@ -1,7 +1,7 @@
 #![allow(unused_crate_dependencies)]
-//! A missing type costs performance. A WRONG type is a miscompile, and
-//! nothing in the pipeline looks for one today. These checks are the trip
-//! wire.
+
+
+
 
 use std::sync::Arc;
 use varn_tir::*;
@@ -62,8 +62,8 @@ fn int(v: i64) -> TirExpr {
     expr(TirExprKind::IntLit(v), BackendTy::Int, Resolution::None)
 }
 
-/// `return null` in a `T?` function: bare null (Nullable over Never) is
-/// assignable to every nullable type.
+
+
 #[test]
 fn bare_null_returns_from_any_nullable_function() {
     let mut m = module_with_point();
@@ -94,7 +94,7 @@ fn bare_null_returns_from_any_nullable_function() {
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
 
-/// `int` widens to `float` at a call argument — `takesFloat(1)`.
+
 #[test]
 fn int_argument_widens_to_a_float_parameter() {
     let mut m = module_with_point();
@@ -127,10 +127,10 @@ fn int_argument_widens_to_a_float_parameter() {
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
 
-/// A subclass argument satisfies an ancestor parameter.
+
 #[test]
 fn a_subclass_is_assignable_to_its_parent() {
-    // ClassId(0) = Animal, ClassId(1) = Dog extends Animal.
+    
     let animal = ClassInfo::new(
         Arc::from("Animal"),
         varn_tir::Ancestry::Root,
@@ -179,7 +179,7 @@ fn a_subclass_is_assignable_to_its_parent() {
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
 
-/// int + int is int.
+
 #[test]
 fn int_addition_is_int() {
     let mut m = module_with_point();
@@ -195,7 +195,7 @@ fn int_addition_is_int() {
     assert!(verify_module(&m).is_ok());
 }
 
-/// int + int claiming to produce Str is a miscompile, and is rejected.
+
 #[test]
 fn a_lying_result_type_is_rejected() {
     let mut m = module_with_point();
@@ -216,8 +216,8 @@ fn a_lying_result_type_is_rejected() {
     );
 }
 
-/// Mixing representations without an explicit Cast is rejected: it is exactly
-/// where a float silently travels in an integer register.
+
+
 #[test]
 fn mixed_operands_without_a_cast_are_rejected() {
     let mut m = module_with_point();
@@ -243,7 +243,7 @@ fn mixed_operands_without_a_cast_are_rejected() {
     );
 }
 
-/// A comparison produces Bool whatever its operands are.
+
 #[test]
 fn comparison_produces_bool() {
     let mut m = module_with_point();
@@ -253,7 +253,7 @@ fn comparison_produces_bool() {
             lhs: Box::new(int(1)),
             rhs: Box::new(int(2)),
         },
-        BackendTy::Int, // wrong on purpose
+        BackendTy::Int, 
         Resolution::None,
     )));
     let errs = verify_module(&m).unwrap_err();
@@ -264,8 +264,8 @@ fn comparison_produces_bool() {
     );
 }
 
-/// A field read's type must be the field's DECLARED type. This is the check
-/// that makes a slot and a type disagreeing impossible.
+
+
 #[test]
 fn a_field_read_must_have_the_declared_type() {
     let mut m = module_with_point();
@@ -274,7 +274,7 @@ fn a_field_read_must_have_the_declared_type() {
         BackendTy::Class(ClassId(0)),
         Resolution::Local(LocalId(0)),
     );
-    // slot 0 is `x: int`, but the node claims Str.
+    
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::Field {
             object: Box::new(recv),
@@ -291,7 +291,7 @@ fn a_field_read_must_have_the_declared_type() {
     );
 }
 
-/// The same read with the right type passes.
+
 #[test]
 fn a_correct_field_read_verifies() {
     let mut m = module_with_point();
@@ -311,7 +311,7 @@ fn a_correct_field_read_verifies() {
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
 
-/// A method call's argument count must match the signature.
+
 #[test]
 fn method_call_arity_mismatch_is_rejected() {
     let mut m = TirModule {
@@ -363,7 +363,7 @@ fn method_call_arity_mismatch_is_rejected() {
         BackendTy::Class(ClassId(0)),
         Resolution::Local(LocalId(0)),
     );
-    // Passing 0 args when signature expects 1
+    
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::MethodCall {
             recv: Box::new(recv),
@@ -381,7 +381,7 @@ fn method_call_arity_mismatch_is_rejected() {
     );
 }
 
-/// A method call with the right arity passes.
+
 #[test]
 fn method_call_with_correct_arity_verifies() {
     let mut m = TirModule {
@@ -445,12 +445,12 @@ fn method_call_with_correct_arity_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-/// An if condition must be Bool.
+
 #[test]
 fn if_condition_must_be_bool() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::If {
-        cond: int(42), // Int, not Bool
+        cond: int(42), 
         then_body: vec![],
         else_body: vec![],
     });
@@ -462,7 +462,7 @@ fn if_condition_must_be_bool() {
     );
 }
 
-/// An if condition that is Bool passes.
+
 #[test]
 fn if_with_bool_condition_verifies() {
     let mut m = module_with_point();
@@ -478,12 +478,12 @@ fn if_with_bool_condition_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-/// A loop condition must be Bool.
+
 #[test]
 fn loop_condition_must_be_bool() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Loop {
-        cond: int(1), // Int, not Bool
+        cond: int(1), 
         body: vec![],
     });
     let errs = verify_module(&m).unwrap_err();
@@ -494,7 +494,7 @@ fn loop_condition_must_be_bool() {
     );
 }
 
-/// A loop condition that is Bool passes.
+
 #[test]
 fn loop_with_bool_condition_verifies() {
     let mut m = module_with_point();
@@ -509,14 +509,14 @@ fn loop_with_bool_condition_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-/// A let binding's type must match the initializer's type.
+
 #[test]
 fn let_type_mismatch_is_rejected() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(1),
-        ty: BackendTy::Str,  // declared Str
-        init: Some(int(42)), // initialized with Int
+        ty: BackendTy::Str,  
+        init: Some(int(42)), 
     });
     let errs = verify_module(&m).unwrap_err();
     assert!(
@@ -526,7 +526,7 @@ fn let_type_mismatch_is_rejected() {
     );
 }
 
-/// A let binding with matching types verifies.
+
 #[test]
 fn let_with_matching_type_verifies() {
     let mut m = module_with_point();
@@ -539,11 +539,11 @@ fn let_with_matching_type_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-/// A return statement's type must match the function's return type.
+
 #[test]
 fn return_type_mismatch_is_rejected() {
     let mut m = module_with_point();
-    m.top_level.body.push(TirStmt::Return(Some(int(42)))); // Int, but function returns Void
+    m.top_level.body.push(TirStmt::Return(Some(int(42)))); 
     let errs = verify_module(&m).unwrap_err();
     assert!(
         errs.iter().any(|e| e.message.contains("return type")),
@@ -552,7 +552,7 @@ fn return_type_mismatch_is_rejected() {
     );
 }
 
-/// A return statement with the right type verifies.
+
 #[test]
 fn return_with_correct_type_verifies() {
     let mut m = TirModule {
@@ -589,7 +589,7 @@ fn return_with_correct_type_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-/// A bare return in a function that returns Void passes.
+
 #[test]
 fn bare_return_in_void_function_verifies() {
     let mut m = module_with_point();
@@ -597,7 +597,7 @@ fn bare_return_in_void_function_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-/// A bare return in a function that doesn't return Void is rejected.
+
 #[test]
 fn bare_return_in_non_void_function_is_rejected() {
     let mut m = TirModule {
@@ -639,7 +639,7 @@ fn bare_return_in_non_void_function_is_rejected() {
     );
 }
 
-/// A let binding declared Nullable(T) initialized with T is valid (assignability).
+
 #[test]
 fn let_with_nullable_declared_and_nonnull_init_is_valid() {
     let mut types = TyTable::default();
@@ -678,12 +678,12 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(0),
         ty: nullable_int,
-        init: Some(int(42)), // non-null Int goes into Nullable(Int)
+        init: Some(int(42)), 
     });
     assert!(verify_module(&m).is_ok());
 }
 
-/// A let binding declared T initialized with Nullable(T) is rejected (needs narrowing).
+
 #[test]
 fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
     let mut types = TyTable::default();
@@ -721,10 +721,10 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
     };
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(0),
-        ty: BackendTy::Int, // declared Int
+        ty: BackendTy::Int, 
         init: Some(expr(
             TirExprKind::IntLit(42),
-            nullable_int, // but init is Nullable(Int)
+            nullable_int, 
             Resolution::None,
         )),
     });
@@ -736,7 +736,7 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
     );
 }
 
-/// A return of Never is valid in any function (Never inhabits every type).
+
 #[test]
 fn return_of_never_type_is_valid_anywhere() {
     let mut m = TirModule {
@@ -771,13 +771,13 @@ fn return_of_never_type_is_valid_anywhere() {
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
         TirExprKind::IntLit(0),
-        BackendTy::Never, // Never inhabits Int
+        BackendTy::Never, 
         Resolution::None,
     ))));
     assert!(verify_module(&m).is_ok());
 }
 
-/// A return declared Nullable(T) with value T is valid (assignability).
+
 #[test]
 fn return_nonnull_when_function_returns_nullable_is_valid() {
     let mut types = TyTable::default();
@@ -802,7 +802,7 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
             name: Arc::from("<module>"),
             sig: SigId(0),
             params: vec![],
-            return_ty: BackendTy::Nullable(int_id), // function returns Int?
+            return_ty: BackendTy::Nullable(int_id), 
             locals: vec![],
             body: vec![],
             has_this: false,
@@ -812,11 +812,11 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
             has_rest: false,
         },
     };
-    m.top_level.body.push(TirStmt::Return(Some(int(42)))); // returning Int
+    m.top_level.body.push(TirStmt::Return(Some(int(42)))); 
     assert!(verify_module(&m).is_ok());
 }
 
-/// A return declared T with value Nullable(T) is rejected (needs narrowing).
+
 #[test]
 fn return_nullable_when_function_returns_nonnull_is_rejected() {
     let mut types = TyTable::default();
@@ -841,7 +841,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
             name: Arc::from("<module>"),
             sig: SigId(0),
             params: vec![],
-            return_ty: BackendTy::Int, // function returns Int
+            return_ty: BackendTy::Int, 
             locals: vec![],
             body: vec![],
             has_this: false,
@@ -853,7 +853,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
         TirExprKind::IntLit(42),
-        BackendTy::Nullable(int_id), // returning Int?
+        BackendTy::Nullable(int_id), 
         Resolution::None,
     ))));
     let errs = verify_module(&m).unwrap_err();
@@ -864,7 +864,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
     );
 }
 
-/// A method call with argument T where parameter is Nullable(T) passes.
+
 #[test]
 fn method_call_arg_nonnull_into_nullable_param_passes() {
     let mut types = TyTable::default();
@@ -922,7 +922,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
         TirExprKind::MethodCall {
             recv: Box::new(recv),
             name: "move".into(),
-            args: vec![TirArg::Expr(int(42))], // Int goes into Nullable(Int)
+            args: vec![TirArg::Expr(int(42))], 
         },
         BackendTy::Void,
         Resolution::VtableSlot(0),
@@ -930,7 +930,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
     assert!(verify_module(&m).is_ok());
 }
 
-/// A method call with argument Nullable(T) where parameter is T is rejected.
+
 #[test]
 fn method_call_arg_nullable_into_nonnull_param_rejected() {
     let mut types = TyTable::default();
@@ -990,7 +990,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
             name: "move".into(),
             args: vec![TirArg::Expr(expr(
                 TirExprKind::IntLit(42),
-                BackendTy::Nullable(int_id), // Nullable(Int) goes into Int
+                BackendTy::Nullable(int_id), 
                 Resolution::None,
             ))],
         },
@@ -1005,7 +1005,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
     );
 }
 
-/// PERMISSIVENESS CHECK: Nullable(Int) must NOT accept Str.
+
 #[test]
 fn let_declared_nullable_int_init_str_should_fail() {
     let mut types = TyTable::default();
@@ -1046,7 +1046,7 @@ fn let_declared_nullable_int_init_str_should_fail() {
         ty: nullable_int,
         init: Some(expr(
             TirExprKind::StrLit("hello".into()),
-            BackendTy::Str, // Str into Nullable(Int) should fail
+            BackendTy::Str, 
             Resolution::None,
         )),
     });
@@ -1058,7 +1058,7 @@ fn let_declared_nullable_int_init_str_should_fail() {
     );
 }
 
-/// PERMISSIVENESS CHECK: Nullable(Int) must NOT accept Nullable(Str).
+
 #[test]
 fn let_declared_nullable_int_init_nullable_str_should_fail() {
     let mut types = TyTable::default();
@@ -1101,7 +1101,7 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
         ty: nullable_int,
         init: Some(expr(
             TirExprKind::StrLit("hello".into()),
-            nullable_str, // Nullable(Str) into Nullable(Int) should fail
+            nullable_str, 
             Resolution::None,
         )),
     });
@@ -1113,25 +1113,25 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
     );
 }
 
-/// A deeply nested chain of `Nullable` terminates and is not falsely
-/// reported.
-///
-/// `TyTable` is append-only (see its doc comment in `ty.rs`): `intern`
-/// assigns an index only after pushing, so any entry can reference only
-/// strictly smaller `TyId`s. The type graph is therefore a DAG, and a real
-/// cycle is not constructible through the public API — this test does NOT
-/// build one. What it builds is a straight-line chain of `Nullable` wrapping
-/// `Nullable` wrapping ... `Int`, deep enough (deeper than the 32-level depth
-/// bound in `assignable` and `non_nullable`) to actually cross that bound
-/// rather than terminate on its own before reaching it. That exercises the
-/// depth-bound path itself, not just ordinary recursion: it asserts
-/// `verify_module` returns rather than hanging, and that saturating the
-/// bound on a type that is merely deep — not cyclic — does not produce a
-/// false positive.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #[test]
 fn deeply_nested_nullable_chain_terminates_without_false_positive() {
-    // Build a chain of 40 Nullable levels, each interned from the previous,
-    // strictly increasing TyId by construction. 40 > the 32-level bound.
+    
+    
     let mut types = TyTable::default();
     let mut id = types.intern(BackendTy::Int);
     for _ in 0..40 {
@@ -1170,7 +1170,7 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
         },
     };
 
-    // A non-null Int is assignable to any depth of Nullable(...Nullable(Int)).
+    
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(0),
         ty: deeply_nullable,
@@ -1181,9 +1181,9 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
         )),
     });
 
-    // The key assertion: verify_module must RETURN, not hang, and must not
-    // falsely reject a merely-deep (non-cyclic) chain once the bound
-    // saturates.
+    
+    
+    
     let result = verify_module(&m);
     assert!(
         result.is_ok(),

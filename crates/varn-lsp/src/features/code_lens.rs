@@ -12,7 +12,7 @@ pub fn build_code_lenses(
     let mut lenses = Vec::new();
     let uri_str = uri.to_string();
 
-    // 1. Top-level file lens: "▶ Run File"
+    
     lenses.push(CodeLens {
         range: Range {
             start: Position {
@@ -32,7 +32,7 @@ pub fn build_code_lenses(
         data: None,
     });
 
-    // Top-level View Bytecode / SSA lenses
+    
     lenses.push(CodeLens {
         range: Range {
             start: Position {
@@ -71,7 +71,7 @@ pub fn build_code_lenses(
         data: None,
     });
 
-    // 2. Symbol-level lenses
+    
     for sym in analysis.symbols() {
         if sym.line() == u32::MAX || sym.is_from_stdlib() {
             continue;
@@ -135,7 +135,7 @@ pub fn build_code_lenses(
             });
         }
 
-        // Reference count lens for top-level functions and classes
+        
         if matches!(
             sym.kind(),
             SymbolKind::Function | SymbolKind::Class | SymbolKind::Interface

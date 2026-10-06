@@ -1,13 +1,13 @@
-//! On-stack replacement from typed SSA, forced.
-//!
-//! A function with a loop is compiled at its first call, so the ordinary
-//! suite almost never resumes a running frame mid-loop. This runs
-//! `tests/151-jit-osr.vn` with the entry thresholds out of reach and the OSR
-//! threshold low, so every function in it reaches compiled code only through
-//! an OSR entry — and checks both the results and that the entry taken was
-//! the one lowered from SSA.
 
-// Un test de integración no usa las dependencias de la librería.
+
+
+
+
+
+
+
+
+
 #![allow(unused_crate_dependencies)]
 
 use std::path::{Path, PathBuf};
@@ -52,7 +52,7 @@ fn osr_entries_resume_from_ssa() {
     }
 }
 
-/// A fresh cache directory, so the run compiles from source.
+
 fn tempfile_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!("varn-osr-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("cache dir");

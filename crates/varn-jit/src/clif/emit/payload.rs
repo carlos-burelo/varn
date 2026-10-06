@@ -1,30 +1,30 @@
-//! Runtime-helper calls and the inline walks from a boxed value to its
-//! payload.
+
+
 
 use super::*;
 
-/// Indirect call to a template-JIT runtime helper
-/// (`extern "C" fn(exec_ctx, VmValue…) -> VmValue`). The admitted helpers
-/// never allocate on the VM heap (no GC can run under a clif frame) and
-/// raise VM errors by longjmp'ing to the outer setjmp, exactly like the
-/// template's slow paths.
-/// Normalize a RAW function's return value to boxed `VmValue` bits.
-///
-/// An `int`-returning raw yields an unboxed i64 payload — UNCONDITIONALLY.
-/// Every arm of `emit_return_value`'s `SlotKind::Int` case produces one: an
-/// `Int` register is already a payload, a boxed one goes through `use_int`,
-/// and a float one converts and wraps. Every other return kind is boxed by
-/// construction and passes straight through.
-///
-/// This used to re-tag only when the high bits were clear, on the theory that
-/// a set NaN-box tag meant the value was already boxed. That test cannot tell
-/// a boxed value from a NEGATIVE payload — `-3` is `0xFFFF_FFFF_FFFF_FFFD`,
-/// whose high bits are all set — so every negative `int` return escaped
-/// untagged and decoded as null. `function sub(a: int, b: int): int` returned
-/// null for `sub(1, 4)`. Pinned by tests/59-clif-negative-int.vn.
-///
-/// Shared by `build_wrapper` and by the direct clif→clif call site: the two
-/// consume the same raw entry and must decode its result identically.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 pub(in crate::clif) fn retag_raw_return(
     b: &mut FunctionBuilder,
     raw_res: cranelift_codegen::ir::Value,
@@ -39,9 +39,9 @@ pub(in crate::clif) fn retag_raw_return(
 }
 
 thread_local! {
-    /// Set when the lowering emits a call to a helper the VM left at address 0
-    /// (its body is still a fase-A tripwire). `try_compile` reads it and bails
-    /// the whole function instead of emitting a call to `unreachable!`/null.
+    
+    
+    
     static DISABLED_HELPER_HIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -78,8 +78,8 @@ pub(in crate::clif) fn call_helper(
     b.inst_results(call)[0]
 }
 
-/// Like [`call_helper`] but for a `-> ()` helper (`gc_safepoint`,
-/// `array_push`, `set_fixed_field`).
+
+
 pub(in crate::clif) fn call_helper_void(
     b: &mut FunctionBuilder,
     cc: cranelift_codegen::isa::CallConv,
@@ -95,10 +95,10 @@ pub(in crate::clif) fn call_helper_void(
     let ptr = b.ins().iconst(types::I64, helper as i64);
     b.ins().call_indirect(sig_ref, ptr, args);
 }
-/// Resolve a boxed receiver down to its array payload pointer (the three
-/// `Vec<VmValue>` words live at payload+16). Any rejection — not a heap
-/// value, or a slot that is not an array — branches to `slow`; on return the
-/// builder is positioned in a fresh block where the payload is valid.
+
+
+
+
 pub(in crate::clif) fn emit_array_payload(
     b: &mut FunctionBuilder,
     obj: cranelift_codegen::ir::Value,
@@ -126,22 +126,22 @@ pub(in crate::clif) fn emit_array_payload(
     b.ins().load(types::I64, m, slot, lay.payload_off as i32)
 }
 
-/// The `ArrayRepr` discriminant (0 = `Boxed`, 1 = `I64`, 2 = `F64`) of an
-/// already-resolved payload, zero-extended to `I64`.
-///
-/// Read at every element access rather than folded into
-/// [`emit_array_payload`]: the resolve can be hoisted into a loop cache
-/// (see [`cached_payload`]), but an array's repr changes *under* that cached
-/// pointer — an empty array specializes on its first push, a typed array
-/// migrates back to `Boxed` on a mismatched write. Both swap the contents of
-/// the same `ArrayRepr` cell, so the cached pointer stays valid while the tag
-/// under it does not.
-///
-/// This load DEREFERENCES `payload`, so it must be plain `trusted()` — NOT
-/// `readonly`/`can_move`. `can_move` would let the mid-end speculate the deref
-/// above the resolve's `is_arr` guard, reading `[payload + disc_off]` for a
-/// non-array receiver (bogus payload) → segfault. The element loads keyed off
-/// this discriminant use `trusted()` for the same reason.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 pub(in crate::clif) fn array_disc(
     b: &mut FunctionBuilder,
     payload: cranelift_codegen::ir::Value,
@@ -155,7 +155,7 @@ pub(in crate::clif) fn array_disc(
     )
 }
 
-/// A boxed `VmValue`'s payload word IS the int — extract it.
+
 pub(in crate::clif) fn unbox_int(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
@@ -168,9 +168,9 @@ pub(in crate::clif) fn unbox_int(
     }
 }
 
-/// Raise `integer overflow` if the CPU's overflow flag was set, otherwise yield `r`.
-/// `exec_ctx` es siempre real (leaf param 0, frame-aware param 3): el raise lo
-/// usa directo, sin getters ni placeholders.
+
+
+
 pub(in crate::clif) fn guard_overflow(
     b: &mut FunctionBuilder,
     cc: cranelift_codegen::isa::CallConv,
@@ -202,9 +202,9 @@ pub(in crate::clif) fn guard_overflow(
     r
 }
 
-/// Resolve boxed `obj` to the base of its instance payload, where compact
-/// field offsets apply, branching to `invalid` unless it is an instance. The
-/// payload shares the object's cell, so the base is a constant offset away.
+
+
+
 pub(in crate::clif) fn emit_instance_payload(
     b: &mut FunctionBuilder,
     obj: cranelift_codegen::ir::Value,
@@ -239,8 +239,8 @@ pub(in crate::clif) fn emit_instance_payload(
     )
 }
 
-/// Whether the heap object at `addr` is young: a store into it needs no
-/// write barrier, so an inline store path may skip the helper that carries it.
+
+
 pub(in crate::clif) fn is_young(
     b: &mut FunctionBuilder,
     addr: cranelift_codegen::ir::Value,

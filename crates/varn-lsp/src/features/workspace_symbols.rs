@@ -20,8 +20,8 @@ pub fn build_workspace_symbols(index: &ProjectIndex, query: &str) -> Vec<SymbolI
                 line: entry.line,
                 character: entry.col,
             };
-            // `SymbolInformation` implements no `Default`, so the deprecated
-            // field has to be named to build one. Scoped to this literal.
+            
+            
             #[allow(deprecated)]
             let symbol = SymbolInformation {
                 name: name.clone(),

@@ -1,8 +1,8 @@
-//! What the server tells the client it can do.
-//!
-//! Kept apart from the handlers because it is a declaration, not behaviour: a
-//! capability that no handler backs is a promise the client will hold the
-//! server to.
+
+
+
+
+
 
 use tower_lsp::lsp_types::*;
 
@@ -10,16 +10,16 @@ use crate::features::semantic_tokens::LEGEND;
 
 pub fn server_capabilities() -> ServerCapabilities {
     ServerCapabilities {
-        // Incremental: a keystroke arrives as the range it replaced plus the
-        // text that replaced it. Under FULL sync every keystroke shipped the
-        // whole buffer over stdio and re-serialized it on both ends, which is
-        // work that grows with file size while the edit does not.
+        
+        
+        
+        
         text_document_sync: Some(TextDocumentSyncCapability::Options(
             TextDocumentSyncOptions {
                 open_close: Some(true),
                 change: Some(TextDocumentSyncKind::INCREMENTAL),
-                // The buffer is already current from `didChange`, so asking for
-                // the text again on every save is a copy nobody reads.
+                
+                
                 save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
                     include_text: Some(false),
                 })),
@@ -53,14 +53,14 @@ pub fn server_capabilities() -> ServerCapabilities {
             first_trigger_character: "}".to_string(),
             more_trigger_character: Some(vec![";".to_string(), "\n".to_string()]),
         }),
-        // Empty on purpose: the extension calls these (varn.showAst,
-        // varn.showBytecode, varn.showSSA, varn.getCFG) via a raw
-        // `workspace/executeCommand` request, never through VS Code's own
-        // command registry. Declaring them here would make
-        // vscode-languageclient's `ExecuteCommandFeature` auto-register a
-        // VS Code command of the same name to forward it — colliding with
-        // the extension's own `vscode.commands.registerCommand` for that
-        // same id, which does real UI work, not just forwarding.
+        
+        
+        
+        
+        
+        
+        
+        
         execute_command_provider: Some(ExecuteCommandOptions {
             commands: vec![],
             work_done_progress_options: Default::default(),

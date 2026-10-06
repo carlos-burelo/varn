@@ -11,15 +11,15 @@ pub struct CheckResult {
     pub checker_result: varn_checker::CheckResult,
 }
 
-/// What a checker run means for the build: errors stop it, warnings are
-/// printed, silence passes.
-///
-/// Shared by the entry file and by every module reached through `import`
-/// ([`crate::module_precompile::build_module_graph`]). It has to be one
-/// function: the module graph used to call the checker for its type
-/// annotations and drop `diagnostics` on the floor, so `let x: int = "s"` was
-/// a hard error in the file you ran and silently fine in the file it imported.
-/// A rule about validity that two call sites apply differently is not a rule.
+
+
+
+
+
+
+
+
+
 pub fn report_diagnostics(
     diagnostics: &varn_core::DiagnosticBag,
     filename: &str,
@@ -71,9 +71,9 @@ pub fn check(
         varn_debug::symbols::debug_symbols(&check_result, &program.filename, debug);
     }
 
-    // After the check, not after the parse: this dump is the checker's answers,
-    // and the old `debug_expr` hook fired in `parse` where none of them exist
-    // yet — which is why it could only ever print "not implemented".
+    
+    
+    
     if debug.check_types {
         varn_debug::expr::debug_check_types(program, source, &check_result);
     }

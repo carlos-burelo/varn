@@ -1,12 +1,12 @@
-//! Phase-collected, format-agnostic intermediate representation
-//! (DEBUG_PLAN §3.5).
-//!
-//! A phase's `collect` returns one of these; `render` turns it into either
-//! `Plain` (byte-identical to the historical output) or `Text`. Keeping the
-//! data separate from the printing is what makes `Text` possible without
-//! duplicating every phase.
 
-/// One node of a tree report (`ast`, `scope`, ...).
+
+
+
+
+
+
+
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TreeNode {
     pub label: String,
@@ -31,8 +31,8 @@ impl TreeNode {
     }
 }
 
-/// What a phase produced. `None` means "nothing to show" (e.g. a sweep phase
-/// with no violations, like `clif:check`).
+
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Report {
     None,

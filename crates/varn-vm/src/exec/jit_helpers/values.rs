@@ -1,12 +1,12 @@
-//! Value-level helpers: constants, upvalues, closures, and the arithmetic and
-//! comparison operators compiled code cannot inline.
-//!
-//! Name-keyed globals live here too: the indexed forms stay inline off
-//! `ExecCtx.globals`, and a genuinely dynamic name (unresolved at compile
-//! time) lowers through these helpers instead of bailing to the interpreter.
-//!
-//! Everything here is a pure value operation over the running `ExecCtx` —
-//! no frame is pushed and no call is made.
+
+
+
+
+
+
+
+
+
 
 use crate::exec::closures::UpvalueSrc;
 use crate::exec::ctx::ExecCtx;
@@ -239,9 +239,9 @@ pub(crate) extern "C" fn jit_store_upvalue(
         }
     }
 }
-/// `MakeClosure` out of the lowering from bytecode: the descriptor follows
-/// the opcode at `ip_offset` of the running closure's code. `base` is the
-/// compiled caller's activation, whose registers a local upvalue captures.
+
+
+
 #[varn_op_macros::jit_slow(field = "make_closure")]
 pub(crate) extern "C" fn jit_make_closure(
     ctx: *mut ExecCtx,
@@ -264,9 +264,9 @@ pub(crate) extern "C" fn jit_make_closure(
     }
 }
 
-/// `MakeClosure` out of the lowering from typed SSA: function constant
-/// `proto_idx`, and `count` upvalue source words at `descs`
-/// ([`UpvalueSrc::from_word`]). `base` is the compiled caller's activation.
+
+
+
 #[varn_op_macros::jit_slow(field = "make_closure_window")]
 pub(crate) extern "C" fn jit_make_closure_window(
     ctx: *mut ExecCtx,
@@ -292,10 +292,10 @@ pub(crate) extern "C" fn jit_make_closure_window(
     }
 }
 
-/// Name-keyed global read for the SSA lowering: `name_idx` names the
-/// constant-pool string. A genuinely dynamic name the checker could not
-/// number; the indexed forms stay inline. Missing names read as `null`, as
-/// the interpreter's `exec_variable_op` does.
+
+
+
+
 #[varn_op_macros::jit_slow(field = "load_global_by_name")]
 pub(crate) extern "C" fn jit_load_global_by_name(
     ctx: *mut ExecCtx,
@@ -318,8 +318,8 @@ pub(crate) extern "C" fn jit_load_global_by_name(
     }
 }
 
-/// Name-keyed global write for the SSA lowering. Unknown names define a new
-/// global, as the interpreter does.
+
+
 #[varn_op_macros::jit_slow(field = "store_global_by_name")]
 pub(crate) extern "C" fn jit_store_global_by_name(
     ctx: *mut ExecCtx,

@@ -1,33 +1,33 @@
-//! Scalar replacement and devirtualization of locally-built object literals.
-//!
-//! `BuildObject` produces an object whose shape (key -> slot order) is known
-//! at compile time. As long as that object's shape cannot change and the
-//! object does not escape the function, every `GetProperty` on it with a
-//! known key reads a value the compiler already has in SSA form — so the
-//! read is forwarded to that value directly. A forwarded read runs no user
-//! code (a fresh literal carries no class, and no Varn-level operation can
-//! attach one without using the object — which disqualifies it), resolves a
-//! key its shape is known to hold (so it cannot throw), and leaves no trace
-//! in any cache the program can observe — so this pass deletes the read
-//! itself. Once every read of a literal is forwarded, the `BuildObject` is
-//! dead and DCE deletes the allocation.
-//!
-//! Reads whose key is not part of the literal's shape are left as
-//! `GetProperty` (they resolve through the normal runtime path), which keeps
-//! the allocation alive.
-//!
-//! Disqualification is conservative: any use of the literal other than a
-//! `GetProperty` on it (call argument, store into another object, return,
-//! branch argument, `SetProperty`, ...) drops it from consideration, since
-//! such a use could add keys or let the object outlive our view of it.
-//!
-//! Array literals follow the same rule with constant in-bounds indices: a
-//! `BuildArray` read only through `GetIndex`/`ArrayGetIndex` with a literal
-//! index never escapes, grows or is written (`push`, `length`, `SetIndex` and
-//! every other use disqualify it), so each read is the element itself. The
-//! forward is skipped unless the element and the read share an SSA type, so
-//! a representation change on store (`Array<float>` holding an `int`
-//! literal) is never bypassed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 use std::sync::Arc;
 
@@ -37,13 +37,13 @@ use crate::ssa::ir::{InstKind, SsaFunc, Terminator, Value};
 use crate::ssa::verify::inst_uses;
 
 pub fn run(func: &mut SsaFunc) -> bool {
-    // ConstInt definitions in function: SSA value -> i64
+    
     let mut const_ints: FxHashMap<u32, i64> = FxHashMap::default();
-    // Object/Record-literal defs: SSA value -> (key, value) pairs in slot order.
+    
     let mut obj_literals: FxHashMap<u32, Vec<(Arc<str>, Value)>> = FxHashMap::default();
-    // Tuple-literal defs: SSA value -> elements in index order.
+    
     let mut tuple_literals: FxHashMap<u32, Vec<Value>> = FxHashMap::default();
-    // Array-literal defs: SSA value -> elements in index order.
+    
     let mut array_literals: FxHashMap<u32, Vec<Value>> = FxHashMap::default();
 
     for block in &func.blocks {
@@ -77,7 +77,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
         return false;
     }
 
-    // Disqualify escaping or shape-mutating uses.
+    
     for block in &func.blocks {
         for inst in &block.insts {
             if let InstKind::GetProperty { object, .. } = &inst.kind {
@@ -140,14 +140,14 @@ pub fn run(func: &mut SsaFunc) -> bool {
         return false;
     }
 
-    // Forward each resolvable read to the stored value, and delete the
-    // `GetProperty` reads: on a known literal they are effect-free (see
-    // module docs), and leaving them for DCE would pin the allocation
-    // forever — `GetProperty` is impure in general (class getters), so DCE
-    // correctly refuses it without the literal knowledge that only lives in
-    // this pass. Tuple reads stay for DCE, which already deletes them: the
-    // statically-typed form is pure, and the dynamic form keeps the
-    // allocation alive by design.
+    
+    
+    
+    
+    
+    
+    
+    
     let mut forwards: Vec<(Value, Value)> = Vec::new();
     let mut dead_reads: FxHashSet<Value> = FxHashSet::default();
     for block in &func.blocks {
@@ -188,12 +188,12 @@ pub fn run(func: &mut SsaFunc) -> bool {
     }
 
     let changed = !forwards.is_empty();
-    // Transitively resolve chained forwards before rewriting: a forwarded
-    // value can itself be another forwarded read's destination
-    // (`v12 -> v3 -> v0` when a tuple holds a literal's field), and the
-    // intermediate def is deleted below — capturing it stale would leave a
-    // use of an undefined value. The map is acyclic (every edge points at a
-    // pre-existing value), so this terminates.
+    
+    
+    
+    
+    
+    
     let mut fwd_map: FxHashMap<Value, Value> = forwards.into_iter().collect();
     let keys: Vec<Value> = fwd_map.keys().copied().collect();
     for k in keys {
@@ -233,11 +233,11 @@ mod tests {
         }
     }
 
-    /// `bench_now` en miniatura: un literal construido y leído dentro de un
-    /// cuerpo de loop debe redirigirse al valor SSA y soltar el alloc.
+    
+    
     #[test]
     fn loop_body_literal_read_forwards() {
-        // v0 = i (parámetro de bloque), v1 = i+1, v2 = objeto, v3 = x.a.
+        
         let body = Block {
             params: vec![Value(0)],
             insts: vec![
@@ -297,7 +297,7 @@ mod tests {
             is_generator: false,
         };
         assert!(run(&mut func), "literal read should forward");
-        // El store ahora usa `i` directo, no el resultado del GetProperty.
+        
         let store = func.blocks[1]
             .insts
             .iter()
@@ -309,12 +309,12 @@ mod tests {
         assert_eq!(store, Value(0));
     }
 
-    /// throughATuple en miniatura: una tupla que guarda el campo de un
-    /// literal (`v12 -> v3 -> v0`) debe resolverse al valor final — capturar
-    /// el intermedio obsoleto y borrar su def deja un uso indefinido.
+    
+    
+    
     #[test]
     fn chained_tuple_forward_resolves_transitively() {
-        // v0 = 1, v2 = objeto, v3 = x.id, v8 = tupla, v12 = t[0] -> v0.
+        
         let body = Block {
             params: vec![],
             insts: vec![
@@ -367,8 +367,8 @@ mod tests {
             is_generator: false,
         };
         assert!(run(&mut func), "chained read should forward");
-        // El store usa el 1 original; el GetProperty intermedio se borró sin
-        // dejar usos colgando (el verificador lo confirma en e2e).
+        
+        
         let store = func.blocks[0]
             .insts
             .iter()

@@ -1,52 +1,52 @@
-//! The per-register physical kind the backend lowers against.
-//!
-//! Etapa 5: this is the ONLY type representation the JIT reads. It is a
-//! projection of the TIR's `BackendTy` onto what codegen actually
-//! discriminates — an unboxed scalar (`Int` / `Float` / `Bool`), a value that
-//! may be a small-string inline payload (`Str`), a value that is always a heap
-//! reference (`Ref`), or a value with no static shape (`Dynamic`). The class /
-//! array / nullable type handles the checker carries never reached codegen, so
-//! they are not kept here.
+
+
+
+
+
+
+
+
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum SlotKind {
     Int,
     Float,
     Bool,
-    /// A `str` — either a heap string or an inline small-string payload, so
-    /// NOT unconditionally a heap pointer.
+    
+    
     Str,
-    /// Always a heap reference: a class instance, an array, a map/set, an
-    /// enum value, a closure, a decimal/bigint/tuple. Never null, never a
-    /// scalar, never inline.
+    
+    
+    
     Ref,
     Dynamic,
 }
 
 impl Default for SlotKind {
-    /// `Dynamic` — matches `proto.rs`'s pre-existing `slot_kind_dynamic()`
-    /// serde default for `FunctionProto::return_kind`, the only place this
-    /// type's default previously had a name.
+    
+    
+    
     fn default() -> Self {
         SlotKind::Dynamic
     }
 }
 
-/// The physical storage class a register is lowered against.
-///
-/// This is the single projection from the checker's [`SlotKind`] to the
-/// register file, shared by both execution tiers so they can never disagree
-/// about where a register lives: the interpreter's partitioned frame
-/// (`varn-vm::frame_store`) and the JIT lowering both read it. Keeping it here
-/// (rather than in the VM) is what lets the backend address a register by
-/// `(class, index)` without re-deriving the mapping — Ley 3 (una tabla, un
-/// dueño) for the register file.
-///
-/// `Int`/`Float`/`Ref` are their own classes; `Bool` and `Str` stay `Dyn`
-/// deliberately (the next step, not this one): neither has an unpacked path
-/// today — comparisons, `JumpIfFalse` and SSO/heap-str all read them boxed, so
-/// moving them would change truthiness/representation semantics rather than
-/// just relocate storage.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
@@ -58,7 +58,7 @@ pub enum SlotClass {
 }
 
 impl SlotClass {
-    /// Honest projection of the checker's proof onto physical storage.
+    
     #[inline(always)]
     pub fn of_kind(kind: SlotKind) -> Self {
         match kind {
@@ -85,18 +85,18 @@ pub struct RegisterMeta {
     pub kind: SlotKind,
 }
 
-/// Static register → `(class, index-within-class)` mapping for one proto.
-///
-/// A pure projection of [`FunctionProto::register_meta`] (via [`SlotClass`]),
-/// so both execution tiers compute the same home-slot coordinates: the VM's
-/// partitioned frame uses it to place each activation's registers, and the
-/// JIT lowering uses it to emit `class_vec[base[class] + idx]`. Deterministic
-/// by construction — a linear scan in register order, no hashing (Ley 4).
+
+
+
+
+
+
+
 #[derive(Debug)]
 pub struct FrameLayout {
-    /// `slots[reg] = (class, index within that class)`.
+    
     pub slots: Vec<(SlotClass, u32)>,
-    /// How many slots each class owns (`counts[class.index()]`).
+    
     pub counts: [u32; 4],
 }
 

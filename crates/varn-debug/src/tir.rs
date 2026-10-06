@@ -1,9 +1,9 @@
-//! `-p tir` / `-p tir:check` — the typed IR the checker emits (stage 2).
-//!
-//! `tir` dumps the module. `tir:check` runs the verifier and prints the
-//! coverage report; silence from the verifier is the healthy answer, the
-//! coverage line always prints. Neither is part of `-p all`: they sweep a
-//! module, they do not read one function.
+
+
+
+
+
+
 
 use crate::flags::DebugFlags;
 use rustc_hash::FxHashMap;
@@ -60,12 +60,12 @@ pub fn debug_tir(
             terminal::log(line.to_string());
         }
 
-        // Stage 3: how far `from_tir` gets building SSA from this module.
+        
         match varn_compiler::from_tir::build_module(&module) {
             Ok(fns) => terminal::info(format!("from_tir(ssa): OK ({} ssa fn(s))", fns.len())),
             Err(e) => terminal::warn(format!("from_tir(ssa): {e:?}")),
         }
-        // ...and compiling it all the way to a proto (panics are caught).
+        
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             varn_compiler::from_tir::compile_module(&module, vec![])
         })) {

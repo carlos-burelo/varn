@@ -9,18 +9,18 @@ pub fn build_folding_ranges(state: &DocumentState) -> Vec<FoldingRange> {
     ranges
 }
 
-/// Foldable comment regions: one per multi-line `/* */`, and one per run of
-/// consecutive `//` lines.
-///
-/// Only possible now that the scanner records comments — before, they were
-/// dropped during lexing, so `FoldingRangeKind::Comment` had nothing to fold
-/// and went unused.
+
+
+
+
+
+
 pub fn fold_comments(trivia: &[Trivia]) -> Vec<FoldingRange> {
     let mut ranges = Vec::new();
     let mut run: Option<(u32, u32)> = None;
 
     for t in trivia {
-        // Trivia ranges are 1-based (lexer convention); LSP lines are 0-based.
+        
         let start = t.range.start.line.saturating_sub(1);
         let end = t.range.end.line.saturating_sub(1);
 
@@ -34,7 +34,7 @@ pub fn fold_comments(trivia: &[Trivia]) -> Vec<FoldingRange> {
                 }
             }
             TriviaKind::Line => match run {
-                // Adjacent line comments fold as one block; a gap ends the run.
+                
                 Some((s, e)) if start == e + 1 => run = Some((s, start)),
                 Some((s, e)) => {
                     push_comment_fold(&mut ranges, s, e);

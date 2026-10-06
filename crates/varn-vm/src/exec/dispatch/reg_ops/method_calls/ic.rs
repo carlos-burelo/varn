@@ -1,5 +1,5 @@
-//! A method call site's inline cache: the probe that answers a call from it
-//! and the one place that records a resolution into it.
+
+
 
 use crate::closure::VmClosure;
 use crate::heap::Heap;
@@ -8,8 +8,8 @@ use std::sync::atomic::Ordering;
 use varn_types::chunk::{CacheEntry, ICKind};
 use varn_types::value::ClassObj;
 
-/// Cache slot `cs` of the calling closure, usable when the closure has that
-/// slot and the site has not gone megamorphic. `usize::MAX` names no slot.
+
+
 #[derive(Clone, Copy)]
 pub(super) struct IcSite {
     cs: usize,
@@ -35,16 +35,16 @@ impl IcSite {
     }
 }
 
-/// What a cache entry resolved the call to.
+
 pub(super) enum IcHit {
     Native(varn_types::NativeFn),
-    /// A VM method, with the receiver's class as the frame's current class.
+    
     Vm(Rc<VmClosure>, Rc<ClassObj>),
 }
 
-/// The entry of `site` that matches receiver class `cls` at its current
-/// vtable version, if any. A VM method is only answered from the cache when
-/// it takes a plain frame (not a generator, not async) and `arg_count` fits.
+
+
+
 pub(super) fn probe(
     heap: &Heap,
     closure: &VmClosure,
@@ -78,13 +78,13 @@ pub(super) fn probe(
     None
 }
 
-/// Record in `site` that receiver class `cls` resolves `name` to its vtable
-/// method of kind `kind` (an [`ICKind`]).
-///
-/// Caching only ever RECORDS what the class already has: a name missing
-/// from the class's `method_map` (a property, a prototype method) is not
-/// cached. Installing it would bump `vtable_version` on the first call,
-/// invalidating every other entry cached against that class.
+
+
+
+
+
+
+
 pub(super) fn record(
     closure: &VmClosure,
     site: IcSite,

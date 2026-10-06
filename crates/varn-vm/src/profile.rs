@@ -134,9 +134,9 @@ impl ProfileCounters {
     }
 }
 
-// `frame_pushes` / `frame_pops` are bumped by `FrameStack` itself, next to the
-// `Vec` they count — see `crate::frame_stack`. They have no recorder here on
-// purpose: a recorder is something a new call site can forget to call.
+
+
+
 
 #[derive(Debug)]
 pub struct VmProfile {
@@ -217,12 +217,12 @@ pub struct HotspotCounters {
     pub fn_calls: FxHashMap<Arc<str>, CallEntry>,
     pub method_calls: FxHashMap<Arc<str>, CallEntry>,
     pub native_calls: FxHashMap<Arc<str>, u64>,
-    /// Wall time actually spent inside each native op, by name — `rdtsc`,
-    /// calibrated once (see `ExecCtx::invoke_native`). Split by name, not
-    /// just summed, because a count alone can't tell a cheap-and-frequent op
-    /// from an expensive-and-frequent one: `charCodeAt` and `.length` can
-    /// both show a million calls, and only the time breaks the tie. Keyed by
-    /// the same resolved name as `native_calls`, so the two line up.
+    
+    
+    
+    
+    
+    
     pub native_ns: FxHashMap<Arc<str>, u64>,
     pub global_accesses: FxHashMap<Arc<str>, u64>,
     pub alloc_types: FxHashMap<&'static str, u64>,

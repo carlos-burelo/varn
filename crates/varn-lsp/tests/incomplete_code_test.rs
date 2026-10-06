@@ -5,12 +5,12 @@ use varn_lsp::pipeline::run_pipeline;
 
 #[test]
 fn test_incomplete_variable_declaration() {
-    // Half-typed variable declaration with missing initializer
+    
     let source = "const x = ";
     let uri = "file:///test/incomplete.vn".to_string();
     let state = run_pipeline(source.to_string(), uri);
 
-    // Should not crash and should parse
+    
     assert!(state.ast.is_some());
 }
 
@@ -28,7 +28,7 @@ p.
     let uri = "file:///test/person.vn".to_string();
     let state = run_pipeline(source.to_string(), uri);
 
-    // Trigger completion right after 'p.' on line 7, col 2
+    
     let (completions, _) = build_completion_response(
         &state,
         7,

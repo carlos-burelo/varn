@@ -71,19 +71,19 @@ pub fn register_fallback_module_entries(entries: &'static [&'static NativeOpEntr
 
 static ALL_OPS: OnceLock<Vec<&'static NativeOpEntry>> = OnceLock::new();
 
-/// Every registered native op: the linker-section walk unioned with the
-/// fallback marker arrays, deduplicated by address.
-///
-/// Both sources point at the *same* statics — `varn_contract!` emits one
-/// `NativeOpEntry` per symbol and lists it in the module's
-/// `__VARN_LINK_MARKER_*` array — so `ptr::eq` collapses them and neither
-/// source is more authoritative than the other. The fallback exists so the
-/// table stays complete when the linker spreads `.varn_ops` across codegen
-/// units.
-///
-/// Frozen on first call, like [`TABLE`] and [`MODULE_OPS`]. Every registration
-/// happens in `register_provider()` (via `force_link_builtins`), which every
-/// entry point calls before touching dispatch.
+
+
+
+
+
+
+
+
+
+
+
+
+
 pub fn all_native_ops() -> &'static [&'static NativeOpEntry] {
     ALL_OPS.get_or_init(|| {
         let mut list: Vec<&'static NativeOpEntry> = Vec::new();
@@ -109,7 +109,7 @@ pub fn all_native_ops() -> &'static [&'static NativeOpEntry] {
     })
 }
 
-/// `op_id` of an entry, as the compound hash the compiler emits for it.
+
 fn entry_op_id(entry: &NativeOpEntry) -> u64 {
     let module = entry.module_id();
     let symbol = entry.symbol_name();
@@ -172,15 +172,15 @@ pub fn find_native_op_entry(op_id: u64) -> Option<&'static NativeOpEntry> {
 
 static NAME_BY_FN: OnceLock<FxHashMap<usize, &'static str>> = OnceLock::new();
 
-/// Reverse index from a native function pointer back to its symbol name.
-///
-/// Call sites that reach a native through a resolved pointer — the JIT's
-/// `CallNativeOp` lowering bakes the address at compile time and keeps no
-/// op-id — have no name to report to the profiler. Without this they bump the
-/// call counter and vanish from the per-name table, which is how `bench -v`
-/// came to show 77k native calls against ~1.1k attributed ones.
-///
-/// Built once, only ever consulted from profiling paths.
+
+
+
+
+
+
+
+
+
 pub fn native_op_name_by_fn(f: varn_types::NativeFn) -> Option<&'static str> {
     NAME_BY_FN
         .get_or_init(|| {
@@ -204,9 +204,9 @@ pub fn describe_op(id: u64) -> Option<OpMeta> {
     })
 }
 
-/// Resolve a stable op-id to its native function pointer, for callers that want
-/// to invoke it through their own native-call path (preserving their error and
-/// profiling semantics) rather than the wrapped [`dispatch_runtime_op`].
+
+
+
 pub fn native_op_fn(id: u64) -> Option<varn_types::NativeFn> {
     let table = TABLE.get_or_init(build_table);
     table.get(&id).map(|e| e.func)

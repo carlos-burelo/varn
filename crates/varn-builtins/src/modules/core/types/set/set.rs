@@ -21,8 +21,8 @@ varn_contract! {
             if let Some(s) = get_set(ctx, this) {
                 let k = ctx.map_key(value)?;
                 s.borrow_mut().insert(k);
-                // Identity keys can hold nursery indices; interior-mutability
-                // store, so no opcode barrier sees it.
+                
+                
                 ctx.collection_write_barrier(this, k.0);
             }
             Ok(())

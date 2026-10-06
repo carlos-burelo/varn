@@ -28,9 +28,9 @@ impl FunctionProto {
         }
     }
 
-    /// Resolve the `PoolEntry::Shape` at `idx` to its runtime `Shape`. The
-    /// first call derives it through the transition tree (which caches each
-    /// step globally); later calls hit the per-proto cache.
+    
+    
+    
     pub fn resolved_shape(&self, idx: usize) -> Option<Rc<crate::Shape>> {
         if let Some((_, s)) = self
             .resolved_shapes

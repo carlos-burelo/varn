@@ -1,9 +1,9 @@
-//! Bytecode emission: SSA -> `FunctionProto`.
-//!
-//! `emit_function` is the driver. The steps it composes live in their own
-//! modules: critical-edge splitting (`phi_edges`), register assignment
-//! (`regs`), immediate folding (`immediates`), the two halves of per-instruction
-//! emission (`effects`, `values`), and block terminators (`terminator`).
+
+
+
+
+
+
 
 use super::ir::{BlockId, Inst, InstKind, SsaFunc, Terminator};
 use crate::OptError;
@@ -28,8 +28,8 @@ use immediates::Immediates;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-/// What `emit_function_meta` needs about a function beyond its SSA body,
-/// built from a `varn_tir::TirFunction` (`from_tir`).
+
+
 pub struct FnMeta {
     pub name: Arc<str>,
     pub start_line: u32,
@@ -66,8 +66,8 @@ pub fn emit_function_meta(
 
     let order = emission_order(&ssa);
     let ic = super::ic::IcSlots::number(&ssa, &order)?;
-    // The function constant each `MakeClosure` was emitted with, by
-    // `[block][inst]`, for the portable SSA below.
+    
+    
     let mut closure_consts: Vec<Vec<Option<u16>>> = ssa
         .blocks
         .iter()
@@ -78,9 +78,9 @@ pub fn emit_function_meta(
     let mut chunk = Chunk::new();
     chunk.source_file = Arc::from(source_file.as_ref());
     let mut block_offset = vec![usize::MAX; n];
-    // Bytecode offset of each instruction (before it) and of its successor
-    // (right after it): suspension points (`Await`/`Yield`/`LoadModule`) resume
-    // the interpreter at an exact offset, so the portable SSA carries it.
+    
+    
+    
     let mut inst_off: Vec<Vec<usize>> = ssa
         .blocks
         .iter()
@@ -162,10 +162,10 @@ pub fn emit_function_meta(
         chunk.code[pos + 1] = (off & 0xFFFF) as u16;
     }
 
-    // Portable typed SSA for the JIT (see `varn_types::ssa`). Built from the
-    // phi-split, register-assigned SSA the bytecode was just emitted from, so
-    // it shares its value graph, cache slots and constants; `Unavailable`
-    // outside the projected family.
+    
+    
+    
+    
     let emitted = super::portable::Emitted {
         reg: &reg,
         register_count,
@@ -202,7 +202,7 @@ pub fn emit_function_meta(
         chunk,
         required_caps: Vec::new(),
         state_size: 0,
-        // Set by `compile_one` for the module top-level proto only.
+        
         global_count: 0,
         register_meta,
         exception_table: Vec::new(),
@@ -235,12 +235,12 @@ pub fn emit_function_meta(
     })
 }
 
-/// Live physical registers at every suspension resume point, sorted by
-/// resume ip. Same `live_after` sets the state machine pass uses, mapped
-/// through the emitted register assignment, plus every `Try` handler's
-/// `live_in` (see `suspend::suspend_live_regs`); the VM roots a parked frame
-/// through this instead of the whole frame. A point is omitted if any live
-/// value lacks a register: absence means full roots, never fewer roots.
+
+
+
+
+
+
 fn suspend_live_table(
     ssa: &SsaFunc,
     reg: &[u8],
@@ -252,22 +252,22 @@ fn suspend_live_table(
         .collect()
 }
 
-/// Loop-aware emission order: reverse postorder from the entry, visiting
-/// `else` before `then` so a loop header's body lands immediately after the
-/// header (fall-through entry) and the exit lands after the whole body.
-/// Nested loop bodies stay contiguous because the DFS nests. Plain
-/// `0..n` order emitted inner-loop headers behind a forward `Jump`, which
-/// disqualified every nested loop from the JIT's loop-invariant hoisting
-/// (`header_reachable_by_fallthrough`). Unreachable blocks are appended in
-/// numeric order so every block is still emitted.
+
+
+
+
+
+
+
+
 fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
     let n = ssa.blocks.len();
-    // Successors in the order the DFS should walk them: `else` before `then`
-    // (loop-header fall-through), then every `try` handler this block opens. A
-    // landing pad is reachable only through the `Try` inst, never the
-    // terminator, so without this it counts as "unreachable" and is emitted in
-    // raw numeric order — which puts a catch-chain merge block ahead of its
-    // predecessors and turns its forward jump into a back-edge `Loop`.
+    
+    
+    
+    
+    
+    
     let succs = |b: usize| -> Vec<usize> {
         let mut s = match &ssa.blocks[b].term {
             Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
@@ -321,23 +321,23 @@ fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
 fn emit_inst(
     chunk: &mut Chunk,
     inst: &Inst,
-    // Static type of every SSA value, so a binary can be specialized on what
-    // its OPERANDS are proven to be and not only on its own result type.
+    
+    
     value_tys: &[crate::hir::HirType],
     reg: &[u8],
     scratch: u8,
     call_base: u8,
-    // The inline-cache slot this instruction owns (`ic::IcSlots`).
+    
     ic_slot: Option<u8>,
     source_file: &Arc<str>,
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
     imms: &Immediates,
-    // Set to the function constant a `MakeClosure` was emitted with.
+    
     closure_const: &mut Option<u16>,
 ) -> Result<()> {
-    // A constant that only ever rides inside an `AddImm`/`SubImm` needs no
-    // instruction of its own.
+    
+    
     if let (Some(d), InstKind::ConstInt(_)) = (inst.dest, &inst.kind) {
         if imms.is_elided(d) {
             return Ok(());
@@ -345,7 +345,7 @@ fn emit_inst(
     }
     if let Some((_, other, value)) = immediates::immediate_operand(&inst.kind, &imms.imm) {
         let dest = reg[inst.dest.expect("binary defines a value").0 as usize];
-        // `a - c` subtracts the immediate; `c - a` never reaches here.
+        
         let opcode = match &inst.kind {
             InstKind::Binary {
                 op: crate::hir::HirBinOp::Sub,
@@ -353,9 +353,9 @@ fn emit_inst(
             } => OpCode::SubImm,
             _ => OpCode::AddImm,
         };
-        // Same shape as any three-register op: dest in the opcode word, then
-        // `(src, imm)` — the immediate rides in the byte a second register
-        // would occupy, which is why it is 8-bit and signed.
+        
+        
+        
         chunk.emit_rrr(opcode, dest, reg[other.0 as usize], value as u8, inst.line);
         return Ok(());
     }
@@ -366,12 +366,12 @@ fn emit_inst(
 
     let d = match inst.dest {
         Some(dest) => reg[dest.0 as usize],
-        // DCE clears the destination of a call whose result nothing reads
-        // (`crate::passes::dce::dest_droppable`). The call must still run, so
-        // it emits as usual with its result thrown into `scratch` — written,
-        // never read. Any other destination-less instruction that reached
-        // here is not one `emit_value` knows how to emit; `emit_effect` above
-        // was its only handler.
+        
+        
+        
+        
+        
+        
         None if crate::passes::dce::dest_droppable(&inst.kind) => scratch,
         None => return Ok(()),
     };

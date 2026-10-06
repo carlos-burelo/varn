@@ -16,9 +16,9 @@ pub struct ModuleSpec {
     pub embedded: Option<&'static str>,
     pub exports: &'static [&'static str],
     pub pure: bool,
-    /// A core module holding Varn code (not only native declarations): it is
-    /// compiled and evaluated, and the prelude links its exports into every
-    /// module (ADR-0018).
+    
+    
+    
     pub has_code: bool,
 }
 
@@ -54,9 +54,9 @@ impl ModuleSpec {
         self.embedded
     }
 
-    /// Materialize a spec whose strings live for the process lifetime.
-    /// Used for std modules loaded from a bundle/tree at startup; the std
-    /// set is small and lives as long as the VM, so leaking is correct.
+    
+    
+    
     pub fn leaked(id: String, kind: ModuleKind, vn_source: String, pure: bool) -> Self {
         Self {
             id: Box::leak(id.into_boxed_str()),

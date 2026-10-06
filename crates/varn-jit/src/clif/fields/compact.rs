@@ -1,7 +1,7 @@
-//! Compact class-field access (`FieldAccess::Compact`): the field sits at a
-//! byte offset of the instance payload the compiler baked, in the
-//! representation its `TypeLayout` gives. [`load_compact`] and
-//! [`store_compact`] are the one lowering of that access.
+
+
+
+
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_codegen::isa::CallConv;
@@ -12,16 +12,16 @@ use varn_types::vm_value::{KIND_HEAP, KIND_NULL};
 use super::super::emit::{self, call_helper_void, unbox_f64_coerce};
 use crate::JitHelpers;
 
-/// What a compact access needs besides its operands.
+
 pub(crate) struct FieldIo<'a> {
     pub helpers: &'a JitHelpers,
     pub cc: CallConv,
     pub exec_ctx: Value,
 }
 
-/// Read the compact field at `offset` of boxed receiver `obj` as a boxed
-/// `VmValue`. A receiver that is not a compact instance (an object, a
-/// record, `null`) takes the `get_fixed_field` helper by `slot`.
+
+
+
 pub(crate) fn load_compact(
     b: &mut FunctionBuilder,
     io: &FieldIo,
@@ -94,10 +94,10 @@ pub(crate) fn load_compact(
     b.block_params(cont)[0]
 }
 
-/// Write boxed `value` into the compact field at `offset` of boxed receiver
-/// `obj`. Only a young receiver is written inline: an old one
-/// needs the write barrier the `set_fixed_field` helper carries, and so does
-/// anything that is not a compact instance.
+
+
+
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn store_compact(
     b: &mut FunctionBuilder,
@@ -112,8 +112,8 @@ pub(crate) fn store_compact(
     let cont = b.create_block();
     let inline = b.create_block();
 
-    // Split both operands here, above the branch: the inline and the slow
-    // path both read them.
+    
+    
     let (obj_tag, obj_payload) = b.ins().isplit(obj);
     let (value_tag, payload) = b.ins().isplit(value);
     let kind = b.ins().band_imm_u(obj_tag, emit::KIND_MASK);

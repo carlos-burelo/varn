@@ -1,7 +1,7 @@
-//! Enums declared in another module whose values this module handles (the
-//! core `Option`/`Result`, an imported sum). The backend needs their tags to
-//! build, test and destructure those values directly; it gets them from the
-//! declaring module's layout, the same one that module's own backend used.
+
+
+
+
 
 use super::Checker;
 use crate::binder::BindResult;
@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use varn_core::TypeKind;
 
-/// A foreign enum: its name, the module declaring it, and its variants in tag
-/// order with their payload arity.
+
+
 #[derive(Clone, Debug)]
 pub struct ForeignEnum {
     pub name: Arc<str>,
@@ -20,7 +20,7 @@ pub struct ForeignEnum {
 }
 
 impl Checker<'_> {
-    /// Every foreign enum among `types`, in a deterministic order.
+    
     pub(super) fn collect_foreign_enums<'t>(
         &self,
         bind: &BindResult,

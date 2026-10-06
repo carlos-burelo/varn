@@ -1,8 +1,8 @@
-//! How static the module actually is.
-//!
-//! The verifier says whether the module is broken. This says whether the work
-//! is advancing — and with the corpus red, those are two different questions
-//! that need two different instruments.
+
+
+
+
+
 
 use crate::node::{TirArrayEl, TirExpr, TirExprKind, TirObjectEntry, TirStmt};
 use crate::resolution::Resolution;
@@ -12,7 +12,7 @@ use crate::{TirFunction, TirModule};
 #[derive(Debug, Default, Clone)]
 pub struct Coverage {
     pub nodes: u32,
-    /// Indexed in the declaration order of `DynReason`.
+    
     dynamics: [u32; 5],
     by_name: [u32; 5],
     pub static_dispatch: u32,
@@ -55,8 +55,8 @@ impl Coverage {
         self.by_name[reason_index(r)]
     }
 
-    /// Share of resolutions that dispatch statically. This is the number a
-    /// regression gate compares between commits.
+    
+    
     pub fn static_ratio(&self) -> f64 {
         let total = self.static_dispatch + self.name_dispatch;
         if total == 0 {

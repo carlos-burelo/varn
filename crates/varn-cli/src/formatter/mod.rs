@@ -126,7 +126,7 @@ fn collect_vn_recursive(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), CliErr
     Ok(())
 }
 
-/// Formats Varn source code with standard 4-space indentation, normalized operators and clean lines.
+
 pub fn format_source(source: &str) -> String {
     let mut result = String::with_capacity(source.len() + 64);
     let mut indent_level: usize = 0;
@@ -139,7 +139,7 @@ pub fn format_source(source: &str) -> String {
         if trimmed.is_empty() {
             if !in_block_comment {
                 blank_count += 1;
-                // Allow at most 1 blank line consecutively
+                
                 if blank_count <= 1 && !result.is_empty() {
                     result.push('\n');
                 }
@@ -149,7 +149,7 @@ pub fn format_source(source: &str) -> String {
 
         blank_count = 0;
 
-        // Handle block comments /* ... */
+        
         if in_block_comment {
             let indent = "    ".repeat(indent_level);
             result.push_str(&indent);
@@ -170,7 +170,7 @@ pub fn format_source(source: &str) -> String {
             continue;
         }
 
-        // Adjust indent for closing braces/brackets on this line
+        
         let leading_closers = count_leading_closers(trimmed);
         let current_indent = indent_level.saturating_sub(leading_closers);
 
@@ -181,12 +181,12 @@ pub fn format_source(source: &str) -> String {
         result.push_str(&formatted_line);
         result.push('\n');
 
-        // Calculate delta for next line
+        
         let (opens, closes) = count_braces_outside_strings(trimmed);
         indent_level = (indent_level + opens).saturating_sub(closes);
     }
 
-    // Ensure trailing newline
+    
     if !result.is_empty() && !result.ends_with('\n') {
         result.push('\n');
     }
@@ -227,7 +227,7 @@ fn count_braces_outside_strings(s: &str) -> (usize, usize) {
             continue;
         }
 
-        // Check for line comment //
+        
         if c == '/' && chars.peek() == Some(&'/') {
             break;
         }
@@ -244,7 +244,7 @@ fn count_braces_outside_strings(s: &str) -> (usize, usize) {
 }
 
 fn format_line_tokens(line: &str) -> String {
-    // Preserve comments verbatim
+    
     if line.starts_with("//") || line.starts_with("/*") || line.starts_with('*') {
         return line.to_string();
     }
@@ -255,7 +255,7 @@ fn format_line_tokens(line: &str) -> String {
     let mut chars = line.chars().peekable();
 
     while let Some(c) = chars.next() {
-        // String literal pass-through
+        
         if let Some(quote) = in_str {
             out.push(c);
             if escaped {
@@ -268,7 +268,7 @@ fn format_line_tokens(line: &str) -> String {
             continue;
         }
 
-        // Line comment pass-through
+        
         if c == '/' && chars.peek() == Some(&'/') {
             if !out.ends_with(' ') && !out.is_empty() {
                 out.push(' ');
@@ -286,7 +286,7 @@ fn format_line_tokens(line: &str) -> String {
             continue;
         }
 
-        // Spacing around commas: `a, b`
+        
         if c == ',' {
             out.push(',');
             if chars
@@ -299,7 +299,7 @@ fn format_line_tokens(line: &str) -> String {
             continue;
         }
 
-        // Spacing after colons: `foo: int`, but not `::`
+        
         if c == ':' {
             if chars.peek() == Some(&':') {
                 chars.next();
@@ -317,7 +317,7 @@ fn format_line_tokens(line: &str) -> String {
             continue;
         }
 
-        // Spacing around binary operators like `===`, `!==`, `==`, `!=`, `=>`, `|>`, `??`
+        
         if c == '|' && chars.peek() == Some(&'>') {
             chars.next();
             if !out.ends_with(' ') {
