@@ -140,7 +140,7 @@ pub(super) fn emit_inst(
         SsaOp::Call { callee, args } => {
             return Ok(Some(call::emit_call(b, ctx, values, *callee, args, dest)?))
         }
-        SsaOp::AllocInstance { class } => {
+        SsaOp::AllocInstance { class, .. } => {
             return Ok(Some(Out::Boxed(super::classops::emit_alloc_instance(
                 b, ctx, values, *class,
             )?)))

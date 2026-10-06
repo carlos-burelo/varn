@@ -5,7 +5,14 @@ use varn_types::ssa::SsaOp;
 
 pub(super) fn try_project(kind: &InstKind, value_tys: &[HirType], site: &Site) -> Option<SsaOp> {
     match kind {
-        InstKind::AllocInstance { class } => Some(SsaOp::AllocInstance { class: class.0 }),
+        InstKind::AllocInstance {
+            class,
+            payload_size,
+            ..
+        } => Some(SsaOp::AllocInstance {
+            class: class.0,
+            payload_size: *payload_size,
+        }),
         InstKind::BuildStr { parts } => Some(SsaOp::BuildStr {
             parts: parts.iter().map(|v| v.0).collect(),
         }),

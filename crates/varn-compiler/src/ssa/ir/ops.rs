@@ -56,6 +56,7 @@ pub enum InstKind {
 
     AllocInstance {
         class: Value,
+        payload_size: u32,
     },
 
     SelfCall {

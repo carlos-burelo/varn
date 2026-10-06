@@ -32,6 +32,7 @@ pub enum SsaOp {
 
     AllocInstance {
         class: u32,
+        payload_size: u32,
     },
 
     LoadGlobalIdx(u32),

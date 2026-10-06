@@ -137,7 +137,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             f(*callee);
             args.iter().for_each(|a| f(*a));
         }
-        AllocInstance { class } => f(*class),
+        AllocInstance { class, .. } => f(*class),
         MethodCall { recv, args, .. } | ExtensionCall { recv, args, .. } => {
             f(*recv);
             args.iter().for_each(|a| f(*a));
@@ -298,7 +298,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
             f(callee);
             args.iter_mut().for_each(f);
         }
-        AllocInstance { class } => f(class),
+        AllocInstance { class, .. } => f(class),
         MethodCall { recv, args, .. } | ExtensionCall { recv, args, .. } => {
             f(recv);
             args.iter_mut().for_each(f);

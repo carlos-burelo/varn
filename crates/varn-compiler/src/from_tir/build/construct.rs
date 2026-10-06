@@ -14,10 +14,10 @@ impl<'m> Builder<'m> {
         args: &[TirArg],
         ty: HirType,
     ) -> Result<Value> {
-        let name = self
+        let (name, payload_size) = self
             .tir
             .class(class)
-            .map(|ci| ci.name.clone())
+            .map(|ci| (ci.name.clone(), ci.layout.payload_size))
             .ok_or(OptError::Unsupported("from_tir: New class out of range"))?;
         let cv = self.emit(self.global_load(&name), HirType::Ref);
         let static_def = self
@@ -29,12 +29,24 @@ impl<'m> Builder<'m> {
         };
         if let Some(func) = self.inlinable_constructor(def, args.len()) {
             let argv = self.lower_ctor_args(func, args)?;
-            let inst = self.emit(InstKind::AllocInstance { class: cv }, ty);
+            let inst = self.emit(
+                InstKind::AllocInstance {
+                    class: cv,
+                    payload_size,
+                },
+                ty,
+            );
             self.inline_constructor(func, argv, inst)?;
             return Ok(inst);
         }
         let argv = self.lower_args(args)?;
-        let inst = self.emit(InstKind::AllocInstance { class: cv }, ty);
+        let inst = self.emit(
+            InstKind::AllocInstance {
+                class: cv,
+                payload_size,
+            },
+            ty,
+        );
         if self.chain_has_constructor(def) {
             self.emit(
                 InstKind::MethodCall {

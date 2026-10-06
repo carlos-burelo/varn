@@ -56,7 +56,7 @@ pub(super) fn emit_value(
         InstKind::Call { callee, args } => {
             calls::emit_call(chunk, d, *callee, args, reg, call_base, line);
         }
-        InstKind::AllocInstance { class } => {
+        InstKind::AllocInstance { class, .. } => {
             chunk.write(Chunk::pack_op(OpCode::AllocInstance, d), line);
             chunk.write(Chunk::pack(reg[class.0 as usize], 0), line);
         }
