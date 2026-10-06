@@ -142,6 +142,20 @@ pub(super) fn emit_alloc_instance(
     b.append_block_param(header_blk, types::I64);
     b.append_block_param(zhead_blk, types::I64);
     b.append_block_param(join_blk, types::I128);
+    for cold in [
+        slow_blk,
+        free_hit_blk,
+        free_pop_blk,
+        bump_blk,
+        bump_ok_blk,
+        header_blk,
+        zhead_blk,
+        zbody_blk,
+        zdone_blk,
+        born_ok_blk,
+    ] {
+        b.set_cold_block(cold);
+    }
 
     let guard = b.ins().bor(c_hot, c_nat);
     let guard = b.ins().bor(guard, c_tag);
@@ -172,7 +186,8 @@ pub(super) fn emit_alloc_instance(
 
     b.switch_to_block(header_blk);
     let r = b.block_params(header_blk)[0];
-    let header_imm = 3i64 | ((class_idx as i64) << 16);
+    let header_imm =
+        3i64 | ((ia.instance_tag as i64) << 8) | ((class_idx as i64) << 16);
     let header_v = b.ins().iconst(types::I64, header_imm);
     b.ins().store(flags, header_v, r, 0);
     let data = b.ins().iadd_imm_u(r, data_off);
