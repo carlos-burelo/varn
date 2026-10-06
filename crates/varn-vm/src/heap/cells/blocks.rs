@@ -20,7 +20,7 @@ pub(crate) struct AllocLane {
 }
 
 #[derive(Default)]
-pub(super) struct SizeClass {
+pub(crate) struct SizeClass {
     pub(super) blocks: Vec<NonNull<u8>>,
     pub(super) lane: AllocLane,
 }

@@ -67,9 +67,9 @@ pub(in crate::heap) fn body<T>(r: HeapRef) -> *mut T {
 }
 
 pub(crate) struct CellSpace {
-    classes: Vec<SizeClass>,
+    pub(crate) classes: Vec<SizeClass>,
     large: Vec<(HeapRef, usize)>,
-    pub(in crate::heap) native: bool,
+    pub(crate) native: bool,
     pub(in crate::heap) native_roots: Vec<HeapRef>,
     pub(crate) old_births: u64,
     pub(crate) old_growth: u64,
