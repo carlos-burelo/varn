@@ -186,8 +186,7 @@ pub(super) fn emit_alloc_instance(
 
     b.switch_to_block(header_blk);
     let r = b.block_params(header_blk)[0];
-    let header_imm =
-        3i64 | ((ia.instance_tag as i64) << 8) | ((class_idx as i64) << 16);
+    let header_imm = 3i64 | ((ia.instance_tag as i64) << 8) | ((class_idx as i64) << 16);
     let header_v = b.ins().iconst(types::I64, header_imm);
     b.ins().store(flags, header_v, r, 0);
     let data = b.ins().iadd_imm_u(r, data_off);
