@@ -23,7 +23,7 @@ pub(super) const ALL_BENCHMARKS: &[BenchDef] = &[
         name: "dto",
         vn: "bench_dto_local.vn",
         ts: "bench_dto.ts",
-        py: Some("py/dto.py"),
+        py: None,
     },
     BenchDef {
         name: "matrix",
@@ -71,6 +71,18 @@ pub(super) const ALL_BENCHMARKS: &[BenchDef] = &[
         name: "csv_etl",
         vn: "bench_csv_etl.vn",
         ts: "bench_csv_etl.ts",
+        py: None,
+    },
+    BenchDef {
+        name: "class_fields",
+        vn: "bench_class_fields.vn",
+        ts: "bench_class_fields.ts",
+        py: None,
+    },
+    BenchDef {
+        name: "new_retained",
+        vn: "bench_new_retained.vn",
+        ts: "bench_new_retained.ts",
         py: None,
     },
     BenchDef {

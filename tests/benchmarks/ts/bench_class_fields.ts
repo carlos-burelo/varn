@@ -1,0 +1,23 @@
+class Point {
+    x: number;
+    y: number;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+const pt = new Point(10, 20);
+const iterations = 1000000;
+let i = 0;
+let sum = 0;
+
+while (i < iterations) {
+    pt.x = pt.x + 1;
+    pt.y = pt.y + 2;
+    sum = sum + pt.x + pt.y;
+    i = i + 1;
+}
+
+console.log("Class field sum: " + sum);

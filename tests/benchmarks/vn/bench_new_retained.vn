@@ -1,0 +1,26 @@
+class P {
+    x: int
+
+    constructor(x: int) {
+        this.x = x
+    }
+}
+
+function run(): void {
+    let count = 200000
+
+    let items: P[] = []
+    for (let i = 0; i < count; i = i + 1) {
+        items.push(new P(i))
+    }
+
+    let total = 0
+    for (let i = 0; i < count; i = i + 1) {
+        total = total + items[i].x
+    }
+
+    print("Count:", items.length)
+    print("Total:", total)
+}
+
+run()
