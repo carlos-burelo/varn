@@ -74,6 +74,7 @@ needless_borrow = "allow"
 should_implement_trait = "allow"
 box_collection = "allow"
 collapsible_match = "allow"
+missing_safety_doc = "allow"
 
 [profile.release]
 opt-level = 3

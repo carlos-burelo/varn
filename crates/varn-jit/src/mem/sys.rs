@@ -1,7 +1,7 @@
 use std::ffi::c_void;
 
 #[cfg(target_os = "windows")]
-mod sys {
+mod imp {
     use super::*;
 
     pub const MEM_COMMIT: u32 = 0x1000;
@@ -39,7 +39,7 @@ mod sys {
 }
 
 #[cfg(not(target_os = "windows"))]
-mod sys {
+mod imp {
     use super::*;
 
     pub const PROT_READ: i32 = 1;
@@ -81,6 +81,6 @@ mod sys {
 }
 
 #[cfg(target_os = "windows")]
-pub use sys::*;
+pub use imp::*;
 #[cfg(not(target_os = "windows"))]
-pub use sys::*;
+pub use imp::*;

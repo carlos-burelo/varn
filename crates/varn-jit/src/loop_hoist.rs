@@ -127,10 +127,10 @@ fn global_stored_in_range(
         let Some(info) = decode(code, off, constants) else {
             return true;
         };
-        if matches!(op, OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx) {
-            if code[off + 2] == target_idx {
-                return true;
-            }
+        if matches!(op, OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx)
+            && code[off + 2] == target_idx
+        {
+            return true;
         }
         off += info.len;
     }

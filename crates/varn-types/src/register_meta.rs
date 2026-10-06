@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
 pub enum SlotKind {
     Int,
     Float,
@@ -7,13 +9,8 @@ pub enum SlotKind {
     Str,
 
     Ref,
+    #[default]
     Dynamic,
-}
-
-impl Default for SlotKind {
-    fn default() -> Self {
-        SlotKind::Dynamic
-    }
 }
 
 #[derive(
