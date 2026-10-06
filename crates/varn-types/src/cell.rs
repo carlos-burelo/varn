@@ -60,6 +60,8 @@ pub const VEC_LEN_OFF: usize = 16;
 
 #[cfg(test)]
 mod tests {
+    use super::{VEC_CAP_OFF, VEC_LEN_OFF, VEC_PTR_OFF};
+
     #[test]
     fn vec_triple_matches_std_layout() {
         let mut v: Vec<u64> = Vec::with_capacity(16);
