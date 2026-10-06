@@ -257,3 +257,27 @@ impl Drop for CellSpace {
         }
     }
 }
+
+#[cfg(test)]
+mod geometry_tests {
+    use super::*;
+    use varn_types::value::InstanceData;
+
+    #[test]
+    fn shared_instance_math_matches_slow_path() {
+        let hob = std::mem::size_of::<HeapObj>();
+        for payload in [0u32, 1, 7, 8, 9, 15, 16, 24, 64, 1000, 5000] {
+            let tail = INSTANCE_DATA_OFF - HEADER_BYTES;
+            let slow_body = tail + InstanceData::bytes_for(payload);
+            let shared_body = varn_types::cell::instance_body_bytes(hob, payload);
+            assert_eq!(shared_body, slow_body, "payload {payload}");
+            let slow_total = HEADER_BYTES + slow_body;
+            let shared_total = varn_types::cell::instance_cell_bytes(hob, payload);
+            assert_eq!(shared_total, slow_total, "payload {payload}");
+            assert_eq!(
+                varn_types::cell::class_for(shared_total),
+                varn_types::cell::class_for(slow_total),
+            );
+        }
+    }
+}

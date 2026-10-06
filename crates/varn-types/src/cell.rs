@@ -34,7 +34,7 @@ pub const fn instance_data_off(heap_obj_bytes: usize) -> usize {
 }
 
 pub fn instance_body_bytes(heap_obj_bytes: usize, payload_size: u32) -> usize {
-    heap_obj_bytes - HEADER_BYTES + instance_bytes_for(payload_size)
+    heap_obj_bytes + instance_bytes_for(payload_size)
 }
 
 pub fn instance_bytes_for(payload_size: u32) -> usize {
@@ -54,6 +54,24 @@ pub const SIZE_CLASS_BLOCKS_OFF: usize = 0;
 pub const SIZE_CLASS_LANE_OFF: usize = 24;
 pub const SIZE_CLASS_STRIDE: usize = 48;
 
-pub const VEC_PTR_OFF: usize = 0;
-pub const VEC_LEN_OFF: usize = 8;
-pub const VEC_CAP_OFF: usize = 16;
+pub const VEC_CAP_OFF: usize = 0;
+pub const VEC_PTR_OFF: usize = 8;
+pub const VEC_LEN_OFF: usize = 16;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn vec_triple_matches_std_layout() {
+        let mut v: Vec<u64> = Vec::with_capacity(16);
+        v.push(0xAA);
+        let base = &v as *const _ as *const usize;
+        unsafe {
+            assert_eq!(*base.add(0), v.capacity());
+            assert_eq!(*base.add(1), v.as_ptr() as usize);
+            assert_eq!(*base.add(2), v.len());
+            assert_eq!(VEC_CAP_OFF, 0);
+            assert_eq!(VEC_PTR_OFF, 8);
+            assert_eq!(VEC_LEN_OFF, 16);
+        }
+    }
+}

@@ -19,11 +19,20 @@ pub(crate) struct AllocLane {
     pub(crate) end: u64,
 }
 
+const _: () = assert!(std::mem::offset_of!(AllocLane, free) == varn_types::cell::LANE_FREE_OFF);
+const _: () = assert!(std::mem::offset_of!(AllocLane, bump) == varn_types::cell::LANE_BUMP_OFF);
+const _: () = assert!(std::mem::offset_of!(AllocLane, end) == varn_types::cell::LANE_END_OFF);
+const _: () = assert!(std::mem::size_of::<AllocLane>() == varn_types::cell::LANE_SIZE);
+
 #[derive(Default)]
 pub(crate) struct SizeClass {
     pub(super) blocks: Vec<NonNull<u8>>,
-    pub(super) lane: AllocLane,
+    pub(crate) lane: AllocLane,
 }
+
+const _: () =
+    assert!(std::mem::offset_of!(SizeClass, lane) == varn_types::cell::SIZE_CLASS_LANE_OFF);
+const _: () = assert!(std::mem::size_of::<SizeClass>() == varn_types::cell::SIZE_CLASS_STRIDE);
 
 #[inline(always)]
 fn next_free(r: u64) -> *mut u64 {

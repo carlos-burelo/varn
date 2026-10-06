@@ -253,6 +253,11 @@ impl Heap {
         let cls_bytes =
             unsafe { std::slice::from_raw_parts(&cls_slot as *const _ as *const u8, cls_size) };
         assert_eq!(cls_size, size, "HeapObj size must be uniform");
+        let class_tag = cls_bytes[0] as usize;
+        assert_ne!(
+            class_tag, instance_tag,
+            "HeapObj::Class and HeapObj::Instance share a tag"
+        );
         let class_ref_off = (0..=cls_size - 8)
             .find(|&off| {
                 usize::from_ne_bytes(cls_bytes[off..off + 8].try_into().unwrap()) == rc_base
@@ -274,6 +279,7 @@ impl Heap {
             native_off: std::mem::offset_of!(CellSpace, native),
             instance_tag,
             instance_ref_off,
+            class_tag,
             class_ref_off,
             class_id_off,
             hotspot_off: RCBOX_PREFIX + std::mem::offset_of!(HeapInner, hotspot),
@@ -304,6 +310,7 @@ mod tests {
         let ia = Heap::jit_instance_alloc();
         assert_eq!(ia.instance_tag, o.instance_tag);
         assert_eq!(ia.heap_obj_bytes, std::mem::size_of::<HeapObj>());
+        assert_eq!(ia.heap_obj_bytes % 8, 0);
         assert!(ia.instance_ref_off + 8 <= ia.heap_obj_bytes);
         assert_eq!(ia.instance_ref_off % 8, 0);
         assert!(ia.class_ref_off + 8 <= ia.heap_obj_bytes);
@@ -311,5 +318,47 @@ mod tests {
         assert_eq!(ia.class_id_off % 4, 0);
         assert_ne!(ia.cells_off, ia.young_off);
         assert!(ia.born_off < 256 && ia.native_off < 512);
+    }
+
+    #[test]
+    fn fast_alloc_navigation_matches_heap() {
+        let ia = Heap::jit_instance_alloc();
+        let heap = Heap::new();
+        let rcbox = heap.rcbox_ptr_for_validation() as usize;
+        unsafe {
+            let inner = &*heap.inner.get();
+            assert_eq!(
+                rcbox + ia.cells_off,
+                std::ptr::addr_of!(inner.cells) as usize
+            );
+            assert_eq!(
+                rcbox + ia.young_off + ia.born_off,
+                std::ptr::addr_of!(inner.young.born) as usize
+            );
+            assert_eq!(
+                rcbox + ia.cells_off + ia.native_off,
+                std::ptr::addr_of!(inner.cells.native) as usize
+            );
+            assert_eq!(
+                rcbox + ia.hotspot_off,
+                std::ptr::addr_of!(inner.hotspot) as usize
+            );
+            let classes_ptr =
+                *((rcbox + ia.cells_off + ia.classes_off + varn_types::cell::VEC_PTR_OFF)
+                    as *const usize);
+            assert_eq!(classes_ptr, inner.cells.classes.as_ptr() as usize);
+            for c in 0..varn_types::cell::CELL_CLASSES.len() {
+                let lane = classes_ptr
+                    + c * varn_types::cell::SIZE_CLASS_STRIDE
+                    + varn_types::cell::SIZE_CLASS_LANE_OFF;
+                assert_eq!(
+                    lane,
+                    std::ptr::addr_of!(inner.cells.classes[c].lane) as usize,
+                    "lane {c}"
+                );
+            }
+            assert_eq!(CellSpace::default().classes.len(), 24);
+            assert_eq!(YoungGen::default().born.len(), 0);
+        }
     }
 }

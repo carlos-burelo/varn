@@ -67,6 +67,8 @@ pub struct JitInstanceAlloc {
     pub instance_tag: usize,
     pub instance_ref_off: usize,
 
+    pub class_tag: usize,
+
     pub class_ref_off: usize,
     pub class_id_off: usize,
 
