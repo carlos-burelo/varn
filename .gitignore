@@ -69,3 +69,5 @@ __pycache__/
 # closes; the same content is always reachable from the parent commit.
 *.rs.back
 dhat-heap.json
+graphify-out
+.opencode
