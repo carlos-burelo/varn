@@ -1,5 +1,5 @@
-use super::super::primary::parse_primary_expr;
 use super::super::parse_expr;
+use super::super::primary::parse_primary_expr;
 use super::generic_args::{looks_like_generic_call, parse_call_args, try_parse_generic_call};
 use crate::stream::TokenStream;
 use varn_core::ast::{ExprId, ExprKind};
