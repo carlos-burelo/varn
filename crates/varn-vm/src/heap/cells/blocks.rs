@@ -1,17 +1,7 @@
 use std::alloc::{alloc_zeroed, Layout};
 use std::ptr::NonNull;
+use varn_types::cell::{cells_per_block, BLOCK_BYTES, CELL_ALIGN};
 use varn_types::HeapRef;
-
-pub(super) const BLOCK_BYTES: usize = 256 * 1024;
-pub(super) const CELL_ALIGN: usize = 16;
-pub(super) const CLASS_BYTES: [usize; 24] = [
-    16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768,
-    1024, 1536, 2048,
-];
-
-pub(super) fn class_for(bytes: usize) -> Option<usize> {
-    CLASS_BYTES.iter().position(|&c| c >= bytes)
-}
 
 pub(super) fn block_layout() -> Layout {
     Layout::from_size_align(BLOCK_BYTES, CELL_ALIGN).expect("block layout")
@@ -37,14 +27,10 @@ pub(super) struct SizeClass {
 
 #[inline(always)]
 fn next_free(r: u64) -> *mut u64 {
-    (r as usize + super::HEADER_BYTES) as *mut u64
+    (r as usize + varn_types::cell::HEADER_BYTES) as *mut u64
 }
 
 impl SizeClass {
-    pub(super) fn cells_per_block(cell: usize) -> usize {
-        BLOCK_BYTES / cell
-    }
-
     #[inline]
     pub(super) fn take(&mut self, cell: usize) -> HeapRef {
         let lane = &mut self.lane;
@@ -60,7 +46,7 @@ impl SizeClass {
             self.blocks.push(block);
             let base = block.as_ptr() as u64;
             lane.bump = base;
-            lane.end = base + (Self::cells_per_block(cell) * cell) as u64;
+            lane.end = base + (cells_per_block(cell) * cell) as u64;
         }
         let r = lane.bump;
         lane.bump += cell as u64;
@@ -90,7 +76,7 @@ impl SizeClass {
             let used = if bi == last {
                 (self.lane.bump as usize - base) / cell
             } else {
-                Self::cells_per_block(cell)
+                cells_per_block(cell)
             };
             (0..used)
                 .map(move |i| unsafe { HeapRef::from_addr_unchecked((base + i * cell) as u64) })

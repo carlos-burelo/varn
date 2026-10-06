@@ -28,7 +28,7 @@ pub(crate) fn probe() -> varn_jit::JitCallLayout {
     let closure_payload_off = (0..=size - 8)
         .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == control)
         .expect("VmClosure payload probe failed")
-        + crate::heap::cells::HEADER_BYTES;
+        + varn_types::cell::HEADER_BYTES;
 
     let strong = Rc::strong_count(&closure);
     let rc_strong_off = (0..RCBOX_PREFIX)

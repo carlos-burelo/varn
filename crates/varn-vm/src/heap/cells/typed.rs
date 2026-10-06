@@ -1,6 +1,7 @@
-use super::{body, header, CellSpace, SlotState, HEADER_BYTES, INSTANCE_DATA_OFF};
+use super::{body, header, CellSpace, SlotState, INSTANCE_DATA_OFF};
 use crate::heap::obj::HeapObj;
 use std::rc::Rc;
+use varn_types::cell::HEADER_BYTES;
 use varn_types::value::{InstanceData, InstanceRef, ObjData, Shape};
 use varn_types::HeapRef;
 

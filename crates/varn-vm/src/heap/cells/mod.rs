@@ -3,20 +3,26 @@ mod native;
 mod typed;
 
 use super::obj::HeapObj;
-use blocks::{block_layout, class_for, large_layout, SizeClass, CLASS_BYTES};
+use blocks::{block_layout, large_layout, SizeClass};
 use std::alloc::{alloc_zeroed, dealloc};
 use std::ptr::NonNull;
+use varn_types::cell::{
+    cells_per_block, class_for, CELL_CLASSES, CELL_CLASS_LARGE, HEADER_BYTES, HEADER_CLASS_OFF,
+    HEADER_KIND_OFF, HEADER_STATE_OFF,
+};
 use varn_types::HeapRef;
 
-pub(crate) const HEADER_BYTES: usize = std::mem::size_of::<ObjHeader>();
-pub(crate) const STATE_OFF: usize = std::mem::offset_of!(ObjHeader, state);
-pub(crate) const KIND_OFF: usize = std::mem::offset_of!(ObjHeader, kind);
-pub(crate) const INSTANCE_DATA_OFF: usize = HEADER_BYTES + std::mem::size_of::<HeapObj>();
+pub(crate) const INSTANCE_DATA_OFF: usize =
+    varn_types::cell::instance_data_off(std::mem::size_of::<HeapObj>());
+
 const MAJOR_MARK: u8 = 0x80;
-const LARGE: u8 = u8::MAX;
 
 const _: () = assert!(HEADER_BYTES == 8);
-const _: () = assert!(HEADER_BYTES.is_multiple_of(std::mem::align_of::<HeapObj>()));
+const _: () = assert!(HEADER_BYTES == std::mem::size_of::<ObjHeader>());
+const _: () = assert!(HEADER_STATE_OFF == std::mem::offset_of!(ObjHeader, state));
+const _: () = assert!(HEADER_KIND_OFF == std::mem::offset_of!(ObjHeader, kind));
+const _: () = assert!(HEADER_CLASS_OFF == std::mem::offset_of!(ObjHeader, class));
+const _: () = assert!(INSTANCE_DATA_OFF == HEADER_BYTES + std::mem::size_of::<HeapObj>());
 
 #[repr(C)]
 pub(in crate::heap) struct ObjHeader {
@@ -73,7 +79,7 @@ pub(crate) struct CellSpace {
 impl Default for CellSpace {
     fn default() -> Self {
         Self {
-            classes: CLASS_BYTES.iter().map(|_| SizeClass::default()).collect(),
+            classes: CELL_CLASSES.iter().map(|_| SizeClass::default()).collect(),
             large: Vec::new(),
             native: false,
             native_roots: Vec::new(),
@@ -94,14 +100,14 @@ impl CellSpace {
     ) -> HeapRef {
         let bytes = HEADER_BYTES + body_bytes;
         let (r, class) = match class_for(bytes) {
-            Some(class) => (self.classes[class].take(CLASS_BYTES[class]), class as u8),
+            Some(class) => (self.classes[class].take(CELL_CLASSES[class]), class as u8),
             None => {
                 let ptr = unsafe { alloc_zeroed(large_layout(bytes)) };
                 let ptr = NonNull::new(ptr)
                     .unwrap_or_else(|| std::alloc::handle_alloc_error(large_layout(bytes)));
                 let r = unsafe { HeapRef::from_addr_unchecked(ptr.as_ptr() as u64) };
                 self.large.push((r, bytes));
-                (r, LARGE)
+                (r, CELL_CLASS_LARGE)
             }
         };
         *header(r) = ObjHeader {
@@ -153,7 +159,7 @@ impl CellSpace {
         let class = h.class;
         unsafe { Self::drop_object(r) };
         h.state = SlotState::Free as u8;
-        if class == LARGE {
+        if class == CELL_CLASS_LARGE {
             let at = self
                 .large
                 .iter()
@@ -196,8 +202,8 @@ impl CellSpace {
     pub(crate) fn capacity(&self) -> usize {
         self.classes
             .iter()
-            .zip(CLASS_BYTES)
-            .map(|(c, cell)| c.blocks.len() * SizeClass::cells_per_block(cell))
+            .zip(CELL_CLASSES)
+            .map(|(c, cell)| c.blocks.len() * cells_per_block(cell))
             .sum::<usize>()
             + self.large.len()
     }
@@ -205,7 +211,7 @@ impl CellSpace {
     pub(crate) fn refs(&self) -> impl Iterator<Item = HeapRef> + '_ {
         self.classes
             .iter()
-            .zip(CLASS_BYTES)
+            .zip(CELL_CLASSES)
             .flat_map(|(c, cell)| c.cells(cell))
             .chain(self.large.iter().map(|&(r, _)| r))
             .filter(|&r| header(r).state != SlotState::Free as u8)

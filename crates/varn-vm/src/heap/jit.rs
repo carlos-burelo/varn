@@ -96,7 +96,7 @@ impl Heap {
         let payload_off = (0..=size - 8)
             .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == data)
             .expect("array payload probe failed")
-            + super::cells::HEADER_BYTES;
+            + varn_types::cell::HEADER_BYTES;
         unsafe { arr.drop_at() };
 
         let none_slot: Option<HeapObj> = None;
@@ -112,8 +112,8 @@ impl Heap {
         );
 
         varn_jit::JitArrayLayout {
-            state_off: super::cells::STATE_OFF,
-            kind_off: super::cells::KIND_OFF,
+            state_off: varn_types::cell::HEADER_STATE_OFF,
+            kind_off: varn_types::cell::HEADER_KIND_OFF,
             young_state: super::cells::SlotState::Young as usize,
             vec_ptr_off: slots_ptr_off,
             array_tag,
@@ -179,7 +179,7 @@ impl Heap {
         let payload_off = (0..=size - 8)
             .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == data)
             .expect("object payload probe failed")
-            + super::cells::HEADER_BYTES;
+            + varn_types::cell::HEADER_BYTES;
         unsafe { varn_types::ObjData::drop_at(oref) };
 
         let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
@@ -199,7 +199,7 @@ impl Heap {
         let inst_bytes =
             unsafe { std::slice::from_raw_parts(&inst_slot as *const _ as *const u8, size) };
         let instance_tag = inst_bytes[0] as usize;
-        let instance_data_off = super::cells::INSTANCE_DATA_OFF;
+        let instance_data_off = varn_types::cell::instance_data_off(std::mem::size_of::<HeapObj>());
 
         let instance_values_off = varn_types::INST_PAYLOAD_OFF;
         let instance_class_id_off = varn_types::INST_CLASS_ID_OFF;
