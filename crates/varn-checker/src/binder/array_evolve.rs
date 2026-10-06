@@ -1,91 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use varn_core::{Atom, TypeKind};
 
 use crate::scope::ScopeId;
@@ -93,9 +5,6 @@ use crate::symbol::SymbolId;
 use crate::types::Type;
 
 use super::Binder;
-
-
-
 
 pub(crate) struct ArrayCandidate {
     sym_id: SymbolId,
@@ -107,9 +16,6 @@ pub(crate) struct ArrayCandidate {
 }
 
 impl<'r> Binder<'r> {
-    
-    
-    
     pub(crate) fn register_array_candidate(&mut self, sym_id: SymbolId, name: Atom) {
         self.array_watch.push(ArrayCandidate {
             sym_id,
@@ -121,10 +27,6 @@ impl<'r> Binder<'r> {
         });
     }
 
-    
-    
-    
-    
     pub(crate) fn array_candidate_active(&self, name: Atom) -> bool {
         !self.array_watch.is_empty() && self.find_candidate(name).is_some()
     }
@@ -137,10 +39,6 @@ impl<'r> Binder<'r> {
         self.array_watch.iter_mut().rev().find(|c| c.name == name)
     }
 
-    
-    
-    
-    
     pub(crate) fn record_array_write(&mut self, name: Atom, value_ty: &Type) {
         if self.array_watch.is_empty() {
             return;
@@ -165,8 +63,6 @@ impl<'r> Binder<'r> {
         }
     }
 
-    
-    
     pub(crate) fn escape_array_candidate(&mut self, name: Atom) {
         if self.array_watch.is_empty() {
             return;
@@ -176,33 +72,12 @@ impl<'r> Binder<'r> {
         }
     }
 
-    
-    
-    
-    
     pub(crate) fn escape_all_open_array_candidates(&mut self) {
         for c in self.array_watch.iter_mut() {
             c.escaped = true;
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn finalize_array_watch(&mut self, scope: ScopeId) {
         if self.array_watch.is_empty() {
             return;

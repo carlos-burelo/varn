@@ -1,19 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::path::Path;
 use std::process::Command;
 
@@ -21,13 +5,10 @@ use varn_core::term::chalk::chalk;
 
 use crate::error::CliError;
 
-
 struct Tier {
     label: &'static str,
     env: &'static [(&'static str, &'static str)],
 }
-
-
 
 const TIERS: &[Tier] = &[
     Tier {
@@ -50,9 +31,6 @@ struct Outcome {
     output: String,
 }
 
-
-
-
 pub fn execute(file: &str, script_args: &[String]) -> Result<(), CliError> {
     if !Path::new(file).exists() {
         return Err(CliError::usage(format!("no such file: {file}")));
@@ -73,8 +51,7 @@ pub fn execute(file: &str, script_args: &[String]) -> Result<(), CliError> {
         if !script_args.is_empty() {
             cmd.arg("--").args(script_args);
         }
-        
-        
+
         cmd.env_remove("VARN_NO_CLIF").env_remove("VARN_JIT_TIER");
         for (k, v) in tier.env {
             cmd.env(k, v);
@@ -143,9 +120,6 @@ pub fn execute(file: &str, script_args: &[String]) -> Result<(), CliError> {
     )))
 }
 
-
-
-
 fn report_first_difference(baseline: &Outcome, tier: &Outcome) {
     const CONTEXT: usize = 3;
     let base: Vec<&str> = baseline.output.lines().collect();
@@ -191,7 +165,7 @@ fn describe_status(status: &std::process::ExitStatus) -> String {
     match status.code() {
         Some(0) => "ok".to_owned(),
         Some(c) => format!("exit {c}"),
-        
+
         None => "killed".to_owned(),
     }
 }

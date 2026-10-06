@@ -1,32 +1,8 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::fs;
 use std::path::PathBuf;
 use varn_checker::module_resolver::{DiskResolver, ImportResolver};
-
-
-
 
 fn scratch_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
@@ -49,18 +25,7 @@ fn imported_symbol_origin_module_resolves_to_the_real_module_path() {
     let main_path = dir.join("main.vn");
 
     fs::write(&lib_path, "export function greet(): int {\n  return 1\n}\n").expect("write lib.vn");
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     fs::write(
         &main_path,
         "import * as lib from \"./lib.vn\"\nlet x: int = lib.greet()\n",
@@ -88,12 +53,6 @@ fn imported_symbol_origin_module_resolves_to_the_real_module_path() {
         .origin_module
         .expect("a namespace import must carry origin_module");
 
-    
-    
-    
-    
-    
-    
     let resolved_origin = bind.interner.resolve(origin_atom);
 
     let expected = varn_modules::canonical_or_original(&lib_path);

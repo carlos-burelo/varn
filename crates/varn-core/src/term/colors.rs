@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 pub const RESET: &str = "\x1b[0m";
 pub const BOLD: &str = "\x1b[1m";
 pub const DIM: &str = "\x1b[2m";
@@ -31,8 +22,6 @@ pub const C_BINDS: &str = BLUE;
 pub const C_CONSTS: &str = YELLOW;
 
 pub const R: &str = RESET;
-
-
 
 pub fn header(color: &str, title: &str, path: &str) {
     let padding = "─".repeat((50_isize - title.len() as isize - 1).max(0) as usize);
@@ -96,8 +85,6 @@ impl Display for Color {
         write!(f, "{color_str}")
     }
 }
-
-
 
 pub fn colored<D: Display>(text: D, color: Color) -> String {
     style_for(color)

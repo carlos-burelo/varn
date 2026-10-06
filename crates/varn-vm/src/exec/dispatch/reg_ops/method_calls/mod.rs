@@ -1,7 +1,3 @@
-
-
-
-
 mod ic;
 mod intrinsic;
 mod invoke;
@@ -18,10 +14,6 @@ use varn_types::chunk::ICKind;
 use varn_types::value::{BoundMethodTarget, ClassObj};
 
 impl ExecCtx {
-    
-    
-    
-    
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn exec_call_method_reg(
         &mut self,
@@ -52,11 +44,6 @@ impl ExecCtx {
         }
     }
 
-    
-    
-    
-    
-    
     pub(crate) fn call_method(
         &mut self,
         this_val: VmValue,
@@ -72,12 +59,6 @@ impl ExecCtx {
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("CallMethod: non-string name"))?;
 
-        
-        
-        
-        
-        
-        
         if let Some(template) = self.enum_variant_template(this_val, name.as_ref()) {
             if let Some(built) = self.construct_enum_variant(&template, args) {
                 return Ok(MethodOutcome::Value(built));
@@ -157,9 +138,6 @@ impl ExecCtx {
         self.finish_generic_method_call(method_nv, this_val, args, frame_idx)
     }
 
-    
-    
-    
     fn call_class_method(
         &mut self,
         cls: &Rc<ClassObj>,
@@ -188,9 +166,6 @@ impl ExecCtx {
         Ok(None)
     }
 
-    
-    
-    
     pub(crate) fn call_native_method(
         &mut self,
         f: varn_types::NativeFn,

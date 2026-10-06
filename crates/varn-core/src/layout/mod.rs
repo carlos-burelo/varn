@@ -1,34 +1,24 @@
-
-
-
-
-
 use crate::RuntimeKind;
 
 mod class;
 pub use class::{ClassLayout, FieldLayout};
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ScalarRepr {
-    
     Bool,
-    
+
     I64,
-    
+
     F64,
-    
-    
+
     Ref,
-    
+
     Boxed,
 }
-
 
 pub const COMPACT_REF_NULL: u64 = 0;
 
 impl ScalarRepr {
-    
     pub const fn holds_reference(self) -> bool {
         match self {
             ScalarRepr::Ref | ScalarRepr::Boxed => true,
@@ -51,13 +41,6 @@ impl TypeLayout {
         Self { size, align, repr }
     }
 
-    
-    
-    
-    
-    
-    
-    
     pub const fn of_field(kind: Option<RuntimeKind>) -> Self {
         match kind {
             Some(RuntimeKind::Bool) => Self::new(1, 1, ScalarRepr::Bool),
@@ -92,8 +75,6 @@ impl TypeLayout {
     }
 }
 
-
-
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GcLayout {
     pub slots: Vec<GcSlot>,
@@ -102,7 +83,7 @@ pub struct GcLayout {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GcSlot {
     pub offset: u32,
-    
+
     pub repr: ScalarRepr,
 }
 

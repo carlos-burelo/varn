@@ -28,8 +28,7 @@ pub(crate) fn op_define_static(
     heap: &mut Heap,
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
-    
-    
+
     if val_nv.is_heap() {
         if let Some(HeapObj::EnumVariant(ev)) = heap.get_mut(val_nv.as_heap()) {
             ev.enum_class_id = Some(cls.id);

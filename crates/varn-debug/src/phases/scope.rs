@@ -1,6 +1,3 @@
-
-
-
 use std::io::Write;
 
 use varn_compiler::FunctionProto;
@@ -9,7 +6,6 @@ use varn_types::chunk::{Literal, PoolEntry};
 use crate::fmt::Format;
 use crate::render::{basename, BLUE, BOLD, DIM, MAGENTA, RESET};
 use crate::report::Report;
-
 
 pub fn collect(proto: &FunctionProto) -> Report {
     let mut rows = Vec::new();

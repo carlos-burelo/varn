@@ -1,23 +1,7 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use tower_lsp::lsp_types::notification::Progress as ProgressNotification;
 use tower_lsp::lsp_types::request::WorkDoneProgressCreate;
 use tower_lsp::lsp_types::*;
 use tower_lsp::Client;
-
 
 pub struct Progress {
     client: Client,
@@ -25,7 +9,6 @@ pub struct Progress {
 }
 
 impl Progress {
-    
     pub async fn begin(client: &Client, supported: bool, id: &str, title: &str) -> Self {
         let mut progress = Self {
             client: client.clone(),

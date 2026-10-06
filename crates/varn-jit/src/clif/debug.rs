@@ -1,23 +1,8 @@
-
-
-
-
-
-
-
-
-
-
 #[derive(Debug, Default, Clone)]
 pub struct KindReport {
     pub nregs: usize,
     pub blocks: Vec<(usize, Vec<String>)>,
 }
-
-
-
-
-
 
 #[derive(Debug, Default, Clone)]
 pub struct CodeBytes {
@@ -26,7 +11,6 @@ pub struct CodeBytes {
     pub raw_len: usize,
     pub entry_off: usize,
 }
-
 
 #[derive(Debug, Default)]
 pub struct ClifDebugSink {
@@ -41,15 +25,11 @@ use cranelift_codegen::ir::Function;
 
 use crate::mem::JitBuffer;
 
-
 pub(super) fn capture_ir(debug: &mut Option<&mut ClifDebugSink>, func: &Function) {
     if let Some(sink) = debug.as_deref_mut() {
         sink.clif_ir = Some(func.display().to_string());
     }
 }
-
-
-
 
 pub(super) fn capture_kinds_ssa(debug: &mut Option<&mut ClifDebugSink>, ssa: &SsaProto) {
     if let Some(sink) = debug.as_deref_mut() {
@@ -78,10 +58,6 @@ fn val_class(ssa: &SsaProto, v: u32) -> String {
     format!("v{v}:{:?}", ssa.value_ty(v))
 }
 
-
-
-
-
 pub(super) fn capture_code(
     debug: &mut Option<&mut ClifDebugSink>,
     buf: &mut JitBuffer,
@@ -106,21 +82,19 @@ use crate::JitHelpers;
 use cranelift_codegen::isa::OwnedTargetIsa;
 use varn_types::{FunctionProto, VmValue};
 
-
 pub struct ClifInspection {
     pub name: String,
-    
+
     pub route: Result<(), String>,
     pub kinds: Option<KindReport>,
     pub clif_ir: Option<String>,
     pub code: Option<CodeBytes>,
     pub frame_aware: bool,
-    
+
     pub framed: bool,
-    
+
     pub fa_reasons: Vec<&'static str>,
 }
-
 
 pub fn inspect(
     proto: &FunctionProto,

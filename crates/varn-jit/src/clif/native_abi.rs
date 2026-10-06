@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, AbiParam, Signature};
 use cranelift_codegen::isa::CallConv;
 use varn_types::register_meta::SlotKind;
@@ -49,7 +40,6 @@ impl NativeClass {
 
 pub(crate) const CALL_CONV: CallConv = CallConv::Tail;
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NativeShape {
     pub params: Vec<NativeClass>,
@@ -83,8 +73,6 @@ impl NativeShape {
     }
 }
 
-
-
 pub const NATIVE_FRAMELESS: u64 = 1 << 63;
 
 const MAX_ID_PARAMS: usize = 27;
@@ -100,9 +88,6 @@ impl NativeClass {
 }
 
 impl NativeShape {
-    
-    
-    
     pub(crate) fn id(&self) -> Option<u64> {
         if self.params.len() > MAX_ID_PARAMS {
             return None;

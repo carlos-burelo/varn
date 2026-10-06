@@ -48,14 +48,6 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
     let kinds: Vec<varn_types::register_meta::SlotKind> = (0..proto.register_count as usize)
         .map(|r| {
             proto
@@ -97,19 +89,7 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         .filter(|&&r| r >= base)
         .map(|&r| r as u16)
         .collect();
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     all_regs.sort_unstable();
 
     if all_regs.is_empty() {
@@ -183,11 +163,6 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         proto.register_count = new_register_count;
     }
 
-    
-    
-    
-    
-    
     if !proto.register_meta.is_empty() {
         use varn_types::register_meta::{RegisterMeta, SlotKind};
         let mut merged: Vec<Option<SlotKind>> = vec![None; new_register_count as usize];
@@ -213,10 +188,6 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
 
     proto.register_count = new_register_count;
 
-    
-    
-    
-    
     if let Some(ssa) = proto.ssa.get_mut() {
         ssa.map_registers(|r| {
             let old = r as u8;

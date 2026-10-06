@@ -97,28 +97,19 @@ varn_contract! {
     class: "IsolateHandle",
     contract: "src/modules/runtime/task/task_runtime.vn",
     impl IsolateHandleImpl {
-        
-        
-        
+
+
+
         fn join(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
             ctx.get_field(this, "_done").unwrap_or(VmValue::null())
         }
     }
 }
 
-
-
-
-
 pub struct SenderImpl;
 pub struct ReceiverImpl;
 pub struct ChannelImpl;
 pub struct ChannelClosedImpl;
-
-
-
-
-
 
 pub fn alloc_endpoint(
     ctx: &mut dyn NativeCtx,
@@ -130,8 +121,6 @@ pub fn alloc_endpoint(
         .ok_or_else(|| format!("channel: {class_name} class not registered"))?;
     ctx.set_field(nv, "_chan", VmValue::from_int(id as i64));
     if class_name == "Receiver" {
-        
-        
         let iter_nv = ctx.alloc_bound_native(nv, receiver_self_iterator, "[Symbol.asyncIterator]");
         ctx.set_field(nv, "Symbol.asyncIterator", iter_nv);
     }

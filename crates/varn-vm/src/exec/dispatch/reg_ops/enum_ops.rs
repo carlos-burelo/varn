@@ -5,7 +5,6 @@ use crate::value::VmValue;
 use std::sync::Arc;
 use varn_core::OpCode;
 
-
 pub(crate) struct EnumVariantTemplate {
     pub enum_class_id: Option<u32>,
     pub enum_name: Arc<str>,
@@ -15,33 +14,6 @@ pub(crate) struct EnumVariantTemplate {
 }
 
 impl ExecCtx {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn enum_variant_template(
         &self,
         receiver: VmValue,

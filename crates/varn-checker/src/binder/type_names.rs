@@ -1,18 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::sync::Arc;
 
 use varn_core::{Atom, Diagnostic, ErrorCode, SourceRange};
@@ -21,10 +6,6 @@ use crate::scope::{ScopeId, ScopeKind};
 use crate::symbol::SymbolKind;
 
 impl super::Binder<'_> {
-    
-    
-    
-    
     pub(crate) fn note_type_decl(&mut self, name: &Arc<str>, scope: ScopeId, range: SourceRange) {
         let Some(&(first_scope, first)) = self.type_decls.get(name) else {
             self.type_decls.insert(name.clone(), (scope, range));
@@ -44,8 +25,6 @@ impl super::Binder<'_> {
         self.emit(diag);
     }
 
-    
-    
     pub(crate) fn check_local_class_capture(&mut self, name: Atom, range: SourceRange) {
         let mut scope = self.current;
         let mut crossed_class = false;

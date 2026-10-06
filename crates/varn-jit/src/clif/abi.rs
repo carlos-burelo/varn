@@ -1,16 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{
     types, AbiParam, ExtFuncData, ExternalName, Function, InstBuilder, MemFlagsData, Signature,
     UserExternalName, UserFuncName, Value,
@@ -30,9 +17,6 @@ pub enum Activation {
     Native,
     Framed,
 }
-
-
-
 
 pub(super) fn raw_signature(proto: &FunctionProto, nparams: usize, cc: CallConv) -> Signature {
     let mut sig = Signature::new(cc);
@@ -77,9 +61,6 @@ pub(crate) fn wrapper_signature(cc: CallConv) -> Signature {
     }
     sig
 }
-
-
-
 
 pub(super) fn build_wrapper(
     proto: &FunctionProto,
@@ -193,7 +174,6 @@ fn kind_of(proto: &FunctionProto, reg: usize) -> SlotKind {
     }
 }
 
-
 pub(crate) fn push_native_arg(
     b: &mut FunctionBuilder,
     args: &mut Vec<Value>,
@@ -212,7 +192,6 @@ pub(crate) fn push_native_arg(
         }
     }
 }
-
 
 pub(crate) fn native_result_boxed(
     b: &mut FunctionBuilder,

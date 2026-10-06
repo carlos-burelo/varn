@@ -1,14 +1,6 @@
-
-
-
-
-
-
-
 use crate::resolution::Resolution;
 use crate::ty::{BackendTy, ClassId, FnId};
 use std::sync::Arc;
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Span {
@@ -19,7 +11,6 @@ pub struct Span {
 impl Span {
     pub const EMPTY: Span = Span { start: 0, end: 0 };
 }
-
 
 #[derive(Debug, Clone)]
 pub struct TirExpr {
@@ -49,9 +40,9 @@ pub enum TirBinOp {
     Shl,
     Shr,
     Ushr,
-    
+
     Instanceof,
-    
+
     In,
 }
 
@@ -60,15 +51,11 @@ pub enum TirUnOp {
     Neg,
     Not,
     BitNot,
-    
+
     Typeof,
-    
-    
-    
+
     IsNull,
 }
-
-
 
 #[derive(Debug, Clone)]
 pub enum TirArg {
@@ -88,14 +75,12 @@ impl TirArg {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub enum TirArrayEl {
     Expr(TirExpr),
     Spread(TirExpr),
     Hole,
 }
-
 
 #[derive(Debug, Clone)]
 pub enum TirObjectEntry {
@@ -105,7 +90,6 @@ pub enum TirObjectEntry {
 
 #[derive(Debug, Clone)]
 pub enum TirExprKind {
-    
     IntLit(i64),
     FloatLit(f64),
     BoolLit(bool),
@@ -113,7 +97,6 @@ pub enum TirExprKind {
     CharLit(char),
     NullLit,
 
-    
     Var,
 
     Binary {
@@ -126,7 +109,6 @@ pub enum TirExprKind {
         operand: Box<TirExpr>,
     },
 
-    
     Field {
         object: Box<TirExpr>,
         name: Arc<str>,
@@ -140,7 +122,7 @@ pub enum TirExprKind {
         callee: Box<TirExpr>,
         args: Vec<TirArg>,
     },
-    
+
     MethodCall {
         recv: Box<TirExpr>,
         name: Arc<str>,
@@ -157,68 +139,53 @@ pub enum TirExprKind {
     ObjectLit {
         entries: Vec<TirObjectEntry>,
     },
-    
+
     RecordLit {
         fields: Vec<(Arc<str>, TirExpr)>,
     },
 
-    
-    
-    
     Await {
         future: Box<TirExpr>,
     },
-    
+
     Yield {
         value: Option<Box<TirExpr>>,
         delegate: bool,
     },
 
-    
-    
     Discriminant {
         value: Box<TirExpr>,
     },
-    
-    
+
     VariantPayload {
         value: Box<TirExpr>,
         tag: u16,
         field: u16,
     },
-    
+
     TypeTest {
         value: Box<TirExpr>,
         class: ClassId,
     },
 
-    
-    
     Cast {
         operand: Box<TirExpr>,
     },
 
-    
-    
-    
-    
-    
     Closure {
         func: FnId,
         upvalues: Vec<TirUpvalue>,
     },
 
-    
     New {
         class: ClassId,
         args: Vec<TirArg>,
     },
-    
+
     MakeVariant {
         args: Vec<TirArg>,
     },
 
-    
     Select {
         cond: Box<TirExpr>,
         then_val: Box<TirExpr>,
@@ -229,52 +196,39 @@ pub enum TirExprKind {
         value: Box<TirExpr>,
     },
 
-    
-    
     ObjectKeys {
         operand: Box<TirExpr>,
     },
-    
-    
-    
+
     IterInit {
         source: Box<TirExpr>,
         is_async: bool,
     },
 
-    
-    
     SuperCall {
         args: Vec<TirArg>,
     },
-    
+
     SuperMethodCall {
         name: Arc<str>,
         args: Vec<TirArg>,
     },
 
-    
-    
     DecimalLit(Arc<str>),
-    
-    
+
     BigIntLit(Arc<str>),
-    
+
     RangeLit {
         start: Box<TirExpr>,
         end: Box<TirExpr>,
         inclusive: bool,
     },
 
-    
-    
     ObjectRest {
         object: Box<TirExpr>,
         skip_keys: Vec<Arc<str>>,
     },
 
-    
-    
     ExtensionCall {
         func: Arc<str>,
         recv: Box<TirExpr>,
@@ -285,8 +239,7 @@ pub enum TirExprKind {
 #[derive(Debug, Clone)]
 pub enum TirStmt {
     Expr(TirExpr),
-    
-    
+
     Let {
         local: crate::ty::LocalId,
         ty: BackendTy,
@@ -298,9 +251,7 @@ pub enum TirStmt {
         then_body: Vec<TirStmt>,
         else_body: Vec<TirStmt>,
     },
-    
-    
-    
+
     Loop {
         cond: TirExpr,
         body: Vec<TirStmt>,
@@ -313,12 +264,9 @@ pub enum TirStmt {
         catch_local: crate::ty::LocalId,
         catch_body: Vec<TirStmt>,
     },
-    
-    
-    
+
     BuildClass(u32),
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TirUpvalue {

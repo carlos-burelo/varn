@@ -4,31 +4,15 @@ use std::ptr::NonNull;
 use super::{ArrayRepr, BoxedElems, VmValue};
 use crate::register_meta::SlotKind;
 
-
-
-
-
 #[derive(Clone, Copy, Debug)]
 pub struct VmArray(NonNull<UnsafeCell<ArrayRepr>>);
 
 impl ArrayRepr {
-    
     #[inline(always)]
     pub fn boxed(items: Vec<VmValue>) -> Self {
         ArrayRepr::Boxed(BoxedElems::new(items))
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn from_items(items: Vec<VmValue>) -> Self {
         Self::unboxed(&items).unwrap_or_else(|| Self::boxed(items))
     }
@@ -50,57 +34,32 @@ impl ArrayRepr {
 }
 
 impl VmArray {
-    
-    
-    
-    
-    
     #[inline(always)]
     pub unsafe fn init_at(at: *mut ArrayRepr, repr: ArrayRepr) -> Self {
         std::ptr::write(at, repr);
         Self(NonNull::new_unchecked(at as *mut UnsafeCell<ArrayRepr>))
     }
 
-    
-    
-    
-    
     pub unsafe fn drop_at(self) {
         std::ptr::drop_in_place(self.0.as_ptr());
     }
 
-    
-
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     pub fn repr(&self) -> &ArrayRepr {
         unsafe { &*(*self.0.as_ptr()).get() }
     }
 
-    
-    
     #[inline(always)]
     #[allow(clippy::mut_from_ref)]
     pub(super) fn repr_mut(&self) -> &mut ArrayRepr {
         unsafe { &mut *(*self.0.as_ptr()).get() }
     }
 
-    
-
-    
-    
     #[inline(always)]
     pub fn discriminant(&self) -> u8 {
         self.repr().discriminant()
     }
 
-    
-    
     #[inline(always)]
     pub fn element_slotkind(&self) -> SlotKind {
         match self.repr() {
@@ -120,9 +79,6 @@ impl VmArray {
         self.repr().is_empty()
     }
 
-    
-
-    
     #[inline(always)]
     pub fn as_boxed(&self) -> Option<&Vec<VmValue>> {
         match self.repr() {
@@ -131,9 +87,6 @@ impl VmArray {
         }
     }
 
-    
-    
-    
     pub fn scan_dirty(&self, mut f: impl FnMut(VmValue)) {
         if let ArrayRepr::Boxed(b) = self.repr_mut() {
             let from = (b.clean_prefix as usize).min(b.items.len());
@@ -144,12 +97,6 @@ impl VmArray {
         }
     }
 
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     pub fn borrow(&self) -> &Vec<VmValue> {
         match self.repr() {
@@ -158,8 +105,6 @@ impl VmArray {
         }
     }
 }
-
-
 
 #[cold]
 #[inline(never)]

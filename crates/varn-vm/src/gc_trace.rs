@@ -1,23 +1,7 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
-
-
 
 pub fn init() {
     ENABLED.store(
@@ -31,15 +15,11 @@ pub fn enabled() -> bool {
     ENABLED.load(Ordering::Relaxed)
 }
 
-
-
 pub struct Before {
     t0: Instant,
     objects_before: usize,
     promoted_before: u64,
 }
-
-
 
 #[inline]
 pub fn note_start(objects_before: usize, promoted_before: u64) -> Before {
@@ -49,9 +29,6 @@ pub fn note_start(objects_before: usize, promoted_before: u64) -> Before {
         promoted_before,
     }
 }
-
-
-
 
 #[inline]
 pub fn note_end(before: Before, collection_no: u64, promoted_after: u64) {

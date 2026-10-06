@@ -2,32 +2,13 @@ use std::rc::Rc;
 use std::sync::Arc;
 use varn_types::RuntimeString;
 
-
-
-
-
 pub(crate) mod ascii_flag {
     pub const UNKNOWN: u8 = 0;
     pub const YES: u8 = 1;
     pub const NO: u8 = 2;
 }
 
-
-
-
-
-
-
-
-
 pub const INLINE_STR_CAP: usize = 37;
-
-
-
-
-
-
-
 
 #[derive(Clone)]
 pub enum HeapStr {
@@ -37,17 +18,7 @@ pub enum HeapStr {
         len: usize,
         ascii: std::cell::Cell<u8>,
     },
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     Inline {
         len: u8,
         ascii: std::cell::Cell<u8>,
@@ -75,8 +46,6 @@ impl HeapStr {
         }
     }
 
-    
-    
     #[inline]
     pub(crate) fn inline(s: &str) -> Self {
         debug_assert!(s.len() <= INLINE_STR_CAP);
@@ -98,12 +67,9 @@ impl HeapStr {
     pub(crate) fn as_str(&self) -> &str {
         match self {
             HeapStr::Shared(s, _) => s,
-            
-            
+
             HeapStr::Ext { buf, len, .. } => unsafe { &(&*buf.get())[..*len] },
-            
-            
-            
+
             HeapStr::Inline { len, bytes, .. } => unsafe {
                 std::str::from_utf8_unchecked(&bytes[..*len as usize])
             },
@@ -179,8 +145,6 @@ impl HeapStr {
         }
     }
 
-    
-    
     #[inline]
     pub(crate) fn is_tip(&self) -> bool {
         match self {

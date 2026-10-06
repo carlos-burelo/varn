@@ -1,12 +1,7 @@
-
-
-
 use crate::IntDivFault;
 use bigdecimal::{BigDecimal, RoundingMode};
 use num_bigint::BigInt;
 use num_traits::{Num, Zero};
-
-
 
 pub fn parse_bigint_literal(text: &str) -> Option<BigInt> {
     let clean: String = text.chars().filter(|c| *c != '_').collect();
@@ -24,14 +19,12 @@ pub fn parse_bigint_literal(text: &str) -> Option<BigInt> {
     Some(if neg { -v } else { v })
 }
 
-
 pub fn div_big(a: &BigInt, b: &BigInt) -> Result<BigInt, IntDivFault> {
     if b.is_zero() {
         return Err(IntDivFault::DivisionByZero);
     }
     Ok(a / b)
 }
-
 
 pub fn rem_big(a: &BigInt, b: &BigInt) -> Result<BigInt, IntDivFault> {
     if b.is_zero() {
@@ -40,10 +33,7 @@ pub fn rem_big(a: &BigInt, b: &BigInt) -> Result<BigInt, IntDivFault> {
     Ok(a % b)
 }
 
-
 pub const DECIMAL_DIV_DIGITS: u64 = 34;
-
-
 
 pub fn div_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivFault> {
     if b.is_zero() {
@@ -55,14 +45,12 @@ pub fn div_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivF
         .normalized_if_exact(a, b))
 }
 
-
 pub fn rem_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivFault> {
     if b.is_zero() {
         return Err(IntDivFault::DivisionByZero);
     }
     Ok(a % b)
 }
-
 
 trait NormalizedIfExact {
     fn normalized_if_exact(self, a: &BigDecimal, b: &BigDecimal) -> BigDecimal;

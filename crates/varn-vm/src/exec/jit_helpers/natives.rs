@@ -1,16 +1,6 @@
-
-
-
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-
-
-
-
-
-
-
 
 #[varn_op_macros::jit_slow(field = "jit_call_native_window")]
 pub(crate) extern "C" fn jit_call_native_window(
@@ -31,9 +21,6 @@ pub(crate) extern "C" fn jit_call_native_window(
         };
     }
 }
-
-
-
 
 unsafe fn resolve_native(
     ctx_ref: &mut ExecCtx,

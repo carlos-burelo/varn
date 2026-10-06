@@ -1,16 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::fmt::Write as _;
 
 use varn_core::OpCode;
@@ -24,9 +11,6 @@ use crate::flags::DebugFlags;
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_core::term::terminal::{Align, Section};
-
-
-
 
 const PAIRS: &[(OpCode, OpCode)] = &[
     (OpCode::AddInt, OpCode::Add),
@@ -46,19 +30,11 @@ const PAIRS: &[(OpCode, OpCode)] = &[
 struct Counts {
     typed: usize,
     generic: usize,
-    
+
     by_op: Vec<(String, usize)>,
-    
-    
-    
+
     members: Vec<String>,
 }
-
-
-
-
-
-
 
 pub fn debug_typeloss(proto: &FunctionProto, flags: &DebugFlags, module: Option<&str>) {
     let mut rows: Vec<(String, Counts)> = Vec::new();

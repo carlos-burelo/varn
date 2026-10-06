@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 use crate::term::chalk::{chalk, Chalk};
 use std::fmt::Display;
 
@@ -113,9 +105,6 @@ impl Table {
     }
 }
 
-
-
-
 fn display_width(s: &str) -> usize {
     console::measure_text_width(s)
 }
@@ -163,8 +152,6 @@ impl Section {
     }
 }
 
-
-
 fn write_line(line: String) {
     let term = console::Term::stderr();
     if term.write_line(&line).is_err() {
@@ -175,8 +162,6 @@ fn write_line(line: String) {
 pub fn log(msg: impl Display) {
     write_line(msg.to_string());
 }
-
-
 
 pub fn warn(msg: impl Display) {
     let tag = console::style("warn")

@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use crate::exec::calls::PreparedCall;
 use crate::exec::ctx::ExecCtx;
 use crate::heap::HeapObj;
@@ -17,23 +10,6 @@ pub(crate) enum Invoked {
 }
 
 impl ExecCtx {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn invoke(
         &mut self,
         callee: VmValue,
@@ -71,7 +47,6 @@ impl ExecCtx {
         };
         let res = match prepared {
             PreparedCall::NativeImmediate(f, arg_count) => {
-                
                 let take = arg_count.min(self.stage.len());
                 let start = self.stage.len() - take;
                 let vm_args: Vec<VmValue> = self.stage.drain(start..).collect();
@@ -203,19 +178,12 @@ pub(super) fn gather_tasks(ctx: &mut ExecCtx, tasks: VmValue) -> Result<VmValue,
     Ok(handle)
 }
 
-
-
-
 pub(super) fn spawn_isolate(
     ctx: &mut ExecCtx,
     module_path: &str,
     export_name: &str,
     args: Vec<varn_types::value::SendValue>,
 ) -> Result<varn_types::HostPromise, String> {
-    
-    
-    
-    
     fn worker_error(msg: &str) -> varn_types::value::SendValue {
         varn_types::value::SendValue::Error {
             class: "Error".to_string(),
@@ -227,14 +195,9 @@ pub(super) fn spawn_isolate(
 
     let module_path_str = module_path.to_string();
     let export_name_str = export_name.to_string();
-    
-    
-    
+
     let settings = ctx.settings;
 
-    
-    
-    
     let done = varn_types::HostPromise::pending();
     let done_t = done.clone();
 
@@ -281,12 +244,6 @@ pub(super) fn spawn_isolate(
                 }
             };
 
-            
-            
-            
-            
-            
-            
             let mut vm_args = Vec::new();
             for arg in args {
                 let v_nv = arg.to_value_ctx(&mut machine.ctx);

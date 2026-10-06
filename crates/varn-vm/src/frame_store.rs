@@ -1,46 +1,10 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::rc::Rc;
 
 use varn_types::FunctionProto;
 
 use crate::value::VmValue;
 
-
-
-
 pub use varn_types::register_meta::SlotClass;
-
-
-
-
-
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SlotAddr {
@@ -48,16 +12,7 @@ pub struct SlotAddr {
     pub idx: u32,
 }
 
-
-
-
-
 pub use varn_types::register_meta::FrameLayout;
-
-
-
-
-
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -66,11 +21,6 @@ pub struct FrameAlloc {
     pub layout: Rc<FrameLayout>,
 }
 
-
-
-
-
-
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct FrameStore {
@@ -78,9 +28,7 @@ pub struct FrameStore {
     pub fpr: Vec<f64>,
     pub refs: Vec<Option<varn_types::HeapRef>>,
     pub dyn_: Vec<VmValue>,
-    
-    
-    
+
     pub(crate) allocs: Vec<FrameAlloc>,
 }
 
@@ -105,7 +53,6 @@ impl FrameStore {
         }
     }
 
-    
     pub fn push_frame(&mut self, proto: &Rc<FunctionProto>) -> usize {
         let layout = proto.frame_layout();
         let id = self.allocs.len();
@@ -134,7 +81,6 @@ impl FrameStore {
         id
     }
 
-    
     pub fn pop_frame(&mut self) {
         if let Some(alloc) = self.allocs.pop() {
             self.gpr
@@ -148,8 +94,6 @@ impl FrameStore {
         }
     }
 
-    
-    
     pub fn ensure_frame_size(&mut self, id: usize, register_count: usize) {
         let (bases, counts) = {
             let a = &self.allocs[id];
@@ -237,20 +181,20 @@ mod tests {
     fn mov_converts_between_classes() {
         use SlotKind as K;
         let mut s = FrameStore::new();
-        
+
         let p = proto_with(&[K::Dynamic, K::Int, K::Float, K::Ref], 4);
         let a = s.push_frame(&p);
         s.set_g(a, 1, 42);
         s.mov(a, 0, 1).unwrap();
         assert_eq!(s.d(a, 0), VmValue::from_int(42));
-        
+
         s.mov(a, 1, 0).unwrap();
         assert_eq!(s.g(a, 1), 42);
-        
+
         s.set_d(a, 0, VmValue::from_bool(true));
         assert!(s.mov(a, 1, 0).is_err());
         assert_eq!(s.g(a, 1), 42);
-        
+
         s.set_f(a, 2, 2.5);
         s.mov(a, 0, 2).unwrap();
         assert_eq!(s.d(a, 0), VmValue::from_f64(2.5));

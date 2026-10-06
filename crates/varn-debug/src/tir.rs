@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use crate::flags::DebugFlags;
 use rustc_hash::FxHashMap;
 use varn_checker::{BindResult, Desugarings, TypeEntry};
@@ -60,12 +53,11 @@ pub fn debug_tir(
             terminal::log(line.to_string());
         }
 
-        
         match varn_compiler::from_tir::build_module(&module) {
             Ok(fns) => terminal::info(format!("from_tir(ssa): OK ({} ssa fn(s))", fns.len())),
             Err(e) => terminal::warn(format!("from_tir(ssa): {e:?}")),
         }
-        
+
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             varn_compiler::from_tir::compile_module(&module, vec![])
         })) {

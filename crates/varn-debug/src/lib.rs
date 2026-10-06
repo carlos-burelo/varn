@@ -29,13 +29,6 @@ pub mod walk;
 pub use cap_trace::debug_cap_trace;
 pub use flags::{print_phases, DebugFlags};
 
-
-
-
-
-
-
-
 pub fn resolved_copy(proto: &varn_types::FunctionProto) -> varn_types::FunctionProto {
     proto.clone()
 }

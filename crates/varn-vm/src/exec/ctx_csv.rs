@@ -105,7 +105,6 @@ fn parse_cell_value(ctx: &mut ExecCtx, s: &str) -> VmValue {
         return VmValue::null();
     }
 
-    
     let bytes = s.as_bytes();
     let mut idx = 0;
     let neg = if bytes[0] == b'-' {
@@ -133,14 +132,12 @@ fn parse_cell_value(ctx: &mut ExecCtx, s: &str) -> VmValue {
         }
     }
 
-    
     if let Ok(f) = s.parse::<f64>() {
         if f.is_finite() {
             return VmValue::from_f64(f);
         }
     }
 
-    
     if let Some(sso) = VmValue::try_from_sso(s) {
         return sso;
     }
@@ -323,7 +320,6 @@ pub(crate) fn stringify_csv(
                         names_with_slots.into_iter().map(|(k, _)| k).collect()
                     };
 
-                    
                     for (i, name) in prop_names.iter().enumerate() {
                         if i > 0 {
                             out.push(delim_char);
@@ -332,7 +328,6 @@ pub(crate) fn stringify_csv(
                     }
                     out.push('\n');
 
-                    
                     for item in items {
                         if !item.is_heap() {
                             continue;
@@ -368,7 +363,6 @@ pub(crate) fn stringify_csv(
                         .collect();
                     drop(map_b);
 
-                    
                     for (i, (_, name)) in prop_names.iter().enumerate() {
                         if i > 0 {
                             out.push(delim_char);
@@ -377,7 +371,6 @@ pub(crate) fn stringify_csv(
                     }
                     out.push('\n');
 
-                    
                     for item in items {
                         if !item.is_heap() {
                             continue;

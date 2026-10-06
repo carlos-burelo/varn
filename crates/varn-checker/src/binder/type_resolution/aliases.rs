@@ -4,7 +4,6 @@ use varn_core::TypeKind;
 use super::contexts::AliasSubstitutionContext;
 use super::resolve_type_node;
 
-
 pub(super) fn try_stdlib_generic_alias(
     name: &str,
     args: &[Type],

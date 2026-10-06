@@ -1,17 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_core::intrinsic_ops::math::MathOp;
@@ -35,7 +21,6 @@ fn native_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, ectx: Value) -> Value {
     )
 }
 
-
 fn float_instruction(b: &mut FunctionBuilder, ctx: &Ctx<'_>, wire: u8, x: Value) -> Option<Value> {
     Some(match wire {
         w if w == MathOp::Abs as u8 => b.ins().fabs(x),
@@ -45,7 +30,6 @@ fn float_instruction(b: &mut FunctionBuilder, ctx: &Ctx<'_>, wire: u8, x: Value)
         _ => return None,
     })
 }
-
 
 pub(super) fn emit_intrinsic(
     b: &mut FunctionBuilder,
@@ -83,11 +67,9 @@ pub(super) fn emit_intrinsic(
     Ok(Out::Boxed(native_result(b, ctx, ectx)))
 }
 
-
 pub(super) fn is_inline_convert(ssa: &SsaProto, operand: u32, conv: NumConv) -> bool {
     conv == NumConv::IntToFloat && ssa.value_ty(operand) == SlotKind::Int
 }
-
 
 pub(super) fn emit_convert(
     b: &mut FunctionBuilder,

@@ -1,5 +1,3 @@
-
-
 use varn_core::ast::{
     AstArena, ClassMember, Decl, ExportDecl, ExportDefaultDecl, InterfaceMember, VarKind,
 };

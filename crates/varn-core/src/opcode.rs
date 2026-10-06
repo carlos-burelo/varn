@@ -187,42 +187,18 @@ pub enum OpCode {
     ArrayGetIndex,
     ArraySetIndex,
 
-    
-    
-    
-    
-    
     CallNativeOp,
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     IntrinsicDirect,
 
-    
-    
-    
-    
-    
     LoadNativeGlobalIdx,
 
     BuildMap,
     MapGetIndex,
     MapSetIndex,
 
-    
     Convert,
 
-    
-    
     BytesLength,
 }
 

@@ -1,34 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::sync::Arc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -37,13 +6,12 @@ use crate::ssa::ir::{InstKind, SsaFunc, Terminator, Value};
 use crate::ssa::verify::inst_uses;
 
 pub fn run(func: &mut SsaFunc) -> bool {
-    
     let mut const_ints: FxHashMap<u32, i64> = FxHashMap::default();
-    
+
     let mut obj_literals: FxHashMap<u32, Vec<(Arc<str>, Value)>> = FxHashMap::default();
-    
+
     let mut tuple_literals: FxHashMap<u32, Vec<Value>> = FxHashMap::default();
-    
+
     let mut array_literals: FxHashMap<u32, Vec<Value>> = FxHashMap::default();
 
     for block in &func.blocks {
@@ -77,7 +45,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
         return false;
     }
 
-    
     for block in &func.blocks {
         for inst in &block.insts {
             if let InstKind::GetProperty { object, .. } = &inst.kind {
@@ -140,14 +107,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
         return false;
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
     let mut forwards: Vec<(Value, Value)> = Vec::new();
     let mut dead_reads: FxHashSet<Value> = FxHashSet::default();
     for block in &func.blocks {
@@ -188,12 +147,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
     }
 
     let changed = !forwards.is_empty();
-    
-    
-    
-    
-    
-    
+
     let mut fwd_map: FxHashMap<Value, Value> = forwards.into_iter().collect();
     let keys: Vec<Value> = fwd_map.keys().copied().collect();
     for k in keys {
@@ -233,11 +187,8 @@ mod tests {
         }
     }
 
-    
-    
     #[test]
     fn loop_body_literal_read_forwards() {
-        
         let body = Block {
             params: vec![Value(0)],
             insts: vec![
@@ -297,7 +248,7 @@ mod tests {
             is_generator: false,
         };
         assert!(run(&mut func), "literal read should forward");
-        
+
         let store = func.blocks[1]
             .insts
             .iter()
@@ -309,12 +260,8 @@ mod tests {
         assert_eq!(store, Value(0));
     }
 
-    
-    
-    
     #[test]
     fn chained_tuple_forward_resolves_transitively() {
-        
         let body = Block {
             params: vec![],
             insts: vec![
@@ -367,8 +314,7 @@ mod tests {
             is_generator: false,
         };
         assert!(run(&mut func), "chained read should forward");
-        
-        
+
         let store = func.blocks[0]
             .insts
             .iter()

@@ -1,8 +1,3 @@
-
-
-
-
-
 use serde_json::Value;
 use varn_core::ast::{
     Arg, ClassMember, Decl, ExportDecl, ExprId, ExprKind, ForInit, InterfaceMember, MatchBody,

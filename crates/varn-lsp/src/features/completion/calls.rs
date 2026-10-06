@@ -72,9 +72,6 @@ pub fn build_call_argument_completions(
                     .filter_map(|p| p.name.as_deref().map(str::to_owned)),
             );
         } else if let TypeKind::Named(name, _) = state.db.ty_kind(&info.ty) {
-            
-            
-            
             push_constructor_params(state, state.name(name), &mut fn_params);
         }
     } else if callee_tok.kind == TokenKind::Identifier || callee_tok.kind.can_be_identifier() {
@@ -129,11 +126,6 @@ pub fn build_call_argument_completions(
         Some(items)
     }
 }
-
-
-
-
-
 
 fn push_constructor_params(state: &DocumentState, class_name: &str, out: &mut Vec<String>) {
     let Some(entry) = state.db.bind.get_class_entry(class_name) else {

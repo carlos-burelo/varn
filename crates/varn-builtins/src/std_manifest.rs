@@ -1,5 +1,3 @@
-
-
 use std::path::Path;
 
 #[derive(serde::Deserialize)]
@@ -45,7 +43,7 @@ fn scan_std_tree(root: &Path) -> Option<StdManifest> {
         } else {
             continue;
         };
-        
+
         let full_path = root.join(&rel_path);
         let pure = if let Ok(source) = std::fs::read_to_string(&full_path) {
             !source.contains("\"runtime:") && !source.contains("'runtime:")

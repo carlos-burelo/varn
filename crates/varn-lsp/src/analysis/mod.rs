@@ -1,35 +1,7 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
 use crate::workspace::Workspace;
-
 
 pub struct Analyzer {
     pub workspace: Workspace,
@@ -45,7 +17,6 @@ impl Analyzer {
 
 type Job = Box<dyn FnOnce(&mut Analyzer) + Send>;
 
-
 #[derive(Clone)]
 pub struct AnalysisHandle {
     fg_tx: mpsc::UnboundedSender<Job>,
@@ -53,15 +24,6 @@ pub struct AnalysisHandle {
 }
 
 impl AnalysisHandle {
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn spawn() -> Self {
         let (fg_tx, mut fg_rx) = mpsc::unbounded_channel::<Job>();
         let (bg_tx, mut bg_rx) = mpsc::unbounded_channel::<Job>();
@@ -90,13 +52,6 @@ impl AnalysisHandle {
         Self { fg_tx, bg_tx }
     }
 
-    
-    
-    
-    
-    
-    
-    
     pub async fn run<R, F>(&self, f: F) -> Option<R>
     where
         F: FnOnce(&mut Analyzer) -> R + Send + 'static,
@@ -105,10 +60,6 @@ impl AnalysisHandle {
         Self::send_and_await(&self.fg_tx, f).await
     }
 
-    
-    
-    
-    
     pub async fn run_background<R, F>(&self, f: F) -> Option<R>
     where
         F: FnOnce(&mut Analyzer) -> R + Send + 'static,
@@ -124,17 +75,12 @@ impl AnalysisHandle {
     {
         let (reply_tx, reply_rx) = oneshot::channel();
         tx.send(Box::new(move |a| {
-            
-            
             let _ = reply_tx.send(f(a));
         }))
         .ok()?;
         reply_rx.await.ok()
     }
 
-    
-    
-    
     pub fn submit<F>(&self, f: F)
     where
         F: FnOnce(&mut Analyzer) + Send + 'static,

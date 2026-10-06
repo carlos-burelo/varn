@@ -50,7 +50,7 @@ fn resolve_recursive(
 ) -> Result<(), String> {
     for (alias, origin) in deps {
         if !visited.insert(alias.clone()) {
-            continue; 
+            continue;
         }
 
         let resolved = if !force_update {
@@ -108,7 +108,6 @@ fn resolve_recursive(
             resolved: origin.tarball_url(&resolved.version),
         });
 
-        
         let installed_pkg_dir = cache::local_package_path(project_root, alias);
         let child_manifest_path = installed_pkg_dir.join(varn_modules::PACKAGE_MANIFEST_FILE);
         if child_manifest_path.exists() {

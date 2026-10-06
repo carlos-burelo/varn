@@ -13,13 +13,7 @@ pub enum ResolvedMemberKind {
     StaticProperty,
     ExtensionMethod,
     ExtensionProperty,
-    
-    
-    
-    
-    
-    
-    
+
     NestedType(NestedTypeKind),
     Constructor,
 }
@@ -74,10 +68,6 @@ pub struct MemberResolution {
     pub doc: Option<Arc<str>>,
 }
 
-
-
-
-
 #[derive(Clone, Debug, Default)]
 pub struct MatchGap {
     pub missing: Vec<String>,
@@ -107,13 +97,7 @@ pub struct ResolvedMemberSummary {
     pub is_static: bool,
     pub optional: bool,
     pub readonly: bool,
-    
-    
-    
-    
-    
-    
-    
+
     pub def_line: Option<u32>,
     pub def_col: u32,
     pub is_async: bool,

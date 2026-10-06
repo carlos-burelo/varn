@@ -85,10 +85,6 @@ pub fn infer_object_member_type(
     }
 }
 
-
-
-
-
 pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>) -> Arc<str> {
     match p {
         Pattern::Identifier { name, .. } => match interner {

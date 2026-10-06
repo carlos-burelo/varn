@@ -1,24 +1,15 @@
-
-
-
-
-
-
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Layer {
-    
     Core,
-    
+
     Runtime,
-    
+
     Std,
-    
+
     User,
 }
 
 impl Layer {
-    
     pub fn of_module(module: &str) -> Layer {
         if module.starts_with(crate::spec::CORE_PREFIX) {
             Layer::Core
@@ -33,9 +24,6 @@ impl Layer {
         }
     }
 }
-
-
-
 
 pub fn check_import(from: Layer, specifier: &str) -> Result<(), String> {
     if matches!(

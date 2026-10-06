@@ -1,16 +1,10 @@
-
-
-
 use varn_core::OpCode;
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Half {
     Hi,
     Lo,
 }
-
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Byte {
@@ -19,7 +13,6 @@ pub struct Byte {
 }
 
 impl Byte {
-    
     pub fn read(self, code: &[u16], offset: usize) -> u8 {
         let w = code.get(offset + self.word).copied().unwrap_or(0);
         match self.half {
@@ -37,7 +30,6 @@ impl Byte {
     }
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum At {
     Byte(Byte),
@@ -53,65 +45,57 @@ impl At {
     }
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Access {
     Read,
     Write,
-    
+
     ReadWrite,
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunKind {
-    
-    
     CallArgs,
-    
+
     Values,
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConstKind {
-    
     Value,
-    
+
     Name,
     Function,
     Shape,
     Layout,
-    
+
     Module,
-    
+
     NativeOp,
     Symbol,
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImmKind {
-    
     Int,
-    
+
     Count,
     Upvalue,
-    
+
     CallSite,
-    
+
     GlobalSlot,
-    
+
     NativeGlobalSlot,
     ModuleSlot,
-    
+
     FieldSlot,
     FieldOffset,
-    
+
     Tag,
-    
+
     Conv,
-    
+
     Intrinsic,
     Flag,
 }
@@ -122,19 +106,18 @@ pub enum Operand {
         at: Byte,
         access: Access,
     },
-    
+
     Run {
         start: Byte,
         count: usize,
         kind: RunKind,
     },
-    
-    
+
     Fixed {
         reg: u8,
         access: Access,
     },
-    
+
     Const {
         word: usize,
         kind: ConstKind,
@@ -143,14 +126,12 @@ pub enum Operand {
         at: At,
         kind: ImmKind,
     },
-    
-    
+
     Jump {
         word: usize,
         backward: bool,
     },
 }
-
 
 #[derive(Clone, Debug)]
 pub struct Layout {
@@ -160,13 +141,10 @@ pub struct Layout {
 }
 
 impl Layout {
-    
     pub fn opaque(&self) -> bool {
         matches!(self.op, OpCode::Jump | OpCode::Loop)
     }
 
-    
-    
     pub fn runs<'a>(
         &'a self,
         code: &'a [u16],
@@ -178,8 +156,6 @@ impl Layout {
         })
     }
 
-    
-    
     pub fn read_registers<'a>(
         &'a self,
         code: &'a [u16],
@@ -191,7 +167,6 @@ impl Layout {
         })
     }
 
-    
     pub fn jump_target(&self, code: &[u16], offset: usize) -> Option<usize> {
         self.operands.iter().find_map(|o| match *o {
             Operand::Jump { word, backward } => {

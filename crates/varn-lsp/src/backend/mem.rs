@@ -1,27 +1,10 @@
-
-
-
-
-
-
-
-
-
-
-
 pub fn resident_kb() -> Option<u64> {
     imp::resident_kb()
 }
 
 #[cfg(target_os = "windows")]
 mod imp {
-    
-    
-    
-    
-    
-    
-    
+
     #[repr(C)]
     #[allow(non_snake_case)]
     struct ProcessMemoryCounters {
@@ -54,10 +37,7 @@ mod imp {
     pub fn resident_kb() -> Option<u64> {
         let mut counters: ProcessMemoryCounters = unsafe { std::mem::zeroed() };
         counters.cb = std::mem::size_of::<ProcessMemoryCounters>() as u32;
-        
-        
-        
-        
+
         let ok = unsafe { GetProcessMemoryInfo(GetCurrentProcess(), &mut counters, counters.cb) };
         if ok == 0 {
             None

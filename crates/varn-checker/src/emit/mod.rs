@@ -1,18 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 mod body;
 mod class_members;
 mod classes;
@@ -41,9 +26,6 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, Program};
 use varn_tir::{BackendTy, SigId, TirFunction, TirModule, TyTable};
-
-
-
 
 pub fn emit_module(
     program: &Program,

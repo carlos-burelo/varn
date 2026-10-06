@@ -3,20 +3,6 @@ use varn_core::OpCode;
 use super::definition::FunctionProto;
 
 impl FunctionProto {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn has_backedge(&self) -> bool {
         match self.backedge_memo.get() {
             1 => return true,
@@ -28,8 +14,6 @@ impl FunctionProto {
         let mut found = false;
         while ip < code.len() {
             let Some(info) = crate::bytecode::decode(code, ip, &self.chunk.constants) else {
-                
-                
                 found = true;
                 break;
             };

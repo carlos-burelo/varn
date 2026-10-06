@@ -1,20 +1,8 @@
-
-
-
-
-
-
-
 use varn_core::term::terminal;
 use varn_core::OpCode;
 use varn_jit::CacheSource;
 
 use varn_core::term::colors::{DIM, GREEN, R, RED, YELLOW};
-
-
-
-
-
 
 fn alloc_free_ignoring_global_resolution(
     code: &[u16],
@@ -48,8 +36,6 @@ fn alloc_free_ignoring_global_resolution(
     true
 }
 
-
-
 pub fn print_loop_diagnostics(code: &[u16], constants: &[varn_types::PoolEntry], indent: &str) {
     let loops = varn_jit::diagnose_loops(code, constants);
     if loops.is_empty() {
@@ -62,9 +48,6 @@ pub fn print_loop_diagnostics(code: &[u16], constants: &[varn_types::PoolEntry],
         if loops.len() == 1 { "" } else { "s" }
     ));
 
-    
-    
-    
     let mut masked_by_resolution = false;
 
     for lp in &loops {

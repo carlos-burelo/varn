@@ -13,13 +13,6 @@ pub(super) enum ControlCallFlow {
 }
 
 impl ExecCtx {
-    
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     fn note_backedge(&mut self, header_ip: usize, frame_idx: usize, closure: &VmClosure) -> bool {
         if self.settings.no_jit {
@@ -34,35 +27,18 @@ impl ExecCtx {
             proto.backedge_count.set(n);
             return false;
         }
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+
         proto.backedge_count.set(0);
         self.request_osr(header_ip, frame_idx, closure)
     }
 
-    
-    
     #[cold]
     #[inline(never)]
     fn request_osr(&mut self, header_ip: usize, frame_idx: usize, closure: &VmClosure) -> bool {
         if closure.proto.jit_osr_failed.get() {
             return false;
         }
-        
-        
-        
-        
+
         if self
             .try_handlers
             .last()
@@ -70,8 +46,7 @@ impl ExecCtx {
         {
             return false;
         }
-        
-        
+
         debug_assert_eq!(frame_idx, self.frames.len() - 1);
         self.frames[frame_idx].ip = header_ip;
         self.osr_request = Some(header_ip);
@@ -101,13 +76,7 @@ impl ExecCtx {
                 let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
                 *ip += 2;
                 *ip -= offset;
-                
-                
-                
-                
-                
-                
-                
+
                 self.gc_backedge_safepoint();
                 if self.note_backedge(*ip, frame_idx, closure) {
                     return Ok(Some(ControlCallFlow::ContinueFrame));

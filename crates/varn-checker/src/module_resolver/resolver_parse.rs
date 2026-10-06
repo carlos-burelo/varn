@@ -28,7 +28,6 @@ impl DiskResolver {
         })
     }
 
-    
     pub(super) fn is_binding(&self, key: &str) -> bool {
         self.in_flight.lock().contains(key)
     }
@@ -65,7 +64,6 @@ impl DiskResolver {
         bind
     }
 
-    
     pub(super) fn collect(
         &self,
         program: &varn_core::ast::Program,

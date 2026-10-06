@@ -1,8 +1,3 @@
-
-
-
-
-
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -56,8 +51,6 @@ impl LangPrimitive {
         Self::ALL.into_iter().find(|p| p.name() == name)
     }
 
-    
-    
     pub const fn core_module(self) -> Option<&'static str> {
         match self {
             Self::Bool => Some("core:types/bool"),
@@ -71,7 +64,6 @@ impl LangPrimitive {
         }
     }
 
-    
     pub const fn is_numeric(self) -> bool {
         matches!(self, Self::Int | Self::Float | Self::BigInt | Self::Decimal)
     }
@@ -82,8 +74,6 @@ impl std::fmt::Display for LangPrimitive {
         f.write_str(self.name())
     }
 }
-
-
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -129,7 +119,6 @@ impl BuiltinType {
         Self::ALL.into_iter().find(|b| b.name() == name)
     }
 
-    
     pub const fn core_module(self) -> &'static str {
         match self {
             Self::Array => "core:types/array",
@@ -147,9 +136,6 @@ impl std::fmt::Display for BuiltinType {
         f.write_str(self.name())
     }
 }
-
-
-
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CoreSum {
@@ -172,15 +158,12 @@ impl CoreSum {
         }
     }
 
-    
     pub fn identify(name: &str, origin: Option<&str>) -> Option<Self> {
         [Self::Option, Self::Result]
             .into_iter()
             .find(|s| s.name() == name && origin == Some(s.module()))
     }
 }
-
-
 
 pub fn is_lang_type_name(name: &str) -> bool {
     LangPrimitive::from_str(name).is_some() || BuiltinType::from_str(name).is_some()

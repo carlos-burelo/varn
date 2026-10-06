@@ -1,43 +1,15 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use core::mem::{align_of, offset_of, size_of};
 
 use varn_core as _;
 
-
-
-
-
-pub const ABI_MAGIC: u32 = 0x5641_524E; 
-
+pub const ABI_MAGIC: u32 = 0x5641_524E;
 
 pub const ABI_VERSION: u16 = 2;
-
-
-
 
 pub const CLASS_GPR: usize = 0;
 pub const CLASS_FPR: usize = 1;
 pub const CLASS_REF: usize = 2;
 pub const CLASS_DYN: usize = 3;
-
-
-
-
-
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -56,8 +28,6 @@ impl AbiValue {
         Self { tag: 0, payload: 0 }
     }
 }
-
-
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -81,11 +51,6 @@ impl AbiHeader {
     }
 }
 
-
-
-
-
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct AbiStacks {
@@ -99,16 +64,11 @@ pub struct AbiStacks {
     pub dyn_end: *mut AbiValue,
 }
 
-
-
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct ActBases {
     pub bases: [u32; 4],
 }
-
-
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -118,9 +78,6 @@ pub struct AbiClosure {
     pub ic_stride: u32,
     pub ic_entries: *const u8,
 }
-
-
-
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -133,7 +90,6 @@ pub struct AbiFrame {
     pub bases: ActBases,
 }
 
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct AbiFrameArena {
@@ -142,10 +98,6 @@ pub struct AbiFrameArena {
     pub cap: u32,
 }
 
-
-
-
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct AbiHeap {
@@ -153,10 +105,6 @@ pub struct AbiHeap {
     pub gc_requested: u8,
     pub _pad: [u8; 7],
 }
-
-
-
-
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -172,26 +120,16 @@ pub struct AbiCtx {
 }
 
 impl AbiCtx {
-    
     #[inline(always)]
     pub fn should_poll(&self) -> bool {
         self.poll != 0
     }
 }
 
-
-
-
 pub type RawJitFn = unsafe extern "C" fn(ctx: *mut AbiCtx, frame: *mut AbiFrame);
-
-
 
 pub type InvokeDynamicFn =
     unsafe extern "C" fn(ctx: *mut AbiCtx, callee: AbiValue, argc: u32) -> AbiValue;
-
-
-
-
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -203,7 +141,6 @@ pub struct CallSite {
 }
 
 impl CallSite {
-    
     pub fn lookup(table: &[CallSite], pc_offset: u32) -> Option<(u32, u16)> {
         table
             .iter()
@@ -211,8 +148,6 @@ impl CallSite {
             .map(|e| (e.resume_ip, e.dest))
     }
 }
-
-
 
 const _: () = {
     assert!(size_of::<AbiValue>() == 16, "AbiValue: 16 B tag+payload");

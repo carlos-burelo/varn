@@ -1,25 +1,14 @@
-
-
-
-
-
-
 use tower_lsp::lsp_types::*;
 
 use crate::features::semantic_tokens::LEGEND;
 
 pub fn server_capabilities() -> ServerCapabilities {
     ServerCapabilities {
-        
-        
-        
-        
         text_document_sync: Some(TextDocumentSyncCapability::Options(
             TextDocumentSyncOptions {
                 open_close: Some(true),
                 change: Some(TextDocumentSyncKind::INCREMENTAL),
-                
-                
+
                 save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
                     include_text: Some(false),
                 })),
@@ -53,14 +42,7 @@ pub fn server_capabilities() -> ServerCapabilities {
             first_trigger_character: "}".to_string(),
             more_trigger_character: Some(vec![";".to_string(), "\n".to_string()]),
         }),
-        
-        
-        
-        
-        
-        
-        
-        
+
         execute_command_provider: Some(ExecuteCommandOptions {
             commands: vec![],
             work_done_progress_options: Default::default(),

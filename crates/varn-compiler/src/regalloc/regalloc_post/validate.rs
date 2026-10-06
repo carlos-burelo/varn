@@ -5,9 +5,6 @@ use varn_types::chunk::PoolEntry;
 use super::scan::ScanResult;
 use crate::regalloc::liveness::LiveRange;
 
-
-
-
 pub(crate) fn verify_interference(ranges: &[LiveRange], mapping: &HashMap<u8, u8>) -> bool {
     let m = |r: u8| mapping.get(&r).copied().unwrap_or(r);
     ranges.iter().all(|range| {
@@ -15,8 +12,6 @@ pub(crate) fn verify_interference(ranges: &[LiveRange], mapping: &HashMap<u8, u8
         range.interference.iter().all(|&n| m(n as u8) != color)
     })
 }
-
-
 
 pub(crate) fn verify_run_constraints(
     code: &[u16],

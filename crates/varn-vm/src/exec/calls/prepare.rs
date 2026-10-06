@@ -20,23 +20,7 @@ pub(crate) fn try_prepare_call_fast(
             }
             None
         }
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+
         HeapObj::BoundMethod(bm) => match &bm.target {
             BoundMethodTarget::Native { func, .. } => {
                 Some((PreparedCall::NativeImmediate(*func, arg_count), true))
@@ -50,10 +34,6 @@ pub(crate) fn try_prepare_call_fast(
     }
 }
 
-
-
-
-
 fn describe_generator(
     nc: &Rc<VmClosure>,
     arg_count: usize,
@@ -66,8 +46,7 @@ fn describe_generator(
     let args_start = staging.len() - arg_count;
     let args: Vec<VmValue> = staging.drain(args_start..).collect();
     let constants = resolve_constants(&nc.proto, heap);
-    
-    
+
     let upvalues = nc
         .upvalues
         .iter()
@@ -131,10 +110,7 @@ pub(crate) fn prepare_call(
                     BoundMethodTarget::Native { func, .. } => {
                         let recv_nv = bm.receiver;
                         let mut final_count = arg_count;
-                        
-                        
-                        
-                        
+
                         if staging.is_empty() {
                             staging.push(recv_nv);
                             final_count = 1;
@@ -156,10 +132,7 @@ pub(crate) fn prepare_call(
                                 "BoundMethod(Vm): invalid closure payload",
                             ));
                         };
-                        
-                        
-                        
-                        
+
                         let mut full_arg_count = arg_count;
                         if staging.is_empty() {
                             staging.push(recv_nv);

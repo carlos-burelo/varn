@@ -8,27 +8,8 @@ use varn_core::ast::{ExprId, ExprKind};
 use varn_core::SourceRange;
 use varn_core::TokenKind;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 fn parse_property_name(s: &mut TokenStream) -> ExprId {
     if s.is_eof() || s.line() > s.prev_line() {
-        
-        
         let range = s.prev_end_range();
         s.push_error("expected a property name after `.`".to_owned(), range);
         return s.expr(range, ExprKind::Missing);
@@ -61,20 +42,12 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
         TokenKind::Bang => prefix_unary!(UnaryOp::Not),
         TokenKind::Tilde => prefix_unary!(UnaryOp::BitNot),
         TokenKind::Minus => {
-            
-            
-            
-            
-            
-            
-            
-            
             const I64_MIN_MAGNITUDE: &str = "9223372036854775808";
-            s.advance(); 
+            s.advance();
             if s.kind() == TokenKind::IntegerLiteral
                 && s.lexeme().replace('_', "") == I64_MIN_MAGNITUDE
             {
-                s.advance(); 
+                s.advance();
                 let full_range = s.span_from(start_range);
                 let raw = s.interner.intern(&format!("-{}", I64_MIN_MAGNITUDE));
                 return Ok(s.expr(
@@ -85,8 +58,7 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                     },
                 ));
             }
-            
-            
+
             let o = parse_unary_expr(s)?;
             let full_range = s.span_from(start_range);
             Ok(s.expr(

@@ -1,24 +1,8 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
-
-
-
-
-
-
-
-
 use std::sync::Arc;
 use varn_checker::types::{CheckerTyId, CheckerTyTable, ObjectTypeMember, Type};
 use varn_core::TypeKind;
-
-
-
-
 
 #[test]
 fn intrinsic_ids_are_fixed_and_small() {
@@ -46,12 +30,6 @@ fn intrinsic_ids_are_fixed_and_small() {
     assert_eq!(t.get(CheckerTyId::THIS), TypeKind::This);
 }
 
-
-
-
-
-
-
 #[test]
 fn content_ids_are_order_independent() {
     let mut left = CheckerTyTable::new();
@@ -62,7 +40,6 @@ fn content_ids_are_order_independent() {
     let l_list = left.intern_list(&[l_int, CheckerTyId::STR]);
     let l_union = left.intern(TypeKind::Union(l_list));
 
-    
     let r_str = right.intern(TypeKind::Primitive(varn_core::LangPrimitive::Str));
     let r_int = right.intern(TypeKind::Primitive(varn_core::LangPrimitive::Int));
     let r_list = right.intern_list(&[r_int, r_str]);
@@ -73,7 +50,6 @@ fn content_ids_are_order_independent() {
     assert_eq!(l_arr, r_arr, "Array<int> es el mismo id en ambas tablas");
     assert_eq!(l_union, r_union, "Union<int,str> es el mismo id");
 }
-
 
 #[test]
 fn intern_is_idempotent_and_get_roundtrips() {
@@ -87,10 +63,6 @@ fn intern_is_idempotent_and_get_roundtrips() {
     assert_eq!(t.get(a), TypeKind::Array(CheckerTyId::INT));
     assert_eq!(t.get(b), TypeKind::Array(CheckerTyId::STR));
 }
-
-
-
-
 
 #[test]
 fn absorb_is_a_union_that_preserves_ids() {
@@ -110,13 +82,10 @@ fn absorb_is_a_union_that_preserves_ids() {
 
     local.absorb(&foreign);
 
-    
     assert_eq!(local.get(foreign_union), foreign.get(foreign_union));
     assert_eq!(local.get(foreign_obj), foreign.get(foreign_obj));
     assert_eq!(local.get(local_arr), TypeKind::Array(CheckerTyId::INT));
 }
-
-
 
 #[test]
 fn checker_ty_table_is_send_and_sync() {
@@ -125,22 +94,17 @@ fn checker_ty_table_is_send_and_sync() {
     assert_send_sync::<Type>();
 }
 
-
 #[test]
 fn bind_result_is_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<varn_checker::BindResult>();
 }
 
-
 #[test]
 fn disk_resolver_is_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<varn_checker::module_resolver::DiskResolver>();
 }
-
-
-
 
 #[test]
 fn ids_agree_across_threads_and_interning_order() {

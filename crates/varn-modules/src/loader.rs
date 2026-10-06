@@ -1,20 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use rustc_hash::FxHashMap as HashMap;
 use std::fmt::{self, Display};
 use std::path::PathBuf;
@@ -22,32 +5,25 @@ use std::sync::Arc;
 
 use varn_core::ModuleId;
 
-
-
-
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Provenance {
-    
     Memory,
-    
+
     File(PathBuf),
-    
+
     Bundle,
-    
+
     Native,
 }
-
-
-
 
 #[derive(Clone)]
 pub struct ModuleSource {
     pub id: ModuleId,
     pub text: Arc<str>,
     pub provenance: Provenance,
-    
+
     pub interface: Option<Arc<[u8]>>,
-    
+
     pub bytecode: Option<Arc<[u8]>>,
 }
 
@@ -87,13 +63,12 @@ impl fmt::Debug for ModuleSource {
 
 #[derive(Debug)]
 pub enum LoadError {
-    
     NotFound { id: ModuleId },
-    
+
     Io { path: PathBuf, message: String },
-    
+
     Resolve { specifier: String, message: String },
-    
+
     Invalid { id: ModuleId, message: String },
 }
 
@@ -116,11 +91,6 @@ impl Display for LoadError {
 
 impl std::error::Error for LoadError {}
 
-
-
-
-
-
 pub trait ModuleLoader: Send + Sync {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, LoadError> {
         crate::resolver::ModuleResolver::new()
@@ -133,12 +103,6 @@ pub trait ModuleLoader: Send + Sync {
 
     fn source(&self, id: &ModuleId) -> Result<ModuleSource, LoadError>;
 }
-
-
-
-
-
-
 
 pub struct ProviderLoader;
 
@@ -196,18 +160,11 @@ impl ModuleLoader for ProviderLoader {
     }
 }
 
-
-
-
-
 pub fn default_registry() -> ModuleRegistry {
     ModuleRegistry::new()
         .with(Box::new(FilesystemLoader))
         .with(Box::new(ProviderLoader))
 }
-
-
-
 
 pub struct ModuleRegistry {
     backends: Vec<Box<dyn ModuleLoader>>,
@@ -226,7 +183,6 @@ impl ModuleRegistry {
         }
     }
 
-    
     pub fn push(&mut self, backend: Box<dyn ModuleLoader>) -> &mut Self {
         self.backends.push(backend);
         self
@@ -262,9 +218,7 @@ impl ModuleLoader for ModuleRegistry {
         for backend in &self.backends {
             match backend.source(id) {
                 Ok(src) => return Ok(src),
-                
-                
-                
+
                 Err(LoadError::NotFound { .. }) => {
                     last = Some(LoadError::NotFound { id: id.clone() })
                 }
@@ -274,9 +228,6 @@ impl ModuleLoader for ModuleRegistry {
         Err(last.unwrap_or(LoadError::NotFound { id: id.clone() }))
     }
 }
-
-
-
 
 pub struct FilesystemLoader;
 
@@ -303,9 +254,6 @@ impl ModuleLoader for FilesystemLoader {
         ))
     }
 }
-
-
-
 
 #[derive(Default)]
 pub struct MemoryLoader {
@@ -352,22 +300,17 @@ mod tests {
         let loader = FilesystemLoader;
         let from = local("C:/proj/main.vn");
 
-        
         let rel = loader.resolve("./util.vn", &from).unwrap();
         assert_eq!(rel, local("C:/proj/util.vn"));
 
-        
         let up = loader.resolve("../lib/x.vn", &from).unwrap();
         assert_eq!(up, local("C:/lib/x.vn"));
 
-        
         assert_eq!(
             loader.resolve("std:math", &from).unwrap(),
             ModuleId::stdlib("std:math")
         );
 
-        
-        
         assert_eq!(
             loader.resolve("core:types/int", &from).unwrap(),
             ModuleId::core("core:types/int")

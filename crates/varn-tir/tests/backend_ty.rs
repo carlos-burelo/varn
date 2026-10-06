@@ -1,12 +1,6 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
 use varn_tir::{BackendTy, DynReason, TyTable};
-
-
 
 #[test]
 fn interning_round_trips_and_dedups() {
@@ -22,7 +16,6 @@ fn interning_round_trips_and_dedups() {
     assert_ne!(x, a, "int and int[] are different types");
 }
 
-
 #[test]
 fn type_lists_round_trip() {
     let mut t = TyTable::default();
@@ -33,41 +26,30 @@ fn type_lists_round_trip() {
     );
 }
 
-
-
-
-
 #[test]
 fn nullable_keeps_its_payload() {
     let mut t = TyTable::default();
     let int_id = t.intern(BackendTy::Int);
     let n = BackendTy::Nullable(int_id);
 
-    
     assert_eq!(n.non_nullable(&t), BackendTy::Int);
 
-    
     let n_id = t.intern(n);
     let nn = BackendTy::Nullable(n_id);
     assert_eq!(nn.non_nullable(&t), BackendTy::Int);
 
-    
     assert_eq!(BackendTy::Str.non_nullable(&t), BackendTy::Str);
 
-    
     let arr = BackendTy::Array(int_id);
     let arr_id = t.intern(arr);
     assert_eq!(BackendTy::Nullable(arr_id).non_nullable(&t), arr);
 }
-
-
 
 #[test]
 fn dynamic_carries_its_reason() {
     let d = BackendTy::Dynamic(DynReason::HostBoundary);
     assert_ne!(d, BackendTy::Dynamic(DynReason::Declared));
 }
-
 
 #[test]
 fn backend_ty_is_copy() {

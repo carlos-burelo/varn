@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 #[derive(Clone, Copy)]
 pub struct CpuFreq {
     pub cur_mhz: u32,
@@ -16,7 +6,6 @@ pub struct CpuFreq {
 
 #[cfg(windows)]
 pub fn sample() -> Option<CpuFreq> {
-    
     #[repr(C)]
     #[derive(Clone, Copy)]
     struct Ppi {
@@ -27,7 +16,7 @@ pub fn sample() -> Option<CpuFreq> {
         max_idle_state: u32,
         current_idle_state: u32,
     }
-    
+
     #[link(name = "powrprof")]
     extern "system" {
         fn CallNtPowerInformation(
@@ -54,7 +43,7 @@ pub fn sample() -> Option<CpuFreq> {
         n
     ];
     let out_len = (core::mem::size_of::<Ppi>() * n) as u32;
-    
+
     let status = unsafe {
         CallNtPowerInformation(
             11,
@@ -81,7 +70,6 @@ pub fn sample() -> Option<CpuFreq> {
 
 #[cfg(target_os = "linux")]
 pub fn sample() -> Option<CpuFreq> {
-    
     let mut cur = 0u32;
     for i in 0.. {
         let p = format!("/sys/devices/system/cpu/cpu{i}/cpufreq/scaling_cur_freq");
@@ -95,7 +83,6 @@ pub fn sample() -> Option<CpuFreq> {
         }
     }
     if cur == 0 {
-        
         if let Ok(txt) = std::fs::read_to_string("/proc/cpuinfo") {
             for line in txt.lines() {
                 if line.starts_with("cpu MHz") {
@@ -127,7 +114,6 @@ pub fn sample() -> Option<CpuFreq> {
 pub fn sample() -> Option<CpuFreq> {
     None
 }
-
 
 pub fn keep_peak(a: Option<CpuFreq>, b: Option<CpuFreq>) -> Option<CpuFreq> {
     match (a, b) {

@@ -9,18 +9,11 @@ pub fn build_folding_ranges(state: &DocumentState) -> Vec<FoldingRange> {
     ranges
 }
 
-
-
-
-
-
-
 pub fn fold_comments(trivia: &[Trivia]) -> Vec<FoldingRange> {
     let mut ranges = Vec::new();
     let mut run: Option<(u32, u32)> = None;
 
     for t in trivia {
-        
         let start = t.range.start.line.saturating_sub(1);
         let end = t.range.end.line.saturating_sub(1);
 
@@ -34,7 +27,6 @@ pub fn fold_comments(trivia: &[Trivia]) -> Vec<FoldingRange> {
                 }
             }
             TriviaKind::Line => match run {
-                
                 Some((s, e)) if start == e + 1 => run = Some((s, start)),
                 Some((s, e)) => {
                     push_comment_fold(&mut ranges, s, e);

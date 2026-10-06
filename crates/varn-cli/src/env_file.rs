@@ -1,27 +1,4 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::path::{Path, PathBuf};
-
 
 pub fn load() {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -32,8 +9,6 @@ pub fn load() {
         dirs.push(root.as_path());
     }
 
-    
-    
     for dir in &dirs {
         load_file(&dir.join(".env.local"));
     }
@@ -59,24 +34,17 @@ fn load_file(path: &Path) {
         if key.is_empty() {
             continue;
         }
-        
-        
-        
+
         if std::env::var_os(key).is_some() {
             continue;
         }
         let value = unquote(value.trim());
-        
-        
-        
+
         unsafe {
             std::env::set_var(key, value);
         }
     }
 }
-
-
-
 
 fn unquote(value: &str) -> &str {
     let bytes = value.as_bytes();

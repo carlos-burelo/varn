@@ -1,14 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
 use std::sync::Arc;
 
 use crate::hir::{HirBinOp, HirType};
@@ -36,21 +25,14 @@ mod stmt;
 pub(super) use context::{Builder, Result};
 
 impl<'m> Builder<'m> {
-    
-
     fn lower_expr(&mut self, e: &TirExpr) -> Result<Value> {
         let ty = self.ty(e.ty);
         match &e.kind {
-            
-            
             TirExprKind::IntLit(n) => Ok(self.emit(InstKind::ConstInt(*n), HirType::Int)),
             TirExprKind::FloatLit(f) => Ok(self.emit(InstKind::ConstFloat(*f), HirType::Float)),
             TirExprKind::BoolLit(b) => Ok(self.emit(InstKind::ConstBool(*b), HirType::Bool)),
             TirExprKind::StrLit(s) => Ok(self.emit(InstKind::ConstStr(s.clone()), HirType::Str)),
-            
-            
-            
-            
+
             TirExprKind::CharLit(c) => Ok(self.emit(InstKind::ConstChar(*c), HirType::Ref)),
             TirExprKind::NullLit => Ok(self.emit(InstKind::ConstNull, HirType::Dynamic)),
             TirExprKind::DecimalLit(s) => {

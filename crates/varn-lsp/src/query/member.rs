@@ -1,6 +1,5 @@
 use crate::document::DocumentState;
 
-
 pub fn member_at(
     state: &DocumentState,
     line: u32,

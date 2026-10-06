@@ -1,39 +1,9 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct VmValue {
     tag: u64,
     payload: u64,
 }
-
-
-
-
-
-
-
-
-
-
-
 
 pub const KIND_MASK: u64 = 0xFF;
 
@@ -42,52 +12,36 @@ pub const KIND_BOOL: u64 = 1;
 pub const KIND_INT: u64 = 2;
 pub const KIND_FLOAT: u64 = 3;
 
-
 pub const KIND_HEAP: u64 = 4;
-
 
 pub const KIND_SSO: u64 = 5;
 pub const KIND_SYMBOL: u64 = 6;
-
 
 const SSO_LEN_SHIFT: u32 = 8;
 
 pub const SSO_MAX_LEN: usize = 5;
 
 impl VmValue {
-    
-    
-    
-    
     #[inline(always)]
     pub const fn from_raw_parts(tag: u64, payload: u64) -> Self {
         Self { tag, payload }
     }
 
-    
-    
-    
     #[inline(always)]
     pub const fn raw_tag(self) -> u64 {
         self.tag
     }
 
-    
     #[inline(always)]
     pub const fn raw_payload(self) -> u64 {
         self.payload
     }
 
-    
     #[inline(always)]
     pub const fn kind(self) -> u64 {
         self.tag & KIND_MASK
     }
 
-    
-    
-    
-    
     #[inline(always)]
     pub const fn ic_miss() -> Self {
         Self {
@@ -96,15 +50,11 @@ impl VmValue {
         }
     }
 
-    
     #[inline(always)]
     pub const fn is_ic_miss(self) -> bool {
         self.tag == u64::MAX
     }
 
-    
-    
-    
     #[inline(always)]
     pub fn bits_eq(self, other: Self) -> bool {
         self.tag == other.tag && self.payload == other.payload
@@ -142,9 +92,6 @@ impl VmValue {
         }
     }
 
-    
-    
-    
     #[inline(always)]
     pub fn from_int(n: i64) -> Self {
         Self {
@@ -153,9 +100,6 @@ impl VmValue {
         }
     }
 
-    
-    
-    
     #[inline(always)]
     pub fn from_int_wrapping(n: i64) -> Self {
         Self::from_int(n)
@@ -166,8 +110,6 @@ impl VmValue {
         Self::from_int(n as i64)
     }
 
-    
-    
     #[inline(always)]
     pub fn from_f64(n: f64) -> Self {
         Self {
@@ -290,7 +232,6 @@ impl VmValue {
         self.payload != 0
     }
 
-    
     #[inline(always)]
     pub fn as_heap(self) -> HeapRef {
         debug_assert!(self.is_heap() && self.payload != 0);

@@ -3,9 +3,6 @@ use crate::heap::HeapObj;
 use crate::value::VmValue;
 use varn_types::NativeCtx;
 
-
-
-
 pub(super) fn to_sendable(
     ctx: &ExecCtx,
     val: VmValue,
@@ -34,17 +31,13 @@ pub(super) fn to_sendable(
             Some(HeapObj::Array(arr)) => {
                 let mut items = Vec::with_capacity(arr.len());
                 for i in 0..arr.len() {
-                    
-                    
-                    
                     items.push(ctx.to_sendable(arr.get_vm(i).unwrap())?);
                 }
                 Ok(varn_types::value::SendValue::Array(items))
             }
             Some(HeapObj::Object(obj)) => {
                 let borrow = obj.borrow();
-                
-                
+
                 if let Some(cls) = borrow.class() {
                     let chan_id = borrow
                         .get("_chan")

@@ -10,7 +10,6 @@ pub use registry::{is_known, spec_for, MODULE_REGISTRY};
 pub use varn_modules::spec::ModuleSpec;
 
 #[cfg(feature = "runtime")]
-
 pub mod dispatch;
 #[cfg(feature = "runtime")]
 pub mod modules;

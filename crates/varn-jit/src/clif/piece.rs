@@ -1,18 +1,10 @@
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{ExternalName, Function};
 use cranelift_codegen::isa::OwnedTargetIsa;
 
 pub(super) struct CompiledPiece {
     pub code: Vec<u8>,
     pub safepoints: Vec<crate::stack_roots::SafepointMap>,
-    
+
     pub call_reloc_offsets: Vec<usize>,
 }
 
@@ -20,8 +12,6 @@ pub(super) fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<Comp
     super::with_ctx(func, isa.as_ref(), |compiled| {
         let mut call_reloc_offsets = Vec::new();
         for reloc in compiled.buffer.relocs() {
-            
-            
             match &reloc.target {
                 cranelift_codegen::FinalizedRelocTarget::ExternalName(ExternalName::User(_)) => {
                     if reloc.addend != -4 {

@@ -33,8 +33,6 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
         .join(", ");
     let _ = writeln!(out, "  b{id}({params}):");
     for inst in &block.insts {
-        
-        
         let lhs = match inst.dest {
             Some(v) => match func.value_ty(v) {
                 HirType::Dynamic => format!("{} = ", val(v)),
@@ -46,7 +44,6 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
     }
     let _ = writeln!(out, "    {}", terminator(&block.term));
 }
-
 
 pub fn inst_kind(kind: &InstKind) -> String {
     match kind {
@@ -351,7 +348,6 @@ pub fn inst_kind(kind: &InstKind) -> String {
     }
 }
 
-
 pub fn terminator(term: &Terminator) -> String {
     match term {
         Terminator::Return(Some(v)) => format!("return {}", val(*v)),
@@ -397,8 +393,7 @@ fn ty(t: HirType) -> &'static str {
         HirType::Str => varn_core::LangPrimitive::Str.name(),
         HirType::Ref => "ref",
         HirType::Dynamic => "dyn",
-        
-        
+
         HirType::Array(_) => "array",
         HirType::Map(_, _) => "map",
         HirType::Set(_) => "set",

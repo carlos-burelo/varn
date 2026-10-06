@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, AbiParam, InstBuilder, UserFuncName};
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
@@ -15,18 +7,9 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use rustc_hash::FxHashMap as HashMap;
 use varn_types::chunk::{Literal, PoolEntry};
 
-
-
 pub struct AotOutput {
     pub object_bytes: Vec<u8>,
 }
-
-
-
-
-
-
-
 
 pub fn compile_to_object(
     proto: &varn_types::FunctionProto,
@@ -36,13 +19,11 @@ pub fn compile_to_object(
         .map_err(|e| format!("aot: ObjectBuilder: {e}"))?;
     let mut module = ObjectModule::new(obj_builder);
 
-    
     let rt_helpers = declare_rt_helpers(&mut module)?;
 
-    
     let main_sig = {
         let mut sig = module.make_signature();
-        
+
         sig.returns.push(AbiParam::new(types::I64));
         sig
     };
@@ -50,7 +31,6 @@ pub fn compile_to_object(
         .declare_function("_varn_main", Linkage::Export, &main_sig)
         .map_err(|e| format!("aot: declare _varn_main: {e}"))?;
 
-    
     let mut ctx = module.make_context();
     ctx.func.signature = main_sig;
     ctx.func.name = UserFuncName::user(0, 0);
@@ -63,10 +43,8 @@ pub fn compile_to_object(
         builder.switch_to_block(entry_block);
         builder.seal_block(entry_block);
 
-        
         emit_module_body(&mut builder, &mut module, main_id, proto, &rt_helpers)?;
 
-        
         let zero = builder.ins().iconst(types::I64, 0);
         builder.ins().return_(&[zero]);
         builder.finalize(module.isa().frontend_config());
@@ -76,7 +54,6 @@ pub fn compile_to_object(
         .define_function(main_id, &mut ctx)
         .map_err(|e| format!("aot: define _varn_main: {e}"))?;
 
-    
     let product = module.finish();
     let bytes = product.emit().map_err(|e| format!("aot: emit: {e}"))?;
 
@@ -84,8 +61,6 @@ pub fn compile_to_object(
         object_bytes: bytes,
     })
 }
-
-
 
 struct RtHelpers {
     print: FuncId,
@@ -95,29 +70,26 @@ struct RtHelpers {
 fn declare_rt_helpers(module: &mut ObjectModule) -> Result<RtHelpers, String> {
     let map_err = |e: cranelift_module::ModuleError| format!("aot: declare helper: {e}");
 
-    
     let mut print_sig = module.make_signature();
-    print_sig.params.push(AbiParam::new(types::I64)); 
-    print_sig.params.push(AbiParam::new(types::I64)); 
+    print_sig.params.push(AbiParam::new(types::I64));
+    print_sig.params.push(AbiParam::new(types::I64));
     let print = module
         .declare_function("varn_rt_print", Linkage::Import, &print_sig)
         .map_err(map_err)?;
 
-    
     let mut sc_sig = module.make_signature();
     sc_sig.params.push(AbiParam::new(types::I64));
     sc_sig.params.push(AbiParam::new(types::I64));
     sc_sig.params.push(AbiParam::new(types::I64));
     sc_sig.params.push(AbiParam::new(types::I64));
-    sc_sig.returns.push(AbiParam::new(types::I64)); 
-    sc_sig.returns.push(AbiParam::new(types::I64)); 
+    sc_sig.returns.push(AbiParam::new(types::I64));
+    sc_sig.returns.push(AbiParam::new(types::I64));
     let str_concat = module
         .declare_function("varn_rt_str_concat", Linkage::Import, &sc_sig)
         .map_err(map_err)?;
 
     Ok(RtHelpers { print, str_concat })
 }
-
 
 fn emit_module_body(
     builder: &mut FunctionBuilder,
@@ -133,21 +105,17 @@ fn emit_module_body(
     let constants = &proto.chunk.constants;
     let nregs = proto.register_count as usize;
 
-    
     let mut vars = Vec::with_capacity(nregs * 2);
     for _ in 0..nregs {
-        
         let v_val = builder.declare_var(types::I64);
         let v_meta = builder.declare_var(types::I64);
         vars.push((v_val, v_meta));
 
-        
         let z = builder.ins().iconst(types::I64, 0);
         builder.def_var(v_val, z);
         builder.def_var(v_meta, z);
     }
 
-    
     let mut data_ids: HashMap<usize, cranelift_module::DataId> = HashMap::default();
 
     let mut ip = 0usize;
@@ -294,13 +262,12 @@ fn emit_module_body(
                 builder.def_var(vars[first_reg].1, res_len);
             }
             OpCode::Call => {
-                
                 let w2 = code[ip + 2];
                 let argc = (w2 >> 8) as usize;
                 let arg_start = (w2 & 0xFF) as usize;
 
                 if argc == 2 {
-                    let arg_r = arg_start + 1; 
+                    let arg_r = arg_start + 1;
                     let val = builder.use_var(vars[arg_r].0);
                     let meta = builder.use_var(vars[arg_r].1);
 
@@ -319,7 +286,6 @@ fn emit_module_body(
 
     Ok(())
 }
-
 
 fn get_or_create_string_data(
     module: &mut ObjectModule,

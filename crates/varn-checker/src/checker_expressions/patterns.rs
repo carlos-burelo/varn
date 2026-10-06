@@ -48,12 +48,6 @@ impl<'r> Checker<'r> {
                     self.check_pattern(&prop.value, &prop_ty, bind);
                 }
                 if let Some(r) = rest {
-                    
-                    
-                    
-                    
-                    
-                    
                     self.check_pattern(r, &Type::Dynamic, bind);
                 }
             }
@@ -141,16 +135,6 @@ impl<'r> Checker<'r> {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn variant_fields_with_subst(
         &mut self,
         variant: &str,
@@ -179,7 +163,6 @@ impl<'r> Checker<'r> {
             _ => (None, Vec::new(), None),
         };
 
-        
         let mut fields = bind.sum_variant_fields.get(variant).cloned();
         let mut def_bind: Option<std::sync::Arc<BindResult>> = None;
         if fields.is_none() {
@@ -196,7 +179,6 @@ impl<'r> Checker<'r> {
         }
         let fields = fields?;
 
-        
         let mut mapping = rustc_hash::FxHashMap::default();
         if !args.is_empty() {
             if let Some(p) = &parent {

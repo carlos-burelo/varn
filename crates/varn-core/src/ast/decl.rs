@@ -193,9 +193,7 @@ pub enum InterfaceMember {
         params: Vec<Param>,
         return_type: Option<TypeNode>,
         optional: bool,
-        
-        
-        
+
         is_async: bool,
         range: SourceRange,
     },

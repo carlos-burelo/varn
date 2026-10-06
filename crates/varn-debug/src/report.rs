@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TreeNode {
     pub label: String,
@@ -30,8 +21,6 @@ impl TreeNode {
         self.children.push(child);
     }
 }
-
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Report {

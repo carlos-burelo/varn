@@ -1,35 +1,9 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use tower_lsp::lsp_types::Position;
-
-
-
-
-
-
 
 pub fn byte_offset(text: &str, pos: Position) -> usize {
     let line_start = line_start(text, pos.line);
     column_offset(&text[line_start..], pos.character) + line_start
 }
-
-
 
 fn line_start(text: &str, line: u32) -> usize {
     if line == 0 {
@@ -46,8 +20,6 @@ fn line_start(text: &str, line: u32) -> usize {
     }
     text.len()
 }
-
-
 
 fn column_offset(line: &str, character: u32) -> usize {
     let mut units = 0u32;

@@ -4,15 +4,7 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::{LangPrimitive, TypeKind};
 
-
-
-
-
-
-
 const FREEZE_THRESHOLD: usize = 2048;
-
-
 
 #[derive(Debug, Default)]
 pub(super) struct CheckerTyBase {
@@ -21,13 +13,6 @@ pub(super) struct CheckerTyBase {
     pub(super) functions: FxHashMap<FunctionTypeId, FunctionType>,
     pub(super) object_members: FxHashMap<ObjectMembersId, Vec<ObjectTypeMember>>,
 }
-
-
-
-
-
-
-
 
 #[derive(Debug, Clone)]
 pub struct CheckerTyTable {
@@ -48,8 +33,7 @@ impl Default for CheckerTyTable {
 impl CheckerTyTable {
     pub fn new() -> Self {
         let mut base = CheckerTyBase::default();
-        
-        
+
         for (id, kind) in [
             (CheckerTyId::INT, TypeKind::Primitive(LangPrimitive::Int)),
             (
@@ -91,9 +75,6 @@ impl CheckerTyTable {
         }
     }
 
-    
-    
-    
     pub(super) fn freeze(&mut self) {
         if self.delta_entries.is_empty()
             && self.delta_lists.is_empty()
@@ -177,14 +158,11 @@ mod tests {
         assert_eq!(union1, union2);
     }
 
-    
-    
     #[test]
     fn ids_are_order_independent_across_tables() {
         let mut left = CheckerTyTable::default();
         let mut right = CheckerTyTable::default();
 
-        
         let l_int = left.intern(TypeKind::Primitive(LangPrimitive::Int));
         let l_arr = left.intern(TypeKind::Array(l_int));
         let r_int = right.intern(TypeKind::Primitive(LangPrimitive::Int));
@@ -251,10 +229,6 @@ mod tests {
         );
     }
 
-    
-    
-    
-    
     #[test]
     fn absorb_with_shared_base_still_picks_up_the_other_deltas_new_entries() {
         let mut local = CheckerTyTable::default();

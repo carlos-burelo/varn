@@ -1,153 +1,15 @@
-
-
-
-
-
-
-
-
-
 use crate::closure::VmClosure;
 use varn_types::FunctionProto;
-
-
-
-
-
-
-
-
-
 
 pub(crate) const FRAME_LAYOUT_V2_JIT_BAIL: bool = false;
 
 impl VmClosure {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     const JIT_TIER_THRESHOLD: u32 = 1;
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     const JIT_TIER_THRESHOLD_STRAIGHT: u32 = 128;
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     const JIT_OSR_BACKEDGES: u32 = 1000;
 
-    
-    
-    
     #[inline(always)]
     pub(crate) fn osr_backedge_threshold() -> u32 {
         static T: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
@@ -159,8 +21,6 @@ impl VmClosure {
         })
     }
 
-    
-    
     fn tier_threshold(proto: &FunctionProto) -> u32 {
         if proto.has_backedge() {
             static LT: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
@@ -180,12 +40,6 @@ impl VmClosure {
         })
     }
 
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     pub(crate) fn jit_fn(&self) -> Option<varn_jit::JitFn> {
         if self.proto.jit_epoch.get() != crate::clif_link::current_epoch() {
@@ -198,7 +52,6 @@ impl VmClosure {
         Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(e) })
     }
 
-    
     pub(crate) fn hot_jit_fn(&self) -> Option<varn_jit::JitFn> {
         if FRAME_LAYOUT_V2_JIT_BAIL {
             return None;
@@ -226,11 +79,7 @@ impl VmClosure {
         if self.proto.jit_failed.get() || epoch == 0 {
             return;
         }
-        
-        
-        
-        
-        
+
         let previous = if self.proto.jit_entry.get() != 0 {
             if self.proto.jit_epoch.get() == epoch {
                 return;
@@ -252,8 +101,7 @@ impl VmClosure {
                 self.proto.jit_epoch.set(epoch);
                 self.proto.jit_entry.set(entry_usize);
                 *self.proto.jit_code.borrow_mut() = Some(compiled.code);
-                
-                
+
                 self.proto.jit_native_sig.set(compiled.native_sig);
                 self.proto.jit_native.set(compiled.native);
                 crate::clif_link::register_compiled(&self.proto, previous);
@@ -271,16 +119,6 @@ impl VmClosure {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn osr_jit_fn(&self, _osr_ip: usize) -> Option<varn_jit::JitFn> {
         if FRAME_LAYOUT_V2_JIT_BAIL {
             return None;
@@ -303,20 +141,6 @@ impl VmClosure {
             }
         }
 
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         if proto.is_generator || proto.is_async {
             proto.jit_osr_failed.set(true);
             return None;
@@ -331,14 +155,12 @@ impl VmClosure {
                 proto.jit_osr_ip.set(osr_ip);
                 proto.jit_osr_entry.set(Some(entry_usize));
                 *proto.jit_osr_code.borrow_mut() = Some(compiled.code);
-                
-                
+
                 debug_assert_eq!(
                     compiled.native, 0,
                     "osr lowering must not publish a native entry"
                 );
-                
-                
+
                 crate::clif_link::register_compiled(proto, None);
                 Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry_usize) })
             }

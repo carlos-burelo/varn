@@ -1,21 +1,14 @@
-
-
 use crate::ty::{BackendTy, ClassId, SigId, TyTable};
 use std::sync::Arc;
 use varn_core::layout::ClassLayout;
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldInfo {
     pub name: Arc<str>,
     pub ty: BackendTy,
-    
+
     pub slot: u16,
 }
-
-
-
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VtableEntry {
@@ -30,8 +23,7 @@ pub struct ClassInfo {
     pub fields: Vec<FieldInfo>,
     pub vtable: Vec<VtableEntry>,
     pub layout: ClassLayout,
-    
-    
+
     pub constructor: Option<SigId>,
 }
 
@@ -42,11 +34,6 @@ pub enum Ancestry<'a> {
 }
 
 impl ClassInfo {
-    
-    
-    
-    
-    
     pub fn new(
         name: Arc<str>,
         parent: Ancestry<'_>,
@@ -56,7 +43,6 @@ impl ClassInfo {
         Self::new_with_methods(name, parent, fields, Vec::new(), types)
     }
 
-    
     pub fn new_with_methods(
         name: Arc<str>,
         parent: Ancestry<'_>,
@@ -92,19 +78,12 @@ impl ClassInfo {
             .collect();
         let layout = ClassLayout::from_fields(&kinds);
 
-        
-        
-        
-        
-        
         let mut vtable: Vec<VtableEntry> =
             parent_info.map(|p| p.vtable.clone()).unwrap_or_default();
         for (m_name, m_sig) in methods {
             if let Some(entry) = vtable.iter_mut().find(|e| e.name == m_name) {
-                
                 entry.sig = m_sig;
             } else {
-                
                 vtable.push(VtableEntry {
                     name: m_name,
                     sig: m_sig,
@@ -165,8 +144,7 @@ impl EnumInfo {
 pub struct Signature {
     pub params: Vec<BackendTy>,
     pub return_ty: BackendTy,
-    
-    
+
     pub has_rest: bool,
 }
 

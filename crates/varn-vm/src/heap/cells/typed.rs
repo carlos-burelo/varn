@@ -12,8 +12,6 @@ impl CellSpace {
         r
     }
 
-    
-    
     #[inline]
     pub(crate) fn alloc_instance(
         &mut self,
@@ -29,8 +27,6 @@ impl CellSpace {
         (r, inst)
     }
 
-    
-    
     #[inline]
     pub(crate) fn alloc_object(
         &mut self,
@@ -54,8 +50,6 @@ impl CellSpace {
         r
     }
 
-    
-    
     #[inline]
     pub(crate) fn alloc_array(
         &mut self,
@@ -78,7 +72,6 @@ impl CellSpace {
         r
     }
 
-    
     pub(super) unsafe fn drop_object(r: HeapRef) {
         let obj = body::<HeapObj>(r);
         match &*obj {

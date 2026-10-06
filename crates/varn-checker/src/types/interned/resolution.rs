@@ -3,8 +3,6 @@ use super::table::CheckerTyTable;
 use crate::types::{FunctionType, ObjectTypeMember};
 
 impl CheckerTyTable {
-    
-    
     pub fn get(&self, id: CheckerTyId) -> InternedTypeKind {
         *self
             .base
@@ -14,7 +12,6 @@ impl CheckerTyTable {
             .unwrap_or_else(|| panic!("CheckerTyId {id:?} is not present in this table"))
     }
 
-    
     pub fn contains(&self, id: CheckerTyId) -> bool {
         self.base.entries.contains_key(&id) || self.delta_entries.contains_key(&id)
     }
@@ -45,10 +42,6 @@ impl CheckerTyTable {
             .unwrap_or_else(|| panic!("ObjectMembersId {id:?} is not present in this table"))
     }
 
-    
-    
-    
-    
     pub fn contains_object_members(&self, id: ObjectMembersId) -> bool {
         self.base.object_members.contains_key(&id) || self.delta_object_members.contains_key(&id)
     }

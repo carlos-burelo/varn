@@ -9,19 +9,15 @@ use varn_modules::std_root::{resolve, StdProvenance, StdSource};
 use crate::loader::CoreSourceLocator;
 use crate::registry::{spec_for, MODULE_REGISTRY};
 
-
-
 struct ActiveStd {
     specs: &'static [ModuleSpec],
-    
+
     blobs: &'static [StdModuleBlobs],
-    
+
     tree_root: Option<PathBuf>,
     description: String,
     provenance: StdProvenance,
 }
-
-
 
 struct StdModuleBlobs {
     id: String,
@@ -36,8 +32,6 @@ fn leak_bundle_modules(
     let mut specs = Vec::with_capacity(modules.len());
     let mut blobs = Vec::with_capacity(modules.len());
     for m in modules {
-        
-        
         let file = format!("{}.vn", m.id.strip_prefix("std:").unwrap_or(&m.id));
         specs.push(ModuleSpec::leaked(
             m.id.clone(),
@@ -55,12 +49,6 @@ fn leak_bundle_modules(
     (specs, blobs)
 }
 
-
-
-
-
-
-
 static ACTIVE_STD: OnceLock<Result<Option<ActiveStd>, String>> = OnceLock::new();
 static EMBEDDED_STDLIB_BYTES: OnceLock<&'static [u8]> = OnceLock::new();
 
@@ -75,11 +63,7 @@ fn active_std_result() -> &'static Result<Option<ActiveStd>, String> {
             StdSource::SourceTree(root) => load_tree_std(&root, provenance).map(Some),
             StdSource::Embedded => match EMBEDDED_STDLIB_BYTES.get() {
                 Some(bytes) => load_embedded_std(bytes).map(Some),
-                
-                
-                
-                
-                
+
                 None if provenance == StdProvenance::Env => Err(format!(
                     "{}={} was requested but this binary has no stdlib compiled into it",
                     varn_modules::std_root::ENV_VARN_STD,
@@ -94,12 +78,6 @@ fn active_std_result() -> &'static Result<Option<ActiveStd>, String> {
 fn active_std() -> Option<&'static ActiveStd> {
     active_std_result().as_ref().ok()?.as_ref()
 }
-
-
-
-
-
-
 
 pub fn std_load_error() -> Option<&'static str> {
     active_std_result().as_ref().err().map(String::as_str)
@@ -122,9 +100,6 @@ fn load_embedded_std(bytes: &'static [u8]) -> Result<ActiveStd, String> {
 }
 
 fn load_tree_std(root: &std::path::Path, provenance: StdProvenance) -> Result<ActiveStd, String> {
-    
-    
-    
     let manifest = crate::std_manifest::read_manifest(root)
         .ok_or_else(|| format!("cannot read std manifest in source tree {}", root.display()))?;
     if manifest.host_api != varn_core::HOST_API_VERSION {
@@ -137,7 +112,6 @@ fn load_tree_std(root: &std::path::Path, provenance: StdProvenance) -> Result<Ac
     }
     let mut specs = Vec::new();
     for m in manifest.modules {
-        
         let file = m.id.strip_prefix("std:").unwrap_or(&m.id);
         let vn_source = if root.join(format!("{file}/mod.vn")).exists() {
             format!("{file}/mod.vn")
@@ -170,11 +144,6 @@ fn std_blobs(specifier: &str) -> Option<&'static StdModuleBlobs> {
     active_std()?.blobs.iter().find(|b| b.id == specifier)
 }
 
-
-
-
-
-
 static COMBINED_SPECS: OnceLock<&'static [ModuleSpec]> = OnceLock::new();
 
 fn combined_specs() -> &'static [ModuleSpec] {
@@ -206,7 +175,7 @@ impl StdlibProvider for BuiltinsProvider {
             return None;
         }
         if std_spec(specifier).is_some() {
-            return None; 
+            return None;
         }
         spec_for(specifier)?.source()
     }

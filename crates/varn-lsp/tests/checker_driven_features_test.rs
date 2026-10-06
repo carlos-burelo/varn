@@ -1,8 +1,5 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
 use tower_lsp::lsp_types::{CodeActionOrCommand, InlayHintLabel, Url};
 use varn_lsp::features::code_action::match_arms::generate_match_arms_action;
 use varn_lsp::features::inlay_hints::param_hints::build_parameter_hints;

@@ -35,7 +35,6 @@ impl IoDriver {
             }
         };
 
-        
         match listener_state.listener.accept() {
             Ok((stream, _)) => {
                 let conn_id = next_socket_id();
@@ -99,7 +98,6 @@ impl IoDriver {
         let conn_id = next_socket_id();
         let task = HostPromise::pending();
 
-        
         if stream.peer_addr().is_ok() {
             let mut reg = self.registry.lock().unwrap();
             reg.streams.insert(
@@ -147,7 +145,6 @@ impl IoDriver {
             }
         };
 
-        
         let mut buf = vec![0u8; len];
         match stream_state.stream.read(&mut buf) {
             Ok(0) => HostPromise::resolved(SendValue::Null),
@@ -180,7 +177,6 @@ impl IoDriver {
             }
         };
 
-        
         match stream_state.stream.write(&data) {
             Ok(n) if n == data.len() => HostPromise::resolved(SendValue::Int(n as i64)),
             Ok(n) => {

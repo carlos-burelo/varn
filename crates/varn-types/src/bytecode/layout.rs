@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 use varn_core::OpCode;
 
 use super::operand::{Access, At, Byte, ConstKind, Half, ImmKind, Layout, Operand, RunKind};
@@ -67,10 +57,6 @@ fn jump(word: usize, backward: bool) -> Operand {
     Operand::Jump { word, backward }
 }
 
-
-
-
-
 pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<Layout> {
     use ConstKind as K;
     use ImmKind as I;
@@ -99,7 +85,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         O::StoreGlobalIdx | O::DefineGlobalIdx => (3, vec![r(hi(1)), imm_word(2, I::GlobalSlot)]),
         O::LoadUpvalue => (2, vec![w(hi(1)), imm(lo(1), I::Upvalue)]),
         O::StoreUpvalue => (2, vec![imm(hi(1), I::Upvalue), r(lo(1))]),
-        
+
         O::CloseUpvalue => (2, vec![r(hi(1))]),
         O::LoadModule => (2, vec![w(hi(0)), k(1, K::Module)]),
         O::LoadModuleSlot => (3, vec![w(hi(0)), r(hi(1)), imm_word(2, I::ModuleSlot)]),
@@ -174,9 +160,9 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         | O::GetIndex
         | O::ArrayGetIndex
         | O::MapGetIndex => (2, vec![w(hi(0)), r(hi(1)), r(lo(1))]),
-        
+
         O::SetIndex | O::ArraySetIndex | O::MapSetIndex => (2, vec![r(hi(0)), r(hi(1)), r(lo(1))]),
-        
+
         O::ArrayPush | O::ArrayExtend => (2, vec![r(hi(0)), r(hi(1))]),
         O::ObjectMerge => (
             2,
@@ -190,13 +176,13 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         ),
         O::AssertNotNull | O::Throw => (2, vec![r(hi(1))]),
         O::Return => (2, vec![r(lo(1))]),
-        
+
         O::Yield => (2, vec![w(hi(1)), r(lo(1))]),
 
         O::Jump => (3, vec![jump(1, false)]),
         O::Loop => (3, vec![jump(1, true)]),
         O::JumpIfFalse | O::JumpIfTrue => (3, vec![r(hi(0)), jump(1, false)]),
-        
+
         O::Try => (4, vec![w(hi(1)), jump(2, false)]),
 
         O::Call | O::CallSpread => (
@@ -221,7 +207,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
                 imm(hi(0), I::CallSite),
             ],
         ),
-        
+
         O::Intrinsic => (
             2,
             vec![
@@ -238,7 +224,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
                 run(hi(0), word(2), RunKind::CallArgs),
             ],
         ),
-        
+
         O::InvokeRuntimeStatic => (
             5,
             vec![
@@ -257,7 +243,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         ),
         O::GetPropertyMaybe => (3, vec![w(hi(0)), r(hi(1)), k(2, K::Name)]),
         O::GetSymbol => (3, vec![w(hi(0)), r(hi(1)), k(2, K::Symbol)]),
-        
+
         O::SetProperty => (
             3,
             vec![r(hi(0)), r(hi(1)), k(2, K::Name), imm(lo(1), I::CallSite)],
@@ -283,11 +269,10 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         ),
         O::BindMethod => (3, vec![w(hi(1)), r(lo(1)), k(2, K::Name)]),
 
-        
         O::MakeClass => (3, vec![w(hi(0)), k(2, K::Name), r(hi(1))]),
-        
+
         O::Inherit => (2, vec![r(hi(1)), r(lo(1))]),
-        
+
         O::Method
         | O::DefineStatic
         | O::DefineGetter
@@ -296,14 +281,13 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         | O::DefineStaticSetter => (3, vec![r(hi(1)), k(2, K::Name), r(lo(1))]),
         O::DeclareLayout => (3, vec![r(hi(1)), k(2, K::Layout)]),
         O::AllocInstance => (2, vec![w(hi(0)), r(hi(1))]),
-        
+
         O::MakeEnumVariant => (3, vec![w(hi(1)), k(2, K::Name), r(lo(1))]),
 
         O::MakeClosure => {
             let captures = byte(lo(1));
             let mut ops = vec![w(hi(1)), k(2, K::Function), imm(lo(1), I::Count)];
-            
-            
+
             for i in 0..captures {
                 ops.push(if byte(hi(3 + i)) == 1 {
                     r(lo(3 + i))
@@ -321,7 +305,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
                 imm(hi(2), I::Count),
             ],
         ),
-        
+
         O::BuildMap => (
             3,
             vec![
@@ -344,7 +328,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
                 ],
             )
         }
-        
+
         O::BuildObject => {
             let pairs = byte(lo(1));
             let mut ops = vec![w(hi(1)), imm(lo(1), I::Count)];
@@ -354,14 +338,14 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
             }
             (2 + 2 * pairs, ops)
         }
-        
+
         O::ObjectRest => {
             let skipped = byte(hi(2));
             let mut ops = vec![w(hi(1)), r(lo(1)), imm(hi(2), I::Count)];
             ops.extend((0..skipped).map(|i| k(3 + i, K::Name)));
             (3 + skipped, ops)
         }
-        
+
         O::BuildStr => {
             let parts = byte(hi(1));
             let mut ops = vec![w(hi(0)), imm(hi(1), I::Count)];

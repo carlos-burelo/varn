@@ -3,8 +3,6 @@ use crate::types::{FunctionType, ObjectTypeMember};
 use std::hash::Hash;
 use xxhash_rust::xxh3::Xxh3;
 
-
-
 pub(super) const CONTENT_FLAG: u128 = 1u128 << 127;
 
 pub(super) fn hash128<T: Hash + ?Sized>(value: &T) -> u128 {

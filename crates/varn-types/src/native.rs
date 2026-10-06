@@ -61,29 +61,16 @@ impl SignatureDescriptor {
     }
 }
 
-
-
-
-
-
-
 #[derive(Debug, Copy, Clone)]
 pub struct NativeOpTarget {
-    
-    
-    
     pub func_ptr: usize,
-    
-    
-    
+
     pub raw_func_ptr: usize,
-    
-    
+
     pub signature: SignatureDescriptor,
 }
 
 impl NativeOpTarget {
-    
     pub const fn unknown() -> Self {
         Self {
             func_ptr: 0,

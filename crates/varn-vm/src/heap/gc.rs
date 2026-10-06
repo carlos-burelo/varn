@@ -47,9 +47,6 @@ impl HeapInner {
         self.identity_index.retain(|_, idx| live(idx));
     }
 
-    
-    
-    
     pub(crate) fn collect(&mut self, roots: &[HeapRef]) -> usize {
         let freed = self.mark_and_sweep(roots);
         self.young.retired += self.young.born.len() as u64;

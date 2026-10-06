@@ -12,22 +12,16 @@ pub const CAP_ALL: u64 = u64::MAX;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilitySet {
-    
     pub mask: u64,
 
-    
     pub fs_read_paths: Option<Vec<PathBuf>>,
 
-    
     pub fs_write_paths: Option<Vec<PathBuf>>,
 
-    
     pub net_hosts: Option<Vec<String>>,
 
-    
     pub net_ports: Option<Vec<i64>>,
 
-    
     pub env_vars: Option<Vec<String>>,
 }
 

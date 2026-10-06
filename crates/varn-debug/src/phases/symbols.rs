@@ -1,5 +1,3 @@
-
-
 use std::io::Write;
 
 use varn_checker::CheckResult;
@@ -7,7 +5,6 @@ use varn_checker::CheckResult;
 use crate::fmt::Format;
 use crate::render::{basename, BLUE, BOLD, DIM, RESET, YELLOW};
 use crate::report::Report;
-
 
 pub fn collect(check_result: &CheckResult) -> Report {
     let mut rows = Vec::new();

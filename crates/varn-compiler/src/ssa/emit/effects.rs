@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use super::super::ir::{Inst, InstKind, VarId};
 use super::regs::var_reg;
 use crate::OptError;
@@ -46,9 +39,6 @@ pub(super) fn emit_effect(
             offset,
             tag,
         } => {
-            
-            
-            
             chunk.write(
                 Chunk::pack_op(OpCode::SetFixedField, reg[object.0 as usize]),
                 line,

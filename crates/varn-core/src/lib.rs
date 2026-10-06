@@ -1,4 +1,3 @@
-
 pub mod ast;
 pub mod atom;
 pub mod capability;
@@ -51,17 +50,6 @@ pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use trivia::{Trivia, TriviaKind};
 
-
-
-
-
 pub const HOST_API_VERSION: u32 = 3;
-
-
-
-
-
-
-
 
 pub fn clear_interner() {}

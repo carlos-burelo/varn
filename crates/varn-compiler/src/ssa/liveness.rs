@@ -1,52 +1,14 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use super::ir::{InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashSet;
 
 #[derive(Debug)]
 pub struct Liveness {
-    
-    
-    
     pub def: Vec<u32>,
-    
+
     pub end: Vec<u32>,
-    
+
     pub live_out: Vec<FxHashSet<u32>>,
-    
+
     pub live_in: Vec<FxHashSet<u32>>,
 }
 
@@ -175,23 +137,6 @@ impl Liveness {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn live_after(&self, ssa: &SsaFunc, b: usize, i: usize) -> Vec<Value> {
         let block = &ssa.blocks[b];
         debug_assert!(
@@ -201,12 +146,6 @@ impl Liveness {
         );
         let mut live: FxHashSet<u32> = self.live_out[b].clone();
 
-        
-        
-        
-        
-        
-        
         for u in crate::ssa::verify::term_value_uses(&block.term) {
             live.insert(u.0);
         }
@@ -216,8 +155,6 @@ impl Liveness {
             }
         }
 
-        
-        
         for inst in block.insts[i + 1..].iter().rev() {
             if let Some(d) = inst.dest {
                 live.remove(&d.0);

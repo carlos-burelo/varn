@@ -134,10 +134,6 @@ impl ProfileCounters {
     }
 }
 
-
-
-
-
 #[derive(Debug)]
 pub struct VmProfile {
     pub ic_hits: u64,
@@ -217,12 +213,7 @@ pub struct HotspotCounters {
     pub fn_calls: FxHashMap<Arc<str>, CallEntry>,
     pub method_calls: FxHashMap<Arc<str>, CallEntry>,
     pub native_calls: FxHashMap<Arc<str>, u64>,
-    
-    
-    
-    
-    
-    
+
     pub native_ns: FxHashMap<Arc<str>, u64>,
     pub global_accesses: FxHashMap<Arc<str>, u64>,
     pub alloc_types: FxHashMap<&'static str, u64>,

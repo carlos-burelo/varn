@@ -20,8 +20,7 @@ pub fn build_workspace_symbols(index: &ProjectIndex, query: &str) -> Vec<SymbolI
                 line: entry.line,
                 character: entry.col,
             };
-            
-            
+
             #[allow(deprecated)]
             let symbol = SymbolInformation {
                 name: name.clone(),

@@ -21,13 +21,7 @@ impl ImportResolver for DiskResolver {
         }
 
         let canonical = varn_modules::canonical_or_original(Path::new(abs_path));
-        
-        
-        
-        
-        
-        
-        
+
         if canonical != abs_path {
             if let Some(cached) = self.cached_bind(&canonical) {
                 return Some(cached);
@@ -85,8 +79,6 @@ impl ImportResolver for DiskResolver {
             return Arc::new(ExportMap::default());
         }
 
-        
-        
         self.store_exports(canonical.clone(), Arc::new(ExportMap::default()));
 
         visiting.push(canonical.clone());
@@ -108,9 +100,7 @@ impl ImportResolver for DiskResolver {
 
         let source = self.load_source(&ModuleId::stdlib(specifier))?;
         let carrier = super::CarrierKind::from(source.provenance);
-        
-        
-        
+
         self.bind_from_embedded(specifier, source.text.as_ref(), carrier)
     }
 
@@ -159,8 +149,7 @@ impl ImportResolver for DiskResolver {
         if let Some(hit) = self.core_exports.lock().as_ref() {
             return Arc::clone(hit);
         }
-        
-        
+
         let built = Arc::new(crate::core::loader::build_core_exports(self));
         *self.core_exports.lock() = Some(Arc::clone(&built));
         built

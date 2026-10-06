@@ -1,6 +1,3 @@
-
-
-
 use std::collections::HashMap;
 use tower_lsp::lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, Position, Range, TextEdit, WorkspaceEdit,
@@ -25,14 +22,13 @@ pub fn generate_match_arms_action(
     let ExprKind::Match { cases, .. } = &node.kind else {
         return None;
     };
-    
+
     let end = cases.last().map_or(node.range.start, |c| c.range.end);
     let insert_pos = Position {
         line: end.line.saturating_sub(1),
         character: end.column,
     };
 
-    
     let indent_cols = cases.first().map_or_else(
         || {
             let line = state
@@ -77,7 +73,6 @@ pub fn generate_match_arms_action(
         data: None,
     }))
 }
-
 
 fn match_at_line(state: &DocumentState, line: u32) -> Option<ExprId> {
     let line = line + 1;

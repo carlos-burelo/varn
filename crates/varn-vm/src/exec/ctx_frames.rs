@@ -34,8 +34,6 @@ impl ExecCtx {
                     let recv_nv = receiver;
                     match prepared {
                         PreparedCall::Frame(ref frame) => {
-                            
-                            
                             self.stack.unbox_into_reg(frame.base, 0, recv_nv)?;
                         }
                         PreparedCall::NativeImmediate(_, _)
@@ -76,22 +74,10 @@ impl ExecCtx {
         Ok(())
     }
 
-    
-    
     pub(crate) fn stage_pop(&mut self) -> VmValue {
         self.stage.pop().unwrap_or(VmValue::null())
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn push_call_frame(
         &mut self,
         proto: &Rc<varn_types::FunctionProto>,
@@ -109,14 +95,6 @@ impl ExecCtx {
         Ok(alloc)
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn push_call_frame_with_this(
         &mut self,
         proto: &Rc<varn_types::FunctionProto>,
@@ -147,10 +125,6 @@ impl ExecCtx {
         up
     }
 
-    
-    
-    
-    
     pub(crate) fn drop_frame_storage(&mut self, alloc: usize) {
         if alloc == crate::frame::CallFrame::NO_ACTIVATION {
             return;
@@ -173,8 +147,6 @@ impl ExecCtx {
             .retain(|(s, _)| s.idx < bases[s.class.index()]);
     }
 
-    
-    
     pub(crate) fn close_upvalues_from_reg(&mut self, alloc: usize, lowest: usize) {
         if self.open_upvalues.is_empty() {
             return;

@@ -3,13 +3,6 @@ use std::path::{Path, PathBuf};
 use crate::registry::{is_known, spec_for};
 use varn_modules::spec::{ModuleKind, ModuleSpec};
 
-
-
-
-
-
-
-
 pub struct CoreSourceLocator {
     stdlib_root: PathBuf,
 }
@@ -19,8 +12,6 @@ impl CoreSourceLocator {
         Self { stdlib_root }
     }
 
-    
-    
     pub fn from_checkout() -> Self {
         Self::new(PathBuf::from("."))
     }

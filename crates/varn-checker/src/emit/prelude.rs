@@ -1,16 +1,9 @@
-
-
-
-
-
 use rustc_hash::FxHashSet;
 use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprKind};
 use varn_core::AtomInterner;
 use varn_modules::layer::Layer;
 use varn_tir::{TirImport, TirImportKind, TirImportSpec};
-
-
 
 pub(super) fn prelude_imports(
     module: &str,

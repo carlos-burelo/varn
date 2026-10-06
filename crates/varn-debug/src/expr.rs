@@ -1,30 +1,7 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::fmt::Write as _;
 
 use varn_checker::CheckResult;
 use varn_core::ast::Program;
-
-
-
-
-
 
 pub(crate) fn line_col(source: &str, offset: u32) -> (u32, u32) {
     let offset = offset as usize;
@@ -44,24 +21,9 @@ pub(crate) fn line_col(source: &str, offset: u32) -> (u32, u32) {
     (line, col)
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 pub fn render_check_types(program: &Program, source: &str, check: &CheckResult) -> String {
     let mut out = String::new();
 
-    
-    
-    
     let name = program
         .filename
         .rsplit(['/', '\\'])
@@ -80,6 +42,5 @@ pub fn render_check_types(program: &Program, source: &str, check: &CheckResult) 
 
     out
 }
-
 
 pub use crate::phases::check_types::debug_check_types;

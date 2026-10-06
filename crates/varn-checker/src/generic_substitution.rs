@@ -20,8 +20,6 @@ pub(crate) fn map_generics_cached(
         return *base;
     }
 
-    
-    
     let atom_mapping: FxHashMap<varn_core::Atom, Type> = mapping
         .iter()
         .map(|(k, v)| (varn_core::Atom::of(k), *v))

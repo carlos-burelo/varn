@@ -15,8 +15,6 @@ pub use graph::ModuleGraph;
 pub use paths::{is_known_module, resolve_package_specifier_path};
 pub use resolver::{DiskResolver, ImportResolver};
 
-
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CarrierKind {
     Memory = 0,

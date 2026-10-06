@@ -16,9 +16,7 @@ pub struct ModuleSpec {
     pub embedded: Option<&'static str>,
     pub exports: &'static [&'static str],
     pub pure: bool,
-    
-    
-    
+
     pub has_code: bool,
 }
 
@@ -54,9 +52,6 @@ impl ModuleSpec {
         self.embedded
     }
 
-    
-    
-    
     pub fn leaked(id: String, kind: ModuleKind, vn_source: String, pure: bool) -> Self {
         Self {
             id: Box::leak(id.into_boxed_str()),

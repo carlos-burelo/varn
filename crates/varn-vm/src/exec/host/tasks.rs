@@ -6,9 +6,6 @@ impl ExecCtx {
         callee: VmValue,
         args: &[VmValue],
     ) -> Result<VmValue, varn_types::NativeError> {
-        
-        
-        
         let mut window = Vec::with_capacity(args.len() + 1);
         window.push(callee);
         window.extend_from_slice(args);

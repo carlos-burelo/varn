@@ -1,28 +1,23 @@
-
-
-
-
 pub struct ICKind;
 impl ICKind {
-    
     pub const SHAPE_PROP: u8 = 1;
-    
+
     pub const CLASS_METHOD: u8 = 2;
-    
+
     pub const CLASS_GETTER: u8 = 3;
-    
+
     pub const CLASS_SETTER: u8 = 4;
-    
+
     pub const SHAPE_TRANSITION: u8 = 5;
-    
+
     pub const NATIVE_VTABLE_METHOD: u8 = 6;
-    
+
     pub const VM_VTABLE_METHOD: u8 = 7;
-    
+
     pub const ARRAY_LENGTH: u8 = 8;
-    
+
     pub const STR_LENGTH: u8 = 9;
-    
+
     pub const INSTANCE_FIELD: u8 = 10;
 }
 
@@ -33,18 +28,7 @@ pub struct CacheEntry {
     pub slot: u16,
     pub is_class: u8,
     pub vtable_ver: u8,
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     #[serde(skip)]
     pub class: Option<std::rc::Rc<crate::value::ClassObj>>,
 }
@@ -56,8 +40,6 @@ impl CacheEntry {
     }
 }
 
-
-
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct PolyICSlot {
@@ -67,8 +49,6 @@ pub struct PolyICSlot {
 
     last_hit: u8,
 }
-
-
 
 pub const POLY_IC_SLOT_SIZE: usize = 136;
 
@@ -81,9 +61,7 @@ impl Default for PolyICSlot {
 impl PolyICSlot {
     pub fn new() -> Self {
         const _: () = assert!(std::mem::size_of::<PolyICSlot>() == POLY_IC_SLOT_SIZE);
-        
-        
-        
+
         const _: () = assert!(std::mem::offset_of!(CacheEntry, id) == 0);
         const _: () = assert!(std::mem::offset_of!(CacheEntry, slot) == 4);
         const _: () = assert!(std::mem::offset_of!(CacheEntry, is_class) == 6);
@@ -163,8 +141,6 @@ impl FeedbackVector {
 mod tests {
     use super::*;
 
-    
-    
     #[test]
     fn jit_entry_contract() {
         assert_eq!(std::mem::offset_of!(CacheEntry, id), 0);
@@ -175,7 +151,6 @@ mod tests {
         assert_eq!(std::mem::size_of::<CacheEntry>(), 16);
         assert_eq!(std::mem::size_of::<PolyICSlot>(), POLY_IC_SLOT_SIZE);
 
-        
         let cls = std::rc::Rc::new(crate::value::ClassObj::new("Probe"));
         let mut slot = PolyICSlot::new();
         slot.find_or_insert(CacheEntry {

@@ -51,10 +51,7 @@ impl<'r> Checker<'r> {
                     self.with_expected(elem_expected, |c| c.check_expr(*e, bind));
                     if let Some(expected) = &elem_expected {
                         let actual = self.infer_type(*e, bind);
-                        
-                        
-                        
-                        
+
                         if !actual.is_dynamic()
                             && !self.value_assignable_to(expected, &actual, Some(*e), Some(bind))
                         {
@@ -101,14 +98,6 @@ impl<'r> Checker<'r> {
                     }
                     TypeKind::Named(name_atom, origin_atom)
                     | TypeKind::Generic(name_atom, _, origin_atom) => {
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
                         let resolve_atom = |a: varn_core::Atom| -> String {
                             bind.interner
                                 .try_resolve(a)
@@ -227,10 +216,7 @@ impl<'r> Checker<'r> {
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;
                 }
-                
-                
-                
-                
+
                 ObjectProp::Getter { body, range, .. } | ObjectProp::Setter { body, range, .. } => {
                     self.emit(
                         Diagnostic::error(

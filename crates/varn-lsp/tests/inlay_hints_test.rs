@@ -28,7 +28,7 @@ class SortedPair<T> {
     let state = run_pipeline(source.to_string(), uri);
 
     let hints = build_inlay_hints(&state);
-    
+
     assert!(
         hints.is_empty(),
         "Expected 0 inlay hints for fully explicitly typed class, but got: {:?}",
@@ -46,7 +46,7 @@ const greeting = "hello";
     let state = run_pipeline(source.to_string(), uri);
 
     let hints = build_inlay_hints(&state);
-    
+
     assert_eq!(
         hints.len(),
         2,

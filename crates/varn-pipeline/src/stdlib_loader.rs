@@ -9,21 +9,6 @@ use varn_modules::loader::ModuleLoader as CanonicalLoader;
 use varn_types::FunctionProto;
 use varn_vm::loader::{ModuleError, ModuleLoader};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 thread_local! {
     static PROTO_CACHE: RefCell<FxHashMap<String, (u64, Rc<FunctionProto>)>> =
         RefCell::new(FxHashMap::default());
@@ -77,8 +62,6 @@ pub struct FileLoader;
 
 impl ModuleLoader for FileLoader {
     fn resolve(&self, spec: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
-        
-        
         varn_modules::resolver::ModuleResolver::new()
             .resolve(spec, from)
             .map_err(ModuleError::new)
@@ -95,7 +78,7 @@ impl ModuleLoader for FileLoader {
             ModuleId::Local(p) => p.as_ref(),
             _ => return Ok(None),
         };
-        
+
         let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)
             .map_err(|e| ModuleError::new(e.to_string()))?
             .text;
@@ -116,7 +99,6 @@ pub struct StdlibLoader;
 
 impl ModuleLoader for StdlibLoader {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
-        
         varn_modules::resolver::ModuleResolver::new()
             .resolve(specifier, from)
             .map_err(ModuleError::new)
@@ -135,7 +117,6 @@ impl ModuleLoader for StdlibLoader {
             _ => return Ok(None),
         };
 
-        
         let key = varn_modules::artifact::module_key(id, STD_FINGERPRINT);
         if let Some(hit) = cached_proto(&key, STD_FINGERPRINT) {
             return Ok(Some(hit));
@@ -147,8 +128,6 @@ impl ModuleLoader for StdlibLoader {
 }
 
 fn load_uncached(id: &ModuleId, spec: &str) -> Result<FunctionProto, ModuleError> {
-    
-    
     let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)
         .map_err(|e| ModuleError::new(e.to_string()))?;
 
@@ -161,18 +140,9 @@ fn load_uncached(id: &ModuleId, spec: &str) -> Result<FunctionProto, ModuleError
         .map_err(|e| ModuleError::new(format!("stdlib compile error in {spec}: {e}")))
 }
 
-
-
 pub fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
     compile_source_inner(source, path, false)
 }
-
-
-
-
-
-
-
 
 pub fn compile_source_checked(source: &str, path: &str) -> Result<FunctionProto, String> {
     compile_source_inner(source, path, true)
@@ -188,10 +158,6 @@ fn compile_source_inner(
         varn_checker::Checker::check(&program, &arena, interner, r)
     });
     if reject_type_errors && check.diagnostics.has_errors() {
-        
-        
-        
-        
         let mut msg = String::new();
         for d in check.diagnostics.errors() {
             msg.push_str(&format!(
@@ -223,11 +189,6 @@ fn compile_source_inner(
     varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
 }
 
-
-
-
-
-
 fn validate_imports(id: &str, source: &str) -> Result<(), String> {
     let (program, arena, interner) = crate::quiet_parse::parse_only(source, id, "")?;
     for spec in crate::import_collector::collect_imports(&program, &arena, &interner) {
@@ -236,9 +197,6 @@ fn validate_imports(id: &str, source: &str) -> Result<(), String> {
     }
     Ok(())
 }
-
-
-
 
 pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, String> {
     #[derive(serde::Deserialize)]
@@ -301,8 +259,7 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
         };
 
     let mut modules = Vec::new();
-    
-    
+
     let mut failures = String::new();
     for m in &manifest.modules {
         let rel_id = m.id.strip_prefix("std:").ok_or("invalid std: prefix")?;

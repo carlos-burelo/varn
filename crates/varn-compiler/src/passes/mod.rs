@@ -23,14 +23,8 @@ pub fn optimize(func: &mut SsaFunc) {
 
         changed |= monomorphize::run(func);
 
-        
-        
-        
         changed |= algebraic::run(func);
 
-        
-        
-        
         changed |= cse::run(func);
 
         changed |= fixed_fields::run(func);

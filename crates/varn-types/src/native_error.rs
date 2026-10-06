@@ -1,8 +1,3 @@
-
-
-
-
-
 use crate::VmValue;
 use varn_core::RuntimeErrorKind;
 
@@ -30,7 +25,6 @@ impl NativeError {
         Self::of_kind(RuntimeErrorKind::DivisionByZero, message)
     }
 
-    
     pub fn rethrow(
         kind: RuntimeErrorKind,
         message: impl Into<String>,

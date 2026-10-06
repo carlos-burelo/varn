@@ -3,9 +3,6 @@ use super::structs::{Heap, HeapInner};
 use crate::value::VmValue;
 use std::rc::Rc;
 
-
-
-
 const RCBOX_PREFIX: usize = 2 * std::mem::size_of::<usize>();
 
 impl Heap {
@@ -45,15 +42,9 @@ impl Heap {
         for _ in 0..3 {
             slots_probe.push(None);
         }
-        
-        
-        
+
         let (slots_ptr_off, vec_len_off) = vec_word_offsets(&slots_probe);
 
-        
-        
-        
-        
         let (disc_off, elems_ptr_off, elems_len_off) = {
             use varn_types::vm_value::ArrayRepr;
             let mut boxed_vec: Vec<VmValue> = Vec::with_capacity(7);
@@ -78,7 +69,6 @@ impl Heap {
             );
             assert_eq!(probed_len, 3, "elems tripwire: Boxed Vec len mismatch");
 
-            
             let i64_repr = ArrayRepr::I64(vec![0, 0, 0]);
             let i64_disc =
                 unsafe { *(&i64_repr as *const _ as *const u8).add(ArrayRepr::DISC_OFF) };
@@ -141,9 +131,7 @@ impl Heap {
 
         let shape = varn_types::Shape::create(None, rustc_hash::FxHashMap::default());
         let shape_id = shape.id;
-        
-        
-        
+
         let mut probe = vec![0u64; varn_types::ObjData::bytes_for(TAIL) / 8];
         let oref = unsafe {
             varn_types::ObjData::init_at(
@@ -156,9 +144,6 @@ impl Heap {
         let data = probe.as_ptr() as usize;
         let shape_ptr = Rc::as_ptr(&shape) as *const u8 as usize - RCBOX_PREFIX;
 
-        
-        
-        
         let values_off = varn_types::OBJ_VALUES_OFF;
         let shape_off = varn_types::OBJ_SHAPE_OFF;
         let len_off = varn_types::OBJ_INLINE_LEN_OFF;
@@ -200,8 +185,6 @@ impl Heap {
         let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
         assert_ne!(object_tag, none_tag, "Option<HeapObj> niche probe failed");
 
-        
-        
         const PROBE_CLASS_ID: u32 = 0x005E_ED1D;
         let mut probe = [0u64; 2];
         let inst = unsafe {
@@ -218,8 +201,6 @@ impl Heap {
         let instance_tag = inst_bytes[0] as usize;
         let instance_data_off = super::cells::INSTANCE_DATA_OFF;
 
-        
-        
         let instance_values_off = varn_types::INST_PAYLOAD_OFF;
         let instance_class_id_off = varn_types::INST_CLASS_ID_OFF;
         assert_eq!(
@@ -247,15 +228,12 @@ impl Heap {
 mod tests {
     use super::*;
 
-    
-    
-    
     #[test]
     fn layouts_match_derived_consts() {
         use varn_types::vm_value::ArrayRepr;
         let a = Heap::jit_array_layout();
         assert_eq!(a.disc_off, ArrayRepr::DISC_OFF);
-        
+
         assert!(a.elems_ptr_off >= ArrayRepr::ELEMS_UNION_OFF);
         assert!(a.elems_len_off >= ArrayRepr::ELEMS_UNION_OFF);
         assert_ne!(a.elems_ptr_off, a.elems_len_off);

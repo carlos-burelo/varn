@@ -1,10 +1,4 @@
-
-
-
 use std::sync::Arc;
-
-
-
 
 static LITERAL_VARIANTS: [&str; 9] = [
     varn_core::RuntimeKind::Null.name(),
@@ -62,11 +56,11 @@ impl PartialEq for Literal {
             (Self::Null, Self::Null) => true,
             (Self::Bool(a), Self::Bool(b)) => a == b,
             (Self::Int(a), Self::Int(b)) => a == b,
-            
+
             (Self::Float(a), Self::Float(b)) => a.to_bits() == b.to_bits(),
             (Self::Str(a), Self::Str(b)) => a == b,
             (Self::BigInt(a), Self::BigInt(b)) => a == b,
-            
+
             (Self::Decimal(a), Self::Decimal(b)) => {
                 a.as_bigint_and_scale() == b.as_bigint_and_scale()
             }

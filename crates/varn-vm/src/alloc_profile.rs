@@ -1,38 +1,19 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::cell::Cell;
-
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Seg {
-    
-    
-    
     HelperTotal = 0,
-    
+
     ShapeLookup = 1,
-    
+
     ClosureScan = 2,
-    
+
     ObjDataAlloc = 3,
-    
+
     HeapPush = 4,
-    
+
     CtorResolve = 5,
-    
+
     CtorFrame = 6,
 }
 
@@ -48,24 +29,12 @@ pub const NAMES: [&str; N] = [
     "ctor frame",
 ];
 
-
-
-
-
-
-
-
-
-
-
-
-
 static LEVEL: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 thread_local! {
     static CYCLES: [Cell<u64>; N] = Default::default();
     static HITS: [Cell<u64>; N] = Default::default();
-    
+
     static OVERHEAD: Cell<u64> = const { Cell::new(0) };
 }
 
@@ -73,7 +42,6 @@ thread_local! {
 pub fn enabled() -> bool {
     LEVEL.load(std::sync::atomic::Ordering::Relaxed) > 0
 }
-
 
 #[inline(always)]
 pub fn detail() -> bool {
@@ -84,9 +52,6 @@ pub fn detail() -> bool {
 pub fn read() -> u64 {
     #[cfg(target_arch = "x86_64")]
     {
-        
-        
-        
         unsafe { core::arch::x86_64::_rdtsc() }
     }
     #[cfg(not(target_arch = "x86_64"))]
@@ -94,7 +59,6 @@ pub fn read() -> u64 {
         0
     }
 }
-
 
 #[inline(always)]
 pub fn record(seg: Seg, start: u64, end: u64) {
@@ -105,7 +69,6 @@ pub fn record(seg: Seg, start: u64, end: u64) {
     HITS.with(|h| h[i].set(h[i].get() + 1));
 }
 
-
 fn calibrate() {
     let mut best = u64::MAX;
     for _ in 0..1000 {
@@ -115,8 +78,6 @@ fn calibrate() {
     }
     OVERHEAD.with(|o| o.set(best));
 }
-
-
 
 pub fn report() {
     if !enabled() {
@@ -148,7 +109,6 @@ pub fn report() {
         );
     }
 
-    
     let ht = HITS.with(|h| h[Seg::HelperTotal as usize].get());
     if ht > 0 {
         let total = CYCLES.with(|c| c[Seg::HelperTotal as usize].get()) as f64 / ht as f64;
@@ -171,8 +131,6 @@ pub fn report() {
         );
     }
 }
-
-
 
 pub fn init() {
     let level = std::env::var("VARN_ALLOC_PROFILE")

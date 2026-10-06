@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::SsaBinOp;
@@ -13,9 +5,6 @@ use varn_types::ssa::SsaBinOp;
 use super::Ctx;
 
 use super::super::emit::{box_f64, box_int, call_helper_void, unbox_f64_coerce, unbox_int};
-
-
-
 
 pub(super) fn emit_bin(
     b: &mut FunctionBuilder,

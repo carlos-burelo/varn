@@ -1,16 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder, TrapCode, Value};
 use cranelift_frontend::FunctionBuilder;
 
@@ -22,8 +9,6 @@ fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
         .as_ref()
         .ok_or_else(|| "from_ssa: try/throw without a frame".into())
 }
-
-
 
 pub(super) fn emit_try(
     b: &mut FunctionBuilder,
@@ -46,13 +31,11 @@ pub(super) fn emit_try(
     Ok(())
 }
 
-
 pub(super) fn emit_pop_try(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<(), String> {
     let frame = frame(ctx)?;
     call_helper_void(b, ctx.cc, ctx.helpers.try_pop, &[frame.exec_ctx]);
     Ok(())
 }
-
 
 pub(super) fn emit_throw(
     b: &mut FunctionBuilder,

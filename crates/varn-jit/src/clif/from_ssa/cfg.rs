@@ -1,11 +1,7 @@
-
-
-
 use varn_types::ssa::{SsaProto, SsaTerm};
 
 use super::store::clif_ty;
 use super::views;
-
 
 pub(super) fn predecessors(ssa: &SsaProto) -> Vec<Vec<usize>> {
     let mut preds = vec![Vec::new(); ssa.blocks.len()];
@@ -23,11 +19,6 @@ pub(super) fn predecessors(ssa: &SsaProto) -> Vec<Vec<usize>> {
     }
     preds
 }
-
-
-
-
-
 
 pub(super) fn loop_may_collect(
     ssa: &SsaProto,
@@ -53,11 +44,6 @@ pub(super) fn loop_may_collect(
             .any(|i| !views::keeps_views(ssa, &i.op))
     })
 }
-
-
-
-
-
 
 pub(super) fn order(ssa: &SsaProto, entry: usize) -> Vec<usize> {
     let n = ssa.blocks.len();
@@ -89,10 +75,6 @@ pub(super) fn order(ssa: &SsaProto, entry: usize) -> Vec<usize> {
     }
     post.into_iter().rev().collect()
 }
-
-
-
-
 
 pub(super) fn check_block_args(ssa: &SsaProto) -> Result<(), String> {
     let check = |from: usize, target: u32, args: &[u32]| -> Result<(), String> {
@@ -168,8 +150,6 @@ pub(super) fn loop_body(
     }
     body
 }
-
-
 
 pub(super) fn def_blocks(ssa: &SsaProto) -> Vec<Option<usize>> {
     let mut def = vec![None; ssa.values.len()];

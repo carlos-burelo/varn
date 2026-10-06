@@ -1,5 +1,3 @@
-
-
 #[cfg(target_arch = "x86_64")]
 use iced_x86::{Decoder, DecoderOptions, Formatter, Instruction, IntelFormatter};
 use varn_jit::clif::debug::{inspect, ClifInspection};
@@ -14,7 +12,6 @@ use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_core::term::terminal::Section;
 
-
 pub fn debug_clif(proto: &FunctionProto, flags: &DebugFlags, helpers: &JitHelpers) {
     Section::new("clif")
         .subtitle(proto.name.as_deref().unwrap_or("<top-level>"))
@@ -28,7 +25,7 @@ pub fn debug_clif(proto: &FunctionProto, flags: &DebugFlags, helpers: &JitHelper
             return;
         }
     };
-    
+
     let resolved = crate::resolved_copy(proto);
     render_recursive(&resolved, flags, helpers, isa);
     Section::new("clif").close();
@@ -40,8 +37,6 @@ fn render_recursive(
     helpers: &JitHelpers,
     isa: &varn_jit::OwnedTargetIsa,
 ) {
-    
-    
     if flags.fn_filter.as_ref().is_none_or(|needle| {
         proto
             .name
@@ -61,11 +56,6 @@ fn render_recursive(
 }
 
 fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
-    
-    
-    
-    
-    
     let check_only = flags.clif_check
         && !(flags.clif_route || flags.clif_kinds || flags.clif_ir || flags.clif_asm);
     if check_only {
@@ -122,10 +112,6 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
 
     if flags.clif_asm {
         if let Some(code) = &insp.code {
-            
-            
-            
-            
             let n = code.bytes.len();
             let raw_end = (code.raw_off + code.raw_len).min(n);
             let entry = code.entry_off.min(n);
@@ -152,7 +138,6 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
     }
 }
 
-
 #[cfg(target_arch = "x86_64")]
 fn disasm(bytes: &[u8], rip: u64) -> String {
     let mut decoder = Decoder::with_ip(64, bytes, rip, DecoderOptions::NONE);
@@ -168,7 +153,6 @@ fn disasm(bytes: &[u8], rip: u64) -> String {
     }
     out
 }
-
 
 #[cfg(not(target_arch = "x86_64"))]
 fn disasm(bytes: &[u8], rip: u64) -> String {

@@ -19,18 +19,8 @@ pub struct TokenStream {
     split_count: u8,
     next_ast_id: AstId,
 
-    
-    
-    
-    
-    
-    
     pub interner: varn_core::AtomInterner,
 
-    
-    
-    
-    
     pub arena: AstArena,
 }
 
@@ -115,9 +105,6 @@ impl TokenStream {
         }
     }
 
-    
-    
-    
     #[inline]
     pub fn pos(&self) -> usize {
         self.pos
@@ -137,11 +124,6 @@ impl TokenStream {
         }
     }
 
-    
-    
-    
-    
-    
     #[inline]
     pub fn prev_end_range(&self) -> SourceRange {
         if self.pos == 0 {
@@ -286,10 +268,6 @@ impl TokenStream {
         }
     }
 
-    
-    
-    
-    
     pub fn consume_lexeme(&mut self) -> varn_core::Atom {
         let tok = self.token().clone();
         let text = tok.get_lexeme(&self.lexeme_buf);

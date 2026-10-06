@@ -1,30 +1,14 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
 use super::Ctx;
 
-
 #[derive(Clone, Copy)]
 pub(super) enum Region {
-    
     Module,
-    
+
     Native,
 }
-
 
 fn slot_addr(
     b: &mut FunctionBuilder,
@@ -67,7 +51,6 @@ fn slot_addr(
     Ok(b.ins().iadd(gbase, scaled))
 }
 
-
 pub(super) fn emit_load(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -82,7 +65,6 @@ pub(super) fn emit_load(
         0,
     ))
 }
-
 
 pub(super) fn emit_store(
     b: &mut FunctionBuilder,

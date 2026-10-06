@@ -29,20 +29,13 @@ const b = acc.balance;
 
     let doc = workspace.get(&uri).unwrap();
 
-    
     let refs = build_references(&doc, &workspace, 2, 5);
     assert!(
         refs.is_some(),
         "Should find references for property balance"
     );
     let locs = refs.unwrap();
-    
-    
-    
-    
-    
-    
-    
+
     assert_eq!(
         locs.len(),
         6,
@@ -50,7 +43,6 @@ const b = acc.balance;
         locs
     );
 
-    
     let edit = build_rename(&doc, &workspace, None, 2, 5, "total_balance".to_string());
     assert!(edit.is_some(), "Rename should produce WorkspaceEdit");
     let ws_edit = edit.unwrap();
@@ -68,7 +60,6 @@ fn test_workspace_indexing_memory_lifecycle() {
     let uri = "file:///test/compute.vn".to_string();
     let workspace = Workspace::new();
 
-    
     workspace.index_file(uri.clone(), source.to_string());
     assert_eq!(
         workspace.file_count(),
@@ -80,7 +71,6 @@ fn test_workspace_indexing_memory_lifecycle() {
         "workspace.get must return None for un-opened indexed files"
     );
 
-    
     {
         let idx = workspace.index.read().unwrap();
         let defs = idx.definitions_of("compute_something");
@@ -88,7 +78,6 @@ fn test_workspace_indexing_memory_lifecycle() {
         assert_eq!(defs[0].name, "compute_something");
     }
 
-    
     workspace.update_file(uri.clone(), source.to_string());
     assert_eq!(
         workspace.file_count(),
@@ -97,7 +86,6 @@ fn test_workspace_indexing_memory_lifecycle() {
     );
     assert!(workspace.get(&uri).is_some());
 
-    
     workspace.close_file(&uri);
     assert_eq!(
         workspace.file_count(),
@@ -114,7 +102,6 @@ fn test_workspace_indexing_memory_lifecycle() {
         );
     }
 
-    
     workspace.remove_file(&uri);
     {
         let idx = workspace.index.read().unwrap();

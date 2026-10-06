@@ -160,7 +160,6 @@ fn find_class_at_line<'a>(
         })
 }
 
-
 fn find_interface(
     state: &DocumentState,
     program: &varn_core::ast::Program,

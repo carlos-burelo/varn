@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 use crate::exec::closures::UpvalueSrc;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
@@ -240,8 +230,6 @@ pub(crate) extern "C" fn jit_store_upvalue(
     }
 }
 
-
-
 #[varn_op_macros::jit_slow(field = "make_closure")]
 pub(crate) extern "C" fn jit_make_closure(
     ctx: *mut ExecCtx,
@@ -263,9 +251,6 @@ pub(crate) extern "C" fn jit_make_closure(
         }
     }
 }
-
-
-
 
 #[varn_op_macros::jit_slow(field = "make_closure_window")]
 pub(crate) extern "C" fn jit_make_closure_window(
@@ -292,10 +277,6 @@ pub(crate) extern "C" fn jit_make_closure_window(
     }
 }
 
-
-
-
-
 #[varn_op_macros::jit_slow(field = "load_global_by_name")]
 pub(crate) extern "C" fn jit_load_global_by_name(
     ctx: *mut ExecCtx,
@@ -317,8 +298,6 @@ pub(crate) extern "C" fn jit_load_global_by_name(
             .unwrap_or(VmValue::null());
     }
 }
-
-
 
 #[varn_op_macros::jit_slow(field = "store_global_by_name")]
 pub(crate) extern "C" fn jit_store_global_by_name(

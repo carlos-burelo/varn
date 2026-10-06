@@ -1,27 +1,6 @@
 use std::io::Write;
 use std::path::Path;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const FINGERPRINTED_CRATES: &[&str] = &["varn-core", "varn-types", "varn-modules", "varn-checker"];
 
 fn main() {

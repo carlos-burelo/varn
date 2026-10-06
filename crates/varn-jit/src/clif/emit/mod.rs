@@ -1,7 +1,3 @@
-
-
-
-
 use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, Signature};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
@@ -10,23 +6,14 @@ mod payload;
 
 pub(in crate::clif) use payload::*;
 
-
-
-
-
 pub(super) const KIND_MASK: i64 = varn_types::vm_value::KIND_MASK as i64;
 pub(super) const HEAP_KIND: i64 = varn_types::vm_value::KIND_HEAP as i64;
-
-
 
 pub(super) fn patch_rel32(buf: &mut [u8], site: usize, target: usize) {
     let disp = target as i64 - (site as i64 + 4);
     let disp = i32::try_from(disp).expect("clif: rel32 out of range");
     buf[site..site + 4].copy_from_slice(&disp.to_le_bytes());
 }
-
-
-
 
 #[allow(unused_variables)]
 pub(super) fn box_int(
@@ -38,10 +25,6 @@ pub(super) fn box_int(
         .iconst(types::I64, varn_types::vm_value::KIND_INT as i64);
     b.ins().iconcat(tag, v)
 }
-
-
-
-
 
 pub(super) fn box_bool(
     b: &mut FunctionBuilder,
@@ -58,10 +41,6 @@ pub(super) fn box_bool(
     b.ins().iconcat(tag, payload)
 }
 
-
-
-
-
 pub(super) fn unbox_bool(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
@@ -73,13 +52,6 @@ pub(super) fn unbox_bool(
         v
     }
 }
-
-
-
-
-
-
-
 
 pub(super) fn box_f64(
     b: &mut FunctionBuilder,
@@ -93,14 +65,6 @@ pub(super) fn box_f64(
         .bitcast(types::I64, cranelift_codegen::ir::MemFlagsData::new(), v);
     b.ins().iconcat(tag, payload)
 }
-
-
-
-
-
-
-
-
 
 pub(super) fn unbox_f64_coerce(
     b: &mut FunctionBuilder,
@@ -131,11 +95,9 @@ pub(super) fn unbox_f64_coerce(
     }
 }
 
-
 pub(super) fn meta_is_float(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
     meta.get(r).is_some_and(|m| m.kind == SlotKind::Float)
 }
-
 
 pub(super) fn box_null(b: &mut FunctionBuilder) -> cranelift_codegen::ir::Value {
     let tag = b

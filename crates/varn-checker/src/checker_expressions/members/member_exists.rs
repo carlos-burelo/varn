@@ -10,10 +10,7 @@ fn check_in_bind(name: &Arc<str>, key: &str, ext_bind: &crate::binder::BindResul
             return true;
         }
     }
-    
-    
-    
-    
+
     if let Some(entry) = ext_bind.get_class_entry(name) {
         if entry.members.iter().any(|m| m.name.as_ref() == key) {
             return true;
@@ -283,15 +280,7 @@ impl<'r> Checker<'r> {
                 .get_object_members(mid)
                 .iter()
                 .any(|m| m.name() == key),
-            
-            
-            
-            
-            
-            
-            
-            
-            
+
             TypeKind::Tuple(_) => key == varn_core::MemberKey::Length.as_str(),
             TypeKind::Array(_) => {
                 if let Some(b) = &bind.core {

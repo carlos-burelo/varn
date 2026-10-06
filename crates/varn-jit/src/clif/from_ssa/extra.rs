@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::{SsaObjectSpreadPart, SsaOp, SsaSpread};
@@ -16,9 +7,6 @@ use super::store::{home_load, home_store, Out};
 use super::{load_value, Ctx};
 
 use super::super::emit::{call_helper, call_helper_void};
-
-
-
 
 pub(super) fn try_emit(
     b: &mut FunctionBuilder,
@@ -292,10 +280,7 @@ pub(super) fn try_emit(
             let (t, p) = b.ins().isplit(v);
             let dv = b.ins().iconst(types::I64, i64::from(ctx.ssa.reg(d)));
             let rv = b.ins().iconst(types::I64, i64::from(*resume_ip));
-            
-            
-            
-            
+
             call_helper_void(b, ctx.cc, h.await_helper, &[ectx, t, p, dv, rv]);
             Ok(Some(None))
         }
@@ -316,8 +301,7 @@ pub(super) fn try_emit(
             let (t, p) = b.ins().isplit(v);
             let dv = b.ins().iconst(types::I64, i64::from(ctx.ssa.reg(d)));
             let rv = b.ins().iconst(types::I64, i64::from(*resume_ip));
-            
-            
+
             call_helper_void(b, ctx.cc, h.yield_helper, &[ectx, t, p, dv, rv]);
             Ok(Some(None))
         }
@@ -349,8 +333,6 @@ pub(super) fn try_emit(
     }
 }
 
-
-
 fn emit_super_call(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -377,8 +359,6 @@ fn emit_super_call(
     Ok(super::call::emit_invoke(b, ctx, addr, (ct, cp), vals.len()))
 }
 
-
-
 fn stage_value(b: &mut FunctionBuilder, ctx: &Ctx<'_>, callee: Value, args: &[Value]) -> Value {
     let addr = super::call::scratch_addr(b, ctx, args.len() + 1);
     b.ins().store(
@@ -398,7 +378,6 @@ fn stage_value(b: &mut FunctionBuilder, ctx: &Ctx<'_>, callee: Value, args: &[Va
     addr
 }
 
-
 fn window_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize, vals: &[Value]) -> Value {
     let ectx = exec_ctx(ctx);
     let (addr, n) = stage(b, ctx, vals);
@@ -410,8 +389,6 @@ fn window_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize, vals: &[
         ctx.helpers.jit_native_result_offset as i32,
     )
 }
-
-
 
 fn stage(b: &mut FunctionBuilder, ctx: &Ctx<'_>, vals: &[Value]) -> (Value, Value) {
     let addr = super::call::scratch_addr(b, ctx, vals.len().max(1));
@@ -425,8 +402,6 @@ fn stage(b: &mut FunctionBuilder, ctx: &Ctx<'_>, vals: &[Value]) -> (Value, Valu
     }
     (addr, b.ins().iconst(types::I64, vals.len() as i64))
 }
-
-
 
 fn emit_array_spread(
     b: &mut FunctionBuilder,
@@ -465,8 +440,6 @@ fn emit_array_spread(
     }
     Ok(fresh(b))
 }
-
-
 
 fn emit_object_spread(
     b: &mut FunctionBuilder,
@@ -511,8 +484,7 @@ fn emit_object_spread(
                     h.set_property_flat,
                     &[ectx, frame.closure, ot, op_, vt, vp, niv, csv, ipv],
                 );
-                
-                
+
                 super::store::drop_home_addrs(ctx);
                 keyed += 1;
             }
@@ -527,8 +499,6 @@ fn emit_object_spread(
     }
     Ok(fresh(b))
 }
-
-
 
 fn spill(
     b: &mut FunctionBuilder,

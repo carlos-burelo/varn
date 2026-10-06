@@ -1,44 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use varn_core::ast::operators::{BinaryOp, UnaryOp};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
@@ -48,13 +7,6 @@ use crate::checker::Checker;
 use crate::types::Type;
 
 impl<'r> Checker<'r> {
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn refine(&mut self, expr: ExprId, bind: &BindResult) -> Option<Type> {
         let arena = self.ast_arena;
         match &arena.expr(expr).kind {
@@ -64,8 +16,6 @@ impl<'r> Checker<'r> {
 
             ExprKind::Paren { expression } => self.refine(*expression, bind),
 
-            
-            
             ExprKind::Unary {
                 op: UnaryOp::Minus | UnaryOp::Plus,
                 operand,
@@ -85,7 +35,6 @@ impl<'r> Checker<'r> {
                     return None;
                 };
                 if computed {
-                    
                     Some(Type::resolved(elem))
                 } else if matches!(
                     &arena.expr(property).kind,
@@ -98,12 +47,6 @@ impl<'r> Checker<'r> {
                 }
             }
 
-            
-            
-            
-            
-            
-            
             ExprKind::Binary { op, left, right } => {
                 let (op, left, right) = (*op, *left, *right);
                 if !matches!(
@@ -131,9 +74,6 @@ impl<'r> Checker<'r> {
         }
     }
 
-    
-    
-    
     fn checked_ty(&self, expr: ExprId) -> Type {
         self.expr_table
             .get(&expr.index())
@@ -141,9 +81,6 @@ impl<'r> Checker<'r> {
             .unwrap_or(Type::Dynamic)
     }
 
-    
-    
-    
     fn evolved_array_of(&self, name: &str, bind: &BindResult) -> Option<Type> {
         if bind.evolved_array_types.is_empty() {
             return None;
@@ -156,8 +93,6 @@ impl<'r> Checker<'r> {
     }
 }
 
-
-
 fn numeric_result(l: &Type, r: &Type, table: &crate::types::CheckerTyTable) -> Option<Type> {
     use crate::binder::type_inference::numeric_operand;
     use varn_core::{binary_operand_kind, NumericOperand};
@@ -166,10 +101,7 @@ fn numeric_result(l: &Type, r: &Type, table: &crate::types::CheckerTyTable) -> O
     match combined {
         NumericOperand::Int => Some(Type::Int),
         NumericOperand::Float => Some(Type::Float),
-        
-        
-        
-        
+
         NumericOperand::Decimal | NumericOperand::BigInt => None,
     }
 }

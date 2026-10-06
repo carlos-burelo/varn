@@ -5,9 +5,6 @@ use crate::ty::BackendTy;
 use crate::verify::VerifyError;
 use crate::TirModule;
 
-
-
-
 fn is_positional(args: &[TirArg]) -> bool {
     args.iter().all(|a| matches!(a, TirArg::Expr(_)))
 }
@@ -34,7 +31,7 @@ pub(super) fn check_direct_call(
     if !check_args(m, sig, args, &label, e, errors) {
         return;
     }
-    
+
     if !assignable(m, sig.return_ty, e.ty) {
         errors.push(VerifyError::new(
             format!(
@@ -57,16 +54,16 @@ pub(super) fn check_method_call(
         return;
     };
     let BackendTy::Class(c) = recv.ty.non_nullable(&m.types) else {
-        return; 
+        return;
     };
     let Some(class_info) = m.class(c) else {
-        return; 
+        return;
     };
     let Some(vtable_entry) = class_info.method_at(*slot) else {
-        return; 
+        return;
     };
     let Some(sig) = m.signature(vtable_entry.sig) else {
-        return; 
+        return;
     };
 
     if !is_positional(args) {
@@ -76,7 +73,6 @@ pub(super) fn check_method_call(
         return;
     }
 
-    
     if !assignable(m, sig.return_ty, e.ty) {
         errors.push(VerifyError::new(
             format!(
@@ -87,9 +83,6 @@ pub(super) fn check_method_call(
         ));
     }
 }
-
-
-
 
 fn check_args(
     m: &TirModule,

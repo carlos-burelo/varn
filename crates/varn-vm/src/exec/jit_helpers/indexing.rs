@@ -1,8 +1,3 @@
-
-
-
-
-
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
@@ -52,7 +47,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
         Ok(key) => key,
         Err(e) => super::construct::jit_propagate_error(&mut *ctx, e),
     };
-    
+
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
         let ctx_ref = &*ctx;
@@ -94,7 +89,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
             _ => {}
         }
     }
-    
+
     let ctx_ref = &mut *ctx;
     match crate::exec::collections::array_get_index(obj, key, &mut ctx_ref.heap) {
         Ok(v) => ctx_ref.jit_native_result = v,
@@ -118,7 +113,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
         Err(e) => super::construct::jit_propagate_error(&mut *ctx, e),
     };
     let val = VmValue::from_raw_parts(val_tag, val_payload);
-    
+
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
         let ctx_ref = &mut *ctx;
@@ -175,7 +170,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
             }
         }
     }
-    
+
     let ctx_ref = &mut *ctx;
     if let Err(e) = crate::exec::collections::array_set_index(obj, key, val, &mut ctx_ref.heap) {
         super::construct::jit_propagate_error(ctx_ref, e);

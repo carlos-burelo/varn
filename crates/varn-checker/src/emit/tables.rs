@@ -1,7 +1,3 @@
-
-
-
-
 mod classes;
 mod enums;
 mod index;

@@ -1,8 +1,3 @@
-
-
-
-
-
 use varn_core::ast::{AstArena, StmtId, StmtKind};
 
 pub(crate) fn can_complete_normally(stmt: StmtId, arena: &AstArena) -> bool {

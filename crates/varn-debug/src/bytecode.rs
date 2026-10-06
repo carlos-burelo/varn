@@ -33,10 +33,6 @@ fn op_color(op: OpCode) -> &'static str {
     }
 }
 
-
-
-
-
 fn short_global_key(s: &str) -> &str {
     let Some((module, symbol)) = s.rsplit_once("::") else {
         return s;
@@ -50,7 +46,7 @@ fn short_global_key(s: &str) -> &str {
         .next()
         .filter(|f| !f.is_empty())
         .unwrap_or(module);
-    
+
     &s[s.len() - (file.len() + 2 + symbol.len())..]
 }
 

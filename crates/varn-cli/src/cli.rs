@@ -64,36 +64,27 @@ pub struct RunArgs {
     #[arg(long)]
     pub trace: bool,
 
-    
     #[arg(short = 'A', long = "allow-all")]
     pub allow_all: bool,
 
-    
     #[arg(long = "allow-read", value_name = "PATHS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
     pub allow_read: Option<String>,
 
-    
     #[arg(long = "allow-write", value_name = "PATHS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
     pub allow_write: Option<String>,
 
-    
     #[arg(long = "allow-net", value_name = "HOSTS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
     pub allow_net: Option<String>,
 
-    
     #[arg(long = "allow-env", value_name = "VARS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
     pub allow_env: Option<String>,
 
-    
     #[arg(long = "allow-ffi")]
     pub allow_ffi: bool,
 
-    
     #[arg(long = "sandbox")]
     pub sandbox: bool,
 
-    
-    
     #[arg(long = "compare-tiers")]
     pub compare_tiers: bool,
 }
@@ -108,11 +99,9 @@ pub struct DebugArgs {
     #[arg(short, long, value_name = "PHASE", default_value = "all")]
     pub phase: String,
 
-    
     #[arg(long = "fn", value_name = "NAME")]
     pub fn_filter: Option<String>,
 
-    
     #[arg(long)]
     pub list_phases: bool,
 }
@@ -155,15 +144,9 @@ pub struct BenchArgs {
     #[arg(short, long)]
     pub verbose: bool,
 
-    
     #[arg(long)]
     pub all_rows: bool,
 
-    
-    
-    
-    
-    
     #[arg(long, value_name = "PCT")]
     pub min_clif_coverage: Option<f64>,
 }
@@ -192,11 +175,6 @@ pub struct LspArgs {
     )]
     pub tcp: Option<String>,
 
-    
-    
-    
-    
-    
     #[arg(
         long,
         help = "Servir sobre stdio (por defecto; aceptado por convención)"
@@ -214,7 +192,6 @@ pub struct BuildArgs {
     #[arg(short, long, default_value = "bytecode", value_name = "TARGET")]
     pub target: String,
 
-    
     #[arg(long)]
     pub native: bool,
 
@@ -268,36 +245,28 @@ pub enum Shell {
 
 #[derive(Args)]
 pub struct TestArgs {
-    
     pub path: Option<String>,
 
-    
     #[arg(short, long)]
     pub filter: Option<String>,
 
-    
     #[arg(short = 'j', long)]
     pub jobs: Option<usize>,
 
-    
     #[arg(long)]
     pub fail_fast: bool,
 
-    
     #[arg(short, long)]
     pub verbose: bool,
 }
 
 #[derive(Args)]
 pub struct FmtArgs {
-    
     pub path: Option<String>,
 
-    
     #[arg(long)]
     pub check: bool,
 
-    
     #[arg(short, long)]
     pub verbose: bool,
 }

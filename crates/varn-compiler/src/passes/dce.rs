@@ -61,22 +61,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
     changed
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub(crate) fn dest_droppable(kind: &InstKind) -> bool {
     use InstKind::*;
     matches!(
@@ -92,23 +76,9 @@ pub(crate) fn dest_droppable(kind: &InstKind) -> bool {
     )
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub(crate) fn is_pure(kind: &InstKind) -> bool {
     use InstKind::*;
     match kind {
-        
         ConstInt(_)
         | ConstFloat(_)
         | ConstBool(_)
@@ -126,24 +96,15 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | This
         | CatchParam { .. } => true,
 
-        
-        
         GetFixedField { .. } | ArrayGetIndex { .. } | MapGetIndex { .. } => true,
 
-        
         IsNull { .. } | Cast { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => {
             true
         }
-        
-        
+
         StrLength { .. } | ArrayLength { .. } | BytesLength { .. } => true,
         Convert { conv, .. } => !conv.can_fault(),
 
-        
-        
-        
-
-        
         AllocInstance { .. }
         | BuildArray { .. }
         | BuildTuple { .. }
@@ -158,7 +119,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
             let typed = matches!(ty, HirType::Int | HirType::Float | HirType::Bool);
             let int_can_overflow =
                 *ty == HirType::Int && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
-            
+
             let never_traps = matches!(
                 op,
                 HirBinOp::Add
@@ -187,30 +148,19 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
             }
         },
 
-        
-        
-        
-        
-        
         GetProperty { .. }
         | GetPropertyMaybe { .. }
         | GetIndex { .. }
         | GetSuper { .. }
         | GetSymbol { .. } => false,
 
-        
-        
-        
-        
         ToString { .. } | BuildStr { .. } => false,
 
-        
         BuildArraySpread { .. }
         | BuildObjectSpread { .. }
         | CallSpread { .. }
         | ObjectRest { .. } => false,
 
-        
         Call { .. }
         | SelfCall { .. }
         | MethodCall { .. }
@@ -222,7 +172,6 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | CallNativeOp { .. }
         | ArrayPush { .. } => false,
 
-        
         StoreGlobal { .. }
         | StoreGlobalIdx { .. }
         | StoreUpvalue { .. }
@@ -235,14 +184,12 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | MapSetIndex { .. }
         | ObjectMerge { .. } => false,
 
-        
         MakeClass { .. }
         | DeclareLayout { .. }
         | DefineStatic { .. }
         | DefineMethod { .. }
         | DefineAccessor { .. } => false,
 
-        
         Try { .. }
         | PopTry
         | CloseUpvalues { .. }

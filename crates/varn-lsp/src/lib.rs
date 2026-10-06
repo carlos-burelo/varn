@@ -10,8 +10,6 @@ pub mod query;
 pub mod util;
 pub mod workspace;
 
-
-
 fn init_std() -> Option<&'static str> {
     varn_builtins::register_provider();
     workspace::std_sources::materialize();

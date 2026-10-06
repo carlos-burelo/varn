@@ -1,8 +1,4 @@
-
-
-
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SsaBinOp {
@@ -38,15 +34,10 @@ pub enum SsaBinOp {
     FloatGt,
     FloatGe,
 
-    
     StrConcat,
 
-    
-    
     Dyn(DynBinOp),
 }
-
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DynBinOp {
@@ -72,25 +63,22 @@ pub enum DynBinOp {
     In,
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DynUnOp {
-    
     Neg,
-    
+
     Not,
-    
+
     BitNot,
 }
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SsaUnOp {
     NegInt,
     NegFloat,
-    
+
     Not,
     BitNotInt,
-    
+
     Dyn(DynUnOp),
 }

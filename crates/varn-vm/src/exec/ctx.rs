@@ -28,11 +28,7 @@ type SharedHashableKeys = Rc<std::cell::UnsafeCell<FxHashMap<(u32, i64), Vec<VmV
 pub struct ExecCtx {
     pub stack: crate::frame_store::FrameStore,
     pub frames: crate::frame_stack::FrameStack,
-    
-    
-    
-    
-    
+
     pub globals: Rc<std::cell::UnsafeCell<GlobalStore>>,
     pub heap: Heap,
     pub try_handlers: Vec<TryHandler>,
@@ -48,21 +44,12 @@ pub struct ExecCtx {
     pub opcode_counts: Option<Rc<Vec<std::sync::atomic::AtomicU64>>>,
     pub profile_counters: Option<Arc<ProfileCounters>>,
     pub hotspot_counters: Option<Rc<RefCell<HotspotCounters>>>,
-    
-    
-    
-    
-    
-    
-    
+
     pub proto_constants: SharedProtoPools,
     pub static_closures: SharedStaticClosures,
     pub linker: Linker,
     pub jit_jmp_buf: *mut JmpBuf,
-    
-    
-    
-    
+
     pub jit_suspend_buf: *mut JmpBuf,
     pub jit_panic_exception_handler: Option<crate::frame::TryHandler>,
     pub jit_panic_exception_error: Option<VmValue>,
@@ -71,40 +58,19 @@ pub struct ExecCtx {
     pub jit_native_result: VmValue,
     pub jit_exit: varn_jit::stack_roots::JitExit,
     pub jit_exits_saved: Vec<varn_jit::stack_roots::JitExit>,
-    
-    
-    
-    
-    
+
     pub osr_request: Option<usize>,
-    
-    
-    
-    
+
     pub resources: Rc<std::cell::UnsafeCell<varn_types::ResourceStore>>,
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     pub gc_inhibited: bool,
     pub capabilities: Rc<varn_types::capabilities::CapabilitySet>,
     pub metadata: SharedMetadata,
-    
-    
+
     pub(crate) hashable_keys: SharedHashableKeys,
-    
-    
-    
-    
+
     pub stage: Vec<VmValue>,
-    
-    
-    
+
     pub(crate) task_queue: std::cell::OnceCell<super::scheduler::TaskQueue>,
 }
 
@@ -166,11 +132,6 @@ impl ExecCtx {
         ctx
     }
 
-    
-    
-    
-    
-    
     fn validate_jit_safepoint_offsets(&self) {
         unsafe {
             let base = self as *const ExecCtx as *const u8;
@@ -214,10 +175,6 @@ impl ExecCtx {
     }
 
     fn init_intrinsics(&mut self) {
-        
-        
-        
-        
         let names = [
             varn_core::RuntimeKind::Array.name(),
             varn_core::RuntimeKind::Str.name(),
@@ -268,10 +225,6 @@ impl ExecCtx {
         unsafe { &*self.globals.get() }
     }
 
-    
-    
-    
-    
     #[allow(clippy::mut_from_ref)]
     pub(crate) fn globals_mut(&mut self) -> &mut GlobalStore {
         unsafe { &mut *self.globals.get() }

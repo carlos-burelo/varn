@@ -6,21 +6,6 @@ use std::ptr;
 use std::rc::Rc;
 use std::sync::Arc;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[repr(C)]
 pub struct ObjData<T: ?Sized = [Cell<VmValue>]> {
     shape: UnsafeCell<Rc<Shape>>,
@@ -30,50 +15,30 @@ pub struct ObjData<T: ?Sized = [Cell<VmValue>]> {
     values: T,
 }
 
-
-
-
-
 pub const OBJ_SHAPE_OFF: usize = std::mem::offset_of!(ObjData<[Cell<VmValue>; 0]>, shape);
 pub const OBJ_INLINE_LEN_OFF: usize = std::mem::offset_of!(ObjData<[Cell<VmValue>; 0]>, inline_len);
 pub const OBJ_VALUES_OFF: usize = std::mem::offset_of!(ObjData<[Cell<VmValue>; 0]>, values);
 
-
 const HEADER_WORDS: usize = 3;
-
-
-
-
 
 const WORDS_PER_VALUE: usize = size_of::<Cell<VmValue>>() / size_of::<u64>();
 
 const _: () = {
-    
-    
     assert!(size_of::<Cell<VmValue>>().is_multiple_of(size_of::<u64>()));
     assert!(align_of::<VmValue>() == 8);
     assert!(align_of::<Cell<VmValue>>() == 8);
     assert!(size_of::<Cell<VmValue>>() == size_of::<VmValue>());
-    
-    
+
     assert!(std::mem::offset_of!(ObjData<[Cell<VmValue>; 0]>, values) == HEADER_WORDS * 8);
     assert!(size_of::<ObjData<[Cell<VmValue>; 0]>>() == HEADER_WORDS * 8);
     assert!(align_of::<ObjData<[Cell<VmValue>; 0]>>() == 8);
 };
 
 impl ObjData {
-    
     pub const fn bytes_for(n: usize) -> usize {
         (HEADER_WORDS + n * WORDS_PER_VALUE) * size_of::<u64>()
     }
 
-    
-    
-    
-    
-    
-    
-    
     pub unsafe fn init_at(at: *mut u8, shape: Rc<Shape>, n: usize, values: &[VmValue]) -> ObjRef {
         debug_assert!(values.len() <= n);
         let data = ptr::slice_from_raw_parts_mut(at as *mut Cell<VmValue>, n) as *mut ObjData;
@@ -89,17 +54,10 @@ impl ObjData {
         ObjRef(ptr::NonNull::new_unchecked(data))
     }
 
-    
-    
-    
-    
-    
     pub unsafe fn drop_at(obj: ObjRef) {
         ptr::drop_in_place(obj.0.as_ptr());
     }
 
-    
-    
     pub fn pairs_layout<I>(pairs: I) -> (Rc<Shape>, Vec<VmValue>)
     where
         I: IntoIterator<Item = (RuntimeString, VmValue)>,

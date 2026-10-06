@@ -1,7 +1,3 @@
-
-
-
-
 use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::{ObjectTypeMember, Type};
@@ -9,18 +5,13 @@ use varn_core::ast::ExprId;
 use varn_core::capability::{OperatorMethod, OperatorShape};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
-
 pub(crate) struct ResolvedOperator {
-    
     pub param: Option<Type>,
-    
+
     pub result: Type,
 }
 
 impl Checker<'_> {
-    
-    
-    
     pub(crate) fn resolve_operator(
         &mut self,
         recv: &Type,
@@ -65,8 +56,6 @@ impl Checker<'_> {
         Some(ResolvedOperator { param, result })
     }
 
-    
-    
     pub(super) fn check_binary_capability(
         &mut self,
         expr: ExprId,
@@ -80,7 +69,7 @@ impl Checker<'_> {
         };
         let l_ty = self.infer_type(left, bind);
         let r_ty = self.infer_type(right, bind);
-        
+
         if matches!(
             method.shape,
             OperatorShape::Equals | OperatorShape::NotEquals
@@ -112,7 +101,6 @@ impl Checker<'_> {
         true
     }
 
-    
     pub(super) fn check_unary_capability(
         &mut self,
         expr: ExprId,

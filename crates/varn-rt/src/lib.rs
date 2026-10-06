@@ -1,14 +1,7 @@
-
-
-
-
-
-
-
 use std::io::Write;
 
 extern "C" {
-    
+
     fn _varn_main() -> i64;
 }
 
@@ -18,11 +11,6 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     let code = unsafe { _varn_main() };
     code as i32
 }
-
-
-
-
-
 
 #[no_mangle]
 pub unsafe extern "C" fn varn_rt_print(ptr: *const u8, len: usize) {
@@ -34,12 +22,10 @@ pub unsafe extern "C" fn varn_rt_print(ptr: *const u8, len: usize) {
     let _ = std::io::stdout().flush();
 }
 
-
 #[no_mangle]
 pub extern "C" fn varn_rt_print_int(val: i64) {
     println!("{val}");
 }
-
 
 #[no_mangle]
 pub extern "C" fn varn_rt_print_bool(val: i64) {
@@ -50,19 +36,11 @@ pub extern "C" fn varn_rt_print_bool(val: i64) {
     }
 }
 
-
-
 #[repr(C)]
 pub struct StrResult {
     pub ptr: *const u8,
     pub len: usize,
 }
-
-
-
-
-
-
 
 #[no_mangle]
 pub unsafe extern "C" fn varn_rt_str_concat(
@@ -82,11 +60,6 @@ pub unsafe extern "C" fn varn_rt_str_concat(
     let ptr = Box::into_raw(vec.into_boxed_slice()) as *const u8;
     StrResult { ptr, len }
 }
-
-
-
-
-
 
 #[no_mangle]
 pub unsafe extern "C" fn varn_rt_panic(ptr: *const u8, len: usize) -> ! {

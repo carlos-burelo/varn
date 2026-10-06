@@ -2,12 +2,6 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-
-
-
-
-
-
 #[varn_op_macros::jit_slow(field = "invoke_dynamic")]
 pub(crate) extern "C" fn jit_invoke_dynamic(
     ctx: *mut ExecCtx,

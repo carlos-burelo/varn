@@ -63,7 +63,7 @@ pub fn send(id: u64, val: SendValue) -> SendOutcome {
     if st.closed {
         return SendOutcome::Closed;
     }
-    
+
     if let Some(w) = st.recv_waiters.pop_front() {
         drop(st);
         w.resolve(val);
@@ -84,7 +84,6 @@ pub fn try_receive(id: u64) -> RecvOutcome {
     };
     let mut st = core.state.lock().unwrap();
     if let Some(v) = st.queue.pop_front() {
-        
         if let Some((pv, ptask)) = st.send_waiters.pop_front() {
             st.queue.push_back(pv);
             drop(st);
@@ -114,7 +113,6 @@ pub fn close(id: u64) {
         w.reject(SendValue::Null);
     }
     for (_, w) in sends {
-        
         w.resolve(SendValue::Bool(false));
     }
 }

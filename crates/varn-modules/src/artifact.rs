@@ -9,38 +9,7 @@ pub const TYPES_DIR_NAME: &str = "types";
 pub const PACKAGE_MANIFEST_FILE: &str = "varn.toml";
 pub const PACKAGE_MANIFEST_FILE_VN: &str = "vn.toml";
 
-
-
-
-
-
-
-
-
-
-
-
 include!(concat!(env!("OUT_DIR"), "/build_fingerprint.rs"));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub fn producer_fingerprint() -> u32 {
     static FP: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
@@ -64,44 +33,16 @@ pub fn producer_fingerprint() -> u32 {
                     }
                 }
             }
-            
-            
-            
+
             Err(_) => eat(b"varn-unknown-producer"),
         }
         (hash ^ (hash >> 32)) as u32
     })
 }
 
-
-
-
-
-
-
-
-
-
-
 pub fn cache_key() -> u32 {
     BUILD_FINGERPRINT ^ producer_fingerprint()
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub fn prune_superseded(current: &Path) {
     let (Some(dir), Some(name), Some(ext)) = (
@@ -111,9 +52,7 @@ pub fn prune_superseded(current: &Path) {
     ) else {
         return;
     };
-    
-    
-    
+
     let suffix = format!(".{ext}");
     let Some(without_ext) = name.strip_suffix(&suffix) else {
         return;
@@ -147,43 +86,21 @@ pub fn prune_superseded(current: &Path) {
     }
 }
 
-
-
-
 pub const ARTIFACT_GENERATIONS: usize = 3;
-
-
-
-
-
-
-
-
-
-
 
 pub const MAGIC: &[u8; 4] = b"VARN";
 
-
-
 pub const MAGIC_VEXE: &[u8; 4] = b"VEXE";
 
-
-
-
 const ENVELOPE_VERSION: u16 = 1;
-
-
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
 pub enum ArtifactKind {
-    
     ModuleGraph = 1,
-    
+
     CheckerInterface = 2,
-    
+
     StdBundle = 3,
 }
 
@@ -206,18 +123,11 @@ impl ArtifactKind {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ArtifactClass {
-    
-    
-    
     Cache = 1,
-    
-    
-    
-    
+
     Distributable = 2,
 }
 
@@ -230,7 +140,6 @@ impl ArtifactClass {
         }
     }
 
-    
     fn producer_stamp(self) -> u32 {
         match self {
             Self::Cache => producer_fingerprint(),
@@ -239,26 +148,22 @@ impl ArtifactClass {
     }
 }
 
-
-
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArtifactError {
     TooShort,
     BadMagic,
-    
+
     UnknownEnvelope(u16),
     UnknownKind(u16),
     UnknownClass(u8),
-    
+
     WrongKind {
         expected: ArtifactKind,
         found: ArtifactKind,
     },
-    
+
     Superseded,
-    
-    
+
     Corrupt,
 }
 
@@ -283,10 +188,6 @@ impl std::fmt::Display for ArtifactError {
         }
     }
 }
-
-
-
-
 
 fn payload_checksum(payload: &[u8]) -> u32 {
     let mut hash: u32 = 0x811c9dc5;
@@ -332,21 +233,6 @@ pub fn get_types_cache_dir(project_root: &Path) -> PathBuf {
     get_cache_dir(project_root).join(TYPES_DIR_NAME)
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub fn source_fingerprint(source: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -354,18 +240,12 @@ pub fn source_fingerprint(source: &str) -> u64 {
     h.finish()
 }
 
-
-
-
 pub fn module_key(id: &ModuleId, fingerprint: u64) -> String {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     id.hash(&mut h);
     format!("{:016x}_{:016x}", h.finish(), fingerprint)
 }
-
-
-
 
 pub fn module_artifact_path(
     dir: &Path,
@@ -379,9 +259,6 @@ pub fn module_artifact_path(
         module_key(id, fingerprint)
     ))
 }
-
-
-
 
 pub fn write_module_artifact(
     dir: &Path,
@@ -399,8 +276,6 @@ pub fn write_module_artifact(
         prune_superseded(&path);
     }
 }
-
-
 
 pub fn read_module_artifact(
     dir: &Path,
@@ -426,22 +301,7 @@ fn dirs_home() -> Option<PathBuf> {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 const HEADER_LEN: usize = 21;
-
-
-
 
 pub fn write_artifact(kind: ArtifactKind, class: ArtifactClass, payload: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(HEADER_LEN + payload.len());
@@ -455,14 +315,6 @@ pub fn write_artifact(kind: ArtifactKind, class: ArtifactClass, payload: &[u8]) 
     out.extend_from_slice(payload);
     out
 }
-
-
-
-
-
-
-
-
 
 pub fn read_artifact(expected: ArtifactKind, bytes: &[u8]) -> Result<&[u8], ArtifactError> {
     if bytes.len() < HEADER_LEN {
@@ -498,30 +350,14 @@ pub fn read_artifact(expected: ArtifactKind, bytes: &[u8]) -> Result<&[u8], Arti
     }
     let expected_sum = u32::from_le_bytes(bytes[17..21].try_into().unwrap());
     let payload = &bytes[HEADER_LEN..];
-    
-    
-    
-    
+
     if payload_checksum(payload) != expected_sum {
         return Err(ArtifactError::Corrupt);
     }
     Ok(payload)
 }
 
-
-
-
-
-
-
-
-
 pub fn write_artifact_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    
-    
-    
-    
-    
     use std::sync::atomic::{AtomicU64, Ordering};
     static WRITE_SEQ: AtomicU64 = AtomicU64::new(0);
     let seq = WRITE_SEQ.fetch_add(1, Ordering::Relaxed);

@@ -1,5 +1,3 @@
-
-
 use crate::hir::{HirType, HirUnOp, HirUpvalueSrc};
 use crate::ssa::ir::{Inst, InstKind, VarId};
 use varn_types::ssa::{SsaInst, SsaOp, SsaUpvalue};
@@ -264,8 +262,7 @@ pub(super) fn project_inst(
         InstKind::CloseUpvalues { targets } => SsaOp::CloseUpvalues {
             vars: targets.iter().map(|t| captured.index(*t)).collect(),
         },
-        
-        
+
         InstKind::Try { .. } => {
             let (catch_ip, live) = site.landing?;
             let mut live: Vec<u32> = live.iter().copied().collect();
@@ -403,7 +400,6 @@ pub(super) fn project_inst(
         line: inst.line,
     })
 }
-
 
 fn is_int(value_tys: &[HirType], v: crate::ssa::ir::Value) -> bool {
     value_tys.get(v.0 as usize).is_some_and(|t| {

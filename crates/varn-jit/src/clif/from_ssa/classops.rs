@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
 
@@ -16,7 +6,6 @@ use super::props::str_idx;
 use super::Ctx;
 
 use super::super::emit::{box_null, call_helper_void};
-
 
 pub(super) fn emit_make_class(
     b: &mut FunctionBuilder,
@@ -104,8 +93,6 @@ pub(super) fn emit_declare_layout(
     Ok(())
 }
 
-
-
 pub(super) fn emit_define_member(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -148,8 +135,6 @@ pub(super) fn emit_define_member(
     Ok(())
 }
 
-
-
 pub(super) fn emit_get_super(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -171,8 +156,6 @@ pub(super) fn emit_get_super(
         ctx.helpers.jit_native_result_offset as i32,
     ))
 }
-
-
 
 pub(super) fn emit_make_enum_variant(
     b: &mut FunctionBuilder,

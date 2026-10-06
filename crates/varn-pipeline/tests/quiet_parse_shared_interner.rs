@@ -1,33 +1,5 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::fs;
 use std::path::PathBuf;
 
@@ -60,12 +32,6 @@ fn build_module_graph_resolves_named_reexport_origin_module_without_panicking() 
     )
     .expect("write leaf.vn");
 
-    
-    
-    
-    
-    
-    
     fs::write(
         &mid_path,
         "import { leafValue } from \"./leaf.vn\"\nexport function midValue(): int {\n  return leafValue()\n}\n",

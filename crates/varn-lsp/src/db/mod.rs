@@ -29,7 +29,7 @@ impl FileInterner {
         }
 
         let mut vec = self.vec.write().unwrap();
-        
+
         if let Some(id) = self.map.get(uri) {
             return *id.value();
         }
@@ -75,7 +75,6 @@ impl Database {
         let rev = self.revision.fetch_add(1, Ordering::SeqCst) + 1;
         self.sources.insert(file_id, (rev, Arc::from(source)));
 
-        
         if let Some(old_token) = self.cancellation_tokens.get(&file_id) {
             old_token.cancel();
         }

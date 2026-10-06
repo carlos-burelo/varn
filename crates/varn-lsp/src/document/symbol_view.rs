@@ -1,25 +1,15 @@
-
-
 use varn_checker::{SymbolKind, Type};
 
 use super::SemanticDB;
-
-
-
-
-
-
-
 
 #[derive(Clone, Copy)]
 pub struct SymbolView<'a> {
     pub id: varn_checker::SymbolId,
     pub sym: &'a varn_checker::symbol::Symbol,
     pub(super) ty: &'a Type,
-    
+
     pub(super) db: &'a SemanticDB,
 }
-
 
 pub(super) static DYNAMIC_TY: Type = Type::resolved(varn_checker::types::CheckerTyId::DYNAMIC);
 
@@ -45,13 +35,11 @@ impl<'a> SymbolView<'a> {
     pub fn ty(&self) -> &'a Type {
         self.ty
     }
-    
-    
-    
+
     pub fn ty_text(&self) -> String {
         self.db.ty_text(self.ty)
     }
-    
+
     pub fn line(&self) -> u32 {
         self.sym.line.saturating_sub(1)
     }
@@ -97,7 +85,7 @@ impl<'a> SymbolView<'a> {
             .map(|a| self.text(*a).to_owned())
             .collect()
     }
-    
+
     fn fn_shape(&self) -> Option<varn_checker::types::FunctionType> {
         self.db.fn_shape(self.ty)
     }
@@ -109,7 +97,7 @@ impl<'a> SymbolView<'a> {
             m.starts_with("std:") || m.starts_with("core:") || m.starts_with("runtime:")
         })
     }
-    
+
     pub fn type_str(&self) -> String {
         match (self.fn_shape(), self.kind()) {
             (Some(ft), SymbolKind::Function | SymbolKind::Method) => {

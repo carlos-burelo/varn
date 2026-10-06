@@ -1,17 +1,9 @@
-
-
-
-
-
-
 use rustc_hash::FxHashSet as HashSet;
 
 use varn_core::OpCode;
 
 use crate::bytecode::decode;
 use crate::chunk::PoolEntry;
-
-
 
 pub fn collect_back_edges(code: &[u16], constants: &[PoolEntry]) -> Vec<(usize, usize)> {
     let mut word_to_instr: rustc_hash::FxHashMap<usize, usize> = rustc_hash::FxHashMap::default();
@@ -51,22 +43,14 @@ pub fn collect_back_edges(code: &[u16], constants: &[PoolEntry]) -> Vec<(usize, 
     edges
 }
 
-
-
-
 pub struct NaturalLoop {
     pub header: usize,
     pub latch: usize,
-    
-    
+
     def_set: HashSet<u8>,
-    
-    
-    
+
     pub has_calls: bool,
-    
-    
-    
+
     pub mutates_arrays: bool,
 }
 
@@ -75,9 +59,6 @@ impl NaturalLoop {
         !self.def_set.contains(&reg)
     }
 }
-
-
-
 
 pub fn instr_offsets(code: &[u16], constants: &[PoolEntry]) -> Vec<usize> {
     let mut offsets = Vec::new();
@@ -91,8 +72,6 @@ pub fn instr_offsets(code: &[u16], constants: &[PoolEntry]) -> Vec<usize> {
     }
     offsets
 }
-
-
 
 pub fn natural_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<NaturalLoop> {
     let back_edges = collect_back_edges(code, constants);

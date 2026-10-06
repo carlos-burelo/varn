@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 #![allow(unused_crate_dependencies)]
 
 use std::path::{Path, PathBuf};
@@ -51,7 +41,6 @@ fn osr_entries_resume_from_ssa() {
         );
     }
 }
-
 
 fn tempfile_dir() -> PathBuf {
     let dir = std::env::temp_dir().join(format!("varn-osr-{}", std::process::id()));

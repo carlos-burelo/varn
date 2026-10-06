@@ -34,13 +34,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     };
 
     let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan(&source, &input.contract);
-    
-    
-    
-    
-    
-    
-    
+
     let (program, interner, arena) = match varn_parser::parse(
         tokens,
         lexeme_buf,
@@ -79,13 +73,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let module = &input.module;
     let ns = "";
 
-    
-    
     let class_name_str: String = input.class.clone().unwrap_or_default();
-
-    
-    
-    
 
     let cx = member::Cx {
         prefix: &prefix,

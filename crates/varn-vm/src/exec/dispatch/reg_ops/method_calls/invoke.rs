@@ -1,7 +1,3 @@
-
-
-
-
 use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
@@ -10,9 +6,6 @@ use crate::value::VmValue;
 use std::rc::Rc;
 
 impl ExecCtx {
-    
-    
-    
     pub(super) fn finish_generic_method_call(
         &mut self,
         method_nv: VmValue,
@@ -149,8 +142,6 @@ impl ExecCtx {
         Ok(result)
     }
 
-    
-    
     pub(crate) fn invoke_vm_method_fast(
         &mut self,
         nc: Rc<VmClosure>,
@@ -170,19 +161,13 @@ impl ExecCtx {
             let is_jit = nc.jit_fn().is_some();
             self.record_hotspot_method(&method_key, is_jit);
         }
-        
-        
-        
-        
-        
+
         if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
             return Err(crate::error::RuntimeError::new(
                 "stack overflow: call depth exceeded 10000",
             ));
         }
         let alloc = if !nc.proto.has_rest {
-            
-            
             self.push_call_frame_with_this(&nc.proto, this_val, args)?
         } else {
             let alloc = self.stack.push_frame(&nc.proto);

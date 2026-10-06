@@ -151,9 +151,7 @@ impl ExecCtx {
 
         if let Some(proto) = self.precompiled.get(&resolved).cloned() {
             let result = self.eval_module_proto(resolved.clone(), proto);
-            
-            
-            
+
             if is_pure {
                 varn_builtins::build_module(&spec_str, &mut self.heap);
             }
@@ -179,9 +177,6 @@ impl ExecCtx {
         resolved: ModuleId,
         proto: std::rc::Rc<varn_types::FunctionProto>,
     ) -> VmResult<VmValue> {
-        
-        
-        
         let module_base = self.globals_mut().reserve_region(proto.global_count);
 
         debug_assert!(
@@ -282,8 +277,8 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
     match heap.get(val.as_heap()) {
         Some(HeapObj::Str(s)) => Some(FrozenExport::Str(Arc::from(s.as_ref()))),
         Some(HeapObj::NativeFn(f, name)) => Some(FrozenExport::NativeFn(*f, name)),
-        Some(HeapObj::Class(_)) => None, 
-        Some(HeapObj::VmClosure(_)) => None, 
+        Some(HeapObj::Class(_)) => None,
+        Some(HeapObj::VmClosure(_)) => None,
         Some(HeapObj::Object(obj_ref)) => {
             let guard = obj_ref.borrow();
             let mut nested = FrozenModuleObj::new(ModuleId::local_str("<nested>"));

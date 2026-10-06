@@ -1,17 +1,6 @@
-
-
-
-
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-
-
-
-
-
-
-
 
 #[varn_op_macros::jit_slow(field = "gc_safepoint")]
 pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
@@ -36,9 +25,7 @@ pub(crate) extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        
-        
-        
+
         let alloc = ctx_ref.frames[frame_idx].base;
         ctx_ref.close_upvalues_from_reg(alloc, lowest);
     }

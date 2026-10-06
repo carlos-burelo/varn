@@ -2,8 +2,6 @@ use varn_core::OpCode;
 
 use super::*;
 
-
-
 fn instruction(op: OpCode, fill: u8) -> Vec<u16> {
     let word = u16::from_be_bytes([fill, fill]);
     let mut code = vec![word; 64];
@@ -70,8 +68,6 @@ fn decode_reads_the_layout() {
     }
 }
 
-
-
 #[test]
 fn read_write_operands() {
     let merge = decode(&instruction(OpCode::ObjectMerge, 3), 0, &[]).unwrap();
@@ -93,8 +89,6 @@ fn read_write_operands() {
 
 #[test]
 fn remap_renames_exactly_the_register_bytes() {
-    
-    
     let mut code = vec![((4u16) << 8) | OpCode::Spawn as u16, (5u16 << 8) | 9];
     remap_registers(&mut code, &[], |r| r + 10);
     assert_eq!(
@@ -102,7 +96,6 @@ fn remap_renames_exactly_the_register_bytes() {
         vec![(14u16 << 8) | OpCode::Spawn as u16, (15u16 << 8) | 9]
     );
 
-    
     let mut code = vec![(4u16 << 8) | OpCode::Intrinsic as u16, (0x21u16 << 8) | 2];
     remap_registers(&mut code, &[], |r| r + 1);
     assert_eq!(code[0] >> 8, 5);

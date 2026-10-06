@@ -18,17 +18,12 @@ impl ObjData<[Cell<VmValue>]> {
         self.field_at(slot)
     }
 
-    
-    
-    
     pub fn insert(&self, name: RuntimeString, value: VmValue) {
         if let Some(&slot) = self.shape().property_names.get(&name) {
             if self.set_field_at(slot, value) {
                 return;
             }
-            
-            
-            
+
             let overflow = self.overflow_mut();
             overflow.resize(slot - self.inline_len() + 1, VmValue::null());
             overflow[slot - self.inline_len()] = value;
@@ -51,14 +46,10 @@ impl ObjData<[Cell<VmValue>]> {
         overflow[slot - base] = value;
     }
 
-    
-    
     pub fn remove(&self, name: &str) -> Option<VmValue> {
         let removed_slot = *self.shape().property_names.get(name)?;
         let removed = self.field_at(removed_slot)?;
 
-        
-        
         let mut ordered: Vec<(RuntimeString, usize)> = self
             .shape()
             .property_names
@@ -79,8 +70,6 @@ impl ObjData<[Cell<VmValue>]> {
         }
         self.set_shape(new_shape);
 
-        
-        
         let base = self.inline_len();
         let overflow = self.overflow_mut();
         overflow.clear();
@@ -108,8 +97,6 @@ impl ObjData<[Cell<VmValue>]> {
         shape.property_names.contains_key(name)
     }
 
-    
-    
     #[inline]
     pub fn len(&self) -> usize {
         self.shape().property_names.len()
@@ -135,16 +122,6 @@ impl ObjData<[Cell<VmValue>]> {
             .into_iter()
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn iter(&self) -> std::vec::IntoIter<(RuntimeString, VmValue)> {
         let names = self.shape().ordered_names();
         let mut pairs = Vec::with_capacity(names.len());

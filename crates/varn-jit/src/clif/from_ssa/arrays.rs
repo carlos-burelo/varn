@@ -1,25 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{condcodes::IntCC, types, Block, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
@@ -29,13 +7,11 @@ use super::super::emit::{
 };
 use super::{heap, load_value, Ctx, Out};
 
-
-
 #[derive(Clone, Copy, PartialEq)]
 enum Elem {
     Int,
     Float,
-    
+
     Boxed,
 }
 
@@ -48,7 +24,6 @@ impl Elem {
         }
     }
 
-    
     fn disc(self) -> i64 {
         match self {
             Elem::Boxed => 0,
@@ -81,8 +56,6 @@ impl Elem {
         }
     }
 }
-
-
 
 fn view(
     b: &mut FunctionBuilder,
@@ -117,8 +90,7 @@ fn view(
     b.def_var(v.data, d);
     b.def_var(v.len, l);
     b.def_var(v.disc, di);
-    
-    
+
     super::store::drop_home_addrs(ctx);
     b.ins().jump(ready, &[d.into(), l.into(), di.into()]);
 
@@ -126,8 +98,6 @@ fn view(
     let p = b.block_params(ready);
     Ok((p[0], p[1], p[2]))
 }
-
-
 
 fn resolve(
     b: &mut FunctionBuilder,
@@ -148,14 +118,12 @@ fn resolve(
     (data, len, disc)
 }
 
-
 fn bounds(b: &mut FunctionBuilder, key: Value, len: Value, slow: Block) {
     let in_bounds = b.ins().icmp(IntCC::UnsignedLessThan, key, len);
     let hit = b.create_block();
     b.ins().brif(in_bounds, hit, &[], slow, &[]);
     b.switch_to_block(hit);
 }
-
 
 pub(super) fn emit_get(
     b: &mut FunctionBuilder,
@@ -196,7 +164,6 @@ pub(super) fn emit_get(
 
     b.switch_to_block(other);
     if want == Elem::Boxed {
-        
         b.ins().jump(slow, &[]);
     } else {
         let is_boxed = b.ins().icmp_imm_u(IntCC::Equal, disc, 0);
@@ -233,8 +200,7 @@ pub(super) fn emit_get(
         ctx.helpers.jit_native_result_offset as i32,
     );
     let r = want.unbox_elem(b, r);
-    
-    
+
     super::store::drop_home_addrs(ctx);
     b.ins().jump(merge, &[r.into()]);
 
@@ -245,7 +211,6 @@ pub(super) fn emit_get(
         Elem::Boxed => Out::Boxed(res),
     })
 }
-
 
 pub(super) fn emit_set(
     b: &mut FunctionBuilder,
@@ -263,8 +228,6 @@ pub(super) fn emit_set(
     b.set_cold_block(slow);
     let merge = b.create_block();
 
-    
-    
     if src != Elem::Boxed {
         let raw = load_value(b, ctx, values, value)?;
         let (data, len, disc) = view(b, ctx, values, object, slow)?;
@@ -313,10 +276,9 @@ pub(super) fn emit_set(
         ctx.helpers.jit_array_set_fast,
         &[exec_ctx, ot, op, kt, kp, vt, vp],
     );
-    
+
     ctx.views.clear(b);
-    
-    
+
     super::store::drop_home_addrs(ctx);
     b.ins().jump(merge, &[]);
 

@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 mod ast_json;
 mod cfg;
 
@@ -46,18 +38,10 @@ pub fn execute_command(
     }
 }
 
-
-
-
 fn memory_stats(workspace: &Workspace) -> serde_json::Value {
     let (graph_binds, graph_programs, graph_arenas, graph_exports) =
         crate::workspace::resolver::with_resolver(|r| r.graph_stats());
 
-    
-    
-    
-    
-    
     let mut source_bytes: u64 = 0;
     let mut token_count: u64 = 0;
     let mut token_lexeme_bytes: u64 = 0;
@@ -134,7 +118,6 @@ fn memory_stats(workspace: &Workspace) -> serde_json::Value {
     })
 }
 
-
 fn emit_tir(state: &DocumentState) -> Result<TirModule, String> {
     let program = state
         .ast
@@ -149,7 +132,6 @@ fn emit_tir(state: &DocumentState) -> Result<TirModule, String> {
         &state.db.desugar,
     ))
 }
-
 
 fn build_ssa(state: &DocumentState) -> Result<Vec<varn_compiler::ssa::ir::SsaFunc>, String> {
     varn_compiler::from_tir::build_module(&emit_tir(state)?)

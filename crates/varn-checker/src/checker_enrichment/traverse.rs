@@ -57,9 +57,6 @@ fn collect_returns_recursive(
                 ) {
                     results.push(ty);
                 } else {
-                    
-                    
-                    
                     results.push(Type::Dynamic);
                 }
             } else {

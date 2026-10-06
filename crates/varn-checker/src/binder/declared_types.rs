@@ -1,19 +1,10 @@
-
-
-
-
-
-
 use super::BindResult;
 use crate::types::{ClassMemberKind, Type};
 use std::sync::Arc;
 
-
-
 pub(crate) type VariantLayout = (Arc<str>, Vec<(Arc<str>, Type)>);
 
 impl BindResult {
-    
     pub(crate) fn declares_type(&self, name: &str) -> bool {
         self.type_members.classes.contains_key(name)
             || self.type_members.interfaces.contains_key(name)
@@ -22,7 +13,6 @@ impl BindResult {
             || self.sum_type_variants.contains_key(name)
     }
 
-    
     pub(crate) fn enum_layout(&self, name: &str) -> Option<Vec<VariantLayout>> {
         let fields = |variant: &Arc<str>| {
             self.sum_variant_fields
@@ -37,8 +27,6 @@ impl BindResult {
         Some(
             members
                 .iter()
-                
-                
                 .filter(|m| {
                     !m.is_static
                         && !matches!(

@@ -3,9 +3,6 @@ use crate::strbuf::StrBuf;
 use crate::value::VmValue;
 use std::rc::Rc;
 
-
-
-
 pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
     if val.is_sso() {
         return Some(VmValue::from_i32(val.sso_len() as i32));
@@ -25,8 +22,6 @@ pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
 }
 
 pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    
-    
     if a.is_sso() && b.is_sso() {
         let la = a.sso_len();
         let lb = b.sso_len();
@@ -37,9 +32,6 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         }
     }
 
-    
-    
-    
     if a.is_heap() {
         if let Some(HeapObj::Str(hs)) = heap.get(a.as_heap()) {
             if let HeapStr::Ext { buf, len, ascii } = hs {
@@ -47,11 +39,9 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
                     let buf = Rc::clone(buf);
                     let len = *len;
                     let a_ascii = ascii.get();
-                    
-                    
+
                     let sb = heap.str_repr(b);
-                    
-                    
+
                     let flag = match a_ascii {
                         crate::heap::ascii_flag::NO => crate::heap::ascii_flag::NO,
                         crate::heap::ascii_flag::YES if sb.is_ascii() => {
@@ -73,10 +63,6 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         }
     }
 
-    
-    
-    
-    
     if let Some(v) = heap.alloc_str_concat_inline(a, b) {
         return v;
     }

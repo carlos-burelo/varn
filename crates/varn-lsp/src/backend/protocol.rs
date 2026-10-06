@@ -9,9 +9,6 @@ use crate::backend::{capabilities, lifecycle, sync};
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> LspResult<InitializeResult> {
-        
-        
-        
         if let Some(opts) = &params.initialization_options {
             self.settings.apply(opts);
         }
@@ -80,9 +77,6 @@ impl LanguageServer for Backend {
         sync::did_close(self, params).await;
     }
 
-    
-    
-    
     async fn did_change_configuration(&self, params: DidChangeConfigurationParams) {
         self.settings.apply(&params.settings);
         self.pull_configuration().await;

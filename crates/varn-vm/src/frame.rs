@@ -1,9 +1,3 @@
-
-
-
-
-
-
 use crate::closure::VmClosure;
 use std::rc::Rc;
 
@@ -18,16 +12,7 @@ pub struct CallFrame {
     pub ip: usize,
     pub base: usize,
     pub current_class: Option<Rc<varn_types::ClassObj>>,
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     pub return_reg: u16,
 }
 
@@ -35,15 +20,8 @@ unsafe impl Send for CallFrame {}
 unsafe impl Sync for CallFrame {}
 
 impl CallFrame {
-    
-    
-    
-    
-    
     pub const NO_RETURN_REG: u16 = u16::MAX;
 
-    
-    
     pub const NO_ACTIVATION: usize = usize::MAX;
 
     pub(crate) fn new(closure: &VmClosure, base: usize) -> Self {
@@ -68,11 +46,6 @@ impl CallFrame {
         }
     }
 
-    
-    
-    
-    
-    
     #[inline(always)]
     pub(crate) fn closure(&self) -> &VmClosure {
         unsafe { &*self.closure_ptr }

@@ -5,28 +5,6 @@ use varn_types::register_meta::SlotKind;
 use super::scan::ScanResult;
 use crate::regalloc::liveness::LiveRange;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub(crate) fn color_with_base(
     ranges: &[LiveRange],
     base: u8,
@@ -41,8 +19,7 @@ pub(crate) fn color_with_base(
             .copied()
             .unwrap_or(SlotKind::Dynamic)
     };
-    
-    
+
     let mut color_kind: HashMap<u8, SlotKind> = HashMap::default();
     let compatible = |color_kind: &HashMap<u8, SlotKind>, color: u8, kind: SlotKind| {
         color_kind.get(&color).is_none_or(|&k| k == kind)
@@ -141,10 +118,6 @@ pub(crate) fn color_with_base(
                 target = coloring.get(&u).copied();
             }
             if let Some(c) = target {
-                
-                
-                
-                
                 let ends_share_kind = kind_of(u) == kind_of(v);
                 let slots_compatible =
                     (0..count).all(|off| compatible(&color_kind, c + off, kind_of(reg + off)));
@@ -162,10 +135,7 @@ pub(crate) fn color_with_base(
 
         let color = match color_opt {
             Some(c) => c,
-            
-            
-            
-            
+
             None => (base..=max_allowed_color).find(|c| {
                 !neighbor_colors.contains(c)
                     && (0..count).all(|off| compatible(&color_kind, c + off, kind_of(reg + off)))

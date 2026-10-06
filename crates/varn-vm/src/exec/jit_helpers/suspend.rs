@@ -1,25 +1,11 @@
-
-
-
-
-
-
-
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-
-
-
 pub(super) unsafe fn jit_suspend_at(ctx: &mut ExecCtx, frame_idx: usize, resume_ip: usize) -> ! {
     ctx.frames[frame_idx].ip = resume_ip;
-    
-    
-    
+
     ctx.jit_panic_suspend_resume_ip = None;
-    
-    
-    
+
     let buf = ctx.jit_suspend_buf;
     if buf.is_null() {
         panic!("JIT suspend triggered but no jump buffer registered");
@@ -56,7 +42,6 @@ pub(crate) extern "C" fn jit_await(
         });
         ctx_ref.jit_panic_suspend_resume_ip = Some(resume_ip);
 
-        
         let buf = ctx_ref.jit_suspend_buf;
         if !buf.is_null() {
             crate::exec::ctx::my_longjmp(buf, 2);
@@ -86,7 +71,6 @@ pub(crate) extern "C" fn jit_yield(
         });
         ctx_ref.jit_panic_suspend_resume_ip = Some(resume_ip);
 
-        
         let buf = ctx_ref.jit_suspend_buf;
         if !buf.is_null() {
             crate::exec::ctx::my_longjmp(buf, 2);

@@ -1,9 +1,6 @@
 use super::*;
 
 impl ExecCtx {
-    
-    
-    
     pub(super) fn host_str_map_key(&mut self, s: &str) -> varn_types::value::MapKey {
         match VmValue::try_from_sso(s) {
             Some(v) => varn_types::value::MapKey(v),

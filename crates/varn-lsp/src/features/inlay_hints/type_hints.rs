@@ -100,15 +100,12 @@ fn find_rparen_col_on_line(state: &DocumentState, line: u32, after_col: u32) -> 
     last_rparen_col
 }
 
-
-
 fn worth_hinting(state: &DocumentState, ty: &varn_checker::Type) -> bool {
     !matches!(
         state.db.ty_kind(ty),
         TypeKind::Primitive(varn_core::LangPrimitive::Void | varn_core::LangPrimitive::Dynamic)
     )
 }
-
 
 fn collect_pipeline_hints(state: &DocumentState, hints: &mut Vec<InlayHint>) {
     let arena = &state.ast_arena;

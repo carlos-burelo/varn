@@ -1,7 +1,3 @@
-
-
-
-
 use std::io::Write;
 
 use varn_checker::CheckResult;

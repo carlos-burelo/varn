@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use crate::regalloc::liveness::{DefSites, LiveRange};
 use crate::regalloc::regalloc_post::*;
 use rustc_hash::FxHashMap as HashMap;
@@ -18,12 +11,6 @@ fn range(vreg: u16, start: usize, end: usize, interference: &[u16]) -> LiveRange
         interference: interference.to_vec(),
     }
 }
-
-
-
-
-
-
 
 fn infeasible_case() -> (Vec<LiveRange>, ScanResult, Vec<(u8, u8)>) {
     let ranges = vec![
@@ -69,9 +56,6 @@ fn an_infeasible_register_abandons_the_function_instead_of_aliasing() {
     );
 }
 
-
-
-
 #[test]
 fn a_feasible_colouring_never_aliases_interfering_registers() {
     let (ranges, mut scan, blocks) = infeasible_case();
@@ -87,19 +71,12 @@ fn a_feasible_colouring_never_aliases_interfering_registers() {
     );
 }
 
-
-
 #[test]
 fn the_verifier_rejects_the_mapping_the_old_colourer_produced() {
     let (ranges, _, _) = infeasible_case();
     let aliased: HashMap<u8, u8> = [(3, 1)].into_iter().collect();
     assert!(!verify_interference(&ranges, &aliased));
 }
-
-
-
-
-
 
 #[test]
 fn copies_across_kinds_never_share_a_colour() {
@@ -119,8 +96,6 @@ fn copies_across_kinds_never_share_a_colour() {
         "int r1 and float r2 must keep distinct colours, got {coloring:?}"
     );
 }
-
-
 
 #[test]
 fn same_kind_copies_still_coalesce() {

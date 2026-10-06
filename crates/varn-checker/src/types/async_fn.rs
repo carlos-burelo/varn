@@ -1,34 +1,5 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use super::{CheckerTyTable, Type};
 use varn_core::{AtomInterner, TypeKind};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub fn async_fn_return(
     ret: Type,
@@ -43,11 +14,6 @@ pub fn async_fn_return(
     Type::generic_atom(atom, vec![ret], None, table)
 }
 
-
-
-
-
-
 pub fn generator_of(yielded: Type, is_async: bool, table: &mut CheckerTyTable) -> Type {
     let name = if is_async {
         "AsyncGenerator"
@@ -57,8 +23,6 @@ pub fn generator_of(yielded: Type, is_async: bool, table: &mut CheckerTyTable) -
     let atom = table.intern_name(name);
     Type::generic_atom(atom, vec![yielded], None, table)
 }
-
-
 
 pub fn is_awaitable(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) -> bool {
     match table.get(ty.0) {
@@ -70,8 +34,6 @@ pub fn is_awaitable(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) 
         _ => false,
     }
 }
-
-
 
 pub fn awaited(ty: &Type, table: &CheckerTyTable, interner: &AtomInterner) -> Type {
     match table.get(ty.0) {

@@ -1,15 +1,7 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
-
 use std::sync::Arc;
 use varn_tir::{DynReason, FnId, LocalId, Resolution};
-
-
-
 
 #[test]
 fn the_three_dispatch_states_are_distinguishable() {
@@ -18,7 +10,6 @@ fn the_three_dispatch_states_are_distinguishable() {
         why: DynReason::IndexSignature,
     };
 
-    
     for r in [
         Resolution::FieldSlot(3),
         Resolution::StaticField(1),
@@ -36,16 +27,12 @@ fn the_three_dispatch_states_are_distinguishable() {
         assert!(!r.is_dynamic_dispatch(), "{r:?} is not by-name");
     }
 
-    
     assert!(!Resolution::None.is_static_dispatch());
     assert!(!Resolution::None.is_dynamic_dispatch());
 
-    
     assert!(!by_name.is_static_dispatch());
     assert!(by_name.is_dynamic_dispatch());
 }
-
-
 
 #[test]
 fn by_name_carries_its_reason() {

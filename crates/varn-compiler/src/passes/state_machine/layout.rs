@@ -1,7 +1,3 @@
-
-
-
-
 use crate::ssa::suspend::SuspendPoint;
 
 #[derive(Debug, Clone)]

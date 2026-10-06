@@ -1,37 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use super::cfg::{dominates, dominators};
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator};
@@ -45,9 +11,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
     let dom = dominators(func);
     let mut changed = false;
 
-    
-    
-    
     let mut loops: rustc_hash::FxHashMap<BlockId, Vec<BlockId>> = rustc_hash::FxHashMap::default();
     for b in 0..n {
         for succ in successors(&func.blocks[b].term) {
@@ -70,8 +33,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
 fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool {
     let n = func.blocks.len();
 
-    
-    
     let mut in_loop = vec![false; n];
     in_loop[header.0 as usize] = true;
     let mut stack = latches.to_vec();
@@ -85,7 +46,6 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
         }
     }
 
-    
     let entries: Vec<BlockId> = func.blocks[header.0 as usize]
         .preds
         .iter()
@@ -103,7 +63,6 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
         return false;
     }
 
-    
     let mut def_in_loop = vec![false; func.values.len()];
     let mut facts = LoopFacts {
         globals_stable: true,
@@ -129,7 +88,6 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
         }
     }
 
-    
     let mut changed = false;
     loop {
         let mut moved_any = false;
@@ -164,18 +122,12 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
     changed
 }
 
-
-
 #[derive(Debug, Clone, Copy)]
 struct LoopFacts {
-    
     globals_stable: bool,
-    
-    
+
     memory_stable: bool,
 }
-
-
 
 fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
     match kind {
@@ -206,8 +158,7 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
         InstKind::LoadGlobal(_) | InstKind::LoadGlobalIdx(_) | InstKind::LoadNativeGlobalIdx(_) => {
             facts.globals_stable
         }
-        
-        
+
         InstKind::IsNull { .. }
         | InstKind::IsArray { .. }
         | InstKind::GetEnumTag { .. }
@@ -216,11 +167,6 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
         _ => false,
     }
 }
-
-
-
-
-
 
 fn is_transparent(kind: &InstKind) -> bool {
     matches!(

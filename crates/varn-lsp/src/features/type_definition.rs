@@ -13,7 +13,6 @@ pub fn build_goto_type_definition(
 ) -> Option<GotoDefinitionResponse> {
     let token = state.identifier_token_at(line, col)?;
 
-    
     let target_type = if let Some(sid) = state.checker_symbol_id_at_token(token) {
         state
             .db
@@ -27,7 +26,6 @@ pub fn build_goto_type_definition(
 
     let type_name = extract_type_identifier(state, &target_type)?;
 
-    
     for sym in state.symbols() {
         if sym.name() == type_name
             && matches!(
@@ -58,7 +56,6 @@ pub fn build_goto_type_definition(
         }
     }
 
-    
     if let Some(idx) = index {
         let defs = idx.definitions_of(&type_name);
         let locs: Vec<Location> = defs
@@ -92,8 +89,6 @@ pub fn build_goto_type_definition(
 
     None
 }
-
-
 
 fn extract_type_identifier(state: &DocumentState, ty: &varn_checker::Type) -> Option<String> {
     match state.db.ty_kind(ty) {

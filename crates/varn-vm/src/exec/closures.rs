@@ -1,6 +1,3 @@
-
-
-
 use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
@@ -8,18 +5,14 @@ use crate::value::VmValue;
 use std::rc::Rc;
 use varn_types::FunctionProto;
 
-
 #[derive(Clone, Copy)]
 pub(crate) enum UpvalueSrc {
-    
-    
     Local(usize),
-    
+
     Inherited(usize),
 }
 
 impl UpvalueSrc {
-    
     pub(crate) fn from_bytecode(word: u16) -> Self {
         let index = (word & 0xFF) as usize;
         if word >> 8 != 0 {
@@ -29,8 +22,6 @@ impl UpvalueSrc {
         }
     }
 
-    
-    
     pub(crate) fn from_word(word: u64) -> Self {
         let index = (word & 0xFFFF_FFFF) as usize;
         if word & varn_types::ssa::UPVALUE_LOCAL != 0 {
@@ -56,9 +47,6 @@ impl ExecCtx {
         )
     }
 
-    
-    
-    
     pub(crate) fn make_closure(
         &mut self,
         parent: &VmClosure,
@@ -90,7 +78,7 @@ impl ExecCtx {
         let constants = self.shared_constants(&proto);
         let mut closure =
             VmClosure::with_upvalues(proto.clone(), captured, constants, self.settings);
-        
+
         closure.module_base = parent.module_base;
         let val = self.heap.alloc_vm_closure(Rc::new(closure));
         if is_static {

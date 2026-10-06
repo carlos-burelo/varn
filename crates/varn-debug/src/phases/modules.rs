@@ -1,5 +1,3 @@
-
-
 use std::io::Write;
 
 use varn_core::ast::{AstArena, Decl, Program, StmtKind};
@@ -7,8 +5,6 @@ use varn_core::ast::{AstArena, Decl, Program, StmtKind};
 use crate::fmt::Format;
 use crate::render::{basename, BLUE, BOLD, CYAN, DIM, RESET, YELLOW};
 use crate::report::Report;
-
-
 
 pub fn collect(program: &Program, arena: &AstArena) -> Report {
     let mut rows = Vec::new();

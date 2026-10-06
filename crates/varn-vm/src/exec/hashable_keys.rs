@@ -1,21 +1,9 @@
-
-
-
-
-
-
-
-
-
 use super::ctx::ExecCtx;
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::HeapObj;
 use crate::value::VmValue;
 
 impl ExecCtx {
-    
-    
-    
     pub(crate) fn hashable_key(&mut self, key: VmValue) -> VmResult<VmValue> {
         let Some(class_id) = self.instance_class_id(key) else {
             return Ok(key);

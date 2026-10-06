@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 pub mod capabilities;
 pub mod edit;
 pub mod insight;

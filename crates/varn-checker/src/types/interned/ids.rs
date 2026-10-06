@@ -1,41 +1,27 @@
 use varn_core::{Atom, LangPrimitive, TypeKind};
 
-
-
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub struct CheckerTyId(pub(super) u128);
-
-
 
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub struct TyListId(pub(super) u128);
 
-
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub struct FunctionTypeId(pub(super) u128);
-
 
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub struct ObjectMembersId(pub(super) u128);
 
-
-
-
 pub type InternedTypeKind =
     TypeKind<CheckerTyId, Atom, TyListId, FunctionTypeId, ObjectMembersId, ()>;
-
-
-
-
-
 
 impl CheckerTyId {
     pub const INT: CheckerTyId = CheckerTyId(0);
@@ -51,9 +37,6 @@ impl CheckerTyId {
     pub const DYNAMIC: CheckerTyId = CheckerTyId(10);
     pub const THIS: CheckerTyId = CheckerTyId(11);
 }
-
-
-
 
 pub(super) fn seeded_id(kind: &InternedTypeKind) -> Option<CheckerTyId> {
     match kind {

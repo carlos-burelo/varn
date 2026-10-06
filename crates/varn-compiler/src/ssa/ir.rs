@@ -30,19 +30,8 @@ pub struct SsaFunc {
 
     pub values: Vec<ValueDef>,
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub is_async: bool,
-    
-    
+
     pub is_generator: bool,
 }
 
@@ -74,10 +63,6 @@ impl SsaFunc {
         self.values[v.0 as usize].ty
     }
 
-    
-    
-    
-    
     pub fn replace_all_uses(&mut self, old: Value, new: Value) {
         let mut sub = |v: &mut Value| {
             if *v == old {
@@ -118,7 +103,7 @@ pub enum InstKind {
     ConstStr(Arc<str>),
     ConstChar(char),
     ConstDecimal(Decimal),
-    
+
     ConstBigInt(Arc<str>),
     ConstNull,
     Binary {
@@ -135,10 +120,8 @@ pub enum InstKind {
 
     LoadGlobal(Arc<str>),
 
-    
     LoadGlobalIdx(u32),
 
-    
     LoadNativeGlobalIdx(u32),
 
     LoadUpvalue(u32),
@@ -148,7 +131,6 @@ pub enum InstKind {
         value: Value,
     },
 
-    
     StoreGlobalIdx {
         slot: u32,
         value: Value,
@@ -164,8 +146,6 @@ pub enum InstKind {
         args: Vec<Value>,
     },
 
-    
-    
     AllocInstance {
         class: Value,
     },
@@ -182,9 +162,7 @@ pub enum InstKind {
     GetFixedField {
         object: Value,
         slot: u16,
-        
-        
-        
+
         offset: u32,
         tag: varn_core::FieldAccess,
     },
@@ -214,9 +192,9 @@ pub enum InstKind {
         object: Value,
         value: Value,
         slot: u16,
-        
+
         offset: u32,
-        
+
         tag: Option<varn_core::RuntimeKind>,
     },
 
@@ -238,9 +216,6 @@ pub enum InstKind {
         value: Value,
     },
 
-    
-    
-    
     ArrayPush {
         array: Value,
         value: Value,
@@ -266,7 +241,6 @@ pub enum InstKind {
         ty: HirType,
     },
 
-    
     Convert {
         operand: Value,
         conv: varn_core::NumConv,
@@ -305,13 +279,7 @@ pub enum InstKind {
         parts: Vec<Value>,
     },
 
-    
-    
-    
-    
-    
     MakeClosure {
-        
         func: u32,
         upvalues_src: Vec<HirUpvalueSrc>,
     },
@@ -417,20 +385,14 @@ pub enum InstKind {
         operand: Value,
     },
 
-    
-    
     StrLength {
         operand: Value,
     },
 
-    
     ArrayLength {
         operand: Value,
     },
 
-    
-    
-    
     BytesLength {
         operand: Value,
     },
@@ -472,8 +434,7 @@ pub enum InstKind {
 
     ExtensionCall {
         func: Arc<str>,
-        
-        
+
         slot: Option<u32>,
         recv: Value,
         args: Vec<Value>,

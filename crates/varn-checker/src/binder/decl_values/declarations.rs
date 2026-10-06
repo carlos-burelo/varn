@@ -77,12 +77,6 @@ impl<'r> super::super::Binder<'r> {
                 } else if !has_explicit_ann
                     && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty())
                 {
-                    
-                    
-                    
-                    
-                    
-                    
                     if let Pattern::Identifier { name, .. } = &d.id {
                         let scope = self.scopes.get(self.current);
                         if let Some(sym_id) = scope.lookup(*name) {

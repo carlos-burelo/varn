@@ -1,65 +1,30 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub const INT_MAX: i64 = i64::MAX;
 pub const INT_MIN: i64 = i64::MIN;
-
 
 #[inline(always)]
 pub fn checked_int(v: i64) -> Option<i64> {
     Some(v)
 }
 
-
 #[inline(always)]
 pub fn add_int(a: i64, b: i64) -> Option<i64> {
     a.checked_add(b)
 }
-
 
 #[inline(always)]
 pub fn sub_int(a: i64, b: i64) -> Option<i64> {
     a.checked_sub(b)
 }
 
-
 #[inline(always)]
 pub fn mul_int(a: i64, b: i64) -> Option<i64> {
     a.checked_mul(b)
 }
 
-
 #[inline(always)]
 pub fn pow_int(a: i64, e: u32) -> Option<i64> {
     a.checked_pow(e)
 }
-
 
 #[inline(always)]
 pub fn neg_int(a: i64) -> Option<i64> {
@@ -72,7 +37,6 @@ pub enum IntDivFault {
     Overflow,
 }
 
-
 #[inline(always)]
 pub fn div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     if b == 0 {
@@ -81,8 +45,6 @@ pub fn div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     a.checked_div(b).ok_or(IntDivFault::Overflow)
 }
 
-
-
 #[inline(always)]
 pub fn rem_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     if b == 0 {
@@ -90,7 +52,6 @@ pub fn rem_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     }
     Ok(a.wrapping_rem(b))
 }
-
 
 pub fn floor_div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     let q = div_int(a, b)?;
@@ -102,7 +63,6 @@ pub fn floor_div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     })
 }
 
-
 pub fn ceil_div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     let q = div_int(a, b)?;
     let inexact = a.wrapping_rem(b) != 0;
@@ -112,7 +72,6 @@ pub fn ceil_div_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
         q
     })
 }
-
 
 pub fn mod_int(a: i64, b: i64) -> Result<i64, IntDivFault> {
     if b == 0 {
@@ -128,10 +87,6 @@ pub enum NumericOperand {
     Decimal,
     BigInt,
 }
-
-
-
-
 
 pub fn binary_operand_kind(
     l: Option<NumericOperand>,

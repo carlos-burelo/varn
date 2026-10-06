@@ -8,9 +8,6 @@ pub struct ParamInfo {
     pub is_type_param: bool,
 }
 
-
-
-
 pub fn param_at(state: &DocumentState, line: u32, col: u32) -> Option<ParamInfo> {
     let name = state.type_param_at_pos(line, col)?;
     Some(ParamInfo {

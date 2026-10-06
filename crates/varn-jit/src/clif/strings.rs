@@ -1,12 +1,7 @@
-
-
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
 
 use super::emit::box_int;
-
-
-
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn str_length_boxed(

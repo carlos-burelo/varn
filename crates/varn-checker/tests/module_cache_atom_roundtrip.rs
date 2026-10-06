@@ -1,27 +1,5 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::fs;
 use std::path::PathBuf;
 use varn_checker::module_resolver::{DiskResolver, ImportResolver};
@@ -50,8 +28,6 @@ fn symbol_names_survive_disk_cache_across_fresh_resolvers() {
     .expect("write greeter.vn");
     let lib_str = lib_path.to_string_lossy().into_owned();
 
-    
-    
     let resolver1 = DiskResolver::new();
     let bind1 = resolver1
         .module_bind(&lib_str)
@@ -62,9 +38,6 @@ fn symbol_names_survive_disk_cache_across_fresh_resolvers() {
         bind1.diagnostics.errors().collect::<Vec<_>>()
     );
 
-    
-    
-    
     let resolver2 = DiskResolver::new();
     let bind2 = resolver2
         .module_bind(&lib_str)
@@ -83,10 +56,6 @@ fn symbol_names_survive_disk_cache_across_fresh_resolvers() {
         "cached reload must recover the real symbol name 'farewell', got: {names:?}"
     );
 
-    
-    
-    
-    
     let atom = bind2.interner.get("makeGreeting").expect(
         "the reloaded interner must have interned 'makeGreeting' while re-interning symbols",
     );

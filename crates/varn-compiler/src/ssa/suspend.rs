@@ -1,9 +1,3 @@
-
-
-
-
-
-
 use super::ir::{InstKind, SsaFunc, Value};
 use super::liveness::Liveness;
 
@@ -31,12 +25,6 @@ pub fn analyze(ssa: &SsaFunc) -> Vec<SuspendPoint> {
     }
     out
 }
-
-
-
-
-
-
 
 pub fn suspend_live_regs(
     ssa: &SsaFunc,
@@ -88,7 +76,6 @@ pub fn suspend_live_regs(
     table
 }
 
-
 pub fn try_handlers(ssa: &SsaFunc) -> Vec<usize> {
     let mut handlers: Vec<usize> = Vec::new();
     for block in &ssa.blocks {
@@ -103,10 +90,6 @@ pub fn try_handlers(ssa: &SsaFunc) -> Vec<usize> {
     }
     handlers
 }
-
-
-
-
 
 pub fn resume_live(
     ssa: &SsaFunc,

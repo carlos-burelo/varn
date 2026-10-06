@@ -8,12 +8,9 @@ use varn_checker::SymbolKind;
 pub struct ExportEntry {
     pub name: String,
     pub kind: SymbolKind,
-    
-    
+
     pub uri: Arc<str>,
-    
-    
-    
+
     pub parent: Option<Arc<str>>,
     pub line: u32,
     pub col: u32,
@@ -39,12 +36,6 @@ impl ProjectIndex {
     }
 
     pub fn update_file(&mut self, uri: &str, state: &DocumentState) {
-        
-        
-        
-        
-        
-        
         if !self.module_exports.contains_key(uri) {
             builder::index_file(self, uri, state);
             return;

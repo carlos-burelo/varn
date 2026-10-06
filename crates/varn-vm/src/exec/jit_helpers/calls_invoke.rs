@@ -4,12 +4,6 @@ use crate::exec::ctx::ExecCtx;
 use crate::exec::host::isolates::Invoked;
 use crate::value::VmValue;
 
-
-
-
-
-
-
 #[varn_op_macros::jit_slow(field = "jit_call_spread_window")]
 pub(crate) extern "C" fn jit_call_spread_window(
     ctx: *mut ExecCtx,

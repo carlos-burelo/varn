@@ -10,7 +10,6 @@ pub(super) fn check_condition(
     cond: &TirExpr,
     errors: &mut Vec<VerifyError>,
 ) {
-    
     if matches!(cond.ty, BackendTy::Dynamic(_)) {
         return;
     }
@@ -29,7 +28,6 @@ pub(super) fn check_let(
     init: &TirExpr,
     errors: &mut Vec<VerifyError>,
 ) {
-    
     if !assignable(m, init.ty, declared_ty) {
         errors.push(VerifyError::new(
             format!(
@@ -47,7 +45,6 @@ pub(super) fn check_return(
     returned: &TirExpr,
     errors: &mut Vec<VerifyError>,
 ) {
-    
     if !assignable(m, returned.ty, f.return_ty) {
         errors.push(VerifyError::new(
             format!(
@@ -60,7 +57,6 @@ pub(super) fn check_return(
 }
 
 pub(super) fn check_return_none(_m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>) {
-    
     if matches!(f.return_ty, BackendTy::Dynamic(_)) {
         return;
     }

@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use crate::PipelineError;
 use varn_modules::artifact::{
     read_artifact, write_artifact, write_artifact_file, ArtifactClass, ArtifactKind,

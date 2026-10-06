@@ -45,7 +45,6 @@ pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Optio
     let call_idx = call_paren_idx?;
     let fn_tok = call_idx.checked_sub(1).and_then(|i| before.get(i))?;
 
-    
     if let Some(resolved) = resolve_callee_signature(
         state,
         fn_tok.line,
@@ -56,7 +55,6 @@ pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Optio
         return Some(resolved);
     }
 
-    
     if let Some(chain) = state.resolve_chain_at(fn_tok.line, fn_tok.col) {
         use crate::document::ChainResult;
         let (params_str, ret_str) = match chain {
@@ -64,8 +62,7 @@ pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Optio
                 Some(ft) => (format_params(state, &ft), state.db.id_text(ft.return_type)),
                 None => (sym.params_str(), sym.type_str()),
             },
-            
-            
+
             ChainResult::Member { member, .. } => match state.db.fn_shape(&member.ty) {
                 Some(ft) => (format_params(state, &ft), state.db.id_text(ft.return_type)),
                 None => (String::new(), state.ty_text(&member.ty)),
@@ -89,7 +86,6 @@ fn resolve_callee_signature(
         .iter()
         .find(|t| t.line == line && t.col <= col && col < t.col + t.length)?;
 
-    
     if let Some(call_res) = state.db.call_resolutions.get(&tok.offset) {
         let params_str = call_res
             .params
@@ -106,7 +102,6 @@ fn resolve_callee_signature(
         return build_signature_response(name_str, &params_str, &ret_str, active_param);
     }
 
-    
     if let Some(mem_res) = state.db.member_resolutions.get(&tok.offset) {
         if let Some(ft) = state.db.fn_shape(&mem_res.member_ty) {
             let params_str = format_params(state, &ft);
@@ -120,7 +115,6 @@ fn resolve_callee_signature(
         }
     }
 
-    
     if let Some(info) = state.db.expr_types.get(&tok.offset) {
         if let Some(ft) = state.db.callable_shape(&info.ty) {
             let params_str = format_params(state, &ft);
@@ -129,7 +123,6 @@ fn resolve_callee_signature(
         }
     }
 
-    
     if let Some((_, ty)) = state.db.resolve_at(name, tok.offset) {
         if let Some(ft) = state.db.fn_shape(&ty) {
             let params_str = format_params(state, &ft);

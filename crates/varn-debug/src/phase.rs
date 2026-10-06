@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Stage {
     Lex,
@@ -15,27 +7,20 @@ pub enum Stage {
     Exec,
 }
 
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PerModule {
     No,
-    
+
     Graph,
 }
 
-
-
-
 pub trait Phase: Sync {
-    
     fn id(&self) -> &'static str;
 
-    
     fn aliases(&self) -> &'static [&'static str] {
         &[]
     }
 
-    
     fn title(&self) -> &'static str;
 
     fn stage(&self) -> Stage;
@@ -44,13 +29,10 @@ pub trait Phase: Sync {
         PerModule::No
     }
 
-    
-    
     fn in_all(&self) -> bool {
         true
     }
 
-    
     fn groups(&self) -> &'static [&'static str] {
         &[]
     }

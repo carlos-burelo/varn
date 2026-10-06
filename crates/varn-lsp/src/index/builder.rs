@@ -9,8 +9,6 @@ use crate::document::{import::uri_to_path, DocumentState};
 use super::{ExportEntry, ProjectIndex};
 
 pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
-    
-    
     let uri_shared: Arc<str> = Arc::from(uri);
     let mut exports: Vec<Arc<ExportEntry>> = state
         .symbols()
@@ -49,12 +47,6 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
         .map(|p| p.to_path_buf());
 
     for specifier in &state.import_paths {
-        
-        
-        
-        
-        
-        
         if is_stable_specifier(specifier) {
             if let Some(cached) = index.module_cache.get(specifier) {
                 index
@@ -80,19 +72,12 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
     }
 }
 
-
-
-
-
-
 fn collect_member_exports(
     state: &crate::document::DocumentState,
     uri: &Arc<str>,
     sym: SymbolView<'_>,
     out: &mut Vec<Arc<ExportEntry>>,
 ) {
-    
-    
     let mut parent: Option<Arc<str>> = None;
     for m in state.members_of(sym) {
         let Some(line) = m.def_line else { continue };
@@ -121,8 +106,6 @@ fn summary_to_symbol_kind(k: varn_checker::ResolvedMemberKind) -> varn_checker::
 }
 
 fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) -> Option<String> {
-    
-    
     let from = match doc_dir {
         Some(dir) => varn_core::ModuleId::local(dir.join("__doc__.vn")),
         None => varn_core::ModuleId::local_str("__doc__.vn"),

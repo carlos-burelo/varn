@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder, StackSlotData, StackSlotKind, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::{SsaUpvalue, UPVALUE_LOCAL};
@@ -27,7 +18,6 @@ fn captured_reg(ctx: &Ctx<'_>, var: u32) -> Result<u32, String> {
         .ok_or_else(|| format!("from_ssa: captured variable {var} has no register"))
 }
 
-
 fn native_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exec_ctx: Value) -> Value {
     b.ins().load(
         types::I128,
@@ -36,9 +26,6 @@ fn native_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exec_ctx: Value) -> Val
         ctx.helpers.jit_native_result_offset as i32,
     )
 }
-
-
-
 
 pub(super) fn emit_make_closure(
     b: &mut FunctionBuilder,
@@ -91,7 +78,6 @@ pub(super) fn emit_make_closure(
     Ok(native_result(b, ctx, frame.exec_ctx))
 }
 
-
 pub(super) fn emit_load_captured(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -99,7 +85,6 @@ pub(super) fn emit_load_captured(
 ) -> Result<Value, String> {
     home_load(b, ctx, captured_reg(ctx, var)?)
 }
-
 
 pub(super) fn emit_store_captured(
     b: &mut FunctionBuilder,
@@ -111,7 +96,6 @@ pub(super) fn emit_store_captured(
     let boxed = heap::boxed_value(b, ctx, values, value)?;
     home_store(b, ctx, captured_reg(ctx, var)?, boxed)
 }
-
 
 pub(super) fn emit_load_upvalue(
     b: &mut FunctionBuilder,
@@ -128,7 +112,6 @@ pub(super) fn emit_load_upvalue(
     );
     Ok(native_result(b, ctx, frame.exec_ctx))
 }
-
 
 pub(super) fn emit_store_upvalue(
     b: &mut FunctionBuilder,
@@ -148,7 +131,6 @@ pub(super) fn emit_store_upvalue(
     );
     Ok(())
 }
-
 
 pub(super) fn emit_close_upvalues(
     b: &mut FunctionBuilder,

@@ -1,33 +1,14 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
 use super::{heap, Ctx};
 
-
 pub(super) enum Out {
-    
-    
     Native(Value),
-    
+
     Boxed(Value),
 }
-
-
 
 pub(super) fn land(
     b: &mut FunctionBuilder,
@@ -49,12 +30,9 @@ pub(super) fn land(
     Ok(())
 }
 
-
 pub(super) fn is_heap(kind: SlotKind) -> bool {
     matches!(kind, SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic)
 }
-
-
 
 pub(super) fn define(
     b: &mut FunctionBuilder,
@@ -74,7 +52,6 @@ pub(super) fn define(
     }
 }
 
-
 pub(super) fn load_value(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -91,7 +68,6 @@ pub(super) fn load_value(
         .ok_or_else(|| format!("from_ssa: value {v} used before definition"))
 }
 
-
 pub(super) fn load_home_value(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -106,7 +82,6 @@ pub(super) fn load_home_value(
     }
 }
 
-
 fn homes<'a>(ctx: &'a Ctx<'_>) -> Result<super::super::homes::Homes<'a>, String> {
     let frame = ctx
         .frame
@@ -120,23 +95,9 @@ fn homes<'a>(ctx: &'a Ctx<'_>) -> Result<super::super::homes::Homes<'a>, String>
     })
 }
 
-
-
-
-
-
-
-
 pub(super) fn drop_home_addrs(ctx: &Ctx<'_>) {
     ctx.home_addrs.borrow_mut().clear();
 }
-
-
-
-
-
-
-
 
 fn home_addr(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, String> {
     if let Some(&a) = ctx.home_addrs.borrow().get(&reg) {
@@ -146,7 +107,6 @@ fn home_addr(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, 
     ctx.home_addrs.borrow_mut().insert(reg, a);
     Ok(a)
 }
-
 
 pub(super) fn home_store(
     b: &mut FunctionBuilder,
@@ -160,14 +120,11 @@ pub(super) fn home_store(
     Ok(())
 }
 
-
 pub(super) fn home_load(b: &mut FunctionBuilder, ctx: &Ctx<'_>, reg: u32) -> Result<Value, String> {
     let h = homes(ctx)?;
     let addr = home_addr(b, ctx, reg)?;
     Ok(h.load_at(b, addr, reg as usize))
 }
-
-
 
 pub(super) fn clif_ty(kind: SlotKind) -> Option<cranelift_codegen::ir::Type> {
     match kind {

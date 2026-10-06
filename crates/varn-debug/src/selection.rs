@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub struct PhaseSel(u64);
 
@@ -37,15 +29,11 @@ impl PhaseSel {
     }
 }
 
-
-
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Filters {
     pub fn_filter: Option<String>,
     pub line_range: Option<(u32, u32)>,
 }
-
-
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub struct SubModes {
@@ -68,7 +56,6 @@ pub struct SubModes {
     pub lsp_colorize: bool,
     pub lsp_hints: bool,
 }
-
 
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct Selection {

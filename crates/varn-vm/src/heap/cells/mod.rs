@@ -1,8 +1,3 @@
-
-
-
-
-
 mod blocks;
 mod native;
 mod typed;
@@ -90,8 +85,6 @@ impl Default for CellSpace {
 }
 
 impl CellSpace {
-    
-    
     #[inline]
     pub(in crate::heap) fn take_cell(
         &mut self,
@@ -128,7 +121,6 @@ impl CellSpace {
         r
     }
 
-    
     #[inline(always)]
     pub(crate) fn get(&self, r: HeapRef) -> &HeapObj {
         debug_assert_ne!(self.state(r), SlotState::Free, "reference to a freed cell");
@@ -156,7 +148,6 @@ impl CellSpace {
         self.old_growth += 1;
     }
 
-    
     pub(crate) fn release(&mut self, r: HeapRef) {
         let h = header(r);
         let class = h.class;
@@ -175,7 +166,6 @@ impl CellSpace {
         }
     }
 
-    
     #[inline(always)]
     pub(crate) fn mark_young(r: HeapRef, work: &mut Vec<HeapRef>) {
         let h = header(r);
@@ -185,7 +175,6 @@ impl CellSpace {
         }
     }
 
-    
     #[inline(always)]
     pub(crate) fn mark_major(r: HeapRef) -> bool {
         let h = header(r);
@@ -213,7 +202,6 @@ impl CellSpace {
             + self.large.len()
     }
 
-    
     pub(crate) fn refs(&self) -> impl Iterator<Item = HeapRef> + '_ {
         self.classes
             .iter()
@@ -227,8 +215,6 @@ impl CellSpace {
         self.refs().map(move |r| (r, self.get(r), self.state(r)))
     }
 
-    
-    
     pub(crate) fn sweep_major(&mut self) -> usize {
         let mut dead: Vec<HeapRef> = Vec::new();
         let mut survivors = 0;

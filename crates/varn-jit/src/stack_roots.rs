@@ -37,13 +37,6 @@ pub struct JitExit {
     pub fp: usize,
 }
 
-
-
-
-
-
-
-
 pub unsafe fn for_each_slot(exit: JitExit, mut visit: impl FnMut(*mut VmValue)) {
     if exit.sp == 0 {
         return;

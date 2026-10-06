@@ -9,11 +9,6 @@ use std::sync::Arc;
 use traverse::{collect_inferred_return_types_raw, enrich_stmts_for_vars};
 use varn_core::ast::AstArena;
 
-
-
-
-
-
 fn with_new_return_type(
     old: Type,
     new_ret: Type,
@@ -27,8 +22,6 @@ fn with_new_return_type(
         old
     }
 }
-
-
 
 pub fn enrich_call_returns(
     bind: &mut BindResult,
@@ -123,13 +116,6 @@ pub fn enrich_call_returns(
                 body,
                 is_async,
             } => {
-                
-                
-                
-                
-                
-                
-                
                 let class_name_str = bind.interner.resolve(*class_name).to_string();
                 let key_str = bind.interner.resolve(*key).to_string();
                 let stmt: varn_core::ast::StmtId = *body;
@@ -280,8 +266,6 @@ pub fn enrich_call_returns(
         }
     }
 }
-
-
 
 fn never_when_diverging(
     inferred: Vec<Type>,

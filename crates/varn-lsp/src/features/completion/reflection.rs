@@ -94,7 +94,6 @@ pub fn colon_colon_receiver(
         return None;
     }
 
-    
     let receiver_ident = receiver_str
         .rsplit(|c: char| !c.is_alphanumeric() && c != '_')
         .next()?
@@ -114,7 +113,6 @@ pub fn build_reflection_completions(
     let mut items = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
-    
     for (idx, meta) in META_PROPERTIES.iter().enumerate() {
         seen.insert(meta.name.to_string());
         let (insert_text, insert_text_format) = match meta.snippet {
@@ -137,10 +135,8 @@ pub fn build_reflection_completions(
         });
     }
 
-    
     for sym in state.symbols() {
         if sym.name() == receiver_name {
-            
             if sym.kind() == varn_checker::SymbolKind::Enum {
                 let members = state.members_of(sym);
                 for m in members {
@@ -156,7 +152,6 @@ pub fn build_reflection_completions(
                     }
                 }
             } else if sym.kind() == varn_checker::SymbolKind::Class {
-                
                 let members = state.members_of(sym);
                 for m in members {
                     let m_name = m.name.to_string();

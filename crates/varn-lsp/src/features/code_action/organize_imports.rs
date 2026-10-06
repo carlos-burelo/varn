@@ -85,7 +85,6 @@ pub fn generate_organize_imports_action(
     }))
 }
 
-
 fn import_ranges(program: &Program, arena: &AstArena) -> Vec<SourceRange> {
     program
         .body
@@ -97,7 +96,6 @@ fn import_ranges(program: &Program, arena: &AstArena) -> Vec<SourceRange> {
         .map(|stmt| stmt.range)
         .collect()
 }
-
 
 fn collect_imports(ranges: &[SourceRange], source: &str) -> Option<Vec<String>> {
     let lines: Vec<&str> = source.lines().collect();

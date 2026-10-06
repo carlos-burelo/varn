@@ -3,7 +3,6 @@ use varn_checker::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary};
 
 use super::format::{format_summary_member, format_type_params_str};
 
-
 const DYNAMIC: &str = varn_core::LangPrimitive::Dynamic.name();
 
 pub fn format_member_sig(
@@ -88,8 +87,6 @@ pub fn format_enum_member(enum_name: &str, member_name: &str, init_value: &str) 
     }
 }
 
-
-
 fn format_nested(
     state: &DocumentState,
     keyword: &str,
@@ -110,7 +107,6 @@ fn format_nested(
     lines.join("\n")
 }
 
-
 fn member_params(state: &DocumentState, m: &ResolvedMemberSummary) -> String {
     let Some(ft) = state.db.fn_shape(&m.ty) else {
         return String::new();
@@ -127,7 +123,6 @@ fn member_params(state: &DocumentState, m: &ResolvedMemberSummary) -> String {
         .collect::<Vec<_>>()
         .join(", ")
 }
-
 
 fn member_return(state: &DocumentState, m: &ResolvedMemberSummary) -> String {
     match state.db.fn_shape(&m.ty) {

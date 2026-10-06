@@ -1,6 +1,3 @@
-
-
-
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
@@ -16,7 +13,6 @@ pub(crate) extern "C" fn jit_object_keys(ctx: *mut ExecCtx, val_tag: u64, val_pa
         }
     }
 }
-
 
 #[varn_op_macros::jit_slow(field = "op_in")]
 pub(crate) extern "C" fn jit_op_in(
@@ -88,9 +84,6 @@ pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) {
         }
     }
 }
-
-
-
 
 #[varn_op_macros::jit_slow(field = "object_rest_window")]
 pub(crate) extern "C" fn jit_object_rest_window(

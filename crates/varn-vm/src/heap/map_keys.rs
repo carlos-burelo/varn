@@ -1,9 +1,3 @@
-
-
-
-
-
-
 use super::obj::HeapObj;
 use super::structs::HeapInner;
 use crate::value::VmValue;

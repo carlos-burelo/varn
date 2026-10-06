@@ -3,7 +3,6 @@ use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
 use varn_types::register_meta::SlotClass;
 
-
 pub(crate) fn value_kind_name(v: VmValue) -> &'static str {
     use varn_types::vm_value::*;
     match v.kind() {
@@ -19,11 +18,6 @@ pub(crate) fn value_kind_name(v: VmValue) -> &'static str {
 }
 
 impl FrameStore {
-    
-
-    
-    
-    
     #[inline(always)]
     pub fn mov(&mut self, id: usize, dst: usize, src: usize) -> VmResult<()> {
         let (sc, si) = self.slot(id, src);
@@ -41,7 +35,6 @@ impl FrameStore {
         self.unbox_into(dc, di, v)
     }
 
-    
     #[inline(always)]
     pub fn mov_cross(
         &mut self,
@@ -100,15 +93,6 @@ impl FrameStore {
                 self.gpr[i] = v.as_int();
             }
             SlotClass::Fpr => {
-                
-                
-                
-                
-                
-                
-                
-                
-                
                 if v.is_f64() {
                     self.fpr[i] = v.as_f64();
                 } else if v.is_int() {
@@ -123,9 +107,6 @@ impl FrameStore {
                 }
             }
             SlotClass::Ref => {
-                
-                
-                
                 if v.is_null() {
                     self.refs[i] = None;
                 } else if v.is_heap() {
@@ -142,27 +123,22 @@ impl FrameStore {
         Ok(())
     }
 
-    
     #[inline(always)]
     pub fn box_reg(&self, id: usize, reg: usize) -> VmValue {
         let (class, i) = self.slot(id, reg);
         self.box_slot(class, i)
     }
 
-    
     #[inline(always)]
     pub fn unbox_into_reg(&mut self, id: usize, reg: usize, v: VmValue) -> VmResult<()> {
         let (class, i) = self.slot(id, reg);
         self.unbox_into(class, i, v)
     }
 
-    
     pub fn box_range(&self, id: usize, start: usize, count: usize) -> Vec<VmValue> {
         (0..count).map(|k| self.box_reg(id, start + k)).collect()
     }
 
-    
-    
     pub fn adopt_values(&mut self, id: usize, start: usize, vals: &[VmValue], nregs: usize) {
         for r in start..start + nregs {
             let v = vals.get(r - start).copied().unwrap_or_else(VmValue::null);

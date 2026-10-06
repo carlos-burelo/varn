@@ -52,10 +52,6 @@ pub const MOD_ASYNC: u32 = 1 << 2;
 pub const MOD_STATIC: u32 = 1 << 3;
 pub const MOD_ABSTRACT: u32 = 1 << 4;
 
-
-
-
-
 pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
     let tokens = &state.tokens;
     let mut result = Vec::with_capacity(tokens.len() * 5);
@@ -63,7 +59,6 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
     let mut prev_col: u32 = 0;
 
     for (i, tok) in tokens.iter().enumerate() {
-        
         let colorable = tok.kind == TokenKind::Identifier
             || tok.kind.is_keyword()
             || tok.kind.is_literal()
@@ -84,18 +79,12 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             .and_then(|j| tokens.get(j))
             .map(|t| t.kind == TokenKind::Dot)
             .unwrap_or(false);
-        
-        
-        
+
         let next_is_colon = tokens
             .get(i + 1)
             .map(|t| t.kind == TokenKind::Colon)
             .unwrap_or(false);
 
-        
-        
-        
-        
         let prev2_is_enum = prev_is_dot
             && i >= 2
             && matches!(
@@ -103,9 +92,6 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                 Some(SymbolKind::Enum)
             );
 
-        
-        
-        
         let getset_as_ident = matches!(tok.kind, TokenKind::Get | TokenKind::Set)
             && !prev_is_dot
             && tokens
@@ -135,8 +121,6 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             continue;
         }
 
-        
-        
         let modifier = if tok.kind == TokenKind::This
             || state
                 .db

@@ -32,18 +32,12 @@ impl Workspace {
         }
     }
 
-    
     pub fn update_source(&self, uri: &str, source: &str) -> (FileId, u64, CancellationToken) {
         let file_id = self.db.intern(uri);
         let (rev, token) = self.db.set_source(file_id, source.to_string());
         (file_id, rev, token)
     }
 
-    
-    
-    
-    
-    
     pub fn source_of(&self, uri: &str) -> Option<String> {
         let file_id = self.db.intern(uri);
         self.db
@@ -51,26 +45,11 @@ impl Workspace {
             .map(|(_, text)| text.to_string())
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn update_file(&self, uri: String, source: String) {
         resolver::invalidate(&Self::module_id_of(&uri));
 
         let file_id = self.db.intern(&uri);
-        
-        
-        
-        
-        
+
         let already_current = self
             .db
             .get_source(file_id)
@@ -108,8 +87,6 @@ impl Workspace {
         self.files.insert(uri.clone(), state);
 
         for (dep_uri, dep_source) in dependents {
-            
-            
             let dep_state = Arc::new(run_pipeline(dep_source, dep_uri.clone()));
             {
                 let mut idx = self.index.write().unwrap();
@@ -124,16 +101,12 @@ impl Workspace {
         }
     }
 
-    
-    
     fn module_id_of(uri: &str) -> varn_core::ModuleId {
         let path = crate::document::uri_to_path(uri);
         let canonical = varn_modules::canonical_or_original(std::path::Path::new(&path));
         varn_core::ModuleId::local_str(&canonical)
     }
 
-    
-    
     pub fn index_file(&self, uri: String, source: String) {
         resolver::invalidate(&Self::module_id_of(&uri));
         let file_id = self.db.intern(&uri);
@@ -146,9 +119,6 @@ impl Workspace {
         }
     }
 
-    
-    
-    
     pub fn close_file(&self, uri: &str) {
         self.files.remove(uri);
     }

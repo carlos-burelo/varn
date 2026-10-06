@@ -206,8 +206,6 @@ impl ExecCtx {
                     }
                 }
 
-                
-                
                 let old_shape_id = o.shape().id;
                 o.insert(Arc::from(name.as_ref()), val);
                 let new_shape_id = o.shape().id;

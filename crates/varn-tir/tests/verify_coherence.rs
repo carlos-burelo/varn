@@ -1,8 +1,5 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
 use std::sync::Arc;
 use varn_tir::*;
 
@@ -62,8 +59,6 @@ fn int(v: i64) -> TirExpr {
     expr(TirExprKind::IntLit(v), BackendTy::Int, Resolution::None)
 }
 
-
-
 #[test]
 fn bare_null_returns_from_any_nullable_function() {
     let mut m = module_with_point();
@@ -93,7 +88,6 @@ fn bare_null_returns_from_any_nullable_function() {
     });
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
-
 
 #[test]
 fn int_argument_widens_to_a_float_parameter() {
@@ -127,10 +121,8 @@ fn int_argument_widens_to_a_float_parameter() {
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
 
-
 #[test]
 fn a_subclass_is_assignable_to_its_parent() {
-    
     let animal = ClassInfo::new(
         Arc::from("Animal"),
         varn_tir::Ancestry::Root,
@@ -179,7 +171,6 @@ fn a_subclass_is_assignable_to_its_parent() {
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
 
-
 #[test]
 fn int_addition_is_int() {
     let mut m = module_with_point();
@@ -194,7 +185,6 @@ fn int_addition_is_int() {
     )));
     assert!(verify_module(&m).is_ok());
 }
-
 
 #[test]
 fn a_lying_result_type_is_rejected() {
@@ -215,8 +205,6 @@ fn a_lying_result_type_is_rejected() {
         errs
     );
 }
-
-
 
 #[test]
 fn mixed_operands_without_a_cast_are_rejected() {
@@ -243,7 +231,6 @@ fn mixed_operands_without_a_cast_are_rejected() {
     );
 }
 
-
 #[test]
 fn comparison_produces_bool() {
     let mut m = module_with_point();
@@ -253,7 +240,7 @@ fn comparison_produces_bool() {
             lhs: Box::new(int(1)),
             rhs: Box::new(int(2)),
         },
-        BackendTy::Int, 
+        BackendTy::Int,
         Resolution::None,
     )));
     let errs = verify_module(&m).unwrap_err();
@@ -264,8 +251,6 @@ fn comparison_produces_bool() {
     );
 }
 
-
-
 #[test]
 fn a_field_read_must_have_the_declared_type() {
     let mut m = module_with_point();
@@ -274,7 +259,7 @@ fn a_field_read_must_have_the_declared_type() {
         BackendTy::Class(ClassId(0)),
         Resolution::Local(LocalId(0)),
     );
-    
+
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::Field {
             object: Box::new(recv),
@@ -290,7 +275,6 @@ fn a_field_read_must_have_the_declared_type() {
         errs
     );
 }
-
 
 #[test]
 fn a_correct_field_read_verifies() {
@@ -310,7 +294,6 @@ fn a_correct_field_read_verifies() {
     )));
     assert!(verify_module(&m).is_ok(), "{:?}", verify_module(&m));
 }
-
 
 #[test]
 fn method_call_arity_mismatch_is_rejected() {
@@ -363,7 +346,7 @@ fn method_call_arity_mismatch_is_rejected() {
         BackendTy::Class(ClassId(0)),
         Resolution::Local(LocalId(0)),
     );
-    
+
     m.top_level.body.push(TirStmt::Expr(expr(
         TirExprKind::MethodCall {
             recv: Box::new(recv),
@@ -380,7 +363,6 @@ fn method_call_arity_mismatch_is_rejected() {
         errs
     );
 }
-
 
 #[test]
 fn method_call_with_correct_arity_verifies() {
@@ -445,12 +427,11 @@ fn method_call_with_correct_arity_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-
 #[test]
 fn if_condition_must_be_bool() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::If {
-        cond: int(42), 
+        cond: int(42),
         then_body: vec![],
         else_body: vec![],
     });
@@ -461,7 +442,6 @@ fn if_condition_must_be_bool() {
         errs
     );
 }
-
 
 #[test]
 fn if_with_bool_condition_verifies() {
@@ -478,12 +458,11 @@ fn if_with_bool_condition_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-
 #[test]
 fn loop_condition_must_be_bool() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Loop {
-        cond: int(1), 
+        cond: int(1),
         body: vec![],
     });
     let errs = verify_module(&m).unwrap_err();
@@ -493,7 +472,6 @@ fn loop_condition_must_be_bool() {
         errs
     );
 }
-
 
 #[test]
 fn loop_with_bool_condition_verifies() {
@@ -509,14 +487,13 @@ fn loop_with_bool_condition_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-
 #[test]
 fn let_type_mismatch_is_rejected() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(1),
-        ty: BackendTy::Str,  
-        init: Some(int(42)), 
+        ty: BackendTy::Str,
+        init: Some(int(42)),
     });
     let errs = verify_module(&m).unwrap_err();
     assert!(
@@ -525,7 +502,6 @@ fn let_type_mismatch_is_rejected() {
         errs
     );
 }
-
 
 #[test]
 fn let_with_matching_type_verifies() {
@@ -539,11 +515,10 @@ fn let_with_matching_type_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-
 #[test]
 fn return_type_mismatch_is_rejected() {
     let mut m = module_with_point();
-    m.top_level.body.push(TirStmt::Return(Some(int(42)))); 
+    m.top_level.body.push(TirStmt::Return(Some(int(42))));
     let errs = verify_module(&m).unwrap_err();
     assert!(
         errs.iter().any(|e| e.message.contains("return type")),
@@ -551,7 +526,6 @@ fn return_type_mismatch_is_rejected() {
         errs
     );
 }
-
 
 #[test]
 fn return_with_correct_type_verifies() {
@@ -589,14 +563,12 @@ fn return_with_correct_type_verifies() {
     assert!(verify_module(&m).is_ok());
 }
 
-
 #[test]
 fn bare_return_in_void_function_verifies() {
     let mut m = module_with_point();
     m.top_level.body.push(TirStmt::Return(None));
     assert!(verify_module(&m).is_ok());
 }
-
 
 #[test]
 fn bare_return_in_non_void_function_is_rejected() {
@@ -639,7 +611,6 @@ fn bare_return_in_non_void_function_is_rejected() {
     );
 }
 
-
 #[test]
 fn let_with_nullable_declared_and_nonnull_init_is_valid() {
     let mut types = TyTable::default();
@@ -678,11 +649,10 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(0),
         ty: nullable_int,
-        init: Some(int(42)), 
+        init: Some(int(42)),
     });
     assert!(verify_module(&m).is_ok());
 }
-
 
 #[test]
 fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
@@ -721,10 +691,10 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
     };
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(0),
-        ty: BackendTy::Int, 
+        ty: BackendTy::Int,
         init: Some(expr(
             TirExprKind::IntLit(42),
-            nullable_int, 
+            nullable_int,
             Resolution::None,
         )),
     });
@@ -735,7 +705,6 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
         errs
     );
 }
-
 
 #[test]
 fn return_of_never_type_is_valid_anywhere() {
@@ -771,12 +740,11 @@ fn return_of_never_type_is_valid_anywhere() {
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
         TirExprKind::IntLit(0),
-        BackendTy::Never, 
+        BackendTy::Never,
         Resolution::None,
     ))));
     assert!(verify_module(&m).is_ok());
 }
-
 
 #[test]
 fn return_nonnull_when_function_returns_nullable_is_valid() {
@@ -802,7 +770,7 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
             name: Arc::from("<module>"),
             sig: SigId(0),
             params: vec![],
-            return_ty: BackendTy::Nullable(int_id), 
+            return_ty: BackendTy::Nullable(int_id),
             locals: vec![],
             body: vec![],
             has_this: false,
@@ -812,10 +780,9 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
             has_rest: false,
         },
     };
-    m.top_level.body.push(TirStmt::Return(Some(int(42)))); 
+    m.top_level.body.push(TirStmt::Return(Some(int(42))));
     assert!(verify_module(&m).is_ok());
 }
-
 
 #[test]
 fn return_nullable_when_function_returns_nonnull_is_rejected() {
@@ -841,7 +808,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
             name: Arc::from("<module>"),
             sig: SigId(0),
             params: vec![],
-            return_ty: BackendTy::Int, 
+            return_ty: BackendTy::Int,
             locals: vec![],
             body: vec![],
             has_this: false,
@@ -853,7 +820,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
     };
     m.top_level.body.push(TirStmt::Return(Some(expr(
         TirExprKind::IntLit(42),
-        BackendTy::Nullable(int_id), 
+        BackendTy::Nullable(int_id),
         Resolution::None,
     ))));
     let errs = verify_module(&m).unwrap_err();
@@ -863,7 +830,6 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
         errs
     );
 }
-
 
 #[test]
 fn method_call_arg_nonnull_into_nullable_param_passes() {
@@ -922,14 +888,13 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
         TirExprKind::MethodCall {
             recv: Box::new(recv),
             name: "move".into(),
-            args: vec![TirArg::Expr(int(42))], 
+            args: vec![TirArg::Expr(int(42))],
         },
         BackendTy::Void,
         Resolution::VtableSlot(0),
     )));
     assert!(verify_module(&m).is_ok());
 }
-
 
 #[test]
 fn method_call_arg_nullable_into_nonnull_param_rejected() {
@@ -990,7 +955,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
             name: "move".into(),
             args: vec![TirArg::Expr(expr(
                 TirExprKind::IntLit(42),
-                BackendTy::Nullable(int_id), 
+                BackendTy::Nullable(int_id),
                 Resolution::None,
             ))],
         },
@@ -1004,7 +969,6 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
         errs
     );
 }
-
 
 #[test]
 fn let_declared_nullable_int_init_str_should_fail() {
@@ -1046,7 +1010,7 @@ fn let_declared_nullable_int_init_str_should_fail() {
         ty: nullable_int,
         init: Some(expr(
             TirExprKind::StrLit("hello".into()),
-            BackendTy::Str, 
+            BackendTy::Str,
             Resolution::None,
         )),
     });
@@ -1057,7 +1021,6 @@ fn let_declared_nullable_int_init_str_should_fail() {
         errs
     );
 }
-
 
 #[test]
 fn let_declared_nullable_int_init_nullable_str_should_fail() {
@@ -1101,7 +1064,7 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
         ty: nullable_int,
         init: Some(expr(
             TirExprKind::StrLit("hello".into()),
-            nullable_str, 
+            nullable_str,
             Resolution::None,
         )),
     });
@@ -1113,25 +1076,8 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
     );
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[test]
 fn deeply_nested_nullable_chain_terminates_without_false_positive() {
-    
-    
     let mut types = TyTable::default();
     let mut id = types.intern(BackendTy::Int);
     for _ in 0..40 {
@@ -1170,7 +1116,6 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
         },
     };
 
-    
     m.top_level.body.push(TirStmt::Let {
         local: LocalId(0),
         ty: deeply_nullable,
@@ -1181,9 +1126,6 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
         )),
     });
 
-    
-    
-    
     let result = verify_module(&m);
     assert!(
         result.is_ok(),

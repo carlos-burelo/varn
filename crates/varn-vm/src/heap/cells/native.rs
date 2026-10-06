@@ -1,16 +1,12 @@
 use super::CellSpace;
 use varn_types::HeapRef;
 
-
 pub(crate) struct NativeScope {
     was_native: bool,
     roots_len: usize,
 }
 
 impl CellSpace {
-    
-    
-    
     pub(crate) fn enter_native(&mut self) -> NativeScope {
         let scope = NativeScope {
             was_native: self.native,
@@ -25,15 +21,10 @@ impl CellSpace {
         self.native_roots.truncate(scope.roots_len);
     }
 
-    
-    
-    
     pub(crate) fn suspend_native(&mut self) -> bool {
         std::mem::replace(&mut self.native, false)
     }
 
-    
-    
     pub(crate) fn resume(&mut self, was_native: bool, result: Option<HeapRef>) {
         self.native = was_native;
         if let (true, Some(r)) = (was_native, result) {

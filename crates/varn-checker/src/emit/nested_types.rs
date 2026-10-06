@@ -1,17 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::cell::RefCell;
 use std::sync::Arc;
 
@@ -21,21 +7,15 @@ use varn_tir::{BackendTy, DynReason, Resolution, Span, TirExpr, TirExprKind, Tir
 
 use crate::binder::BindResult;
 
-
 pub(super) struct NestedTypes {
-    
     slots: FxHashMap<Arc<str>, u32>,
-    
+
     first_ordinal: u32,
-    
+
     met: RefCell<Vec<(Arc<str>, StmtId)>>,
 }
 
 impl NestedTypes {
-    
-    
-    
-    
     pub(super) fn collect(
         bind: &BindResult,
         top_level: &FxHashSet<Arc<str>>,
@@ -73,7 +53,6 @@ impl NestedTypes {
         }
     }
 
-    
     pub(super) fn new_globals(&self, taken: &FxHashMap<Arc<str>, u32>) -> Vec<(Arc<str>, u32)> {
         let mut out: Vec<(Arc<str>, u32)> = self
             .slots
@@ -85,8 +64,6 @@ impl NestedTypes {
         out
     }
 
-    
-    
     pub(super) fn declare(&self, name: &str, stmt: StmtId) -> Option<TirStmt> {
         let slot = *self.slots.get(name)?;
         let mut met = self.met.borrow_mut();
@@ -119,8 +96,6 @@ impl NestedTypes {
         })
     }
 
-    
-    
     pub(super) fn met<'a>(&self, arena: &'a AstArena) -> Vec<&'a Decl> {
         self.met
             .borrow()
@@ -132,8 +107,6 @@ impl NestedTypes {
             .collect()
     }
 }
-
-
 
 pub(super) fn top_level_types(
     program: &Program,

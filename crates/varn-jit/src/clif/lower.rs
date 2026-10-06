@@ -1,40 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::isa::OwnedTargetIsa;
 use varn_types::{FunctionProto, VmValue};
 
@@ -45,24 +8,17 @@ use super::emit::patch_rel32;
 use crate::mem::JitBuffer;
 use crate::JitHelpers;
 
-
-
-
-
 pub struct ClifArtifact {
     pub buffer: JitBuffer,
     pub entry: *const u8,
     pub raw: *const u8,
-    
+
     pub activation: Activation,
-    
-    
+
     pub frameless: bool,
 }
 
 impl ClifArtifact {
-    
-    
     pub fn native_entry(&self, proto: &FunctionProto) -> (usize, u64) {
         if self.activation != Activation::Native || proto.has_rest {
             return (0, 0);
@@ -85,17 +41,9 @@ impl Drop for ClifArtifact {
     }
 }
 
-
-
 pub trait ClifLinker {
-    
-    
-    
-    
-    
     fn current_epoch(&self) -> u64;
 }
-
 
 pub struct NoLinker;
 impl ClifLinker for NoLinker {
@@ -104,23 +52,11 @@ impl ClifLinker for NoLinker {
     }
 }
 
-
-
-
 fn boxed_slots(proto: &FunctionProto) -> bool {
     use varn_types::register_meta::SlotKind;
     let scalar = |k: &SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
     proto.param_kinds.iter().any(|k| !scalar(k)) || !scalar(&proto.return_kind)
 }
-
-
-
-
-
-
-
-
-
 
 pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
     let code = &proto.chunk.code;
@@ -150,10 +86,6 @@ pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
     r
 }
 
-
-
-
-
 pub fn gate_reason(proto: &FunctionProto) -> Option<String> {
     let words = proto.chunk.code.len();
     if words > crate::SIZE_GATE_WORDS && !leaf_safe(proto) {
@@ -162,21 +94,12 @@ pub fn gate_reason(proto: &FunctionProto) -> Option<String> {
     None
 }
 
-
-
-
-
 fn leaf_safe(proto: &FunctionProto) -> bool {
     if proto.is_generator || proto.is_async {
         return false;
     }
     !alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants).unwrap_or(true)
 }
-
-
-
-
-
 
 pub fn try_compile(
     proto: &FunctionProto,
@@ -187,18 +110,12 @@ pub fn try_compile(
     osr_ip: Option<usize>,
     mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<ClifArtifact, String> {
-    
-    
-    
     if crate::PAIR_MIGRATION_PENDING {
         return Err(crate::PAIR_MIGRATION_BAIL.to_owned());
     }
 
     super::emit::reset_disabled_helper_hit();
 
-    
-    
-    
     if let Some(reason) = gate_reason(proto) {
         if super::trace() {
             eprintln!("CLIF GATE  {:?}: {reason}", proto.name);
@@ -222,20 +139,10 @@ pub fn try_compile(
         );
     }
 
-    
-    
-    
-    
-    
     if proto.is_generator || proto.is_async {
         return Err("clif: generator/async not JIT-able in fase B".into());
     }
 
-    
-    
-    
-    
-    
     if let Some(why) = proto.ssa.unavailable() {
         if super::trace() {
             eprintln!(
@@ -302,9 +209,6 @@ pub fn try_compile(
         }
     }
 }
-
-
-
 
 fn finish_artifact(
     lowered: super::from_ssa::Lowered,

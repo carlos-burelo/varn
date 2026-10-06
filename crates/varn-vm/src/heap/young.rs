@@ -1,7 +1,3 @@
-
-
-
-
 use varn_types::HeapRef;
 
 pub const YOUNG_THRESHOLD: usize = 49152;
@@ -31,9 +27,6 @@ impl YoungGen {
         self.born.len()
     }
 
-    
-    
-    
     pub(crate) fn born_len_byte_offset() -> usize {
         std::mem::offset_of!(YoungGen, born) + 2 * std::mem::size_of::<usize>()
     }

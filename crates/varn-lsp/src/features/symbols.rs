@@ -16,27 +16,14 @@ pub fn build_document_symbols(state: &DocumentState) -> DocumentSymbolResponse {
     DocumentSymbolResponse::Nested(nest_symbols(state, &sorted))
 }
 
-
-
-
-
-
-
-
 fn is_outlinable(name: &str, kind: SymbolKind) -> bool {
     if name.starts_with("__ext_") {
         return false;
     }
     !matches!(
         kind,
-        
         SymbolKind::Parameter
             | SymbolKind::TypeParameter
-            
-            
-            
-            
-            
             | SymbolKind::Property
             | SymbolKind::Method
             | SymbolKind::EnumMember
@@ -93,11 +80,6 @@ fn insert_at_depth(nodes: &mut Vec<DocumentSymbol>, depth: usize, sym: DocumentS
     }
 }
 
-
-
-
-
-
 fn summary_to_doc(
     state: &DocumentState,
     m: &varn_checker::ResolvedMemberSummary,
@@ -107,7 +89,6 @@ fn summary_to_doc(
     let kind = summary_to_symbol_kind(m.kind);
     let range = range_on_line(line, m.def_col, name_end);
 
-    
     #[allow(deprecated)]
     Some(DocumentSymbol {
         name: m.name.to_string(),
@@ -157,9 +138,6 @@ fn sym_to_doc(state: &DocumentState, sym: SymbolView<'_>) -> DocumentSymbol {
         Some(sym.type_str())
     };
 
-    
-    
-    
     let members: Vec<DocumentSymbol> = if is_container(sym.kind()) {
         state
             .members_of(sym)
@@ -175,7 +153,6 @@ fn sym_to_doc(state: &DocumentState, sym: SymbolView<'_>) -> DocumentSymbol {
         Some(members)
     };
 
-    
     #[allow(deprecated)]
     let symbol = DocumentSymbol {
         name: sym.name().to_owned(),

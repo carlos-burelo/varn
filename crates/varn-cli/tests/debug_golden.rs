@@ -1,23 +1,7 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::path::{Path, PathBuf};
 use std::process::Command;
-
-
 
 const PHASES: &[&str] = &[
     "tokens",
@@ -48,12 +32,6 @@ fn golden_name(case: &str, phase: &str) -> String {
     format!("{case}.{}.golden.txt", phase.replace(':', "_"))
 }
 
-
-
-
-
-
-
 fn normalize(raw: &str, fixtures: &Path) -> String {
     let mut s = raw.replace("\r\n", "\n");
 
@@ -62,7 +40,7 @@ fn normalize(raw: &str, fixtures: &Path) -> String {
     let canon_verbatim = canon_s.replace("\\\\?\\", "");
     let canon_fwd = canon_s.replace('\\', "/");
     let canon_verbatim_fwd = canon_verbatim.replace('\\', "/");
-    
+
     let canon_escaped = canon_s.replace('\\', "\\\\");
     let canon_verbatim_escaped = canon_verbatim.replace('\\', "\\\\");
 
@@ -82,8 +60,7 @@ fn normalize(raw: &str, fixtures: &Path) -> String {
             s = s.replace(p, "<fixtures>");
         }
     }
-    
-    
+
     s.replace("<fixtures>\\\\", "<fixtures>/")
         .replace("<fixtures>\\", "<fixtures>/")
 }
@@ -117,7 +94,7 @@ fn check_or_update(case: &str, fixture: &Path, phase: &str) {
 
     if std::env::var_os("UPDATE_DEBUG_GOLDENS").is_some() {
         std::fs::create_dir_all(&dir).unwrap();
-        
+
         std::fs::write(&golden_path, got.replace("\r\n", "\n")).unwrap();
         return;
     }

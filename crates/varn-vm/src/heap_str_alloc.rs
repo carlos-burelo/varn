@@ -1,43 +1,10 @@
-
-
-
-
-
-
-
-
-
 use crate::heap::{ascii_flag, HeapInner, HeapObj, HeapStr, INLINE_STR_CAP};
 use crate::value::VmValue;
 
 impl HeapInner {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn alloc_str_concat_inline(&mut self, a: VmValue, b: VmValue) -> Option<VmValue> {
         use crate::strbuf::{itoa, INT_MAX_DIGITS};
 
-        
-        
         let mut a_sso_buf = [0u8; 5];
         let a_bytes: &[u8] = if a.is_sso() {
             a.sso_as_str(&mut a_sso_buf).as_bytes()

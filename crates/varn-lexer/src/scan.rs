@@ -13,11 +13,6 @@ pub fn scan(
     (tokens, buf, diags)
 }
 
-
-
-
-
-
 pub fn scan_with_trivia(
     source: &str,
     filename: &str,

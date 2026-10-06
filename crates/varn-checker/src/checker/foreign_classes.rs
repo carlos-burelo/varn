@@ -1,7 +1,3 @@
-
-
-
-
 use super::Checker;
 use crate::binder::{BindResult, ClassParent};
 use crate::types::{ClassMemberKind, Type};

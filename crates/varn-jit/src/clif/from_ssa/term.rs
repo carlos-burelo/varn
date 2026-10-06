@@ -1,6 +1,3 @@
-
-
-
 use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::ir::{types, BlockArg, InstBuilder, TrapCode, Value};
 use cranelift_frontend::FunctionBuilder;
@@ -12,9 +9,6 @@ use super::{heap, load_value, Ctx};
 fn scalar_return(k: SlotKind) -> bool {
     matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool)
 }
-
-
-
 
 fn store_boxed_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>, boxed: Value) -> Result<(), String> {
     match ctx.activation {
@@ -34,9 +28,6 @@ fn store_boxed_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>, boxed: Value) -> R
     }
     Ok(())
 }
-
-
-
 
 fn truthy(
     b: &mut FunctionBuilder,
@@ -58,12 +49,6 @@ fn truthy(
         }
     })
 }
-
-
-
-
-
-
 
 pub(super) fn emit_term(
     b: &mut FunctionBuilder,
@@ -90,7 +75,7 @@ pub(super) fn emit_term(
                     ctx.helpers.gc_safepoint,
                     &[exec_ctx],
                 );
-                
+
                 ctx.views.clear(b);
             });
         }
@@ -99,9 +84,6 @@ pub(super) fn emit_term(
         SsaTerm::Return(Some(v)) => {
             let ret = ctx.proto.return_kind;
             if scalar_return(ret) {
-                
-                
-                
                 let kind = ctx.ssa.value_ty(*v);
                 let x = if super::is_heap(kind) {
                     let boxed = load_value(b, ctx, values, *v)?;

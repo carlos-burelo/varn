@@ -1,6 +1,5 @@
 use super::*;
 
-
 pub(super) fn compile_via_tir(
     program: &varn_core::ast::Program,
     ast_arena: &varn_core::ast::AstArena,
@@ -110,8 +109,6 @@ pub(super) fn verbose_sections(
     terminal::blank();
     Ok(())
 }
-
-
 
 pub(super) fn parse_shared(
     tokens: Vec<varn_core::Token>,

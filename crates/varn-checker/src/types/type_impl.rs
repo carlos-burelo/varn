@@ -3,12 +3,6 @@ use std::sync::Arc;
 
 #[allow(non_upper_case_globals)]
 impl Type {
-    
-    
-    
-    
-    
-    
     pub const Int: Type = Type::resolved(CheckerTyId::INT);
     pub const Float: Type = Type::resolved(CheckerTyId::FLOAT);
     pub const Decimal: Type = Type::resolved(CheckerTyId::DECIMAL);
@@ -23,14 +17,10 @@ impl Type {
     pub const Error: Type = Type(CheckerTyId::DYNAMIC, Origin::Error);
     pub const This: Type = Type::resolved(CheckerTyId::THIS);
 
-    
-    
     pub fn primitive(p: varn_core::LangPrimitive, table: &mut CheckerTyTable) -> Self {
         Type::resolved(table.intern(TypeKind::Primitive(p)))
     }
 
-    
-    
     pub fn apparent(&self, table: &CheckerTyTable) -> Type {
         fn base(p: varn_core::LangPrimitive) -> Type {
             use varn_core::LangPrimitive as P;
@@ -64,8 +54,6 @@ impl Type {
         }
     }
 
-    
-    
     pub fn range_over(bound: &Type, table: &mut CheckerTyTable) -> Self {
         let elem = if bound.apparent(table) == Type::Char {
             Type::Char
@@ -75,7 +63,6 @@ impl Type {
         Type::generic(varn_core::BuiltinType::Range.name(), vec![elem], table)
     }
 
-    
     pub fn is_range(&self, table: &CheckerTyTable, interner: &varn_core::AtomInterner) -> bool {
         match table.get(self.0) {
             TypeKind::Builtin(varn_core::BuiltinType::Range) => true,
@@ -94,14 +81,9 @@ impl Type {
         Type::resolved(table.intern(TypeKind::Builtin(b)))
     }
 
-    
-    
-    
     pub fn sanitize_foreign(self) -> Type {
         self
     }
-
-    
 
     pub fn get_array_element_type(&self, table: &CheckerTyTable) -> Type {
         match table.get(self.0) {
@@ -142,13 +124,11 @@ impl Type {
         Type::named_with_origin_atom(name_atom, origin_atom, table)
     }
 
-    
     pub fn generic(name: impl Into<Arc<str>>, args: Vec<Type>, table: &mut CheckerTyTable) -> Self {
         let atom = table.intern_name(&name.into());
         Type::generic_atom(atom, args, None, table)
     }
 
-    
     pub fn generic_with_origin(
         name: impl Into<Arc<str>>,
         args: Vec<Type>,
@@ -230,8 +210,6 @@ impl Type {
         }
     }
 
-    
-
     pub fn is_dynamic(&self) -> bool {
         self.0 == CheckerTyId::DYNAMIC
     }
@@ -259,8 +237,6 @@ impl Type {
     pub fn is_never(&self) -> bool {
         self.0 == CheckerTyId::NEVER
     }
-
-    
 
     pub fn stdlib_key<'t>(&self, table: &'t CheckerTyTable) -> Option<&'t str> {
         match table.get(self.0) {

@@ -1,18 +1,8 @@
-
-
-
 use super::super::ir::{InstKind, SsaFunc, Value};
 
-
-
-
-
-
-
 pub(super) struct Immediates {
-    
     pub(super) imm: Vec<Option<i8>>,
-    
+
     elided: Vec<bool>,
 }
 
@@ -21,9 +11,6 @@ impl Immediates {
         self.elided.get(v.0 as usize).copied().unwrap_or(false)
     }
 }
-
-
-
 
 pub(super) fn immediate_operand(kind: &InstKind, imm: &[Option<i8>]) -> Option<(Value, Value, i8)> {
     let InstKind::Binary {
@@ -62,9 +49,6 @@ pub(super) fn plan_immediates(ssa: &SsaFunc) -> Immediates {
         }
     }
 
-    
-    
-    
     let mut total = vec![0u32; n];
     let mut folded = vec![0u32; n];
     for block in &ssa.blocks {

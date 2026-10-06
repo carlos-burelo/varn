@@ -1,45 +1,14 @@
 use super::VmValue;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[repr(C, u8)]
 #[derive(Debug)]
 pub enum ArrayRepr {
-    
-    
     Boxed(BoxedElems) = 0,
-    
+
     I64(Vec<i64>) = 1,
-    
+
     F64(Vec<f64>) = 2,
 }
-
-
-
-
-
-
 
 #[repr(C)]
 #[derive(Debug)]
@@ -73,16 +42,10 @@ impl std::ops::Deref for BoxedElems {
 }
 
 impl ArrayRepr {
-    
-    
     pub const DISC_OFF: usize = 0;
-    
-    
-    
+
     pub const ELEMS_UNION_OFF: usize = 8;
 
-    
-    
     #[inline(always)]
     pub fn discriminant(&self) -> u8 {
         match self {
@@ -108,9 +71,6 @@ impl ArrayRepr {
 }
 
 const _: () = {
-    
-    
-    
     assert!(std::mem::align_of::<ArrayRepr>() == 8);
     assert!(ArrayRepr::ELEMS_UNION_OFF == 8);
     assert!(std::mem::size_of::<ArrayRepr>().is_multiple_of(8));

@@ -1,63 +1,12 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::PoolEntry;
 use varn_types::loop_analysis::{instr_offsets, natural_loops, NaturalLoop};
 
-
 #[cfg(target_os = "windows")]
 const MAX_CANDIDATES: usize = 2;
 #[cfg(not(target_os = "windows"))]
 const MAX_CANDIDATES: usize = 1;
-
-
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CacheSource {
@@ -70,25 +19,9 @@ pub struct HoistCandidate {
     pub source: CacheSource,
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 fn header_reachable_by_fallthrough(code: &[u16], offsets: &[usize], header_instr: usize) -> bool {
     let Some(prev_instr) = header_instr.checked_sub(1) else {
-        return true; 
+        return true;
     };
     let prev_offset = offsets[prev_instr];
     !matches!(
@@ -96,19 +29,6 @@ fn header_reachable_by_fallthrough(code: &[u16], offsets: &[usize], header_instr
         Some(OpCode::Jump | OpCode::Loop | OpCode::Return | OpCode::Throw | OpCode::Yield)
     )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub fn is_alloc_free_op(op: OpCode) -> bool {
     matches!(
@@ -192,12 +112,6 @@ fn body_is_alloc_free(code: &[u16], offsets: &[usize], lp: &NaturalLoop) -> bool
         .all(|instr_idx| OpCode::from_u16(code[offsets[instr_idx]]).is_some_and(is_alloc_free_op))
 }
 
-
-
-
-
-
-
 fn global_stored_in_range(
     code: &[u16],
     constants: &[PoolEntry],
@@ -214,11 +128,6 @@ fn global_stored_in_range(
             return true;
         };
         if matches!(op, OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx) {
-            
-            
-            
-            
-            
             if code[off + 2] == target_idx {
                 return true;
             }
@@ -227,18 +136,6 @@ fn global_stored_in_range(
     }
     false
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 fn classify_site(
     code: &[u16],
@@ -272,38 +169,18 @@ fn classify_site(
     }
 }
 
-
-
-
-
-
 pub struct LoopDiagnostic {
     pub header_offset: usize,
     pub latch_offset: usize,
-    
-    
-    
-    
-    
-    
+
     pub is_real: bool,
-    
-    
-    
+
     pub is_alloc_free: bool,
-    
-    
+
     pub is_innermost: bool,
-    
-    
-    
-    
-    
+
     pub candidates: Vec<HoistCandidate>,
 }
-
-
-
 
 pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnostic> {
     let loops = natural_loops(code, constants);
@@ -312,11 +189,6 @@ pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnost
     }
     let offsets = instr_offsets(code, constants);
 
-    
-    
-    
-    
-    
     let is_real: Vec<bool> = loops
         .iter()
         .map(|lp| header_reachable_by_fallthrough(code, &offsets, lp.header))
@@ -357,7 +229,7 @@ pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnost
                             obj_reg,
                         ) {
                             Some(s) => s,
-                            None => continue, 
+                            None => continue,
                         }
                     };
 
@@ -365,17 +237,10 @@ pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnost
                         .iter()
                         .any(|c| c.obj_vreg == obj_reg && c.source == source)
                     {
-                        continue; 
+                        continue;
                     }
 
                     if candidates.len() >= MAX_CANDIDATES {
-                        
-                        
-                        
-                        
-                        
-                        
-                        
                         continue;
                     }
                     candidates.push(HoistCandidate {

@@ -1,13 +1,8 @@
-
-
-
 use super::{CheckerTyTable, Type};
 use varn_core::ast::{AstArena, ExprId, ExprKind, UnaryOp};
 use varn_core::TypeKind;
 
-
 const F64_EXACT_INT: i64 = 1 << 53;
-
 
 pub(crate) fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
     match &arena.expr(expr).kind {
@@ -29,7 +24,6 @@ pub(crate) fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
     }
 }
 
-
 pub(crate) fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTable) -> bool {
     match table.get(target.0) {
         TypeKind::Primitive(varn_core::LangPrimitive::Float) => {
@@ -45,8 +39,6 @@ pub(crate) fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTab
         _ => false,
     }
 }
-
-
 
 pub(crate) fn literal_operand_class(
     arena: &AstArena,

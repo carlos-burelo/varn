@@ -1,5 +1,3 @@
-
-
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub struct LineEntry {
     pub count: u32,

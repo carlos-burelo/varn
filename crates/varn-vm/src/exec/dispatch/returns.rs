@@ -24,8 +24,6 @@ impl ExecCtx {
         }
 
         if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {
-            
-            
             if let Some(caller) = self.frames.last() {
                 let caller_base = caller.base;
                 self.stack

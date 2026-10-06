@@ -23,7 +23,6 @@ pub fn build_autoimport_completions(
         .map(|p| p.to_lowercase())
         .filter(|p| !p.is_empty());
 
-    
     if filter_lower.is_none() {
         return items;
     }

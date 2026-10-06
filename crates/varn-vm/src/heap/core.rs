@@ -1,9 +1,3 @@
-
-
-
-
-
-
 use super::cells::SlotState;
 use super::obj::HeapObj;
 use super::structs::HeapInner;
@@ -29,7 +23,6 @@ impl HeapInner {
         idx
     }
 
-    
     pub(crate) fn alloc_instance(&mut self, class: &ClassObj) -> (HeapRef, InstanceRef) {
         if let Some(h) = &self.hotspot {
             h.borrow_mut().record_alloc("instance");
@@ -40,8 +33,6 @@ impl HeapInner {
         (r, inst)
     }
 
-    
-    
     pub(crate) fn alloc_object_cell(
         &mut self,
         record: bool,
@@ -60,7 +51,6 @@ impl HeapInner {
         VmValue::from_heap(r)
     }
 
-    
     pub(crate) fn alloc_array_repr(
         &mut self,
         tuple: bool,
@@ -75,7 +65,6 @@ impl HeapInner {
         VmValue::from_heap(r)
     }
 
-    
     pub(crate) fn alloc_object_pairs<I>(&mut self, pairs: I) -> VmValue
     where
         I: IntoIterator<Item = (varn_types::RuntimeString, VmValue)>,

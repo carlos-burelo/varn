@@ -88,8 +88,6 @@ pub(crate) extern "C" fn jit_call_self_window(
     }
 }
 
-
-
 #[varn_op_macros::jit_slow(field = "jit_push_native_frame")]
 pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *const VmClosure) {
     unsafe {
@@ -107,8 +105,6 @@ pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *cons
             .push(CallFrame::new_owned(owned, CallFrame::NO_ACTIVATION));
     }
 }
-
-
 
 #[varn_op_macros::jit_slow(field = "jit_release_closure")]
 pub(crate) extern "C" fn jit_release_closure(closure: *const VmClosure) {

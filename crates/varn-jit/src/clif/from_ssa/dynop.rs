@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
@@ -14,7 +7,6 @@ use super::super::emit::{box_bool, box_int, call_helper, call_helper_void};
 use super::super::generic::{boxed_binop, boxed_compare};
 use super::heap::boxed_parts;
 use super::{Ctx, Out};
-
 
 fn bool_out(b: &mut FunctionBuilder, cond: Value, dest: Option<SlotKind>) -> Out {
     match dest {
@@ -94,7 +86,7 @@ pub(super) fn emit_un(
             let cond = call_helper(b, ctx.cc, h.logical_not, &[ectx, tag, payload]);
             bool_out(b, cond, dest)
         }
-        
+
         DynUnOp::BitNot => {
             let minus_one = b.ins().iconst(types::I64, -1);
             let boxed = box_int(b, minus_one);

@@ -1,6 +1,3 @@
-
-
-
 use std::io::Write;
 
 use varn_types::FunctionProto;

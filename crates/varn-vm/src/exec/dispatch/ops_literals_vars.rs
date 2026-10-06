@@ -60,9 +60,7 @@ impl ExecCtx {
             OpCode::Move => {
                 let w1 = code[*ip];
                 *ip += 1;
-                
-                
-                
+
                 self.stack.mov(base, first_reg, hi(w1))?;
             }
             OpCode::LoadGlobalIdx => {

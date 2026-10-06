@@ -83,19 +83,6 @@ fn fold_redundant_branches(func: &mut SsaFunc) -> bool {
     changed
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 fn jump_forwarding(func: &mut SsaFunc) -> bool {
     let mut changed = false;
     let n = func.blocks.len();
@@ -164,18 +151,10 @@ fn jump_forwarding(func: &mut SsaFunc) -> bool {
                         changed = true;
                     }
 
-                    
-                    
-                    
-                    
                     func.blocks[b_id.0 as usize]
                         .preds
                         .retain(|p| !updates.iter().any(|(a_id, _)| a_id == p));
 
-                    
-                    
-                    
-                    
                     if func.blocks[b_id.0 as usize].preds.is_empty() {
                         let c_preds = &mut func.blocks[c_id.0 as usize].preds;
                         if let Some(pos) = c_preds.iter().position(|p| *p == b_id) {
@@ -236,14 +215,6 @@ fn merge_blocks(func: &mut SsaFunc) -> bool {
                         }
                     }
 
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
                     func.blocks[b_id.0 as usize].preds.clear();
 
                     func.blocks[a_id.0 as usize].term = b_term;
@@ -310,7 +281,6 @@ fn compact_cfg(func: &mut SsaFunc) -> bool {
     func.blocks = new_blocks;
     true
 }
-
 
 pub(crate) fn dominators(func: &SsaFunc) -> Vec<Vec<u64>> {
     let n = func.blocks.len();

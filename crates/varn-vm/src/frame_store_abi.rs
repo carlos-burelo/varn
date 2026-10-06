@@ -1,14 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
 use crate::frame_store::FrameStore;
 use crate::value::VmValue;
 
@@ -23,14 +12,12 @@ const _: () = {
     );
 };
 
-
 pub fn abi_stacks(store: &FrameStore) -> varn_abi::AbiStacks {
     let gpr = store.gpr.as_ptr() as *mut i64;
     let fpr = store.fpr.as_ptr() as *mut f64;
     let refs = store.refs.as_ptr() as *mut u32;
     let dyn_ = store.dyn_.as_ptr() as *mut varn_abi::AbiValue;
-    
-    
+
     unsafe {
         varn_abi::AbiStacks {
             gpr,
@@ -45,12 +32,9 @@ pub fn abi_stacks(store: &FrameStore) -> varn_abi::AbiStacks {
     }
 }
 
-
-
 pub fn debug_check_stacks(store: &FrameStore) -> bool {
     let v = abi_stacks(store);
-    
-    
+
     let ok = |base: *mut u8, end: *mut u8| (end as usize) >= (base as usize);
     ok(v.gpr as *mut u8, v.gpr_end as *mut u8)
         && ok(v.fpr as *mut u8, v.fpr_end as *mut u8)

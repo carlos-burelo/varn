@@ -12,7 +12,6 @@ pub fn build_goto_definition(
 ) -> Option<GotoDefinitionResponse> {
     let token = state.identifier_token_at(line, col)?;
 
-    
     if let Some(mem_res) = state.db.member_resolutions.get(&token.offset) {
         if let Some(def_range) = mem_res.def_range {
             if let Ok(url) = Url::parse(&state.uri) {
@@ -44,11 +43,8 @@ pub fn build_goto_definition(
         }
     }
 
-    
     if let Some(chain) = state.resolve_chain_at(line, col) {
         match chain {
-            
-            
             ChainResult::Member {
                 member,
                 parent_name,
@@ -56,8 +52,7 @@ pub fn build_goto_definition(
                 if let Some(loc) = resolve_member_location(index, &parent_name, &member.name) {
                     return Some(GotoDefinitionResponse::Scalar(loc));
                 }
-                
-                
+
                 if let Some(line) = member.def_line {
                     let url = Url::parse(&state.uri).ok()?;
                     return Some(GotoDefinitionResponse::Scalar(Location::new(
@@ -74,7 +69,6 @@ pub fn build_goto_definition(
         }
     }
 
-    
     if let Some(idx) = index {
         let defs = idx.definitions_of(state.lexeme(token));
         let locs: Vec<Location> = defs
@@ -120,8 +114,7 @@ fn resolve_origin_to_url(origin: &str) -> Option<Url> {
     if std::path::Path::new(origin).is_absolute() {
         return Url::from_file_path(origin).ok();
     }
-    
-    
+
     let path = crate::workspace::std_sources::resolve_module_file(origin)?;
     Url::from_file_path(path).ok()
 }
@@ -142,8 +135,7 @@ fn resolve_member_location(
 ) -> Option<Location> {
     let idx = index?;
     let entries = idx.definitions_of(member_name);
-    
-    
+
     let entry_opt = entries
         .iter()
         .find(|entry| entry.name == member_name && entry.parent.as_deref() == Some(parent_name));

@@ -1,16 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub mod abi;
 pub(crate) mod alloc;
 pub mod debug;
@@ -33,39 +20,26 @@ use cranelift_codegen::Context;
 use std::sync::atomic::Ordering;
 use std::sync::OnceLock;
 
-
-
 pub fn enabled() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var("VARN_NO_CLIF").is_err())
 }
-
 
 pub fn trace() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var("VARN_CLIF_TRACE").is_ok())
 }
 
-
 pub fn shared_isa() -> Result<&'static OwnedTargetIsa, String> {
     static ISA: OnceLock<Result<OwnedTargetIsa, String>> = OnceLock::new();
     ISA.get_or_init(host_isa).as_ref().map_err(|e| e.clone())
 }
 
-
-
-
-
-
-
-
 pub fn host_isa() -> Result<OwnedTargetIsa, String> {
     let mut flags = settings::builder();
     let opt = std::env::var("VARN_CLIF_OPT").unwrap_or_else(|_| "speed".to_owned());
     flags.set("opt_level", &opt).map_err(|e| e.to_string())?;
-    
-    
-    
+
     let verify = std::env::var("VARN_CLIF_VERIFY").is_ok() || cfg!(debug_assertions);
     flags
         .set("enable_verifier", if verify { "true" } else { "false" })
@@ -80,33 +54,24 @@ pub fn host_isa() -> Result<OwnedTargetIsa, String> {
 }
 
 thread_local! {
-    
-    
-    
+
+
+
     static CTX: std::cell::RefCell<Context> = std::cell::RefCell::new(Context::new());
 }
-
-
-
-
 
 pub(crate) fn with_ctx<R>(
     func: Function,
     isa: &dyn TargetIsa,
     take: impl FnOnce(&cranelift_codegen::CompiledCode) -> Result<R, String>,
 ) -> Result<R, String> {
-    CTX.with(|cell| {
-        
-        
-        
-        match cell.try_borrow_mut() {
-            Ok(mut ctx) => {
-                ctx.clear();
-                ctx.func = func;
-                compile_in(&mut ctx, isa, take)
-            }
-            Err(_) => compile_in(&mut Context::for_function(func), isa, take),
+    CTX.with(|cell| match cell.try_borrow_mut() {
+        Ok(mut ctx) => {
+            ctx.clear();
+            ctx.func = func;
+            compile_in(&mut ctx, isa, take)
         }
+        Err(_) => compile_in(&mut Context::for_function(func), isa, take),
     })
 }
 

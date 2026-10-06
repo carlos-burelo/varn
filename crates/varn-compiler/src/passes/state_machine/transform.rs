@@ -1,52 +1,28 @@
-
-
-
-
-
-
-
-
-
-
 use crate::ssa::ir::{Block, BlockId, InstKind, SsaFunc, Terminator, Value};
 use crate::ssa::suspend::SuspendPoint;
 
 use super::layout::StateLayout;
 
-
-
 pub fn transform_suspend_func(func: &mut SsaFunc, points: &[SuspendPoint]) -> u16 {
     let layout = StateLayout::compute(points);
 
-    
     for (k, pt) in points.iter().enumerate() {
         split_at_suspend_point(func, k, pt);
     }
 
-    
     compute_preds(func);
 
-    
-    
-    
-    
     reorder_blocks_rpo(func);
 
     layout.state_size
 }
 
-
-
-
 fn split_at_suspend_point(func: &mut SsaFunc, _k: usize, pt: &SuspendPoint) {
-    
     let (target_bid, inst_idx) = find_suspend_inst(func, pt.operand)
         .expect("suspend point instruction must exist in func blocks");
 
-    
     let cont_bid = func.alloc_block();
 
-    
     let (suffix_insts, original_term) = {
         let block = func.block_mut(target_bid);
         let suffix = block.insts.split_off(inst_idx + 1);
@@ -54,14 +30,12 @@ fn split_at_suspend_point(func: &mut SsaFunc, _k: usize, pt: &SuspendPoint) {
         (suffix, term)
     };
 
-    
     {
         let cont_block = func.block_mut(cont_bid);
         cont_block.insts = suffix_insts;
         cont_block.term = original_term;
     }
 
-    
     func.block_mut(target_bid).term = Terminator::Jump {
         target: cont_bid,
         args: Vec::new(),

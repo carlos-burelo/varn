@@ -1,10 +1,6 @@
 use super::{ArrayRepr, BoxedElems, VmArray, VmValue};
 
 impl VmArray {
-    
-
-    
-    
     #[inline]
     pub fn get_vm(&self, idx: usize) -> Option<VmValue> {
         match self.repr() {
@@ -14,13 +10,6 @@ impl VmArray {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
     #[inline]
     pub fn set_vm(&self, idx: usize, val: VmValue) -> bool {
         {
@@ -54,27 +43,15 @@ impl VmArray {
                 }
             }
         }
-        
+
         self.migrate_to_boxed()[idx] = val;
         true
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[inline]
     pub fn push_vm(&self, val: VmValue) {
         {
             match self.repr_mut() {
-                
-                
                 ArrayRepr::Boxed(v) => {
                     if !v.items.is_empty() {
                         v.items.push(val);
@@ -98,12 +75,6 @@ impl VmArray {
         self.push_repr_change(val);
     }
 
-    
-    
-    
-    
-    
-    
     #[cold]
     fn push_repr_change(&self, val: VmValue) {
         if matches!(self.repr(), ArrayRepr::Boxed(_)) {
@@ -122,8 +93,6 @@ impl VmArray {
         self.migrate_to_boxed().push(val);
     }
 
-    
-    
     #[inline]
     pub fn pop_vm(&self) -> Option<VmValue> {
         match self.repr_mut() {
@@ -136,11 +105,7 @@ impl VmArray {
             ArrayRepr::F64(v) => v.pop().map(VmValue::from_f64),
         }
     }
-    
-    
-    
-    
-    
+
     #[cold]
     #[allow(clippy::mut_from_ref)]
     fn migrate_to_boxed(&self) -> &mut Vec<VmValue> {
@@ -164,9 +129,6 @@ impl VmArray {
         }
     }
 
-    
-
-    
     #[inline]
     pub fn get_i64(&self, idx: usize) -> Option<i64> {
         match self.repr() {
@@ -175,7 +137,6 @@ impl VmArray {
         }
     }
 
-    
     #[inline]
     pub fn set_i64(&self, idx: usize, val: i64) -> bool {
         match self.repr_mut() {
@@ -187,7 +148,6 @@ impl VmArray {
         }
     }
 
-    
     #[inline]
     pub fn get_f64(&self, idx: usize) -> Option<f64> {
         match self.repr() {
@@ -196,7 +156,6 @@ impl VmArray {
         }
     }
 
-    
     #[inline]
     pub fn set_f64(&self, idx: usize, val: f64) -> bool {
         match self.repr_mut() {

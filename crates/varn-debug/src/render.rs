@@ -1,16 +1,5 @@
-
-
-
-
-
-
-
 pub use varn_core::term::colors::*;
 pub use varn_core::term::terminal::Section;
-
-
-
-
 
 pub fn truncate(s: &str, width: usize) -> String {
     if width == 0 {
@@ -21,7 +10,6 @@ pub fn truncate(s: &str, width: usize) -> String {
     }
     console::truncate_str(s, width, "…").into_owned()
 }
-
 
 pub fn basename(path: &str) -> &str {
     path.rsplit(['/', '\\']).next().unwrap_or(path)
@@ -44,7 +32,6 @@ mod tests {
 
     #[test]
     fn counts_chars_not_bytes() {
-        
         assert_eq!(truncate("ññññ", 3), "ññ…");
     }
 

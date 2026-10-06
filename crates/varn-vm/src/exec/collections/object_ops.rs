@@ -72,8 +72,7 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
         Some(HeapObj::Object(o)) => *o,
         _ => return Ok(target),
     };
-    
-    
+
     if spread.is_heap() {
         let spread_idx = spread.as_heap();
         if let Some(HeapObj::Instance(inst)) = heap.get(spread_idx) {

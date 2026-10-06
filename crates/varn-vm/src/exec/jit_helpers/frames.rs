@@ -1,8 +1,6 @@
 use crate::exec::ctx::ExecCtx;
 use crate::exec::jit_helpers::construct::jit_propagate_error;
 
-
-
 #[varn_op_macros::jit_slow(field = "load_static_fn")]
 pub(crate) extern "C" fn jit_load_static_fn(
     ctx: *mut ExecCtx,

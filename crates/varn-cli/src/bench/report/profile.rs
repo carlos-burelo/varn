@@ -1,5 +1,3 @@
-
-
 use std::time::Duration;
 
 use varn_core::term::chalk::chalk;
@@ -12,15 +10,8 @@ use super::fmt::{fmt_dur, fmt_num, fmt_pct, row, row_note, DurScale};
 const TOP_OPCODES: usize = 12;
 
 pub struct BreakdownOpts {
-    
     pub all_rows: bool,
 }
-
-
-
-
-
-
 
 pub fn print_breakdown(
     title: &str,
@@ -79,11 +70,6 @@ pub fn print_breakdown(
         }
     }
 }
-
-
-
-
-
 
 pub fn print_opcode_hotspots(rows: &[(OpCode, u64)], interp_frame_share: Option<f64>) {
     let total: u64 = rows.iter().map(|(_, count)| *count).sum();
@@ -190,8 +176,7 @@ pub fn print_vm_profile(profile: &VmProfile, interp_frame_share: Option<f64>) {
 
     terminal::blank();
     terminal::log(chalk("GC").cyan().bold());
-    
-    
+
     terminal::log(row_note(
         "young allocs",
         fmt_num(profile.nursery_allocs),

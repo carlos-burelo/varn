@@ -10,10 +10,6 @@ use varn_types::HeapRef;
 use varn_types::{value::RuntimeSymbol, ClassObj, RuntimeString};
 
 pub struct HeapInner {
-    
-    
-    
-    
     pub jit_epoch: u64,
     pub intrinsic_classes: FxHashMap<String, Rc<ClassObj>>,
     pub gc_collections: u64,
@@ -74,13 +70,6 @@ impl HeapInner {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     pub(super) fn needs_minor_scan(obj: &HeapObj) -> bool {
         matches!(
@@ -93,9 +82,6 @@ impl HeapInner {
         )
     }
 
-    
-    
-    
     #[inline(always)]
     pub(super) fn born_old(obj: &HeapObj) -> bool {
         matches!(
@@ -169,14 +155,6 @@ impl Heap {
         unsafe { (*self.inner.get()).jit_epoch }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
     #[allow(clippy::mut_from_ref)]
     #[inline(always)]
     pub(crate) unsafe fn inner_mut(&self) -> &mut HeapInner {

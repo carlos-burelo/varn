@@ -57,18 +57,6 @@ impl FromVm for String {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 pub enum VnStr {
     Sso { buf: [u8; 5], len: u8, ascii: bool },
     Shared(std::sync::Arc<str>, bool),
@@ -78,8 +66,6 @@ impl VnStr {
     #[inline]
     pub fn as_str(&self) -> &str {
         match self {
-            
-            
             VnStr::Sso { buf, len, .. } => unsafe {
                 std::str::from_utf8_unchecked(&buf[..*len as usize])
             },
@@ -95,12 +81,6 @@ impl VnStr {
         }
     }
 
-    
-    
-    
-    
-    
-    
     #[inline]
     pub fn char_code_at(&self, pos: i64) -> i64 {
         if pos < 0 {

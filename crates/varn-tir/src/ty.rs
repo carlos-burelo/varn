@@ -1,73 +1,47 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TyId(pub u32);
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TyListId(pub u32);
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClassId(pub u32);
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EnumId(pub u32);
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SigId(pub u32);
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FnId(pub u32);
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModuleId(pub u32);
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LocalId(pub u32);
 
-
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DynReason {
-    
     HostBoundary,
-    
+
     Union,
-    
+
     IndexSignature,
-    
+
     Declared,
-    
+
     NotYetSupported,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BackendTy {
-    
     Int,
     Float,
     Bool,
     Char,
-    
+
     Str,
     Bytes,
     Decimal,
@@ -79,8 +53,7 @@ pub enum BackendTy {
     Class(ClassId),
     Enum(EnumId),
     Fn(SigId),
-    
-    
+
     Nullable(TyId),
     Void,
     Never,
@@ -117,20 +90,13 @@ impl BackendTy {
         }
     }
 
-    
-    
     pub fn non_nullable(self, t: &TyTable) -> BackendTy {
         self.non_nullable_with_depth(t, 0)
     }
 
     fn non_nullable_with_depth(self, t: &TyTable, depth: usize) -> BackendTy {
-        
-        
         const DEPTH_LIMIT: usize = 32;
         match self {
-            
-            
-            
             BackendTy::Nullable(inner) if depth < DEPTH_LIMIT && t.contains(inner) => {
                 t.get(inner).non_nullable_with_depth(t, depth + 1)
             }
@@ -138,7 +104,6 @@ impl BackendTy {
         }
     }
 
-    
     pub fn is_unboxed_scalar(self) -> bool {
         matches!(
             self,
@@ -146,38 +111,6 @@ impl BackendTy {
         )
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(Debug, Default)]
 pub struct TyTable {
@@ -214,8 +147,6 @@ impl TyTable {
         &self.lists[id.0 as usize]
     }
 
-    
-    
     pub fn contains(&self, id: TyId) -> bool {
         (id.0 as usize) < self.entries.len()
     }

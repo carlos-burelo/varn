@@ -1,30 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use rustc_hash::FxHashMap;
 
 use crate::hir::{HirBinOp, HirType, HirUnOp};
@@ -32,10 +5,6 @@ use crate::ssa::ir::{InstKind, SsaFunc, Value};
 use crate::ssa::uses::replace_uses_with_map;
 
 use std::sync::Arc;
-
-
-
-
 
 #[derive(PartialEq, Eq, Hash)]
 enum Key {
@@ -53,7 +22,6 @@ enum Key {
     StrLength(u32),
     EnumTag(u32),
 
-    
     FixedField(u32, u16),
     ArrayElem(u32, u32),
     ModuleSlot(u32, u16),
@@ -64,7 +32,6 @@ enum Key {
 }
 
 impl Key {
-    
     fn reads_memory(&self) -> bool {
         matches!(
             self,
@@ -93,9 +60,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
             }
             let Some(dest) = inst.dest else { continue };
 
-            
-            
-            
             let Some(key) = key_of(&inst.kind, &|v| resolve(&rewrites, v)) else {
                 continue;
             };
@@ -170,12 +134,9 @@ pub fn run_global(func: &mut SsaFunc) -> bool {
     replace_uses_with_map(func, &rewrites)
 }
 
-
 fn resolve(rewrites: &FxHashMap<Value, Value>, v: Value) -> u32 {
     let mut cur = v;
-    
-    
-    
+
     for _ in 0..rewrites.len() + 1 {
         match rewrites.get(&cur) {
             Some(&next) if next != cur => cur = next,
@@ -210,11 +171,6 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
         InstKind::LoadNativeGlobalIdx(slot) => Key::NativeGlobalIdx(*slot),
         InstKind::LoadUpvalue(i) => Key::Upvalue(*i),
 
-        
-        
-        
-        
-        
         _ => return None,
     })
 }

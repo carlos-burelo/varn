@@ -1,32 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use serde::{Deserialize, Serialize};
 
 use crate::register_meta::{SlotClass, SlotKind};
@@ -37,14 +8,7 @@ mod operators;
 pub use op::{SsaObjectSpreadPart, SsaOp, SsaSpread, SsaUpvalue, UPVALUE_LOCAL};
 pub use operators::{DynBinOp, DynUnOp, SsaBinOp, SsaUnOp};
 
-
-
-
-
-
-
 pub type SsaTy = SlotKind;
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SsaValue {
@@ -52,14 +16,11 @@ pub struct SsaValue {
 }
 
 impl SsaValue {
-    
     #[inline]
     pub fn class(&self) -> SlotClass {
         SlotClass::of_kind(self.ty)
     }
 }
-
-
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsaBlock {
@@ -68,14 +29,12 @@ pub struct SsaBlock {
     pub term: SsaTerm,
 }
 
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsaInst {
     pub dest: Option<u32>,
     pub op: SsaOp,
     pub line: u32,
 }
-
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SsaTerm {
@@ -95,12 +54,6 @@ pub enum SsaTerm {
     Unreachable,
 }
 
-
-
-
-
-
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsaProto {
     pub name: Box<str>,
@@ -111,24 +64,17 @@ pub struct SsaProto {
     pub regs: Vec<u32>,
     pub register_count: u16,
     pub has_this: bool,
-    
-    
+
     pub captured: Vec<u32>,
-    
+
     pub loop_headers: Vec<SsaLoopHeader>,
 }
-
-
-
-
-
-
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsaLoopHeader {
     pub block: u32,
     pub ip: u32,
-    
+
     pub live: Vec<u32>,
 }
 
@@ -148,29 +94,21 @@ impl SsaProto {
         self.regs.get(v as usize).copied().unwrap_or(0)
     }
 
-    
     pub fn loop_header_at(&self, ip: usize) -> Option<&SsaLoopHeader> {
         self.loop_headers.iter().find(|h| h.ip as usize == ip)
     }
 
-    
     #[inline]
     pub fn captured_reg(&self, var: u32) -> Option<u32> {
         self.captured.get(var as usize).copied()
     }
 
-    
-    
-    
     pub fn map_registers(&mut self, f: impl Fn(u32) -> u32) {
         for r in self.regs.iter_mut().chain(self.captured.iter_mut()) {
             *r = f(*r);
         }
     }
 }
-
-
-
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PortableSsa {
@@ -199,7 +137,6 @@ impl PortableSsa {
         }
     }
 
-    
     pub fn unavailable(&self) -> Option<&str> {
         match self {
             Self::Available(_) => None,

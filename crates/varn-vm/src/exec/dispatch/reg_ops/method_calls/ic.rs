@@ -1,14 +1,9 @@
-
-
-
 use crate::closure::VmClosure;
 use crate::heap::Heap;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use varn_types::chunk::{CacheEntry, ICKind};
 use varn_types::value::ClassObj;
-
-
 
 #[derive(Clone, Copy)]
 pub(super) struct IcSite {
@@ -35,15 +30,11 @@ impl IcSite {
     }
 }
 
-
 pub(super) enum IcHit {
     Native(varn_types::NativeFn),
-    
+
     Vm(Rc<VmClosure>, Rc<ClassObj>),
 }
-
-
-
 
 pub(super) fn probe(
     heap: &Heap,
@@ -77,13 +68,6 @@ pub(super) fn probe(
     }
     None
 }
-
-
-
-
-
-
-
 
 pub(super) fn record(
     closure: &VmClosure,

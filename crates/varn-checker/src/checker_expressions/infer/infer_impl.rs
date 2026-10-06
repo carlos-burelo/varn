@@ -12,8 +12,7 @@ impl<'r> Checker<'r> {
         match &arena.expr(expr).kind {
             ExprKind::Identifier { name } => {
                 let name_str = bind.interner.resolve(*name);
-                
-                
+
                 if name_str == "_" && self.in_pipeline_rhs {
                     return self.pipeline_value_type.unwrap_or(Type::Dynamic);
                 }
@@ -241,9 +240,7 @@ impl<'r> Checker<'r> {
                     _ => res,
                 }
             }
-            
-            
-            
+
             ExprKind::Missing => Type::Dynamic,
             _ => Type::Dynamic,
         }

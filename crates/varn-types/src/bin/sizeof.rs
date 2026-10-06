@@ -1,4 +1,4 @@
-#![allow(unused_crate_dependencies)] 
+#![allow(unused_crate_dependencies)]
 
 use varn_core::ast::expr::Expr;
 use varn_core::ast::stmt::Stmt;

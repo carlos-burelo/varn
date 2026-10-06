@@ -1,5 +1,3 @@
-
-
 pub mod compiled;
 pub mod harness;
 pub mod report;
@@ -8,13 +6,12 @@ pub mod stats;
 
 use crate::error::CliError;
 
-
 pub struct BenchOpts {
     pub runs: usize,
     pub show_output: bool,
     pub verbose: bool,
     pub all_rows: bool,
-    
+
     pub min_clif_coverage: Option<f64>,
 }
 
@@ -24,13 +21,6 @@ pub fn run_bench(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(),
     }
     source::run(path, eval, opts)
 }
-
-
-
-
-
-
-
 
 pub fn enforce_coverage_floor(
     jit: &varn_vm::varn_jit::JitStatsSnapshot,

@@ -1,12 +1,4 @@
-
-
 use super::super::ir::SsaFunc;
-
-
-
-
-
-
 
 pub(super) fn derive_register_meta(
     ssa: &SsaFunc,
@@ -17,14 +9,7 @@ pub(super) fn derive_register_meta(
     use varn_types::register_meta::{RegisterMeta, SlotKind};
     let n = register_count as usize;
     let mut kinds: Vec<Option<SlotKind>> = vec![None; n];
-    
-    
-    
-    
-    
-    
-    
-    
+
     if n > 0 {
         kinds[0] = Some(SlotKind::Dynamic);
     }
@@ -62,15 +47,13 @@ pub(crate) fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta
         HirType::Float => SlotKind::Float,
         HirType::Bool => SlotKind::Bool,
         HirType::Str => SlotKind::Str,
-        
-        
+
         HirType::Class(_)
         | HirType::Array(_)
         | HirType::Ref
         | HirType::Map(_, _)
         | HirType::Set(_) => SlotKind::Ref,
-        
-        
+
         HirType::Nullable(_) => SlotKind::Dynamic,
         HirType::Dynamic => SlotKind::Dynamic,
     }

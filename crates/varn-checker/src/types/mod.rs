@@ -54,17 +54,6 @@ impl Default for Type {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FunctionParam {
     pub name: Option<Arc<str>>,

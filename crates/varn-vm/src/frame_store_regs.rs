@@ -5,10 +5,6 @@ use crate::value::VmValue;
 use varn_types::register_meta::SlotClass;
 
 impl FrameStore {
-    
-    
-    
-
     #[inline(always)]
     pub fn g(&self, id: usize, reg: usize) -> i64 {
         let (class, i) = self.slot(id, reg);
@@ -51,7 +47,6 @@ impl FrameStore {
         self.dyn_[i] = v;
     }
 
-    
     #[inline(always)]
     pub fn addr_of(&self, id: usize, reg: usize) -> SlotAddr {
         let (class, i) = self.slot(id, reg);
@@ -60,8 +55,6 @@ impl FrameStore {
             idx: i as u32,
         }
     }
-
-    
 
     #[inline(always)]
     pub fn get_addr(&self, a: SlotAddr) -> VmValue {
@@ -88,17 +81,6 @@ impl FrameStore {
                 self.gpr[i] = v.as_int();
             }
             SlotClass::Fpr => {
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
                 if v.is_f64() {
                     self.fpr[i] = v.as_f64();
                 } else if v.is_int() {
@@ -113,9 +95,6 @@ impl FrameStore {
                 }
             }
             SlotClass::Ref => {
-                
-                
-                
                 if v.is_null() {
                     self.refs[i] = None;
                 } else if v.is_heap() {

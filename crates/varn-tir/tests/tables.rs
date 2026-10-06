@@ -1,17 +1,7 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
-
-
-
-
 use std::sync::Arc;
 use varn_tir::{BackendTy, ClassId, ClassInfo, SigId};
-
-
 
 #[test]
 fn inheritance_lays_out_by_prefix() {
@@ -40,7 +30,6 @@ fn inheritance_lays_out_by_prefix() {
     assert_eq!(base.parent, None);
 }
 
-
 #[test]
 fn slots_are_dense_and_ordered() {
     let c = ClassInfo::new(
@@ -57,8 +46,6 @@ fn slots_are_dense_and_ordered() {
     assert_eq!(slots, vec![0, 1, 2]);
 }
 
-
-
 #[test]
 fn declared_types_reach_the_layout() {
     let c = ClassInfo::new(
@@ -70,8 +57,6 @@ fn declared_types_reach_the_layout() {
     assert_eq!(c.field("n").map(|f| f.ty), Some(BackendTy::Int));
     assert_eq!(c.field("s").map(|f| f.ty), Some(BackendTy::Str));
 }
-
-
 
 #[test]
 fn override_reuses_the_parent_slot() {
@@ -103,7 +88,6 @@ fn override_reuses_the_parent_slot() {
     );
     assert_eq!(derived.method_slot("fetch"), Some(2), "new method appends");
 
-    
     assert_eq!(
         derived.vtable[0].sig,
         SigId(2),

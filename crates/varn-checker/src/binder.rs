@@ -43,15 +43,8 @@ pub use type_resolution::{resolve_primitive, resolve_type_node};
 pub use types::{BindResult, BindView, ClassParent, Extensions, PendingEnrich, TypeMembers};
 
 pub struct Binder<'r> {
-    
-    
-    
     pub(crate) resolver: &'r dyn ImportResolver,
-    
-    
-    
-    
-    
+
     pub(crate) ast_arena: &'r AstArena,
     pub(crate) arena: SymbolArena,
     pub(crate) scopes: ScopeArena,
@@ -74,9 +67,8 @@ pub struct Binder<'r> {
     reported_type_forms: rustc_hash::FxHashSet<u32>,
     reported_params: rustc_hash::FxHashSet<u32>,
     pub(crate) array_watch: Vec<array_evolve::ArrayCandidate>,
-    
-    
+
     pub(crate) evolved_array_types: FxHashMap<u32, Type>,
-    
+
     pub(crate) type_decls: FxHashMap<Arc<str>, (crate::scope::ScopeId, varn_core::SourceRange)>,
 }

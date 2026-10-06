@@ -10,7 +10,6 @@ impl IoDriver {
         let mut events = Events::with_capacity(1024);
 
         while is_running.load(Ordering::Relaxed) {
-            
             while let Ok(cmd) = cmd_rx.try_recv() {
                 match cmd {
                     DriverCommand::RegisterListener(id) => {
@@ -78,7 +77,6 @@ impl IoDriver {
                 let id = token.0 as i64;
                 let mut reg = registry.lock().unwrap();
 
-                
                 if let Some(listener_state) = reg.listeners.get_mut(&id) {
                     if event.is_readable() {
                         let mut resolved_conns: Vec<(HostPromise, i64)> = Vec::new();
@@ -128,10 +126,8 @@ impl IoDriver {
                     }
                 }
 
-                
                 let mut deferred: Vec<(HostPromise, Result<SendValue, SendValue>)> = Vec::new();
                 if let Some(stream_state) = reg.streams.get_mut(&id) {
-                    
                     if stream_state.is_connecting && (event.is_writable() || event.is_readable()) {
                         if let Some(task) = stream_state.pending_connect.take() {
                             stream_state.is_connecting = false;
@@ -146,7 +142,6 @@ impl IoDriver {
                         }
                     }
 
-                    
                     if event.is_writable() {
                         if let Some(mut pw) = stream_state.pending_write.take() {
                             match stream_state.stream.write(&pw.data[pw.written..]) {
@@ -169,7 +164,6 @@ impl IoDriver {
                         }
                     }
 
-                    
                     if event.is_readable() {
                         if let Some(pr) = stream_state.pending_read.take() {
                             let mut buf = vec![0u8; pr.len];

@@ -47,8 +47,6 @@ pub(crate) fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<
         if let (Some(HeapObj::Array(da)), Some(HeapObj::Array(sa))) =
             (heap.get(dst.as_heap()), heap.get(src.as_heap()))
         {
-            
-            
             let n = sa.len();
             let mut items: Vec<VmValue> = Vec::with_capacity(n);
             for i in 0..n {

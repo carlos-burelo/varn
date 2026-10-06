@@ -1,5 +1,3 @@
-
-
 use rustc_hash::FxHashMap;
 
 pub struct SemanticDB {
@@ -8,15 +6,9 @@ pub struct SemanticDB {
     pub expr_types: FxHashMap<u32, varn_checker::ExprInfo>,
     pub node_scopes: FxHashMap<u32, varn_checker::ScopeId>,
     pub scope_spans: Vec<varn_checker::checker::ScopeSpan>,
-    
-    
-    
-    
+
     pub symbol_types: FxHashMap<varn_checker::SymbolId, varn_checker::Type>,
 
-    
-    
-    
     pub global_scope: varn_checker::ScopeId,
 
     pub flattened_members: FxHashMap<String, Vec<varn_checker::types::ClassMemberInfo>>,
@@ -25,35 +17,17 @@ pub struct SemanticDB {
 
     pub call_resolutions: FxHashMap<u32, varn_checker::CallResolution>,
 
-    
     pub match_gaps: FxHashMap<varn_core::ast::AstId, varn_checker::MatchGap>,
 
-    
-    
-    
     pub call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
     pub desugar: varn_checker::checker::Desugarings,
 
     pub bind: varn_checker::BindResult,
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub types: std::cell::RefCell<std::sync::Arc<varn_checker::types::CheckerTyTable>>,
 }
 
 impl SemanticDB {
-    
     pub fn name(&self, atom: varn_core::Atom) -> &str {
         self.bind.interner.resolve(atom)
     }

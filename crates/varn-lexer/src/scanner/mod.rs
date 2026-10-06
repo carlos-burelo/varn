@@ -7,11 +7,7 @@ mod templates;
 #[derive(Clone, Copy, Debug)]
 pub struct LexerConfig {
     pub emit_doc_comments: bool,
-    
-    
-    
-    
-    
+
     pub emit_trivia: bool,
 }
 
@@ -35,7 +31,7 @@ pub(crate) struct Scanner<'a> {
     pub diagnostics: varn_core::DiagnosticBag,
     pub(super) cur_line: u32,
     pub(super) cur_col: u32,
-    
+
     pub(super) trivia: Vec<varn_core::Trivia>,
 }
 
@@ -63,10 +59,6 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    
-    
-    
-    
     pub(super) fn push_trivia(&mut self, kind: varn_core::TriviaKind, start: usize) {
         if !self.config.emit_trivia {
             return;

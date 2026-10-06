@@ -1,20 +1,9 @@
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::{FrameLayout, SlotClass};
 use varn_types::vm_value::{KIND_HEAP, KIND_INT, KIND_NULL};
 
 use crate::JitFrameLayout;
-
-
 
 pub(crate) struct Homes<'a> {
     pub exec_ctx: Value,
@@ -24,7 +13,6 @@ pub(crate) struct Homes<'a> {
 }
 
 impl Homes<'_> {
-    
     fn class_ptr_offset(&self, class: SlotClass) -> i32 {
         let fl = self.offsets;
         (match class {
@@ -35,7 +23,6 @@ impl Homes<'_> {
         }) as i32
     }
 
-    
     pub(crate) fn addr(&self, b: &mut FunctionBuilder, reg: usize) -> Value {
         let class = self.layout.class_of(reg);
         let idx = self.layout.idx_of(reg);
@@ -57,11 +44,6 @@ impl Homes<'_> {
         b.ins().iadd(ptr, off)
     }
 
-    
-    
-    
-    
-    
     pub(crate) fn store_at(&self, b: &mut FunctionBuilder, home: Value, reg: usize, value: Value) {
         let class = self.layout.class_of(reg);
         let m = cranelift_codegen::ir::MemFlagsData::trusted();
@@ -111,13 +93,11 @@ impl Homes<'_> {
         }
     }
 
-    
     pub(crate) fn load(&self, b: &mut FunctionBuilder, reg: usize) -> Value {
         let home = self.addr(b, reg);
         self.load_at(b, home, reg)
     }
 
-    
     pub(crate) fn load_at(&self, b: &mut FunctionBuilder, home: Value, reg: usize) -> Value {
         let class = self.layout.class_of(reg);
         let m = cranelift_codegen::ir::MemFlagsData::trusted();
@@ -142,7 +122,6 @@ impl Homes<'_> {
         }
     }
 }
-
 
 fn elem_size(class: SlotClass) -> i64 {
     match class {

@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use std::path::{Path, PathBuf};
 
 pub const ENV_VARN_STD: &str = "VARN_STD";
@@ -12,26 +5,12 @@ pub const STD_MANIFEST_FILE: &str = "std.json";
 pub const STD_BUNDLE_FILE: &str = "std.vnb";
 pub const STD_DIR_NAME: &str = "std";
 
-
-
-
-
-
-
-
 pub const STD_EMBEDDED_SENTINEL: &str = "@embedded";
-
-
-
-
-
 
 #[derive(Debug, Clone)]
 pub enum StdSource {
     SourceTree(PathBuf),
-    
-    
-    
+
     Embedded,
 }
 
@@ -39,23 +18,17 @@ pub enum StdSource {
 pub enum StdProvenance {
     ProjectOverride,
     Env,
-    
-    
-    
-    
+
     DevCheckout,
-    
-    
+
     Embedded,
 }
-
 
 pub fn classify(path: &Path) -> Option<StdSource> {
     (path.is_dir()
         && (path.join(STD_MANIFEST_FILE).is_file() || path.join("math/mod.vn").is_file()))
     .then(|| StdSource::SourceTree(path.to_path_buf()))
 }
-
 
 pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
     let manifest_path = if project_root
@@ -86,13 +59,6 @@ pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
     })
 }
 
-
-
-
-
-
-
-
 pub fn resolve() -> (StdSource, StdProvenance) {
     static RESOLVED: std::sync::OnceLock<(StdSource, StdProvenance)> = std::sync::OnceLock::new();
     RESOLVED.get_or_init(resolve_uncached).clone()
@@ -119,10 +85,6 @@ fn resolve_uncached() -> (StdSource, StdProvenance) {
     }
     (StdSource::Embedded, StdProvenance::Embedded)
 }
-
-
-
-
 
 pub fn in_source_tree(file: &str) -> bool {
     static TREE_ROOT: std::sync::OnceLock<Option<(PathBuf, Option<PathBuf>)>> =
@@ -152,10 +114,6 @@ pub fn in_source_tree(file: &str) -> bool {
     MEMO.with(|m| m.borrow_mut().insert(Box::from(file), verdict));
     verdict
 }
-
-
-
-
 
 fn dev_checkout_std() -> Option<StdSource> {
     let exe = std::env::current_exe().ok()?;

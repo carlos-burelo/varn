@@ -57,7 +57,6 @@ pub fn generate_class_member_actions(
         character: 0,
     };
 
-    
     if !has_constructor {
         let params = fields
             .iter()
@@ -98,7 +97,6 @@ pub fn generate_class_member_actions(
         }));
     }
 
-    
     let ungenerated_fields: Vec<_> = fields
         .iter()
         .filter(|(n, _)| !methods.contains(&format!("get_{n}")) && !methods.contains(n.as_str()))

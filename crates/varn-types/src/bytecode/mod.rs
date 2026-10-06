@@ -1,16 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub mod disasm;
 mod layout;
 mod operand;
@@ -23,24 +10,16 @@ pub use remap::remap_registers;
 use crate::chunk::PoolEntry;
 
 pub struct InstrInfo {
-    
     pub len: usize,
 
-    
     pub def: Option<u8>,
 
-    
     pub uses: Vec<u8>,
 
-    
-    
     pub call_args: Option<(u8, u8)>,
 
-    
-    
     pub opaque: bool,
 }
-
 
 pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<InstrInfo> {
     let layout = layout(code, offset, constants)?;

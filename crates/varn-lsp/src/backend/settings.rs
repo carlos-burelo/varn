@@ -1,14 +1,4 @@
-
-
-
-
-
-
-
-
 use std::sync::atomic::{AtomicBool, Ordering};
-
-
 
 pub struct Settings {
     inlay_hints: AtomicBool,
@@ -25,19 +15,12 @@ impl Settings {
         self.inlay_hints.load(Ordering::Relaxed)
     }
 
-    
     pub fn apply(&self, value: &serde_json::Value) {
         if let Some(enabled) = Self::inlay_hints_enabled_in(value) {
             self.inlay_hints.store(enabled, Ordering::Relaxed);
         }
     }
 
-    
-    
-    
-    
-    
-    
     pub fn inlay_hints_enabled_in(value: &serde_json::Value) -> Option<bool> {
         value
             .pointer("/Varn/inlayHints/enabled")

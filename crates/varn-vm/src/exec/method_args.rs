@@ -1,23 +1,15 @@
-
-
-
-
-
-
-
 use crate::error::VmResult;
 use crate::frame_store::FrameStore;
 use crate::value::VmValue;
 
 #[derive(Clone, Copy)]
 pub(crate) enum MethodArgs<'a> {
-    
     Regs {
         base: usize,
         start: usize,
         count: usize,
     },
-    
+
     Boxed(&'a [VmValue]),
 }
 
@@ -29,7 +21,6 @@ impl MethodArgs<'_> {
         }
     }
 
-    
     pub(crate) fn get(&self, stack: &FrameStore, i: usize) -> VmValue {
         match self {
             MethodArgs::Regs { base, start, .. } => stack.box_reg(*base, start + i),
@@ -37,8 +28,6 @@ impl MethodArgs<'_> {
         }
     }
 
-    
-    
     pub(crate) fn copy_into(
         &self,
         stack: &mut FrameStore,
@@ -57,9 +46,6 @@ impl MethodArgs<'_> {
         Ok(())
     }
 }
-
-
-
 
 pub(crate) enum MethodOutcome {
     Value(VmValue),

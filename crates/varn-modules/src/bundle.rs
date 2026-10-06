@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 use serde::{Deserialize, Serialize};
 
 use crate::artifact::{read_artifact, write_artifact, ArtifactClass, ArtifactKind};
@@ -24,12 +15,7 @@ pub struct BundleModule {
     pub pure: bool,
     pub interface: Vec<u8>,
     pub bytecode: Vec<u8>,
-    
-    
-    
-    
-    
-    
+
     pub source: String,
 }
 
@@ -49,14 +35,6 @@ pub fn read_bundle(bytes: &[u8]) -> Result<StdBundle, String> {
 }
 
 impl StdBundle {
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn validate_compat_with(&self, host_api_expected: u32) -> Result<(), String> {
         if self.host_api_version != host_api_expected {
             return Err(format!(

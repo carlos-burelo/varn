@@ -9,17 +9,12 @@ pub struct ExprId(u32);
 pub struct StmtId(u32);
 
 impl ExprId {
-    
-    
-    
-    
     pub fn index(&self) -> u32 {
         self.0
     }
 }
 
 impl StmtId {
-    
     pub fn index(&self) -> u32 {
         self.0
     }

@@ -1,19 +1,9 @@
-
-
-
 use super::ClassObj;
 use crate::vm_value::VmValue;
 use std::cell::UnsafeCell;
 use std::ptr;
 use std::rc::Rc;
 use varn_core::layout::{ClassLayout, FieldLayout, ScalarRepr, TypeLayout, COMPACT_REF_NULL};
-
-
-
-
-
-
-
 
 #[repr(C, align(8))]
 pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
@@ -22,32 +12,20 @@ pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
     payload: T,
 }
 
-
-
-
 pub const INST_CLASS_ID_OFF: usize =
     std::mem::offset_of!(InstanceData<[UnsafeCell<u8>; 0]>, class_id);
 pub const INST_PAYLOAD_OFF: usize =
     std::mem::offset_of!(InstanceData<[UnsafeCell<u8>; 0]>, payload);
 
 impl InstanceData {
-    
     pub fn payload_size_of(class: &ClassObj) -> u32 {
         class.layout().payload_size
     }
 
-    
     pub const fn bytes_for(payload_size: u32) -> usize {
         INST_PAYLOAD_OFF + (payload_size as usize).div_ceil(8) * 8
     }
 
-    
-    
-    
-    
-    
-    
-    
     #[inline]
     pub unsafe fn init_at(at: *mut u8, class_id: u32, payload_size: u32) -> InstanceRef {
         let payload_bytes = payload_size as usize;
@@ -64,8 +42,6 @@ impl InstanceData {
     pub fn raw_payload_ptr(&self) -> *mut u8 {
         self.payload.as_ptr() as *mut u8
     }
-
-    
 
     #[inline(always)]
     unsafe fn read_i64(&self, offset: usize) -> i64 {
@@ -102,10 +78,6 @@ impl InstanceData {
         ClassObj::find_by_id(self.class_id).map(|c| c.layout())
     }
 
-    
-    
-    
-    
     #[inline]
     pub fn slot_count(&self) -> usize {
         self.layout().map(|l| l.field_count()).unwrap_or(0)
@@ -118,9 +90,6 @@ impl InstanceData {
         self.read_field(f)
     }
 
-    
-    
-    
     #[inline]
     pub fn read_field_at(
         &self,
@@ -130,8 +99,6 @@ impl InstanceData {
         self.read_scalar(offset, &TypeLayout::of_field(tag))
     }
 
-    
-    
     #[inline]
     pub fn write_field_at(
         &self,
@@ -153,15 +120,10 @@ impl InstanceData {
         self.write_field(f, val).is_ok()
     }
 
-    
-    
     pub fn read_field(&self, f: &FieldLayout) -> Option<VmValue> {
         self.read_scalar(f.offset, &f.layout)
     }
 
-    
-    
-    
     pub fn read_scalar(&self, offset: u32, layout: &TypeLayout) -> Option<VmValue> {
         let offset = offset as usize;
         if offset + layout.size as usize > self.payload_size as usize {
@@ -185,20 +147,10 @@ impl InstanceData {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn write_field(&self, f: &FieldLayout, val: VmValue) -> Result<(), &'static str> {
         self.write_scalar(f.offset, &f.layout, val)
     }
 
-    
     pub fn write_scalar(
         &self,
         offset: u32,
@@ -224,10 +176,6 @@ impl InstanceData {
                     self.write_i64(offset, val.as_int());
                 }
                 ScalarRepr::F64 => {
-                    
-                    
-                    
-                    
                     if val.is_f64() {
                         self.write_f64(offset, val.as_f64());
                     } else if val.is_int() {
@@ -253,12 +201,6 @@ impl InstanceData {
         Ok(())
     }
 
-    
-
-    
-    
-    
-    
     pub fn for_each_reference(&self, mut f: impl FnMut(VmValue)) {
         let Some(layout) = self.layout() else {
             return;
@@ -270,8 +212,6 @@ impl InstanceData {
         }
     }
 
-    
-    
     fn read_gc_slot(&self, offset: usize, repr: ScalarRepr) -> Option<VmValue> {
         unsafe {
             match repr {
@@ -286,8 +226,6 @@ impl InstanceData {
             }
         }
     }
-
-    
 
     #[inline(always)]
     unsafe fn write_i64(&self, offset: usize, val: i64) {
@@ -319,8 +257,6 @@ impl InstanceData {
         ptr.write(val);
     }
 }
-
-
 
 #[derive(Clone, Copy)]
 pub struct InstanceRef(ptr::NonNull<InstanceData>);

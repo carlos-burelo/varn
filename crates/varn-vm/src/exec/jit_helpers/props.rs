@@ -1,14 +1,6 @@
-
-
-
-
-
-
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-
-
 
 #[varn_op_macros::jit_slow(field = "get_property_flat")]
 pub(crate) extern "C" fn jit_get_property_flat(
@@ -32,8 +24,6 @@ pub(crate) extern "C" fn jit_get_property_flat(
         }
     }
 }
-
-
 
 #[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "set_property_flat")]

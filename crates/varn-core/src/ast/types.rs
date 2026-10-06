@@ -5,18 +5,6 @@ use crate::kinds::TypeKind;
 use crate::source::SourceRange;
 use crate::Atom;
 
-
-
-
-
-
-
-
-
-
-
-
-
 pub type AstTypeKind = TypeKind<
     Box<TypeNode>,
     Atom,

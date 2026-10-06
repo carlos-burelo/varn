@@ -86,20 +86,14 @@ impl RuntimeKind {
 }
 
 impl RuntimeKind {
-    
-    
-    
     pub const fn from_u8(raw: u8) -> Option<Self> {
         if raw <= Self::Bytes as u8 {
-            
-            
             Some(unsafe { std::mem::transmute::<u8, Self>(raw) })
         } else {
             None
         }
     }
 
-    
     pub const fn encode(kind: Option<Self>) -> u8 {
         match kind {
             Some(k) => k as u8,
@@ -108,9 +102,6 @@ impl RuntimeKind {
     }
 }
 
-
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum FieldAccess {
     Slot,
@@ -118,7 +109,6 @@ pub enum FieldAccess {
 }
 
 impl FieldAccess {
-    
     pub fn encode(self) -> u8 {
         match self {
             Self::Slot => 0,

@@ -7,8 +7,6 @@ use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeLiteral};
 
 impl<'r> Checker<'r> {
-    
-    
     fn report_gap(
         &mut self,
         expr: ExprId,
@@ -21,8 +19,6 @@ impl<'r> Checker<'r> {
             .insert(expr.index(), crate::semantic_info::MatchGap { missing });
     }
 
-    
-    
     fn require_catch_all(
         &mut self,
         expr: ExprId,
@@ -75,9 +71,7 @@ impl<'r> Checker<'r> {
             if !uncovered.is_empty() {
                 let text = |t: &Type| t.display(&self.ty_table, &bind.interner).to_string();
                 let names: Vec<String> = uncovered.iter().map(text).collect();
-                
-                
-                
+
                 let mut missing: Vec<String> = uncovered
                     .iter()
                     .filter(|t| is_literal_pattern(t, &self.ty_table))
@@ -102,8 +96,7 @@ impl<'r> Checker<'r> {
             return;
         };
         let type_name: std::sync::Arc<str> = self.resolve_bind_atom(bind, type_name_atom);
-        
-        
+
         let foreign = origin_atom.and_then(|o| {
             let origin = self.resolve_bind_atom(bind, o);
             self.resolver
@@ -161,7 +154,6 @@ impl<'r> Checker<'r> {
                 .map(|v| v.to_string())
                 .collect();
             if !uncovered.is_empty() {
-                
                 let missing = uncovered
                     .iter()
                     .map(|v| match owner.sum_variant_fields.get(v.as_str()) {
@@ -241,9 +233,6 @@ impl<'r> Checker<'r> {
     }
 }
 
-
-
-
 fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type>> {
     let split_bool = |t: Type, out: &mut Vec<Type>, table: &mut CheckerTyTable| {
         if t == Type::Bool {
@@ -267,8 +256,6 @@ fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type
     }
     Some(out)
 }
-
-
 
 fn is_literal_pattern(t: &Type, table: &CheckerTyTable) -> bool {
     matches!(

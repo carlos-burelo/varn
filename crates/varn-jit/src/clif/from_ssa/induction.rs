@@ -1,25 +1,13 @@
-
-
-
-
-
-
-
-
-
 use std::collections::HashSet;
 
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaProto, SsaTerm};
 
-
 #[derive(Clone, Copy, PartialEq)]
 enum Bound {
-    
     Below,
-    
+
     Above,
 }
-
 
 pub(super) fn in_range_steps(
     ssa: &SsaProto,
@@ -49,7 +37,7 @@ pub(super) fn in_range_steps(
         else {
             continue;
         };
-        
+
         let in_header = blk.insts.iter().any(|i| i.dest == Some(*cond));
         let Some(SsaOp::Binary { op, lhs, rhs }) = def[*cond as usize] else {
             continue;
@@ -62,7 +50,6 @@ pub(super) fn in_range_steps(
         let (k, bound) = if blk.params.contains(&k) {
             (k, bound)
         } else {
-            
             let flipped = match bound {
                 Bound::Below => Bound::Above,
                 Bound::Above => Bound::Below,

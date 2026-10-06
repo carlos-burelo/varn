@@ -2,9 +2,6 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-
-
-
 fn main() {
     println!("cargo:rerun-if-changed=src/modules");
 
@@ -80,8 +77,6 @@ fn emit_spec_entry(out: &mut impl Write, id: &str, kind_expr: &str, contract: &P
     )
     .unwrap();
 }
-
-
 
 fn has_code(source: &str) -> bool {
     source.lines().any(|line| {

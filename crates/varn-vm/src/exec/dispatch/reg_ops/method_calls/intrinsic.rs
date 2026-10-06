@@ -1,7 +1,3 @@
-
-
-
-
 use crate::exec::ctx::ExecCtx;
 use crate::exec::method_args::MethodArgs;
 use crate::heap::{Heap, HeapObj};
@@ -9,13 +5,11 @@ use crate::value::VmValue;
 use varn_core::MemberKey;
 use varn_types::vm_value::SSO_MAX_LEN;
 
-
 enum StrOp {
     StartsWith,
     EndsWith,
     IndexOf,
 }
-
 
 fn str_of<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; SSO_MAX_LEN]) -> Option<&'a str> {
     if v.is_sso() {
@@ -30,8 +24,6 @@ fn str_of<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; SSO_MAX_LEN]) -> Opt
 }
 
 impl ExecCtx {
-    
-    
     pub(super) fn intrinsic_method(
         &mut self,
         this_val: VmValue,
@@ -83,7 +75,6 @@ impl ExecCtx {
         Some(result)
     }
 }
-
 
 fn char_index_of(s: &str, p: &str) -> i64 {
     if p.is_empty() {

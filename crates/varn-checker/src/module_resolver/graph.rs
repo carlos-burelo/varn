@@ -5,36 +5,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use varn_core::ModuleId;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[derive(Default)]
 pub struct ModuleGraph {
-    
     binds: FxHashMap<String, Arc<BindResult>>,
     exports: FxHashMap<String, Arc<ExportMap>>,
     programs: FxHashMap<String, Arc<varn_core::ast::Program>>,
-    
-    
-    
+
     arenas: FxHashMap<String, Arc<varn_core::ast::AstArena>>,
-    
+
     resolved_paths: FxHashMap<(String, String), String>,
-    
+
     reverse_deps: FxHashMap<String, Vec<String>>,
     project_root: Option<PathBuf>,
 }
@@ -44,20 +24,13 @@ impl ModuleGraph {
         Self::default()
     }
 
-    
-
     pub fn bind(&self, key: &str) -> Option<Arc<BindResult>> {
         self.binds.get(key).map(Arc::clone)
     }
 
-    
-    
-    
     pub fn insert_bind(&mut self, key: String, bind: Arc<BindResult>) {
         self.binds.entry(key).or_insert(bind);
     }
-
-    
 
     pub fn exports(&self, key: &str) -> Option<Arc<ExportMap>> {
         self.exports.get(key).map(Arc::clone)
@@ -67,8 +40,6 @@ impl ModuleGraph {
         self.exports.insert(key, exports);
     }
 
-    
-
     pub fn program(&self, key: &str) -> Option<Arc<varn_core::ast::Program>> {
         self.programs.get(key).map(Arc::clone)
     }
@@ -77,8 +48,6 @@ impl ModuleGraph {
         self.programs.entry(key).or_insert(program);
     }
 
-    
-
     pub fn arena(&self, key: &str) -> Option<Arc<varn_core::ast::AstArena>> {
         self.arenas.get(key).map(Arc::clone)
     }
@@ -86,8 +55,6 @@ impl ModuleGraph {
     pub fn insert_arena(&mut self, key: String, arena: Arc<varn_core::ast::AstArena>) {
         self.arenas.entry(key).or_insert(arena);
     }
-
-    
 
     pub fn resolved_path(&self, base_dir: &str, specifier: &str) -> Option<String> {
         self.resolved_paths
@@ -99,16 +66,12 @@ impl ModuleGraph {
         self.resolved_paths.insert((base_dir, specifier), abs);
     }
 
-    
-
     pub fn record_dep(&mut self, importer: &str, imported: &str) {
         self.reverse_deps
             .entry(imported.to_owned())
             .or_default()
             .push(importer.to_owned());
     }
-
-    
 
     pub fn project_root_or_init(&mut self) -> &PathBuf {
         self.project_root.get_or_insert_with(|| {
@@ -117,9 +80,6 @@ impl ModuleGraph {
         })
     }
 
-    
-
-    
     pub fn invalidate(&mut self, id: &ModuleId) {
         let key = id.as_str();
         let mut to_clear = Vec::new();
@@ -145,15 +105,6 @@ impl ModuleGraph {
         self.resolved_paths.retain(|_, v| !to_clear.contains(v));
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn evict_heavy(&mut self) -> (usize, usize, usize) {
         let counts = (self.binds.len(), self.programs.len(), self.arenas.len());
         self.binds.clear();
@@ -162,7 +113,6 @@ impl ModuleGraph {
         counts
     }
 
-    
     pub fn heavy_stats(&self) -> (usize, usize, usize, usize) {
         (
             self.binds.len(),
@@ -172,8 +122,6 @@ impl ModuleGraph {
         )
     }
 
-    
-    
     pub fn clear(&mut self) {
         self.binds.clear();
         self.exports.clear();
@@ -186,10 +134,7 @@ impl ModuleGraph {
 
 #[cfg(test)]
 mod tests {
-    
-    
-    
-    
+
     #[test]
     fn module_graph_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}

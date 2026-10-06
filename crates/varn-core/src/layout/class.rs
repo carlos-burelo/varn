@@ -1,28 +1,18 @@
-
-
-
-
-
-
 use super::{GcLayout, GcSlot, TypeLayout};
 use crate::RuntimeKind;
 use std::sync::Arc;
 
-
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FieldLayout {
-    
     pub name: Arc<str>,
-    
+
     pub kind: Option<RuntimeKind>,
-    
+
     pub offset: u32,
     pub layout: TypeLayout,
 }
 
 impl FieldLayout {
-    
-    
     pub fn at(offset: u32, kind: Option<RuntimeKind>) -> Self {
         Self {
             name: Arc::from(""),
@@ -33,26 +23,18 @@ impl FieldLayout {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ClassLayout {
-    
     pub payload_size: u32,
-    
+
     pub alignment: u32,
-    
+
     pub fields: Vec<FieldLayout>,
-    
+
     pub gc: GcLayout,
 }
 
 impl ClassLayout {
-    
-    
-    
-    
-    
-    
     pub fn from_fields(fields_in: &[(Arc<str>, Option<RuntimeKind>)]) -> Self {
         let mut fields = Vec::with_capacity(fields_in.len());
         let mut cur_offset = 0u32;
@@ -82,7 +64,6 @@ impl ClassLayout {
             });
         }
 
-        
         let end_padding = (max_align - (cur_offset % max_align)) % max_align;
         let payload_size = cur_offset + end_padding;
 
@@ -94,17 +75,14 @@ impl ClassLayout {
         }
     }
 
-    
     pub fn get_field(&self, name: &str) -> Option<&FieldLayout> {
         self.fields.iter().find(|f| f.name.as_ref() == name)
     }
 
-    
     pub fn get_field_by_index(&self, idx: usize) -> Option<&FieldLayout> {
         self.fields.get(idx)
     }
 
-    
     pub fn field_count(&self) -> usize {
         self.fields.len()
     }

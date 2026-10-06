@@ -21,9 +21,6 @@ impl GlobalStore {
     }
 
     pub(crate) fn with_native_layout(heap: &mut Heap) -> Self {
-        
-        
-        
         let mut native_map = varn_builtins::register_globals_vm(heap);
         let order = varn_builtins::native_global_layout();
 
@@ -39,9 +36,6 @@ impl GlobalStore {
             values.push(val);
         }
 
-        
-        
-        
         let mut leftover: Vec<(Arc<str>, VmValue)> = native_map.into_iter().collect();
         leftover.sort_by(|(a, _), (b, _)| a.as_ref().cmp(b.as_ref()));
         for (name, val) in leftover {
@@ -57,15 +51,6 @@ impl GlobalStore {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn reserve_region(&mut self, count: u32) -> u32 {
         let base = self.values.len() as u32;
         let empty: Arc<str> = Arc::from("");

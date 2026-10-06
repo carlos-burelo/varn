@@ -1,12 +1,7 @@
-
-
-
 use super::emit::{call_helper, call_helper_void};
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::FunctionBuilder;
-
-
 
 pub(crate) fn boxed_binop(
     b: &mut FunctionBuilder,
@@ -25,10 +20,6 @@ pub(crate) fn boxed_binop(
         native_result_offset,
     )
 }
-
-
-
-
 
 pub(crate) fn boxed_compare(
     b: &mut FunctionBuilder,

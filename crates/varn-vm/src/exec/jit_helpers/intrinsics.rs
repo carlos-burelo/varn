@@ -1,13 +1,7 @@
-
-
-
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
-
-
-
 
 #[varn_op_macros::jit_slow(field = "dispatch_intrinsic")]
 pub(crate) extern "C" fn jit_dispatch_intrinsic(
@@ -38,9 +32,6 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
     }
 }
 
-
-
-
 #[varn_op_macros::jit_slow(field = "intrinsic_window")]
 pub(crate) extern "C" fn jit_intrinsic_window(
     ctx: *mut ExecCtx,
@@ -57,12 +48,6 @@ pub(crate) extern "C" fn jit_intrinsic_window(
         }
     }
 }
-
-
-
-
-
-
 
 #[varn_op_macros::jit_slow(field = "str_char_code_at")]
 pub(crate) extern "C" fn jit_str_char_code_at(
@@ -83,7 +68,6 @@ pub(crate) extern "C" fn jit_str_char_code_at(
         }
         let idx = signed as usize;
 
-        
         if receiver.is_sso() {
             let mut buf = [0u8; 5];
             let len = receiver.sso_copy_bytes(&mut buf);
@@ -96,7 +80,6 @@ pub(crate) extern "C" fn jit_str_char_code_at(
                 let code = if h.is_ascii_cached() {
                     s.as_bytes().get(idx).map(|&b| b as i64)
                 } else {
-                    
                     h.is_ascii();
                     if h.is_ascii_cached() {
                         s.as_bytes().get(idx).map(|&b| b as i64)
@@ -138,8 +121,6 @@ pub(crate) extern "C" fn jit_str_ascii_len(
     }
 }
 
-
-
 #[inline]
 fn ascii_view(heap: &crate::heap::Heap, receiver: VmValue) -> Option<&str> {
     if !receiver.is_heap() {
@@ -148,8 +129,7 @@ fn ascii_view(heap: &crate::heap::Heap, receiver: VmValue) -> Option<&str> {
     let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap()) else {
         return None;
     };
-    
-    
+
     h.is_ascii().then(|| h.as_str())
 }
 
@@ -165,7 +145,6 @@ unsafe fn borrow_str_fast<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) 
     }
     None
 }
-
 
 #[varn_op_macros::jit_slow(field = "str_starts_with")]
 pub(crate) extern "C" fn jit_str_starts_with(
@@ -245,7 +224,6 @@ pub(crate) extern "C" fn jit_str_starts_with(
         )
     }
 }
-
 
 #[varn_op_macros::jit_slow(field = "str_ends_with")]
 pub(crate) extern "C" fn jit_str_ends_with(
@@ -328,9 +306,6 @@ pub(crate) extern "C" fn jit_str_ends_with(
     }
 }
 
-
-
-
 #[varn_op_macros::jit_slow(field = "str_index_of")]
 pub(crate) extern "C" fn jit_str_index_of(
     ctx: *mut ExecCtx,
@@ -365,9 +340,6 @@ pub(crate) extern "C" fn jit_str_index_of(
     }
 }
 
-
-
-
 #[varn_op_macros::jit_slow(field = "str_includes")]
 pub(crate) extern "C" fn jit_str_includes(
     ctx: *mut ExecCtx,
@@ -396,8 +368,6 @@ pub(crate) extern "C" fn jit_str_includes(
     }
 }
 
-
-
 #[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "str_split")]
 pub(crate) extern "C" fn jit_str_split(
@@ -418,7 +388,7 @@ pub(crate) extern "C" fn jit_str_split(
                 crate::error::RuntimeError::new("split: receiver must be a string"),
             );
         };
-        
+
         let text = text.to_owned();
         let sep: Option<String> = if argc == 0 {
             None
@@ -458,10 +428,6 @@ pub(crate) extern "C" fn jit_str_split(
             .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(out));
     }
 }
-
-
-
-
 
 #[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "str_slice_range")]
@@ -524,7 +490,6 @@ pub(crate) extern "C" fn jit_str_slice_range(
         ctx_ref.jit_native_result = ctx_ref.heap.alloc_str(&out);
     }
 }
-
 
 #[inline]
 fn normalize_idx(idx: i64, len: i64) -> usize {

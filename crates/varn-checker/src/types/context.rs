@@ -16,8 +16,7 @@ pub trait TypeContext {
         None
     }
     fn resolve_symbol(&self, name: &str) -> Option<Type>;
-    
-    
+
     fn symbol_origin(&self, _name: &str) -> Option<varn_core::Atom> {
         None
     }
@@ -35,55 +34,18 @@ pub trait TypeContext {
         None
     }
 
-    
-    
-    
-    
-    
-    
     fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {
         None
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
     fn interner(&self) -> Option<&varn_core::AtomInterner> {
         None
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
         None
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn ty_table(&self) -> Option<&CheckerTyTable> {
         None
     }

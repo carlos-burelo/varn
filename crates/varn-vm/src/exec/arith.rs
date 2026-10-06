@@ -5,11 +5,6 @@ use bigdecimal::BigDecimal as Decimal;
 use num_traits::Zero;
 use varn_core::{add_int, mul_int, neg_int, pow_int, sub_int, INT_MAX, INT_MIN};
 
-
-
-
-
-
 #[cold]
 #[inline(never)]
 fn overflow(op: &str, a: i64, b: i64) -> RuntimeError {
@@ -25,7 +20,6 @@ fn overflow_neg(a: i64) -> RuntimeError {
         "integer overflow: -({a}) is outside int ({INT_MIN}..={INT_MAX})"
     ))
 }
-
 
 #[cold]
 #[inline(never)]
@@ -45,19 +39,6 @@ pub(crate) fn int_div_fault(
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[inline(always)]
 fn decimal_of(v: VmValue, heap: &Heap) -> Option<Decimal> {
     if !v.is_heap() {
@@ -68,15 +49,6 @@ fn decimal_of(v: VmValue, heap: &Heap) -> Option<Decimal> {
         _ => None,
     }
 }
-
-
-
-
-
-
-
-
-
 
 #[cold]
 fn decimal_pair(a: VmValue, b: VmValue, heap: &Heap) -> Option<(Decimal, Decimal)> {
@@ -97,9 +69,7 @@ pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
             None => Err(overflow("+", x, y)),
         };
     }
-    
-    
-    
+
     if (a.is_f64() || heap.is_int(a)) && (b.is_f64() || heap.is_int(b)) {
         return Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)));
     }

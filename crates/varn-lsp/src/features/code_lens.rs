@@ -12,7 +12,6 @@ pub fn build_code_lenses(
     let mut lenses = Vec::new();
     let uri_str = uri.to_string();
 
-    
     lenses.push(CodeLens {
         range: Range {
             start: Position {
@@ -32,7 +31,6 @@ pub fn build_code_lenses(
         data: None,
     });
 
-    
     lenses.push(CodeLens {
         range: Range {
             start: Position {
@@ -71,7 +69,6 @@ pub fn build_code_lenses(
         data: None,
     });
 
-    
     for sym in analysis.symbols() {
         if sym.line() == u32::MAX || sym.is_from_stdlib() {
             continue;
@@ -135,7 +132,6 @@ pub fn build_code_lenses(
             });
         }
 
-        
         if matches!(
             sym.kind(),
             SymbolKind::Function | SymbolKind::Class | SymbolKind::Interface

@@ -120,9 +120,6 @@ fn fold_convert(conv: varn_core::NumConv, operand: &InstKind) -> Option<InstKind
 
 fn fold_unary(op: HirUnOp, operand: &InstKind, _ty: HirType) -> Option<InstKind> {
     match (op, operand) {
-        
-        
-        
         (HirUnOp::Neg, InstKind::ConstInt(x)) => neg_int(*x).map(InstKind::ConstInt),
         (HirUnOp::Neg, InstKind::ConstFloat(x)) => Some(InstKind::ConstFloat(-x)),
         (HirUnOp::Not, InstKind::ConstBool(x)) => Some(InstKind::ConstBool(!x)),
@@ -135,21 +132,12 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
     use HirBinOp::*;
     match (lhs, rhs) {
         (InstKind::ConstInt(x), InstKind::ConstInt(y)) => match op {
-            
-            
-            
-            
-            
-            
-            
-            
-            
             Add => add_int(*x, *y).map(InstKind::ConstInt),
             Sub => sub_int(*x, *y).map(InstKind::ConstInt),
             Mul => mul_int(*x, *y).map(InstKind::ConstInt),
             Div => varn_core::div_int(*x, *y).ok().map(InstKind::ConstInt),
             Mod => varn_core::rem_int(*x, *y).ok().map(InstKind::ConstInt),
-            
+
             Pow => {
                 if *y >= 0 && *y <= 30 {
                     pow_int(*x, *y as u32).map(InstKind::ConstInt)
@@ -247,16 +235,13 @@ fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
         InstKind::ConstFloat(_) => Some(HirType::Float),
         InstKind::ConstBool(_) => Some(HirType::Bool),
         InstKind::ConstStr(_) => Some(HirType::Str),
-        
-        
+
         InstKind::ConstChar(_) => Some(HirType::Ref),
         InstKind::ConstDecimal(_) | InstKind::ConstBigInt(_) => Some(HirType::Dynamic),
         InstKind::ConstNull => Some(HirType::Dynamic),
         _ => None,
     }
 }
-
-
 
 fn fold_bigint(op: HirBinOp, x: &str, y: &str) -> Option<InstKind> {
     use HirBinOp::*;

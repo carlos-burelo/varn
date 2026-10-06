@@ -1,6 +1,5 @@
 pub use varn_types::chunk::FunctionProto;
 
-
 pub mod from_tir;
 pub mod hir;
 pub mod lower;

@@ -1,18 +1,4 @@
-
-
-
-
-
-
 use varn_types::{FunctionProto, Literal, PoolEntry, VmValue};
-
-
-
-
-
-
-
-
 
 pub fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
     proto
@@ -24,13 +10,11 @@ pub fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
             PoolEntry::Literal(Literal::Bool(b)) => VmValue::from_bool(*b),
             PoolEntry::Literal(Literal::Int(n)) => VmValue::from_int(*n),
             PoolEntry::Literal(Literal::Float(f)) => VmValue::from_f64(*f),
-            
+
             _ => VmValue::null(),
         })
         .collect()
 }
-
-
 
 pub fn for_each_fn(root: &FunctionProto, f: &mut impl FnMut(usize, &FunctionProto)) {
     visit(root, 0, f);

@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;

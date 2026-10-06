@@ -39,15 +39,8 @@ use crate::semantic_info::{CallResolution, MemberResolution};
 pub(crate) type MemberTypeCacheEntry = Option<(Type, Option<usize>)>;
 
 pub struct Checker<'r> {
-    
-    
-    
     pub(crate) resolver: &'r dyn crate::module_resolver::ImportResolver,
-    
-    
-    
-    
-    
+
     pub(crate) ast_arena: &'r AstArena,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
     pub(crate) source_file: std::sync::Arc<str>,
@@ -65,7 +58,7 @@ pub struct Checker<'r> {
     pub(crate) symbol_type_params_cache: FxHashMap<(Arc<str>, u8), Vec<Arc<str>>>,
     pub(crate) symbol_types: FxHashMap<SymbolId, Type>,
     pub(crate) expr_table: FxHashMap<varn_core::ast::AstId, TypeEntry>,
-    
+
     pub(crate) expr_seq: u32,
     pub(crate) current_class: Option<Arc<str>>,
     pub(crate) active_type_params: FxHashSet<Arc<str>>,
@@ -77,9 +70,7 @@ pub struct Checker<'r> {
     pub(crate) member_exists_cache: FxHashMap<(Type, Arc<str>), bool>,
     pub(crate) member_type_cache: FxHashMap<(Type, Arc<str>), MemberTypeCacheEntry>,
     pub(crate) expected_type: Option<Type>,
-    
-    
-    
+
     pub(crate) call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
@@ -98,12 +89,6 @@ pub struct Checker<'r> {
 }
 
 impl<'r> Checker<'r> {
-    
-    
-    
-    
-    
-    
     pub fn check(
         program: &Program,
         ast_arena: &'r AstArena,

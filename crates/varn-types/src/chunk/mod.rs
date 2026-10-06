@@ -1,6 +1,3 @@
-
-
-
 #![allow(clippy::mutable_key_type)]
 
 mod inline_cache;

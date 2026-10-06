@@ -1,6 +1,5 @@
 use crate::lang_type::{BuiltinType, LangPrimitive};
 
-
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -12,7 +11,6 @@ pub enum TypeLiteral<N> {
 }
 
 impl<N> TypeLiteral<N> {
-    
     pub const fn base(&self) -> LangPrimitive {
         match self {
             TypeLiteral::Int(_) => LangPrimitive::Int,
@@ -86,7 +84,6 @@ impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
         matches!(self, TypeKind::Primitive(_) | TypeKind::This)
     }
 
-    
     pub fn lang_name(&self) -> Option<&'static str> {
         match self {
             TypeKind::Primitive(p) => Some(p.name()),
@@ -96,8 +93,6 @@ impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
         }
     }
 
-    
-    
     pub fn of_lang_name(name: &str) -> Option<Self> {
         LangPrimitive::from_str(name)
             .map(TypeKind::Primitive)

@@ -1,39 +1,22 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub struct YoungReport {
-    
     pub threshold: usize,
-    
+
     pub live: usize,
-    
+
     pub alloc_count: u64,
-    
+
     pub minor_gc_count: u64,
-    
+
     pub minor_gc_promoted: u64,
 }
 
 impl YoungReport {
-    
     pub fn reclaimed(&self) -> u64 {
         self.alloc_count
             .saturating_sub(self.live as u64)
             .saturating_sub(self.minor_gc_promoted)
     }
 
-    
     pub fn promotion_rate(&self) -> f64 {
         if self.alloc_count == 0 {
             return 0.0;
@@ -42,27 +25,20 @@ impl YoungReport {
     }
 }
 
-
 pub struct OldGenReport {
-    
     pub slots_total: usize,
-    
+
     pub slots_live: usize,
-    
-    
+
     pub free_list: usize,
-    
+
     pub alloc_count: u64,
-    
+
     pub gc_collections: u64,
     pub gc_total_freed: u64,
     pub gc_alloc_since_collect: u64,
     pub gc_threshold: u64,
 }
-
-
-
-
 
 #[derive(Default)]
 pub struct InternerSizes {
@@ -72,9 +48,6 @@ pub struct InternerSizes {
     pub decimals: usize,
     pub chars: usize,
 }
-
-
-
 
 pub struct HistogramRow {
     pub type_name: &'static str,
@@ -86,7 +59,7 @@ pub struct GcReport {
     pub young: YoungReport,
     pub old_gen: OldGenReport,
     pub interners: InternerSizes,
-    
+
     pub histogram: Vec<HistogramRow>,
 }
 

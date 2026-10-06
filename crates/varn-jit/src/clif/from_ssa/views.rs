@@ -1,25 +1,8 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::collections::BTreeMap;
 
 use cranelift_codegen::ir::{types, InstBuilder};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaProto, SsaUnOp};
-
 
 #[derive(Clone, Copy)]
 pub(crate) struct View {
@@ -28,14 +11,11 @@ pub(crate) struct View {
     pub disc: Variable,
 }
 
-
 pub(crate) struct Views {
     by_value: BTreeMap<u32, View>,
 }
 
 impl Views {
-    
-    
     pub(super) fn declare(b: &mut FunctionBuilder, ssa: &SsaProto) -> Self {
         let mut by_value = BTreeMap::new();
         for inst in ssa.blocks.iter().flat_map(|blk| &blk.insts) {
@@ -60,8 +40,6 @@ impl Views {
         self.by_value.get(&object).copied()
     }
 
-    
-    
     pub(super) fn clear(&self, b: &mut FunctionBuilder) {
         if self.by_value.is_empty() {
             return;
@@ -74,16 +52,6 @@ impl Views {
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
 
 pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
     match op {
@@ -104,9 +72,7 @@ pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
         | SsaOp::StoreGlobal { .. }
         | SsaOp::AssertNotNull { .. }
         | SsaOp::ModuleSlot { .. } => true,
-        
-        
-        
+
         SsaOp::Binary { op, .. } => match op {
             SsaBinOp::IntAdd
             | SsaBinOp::IntSub

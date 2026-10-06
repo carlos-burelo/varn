@@ -104,18 +104,11 @@ pub trait NativeCtx {
         Cow::Owned(self.str_repr(v))
     }
     fn str_owned(&self, v: VmValue) -> Option<String>;
-    
-    
-    
+
     fn str_shared(&self, v: VmValue) -> Option<std::sync::Arc<str>> {
         self.str_owned(v).map(std::sync::Arc::from)
     }
-    
-    
-    
-    
-    
-    
+
     fn str_is_ascii(&self, v: VmValue) -> bool {
         self.str_repr_borrowed(v).is_ascii()
     }
@@ -139,13 +132,9 @@ pub trait NativeCtx {
         obj
     }
 
-    
-    
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue])
         -> Result<VmValue, crate::NativeError>;
 
-    
-    
     fn method(&mut self, _recv: VmValue, _name: &str) -> Option<VmValue> {
         None
     }
@@ -258,17 +247,10 @@ pub trait NativeCtx {
         }
     }
 
-    
-    
-    
-    
-    
     fn map_key(&mut self, v: VmValue) -> Result<crate::value::MapKey, crate::NativeError> {
         Ok(crate::value::MapKey(v))
     }
 
-    
-    
     fn str_map_key(&mut self, s: &str) -> crate::value::MapKey {
         match VmValue::try_from_sso(s) {
             Some(v) => crate::value::MapKey(v),
@@ -276,9 +258,6 @@ pub trait NativeCtx {
         }
     }
 
-    
-    
-    
     fn collection_write_barrier(&mut self, _parent: VmValue, _child: VmValue) {}
 
     fn alloc_obj(&mut self) -> VmValue {
@@ -297,10 +276,6 @@ pub trait NativeCtx {
         None
     }
 
-    
-    
-    
-    
     fn spawn_isolate(
         &mut self,
         _module_path: &str,

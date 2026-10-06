@@ -1,41 +1,14 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use super::ExecCtx;
 use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::frame_ctrl::{resolve_constructor_return, unwind_to_handler};
 use crate::value::VmValue;
 
-
 pub(super) enum JitFrameOutcome {
-    
-    
-    
     Continue,
-    
+
     Done(VmValue),
-    
+
     Failed(RuntimeError),
 }
 
@@ -49,12 +22,6 @@ impl JitFrameOutcome {
         }
     }
 }
-
-
-
-
-
-
 
 #[inline(never)]
 unsafe fn execute_jit_frame(
@@ -105,14 +72,6 @@ unsafe fn restore_exit(ctx: *mut ExecCtx, exits_len: usize) {
     ctx.jit_exits_saved.truncate(exits_len);
 }
 
-
-
-
-
-
-
-
-
 #[allow(clippy::too_many_arguments)]
 #[allow(dangerous_implicit_autorefs)]
 pub(super) unsafe fn run_compiled_frame(
@@ -131,9 +90,6 @@ pub(super) unsafe fn run_compiled_frame(
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
     if is_osr {
-        
-        
-        
         varn_jit::JIT_STATS
             .osr_entries
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -167,9 +123,6 @@ pub(super) unsafe fn run_compiled_frame(
                     return JitFrameOutcome::Failed(err_obj.unwrap());
                 }
             } else if code == 2 {
-                
-                
-                
                 if let Some(resume_ip) = (*ctx).jit_panic_suspend_resume_ip.take() {
                     let frame_idx2 = (*ctx).frames.len() - 1;
                     (*ctx).frames[frame_idx2].ip = resume_ip;
@@ -181,10 +134,6 @@ pub(super) unsafe fn run_compiled_frame(
         }
     };
 
-    
-    
-    
-    
     let returning_frame_idx = (*ctx).frames.len().saturating_sub(1);
     let frame = (*ctx).frames.pop().unwrap();
     (*ctx).drop_frame_storage(frame.base);

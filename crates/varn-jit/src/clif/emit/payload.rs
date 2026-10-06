@@ -1,29 +1,4 @@
-
-
-
 use super::*;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub(in crate::clif) fn retag_raw_return(
     b: &mut FunctionBuilder,
@@ -39,9 +14,9 @@ pub(in crate::clif) fn retag_raw_return(
 }
 
 thread_local! {
-    
-    
-    
+
+
+
     static DISABLED_HELPER_HIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -78,8 +53,6 @@ pub(in crate::clif) fn call_helper(
     b.inst_results(call)[0]
 }
 
-
-
 pub(in crate::clif) fn call_helper_void(
     b: &mut FunctionBuilder,
     cc: cranelift_codegen::isa::CallConv,
@@ -95,9 +68,6 @@ pub(in crate::clif) fn call_helper_void(
     let ptr = b.ins().iconst(types::I64, helper as i64);
     b.ins().call_indirect(sig_ref, ptr, args);
 }
-
-
-
 
 pub(in crate::clif) fn emit_array_payload(
     b: &mut FunctionBuilder,
@@ -126,22 +96,6 @@ pub(in crate::clif) fn emit_array_payload(
     b.ins().load(types::I64, m, slot, lay.payload_off as i32)
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub(in crate::clif) fn array_disc(
     b: &mut FunctionBuilder,
     payload: cranelift_codegen::ir::Value,
@@ -155,7 +109,6 @@ pub(in crate::clif) fn array_disc(
     )
 }
 
-
 pub(in crate::clif) fn unbox_int(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
@@ -167,9 +120,6 @@ pub(in crate::clif) fn unbox_int(
         v
     }
 }
-
-
-
 
 pub(in crate::clif) fn guard_overflow(
     b: &mut FunctionBuilder,
@@ -201,9 +151,6 @@ pub(in crate::clif) fn guard_overflow(
     b.switch_to_block(cont);
     r
 }
-
-
-
 
 pub(in crate::clif) fn emit_instance_payload(
     b: &mut FunctionBuilder,
@@ -238,8 +185,6 @@ pub(in crate::clif) fn emit_instance_payload(
         (olay.instance_data_off + olay.instance_values_off) as i64,
     )
 }
-
-
 
 pub(in crate::clif) fn is_young(
     b: &mut FunctionBuilder,

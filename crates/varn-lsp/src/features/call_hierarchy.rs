@@ -53,9 +53,7 @@ pub fn prepare_call_hierarchy(
                 uri: url,
                 range,
                 selection_range,
-                
-                
-                
+
                 data: None,
             };
             return Some(vec![item]);
@@ -147,8 +145,6 @@ pub fn outgoing_calls(
     }
 }
 
-
-
 fn callables(file: &DocumentState) -> Vec<(String, SourceRange)> {
     let body = file
         .ast
@@ -181,8 +177,6 @@ fn callables(file: &DocumentState) -> Vec<(String, SourceRange)> {
     out
 }
 
-
-
 fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)> + '_ {
     let arena = &file.ast_arena;
     let name_of = move |id: ExprId| match &arena.expr(id).kind {
@@ -210,14 +204,11 @@ fn encloses(outer: &SourceRange, inner: &SourceRange) -> bool {
     outer.start.offset <= inner.start.offset && inner.end.offset <= outer.end.offset
 }
 
-
-
 fn find_calls_to(file: &DocumentState, target_callee: &str) -> Vec<(String, Range, Range)> {
     let callers = callables(file);
     calls_in(file)
         .filter(|(callee, _)| callee == target_callee)
         .filter_map(|(_, call)| {
-            
             let (name, range) = callers
                 .iter()
                 .filter(|(_, r)| encloses(r, &call))

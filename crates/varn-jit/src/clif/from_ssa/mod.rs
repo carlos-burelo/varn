@@ -1,49 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{
     ExtFuncData, ExternalName, FuncRef, Function, InstBuilder, UserExternalName, UserFuncName,
     Value,
@@ -87,78 +41,51 @@ mod views;
 
 use store::{clif_ty, drop_home_addrs, home_load, home_store, is_heap, land, load_value, Out};
 
-
-
-
-
 pub(super) struct FrameIo<'a> {
     pub exec_ctx: Value,
     pub closure: Value,
     pub base: Option<Value>,
     pub linker: &'a dyn ClifLinker,
-    
+
     pub layout: varn_types::register_meta::FrameLayout,
 }
-
-
-
 
 pub(super) struct Ctx<'a> {
     pub cc: CallConv,
     pub helpers: &'a JitHelpers,
     pub ssa: &'a SsaProto,
     pub proto: &'a FunctionProto,
-    
+
     pub constants: &'a [VmValue],
     pub self_ref: FuncRef,
-    
-    
-    
+
     pub exec_ctx: Value,
-    
+
     pub frame: Option<FrameIo<'a>>,
     pub activation: Activation,
-    
-    
+
     pub this: Option<Value>,
-    
+
     pub has_round: bool,
-    
+
     pub views: views::Views,
-    
+
     pub in_range_steps: std::collections::HashSet<u32>,
-    
-    
-    
+
     pub carried: std::collections::HashMap<u32, cranelift_frontend::Variable>,
-    
-    
-    
-    
+
     pub home_addrs: std::cell::RefCell<std::collections::HashMap<u32, Value>>,
-    
+
     pub scratch: Option<call::ScratchWin>,
 }
-
-
 
 pub(super) const NEEDS_ACTIVATION: &str = "from_ssa: body needs a FrameStore activation";
 
 pub(super) struct Lowered {
     pub piece: CompiledPiece,
-    
-    
+
     pub frameless: bool,
 }
-
-
-
-
-
-
-
-
-
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn try_lower(
@@ -225,9 +152,6 @@ pub(super) fn try_lower(
     let mut fb_ctx = FunctionBuilderContext::new();
     let mut b = FunctionBuilder::new(&mut func, &mut fb_ctx);
 
-    
-    
-    
     let entry = ssa.entry as usize;
     let call_entry = osr.is_none().then_some(entry);
     let start = osr.map_or(entry, |h| h.block as usize);
@@ -249,10 +173,6 @@ pub(super) fn try_lower(
         blocks[i] = Some(cb);
     }
 
-    
-    
-    
-    
     let rpo = cfg::order(ssa, start);
     let preds = cfg::predecessors(ssa);
     let mut rpo_pos = vec![0usize; ssa.blocks.len()];
@@ -354,20 +274,11 @@ pub(super) fn try_lower(
         let i = *i;
         let blk = &ssa.blocks[i];
         let cb = blocks[i].expect("block created");
-        
-        
-        
-        
-        
-        
-        
+
         if !(n == 0 && Some(i) == call_entry) {
             b.switch_to_block(cb);
         }
-        
-        
-        
-        
+
         drop_home_addrs(&ctx);
 
         let params: Vec<Value> = b.block_params(cb).to_vec();
@@ -398,7 +309,7 @@ pub(super) fn try_lower(
                 drop_home_addrs(&ctx);
             }
         }
-        
+
         let polls = |target: u32| {
             rpo_pos[target as usize] <= rpo_pos[i]
                 && cfg::loop_may_collect(ssa, &preds, target as usize, i)
@@ -409,7 +320,6 @@ pub(super) fn try_lower(
         term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, polls)?;
     }
 
-    
     for (i, cb) in blocks.iter().enumerate() {
         if !reached[i] {
             b.switch_to_block(cb.expect("block created"));
@@ -427,10 +337,6 @@ pub(super) fn try_lower(
         frameless,
     })
 }
-
-
-
-
 
 fn entry_param(
     b: &mut FunctionBuilder,
@@ -474,13 +380,6 @@ fn entry_param(
     }
 }
 
-
-
-
-
-
-
-
 fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
     match op {
         SsaOp::Call { .. }
@@ -507,8 +406,6 @@ fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
         _ => false,
     }
 }
-
-
 
 fn needs_frame(ssa: &SsaProto, op: &SsaOp) -> bool {
     matches!(

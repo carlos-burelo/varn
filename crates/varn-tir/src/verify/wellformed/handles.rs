@@ -5,7 +5,6 @@ use crate::ty::{BackendTy, TyId, TyListId};
 use crate::{TirFunction, TirModule};
 use rustc_hash::FxHashSet as HashSet;
 
-
 pub(super) fn check_ty(m: &TirModule, ty: BackendTy, e: &TirExpr, errors: &mut Vec<VerifyError>) {
     let mut visited = HashSet::default();
     let mut visited_lists = HashSet::default();
@@ -36,11 +35,9 @@ fn check_ty_recursive(
             if !m.types.contains(t) {
                 bad(&format!("TyId({})", t.0), errors);
             } else if visited.insert(t) {
-                
                 let inner_ty = m.types.get(t);
                 check_ty_recursive(m, inner_ty, e, errors, visited, visited_lists);
             }
-            
         }
         BackendTy::Map(k, v) => {
             if !m.types.contains(k) {
@@ -60,21 +57,14 @@ fn check_ty_recursive(
             if !m.types.contains_list(l) {
                 bad(&format!("TyListId({})", l.0), errors);
             } else if visited_lists.insert(l) {
-                
-                
-                
-                
-                
                 for &elem_ty in m.types.get_list(l) {
                     check_ty_recursive(m, elem_ty, e, errors, visited, visited_lists);
                 }
             }
-            
         }
         _ => {}
     }
 }
-
 
 pub(super) fn check_res(
     m: &TirModule,

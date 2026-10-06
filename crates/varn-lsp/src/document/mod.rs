@@ -44,15 +44,9 @@ pub struct TokenRecord {
     pub col: u32,
     pub length: u32,
     pub offset: u32,
-    
-    
-    
+
     pub end: u32,
 }
-
-
-
-
 
 pub fn token_lexeme<'a>(source: &'a str, tok: &TokenRecord) -> &'a str {
     &source[tok.offset as usize..tok.end as usize]
@@ -61,12 +55,7 @@ pub fn token_lexeme<'a>(source: &'a str, tok: &TokenRecord) -> &'a str {
 #[derive(Debug)]
 pub enum ChainResult<'a> {
     Symbol(SymbolView<'a>),
-    
-    
-    
-    
-    
-    
+
     Member {
         member: varn_checker::ResolvedMemberSummary,
         parent_name: String,
@@ -109,14 +98,10 @@ pub struct DocumentState {
     pub source: String,
     pub uri: String,
     pub diagnostics: Vec<LspDiag>,
-    
-    
-    
-    
+
     pub symbols: Vec<varn_checker::SymbolId>,
     pub tokens: Vec<TokenRecord>,
-    
-    
+
     pub trivia: Vec<varn_core::Trivia>,
     pub symbol_map: HashMap<String, SymbolKind>,
 
@@ -127,34 +112,13 @@ pub struct DocumentState {
     pub import_paths: Vec<String>,
     pub spatial_index: crate::query::SpatialIndex,
     pub ast: Option<varn_core::ast::Program>,
-    
+
     pub ast_arena: varn_core::ast::AstArena,
 }
-
-
-
-
-
-
-
-
-
-
 
 pub type DocumentAnalysis = DocumentState;
 
 impl DocumentState {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn members_of(&self, sym: SymbolView<'_>) -> Vec<varn_checker::ResolvedMemberSummary> {
         let ty = match sym.kind() {
             SymbolKind::Class
@@ -167,7 +131,6 @@ impl DocumentState {
         self.members_of_type(&ty)
     }
 
-    
     pub fn members_of_type(&self, ty: &Type) -> Vec<varn_checker::ResolvedMemberSummary> {
         crate::workspace::resolver::with_resolver(|r| {
             varn_checker::get_members_of_type(
@@ -179,28 +142,23 @@ impl DocumentState {
         })
     }
 
-    
     pub fn name(&self, atom: varn_core::Atom) -> &str {
         self.db.name(atom)
     }
 
-    
     pub fn lexeme(&self, tok: &TokenRecord) -> &str {
         token_lexeme(&self.source, tok)
     }
 
-    
     pub fn ty_text(&self, ty: &Type) -> String {
         self.db.ty_text(ty)
     }
 
-    
     pub fn symbols(&self) -> impl Iterator<Item = SymbolView<'_>> + '_ {
         let ids = &self.symbols;
         (0..ids.len()).map(move |i| self.symbol(ids[i]))
     }
 
-    
     pub fn symbol(&self, id: varn_checker::SymbolId) -> SymbolView<'_> {
         SymbolView {
             id,

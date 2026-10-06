@@ -1,12 +1,6 @@
-
-
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use varn_core::OpCode;
 use varn_types::ssa::{DynBinOp, DynUnOp, SsaBinOp, SsaUnOp};
-
-
-
-
 
 pub(super) fn project_bin(
     op: HirBinOp,
@@ -72,9 +66,6 @@ pub(super) fn project_bin(
     })
 }
 
-
-
-
 pub(super) fn project_un(op: HirUnOp, operand_ty: Option<HirType>) -> Option<SsaUnOp> {
     Some(match (op, operand_ty) {
         (HirUnOp::Neg, Some(HirType::Int)) => SsaUnOp::NegInt,
@@ -84,7 +75,7 @@ pub(super) fn project_un(op: HirUnOp, operand_ty: Option<HirType>) -> Option<Ssa
         (HirUnOp::Not, _) => SsaUnOp::Dyn(DynUnOp::Not),
         (HirUnOp::BitNot, Some(HirType::Int)) => SsaUnOp::BitNotInt,
         (HirUnOp::BitNot, _) => SsaUnOp::Dyn(DynUnOp::BitNot),
-        
+
         (HirUnOp::Typeof, _) => return None,
     })
 }

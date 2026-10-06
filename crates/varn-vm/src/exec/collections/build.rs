@@ -1,8 +1,5 @@
 use super::*;
 
-
-
-
 pub(crate) fn build_with_shape(
     store: &crate::frame_store::FrameStore,
     base: usize,
@@ -18,9 +15,6 @@ pub(crate) fn build_with_shape(
     build_with_shape_slice(store, shape, &vals, heap, may_hold_closure, is_record)
 }
 
-
-
-
 pub(crate) fn build_with_shape_slice(
     store: &crate::frame_store::FrameStore,
     shape: Rc<varn_types::Shape>,
@@ -34,8 +28,6 @@ pub(crate) fn build_with_shape_slice(
     }
     heap.alloc_object_cell(is_record, shape, vals.len(), vals)
 }
-
-
 
 fn close_captured_upvalues(store: &crate::frame_store::FrameStore, vals: &[VmValue], heap: &Heap) {
     for &val_nv in vals {

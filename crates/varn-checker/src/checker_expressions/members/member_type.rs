@@ -184,8 +184,6 @@ impl<'r> Checker<'r> {
                 let name: Arc<str> = self.resolve_bind_atom(bind, name_atom);
                 if let Some(entry) = bind.get_class_entry(name.as_ref()) {
                     if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
-                        
-                        
                         let origin: Option<Arc<str>> =
                             origin_atom.map(|o| self.resolve_bind_atom(bind, o));
                         let args: Vec<Type> = self

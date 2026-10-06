@@ -1,12 +1,5 @@
-
-
-
-
-
 use std::cmp::Ordering;
 use varn_types::{NativeCtx, NativeError, VmValue};
-
-
 
 pub(super) fn natural_cmp(
     ctx: &mut dyn NativeCtx,
@@ -27,7 +20,6 @@ pub(super) fn natural_cmp(
     }
 }
 
-
 pub(super) fn sign(
     ctx: &mut dyn NativeCtx,
     compare: VmValue,
@@ -39,9 +31,6 @@ pub(super) fn sign(
     }
     Ok(result.as_int().cmp(&0))
 }
-
-
-
 
 pub(super) fn merge_sort(
     items: &mut Vec<VmValue>,

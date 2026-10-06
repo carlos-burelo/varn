@@ -67,8 +67,6 @@ impl<'r> Checker<'r> {
             ret
         };
 
-        
-        
         ret
     }
 
@@ -142,12 +140,6 @@ impl<'r> Checker<'r> {
             })
             .collect();
 
-        
-        
-        
-        
-        
-        
         let arrow_scope =
             crate::checker_generics::find_arrow_scope(self.current_scope, params, bind);
         let saved_scope = self.current_scope;

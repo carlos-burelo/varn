@@ -59,28 +59,12 @@ impl ExecCtx {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[inline(always)]
     pub(crate) fn record_call_native(&self, f: varn_types::NativeFn, name: Option<&str>) {
         if let Some(ref c) = self.profile_counters {
             c.record_call_native();
         }
         if let Some(ref h) = self.hotspot_counters {
-            
-            
-            
             let resolved = match name {
                 Some(n) if !n.is_empty() => n,
                 _ => varn_builtins::native_op_name_by_fn(f).unwrap_or("<nativo sin nombre>"),
@@ -140,13 +124,7 @@ impl ExecCtx {
         if self.hotspot_counters.is_none() {
             return (f)(self as &mut dyn varn_types::NativeCtx, args);
         }
-        
-        
-        
-        
-        
-        
-        
+
         let name = varn_builtins::native_op_name_by_fn(f).unwrap_or("<nativo sin nombre>");
 
         #[cfg(target_arch = "x86_64")]

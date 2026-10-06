@@ -1,31 +1,14 @@
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 
-
-
-
-
-
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum IntrinsicScan {
-    
     Conservative,
-    
-    
+
     ByWireByte,
 }
-
 
 pub(crate) fn has_alloc(
     code: &[u16],
@@ -129,11 +112,6 @@ pub(crate) fn has_alloc_scan(
     }
     Ok(false)
 }
-
-
-
-
-
 
 pub(crate) fn emit_gc_poll(
     b: &mut FunctionBuilder,

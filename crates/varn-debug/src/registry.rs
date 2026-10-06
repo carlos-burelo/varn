@@ -1,14 +1,4 @@
-
-
-
-
-
-
-
 use crate::phase::{PerModule, Phase, Stage};
-
-
-
 
 pub struct Info {
     pub id: &'static str,
@@ -189,7 +179,6 @@ static GC: Info = Info {
     groups: &[],
 };
 
-
 pub static ALL: &[&dyn Phase] = &[
     &TOKENS,
     &AST,
@@ -209,13 +198,11 @@ pub static ALL: &[&dyn Phase] = &[
     &GC,
 ];
 
-
 pub fn lookup(name: &str) -> Option<&'static dyn Phase> {
     ALL.iter()
         .copied()
         .find(|p| p.id() == name || p.aliases().contains(&name))
 }
-
 
 pub fn in_all() -> impl Iterator<Item = &'static dyn Phase> {
     ALL.iter().copied().filter(|p| p.in_all())

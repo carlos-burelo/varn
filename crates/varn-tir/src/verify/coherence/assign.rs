@@ -1,16 +1,6 @@
 use crate::ty::BackendTy;
 use crate::TirModule;
 
-
-
-
-
-
-
-
-
-
-
 pub(super) fn assignable(m: &TirModule, from: BackendTy, to: BackendTy) -> bool {
     assignable_with_depth(m, from, to, 0)
 }
@@ -19,9 +9,6 @@ const ASSIGNABLE_DEPTH_LIMIT: usize = 32;
 
 fn assignable_with_depth(m: &TirModule, from: BackendTy, to: BackendTy, depth: usize) -> bool {
     if depth > ASSIGNABLE_DEPTH_LIMIT {
-        
-        
-        
         return true;
     }
 
@@ -31,15 +18,11 @@ fn assignable_with_depth(m: &TirModule, from: BackendTy, to: BackendTy, depth: u
     if from == to {
         return true;
     }
-    
-    
+
     if from == BackendTy::Never {
         return true;
     }
-    
-    
-    
-    
+
     if from == BackendTy::Int
         && matches!(
             to,
@@ -48,9 +31,7 @@ fn assignable_with_depth(m: &TirModule, from: BackendTy, to: BackendTy, depth: u
     {
         return true;
     }
-    
-    
-    
+
     match (from, to) {
         (BackendTy::Array(a), BackendTy::Array(b)) | (BackendTy::Set(a), BackendTy::Set(b))
             if m.types.contains(a) && m.types.contains(b) =>
@@ -59,7 +40,7 @@ fn assignable_with_depth(m: &TirModule, from: BackendTy, to: BackendTy, depth: u
         }
         _ => {}
     }
-    
+
     if let (BackendTy::Class(sub), BackendTy::Class(sup)) = (from, to) {
         let mut cur = Some(sub);
         let mut hops = 0;
@@ -80,11 +61,8 @@ fn assignable_with_depth(m: &TirModule, from: BackendTy, to: BackendTy, depth: u
         }
         return assignable_with_depth(m, m.types.get(fi), m.types.get(ti), depth + 1);
     }
-    
+
     if let BackendTy::Nullable(inner) = to {
-        
-        
-        
         if !m.types.contains(inner) {
             return true;
         }

@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 use std::sync::OnceLock;
 
 pub(crate) fn enabled() -> bool {

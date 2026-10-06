@@ -26,7 +26,6 @@ pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult
             None => break,
         };
 
-        
         if let Some(l) = layout(code, offset, constants).filter(|l| l.op == OpCode::MakeClosure) {
             open_captures.extend(l.read_registers(code, offset));
         }
@@ -64,9 +63,6 @@ pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult
         call_sites,
     }
 }
-
-
-
 
 pub(crate) fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) -> Vec<(u8, u8)> {
     let mut blocks = Vec::new();

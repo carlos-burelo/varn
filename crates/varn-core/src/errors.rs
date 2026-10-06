@@ -1,13 +1,10 @@
-
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RuntimeErrorKind {
     #[default]
     Error,
     IntegerOverflow,
     DivisionByZero,
-    
+
     MatchError,
 }
 

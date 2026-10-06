@@ -66,8 +66,6 @@ pub fn core_module_ids() -> Vec<&'static str> {
     module_ids_of_kind(ModuleKind::Core)
 }
 
-
-
 pub fn prelude_modules() -> Vec<&'static ModuleSpec> {
     provider::get()
         .map(|p| {
@@ -200,7 +198,6 @@ fn resolve_export_target(
         format!("./{sub}")
     };
 
-    
     if let Some(target) = manifest.exports.get(&export_key) {
         let entry = package_root.join(target.trim_start_matches(RELATIVE_EXPORT_PREFIX));
         if entry.exists() {
@@ -208,7 +205,6 @@ fn resolve_export_target(
         }
     }
 
-    
     for (key, val) in &manifest.exports {
         if key.contains('*') {
             let prefix = key.trim_end_matches('*');
@@ -223,7 +219,6 @@ fn resolve_export_target(
         }
     }
 
-    
     if sub.is_empty() {
         if let Some(ref main_field) = manifest.main {
             let main_path =
@@ -274,7 +269,6 @@ fn find_package_root(base_dir: &Path, package_name: &str) -> Option<PathBuf> {
             return Some(env_modules);
         }
 
-        
         if let Ok(manifest) = load_package_manifest(dir) {
             if manifest.name.as_deref() == Some(package_name) {
                 return Some(dir.to_path_buf());

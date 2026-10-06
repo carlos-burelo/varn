@@ -1,16 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
@@ -20,13 +7,9 @@ use super::super::emit::{
     box_bool, box_f64, box_int, call_helper, call_helper_void, unbox_f64_coerce, unbox_int,
 };
 
-
-
 pub(super) fn exec_ctx(ctx: &Ctx<'_>) -> Value {
     ctx.exec_ctx
 }
-
-
 
 pub(super) fn boxed_value(
     b: &mut FunctionBuilder,
@@ -37,7 +20,6 @@ pub(super) fn boxed_value(
     let x = load_value(b, ctx, values, v)?;
     Ok(box_native(b, ctx.ssa.value_ty(v), x))
 }
-
 
 pub(super) fn box_native(
     b: &mut FunctionBuilder,
@@ -53,7 +35,6 @@ pub(super) fn box_native(
     }
 }
 
-
 pub(super) fn boxed_parts(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -63,7 +44,6 @@ pub(super) fn boxed_parts(
     let boxed = boxed_value(b, ctx, values, v)?;
     Ok(b.ins().isplit(boxed))
 }
-
 
 pub(super) fn unbox_dest(
     b: &mut FunctionBuilder,
@@ -77,7 +57,6 @@ pub(super) fn unbox_dest(
         _ => boxed,
     })
 }
-
 
 pub(super) fn emit_is_array(
     b: &mut FunctionBuilder,
@@ -94,7 +73,6 @@ pub(super) fn emit_is_array(
         &[ectx, tag, payload],
     ))
 }
-
 
 pub(super) fn emit_unary_boxed(
     b: &mut FunctionBuilder,
@@ -113,8 +91,6 @@ pub(super) fn emit_unary_boxed(
         ctx.helpers.jit_native_result_offset as i32,
     ))
 }
-
-
 
 pub(super) fn emit_str_concat(
     b: &mut FunctionBuilder,
@@ -135,7 +111,6 @@ pub(super) fn emit_str_concat(
     ))
 }
 
-
 pub(super) fn emit_build_str(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -148,7 +123,6 @@ pub(super) fn emit_build_str(
         .collect::<Result<_, _>>()?;
     emit_window_boxed(b, ctx, ctx.helpers.build_str, &vals, vals.len())
 }
-
 
 pub(super) fn emit_build_array(
     b: &mut FunctionBuilder,
@@ -163,7 +137,6 @@ pub(super) fn emit_build_array(
     emit_window_boxed(b, ctx, ctx.helpers.build_array_window, &vals, vals.len())
 }
 
-
 pub(super) fn emit_build_map(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -177,9 +150,6 @@ pub(super) fn emit_build_map(
     }
     emit_window_boxed(b, ctx, ctx.helpers.build_map_window, &vals, pairs.len())
 }
-
-
-
 
 pub(super) fn emit_build_object(
     b: &mut FunctionBuilder,
@@ -230,8 +200,7 @@ pub(super) fn emit_build_object(
     let count_v = b.ins().iconst(types::I64, count as i64);
     let shape_v = b.ins().iconst(types::I64, shape_ptr as i64);
     let rec_v = b.ins().iconst(types::I64, is_record as i64);
-    
-    
+
     let mhc_v = b.ins().iconst(types::I64, 1);
     call_helper_void(
         b,
@@ -246,9 +215,6 @@ pub(super) fn emit_build_object(
         ctx.helpers.jit_native_result_offset as i32,
     ))
 }
-
-
-
 
 fn emit_window_boxed(
     b: &mut FunctionBuilder,

@@ -126,11 +126,6 @@ pub fn compile(
     }
 
     if debug.bytecode {
-        
-        
-        
-        
-        
         let mut paths: Vec<&String> = graph_build.modules.keys().collect();
         paths.sort_unstable();
         for path in paths {
@@ -151,9 +146,6 @@ pub fn compile(
         }
     }
 
-    
-    
-    
     if debug.tiers || debug.bails || debug.summary {
         let helpers = varn_vm::jit::helpers::build_jit_helpers();
         for (path, module_proto) in graph_build.modules.iter() {
@@ -164,8 +156,7 @@ pub fn compile(
                 eprintln!("\n=== MODULE: {} ===", path);
                 varn_debug::summary::debug_summary(module_proto);
             }
-            
-            
+
             if debug.tiers {
                 varn_debug::tiers::debug_tiers(module_proto, debug, &helpers, Some(path));
             }
@@ -175,11 +166,6 @@ pub fn compile(
         }
     }
 
-    
-    
-    
-    
-    
     if debug.typeloss {
         let mut paths: Vec<&String> = graph_build.modules.keys().collect();
         paths.sort_unstable();

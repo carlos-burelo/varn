@@ -64,9 +64,7 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
         let val = match entry.entry_kind {
             0x09 => ctx.call_static(entry.func()),
             0x10 => (entry.func())(ctx, &[]).unwrap_or(VmValue::null()),
-            
-            
-            
+
             0x03 | 0x04 | 0x05 | 0x06 | 0x11 | 0x12 | 0x13 | 0x14 | 0x15 => continue,
             _ => ctx.alloc_fn(entry.func(), symbol),
         };
@@ -76,8 +74,6 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
 
     Some(ctx.finalize(root))
 }
-
-
 
 const FLOAT_CONSTANTS: &[(&str, f64)] = &[("Infinity", f64::INFINITY), ("NaN", f64::NAN)];
 
@@ -97,20 +93,9 @@ pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Arc
     out
 }
 
-
-
-
-
-
-
-
-
 pub fn native_global_layout() -> &'static [&'static str] {
     static LAYOUT: OnceLock<Vec<&'static str>> = OnceLock::new();
     LAYOUT.get_or_init(|| {
-        
-        
-        
         const SKIP_KINDS: &[u8] = &[0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14, 0x15];
 
         let mut names: Vec<&'static str> = vec!["isIsolate"];
@@ -143,8 +128,6 @@ pub fn native_global_layout() -> &'static [&'static str] {
         out
     })
 }
-
-
 
 pub fn native_global_index(name: &str) -> Option<u32> {
     native_global_layout()

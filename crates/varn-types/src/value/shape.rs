@@ -11,15 +11,12 @@ pub struct Shape {
     pub id: u32,
     pub class: Option<Rc<crate::value::ClassObj>>,
     pub property_names: HashMap<RuntimeString, usize>,
-    
+
     ordered: Vec<RuntimeString>,
-    
-    
-    
+
     json_prefixes: OnceCell<Vec<String>>,
     transitions: RefCell<HashMap<RuntimeString, Rc<Shape>>>,
 }
-
 
 pub const SHAPE_ID_OFF: usize = std::mem::offset_of!(Shape, id);
 
@@ -54,8 +51,6 @@ impl Shape {
         })
     }
 
-    
-    
     #[inline]
     pub fn ordered_names(&self) -> &[RuntimeString] {
         &self.ordered

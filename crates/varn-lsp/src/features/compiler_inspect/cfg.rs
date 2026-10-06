@@ -1,5 +1,3 @@
-
-
 use varn_compiler::ssa::dump;
 use varn_compiler::ssa::ir::Terminator;
 
@@ -66,7 +64,6 @@ pub fn compile_and_get_cfg_json(state: &DocumentState) -> Result<serde_json::Val
         "bytecode": bytecode_text,
     }))
 }
-
 
 fn successors_json(term: &Terminator) -> Vec<serde_json::Value> {
     match term {

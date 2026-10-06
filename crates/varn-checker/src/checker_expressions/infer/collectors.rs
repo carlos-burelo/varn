@@ -2,9 +2,6 @@ use crate::checker::Checker;
 use crate::types::Type;
 use varn_core::ast::{ArrowBody, StmtId, StmtKind};
 
-
-
-
 pub(crate) fn arrow_body_return_type(
     body: ArrowBody,
     checker: &mut Checker,

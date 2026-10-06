@@ -1,15 +1,6 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
-
-
 use varn_tir::{BackendTy, Resolution, Span, TirArrayEl, TirExpr, TirExprKind};
-
-
-
 
 #[test]
 fn every_node_kind_carries_a_type() {
@@ -21,18 +12,14 @@ fn every_node_kind_carries_a_type() {
     };
     assert_eq!(lit.ty, BackendTy::Int);
 
-    
     let arr = TirExpr {
         kind: TirExprKind::ArrayLit(vec![TirArrayEl::Expr(lit)]),
-        ty: BackendTy::Int, 
+        ty: BackendTy::Int,
         res: Resolution::None,
         span: Span::EMPTY,
     };
     assert_eq!(arr.ty, BackendTy::Int);
 }
-
-
-
 
 #[test]
 fn field_access_is_one_kind_with_a_resolution() {
@@ -65,7 +52,7 @@ fn field_access_is_one_kind_with_a_resolution() {
     };
     assert!(fast.res.is_static_dispatch());
     assert!(!slow.res.is_static_dispatch());
-    
+
     assert!(matches!(fast.kind, TirExprKind::Field { .. }));
     assert!(matches!(slow.kind, TirExprKind::Field { .. }));
 }

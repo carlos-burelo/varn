@@ -1,9 +1,3 @@
-
-
-
-
-
-
 use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, SsaFunc};
 use rustc_hash::FxHashSet;
@@ -13,7 +7,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
     let mut array_values: FxHashSet<u32> = FxHashSet::default();
     let mut map_values: FxHashSet<u32> = FxHashSet::default();
 
-    
     for (i, vdef) in func.values.iter().enumerate() {
         if matches!(vdef.ty, HirType::Array(_)) {
             array_values.insert(i as u32);
@@ -38,7 +31,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
         return false;
     }
 
-    
     for block in &mut func.blocks {
         for inst in &mut block.insts {
             match &inst.kind {

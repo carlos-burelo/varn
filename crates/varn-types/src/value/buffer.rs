@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-
 #[derive(Clone, Debug)]
 pub struct VmBuffer {
     data: Rc<RefCell<Vec<u8>>>,

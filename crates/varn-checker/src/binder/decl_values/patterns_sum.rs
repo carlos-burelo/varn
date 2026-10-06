@@ -126,13 +126,6 @@ impl<'r> super::super::Binder<'r> {
                     self.bind_pattern(&prop.value, prop_kind, line, doc.clone(), prop_ty, false);
                 }
                 if let Some(r) = rest {
-                    
-                    
-                    
-                    
-                    
-                    
-                    
                     let _ = &ty;
                     self.bind_pattern(r, kind, line, doc.clone(), None, false);
                 }
@@ -165,17 +158,10 @@ impl<'r> super::super::Binder<'r> {
         );
         let mut pe_sym =
             Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(alias_ty);
-        
-        
+
         pe_sym.type_params = t.type_params.iter().map(|tp| tp.name).collect();
         self.define(t.id, pe_sym);
 
-        
-        
-        
-        
-        
-        
         let mut variant_names = Vec::new();
 
         for v in &t.variants {

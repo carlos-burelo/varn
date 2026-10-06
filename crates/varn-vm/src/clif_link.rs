@@ -1,24 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -31,42 +10,32 @@ use crate::exec::ExecCtx;
 
 thread_local! {
     static CURRENT_CTX: Cell<*const ExecCtx> = const { Cell::new(std::ptr::null()) };
-    
-    
+
+
     static CURRENT_EPOCH: Cell<u64> = const { Cell::new(0) };
-    
-    
+
+
     static COMPILED: RefCell<FxHashMap<u64, EpochCode>> =
         RefCell::new(FxHashMap::default());
 }
 
 #[derive(Default)]
 struct EpochCode {
-    
-    
-    
     protos: Vec<Rc<FunctionProto>>,
-    
-    
-    
+
     retired: Vec<Rc<dyn std::any::Any>>,
 }
 
 static NEXT_EPOCH: AtomicU64 = AtomicU64::new(1);
 
-
-
 pub(crate) fn next_epoch() -> u64 {
     NEXT_EPOCH.fetch_add(1, Ordering::Relaxed)
 }
-
 
 #[inline(always)]
 pub(crate) fn current_epoch() -> u64 {
     CURRENT_EPOCH.with(|e| e.get())
 }
-
-
 
 pub(crate) fn register_compiled(
     proto: &Rc<FunctionProto>,
@@ -82,22 +51,14 @@ pub(crate) fn register_compiled(
     });
 }
 
-
 pub(crate) fn retire_code(epoch: u64, code: Rc<dyn std::any::Any>) {
     COMPILED.with(|m| m.borrow_mut().entry(epoch).or_default().retired.push(code));
 }
-
-
-
 
 pub(crate) fn invalidate_epoch(epoch: u64) {
     let entry = COMPILED.with(|m| m.borrow_mut().remove(&epoch));
     let Some(entry) = entry else { return };
     for proto in &entry.protos {
-        
-        
-        
-        
         if proto.jit_osr_epoch.get() == epoch {
             proto.jit_osr_entry.set(None);
             proto.jit_osr_epoch.set(0);
@@ -107,7 +68,6 @@ pub(crate) fn invalidate_epoch(epoch: u64) {
             proto.backedge_count.set(0);
         }
         if proto.jit_epoch.get() != epoch {
-            
             continue;
         }
         proto.jit_entry.set(0);
@@ -119,8 +79,6 @@ pub(crate) fn invalidate_epoch(epoch: u64) {
     }
 }
 
-
-
 pub struct CtxGuard(*const ExecCtx, u64);
 
 impl CtxGuard {
@@ -128,8 +86,6 @@ impl CtxGuard {
         let epoch = if ctx.is_null() {
             0
         } else {
-            
-            
             unsafe { (*ctx).heap.jit_epoch() }
         };
         let prev = CURRENT_CTX.with(|c| c.replace(ctx));
@@ -145,16 +101,10 @@ impl Drop for CtxGuard {
     }
 }
 
-
 pub struct CtxLinker;
 
 impl ClifLinker for CtxLinker {
     fn current_epoch(&self) -> u64 {
-        
-        
-        
-        
-        
         current_epoch()
     }
 }

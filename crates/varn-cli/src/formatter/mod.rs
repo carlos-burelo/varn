@@ -126,7 +126,6 @@ fn collect_vn_recursive(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), CliErr
     Ok(())
 }
 
-
 pub fn format_source(source: &str) -> String {
     let mut result = String::with_capacity(source.len() + 64);
     let mut indent_level: usize = 0;
@@ -139,7 +138,7 @@ pub fn format_source(source: &str) -> String {
         if trimmed.is_empty() {
             if !in_block_comment {
                 blank_count += 1;
-                
+
                 if blank_count <= 1 && !result.is_empty() {
                     result.push('\n');
                 }
@@ -149,7 +148,6 @@ pub fn format_source(source: &str) -> String {
 
         blank_count = 0;
 
-        
         if in_block_comment {
             let indent = "    ".repeat(indent_level);
             result.push_str(&indent);
@@ -170,7 +168,6 @@ pub fn format_source(source: &str) -> String {
             continue;
         }
 
-        
         let leading_closers = count_leading_closers(trimmed);
         let current_indent = indent_level.saturating_sub(leading_closers);
 
@@ -181,12 +178,10 @@ pub fn format_source(source: &str) -> String {
         result.push_str(&formatted_line);
         result.push('\n');
 
-        
         let (opens, closes) = count_braces_outside_strings(trimmed);
         indent_level = (indent_level + opens).saturating_sub(closes);
     }
 
-    
     if !result.is_empty() && !result.ends_with('\n') {
         result.push('\n');
     }
@@ -227,7 +222,6 @@ fn count_braces_outside_strings(s: &str) -> (usize, usize) {
             continue;
         }
 
-        
         if c == '/' && chars.peek() == Some(&'/') {
             break;
         }
@@ -244,7 +238,6 @@ fn count_braces_outside_strings(s: &str) -> (usize, usize) {
 }
 
 fn format_line_tokens(line: &str) -> String {
-    
     if line.starts_with("//") || line.starts_with("/*") || line.starts_with('*') {
         return line.to_string();
     }
@@ -255,7 +248,6 @@ fn format_line_tokens(line: &str) -> String {
     let mut chars = line.chars().peekable();
 
     while let Some(c) = chars.next() {
-        
         if let Some(quote) = in_str {
             out.push(c);
             if escaped {
@@ -268,7 +260,6 @@ fn format_line_tokens(line: &str) -> String {
             continue;
         }
 
-        
         if c == '/' && chars.peek() == Some(&'/') {
             if !out.ends_with(' ') && !out.is_empty() {
                 out.push(' ');
@@ -286,7 +277,6 @@ fn format_line_tokens(line: &str) -> String {
             continue;
         }
 
-        
         if c == ',' {
             out.push(',');
             if chars
@@ -299,7 +289,6 @@ fn format_line_tokens(line: &str) -> String {
             continue;
         }
 
-        
         if c == ':' {
             if chars.peek() == Some(&':') {
                 chars.next();
@@ -317,7 +306,6 @@ fn format_line_tokens(line: &str) -> String {
             continue;
         }
 
-        
         if c == '|' && chars.peek() == Some(&'>') {
             chars.next();
             if !out.ends_with(' ') {

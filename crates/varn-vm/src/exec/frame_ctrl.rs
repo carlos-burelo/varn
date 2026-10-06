@@ -1,37 +1,9 @@
-
-
-
-
-
-
 use super::calls::PreparedCall;
 use super::ctx::ExecCtx;
 use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
 
 impl ExecCtx {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) fn build_generator(
         &mut self,
         closure: std::rc::Rc<crate::closure::VmClosure>,
@@ -40,9 +12,7 @@ impl ExecCtx {
     ) -> VmValue {
         let mut gen_ctx = Box::new(self.fork_for_task());
         gen_ctx.gc_inhibited = true;
-        
-        
-        
+
         let alloc = gen_ctx.stack.push_frame(&closure.proto);
         let nregs = closure.proto.register_count as usize;
         gen_ctx.stack.adopt_values(alloc, 0, &args, nregs);
@@ -57,21 +27,6 @@ impl ExecCtx {
         )))
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub(crate) fn resolve_constructor_return(
     ctx: &mut ExecCtx,
@@ -99,44 +54,21 @@ pub(crate) fn resolve_constructor_return(
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub fn unwind_to_handler(
     ctx: &mut ExecCtx,
     handler: crate::frame::TryHandler,
     thrown: VmValue,
 ) -> VmResult<()> {
-    
     while ctx.frames.len() > handler.frame_depth {
         let f = ctx.frames.pop().unwrap();
         ctx.drop_frame_storage(f.base);
     }
 
-    
-    
     let target = ctx.frames.len() - 1;
     let base = ctx.frames[target].base;
     let nregs = ctx.frames[target].closure().proto.register_count as usize;
     ctx.stack.ensure_frame_size(base, nregs);
-    
-    
-    
+
     ctx.stack
         .unbox_into_reg(base, handler.err_reg as usize, thrown)?;
 
@@ -153,8 +85,7 @@ impl ExecCtx {
                 current_class,
             } => {
                 let value = self.build_generator(closure, args, current_class);
-                
-                
+
                 self.stage.clear();
                 self.stage.push(value);
             }
@@ -165,9 +96,7 @@ impl ExecCtx {
                     ));
                 }
                 self.record_call_vm_fast();
-                
-                
-                
+
                 self.frames.push(frame);
 
                 if !self.gc_inhibited && self.heap.needs_minor_gc() {
@@ -189,17 +118,10 @@ impl ExecCtx {
                 self.frames.push(frame);
                 self.pending_constructors
                     .push((ctor_frame_idx, instance_nv));
-                
-                
-                
             }
             PreparedCall::NativeImmediate(f, arg_count) => {
                 self.record_call_native(f, None);
-                
-                
-                
-                
-                
+
                 let take = arg_count.min(self.stage.len());
                 let start = self.stage.len() - take;
                 let args: Vec<VmValue> = self.stage.drain(start..).collect();

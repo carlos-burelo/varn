@@ -1,14 +1,8 @@
-
-
-
-
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use std::sync::Arc;
 
 impl ExecCtx {
-    
-    
     pub(crate) fn make_enum_variant(&mut self, tag: i64, meta: &str) -> VmValue {
         let (name_part, fields_part) = match meta.find(':') {
             Some(idx) => (&meta[..idx], &meta[idx + 1..]),

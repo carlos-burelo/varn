@@ -1,24 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use rustc_hash::FxHashMap;
 
 use crate::hir::{HirBinOp, HirType};
@@ -26,9 +5,6 @@ use crate::ssa::ir::{Inst, InstKind, SsaFunc, Value};
 use crate::ssa::uses::replace_uses_with_map;
 
 pub fn run(func: &mut SsaFunc) -> bool {
-    
-    
-    
     let mut int_const: FxHashMap<Value, i64> = FxHashMap::default();
     let mut float_const: FxHashMap<Value, f64> = FxHashMap::default();
     for block in &func.blocks {
@@ -45,8 +21,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
         }
     }
 
-    
-    
     let mut rewrites: FxHashMap<Value, Value> = FxHashMap::default();
     let mut to_const: Vec<(usize, usize, InstKind)> = Vec::new();
 
@@ -54,13 +28,6 @@ pub fn run(func: &mut SsaFunc) -> bool {
         for (i, inst) in block.insts.iter().enumerate() {
             match simplify(inst, &int_const, &float_const) {
                 Some(Simplified::Use(v)) => {
-                    
-                    
-                    
-                    
-                    
-                    
-                    
                     let dest = inst.dest.expect("simplified inst defines a value");
                     if func.value_ty(v) == func.value_ty(dest) {
                         rewrites.insert(dest, v);
@@ -86,9 +53,8 @@ pub fn run(func: &mut SsaFunc) -> bool {
 }
 
 enum Simplified {
-    
     Use(Value),
-    
+
     Const(InstKind),
 }
 
@@ -124,20 +90,11 @@ fn simplify(
                 HirBinOp::Mul => match (li, ri) {
                     (_, Some(1)) => Some(Simplified::Use(l)),
                     (Some(1), _) => Some(Simplified::Use(r)),
-                    
+
                     (_, Some(0)) | (Some(0), _) => Some(Simplified::Const(InstKind::ConstInt(0))),
                     _ => None,
                 },
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
+
                 _ => None,
             }
         }

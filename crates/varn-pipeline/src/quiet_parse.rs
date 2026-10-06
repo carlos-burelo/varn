@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use varn_core::ast::{AstArena, Program};
 
 pub(crate) fn parse_module(
@@ -27,21 +20,13 @@ pub(crate) fn parse_module(
     Ok((program, arena, interner))
 }
 
-
-
-
 pub(crate) fn parse_only(
     source: &str,
     path: &str,
     label: &str,
 ) -> Result<(Program, AstArena, varn_core::AtomInterner), String> {
     let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan(source, path);
-    
-    
-    
-    
-    
-    
+
     varn_parser::parse(tokens, lexeme_buf, path, varn_core::AtomInterner::new())
         .map(|(program, interner, arena)| (program, arena, interner))
         .map_err(|errs| {

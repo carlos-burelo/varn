@@ -146,7 +146,6 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
             Ok(first)
         }
 
-        
         TokenKind::Hash if s.peek_kind(1) == TokenKind::LBracket => {
             s.advance();
             super::composite::parse_tuple_type(s, range)

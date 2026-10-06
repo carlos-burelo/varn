@@ -4,8 +4,6 @@ use varn_core::ast::{
 };
 use varn_core::{Diagnostic, ErrorCode};
 
-
-
 fn type_only(kind: crate::symbol::SymbolKind) -> bool {
     use crate::symbol::SymbolKind as K;
     matches!(kind, K::Interface | K::TypeAlias)
@@ -43,19 +41,13 @@ impl<'r> super::Binder<'r> {
                 self.scopes.get_mut(self.current).define(name, id);
                 return id;
             }
-            
-            
-            
-            
-            
+
             if existing_from_extern && (new_is_import || sym.origin_module.is_none()) {
                 let id = self.arena.push(sym);
                 self.scopes.get_mut(self.current).define(name, id);
                 return id;
             }
-            
-            
-            
+
             if type_only(existing_sym.kind) != type_only(sym.kind) {
                 let id = self.arena.push(sym);
                 self.scopes.get_mut(self.current).define(name, id);
@@ -104,9 +96,6 @@ impl<'r> super::Binder<'r> {
     pub(super) fn bind_expr(&mut self, id: ExprId) {
         let arena = self.ast_arena;
         match &arena.expr(id).kind {
-            
-            
-            
             ExprKind::Missing => {}
             ExprKind::Arrow {
                 params,
@@ -230,10 +219,6 @@ impl<'r> super::Binder<'r> {
                             );
                         }
                         ObjectProp::Getter { body, .. } => {
-                            
-                            
-                            
-                            
                             self.escape_all_open_array_candidates();
                             self.bind_stmt(*body);
                         }
@@ -315,14 +300,6 @@ impl<'r> super::Binder<'r> {
             }
 
             ExprKind::Identifier { name } => {
-                
-                
-                
-                
-                
-                
-                
-                
                 self.escape_array_candidate(*name);
                 let range = arena.expr(id).range;
                 self.check_local_class_capture(*name, range);

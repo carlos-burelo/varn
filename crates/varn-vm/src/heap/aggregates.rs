@@ -1,6 +1,3 @@
-
-
-
 use super::obj::HeapObj;
 use super::structs::HeapInner;
 use crate::value::VmValue;
@@ -32,8 +29,6 @@ impl HeapInner {
         self.alloc_object_with_shape_slice(shape, &values)
     }
 
-    
-    
     pub(crate) fn alloc_object_with_shape_slice(
         &mut self,
         shape: &Rc<varn_types::Shape>,

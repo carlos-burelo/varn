@@ -14,7 +14,6 @@ pub fn build_goto_implementation(
     let token = state.identifier_token_at(line, col)?;
     let target_name = state.lexeme(token);
 
-    
     let (is_interface, is_class_or_method) = {
         let is_iface = state
             .symbols()
@@ -60,7 +59,6 @@ pub fn build_goto_implementation(
     }
 }
 
-
 fn top_level_classes(file: &DocumentState) -> impl Iterator<Item = &ClassDecl> {
     let body = file
         .ast
@@ -100,7 +98,6 @@ fn find_class_subtypes(
     locations: &mut Vec<Location>,
 ) {
     for c in top_level_classes(file) {
-        
         if let Some(super_expr) = c.super_class {
             if let varn_core::ast::ExprKind::Identifier { name } =
                 &file.ast_arena.expr(super_expr).kind
@@ -111,7 +108,6 @@ fn find_class_subtypes(
             }
         }
 
-        
         for member in &c.body {
             if let ClassMember::Method { key, range, .. } = member {
                 if file.name(*key) == class_or_method_name {

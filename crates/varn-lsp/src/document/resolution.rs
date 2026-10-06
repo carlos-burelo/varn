@@ -40,7 +40,6 @@ impl DocumentState {
 }
 
 impl DocumentState {
-    
     pub fn source_text(&self, range: varn_core::SourceRange) -> &str {
         let (start, end) = (range.start.offset as usize, range.end.offset as usize);
         self.source.get(start..end).unwrap_or("")
@@ -48,8 +47,6 @@ impl DocumentState {
 }
 
 impl DocumentState {
-    
-    
     pub fn type_node_decl_name(&self, node: &varn_core::ast::TypeNode) -> Option<&str> {
         match &node.kind {
             varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, _, _) => {

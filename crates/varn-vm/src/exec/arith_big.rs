@@ -1,7 +1,3 @@
-
-
-
-
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
@@ -50,8 +46,6 @@ fn fault(f: varn_core::IntDivFault, op: &str) -> RuntimeError {
     }
 }
 
-
-
 #[cold]
 pub(crate) fn binary(
     op: BigOp,
@@ -82,7 +76,6 @@ pub(crate) fn binary(
     };
     Some(r.map(|v| alloc(heap, v)))
 }
-
 
 #[cold]
 pub(crate) fn negate(a: VmValue, heap: &mut Heap) -> Option<VmValue> {

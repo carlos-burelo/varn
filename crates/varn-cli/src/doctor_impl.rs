@@ -38,9 +38,6 @@ pub fn run_doctor() -> CliResult<()> {
         None => println!("  std: none resolved"),
     }
 
-    
-    
-    
     match varn_builtins::std_load_error() {
         Some(reason) => {
             println!("  status: BROKEN");

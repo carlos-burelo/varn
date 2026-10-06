@@ -1,15 +1,5 @@
-
-
-
-
-
-
-
-
 use super::ir::{InstKind, SsaFunc};
 use crate::OptError;
-
-
 
 pub(crate) struct IcSlots {
     slots: Vec<Vec<Option<u8>>>,
@@ -17,8 +7,6 @@ pub(crate) struct IcSlots {
 }
 
 impl IcSlots {
-    
-    
     pub(crate) fn number(ssa: &SsaFunc, order: &[usize]) -> Result<Self, OptError> {
         let mut slots: Vec<Vec<Option<u8>>> = ssa
             .blocks
@@ -33,7 +21,7 @@ impl IcSlots {
                     continue;
                 }
                 let too_many = || OptError::Unsupported("ssa-emit: too many inline-cache sites");
-                
+
                 u8::try_from(count + n - 1).map_err(|_| too_many())?;
                 slots[b][i] = Some(count as u8);
                 count += n;
@@ -42,20 +30,14 @@ impl IcSlots {
         Ok(Self { slots, count })
     }
 
-    
     pub(crate) fn of(&self, block: usize, inst: usize) -> Option<u8> {
         self.slots.get(block)?.get(inst).copied().flatten()
     }
 
-    
     pub(crate) fn count(&self) -> u16 {
         self.count
     }
 }
-
-
-
-
 
 fn sites(kind: &InstKind, has_dest: bool) -> u16 {
     match kind {

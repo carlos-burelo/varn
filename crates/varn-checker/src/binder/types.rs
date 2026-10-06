@@ -9,11 +9,6 @@ use varn_core::Atom;
 
 pub use crate::types::TypeContext;
 
-
-
-
-
-
 #[derive(Clone)]
 pub enum PendingEnrich {
     Var {
@@ -26,9 +21,6 @@ pub enum PendingEnrich {
         is_async: bool,
     },
     Method {
-        
-        
-        
         class_name: Atom,
         key: Atom,
         body: StmtId,
@@ -99,17 +91,7 @@ pub struct BindResult {
     pub core: Option<Arc<CoreMembers>>,
     #[serde(skip)]
     pub pending_enrich: Vec<PendingEnrich>,
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     #[serde(skip, default)]
     pub evolved_array_types: FxHashMap<u32, Type>,
 }
@@ -127,8 +109,6 @@ impl BindResult {
             .or_else(|| self.core.as_ref().and_then(|b| b.class_members.get(name)))
     }
 
-    
-    
     #[inline]
     pub fn is_user_class(&self, name: &str) -> bool {
         if varn_core::is_lang_type_name(name) {
@@ -182,10 +162,6 @@ impl BindResult {
         })
     }
 
-    
-    
-    
-    
     pub fn intrinsic_import_wire(&self, name: &str) -> Option<u8> {
         let scope = self.scopes.get(self.global_scope);
         let atom = self.interner.get(name)?;
@@ -193,10 +169,6 @@ impl BindResult {
         self.arena.get(id).intrinsic_wire
     }
 
-    
-    
-    
-    
     pub fn get_alias_node_local(&self, name: &str) -> Option<(Vec<String>, TypeNode)> {
         let scope = self.scopes.get(self.global_scope);
         let atom = self.interner.get(name)?;
@@ -230,17 +202,6 @@ impl BindResult {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
 pub struct BindView<'r> {
     pub bind: &'r BindResult,
     pub resolver: &'r dyn crate::module_resolver::ImportResolver,
@@ -254,7 +215,6 @@ impl<'r> BindView<'r> {
         Self { bind, resolver }
     }
 
-    
     fn foreign(&self, origin: Option<&str>) -> Option<Arc<BindResult>> {
         let origin = origin?;
         if origin == self.bind.source_file.as_ref() {

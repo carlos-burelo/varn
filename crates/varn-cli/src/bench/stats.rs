@@ -1,11 +1,6 @@
-
-
 use std::time::Duration;
 
-
-
 pub const CV_NOISY: f64 = 0.05;
-
 
 pub const CV_UNRELIABLE: f64 = 0.10;
 
@@ -61,9 +56,6 @@ impl PhaseStats {
         self.total / self.runs as u32
     }
 
-    
-    
-    
     pub fn cv(&self) -> f64 {
         if self.p50.as_nanos() == 0 {
             return 0.0;
@@ -71,7 +63,6 @@ impl PhaseStats {
         self.stddev.as_nanos() as f64 / self.p50.as_nanos() as f64
     }
 
-    
     pub fn spread(&self) -> f64 {
         if self.min.as_nanos() == 0 {
             return 0.0;

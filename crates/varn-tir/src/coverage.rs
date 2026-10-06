@@ -1,9 +1,3 @@
-
-
-
-
-
-
 use crate::node::{TirArrayEl, TirExpr, TirExprKind, TirObjectEntry, TirStmt};
 use crate::resolution::Resolution;
 use crate::ty::{BackendTy, DynReason};
@@ -12,7 +6,7 @@ use crate::{TirFunction, TirModule};
 #[derive(Debug, Default, Clone)]
 pub struct Coverage {
     pub nodes: u32,
-    
+
     dynamics: [u32; 5],
     by_name: [u32; 5],
     pub static_dispatch: u32,
@@ -55,8 +49,6 @@ impl Coverage {
         self.by_name[reason_index(r)]
     }
 
-    
-    
     pub fn static_ratio(&self) -> f64 {
         let total = self.static_dispatch + self.name_dispatch;
         if total == 0 {

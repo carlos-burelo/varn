@@ -2,11 +2,6 @@ use varn_core::OpCode;
 
 use crate::hir::{HirBinOp, HirType};
 
-
-
-
-
-
 pub(crate) fn binary_opcode(
     op: HirBinOp,
     ty: HirType,
@@ -21,7 +16,6 @@ pub(crate) fn binary_opcode(
         bin_opcode(op, ty)
     }
 }
-
 
 fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
     use HirBinOp::*;

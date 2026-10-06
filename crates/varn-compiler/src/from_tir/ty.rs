@@ -1,18 +1,5 @@
-
-
-
-
-
-
-
-
-
-
-
-
 use crate::hir::{HirType, TyTable as SsaTyTable};
 use varn_tir::{BackendTy, TirModule};
-
 
 pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
     match bt {
@@ -20,16 +7,9 @@ pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
         BackendTy::Float => HirType::Float,
         BackendTy::Bool => HirType::Bool,
         BackendTy::Str => HirType::Str,
-        
-        
-        
-        
+
         BackendTy::Char => HirType::Ref,
-        
-        
-        
-        
-        
+
         BackendTy::Decimal | BackendTy::BigInt => HirType::Dynamic,
 
         BackendTy::Bytes | BackendTy::Tuple(_) | BackendTy::Enum(_) | BackendTy::Fn(_) => {
@@ -141,10 +121,6 @@ mod tests {
 
     #[test]
     fn heap_boxed_scalars_are_ref() {
-        
-        
-        
-        
         let m = empty_module();
         let mut out = SsaTyTable::default();
         assert_eq!(lower(B::Char, &m, &mut out), HirType::Ref);

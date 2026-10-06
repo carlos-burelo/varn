@@ -1,18 +1,7 @@
-
-
-
-
-
-
-
-
 mod dashboard;
 mod types;
 
 use varn_debug::flags::DebugFlags;
-
-
-
 
 pub fn run_for(path: &str, eval: Option<&str>, flags: &DebugFlags) {
     if !(flags.types || flags.lsp) {

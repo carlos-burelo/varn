@@ -1,13 +1,8 @@
-
-
-
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::{Literal, PoolEntry};
 
 use super::Ctx;
-
-
 
 pub(super) fn literal(
     b: &mut FunctionBuilder,

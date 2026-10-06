@@ -198,10 +198,7 @@ pub fn build_module_graph(
                 varn_checker::CheckOptions::compile(),
             )
         });
-        
-        
-        
-        
+
         crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)
             .map_err(|e| e.message)?;
         let exports = if program.filename.starts_with("std:")

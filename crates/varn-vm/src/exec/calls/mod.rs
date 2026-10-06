@@ -45,28 +45,11 @@ pub(crate) fn build_closure(
     Rc::new(VmClosure::new(proto, constants, settings))
 }
 
-
-
-
 #[inline]
 fn stage_window(staging: &[VmValue], arg_count: usize) -> &[VmValue] {
     let start = staging.len().saturating_sub(arg_count);
     &staging[start..]
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub(crate) fn materialize_frame(
     store: &mut FrameStore,
@@ -92,32 +75,13 @@ pub(crate) fn materialize_frame(
 pub enum PreparedCall {
     Frame(CallFrame),
     Constructor(CallFrame, VmValue),
-    
-    
-    
-    
+
     NativeImmediate(varn_types::NativeFn, usize),
-    
-    
-    
-    
-    
+
     RawNativeImmediate(varn_types::NativeFn, usize),
     NativeConstructor(varn_types::NativeFn, Vec<VmValue>, VmValue),
     PushValue(VmValue),
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     Generator {
         closure: Rc<VmClosure>,
         args: Vec<VmValue>,

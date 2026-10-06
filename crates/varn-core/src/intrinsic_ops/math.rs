@@ -22,14 +22,6 @@ impl MathOp {
     }
 }
 
-
-
-
-
-
-
-
-
 pub fn is_unary_math(wire_byte: u8) -> bool {
     let op = wire_byte;
     op == MathOp::Abs as u8

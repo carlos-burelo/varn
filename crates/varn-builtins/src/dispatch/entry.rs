@@ -9,6 +9,4 @@ pub struct DispatchEntry {
     pub capability: Option<&'static str>,
 }
 
-
-
 pub use varn_core::op_id::{compound_op_id, compound_op_id3};

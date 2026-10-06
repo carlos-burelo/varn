@@ -12,10 +12,6 @@ pub struct SpatialEntry {
     pub expr: ExprId,
 }
 
-
-
-
-
 #[derive(Clone, Debug, Default)]
 pub struct SpatialIndex {
     entries: Vec<SpatialEntry>,
@@ -29,7 +25,7 @@ impl SpatialIndex {
             collect_stmt(a, stmt, &mut entries);
         }
         entries.shrink_to_fit();
-        
+
         entries.sort_by(|a, b| {
             a.start
                 .cmp(&b.start)
@@ -38,13 +34,11 @@ impl SpatialIndex {
         Self { entries }
     }
 
-    
     pub fn innermost_at(&self, offset: u32) -> Option<AstId> {
         if self.entries.is_empty() {
             return None;
         }
 
-        
         let upper = match self.entries.binary_search_by(|e| e.start.cmp(&offset)) {
             Ok(idx) => {
                 let mut i = idx;
@@ -73,8 +67,6 @@ impl SpatialIndex {
         best.map(|(_, id)| id)
     }
 
-    
-    
     pub fn exprs(&self) -> impl Iterator<Item = ExprId> + '_ {
         self.entries.iter().map(|e| e.expr)
     }

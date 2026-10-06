@@ -1,22 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use crate::frame::CallFrame;
 use crate::profile::ProfileCounters;
 use std::ops::{Deref, DerefMut};
@@ -25,7 +6,7 @@ use std::sync::Arc;
 
 pub struct FrameStack {
     frames: Vec<CallFrame>,
-    
+
     counters: Option<Arc<ProfileCounters>>,
 }
 
@@ -41,9 +22,6 @@ impl FrameStack {
         }
     }
 
-    
-    
-    
     pub(crate) fn set_counters(&mut self, counters: Option<Arc<ProfileCounters>>) {
         self.counters = counters;
     }
@@ -83,8 +61,6 @@ impl DerefMut for FrameStack {
         &mut self.frames
     }
 }
-
-
 
 impl<'a> IntoIterator for &'a FrameStack {
     type Item = &'a CallFrame;

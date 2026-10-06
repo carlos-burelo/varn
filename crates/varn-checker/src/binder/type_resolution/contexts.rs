@@ -21,12 +21,6 @@ impl TypeContext for InferBindingContext<'_> {
         self.inner.and_then(|c| c.ty_table())
     }
 
-    
-    
-    
-    
-    
-    
     fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
         self.inner.and_then(|c| c.ast_arena())
     }
@@ -127,8 +121,6 @@ impl TypeContext for MappedContext<'_> {
         self.inner.and_then(|c| c.ty_table())
     }
 
-    
-    
     fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
         self.inner.and_then(|c| c.ast_arena())
     }
@@ -194,18 +186,6 @@ impl TypeContext for AliasSubstitutionContext<'_> {
         self.inner.and_then(|c| c.ty_table())
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn ast_arena(&self) -> Option<&varn_core::ast::AstArena> {
         None
     }

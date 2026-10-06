@@ -11,9 +11,7 @@ use varn_core::{DiagnosticKind, TokenKind};
 pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     varn_builtins::register_provider();
     let path = uri_to_path(&uri);
-    
-    
-    
+
     let (raw_tokens, lexeme_buf, lex_errs, trivia) = varn_lexer::scan_with_trivia(&source, &path);
 
     let mut diagnostics: Vec<LspDiag> = Vec::new();
@@ -31,9 +29,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         });
     }
 
-    
-    
-    
     let mut line_starts: Vec<usize> = vec![0];
     for (i, b) in source.bytes().enumerate() {
         if b == b'\n' {
@@ -121,10 +116,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         });
     }
 
-    
-    
-    
-    
     if diagnostics
         .iter()
         .any(|d| d.message.starts_with("cannot resolve module 'std:"))
@@ -151,11 +142,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         );
     }
 
-    
-    
-    
-    
-    
     let mut resolved_types: rustc_hash::FxHashMap<varn_checker::SymbolId, varn_checker::Type> =
         rustc_hash::FxHashMap::default();
     let mut all_symbols: Vec<varn_checker::SymbolId> = Vec::new();
@@ -176,9 +162,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         symbol_map.entry(name).or_insert(sym.kind);
     }
 
-    
-    
-    
     let (_type_param_map, mut type_param_names) = params::collect_type_params(&source, &tokens);
     for &id in &all_symbols {
         let sym = result.bind.arena.get(id);

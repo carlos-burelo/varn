@@ -23,20 +23,12 @@ impl<'r> Checker<'r> {
         let range = arena.expr(expr).range;
         let start = range.start.offset;
         let end = range.end.offset.saturating_sub(1);
-        
-        
-        
-        
-        
-        
-        
+
         if self.record_expr_types {
             self.node_scopes.insert(start, self.current_scope);
         }
         let ty = self.infer_type(expr, bind);
 
-        
-        
         let symbol_id = match (&arena.expr(expr).kind, self.record_expr_types) {
             (ExprKind::Identifier { name }, true) => {
                 let scope = bind.scopes.get(self.current_scope);
@@ -45,12 +37,6 @@ impl<'r> Checker<'r> {
             _ => None,
         };
 
-        
-        
-        
-        
-        
-        
         let refined = self.refine(expr, bind);
         debug_assert!(
             refined.as_ref().is_none_or(|r| !r.is_dynamic()),
@@ -59,11 +45,7 @@ impl<'r> Checker<'r> {
 
         let seq = self.expr_seq;
         self.expr_seq += 1;
-        
-        
-        
-        
-        
+
         self.expr_table.insert(
             expr.index(),
             crate::checker::TypeEntry {
@@ -81,9 +63,6 @@ impl<'r> Checker<'r> {
         let arena = self.ast_arena;
         let range = arena.expr(expr).range;
         match &arena.expr(expr).kind {
-            
-            
-            
             ExprKind::Missing => {}
             ExprKind::Arrow {
                 params,

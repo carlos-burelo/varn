@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 #![allow(unused_crate_dependencies)]
 
 use std::collections::BTreeSet;
@@ -59,7 +50,6 @@ fn const_matches(kind: ConstKind, entry: &PoolEntry) -> bool {
     )
 }
 
-
 fn check(file: &str, proto: &FunctionProto, seen: &mut BTreeSet<String>) {
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
     let at = |offset: usize| format!("{file} fn {name} @{offset:04}");
@@ -84,7 +74,7 @@ fn check(file: &str, proto: &FunctionProto, seen: &mut BTreeSet<String>) {
             match *operand {
                 Operand::Reg { at: b, .. } => {
                     let reg = b.read(code, offset) as u16;
-                    
+
                     assert!(
                         reg < proto.register_count.max(1),
                         "{}: {:?} r{reg}",
@@ -127,7 +117,6 @@ fn check(file: &str, proto: &FunctionProto, seen: &mut BTreeSet<String>) {
         "{file} fn {name}: lengths do not add up"
     );
 
-    
     for &start in &starts {
         let l = layout(code, start, pool).unwrap();
         if let Some(target) = l.jump_target(code, start) {
@@ -140,10 +129,8 @@ fn check(file: &str, proto: &FunctionProto, seen: &mut BTreeSet<String>) {
         }
     }
 
-    
     assert!(disasm::instructions(&proto.chunk).all(|i| i.op.is_some()));
 
-    
     let flip = |r: u8| r ^ 0x5a;
     let mut renamed = code.clone();
     bytecode::remap_registers(&mut renamed, pool, flip);

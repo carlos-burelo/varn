@@ -19,7 +19,6 @@ pub fn build_formatting(source: &str, options: FormattingOptions) -> Option<Vec<
     for (line_idx, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
         if trimmed.is_empty() {
-            
             if !line.is_empty() {
                 edits.push(TextEdit {
                     range: Range {
@@ -50,7 +49,6 @@ pub fn build_formatting(source: &str, options: FormattingOptions) -> Option<Vec<
             continue;
         }
 
-        
         let starts_closing =
             trimmed.starts_with('}') || trimmed.starts_with(']') || trimmed.starts_with(')');
 
@@ -80,7 +78,6 @@ pub fn build_formatting(source: &str, options: FormattingOptions) -> Option<Vec<
             });
         }
 
-        
         let delta = compute_line_indent_delta(trimmed);
         if delta > 0 {
             current_indent += delta as usize;
@@ -125,7 +122,6 @@ fn compute_line_indent_delta(line: &str) -> i32 {
             continue;
         }
 
-        
         if b == b'/' && i + 1 < bytes.len() && bytes[i + 1] == b'/' {
             break;
         }

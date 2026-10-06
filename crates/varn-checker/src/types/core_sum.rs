@@ -1,12 +1,7 @@
-
-
-
 use super::{CheckerTyTable, Type};
 use varn_core::{Atom, CoreSum, TypeKind};
 
 impl Type {
-    
-    
     pub(crate) fn core_sum<S: AsRef<str>>(
         &self,
         table: &CheckerTyTable,

@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 use crate::frame_store::{FrameStore, SlotAddr};
 use crate::value::VmValue;
 use std::cell::RefCell;
@@ -78,16 +70,9 @@ pub struct VmClosure {
     pub constants: Rc<Vec<VmValue>>,
     pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
     pub feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
-    
-    
-    
-    
+
     pub ic_entries: *const PolyICSlot,
-    
-    
-    
-    
-    
+
     pub module_base: u32,
 }
 
@@ -110,11 +95,7 @@ impl VmClosure {
             ic_entries,
             module_base: 0,
         };
-        
-        
-        
-        
-        
+
         let _ = settings;
         closure
     }
@@ -138,11 +119,7 @@ impl VmClosure {
             ic_entries,
             module_base: 0,
         };
-        
-        
-        
-        
-        
+
         let _ = settings;
         closure
     }

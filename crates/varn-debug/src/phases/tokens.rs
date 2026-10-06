@@ -1,9 +1,3 @@
-
-
-
-
-
-
 use std::io::Write;
 
 use varn_core::Token;
@@ -11,7 +5,6 @@ use varn_core::Token;
 use crate::fmt::Format;
 use crate::render::{basename, DIM, MAGENTA, RESET, YELLOW};
 use crate::report::Report;
-
 
 pub fn collect(tokens: &[Token], lexeme_buf: &[u8]) -> Report {
     Report::Rows(

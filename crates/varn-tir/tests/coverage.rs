@@ -1,9 +1,5 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
 use std::sync::Arc;
 use varn_tir::*;
 
@@ -54,8 +50,6 @@ fn expr(kind: TirExprKind, ty: BackendTy, res: Resolution) -> TirExpr {
     }
 }
 
-
-
 #[test]
 fn dynamics_are_counted_by_reason() {
     let mut m = module();
@@ -75,8 +69,6 @@ fn dynamics_are_counted_by_reason() {
     assert_eq!(c.dynamic_by_reason(DynReason::Declared), 1);
     assert_eq!(c.dynamic_by_reason(DynReason::Union), 0);
 }
-
-
 
 #[test]
 fn name_dispatch_on_a_known_class_is_counted_not_rejected() {
@@ -105,7 +97,6 @@ fn name_dispatch_on_a_known_class_is_counted_not_rejected() {
     let c = Coverage::of(&m);
     assert_eq!(c.name_dispatch, 1);
 }
-
 
 #[test]
 fn the_static_ratio_is_reported() {

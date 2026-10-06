@@ -1,11 +1,6 @@
 use super::*;
 
 impl Type {
-    
-    
-    
-    
-    
     pub fn is_bytes(&self, table: &CheckerTyTable) -> bool {
         matches!(
             table.get(self.0),

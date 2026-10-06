@@ -1,20 +1,6 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::path::PathBuf;
 
 const DIR_NAME: &str = "std-src";
-
 
 pub fn root() -> PathBuf {
     varn_core::paths::varn_home_dir()
@@ -22,16 +8,10 @@ pub fn root() -> PathBuf {
         .join(format!("{:08x}", varn_modules::artifact::BUILD_FINGERPRINT))
 }
 
-
 fn path_for_specifier(specifier: &str) -> Option<PathBuf> {
     let (kind, name) = specifier.split_once(':')?;
     Some(root().join(kind).join(format!("{name}.vn")))
 }
-
-
-
-
-
 
 fn carried_source(
     provider: &dyn varn_modules::provider::StdlibProvider,
@@ -41,12 +21,6 @@ fn carried_source(
         .bundled_source(specifier)
         .or_else(|| provider.embedded_source(specifier))
 }
-
-
-
-
-
-
 
 pub fn materialize() {
     let Some(provider) = varn_modules::provider::get() else {
@@ -59,8 +33,7 @@ pub fn materialize() {
         let Some(path) = path_for_specifier(spec.id) else {
             continue;
         };
-        
-        
+
         if std::fs::read_to_string(&path).is_ok_and(|existing| existing == source) {
             continue;
         }
@@ -73,18 +46,10 @@ pub fn materialize() {
     }
 }
 
-
 pub fn path_for(specifier: &str) -> Option<PathBuf> {
     let path = path_for_specifier(specifier)?;
     path.is_file().then_some(path)
 }
-
-
-
-
-
-
-
 
 pub fn specifier_from_path(path: &str) -> Option<String> {
     let normalized = varn_modules::resolver::normalize_display_path(path);
@@ -121,19 +86,12 @@ fn strip_root(normalized_path: &str, root: &std::path::Path) -> Option<String> {
     )
 }
 
-
-
 pub fn is_mirrored_uri(uri: &str) -> bool {
     let path =
         varn_modules::resolver::normalize_display_path(&varn_modules::resolver::uri_to_path(uri));
     let root = varn_modules::resolver::normalize_display_path(&root().to_string_lossy());
     path.starts_with(&root)
 }
-
-
-
-
-
 
 pub fn resolve_module_file(specifier: &str) -> Option<PathBuf> {
     let provider = varn_modules::provider::get()?;

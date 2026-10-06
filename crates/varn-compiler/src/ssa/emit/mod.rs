@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use super::ir::{BlockId, Inst, InstKind, SsaFunc, Terminator};
 use crate::OptError;
 use std::cell::{Cell, RefCell};
@@ -27,8 +20,6 @@ mod values;
 use immediates::Immediates;
 
 type Result<T> = std::result::Result<T, OptError>;
-
-
 
 pub struct FnMeta {
     pub name: Arc<str>,
@@ -66,8 +57,7 @@ pub fn emit_function_meta(
 
     let order = emission_order(&ssa);
     let ic = super::ic::IcSlots::number(&ssa, &order)?;
-    
-    
+
     let mut closure_consts: Vec<Vec<Option<u16>>> = ssa
         .blocks
         .iter()
@@ -78,9 +68,7 @@ pub fn emit_function_meta(
     let mut chunk = Chunk::new();
     chunk.source_file = Arc::from(source_file.as_ref());
     let mut block_offset = vec![usize::MAX; n];
-    
-    
-    
+
     let mut inst_off: Vec<Vec<usize>> = ssa
         .blocks
         .iter()
@@ -162,10 +150,6 @@ pub fn emit_function_meta(
         chunk.code[pos + 1] = (off & 0xFFFF) as u16;
     }
 
-    
-    
-    
-    
     let emitted = super::portable::Emitted {
         reg: &reg,
         register_count,
@@ -202,7 +186,7 @@ pub fn emit_function_meta(
         chunk,
         required_caps: Vec::new(),
         state_size: 0,
-        
+
         global_count: 0,
         register_meta,
         exception_table: Vec::new(),
@@ -235,12 +219,6 @@ pub fn emit_function_meta(
     })
 }
 
-
-
-
-
-
-
 fn suspend_live_table(
     ssa: &SsaFunc,
     reg: &[u8],
@@ -252,22 +230,9 @@ fn suspend_live_table(
         .collect()
 }
 
-
-
-
-
-
-
-
-
 fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
     let n = ssa.blocks.len();
-    
-    
-    
-    
-    
-    
+
     let succs = |b: usize| -> Vec<usize> {
         let mut s = match &ssa.blocks[b].term {
             Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
@@ -321,23 +286,20 @@ fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
 fn emit_inst(
     chunk: &mut Chunk,
     inst: &Inst,
-    
-    
+
     value_tys: &[crate::hir::HirType],
     reg: &[u8],
     scratch: u8,
     call_base: u8,
-    
+
     ic_slot: Option<u8>,
     source_file: &Arc<str>,
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
     imms: &Immediates,
-    
+
     closure_const: &mut Option<u16>,
 ) -> Result<()> {
-    
-    
     if let (Some(d), InstKind::ConstInt(_)) = (inst.dest, &inst.kind) {
         if imms.is_elided(d) {
             return Ok(());
@@ -345,7 +307,7 @@ fn emit_inst(
     }
     if let Some((_, other, value)) = immediates::immediate_operand(&inst.kind, &imms.imm) {
         let dest = reg[inst.dest.expect("binary defines a value").0 as usize];
-        
+
         let opcode = match &inst.kind {
             InstKind::Binary {
                 op: crate::hir::HirBinOp::Sub,
@@ -353,9 +315,7 @@ fn emit_inst(
             } => OpCode::SubImm,
             _ => OpCode::AddImm,
         };
-        
-        
-        
+
         chunk.emit_rrr(opcode, dest, reg[other.0 as usize], value as u8, inst.line);
         return Ok(());
     }
@@ -366,12 +326,7 @@ fn emit_inst(
 
     let d = match inst.dest {
         Some(dest) => reg[dest.0 as usize],
-        
-        
-        
-        
-        
-        
+
         None if crate::passes::dce::dest_droppable(&inst.kind) => scratch,
         None => return Ok(()),
     };

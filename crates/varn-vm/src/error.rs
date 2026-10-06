@@ -48,8 +48,6 @@ impl From<varn_types::NativeError> for RuntimeError {
     }
 }
 
-
-
 impl From<RuntimeError> for varn_types::NativeError {
     fn from(e: RuntimeError) -> Self {
         varn_types::NativeError::rethrow(e.kind, e.message, e.thrown)

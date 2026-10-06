@@ -1,51 +1,20 @@
-
-
-
-
-
-
-
-
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum SlotKind {
     Int,
     Float,
     Bool,
-    
-    
+
     Str,
-    
-    
-    
+
     Ref,
     Dynamic,
 }
 
 impl Default for SlotKind {
-    
-    
-    
     fn default() -> Self {
         SlotKind::Dynamic
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
@@ -58,7 +27,6 @@ pub enum SlotClass {
 }
 
 impl SlotClass {
-    
     #[inline(always)]
     pub fn of_kind(kind: SlotKind) -> Self {
         match kind {
@@ -85,18 +53,10 @@ pub struct RegisterMeta {
     pub kind: SlotKind,
 }
 
-
-
-
-
-
-
-
 #[derive(Debug)]
 pub struct FrameLayout {
-    
     pub slots: Vec<(SlotClass, u32)>,
-    
+
     pub counts: [u32; 4],
 }
 

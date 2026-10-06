@@ -32,7 +32,6 @@ pub(super) fn check_binary(
     let l = lhs.ty.non_nullable(&m.types);
     let r = rhs.ty.non_nullable(&m.types);
 
-    
     if matches!(l, BackendTy::Dynamic(_)) || matches!(r, BackendTy::Dynamic(_)) {
         return;
     }
@@ -48,7 +47,6 @@ pub(super) fn check_binary(
         return;
     }
 
-    
     let expected = l;
 
     if e.ty != expected {
@@ -72,14 +70,12 @@ pub(super) fn check_field(
         return;
     };
     let BackendTy::Class(c) = object.ty.non_nullable(&m.types) else {
-        return; 
+        return;
     };
     let Some(field) = m.class(c).and_then(|ci| ci.field_at(*slot)) else {
-        return; 
+        return;
     };
-    
-    
-    
+
     if e.ty != field.ty {
         errors.push(VerifyError::new(
             format!(
@@ -111,7 +107,6 @@ pub(super) fn check_index(
     }
 }
 
-
 pub(super) fn check_variant_payload(
     m: &TirModule,
     e: &TirExpr,
@@ -121,7 +116,7 @@ pub(super) fn check_variant_payload(
     errors: &mut Vec<VerifyError>,
 ) {
     let BackendTy::Enum(id) = value.ty.non_nullable(&m.types) else {
-        return; 
+        return;
     };
     let Some(variant) = m.enum_info(id).and_then(|ei| ei.variant_at(tag)) else {
         errors.push(VerifyError::new(

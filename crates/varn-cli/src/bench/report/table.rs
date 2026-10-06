@@ -1,15 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
 use std::time::Duration;
 
 use varn_core::term::chalk::chalk;
@@ -18,12 +6,9 @@ use varn_core::term::terminal;
 use super::fmt::{fmt_dur, fmt_pct, DurScale};
 use crate::bench::stats::{PhaseStats, CV_NOISY};
 
-
-
 const FOLD_BELOW: f64 = 0.01;
 
 pub struct TableOpts {
-    
     pub all_rows: bool,
 }
 
@@ -39,8 +24,6 @@ pub fn print_table(phases: &[PhaseStats], e2e: Option<&PhaseStats>, opts: &Table
         }
     };
 
-    
-    
     let scale = DurScale::for_column(
         phases
             .iter()
@@ -98,7 +81,6 @@ pub fn print_table(phases: &[PhaseStats], e2e: Option<&PhaseStats>, opts: &Table
 
     table.rule();
 
-    
     table.row([
         chalk("total").green().bold().to_string(),
         chalk("—").dim().to_string(),
@@ -120,12 +102,7 @@ pub fn print_table(phases: &[PhaseStats], e2e: Option<&PhaseStats>, opts: &Table
         ));
     }
 
-    
-    
     if let Some(e) = e2e {
-        
-        
-        
         let delta = if e.p50 >= total_p50 {
             format!("+{}", fmt_dur(e.p50 - total_p50))
         } else {

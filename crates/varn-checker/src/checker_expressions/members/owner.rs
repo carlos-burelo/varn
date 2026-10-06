@@ -1,18 +1,8 @@
-
-
-
-
 use crate::binder::BindResult;
 use crate::checker::Checker;
 use std::sync::Arc;
 
 impl Checker<'_> {
-    
-    
-    
-    
-    
-    
     pub(crate) fn parent_type(
         &mut self,
         parent: &crate::binder::ClassParent,

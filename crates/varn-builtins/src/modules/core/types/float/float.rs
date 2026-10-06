@@ -51,10 +51,10 @@ varn_contract! {
         fn ceil(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this.ceil() }
         fn round(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this.round() }
         fn trunc(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this.trunc() }
-        
-        
-        
-        
+
+
+
+
         fn toInt(_ctx: &mut dyn NativeCtx, this: f64) -> i64 { this.trunc() as i64 }
     }
 }

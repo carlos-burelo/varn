@@ -1,7 +1,3 @@
-
-
-
-
 use std::num::NonZeroU64;
 
 #[repr(transparent)]
@@ -14,8 +10,6 @@ impl HeapRef {
         NonZeroU64::new(addr).map(Self)
     }
 
-    
-    
     #[inline(always)]
     pub unsafe fn from_addr_unchecked(addr: u64) -> Self {
         Self(NonZeroU64::new_unchecked(addr))

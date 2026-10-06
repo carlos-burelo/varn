@@ -36,16 +36,6 @@ pub enum StmtKind {
     },
     Decl(Box<Decl>),
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     Error,
 
     If {

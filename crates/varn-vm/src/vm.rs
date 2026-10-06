@@ -61,8 +61,7 @@ impl Vm {
 
     pub fn enable_profiling(&mut self) {
         let counters = ProfileCounters::new();
-        
-        
+
         self.ctx.frames.set_counters(Some(counters.clone()));
         self.ctx.profile_counters = Some(counters);
     }
@@ -73,10 +72,6 @@ impl Vm {
         self.ctx.heap.hotspot = Some(counters);
     }
 
-    
-    
-    
-    
     pub fn gc_report(&self) -> crate::gc_report::GcReport {
         self.ctx.heap.gc_report()
     }

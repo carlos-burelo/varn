@@ -1,26 +1,10 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use rustc_hash::FxHashMap;
 
 use super::ir::{InstKind, SsaFunc, Terminator, Value};
 
-
 pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
     use InstKind::*;
     match kind {
-        
         ConstInt(_)
         | ConstFloat(_)
         | ConstBool(_)
@@ -44,7 +28,6 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | This
         | GetSuper { .. } => {}
 
-        
         Unary { operand, .. }
         | IsNull { operand }
         | Cast { operand, .. }
@@ -82,7 +65,6 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             }
         }
 
-        
         Binary { lhs, rhs, .. } => {
             f(*lhs);
             f(*rhs);
@@ -128,7 +110,6 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             f(*accessor);
         }
 
-        
         SetIndex {
             object,
             index,
@@ -149,7 +130,6 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             f(*value);
         }
 
-        
         SelfCall { args } | SuperCall { args } | SuperMethodCall { args, .. } => {
             args.iter().for_each(|a| f(*a))
         }
@@ -182,7 +162,6 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         BuildObjectSpread { parts } => parts.iter().for_each(|(_, v)| f(*v)),
     }
 }
-
 
 pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
     use InstKind::*;
@@ -345,7 +324,6 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
     }
 }
 
-
 pub fn visit_term_uses(term: &Terminator, f: &mut impl FnMut(Value)) {
     match term {
         Terminator::Return(Some(v)) | Terminator::Throw(v) => f(*v),
@@ -363,7 +341,6 @@ pub fn visit_term_uses(term: &Terminator, f: &mut impl FnMut(Value)) {
         }
     }
 }
-
 
 pub fn visit_term_uses_mut(term: &mut Terminator, mut f: impl FnMut(&mut Value)) {
     match term {
@@ -391,20 +368,12 @@ pub fn visit_term_uses_mut(term: &mut Terminator, mut f: impl FnMut(&mut Value))
     }
 }
 
-
-
-
-
-
-
 pub fn replace_uses_with_map(func: &mut SsaFunc, map: &FxHashMap<Value, Value>) -> bool {
     if map.is_empty() {
         return false;
     }
     let mut changed = false;
     let mut sub = |v: &mut Value| {
-        
-        
         let mut hops = 0;
         while let Some(&next) = map.get(v) {
             if next == *v || hops > map.len() {

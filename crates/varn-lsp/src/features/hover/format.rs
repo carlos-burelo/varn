@@ -99,8 +99,6 @@ fn format_enum_member_sym(sym: SymbolView<'_>) -> String {
     }
 }
 
-
-
 fn is_primitive_class_name(name: &str) -> bool {
     varn_core::LangPrimitive::from_str(name).is_some()
 }
@@ -153,12 +151,6 @@ fn format_binding(keyword: &str, sym: SymbolView<'_>) -> String {
         format!("{} {}: {}", keyword, sym.name(), sym.type_str())
     }
 }
-
-
-
-
-
-
 
 pub fn format_summary_member(state: &DocumentState, m: &ResolvedMemberSummary) -> String {
     let indent = "  ";

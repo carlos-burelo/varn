@@ -38,30 +38,12 @@ mod number;
 mod serde_parse;
 mod stringify;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub(super) type CacheEntry = (std::rc::Rc<Vec<String>>, std::rc::Rc<varn_types::Shape>);
 pub(super) type ShapeCache = std::cell::RefCell<Option<CacheEntry>>;
-
 
 pub(super) fn cache_snapshot() -> Option<CacheEntry> {
     JSON_SHAPE_CACHE.with(|c| c.borrow().clone())
 }
-
-
 
 pub(super) fn key_prefix(cached: &Option<CacheEntry>, n: usize) -> Vec<String> {
     match cached {

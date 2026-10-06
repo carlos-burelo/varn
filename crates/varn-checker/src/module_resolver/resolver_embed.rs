@@ -55,8 +55,6 @@ impl DiskResolver {
         )
     }
 
-    
-
     pub(super) fn exports_from_embedded(
         &self,
         virtual_id: &str,

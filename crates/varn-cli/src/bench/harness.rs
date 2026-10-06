@@ -1,5 +1,3 @@
-
-
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -12,12 +10,6 @@ use varn_vm::Vm;
 
 use crate::error::CliError;
 
-
-
-
-
-
-
 pub struct VmFactory {
     precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     builtins: Vec<Rc<FunctionProto>>,
@@ -27,8 +19,6 @@ pub struct VmFactory {
 }
 
 impl VmFactory {
-    
-    
     pub fn new(
         precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
         builtins: Vec<FunctionProto>,
@@ -47,8 +37,6 @@ impl VmFactory {
         Ok(factory)
     }
 
-    
-    
     pub fn build(&self) -> Vm {
         self.try_build()
             .expect("initialization already succeeded in VmFactory::new")
@@ -95,7 +83,6 @@ impl VmFactory {
         self.proto.clone()
     }
 
-    
     pub fn run_once(&self) -> Result<Vm, String> {
         let mut machine = self.build();
         run_vm_to_completion(&mut machine, self.entry_proto())?;
@@ -173,7 +160,6 @@ fn compiled_keys() -> std::collections::BTreeSet<(String, usize)> {
         .collect()
 }
 
-
 pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Duration>, CliError> {
     f().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
 
@@ -185,8 +171,6 @@ pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Du
     }
     Ok(samples)
 }
-
-
 
 pub fn time_n_freq_setup_progress<T, S, F, P>(
     runs: usize,
@@ -218,21 +202,6 @@ where
     let tiered = compiled_keys().difference(&warmed).count() as u64;
     Ok((samples, peak, tiered))
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 pub fn time_n_freq_setup<T, S, F>(
     runs: usize,

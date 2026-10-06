@@ -11,15 +11,6 @@ pub struct CheckResult {
     pub checker_result: varn_checker::CheckResult,
 }
 
-
-
-
-
-
-
-
-
-
 pub fn report_diagnostics(
     diagnostics: &varn_core::DiagnosticBag,
     filename: &str,
@@ -71,9 +62,6 @@ pub fn check(
         varn_debug::symbols::debug_symbols(&check_result, &program.filename, debug);
     }
 
-    
-    
-    
     if debug.check_types {
         varn_debug::expr::debug_check_types(program, source, &check_result);
     }

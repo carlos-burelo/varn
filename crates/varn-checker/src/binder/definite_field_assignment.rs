@@ -1,21 +1,8 @@
-
-
-
-
-
-
-
-
-
-
-
-
 use rustc_hash::FxHashSet;
 use std::sync::Arc;
 use varn_core::ast::operators::AssignOp;
 use varn_core::ast::{AstArena, ExprId, ExprKind, StmtId, StmtKind};
 use varn_core::AtomInterner;
-
 
 pub(super) fn fields_assigned_on_every_path(
     body: StmtId,
@@ -60,10 +47,6 @@ fn walk_expr(e: ExprId, arena: &AstArena, interner: &AtomInterner, out: &mut FxH
     }
 }
 
-
-
-
-
 fn walk_stmt(s: StmtId, arena: &AstArena, interner: &AtomInterner, out: &mut FxHashSet<Arc<str>>) {
     match &arena.stmt(s).kind {
         StmtKind::Block { stmts } => {
@@ -85,15 +68,12 @@ fn walk_stmt(s: StmtId, arena: &AstArena, interner: &AtomInterner, out: &mut FxH
                     walk_stmt(*alt, arena, interner, &mut s);
                     s
                 }
-                
-                
+
                 None => FxHashSet::default(),
             };
             out.extend(then_set.intersection(&else_set).cloned());
         }
-        
-        
-        
+
         _ => {}
     }
 }

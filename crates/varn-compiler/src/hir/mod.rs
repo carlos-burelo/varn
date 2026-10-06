@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TyId(pub u32);
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClassId(pub u32);
@@ -16,18 +14,15 @@ pub enum HirType {
     Str,
     Ref,
     Dynamic,
-    
+
     Array(TyId),
     Map(TyId, TyId),
     Set(TyId),
-    
+
     Class(ClassId),
-    
+
     Nullable(TyId),
 }
-
-
-
 
 #[derive(Debug, Default)]
 pub struct TyTable {
@@ -105,9 +100,6 @@ pub enum HirBinOp {
 
     In,
 }
-
-
-
 
 pub(crate) fn binary_result_ty(op: HirBinOp, operand_ty: HirType) -> HirType {
     use HirBinOp::*;

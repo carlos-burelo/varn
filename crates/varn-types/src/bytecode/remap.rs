@@ -1,18 +1,7 @@
-
-
 use std::collections::BTreeSet;
 
 use super::{layout, Byte, Operand};
 use crate::chunk::PoolEntry;
-
-
-
-
-
-
-
-
-
 
 pub fn remap_registers(code: &mut [u16], constants: &[PoolEntry], map: impl Fn(u8) -> u8) {
     let mut offset = 0;

@@ -1,12 +1,5 @@
 use super::*;
 
-
-
-
-
-
-
-
 pub struct TypeDisplay<'t> {
     ty: Type,
     table: &'t CheckerTyTable,
@@ -36,11 +29,6 @@ impl<'t> TypeDisplay<'t> {
         }
     }
 
-    
-    
-    
-    
-    
     fn name(&self, atom: varn_core::Atom) -> std::borrow::Cow<'t, str> {
         match self.interner.try_resolve(atom) {
             Some(s) => std::borrow::Cow::Borrowed(s),

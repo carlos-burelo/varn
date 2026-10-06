@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C, align(16))]
 pub struct JmpBuf {
@@ -20,8 +11,8 @@ pub struct JmpBuf {
     pub x26: u64,
     pub x27: u64,
     pub x28: u64,
-    pub fp: u64, 
-    pub lr: u64, 
+    pub fp: u64,
+    pub lr: u64,
     pub sp: u64,
     pub d8: u64,
     pub d9: u64,

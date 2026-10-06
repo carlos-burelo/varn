@@ -12,8 +12,6 @@ impl ExecCtx {
         dest: usize,
         frame_idx: usize,
     ) -> VmResult<bool> {
-        
-        
         let mut pending_receiver: Option<VmValue> = None;
         if callee.is_heap() {
             let heap_idx = callee.as_heap();
@@ -32,10 +30,7 @@ impl ExecCtx {
                                 "stack overflow: call depth exceeded 10000",
                             ));
                         }
-                        
-                        
-                        
-                        
+
                         let alloc = self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
                         let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
                         frame.return_reg = dest as u16;
@@ -88,9 +83,7 @@ impl ExecCtx {
                                         "stack overflow: call depth exceeded 10000",
                                     ));
                                 }
-                                
-                                
-                                
+
                                 let first_arg = if arg_count == arity { 1 } else { 0 };
                                 let alloc = self.push_call_frame_with_this(
                                     &nc.proto,
@@ -112,10 +105,6 @@ impl ExecCtx {
                     }
                 }
 
-                
-                
-                
-                
                 pending_receiver = Some(receiver);
             } else {
                 match self.heap.get(callee.as_heap()) {
@@ -178,7 +167,6 @@ impl ExecCtx {
                             }
                             if failed.is_none() {
                                 for i in regular_count..rest_idx {
-                                    
                                     if let Err(e) =
                                         self.stack.unbox_into_reg(alloc, i, VmValue::null())
                                     {
@@ -220,8 +208,6 @@ impl ExecCtx {
             }
         }
 
-        
-        
         self.stage.clear();
         for i in 0..arg_count {
             self.stage.push(self.stack.box_reg(base, arg_start + i));
@@ -259,14 +245,6 @@ impl ExecCtx {
         let closure_ptr = parent_frame.closure_ptr;
         let closure_ref = unsafe { &*closure_ptr };
 
-        
-        
-        
-        
-        
-        
-        
-        
         let callee = match &parent_frame._owned_closure {
             Some(rc) => self.heap.alloc_vm_closure(rc.clone()),
             None => VmValue::null(),

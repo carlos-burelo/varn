@@ -1,35 +1,12 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompileOutcome {
-    
     Routed,
-    
-    
-    
-    
-    
-    
-    
+
     Gated(String),
-    
+
     Bailed(String),
 }
 
@@ -38,7 +15,6 @@ impl CompileOutcome {
         matches!(self, CompileOutcome::Routed)
     }
 
-    
     pub fn reason(&self) -> Option<&str> {
         match self {
             CompileOutcome::Routed => None,
@@ -48,14 +24,13 @@ impl CompileOutcome {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct CompileRecord {
     pub name: String,
-    
+
     pub words: usize,
     pub outcome: CompileOutcome,
-    
+
     pub compile_ns: u64,
 }
 
@@ -63,72 +38,40 @@ pub struct CompileRecord {
 pub struct JitStatsSnapshot {
     pub compile_success: u64,
     pub compile_fail: u64,
-    
+
     pub gate_rejected: u64,
     pub total_compile_time_ns: u64,
-    
-    
-    
-    
+
     pub backend_time_ns: u64,
     pub total_code_size_bytes: u64,
     pub jit_runs: u64,
     pub jit_cached: u64,
     pub interp_runs: u64,
-    
-    
-    
-    
-    
+
     pub osr_entries: u64,
 }
 
 impl JitStatsSnapshot {
-    
     pub fn total_frames(&self) -> u64 {
         self.jit_runs + self.interp_runs
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn machine_code_frames(&self) -> u64 {
         self.jit_runs + self.osr_entries
     }
 
-    
-    
-    
     pub fn never_compiled_frames(&self) -> u64 {
         self.interp_runs.saturating_sub(self.osr_entries)
     }
 
-    
     pub fn machine_code_ratio(&self) -> f64 {
         self.frame_share_of(self.machine_code_frames())
     }
 
-    
-    
-    
-    
     pub fn never_compiled_ratio(&self) -> f64 {
         self.frame_share_of(self.never_compiled_frames())
     }
 
-    
-    
-    
-    
     pub fn frame_share_of(&self, n: u64) -> f64 {
         let total = self.total_frames();
         if total == 0 {
@@ -137,19 +80,10 @@ impl JitStatsSnapshot {
         n as f64 / total as f64
     }
 
-    
     pub fn functions_seen(&self) -> u64 {
         self.compile_success + self.compile_fail + self.gate_rejected
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
     pub fn fn_compilation_rate(&self) -> f64 {
         let seen = self.functions_seen();
         if seen == 0 {
@@ -158,7 +92,6 @@ impl JitStatsSnapshot {
         self.compile_success as f64 / seen as f64
     }
 
-    
     pub fn ns_per_routed_fn(&self) -> Option<f64> {
         if self.compile_success == 0 {
             return None;
@@ -236,15 +169,12 @@ pub static JIT_STATS: JitStats = JitStats::new();
 static RECORDING: AtomicBool = AtomicBool::new(false);
 static RECORDS: Mutex<Vec<CompileRecord>> = Mutex::new(Vec::new());
 
-
-
 pub fn start_recording() {
     if let Ok(mut buf) = RECORDS.lock() {
         buf.clear();
     }
     RECORDING.store(true, Ordering::Relaxed);
 }
-
 
 pub fn take_records() -> Vec<CompileRecord> {
     RECORDING.store(false, Ordering::Relaxed);
@@ -253,8 +183,6 @@ pub fn take_records() -> Vec<CompileRecord> {
         .map(|mut buf| std::mem::take(&mut *buf))
         .unwrap_or_default()
 }
-
-
 
 pub(crate) fn record(make: impl FnOnce() -> CompileRecord) {
     if !RECORDING.load(Ordering::Relaxed) {

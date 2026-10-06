@@ -1,18 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -24,15 +9,13 @@ use super::fmt::{fmt_bytes, fmt_dur, fmt_num, fmt_pct, row, LABEL_WIDTH, VALUE_W
 
 const TOP_N: usize = 3;
 
-
 pub fn top_blocker(records: &[CompileRecord]) -> Option<(String, String)> {
     let mut worst: Option<&CompileRecord> = None;
     for r in records {
         if r.outcome.is_routed() {
             continue;
         }
-        
-        
+
         if worst.is_none_or(|w| r.words > w.words) {
             worst = Some(r);
         }
@@ -125,13 +108,7 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
         row("frames clif", fmt_num(jit.jit_runs)),
         chalk(frame_pct(jit.jit_runs)).dim()
     ));
-    
-    
-    
-    
-    
-    
-    
+
     let never_compiled = jit.never_compiled_frames();
     terminal::log(format!(
         "{}  {}",
@@ -209,8 +186,6 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
         print_blockers(records);
     }
 }
-
-
 
 fn print_blockers(records: &[CompileRecord]) {
     let mut groups: BTreeMap<String, Vec<&CompileRecord>> = BTreeMap::new();

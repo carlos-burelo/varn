@@ -5,12 +5,10 @@ use varn_lsp::pipeline::run_pipeline;
 
 #[test]
 fn test_incomplete_variable_declaration() {
-    
     let source = "const x = ";
     let uri = "file:///test/incomplete.vn".to_string();
     let state = run_pipeline(source.to_string(), uri);
 
-    
     assert!(state.ast.is_some());
 }
 
@@ -28,7 +26,6 @@ p.
     let uri = "file:///test/person.vn".to_string();
     let state = run_pipeline(source.to_string(), uri);
 
-    
     let (completions, _) = build_completion_response(
         &state,
         7,

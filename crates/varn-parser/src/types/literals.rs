@@ -2,8 +2,6 @@ use crate::stream::TokenStream;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
 
-
-
 pub(crate) fn parse_literal_type(
     s: &mut TokenStream,
     range: varn_core::SourceRange,

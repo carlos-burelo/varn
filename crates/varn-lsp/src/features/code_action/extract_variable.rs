@@ -24,7 +24,6 @@ pub fn generate_extract_variable_action(
         return None;
     }
 
-    
     let selected_text = if start_line == end_line {
         let line = lines[start_line];
         if start_col >= line.len() || end_col > line.len() || start_col >= end_col {
@@ -32,7 +31,7 @@ pub fn generate_extract_variable_action(
         }
         line[start_col..end_col].trim()
     } else {
-        return None; 
+        return None;
     };
 
     if selected_text.is_empty() || selected_text.contains(';') {

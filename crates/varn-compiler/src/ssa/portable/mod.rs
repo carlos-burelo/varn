@@ -1,15 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
 use std::sync::Arc;
 
 use crate::hir::HirType;
@@ -23,27 +11,23 @@ mod ops;
 
 use inst::project_inst;
 
-
 pub(crate) struct Emitted<'a> {
-    
     pub reg: &'a [u8],
     pub register_count: u16,
     pub nparams: usize,
-    
+
     pub ic: &'a crate::ssa::ic::IcSlots,
-    
+
     pub closure_consts: &'a [Vec<Option<u16>>],
-    
+
     pub block_offset: &'a [usize],
-    
+
     pub inst_off: &'a [Vec<usize>],
-    
+
     pub inst_next: &'a [Vec<usize>],
-    
+
     pub liveness: &'a Liveness,
 }
-
-
 
 struct Captured {
     vars: Vec<VarId>,
@@ -68,9 +52,6 @@ impl Captured {
             .collect()
     }
 }
-
-
-
 
 pub(crate) fn project(
     ssa: &SsaFunc,
@@ -171,8 +152,6 @@ pub(crate) fn project(
     })
 }
 
-
-
 fn loop_headers(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaLoopHeader> {
     let off = |b: usize| emitted.block_offset.get(b).copied().unwrap_or(usize::MAX);
     let mut is_header = vec![false; ssa.blocks.len()];
@@ -207,19 +186,17 @@ fn loop_headers(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaLoopHeader> {
         .collect()
 }
 
-
 struct Site<'a> {
-    
     ic_slot: Option<u8>,
-    
+
     closure_const: Option<u16>,
-    
+
     landing: Option<(u32, &'a FxHashSet<u32>)>,
-    
+
     own_ip: u32,
-    
+
     next_ip: u32,
-    
+
     resume_live: Vec<u32>,
 }
 
@@ -247,8 +224,6 @@ fn project_term(term: &Terminator) -> SsaTerm {
         Terminator::Unreachable => SsaTerm::Unreachable,
     }
 }
-
-
 
 fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
     let ty = |v: &crate::ssa::ir::Value| value_tys.get(v.0 as usize).copied();

@@ -34,16 +34,11 @@ pub struct ClassObj {
     pub setter_vtable_owners: RefCell<Vec<Option<Rc<ClassObj>>>>,
     pub static_getter_map: RefCell<HashMap<RuntimeString, VmValue>>,
     pub static_setter_map: RefCell<HashMap<RuntimeString, VmValue>>,
-    
-    
+
     pub ctor_cache: RefCell<Option<(u32, Option<VmValue>)>>,
-    
-    
-    
-    
+
     pub ctor_rt_cache: RefCell<Option<CtorRtCacheEntry>>,
-    
-    
+
     pub instance_shape_cache: RefCell<Option<(Rc<super::shape::Shape>, usize)>>,
     pub layout: RefCell<Rc<varn_core::layout::ClassLayout>>,
 }
@@ -321,7 +316,6 @@ impl ClassObj {
         None
     }
 
-    
     pub fn constructor(&self) -> Option<VmValue> {
         let ver = self.vtable_version.load(Ordering::Relaxed);
         if let Some((cached_ver, ctor)) = self.ctor_cache.borrow().as_ref() {

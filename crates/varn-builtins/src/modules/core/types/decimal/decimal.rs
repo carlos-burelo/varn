@@ -27,8 +27,6 @@ fn not_decimal() -> NativeError {
     NativeError::from("decimal: receiver is not a decimal")
 }
 
-
-
 fn pow_decimal(d: &BigDecimal, exp: i64) -> Result<BigDecimal, NativeError> {
     let mut result = BigDecimal::one();
     let mut base = d.clone();

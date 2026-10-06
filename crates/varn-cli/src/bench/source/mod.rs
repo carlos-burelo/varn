@@ -1,5 +1,3 @@
-
-
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -111,11 +109,6 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    
-    
-    
-    
-    
     let check_result = varn_pipeline::resolver::with_resolver(|r| {
         Checker::check_with(
             &program,
@@ -227,10 +220,6 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     let total_p50: Duration = phases.iter().map(|p| p.p50).sum();
     let execute = phases.iter().find(|p| p.name == "execute (warm)");
 
-    
-    
-    
-    
     let (exec_jit, records) = {
         varn_vm::varn_jit::JIT_STATS.reset();
         varn_vm::varn_jit::stats::start_recording();
@@ -300,7 +289,5 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);
 
-    
-    
     super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
 }

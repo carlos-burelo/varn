@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 use super::Checker;
 use crate::binder::BindResult;
 use rustc_hash::FxHashSet;
@@ -15,12 +6,10 @@ use varn_core::{Atom, Diagnostic, ErrorCode};
 
 #[derive(Clone, Default)]
 struct Flow {
-    
     pending: FxHashSet<Atom>,
-    
+
     assigned: FxHashSet<Atom>,
-    
-    
+
     diverged: bool,
 }
 
@@ -28,7 +17,7 @@ impl Flow {
     fn assign(&mut self, name: &Atom) {
         self.assigned.insert(*name);
     }
-    
+
     fn merge(&mut self, a: Flow, b: Flow) {
         match (a.diverged, b.diverged) {
             (true, true) => self.diverged = true,
@@ -56,7 +45,7 @@ impl<'r> Checker<'r> {
             }
             self.da_stmt(s, flow, bind);
         }
-        
+
         flow.pending.retain(|n| outer_pending.contains(n));
     }
 
@@ -87,7 +76,7 @@ impl<'r> Checker<'r> {
                         }
                     }
                 }
-                
+
                 self.da_nested_decl(&decl, bind);
             }
 
@@ -266,13 +255,11 @@ impl<'r> Checker<'r> {
                         )
                         .with_range(arena.expr(e).range),
                     );
-                    
+
                     flow.assigned.insert(name);
                 }
             }
 
-            
-            
             ExprKind::Assign { target, value, .. } => {
                 let (target, value) = (*target, *value);
                 self.da_expr(value, flow, bind);
@@ -283,7 +270,6 @@ impl<'r> Checker<'r> {
                 }
             }
 
-            
             ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::ClassExpr { .. } => {}
 
             _ => walk_expr_children(e, arena, &mut |c| self.da_expr(c, flow, bind)),
@@ -352,9 +338,6 @@ fn pattern_names(p: &varn_core::ast::Pattern) -> Vec<Atom> {
     go(p, &mut out);
     out
 }
-
-
-
 
 fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(ExprId)) {
     use varn_core::ast::{Arg, ArrayEl, ObjectProp, TemplatePart};

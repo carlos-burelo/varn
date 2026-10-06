@@ -1,5 +1,3 @@
-
-
 mod handles;
 
 use super::VerifyError;
@@ -18,7 +16,6 @@ pub(super) fn check(m: &TirModule, errors: &mut Vec<VerifyError>) {
 }
 
 fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
-    
     let dummy_expr = TirExpr {
         kind: TirExprKind::NullLit,
         ty: BackendTy::Void,
@@ -29,14 +26,11 @@ fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
         check_ty(m, *ty, &dummy_expr, errors);
     }
 
-    
     for class in &m.classes {
         for field in &class.fields {
             check_ty(m, field.ty, &dummy_expr, errors);
         }
-        
-        
-        
+
         for entry in &class.vtable {
             if m.signature(entry.sig).is_none() {
                 errors.push(VerifyError::new(
@@ -50,7 +44,6 @@ fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
         }
     }
 
-    
     for enum_info in &m.enums {
         for variant in &enum_info.variants {
             for ty in &variant.payload {
@@ -59,7 +52,6 @@ fn check_declarations(m: &TirModule, errors: &mut Vec<VerifyError>) {
         }
     }
 
-    
     for sig in &m.signatures {
         for param_ty in &sig.params {
             check_ty(m, *param_ty, &dummy_expr, errors);
@@ -79,7 +71,6 @@ fn check_function(m: &TirModule, f: &TirFunction, errors: &mut Vec<VerifyError>)
         ));
     }
 
-    
     let dummy_expr = TirExpr {
         kind: TirExprKind::NullLit,
         ty: BackendTy::Void,

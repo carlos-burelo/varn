@@ -1,6 +1,3 @@
-
-
-
 use super::super::ir::{BlockId, SsaFunc, Terminator, Value};
 use crate::OptError;
 use varn_core::OpCode;

@@ -1,23 +1,6 @@
-
-
 use super::calls_static::{hand_off, settle, Handoff};
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "jit_call_method_cached_window")]
@@ -45,17 +28,6 @@ pub(crate) extern "C" fn jit_call_method_cached_window(
         let args = crate::exec::method_args::MethodArgs::Boxed(&window[1..]);
         let this_val = window[0];
 
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         let fast = (|| {
             if class_ptr == 0
                 || (kind != ICKind::NATIVE_VTABLE_METHOD && kind != ICKind::VM_VTABLE_METHOD)
@@ -85,9 +57,7 @@ pub(crate) extern "C" fn jit_call_method_cached_window(
                 if nc.proto.is_generator || nc.proto.is_async || args.len() > nc.proto.arity {
                     return None;
                 }
-                
-                
-                
+
                 let owned: std::rc::Rc<varn_types::value::ClassObj> = {
                     let rc = std::rc::Rc::from_raw(class_ptr as *const varn_types::value::ClassObj);
                     let out = std::rc::Rc::clone(&rc);

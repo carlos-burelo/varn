@@ -1,19 +1,13 @@
-
-
-
-
 use crate::ast::operators::{BinaryOp, UnaryOp};
-
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OperatorShape {
-    
     Value,
-    
+
     CompareToZero(BinaryOp),
-    
+
     Equals,
-    
+
     NotEquals,
 }
 

@@ -1,18 +1,4 @@
-
-
-
-
-
-
-
-
-
-
-
-
 use std::fmt::{self, Display, Formatter};
-
-
 
 #[derive(Clone, Debug)]
 pub struct Chalk {
@@ -68,14 +54,10 @@ impl Chalk {
 
 impl Display for Chalk {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        
-        
-        
         let forced = self.style.clone().force_styling(true).for_stderr();
         write!(f, "{}", forced.apply_to(&self.text))
     }
 }
-
 
 pub fn chalk(text: impl Display) -> Chalk {
     Chalk::new(text, console::Style::new())

@@ -21,8 +21,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 pub use varn_core::RuntimeKind;
 
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RangeElem {
     Int,
@@ -57,7 +55,6 @@ impl RangeData {
         }
     }
 
-    
     pub fn len(&self) -> i64 {
         let span = self.end_exclusive() - self.start;
         if span <= 0 {
@@ -71,7 +68,6 @@ impl RangeData {
         self.len() == 0
     }
 
-    
     pub fn nth(&self, i: i64) -> Option<i64> {
         (0..self.len())
             .contains(&i)
@@ -82,7 +78,6 @@ impl RangeData {
         raw >= self.start && raw < self.end_exclusive() && (raw - self.start) % self.step == 0
     }
 
-    
     pub fn char_of(raw: i64) -> char {
         u32::try_from(raw)
             .ok()
@@ -140,9 +135,6 @@ impl std::fmt::Display for RuntimeSymbol {
 
 #[derive(Debug, Clone)]
 pub struct EnumVariantData {
-    
-    
-    
     pub enum_class_id: Option<u32>,
     pub enum_name: Arc<str>,
     pub variant_name: Arc<str>,

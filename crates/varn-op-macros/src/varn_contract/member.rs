@@ -43,7 +43,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
         return;
     }
     let rust_sym = sym.trim_end_matches('$');
-    
+
     let method_ident = if syn::parse_str::<Ident>(rust_sym).is_ok() {
         format_ident!("{}", rust_sym)
     } else {
@@ -237,8 +237,6 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
         };
         out.setup_calls.push(setup);
 
-        
-        
         let mkind: u8 = match m.kind {
             Kind::Method => 0x03,
             Kind::StaticMethod => 0x04,

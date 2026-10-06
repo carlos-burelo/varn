@@ -33,7 +33,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             return None;
         }
 
-        
         if tok.kind == TokenKind::This {
             if let Some((_, ty)) = state.db.resolve_at("this", tok.offset) {
                 if !state.db.is_dynamic(&ty) {
@@ -43,7 +42,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             return Some(make_lang_hover("this".to_owned()));
         }
 
-        
         let prev_is_at = idx
             .checked_sub(1)
             .and_then(|j| state.tokens.get(j))
@@ -55,7 +53,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             }
         }
 
-        
         if let Some(mem_res) = state.db.member_resolutions.get(&tok.offset) {
             let sig = member_resolution_sig(state, mem_res);
             return Some(make_lang_hover(sig));
@@ -100,8 +97,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     }
 
     if let Some((parent_name, member)) = query::member_at(state, line, col) {
-        
-        
         let sig = if member.kind == varn_checker::ResolvedMemberKind::EnumMember {
             format_enum_member(&parent_name, &member.name, "")
         } else {
@@ -121,7 +116,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         return Some(make_lang_hover(sig));
     }
 
-    
     if let Some((_, tok)) = tok_any {
         if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
             return Some(h);
@@ -140,7 +134,6 @@ pub(crate) fn make_lang_hover(value: String) -> Hover {
         range: None,
     }
 }
-
 
 fn member_resolution_sig(state: &DocumentState, res: &varn_checker::MemberResolution) -> String {
     use varn_checker::ResolvedMemberKind as R;
@@ -170,8 +163,7 @@ fn member_resolution_sig(state: &DocumentState, res: &varn_checker::MemberResolu
             "(constructor) {parent}({})",
             format_member_params(state, &res.member_ty)
         ),
-        
-        
+
         R::NestedType(k) => format!("{} {parent}.{name}", k.label()),
     }
 }
@@ -192,7 +184,6 @@ fn format_fn_params(
         .collect::<Vec<_>>()
         .join(", ")
 }
-
 
 fn format_member_params(state: &DocumentState, ty: &varn_checker::Type) -> String {
     state

@@ -1,17 +1,7 @@
-
-
-
-
-
-
 use super::construct::jit_propagate_error;
 use super::suspend::jit_suspend_at;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-
-
-
-
 
 #[varn_op_macros::jit_slow(field = "load_module")]
 pub(crate) extern "C" fn jit_load_module(
@@ -31,15 +21,9 @@ pub(crate) extern "C" fn jit_load_module(
                 return;
             }
         };
-        
-        
+
         let self_idx = ctx_ref.frames.len() - 1;
-        
-        
-        
-        
-        
-        
+
         let loaded =
             match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
                 Ok(v) => v,

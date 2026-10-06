@@ -23,19 +23,6 @@ pub(super) fn write_int(n: i64, out: &mut String) {
     out.push_str(s);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
     if val.is_null() {
         out.push_str("null");
@@ -151,8 +138,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
 pub(super) fn write_json_str(s: &str, out: &mut String) {
     out.push('"');
     let bytes = s.as_bytes();
-    
-    
+
     if !bytes.iter().any(|&b| b == b'"' || b == b'\\' || b < 0x20) {
         out.push_str(s);
         out.push('"');

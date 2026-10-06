@@ -104,14 +104,6 @@ pub fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> Ru
     }
 }
 
-
-
-
-
-
-
-
-
 pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
     if let Some(v) = err.thrown {
         return v;
@@ -119,8 +111,6 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
     let msg = heap.alloc_str_dynamic(&err.message);
     let class_name = err.kind.class_name();
     let Some(cls) = heap.get_intrinsic_class(class_name) else {
-        
-        
         return msg;
     };
     let name = heap.alloc_str_dynamic(class_name);
@@ -133,12 +123,6 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
     err_obj
 }
 
-
-
-
-
-
-
 #[allow(dangerous_implicit_autorefs)]
 pub(crate) unsafe fn dispatch_to_handler(
     ctx: *mut crate::exec::ExecCtx,
@@ -146,14 +130,12 @@ pub(crate) unsafe fn dispatch_to_handler(
     depth: usize,
 ) -> bool {
     if let Some(handler) = (*ctx).try_handlers.pop_if(|h| h.frame_depth > depth) {
-        
-        
         if crate::exec::frame_ctrl::unwind_to_handler(&mut *ctx, handler, thrown_val).is_err() {
             return false;
         }
         return true;
     }
-    
+
     while (*ctx).frames.len() > depth {
         let cur_ip = (*ctx).frames.last().unwrap().ip as u32;
         let proto = &(*ctx).frames.last().unwrap().closure().proto;

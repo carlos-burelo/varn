@@ -1,20 +1,6 @@
-
-
-
-
-
-
-
 use tower_lsp::lsp_types::TextDocumentContentChangeEvent;
 
 use crate::document::position::byte_offset;
-
-
-
-
-
-
-
 
 pub fn apply_change(source: &mut String, change: TextDocumentContentChangeEvent) {
     let Some(range) = change.range else {
@@ -23,16 +9,10 @@ pub fn apply_change(source: &mut String, change: TextDocumentContentChangeEvent)
     };
 
     let start = byte_offset(source, range.start);
-    
-    
+
     let end = byte_offset(source, range.end).max(start);
     source.replace_range(start..end, &change.text);
 }
-
-
-
-
-
 
 pub fn apply_changes(
     source: &mut String,

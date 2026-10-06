@@ -71,19 +71,6 @@ pub fn register_fallback_module_entries(entries: &'static [&'static NativeOpEntr
 
 static ALL_OPS: OnceLock<Vec<&'static NativeOpEntry>> = OnceLock::new();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub fn all_native_ops() -> &'static [&'static NativeOpEntry] {
     ALL_OPS.get_or_init(|| {
         let mut list: Vec<&'static NativeOpEntry> = Vec::new();
@@ -108,7 +95,6 @@ pub fn all_native_ops() -> &'static [&'static NativeOpEntry] {
         list
     })
 }
-
 
 fn entry_op_id(entry: &NativeOpEntry) -> u64 {
     let module = entry.module_id();
@@ -172,15 +158,6 @@ pub fn find_native_op_entry(op_id: u64) -> Option<&'static NativeOpEntry> {
 
 static NAME_BY_FN: OnceLock<FxHashMap<usize, &'static str>> = OnceLock::new();
 
-
-
-
-
-
-
-
-
-
 pub fn native_op_name_by_fn(f: varn_types::NativeFn) -> Option<&'static str> {
     NAME_BY_FN
         .get_or_init(|| {
@@ -203,9 +180,6 @@ pub fn describe_op(id: u64) -> Option<OpMeta> {
         capability: None,
     })
 }
-
-
-
 
 pub fn native_op_fn(id: u64) -> Option<varn_types::NativeFn> {
     let table = TABLE.get_or_init(build_table);

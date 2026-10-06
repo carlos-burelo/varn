@@ -6,9 +6,6 @@ pub type RuntimeString = Arc<str>;
 
 pub use super::map::{MapKey, MapRef, ValueMap, ValueSet};
 
-
-
-
 #[derive(Clone, Copy)]
 pub struct ObjRef(pub(crate) std::ptr::NonNull<super::ObjData>);
 

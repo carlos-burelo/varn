@@ -1,5 +1,3 @@
-
-
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
@@ -16,8 +14,6 @@ pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmVa
     }
 }
 
-
-
 #[varn_op_macros::jit_slow(field = "build_array_window")]
 pub(crate) extern "C" fn jit_build_array_window(
     ctx: *mut ExecCtx,
@@ -31,8 +27,6 @@ pub(crate) extern "C" fn jit_build_array_window(
     }
 }
 
-
-
 #[varn_op_macros::jit_slow(field = "build_empty_object")]
 pub(crate) extern "C" fn jit_build_empty_object(ctx: *mut ExecCtx) {
     unsafe {
@@ -40,8 +34,6 @@ pub(crate) extern "C" fn jit_build_empty_object(ctx: *mut ExecCtx) {
         ctx_ref.jit_native_result = ctx_ref.heap.alloc_object();
     }
 }
-
-
 
 #[varn_op_macros::jit_slow(field = "build_map_window")]
 pub(crate) extern "C" fn jit_build_map_window(
@@ -120,10 +112,6 @@ unsafe fn build_shaped_from_ptr(
         is_record,
     )
 }
-
-
-
-
 
 #[varn_op_macros::jit_slow(field = "build_object_window")]
 pub(crate) extern "C" fn jit_build_object_window(

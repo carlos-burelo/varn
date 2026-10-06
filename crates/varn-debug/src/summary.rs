@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use varn_types::{FunctionProto, PoolEntry};
 
 use crate::render::truncate;

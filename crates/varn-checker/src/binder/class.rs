@@ -8,10 +8,6 @@ use varn_core::{Atom, TypeKind};
 
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_class(&mut self, c: &ClassDecl) {
-        
-        
-        
-        
         let name_atom: Atom = c.id.unwrap_or_else(|| self.intern_local("<anon>"));
         let name: Arc<str> = Arc::from(self.interner.resolve(name_atom));
         let line = c.range.start.line;

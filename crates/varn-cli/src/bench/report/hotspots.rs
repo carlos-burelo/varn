@@ -1,5 +1,3 @@
-
-
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_vm::HotspotCounters;
@@ -17,7 +15,6 @@ pub fn print_hotspots(h: &HotspotCounters) {
     terminal::blank();
     terminal::log(chalk("Runtime Hotspots").cyan().bold());
 
-    
     let mut interp_only: Vec<_> = h
         .fn_calls
         .iter()
@@ -112,11 +109,7 @@ pub fn print_hotspots(h: &HotspotCounters) {
 
     if !h.native_calls.is_empty() {
         section("Llamadas nativas");
-        
-        
-        
-        
-        
+
         let mut entries: Vec<_> = h.native_calls.iter().collect();
         entries.sort_by_key(|(name, count)| {
             std::cmp::Reverse(h.native_ns.get(*name).copied().unwrap_or(0).max(**count))
@@ -149,9 +142,6 @@ pub fn print_hotspots(h: &HotspotCounters) {
         let mut entries: Vec<_> = h.global_accesses.iter().collect();
         entries.sort_by(|a, b| b.1.cmp(a.1));
         for (name, count) in entries.iter().take(TOP_N) {
-            
-            
-            
             terminal::log(row(&short_global(name), fmt_num(**count)));
         }
     }

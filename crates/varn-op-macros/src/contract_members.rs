@@ -1,6 +1,3 @@
-
-
-
 use crate::varn_contract::{classify, Mapped};
 use varn_core::ast::{
     AstArena, ClassDecl, ClassMember, Decl, ExportDecl, ExprKind, FunctionDecl, Param, Pattern,
@@ -30,8 +27,7 @@ pub(crate) struct Member {
     pub(crate) kind: Kind,
     pub(crate) params: Vec<ParamInfo>,
     pub(crate) ret: Mapped,
-    
-    
+
     pub(crate) fallible: bool,
 }
 

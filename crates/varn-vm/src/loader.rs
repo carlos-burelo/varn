@@ -19,14 +19,6 @@ impl Display for ModuleError {
     }
 }
 
-
-
-
-
-
-
-
-
 pub trait ModuleLoader {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError>;
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError>;

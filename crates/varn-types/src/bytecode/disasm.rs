@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 use std::fmt::Write;
 
 use varn_core::OpCode;
@@ -13,23 +6,19 @@ use super::{layout, Access, At, Byte, ImmKind, Layout, Operand};
 use crate::chunk::{Chunk, Literal, PoolEntry};
 use crate::FunctionProto;
 
-
 #[derive(Clone, Debug)]
 pub struct Instr {
     pub offset: usize,
-    
+
     pub line: u32,
-    
-    
+
     pub op: Option<OpCode>,
     pub len: usize,
-    
+
     pub text: String,
-    
-    
+
     pub constants: Vec<usize>,
 }
-
 
 pub fn instructions(chunk: &Chunk) -> impl Iterator<Item = Instr> + '_ {
     let code = &chunk.code;
@@ -70,7 +59,6 @@ pub fn instructions(chunk: &Chunk) -> impl Iterator<Item = Instr> + '_ {
         Some(instr)
     })
 }
-
 
 pub fn render(proto: &FunctionProto) -> String {
     let mut out = String::new();
@@ -135,8 +123,6 @@ fn render_into(proto: &FunctionProto, out: &mut String) {
     }
 }
 
-
-
 pub fn constant_text(entry: &PoolEntry) -> String {
     match entry {
         PoolEntry::Literal(lit) => match lit {
@@ -163,8 +149,6 @@ pub fn constant_text(entry: &PoolEntry) -> String {
         ),
     }
 }
-
-
 
 pub fn operands_text(layout: &Layout, code: &[u16], offset: usize) -> String {
     let reg = |at: Byte| format!("r{}", at.read(code, offset));
@@ -228,7 +212,7 @@ fn imm_text(at: At, kind: ImmKind, code: &[u16], offset: usize) -> Option<String
             At::Byte(_) => (v as u8 as i8).to_string(),
             At::Word(_) => (v as i16).to_string(),
         },
-        
+
         ImmKind::Count => return None,
         ImmKind::Upvalue => format!("uv{v}"),
         ImmKind::CallSite => format!("ic{v}"),
@@ -250,7 +234,6 @@ fn imm_text(at: At, kind: ImmKind, code: &[u16], offset: usize) -> Option<String
     })
 }
 
-
 fn implied(op: OpCode) -> Option<&'static str> {
     Some(match op {
         OpCode::LoadNull => "null",
@@ -262,7 +245,6 @@ fn implied(op: OpCode) -> Option<&'static str> {
         _ => return None,
     })
 }
-
 
 fn infix(op: OpCode) -> Option<&'static str> {
     use OpCode as O;
@@ -290,7 +272,6 @@ fn infix(op: OpCode) -> Option<&'static str> {
         _ => return None,
     })
 }
-
 
 fn prefix(op: OpCode) -> Option<&'static str> {
     Some(match op {

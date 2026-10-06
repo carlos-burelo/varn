@@ -69,9 +69,7 @@ pub struct Symbol {
     #[serde(skip)]
     pub alias_node: Option<Box<TypeNode>>,
     pub slot_idx: Option<usize>,
-    
-    
-    
+
     #[serde(default)]
     pub intrinsic_wire: Option<u8>,
 }

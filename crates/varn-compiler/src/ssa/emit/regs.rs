@@ -1,22 +1,16 @@
-
-
-
 use super::super::ir::{InstKind, SsaFunc, VarId};
 use super::slot_kind_of;
 use crate::OptError;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-
 pub(super) struct Assignment {
-    
     pub reg: Vec<u8>,
     pub scratch: u8,
     pub null_reg: u8,
     pub call_base: u8,
     pub register_count: u16,
-    
-    
+
     pub liveness: crate::ssa::liveness::Liveness,
 }
 
@@ -63,17 +57,11 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 InstKind::BuildArray { elements, .. } => elements.len() as u32,
                 InstKind::BuildTuple { elements } => elements.len() as u32,
                 InstKind::BuildMap { pairs } => (pairs.len() * 2) as u32,
-                
-                
+
                 InstKind::BuildObject { pairs } | InstKind::BuildRecord { pairs } => {
                     pairs.len() as u32
                 }
 
-                
-                
-                
-                
-                
                 InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
                 InstKind::CallNativeOp { args, .. } => args.len() as u32 + 1,
 
@@ -85,7 +73,6 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 InstKind::ExtensionCall { args, .. } => args.len() as u32 + 2,
                 InstKind::CallSpread { args, .. } => args.len() as u32 + 1,
 
-                
                 InstKind::BuildArraySpread { .. }
                 | InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
@@ -161,38 +148,13 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     let kind_of_v = |v: usize| slot_kind_of(ssa.values[v].ty);
-    
-    
+
     let ceiling = 256u32.saturating_sub(2 + max_call);
     let mut next: u32 = base;
-    
+
     let mut free: [Vec<u32>; POOLS] = Default::default();
-    
+
     let mut active: Vec<(u32, u32, usize)> = Vec::new();
     for &v in &order {
         let d = def[v];
@@ -215,8 +177,6 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
             next += 1;
             r
         } else {
-            
-            
             let borrowed = free
                 .iter()
                 .enumerate()
@@ -271,9 +231,7 @@ pub(crate) fn var_reg(var: VarId, nparams: usize) -> u8 {
     }
 }
 
-
 const POOLS: usize = 6;
-
 
 fn pool_index(k: varn_types::register_meta::SlotKind) -> usize {
     use varn_types::register_meta::SlotKind;

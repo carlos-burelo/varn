@@ -1,18 +1,4 @@
-
-
-
-
-
-
 use cranelift_codegen::isa::OwnedTargetIsa;
-
-
-
-
-
-
-
-
 
 pub(super) fn has_round_support(isa: &OwnedTargetIsa) -> bool {
     isa.isa_flags()

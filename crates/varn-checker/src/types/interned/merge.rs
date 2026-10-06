@@ -1,15 +1,7 @@
 use super::table::CheckerTyTable;
 
 impl CheckerTyTable {
-    
-    
-    
-    
     pub fn absorb(&mut self, other: &CheckerTyTable) {
-        
-        
-        
-        
         let shared_base = std::sync::Arc::ptr_eq(&self.base, &other.base);
         if !shared_base {
             for (k, v) in &other.base.entries {

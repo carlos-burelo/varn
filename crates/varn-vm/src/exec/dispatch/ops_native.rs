@@ -20,18 +20,9 @@ impl ExecCtx {
                 let wire_byte = (w1 >> 8) as u8;
 
                 let arg_count = (w1 & 0xFF) as usize;
-                
-                
-                
-                
-                
-                
-                
-                
-                
+
                 let args_start = first_reg;
-                
-                
+
                 let result = if arg_count <= 16 {
                     let mut buf = [VmValue::null(); 16];
                     for (i, slot) in buf.iter_mut().take(arg_count).enumerate() {
@@ -59,8 +50,7 @@ impl ExecCtx {
                 let cidx = code[*ip] as usize;
                 let total = code[*ip + 1] as usize;
                 *ip += 2;
-                
-                
+
                 let op_id = match closure.proto.chunk.constants.get(cidx) {
                     Some(varn_types::chunk::PoolEntry::Literal(
                         varn_types::chunk::Literal::Int(i),
@@ -75,8 +65,7 @@ impl ExecCtx {
                     crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}"))
                 }))?;
                 let receiver = self.stack.box_reg(base, first_reg);
-                
-                
+
                 let result = (self.call_native_with_receiver(
                     f,
                     receiver,

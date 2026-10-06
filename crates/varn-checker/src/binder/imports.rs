@@ -11,8 +11,7 @@ impl<'r> super::Binder<'r> {
         use varn_modules::layer::{check_import, Layer};
         if let Err(message) = check_import(Layer::of_module(&self.source_file), &source_str) {
             self.emit(Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(i.range));
-            
-            
+
             if Layer::of_module(&source_str) == Layer::Core {
                 return;
             }
@@ -131,14 +130,7 @@ impl<'r> super::Binder<'r> {
                             s.full_range = resolved.full_range;
                             s.name = local;
                             s.line = line;
-                            
-                            
-                            
-                            
-                            
-                            
-                            
-                            
+
                             s.alias_node = resolved.alias_node.clone();
                             s.original_name = Some(self.intern_local(&imported));
                             s.origin_module = s.origin_module.or(module_path_atom);
@@ -149,11 +141,7 @@ impl<'r> super::Binder<'r> {
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 );
                             }
-                            
-                            
-                            
-                            
-                            
+
                             if let Some(mp) = &module_path {
                                 s.intrinsic_wire = varn_core::intrinsic_ops::intrinsic_lookup(
                                     &format!("{}/{}", mp, imported),
@@ -191,10 +179,7 @@ impl<'r> super::Binder<'r> {
         match e {
             ExportDecl::Decl { declaration, .. } => {
                 self.bind_decl(declaration);
-                
-                
-                
-                
+
                 if let Decl::Variable(v) = declaration.as_ref() {
                     for d in &v.declarators {
                         if let Pattern::Identifier { name, .. } = &d.id {
@@ -206,12 +191,10 @@ impl<'r> super::Binder<'r> {
             ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
                 ExportDefaultDecl::Function(f) => self.bind_function(f),
                 ExportDefaultDecl::Class(c) => self.bind_class(c),
-                
-                
+
                 ExportDefaultDecl::Expr(_) => self.escape_all_open_array_candidates(),
             },
-            
-            
+
             ExportDecl::Named {
                 specifiers, source, ..
             } => {

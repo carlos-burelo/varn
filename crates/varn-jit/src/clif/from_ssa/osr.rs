@@ -1,19 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use std::collections::HashMap;
 
 use cranelift_codegen::ir::{Block, BlockArg, InstBuilder, Value};
@@ -22,9 +6,6 @@ use varn_types::ssa::{SsaLoopHeader, SsaProto};
 
 use super::store::{clif_ty, define, is_heap, load_home_value};
 use super::Ctx;
-
-
-
 
 pub(super) fn carried(
     b: &mut FunctionBuilder,
@@ -49,8 +30,6 @@ pub(super) fn carried(
     }
     carried
 }
-
-
 
 pub(super) fn emit_entry(
     b: &mut FunctionBuilder,

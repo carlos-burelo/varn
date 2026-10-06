@@ -9,18 +9,15 @@ pub(crate) const SLOW_REQUEST_MS: u128 = 30;
 
 pub struct Backend {
     pub client: Client,
-    
-    
+
     pub(crate) analysis: AnalysisHandle,
-    
-    
+
     pub(crate) std_error: Option<&'static str>,
-    
-    
+
     pub(crate) settings: super::settings::Settings,
-    
+
     pub(crate) progress_supported: std::sync::atomic::AtomicBool,
-    
+
     pub(crate) configuration_supported: std::sync::atomic::AtomicBool,
 }
 
@@ -36,16 +33,6 @@ impl Backend {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     pub(crate) async fn pull_configuration(&self) {
         if !self
             .configuration_supported
@@ -64,13 +51,6 @@ impl Backend {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
     pub(crate) async fn query<T, F>(&self, op: &str, f: F) -> Option<T>
     where
         F: FnOnce(&mut Analyzer) -> Option<T> + Send + 'static,
@@ -82,8 +62,6 @@ impl Backend {
         result
     }
 
-    
-    
     pub(crate) async fn log_slow(&self, op: &str, elapsed: std::time::Duration) {
         if elapsed.as_millis() >= SLOW_REQUEST_MS {
             self.client
@@ -95,8 +73,6 @@ impl Backend {
         }
     }
 }
-
-
 
 pub(crate) fn at(params: TextDocumentPositionParams) -> (String, Position) {
     (params.text_document.uri.to_string(), params.position)

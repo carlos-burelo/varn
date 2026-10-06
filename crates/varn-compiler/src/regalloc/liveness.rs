@@ -1,11 +1,5 @@
 use rustc_hash::FxHashMap as HashMap;
 
-
-
-
-
-
-
 #[derive(Debug, Clone, Copy)]
 pub struct DefSites {
     pub first: usize,

@@ -1,9 +1,3 @@
-
-
-
-
-
-
 #[inline]
 pub fn char_len(s: &str, ascii: bool) -> usize {
     if ascii {
@@ -12,8 +6,6 @@ pub fn char_len(s: &str, ascii: bool) -> usize {
         s.chars().count()
     }
 }
-
-
 
 #[inline]
 pub fn char_range_to_bytes(s: &str, ascii: bool, si: usize, ei: usize) -> (usize, usize) {
@@ -34,23 +26,15 @@ pub fn char_range_to_bytes(s: &str, ascii: bool, si: usize, ei: usize) -> (usize
     (bs, be)
 }
 
-
-
-
-
-
-
 #[inline]
 pub fn find_bytes(haystack: &str, needle: &str) -> Option<usize> {
     memchr::memmem::find(haystack.as_bytes(), needle.as_bytes())
 }
 
-
 #[inline]
 pub fn rfind_bytes(haystack: &str, needle: &str) -> Option<usize> {
     memchr::memmem::rfind(haystack.as_bytes(), needle.as_bytes())
 }
-
 
 #[inline]
 pub fn byte_to_char_idx(s: &str, ascii: bool, byte_idx: usize) -> i64 {

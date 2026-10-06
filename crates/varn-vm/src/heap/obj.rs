@@ -12,8 +12,6 @@ use varn_types::{
     ClassObj, NativeFn, VmArray,
 };
 
-
-
 #[derive(Debug, Clone)]
 #[repr(u8)]
 pub enum HeapObj {
@@ -47,10 +45,6 @@ pub enum HeapObj {
 }
 
 impl HeapObj {
-    
-    
-    
-    
     pub(crate) fn tag(&self) -> varn_core::RuntimeKind {
         use varn_core::RuntimeKind;
         match self {

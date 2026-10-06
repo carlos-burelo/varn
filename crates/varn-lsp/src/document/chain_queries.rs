@@ -3,11 +3,6 @@ use varn_core::TokenKind;
 
 use super::{ChainResult, DocumentState, TokenRecord};
 
-
-
-
-
-
 fn summary_from_resolution(
     res: &varn_checker::MemberResolution,
 ) -> varn_checker::ResolvedMemberSummary {
@@ -25,9 +20,6 @@ fn summary_from_resolution(
         is_generator: false,
     }
 }
-
-
-
 
 fn summary_from_class_member(
     m: &varn_checker::types::ClassMemberInfo,
@@ -58,8 +50,6 @@ fn summary_from_class_member(
     }
 }
 
-
-
 fn summary_of(
     name: std::sync::Arc<str>,
     ty: varn_checker::Type,
@@ -81,16 +71,9 @@ fn summary_of(
     }
 }
 
-
 const DYNAMIC: &str = varn_core::LangPrimitive::Dynamic.name();
 
 impl DocumentState {
-    
-    
-    
-    
-    
-    
     pub fn offset_at_line_col(&self, line: u32, col: u32) -> u32 {
         crate::document::position::byte_offset(
             &self.source,
@@ -112,14 +95,6 @@ impl DocumentState {
             })
             .unwrap_or(false);
 
-        
-        
-        
-        
-        
-        
-        
-        
         if after_dot {
             if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
                 return Some(ChainResult::Member {
@@ -250,7 +225,6 @@ impl DocumentState {
         None
     }
 
-    
     pub fn resolve_receiver_type_name_at(&self, tok: &TokenRecord) -> String {
         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
             if let Some(name) = self.db.decl_name(&res.receiver_ty) {
@@ -295,7 +269,6 @@ impl DocumentState {
         DYNAMIC.to_string()
     }
 
-    
     pub fn member_at_pos(
         &self,
         line: u32,
@@ -303,7 +276,6 @@ impl DocumentState {
     ) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
         let tok = self.identifier_token_at(line, col)?;
 
-        
         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
             let parent = self
                 .db
@@ -312,17 +284,9 @@ impl DocumentState {
             return Some((parent, summary_from_resolution(res)));
         }
 
-        
-        
-        
-        
         self.declared_member_at(tok)
     }
 
-    
-    
-    
-    
     fn declared_member_at(
         &self,
         tok: &TokenRecord,

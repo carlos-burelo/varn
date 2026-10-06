@@ -1,5 +1,3 @@
-
-
 pub mod edits;
 
 use std::time::Instant;
@@ -9,14 +7,7 @@ use tower_lsp::lsp_types::*;
 use crate::backend::Backend;
 use crate::features::diagnostics::convert_diagnostics;
 
-
-
 const DEBOUNCE_MS: u64 = 150;
-
-
-
-
-
 
 pub async fn analyze_and_publish(backend: &Backend, uri: Url, source: String, is_eager: bool) {
     let uri_str = uri.to_string();
@@ -41,8 +32,7 @@ pub async fn analyze_and_publish(backend: &Backend, uri: Url, source: String, is
     }
 
     let start = Instant::now();
-    
-    
+
     let report = backend
         .analysis
         .run({
@@ -97,14 +87,6 @@ pub async fn did_open(backend: &Backend, params: DidOpenTextDocumentParams) {
     .await;
 }
 
-
-
-
-
-
-
-
-
 pub async fn did_change(backend: &Backend, params: DidChangeTextDocumentParams) {
     let uri = params.text_document.uri;
     let uri_str = uri.to_string();
@@ -120,16 +102,11 @@ pub async fn did_change(backend: &Backend, params: DidChangeTextDocumentParams) 
         .await
         .flatten();
 
-    
-    
     let Some(source) = updated else {
         return;
     };
     analyze_and_publish(backend, uri, source, false).await;
 }
-
-
-
 
 pub async fn did_save(backend: &Backend, params: DidSaveTextDocumentParams) {
     if let Some(text) = params.text {
@@ -144,15 +121,6 @@ pub async fn did_close(backend: &Backend, params: DidCloseTextDocumentParams) {
         .submit(move |a| a.workspace.close_file(&uri));
 }
 
-
-
-
-
-
-
-
-
-
 pub async fn did_change_watched_files(backend: &Backend, params: DidChangeWatchedFilesParams) {
     for event in params.changes {
         let uri = event.uri.clone();
@@ -165,7 +133,6 @@ pub async fn did_change_watched_files(backend: &Backend, params: DidChangeWatche
             continue;
         }
 
-        
         let Ok(path) = uri.to_file_path() else {
             continue;
         };
@@ -175,8 +142,6 @@ pub async fn did_change_watched_files(backend: &Backend, params: DidChangeWatche
             continue;
         };
 
-        
-        
         analyze_and_publish(backend, uri, source, true).await;
     }
 }

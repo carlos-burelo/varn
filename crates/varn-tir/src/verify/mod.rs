@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 mod coherence;
 mod wellformed;
 
@@ -26,9 +18,6 @@ impl VerifyError {
         }
     }
 }
-
-
-
 
 pub fn verify_module(m: &TirModule) -> Result<(), Vec<VerifyError>> {
     let mut errors = Vec::new();

@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 #[derive(Default, Debug, Clone, Copy)]
 #[repr(C)]
 pub struct JmpBuf {
@@ -20,11 +12,6 @@ pub struct JmpBuf {
     pub rsp: u64,
     pub rip: u64,
 }
-
-
-
-
-
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn vm_setjmp(_buf: *mut JmpBuf) -> i32 {
@@ -45,11 +32,6 @@ pub unsafe extern "C" fn vm_setjmp(_buf: *mut JmpBuf) -> i32 {
         "ret"
     );
 }
-
-
-
-
-
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn vm_longjmp(_buf: *const JmpBuf, _val: i32) -> ! {

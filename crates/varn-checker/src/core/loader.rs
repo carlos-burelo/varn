@@ -29,9 +29,6 @@ pub fn is_core_file(filename: &str) -> bool {
     filename.contains("varn-builtins") || filename.starts_with(CORE_PREFIX)
 }
 
-
-
-
 pub(crate) fn module_globals(
     filename: &str,
     resolver: &dyn ImportResolver,
@@ -45,10 +42,6 @@ pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) 
     Arc::make_mut(&mut bind.ty_table).absorb(&core.table);
     bind.core = Some(core);
 }
-
-
-
-
 
 pub(crate) fn build_core_exports(resolver: &dyn ImportResolver) -> CoreExports {
     let mut core = CoreExports::default();

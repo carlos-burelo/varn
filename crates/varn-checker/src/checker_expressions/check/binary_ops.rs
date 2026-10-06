@@ -1,7 +1,3 @@
-
-
-
-
 use super::super::helpers::{base_type, op_str};
 use super::super::infer::member_binary::normalize_for_binary;
 use crate::binder::BindResult;
@@ -71,8 +67,6 @@ impl<'r> Checker<'r> {
                     if both_numeric {
                         same_numeric
                     } else {
-                        
-                        
                         l_ty == Type::Null
                             || r_ty == Type::Null
                             || self.value_assignable_to(&l_ty, &r_ty, Some(right), Some(bind))

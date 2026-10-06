@@ -50,14 +50,11 @@ mod sys {
     pub const MAP_PRIVATE: i32 = 0x02;
     pub const MAP_FAILED: *mut c_void = !0 as *mut c_void;
 
-    
     #[cfg(target_os = "macos")]
     pub const MAP_ANON: i32 = 0x1000;
     #[cfg(not(target_os = "macos"))]
     pub const MAP_ANON: i32 = 0x20;
 
-    
-    
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     pub const MAP_JIT: i32 = 0x0800;
     #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
@@ -78,8 +75,6 @@ mod sys {
         pub fn munmap(addr: *mut c_void, length: usize) -> i32;
     }
 
-    
-    
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     extern "C" {
         pub fn pthread_jit_write_protect_np(enabled: i32);
@@ -123,8 +118,6 @@ impl JitBuffer {
 
         #[cfg(not(target_os = "windows"))]
         {
-            
-            
             let flags = sys::MAP_PRIVATE | sys::MAP_ANON | sys::MAP_JIT;
             let ptr = unsafe {
                 sys::mmap(
@@ -149,9 +142,7 @@ impl JitBuffer {
 
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         assert!(!self.executable, "Cannot modify an executable JIT buffer");
-        
-        
-        
+
         #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
         unsafe {
             sys::pthread_jit_write_protect_np(0);
@@ -193,9 +184,6 @@ impl JitBuffer {
 
         #[cfg(not(target_os = "windows"))]
         {
-            
-            
-            
             #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
             {
                 unsafe {
@@ -271,18 +259,7 @@ impl Drop for JitBuffer {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
 pub const STACK_RESERVE_BYTES: usize = 64 << 20;
-
 
 pub struct StackArenas {
     gpr: JitBuffer,
@@ -296,7 +273,6 @@ pub struct StackArenas {
 }
 
 impl StackArenas {
-    
     pub fn new(bytes: usize) -> Result<Self, String> {
         Ok(Self {
             gpr: JitBuffer::new(bytes)?,
@@ -310,13 +286,12 @@ impl StackArenas {
         })
     }
 
-    
     pub fn abi_stacks(&self) -> varn_abi::AbiStacks {
         let gpr = self.gpr.as_ptr() as *mut i64;
         let fpr = self.fpr.as_ptr() as *mut f64;
         let refs = self.refs.as_ptr() as *mut u32;
         let dyn_ = self.dyn_.as_ptr() as *mut varn_abi::AbiValue;
-        
+
         unsafe {
             varn_abi::AbiStacks {
                 gpr,
@@ -331,8 +306,6 @@ impl StackArenas {
         }
     }
 
-    
-    
     pub fn alloc(&mut self, counts: [u32; 4]) -> Option<varn_abi::ActBases> {
         let cap = |bytes: usize, elem: usize| (bytes / elem) as u64;
         let ok = (self.top_gpr as u64 + counts[0] as u64) <= cap(self.gpr.size(), 8)
@@ -352,7 +325,6 @@ impl StackArenas {
         Some(bases)
     }
 
-    
     pub fn truncate(&mut self, bases: varn_abi::ActBases) {
         self.top_gpr = bases.bases[0];
         self.top_fpr = bases.bases[1];
@@ -369,7 +341,6 @@ impl StackArenas {
 }
 
 use core::mem::size_of;
-
 
 pub struct FrameArena {
     buf: JitBuffer,
@@ -389,13 +360,12 @@ impl FrameArena {
         (self.buf.size() / size_of::<varn_abi::AbiFrame>()) as u32
     }
 
-    
     pub fn push(&mut self, frame: varn_abi::AbiFrame) -> Option<u32> {
         if self.len >= self.cap() {
             return None;
         }
         let id = self.len;
-        
+
         unsafe {
             let base = self.buf.as_ptr() as *mut varn_abi::AbiFrame;
             base.add(id as usize).write(frame);

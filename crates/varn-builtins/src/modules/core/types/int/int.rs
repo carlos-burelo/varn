@@ -3,9 +3,6 @@ use varn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct Int;
 
-
-
-
 const INT_MAX: i64 = varn_core::INT_MAX;
 const INT_MIN: i64 = varn_core::INT_MIN;
 

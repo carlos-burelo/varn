@@ -55,7 +55,6 @@ pub fn build_rename(
     };
     let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
 
-    
     if matches!(target, SymbolTarget::Local { .. }) {
         collect_rename_edits_in_document(state, &target, target_name, &new_name, &mut changes);
         return if changes.is_empty() {
@@ -68,7 +67,6 @@ pub fn build_rename(
         };
     }
 
-    
     let mut checked_uris = rustc_hash::FxHashSet::default();
 
     let open_entries: Vec<(String, std::sync::Arc<DocumentState>)> = workspace

@@ -1,6 +1,3 @@
-
-
-
 use super::super::ir::{Block, BlockId, SsaFunc, Terminator};
 
 pub(super) fn split_phi_edges(ssa: &mut SsaFunc) {

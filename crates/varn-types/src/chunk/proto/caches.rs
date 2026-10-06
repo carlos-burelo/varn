@@ -28,9 +28,6 @@ impl FunctionProto {
         }
     }
 
-    
-    
-    
     pub fn resolved_shape(&self, idx: usize) -> Option<Rc<crate::Shape>> {
         if let Some((_, s)) = self
             .resolved_shapes

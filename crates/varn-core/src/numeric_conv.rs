@@ -1,6 +1,3 @@
-
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NumericDomain {
     Int,
@@ -18,9 +15,9 @@ pub enum NumConv {
     BigIntToInt = 3,
     IntToDecimal = 4,
     DecimalToInt = 5,
-    
+
     DynToInt = 6,
-    
+
     DynToFloat = 7,
     BigIntToFloat = 8,
     FloatToBigInt = 9,
@@ -75,7 +72,6 @@ impl NumConv {
         })
     }
 
-    
     pub const fn can_fault(self) -> bool {
         matches!(
             self,
@@ -88,7 +84,6 @@ impl NumConv {
         )
     }
 }
-
 
 pub fn float_to_int(f: f64) -> Option<i64> {
     const TWO_POW_63: f64 = 9_223_372_036_854_775_808.0;

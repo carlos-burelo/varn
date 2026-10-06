@@ -1,13 +1,5 @@
-
-
-
-
-
-
 use crate::exec::ctx::ExecCtx;
 use crate::frame_store::FrameStore;
-
-
 
 pub(super) fn probe_vec_words() -> (usize, usize, usize) {
     let mut v: Vec<u64> = Vec::with_capacity(7);
@@ -65,10 +57,6 @@ pub(crate) fn probe() -> varn_jit::JitFrameLayout {
 mod tests {
     use super::*;
 
-    
-    
-    
-    
     #[test]
     fn class_ptr_offsets_point_at_the_class_vectors() {
         let mut store = crate::frame_store::FrameStore::new();
@@ -94,16 +82,12 @@ mod tests {
             assert_eq!(dyn_, store.dyn_.as_ptr());
         }
 
-        
-        
         assert_eq!(
             std::mem::offset_of!(crate::frame_store::FrameAlloc, bases),
             0
         );
     }
 
-    
-    
     #[test]
     fn alloc_bases_offsets_resolve_to_the_activation_bases() {
         use varn_types::register_meta::{RegisterMeta, SlotKind};

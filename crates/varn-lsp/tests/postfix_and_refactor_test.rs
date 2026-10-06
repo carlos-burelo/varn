@@ -130,7 +130,6 @@ fn test_root_scope_isolation_from_unreachable_type_parameters() {
     let src = "function compose<A, B, C>(f: (a: B) => C, g: (b: A) => B): (c: A) => C {\n    return (x: A) => f(g(x));\n}\nconst double: (n: int) => int = (n: int) => n * 2;\n\n";
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
 
-    
     let root_items = varn_lsp::features::completion::build_completions(&state, 4, 0);
     let root_labels: Vec<&str> = root_items.iter().map(|i| i.label.as_str()).collect();
 
@@ -143,7 +142,6 @@ fn test_root_scope_isolation_from_unreachable_type_parameters() {
         "Root should contain top-level const double"
     );
 
-    
     assert!(
         !root_labels.contains(&"A"),
         "Root scope must NOT contain unreachable type parameter A"

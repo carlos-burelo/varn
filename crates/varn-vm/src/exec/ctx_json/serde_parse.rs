@@ -80,39 +80,19 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
         Ok(self.0.alloc_array(items))
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: MapAccess<'de>,
     {
-        
-        
-        
         const INLINE_FIELDS: usize = 16;
 
         let mut inline = [VmValue::null(); INLINE_FIELDS];
         let mut spilled: Vec<VmValue> = Vec::new();
         let mut n = 0usize;
 
-        
-        
         let cached = cache_snapshot();
         let cached_keys = |k: usize| cached.as_ref().and_then(|(keys, _)| keys.get(k));
 
-        
-        
         let mut matched: Option<usize> = Some(0);
         let mut owned_keys: Vec<String> = Vec::new();
 
@@ -133,7 +113,6 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
                     matched = Some(k + 1);
                 }
                 Some(k) => {
-                    
                     owned_keys = key_prefix(&cached, k);
                     owned_keys.push(key.into_owned());
                     matched = None;
@@ -148,8 +127,6 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
             &spilled
         };
 
-        
-        
         if matched == Some(n) {
             if let Some((keys, shape)) = &cached {
                 if keys.len() == n {
@@ -158,9 +135,6 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
             }
         }
 
-        
-        
-        
         if let Some(k) = matched {
             owned_keys = key_prefix(&cached, k);
         }

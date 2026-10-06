@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 use varn_jit::clif::debug::inspect;
 use varn_jit::clif::lower::{gate_reason, NoLinker};
 use varn_jit::JitHelpers;
@@ -21,13 +11,12 @@ use crate::flags::DebugFlags;
 use varn_core::term::terminal;
 use varn_core::term::terminal::{Align, Section};
 
-
 #[derive(PartialEq, Eq)]
 pub enum Tier {
     Clif,
-    
+
     Gate(String),
-    
+
     Bail(String),
 }
 
@@ -37,7 +26,7 @@ pub struct TierRow {
     pub tier: Tier,
     pub frame_aware: bool,
     pub framed: bool,
-    
+
     pub fa_reasons: Vec<&'static str>,
 }
 
@@ -58,7 +47,6 @@ impl TierRow {
     }
 }
 
-
 pub fn classify(proto: &FunctionProto, helpers: &JitHelpers) -> Vec<TierRow> {
     let Ok(isa) = varn_jit::clif::shared_isa() else {
         return Vec::new();
@@ -78,7 +66,6 @@ fn walk(
     let name = proto.name.as_deref().unwrap_or("<module>").to_owned();
     let words = proto.chunk.code.len();
 
-    
     if let Some(reason) = gate_reason(proto) {
         out.push(TierRow {
             name,
@@ -118,8 +105,6 @@ fn matches_filter(row: &TierRow, flags: &DebugFlags) -> bool {
         Some(needle) => row.name.contains(needle.as_str()),
     }
 }
-
-
 
 pub fn debug_tiers(
     proto: &FunctionProto,
@@ -176,8 +161,6 @@ pub fn debug_tiers(
     table.print();
     Section::new("tiers").close();
 }
-
-
 
 pub fn debug_bails(
     proto: &FunctionProto,

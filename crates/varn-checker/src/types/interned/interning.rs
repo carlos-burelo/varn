@@ -6,8 +6,6 @@ use super::table::CheckerTyTable;
 use crate::types::{FunctionType, ObjectTypeMember};
 
 impl CheckerTyTable {
-    
-    
     pub fn intern(&mut self, kind: InternedTypeKind) -> CheckerTyId {
         if let Some(id) = seeded_id(&kind) {
             return id;

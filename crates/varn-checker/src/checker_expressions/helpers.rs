@@ -139,9 +139,6 @@ impl<'r> Checker<'r> {
         None
     }
 
-    
-    
-    
     pub(crate) fn is_throwable(&self, ty: &Type, bind: &crate::binder::BindResult) -> bool {
         match self.ty_table.get(ty.0) {
             varn_core::TypeKind::Named(name, _) => {

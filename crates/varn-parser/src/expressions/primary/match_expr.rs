@@ -155,9 +155,7 @@ fn parse_variant_record_pattern(
 ) -> Result<MatchPattern, String> {
     use varn_core::ast::MatchBinding;
     s.advance();
-    
-    
-    
+
     let mut bindings: Vec<MatchBinding> = Vec::new();
     let mut rest = false;
     while !s.check(TokenKind::RBrace) && !s.is_eof() {

@@ -143,12 +143,7 @@ pub(crate) fn get_symbol_property(
         (2, RuntimeSymbol::Iterator) => {
             heap.alloc_bound_native(obj, range_symbol_iterator, "[Symbol.iterator]")
         }
-        
-        
-        
-        
-        
-        
+
         (3, RuntimeSymbol::Iterator | RuntimeSymbol::AsyncIterator) => {
             heap.alloc_bound_native(obj, generator_symbol_iterator, "[Symbol.iterator]")
         }

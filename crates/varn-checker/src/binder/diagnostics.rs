@@ -1,6 +1,3 @@
-
-
-
 use varn_core::Diagnostic;
 
 impl super::Binder<'_> {

@@ -1,9 +1,3 @@
-
-
-
-
-
-
 #![allow(unused_crate_dependencies)]
 
 use std::collections::HashSet;
@@ -31,27 +25,18 @@ acc.balance = 100;
 const b = acc.balance;
 "#;
 
-
-
-
-
-
-
 #[test]
 fn h1_tokens_hold_no_lexeme_strings() {
     let uri = "file:///test/h1.vn".to_string();
     let state = run_pipeline(ACCOUNT_SRC.to_string(), uri);
     assert!(!state.tokens.is_empty(), "la muestra debe producir tokens");
 
-    
-    
     assert_eq!(
         size_of::<varn_lsp::document::TokenRecord>(),
         6 * size_of::<u32>(),
         "TokenRecord = 6×u32, sin heap propio"
     );
 
-    
     for t in &state.tokens {
         let lex = state.lexeme(t);
         assert_eq!(lex.len(), (t.end - t.offset) as usize);
@@ -60,11 +45,6 @@ fn h1_tokens_hold_no_lexeme_strings() {
     }
     eprintln!("tokens={} lexemes_resolved_on_demand", state.tokens.len());
 }
-
-
-
-
-
 
 #[test]
 fn h2_document_keeps_single_arena_copy() {
@@ -75,7 +55,7 @@ fn h2_document_keeps_single_arena_copy() {
         !state.db.bind.arena.all().is_empty(),
         "la muestra debe declarar símbolos"
     );
-    
+
     for id in &state.symbols {
         assert!(
             *id < state.db.bind.arena.len(),
@@ -89,13 +69,6 @@ fn h2_document_keeps_single_arena_copy() {
     );
 }
 
-
-
-
-
-
-
-
 #[test]
 fn h3_single_id_to_type_map() {
     let uri = "file:///test/h3.vn".to_string();
@@ -103,14 +76,13 @@ fn h3_single_id_to_type_map() {
 
     let stored: HashSet<usize> = state.db.symbol_types.keys().copied().collect();
     assert!(!stored.is_empty(), "debe haber tipos resueltos");
-    
-    
+
     assert_eq!(
         stored.len(),
         state.db.bind.arena.len(),
         "una tabla, cobertura total"
     );
-    
+
     for id in &state.symbols {
         let _ = state.symbol(*id);
     }
@@ -120,10 +92,6 @@ fn h3_single_id_to_type_map() {
         stored.len()
     );
 }
-
-
-
-
 
 #[test]
 fn h4_index_shares_one_uri_per_file() {
@@ -148,10 +116,6 @@ fn h4_index_shares_one_uri_per_file() {
     eprintln!("entries={} uri_allocs=1", entries.len());
 }
 
-
-
-
-
 #[test]
 fn h5_sources_survive_close_and_remove() {
     let uri = "file:///test/h5.vn".to_string();
@@ -173,12 +137,6 @@ fn h5_sources_survive_close_and_remove() {
     );
 }
 
-
-
-
-
-
-
 #[test]
 fn h10_evict_heavy_keeps_exports_drops_artifacts() {
     use varn_lsp::workspace::resolver::with_resolver;
@@ -197,7 +155,6 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
     assert_eq!((b2, p2, a2), (0, 0, 0), "artefactos evictados");
     assert_eq!(e2, e, "exports sobreviven a la evicción");
 
-    
     {
         let idx = workspace.index.read().unwrap();
         assert!(
@@ -206,8 +163,6 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
         );
     }
 
-    
-    
     workspace.index_file("file:///test/h10b.vn".to_string(), ACCOUNT_SRC.to_string());
     let (b3, p3, a3, e3) = with_resolver(|r| r.graph_stats());
     assert_eq!(
@@ -217,10 +172,6 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
     );
     assert!(e3 >= e2, "los exports siguen acumulándose");
 }
-
-
-
-
 
 #[test]
 fn h10b_module_bind_rederives_after_evict() {
@@ -260,10 +211,6 @@ fn h10b_module_bind_rederives_after_evict() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-
-
-
-
 #[test]
 fn h7_small_types_are_copy_sized() {
     fn is_copy<T: Copy>() {}
@@ -279,7 +226,7 @@ fn h7_small_types_are_copy_sized() {
         size_of::<varn_core::Token>() <= 64,
         "Token = kind + rango + offsets, lexema zero-copy"
     );
-    
+
     assert!(
         size_of::<varn_lsp::index::ExportEntry>() >= 4 * size_of::<String>(),
         "ExportEntry retiene name/global_key/uri/type_str como Strings"
@@ -290,11 +237,6 @@ fn h7_small_types_are_copy_sized() {
         "TokenRecord = 6×u32, lexema on-demand (ver H1)"
     );
 }
-
-
-
-
-
 
 #[test]
 fn h8_reindex_does_not_accumulate_entries() {
@@ -315,14 +257,6 @@ fn h8_reindex_does_not_accumulate_entries() {
         defs.len()
     );
 }
-
-
-
-
-
-
-
-
 
 #[test]
 fn h9_member_identity_is_structural() {
@@ -348,8 +282,6 @@ fn h9_member_identity_is_structural() {
         );
     }
 
-    
-    
     workspace.update_file(uri.clone(), ACCOUNT_SRC.to_string());
     let doc = workspace.get(&uri).unwrap();
     let usage = doc
@@ -371,7 +303,6 @@ fn h9_member_identity_is_structural() {
         );
     }
 
-    
     let func = doc
         .tokens
         .iter()

@@ -17,9 +17,6 @@ use varn_core::{
     Token,
 };
 
-
-
-
 pub fn parse(
     tokens: Vec<Token>,
     lexeme_buf: Arc<[u8]>,
@@ -43,13 +40,6 @@ pub fn parse_with_profile(
     let arena = std::mem::take(&mut parser.stream.arena);
     Ok((program, profile, parser.stream.interner, arena))
 }
-
-
-
-
-
-
-
 
 pub fn parse_partial(
     tokens: Vec<Token>,

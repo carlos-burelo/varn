@@ -1,7 +1,3 @@
-
-
-
-
 use super::obj::HeapObj;
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;

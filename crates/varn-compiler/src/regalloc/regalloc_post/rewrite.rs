@@ -3,11 +3,6 @@ use varn_core::OpCode;
 use varn_types::bytecode::{decode, remap_registers};
 use varn_types::chunk::PoolEntry;
 
-
-
-
-
-
 pub(crate) fn remap_bytecode(code: &mut [u16], constants: &[PoolEntry], mapping: &HashMap<u8, u8>) {
     remap_registers(code, constants, |r| mapping.get(&r).copied().unwrap_or(r));
 

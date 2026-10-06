@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{
     condcodes::{FloatCC, IntCC},
     types, InstBuilder, Value,
@@ -19,8 +10,6 @@ use super::{
     arrays, boxed, call, closures, dynop, exceptions, globals, heap, heapvalue, is_heap,
     load_value, numeric, Ctx, Out,
 };
-
-
 
 pub(super) fn emit_inst(
     b: &mut FunctionBuilder,
@@ -64,10 +53,7 @@ pub(super) fn emit_inst(
                 b, ctx, values, *object, args, *wire, dest,
             )?))
         }
-        
-        
-        
-        
+
         SsaOp::Cast { operand } => {
             let from = ctx.ssa.value_ty(*operand);
             let to = dest_ty.ok_or("from_ssa: cast without dest")?;
@@ -115,8 +101,6 @@ pub(super) fn emit_inst(
             emit_un(b, ctx, *op, a)?
         }
         SsaOp::SelfCall { args } => {
-            
-            
             if ctx.frame.is_some() {
                 return Ok(Some(Out::Boxed(call::emit_self_call_framed(
                     b, ctx, values, args,
@@ -197,7 +181,7 @@ pub(super) fn emit_inst(
             exceptions::emit_pop_try(b, ctx)?;
             return Ok(None);
         }
-        
+
         SsaOp::CatchParam { .. } => {
             return Err("from_ssa: a landing pad reached compiled code".into())
         }
@@ -211,7 +195,6 @@ pub(super) fn emit_inst(
             return Ok(None);
         }
 
-        
         SsaOp::ConstNull
         | SsaOp::ConstStr(_)
         | SsaOp::ConstChar(_)
@@ -283,7 +266,7 @@ fn emit_bin(
     op: SsaBinOp,
     a: Value,
     c: Value,
-    
+
     in_range: bool,
 ) -> Result<Value, String> {
     use SsaBinOp::*;
@@ -354,7 +337,7 @@ fn checked_int(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaBinOp, a: Value, c
             (r, o, helpers.mul)
         }
     };
-    
+
     guard_overflow(b, ctx.cc, ctx.exec_ctx, helper, r, ovf, a, c)
 }
 

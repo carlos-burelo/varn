@@ -17,15 +17,7 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     let path_hash = crate::hash::fnv1a64(canonical.to_string_lossy().as_bytes());
 
     let stem = path.file_stem().unwrap_or_default().to_string_lossy();
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
     varn_modules::artifact::get_bytecode_cache_dir(&project_root).join(format!(
         "{}.{:x}.{:08x}.vncache",
         stem,
@@ -33,13 +25,6 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
         varn_modules::artifact::cache_key()
     ))
 }
-
-
-
-
-
-
-
 
 pub fn load_cached_graph(
     cache_path: &Path,
@@ -81,12 +66,7 @@ pub fn load_cached_graph(
         if path == &graph.entry_path {
             continue;
         }
-        
-        
-        
-        
-        
-        
+
         if let Some(provider) = varn_modules::provider::get() {
             if let Some(src) = provider.embedded_source(path) {
                 let current_hash = crate::hash::fnv1a64(src.as_bytes());
@@ -97,8 +77,6 @@ pub fn load_cached_graph(
                 continue;
             }
             if let Some(p) = provider.source_path(path) {
-                
-                
                 match std::fs::read(&p) {
                     Ok(src) => {
                         let current_hash = crate::hash::fnv1a64(&src);

@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 use cranelift_codegen::ir::{InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::SsaOp;
@@ -15,8 +7,6 @@ use varn_types::Literal;
 
 use super::{classops, globals, heap, load_value, pool, props, Ctx, Out};
 
-
-
 pub(super) fn emit(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -24,7 +14,6 @@ pub(super) fn emit(
     op: &SsaOp,
     dest: Option<u32>,
 ) -> Result<Option<Option<Out>>, String> {
-    
     match op {
         SsaOp::SetIndex {
             object,

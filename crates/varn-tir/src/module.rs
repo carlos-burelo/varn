@@ -12,45 +12,36 @@ pub struct TirFunction {
     pub body: Vec<TirStmt>,
     pub has_this: bool,
     pub this_class: Option<ClassId>,
-    
-    
+
     pub is_async: bool,
     pub is_generator: bool,
-    
-    
+
     pub has_rest: bool,
 }
-
-
-
-
 
 #[derive(Debug, Clone, Default)]
 pub struct TirClassDef {
     pub name: Arc<str>,
-    
-    
+
     pub class_id: Option<ClassId>,
     pub enum_id: Option<EnumId>,
-    
-    
+
     pub parent: Option<ClassId>,
-    
-    
+
     pub prelude: Vec<TirStmt>,
-    
+
     pub super_class: Option<TirExpr>,
-    
+
     pub statics: Vec<(Arc<str>, Option<TirExpr>)>,
-    
+
     pub methods: Vec<TirClassMember>,
-    
+
     pub accessors: Vec<TirClassAccessor>,
-    
+
     pub decorators: Vec<TirExpr>,
-    
+
     pub static_blocks: Vec<FnId>,
-    
+
     pub variants: Vec<TirVariantDef>,
 }
 
@@ -60,7 +51,7 @@ pub struct TirClassMember {
     pub func: FnId,
     pub is_static: bool,
     pub is_private: bool,
-    
+
     pub decorators: Vec<TirExpr>,
 }
 
@@ -93,8 +84,6 @@ pub struct TirImportSpec {
     pub kind: TirImportKind,
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct TirImport {
     pub source: Arc<str>,
@@ -102,16 +91,13 @@ pub struct TirImport {
     pub specs: Vec<TirImportSpec>,
 }
 
-
-
-
 #[derive(Debug, Clone)]
 pub struct TirExport {
     pub exported: Arc<str>,
     pub local: Arc<str>,
-    
+
     pub reexport_from: Option<Arc<str>>,
-    
+
     pub namespace: bool,
 }
 
@@ -126,11 +112,9 @@ pub struct TirModule {
     pub signatures: Vec<crate::tables::Signature>,
     pub functions: Vec<TirFunction>,
     pub globals: Vec<BackendTy>,
-    
-    
+
     pub global_names: Vec<Arc<str>>,
-    
-    
+
     pub class_defs: Vec<TirClassDef>,
     pub top_level: TirFunction,
 }

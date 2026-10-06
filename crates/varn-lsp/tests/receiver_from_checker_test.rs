@@ -21,8 +21,6 @@ const res = c.get_value();
     let uri = "file:///test/main.vn".to_string();
     let state = run_pipeline(source.to_string(), uri);
 
-    
-    
     let hover = build_hover(&state, 10, 16);
     assert!(
         hover.is_some(),
@@ -49,7 +47,6 @@ const trimmed = text.trim();
     let uri = "file:///test/main.vn".to_string();
     let state = run_pipeline(source.to_string(), uri);
 
-    
     let hover = build_hover(&state, 2, 23);
     assert!(hover.is_some(), "Hover over trim() on str should succeed");
 }

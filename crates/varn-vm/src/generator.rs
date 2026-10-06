@@ -26,20 +26,10 @@ impl std::fmt::Debug for NanGenInner {
     }
 }
 
-
-
-
-
-
-
-
-
-
 #[derive(Debug)]
 pub struct NanGenDriver {
     inner: RefCell<NanGenInner>,
-    
-    
+
     is_async: bool,
 }
 
@@ -73,8 +63,6 @@ impl GeneratorDriver for NanGenDriver {
                     let nregs = frame.closure().proto.register_count as usize;
                     inner.ctx.stack.ensure_frame_size(base, nregs);
                     if (dest_reg as usize) < nregs {
-                        
-                        
                         let _ = inner
                             .ctx
                             .stack
@@ -85,8 +73,6 @@ impl GeneratorDriver for NanGenDriver {
         }
         inner.started = true;
 
-        
-        
         loop {
             let result = inner.ctx.run_until(0);
 
@@ -137,8 +123,6 @@ impl GeneratorDriver for NanGenDriver {
     fn trace_vm_values(&self, callback: &mut dyn FnMut(varn_types::VmValue)) {
         let inner = self.inner.borrow();
 
-        
-        
         for &nv in &inner.ctx.stack.dyn_ {
             callback(nv);
         }

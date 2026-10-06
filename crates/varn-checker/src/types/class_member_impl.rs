@@ -1,8 +1,6 @@
 use super::*;
 
 impl ClassMemberInfo {
-    
-    
     pub fn as_object_member(&self, table: &CheckerTyTable) -> ObjectTypeMember {
         if let (ClassMemberKind::Method, TypeKind::Fn(fid)) = (self.kind, table.get(self.ty.0)) {
             let ft = table.get_function(fid);

@@ -1,12 +1,5 @@
 #![allow(unused_crate_dependencies)]
 
-
-
-
-
-
-
-
 use std::collections::BTreeMap;
 use varn_core::OpCode;
 use varn_types::ssa::SsaOp;
@@ -29,7 +22,6 @@ function walk(o: dynamic, n: int): dynamic {
 }
 print(walk({ start: 0, flag: true, result: 1 }, 3))
 "#;
-
 
 type Sites = BTreeMap<(String, u16), usize>;
 
@@ -68,8 +60,6 @@ fn ssa_sites(proto: &FunctionProto) -> Option<Sites> {
     }
     Some(sites)
 }
-
-
 
 fn index_order_slots(proto: &FunctionProto) -> Vec<u16> {
     let ssa = proto.ssa.get().expect("portable SSA");

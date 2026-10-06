@@ -139,8 +139,6 @@ impl NativeCtx for Heap {
         }
         if v.is_heap() {
             if let Some(HeapObj::Str(s)) = self.get(v.as_heap()) {
-                
-                
                 return s.is_ascii();
             }
         }

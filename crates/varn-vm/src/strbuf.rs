@@ -1,26 +1,10 @@
-
-
-
-
-
-
-
-
-
 use std::fmt;
-
-
 
 pub const INT_MAX_DIGITS: usize = 20;
 
-
-
-
-
 pub(crate) fn itoa(v: i64, buf: &mut [u8; INT_MAX_DIGITS]) -> &str {
     let negative = v < 0;
-    
-    
+
     let mut n = if negative {
         (v as u64).wrapping_neg()
     } else {
@@ -43,14 +27,10 @@ pub(crate) fn itoa(v: i64, buf: &mut [u8; INT_MAX_DIGITS]) -> &str {
         buf[i] = b'-';
     }
 
-    
     std::str::from_utf8(&buf[i..]).expect("itoa writes ASCII only")
 }
 
-
-
 pub const INLINE_CAP: usize = 64;
-
 
 pub struct StrBuf {
     inline: [u8; INLINE_CAP],
@@ -77,8 +57,7 @@ impl StrBuf {
     pub(crate) fn as_str(&self) -> &str {
         match &self.spilled {
             Some(s) => s,
-            
-            
+
             None => std::str::from_utf8(&self.inline[..self.len])
                 .expect("StrBuf only ever appends whole &str"),
         }
@@ -94,8 +73,7 @@ impl StrBuf {
             self.len += s.len();
             return;
         }
-        
-        
+
         let mut spilled = String::with_capacity((self.len + s.len()) * 2);
         spilled.push_str(
             std::str::from_utf8(&self.inline[..self.len])
@@ -105,8 +83,6 @@ impl StrBuf {
         self.spilled = Some(spilled);
     }
 
-    
-    
     pub(crate) fn into_string(self) -> String {
         match self.spilled {
             Some(s) => s,

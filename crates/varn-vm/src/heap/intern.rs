@@ -1,7 +1,3 @@
-
-
-
-
 use super::cells::SlotState;
 use super::obj::HeapObj;
 use super::structs::HeapInner;

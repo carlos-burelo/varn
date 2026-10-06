@@ -1,8 +1,3 @@
-
-
-
-
-
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::FunctionBuilder;
@@ -12,15 +7,11 @@ use varn_types::vm_value::{KIND_HEAP, KIND_NULL};
 use super::super::emit::{self, call_helper_void, unbox_f64_coerce};
 use crate::JitHelpers;
 
-
 pub(crate) struct FieldIo<'a> {
     pub helpers: &'a JitHelpers,
     pub cc: CallConv,
     pub exec_ctx: Value,
 }
-
-
-
 
 pub(crate) fn load_compact(
     b: &mut FunctionBuilder,
@@ -94,10 +85,6 @@ pub(crate) fn load_compact(
     b.block_params(cont)[0]
 }
 
-
-
-
-
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn store_compact(
     b: &mut FunctionBuilder,
@@ -112,8 +99,6 @@ pub(crate) fn store_compact(
     let cont = b.create_block();
     let inline = b.create_block();
 
-    
-    
     let (obj_tag, obj_payload) = b.ins().isplit(obj);
     let (value_tag, payload) = b.ins().isplit(value);
     let kind = b.ins().band_imm_u(obj_tag, emit::KIND_MASK);

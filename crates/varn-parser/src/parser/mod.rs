@@ -20,12 +20,6 @@ pub struct Parser {
     pub diagnostics: varn_core::DiagnosticBag,
 }
 
-
-
-
-
-
-
 impl std::ops::Deref for Parser {
     type Target = TokenStream;
     fn deref(&self) -> &TokenStream {
@@ -94,16 +88,11 @@ impl Parser {
                     self.diagnostics
                         .error(ErrorCode::InvalidStatement, msg, self.stream.range());
                     self.recover(stmt_start);
-                    
-                    
-                    
-                    
-                    
+
                     if self.stream.pos() == loop_entry && !self.stream.is_eof() {
                         self.stream.advance();
                     }
-                    
-                    
+
                     let recovered = self.stream.span_from(stmt_start);
                     let stmt = self.stream.stmt(recovered, varn_core::ast::StmtKind::Error);
                     body.push(stmt);
@@ -128,16 +117,6 @@ impl Parser {
         (prog, errors, profile)
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     fn recover(&mut self, start: varn_core::SourceRange) -> varn_core::SourceRange {
         #[cfg(feature = "profiling")]
         let started = Instant::now();

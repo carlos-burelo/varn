@@ -1,12 +1,9 @@
-
-
 use tower_lsp::lsp_types::*;
 use tower_lsp::Client;
 
 use crate::analysis::AnalysisHandle;
 use crate::backend::progress::Progress;
 use crate::backend::SLOW_REQUEST_MS;
-
 
 pub fn supports_progress(caps: &ClientCapabilities) -> bool {
     caps.window
@@ -15,7 +12,6 @@ pub fn supports_progress(caps: &ClientCapabilities) -> bool {
         .unwrap_or(false)
 }
 
-
 pub fn supports_configuration(caps: &ClientCapabilities) -> bool {
     caps.workspace
         .as_ref()
@@ -23,23 +19,7 @@ pub fn supports_configuration(caps: &ClientCapabilities) -> bool {
         .unwrap_or(false)
 }
 
-
-
-
-
-
-
-
-
-
-
 const INDEX_SIZE_LIMIT_BYTES: u64 = 256 * 1024;
-
-
-
-
-
-
 
 pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_supported: bool) {
     let Ok(root) = std::env::current_dir() else {
@@ -60,15 +40,9 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
     })
     .await
     .unwrap_or_default();
-    
-    
+
     files.sort();
 
-    
-    
-    
-    
-    
     let mut read_set = tokio::task::JoinSet::new();
     for path in files {
         read_set.spawn_blocking(move || {
@@ -104,8 +78,7 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
             )
             .await;
     }
-    
-    
+
     ready.sort_by(|a, b| a.0.cmp(&b.0));
 
     let total = ready.len() + skipped.len();
@@ -151,9 +124,6 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
         }
     }
 
-    
-    
-    
     let (ev_b, ev_p, ev_a) = analysis
         .run_background(|_| {
             crate::workspace::resolver::with_resolver(|r| {

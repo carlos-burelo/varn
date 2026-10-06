@@ -1,23 +1,8 @@
-
-
-
-
-
-
-
-
-
-
-
 use std::time::Duration;
-
-
 
 pub const LABEL_WIDTH: usize = 26;
 
-
 pub const VALUE_WIDTH: usize = 10;
-
 
 #[derive(Clone, Copy)]
 pub struct DurScale {
@@ -27,8 +12,6 @@ pub struct DurScale {
 }
 
 impl DurScale {
-    
-    
     pub fn for_column(values: impl IntoIterator<Item = Duration>) -> Self {
         let max_ns = values
             .into_iter()
@@ -74,7 +57,6 @@ impl DurScale {
     }
 }
 
-
 pub fn fmt_dur(d: Duration) -> String {
     let ns = d.as_nanos();
     if ns < 1_000 {
@@ -87,7 +69,6 @@ pub fn fmt_dur(d: Duration) -> String {
         format!("{:.3} s", ns as f64 / 1_000_000_000.0)
     }
 }
-
 
 pub fn fmt_num(n: u64) -> String {
     let s = n.to_string();
@@ -111,13 +92,9 @@ pub fn fmt_bytes(n: u64) -> String {
     }
 }
 
-
 pub fn fmt_pct(ratio: f64) -> String {
     format!("{:.1}%", ratio * 100.0)
 }
-
-
-
 
 pub fn short_path(path: &str) -> String {
     let stripped = path
@@ -137,9 +114,6 @@ pub fn short_path(path: &str) -> String {
     }
 }
 
-
-
-
 pub fn short_global(name: &str) -> String {
     let Some((module, symbol)) = name.rsplit_once("::") else {
         return name.to_owned();
@@ -151,9 +125,6 @@ pub fn short_global(name: &str) -> String {
         .trim_end_matches(".vn");
     format!("{file}::{symbol}")
 }
-
-
-
 
 pub fn truncate_middle(s: &str, width: usize) -> String {
     let count = s.chars().count();
@@ -171,7 +142,6 @@ pub fn truncate_middle(s: &str, width: usize) -> String {
     format!("{head_str}…{tail_str}")
 }
 
-
 pub fn row(label: &str, value: impl AsRef<str>) -> String {
     format!(
         "  {:<LABEL_WIDTH$} {:>VALUE_WIDTH$}",
@@ -179,7 +149,6 @@ pub fn row(label: &str, value: impl AsRef<str>) -> String {
         value.as_ref()
     )
 }
-
 
 pub fn row_note(label: &str, value: impl AsRef<str>, note: impl AsRef<str>) -> String {
     use varn_core::term::chalk::chalk;

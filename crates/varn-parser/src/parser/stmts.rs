@@ -7,9 +7,6 @@ use varn_core::TokenKind;
 
 pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<StmtId, String> {
     while s.check(TokenKind::DocComment) {
-        
-        
-        
         let lexeme: std::sync::Arc<str> = std::sync::Arc::from(s.lexeme());
         s.advance();
         s.store_pending_doc(lexeme);

@@ -14,10 +14,7 @@ pub struct DebugFlags {
     pub types_range: Option<(u32, u32)>,
     pub expr: bool,
     pub expr_range: Option<(u32, u32)>,
-    
-    
-    
-    
+
     pub check_types: bool,
     pub errors: bool,
     pub trace: bool,
@@ -36,9 +33,6 @@ pub struct DebugFlags {
     pub lsp_colorize: bool,
     pub lsp_hints: bool,
 
-    
-    
-    
     pub tir: bool,
     pub tir_check: bool,
 
@@ -47,33 +41,19 @@ pub struct DebugFlags {
     pub clif_kinds: bool,
     pub clif_ir: bool,
     pub clif_asm: bool,
-    
-    
-    
-    
+
     pub clif_check: bool,
 
     pub tiers: bool,
     pub bails: bool,
     pub summary: bool,
-    
-    
-    
+
     pub typeloss: bool,
 
-    
-    
-    
-    
     pub gc: bool,
 
-    
-    
     pub fn_filter: Option<String>,
 }
-
-
-
 
 fn valid_names() -> Vec<&'static str> {
     let mut names: Vec<&'static str> = crate::registry::ALL.iter().map(|p| p.id()).collect();
@@ -265,15 +245,12 @@ impl DebugFlags {
                         flags.types = true;
                         flags.types_all = true;
                     }
-                    
-                    
+
                     "lsp" => flags.lsp = true,
                     "types" => flags.types = true,
-                    
+
                     "trace" => flags.trace = true,
-                    
-                    
-                    
+
                     "all" => {
                         for p in crate::registry::in_all() {
                             apply_registered(&mut flags, p.id());
@@ -284,8 +261,7 @@ impl DebugFlags {
                         flags.lsp = true;
                         flags.lsp_all();
                     }
-                    
-                    
+
                     "binds" => flags.binds = true,
                     "expr" => flags.expr = true,
                     "errors" => flags.errors = true,
@@ -310,22 +286,10 @@ impl DebugFlags {
         Ok(flags)
     }
 
-    
-    
-    
-    
-    
     pub fn needs_execution(&self) -> bool {
         self.gc
     }
 
-    
-    
-    
-    
-    
-    
-    
     pub fn any(&self) -> bool {
         *self != Self::default()
     }
@@ -347,15 +311,11 @@ impl DebugFlags {
         self.clif_asm = true;
     }
 
-    
     pub fn clif_all_on(&mut self) {
         self.clif = true;
         self.clif_all();
     }
 }
-
-
-
 
 fn apply_registered(flags: &mut DebugFlags, id: &str) {
     match id {

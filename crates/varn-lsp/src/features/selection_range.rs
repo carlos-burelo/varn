@@ -17,7 +17,6 @@ pub fn build_selection_ranges(
 fn build_single_selection_range(state: &DocumentState, pos: Position) -> SelectionRange {
     let mut ranges = Vec::new();
 
-    
     if let Some(tok) = state
         .tokens
         .iter()
@@ -35,7 +34,6 @@ fn build_single_selection_range(state: &DocumentState, pos: Position) -> Selecti
         });
     }
 
-    
     if let Some(program) = &state.ast {
         collect_enclosing_ranges(
             program,
@@ -46,7 +44,6 @@ fn build_single_selection_range(state: &DocumentState, pos: Position) -> Selecti
         );
     }
 
-    
     if let Some(last_tok) = state.tokens.last() {
         let full_range = Range {
             start: Position {
@@ -61,10 +58,8 @@ fn build_single_selection_range(state: &DocumentState, pos: Position) -> Selecti
         ranges.push(full_range);
     }
 
-    
     ranges.dedup();
 
-    
     let mut current: Option<SelectionRange> = None;
     for r in ranges.into_iter().rev() {
         current = Some(SelectionRange {

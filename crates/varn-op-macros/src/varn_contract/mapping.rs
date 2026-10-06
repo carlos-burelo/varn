@@ -14,23 +14,13 @@ pub(crate) enum Mapped {
     Bool,
     Char,
     Str,
-    
-    
-    
-    
-    
-    
-    
+
     StrRecv,
     Array,
     Dynamic,
     Void,
     Opt(Box<Mapped>),
 }
-
-
-
-
 
 pub(super) fn scalar_mapped(p: LangPrimitive) -> Mapped {
     match p {
@@ -75,8 +65,6 @@ pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
     }
 }
 
-
-
 pub(super) fn mapped_tag_path(m: &Mapped) -> TS2 {
     let name = match m {
         Mapped::Int => quote! { Int },
@@ -109,7 +97,7 @@ pub(super) fn param_ty(m: &Mapped) -> TS2 {
         Mapped::Bool => quote!(bool),
         Mapped::Char => quote!(char),
         Mapped::Str => quote!(&str),
-        
+
         Mapped::StrRecv => quote!(&::varn_types::VnStr),
         Mapped::Array => quote!(::varn_types::VnArray),
         Mapped::Dynamic => quote!(::varn_types::VmValue),
@@ -123,8 +111,6 @@ pub(super) fn param_ty(m: &Mapped) -> TS2 {
 
 pub(super) fn owned_ty(m: &Mapped) -> TS2 {
     match m {
-        
-        
         Mapped::Str | Mapped::StrRecv => quote!(::varn_types::VnStr),
         Mapped::Opt(inner) => {
             let i = owned_ty(inner);
@@ -149,7 +135,7 @@ pub(super) fn ret_ty(m: &Mapped) -> TS2 {
 pub(super) fn call_expr(binding: &Ident, m: &Mapped) -> TS2 {
     match m {
         Mapped::Str => quote!(#binding.as_str()),
-        
+
         Mapped::StrRecv => quote!(&#binding),
         Mapped::Opt(inner) if matches!(**inner, Mapped::Str) => {
             quote!(#binding.as_ref().map(|s| s.as_str()))

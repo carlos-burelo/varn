@@ -1,21 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 

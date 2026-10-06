@@ -26,53 +26,9 @@ pub struct FunctionProto {
     #[serde(default)]
     pub required_caps: Vec<std::sync::Arc<str>>,
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[serde(default)]
     pub state_size: u16,
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[serde(default)]
     pub global_count: u32,
 
@@ -82,52 +38,23 @@ pub struct FunctionProto {
     #[serde(default)]
     pub exception_table: Vec<super::records::ExceptionRange>,
 
-    
-    
-    
     #[serde(default)]
     pub param_kinds: Vec<crate::register_meta::SlotKind>,
 
-    
-    
     #[serde(default = "slot_kind_dynamic")]
     pub return_kind: crate::register_meta::SlotKind,
 
-    
-    
-    
-    
     #[serde(skip, default)]
     pub resolved_shapes: RefCell<Vec<(u32, Rc<crate::Shape>)>>,
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_entry: std::cell::Cell<usize>,
 
-    
-    
-    
-    
-    
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_native: std::cell::Cell<usize>,
 
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_native_sig: std::cell::Cell<u64>,
@@ -140,24 +67,10 @@ pub struct FunctionProto {
     #[serde(default)]
     pub jit_failed: std::cell::Cell<bool>,
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_epoch: std::cell::Cell<u64>,
 
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub backedge_memo: std::cell::Cell<u8>,
@@ -180,78 +93,37 @@ pub struct FunctionProto {
     #[serde(default)]
     pub static_closure_val: std::cell::Cell<u64>,
 
-    
-    
-    
-    
-    
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_entry_count: std::cell::Cell<u32>,
 
-    
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub backedge_count: std::cell::Cell<u32>,
 
-    
-    
-    
-    
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_osr_entry: std::cell::Cell<Option<usize>>,
 
-    
-    
-    
-    
-    
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_osr_epoch: std::cell::Cell<u64>,
 
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_osr_ip: std::cell::Cell<usize>,
 
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_osr_code: std::cell::RefCell<Option<Rc<dyn std::any::Any>>>,
 
-    
-    
-    
     #[serde(skip)]
     #[serde(default)]
     pub jit_osr_failed: std::cell::Cell<bool>,
 
-    
-    
     #[serde(default)]
     pub ssa: crate::ssa::PortableSsa,
 
-    
-    
-    
     #[serde(default)]
     pub suspend_live: Vec<super::records::SuspendLive>,
 }

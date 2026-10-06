@@ -113,10 +113,6 @@ impl<'a> FnEmitter<'a> {
 }
 
 impl FnEmitter<'_> {
-    
-    
-    
-    
     fn closure_signature(
         &mut self,
         source: Option<ExprId>,

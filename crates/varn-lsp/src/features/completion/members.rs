@@ -1,19 +1,11 @@
-
-
-
-
-
-
-
 use crate::document::{DocumentState, TokenRecord};
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
 use varn_checker::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary, SymbolKind, Type};
 use varn_core::{LangPrimitive, TokenKind};
 
-
 pub struct ReceiverInfo {
     pub ty: Type,
-    
+
     pub is_instance: bool,
 }
 
@@ -32,7 +24,6 @@ pub fn build_member_completions(
         .map(|m| summary_to_completion_item(state, m, use_snippets))
         .collect()
 }
-
 
 fn summary_to_completion_item(
     state: &DocumentState,
@@ -99,8 +90,6 @@ fn completion_kind(kind: ResolvedMemberKind) -> CompletionItemKind {
     }
 }
 
-
-
 fn names_a_type(kind: SymbolKind) -> bool {
     matches!(
         kind,
@@ -166,7 +155,6 @@ pub fn dot_receiver(
     literal_receiver(state, before)
 }
 
-
 fn literal_receiver(state: &DocumentState, tok: &TokenRecord) -> Option<ReceiverInfo> {
     let p = match tok.kind {
         TokenKind::Str => LangPrimitive::Str,
@@ -186,8 +174,6 @@ fn literal_receiver(state: &DocumentState, tok: &TokenRecord) -> Option<Receiver
         is_instance: true,
     })
 }
-
-
 
 fn dot_receiver_source_fallback(
     state: &DocumentState,
@@ -230,7 +216,6 @@ fn dot_receiver_source_fallback(
         is_instance: true,
     })
 }
-
 
 pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<ReceiverInfo> {
     let line_toks: Vec<_> = state.tokens.iter().filter(|t| t.line == line).collect();

@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 #[cfg(not(feature = "dhat-heap"))]
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -31,21 +22,14 @@ mod tester;
 use clap::Parser;
 use cli::{Cli, Commands};
 
-
 use std::process;
 use varn_core::term::terminal;
 use varn_lexer as _;
-
-
 
 #[cfg(feature = "dhat-heap")]
 use mimalloc as _;
 
 fn main() {
-    
-    
-    
-    
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -58,10 +42,6 @@ fn main() {
 }
 
 fn run_cli() {
-    
-    
-    
-    
     env_file::load();
 
     const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));
@@ -93,15 +73,6 @@ fn run_cli() {
 
     let cli = Cli::parse_from(effective);
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
     if !matches!(cli.command, Commands::Lsp(_) | Commands::Doctor) {
         if let Some(reason) = varn_builtins::std_load_error() {
             let e = error::CliError::fatal(reason);

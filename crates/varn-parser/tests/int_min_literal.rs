@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 fn parses(src: &str) -> bool {
     let (tokens, buf, lex_diags) = varn_lexer::scan(src, "test.vn");
     if !lex_diags.is_empty() {
@@ -13,7 +5,6 @@ fn parses(src: &str) -> bool {
     }
     varn_parser::parse(tokens, buf, "test.vn", varn_core::AtomInterner::new()).is_ok()
 }
-
 
 #[test]
 fn i64_min_parses_as_a_literal() {
@@ -23,7 +14,6 @@ fn i64_min_parses_as_a_literal() {
     );
 }
 
-
 #[test]
 fn one_below_i64_min_is_rejected() {
     assert!(
@@ -32,7 +22,6 @@ fn one_below_i64_min_is_rejected() {
     );
 }
 
-
 #[test]
 fn unsigned_magnitude_is_still_rejected() {
     assert!(
@@ -40,8 +29,6 @@ fn unsigned_magnitude_is_still_rejected() {
         "9223372036854775808 is above i64::MAX and must be rejected"
     );
 }
-
-
 
 #[test]
 fn ordinary_negation_still_parses() {

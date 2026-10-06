@@ -8,14 +8,12 @@ fn get_range(ctx: &dyn NativeCtx, this: VmValue) -> Option<RangeData> {
     ctx.as_range(this)
 }
 
-
 fn elements(ctx: &mut dyn NativeCtx, r: &RangeData) -> Vec<VmValue> {
     (0..r.len())
         .filter_map(|i| r.nth(i))
         .map(|raw| ctx.range_element(r, raw))
         .collect()
 }
-
 
 fn raw_of(ctx: &dyn NativeCtx, r: &RangeData, val: VmValue) -> Option<i64> {
     match r.elem {

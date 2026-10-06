@@ -197,9 +197,7 @@ impl<'r> super::super::Binder<'r> {
                             body,
                         });
                     }
-                    
-                    
-                    
+
                     self.escape_all_open_array_candidates();
                     self.bind_stmt(body);
                 }
