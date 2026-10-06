@@ -15,7 +15,7 @@ pub(crate) fn get_fixed_field_at(
     heap: &Heap,
 ) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap()) {
+        if let Some(inst) = heap.instance(obj.as_heap()) {
             if let Some(v) = inst.read_field_at(offset, tag) {
                 return Ok(v);
             }
@@ -34,7 +34,7 @@ pub(crate) fn set_fixed_field_at(
     heap: &mut Heap,
 ) -> VmResult<()> {
     if obj.is_heap() {
-        if let Some(HeapObj::Instance(inst)) = heap.get(obj.as_heap()) {
+        if let Some(inst) = heap.instance(obj.as_heap()) {
             if inst.write_field_at(offset, tag, val).is_ok() {
                 heap.write_barrier(obj.as_heap(), val);
                 return Ok(());
@@ -48,8 +48,12 @@ pub(crate) fn set_fixed_field_at(
 
 pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
+        if let Some(inst) = heap.instance(obj.as_heap()) {
+            if let Some(v) = inst.field_at(slot) {
+                return Ok(v);
+            }
+        }
         let found = match heap.get(obj.as_heap()) {
-            Some(HeapObj::Instance(inst)) => inst.field_at(slot),
             Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.field_at(slot),
             Some(HeapObj::EnumVariant(ev)) => {
                 payload_object(heap, ev.payload).and_then(|o| o.field_at(slot))
@@ -102,14 +106,16 @@ pub(crate) fn set_fixed_field(
             Class(Rc<ClassObj>),
         }
 
-        let target = match heap.get(heap_idx) {
-            Some(HeapObj::Instance(inst)) => Some(Target::Instance(*inst)),
-            Some(HeapObj::Object(o)) => Some(Target::Obj(*o, heap_idx)),
-            Some(HeapObj::EnumVariant(ev)) => {
-                payload_object(heap, ev.payload).map(|o| Target::Obj(o, ev.payload.as_heap()))
-            }
-            Some(HeapObj::Class(cls)) => Some(Target::Class(cls.clone())),
-            _ => None,
+        let target = match heap.instance(heap_idx) {
+            Some(inst) => Some(Target::Instance(inst)),
+            None => match heap.get(heap_idx) {
+                Some(HeapObj::Object(o)) => Some(Target::Obj(*o, heap_idx)),
+                Some(HeapObj::EnumVariant(ev)) => {
+                    payload_object(heap, ev.payload).map(|o| Target::Obj(o, ev.payload.as_heap()))
+                }
+                Some(HeapObj::Class(cls)) => Some(Target::Class(cls.clone())),
+                _ => None,
+            },
         };
 
         match target {

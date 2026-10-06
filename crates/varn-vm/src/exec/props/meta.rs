@@ -67,8 +67,8 @@ fn snapshot_object(heap: &mut Heap, pairs: Vec<(Arc<str>, VmValue)>) -> VmValue 
 }
 
 fn instance_snapshot(obj: VmValue, cls: &ClassObj, heap: &mut Heap) -> VmValue {
-    let pairs = match heap.get(obj.as_heap()) {
-        Some(HeapObj::Instance(inst)) => cls
+    let pairs = match heap.instance(obj.as_heap()) {
+        Some(inst) => cls
             .layout()
             .fields
             .iter()
@@ -96,8 +96,7 @@ pub(crate) fn resolve_meta_property(
         return Ok(VmValue::null());
     };
     let cls = class_of(obj, heap);
-    let is_instance =
-        obj.is_heap() && matches!(heap.get(obj.as_heap()), Some(HeapObj::Instance(_)));
+    let is_instance = obj.is_heap() && heap.instance(obj.as_heap()).is_some();
     let is_class = obj.is_heap() && matches!(heap.get(obj.as_heap()), Some(HeapObj::Class(_)));
     match key {
         MemberKey::Type => {

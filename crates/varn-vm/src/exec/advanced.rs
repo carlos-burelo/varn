@@ -65,10 +65,12 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
     if !obj.is_heap() {
         return false;
     }
-    let obj_class = match heap.get(obj.as_heap()) {
-        Some(HeapObj::Instance(inst)) => ClassObj::find_by_id(inst.class_id),
-        Some(HeapObj::Object(o) | HeapObj::Record(o)) => o.borrow().class().clone(),
-        _ => return false,
+    let obj_class = match heap.instance(obj.as_heap()) {
+        Some(inst) => ClassObj::find_by_id(inst.class_id),
+        None => match heap.get(obj.as_heap()) {
+            Some(HeapObj::Object(o) | HeapObj::Record(o)) => o.borrow().class().clone(),
+            _ => return false,
+        },
     };
     let mut cur = obj_class;
     while let Some(c) = cur {

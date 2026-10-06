@@ -43,10 +43,7 @@ impl ExecCtx {
         if !v.is_heap() {
             return None;
         }
-        match self.heap.get(v.as_heap()) {
-            Some(HeapObj::Instance(inst)) => Some(inst.class_id),
-            _ => None,
-        }
+        self.heap.instance(v.as_heap()).map(|inst| inst.class_id)
     }
 
     pub(crate) fn bound_method(&mut self, recv: VmValue, name: &str) -> Option<VmValue> {

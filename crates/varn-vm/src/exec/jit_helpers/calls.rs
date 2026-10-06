@@ -35,9 +35,7 @@ pub(crate) extern "C" fn jit_call_method_cached_window(
             {
                 return None;
             }
-            let crate::heap::HeapObj::Instance(inst) = ctx_ref.heap.get(this_val.as_heap())? else {
-                return None;
-            };
+            let inst = ctx_ref.heap.instance(this_val.as_heap())?;
             if inst.class_id != entry_id {
                 return None;
             }

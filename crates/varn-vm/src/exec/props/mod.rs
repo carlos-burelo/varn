@@ -95,23 +95,23 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
         return Ok(());
     }
     let idx = obj.as_heap();
-    match heap.get(idx).cloned() {
-        Some(HeapObj::Instance(inst)) => {
-            let cls = ClassObj::find_by_id(inst.class_id);
-            let layout = cls.as_ref().map(|c| c.layout());
-            let field = layout.as_ref().and_then(|l| l.get_field(key));
-            if let Some(f) = field {
-                if inst.write_field(f, val).is_ok() {
-                    heap.write_barrier(idx, val);
-                    return Ok(());
-                }
+    if let Some(inst) = heap.instance(idx) {
+        let cls = ClassObj::find_by_id(inst.class_id);
+        let layout = cls.as_ref().map(|c| c.layout());
+        let field = layout.as_ref().and_then(|l| l.get_field(key));
+        if let Some(f) = field {
+            if inst.write_field(f, val).is_ok() {
+                heap.write_barrier(idx, val);
+                return Ok(());
             }
-            Err(RuntimeError::new(format!(
-                "cannot set property '{}': no such field on class {:?}",
-                key,
-                cls.map(|c| c.name.clone())
-            )))
         }
+        return Err(RuntimeError::new(format!(
+            "cannot set property '{}': no such field on class {:?}",
+            key,
+            cls.map(|c| c.name.clone())
+        )));
+    }
+    match heap.get(idx).cloned() {
         Some(HeapObj::Object(o)) => {
             o.set_field_str(key, val);
             heap.write_barrier(idx, val);
@@ -139,13 +139,13 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
     if !obj.is_heap() {
         return None;
     }
+    if let Some(inst) = heap.instance(obj.as_heap()) {
+        let cls = ClassObj::find_by_id(inst.class_id)?;
+        let layout = cls.layout();
+        let f = layout.get_field(key)?;
+        return inst.read_field(f);
+    }
     match heap.get(obj.as_heap()).cloned() {
-        Some(HeapObj::Instance(inst)) => {
-            let cls = ClassObj::find_by_id(inst.class_id)?;
-            let layout = cls.layout();
-            let f = layout.get_field(key)?;
-            inst.read_field(f)
-        }
         Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.get(key),
         Some(HeapObj::Array(a)) | Some(HeapObj::Tuple(a)) if key == MemberKey::Length.as_str() => {
             Some(VmValue::from_int(a.len() as i64))
@@ -307,8 +307,10 @@ fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::Nati
 pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     if val.is_heap() {
         let intrinsic = |kind: varn_core::RuntimeKind| heap.get_intrinsic_class(kind.name());
+        if let Some(inst) = heap.instance_of(val) {
+            return ClassObj::find_by_id(inst.class_id);
+        }
         return match heap.get(val.as_heap()) {
-            Some(HeapObj::Instance(inst)) => ClassObj::find_by_id(inst.class_id),
             Some(HeapObj::Object(o) | HeapObj::Record(o)) => o.borrow().class(),
             Some(HeapObj::Class(cls)) => Some(cls.clone()),
             Some(HeapObj::Array(_) | HeapObj::Tuple(_)) => intrinsic(varn_core::RuntimeKind::Array),

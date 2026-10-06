@@ -26,6 +26,17 @@ impl HeapInner {
         }
     }
 
+    pub(crate) fn instance(&self, r: HeapRef) -> Option<varn_types::value::InstanceRef> {
+        match self.get(r)? {
+            HeapObj::Instance(inst) => Some(*inst),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn instance_of(&self, v: VmValue) -> Option<varn_types::value::InstanceRef> {
+        self.instance(self.heap_ref(v)?)
+    }
+
     pub(crate) fn native_of(&self, v: VmValue) -> Option<(varn_types::NativeFn, &'static str)> {
         match self.get(self.heap_ref(v)?)? {
             HeapObj::NativeFn(f, name) => Some((*f, *name)),

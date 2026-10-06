@@ -51,7 +51,7 @@ pub(crate) fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
 
 fn extract_error_message(val: VmValue, heap: &Heap) -> String {
     if val.is_heap() {
-        if let Some(HeapObj::Instance(inst)) = heap.get(val.as_heap()) {
+        if let Some(inst) = heap.instance(val.as_heap()) {
             if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
                 let layout = cls.layout();
                 let message = layout

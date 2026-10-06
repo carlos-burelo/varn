@@ -53,7 +53,7 @@ impl ExecCtx {
                 return o.borrow().get_field(key);
             }
 
-            if let Some(HeapObj::Instance(inst)) = self.heap.get(obj.as_heap()) {
+            if let Some(inst) = self.heap.instance(obj.as_heap()) {
                 let cls = ClassObj::find_by_id(inst.class_id)?;
                 let layout = cls.layout();
                 let f = layout.get_field(key)?;
@@ -73,8 +73,7 @@ impl ExecCtx {
             if let Some(HeapObj::Object(o)) = self.heap.get(idx) {
                 o.set_field(std::sync::Arc::from(key), val);
                 self.heap.write_barrier(idx, val);
-            } else if let Some(HeapObj::Instance(inst)) = self.heap.get(idx) {
-                let inst = *inst;
+            } else if let Some(inst) = self.heap.instance(idx) {
                 let field = ClassObj::find_by_id(inst.class_id)
                     .map(|cls| cls.layout())
                     .and_then(|layout| layout.get_field(key).cloned());
