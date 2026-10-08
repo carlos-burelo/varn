@@ -28,8 +28,8 @@ Ley 13 perfil `quick` para iterar (`cargo build --profile quick --bin vn`), matr
   - [ ] `varn-jit/src/clif/from_ssa/extra/common.rs`
   - [ ] `varn-tir/tests/verify_coherence/common.rs`
 - [x] Migrar 36 `std::collections` → Fx/BTree (`d3728072` + `a1879997` absoluto: cero std en `lsp/src`, wire via `document_changes` ordenado por URI; quedan solo tests, xtask, BTree/VecDeque ordenados)
-- [ ] Auditar 318 `_ =>` (Ley 7, cada brazo explícito ante variante nueva)
-- [ ] Puerta: `vn test` 155/0
+- [x] Auditar 318 `_ =>` (Ley 7, cada brazo explícito ante variante nueva) → 586 brazos expandidos + lint `wildcard_enum_match_arm` permanente en cero (`e31475c6` lint, `939fd34e` compiler, `93555c5f` checker emit+binder, `d118d220` checker core, `42d7dd0c` runtime, `bf171c00` tooling). Externos `non_exhaustive` (io::ErrorKind, syn) no los flaggea el lint: se dejan.
+- [x] Puerta F0: `vn test` 155/0
 
 Deuda preexistente detectada (no de este plan, no tocar aquí): `design_audit_test::h7_small_types_are_copy_sized` falla en HEAD limpio
 (`size_of::<Atom>()` 16 vs 4 esperado). Toca F2 (identidad portable / NameId), no F0.
