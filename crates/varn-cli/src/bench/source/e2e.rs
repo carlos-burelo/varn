@@ -39,7 +39,7 @@ pub(super) fn measure_e2e(
             varn_checker::CheckOptions::compile(),
         );
 
-        let proto = compile_via_tir(
+        let proto = varn_pipeline::emit_and_compile(
             &program,
             &arena,
             &check_result,

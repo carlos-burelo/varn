@@ -26,7 +26,7 @@ use crate::error::CliError;
 mod bench_pipeline;
 mod e2e;
 
-use bench_pipeline::{compile_via_tir, export_names_of, parse_shared, verbose_sections};
+use bench_pipeline::{export_names_of, parse_shared, verbose_sections};
 
 pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliError> {
     let runs = opts.runs;
@@ -124,7 +124,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         varn_compiler::regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
         varn_compiler::regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
 
-        let res = compile_via_tir(
+        let res = varn_pipeline::emit_and_compile(
             program_ref,
             arena_ref,
             &check_result,
@@ -147,7 +147,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
-    let proto = compile_via_tir(
+    let proto = varn_pipeline::emit_and_compile(
         &program,
         &arena,
         &check_result,

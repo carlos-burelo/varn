@@ -209,21 +209,9 @@ pub fn build_module_graph(
         } else {
             resolver.module_exports(&program.filename, &mut vec![])
         };
-        let mut export_names: Vec<std::sync::Arc<str>> = exports
-            .keys()
-            .map(|k| std::sync::Arc::from(k.as_str()))
-            .collect();
-        export_names.sort();
-        let tir = varn_checker::emit::emit_module(
-            program,
-            arena,
-            &check.bind,
-            &check.expr_table,
-            &check.call_mappings,
-            &check.desugar,
-        );
+        let export_names = crate::compile::sorted_export_names(&exports);
         let module_proto =
-            varn_compiler::from_tir::compile_module(&tir, export_names, module_source)
+            crate::compile::emit_and_compile(program, arena, &check, export_names, module_source)
                 .map_err(|e| format!("compile error (tir) in '{module_path}': {e:?}"))?;
 
         modules.insert(module_path, module_proto);

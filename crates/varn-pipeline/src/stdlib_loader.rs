@@ -135,21 +135,8 @@ fn compile_source_inner(
         } else {
             resolver.module_exports(path, &mut vec![])
         };
-    let mut export_names: Vec<std::sync::Arc<str>> = exports
-        .keys()
-        .map(|k| std::sync::Arc::from(k.as_str()))
-        .collect();
-    export_names.sort();
-    let tir = varn_checker::emit::emit_module(
-        &program,
-        &arena,
-        &check.bind,
-        &check.expr_table,
-        &check.call_mappings,
-        &check.desugar,
-    );
-    varn_compiler::from_tir::compile_module(&tir, export_names, source)
-        .map_err(|e| format!("{e:?}"))
+    let export_names = crate::compile::sorted_export_names(&exports);
+    crate::compile::emit_and_compile(&program, &arena, &check, export_names, source)
 }
 
 fn validate_imports(id: &str, source: &str) -> Result<(), String> {

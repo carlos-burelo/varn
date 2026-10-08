@@ -20,6 +20,7 @@ mod lex;
 pub use check::check as phase_check;
 pub use check::collect_test_targets;
 pub use compile::CompileOutput;
+pub use compile::{emit_and_compile, sorted_export_names};
 pub use core::core_protos_owned;
 pub use error::PipelineError;
 pub use execute::{boot_machine, enter_main, execute, execute_with_caps};

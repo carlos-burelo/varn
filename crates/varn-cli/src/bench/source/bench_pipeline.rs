@@ -1,24 +1,5 @@
 use super::*;
 
-pub(super) fn compile_via_tir(
-    program: &varn_core::ast::Program,
-    ast_arena: &varn_core::ast::AstArena,
-    check: &varn_checker::CheckResult,
-    export_names: Vec<Arc<str>>,
-    source: &str,
-) -> Result<FunctionProto, String> {
-    let tir = varn_checker::emit::emit_module(
-        program,
-        ast_arena,
-        &check.bind,
-        &check.expr_table,
-        &check.call_mappings,
-        &check.desugar,
-    );
-    varn_compiler::from_tir::compile_module(&tir, export_names, source)
-        .map_err(|e| format!("{e:?}"))
-}
-
 pub(super) fn export_names_of(
     filename: &str,
     session: &varn_pipeline::resolver::Session,

@@ -10,6 +10,36 @@ use varn_types::ModuleGraphArtifact;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
+pub fn sorted_export_names(
+    exports: &varn_checker::module_resolver::ExportMap,
+) -> Vec<std::sync::Arc<str>> {
+    let mut names: Vec<std::sync::Arc<str>> = exports
+        .keys()
+        .map(|k| std::sync::Arc::from(k.as_str()))
+        .collect();
+    names.sort();
+    names
+}
+
+pub fn emit_and_compile(
+    program: &Program,
+    ast_arena: &AstArena,
+    check: &varn_checker::CheckResult,
+    export_names: Vec<std::sync::Arc<str>>,
+    source: &str,
+) -> Result<FunctionProto, String> {
+    let tir = varn_checker::emit::emit_module(
+        program,
+        ast_arena,
+        &check.bind,
+        &check.expr_table,
+        &check.call_mappings,
+        &check.desugar,
+    );
+    varn_compiler::from_tir::compile_module(&tir, export_names, source)
+        .map_err(|e| format!("{e:?}"))
+}
+
 pub struct CompileOutput {
     pub entry_proto: FunctionProto,
     pub precompiled: Rc<FxHashMap<varn_core::ModuleId, Rc<FunctionProto>>>,
@@ -32,29 +62,23 @@ pub fn compile(
     let exports = session
         .resolver()
         .module_exports(&program.filename, &mut vec![]);
-    let mut export_names: Vec<std::sync::Arc<str>> = exports
-        .keys()
-        .map(|k| std::sync::Arc::from(k.as_str()))
-        .collect();
-    export_names.sort();
+    let export_names = sorted_export_names(&exports);
 
-    let tir = varn_checker::emit::emit_module(
+    let proto = emit_and_compile(
         program,
         ast_arena,
-        &check_result.checker_result.bind,
-        &check_result.checker_result.expr_table,
-        &check_result.checker_result.call_mappings,
-        &check_result.checker_result.desugar,
-    );
-    let proto =
-        varn_compiler::from_tir::compile_module(&tir, export_names, source).map_err(|e| {
-            PipelineError::fatal(format!(
-                "{}: {e:?}",
-                varn_core::term::chalk::chalk("error[emit:tir]")
-                    .red()
-                    .bold()
-            ))
-        })?;
+        &check_result.checker_result,
+        export_names,
+        source,
+    )
+    .map_err(|e| {
+        PipelineError::fatal(format!(
+            "{}: {e:?}",
+            varn_core::term::chalk::chalk("error[emit:tir]")
+                .red()
+                .bold()
+        ))
+    })?;
 
     if debug.bytecode {
         varn_debug::bytecode::debug_bytecode(&proto, debug);
