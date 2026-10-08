@@ -9,6 +9,7 @@ import {
 } from "runtime:net";
 
 import { AsyncReader, AsyncWriter } from "std:io";
+import { delay } from "std:task";
 
 export class TcpStream implements AsyncReader, AsyncWriter {
     private _connId: int;
@@ -22,12 +23,19 @@ export class TcpStream implements AsyncReader, AsyncWriter {
         this._remotePort = remotePort;
     }
 
-    static async connect(host: str, port: int): Task<TcpStream> {
-        let connId = await tcpConnect$(host, port);
-        if (connId === -1) {
-            throw new Error("TcpConnectError: Could not connect to " + host + ":" + port.toString());
+    static async connect(host: str, port: int, attempts: int = 25, baseDelayMs: int = 50): Task<TcpStream> {
+        let attempt = 0;
+        while (attempt < attempts) {
+            let connId = await tcpConnect$(host, port);
+            if (connId !== -1) {
+                return new TcpStream(connId, host, port);
+            }
+            attempt = attempt + 1;
+            if (attempt < attempts) {
+                await delay(baseDelayMs + attempt * 20);
+            }
         }
-        return new TcpStream(connId, host, port);
+        throw new Error("TcpConnectError: Could not connect to " + host + ":" + port.toString());
     }
 
     get connId(): int {

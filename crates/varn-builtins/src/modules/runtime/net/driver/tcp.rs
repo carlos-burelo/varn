@@ -1,11 +1,25 @@
 use super::*;
 
+fn bind_reuse_listener(addr: SocketAddr) -> std::io::Result<TcpListener> {
+    let domain = if addr.is_ipv4() {
+        socket2::Domain::IPV4
+    } else {
+        socket2::Domain::IPV6
+    };
+    let sock = socket2::Socket::new(domain, socket2::Type::STREAM, None)?;
+    sock.set_reuse_address(true)?;
+    sock.set_nonblocking(true)?;
+    sock.bind(&addr.into())?;
+    sock.listen(128)?;
+    Ok(TcpListener::from_std(sock.into()))
+}
+
 impl IoDriver {
     pub fn listen(&self, port: i64) -> std::io::Result<i64> {
         let addr: SocketAddr = format!("127.0.0.1:{port}")
             .parse()
             .map_err(|e| std::io::Error::new(ErrorKind::InvalidInput, e))?;
-        let listener = TcpListener::bind(addr)?;
+        let listener = bind_reuse_listener(addr)?;
         let id = next_socket_id();
 
         {
@@ -97,25 +111,6 @@ impl IoDriver {
 
         let conn_id = next_socket_id();
         let task = HostPromise::pending();
-
-        if stream.peer_addr().is_ok() {
-            let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
-            reg.streams.insert(
-                conn_id,
-                StreamState {
-                    stream,
-                    is_connecting: false,
-                    pending_connect: None,
-                    pending_read: None,
-                    pending_write: None,
-                },
-            );
-            drop(reg);
-            let _ = self.cmd_tx.send(DriverCommand::RegisterStream(conn_id));
-            let _ = self.waker.wake();
-            task.complete(Ok(SendValue::Int(conn_id)));
-            return task;
-        }
 
         let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         reg.streams.insert(

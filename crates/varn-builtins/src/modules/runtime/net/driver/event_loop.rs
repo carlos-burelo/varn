@@ -129,16 +129,19 @@ impl IoDriver {
                 let mut deferred: Vec<(HostPromise, Result<SendValue, SendValue>)> = Vec::new();
                 if let Some(stream_state) = reg.streams.get_mut(&id) {
                     if stream_state.is_connecting && (event.is_writable() || event.is_readable()) {
-                        if let Some(task) = stream_state.pending_connect.take() {
-                            stream_state.is_connecting = false;
-                            let res = match stream_state.stream.peer_addr() {
-                                Ok(_) => Ok(SendValue::Int(id)),
-                                Err(_) => match stream_state.stream.take_error() {
-                                    Ok(None) => Ok(SendValue::Int(id)),
-                                    Ok(Some(_)) | Err(_) => Ok(SendValue::Int(-1)),
-                                },
-                            };
-                            deferred.push((task, res));
+                        let settled = match stream_state.stream.peer_addr() {
+                            Ok(_) => Some(true),
+                            Err(_) => match stream_state.stream.take_error() {
+                                Ok(None) => None,
+                                Ok(Some(_)) | Err(_) => Some(false),
+                            },
+                        };
+                        if let Some(ok) = settled {
+                            if let Some(task) = stream_state.pending_connect.take() {
+                                stream_state.is_connecting = false;
+                                let v = if ok { id } else { -1 };
+                                deferred.push((task, Ok(SendValue::Int(v))));
+                            }
                         }
                     }
 

@@ -18,6 +18,7 @@ runtime = [
     "dep:chrono",
     "dep:libloading",
     "dep:mio",
+    "dep:socket2",
     "dep:httparse",
     "dep:regex",
     "dep:flate2",
@@ -54,6 +55,7 @@ zip          = { workspace = true, optional = true }
 sha1         = { version = "0.10", optional = true }
 libloading   = { version = "0.8", optional = true }
 mio          = { workspace = true, optional = true }
+socket2      = { workspace = true, optional = true }
 httparse     = { workspace = true, optional = true }
 rustc-hash   = { workspace = true }
 parking_lot  = { workspace = true }

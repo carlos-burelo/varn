@@ -5,7 +5,16 @@ impl IoDriver {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
             .map_err(|e| std::io::Error::new(ErrorKind::InvalidInput, e))?;
-        let socket = MioUdpSocket::bind(addr)?;
+        let domain = if addr.is_ipv4() {
+            socket2::Domain::IPV4
+        } else {
+            socket2::Domain::IPV6
+        };
+        let sock = socket2::Socket::new(domain, socket2::Type::DGRAM, None)?;
+        sock.set_reuse_address(true)?;
+        sock.set_nonblocking(true)?;
+        sock.bind(&addr.into())?;
+        let socket = MioUdpSocket::from_std(sock.into());
         let id = next_socket_id();
         {
             let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());

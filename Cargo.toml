@@ -78,6 +78,7 @@ semver       = "1"
 sha2         = "0.10"
 hex          = "0.4"
 mio          = { version = "1.0", features = ["net", "os-poll"] }
+socket2      = { version = "0.6", features = ["all"] }
 httparse     = { version = "1.9", default-features = false, features = ["std"] }
 toml         = "0.8"
 # SIMD substring search. Already in the build graph via `serde_json`, so this

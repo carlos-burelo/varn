@@ -1,7 +1,23 @@
 import { TcpListener } from "std:net";
+import { delay } from "std:task";
+
+async function listenWithRetry(port: int): Task<TcpListener> {
+    let attempt = 0;
+    while (true) {
+        try {
+            return TcpListener.listen(port);
+        } catch (e) {
+            attempt = attempt + 1;
+            if (attempt >= 25) {
+                throw e;
+            }
+            await delay(100 + attempt * 20);
+        }
+    }
+}
 
 async function main() {
-    let listener = TcpListener.listen(19877);
+    let listener = await listenWithRetry(19877);
     let client = await listener.accept();
     let data = await client.read(1024);
     if (data !== null) {
