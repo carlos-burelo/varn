@@ -2164,6 +2164,7 @@ dependencies = [
  "varn-core",
  "varn-dap",
  "varn-debug",
+ "varn-debug-flags",
  "varn-fmt",
  "varn-jit",
  "varn-lexer",
@@ -2224,10 +2225,15 @@ dependencies = [
  "varn-checker",
  "varn-compiler",
  "varn-core",
+ "varn-debug-flags",
  "varn-jit",
  "varn-tir",
  "varn-types",
 ]
+
+[[package]]
+name = "varn-debug-flags"
+version = "0.1.0"
 
 [[package]]
 name = "varn-fmt"
@@ -2321,7 +2327,7 @@ dependencies = [
  "varn-checker",
  "varn-compiler",
  "varn-core",
- "varn-debug",
+ "varn-debug-flags",
  "varn-lexer",
  "varn-modules",
  "varn-parser",
