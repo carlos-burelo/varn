@@ -50,7 +50,6 @@ impl<'r> super::super::Binder<'r> {
                         declared,
                         f.modifiers.is_async,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        &self.interner,
                     );
                     let params_list = f
                         .params

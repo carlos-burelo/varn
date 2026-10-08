@@ -63,7 +63,7 @@ pub(super) fn resolve_object_type(
                     .as_ref()
                     .map(|m| resolve_type_node(m, ctx, table))
                     .unwrap_or(Type::Dynamic);
-                let ret = crate::types::async_fn_return(ret_resolved, *is_async, table, interner);
+                let ret = crate::types::async_fn_return(ret_resolved, *is_async, table);
                 ObjectTypeMember::Method {
                     name: resolve_atom_name(*key, ctx, interner),
                     params: resolved_params,

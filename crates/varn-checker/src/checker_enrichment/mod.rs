@@ -89,12 +89,7 @@ pub fn enrich_call_returns(
                 let returns_value = !inferred.is_empty();
                 let ret_ty = types::join_types(inferred, &mut table);
                 if returns_value {
-                    let final_ret = crate::types::async_fn_return(
-                        ret_ty,
-                        *is_async,
-                        &mut table,
-                        &bind.interner,
-                    );
+                    let final_ret = crate::types::async_fn_return(ret_ty, *is_async, &mut table);
                     bind.ty_table = std::sync::Arc::new(table);
                     if let Some(old_ty) = bind.arena.get(*sym_id).ty {
                         let new_ty = with_new_return_type(
@@ -138,7 +133,6 @@ pub fn enrich_call_returns(
                         ret,
                         *is_async,
                         &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
-                        &bind.interner,
                     );
                     if let Some(old) = bind
                         .class_methods

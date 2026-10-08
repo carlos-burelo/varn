@@ -165,7 +165,7 @@ impl<'r> Checker<'r> {
             }
             ExprKind::Await { argument } => {
                 let inner = self.infer_type(*argument, bind);
-                crate::types::awaited(&inner, &self.ty_table, &bind.interner)
+                crate::types::awaited(&inner, &self.ty_table)
             }
             ExprKind::NonNull { expression } => self.infer_non_null(*expression, bind),
             ExprKind::Try { expression } => self.infer_try(*expression, bind),

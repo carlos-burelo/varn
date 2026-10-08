@@ -336,7 +336,7 @@ impl<'r> Checker<'r> {
                     self.expected_return_type = return_type.as_ref().map(|rt| {
                         let ty = self.resolve_type_node_cached(rt, bind);
                         if modifiers.is_async {
-                            crate::types::awaited(&ty, &self.ty_table, &bind.interner)
+                            crate::types::awaited(&ty, &self.ty_table)
                         } else {
                             ty
                         }

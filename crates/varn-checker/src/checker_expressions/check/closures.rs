@@ -25,7 +25,7 @@ impl<'r> Checker<'r> {
             .map(|rt| self.resolve_type_node_cached(rt, bind))
             .or_else(|| self.expected_return_from_fn_type());
         self.expected_return_type = if is_async {
-            resolved_ret.map(|t| crate::types::awaited(&t, &self.ty_table, &bind.interner))
+            resolved_ret.map(|t| crate::types::awaited(&t, &self.ty_table))
         } else {
             resolved_ret
         };
@@ -80,7 +80,7 @@ impl<'r> Checker<'r> {
         self.expected_return_type = return_type.as_ref().map(|rt| {
             let ty = self.resolve_type_node_cached(rt, bind);
             if is_async {
-                crate::types::awaited(&ty, &self.ty_table, &bind.interner)
+                crate::types::awaited(&ty, &self.ty_table)
             } else {
                 ty
             }
@@ -141,9 +141,7 @@ impl<'r> Checker<'r> {
         }
         self.check_expr(argument, bind);
         let arg_ty = self.infer_type(argument, bind);
-        if !arg_ty.is_dynamic()
-            && !crate::types::is_awaitable(&arg_ty, &self.ty_table, &bind.interner)
-        {
+        if !arg_ty.is_dynamic() && !crate::types::is_awaitable(&arg_ty, &self.ty_table) {
             let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
             self.emit(
                 Diagnostic::warning(

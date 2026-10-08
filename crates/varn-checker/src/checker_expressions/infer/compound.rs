@@ -172,7 +172,6 @@ impl<'r> Checker<'r> {
                         ret,
                         *is_async,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        &bind.interner,
                     );
                     members.push(ObjectTypeMember::Method {
                         name,
@@ -237,7 +236,6 @@ impl<'r> Checker<'r> {
                 declared.unwrap_or(Type::Dynamic),
                 is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                &bind.interner,
             )
         };
         let params = self.signature_params(params, bind);

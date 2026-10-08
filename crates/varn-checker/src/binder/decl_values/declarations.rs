@@ -110,7 +110,6 @@ impl<'r> super::super::Binder<'r> {
                 declared_ret.unwrap_or(Type::Void),
                 f.modifiers.is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                &self.interner,
             )
         };
         let fn_type = Type::fn_(

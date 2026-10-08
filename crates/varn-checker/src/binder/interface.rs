@@ -113,7 +113,6 @@ impl<'r> super::Binder<'r> {
                     declared,
                     *is_async,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    &self.interner,
                 );
                 let params_list = params
                     .iter()

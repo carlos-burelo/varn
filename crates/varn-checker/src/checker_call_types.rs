@@ -97,12 +97,14 @@ pub(crate) fn infer_call_type(
                 table,
             )?;
             let obj_kind = table.get(obj_ty.0);
-            let (class_name, origin): (&str, Option<&str>) = match obj_kind {
-                TypeKind::Named(n, origin) => {
-                    (interner.resolve(n), origin.map(|o| interner.resolve(o)))
-                }
+            let text_of = |atom| -> Option<String> {
+                ctx.and_then(|c| c.atom_text(atom))
+                    .or_else(|| table.name(atom).map(str::to_owned))
+            };
+            let (class_name, origin): (Option<String>, Option<String>) = match obj_kind {
+                TypeKind::Named(n, origin) => (text_of(n), origin.and_then(|o| text_of(o))),
                 TypeKind::Generic(name, _, origin) => {
-                    (interner.resolve(name), origin.map(|o| interner.resolve(o)))
+                    (text_of(name), origin.and_then(|o| text_of(o)))
                 }
                 TypeKind::Primitive(_)
                 | TypeKind::Builtin(_)
@@ -122,20 +124,25 @@ pub(crate) fn infer_call_type(
                 | TypeKind::Conditional { .. }
                 | TypeKind::Infer(_)
                 | TypeKind::EnumVariant { .. }
-                | TypeKind::TypePredicate { .. } => (obj_ty.stdlib_key(table)?, None),
+                | TypeKind::TypePredicate { .. } => {
+                    (Some(obj_ty.stdlib_key(table)?.to_string()), None)
+                }
+            };
+            let (Some(class_name), origin) = (class_name, origin) else {
+                return None;
             };
 
             if let Some(ctx) = ctx {
-                if let Some(members) = ctx.get_class_members(class_name, origin) {
+                if let Some(members) = ctx.get_class_members(&class_name, origin.as_deref()) {
                     if let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name) {
                         return Some(m.ty);
                     }
                 }
-                if let Some(ext_ty) = ctx.get_extension_method(class_name, prop_name) {
+                if let Some(ext_ty) = ctx.get_extension_method(&class_name, prop_name) {
                     return Some(ext_ty);
                 }
             }
-            if let Some(methods) = class_methods.get(class_name) {
+            if let Some(methods) = class_methods.get(class_name.as_str()) {
                 if let Some(ty) = methods.get(prop_name) {
                     return Some(*ty);
                 }

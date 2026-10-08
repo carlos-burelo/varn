@@ -218,7 +218,6 @@ impl<'r> Checker<'r> {
             ret_ty,
             is_async,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-            &bind.interner,
         );
         Type::fn_(
             FunctionType {

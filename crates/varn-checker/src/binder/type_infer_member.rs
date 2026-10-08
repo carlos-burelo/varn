@@ -9,10 +9,7 @@ pub(crate) fn ctx_resolve_text(
     ctx: Option<&dyn crate::types::TypeContext>,
     atom: varn_core::Atom,
 ) -> Option<String> {
-    let ctx = ctx?;
-    let interner = ctx.interner()?;
-    let s = interner.try_resolve(atom)?;
-    Some(s.to_string())
+    ctx?.atom_text(atom)
 }
 
 pub(crate) fn reintern_member_type(
