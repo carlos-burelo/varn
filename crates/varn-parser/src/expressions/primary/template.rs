@@ -1,4 +1,4 @@
-use crate::expressions::helpers::unescape_string;
+use crate::expressions::literal_text::unescape_string;
 use crate::stream::TokenStream;
 use varn_core::ast::{ExprId, TemplatePart};
 

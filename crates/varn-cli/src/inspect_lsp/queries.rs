@@ -79,10 +79,7 @@ pub fn run_query(verb: Verb, ctx: &Ctx) -> (Vec<String>, Outcome) {
             } else {
                 "—".to_string()
             };
-            (
-                vec![tag("hl", text)],
-                Outcome::Single { found },
-            )
+            (vec![tag("hl", text)], Outcome::Single { found })
         }
         Verb::Signature => single(
             "sig",
@@ -97,7 +94,11 @@ pub fn run_query(verb: Verb, ctx: &Ctx) -> (Vec<String>, Outcome) {
                     .get(idx)
                     .or_else(|| s.signatures.first())
                     .map(|info| {
-                        format!("{}  ({} sigs)", one_line(&info.label, 100), s.signatures.len())
+                        format!(
+                            "{}  ({} sigs)",
+                            one_line(&info.label, 100),
+                            s.signatures.len()
+                        )
                     })
             }),
         ),
@@ -223,11 +224,9 @@ fn log_branch(msg: &str) -> &'static str {
 fn hover_text(h: &tower_lsp_f::lsp_types::Hover) -> String {
     match &h.contents {
         Contents::MarkedString(c) => marked_text(c),
-        Contents::MarkedStringList(arr) => arr
-            .iter()
-            .map(marked_text)
-            .collect::<Vec<_>>()
-            .join(" | "),
+        Contents::MarkedStringList(arr) => {
+            arr.iter().map(marked_text).collect::<Vec<_>>().join(" | ")
+        }
         Contents::MarkupContent(m) => m.value.clone(),
     }
 }

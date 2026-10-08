@@ -6,7 +6,7 @@ edition.workspace = true
 # The compiler: AST -> HIR -> SSA -> opt passes -> bytecode (FunctionProto).
 # Depends only on the AST (varn-core) and the bytecode/proto types (varn-types).
 # `compile_module` is the front door; the VM/JIT consume the FunctionProto it
-# emits. The register-allocation post-passes live in varn-regalloc.
+# emits.
 [dependencies]
 varn-core  = { path = "../varn-core" }
 varn-tir   = { path = "../varn-tir" }

@@ -164,7 +164,7 @@ fn parse_prop_key(s: &mut TokenStream) -> Result<PropKey, String> {
             let raw_text = s.interner.resolve(raw);
             let v = match pre_parsed {
                 Some(varn_core::ParsedNumber::Int(n)) => n,
-                _ => super::super::helpers::parse_int_radix(raw_text).unwrap_or(0),
+                _ => super::super::literal_text::parse_int_radix(raw_text).unwrap_or(0),
             };
             Ok(PropKey::Int(v))
         }

@@ -1,8 +1,8 @@
-use super::core::types_compatible_impl;
-use super::helpers::{
+use super::compat_lookup::{
     class_members_match_object, compatible_named, is_known_named, named_members,
     object_matches_class_members,
 };
+use super::core::types_compatible_impl;
 use super::resolve::{is_intrinsic, m_ty, resolve_atom};
 use super::scalar::t;
 use crate::binder::BindView;

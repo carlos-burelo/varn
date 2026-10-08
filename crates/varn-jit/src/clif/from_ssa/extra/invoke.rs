@@ -3,7 +3,7 @@ use super::super::heap::{boxed_value, exec_ctx};
 use super::super::load_value;
 use super::super::store::Out;
 use super::super::Ctx;
-use super::common::{frame, native, stage};
+use super::extra_shared::{frame, native, stage};
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 

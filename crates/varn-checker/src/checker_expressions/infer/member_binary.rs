@@ -4,7 +4,7 @@ use crate::types::{CheckerTyTable, Type};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
 
-use super::super::helpers::base_type;
+use super::super::expr_labels::base_type;
 
 pub(super) fn infer_member_type(
     checker: &mut Checker<'_>,

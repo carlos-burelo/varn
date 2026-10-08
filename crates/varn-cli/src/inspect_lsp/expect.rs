@@ -1,5 +1,5 @@
 use varn_core::term::terminal;
-use varn_debug::colors::{GREEN, RED, R};
+use varn_debug::colors::{GREEN, R, RED};
 use varn_debug::flags::{Cmp, Predicate, Verb};
 
 use super::queries::Outcome;

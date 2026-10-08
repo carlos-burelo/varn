@@ -7,11 +7,11 @@ pub mod postfix;
 pub mod reflection;
 pub(crate) mod scope;
 
+use std::time::Instant;
 use tower_lsp_f::lsp_types::{
     CompletionItem, CompletionItemKind, CompletionList, CompletionResponse, Documentation,
     InsertTextFormat, MarkupContent, MarkupKind, Position, Range, TextEdit,
 };
-use std::time::Instant;
 
 use crate::document::{
     import_path_at, named_import_module_at, named_imported_names_at, DocumentState,
@@ -53,8 +53,8 @@ pub fn build_completion_response(
                 item.insert_text = Some(insert_text);
             } else {
                 item.filter_text = Some(full_label.clone());
-                item.text_edit = Some(
-                    tower_lsp_f::lsp_types::CompletionItemTextEdit::TextEdit(TextEdit {
+                item.text_edit = Some(tower_lsp_f::lsp_types::CompletionItemTextEdit::TextEdit(
+                    TextEdit {
                         range: Range {
                             start: Position {
                                 line,
@@ -66,8 +66,8 @@ pub fn build_completion_response(
                             },
                         },
                         new_text: full_label,
-                    }),
-                );
+                    },
+                ));
                 item.insert_text = None;
             }
         }
@@ -114,8 +114,12 @@ pub fn build_completion_response(
     if let Some((receiver_name, receiver_offset)) =
         reflection::colon_colon_receiver(state, line, col, trigger_char)
     {
-        let items =
-            reflection::build_reflection_completions(state, &receiver_name, receiver_offset, &prefix);
+        let items = reflection::build_reflection_completions(
+            state,
+            &receiver_name,
+            receiver_offset,
+            &prefix,
+        );
         let log = format!(
             "cmp {lc} trg={trig} pre={prefix:?} ccref={receiver_name:?} items={} {}ms",
             items.len(),

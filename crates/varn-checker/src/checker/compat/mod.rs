@@ -1,8 +1,8 @@
 mod arrays;
+mod compat_lookup;
 mod core;
 mod expr_sat;
 mod generics;
-mod helpers;
 mod nominal;
 mod objects;
 mod resolve;

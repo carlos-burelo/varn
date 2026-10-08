@@ -1,4 +1,4 @@
-use super::super::helpers::{base_type, op_str};
+use super::super::expr_labels::{base_type, op_str};
 use super::super::infer::member_binary::normalize_for_binary;
 use crate::binder::BindResult;
 use crate::checker::Checker;

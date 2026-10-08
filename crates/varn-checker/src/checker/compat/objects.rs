@@ -1,5 +1,5 @@
+use super::compat_lookup::types_compatible_with_fn_signature;
 use super::core::types_compatible_impl;
-use super::helpers::types_compatible_with_fn_signature;
 use super::scalar::t;
 use crate::binder::BindView;
 use crate::types::{CheckerTyTable, ObjectMembersId, ObjectTypeMember, Type};

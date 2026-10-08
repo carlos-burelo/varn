@@ -1,4 +1,4 @@
-use super::common::{expr, int};
+use super::fixtures::{expr, int};
 use std::sync::Arc;
 use varn_tir::*;
 #[test]

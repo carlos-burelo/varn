@@ -1,5 +1,5 @@
 #![allow(unused_crate_dependencies)]
-mod common;
+mod fixtures;
 mod verify_calls;
 mod verify_flow;
 mod verify_nullable;

@@ -1,6 +1,6 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::checker_expressions::helpers::closest_in_list;
+use crate::checker_expressions::name_suggestions::closest_in_list;
 use crate::types::{ObjectTypeMember, Type};
 use varn_core::ast::operators::Visibility;
 use varn_core::ast::{ExprId, ExprKind};

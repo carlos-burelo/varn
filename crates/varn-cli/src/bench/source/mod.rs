@@ -23,10 +23,10 @@ use super::stats::PhaseStats;
 use super::BenchOpts;
 use crate::error::CliError;
 
+mod bench_pipeline;
 mod e2e;
-mod helpers;
 
-use helpers::{compile_via_tir, export_names_of, parse_shared, verbose_sections};
+use bench_pipeline::{compile_via_tir, export_names_of, parse_shared, verbose_sections};
 
 pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliError> {
     let runs = opts.runs;

@@ -93,7 +93,7 @@ impl VmClosure {
         } else {
             None
         };
-        let helpers = super::helpers::build_jit_helpers();
+        let helpers = super::table_build::build_jit_helpers();
         let linker = crate::clif_link::CtxLinker;
         match varn_jit::compile(&self.proto, &self.constants, helpers, &linker, None) {
             Ok(compiled) => {
@@ -146,7 +146,7 @@ impl VmClosure {
             return None;
         }
 
-        let helpers = super::helpers::build_jit_helpers();
+        let helpers = super::table_build::build_jit_helpers();
         let linker = crate::clif_link::CtxLinker;
         match varn_jit::compile(proto, &self.constants, helpers, &linker, Some(osr_ip)) {
             Ok(compiled) => {

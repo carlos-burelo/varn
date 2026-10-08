@@ -73,10 +73,16 @@ impl Predicate {
             return Some(Predicate::Branch(branch.to_owned()));
         }
         if let Some(rest) = s.strip_prefix("count>=") {
-            return rest.parse::<usize>().ok().map(|n| Predicate::Count(Cmp::Ge, n));
+            return rest
+                .parse::<usize>()
+                .ok()
+                .map(|n| Predicate::Count(Cmp::Ge, n));
         }
         if let Some(rest) = s.strip_prefix("count==") {
-            return rest.parse::<usize>().ok().map(|n| Predicate::Count(Cmp::Eq, n));
+            return rest
+                .parse::<usize>()
+                .ok()
+                .map(|n| Predicate::Count(Cmp::Eq, n));
         }
         if let Some(label) = s.strip_prefix("has=") {
             if label.is_empty() {
@@ -167,15 +173,14 @@ fn parse_pos(s: &str) -> Option<(u32, u32)> {
 }
 
 pub fn parse_step(text: &str) -> Result<Step, String> {
-    let tokens =
-        tokenize(text).ok_or_else(|| format!("unterminated quote in step {text:?}"))?;
+    let tokens = tokenize(text).ok_or_else(|| format!("unterminated quote in step {text:?}"))?;
     let mut tokens = tokens.into_iter();
     let pos = tokens.next().ok_or_else(|| "empty step".to_string())?;
     if pos.contains('=') {
         return Err(format!("first token must be Ln:Col, got {pos:?}"));
     }
-    let (line, col) =
-        parse_pos(&pos).ok_or_else(|| format!("invalid position {pos:?} (expected Ln:Col, 1-based)"))?;
+    let (line, col) = parse_pos(&pos)
+        .ok_or_else(|| format!("invalid position {pos:?} (expected Ln:Col, 1-based)"))?;
     let mut step = Step {
         line,
         col,
@@ -202,8 +207,9 @@ pub fn parse_step(text: &str) -> Result<Step, String> {
                     return Err("ask= needs at least one verb".to_string());
                 }
                 step.ask.push(
-                    Verb::parse(value)
-                        .ok_or_else(|| format!("unknown verb {value:?} (verbs: {})", Verb::list()))?,
+                    Verb::parse(value).ok_or_else(|| {
+                        format!("unknown verb {value:?} (verbs: {})", Verb::list())
+                    })?,
                 );
             }
             "expect" => {
@@ -216,9 +222,7 @@ pub fn parse_step(text: &str) -> Result<Step, String> {
                 );
             }
             _ => {
-                return Err(format!(
-                    "unknown key {key:?} (keys: type, ask, expect)"
-                ));
+                return Err(format!("unknown key {key:?} (keys: type, ask, expect)"));
             }
         }
     }

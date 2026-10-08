@@ -87,10 +87,7 @@ impl DebugFlags {
                         continue;
                     }
                     if head.starts_with("interact@") {
-                        let mut body = head
-                            .strip_prefix("interact@")
-                            .unwrap_or("")
-                            .to_owned();
+                        let mut body = head.strip_prefix("interact@").unwrap_or("").to_owned();
                         for next in sub_parts.by_ref() {
                             body.push('+');
                             body.push_str(next);
@@ -98,9 +95,7 @@ impl DebugFlags {
                         flags.lsp_interact = true;
                         if let Some(path) = body.strip_prefix("file:") {
                             let text = std::fs::read_to_string(path).map_err(|e| {
-                                CliError::usage(format!(
-                                    "cannot read interact file {path:?}: {e}"
-                                ))
+                                CliError::usage(format!("cannot read interact file {path:?}: {e}"))
                             })?;
                             for (idx, raw) in text.lines().enumerate() {
                                 let raw = raw.trim();

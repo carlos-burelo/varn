@@ -138,7 +138,13 @@ fn miss(stage: &'static str, receiver: String) -> DotVerdict {
     }
 }
 
-fn hit(state: &DocumentState, stage: &'static str, tok: &TokenRecord, ty: Type, is_instance: bool) -> DotVerdict {
+fn hit(
+    state: &DocumentState,
+    stage: &'static str,
+    tok: &TokenRecord,
+    ty: Type,
+    is_instance: bool,
+) -> DotVerdict {
     DotVerdict {
         info: Some(ReceiverInfo {
             ty: state.db.non_null(&ty),
@@ -186,7 +192,12 @@ pub fn dot_receiver(
         return miss("lone-dot", String::new());
     }
 
-    let after: Vec<_> = state.tokens.iter().skip(dot_pos + 1).filter(|t| t.offset < cursor_offset).collect();
+    let after: Vec<_> = state
+        .tokens
+        .iter()
+        .skip(dot_pos + 1)
+        .filter(|t| t.offset < cursor_offset)
+        .collect();
     if after.len() == 1 {
         if let Some(res) = state.db.member_resolutions.get(&after[0].offset) {
             let before = &state.tokens[dot_pos - 1];
@@ -204,9 +215,7 @@ pub fn dot_receiver(
 
     if let Some(res) = state.db.member_resolutions.get(&before.offset) {
         let is_instance = match res.member_kind {
-            ResolvedMemberKind::NestedType(kind) => {
-                kind == NestedTypeKind::Namespace
-            }
+            ResolvedMemberKind::NestedType(kind) => kind == NestedTypeKind::Namespace,
             _ => true,
         };
         return hit(state, "chained", before, res.member_ty, is_instance);

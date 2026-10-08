@@ -55,7 +55,9 @@ pub fn print_phases() {
     terminal::log("  lsp:hovers  lsp:semantic  lsp:types  lsp:completions");
     terminal::log("  lsp:symbols  lsp:colorize  lsp:hints  lsp:all");
     terminal::log("  lsp:interact[@STEP[;STEP...] | @file:PATH]  (query session: Ln:Col [type=T] [ask=v] [expect=..])");
-    terminal::log("    STEP verbs: complete,hover,definition,declaration,highlight,signature (default all)");
+    terminal::log(
+        "    STEP verbs: complete,hover,definition,declaration,highlight,signature (default all)",
+    );
     terminal::log("    STEP expects: branch=X, count>=N, count==N, has=X, missing=X, found, none");
     terminal::separator();
     terminal::tagged("filtros", "--fn <nombre>, types:N, types:all, expr:N");

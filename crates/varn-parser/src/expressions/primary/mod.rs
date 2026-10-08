@@ -2,7 +2,7 @@ mod match_expr;
 mod object;
 mod template;
 
-use super::helpers::{parse_int_radix, split_regex, unescape_string};
+use super::literal_text::{parse_int_radix, split_regex, unescape_string};
 use super::{parse_call_args, parse_seq_expr, try_parse_arrow};
 use crate::stream::TokenStream;
 use crate::types::parse_type_args;

@@ -1,4 +1,4 @@
-use super::common::{expr, int, module_with_point};
+use super::fixtures::{expr, int, module_with_point};
 use std::sync::Arc;
 use varn_tir::*;
 #[test]

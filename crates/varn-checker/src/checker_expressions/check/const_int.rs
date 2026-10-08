@@ -1,4 +1,4 @@
-use super::super::helpers::closest_in_list;
+use super::super::name_suggestions::closest_in_list;
 use super::Checker;
 use std::sync::Arc;
 use varn_core::ast::operators::BinaryOp;

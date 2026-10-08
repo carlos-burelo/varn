@@ -59,7 +59,7 @@ pub fn compile(
     }
 
     if debug.clif {
-        let helpers = varn_vm::jit::helpers::build_jit_helpers();
+        let helpers = varn_vm::jit::table_build::build_jit_helpers();
         varn_debug::clif::debug_clif(&proto, debug, &helpers);
     }
 
@@ -72,7 +72,7 @@ pub fn compile(
     }
 
     if debug.tiers || debug.bails {
-        let helpers = varn_vm::jit::helpers::build_jit_helpers();
+        let helpers = varn_vm::jit::table_build::build_jit_helpers();
         if debug.tiers {
             varn_debug::tiers::debug_tiers(&proto, debug, &helpers, None);
         }
@@ -138,7 +138,7 @@ pub fn compile(
     }
 
     if debug.clif {
-        let helpers = varn_vm::jit::helpers::build_jit_helpers();
+        let helpers = varn_vm::jit::table_build::build_jit_helpers();
         for (path, module_proto) in graph_build.modules.iter() {
             if path != &graph_build.entry_path {
                 eprintln!("\n=== MODULE CLIF: {} ===", path);
@@ -148,7 +148,7 @@ pub fn compile(
     }
 
     if debug.tiers || debug.bails || debug.summary {
-        let helpers = varn_vm::jit::helpers::build_jit_helpers();
+        let helpers = varn_vm::jit::table_build::build_jit_helpers();
         for (path, module_proto) in graph_build.modules.iter() {
             if path == &graph_build.entry_path {
                 continue;
