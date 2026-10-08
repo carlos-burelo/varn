@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use tower_lsp_f::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, Uri, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, Uri,
 };
 
 use crate::document::DocumentState;
@@ -76,18 +75,13 @@ pub fn generate_extract_function_action(
         new_text: format!("{fn_name}()"),
     };
 
-    let mut changes = HashMap::new();
-    changes.insert(uri.clone(), vec![def_edit, call_edit]);
+    let doc_edits = vec![(uri.clone(), vec![def_edit, call_edit])];
 
     Some(CodeActionResponse::CodeAction(CodeAction {
         title: format!("Extract into function '{fn_name}'"),
         kind: Some(CodeActionKind::RefactorExtract),
         diagnostics: None,
-        edit: Some(WorkspaceEdit {
-            changes: Some(changes),
-            document_changes: None,
-            change_annotations: None,
-        }),
+        edit: Some(crate::features::workspace_edit::doc_edits(doc_edits)),
         command: None,
         is_preferred: Some(false),
         disabled: None,

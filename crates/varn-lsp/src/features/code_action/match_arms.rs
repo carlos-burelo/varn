@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use tower_lsp_f::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit,
 };
 use varn_core::ast::{ExprId, ExprKind};
 
@@ -46,8 +45,7 @@ pub fn generate_match_arms_action(
         .map(|pattern| format!("\n{indent}{pattern} => {{\n{indent}    // TODO\n{indent}}}"))
         .collect();
 
-    let mut changes = HashMap::new();
-    changes.insert(
+    let doc_edits = vec![(
         uri.clone(),
         vec![TextEdit {
             range: Range {
@@ -56,17 +54,13 @@ pub fn generate_match_arms_action(
             },
             new_text: new_cases,
         }],
-    );
+    )];
 
     Some(CodeActionResponse::CodeAction(CodeAction {
         title: format!("💡 Fill missing match arms ({})", gap.missing.join(", ")),
         kind: Some(CodeActionKind::QuickFix),
         diagnostics: None,
-        edit: Some(WorkspaceEdit {
-            changes: Some(changes),
-            document_changes: None,
-            change_annotations: None,
-        }),
+        edit: Some(crate::features::workspace_edit::doc_edits(doc_edits)),
         command: None,
         is_preferred: Some(true),
         disabled: None,

@@ -1,10 +1,9 @@
 use crate::document::import::uri_to_path;
 use crate::workspace::Workspace;
-use std::collections::HashMap;
 use tower_lsp_f::lsp_types::{Position, Range, TextEdit, Uri, WorkspaceEdit};
 
 pub fn rename_edits(workspace: &Workspace, renames: &[(String, String)]) -> Option<WorkspaceEdit> {
-    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
+    let mut docs: Vec<(Uri, Vec<TextEdit>)> = Vec::new();
     let index = workspace.index.read().ok()?;
     for (old_uri, new_uri) in renames {
         let dependents: Vec<String> = index.dependents_of(old_uri).map(str::to_owned).collect();
@@ -21,7 +20,7 @@ pub fn rename_edits(workspace: &Workspace, renames: &[(String, String)]) -> Opti
             for (idx, line) in state.source.lines().enumerate() {
                 for (start, end, spec) in quoted_specs(line) {
                     if resolves_to(&state.uri, &spec, old_uri) {
-                        changes.entry(uri.clone()).or_default().push(TextEdit {
+                        let edit = TextEdit {
                             range: Range {
                                 start: Position {
                                     line: idx as u32,
@@ -33,20 +32,20 @@ pub fn rename_edits(workspace: &Workspace, renames: &[(String, String)]) -> Opti
                                 },
                             },
                             new_text: new_spec.clone(),
-                        });
+                        };
+                        match docs.iter_mut().find(|(u, _)| *u == uri) {
+                            Some((_, edits)) => edits.push(edit),
+                            None => docs.push((uri.clone(), vec![edit])),
+                        }
                     }
                 }
             }
         }
     }
-    if changes.is_empty() {
+    if docs.is_empty() {
         None
     } else {
-        Some(WorkspaceEdit {
-            changes: Some(changes),
-            document_changes: None,
-            change_annotations: None,
-        })
+        Some(crate::features::workspace_edit::doc_edits(docs))
     }
 }
 

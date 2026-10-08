@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use tower_lsp_f::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit,
 };
 use varn_core::ast::{AstArena, Decl, Program, StmtKind};
 use varn_core::SourceRange;
@@ -51,8 +50,7 @@ pub fn generate_organize_imports_action(
     let first_line = ranges.first()?.start.line.saturating_sub(1);
     let last_line = ranges.last()?.end.line.saturating_sub(1);
 
-    let mut changes = HashMap::new();
-    changes.insert(
+    let doc_edits = vec![(
         uri.clone(),
         vec![TextEdit {
             range: Range {
@@ -67,17 +65,13 @@ pub fn generate_organize_imports_action(
             },
             new_text: organized,
         }],
-    );
+    )];
 
     Some(CodeActionResponse::CodeAction(CodeAction {
         title: "Organize Imports".to_string(),
         kind: Some(CodeActionKind::SourceOrganizeImports),
         diagnostics: None,
-        edit: Some(WorkspaceEdit {
-            changes: Some(changes),
-            document_changes: None,
-            change_annotations: None,
-        }),
+        edit: Some(crate::features::workspace_edit::doc_edits(doc_edits)),
         command: None,
         is_preferred: Some(false),
         disabled: None,

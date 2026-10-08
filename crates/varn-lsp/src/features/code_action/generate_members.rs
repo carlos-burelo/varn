@@ -1,7 +1,6 @@
 use rustc_hash::FxHashSet;
-use std::collections::HashMap;
 use tower_lsp_f::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, Uri, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, Uri,
 };
 use varn_core::ast::{AstArena, ClassMember, Decl, Program, StmtId, StmtKind};
 
@@ -79,18 +78,13 @@ pub fn generate_class_member_actions(
             new_text: ctor_code,
         };
 
-        let mut changes = HashMap::new();
-        changes.insert(uri.clone(), vec![edit]);
+        let doc_edits = vec![(uri.clone(), vec![edit])];
 
         actions.push(CodeActionResponse::CodeAction(CodeAction {
             title: format!("Generate constructor for class '{class_name}'"),
             kind: Some(CodeActionKind::RefactorRewrite),
             diagnostics: None,
-            edit: Some(WorkspaceEdit {
-                changes: Some(changes),
-                document_changes: None,
-                change_annotations: None,
-            }),
+            edit: Some(crate::features::workspace_edit::doc_edits(doc_edits)),
             command: None,
             is_preferred: Some(false),
             disabled: None,
@@ -123,18 +117,13 @@ pub fn generate_class_member_actions(
             new_text: accessors,
         };
 
-        let mut changes = HashMap::new();
-        changes.insert(uri.clone(), vec![edit]);
+        let doc_edits = vec![(uri.clone(), vec![edit])];
 
         actions.push(CodeActionResponse::CodeAction(CodeAction {
             title: format!("Generate getters/setters for class '{class_name}'"),
             kind: Some(CodeActionKind::RefactorRewrite),
             diagnostics: None,
-            edit: Some(WorkspaceEdit {
-                changes: Some(changes),
-                document_changes: None,
-                change_annotations: None,
-            }),
+            edit: Some(crate::features::workspace_edit::doc_edits(doc_edits)),
             command: None,
             is_preferred: Some(false),
             disabled: None,

@@ -6,10 +6,8 @@ pub mod interface_impl;
 pub mod match_arms;
 pub mod organize_imports;
 
-use std::collections::HashMap;
 use tower_lsp_f::lsp_types::{
     CodeAction, CodeActionKind, CodeActionParams, CodeActionResponse, Position, Range, TextEdit,
-    WorkspaceEdit,
 };
 
 use crate::document::DocumentState;
@@ -89,14 +87,9 @@ pub fn build_code_action(
                             new_text: repl.to_string(),
                         });
 
-                        let mut changes = HashMap::new();
-                        changes.insert(uri.clone(), edits);
+                        let doc_edits = vec![(uri.clone(), edits)];
 
-                        action.edit = Some(WorkspaceEdit {
-                            changes: Some(changes),
-                            document_changes: None,
-                            change_annotations: None,
-                        });
+                        action.edit = Some(crate::features::workspace_edit::doc_edits(doc_edits));
                     }
 
                     actions.push(CodeActionResponse::CodeAction(action));

@@ -1,6 +1,6 @@
 #![allow(unused_crate_dependencies)]
 
-use tower_lsp_f::lsp_types::{CodeActionResponse, Label, Uri};
+use tower_lsp_f::lsp_types::{CodeActionResponse, DocumentChange, Edit, Label, Uri};
 use varn_lsp::features::code_action::match_arms::generate_match_arms_action;
 use varn_lsp::features::inlay_hints::param_hints::build_parameter_hints;
 use varn_lsp::pipeline::run_pipeline;
@@ -11,12 +11,19 @@ fn fill_arms_edit(source: &str, line: u32) -> Option<String> {
     let Uri = Uri::parse(&uri).unwrap();
     match generate_match_arms_action(&state, &Uri, line, 0)? {
         CodeActionResponse::CodeAction(action) => {
-            let changes = action.edit?.changes?;
+            let document_changes = action.edit?.document_changes?;
             Some(
-                changes
-                    .values()
-                    .flatten()
-                    .map(|e| e.new_text.clone())
+                document_changes
+                    .into_iter()
+                    .filter_map(|d| match d {
+                        DocumentChange::TextDocumentEdit(t) => Some(t),
+                        _ => None,
+                    })
+                    .flat_map(|t| t.edits)
+                    .filter_map(|e| match e {
+                        Edit::TextEdit(t) => Some(t.new_text),
+                        _ => None,
+                    })
                     .collect(),
             )
         }

@@ -1,7 +1,5 @@
-use std::collections::HashMap;
 use tower_lsp_f::lsp_types::{
     CodeAction, CodeActionKind, CodeActionResponse, Diagnostic, Position, Range, TextEdit,
-    WorkspaceEdit,
 };
 
 use crate::document::DocumentState;
@@ -116,33 +114,28 @@ fn create_import_action(
     sym_name: &str,
     module: &str,
 ) -> Option<CodeActionResponse> {
-    let mut changes = HashMap::new();
-    changes.insert(
-        uri.clone(),
-        vec![TextEdit {
-            range: Range {
-                start: Position {
-                    line: 0,
-                    character: 0,
-                },
-                end: Position {
-                    line: 0,
-                    character: 0,
-                },
+    let edit = TextEdit {
+        range: Range {
+            start: Position {
+                line: 0,
+                character: 0,
             },
-            new_text: format!("import {{ {sym_name} }} from \"{module}\"\n"),
-        }],
-    );
+            end: Position {
+                line: 0,
+                character: 0,
+            },
+        },
+        new_text: format!("import {{ {sym_name} }} from \"{module}\"\n"),
+    };
 
     Some(CodeActionResponse::CodeAction(CodeAction {
         title: format!("💡 Import {{ {sym_name} }} from \"{module}\""),
         kind: Some(CodeActionKind::QuickFix),
         diagnostics: Some(vec![diag.clone()]),
-        edit: Some(WorkspaceEdit {
-            changes: Some(changes),
-            document_changes: None,
-            change_annotations: None,
-        }),
+        edit: Some(crate::features::workspace_edit::doc_edits(vec![(
+            uri.clone(),
+            vec![edit],
+        )])),
         command: None,
         is_preferred: Some(true),
         disabled: None,

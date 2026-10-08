@@ -46,10 +46,22 @@ const b = acc.balance;
     let edit = build_rename(&doc, &workspace, None, 2, 5, "total_balance".to_string());
     assert!(edit.is_some(), "Rename should produce WorkspaceEdit");
     let ws_edit = edit.unwrap();
-    let file_edits = ws_edit.changes.unwrap();
-    let edits = file_edits.values().next().unwrap();
+    let document_changes = ws_edit.document_changes.unwrap();
+    let edits: Vec<_> = document_changes
+        .into_iter()
+        .filter_map(|d| match d {
+            tower_lsp_f::lsp_types::DocumentChange::TextDocumentEdit(t) => Some(t),
+            _ => None,
+        })
+        .flat_map(|t| {
+            t.edits.into_iter().filter_map(|e| match e {
+                tower_lsp_f::lsp_types::Edit::TextEdit(t) => Some(t),
+                _ => None,
+            })
+        })
+        .collect();
     assert_eq!(edits.len(), 6, "Rename should edit all 6 occurrences");
-    for e in edits {
+    for e in &edits {
         assert_eq!(e.new_text, "total_balance");
     }
 }

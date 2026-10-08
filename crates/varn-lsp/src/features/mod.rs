@@ -22,4 +22,5 @@ pub mod signature_help;
 pub mod symbols;
 pub mod type_definition;
 pub mod type_hierarchy;
+pub mod workspace_edit;
 pub mod workspace_symbols;

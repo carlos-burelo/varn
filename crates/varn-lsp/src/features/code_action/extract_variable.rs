@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use tower_lsp_f::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, Uri, WorkspaceEdit,
+    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, Uri,
 };
 
 use crate::document::DocumentState;
@@ -61,18 +60,13 @@ pub fn generate_extract_variable_action(
         new_text: var_name.to_string(),
     };
 
-    let mut changes = HashMap::new();
-    changes.insert(uri.clone(), vec![decl_edit, replace_edit]);
+    let doc_edits = vec![(uri.clone(), vec![decl_edit, replace_edit])];
 
     Some(CodeActionResponse::CodeAction(CodeAction {
         title: format!("Extract '{selected_text}' into variable '{var_name}'"),
         kind: Some(CodeActionKind::RefactorExtract),
         diagnostics: None,
-        edit: Some(WorkspaceEdit {
-            changes: Some(changes),
-            document_changes: None,
-            change_annotations: None,
-        }),
+        edit: Some(crate::features::workspace_edit::doc_edits(doc_edits)),
         command: None,
         is_preferred: Some(false),
         disabled: None,
