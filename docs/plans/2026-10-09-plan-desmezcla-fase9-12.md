@@ -39,8 +39,9 @@ Partir (cada uno invariante propio, nada compartido nuevo):
 - `enum_payload.rs`: `enum_variant_property:445-519`.
 - `generator_next:521-531` fuera: mover al módulo del driver de
   generadores (auditar destino en sesión), no queda en props.
-- `meta.rs:114-291` igual: separar snapshots/nativas de la tabla
-  `Type/Name/Class/Fields/...`.
+- `meta.rs` (354 líneas) NO se parte: un solo dominio (meta
+  reflection); las 4 nativas solo se registran ahí (`meta.rs:201-245`).
+  Criterio manda: 400 dispara revisión, partir solo si >1 dominio.
 - Criterio general (vale para `parser/decls/class.rs:637`,
   `types/disasm.rs:640`): tamaño ≠ mezcla; 400 dispara revisión,
   se parte solo si hay >1 dominio. Pases de compiler (`const_fold:493`,

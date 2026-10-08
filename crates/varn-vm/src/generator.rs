@@ -2,9 +2,22 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use varn_types::generator::GeneratorDriver;
+use varn_types::{NativeCtx, NativeFnResult};
 
 use crate::exec::{ExecCtx, VmSuspend};
 use crate::value::VmValue;
+
+pub(crate) fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
+    let gen_nv = args
+        .first()
+        .copied()
+        .ok_or("generator.next: missing receiver")?;
+    let gen = ctx
+        .as_generator(gen_nv)
+        .ok_or("generator.next: invalid receiver")?;
+    let input = args.get(1).copied().unwrap_or(VmValue::null());
+    gen.0.next(input).map_err(Into::into)
+}
 
 fn make_iter_result(heap: &mut crate::heap::Heap, value: VmValue, done: bool) -> VmValue {
     heap.alloc_object_pairs([
