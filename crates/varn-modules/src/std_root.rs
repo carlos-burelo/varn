@@ -99,20 +99,11 @@ pub fn in_source_tree(file: &str) -> bool {
         return false;
     };
 
-    thread_local! {
-        static MEMO: std::cell::RefCell<rustc_hash::FxHashMap<Box<str>, bool>> =
-            std::cell::RefCell::new(rustc_hash::FxHashMap::default());
-    }
-    if let Some(hit) = MEMO.with(|m| m.borrow().get(file).copied()) {
-        return hit;
-    }
     let path = Path::new(file);
-    let verdict = match (std::fs::canonicalize(path).ok(), canon_root) {
+    match (std::fs::canonicalize(path).ok(), canon_root) {
         (Some(p), Some(r)) => p.starts_with(r),
         _ => path.starts_with(root),
-    };
-    MEMO.with(|m| m.borrow_mut().insert(Box::from(file), verdict));
-    verdict
+    }
 }
 
 fn dev_checkout_std() -> Option<StdSource> {

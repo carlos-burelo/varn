@@ -53,26 +53,13 @@ pub fn host_isa() -> Result<OwnedTargetIsa, String> {
         .map_err(|e| e.to_string())
 }
 
-thread_local! {
-
-
-
-    static CTX: std::cell::RefCell<Context> = std::cell::RefCell::new(Context::new());
-}
-
 pub(crate) fn with_ctx<R>(
     func: Function,
     isa: &dyn TargetIsa,
     take: impl FnOnce(&cranelift_codegen::CompiledCode) -> Result<R, String>,
 ) -> Result<R, String> {
-    CTX.with(|cell| match cell.try_borrow_mut() {
-        Ok(mut ctx) => {
-            ctx.clear();
-            ctx.func = func;
-            compile_in(&mut ctx, isa, take)
-        }
-        Err(_) => compile_in(&mut Context::for_function(func), isa, take),
-    })
+    let mut ctx = Context::for_function(func);
+    compile_in(&mut ctx, isa, take)
 }
 
 fn compile_in<R>(

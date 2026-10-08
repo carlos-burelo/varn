@@ -3,7 +3,7 @@ use super::*;
 use super::number::fast_parse_f64;
 
 pub(super) fn fast_parse_json(ctx: &mut ExecCtx, text: &str) -> Option<VmValue> {
-    let cached_shape = cache_snapshot();
+    let cached_shape = None;
     let mut parser = FastJsonParser {
         bytes: text.as_bytes(),
         pos: 0,
@@ -331,8 +331,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         }
         if let Some(shape) = self.ctx.get_object_shape(obj) {
             let entry = (std::rc::Rc::new(owned_keys), shape);
-            self.cached_shape = Some(entry.clone());
-            JSON_SHAPE_CACHE.with(|c| *c.borrow_mut() = Some(entry));
+            self.cached_shape = Some(entry);
         }
         Some(obj)
     }

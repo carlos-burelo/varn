@@ -90,10 +90,6 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
         let mut spilled: Vec<VmValue> = Vec::new();
         let mut n = 0usize;
 
-        let cached = cache_snapshot();
-        let cached_keys = |k: usize| cached.as_ref().and_then(|(keys, _)| keys.get(k));
-
-        let mut matched: Option<usize> = Some(0);
         let mut owned_keys: Vec<String> = Vec::new();
 
         while let Some(key) = map.next_key::<Cow<'de, str>>()? {
@@ -107,18 +103,7 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
                 spilled.push(val);
             }
             n += 1;
-
-            match matched {
-                Some(k) if cached_keys(k).map(String::as_str) == Some(key.as_ref()) => {
-                    matched = Some(k + 1);
-                }
-                Some(k) => {
-                    owned_keys = key_prefix(&cached, k);
-                    owned_keys.push(key.into_owned());
-                    matched = None;
-                }
-                None => owned_keys.push(key.into_owned()),
-            }
+            owned_keys.push(key.into_owned());
         }
 
         let values: &[VmValue] = if spilled.is_empty() {
@@ -127,24 +112,9 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
             &spilled
         };
 
-        if matched == Some(n) {
-            if let Some((keys, shape)) = &cached {
-                if keys.len() == n {
-                    return Ok(self.0.heap.alloc_object_with_shape_slice(shape, values));
-                }
-            }
-        }
-
-        if let Some(k) = matched {
-            owned_keys = key_prefix(&cached, k);
-        }
         let obj = self.0.alloc_object();
         for (k, v) in owned_keys.iter().zip(values.iter()) {
             self.0.set_field(obj, k, *v);
-        }
-        if let Some(shape) = self.0.get_object_shape(obj) {
-            let entry = (std::rc::Rc::new(owned_keys), shape);
-            JSON_SHAPE_CACHE.with(|c| *c.borrow_mut() = Some(entry));
         }
         Ok(obj)
     }
