@@ -30,13 +30,53 @@ pub(crate) fn format_expr_short(
             }
             format!("{}[...]", format_expr_short(object, arena, interner))
         }
-        _ => "...".to_owned(),
+        ExprKind::BigIntLiteral { .. }
+        | ExprKind::DecimalLiteral { .. }
+        | ExprKind::CharLiteral { .. }
+        | ExprKind::NullLiteral
+        | ExprKind::RegexLiteral { .. }
+        | ExprKind::Template { .. }
+        | ExprKind::TaggedTemplate { .. }
+        | ExprKind::Missing
+        | ExprKind::This
+        | ExprKind::Super
+        | ExprKind::Array { .. }
+        | ExprKind::Object { .. }
+        | ExprKind::Tuple { .. }
+        | ExprKind::Record { .. }
+        | ExprKind::Unary { .. }
+        | ExprKind::Update { .. }
+        | ExprKind::Binary { .. }
+        | ExprKind::Logical { .. }
+        | ExprKind::Assign { .. }
+        | ExprKind::Conditional { .. }
+        | ExprKind::Call { .. }
+        | ExprKind::New { .. }
+        | ExprKind::Function { .. }
+        | ExprKind::Arrow { .. }
+        | ExprKind::Sequence { .. }
+        | ExprKind::Paren { .. }
+        | ExprKind::Await { .. }
+        | ExprKind::Spawn { .. }
+        | ExprKind::Yield { .. }
+        | ExprKind::Spread { .. }
+        | ExprKind::Pipeline { .. }
+        | ExprKind::Range { .. }
+        | ExprKind::NonNull { .. }
+        | ExprKind::Try { .. }
+        | ExprKind::As { .. }
+        | ExprKind::Satisfies { .. }
+        | ExprKind::ClassExpr { .. }
+        | ExprKind::Match { .. }
+        | ExprKind::Is { .. }
+        | ExprKind::With { .. }
+        | ExprKind::MetaAccess { .. } => "...".to_owned(),
     }
 }
 
 pub(crate) fn format_pattern(pat: &Pattern, interner: &AtomInterner) -> String {
     match pat {
         Pattern::Identifier { name, .. } => interner.resolve(*name).to_owned(),
-        _ => "{...}".to_owned(),
+        Pattern::Array { .. } | Pattern::Object { .. } | Pattern::Assignment { .. } | Pattern::Rest { .. } => "{...}".to_owned(),
     }
 }

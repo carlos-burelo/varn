@@ -28,7 +28,7 @@ fn valid_class(name: &str) -> bool {
     let mut chars = name.chars();
     match chars.next() {
         Some(c) if c.is_ascii_uppercase() => (),
-        _ => return false,
+        None | Some(_) => return false,
     }
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }

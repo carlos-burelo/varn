@@ -55,7 +55,7 @@ impl SpatialIndex {
                     Some((best_len, _)) if span_len < best_len => {
                         best = Some((span_len, entry.expr.index()));
                     }
-                    _ => {}
+                    Some(_) => {}
                 }
             }
         }

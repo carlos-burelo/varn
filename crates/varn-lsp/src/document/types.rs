@@ -35,7 +35,26 @@ impl SemanticDB {
         let types = self.types.borrow();
         match ty.kind(&types) {
             TypeKind::Fn(f) => Some(types.get_function(f).clone()),
-            _ => None,
+            TypeKind::Primitive(_)
+            | TypeKind::Builtin(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::Named(_, _)
+            | TypeKind::Generic(_, _, _)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Object(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => None,
         }
     }
 
@@ -43,7 +62,25 @@ impl SemanticDB {
         match self.ty_kind(ty) {
             TypeKind::Fn(_) => self.fn_shape(ty),
             TypeKind::Union(list) => self.ty_list(list).iter().find_map(|t| self.fn_shape(t)),
-            _ => None,
+            TypeKind::Primitive(_)
+            | TypeKind::Builtin(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::Named(_, _)
+            | TypeKind::Generic(_, _, _)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Object(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => None,
         }
     }
 
@@ -81,7 +118,22 @@ impl SemanticDB {
             TypeKind::Primitive(p) => Some(p.name().to_owned()),
             TypeKind::Builtin(b) => Some(b.name().to_owned()),
             TypeKind::Array(_) => Some(BuiltinType::Array.name().to_owned()),
-            _ => None,
+            TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Object(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => None,
         }
     }
 }

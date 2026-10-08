@@ -52,7 +52,25 @@ impl DocumentState {
             varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, _, _) => {
                 Some(self.name(*name))
             }
-            _ => None,
+            varn_core::TypeKind::Primitive(_)
+            | varn_core::TypeKind::Builtin(_)
+            | varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::This
+            | varn_core::TypeKind::Array(_)
+            | varn_core::TypeKind::Union(_)
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::Tuple(_)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Fn(_)
+            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::EnumVariant { .. }
+            | varn_core::TypeKind::TypePredicate { .. } => None,
         }
     }
 }

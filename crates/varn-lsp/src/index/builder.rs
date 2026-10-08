@@ -27,7 +27,20 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
                 SymbolKind::Class | SymbolKind::Struct => {
                     heritage.get(s.name()).map(|p| Arc::from(p.as_str()))
                 }
-                _ => None,
+                SymbolKind::Var
+                | SymbolKind::Let
+                | SymbolKind::Const
+                | SymbolKind::Function
+                | SymbolKind::Interface
+                | SymbolKind::TypeAlias
+                | SymbolKind::Enum
+                | SymbolKind::Parameter
+                | SymbolKind::Property
+                | SymbolKind::Method
+                | SymbolKind::TypeParameter
+                | SymbolKind::Namespace
+                | SymbolKind::Extension
+                | SymbolKind::EnumMember => None,
             };
             let name = s.name().to_owned();
             Arc::new(ExportEntry {
@@ -120,7 +133,13 @@ fn summary_to_symbol_kind(k: varn_checker::ResolvedMemberKind) -> varn_checker::
     match k {
         R::Method | R::StaticMethod | R::ExtensionMethod => S::Method,
         R::EnumMember => S::EnumMember,
-        _ => S::Property,
+        R::Property
+        | R::Getter
+        | R::Setter
+        | R::StaticProperty
+        | R::ExtensionProperty
+        | R::NestedType(_)
+        | R::Constructor => S::Property,
     }
 }
 

@@ -142,7 +142,7 @@ fn derive_trigger(prev: Option<char>) -> (Option<&'static str>, &'static str) {
         Some('.') => (Some("."), "TriggerCharacter"),
         Some(':') => (Some(":"), "TriggerCharacter"),
         Some('(') => (None, "TriggerCharacter"),
-        _ => (None, "Invoked"),
+        None | Some(_) => (None, "Invoked"),
     }
 }
 

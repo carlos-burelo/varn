@@ -79,6 +79,18 @@ fn format_sym_details(s: &varn_lsp::document::SymbolView<'_>) -> String {
             }
             parts.join(" ")
         }
-        _ => s.ty_text(),
+        SymbolKind::Var
+        | SymbolKind::Let
+        | SymbolKind::Const
+        | SymbolKind::TypeAlias
+        | SymbolKind::Enum
+        | SymbolKind::Parameter
+        | SymbolKind::Property
+        | SymbolKind::Method
+        | SymbolKind::TypeParameter
+        | SymbolKind::Namespace
+        | SymbolKind::Struct
+        | SymbolKind::Extension
+        | SymbolKind::EnumMember => s.ty_text(),
     }
 }

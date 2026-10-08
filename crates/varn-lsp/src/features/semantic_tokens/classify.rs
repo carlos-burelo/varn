@@ -28,7 +28,22 @@ pub fn resolve_token(
         Str | Char | Template | TemplateHead | TemplateMiddle | TemplateTail => {
             return Some(TT_STRING)
         }
-        _ => {}
+        EOF | Dynamic | Identifier | RegularExpression | LParen | RParen | LBrace | RBrace
+        | LBracket | RBracket | LAngle | RAngle | Semicolon | Comma | Dot | DotDot | DotDotDot
+        | DotDotEq | Colon | ColonColon | Question | QuestionDot | QuestionLBracket
+        | QuestionQuestion | QuestionQuestionEq | Plus | PlusPlus | PlusEq | Minus | MinusMinus
+        | MinusEq | Star | StarStar | StarEq | StarStarEq | Slash | SlashEq | Percent | PercentEq
+        | Amp | AmpAmp | AmpEq | AmpAmpEq | Pipe | PipePipe | PipeEq | PipePipeEq | Caret
+        | CaretEq | Tilde | LtLt | LtLtEq | GtGt | GtGtEq | GtGtGt | GtGtGtEq | Eq | EqEq
+        | EqEqEq | Bang | BangEq | BangEqEq | Lt | LtEq | Gt | GtEq | Let | Const | Var
+        | Function | Class | Struct | Interface | Type | Enum | Namespace | Module | Extension
+        | On | If | Else | Switch | Case | Default | While | For | Do | Break | Continue
+        | Return | Throw | Try | Catch | Finally | Using | With | Import | Export | From | As
+        | Async | Await | Yield | New | Super | Delete | Typeof | Instanceof | In | Of | Is
+        | Public | Private | Protected | Static | Abstract | Override | Readonly | Declare
+        | Native | Extends | Implements | Get | Set | Constructor | Destructor | Match | At
+        | Hash | Backslash | Dollar | Backtick | Newline | Whitespace | DocComment
+        | Placeholder | Spawn | Parallel | Start | RawStr => {}
     }
 
     if tok.kind.is_keyword() && !prev_is_dot && !getset_as_ident {
@@ -163,6 +178,24 @@ fn is_enum_type(state: &DocumentState, ty: &Type) -> bool {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
             matches!(state.symbol_map.get(state.name(n)), Some(SymbolKind::Enum))
         }
-        _ => false,
+        TypeKind::Primitive(_)
+        | TypeKind::Builtin(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Array(_)
+        | TypeKind::Union(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => false,
     }
 }

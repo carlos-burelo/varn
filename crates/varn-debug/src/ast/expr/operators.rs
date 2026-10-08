@@ -178,6 +178,37 @@ pub(super) fn try_print(
             print_expr(expression, arena, child_indent, true, interner);
             true
         }
-        _ => false,
+        ExprKind::IntLiteral { .. }
+        | ExprKind::FloatLiteral { .. }
+        | ExprKind::BigIntLiteral { .. }
+        | ExprKind::DecimalLiteral { .. }
+        | ExprKind::StrLiteral { .. }
+        | ExprKind::CharLiteral { .. }
+        | ExprKind::BoolLiteral { .. }
+        | ExprKind::NullLiteral
+        | ExprKind::RegexLiteral { .. }
+        | ExprKind::Template { .. }
+        | ExprKind::TaggedTemplate { .. }
+        | ExprKind::Identifier { .. }
+        | ExprKind::Missing
+        | ExprKind::This
+        | ExprKind::Super
+        | ExprKind::Array { .. }
+        | ExprKind::Object { .. }
+        | ExprKind::Tuple { .. }
+        | ExprKind::Record { .. }
+        | ExprKind::Member { .. }
+        | ExprKind::Call { .. }
+        | ExprKind::New { .. }
+        | ExprKind::Function { .. }
+        | ExprKind::Arrow { .. }
+        | ExprKind::Await { .. }
+        | ExprKind::Spawn { .. }
+        | ExprKind::Yield { .. }
+        | ExprKind::Spread { .. }
+        | ExprKind::ClassExpr { .. }
+        | ExprKind::Match { .. }
+        | ExprKind::With { .. }
+        | ExprKind::MetaAccess { .. } => false,
     }
 }

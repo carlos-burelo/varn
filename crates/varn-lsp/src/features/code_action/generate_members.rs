@@ -43,7 +43,8 @@ pub fn generate_class_member_actions(
             ClassMember::Method { key, .. } => {
                 methods.insert(state.name(*key).to_owned());
             }
-            _ => {}
+            ClassMember::Destructor { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. }
+            | ClassMember::StaticBlock { .. } => {}
         }
     }
 
@@ -163,7 +164,17 @@ fn find_class_in_stmt(
     match &stmt.kind {
         StmtKind::Decl(d) => match d.as_ref() {
             Decl::Class(c) => Some(c),
-            _ => None,
+            Decl::Variable(_)
+            | Decl::Function(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Enum(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => None,
         },
         StmtKind::Block { stmts } => {
             for s in stmts {
@@ -173,6 +184,23 @@ fn find_class_in_stmt(
             }
             None
         }
-        _ => None,
+        StmtKind::Empty
+        | StmtKind::Expr { .. }
+        | StmtKind::Error
+        | StmtKind::If { .. }
+        | StmtKind::While { .. }
+        | StmtKind::DoWhile { .. }
+        | StmtKind::For { .. }
+        | StmtKind::ForIn { .. }
+        | StmtKind::ForOf { .. }
+        | StmtKind::Switch { .. }
+        | StmtKind::Return { .. }
+        | StmtKind::Break { .. }
+        | StmtKind::Continue { .. }
+        | StmtKind::Throw { .. }
+        | StmtKind::Try { .. }
+        | StmtKind::Using { .. }
+        | StmtKind::Labeled { .. }
+        | StmtKind::Debugger => None,
     }
 }

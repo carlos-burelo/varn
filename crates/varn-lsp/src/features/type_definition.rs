@@ -102,6 +102,22 @@ fn extract_type_identifier(state: &DocumentState, ty: &varn_checker::Type) -> Op
                 _ => None,
             }
         }
-        _ => None,
+        TypeKind::Primitive(_)
+        | TypeKind::Builtin(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => None,
     }
 }

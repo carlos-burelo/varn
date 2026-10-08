@@ -200,7 +200,10 @@ pub(super) fn collect_class_decl(a: &AstArena, c: &ClassDecl, out: &mut Vec<Spat
                 }
                 collect_stmt(a, body, out);
             }
-            _ => {}
+            ClassMember::Method { body: None, .. }
+            | ClassMember::Property { init: None, .. }
+            | ClassMember::Getter { body: None, .. }
+            | ClassMember::Setter { body: None, .. } => {}
         }
     }
 }
@@ -232,7 +235,7 @@ pub(super) fn collect_export_decl(a: &AstArena, exp: &ExportDecl, out: &mut Vec<
             ExportDefaultDecl::Expr(e) => collect_expr(a, e, out),
         },
         ExportDecl::Decl { declaration, .. } => collect_decl(a, declaration, out),
-        _ => {}
+        ExportDecl::Named { .. } | ExportDecl::All { .. } => {}
     }
 }
 

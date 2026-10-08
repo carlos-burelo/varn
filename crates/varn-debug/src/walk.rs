@@ -10,8 +10,14 @@ pub fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
             PoolEntry::Literal(Literal::Bool(b)) => VmValue::from_bool(*b),
             PoolEntry::Literal(Literal::Int(n)) => VmValue::from_int(*n),
             PoolEntry::Literal(Literal::Float(f)) => VmValue::from_f64(*f),
-
-            _ => VmValue::null(),
+            PoolEntry::Literal(Literal::Str(_))
+            | PoolEntry::Literal(Literal::BigInt(_))
+            | PoolEntry::Literal(Literal::Decimal(_))
+            | PoolEntry::Literal(Literal::Symbol(_))
+            | PoolEntry::Literal(Literal::Char(_))
+            | PoolEntry::Function(_)
+            | PoolEntry::Shape(_)
+            | PoolEntry::Layout(_) => VmValue::null(),
         })
         .collect()
 }

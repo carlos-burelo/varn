@@ -193,7 +193,7 @@ fn print_blockers(records: &[CompileRecord]) {
         if let Some(reason) = r.outcome.reason() {
             let kind = match r.outcome {
                 CompileOutcome::Gated(_) => "gate",
-                _ => "bail",
+                CompileOutcome::Routed | CompileOutcome::Bailed(_) => "bail",
             };
             groups
                 .entry(format!("{kind}: {reason}"))

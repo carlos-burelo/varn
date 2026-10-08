@@ -16,7 +16,7 @@ pub fn eval(outcomes: &[(Verb, Outcome)], expects: &[Predicate]) -> bool {
         .iter()
         .filter_map(|(_, o)| match o {
             Outcome::Single { found } => Some(*found),
-            _ => None,
+            Outcome::Items { .. } => None,
         })
         .collect();
     let mut pass = true;

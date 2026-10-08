@@ -25,7 +25,12 @@ pub fn generate_interface_impl_action(
         .iter()
         .filter_map(|m| match m {
             ClassMember::Method { key, .. } => Some(state.name(*key).to_owned()),
-            _ => None,
+            ClassMember::Constructor { .. }
+            | ClassMember::Destructor { .. }
+            | ClassMember::Property { .. }
+            | ClassMember::Getter { .. }
+            | ClassMember::Setter { .. }
+            | ClassMember::StaticBlock { .. } => None,
         })
         .collect();
 
@@ -82,7 +87,10 @@ pub fn generate_interface_impl_action(
                             varn_core::ast::Pattern::Identifier { name, .. } => {
                                 format!("{}{}", state.name(*name), ty_str)
                             }
-                            _ => format!("arg{}", ty_str),
+                            varn_core::ast::Pattern::Array { .. }
+                            | varn_core::ast::Pattern::Object { .. }
+                            | varn_core::ast::Pattern::Assignment { .. }
+                            | varn_core::ast::Pattern::Rest { .. } => format!("arg{}", ty_str),
                         }
                     })
                     .collect();
@@ -149,9 +157,38 @@ fn find_class_at_line<'a>(
                 {
                     Some(c)
                 }
-                _ => None,
+                Decl::Class(_)
+                | Decl::Variable(_)
+                | Decl::Function(_)
+                | Decl::Interface(_)
+                | Decl::TypeAlias(_)
+                | Decl::Enum(_)
+                | Decl::Namespace(_)
+                | Decl::Import(_)
+                | Decl::Export(_)
+                | Decl::Extension(_)
+                | Decl::Struct(_)
+                | Decl::SumType(_) => None,
             },
-            _ => None,
+            StmtKind::Block { .. }
+            | StmtKind::Empty
+            | StmtKind::Expr { .. }
+            | StmtKind::Error
+            | StmtKind::If { .. }
+            | StmtKind::While { .. }
+            | StmtKind::DoWhile { .. }
+            | StmtKind::For { .. }
+            | StmtKind::ForIn { .. }
+            | StmtKind::ForOf { .. }
+            | StmtKind::Switch { .. }
+            | StmtKind::Return { .. }
+            | StmtKind::Break { .. }
+            | StmtKind::Continue { .. }
+            | StmtKind::Throw { .. }
+            | StmtKind::Try { .. }
+            | StmtKind::Using { .. }
+            | StmtKind::Labeled { .. }
+            | StmtKind::Debugger => None,
         })
 }
 
@@ -167,8 +204,37 @@ fn find_interface(
         .find_map(|&id| match &state.ast_arena.stmt(id).kind {
             StmtKind::Decl(decl) => match decl.as_ref() {
                 Decl::Interface(i) if state.name(i.id) == name => Some(i.clone()),
-                _ => None,
+                Decl::Interface(_)
+                | Decl::Variable(_)
+                | Decl::Function(_)
+                | Decl::Class(_)
+                | Decl::TypeAlias(_)
+                | Decl::Enum(_)
+                | Decl::Namespace(_)
+                | Decl::Import(_)
+                | Decl::Export(_)
+                | Decl::Extension(_)
+                | Decl::Struct(_)
+                | Decl::SumType(_) => None,
             },
-            _ => None,
+            StmtKind::Block { .. }
+            | StmtKind::Empty
+            | StmtKind::Expr { .. }
+            | StmtKind::Error
+            | StmtKind::If { .. }
+            | StmtKind::While { .. }
+            | StmtKind::DoWhile { .. }
+            | StmtKind::For { .. }
+            | StmtKind::ForIn { .. }
+            | StmtKind::ForOf { .. }
+            | StmtKind::Switch { .. }
+            | StmtKind::Return { .. }
+            | StmtKind::Break { .. }
+            | StmtKind::Continue { .. }
+            | StmtKind::Throw { .. }
+            | StmtKind::Try { .. }
+            | StmtKind::Using { .. }
+            | StmtKind::Labeled { .. }
+            | StmtKind::Debugger => None,
         })
 }

@@ -51,12 +51,15 @@ const b = acc.balance;
         .into_iter()
         .filter_map(|d| match d {
             tower_lsp_f::lsp_types::DocumentChange::TextDocumentEdit(t) => Some(t),
-            _ => None,
+            tower_lsp_f::lsp_types::DocumentChange::CreateFile(_)
+            | tower_lsp_f::lsp_types::DocumentChange::RenameFile(_)
+            | tower_lsp_f::lsp_types::DocumentChange::DeleteFile(_) => None,
         })
         .flat_map(|t| {
             t.edits.into_iter().filter_map(|e| match e {
                 tower_lsp_f::lsp_types::Edit::TextEdit(t) => Some(t),
-                _ => None,
+                tower_lsp_f::lsp_types::Edit::AnnotatedTextEdit(_)
+                | tower_lsp_f::lsp_types::Edit::SnippetTextEdit(_) => None,
             })
         })
         .collect();

@@ -12,9 +12,37 @@ pub fn top_level_classes(state: &DocumentState) -> impl Iterator<Item = &ClassDe
         .filter_map(|&id| match &state.ast_arena.stmt(id).kind {
             StmtKind::Decl(decl) => match decl.as_ref() {
                 Decl::Class(c) => Some(c),
-                _ => None,
+                Decl::Variable(_)
+                | Decl::Function(_)
+                | Decl::Interface(_)
+                | Decl::TypeAlias(_)
+                | Decl::Enum(_)
+                | Decl::Namespace(_)
+                | Decl::Import(_)
+                | Decl::Export(_)
+                | Decl::Extension(_)
+                | Decl::Struct(_)
+                | Decl::SumType(_) => None,
             },
-            _ => None,
+            StmtKind::Block { .. }
+            | StmtKind::Empty
+            | StmtKind::Expr { .. }
+            | StmtKind::Error
+            | StmtKind::If { .. }
+            | StmtKind::While { .. }
+            | StmtKind::DoWhile { .. }
+            | StmtKind::For { .. }
+            | StmtKind::ForIn { .. }
+            | StmtKind::ForOf { .. }
+            | StmtKind::Switch { .. }
+            | StmtKind::Return { .. }
+            | StmtKind::Break { .. }
+            | StmtKind::Continue { .. }
+            | StmtKind::Throw { .. }
+            | StmtKind::Try { .. }
+            | StmtKind::Using { .. }
+            | StmtKind::Labeled { .. }
+            | StmtKind::Debugger => None,
         })
 }
 

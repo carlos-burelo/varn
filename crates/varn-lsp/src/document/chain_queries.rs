@@ -235,7 +235,7 @@ impl DocumentState {
         let tok_idx_opt = self.tokens.iter().position(|t| t.offset == tok.offset);
         let tok_idx = match tok_idx_opt {
             Some(i) if i >= 2 => i,
-            _ => return DYNAMIC.to_string(),
+            None | Some(_) => return DYNAMIC.to_string(),
         };
 
         let dot_tok = &self.tokens[tok_idx - 1];

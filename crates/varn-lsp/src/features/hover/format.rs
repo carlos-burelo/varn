@@ -21,7 +21,26 @@ pub fn format_type_params_str(state: &DocumentState, ty: &varn_checker::Type) ->
                 .collect();
             format!("<{}>", names.join(", "))
         }
-        _ => String::new(),
+        varn_core::TypeKind::Primitive(_)
+        | varn_core::TypeKind::Builtin(_)
+        | varn_core::TypeKind::Literal(_)
+        | varn_core::TypeKind::This
+        | varn_core::TypeKind::Array(_)
+        | varn_core::TypeKind::Union(_)
+        | varn_core::TypeKind::Intersection(_)
+        | varn_core::TypeKind::Tuple(_)
+        | varn_core::TypeKind::Named(_, _)
+        | varn_core::TypeKind::TemplateLiteral(_)
+        | varn_core::TypeKind::Fn(_)
+        | varn_core::TypeKind::Object(_)
+        | varn_core::TypeKind::Typeof(_)
+        | varn_core::TypeKind::KeyOf(_)
+        | varn_core::TypeKind::IndexedAccess { .. }
+        | varn_core::TypeKind::Mapped { .. }
+        | varn_core::TypeKind::Conditional { .. }
+        | varn_core::TypeKind::Infer(_)
+        | varn_core::TypeKind::EnumVariant { .. }
+        | varn_core::TypeKind::TypePredicate { .. } => String::new(),
     }
 }
 
@@ -180,7 +199,7 @@ pub fn format_summary_member(state: &DocumentState, m: &ResolvedMemberSummary) -
                 state.db.id_text(ft.return_type)
             )
         }
-        _ => match m.kind {
+        None | Some(_) => match m.kind {
             ResolvedMemberKind::Getter => {
                 let ty = state.ty_text(&m.ty);
                 format!("{indent}{static_prefix}get {}(): {ty}", m.name)
@@ -190,7 +209,14 @@ pub fn format_summary_member(state: &DocumentState, m: &ResolvedMemberSummary) -
                 format!("{indent}{static_prefix}set {}({ty})", m.name)
             }
             ResolvedMemberKind::EnumMember => format!("{indent}{}", m.name),
-            _ => format!(
+            ResolvedMemberKind::Method
+            | ResolvedMemberKind::Property
+            | ResolvedMemberKind::StaticMethod
+            | ResolvedMemberKind::StaticProperty
+            | ResolvedMemberKind::ExtensionMethod
+            | ResolvedMemberKind::ExtensionProperty
+            | ResolvedMemberKind::NestedType(_)
+            | ResolvedMemberKind::Constructor => format!(
                 "{indent}{static_prefix}{}{optional}: {}",
                 m.name,
                 state.ty_text(&m.ty)

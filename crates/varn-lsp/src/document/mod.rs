@@ -127,7 +127,17 @@ impl DocumentState {
             | SymbolKind::Enum
             | SymbolKind::Struct
             | SymbolKind::Namespace => self.db.named_type(sym.name()),
-            _ => *sym.ty(),
+            SymbolKind::Var
+            | SymbolKind::Let
+            | SymbolKind::Const
+            | SymbolKind::Function
+            | SymbolKind::TypeAlias
+            | SymbolKind::Parameter
+            | SymbolKind::Property
+            | SymbolKind::Method
+            | SymbolKind::TypeParameter
+            | SymbolKind::Extension
+            | SymbolKind::EnumMember => *sym.ty(),
         };
         self.members_of_type(&ty)
     }

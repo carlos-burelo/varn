@@ -134,9 +134,14 @@ fn count_one(proto: &FunctionProto) -> Counts {
                     kind: ConstKind::Name,
                 } => match code.get(ip + word).and_then(|&i| pool.get(i as usize)) {
                     Some(PoolEntry::Literal(varn_types::Literal::Str(s))) => Some(s.to_string()),
-                    _ => None,
+                    None | Some(_) => None,
                 },
-                _ => None,
+                Operand::Reg { .. }
+                | Operand::Run { .. }
+                | Operand::Fixed { .. }
+                | Operand::Const { .. }
+                | Operand::Imm { .. }
+                | Operand::Jump { .. } => None,
             });
             if let Some(name) = name {
                 if !c.members.contains(&name) {

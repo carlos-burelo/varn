@@ -115,6 +115,43 @@ pub(super) fn try_print(
             );
             true
         }
-        _ => false,
+        ExprKind::IntLiteral { .. }
+        | ExprKind::FloatLiteral { .. }
+        | ExprKind::BigIntLiteral { .. }
+        | ExprKind::DecimalLiteral { .. }
+        | ExprKind::StrLiteral { .. }
+        | ExprKind::CharLiteral { .. }
+        | ExprKind::BoolLiteral { .. }
+        | ExprKind::NullLiteral
+        | ExprKind::RegexLiteral { .. }
+        | ExprKind::Identifier { .. }
+        | ExprKind::Missing
+        | ExprKind::This
+        | ExprKind::Super
+        | ExprKind::Array { .. }
+        | ExprKind::Object { .. }
+        | ExprKind::Tuple { .. }
+        | ExprKind::Record { .. }
+        | ExprKind::Unary { .. }
+        | ExprKind::Update { .. }
+        | ExprKind::Binary { .. }
+        | ExprKind::Logical { .. }
+        | ExprKind::Assign { .. }
+        | ExprKind::Conditional { .. }
+        | ExprKind::Member { .. }
+        | ExprKind::Call { .. }
+        | ExprKind::New { .. }
+        | ExprKind::Sequence { .. }
+        | ExprKind::Paren { .. }
+        | ExprKind::Spread { .. }
+        | ExprKind::Pipeline { .. }
+        | ExprKind::Range { .. }
+        | ExprKind::NonNull { .. }
+        | ExprKind::Try { .. }
+        | ExprKind::As { .. }
+        | ExprKind::Satisfies { .. }
+        | ExprKind::Is { .. }
+        | ExprKind::With { .. }
+        | ExprKind::MetaAccess { .. } => false,
     }
 }

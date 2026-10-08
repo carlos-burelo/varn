@@ -110,7 +110,13 @@ fn summary_to_symbol_kind(
     match k {
         R::Method | R::StaticMethod | R::ExtensionMethod => L::Method,
         R::EnumMember => L::EnumMember,
-        _ => L::Property,
+        R::Property
+        | R::Getter
+        | R::Setter
+        | R::StaticProperty
+        | R::ExtensionProperty
+        | R::NestedType(_)
+        | R::Constructor => L::Property,
     }
 }
 

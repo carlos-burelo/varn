@@ -17,7 +17,16 @@ pub fn collect(program: &Program, arena: &AstArena) -> Report {
                     format!("{:?}", i.source),
                 ]),
                 Decl::Export(e) => rows.push(vec!["export".to_owned(), format!("{:?}", e)]),
-                _ => {}
+                Decl::Variable(_)
+                | Decl::Function(_)
+                | Decl::Class(_)
+                | Decl::Interface(_)
+                | Decl::TypeAlias(_)
+                | Decl::Enum(_)
+                | Decl::Namespace(_)
+                | Decl::Extension(_)
+                | Decl::Struct(_)
+                | Decl::SumType(_) => {}
             }
         }
     }

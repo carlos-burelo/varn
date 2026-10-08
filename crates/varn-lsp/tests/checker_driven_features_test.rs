@@ -17,12 +17,14 @@ fn fill_arms_edit(source: &str, line: u32) -> Option<String> {
                     .into_iter()
                     .filter_map(|d| match d {
                         DocumentChange::TextDocumentEdit(t) => Some(t),
-                        _ => None,
+                        DocumentChange::CreateFile(_)
+                        | DocumentChange::RenameFile(_)
+                        | DocumentChange::DeleteFile(_) => None,
                     })
                     .flat_map(|t| t.edits)
                     .filter_map(|e| match e {
                         Edit::TextEdit(t) => Some(t.new_text),
-                        _ => None,
+                        Edit::AnnotatedTextEdit(_) | Edit::SnippetTextEdit(_) => None,
                     })
                     .collect(),
             )

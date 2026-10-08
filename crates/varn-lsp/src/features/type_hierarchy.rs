@@ -126,6 +126,27 @@ fn from_lsp_kind(k: LspKind) -> varn_checker::SymbolKind {
         LspKind::Struct => S::Struct,
         LspKind::Interface => S::Interface,
         LspKind::Enum => S::Enum,
-        _ => S::Class,
+        LspKind::File
+        | LspKind::Module
+        | LspKind::Namespace
+        | LspKind::Package
+        | LspKind::Method
+        | LspKind::Property
+        | LspKind::Field
+        | LspKind::Constructor
+        | LspKind::Function
+        | LspKind::Variable
+        | LspKind::Constant
+        | LspKind::String
+        | LspKind::Number
+        | LspKind::Boolean
+        | LspKind::Array
+        | LspKind::Object
+        | LspKind::Key
+        | LspKind::Null
+        | LspKind::EnumMember
+        | LspKind::Event
+        | LspKind::Operator
+        | LspKind::TypeParameter => S::Class,
     }
 }

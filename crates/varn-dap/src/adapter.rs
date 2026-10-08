@@ -196,7 +196,7 @@ impl Adapter {
                 let frame = var_ref - 1000;
                 let vars = match self.driver.machine() {
                     Some(m) if frame >= 0 => varn_vm::debug::snapshot_vars(&m.ctx, frame as usize),
-                    _ => {
+                    None | Some(_) => {
                         self.fail(&req, "bad variablesReference".to_string());
                         return true;
                     }

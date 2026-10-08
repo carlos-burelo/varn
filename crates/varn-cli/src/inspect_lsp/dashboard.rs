@@ -253,7 +253,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         for hint in inlay_hints {
             let label = match hint.label {
                 tower_lsp_f::lsp_types::Label::String(s) => s,
-                _ => "".to_string(),
+                tower_lsp_f::lsp_types::Label::InlayHintLabelPartList(_) => "".to_string(),
             };
             terminal::log(format!(
                 "    {DIM}({:>2}:{:>2}){RESET} → {YELLOW}{}{RESET}",

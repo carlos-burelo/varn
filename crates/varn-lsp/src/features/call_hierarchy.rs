@@ -171,7 +171,16 @@ fn callables(file: &DocumentState) -> Vec<(String, SourceRange)> {
                     }
                 }
             }
-            _ => {}
+            Decl::Variable(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Enum(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => {}
         }
     }
     out
@@ -181,7 +190,52 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
     let arena = &file.ast_arena;
     let name_of = move |id: ExprId| match &arena.expr(id).kind {
         ExprKind::Identifier { name } => Some(file.name(*name).to_owned()),
-        _ => None,
+        ExprKind::IntLiteral { .. }
+        | ExprKind::FloatLiteral { .. }
+        | ExprKind::BigIntLiteral { .. }
+        | ExprKind::DecimalLiteral { .. }
+        | ExprKind::StrLiteral { .. }
+        | ExprKind::CharLiteral { .. }
+        | ExprKind::BoolLiteral { .. }
+        | ExprKind::NullLiteral
+        | ExprKind::RegexLiteral { .. }
+        | ExprKind::Template { .. }
+        | ExprKind::TaggedTemplate { .. }
+        | ExprKind::Missing
+        | ExprKind::This
+        | ExprKind::Super
+        | ExprKind::Array { .. }
+        | ExprKind::Object { .. }
+        | ExprKind::Tuple { .. }
+        | ExprKind::Record { .. }
+        | ExprKind::Unary { .. }
+        | ExprKind::Update { .. }
+        | ExprKind::Binary { .. }
+        | ExprKind::Logical { .. }
+        | ExprKind::Assign { .. }
+        | ExprKind::Conditional { .. }
+        | ExprKind::Member { .. }
+        | ExprKind::Call { .. }
+        | ExprKind::New { .. }
+        | ExprKind::Function { .. }
+        | ExprKind::Arrow { .. }
+        | ExprKind::Sequence { .. }
+        | ExprKind::Paren { .. }
+        | ExprKind::Await { .. }
+        | ExprKind::Spawn { .. }
+        | ExprKind::Yield { .. }
+        | ExprKind::Spread { .. }
+        | ExprKind::Pipeline { .. }
+        | ExprKind::Range { .. }
+        | ExprKind::NonNull { .. }
+        | ExprKind::Try { .. }
+        | ExprKind::As { .. }
+        | ExprKind::Satisfies { .. }
+        | ExprKind::ClassExpr { .. }
+        | ExprKind::Match { .. }
+        | ExprKind::Is { .. }
+        | ExprKind::With { .. }
+        | ExprKind::MetaAccess { .. } => None,
     };
     file.spatial_index.exprs().filter_map(move |id| {
         let call = arena.expr(id);
@@ -194,7 +248,53 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
                 computed: false,
                 ..
             } => name_of(*property),
-            _ => name_of(*callee),
+            ExprKind::Member { computed: true, .. }
+            | ExprKind::IntLiteral { .. }
+            | ExprKind::FloatLiteral { .. }
+            | ExprKind::BigIntLiteral { .. }
+            | ExprKind::DecimalLiteral { .. }
+            | ExprKind::StrLiteral { .. }
+            | ExprKind::CharLiteral { .. }
+            | ExprKind::BoolLiteral { .. }
+            | ExprKind::NullLiteral
+            | ExprKind::RegexLiteral { .. }
+            | ExprKind::Template { .. }
+            | ExprKind::TaggedTemplate { .. }
+            | ExprKind::Identifier { .. }
+            | ExprKind::Missing
+            | ExprKind::This
+            | ExprKind::Super
+            | ExprKind::Array { .. }
+            | ExprKind::Object { .. }
+            | ExprKind::Tuple { .. }
+            | ExprKind::Record { .. }
+            | ExprKind::Unary { .. }
+            | ExprKind::Update { .. }
+            | ExprKind::Binary { .. }
+            | ExprKind::Logical { .. }
+            | ExprKind::Assign { .. }
+            | ExprKind::Conditional { .. }
+            | ExprKind::Call { .. }
+            | ExprKind::New { .. }
+            | ExprKind::Function { .. }
+            | ExprKind::Arrow { .. }
+            | ExprKind::Sequence { .. }
+            | ExprKind::Paren { .. }
+            | ExprKind::Await { .. }
+            | ExprKind::Spawn { .. }
+            | ExprKind::Yield { .. }
+            | ExprKind::Spread { .. }
+            | ExprKind::Pipeline { .. }
+            | ExprKind::Range { .. }
+            | ExprKind::NonNull { .. }
+            | ExprKind::Try { .. }
+            | ExprKind::As { .. }
+            | ExprKind::Satisfies { .. }
+            | ExprKind::ClassExpr { .. }
+            | ExprKind::Match { .. }
+            | ExprKind::Is { .. }
+            | ExprKind::With { .. }
+            | ExprKind::MetaAccess { .. } => name_of(*callee),
         }?;
         Some((name, call.range))
     })
