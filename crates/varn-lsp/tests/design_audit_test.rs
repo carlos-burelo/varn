@@ -219,7 +219,11 @@ fn h7_small_types_are_copy_sized() {
     is_copy::<varn_core::Atom>();
     is_copy::<varn_checker::Type>();
 
-    assert_eq!(size_of::<varn_core::Atom>(), 4, "Atom = un u32");
+    assert_eq!(
+        size_of::<varn_core::Atom>(),
+        16,
+        "Atom = hash XXH3-128 del texto"
+    );
     assert!(
         size_of::<varn_checker::Type>() <= 32,
         "Type = ids + flags, no heap propio"
