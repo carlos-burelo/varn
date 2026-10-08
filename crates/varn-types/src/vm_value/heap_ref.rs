@@ -12,7 +12,7 @@ impl HeapRef {
 
     #[inline(always)]
     pub unsafe fn from_addr_unchecked(addr: u64) -> Self {
-        Self(NonZeroU64::new_unchecked(addr))
+        Self(unsafe { NonZeroU64::new_unchecked(addr) })
     }
 
     #[inline(always)]

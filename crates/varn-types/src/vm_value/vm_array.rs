@@ -36,12 +36,14 @@ impl ArrayRepr {
 impl VmArray {
     #[inline(always)]
     pub unsafe fn init_at(at: *mut ArrayRepr, repr: ArrayRepr) -> Self {
-        std::ptr::write(at, repr);
-        Self(NonNull::new_unchecked(at as *mut UnsafeCell<ArrayRepr>))
+        unsafe {
+            std::ptr::write(at, repr);
+            Self(NonNull::new_unchecked(at as *mut UnsafeCell<ArrayRepr>))
+        }
     }
 
     pub unsafe fn drop_at(self) {
-        std::ptr::drop_in_place(self.0.as_ptr());
+        unsafe { std::ptr::drop_in_place(self.0.as_ptr()) };
     }
 
     #[inline(always)]

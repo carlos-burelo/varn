@@ -178,7 +178,7 @@ impl Heap {
     #[allow(clippy::mut_from_ref)]
     #[inline(always)]
     pub(crate) unsafe fn inner_mut(&self) -> &mut HeapInner {
-        &mut *self.inner.get()
+        unsafe { &mut *self.inner.get() }
     }
 }
 

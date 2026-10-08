@@ -113,7 +113,7 @@ pub fn build_module_graph(
 
     let mut topo_queue: VecDeque<&str> = in_degree
         .iter()
-        .filter(|(_, &deg)| deg == 0)
+        .filter(|(_, deg)| **deg == 0)
         .map(|(&n, _)| n)
         .collect();
 

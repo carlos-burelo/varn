@@ -18,7 +18,7 @@ pub fn sample() -> Option<CpuFreq> {
     }
 
     #[link(name = "powrprof")]
-    extern "system" {
+    unsafe extern "system" {
         fn CallNtPowerInformation(
             level: i32,
             in_buf: *mut core::ffi::c_void,

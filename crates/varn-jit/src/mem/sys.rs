@@ -11,7 +11,7 @@ mod imp {
     pub const PAGE_EXECUTE_READ: u32 = 0x20;
 
     #[link(name = "kernel32")]
-    extern "system" {
+    unsafe extern "system" {
         pub fn VirtualAlloc(
             lpAddress: *const c_void,
             dwSize: usize,

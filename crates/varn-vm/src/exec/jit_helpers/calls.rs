@@ -106,9 +106,9 @@ unsafe fn finish_method_outcome(
 ) -> usize {
     let handoff = match outcome {
         Ok(crate::exec::method_args::MethodOutcome::Value(v)) => Handoff::Ran(Ok(v)),
-        Ok(crate::exec::method_args::MethodOutcome::FramePushed) => {
+        Ok(crate::exec::method_args::MethodOutcome::FramePushed) => unsafe {
             hand_off(ctx_ref, caller_depth, out)
-        }
+        },
         Err(e) => Handoff::Ran(Err(e)),
     };
     if let Handoff::Ran(Err(_)) = handoff {
@@ -117,7 +117,7 @@ unsafe fn finish_method_outcome(
             ctx_ref.close_upvalues_in(f.base);
         }
     }
-    settle(ctx_ref, handoff)
+    unsafe { settle(ctx_ref, handoff) }
 }
 unsafe fn fallback_method_call(
     ctx_ref: &mut ExecCtx,
@@ -131,7 +131,7 @@ unsafe fn fallback_method_call(
     out: *mut usize,
 ) -> usize {
     let outcome = ctx_ref.call_method(this_val, name_idx, cs, args, frame_idx, closure_ref);
-    finish_method_outcome(ctx_ref, caller_depth, outcome, out)
+    unsafe { finish_method_outcome(ctx_ref, caller_depth, outcome, out) }
 }
 
 #[varn_op_macros::jit_slow(field = "jit_call_method_window")]

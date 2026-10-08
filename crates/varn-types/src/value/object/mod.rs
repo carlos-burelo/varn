@@ -40,22 +40,24 @@ impl ObjData {
     }
 
     pub unsafe fn init_at(at: *mut u8, shape: Rc<Shape>, n: usize, values: &[VmValue]) -> ObjRef {
-        debug_assert!(values.len() <= n);
-        let data = ptr::slice_from_raw_parts_mut(at as *mut Cell<VmValue>, n) as *mut ObjData;
-        ptr::write(ptr::addr_of_mut!((*data).shape), UnsafeCell::new(shape));
-        ptr::write(ptr::addr_of_mut!((*data).inline_len), n as u32);
-        ptr::write(ptr::addr_of_mut!((*data)._pad), 0);
-        ptr::write(ptr::addr_of_mut!((*data).overflow), UnsafeCell::new(None));
-        let vals = ptr::addr_of_mut!((*data).values) as *mut Cell<VmValue>;
-        ptr::write_bytes(vals, 0, n);
-        for (i, v) in values.iter().enumerate() {
-            (*vals.add(i)).set(*v);
+        unsafe {
+            debug_assert!(values.len() <= n);
+            let data = ptr::slice_from_raw_parts_mut(at as *mut Cell<VmValue>, n) as *mut ObjData;
+            ptr::write(ptr::addr_of_mut!((*data).shape), UnsafeCell::new(shape));
+            ptr::write(ptr::addr_of_mut!((*data).inline_len), n as u32);
+            ptr::write(ptr::addr_of_mut!((*data)._pad), 0);
+            ptr::write(ptr::addr_of_mut!((*data).overflow), UnsafeCell::new(None));
+            let vals = ptr::addr_of_mut!((*data).values) as *mut Cell<VmValue>;
+            ptr::write_bytes(vals, 0, n);
+            for (i, v) in values.iter().enumerate() {
+                (*vals.add(i)).set(*v);
+            }
+            ObjRef(ptr::NonNull::new_unchecked(data))
         }
-        ObjRef(ptr::NonNull::new_unchecked(data))
     }
 
     pub unsafe fn drop_at(obj: ObjRef) {
-        ptr::drop_in_place(obj.0.as_ptr());
+        unsafe { ptr::drop_in_place(obj.0.as_ptr()) };
     }
 
     pub fn pairs_layout<I>(pairs: I) -> (Rc<Shape>, Vec<VmValue>)

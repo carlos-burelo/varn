@@ -12,11 +12,11 @@ pub(crate) fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Nativ
         .first()
         .copied()
         .ok_or("generator.next: missing receiver")?;
-    let gen = ctx
+    let generator = ctx
         .as_generator(gen_nv)
         .ok_or("generator.next: invalid receiver")?;
     let input = args.get(1).copied().unwrap_or(VmValue::null());
-    gen.0.next(input).map_err(Into::into)
+    generator.0.next(input).map_err(Into::into)
 }
 
 fn make_iter_result(heap: &mut crate::heap::Heap, value: VmValue, done: bool) -> VmValue {

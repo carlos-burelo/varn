@@ -16,8 +16,7 @@ varn_contract! {
         fn ceil(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.ceil()) }
         fn round(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.round()) }
         fn random(_ctx: &mut dyn NativeCtx) -> Result<f64, String> {
-            use rand::Rng;
-            Ok(rand::thread_rng().gen())
+            Ok(rand::random())
         }
         fn acos(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.acos()) }
         fn asin(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.asin()) }

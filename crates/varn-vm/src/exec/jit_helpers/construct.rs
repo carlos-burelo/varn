@@ -7,7 +7,7 @@ pub(crate) unsafe fn jit_propagate_error(ctx: &mut ExecCtx, e: crate::error::Run
     ctx.jit_panic_exception_err_obj = Some(e);
     let buf = ctx.jit_jmp_buf;
     if !buf.is_null() {
-        crate::exec::ctx::my_longjmp(buf, 1);
+        unsafe { crate::exec::ctx::my_longjmp(buf, 1) };
     }
     panic!("JIT error: no jump buffer");
 }

@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use varn_core::op_meta::OpMeta;
 use varn_types::{NativeCtx, NativeOpEntry, VmValue};
 
-extern "C" {
+unsafe extern "C" {
     #[cfg(target_os = "macos")]
     #[link_name = "\x01section$start$__DATA$varn_ops"]
     static __VARN_OPS_START: NativeOpEntry;
@@ -25,12 +25,12 @@ extern "C" {
 
 #[cfg(target_os = "windows")]
 #[used]
-#[link_section = ".varn_ops$A"]
+#[unsafe(link_section = ".varn_ops$A")]
 pub static __VARN_OPS_START_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
 
 #[cfg(target_os = "windows")]
 #[used]
-#[link_section = ".varn_ops$C"]
+#[unsafe(link_section = ".varn_ops$C")]
 pub static __VARN_OPS_END_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
 
 pub fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {

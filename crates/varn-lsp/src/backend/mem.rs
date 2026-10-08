@@ -21,7 +21,7 @@ mod imp {
     }
 
     #[link(name = "psapi")]
-    extern "system" {
+    unsafe extern "system" {
         fn GetProcessMemoryInfo(
             process: *mut core::ffi::c_void,
             counters: *mut ProcessMemoryCounters,
@@ -30,7 +30,7 @@ mod imp {
     }
 
     #[link(name = "kernel32")]
-    extern "system" {
+    unsafe extern "system" {
         fn GetCurrentProcess() -> *mut core::ffi::c_void;
     }
 

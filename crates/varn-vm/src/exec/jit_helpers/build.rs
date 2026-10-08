@@ -100,8 +100,8 @@ unsafe fn build_shaped_from_ptr(
     may_hold_closure: bool,
     is_record: bool,
 ) -> VmValue {
-    let ctx_ref = &mut *ctx;
-    let shape = std::mem::ManuallyDrop::new(std::rc::Rc::from_raw(shape));
+    let ctx_ref = unsafe { &mut *ctx };
+    let shape = unsafe { std::mem::ManuallyDrop::new(std::rc::Rc::from_raw(shape)) };
     crate::exec::collections::build_with_shape(
         &ctx_ref.stack,
         base,

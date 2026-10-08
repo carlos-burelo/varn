@@ -35,7 +35,7 @@ varn_contract! {
             if !ctx.check_env(key) {
                 return Err(format!("SecurityError: Permission denied (sys.env) for variable '{key}'"));
             }
-            std::env::set_var(key, val);
+            unsafe { std::env::set_var(key, val) };
             Ok(())
         }
         fn now(_ctx: &mut dyn NativeCtx) -> Result<f64, String> {

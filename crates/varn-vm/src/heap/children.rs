@@ -106,9 +106,9 @@ fn for_each_heap_child(
         HeapObj::EnumVariant(ev) => value(ev.payload),
         HeapObj::Task(task) => task.trace_cells(&mut |c| value(c.get())),
         HeapObj::TaskHandle(cell) => cell.trace_cells(&mut |c| value(c.get())),
-        HeapObj::Generator(gen) => {
-            gen.0.trace_vm_values(&mut value);
-            gen.0.trace_closures(&mut |ptr| {
+        HeapObj::Generator(generator) => {
+            generator.0.trace_vm_values(&mut value);
+            generator.0.trace_closures(&mut |ptr| {
                 if let Some(&idx) = identity.get(&ptr) {
                     value(VmValue::from_heap(idx));
                 }

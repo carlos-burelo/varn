@@ -149,10 +149,10 @@ fn count_one(proto: &FunctionProto) -> Counts {
                 }
             }
         }
-        for (typed, gen) in PAIRS {
+        for (typed, gen_op) in PAIRS {
             if op == *typed {
                 c.typed += 1;
-            } else if op == *gen {
+            } else if op == *gen_op {
                 c.generic += 1;
                 let label = format!("{op:?}");
                 match generic.iter_mut().find(|(n, _)| *n == label) {

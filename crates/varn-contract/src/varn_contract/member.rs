@@ -204,9 +204,9 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
         out.generated_entry_idents.push(fn_entry_ident.clone());
         out.fn_entries.push(quote! {
                 #[used]
-                #[cfg_attr(target_os = "windows", link_section = ".varn_ops$B")]
-                #[cfg_attr(target_os = "macos", link_section = "__DATA,varn_ops")]
-                #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link_section = "varn_ops")]
+                #[cfg_attr(target_os = "windows", unsafe(link_section = ".varn_ops$B"))]
+                #[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,varn_ops"))]
+                #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), unsafe(link_section = "varn_ops"))]
                 static #fn_entry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
                     module_id: #module.as_ptr(),
                     module_id_len: #module.len() as u32,
@@ -253,9 +253,9 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
             out.generated_entry_idents.push(mentry_ident.clone());
             out.method_entries.push(quote! {
                     #[used]
-                    #[cfg_attr(target_os = "windows", link_section = ".varn_ops$B")]
-                    #[cfg_attr(target_os = "macos", link_section = "__DATA,varn_ops")]
-                    #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link_section = "varn_ops")]
+                    #[cfg_attr(target_os = "windows", unsafe(link_section = ".varn_ops$B"))]
+                    #[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,varn_ops"))]
+                    #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), unsafe(link_section = "varn_ops"))]
                     static #mentry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
                         module_id: #module.as_ptr(),
                         module_id_len: #module.len() as u32,

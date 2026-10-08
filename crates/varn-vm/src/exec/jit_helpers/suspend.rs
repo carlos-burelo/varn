@@ -10,7 +10,7 @@ pub(super) unsafe fn jit_suspend_at(ctx: &mut ExecCtx, frame_idx: usize, resume_
     if buf.is_null() {
         panic!("JIT suspend triggered but no jump buffer registered");
     }
-    crate::exec::ctx::my_longjmp(buf, 2)
+    unsafe { crate::exec::ctx::my_longjmp(buf, 2) }
 }
 
 #[varn_op_macros::jit_slow(field = "spawn")]

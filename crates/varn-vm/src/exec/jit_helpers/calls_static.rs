@@ -24,8 +24,8 @@ pub(super) unsafe fn hand_off(ctx: &mut ExecCtx, caller_depth: usize, out: *mut 
     {
         let top = &ctx.frames[caller_depth];
         if let Some(entry) = direct_entry(top.closure()) {
-            out.write(top.closure_ptr as usize);
-            out.add(1).write(top.base);
+            unsafe { out.write(top.closure_ptr as usize) };
+            unsafe { out.add(1).write(top.base) };
             return Handoff::Entry(entry);
         }
     }
@@ -39,7 +39,7 @@ pub(super) unsafe fn settle(ctx: &mut ExecCtx, handoff: Handoff) -> usize {
             ctx.jit_native_result = v;
             0
         }
-        Handoff::Ran(Err(e)) => jit_propagate_error(ctx, e),
+        Handoff::Ran(Err(e)) => unsafe { jit_propagate_error(ctx, e) },
     }
 }
 

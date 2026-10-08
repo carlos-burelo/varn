@@ -96,7 +96,7 @@ pub(super) const ALL_BENCHMARKS: &[BenchDef] = &[
 pub(super) fn select_benchmarks(
     only: &Option<Vec<String>>,
 ) -> Result<Vec<&'static BenchDef>, String> {
-    let benchmarks: Vec<&BenchDef> = if let Some(ref only_list) = only {
+    let benchmarks: Vec<&BenchDef> = if let Some(only_list) = only {
         let filtered: Vec<&BenchDef> = ALL_BENCHMARKS
             .iter()
             .filter(|b| only_list.iter().any(|o| o.eq_ignore_ascii_case(b.name)))

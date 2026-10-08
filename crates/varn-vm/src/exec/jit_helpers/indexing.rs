@@ -43,14 +43,14 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
     key_payload: u64,
 ) {
     let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
-    let key = match (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload)) {
+    let key = match unsafe { (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload)) } {
         Ok(key) => key,
-        Err(e) => super::construct::jit_propagate_error(&mut *ctx, e),
+        Err(e) => unsafe { super::construct::jit_propagate_error(&mut *ctx, e) },
     };
 
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
-        let ctx_ref = &*ctx;
+        let ctx_ref = unsafe { &*ctx };
         match ctx_ref.heap.get(heap_idx) {
             Some(crate::heap::HeapObj::Array(a)) => {
                 let idx = if key.is_int() {
@@ -58,7 +58,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                 } else {
                     key.to_i32() as usize
                 };
-                (*ctx).jit_native_result = a.get_vm(idx).unwrap_or(VmValue::null());
+                unsafe { (*ctx).jit_native_result = a.get_vm(idx).unwrap_or(VmValue::null()) };
                 return;
             }
             Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
@@ -99,7 +99,9 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                     None
                 };
                 if let Some(ks) = key_str {
-                    (*ctx).jit_native_result = o.read().get(ks).unwrap_or(VmValue::null());
+                    unsafe {
+                        (*ctx).jit_native_result = o.read().get(ks).unwrap_or(VmValue::null())
+                    };
                     return;
                 }
             }
@@ -108,7 +110,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                     .heap
                     .lookup_map_key(key)
                     .and_then(|k| m.borrow().get(&k).copied());
-                (*ctx).jit_native_result = found.unwrap_or_else(VmValue::null);
+                unsafe { (*ctx).jit_native_result = found.unwrap_or_else(VmValue::null) };
                 return;
             }
             Some(
@@ -137,10 +139,10 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
         }
     }
 
-    let ctx_ref = &mut *ctx;
+    let ctx_ref = unsafe { &mut *ctx };
     match crate::exec::collections::array_get_index(obj, key, &mut ctx_ref.heap) {
         Ok(v) => ctx_ref.jit_native_result = v,
-        Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        Err(e) => unsafe { super::construct::jit_propagate_error(ctx_ref, e) },
     }
 }
 
@@ -155,15 +157,15 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
     val_payload: u64,
 ) {
     let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
-    let key = match (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload)) {
+    let key = match unsafe { (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload)) } {
         Ok(key) => key,
-        Err(e) => super::construct::jit_propagate_error(&mut *ctx, e),
+        Err(e) => unsafe { super::construct::jit_propagate_error(&mut *ctx, e) },
     };
     let val = VmValue::from_raw_parts(val_tag, val_payload);
 
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
-        let ctx_ref = &mut *ctx;
+        let ctx_ref = unsafe { &mut *ctx };
         if let Some(crate::heap::HeapObj::Array(a)) = ctx_ref.heap.get_mut(heap_idx) {
             let idx = if key.is_int() {
                 key.as_int() as usize
@@ -243,9 +245,9 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
         }
     }
 
-    let ctx_ref = &mut *ctx;
+    let ctx_ref = unsafe { &mut *ctx };
     if let Err(e) = crate::exec::collections::array_set_index(obj, key, val, &mut ctx_ref.heap) {
-        super::construct::jit_propagate_error(ctx_ref, e);
+        unsafe { super::construct::jit_propagate_error(ctx_ref, e) };
     }
 }
 

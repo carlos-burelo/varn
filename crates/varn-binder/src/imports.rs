@@ -132,8 +132,7 @@ impl<'r> super::Binder<'r> {
                             s.alias_node = resolved.alias_node.clone();
                             s.original_name = Some(self.intern_local(&imported));
                             s.origin_module = s.origin_module.or(module_path_atom);
-                            if let (Some(ref mut ty), Some(origin)) = (&mut s.ty, &s.origin_module)
-                            {
+                            if let (Some(ty), Some(origin)) = (&mut s.ty, &s.origin_module) {
                                 *ty = ty.with_origin(
                                     *origin,
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),

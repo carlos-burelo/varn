@@ -28,14 +28,16 @@ impl InstanceData {
 
     #[inline]
     pub unsafe fn init_at(at: *mut u8, class_id: u32, payload_size: u32) -> InstanceRef {
-        let payload_bytes = payload_size as usize;
-        let data = ptr::slice_from_raw_parts_mut(at as *mut UnsafeCell<u8>, payload_bytes)
-            as *mut InstanceData;
-        ptr::write(ptr::addr_of_mut!((*data).class_id), class_id);
-        ptr::write(ptr::addr_of_mut!((*data).payload_size), payload_size);
-        let payload_ptr = ptr::addr_of_mut!((*data).payload) as *mut u8;
-        ptr::write_bytes(payload_ptr, 0, payload_bytes);
-        InstanceRef(ptr::NonNull::new_unchecked(data))
+        unsafe {
+            let payload_bytes = payload_size as usize;
+            let data = ptr::slice_from_raw_parts_mut(at as *mut UnsafeCell<u8>, payload_bytes)
+                as *mut InstanceData;
+            ptr::write(ptr::addr_of_mut!((*data).class_id), class_id);
+            ptr::write(ptr::addr_of_mut!((*data).payload_size), payload_size);
+            let payload_ptr = ptr::addr_of_mut!((*data).payload) as *mut u8;
+            ptr::write_bytes(payload_ptr, 0, payload_bytes);
+            InstanceRef(ptr::NonNull::new_unchecked(data))
+        }
     }
 
     #[inline(always)]
@@ -45,32 +47,42 @@ impl InstanceData {
 
     #[inline(always)]
     unsafe fn read_i64(&self, offset: usize) -> i64 {
-        let ptr = self.raw_payload_ptr().add(offset) as *const i64;
-        ptr.read()
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset) as *const i64;
+            ptr.read()
+        }
     }
 
     #[inline(always)]
     unsafe fn read_f64(&self, offset: usize) -> f64 {
-        let ptr = self.raw_payload_ptr().add(offset) as *const f64;
-        ptr.read()
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset) as *const f64;
+            ptr.read()
+        }
     }
 
     #[inline(always)]
     unsafe fn read_bool(&self, offset: usize) -> bool {
-        let ptr = self.raw_payload_ptr().add(offset);
-        *ptr != 0
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset);
+            *ptr != 0
+        }
     }
 
     #[inline(always)]
     unsafe fn read_u64(&self, offset: usize) -> u64 {
-        let ptr = self.raw_payload_ptr().add(offset) as *const u64;
-        ptr.read()
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset) as *const u64;
+            ptr.read()
+        }
     }
 
     #[inline(always)]
     unsafe fn read_vm_value(&self, offset: usize) -> VmValue {
-        let ptr = self.raw_payload_ptr().add(offset) as *const VmValue;
-        ptr.read()
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset) as *const VmValue;
+            ptr.read()
+        }
     }
 
     #[inline]
@@ -229,32 +241,42 @@ impl InstanceData {
 
     #[inline(always)]
     unsafe fn write_i64(&self, offset: usize, val: i64) {
-        let ptr = self.raw_payload_ptr().add(offset) as *mut i64;
-        ptr.write(val);
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset) as *mut i64;
+            ptr.write(val);
+        }
     }
 
     #[inline(always)]
     unsafe fn write_f64(&self, offset: usize, val: f64) {
-        let ptr = self.raw_payload_ptr().add(offset) as *mut f64;
-        ptr.write(val);
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset) as *mut f64;
+            ptr.write(val);
+        }
     }
 
     #[inline(always)]
     unsafe fn write_bool(&self, offset: usize, val: bool) {
-        let ptr = self.raw_payload_ptr().add(offset);
-        *ptr = val as u8;
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset);
+            *ptr = val as u8;
+        }
     }
 
     #[inline(always)]
     unsafe fn write_u64(&self, offset: usize, val: u64) {
-        let ptr = self.raw_payload_ptr().add(offset) as *mut u64;
-        ptr.write(val);
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset) as *mut u64;
+            ptr.write(val);
+        }
     }
 
     #[inline(always)]
     unsafe fn write_vm_value(&self, offset: usize, val: VmValue) {
-        let ptr = self.raw_payload_ptr().add(offset) as *mut VmValue;
-        ptr.write(val);
+        unsafe {
+            let ptr = self.raw_payload_ptr().add(offset) as *mut VmValue;
+            ptr.write(val);
+        }
     }
 }
 
@@ -268,9 +290,12 @@ impl InstanceRef {
     }
 
     pub unsafe fn from_data_ptr(data: *mut u8) -> Self {
-        let payload_size = (data.add(4) as *const u32).read();
-        let inst = ptr::slice_from_raw_parts_mut(data, payload_size as usize) as *mut InstanceData;
-        Self(ptr::NonNull::new_unchecked(inst))
+        unsafe {
+            let payload_size = (data.add(4) as *const u32).read();
+            let inst =
+                ptr::slice_from_raw_parts_mut(data, payload_size as usize) as *mut InstanceData;
+            Self(ptr::NonNull::new_unchecked(inst))
+        }
     }
 }
 

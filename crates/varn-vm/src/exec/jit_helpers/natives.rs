@@ -28,13 +28,15 @@ unsafe fn resolve_native(
     op_id: u64,
 ) -> varn_types::NativeFn {
     if fn_addr != 0 {
-        return std::mem::transmute::<usize, varn_types::NativeFn>(fn_addr);
+        return unsafe { std::mem::transmute::<usize, varn_types::NativeFn>(fn_addr) };
     }
     match varn_builtins::native_op_fn(op_id) {
         Some(f) => f,
-        None => jit_propagate_error(
-            ctx_ref,
-            crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
-        ),
+        None => unsafe {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
+            )
+        },
     }
 }

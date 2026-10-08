@@ -100,11 +100,11 @@ impl ExecCtx {
         if v.is_heap() {
             if let Some(obj) = self.heap.get(v.as_heap()) {
                 match obj {
-                    HeapObj::Class(ref cls) => format!("class:{:p}", std::rc::Rc::as_ptr(cls)),
-                    HeapObj::VmClosure(ref c) => {
+                    HeapObj::Class(cls) => format!("class:{:p}", std::rc::Rc::as_ptr(cls)),
+                    HeapObj::VmClosure(c) => {
                         format!("fn:{:p}", std::rc::Rc::as_ptr(&c.proto))
                     }
-                    HeapObj::Object(ref oref) => {
+                    HeapObj::Object(oref) => {
                         format!("obj:{:p}", oref.read() as *const _ as *const u8)
                     }
                     HeapObj::Str(_)

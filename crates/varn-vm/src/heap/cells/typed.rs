@@ -77,9 +77,9 @@ impl CellSpace {
 
     pub(super) unsafe fn drop_object(r: HeapRef) {
         let obj = body::<HeapObj>(r);
-        match &*obj {
-            HeapObj::Object(o) | HeapObj::Record(o) => ObjData::drop_at(*o),
-            HeapObj::Array(a) | HeapObj::Tuple(a) => a.drop_at(),
+        match unsafe { &*obj } {
+            HeapObj::Object(o) | HeapObj::Record(o) => unsafe { ObjData::drop_at(*o) },
+            HeapObj::Array(a) | HeapObj::Tuple(a) => unsafe { a.drop_at() },
             HeapObj::Str(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
@@ -101,7 +101,7 @@ impl CellSpace {
             | HeapObj::Generator(_)
             | HeapObj::Spread(_) => {}
         }
-        std::ptr::drop_in_place(obj);
+        unsafe { std::ptr::drop_in_place(obj) };
     }
 
     #[inline(always)]
