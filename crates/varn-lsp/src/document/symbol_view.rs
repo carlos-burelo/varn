@@ -1,17 +1,18 @@
-use varn_checker::{SymbolKind, Type};
+use varn_sem::symbol::SymbolKind;
+use varn_sem::types::Type;
 
 use super::SemanticDB;
 
 #[derive(Clone, Copy)]
 pub struct SymbolView<'a> {
-    pub id: varn_checker::SymbolId,
-    pub sym: &'a varn_checker::symbol::Symbol,
+    pub id: varn_sem::symbol::SymbolId,
+    pub sym: &'a varn_sem::symbol::Symbol,
     pub(super) ty: &'a Type,
 
     pub(super) db: &'a SemanticDB,
 }
 
-pub(super) static DYNAMIC_TY: Type = Type::resolved(varn_checker::types::CheckerTyId::DYNAMIC);
+pub(super) static DYNAMIC_TY: Type = Type::resolved(varn_sem::types::CheckerTyId::DYNAMIC);
 
 impl std::fmt::Debug for SymbolView<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -86,7 +87,7 @@ impl<'a> SymbolView<'a> {
             .collect()
     }
 
-    fn fn_shape(&self) -> Option<varn_checker::types::FunctionType> {
+    fn fn_shape(&self) -> Option<varn_sem::types::FunctionType> {
         self.db.fn_shape(self.ty)
     }
     pub fn is_arrow(&self) -> bool {

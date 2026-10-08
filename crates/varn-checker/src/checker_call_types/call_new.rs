@@ -1,8 +1,8 @@
 use super::CallTypeCtx;
-use crate::binder::resolve_type_node;
-use crate::types::Type;
 use std::sync::Arc;
+use varn_binder::resolve_type_node;
 use varn_core::ast::{ExprId, ExprKind, TypeNode};
+use varn_sem::types::Type;
 
 pub(super) fn infer_new(
     c: &mut CallTypeCtx,

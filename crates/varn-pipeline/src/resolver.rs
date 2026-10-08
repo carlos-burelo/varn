@@ -1,4 +1,4 @@
-use varn_checker::module_resolver::DiskResolver;
+use varn_resolver::DiskResolver;
 
 pub struct Session {
     resolver: DiskResolver,

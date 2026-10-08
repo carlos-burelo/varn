@@ -1,0 +1,14 @@
+[package]
+name = "varn-emit"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+varn-core    = { path = "../varn-core" }
+varn-sem     = { path = "../varn-sem" }
+varn-tir     = { path = "../varn-tir" }
+varn-modules = { path = "../varn-modules" }
+rustc-hash   = { workspace = true }
+
+[lints]
+workspace = true

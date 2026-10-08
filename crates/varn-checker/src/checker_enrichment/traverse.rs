@@ -1,10 +1,10 @@
-use crate::binder::{BindResult, BindView};
 use crate::checker_call_types::infer_call_type;
 use crate::checker_enrichment::index::EnrichContext;
-use crate::types::{CheckerTyTable, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::{AstArena, Decl, StmtId, StmtKind};
+use varn_sem::bind::{BindResult, BindView};
+use varn_sem::types::{CheckerTyTable, Type};
 
 pub(super) fn collect_inferred_return_types_raw(
     ctx: &EnrichContext,
@@ -216,7 +216,7 @@ pub(super) fn enrich_stmts_for_vars(
     stmt: StmtId,
     ast_arena: &AstArena,
     bind: &mut BindResult,
-    resolver: &dyn crate::module_resolver::ImportResolver,
+    resolver: &dyn varn_sem::resolver::ImportResolver,
     current_class: Option<&str>,
 ) {
     enrich_vars_recursive(ctx, sym_map, stmt, ast_arena, bind, resolver, current_class);
@@ -228,13 +228,13 @@ fn enrich_vars_recursive(
     stmt: StmtId,
     ast_arena: &AstArena,
     bind: &mut BindResult,
-    resolver: &dyn crate::module_resolver::ImportResolver,
+    resolver: &dyn varn_sem::resolver::ImportResolver,
     current_class: Option<&str>,
 ) {
     match &ast_arena.stmt(stmt).kind {
         StmtKind::Decl(decl) => {
             if let Decl::Variable(v) = decl.as_ref() {
-                use crate::binder::pattern_lead_name;
+                use varn_binder::pattern_lead_name;
                 for d in &v.declarators {
                     let name = pattern_lead_name(&d.id, &bind.interner).to_owned();
                     let scope = bind.scopes.get(bind.global_scope);

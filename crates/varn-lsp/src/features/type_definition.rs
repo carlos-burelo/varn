@@ -1,8 +1,8 @@
 use crate::document::DocumentState;
 use crate::index::ProjectIndex;
 use tower_lsp_f::lsp_types::{Definition, Location, Position, Range, Uri};
-use varn_checker::SymbolKind;
 use varn_core::TypeKind;
+use varn_sem::symbol::SymbolKind;
 pub fn build_goto_type_definition(
     state: &DocumentState,
     index: Option<&ProjectIndex>,
@@ -82,13 +82,13 @@ pub fn build_goto_type_definition(
     }
     None
 }
-fn extract_type_identifier(state: &DocumentState, ty: &varn_checker::Type) -> Option<String> {
+fn extract_type_identifier(state: &DocumentState, ty: &varn_sem::types::Type) -> Option<String> {
     match state.db.ty_kind(ty) {
         TypeKind::Named(name, _) | TypeKind::Generic(name, _, _) => {
             Some(state.name(name).to_owned())
         }
         TypeKind::Array(elem) => {
-            extract_type_identifier(state, &varn_checker::Type::resolved(elem))
+            extract_type_identifier(state, &varn_sem::types::Type::resolved(elem))
         }
         TypeKind::Union(list) => {
             let named: Vec<String> = state

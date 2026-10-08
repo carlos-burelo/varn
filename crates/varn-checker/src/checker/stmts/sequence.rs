@@ -1,9 +1,9 @@
 use super::super::Checker;
-use crate::binder::BindResult;
-use crate::symbol::SymbolId;
-use crate::types::Type;
 use varn_core::ast::{StmtId, StmtKind};
 use varn_core::{Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
+use varn_sem::symbol::SymbolId;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn check_stmts(&mut self, stmts: &[StmtId], bind: &BindResult) {
@@ -94,7 +94,7 @@ impl<'r> Checker<'r> {
 
     pub(crate) fn with_narrowings(
         &mut self,
-        narrowings: &[(crate::symbol::SymbolId, Type)],
+        narrowings: &[(varn_sem::symbol::SymbolId, Type)],
         f: impl FnOnce(&mut Self),
     ) {
         if narrowings.is_empty() {
@@ -107,14 +107,14 @@ impl<'r> Checker<'r> {
         self.pop_narrowings(narrowings);
     }
 
-    fn push_narrowings(&mut self, narrowings: &[(crate::symbol::SymbolId, Type)]) {
+    fn push_narrowings(&mut self, narrowings: &[(varn_sem::symbol::SymbolId, Type)]) {
         for (id, ty) in narrowings {
             self.narrowed_types.entry(*id).or_default().push(*ty);
         }
         self.mark_infer_env_dirty();
     }
 
-    fn pop_narrowings(&mut self, narrowings: &[(crate::symbol::SymbolId, Type)]) {
+    fn pop_narrowings(&mut self, narrowings: &[(varn_sem::symbol::SymbolId, Type)]) {
         for (id, _) in narrowings {
             if let Some(stack) = self.narrowed_types.get_mut(id) {
                 stack.pop();

@@ -3,9 +3,9 @@ use tower_lsp_f::lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, Position, Range,
     SymbolKind as LspSymbolKind, Uri,
 };
-use varn_checker::SymbolKind;
 use varn_core::ast::{ClassMember, Decl, ExprId, ExprKind, StmtKind};
 use varn_core::SourceRange;
+use varn_sem::symbol::SymbolKind;
 
 use crate::document::DocumentState;
 use crate::workspace::Workspace;

@@ -1,9 +1,9 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{ObjectTypeMember, Type};
 use varn_core::ast::ExprId;
 use varn_core::capability::{OperatorMethod, OperatorShape};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{ObjectTypeMember, Type};
 
 pub(crate) struct ResolvedOperator {
     pub param: Option<Type>,

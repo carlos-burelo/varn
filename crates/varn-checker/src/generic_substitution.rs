@@ -1,8 +1,8 @@
 use crate::checker::Checker;
-use crate::types::{CheckerTyTable, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::TypeKind;
+use varn_sem::types::{CheckerTyTable, Type};
 
 fn is_generic_possible(ty: &Type, table: &CheckerTyTable) -> bool {
     !matches!(

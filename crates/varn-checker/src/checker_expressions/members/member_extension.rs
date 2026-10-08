@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use crate::binder::BindResult;
-use crate::types::{CheckerTyTable, Type};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{CheckerTyTable, Type};
 
 pub(super) fn collect_extension_members(
-    results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
+    results: &mut Vec<varn_sem::semantic_info::ResolvedMemberSummary>,
     seen: &mut rustc_hash::FxHashSet<Arc<str>>,
     ty: &Type,
     bind: &BindResult,
@@ -15,12 +15,12 @@ pub(super) fn collect_extension_members(
     };
     let scope = bind.scopes.get(bind.global_scope);
 
-    let strip_this = |ft: &crate::types::FunctionType| {
+    let strip_this = |ft: &varn_sem::types::FunctionType| {
         let mut params = ft.params.clone();
         if params.first().and_then(|p| p.name.as_deref()) == Some("this") {
             params.remove(0);
         }
-        crate::types::FunctionType {
+        varn_sem::types::FunctionType {
             params,
             return_type: ft.return_type,
             is_arrow: ft.is_arrow,
@@ -30,9 +30,9 @@ pub(super) fn collect_extension_members(
 
     let push = |name: &Arc<str>,
                 mangled: &Arc<str>,
-                kind: crate::semantic_info::ResolvedMemberKind,
+                kind: varn_sem::semantic_info::ResolvedMemberKind,
                 as_return: bool,
-                results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
+                results: &mut Vec<varn_sem::semantic_info::ResolvedMemberSummary>,
                 seen: &mut rustc_hash::FxHashSet<Arc<str>>,
                 table: &mut CheckerTyTable| {
         let Some(sid) = bind
@@ -56,7 +56,7 @@ pub(super) fn collect_extension_members(
             Type::fn_(strip_this(&ft), table)
         };
         if seen.insert(name.clone()) {
-            results.push(crate::semantic_info::ResolvedMemberSummary {
+            results.push(varn_sem::semantic_info::ResolvedMemberSummary {
                 name: name.clone(),
                 ty: member_ty,
                 kind,
@@ -71,7 +71,7 @@ pub(super) fn collect_extension_members(
         }
     };
 
-    use crate::semantic_info::ResolvedMemberKind as K;
+    use varn_sem::semantic_info::ResolvedMemberKind as K;
     if let Some(methods) = bind.extensions.methods.get(type_name.as_ref()) {
         for (name, mangled) in methods {
             push(

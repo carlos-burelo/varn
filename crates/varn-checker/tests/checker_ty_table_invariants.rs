@@ -1,8 +1,8 @@
 #![allow(unused_crate_dependencies)]
 
 use std::sync::Arc;
-use varn_checker::types::{CheckerTyId, CheckerTyTable, ObjectTypeMember, Type};
 use varn_core::TypeKind;
+use varn_sem::types::{CheckerTyId, CheckerTyTable, ObjectTypeMember, Type};
 
 #[test]
 fn intrinsic_ids_are_fixed_and_small() {
@@ -97,13 +97,7 @@ fn checker_ty_table_is_send_and_sync() {
 #[test]
 fn bind_result_is_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<varn_checker::BindResult>();
-}
-
-#[test]
-fn disk_resolver_is_send_and_sync() {
-    fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<varn_checker::module_resolver::DiskResolver>();
+    assert_send_sync::<varn_sem::bind::BindResult>();
 }
 
 #[test]

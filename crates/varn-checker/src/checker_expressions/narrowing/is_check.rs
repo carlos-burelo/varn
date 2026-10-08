@@ -1,8 +1,8 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::symbol::SymbolId;
-use crate::types::Type;
 use varn_core::ast::{ExprId, ExprKind, TypeNode};
+use varn_sem::bind::BindResult;
+use varn_sem::symbol::SymbolId;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_is(
@@ -19,8 +19,8 @@ impl<'r> Checker<'r> {
             let scope = bind.scopes.get(self.current_scope);
             if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
                 if is_true_branch {
-                    let view = crate::binder::BindView::new(bind, self.resolver);
-                    let narrowed_ty = crate::binder::resolve_type_node(
+                    let view = varn_sem::bind::BindView::new(bind, self.resolver);
+                    let narrowed_ty = varn_binder::resolve_type_node(
                         &type_ann,
                         Some(&view),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -28,8 +28,8 @@ impl<'r> Checker<'r> {
                     out.push((id, narrowed_ty));
                 } else {
                     if let Some(original_ty) = bind.arena.get(id).ty {
-                        let view = crate::binder::BindView::new(bind, self.resolver);
-                        let target_ty = crate::binder::resolve_type_node(
+                        let view = varn_sem::bind::BindView::new(bind, self.resolver);
+                        let target_ty = varn_binder::resolve_type_node(
                             &type_ann,
                             Some(&view),
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),

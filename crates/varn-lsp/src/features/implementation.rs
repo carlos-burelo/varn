@@ -16,14 +16,14 @@ pub fn build_goto_implementation(
     let target_name = state.lexeme(token);
 
     let (is_interface, is_class_or_method) = {
-        let is_iface = state
-            .symbols()
-            .any(|s| s.name() == target_name && s.kind() == varn_checker::SymbolKind::Interface);
+        let is_iface = state.symbols().any(|s| {
+            s.name() == target_name && s.kind() == varn_sem::symbol::SymbolKind::Interface
+        });
         let is_cls = state.symbols().any(|s| {
             s.name() == target_name
                 && matches!(
                     s.kind(),
-                    varn_checker::SymbolKind::Class | varn_checker::SymbolKind::Method
+                    varn_sem::symbol::SymbolKind::Class | varn_sem::symbol::SymbolKind::Method
                 )
         });
         (is_iface, is_cls)

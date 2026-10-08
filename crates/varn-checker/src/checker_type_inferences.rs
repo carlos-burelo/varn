@@ -1,7 +1,7 @@
-use crate::types::{CheckerTyTable, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::TypeKind;
+use varn_sem::types::{CheckerTyTable, Type};
 
 pub(crate) fn collect_type_inferences(
     expected: &Type,

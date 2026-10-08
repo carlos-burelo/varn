@@ -1,8 +1,8 @@
 use super::super::Checker;
-use crate::binder::BindResult;
-use crate::types::Type;
 use varn_core::ast::ExprId;
 use varn_core::{Diagnostic, ErrorCode, SourceRange, TypeKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_return_stmt(

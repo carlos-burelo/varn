@@ -1,5 +1,5 @@
 use varn_core::ast::{AstArena, Program};
-use varn_debug_flags::DebugFlags;
+use varn_core::debug_flags::DebugFlags;
 
 use crate::error::CliError;
 
@@ -40,7 +40,7 @@ impl varn_pipeline::DebugSink for CliDebugSink {
         &self,
         program: &Program,
         source: &str,
-        check: &varn_checker::CheckResult,
+        check: &varn_sem::output::CheckResult,
         debug: &DebugFlags,
     ) {
         if debug.symbols {
@@ -56,7 +56,7 @@ impl varn_pipeline::DebugSink for CliDebugSink {
         &self,
         program: &Program,
         arena: &AstArena,
-        check: &varn_checker::CheckResult,
+        check: &varn_sem::output::CheckResult,
         proto: &varn_compiler::FunctionProto,
         graph: &varn_pipeline::module_precompile::ModuleGraphBuild,
         debug: &DebugFlags,

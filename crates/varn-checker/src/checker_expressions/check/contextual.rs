@@ -1,8 +1,9 @@
-use crate::binder::{pattern_lead_name, BindResult};
 use crate::checker::Checker;
-use crate::types::{FunctionType, ObjectTypeMember, Type, TypeContext};
+use varn_binder::pattern_lead_name;
 use varn_core::ast::{ArrayEl, ObjectProp, Param, PropKey};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{FunctionType, ObjectTypeMember, Type, TypeContext};
 
 impl<'r> Checker<'r> {
     pub(super) fn apply_contextual_arrow_params(
@@ -126,7 +127,7 @@ impl<'r> Checker<'r> {
                         };
                         let name = resolve_atom(name_atom);
                         let origin: Option<String> = origin_atom.map(resolve_atom);
-                        let view = crate::binder::BindView::new(bind, self.resolver);
+                        let view = varn_sem::bind::BindView::new(bind, self.resolver);
                         let members = view
                             .get_class_members(&name, origin.as_deref())
                             .or_else(|| view.get_interface_members(&name, origin.as_deref()))
@@ -240,7 +241,7 @@ impl<'r> Checker<'r> {
                     self.expected_return_type = return_type.as_ref().map(|rt| {
                         let ty = self.resolve_type_node_cached(rt, bind);
                         if *is_async {
-                            crate::types::awaited(&ty, &self.ty_table)
+                            varn_sem::types::awaited(&ty, &self.ty_table)
                         } else {
                             ty
                         }

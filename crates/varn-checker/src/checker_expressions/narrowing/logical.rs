@@ -1,10 +1,10 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::symbol::SymbolId;
-use crate::types::Type;
 use rustc_hash::FxHashMap;
 use varn_core::ast::ExprId;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::symbol::SymbolId;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_logical_and(
@@ -69,7 +69,7 @@ impl<'r> Checker<'r> {
                     Type::union(types, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
                 ));
             } else {
-                let ids: Vec<crate::types::CheckerTyId> = types.iter().map(|t| t.0).collect();
+                let ids: Vec<varn_sem::types::CheckerTyId> = types.iter().map(|t| t.0).collect();
                 let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
                 let interned = std::sync::Arc::make_mut(&mut self.ty_table)
                     .intern(TypeKind::Intersection(list));

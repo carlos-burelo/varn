@@ -3,9 +3,6 @@ use quote::quote;
 use syn::Ident;
 
 use crate::contract_members::{Kind, Member};
-use varn_core::ast::TypeNode;
-use varn_core::kinds::TypeKind;
-use varn_core::{AtomInterner, LangPrimitive};
 
 #[derive(Clone)]
 pub(crate) enum Mapped {
@@ -22,63 +19,34 @@ pub(crate) enum Mapped {
     Opt(Box<Mapped>),
 }
 
-pub(super) fn scalar_mapped(p: LangPrimitive) -> Mapped {
-    match p {
-        LangPrimitive::Int => Mapped::Int,
-        LangPrimitive::Float => Mapped::Float,
-        LangPrimitive::Bool => Mapped::Bool,
-        LangPrimitive::Char => Mapped::Char,
-        LangPrimitive::Str => Mapped::Str,
-        LangPrimitive::Void => Mapped::Void,
-        LangPrimitive::Null
-        | LangPrimitive::BigInt
-        | LangPrimitive::Decimal
-        | LangPrimitive::Never
-        | LangPrimitive::Dynamic => Mapped::Dynamic,
+impl Mapped {
+    pub(crate) fn from_code(code: &str) -> Option<Mapped> {
+        match code {
+            "int" => Some(Mapped::Int),
+            "float" => Some(Mapped::Float),
+            "bool" => Some(Mapped::Bool),
+            "char" => Some(Mapped::Char),
+            "str" => Some(Mapped::Str),
+            "array" => Some(Mapped::Array),
+            "dynamic" => Some(Mapped::Dynamic),
+            "void" => Some(Mapped::Void),
+            _ => {
+                let inner = code.strip_prefix("opt(")?.strip_suffix(')')?;
+                Some(Mapped::Opt(Box::new(Mapped::from_code(inner)?)))
+            }
+        }
     }
 }
 
-pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
-    match &t.kind {
-        TypeKind::Named(n, _) => LangPrimitive::from_str(interner.resolve(*n))
-            .map(scalar_mapped)
-            .unwrap_or(Mapped::Dynamic),
-        TypeKind::Primitive(varn_core::LangPrimitive::Void) => Mapped::Void,
-        TypeKind::TypePredicate { .. } => Mapped::Bool,
-        TypeKind::Array(_) => Mapped::Array,
-        TypeKind::Union(members) if members.len() == 2 => {
-            if matches!(
-                members[1].kind,
-                TypeKind::Primitive(varn_core::LangPrimitive::Null)
-            ) {
-                Mapped::Opt(Box::new(classify(&members[0], interner)))
-            } else if matches!(
-                members[0].kind,
-                TypeKind::Primitive(varn_core::LangPrimitive::Null)
-            ) {
-                Mapped::Opt(Box::new(classify(&members[1], interner)))
-            } else {
-                Mapped::Dynamic
-            }
-        }
-        TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
-        | TypeKind::Literal(_)
-        | TypeKind::This
-        | TypeKind::Union(_)
-        | TypeKind::Intersection(_)
-        | TypeKind::Tuple(_)
-        | TypeKind::Generic(..)
-        | TypeKind::TemplateLiteral(_)
-        | TypeKind::Fn(_)
-        | TypeKind::Object(_)
-        | TypeKind::Typeof(_)
-        | TypeKind::KeyOf(_)
-        | TypeKind::IndexedAccess { .. }
-        | TypeKind::Mapped { .. }
-        | TypeKind::Conditional { .. }
-        | TypeKind::Infer(_)
-        | TypeKind::EnumVariant { .. } => Mapped::Dynamic,
+fn primitive_mapped(name: &str) -> Option<Mapped> {
+    match name {
+        "int" => Some(Mapped::Int),
+        "float" => Some(Mapped::Float),
+        "bool" => Some(Mapped::Bool),
+        "char" => Some(Mapped::Char),
+        "str" => Some(Mapped::Str),
+        "void" => Some(Mapped::Void),
+        _ => None,
     }
 }
 
@@ -96,15 +64,14 @@ pub(super) fn mapped_tag_path(m: &Mapped) -> TS2 {
 }
 
 pub(super) fn receiver_mapped(class: &str) -> Mapped {
-    if class == varn_core::BuiltinType::Array.name() {
+    if class == "Array" {
         return Mapped::Array;
     }
-    if LangPrimitive::from_str(class) == Some(LangPrimitive::Str) {
-        return Mapped::StrRecv;
+    match primitive_mapped(class) {
+        Some(Mapped::Str) => Mapped::StrRecv,
+        Some(m) => m,
+        None => Mapped::Dynamic,
     }
-    LangPrimitive::from_str(class)
-        .map(scalar_mapped)
-        .unwrap_or(Mapped::Dynamic)
 }
 
 pub(super) fn param_ty(m: &Mapped) -> TS2 {

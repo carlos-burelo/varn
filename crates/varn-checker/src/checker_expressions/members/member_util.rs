@@ -1,11 +1,11 @@
-use crate::binder::BindResult;
-use crate::types::{CheckerTyTable, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::{CheckerTyTable, Type};
 
 pub(super) fn class_type_params(
-    resolver: &dyn crate::module_resolver::ImportResolver,
+    resolver: &dyn varn_sem::resolver::ImportResolver,
     name: &str,
     origin: Option<&Arc<str>>,
     bind: &BindResult,
@@ -58,7 +58,7 @@ fn params_in(name: &str, bind: &BindResult) -> Vec<Arc<str>> {
 }
 
 pub(crate) fn generic_mapping(
-    resolver: &dyn crate::module_resolver::ImportResolver,
+    resolver: &dyn varn_sem::resolver::ImportResolver,
     name: &str,
     args: &[Type],
     origin: Option<&Arc<str>>,
@@ -92,7 +92,7 @@ pub(super) fn extension_method_type(
     };
     let ft = table.get_function(fid).clone();
 
-    let params: Vec<crate::types::FunctionParam> = ft
+    let params: Vec<varn_sem::types::FunctionParam> = ft
         .params
         .iter()
         .skip_while(|p| p.name.as_deref() == Some("this"))
@@ -100,7 +100,7 @@ pub(super) fn extension_method_type(
         .collect();
 
     Some(Type::fn_(
-        crate::types::FunctionType {
+        varn_sem::types::FunctionType {
             params,
             return_type: ft.return_type,
             is_arrow: ft.is_arrow,

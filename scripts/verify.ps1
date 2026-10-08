@@ -134,6 +134,28 @@ if (-not (Test-Path $vnBin)) {
     $vnBin = Join-Path $RootDir "target\$BuildProfile\vn"
 }
 
+# 4b. Artefactos derivados (tablas de contratos + bundle std para cuadrantes embedded)
+Write-StepHeader "4b/6: Artefactos derivados (gen-contract-tables --check)"
+& $vnBin gen-contract-tables --check
+if ($LASTEXITCODE -ne 0) {
+    Write-Failure "Tablas de contratos stale: regenerar con 'vn gen-contract-tables'."
+    $failedSteps += "gen-contract-tables --check"
+} else {
+    Write-Success "Tablas de contratos al dia."
+}
+
+$stdBundle = Join-Path $RootDir "dist\std.vnb"
+if (-not $Quick) {
+    Write-StepHeader "4c/6: Bundle std para cuadrantes @embedded (vn std-bundle)"
+    & $vnBin std-bundle --std-dir "std" --out $stdBundle
+    if ($LASTEXITCODE -ne 0) {
+        Write-Failure "No se pudo compilar el bundle std."
+        $failedSteps += "vn std-bundle"
+    } else {
+        Write-Success "Bundle std listo."
+    }
+}
+
 # Helper para ejecutar un cuadrante
 function Run-Quadrant($name, $envVars, $argsList) {
     Write-Host "`n--- Ejecutando Cuadrante: $name ---" -ForegroundColor Yellow
@@ -182,11 +204,11 @@ $q2 = Run-Quadrant "2/4: [dev-checkout] + [Interprete Pure (VARN_NO_JIT=1)]" @{ 
 if (-not $q2) { $failedSteps += "Cuadrante 2 (dev-checkout + No-JIT)" }
 
 # Q3: @embedded + JIT
-$q3 = Run-Quadrant "3/4: [@embedded std] + [JIT Habilitado]" @{ "VARN_STD" = "@embedded" } @("run", "tests/main.vn")
+$q3 = Run-Quadrant "3/4: [@embedded std] + [JIT Habilitado]" @{ "VARN_STD" = "@embedded"; "VARN_STD_BUNDLE" = $stdBundle } @("run", "tests/main.vn")
 if (-not $q3) { $failedSteps += "Cuadrante 3 (@embedded + JIT)" }
 
 # Q4: @embedded + No-JIT (Interprete Pure)
-$q4 = Run-Quadrant "4/4: [@embedded std] + [Interprete Pure (VARN_NO_JIT=1)]" @{ "VARN_STD" = "@embedded"; "VARN_NO_JIT" = "1" } @("run", "tests/main.vn")
+$q4 = Run-Quadrant "4/4: [@embedded std] + [Interprete Pure (VARN_NO_JIT=1)]" @{ "VARN_STD" = "@embedded"; "VARN_STD_BUNDLE" = $stdBundle; "VARN_NO_JIT" = "1" } @("run", "tests/main.vn")
 if (-not $q4) { $failedSteps += "Cuadrante 4 (@embedded + No-JIT)" }
 }
 

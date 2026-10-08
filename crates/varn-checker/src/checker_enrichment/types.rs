@@ -1,4 +1,4 @@
-use crate::types::{CheckerTyTable, Type};
+use varn_sem::types::{CheckerTyTable, Type};
 
 pub(super) fn join_types(mut types: Vec<Type>, table: &mut CheckerTyTable) -> Type {
     if types.is_empty() {

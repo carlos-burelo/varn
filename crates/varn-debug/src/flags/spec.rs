@@ -1,5 +1,5 @@
 use crate::error::CliError;
-use varn_debug_flags::DebugFlags;
+use varn_core::debug_flags::DebugFlags;
 
 fn valid_names() -> Vec<&'static str> {
     let mut names: Vec<&'static str> = crate::registry::ALL.iter().map(|p| p.id()).collect();
@@ -101,7 +101,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
                             if raw.is_empty() || raw.starts_with('#') {
                                 continue;
                             }
-                            match varn_debug_flags::parse_step(raw) {
+                            match varn_core::debug_flags::parse_step(raw) {
                                 Ok(step) => flags.lsp_cursors.push(step),
                                 Err(e) => {
                                     return Err(CliError::usage(format!(
@@ -118,7 +118,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
                         if raw.is_empty() || raw.starts_with('#') {
                             continue;
                         }
-                        match varn_debug_flags::parse_step(raw) {
+                        match varn_core::debug_flags::parse_step(raw) {
                             Ok(step) => flags.lsp_cursors.push(step),
                             Err(e) => {
                                 return Err(CliError::usage(format!(

@@ -1,6 +1,6 @@
 use super::super::Checker;
-use crate::binder::BindResult;
 use varn_core::ast::{StmtId, StmtKind};
+use varn_sem::bind::BindResult;
 
 impl<'r> Checker<'r> {
     pub(crate) fn check_stmt(&mut self, stmt: StmtId, bind: &BindResult) {

@@ -1,11 +1,11 @@
 use crate::checker::Checker;
-use crate::types::Type;
 use varn_core::ast::{ArrowBody, StmtId, StmtKind};
+use varn_sem::types::Type;
 
 pub(crate) fn arrow_body_return_type(
     body: ArrowBody,
     checker: &mut Checker,
-    bind: &crate::binder::BindResult,
+    bind: &varn_sem::bind::BindResult,
 ) -> Type {
     match body {
         ArrowBody::Expr(e) => {
@@ -51,7 +51,7 @@ struct Returns {
 fn collect_returns(
     stmt: StmtId,
     checker: &mut Checker,
-    bind: &crate::binder::BindResult,
+    bind: &varn_sem::bind::BindResult,
     out: &mut Returns,
 ) {
     let arena = checker.ast_arena;

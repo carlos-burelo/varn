@@ -12,9 +12,9 @@ mod misc;
 mod operator_capability;
 mod ops;
 
-use crate::binder::BindResult;
 use crate::checker::Checker;
 use varn_core::ast::{ExprId, ExprKind, TemplatePart};
+use varn_sem::bind::BindResult;
 
 impl<'r> Checker<'r> {
     pub(crate) fn check_expr(&mut self, expr: ExprId, bind: &BindResult) {
@@ -48,7 +48,7 @@ impl<'r> Checker<'r> {
 
         self.expr_table.insert(
             expr.index(),
-            crate::checker::TypeEntry {
+            varn_sem::output::TypeEntry {
                 ty,
                 refined,
                 symbol_id,

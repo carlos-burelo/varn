@@ -1,5 +1,5 @@
 use crate::document::DocumentState;
-use varn_checker::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary};
+use varn_sem::semantic_info::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary};
 
 use super::format::{format_summary_member, format_type_params_str};
 

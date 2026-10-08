@@ -3,8 +3,8 @@
 use varn_lsp::features::inlay_hints::build_inlay_hints;
 use varn_lsp::pipeline::run_pipeline;
 
-fn test_resolver() -> std::sync::Arc<varn_checker::module_resolver::DiskResolver> {
-    std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new())
+fn test_resolver() -> std::sync::Arc<varn_resolver::DiskResolver> {
+    std::sync::Arc::new(varn_resolver::DiskResolver::new())
 }
 
 #[test]

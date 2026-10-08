@@ -1,9 +1,9 @@
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::Type;
 use std::sync::Arc;
 use varn_core::ast::{ArrowBody, ExprId};
 use varn_core::{Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_arrow(
@@ -25,7 +25,7 @@ impl<'r> Checker<'r> {
             .map(|rt| self.resolve_type_node_cached(rt, bind))
             .or_else(|| self.expected_return_from_fn_type());
         self.expected_return_type = if is_async {
-            resolved_ret.map(|t| crate::types::awaited(&t, &self.ty_table))
+            resolved_ret.map(|t| varn_sem::types::awaited(&t, &self.ty_table))
         } else {
             resolved_ret
         };
@@ -80,7 +80,7 @@ impl<'r> Checker<'r> {
         self.expected_return_type = return_type.as_ref().map(|rt| {
             let ty = self.resolve_type_node_cached(rt, bind);
             if is_async {
-                crate::types::awaited(&ty, &self.ty_table)
+                varn_sem::types::awaited(&ty, &self.ty_table)
             } else {
                 ty
             }
@@ -141,7 +141,7 @@ impl<'r> Checker<'r> {
         }
         self.check_expr(argument, bind);
         let arg_ty = self.infer_type(argument, bind);
-        if !arg_ty.is_dynamic() && !crate::types::is_awaitable(&arg_ty, &self.ty_table) {
+        if !arg_ty.is_dynamic() && !varn_sem::types::is_awaitable(&arg_ty, &self.ty_table) {
             let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
             self.emit(
                 Diagnostic::warning(

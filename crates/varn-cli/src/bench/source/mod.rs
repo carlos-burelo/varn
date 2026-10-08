@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use varn_checker::module_resolver::ImportResolver;
+use varn_sem::resolver::ImportResolver;
 
 use rustc_hash::FxHashMap;
 use varn_checker::Checker;
@@ -119,7 +119,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         &arena,
         interner,
         session.resolver(),
-        varn_checker::CheckOptions::compile(),
+        varn_sem::output::CheckOptions::compile(),
     );
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));

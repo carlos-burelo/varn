@@ -1,13 +1,13 @@
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::Type;
 use std::sync::Arc;
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn member_enum_variant(
         &mut self,
         enum_name: varn_core::Atom,
-        payload_ty: crate::types::CheckerTyId,
+        payload_ty: varn_sem::types::CheckerTyId,
         key: &str,
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
@@ -44,7 +44,7 @@ impl<'r> Checker<'r> {
         let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
         if name.as_ref() == "*" {
             if let Some(origin_path) = &origin {
-                let exports = if crate::module_resolver::is_known_module(origin_path) {
+                let exports = if varn_binder::paths::is_known_module(origin_path) {
                     Some(self.resolver.stdlib_exports(origin_path))
                 } else {
                     let mut visiting = Vec::new();
@@ -186,7 +186,7 @@ impl<'r> Checker<'r> {
         }
 
         let ext_bind_opt = self.resolver.find_bind_for_type(&name, &origin_modules);
-        let candidates: Box<dyn Iterator<Item = Arc<crate::binder::BindResult>>> =
+        let candidates: Box<dyn Iterator<Item = Arc<varn_sem::bind::BindResult>>> =
             if let Some(b) = ext_bind_opt {
                 Box::new(std::iter::once(b))
             } else if origin.is_none() {

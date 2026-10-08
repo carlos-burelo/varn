@@ -1,8 +1,8 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{CheckerTyTable, Type};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::{CheckerTyTable, Type};
 
 use super::super::expr_labels::base_type;
 
@@ -26,10 +26,10 @@ pub(super) fn infer_member_type(
     };
 
     let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
-        return crate::binder::infer_expr_type(
+        return varn_binder::infer_expr_type(
             expr,
             arena,
-            Some(&crate::binder::BindView::new(bind, checker.resolver)),
+            Some(&varn_sem::bind::BindView::new(bind, checker.resolver)),
             &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
         );
     };
@@ -80,10 +80,10 @@ pub(super) fn infer_member_type(
         }
     }
 
-    crate::binder::infer_expr_type(
+    varn_binder::infer_expr_type(
         expr,
         arena,
-        Some(&crate::binder::BindView::new(bind, checker.resolver)),
+        Some(&varn_sem::bind::BindView::new(bind, checker.resolver)),
         &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
     )
 }
@@ -156,7 +156,7 @@ pub(super) fn infer_binary_type(
             } else {
                 Type::Error
             };
-            let (l, r) = crate::binder::type_inference::adopt_literal_operands(
+            let (l, r) = varn_binder::type_inference::adopt_literal_operands(
                 checker.ast_arena,
                 left,
                 right,
@@ -175,11 +175,11 @@ pub(super) fn infer_binary_type(
                     ) {
                         return Type::Str;
                     }
-                    crate::binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
+                    varn_binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
                         .unwrap_or(unresolved)
                 }
                 BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-                    crate::binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
+                    varn_binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
                         .unwrap_or(unresolved)
                 }
                 BinaryOp::BitAnd

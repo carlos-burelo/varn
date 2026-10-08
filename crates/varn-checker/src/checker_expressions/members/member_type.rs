@@ -1,8 +1,8 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{ObjectTypeMember, Type};
 use std::sync::Arc;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::{ObjectTypeMember, Type};
 
 impl<'r> Checker<'r> {
     pub(crate) fn find_member_info(
@@ -147,7 +147,7 @@ impl<'r> Checker<'r> {
                 if name.as_ref() == "*" {
                     if let Some(origin_atom) = origin_atom {
                         let origin_path = self.resolve_bind_atom(bind, origin_atom).to_string();
-                        let exports = if crate::module_resolver::is_known_module(&origin_path) {
+                        let exports = if varn_binder::paths::is_known_module(&origin_path) {
                             Some(self.resolver.stdlib_exports(&origin_path))
                         } else {
                             let mut visiting = Vec::new();

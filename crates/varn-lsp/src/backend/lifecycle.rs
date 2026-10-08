@@ -126,7 +126,7 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
 
     let (ev_b, ev_p, ev_a) = analysis
         .run_background(|a| {
-            use varn_checker::module_resolver::ImportResolver;
+            use varn_sem::resolver::ImportResolver;
             a.workspace.resolver().evict_heavy()
         })
         .await

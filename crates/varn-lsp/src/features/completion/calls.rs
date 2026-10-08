@@ -89,7 +89,7 @@ pub fn build_call_argument_completions(
                         .iter()
                         .filter_map(|p| p.name.as_deref().map(str::to_owned)),
                 );
-            } else if matches!(sym.kind(), varn_checker::SymbolKind::Class) {
+            } else if matches!(sym.kind(), varn_sem::symbol::SymbolKind::Class) {
                 push_constructor_params(state, state.lexeme(callee_tok), &mut fn_params);
             }
         }
@@ -139,7 +139,7 @@ fn push_constructor_params(state: &DocumentState, class_name: &str, out: &mut Ve
     let Some(ctor) = entry
         .members
         .iter()
-        .find(|m| m.kind == varn_checker::ClassMemberKind::Constructor)
+        .find(|m| m.kind == varn_sem::types::ClassMemberKind::Constructor)
     else {
         return;
     };

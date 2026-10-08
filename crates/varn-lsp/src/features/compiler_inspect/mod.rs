@@ -1,7 +1,7 @@
 mod ast_json;
 mod cfg;
 
-use varn_checker::module_resolver::ImportResolver;
+use varn_sem::resolver::ImportResolver;
 use varn_tir::TirModule;
 
 use crate::document::DocumentState;
@@ -153,7 +153,7 @@ fn emit_tir(state: &DocumentState) -> Result<TirModule, String> {
         .ast
         .as_ref()
         .ok_or_else(|| "No AST available".to_string())?;
-    Ok(varn_checker::emit::emit_module(
+    Ok(varn_emit::emit_module(
         program,
         &state.ast_arena,
         &state.db.bind,

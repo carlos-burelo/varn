@@ -3,13 +3,16 @@ name = "varn-debug"
 version.workspace = true
 edition.workspace = true
 
+[features]
+clif = ["varn-jit/clif"]
+
 [dependencies]
 console       = { workspace = true }
 varn-core     = { path = "../varn-core" }
-varn-debug-flags = { path = "../varn-debug-flags" }
-varn-checker  = { path = "../varn-checker" }
+varn-emit     = { path = "../varn-emit" }
 varn-tir      = { path = "../varn-tir" }
 varn-types    = { path = "../varn-types" }
+varn-sem      = { path = "../varn-sem" }
 varn-compiler = { path = "../varn-compiler" }
 varn-jit      = { path = "../varn-jit" }
 rustc-hash    = { workspace = true }

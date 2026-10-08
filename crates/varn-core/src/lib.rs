@@ -1,9 +1,12 @@
+pub mod abi;
 pub mod ast;
 pub mod atom;
 pub mod capability;
+pub mod debug_flags;
 pub mod diagnostics;
 pub mod doc;
 pub mod errors;
+pub mod fmt;
 pub mod intrinsic_ops;
 pub mod intrinsics;
 pub mod kinds;

@@ -42,7 +42,7 @@ pub(super) fn measure_e2e(
             &arena,
             interner,
             session.resolver(),
-            varn_checker::CheckOptions::compile(),
+            varn_sem::output::CheckOptions::compile(),
         );
 
         let (e2e_result, _) = varn_pipeline::emit_and_compile(

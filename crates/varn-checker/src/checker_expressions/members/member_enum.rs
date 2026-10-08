@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use crate::binder::BindResult;
+use varn_sem::bind::BindResult;
 
 pub(crate) fn is_enum_type(
-    resolver: &dyn crate::module_resolver::ImportResolver,
+    resolver: &dyn varn_sem::resolver::ImportResolver,
     bind: &BindResult,
     name: &Arc<str>,
     origin_modules: &[String],

@@ -15,7 +15,7 @@ pub fn debug_interact(path: &str, source: &str, flags: &DebugFlags) {
     let analysis = varn_lsp::pipeline::run_pipeline(
         source.to_string(),
         uri.clone(),
-        std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new()),
+        std::sync::Arc::new(varn_resolver::DiskResolver::new()),
     );
     let mut index = varn_lsp::index::ProjectIndex::new();
     index.update_file(&uri, &analysis);
@@ -165,7 +165,7 @@ fn build_stale(
     let analysis = varn_lsp::pipeline::run_pipeline(
         stale_source,
         uri.to_owned(),
-        std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new()),
+        std::sync::Arc::new(varn_resolver::DiskResolver::new()),
     );
     let mut index = varn_lsp::index::ProjectIndex::new();
     index.update_file(uri, &analysis);

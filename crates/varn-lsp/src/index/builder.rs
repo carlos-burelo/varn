@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::document::SymbolView;
-use varn_checker::SymbolKind;
 use varn_modules::resolver::path_to_uri;
+use varn_sem::symbol::SymbolKind;
 
 use crate::document::{import::uri_to_path, DocumentState};
 
@@ -127,9 +127,11 @@ fn collect_member_exports(
     }
 }
 
-fn summary_to_symbol_kind(k: varn_checker::ResolvedMemberKind) -> varn_checker::SymbolKind {
-    use varn_checker::ResolvedMemberKind as R;
-    use varn_checker::SymbolKind as S;
+fn summary_to_symbol_kind(
+    k: varn_sem::semantic_info::ResolvedMemberKind,
+) -> varn_sem::symbol::SymbolKind {
+    use varn_sem::semantic_info::ResolvedMemberKind as R;
+    use varn_sem::symbol::SymbolKind as S;
     match k {
         R::Method | R::StaticMethod | R::ExtensionMethod => S::Method,
         R::EnumMember => S::EnumMember,

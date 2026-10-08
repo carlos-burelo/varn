@@ -200,7 +200,7 @@ impl NativeCtx for ExecCtx {
 
     fn suspend_timer(&mut self, ms: u64) -> VmValue {
         varn_builtins::modules::net::driver::driver();
-        let promise = varn_runtime::timer::sleep_task(ms);
+        let promise = varn_builtins::runtime::timer::sleep_task(ms);
         self.task_from_host(promise, varn_types::HostOpen::Plain)
     }
 

@@ -1,6 +1,6 @@
 use rustc_hash::FxHashSet;
 use tower_lsp_f::lsp_types::{CompletionItem, InsertTextFormat};
-use varn_checker::SymbolKind;
+use varn_sem::symbol::SymbolKind;
 
 use crate::document::DocumentState;
 use crate::util::converters::to_completion_kind;

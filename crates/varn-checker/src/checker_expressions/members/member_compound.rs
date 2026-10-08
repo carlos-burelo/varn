@@ -1,15 +1,15 @@
 use super::member_util::intrinsic_member_info;
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::{ObjectTypeMember, Type};
 use std::sync::Arc;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::{ObjectTypeMember, Type};
 
 impl<'r> Checker<'r> {
     pub(super) fn member_generic(
         &mut self,
         name_atom: varn_core::Atom,
-        args_list: crate::types::TyListId,
+        args_list: varn_sem::types::TyListId,
         origin_atom: Option<varn_core::Atom>,
         key: &str,
         bind: &BindResult,
@@ -52,7 +52,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn member_object(
         &mut self,
-        mid: crate::types::ObjectMembersId,
+        mid: varn_sem::types::ObjectMembersId,
         key: &str,
     ) -> Option<(Type, Option<usize>)> {
         let members = self.ty_table.get_object_members(mid).to_vec();
@@ -73,7 +73,7 @@ impl<'r> Checker<'r> {
                     ..
                 } => Type::make_nullable(
                     Type::fn_(
-                        crate::types::FunctionType {
+                        varn_sem::types::FunctionType {
                             params: params.clone(),
                             return_type: *return_type,
                             is_arrow: *is_arrow,
@@ -89,7 +89,7 @@ impl<'r> Checker<'r> {
                     is_arrow,
                     ..
                 } => Type::fn_(
-                    crate::types::FunctionType {
+                    varn_sem::types::FunctionType {
                         params: params.clone(),
                         return_type: *return_type,
                         is_arrow: *is_arrow,
@@ -105,7 +105,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn member_union(
         &mut self,
-        list: crate::types::TyListId,
+        list: varn_sem::types::TyListId,
         key: &str,
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
@@ -132,7 +132,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn member_array(
         &mut self,
-        inner: crate::types::CheckerTyId,
+        inner: varn_sem::types::CheckerTyId,
         key: &str,
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
@@ -144,7 +144,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn member_scalar(
         &self,
-        kind: &crate::types::InternedTypeKind,
+        kind: &varn_sem::types::InternedTypeKind,
         key: &str,
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {

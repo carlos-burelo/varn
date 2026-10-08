@@ -1,7 +1,7 @@
-use varn_checker::SymbolKind;
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal::{Section, Table};
 use varn_debug::flags::DebugFlags;
+use varn_sem::symbol::SymbolKind;
 
 pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     let uri = varn_modules::resolver::path_to_uri(path);
@@ -9,7 +9,7 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     let analysis = varn_lsp::pipeline::run_pipeline(
         source.to_owned(),
         uri,
-        std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new()),
+        std::sync::Arc::new(varn_resolver::DiskResolver::new()),
     );
     Section::new("type inference engine")
         .subtitle(path)

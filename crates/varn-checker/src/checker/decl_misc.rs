@@ -1,8 +1,8 @@
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::Type;
 use std::sync::Arc;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_extension(
@@ -50,7 +50,7 @@ impl<'r> Checker<'r> {
                     self.expected_return_type = method.return_type.as_ref().map(|rt| {
                         let ty = self.resolve_type_node_cached(rt, bind);
                         if method.modifiers.is_async {
-                            crate::types::awaited(&ty, &self.ty_table)
+                            varn_sem::types::awaited(&ty, &self.ty_table)
                         } else {
                             ty
                         }

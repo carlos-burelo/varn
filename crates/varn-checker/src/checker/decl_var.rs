@@ -1,8 +1,8 @@
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::Type;
 use varn_core::ast::ExprKind;
 use varn_core::{Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn reject_void_value(&mut self, ty: &Type, range: varn_core::SourceRange) {
@@ -51,7 +51,7 @@ impl<'r> Checker<'r> {
                     let init_ty = self.infer_type(init_expr, bind);
                     self.reject_void_value(&init_ty, *decl_range);
                     let final_ty = if v.kind == varn_core::ast::VarKind::Let {
-                        crate::binder::widen_literal(init_ty)
+                        varn_binder::widen_literal(init_ty)
                     } else {
                         init_ty
                     };

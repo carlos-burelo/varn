@@ -14,7 +14,7 @@ pub(super) fn verbose_sections(
     exec_jit: &varn_vm::varn_jit::JitStatsSnapshot,
     records: &[varn_vm::varn_jit::CompileRecord],
     parse_profile: &varn_parser::ParseProfile,
-    check_result: &varn_checker::CheckResult,
+    check_result: &varn_sem::output::CheckResult,
     phases: &[PhaseStats],
     opts: &BenchOpts,
 ) -> Result<(), CliError> {

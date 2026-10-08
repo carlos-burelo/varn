@@ -2,7 +2,7 @@ use crate::hash::fnv1a64;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::VecDeque;
 use std::path::Path;
-use varn_checker::module_resolver::ImportResolver;
+use varn_sem::resolver::ImportResolver;
 
 use varn_compiler::FunctionProto;
 use varn_core::ast::{AstArena, Program};
@@ -195,7 +195,7 @@ pub fn build_module_graph(
             arena,
             interner.clone(),
             session.resolver(),
-            varn_checker::CheckOptions::compile(),
+            varn_sem::output::CheckOptions::compile(),
         );
 
         crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)

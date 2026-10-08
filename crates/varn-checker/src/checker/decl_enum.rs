@@ -1,9 +1,9 @@
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::Type;
 use std::sync::Arc;
 use varn_core::ast::ClassMember;
 use varn_core::{Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_enum(&mut self, e: &varn_core::ast::EnumDecl, bind: &BindResult) {

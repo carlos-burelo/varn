@@ -2,22 +2,22 @@ mod index;
 mod traverse;
 mod types;
 
-use crate::binder::{BindResult, BindView, PendingEnrich};
-use crate::types::Type;
 use index::build_enrich_context;
 use std::sync::Arc;
 use traverse::{collect_inferred_return_types_raw, enrich_stmts_for_vars};
 use varn_core::ast::AstArena;
+use varn_sem::bind::{BindResult, BindView, PendingEnrich};
+use varn_sem::types::Type;
 
 fn with_new_return_type(
     old: Type,
     new_ret: Type,
-    table: &mut crate::types::CheckerTyTable,
+    table: &mut varn_sem::types::CheckerTyTable,
 ) -> Type {
     if let varn_core::TypeKind::Fn(fid) = table.get(old.0) {
         let mut ft = table.get_function(fid).clone();
         ft.return_type = new_ret.0;
-        crate::types::Type::fn_(ft, table)
+        varn_sem::types::Type::fn_(ft, table)
     } else {
         old
     }
@@ -26,7 +26,7 @@ fn with_new_return_type(
 pub fn enrich_call_returns(
     bind: &mut BindResult,
     ast_arena: &AstArena,
-    resolver: &dyn crate::module_resolver::ImportResolver,
+    resolver: &dyn varn_sem::resolver::ImportResolver,
 ) {
     if bind.pending_enrich.is_empty() {
         return;
@@ -89,7 +89,7 @@ pub fn enrich_call_returns(
                 let returns_value = !inferred.is_empty();
                 let ret_ty = types::join_types(inferred, &mut table);
                 if returns_value {
-                    let final_ret = crate::types::async_fn_return(ret_ty, *is_async, &mut table);
+                    let final_ret = varn_sem::types::async_fn_return(ret_ty, *is_async, &mut table);
                     bind.ty_table = std::sync::Arc::new(table);
                     if let Some(old_ty) = bind.arena.get(*sym_id).ty {
                         let new_ty = with_new_return_type(
@@ -129,7 +129,7 @@ pub fn enrich_call_returns(
                 let ret = types::join_types(inferred, &mut table);
                 bind.ty_table = std::sync::Arc::new(table);
                 if returns_value {
-                    let final_ret = crate::types::async_fn_return(
+                    let final_ret = varn_sem::types::async_fn_return(
                         ret,
                         *is_async,
                         &mut *std::sync::Arc::make_mut(&mut bind.ty_table),

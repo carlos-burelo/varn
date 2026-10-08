@@ -1,8 +1,8 @@
 use super::Checker;
-use crate::binder::BindResult;
-use crate::scope::ScopeId;
-use crate::types::Type;
 use varn_core::Diagnostic;
+use varn_sem::bind::BindResult;
+use varn_sem::scope::ScopeId;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     #[inline]
@@ -24,7 +24,7 @@ impl<'r> Checker<'r> {
     pub(crate) fn record_scope_span(&mut self, start: u32, end: u32, scope: ScopeId) {
         if self.record_expr_types {
             self.scope_spans
-                .push(super::ScopeSpan { start, end, scope });
+                .push(varn_sem::output::ScopeSpan { start, end, scope });
             self.node_scopes.insert(start, scope);
         }
     }

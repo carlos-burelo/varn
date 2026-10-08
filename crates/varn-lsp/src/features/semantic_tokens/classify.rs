@@ -1,5 +1,6 @@
-use varn_checker::{SymbolKind, Type};
 use varn_core::{is_lang_type_name, TokenKind, TypeKind};
+use varn_sem::symbol::SymbolKind;
+use varn_sem::types::Type;
 
 use super::{
     TT_CLASS, TT_ENUM_MEMBER, TT_FUNCTION, TT_INTERFACE, TT_KEYWORD, TT_NAMESPACE, TT_NUMBER,
@@ -56,24 +57,23 @@ pub fn resolve_token(
 
     if let Some(mem_res) = state.db.member_resolutions.get(&tok.offset) {
         return Some(match mem_res.member_kind {
-            varn_checker::ResolvedMemberKind::EnumMember => TT_ENUM_MEMBER,
-            varn_checker::ResolvedMemberKind::Method
-            | varn_checker::ResolvedMemberKind::StaticMethod
-            | varn_checker::ResolvedMemberKind::ExtensionMethod => TT_FUNCTION,
-            varn_checker::ResolvedMemberKind::Property
-            | varn_checker::ResolvedMemberKind::StaticProperty
-            | varn_checker::ResolvedMemberKind::ExtensionProperty
-            | varn_checker::ResolvedMemberKind::Getter
-            | varn_checker::ResolvedMemberKind::Setter => TT_PROPERTY,
-            varn_checker::ResolvedMemberKind::Constructor => TT_FUNCTION,
+            varn_sem::semantic_info::ResolvedMemberKind::EnumMember => TT_ENUM_MEMBER,
+            varn_sem::semantic_info::ResolvedMemberKind::Method
+            | varn_sem::semantic_info::ResolvedMemberKind::StaticMethod
+            | varn_sem::semantic_info::ResolvedMemberKind::ExtensionMethod => TT_FUNCTION,
+            varn_sem::semantic_info::ResolvedMemberKind::Property
+            | varn_sem::semantic_info::ResolvedMemberKind::StaticProperty
+            | varn_sem::semantic_info::ResolvedMemberKind::ExtensionProperty
+            | varn_sem::semantic_info::ResolvedMemberKind::Getter
+            | varn_sem::semantic_info::ResolvedMemberKind::Setter => TT_PROPERTY,
+            varn_sem::semantic_info::ResolvedMemberKind::Constructor => TT_FUNCTION,
 
-            varn_checker::ResolvedMemberKind::NestedType(k) => match k {
-                varn_checker::NestedTypeKind::Interface => TT_INTERFACE,
-                varn_checker::NestedTypeKind::Namespace => TT_NAMESPACE,
-                varn_checker::NestedTypeKind::Enum => TT_TYPE,
-                varn_checker::NestedTypeKind::Class | varn_checker::NestedTypeKind::Struct => {
-                    TT_CLASS
-                }
+            varn_sem::semantic_info::ResolvedMemberKind::NestedType(k) => match k {
+                varn_sem::semantic_info::NestedTypeKind::Interface => TT_INTERFACE,
+                varn_sem::semantic_info::NestedTypeKind::Namespace => TT_NAMESPACE,
+                varn_sem::semantic_info::NestedTypeKind::Enum => TT_TYPE,
+                varn_sem::semantic_info::NestedTypeKind::Class
+                | varn_sem::semantic_info::NestedTypeKind::Struct => TT_CLASS,
             },
         });
     }

@@ -91,7 +91,8 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 member,
                 parent_name,
             } => {
-                let sig = if member.kind == varn_checker::ResolvedMemberKind::EnumMember {
+                let sig = if member.kind == varn_sem::semantic_info::ResolvedMemberKind::EnumMember
+                {
                     format_enum_member(&parent_name, &member.name, "")
                 } else {
                     format_member_sig(state, &parent_name, &member)
@@ -113,7 +114,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     }
 
     if let Some((parent_name, member)) = query::member_at(state, line, col) {
-        let sig = if member.kind == varn_checker::ResolvedMemberKind::EnumMember {
+        let sig = if member.kind == varn_sem::semantic_info::ResolvedMemberKind::EnumMember {
             format_enum_member(&parent_name, &member.name, "")
         } else {
             format_member_sig(state, &parent_name, &member)
@@ -161,8 +162,11 @@ fn with_range(mut hover: Hover, range: Option<tower_lsp_f::lsp_types::Range>) ->
     hover
 }
 
-fn member_resolution_sig(state: &DocumentState, res: &varn_checker::MemberResolution) -> String {
-    use varn_checker::ResolvedMemberKind as R;
+fn member_resolution_sig(
+    state: &DocumentState,
+    res: &varn_sem::semantic_info::MemberResolution,
+) -> String {
+    use varn_sem::semantic_info::ResolvedMemberKind as R;
     let parent = state.ty_text(&res.receiver_ty);
     let name = &res.member_name;
     let ty = state.ty_text(&res.member_ty);
@@ -194,10 +198,7 @@ fn member_resolution_sig(state: &DocumentState, res: &varn_checker::MemberResolu
     }
 }
 
-fn format_fn_params(
-    state: &DocumentState,
-    params: &[varn_checker::types::FunctionParam],
-) -> String {
+fn format_fn_params(state: &DocumentState, params: &[varn_sem::types::FunctionParam]) -> String {
     params
         .iter()
         .map(|p| {
@@ -211,7 +212,7 @@ fn format_fn_params(
         .join(", ")
 }
 
-fn format_member_params(state: &DocumentState, ty: &varn_checker::Type) -> String {
+fn format_member_params(state: &DocumentState, ty: &varn_sem::types::Type) -> String {
     state
         .db
         .fn_shape(ty)

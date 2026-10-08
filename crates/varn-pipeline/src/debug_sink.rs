@@ -1,5 +1,5 @@
 use varn_core::ast::{AstArena, Program};
-use varn_debug_flags::DebugFlags;
+use varn_core::debug_flags::DebugFlags;
 
 pub trait DebugSink {
     fn lex(&self, tokens: &[varn_core::Token], lexeme_buf: &[u8], path: &str, debug: &DebugFlags);
@@ -14,14 +14,14 @@ pub trait DebugSink {
         &self,
         program: &Program,
         source: &str,
-        check: &varn_checker::CheckResult,
+        check: &varn_sem::output::CheckResult,
         debug: &DebugFlags,
     );
     fn compile(
         &self,
         program: &Program,
         arena: &AstArena,
-        check: &varn_checker::CheckResult,
+        check: &varn_sem::output::CheckResult,
         proto: &varn_compiler::FunctionProto,
         graph: &crate::module_precompile::ModuleGraphBuild,
         debug: &DebugFlags,
@@ -51,7 +51,7 @@ impl DebugSink for NullSink {
         &self,
         _program: &Program,
         _source: &str,
-        _check: &varn_checker::CheckResult,
+        _check: &varn_sem::output::CheckResult,
         _debug: &DebugFlags,
     ) {
     }
@@ -59,7 +59,7 @@ impl DebugSink for NullSink {
         &self,
         _program: &Program,
         _arena: &AstArena,
-        _check: &varn_checker::CheckResult,
+        _check: &varn_sem::output::CheckResult,
         _proto: &varn_compiler::FunctionProto,
         _graph: &crate::module_precompile::ModuleGraphBuild,
         _debug: &DebugFlags,

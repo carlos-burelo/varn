@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{ObjectTypeMember, Type};
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::{ObjectTypeMember, Type};
 
 impl<'r> Checker<'r> {
     pub(crate) fn collect_member_names(&self, ty: &Type, bind: &BindResult) -> Vec<Arc<str>> {

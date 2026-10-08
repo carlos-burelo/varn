@@ -8,10 +8,10 @@ pub(crate) mod member_binary;
 mod meta;
 mod new_ty;
 
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
 use varn_core::ast::{ExprId, ExprKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 pub(crate) use self::collectors::arrow_body_return_type;
 

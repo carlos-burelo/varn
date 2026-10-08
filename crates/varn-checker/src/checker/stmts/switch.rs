@@ -1,7 +1,7 @@
 use super::super::Checker;
-use crate::binder::BindResult;
 use varn_core::ast::{AstArena, ExprId, SwitchCase};
 use varn_core::{Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_switch_stmt(

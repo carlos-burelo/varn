@@ -51,7 +51,7 @@ fn call_hints(state: &DocumentState, callee: ExprId, args: &[Arg], hints: &mut V
 
 fn resolve_callee_params(state: &DocumentState, callee: ExprId) -> Vec<String> {
     let node = state.ast_arena.expr(callee);
-    let names = |f: varn_checker::types::FunctionType| {
+    let names = |f: varn_sem::types::FunctionType| {
         f.params
             .iter()
             .map(|p| p.name.as_deref().unwrap_or_default().to_owned())

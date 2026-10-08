@@ -1,6 +1,6 @@
 use super::CallTypeCtx;
-use crate::types::Type;
 use varn_core::ast::MatchCase;
+use varn_sem::types::Type;
 
 pub(super) fn infer_match(c: &mut CallTypeCtx, cases: &[MatchCase]) -> Option<Type> {
     let mut tys = Vec::new();

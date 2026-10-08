@@ -6,8 +6,6 @@ mod call_invoke;
 mod call_member;
 mod call_new;
 
-use crate::binder::resolve_type_node;
-use crate::types::{CheckerTyTable, Type, TypeContext};
 use call_binary::infer_binary;
 use call_closure::infer_closure;
 use call_composite::infer_match;
@@ -17,8 +15,10 @@ use call_member::infer_member;
 use call_new::infer_new;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
+use varn_binder::resolve_type_node;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
 use varn_core::AtomInterner;
+use varn_sem::types::{CheckerTyTable, Type, TypeContext};
 
 pub(crate) struct CallTypeCtx<'a> {
     pub fn_map: &'a FxHashMap<Arc<str>, Type>,

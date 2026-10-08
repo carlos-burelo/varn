@@ -1,0 +1,13 @@
+[package]
+name = "varn-binder"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+varn-sem     = { path = "../varn-sem" }
+varn-core    = { path = "../varn-core" }
+varn-modules = { path = "../varn-modules" }
+rustc-hash   = { workspace = true }
+
+[lints]
+workspace = true

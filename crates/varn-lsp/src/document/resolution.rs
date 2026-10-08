@@ -1,5 +1,5 @@
-use varn_checker::symbol::SymbolId;
 use varn_core::TokenKind;
+use varn_sem::symbol::SymbolId;
 
 use super::{DocumentState, SymbolView, TokenRecord};
 

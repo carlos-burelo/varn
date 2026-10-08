@@ -1,10 +1,10 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::symbol::SymbolId;
-use crate::types::{ObjectTypeMember, Type};
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::symbol::SymbolId;
+use varn_sem::types::{ObjectTypeMember, Type};
 
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_discriminant(
@@ -178,12 +178,12 @@ impl<'r> Checker<'r> {
                                     }
                                 }
                                 let make_ty =
-                                    |v: Vec<Type>, table: &mut crate::types::CheckerTyTable| match v
-                                        .len()
-                                    {
-                                        0 => None,
-                                        1 => Some(v.into_iter().next().unwrap()),
-                                        _ => Some(Type::union(v, table)),
+                                    |v: Vec<Type>, table: &mut varn_sem::types::CheckerTyTable| {
+                                        match v.len() {
+                                            0 => None,
+                                            1 => Some(v.into_iter().next().unwrap()),
+                                            _ => Some(Type::union(v, table)),
+                                        }
                                     };
                                 if (is_eq && is_true_branch) || (is_neq && !is_true_branch) {
                                     if !matched.is_empty() {

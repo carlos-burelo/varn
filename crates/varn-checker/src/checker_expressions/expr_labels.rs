@@ -1,5 +1,5 @@
-use crate::types::Type;
 use varn_core::ast::operators::BinaryOp;
+use varn_sem::types::Type;
 
 pub(super) fn base_type(ty: &Type) -> Type {
     *ty

@@ -3,23 +3,23 @@ use crate::value::VmValue;
 
 const _: () = {
     assert!(
-        core::mem::size_of::<VmValue>() == core::mem::size_of::<varn_abi::AbiValue>(),
+        core::mem::size_of::<VmValue>() == core::mem::size_of::<varn_core::abi::AbiValue>(),
         "VmValue/AbiValue: mismo layout 16 B"
     );
     assert!(
-        core::mem::align_of::<VmValue>() == core::mem::align_of::<varn_abi::AbiValue>(),
+        core::mem::align_of::<VmValue>() == core::mem::align_of::<varn_core::abi::AbiValue>(),
         "VmValue/AbiValue: mismo align"
     );
 };
 
-pub fn abi_stacks(store: &FrameStore) -> varn_abi::AbiStacks {
+pub fn abi_stacks(store: &FrameStore) -> varn_core::abi::AbiStacks {
     let gpr = store.gpr.as_ptr() as *mut i64;
     let fpr = store.fpr.as_ptr() as *mut f64;
     let refs = store.refs.as_ptr() as *mut u32;
-    let dyn_ = store.dyn_.as_ptr() as *mut varn_abi::AbiValue;
+    let dyn_ = store.dyn_.as_ptr() as *mut varn_core::abi::AbiValue;
 
     unsafe {
-        varn_abi::AbiStacks {
+        varn_core::abi::AbiStacks {
             gpr,
             gpr_end: gpr.add(store.gpr.len()),
             fpr,

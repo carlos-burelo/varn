@@ -4,14 +4,14 @@ use rustc_hash::FxHashMap;
 
 use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
 use crate::document::{uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, TokenRecord};
-use varn_checker::SymbolKind;
 use varn_core::ast::{AstArena, Decl, StmtId, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind};
+use varn_sem::symbol::SymbolKind;
 
 pub fn run_pipeline(
     source: String,
     uri: String,
-    resolver: std::sync::Arc<varn_checker::module_resolver::DiskResolver>,
+    resolver: std::sync::Arc<varn_resolver::DiskResolver>,
 ) -> DocumentAnalysis {
     varn_builtins::register_provider();
     let path = uri_to_path(&uri);
@@ -94,7 +94,7 @@ pub fn run_pipeline(
         &ast_arena,
         interner,
         resolver.as_ref(),
-        varn_checker::CheckOptions::tooling(),
+        varn_sem::output::CheckOptions::tooling(),
     );
 
     for d in &result.diagnostics {
@@ -144,9 +144,11 @@ pub fn run_pipeline(
         );
     }
 
-    let mut resolved_types: rustc_hash::FxHashMap<varn_checker::SymbolId, varn_checker::Type> =
-        rustc_hash::FxHashMap::default();
-    let mut all_symbols: Vec<varn_checker::SymbolId> = Vec::new();
+    let mut resolved_types: rustc_hash::FxHashMap<
+        varn_sem::symbol::SymbolId,
+        varn_sem::types::Type,
+    > = rustc_hash::FxHashMap::default();
+    let mut all_symbols: Vec<varn_sem::symbol::SymbolId> = Vec::new();
     let mut symbol_map: FxHashMap<String, SymbolKind> = FxHashMap::default();
 
     for (id, sym) in result.bind.arena.all().iter().enumerate() {

@@ -1,34 +1,42 @@
-fn nested(k: crate::semantic_info::NestedTypeKind) -> crate::semantic_info::ResolvedMemberKind {
-    crate::semantic_info::ResolvedMemberKind::NestedType(k)
+fn nested(
+    k: varn_sem::semantic_info::NestedTypeKind,
+) -> varn_sem::semantic_info::ResolvedMemberKind {
+    varn_sem::semantic_info::ResolvedMemberKind::NestedType(k)
 }
 
 pub(super) fn map_class_member_kind(
-    k: crate::binder::ClassMemberKind,
-) -> crate::semantic_info::ResolvedMemberKind {
+    k: varn_sem::types::ClassMemberKind,
+) -> varn_sem::semantic_info::ResolvedMemberKind {
     match k {
-        crate::binder::ClassMemberKind::Method | crate::binder::ClassMemberKind::Function => {
-            crate::semantic_info::ResolvedMemberKind::Method
+        varn_sem::types::ClassMemberKind::Method | varn_sem::types::ClassMemberKind::Function => {
+            varn_sem::semantic_info::ResolvedMemberKind::Method
         }
-        crate::binder::ClassMemberKind::Property | crate::binder::ClassMemberKind::Variable => {
-            crate::semantic_info::ResolvedMemberKind::Property
+        varn_sem::types::ClassMemberKind::Property | varn_sem::types::ClassMemberKind::Variable => {
+            varn_sem::semantic_info::ResolvedMemberKind::Property
         }
-        crate::binder::ClassMemberKind::Constructor => {
-            crate::semantic_info::ResolvedMemberKind::Constructor
+        varn_sem::types::ClassMemberKind::Constructor => {
+            varn_sem::semantic_info::ResolvedMemberKind::Constructor
         }
-        crate::binder::ClassMemberKind::Getter => crate::semantic_info::ResolvedMemberKind::Getter,
-        crate::binder::ClassMemberKind::Setter => crate::semantic_info::ResolvedMemberKind::Setter,
-        crate::binder::ClassMemberKind::Class => {
-            nested(crate::semantic_info::NestedTypeKind::Class)
+        varn_sem::types::ClassMemberKind::Getter => {
+            varn_sem::semantic_info::ResolvedMemberKind::Getter
         }
-        crate::binder::ClassMemberKind::Interface => {
-            nested(crate::semantic_info::NestedTypeKind::Interface)
+        varn_sem::types::ClassMemberKind::Setter => {
+            varn_sem::semantic_info::ResolvedMemberKind::Setter
         }
-        crate::binder::ClassMemberKind::Namespace => {
-            nested(crate::semantic_info::NestedTypeKind::Namespace)
+        varn_sem::types::ClassMemberKind::Class => {
+            nested(varn_sem::semantic_info::NestedTypeKind::Class)
         }
-        crate::binder::ClassMemberKind::Enum => nested(crate::semantic_info::NestedTypeKind::Enum),
-        crate::binder::ClassMemberKind::Struct => {
-            nested(crate::semantic_info::NestedTypeKind::Struct)
+        varn_sem::types::ClassMemberKind::Interface => {
+            nested(varn_sem::semantic_info::NestedTypeKind::Interface)
+        }
+        varn_sem::types::ClassMemberKind::Namespace => {
+            nested(varn_sem::semantic_info::NestedTypeKind::Namespace)
+        }
+        varn_sem::types::ClassMemberKind::Enum => {
+            nested(varn_sem::semantic_info::NestedTypeKind::Enum)
+        }
+        varn_sem::types::ClassMemberKind::Struct => {
+            nested(varn_sem::semantic_info::NestedTypeKind::Struct)
         }
     }
 }

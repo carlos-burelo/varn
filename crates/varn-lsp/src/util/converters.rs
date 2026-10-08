@@ -22,7 +22,7 @@ pub fn zero_range(line: u32, col: u32) -> Range {
 }
 
 use tower_lsp_f::lsp_types::SymbolKind as LspSymbolKind;
-use varn_checker::SymbolKind;
+use varn_sem::symbol::SymbolKind;
 
 pub fn to_lsp_symbol_kind(kind: SymbolKind) -> LspSymbolKind {
     crate::util::kinds::to_lsp_symbol_kind(kind)

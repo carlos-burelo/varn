@@ -2,8 +2,8 @@ mod classify;
 
 use once_cell::sync::Lazy;
 use tower_lsp_f::lsp_types::{SemanticTokenModifiers, SemanticTokenTypes, SemanticTokensLegend};
-use varn_checker::SymbolKind;
 use varn_core::TokenKind;
+use varn_sem::symbol::SymbolKind;
 
 use crate::document::DocumentState;
 

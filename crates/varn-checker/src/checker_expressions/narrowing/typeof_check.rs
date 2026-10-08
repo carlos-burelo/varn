@@ -1,9 +1,9 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::symbol::SymbolId;
-use crate::types::Type;
 use varn_core::ast::operators::{BinaryOp, UnaryOp};
 use varn_core::ast::{ExprId, ExprKind};
+use varn_sem::bind::BindResult;
+use varn_sem::symbol::SymbolId;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_typeof(
@@ -43,8 +43,8 @@ impl<'r> Checker<'r> {
                 if let ExprKind::Identifier { name } = &arena.expr(typeof_op).kind {
                     let scope = bind.scopes.get(self.current_scope);
                     if let Some(id) = scope.resolve(*name, &bind.scopes) {
-                        let view = crate::binder::BindView::new(bind, self.resolver);
-                        let narrowed_ty = crate::binder::resolve_primitive(
+                        let view = varn_sem::bind::BindView::new(bind, self.resolver);
+                        let narrowed_ty = varn_binder::resolve_primitive(
                             &value,
                             Some(&view),
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),

@@ -1,4 +1,5 @@
 mod contract_members;
+mod tables;
 mod varn_contract;
 
 use proc_macro::TokenStream;

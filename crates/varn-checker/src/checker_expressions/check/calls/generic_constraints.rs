@@ -1,9 +1,9 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
 use varn_core::ast::{ExprId, ExprKind, TypeNode};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_type_arg_constraints(
@@ -51,9 +51,9 @@ impl<'r> Checker<'r> {
 
 fn resolve_function_symbol<'a>(
     name: &str,
-    current_scope: crate::scope::ScopeId,
+    current_scope: varn_sem::scope::ScopeId,
     bind: &'a BindResult,
-) -> Option<&'a crate::symbol::Symbol> {
+) -> Option<&'a varn_sem::symbol::Symbol> {
     let current = bind.scopes.get(current_scope);
     if let Some(id) = bind
         .interner
@@ -61,7 +61,7 @@ fn resolve_function_symbol<'a>(
         .and_then(|atom| current.resolve(atom, &bind.scopes))
     {
         let sym = bind.arena.get(id);
-        if matches!(sym.kind, crate::symbol::SymbolKind::Function) {
+        if matches!(sym.kind, varn_sem::symbol::SymbolKind::Function) {
             return Some(sym);
         }
     }
@@ -73,7 +73,7 @@ fn resolve_function_symbol<'a>(
         .and_then(|atom| global.resolve(atom, &bind.scopes))
     {
         let sym = bind.arena.get(id);
-        if matches!(sym.kind, crate::symbol::SymbolKind::Function) {
+        if matches!(sym.kind, varn_sem::symbol::SymbolKind::Function) {
             return Some(sym);
         }
     }

@@ -24,7 +24,7 @@ varn_contract! {
 
         fn cancelTask(ctx: &mut dyn NativeCtx, handle_nv: VmValue) -> Result<(), String> {
             ctx.task_cancel(handle_nv)?;
-            varn_runtime::timer::note_cancel();
+            crate::runtime::timer::note_cancel();
             Ok(())
         }
 
@@ -79,7 +79,7 @@ varn_contract! {
             if capacity < 1 {
                 return Err("channel: capacity must be >= 1".to_string());
             }
-            let id = varn_runtime::channel::create(capacity as usize);
+            let id = crate::runtime::channel::create(capacity as usize);
             let ch_nv = ctx
                 .alloc_instance("Channel")
                 .ok_or("channel: Channel class not registered")?;
@@ -201,13 +201,13 @@ varn_contract! {
                 Ok(v) => v,
                 Err(e) => return reject_with_message(ctx, &format!("send: {e}")),
             };
-            match varn_runtime::channel::send(id, send_val) {
-                varn_runtime::channel::SendOutcome::Sent => {
+            match crate::runtime::channel::send(id, send_val) {
+                crate::runtime::channel::SendOutcome::Sent => {
                     let null = ctx.null_val();
                     ctx.task_resolved(null)
                 }
-                varn_runtime::channel::SendOutcome::Closed => reject_closed(ctx),
-                varn_runtime::channel::SendOutcome::Parked(promise) => {
+                crate::runtime::channel::SendOutcome::Closed => reject_closed(ctx),
+                crate::runtime::channel::SendOutcome::Parked(promise) => {
                     ctx.task_from_host(promise, HostOpen::SendAck)
                 }
             }
@@ -215,13 +215,13 @@ varn_contract! {
 
         fn close(ctx: &mut dyn NativeCtx, this: VmValue) {
             if let Some(id) = chan_id(ctx, this) {
-                varn_runtime::channel::close(id);
+                crate::runtime::channel::close(id);
             }
         }
 
         fn dispose(ctx: &mut dyn NativeCtx, this: VmValue) {
             if let Some(id) = chan_id(ctx, this) {
-                varn_runtime::channel::close(id);
+                crate::runtime::channel::close(id);
             }
         }
     }
@@ -241,14 +241,14 @@ varn_contract! {
             let Some(id) = chan_id(ctx, this) else {
                 return finished(ctx);
             };
-            match varn_runtime::channel::try_receive(id) {
-                varn_runtime::channel::RecvOutcome::Item(item) => {
+            match crate::runtime::channel::try_receive(id) {
+                crate::runtime::channel::RecvOutcome::Item(item) => {
                     let value = open_sent(ctx, &item);
                     let result = next_result(ctx, value, false);
                     ctx.task_resolved(result)
                 }
-                varn_runtime::channel::RecvOutcome::Closed => finished(ctx),
-                varn_runtime::channel::RecvOutcome::Parked(promise) => {
+                crate::runtime::channel::RecvOutcome::Closed => finished(ctx),
+                crate::runtime::channel::RecvOutcome::Parked(promise) => {
                     ctx.task_from_host(promise, HostOpen::ReceiveNext)
                 }
             }
@@ -258,13 +258,13 @@ varn_contract! {
             let Some(id) = chan_id(ctx, this) else {
                 return reject_closed(ctx);
             };
-            match varn_runtime::channel::try_receive(id) {
-                varn_runtime::channel::RecvOutcome::Item(item) => {
+            match crate::runtime::channel::try_receive(id) {
+                crate::runtime::channel::RecvOutcome::Item(item) => {
                     let value = open_sent(ctx, &item);
                     ctx.task_resolved(value)
                 }
-                varn_runtime::channel::RecvOutcome::Closed => reject_closed(ctx),
-                varn_runtime::channel::RecvOutcome::Parked(promise) => {
+                crate::runtime::channel::RecvOutcome::Closed => reject_closed(ctx),
+                crate::runtime::channel::RecvOutcome::Parked(promise) => {
                     ctx.task_from_host(promise, HostOpen::Receive)
                 }
             }
@@ -272,7 +272,7 @@ varn_contract! {
 
         fn dispose(ctx: &mut dyn NativeCtx, this: VmValue) {
             if let Some(id) = chan_id(ctx, this) {
-                varn_runtime::channel::close(id);
+                crate::runtime::channel::close(id);
             }
         }
     }

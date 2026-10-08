@@ -1,9 +1,9 @@
 use super::CallTypeCtx;
-use crate::binder::resolve_type_node;
-use crate::types::Type;
 use rustc_hash::FxHashMap;
+use varn_binder::resolve_type_node;
 use varn_core::ast::{ExprId, ExprKind, TypeNode};
 use varn_core::{Atom, TypeKind};
+use varn_sem::types::Type;
 
 pub(super) fn infer_invoke(
     c: &mut CallTypeCtx,

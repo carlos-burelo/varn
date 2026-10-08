@@ -1,9 +1,9 @@
 use super::const_int::closest_name;
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::Type;
 use varn_core::ast::ExprId;
 use varn_core::{Diagnostic, ErrorCode, Suggestion};
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_pipeline(&mut self, left: ExprId, right: ExprId, bind: &BindResult) {

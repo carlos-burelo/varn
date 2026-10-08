@@ -8,11 +8,13 @@ varn-core        = { path = "../varn-core" }
 varn-lexer       = { path = "../varn-lexer" }
 varn-parser      = { path = "../varn-parser", features = ["profiling"] }
 varn-checker     = { path = "../varn-checker" }
+varn-emit        = { path = "../varn-emit" }
 varn-compiler    = { path = "../varn-compiler" }
 varn-vm          = { path = "../varn-vm" }
 varn-modules     = { path = "../varn-modules" }
 varn-types       = { path = "../varn-types" }
-varn-debug-flags = { path = "../varn-debug-flags" }
+varn-sem         = { path = "../varn-sem" }
+varn-resolver    = { path = "../varn-resolver" }
 rustc-hash       = { workspace = true }
 serde            = { workspace = true }
 serde_json       = { workspace = true }

@@ -1,10 +1,10 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
 use std::sync::Arc;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
-fn check_in_bind(name: &Arc<str>, key: &str, ext_bind: &crate::binder::BindResult) -> bool {
+fn check_in_bind(name: &Arc<str>, key: &str, ext_bind: &varn_sem::bind::BindResult) -> bool {
     if let Some(members) = ext_bind.type_members.classes.get(name) {
         if members.members.iter().any(|m| m.name.as_ref() == key) {
             return true;
@@ -40,7 +40,7 @@ fn check_in_bind(name: &Arc<str>, key: &str, ext_bind: &crate::binder::BindResul
 }
 
 fn check_origin_module(
-    resolver: &dyn crate::module_resolver::ImportResolver,
+    resolver: &dyn varn_sem::resolver::ImportResolver,
     name: &Arc<str>,
     origin: &Option<Arc<str>>,
     key: &str,
@@ -148,7 +148,7 @@ impl<'r> Checker<'r> {
                 let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = &origin {
-                        let exports = if crate::module_resolver::is_known_module(origin_path) {
+                        let exports = if varn_binder::paths::is_known_module(origin_path) {
                             Some(self.resolver.stdlib_exports(origin_path))
                         } else {
                             let mut visiting = Vec::new();

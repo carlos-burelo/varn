@@ -1,9 +1,10 @@
 use crate::flags::DebugFlags;
 use rustc_hash::FxHashMap;
-use varn_checker::{BindResult, Desugarings, TypeEntry};
 use varn_core::ast::{AstArena, AstId, Program};
 use varn_core::term::terminal;
 use varn_core::term::terminal::Section;
+use varn_sem::bind::BindResult;
+use varn_sem::output::{Desugarings, TypeEntry};
 
 pub fn debug_tir(
     program: &Program,
@@ -14,14 +15,8 @@ pub fn debug_tir(
     desugar: &Desugarings,
     flags: &DebugFlags,
 ) {
-    let module = varn_checker::emit::emit_module(
-        program,
-        ast_arena,
-        bind,
-        expr_table,
-        call_mappings,
-        desugar,
-    );
+    let module =
+        varn_emit::emit_module(program, ast_arena, bind, expr_table, call_mappings, desugar);
 
     if flags.tir {
         Section::new("tir")

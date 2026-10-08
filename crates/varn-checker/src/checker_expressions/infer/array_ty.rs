@@ -1,8 +1,8 @@
 use super::Checker;
-use crate::binder::widen_literal;
-use crate::binder::BindResult;
-use crate::types::Type;
+use varn_binder::widen_literal;
 use varn_core::ast::ExprId;
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn infer_array(
@@ -65,7 +65,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn infer_tuple(&mut self, elements: &[ExprId], bind: &BindResult) -> Type {
         let elem_tys: Vec<Type> = elements.iter().map(|e| self.infer_type(*e, bind)).collect();
-        let ids: Vec<crate::types::CheckerTyId> = elem_tys.iter().map(|t| t.0).collect();
+        let ids: Vec<varn_sem::types::CheckerTyId> = elem_tys.iter().map(|t| t.0).collect();
         let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
         Type::resolved(
             std::sync::Arc::make_mut(&mut self.ty_table).intern(varn_core::TypeKind::Tuple(list)),
@@ -88,7 +88,7 @@ impl<'r> Checker<'r> {
                     varn_core::ast::PropKey::Int(n) => std::sync::Arc::from(n.to_string().as_str()),
                     varn_core::ast::PropKey::Computed(_) => std::sync::Arc::from("<computed>"),
                 };
-                members.push(crate::types::ObjectTypeMember::Property {
+                members.push(varn_sem::types::ObjectTypeMember::Property {
                     name,
                     ty: ty.0,
                     optional: false,

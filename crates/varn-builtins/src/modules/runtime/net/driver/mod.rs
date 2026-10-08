@@ -113,7 +113,7 @@ impl IoDriver {
                 Self::run_event_loop(poll, cmd_rx, reg_clone, run_clone);
             })?;
 
-        varn_runtime::timer::set_waker(wake_driver);
+        crate::runtime::timer::set_waker(wake_driver);
 
         Ok(Self {
             registry,

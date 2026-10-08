@@ -1,7 +1,7 @@
 use super::CallTypeCtx;
-use crate::types::Type;
 use varn_core::ast::expr::ArrowBody;
 use varn_core::ast::{Param, TypeNode};
+use varn_sem::types::Type;
 
 pub(super) fn infer_closure(
     c: &mut CallTypeCtx,
@@ -11,7 +11,7 @@ pub(super) fn infer_closure(
 ) -> Option<Type> {
     let ctx = c.ctx;
     match body {
-        None => Some(crate::binder::build_fn_type(
+        None => Some(varn_binder::build_fn_type(
             params,
             return_type,
             false,
@@ -19,7 +19,7 @@ pub(super) fn infer_closure(
             c.table,
             Type::Dynamic,
         )),
-        Some(ArrowBody::Block(_)) => Some(crate::binder::build_fn_type(
+        Some(ArrowBody::Block(_)) => Some(varn_binder::build_fn_type(
             params,
             return_type,
             true,
@@ -29,7 +29,7 @@ pub(super) fn infer_closure(
         )),
         Some(ArrowBody::Expr(e)) => {
             let inferred_ret = c.infer(*e).unwrap_or(Type::Dynamic);
-            Some(crate::binder::build_fn_type(
+            Some(varn_binder::build_fn_type(
                 params,
                 return_type,
                 true,

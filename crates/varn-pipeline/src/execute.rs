@@ -3,8 +3,8 @@ use crate::PipelineError;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_compiler::FunctionProto;
+use varn_core::debug_flags::DebugFlags;
 use varn_core::ModuleId;
-use varn_debug_flags::DebugFlags;
 use varn_types::capabilities::CapabilitySet;
 use varn_vm::Vm;
 

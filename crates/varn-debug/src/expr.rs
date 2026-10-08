@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 
-use varn_checker::CheckResult;
 use varn_core::ast::Program;
+use varn_sem::output::CheckResult;
 
 pub(crate) fn line_col(source: &str, offset: u32) -> (u32, u32) {
     let offset = offset as usize;
@@ -32,7 +32,7 @@ pub fn render_check_types(program: &Program, source: &str, check: &CheckResult) 
     let _ = writeln!(out, "# check:types {name}");
 
     let _ = writeln!(out, "## checker types (key = expr id)");
-    let mut by_id: Vec<(&u32, &varn_checker::TypeEntry)> = check.expr_table.iter().collect();
+    let mut by_id: Vec<(&u32, &varn_sem::output::TypeEntry)> = check.expr_table.iter().collect();
     by_id.sort_by_key(|(id, _)| **id);
     for (id, entry) in by_id {
         let (line, col) = line_col(source, entry.start);

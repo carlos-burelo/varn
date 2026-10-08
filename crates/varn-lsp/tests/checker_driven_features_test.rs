@@ -5,8 +5,8 @@ use varn_lsp::features::code_action::match_arms::generate_match_arms_action;
 use varn_lsp::features::inlay_hints::param_hints::build_parameter_hints;
 use varn_lsp::pipeline::run_pipeline;
 
-fn test_resolver() -> std::sync::Arc<varn_checker::module_resolver::DiskResolver> {
-    std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new())
+fn test_resolver() -> std::sync::Arc<varn_resolver::DiskResolver> {
+    std::sync::Arc::new(varn_resolver::DiskResolver::new())
 }
 
 fn fill_arms_edit(source: &str, line: u32) -> Option<String> {

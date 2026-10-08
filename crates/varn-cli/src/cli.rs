@@ -48,6 +48,10 @@ pub enum Commands {
     Completions(CompletionsArgs),
 
     Dap,
+
+    StdBundle(StdBundleArgs),
+
+    GenContractTables(GenContractTablesArgs),
 }
 
 #[derive(Args)]
@@ -271,4 +275,25 @@ pub struct FmtArgs {
 
     #[arg(short, long)]
     pub verbose: bool,
+}
+
+#[derive(Args)]
+pub struct StdBundleArgs {
+    #[arg(long, default_value = "std")]
+    pub std_dir: String,
+
+    #[arg(long, default_value = "dist/std.vnb")]
+    pub out: String,
+}
+
+#[derive(Args)]
+pub struct GenContractTablesArgs {
+    #[arg(long, default_value = "")]
+    pub crate_dir: String,
+
+    #[arg(long, default_value = "")]
+    pub out: String,
+
+    #[arg(long)]
+    pub check: bool,
 }

@@ -127,5 +127,5 @@ fn collect_vn_recursive(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), CliErr
 }
 
 pub fn format_source(source: &str) -> String {
-    varn_fmt::format_source(source)
+    varn_core::fmt::format_source(source)
 }

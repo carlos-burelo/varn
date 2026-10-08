@@ -1,8 +1,8 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{Type, TypeContext};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{Type, TypeContext};
 
 use super::member_binary::{infer_binary_type, infer_member_type};
 
@@ -25,7 +25,7 @@ impl<'r> Checker<'r> {
                         return ty;
                     }
                 }
-                crate::binder::BindView::new(bind, self.resolver)
+                varn_sem::bind::BindView::new(bind, self.resolver)
                     .resolve_symbol(name_str)
                     .unwrap_or(Type::Dynamic)
             }
@@ -165,7 +165,7 @@ impl<'r> Checker<'r> {
             }
             ExprKind::Await { argument } => {
                 let inner = self.infer_type(*argument, bind);
-                crate::types::awaited(&inner, &self.ty_table)
+                varn_sem::types::awaited(&inner, &self.ty_table)
             }
             ExprKind::NonNull { expression } => self.infer_non_null(*expression, bind),
             ExprKind::Try { expression } => self.infer_try(*expression, bind),

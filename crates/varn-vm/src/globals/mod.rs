@@ -22,7 +22,7 @@ impl GlobalStore {
 
     pub(crate) fn with_native_layout(heap: &mut Heap) -> Self {
         let mut native_map = varn_builtins::register_globals_vm(heap);
-        let order = varn_abi::NATIVE_GLOBALS;
+        let order = varn_core::abi::NATIVE_GLOBALS;
 
         let mut values = Vec::with_capacity(order.len());
         let mut names = FxHashMap::default();

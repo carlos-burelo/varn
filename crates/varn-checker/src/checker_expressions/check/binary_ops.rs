@@ -1,12 +1,12 @@
 use super::super::expr_labels::{base_type, op_str};
 use super::super::infer::member_binary::normalize_for_binary;
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::ExprId;
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_binary_operands(
@@ -35,7 +35,7 @@ impl<'r> Checker<'r> {
                     || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.try_resolve(n).unwrap_or_default() == varn_core::LangPrimitive::Decimal.name())
             };
             let both_numeric = is_numeric(&l_base, self) && is_numeric(&r_base, self);
-            let (l_eff, r_eff) = crate::binder::type_inference::adopt_literal_operands(
+            let (l_eff, r_eff) = varn_binder::type_inference::adopt_literal_operands(
                 self.ast_arena,
                 left,
                 right,
@@ -44,7 +44,7 @@ impl<'r> Checker<'r> {
                 &self.ty_table,
             );
             let same_numeric = both_numeric
-                && crate::binder::type_inference::numeric_operands_compatible(
+                && varn_binder::type_inference::numeric_operands_compatible(
                     &l_eff,
                     &r_eff,
                     &self.ty_table,

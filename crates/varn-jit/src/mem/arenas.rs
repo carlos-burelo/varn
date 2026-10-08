@@ -28,14 +28,14 @@ impl StackArenas {
         })
     }
 
-    pub fn abi_stacks(&self) -> varn_abi::AbiStacks {
+    pub fn abi_stacks(&self) -> varn_core::abi::AbiStacks {
         let gpr = self.gpr.as_ptr() as *mut i64;
         let fpr = self.fpr.as_ptr() as *mut f64;
         let refs = self.refs.as_ptr() as *mut u32;
-        let dyn_ = self.dyn_.as_ptr() as *mut varn_abi::AbiValue;
+        let dyn_ = self.dyn_.as_ptr() as *mut varn_core::abi::AbiValue;
 
         unsafe {
-            varn_abi::AbiStacks {
+            varn_core::abi::AbiStacks {
                 gpr,
                 gpr_end: gpr.add(self.gpr.size() / size_of::<i64>()),
                 fpr,
@@ -43,12 +43,12 @@ impl StackArenas {
                 refs,
                 refs_end: refs.add(self.refs.size() / size_of::<u32>()),
                 dyn_,
-                dyn_end: dyn_.add(self.dyn_.size() / size_of::<varn_abi::AbiValue>()),
+                dyn_end: dyn_.add(self.dyn_.size() / size_of::<varn_core::abi::AbiValue>()),
             }
         }
     }
 
-    pub fn alloc(&mut self, counts: [u32; 4]) -> Option<varn_abi::ActBases> {
+    pub fn alloc(&mut self, counts: [u32; 4]) -> Option<varn_core::abi::ActBases> {
         let cap = |bytes: usize, elem: usize| (bytes / elem) as u64;
         let ok = (self.top_gpr as u64 + counts[0] as u64) <= cap(self.gpr.size(), 8)
             && (self.top_fpr as u64 + counts[1] as u64) <= cap(self.fpr.size(), 8)
@@ -57,7 +57,7 @@ impl StackArenas {
         if !ok {
             return None;
         }
-        let bases = varn_abi::ActBases {
+        let bases = varn_core::abi::ActBases {
             bases: [self.top_gpr, self.top_fpr, self.top_ref, self.top_dyn],
         };
         self.top_gpr += counts[0];
@@ -67,7 +67,7 @@ impl StackArenas {
         Some(bases)
     }
 
-    pub fn truncate(&mut self, bases: varn_abi::ActBases) {
+    pub fn truncate(&mut self, bases: varn_core::abi::ActBases) {
         self.top_gpr = bases.bases[0];
         self.top_fpr = bases.bases[1];
         self.top_ref = bases.bases[2];
@@ -89,7 +89,7 @@ pub struct FrameArena {
 
 impl FrameArena {
     pub fn new(cap_frames: u32) -> Result<Self, String> {
-        let bytes = (cap_frames as usize).saturating_mul(size_of::<varn_abi::AbiFrame>());
+        let bytes = (cap_frames as usize).saturating_mul(size_of::<varn_core::abi::AbiFrame>());
         Ok(Self {
             buf: JitBuffer::new(bytes.max(4096))?,
             len: 0,
@@ -97,17 +97,17 @@ impl FrameArena {
     }
 
     pub fn cap(&self) -> u32 {
-        (self.buf.size() / size_of::<varn_abi::AbiFrame>()) as u32
+        (self.buf.size() / size_of::<varn_core::abi::AbiFrame>()) as u32
     }
 
-    pub fn push(&mut self, frame: varn_abi::AbiFrame) -> Option<u32> {
+    pub fn push(&mut self, frame: varn_core::abi::AbiFrame) -> Option<u32> {
         if self.len >= self.cap() {
             return None;
         }
         let id = self.len;
 
         unsafe {
-            let base = self.buf.as_ptr() as *mut varn_abi::AbiFrame;
+            let base = self.buf.as_ptr() as *mut varn_core::abi::AbiFrame;
             base.add(id as usize).write(frame);
         }
         self.len += 1;
@@ -118,9 +118,9 @@ impl FrameArena {
         self.len = self.len.saturating_sub(1);
     }
 
-    pub fn abi(&self) -> varn_abi::AbiFrameArena {
-        varn_abi::AbiFrameArena {
-            base: self.buf.as_ptr() as *mut varn_abi::AbiFrame,
+    pub fn abi(&self) -> varn_core::abi::AbiFrameArena {
+        varn_core::abi::AbiFrameArena {
+            base: self.buf.as_ptr() as *mut varn_core::abi::AbiFrame,
             len: self.len,
             cap: self.cap(),
         }
@@ -152,13 +152,13 @@ mod abi_v2_tests {
     #[test]
     fn frame_arena_push_pop() {
         let mut f = FrameArena::new(4).unwrap();
-        let frame = varn_abi::AbiFrame {
+        let frame = varn_core::abi::AbiFrame {
             closure: core::ptr::null(),
             caller: 0,
             resume: 0,
             dest: 0,
             _pad: 0,
-            bases: varn_abi::ActBases { bases: [0; 4] },
+            bases: varn_core::abi::ActBases { bases: [0; 4] },
         };
         assert_eq!(f.push(frame), Some(0));
         assert_eq!(f.push(frame), Some(1));

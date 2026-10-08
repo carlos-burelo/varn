@@ -2,7 +2,7 @@ pub mod builder;
 use crate::document::DocumentState;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use varn_checker::SymbolKind;
+use varn_sem::symbol::SymbolKind;
 
 #[derive(Debug, Clone)]
 pub struct ExportEntry {

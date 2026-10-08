@@ -1,6 +1,7 @@
-use crate::checker::{Checker, ExprInfo};
-use crate::types::Type;
-use crate::SymbolId;
+use crate::checker::Checker;
+use varn_sem::output::ExprInfo;
+use varn_sem::symbol::SymbolId;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn record_type(&mut self, offset: u32, ty: Type) {

@@ -1,5 +1,5 @@
 use tower_lsp_f::lsp_types::{CodeLens, Command, Position, Range, Uri};
-use varn_checker::SymbolKind;
+use varn_sem::symbol::SymbolKind;
 
 use crate::document::DocumentState;
 use crate::workspace::Workspace;

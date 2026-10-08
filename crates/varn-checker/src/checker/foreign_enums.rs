@@ -1,16 +1,10 @@
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::Type;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use varn_core::TypeKind;
-
-#[derive(Clone, Debug)]
-pub struct ForeignEnum {
-    pub name: Arc<str>,
-    pub origin: Arc<str>,
-    pub variants: Vec<(Arc<str>, usize)>,
-}
+use varn_sem::bind::BindResult;
+use varn_sem::output::ForeignEnum;
+use varn_sem::types::Type;
 
 impl Checker<'_> {
     pub(super) fn collect_foreign_enums<'t>(

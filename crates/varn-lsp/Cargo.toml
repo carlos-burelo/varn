@@ -4,16 +4,18 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-varn-fmt = { path = "../varn-fmt" }
 varn-core    = { path = "../varn-core" }
 varn-lexer   = { path = "../varn-lexer" }
 varn-parser  = { path = "../varn-parser" }
 varn-checker = { path = "../varn-checker" }
+varn-emit    = { path = "../varn-emit" }
 varn-modules  = { path = "../varn-modules" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-types    = { path = "../varn-types" }
 varn-compiler = { path = "../varn-compiler" }
 varn-tir      = { path = "../varn-tir" }
+varn-sem      = { path = "../varn-sem" }
+varn-resolver = { path = "../varn-resolver" }
 
 tower-lsp-f  = { workspace = true }
 tokio      = { workspace = true }

@@ -1,7 +1,7 @@
 use std::io::Write;
 
-use varn_checker::CheckResult;
 use varn_core::ast::Program;
+use varn_sem::output::CheckResult;
 
 use crate::fmt::Format;
 use crate::report::Report;

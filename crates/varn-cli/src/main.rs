@@ -53,8 +53,7 @@ fn main() {
 fn run_cli() {
     env_file::load();
 
-    const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));
-    varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
+    register_embedded_stdlib_if_available();
     varn_builtins::register_provider();
 
     try_run_standalone_executable();
@@ -105,6 +104,26 @@ fn run_cli() {
     }
 }
 
+fn register_embedded_stdlib_if_available() {
+    #[cfg(feature = "embed-std")]
+    {
+        const STDLIB_BYTES: &[u8] = include_bytes!("../../../dist/std.vnb");
+        varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
+        return;
+    }
+    #[cfg(not(feature = "embed-std"))]
+    {
+        let Ok(path) = std::env::var("VARN_STD_BUNDLE") else {
+            return;
+        };
+        let Ok(bytes) = std::fs::read(&path) else {
+            return;
+        };
+        let leaked: &'static [u8] = Box::leak(bytes.into_boxed_slice());
+        varn_builtins::register_embedded_stdlib(leaked);
+    }
+}
+
 fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
     match cmd {
         Commands::Run(args) => commands::run::execute(args),
@@ -116,7 +135,6 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         Commands::Build(args) => commands::build::execute(args),
         Commands::Test(args) => commands::test::execute(args),
         Commands::Fmt(args) => commands::fmt::execute(args),
-        Commands::Pkg(sub) => commands::pkg::execute(sub),
         Commands::Doctor => commands::doctor::execute(),
         Commands::Cache(sub) => commands::cache::execute(sub),
         #[cfg(feature = "lsp")]
@@ -128,7 +146,20 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         )),
         Commands::Init(args) => commands::init::execute(args),
         Commands::Completions(args) => commands::completions::execute(args),
+        #[cfg(feature = "dap")]
         Commands::Dap => commands::dap::execute(),
+        #[cfg(not(feature = "dap"))]
+        Commands::Dap => Err(error::CliError::fatal(
+            "vn was built without the \"dap\" feature".to_string(),
+        )),
+        #[cfg(feature = "pm")]
+        Commands::Pkg(sub) => commands::pkg::execute(sub),
+        #[cfg(not(feature = "pm"))]
+        Commands::Pkg(_) => Err(error::CliError::fatal(
+            "vn was built without the \"pm\" feature".to_string(),
+        )),
+        Commands::StdBundle(args) => commands::std_bundle::execute(args),
+        Commands::GenContractTables(args) => commands::contract_tables::execute(args),
     }
 }
 
@@ -150,6 +181,8 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
         "lsp",
         "completions",
         "dap",
+        "std-bundle",
+        "gen-contract-tables",
         "help",
         "--help",
         "-h",

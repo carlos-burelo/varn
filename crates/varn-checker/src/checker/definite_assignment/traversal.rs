@@ -1,10 +1,10 @@
 use super::flow::Flow;
 use super::patterns::{pattern_names, walk_expr_children};
-use crate::binder::BindResult;
 use crate::checker::Checker;
 use rustc_hash::FxHashSet;
 use varn_core::ast::{Decl, ExprId, ExprKind, Program, StmtId, StmtKind};
 use varn_core::{Atom, Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
 
 impl<'r> Checker<'r> {
     pub(crate) fn check_definite_assignment(&mut self, program: &Program, bind: &BindResult) {

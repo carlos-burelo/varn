@@ -16,9 +16,13 @@ path = "src/debug_binder.rs"
 required-features = ["dev-tools"]
 
 [features]
-default = ["lsp"]
-dev-tools = []
-lsp = ["dep:varn-lsp", "dep:tower-lsp-f"]
+default = ["lsp", "clif", "dap", "pm"]
+dev-tools = ["dep:varn-binder", "dep:varn-resolver"]
+lsp = ["dep:varn-lsp", "dep:tower-lsp-f", "dep:varn-resolver"]
+clif = ["varn-jit/clif", "varn-vm/clif", "varn-debug/clif"]
+dap = ["dep:varn-dap"]
+pm = ["dep:varn-pm"]
+embed-std = []
 # Real heap profiling (dhat-rs), for when RSS doesn't add up to counted
 # structures — mimalloc retains freed pages instead of returning them to the
 # OS, so `Task Manager`/`GetProcessMemoryInfo` numbers can include a lot of
@@ -29,8 +33,6 @@ lsp = ["dep:varn-lsp", "dep:tower-lsp-f"]
 dhat-heap = ["dep:dhat"]
 
 [dependencies]
-varn-fmt = { path = "../varn-fmt" }
-varn-debug-flags = { path = "../varn-debug-flags" }
 varn-pipeline = { path = "../varn-pipeline" }
 varn-core     = { path = "../varn-core" }
 varn-lexer    = { path = "../varn-lexer" }
@@ -40,24 +42,24 @@ varn-compiler = { path = "../varn-compiler" }
 varn-vm       = { path = "../varn-vm", features = ["profiling"] }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-types    = { path = "../varn-types" }
+varn-sem      = { path = "../varn-sem" }
+varn-binder   = { path = "../varn-binder", optional = true }
+varn-resolver = { path = "../varn-resolver", optional = true }
 varn-debug    = { path = "../varn-debug" }
 varn-lsp      = { path = "../varn-lsp", optional = true }
-varn-dap      = { path = "../varn-dap" }
-varn-pm       = { path = "../varn-pm" }
+varn-dap      = { path = "../varn-dap", optional = true }
+varn-pm       = { path = "../varn-pm", optional = true }
 varn-modules  = { path = "../varn-modules" }
 varn-jit      = { path = "../varn-jit" }
 tower-lsp-f   = { workspace = true, optional = true }
 postcard      = { workspace = true }
+serde_json    = { workspace = true }
+xxhash-rust   = { workspace = true }
 clap          = { version = "4", features = ["derive"] }
 clap_complete = "4"
 rustc-hash    = { workspace = true }
 mimalloc = "0.1.52"
 dhat     = { version = "0.3", optional = true }
-
-[build-dependencies]
-varn-pipeline = { path = "../varn-pipeline" }
-varn-modules  = { path = "../varn-modules" }
-varn-builtins = { path = "../varn-builtins" }
 
 [lints]
 workspace = true

@@ -2,8 +2,8 @@ use rustc_hash::FxHashSet;
 use tower_lsp_f::lsp_types::{
     CompletionItem, CompletionItemKind, Documentation, InsertTextFormat, MarkupContent, MarkupKind,
 };
-use varn_checker::SymbolKind;
 use varn_core::TokenKind;
+use varn_sem::symbol::SymbolKind;
 
 use super::members::member_group;
 use super::scope::prefix_boost;
@@ -196,8 +196,8 @@ pub fn build_reflection_completions(
                             kind: Some(
                                 if matches!(
                                     m.kind,
-                                    varn_checker::ResolvedMemberKind::Method
-                                        | varn_checker::ResolvedMemberKind::StaticMethod
+                                    varn_sem::semantic_info::ResolvedMemberKind::Method
+                                        | varn_sem::semantic_info::ResolvedMemberKind::StaticMethod
                                 ) {
                                     CompletionItemKind::Method
                                 } else {
@@ -230,8 +230,8 @@ pub fn build_reflection_completions(
                             kind: Some(
                                 if matches!(
                                     m.kind,
-                                    varn_checker::ResolvedMemberKind::Method
-                                        | varn_checker::ResolvedMemberKind::StaticMethod
+                                    varn_sem::semantic_info::ResolvedMemberKind::Method
+                                        | varn_sem::semantic_info::ResolvedMemberKind::StaticMethod
                                 ) {
                                     CompletionItemKind::Method
                                 } else {

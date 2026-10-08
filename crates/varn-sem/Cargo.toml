@@ -1,0 +1,14 @@
+[package]
+name = "varn-sem"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+varn-core   = { path = "../varn-core" }
+serde       = { workspace = true }
+postcard    = { workspace = true }
+rustc-hash  = { workspace = true }
+xxhash-rust = { workspace = true }
+
+[lints]
+workspace = true

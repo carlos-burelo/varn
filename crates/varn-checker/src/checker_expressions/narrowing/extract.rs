@@ -1,8 +1,8 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
 use varn_core::ast::operators::UnaryOp;
 use varn_core::ast::{ExprId, ExprKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn extract_narrowings(
@@ -10,7 +10,7 @@ impl<'r> Checker<'r> {
         expr: ExprId,
         bind: &BindResult,
         is_true_branch: bool,
-    ) -> Vec<(crate::symbol::SymbolId, Type)> {
+    ) -> Vec<(varn_sem::symbol::SymbolId, Type)> {
         let arena = self.ast_arena;
         let cache_key = (expr.index(), is_true_branch, self.current_scope);
         if let Some(cached) = self.narrowings_cache.get(&cache_key) {

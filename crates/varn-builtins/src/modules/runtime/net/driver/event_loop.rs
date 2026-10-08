@@ -55,7 +55,7 @@ impl IoDriver {
                 }
             }
 
-            let poll_timeout = match varn_runtime::timer::next_deadline() {
+            let poll_timeout = match crate::runtime::timer::next_deadline() {
                 None => Duration::from_millis(50),
                 Some(deadline) => deadline
                     .saturating_duration_since(std::time::Instant::now())
@@ -210,7 +210,7 @@ impl IoDriver {
                     task.complete(res);
                 }
             }
-            for task in varn_runtime::timer::take_due() {
+            for task in crate::runtime::timer::take_due() {
                 task.resolve(SendValue::Null);
             }
         }

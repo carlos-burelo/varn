@@ -1,5 +1,5 @@
 use tower_lsp_f::lsp_types::{CompletionItem, CompletionItemKind};
-use varn_checker::module_resolver::ImportResolver;
+use varn_sem::resolver::ImportResolver;
 
 use crate::constants::STD_PREFIX;
 use crate::document::import::uri_to_path;
@@ -107,7 +107,7 @@ fn relative_varn_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem>
 }
 
 pub fn build_module_export_completions(
-    resolver: &varn_checker::module_resolver::DiskResolver,
+    resolver: &varn_resolver::DiskResolver,
     module_path: &str,
     doc_uri: &str,
 ) -> Vec<CompletionItem> {
@@ -122,7 +122,7 @@ pub fn build_module_export_completions(
 }
 
 fn build_stdlib_export_completions(
-    resolver: &varn_checker::module_resolver::DiskResolver,
+    resolver: &varn_resolver::DiskResolver,
     module_path: &str,
 ) -> Vec<CompletionItem> {
     let exports = resolver.stdlib_exports(module_path).as_ref().clone();
@@ -143,7 +143,7 @@ fn build_stdlib_export_completions(
 }
 
 fn build_relative_export_completions(
-    resolver: &varn_checker::module_resolver::DiskResolver,
+    resolver: &varn_resolver::DiskResolver,
     module_path: &str,
     doc_uri: &str,
 ) -> Vec<CompletionItem> {

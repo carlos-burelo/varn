@@ -112,6 +112,24 @@ fi
 
 VN_BIN="./target/release/vn"
 
+# 4b. Artefactos derivados (tablas de contratos + bundle std para cuadrantes embedded)
+header "4b/6: Artefactos derivados (gen-contract-tables --check)"
+if $VN_BIN gen-contract-tables --check; then
+    pass "Tablas de contratos al dia."
+else
+    fail "Tablas de contratos stale: regenerar con 'vn gen-contract-tables'."
+    FAILED_STEPS+=("gen-contract-tables --check")
+fi
+
+header "4c/6: Bundle std para cuadrantes @embedded (vn std-bundle)"
+if $VN_BIN std-bundle --std-dir "std" --out "dist/std.vnb"; then
+    pass "Bundle std listo."
+else
+    fail "No se pudo compilar el bundle std."
+    FAILED_STEPS+=("vn std-bundle")
+fi
+STD_BUNDLE="$PWD/dist/std.vnb"
+
 # Helper cuadrante
 run_quadrant() {
     local name="$1"
@@ -148,12 +166,12 @@ if ! run_quadrant "2/4: [dev-checkout] + [Intérprete Pure (VARN_NO_JIT=1)]" "VA
 fi
 
 # Q3: @embedded + JIT
-if ! run_quadrant "3/4: [@embedded std] + [JIT Habilitado]" "VARN_STD=@embedded" "run tests/main.vn"; then
+if ! run_quadrant "3/4: [@embedded std] + [JIT Habilitado]" "VARN_STD=@embedded VARN_STD_BUNDLE=$STD_BUNDLE" "run tests/main.vn"; then
     FAILED_STEPS+=("Cuadrante 3 (@embedded + JIT)")
 fi
 
 # Q4: @embedded + No-JIT
-if ! run_quadrant "4/4: [@embedded std] + [Intérprete Pure (VARN_NO_JIT=1)]" "VARN_STD=@embedded VARN_NO_JIT=1" "run tests/main.vn"; then
+if ! run_quadrant "4/4: [@embedded std] + [Intérprete Pure (VARN_NO_JIT=1)]" "VARN_STD=@embedded VARN_STD_BUNDLE=$STD_BUNDLE VARN_NO_JIT=1" "run tests/main.vn"; then
     FAILED_STEPS+=("Cuadrante 4 (@embedded + No-JIT)")
 fi
 

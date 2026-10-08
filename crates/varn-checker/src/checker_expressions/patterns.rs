@@ -1,7 +1,7 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 type VariantSubst = (
     Vec<(std::sync::Arc<str>, Type)>,

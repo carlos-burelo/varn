@@ -1,9 +1,9 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::symbol::SymbolId;
-use crate::types::Type;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{ExprId, ExprKind};
+use varn_sem::bind::BindResult;
+use varn_sem::symbol::SymbolId;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_instanceof(

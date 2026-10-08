@@ -1,6 +1,6 @@
 use super::Checker;
-use crate::binder::BindResult;
 use varn_core::ast::ExprId;
+use varn_sem::bind::BindResult;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_match(
@@ -34,8 +34,8 @@ impl<'r> Checker<'r> {
 
             let arm_disc_ty = match &case.pattern {
                 varn_core::ast::MatchPattern::Literal(e) => match &arena.expr(*e).kind {
-                    varn_core::ast::ExprKind::StrLiteral { .. } => Some(crate::types::Type::Str),
-                    varn_core::ast::ExprKind::IntLiteral { .. } => Some(crate::types::Type::Int),
+                    varn_core::ast::ExprKind::StrLiteral { .. } => Some(varn_sem::types::Type::Str),
+                    varn_core::ast::ExprKind::IntLiteral { .. } => Some(varn_sem::types::Type::Int),
                     varn_core::ast::ExprKind::FloatLiteral { .. }
                     | varn_core::ast::ExprKind::BigIntLiteral { .. }
                     | varn_core::ast::ExprKind::DecimalLiteral { .. }
@@ -92,7 +92,7 @@ impl<'r> Checker<'r> {
 
             let narrowings = arm_disc_ty.and_then(|disc_ty| {
                 disc_narrowings.as_ref().map(|(id, members)| {
-                    let matched: Vec<crate::types::Type> = members
+                    let matched: Vec<varn_sem::types::Type> = members
                         .iter()
                         .filter(|m| {
                             self.union_member_matches_disc(
@@ -108,14 +108,14 @@ impl<'r> Checker<'r> {
                 })
             });
 
-            let narrowing_vec: Vec<(crate::symbol::SymbolId, crate::types::Type)> =
+            let narrowing_vec: Vec<(varn_sem::symbol::SymbolId, varn_sem::types::Type)> =
                 if let Some((id, matched)) = narrowings {
                     match matched.len() {
                         0 => vec![],
                         1 => vec![(id, matched.into_iter().next().unwrap())],
                         _ => vec![(
                             id,
-                            crate::types::Type::union(
+                            varn_sem::types::Type::union(
                                 matched,
                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                             ),

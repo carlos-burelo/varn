@@ -1,7 +1,7 @@
 use super::Checker;
-use crate::binder::BindResult;
 use varn_core::ast::ExprId;
 use varn_core::{Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_assign(
@@ -62,22 +62,22 @@ impl<'r> Checker<'r> {
             if let Some(id) = scope.resolve(name, &bind.scopes) {
                 let sym = bind.arena.get(id);
                 let what = match sym.kind {
-                    crate::symbol::SymbolKind::Const => Some("constant"),
-                    crate::symbol::SymbolKind::Class => Some("class"),
-                    crate::symbol::SymbolKind::Enum => Some("enum"),
-                    crate::symbol::SymbolKind::Var
-                    | crate::symbol::SymbolKind::Let
-                    | crate::symbol::SymbolKind::Function
-                    | crate::symbol::SymbolKind::Interface
-                    | crate::symbol::SymbolKind::TypeAlias
-                    | crate::symbol::SymbolKind::Parameter
-                    | crate::symbol::SymbolKind::Property
-                    | crate::symbol::SymbolKind::Method
-                    | crate::symbol::SymbolKind::TypeParameter
-                    | crate::symbol::SymbolKind::Namespace
-                    | crate::symbol::SymbolKind::Struct
-                    | crate::symbol::SymbolKind::Extension
-                    | crate::symbol::SymbolKind::EnumMember => None,
+                    varn_sem::symbol::SymbolKind::Const => Some("constant"),
+                    varn_sem::symbol::SymbolKind::Class => Some("class"),
+                    varn_sem::symbol::SymbolKind::Enum => Some("enum"),
+                    varn_sem::symbol::SymbolKind::Var
+                    | varn_sem::symbol::SymbolKind::Let
+                    | varn_sem::symbol::SymbolKind::Function
+                    | varn_sem::symbol::SymbolKind::Interface
+                    | varn_sem::symbol::SymbolKind::TypeAlias
+                    | varn_sem::symbol::SymbolKind::Parameter
+                    | varn_sem::symbol::SymbolKind::Property
+                    | varn_sem::symbol::SymbolKind::Method
+                    | varn_sem::symbol::SymbolKind::TypeParameter
+                    | varn_sem::symbol::SymbolKind::Namespace
+                    | varn_sem::symbol::SymbolKind::Struct
+                    | varn_sem::symbol::SymbolKind::Extension
+                    | varn_sem::symbol::SymbolKind::EnumMember => None,
                 };
                 if let Some(what) = what {
                     self.emit(

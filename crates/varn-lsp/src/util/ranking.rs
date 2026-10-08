@@ -1,4 +1,4 @@
-use varn_checker::SymbolKind;
+use varn_sem::symbol::SymbolKind;
 
 pub fn symbol_priority(kind: SymbolKind) -> u8 {
     use SymbolKind::*;

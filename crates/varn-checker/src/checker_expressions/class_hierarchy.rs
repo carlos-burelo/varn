@@ -1,15 +1,15 @@
 use crate::checker::Checker;
-use crate::types::Type;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn is_subclass_or_same(
         &self,
         candidate: &str,
         target: &str,
-        bind: &crate::binder::BindResult,
+        bind: &varn_sem::bind::BindResult,
     ) -> bool {
-        let mut visited: Vec<crate::binder::ClassParent> = Vec::new();
-        let mut current = crate::binder::ClassParent {
+        let mut visited: Vec<varn_sem::bind::ClassParent> = Vec::new();
+        let mut current = varn_sem::bind::ClassParent {
             name: std::sync::Arc::from(candidate),
             origin: None,
         };
@@ -30,16 +30,16 @@ impl<'r> Checker<'r> {
 
     fn class_parent_step(
         &self,
-        class: &crate::binder::ClassParent,
-        bind: &crate::binder::BindResult,
-    ) -> Option<crate::binder::ClassParent> {
+        class: &varn_sem::bind::ClassParent,
+        bind: &varn_sem::bind::BindResult,
+    ) -> Option<varn_sem::bind::ClassParent> {
         if let Some(owner) = class.origin.as_deref().and_then(|o| {
             self.resolver
                 .module_bind(o)
                 .or_else(|| self.resolver.stdlib_bind(o))
         }) {
             let parent = owner.get_class_parent(&class.name)?;
-            return Some(crate::binder::ClassParent {
+            return Some(varn_sem::bind::ClassParent {
                 name: parent.name.clone(),
                 origin: parent.origin.clone().or_else(|| class.origin.clone()),
             });
@@ -50,7 +50,7 @@ impl<'r> Checker<'r> {
         for spec in varn_modules::std_module_ids() {
             if let Some(rb) = self.resolver.stdlib_bind(spec) {
                 if let Some(parent) = rb.class_parents.get(class.name.as_ref()) {
-                    return Some(crate::binder::ClassParent {
+                    return Some(varn_sem::bind::ClassParent {
                         name: parent.name.clone(),
                         origin: parent
                             .origin
@@ -63,7 +63,7 @@ impl<'r> Checker<'r> {
         None
     }
 
-    pub(crate) fn is_throwable(&self, ty: &Type, bind: &crate::binder::BindResult) -> bool {
+    pub(crate) fn is_throwable(&self, ty: &Type, bind: &varn_sem::bind::BindResult) -> bool {
         match self.ty_table.get(ty.0) {
             varn_core::TypeKind::Named(name, _) => {
                 self.is_subclass_or_same(bind.interner.resolve(name), "Error", bind)

@@ -1,8 +1,9 @@
 use tower_lsp_f::lsp_types::{FormattingOptions, Position, Range, TextEdit};
 
 pub fn build_formatting(source: &str, options: FormattingOptions) -> Option<Vec<TextEdit>> {
-    let canonical = varn_fmt::format_source(source);
-    let styled = varn_fmt::apply_indent_style(&canonical, options.insert_spaces, options.tab_size);
+    let canonical = varn_core::fmt::format_source(source);
+    let styled =
+        varn_core::fmt::apply_indent_style(&canonical, options.insert_spaces, options.tab_size);
     if styled == source {
         return None;
     }
@@ -29,8 +30,9 @@ pub fn build_range_edits(
     start_line: u32,
     end_line: u32,
 ) -> Option<Vec<TextEdit>> {
-    let canonical = varn_fmt::format_source(source);
-    let styled = varn_fmt::apply_indent_style(&canonical, options.insert_spaces, options.tab_size);
+    let canonical = varn_core::fmt::format_source(source);
+    let styled =
+        varn_core::fmt::apply_indent_style(&canonical, options.insert_spaces, options.tab_size);
     if styled == source {
         return None;
     }

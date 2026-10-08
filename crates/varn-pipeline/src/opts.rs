@@ -1,4 +1,4 @@
-pub use varn_debug_flags::DebugFlags;
+pub use varn_core::debug_flags::DebugFlags;
 pub use varn_types::capabilities::CapabilitySet;
 
 pub struct RunOpts {

@@ -1,6 +1,6 @@
-use varn_checker::types::{CheckerTyId, FunctionType, InternedTypeKind, TyListId};
-use varn_checker::Type;
 use varn_core::{BuiltinType, LangPrimitive, TypeKind};
+use varn_sem::types::Type;
+use varn_sem::types::{CheckerTyId, FunctionType, InternedTypeKind, TyListId};
 
 use super::SemanticDB;
 

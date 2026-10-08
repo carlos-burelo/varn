@@ -3,11 +3,11 @@
 use std::collections::HashSet;
 use std::mem::size_of;
 
-use varn_checker::module_resolver::ImportResolver;
 use varn_lsp::pipeline::run_pipeline;
+use varn_sem::resolver::ImportResolver;
 
-fn test_resolver() -> std::sync::Arc<varn_checker::module_resolver::DiskResolver> {
-    std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new())
+fn test_resolver() -> std::sync::Arc<varn_resolver::DiskResolver> {
+    std::sync::Arc::new(varn_resolver::DiskResolver::new())
 }
 use varn_lsp::workspace::Workspace;
 
@@ -177,7 +177,8 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
 
 #[test]
 fn h10b_module_bind_rederives_after_evict() {
-    use varn_checker::module_resolver::{DiskResolver, ImportResolver};
+    use varn_resolver::DiskResolver;
+    use varn_sem::resolver::ImportResolver;
 
     let dir = std::env::temp_dir().join(format!("varn-h10b-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -217,7 +218,7 @@ fn h10b_module_bind_rederives_after_evict() {
 fn h7_small_types_are_copy_sized() {
     fn is_copy<T: Copy>() {}
     is_copy::<varn_core::Atom>();
-    is_copy::<varn_checker::Type>();
+    is_copy::<varn_sem::types::Type>();
 
     assert_eq!(
         size_of::<varn_core::Atom>(),
@@ -225,7 +226,7 @@ fn h7_small_types_are_copy_sized() {
         "Atom = hash XXH3-128 del texto"
     );
     assert!(
-        size_of::<varn_checker::Type>() <= 32,
+        size_of::<varn_sem::types::Type>() <= 32,
         "Type = ids + flags, no heap propio"
     );
     assert!(

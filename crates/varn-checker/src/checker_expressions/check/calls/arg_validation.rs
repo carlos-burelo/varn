@@ -1,11 +1,11 @@
 use rustc_hash::FxHashSet;
 
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{FunctionParam, Type};
 use varn_core::ast::{Arg, ExprKind};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{FunctionParam, Type};
 
 impl<'r> Checker<'r> {
     pub(super) fn validate_call_arguments(
@@ -345,7 +345,7 @@ fn analyze_call_args<'a>(
 fn compatible_param_type(
     param: &FunctionParam,
     spread_inner: Option<Type>,
-    table: &crate::types::CheckerTyTable,
+    table: &varn_sem::types::CheckerTyTable,
 ) -> Type {
     if let Some(inner) = spread_inner {
         if param.is_rest {

@@ -1,28 +1,28 @@
 use std::sync::Arc;
 
-use crate::binder::BindResult;
-use crate::types::{CheckerTyTable, ObjectTypeMember, Type};
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::{CheckerTyTable, ObjectTypeMember, Type};
 
 pub fn get_members_of_type(
-    resolver: &dyn crate::module_resolver::ImportResolver,
+    resolver: &dyn varn_sem::resolver::ImportResolver,
     ty: &Type,
     bind: &BindResult,
     table: &mut CheckerTyTable,
-) -> Vec<crate::semantic_info::ResolvedMemberSummary> {
-    let mut results: Vec<crate::semantic_info::ResolvedMemberSummary> = Vec::new();
+) -> Vec<varn_sem::semantic_info::ResolvedMemberSummary> {
+    let mut results: Vec<varn_sem::semantic_info::ResolvedMemberSummary> = Vec::new();
     let mut seen = rustc_hash::FxHashSet::default();
 
-    let add_member = |results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
+    let add_member = |results: &mut Vec<varn_sem::semantic_info::ResolvedMemberSummary>,
                       seen: &mut rustc_hash::FxHashSet<Arc<str>>,
                       name: Arc<str>,
                       ty: Type,
-                      kind: crate::semantic_info::ResolvedMemberKind,
+                      kind: varn_sem::semantic_info::ResolvedMemberKind,
                       is_static: bool,
                       optional: bool,
                       readonly: bool| {
         if seen.insert(name.clone()) {
-            results.push(crate::semantic_info::ResolvedMemberSummary {
+            results.push(varn_sem::semantic_info::ResolvedMemberSummary {
                 name,
                 ty,
                 kind,
@@ -38,14 +38,14 @@ pub fn get_members_of_type(
     };
 
     fn add_declared(
-        results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
+        results: &mut Vec<varn_sem::semantic_info::ResolvedMemberSummary>,
         seen: &mut rustc_hash::FxHashSet<Arc<str>>,
-        m: &crate::types::ClassMemberInfo,
+        m: &varn_sem::types::ClassMemberInfo,
         ty: Type,
-        kind: crate::semantic_info::ResolvedMemberKind,
+        kind: varn_sem::semantic_info::ResolvedMemberKind,
     ) {
         if seen.insert(m.name.clone()) {
-            results.push(crate::semantic_info::ResolvedMemberSummary {
+            results.push(varn_sem::semantic_info::ResolvedMemberSummary {
                 name: m.name.clone(),
                 ty,
                 kind,
@@ -76,7 +76,7 @@ pub fn get_members_of_type(
                             &mut seen,
                             name.clone(),
                             Type::resolved(ty),
-                            crate::semantic_info::ResolvedMemberKind::Property,
+                            varn_sem::semantic_info::ResolvedMemberKind::Property,
                             false,
                             optional,
                             readonly,
@@ -90,7 +90,7 @@ pub fn get_members_of_type(
                         ..
                     } => {
                         let fn_ty = Type::fn_(
-                            crate::types::FunctionType {
+                            varn_sem::types::FunctionType {
                                 params: params.clone(),
                                 return_type,
                                 is_arrow,
@@ -103,7 +103,7 @@ pub fn get_members_of_type(
                             &mut seen,
                             name.clone(),
                             fn_ty,
-                            crate::semantic_info::ResolvedMemberKind::Method,
+                            varn_sem::semantic_info::ResolvedMemberKind::Method,
                             false,
                             false,
                             true,
@@ -121,7 +121,7 @@ pub fn get_members_of_type(
                     &mut seen,
                     Arc::from(idx.to_string()),
                     Type::resolved(*elem),
-                    crate::semantic_info::ResolvedMemberKind::Property,
+                    varn_sem::semantic_info::ResolvedMemberKind::Property,
                     false,
                     false,
                     false,
@@ -132,7 +132,7 @@ pub fn get_members_of_type(
                 &mut seen,
                 Arc::from("length"),
                 Type::Int,
-                crate::semantic_info::ResolvedMemberKind::Property,
+                varn_sem::semantic_info::ResolvedMemberKind::Property,
                 false,
                 false,
                 true,
@@ -235,7 +235,7 @@ pub fn get_members_of_type(
                 &mut seen,
                 Arc::from(varn_core::MemberKey::Length.as_str()),
                 Type::Int,
-                crate::semantic_info::ResolvedMemberKind::Property,
+                varn_sem::semantic_info::ResolvedMemberKind::Property,
                 false,
                 false,
                 true,
@@ -249,7 +249,7 @@ pub fn get_members_of_type(
                 &mut seen,
                 Arc::from(varn_core::MemberKey::Length.as_str()),
                 Type::Int,
-                crate::semantic_info::ResolvedMemberKind::Property,
+                varn_sem::semantic_info::ResolvedMemberKind::Property,
                 false,
                 false,
                 true,

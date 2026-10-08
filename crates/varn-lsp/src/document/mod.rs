@@ -10,8 +10,9 @@ mod types;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use varn_checker::{SymbolKind, Type};
 use varn_core::TokenKind;
+use varn_sem::symbol::SymbolKind;
+use varn_sem::types::Type;
 
 pub use import::{import_path_at, named_import_module_at, named_imported_names_at, uri_to_path};
 pub use semantic_db::SemanticDB;
@@ -58,7 +59,7 @@ pub enum ChainResult<'a> {
     Symbol(SymbolView<'a>),
 
     Member {
-        member: varn_checker::ResolvedMemberSummary,
+        member: varn_sem::semantic_info::ResolvedMemberSummary,
         parent_name: String,
     },
 }
@@ -83,7 +84,7 @@ pub struct ImportPathContext {
 pub enum SymbolTarget {
     Local {
         uri: String,
-        symbol_id: varn_checker::SymbolId,
+        symbol_id: varn_sem::symbol::SymbolId,
     },
     Global {
         origin: String,
@@ -100,7 +101,7 @@ pub struct DocumentState {
     pub uri: String,
     pub diagnostics: Vec<LspDiag>,
 
-    pub symbols: Vec<varn_checker::SymbolId>,
+    pub symbols: Vec<varn_sem::symbol::SymbolId>,
     pub tokens: Vec<TokenRecord>,
 
     pub trivia: Vec<varn_core::Trivia>,
@@ -110,7 +111,7 @@ pub struct DocumentState {
 
     pub db: SemanticDB,
 
-    pub resolver: std::sync::Arc<varn_checker::module_resolver::DiskResolver>,
+    pub resolver: std::sync::Arc<varn_resolver::DiskResolver>,
 
     pub import_paths: Vec<String>,
     pub spatial_index: crate::query::SpatialIndex,
@@ -122,7 +123,10 @@ pub struct DocumentState {
 pub type DocumentAnalysis = DocumentState;
 
 impl DocumentState {
-    pub fn members_of(&self, sym: SymbolView<'_>) -> Vec<varn_checker::ResolvedMemberSummary> {
+    pub fn members_of(
+        &self,
+        sym: SymbolView<'_>,
+    ) -> Vec<varn_sem::semantic_info::ResolvedMemberSummary> {
         let ty = match sym.kind() {
             SymbolKind::Class
             | SymbolKind::Interface
@@ -144,7 +148,10 @@ impl DocumentState {
         self.members_of_type(&ty)
     }
 
-    pub fn members_of_type(&self, ty: &Type) -> Vec<varn_checker::ResolvedMemberSummary> {
+    pub fn members_of_type(
+        &self,
+        ty: &Type,
+    ) -> Vec<varn_sem::semantic_info::ResolvedMemberSummary> {
         varn_checker::get_members_of_type(
             self.resolver.as_ref(),
             ty,
@@ -170,7 +177,7 @@ impl DocumentState {
         (0..ids.len()).map(move |i| self.symbol(ids[i]))
     }
 
-    pub fn symbol(&self, id: varn_checker::SymbolId) -> SymbolView<'_> {
+    pub fn symbol(&self, id: varn_sem::symbol::SymbolId) -> SymbolView<'_> {
         SymbolView {
             id,
             sym: self.db.bind.arena.get(id),
@@ -184,16 +191,16 @@ impl DocumentState {
         }
     }
 
-    pub fn expr_entry_at_offset(&self, offset: u32) -> Option<&varn_checker::TypeEntry> {
+    pub fn expr_entry_at_offset(&self, offset: u32) -> Option<&varn_sem::output::TypeEntry> {
         let ast_id = self.spatial_index.innermost_at(offset)?;
         self.db.expr_table.get(&ast_id)
     }
 
-    pub fn expr_type_at_offset(&self, offset: u32) -> Option<&varn_checker::Type> {
+    pub fn expr_type_at_offset(&self, offset: u32) -> Option<&varn_sem::types::Type> {
         self.expr_entry_at_offset(offset).map(|e| &e.ty)
     }
 
-    pub fn resolve_symbol_id_at_offset(&self, offset: u32) -> Option<varn_checker::SymbolId> {
+    pub fn resolve_symbol_id_at_offset(&self, offset: u32) -> Option<varn_sem::symbol::SymbolId> {
         if let Some(entry) = self.expr_entry_at_offset(offset) {
             if let Some(sid) = entry.symbol_id {
                 return Some(sid);
@@ -221,7 +228,7 @@ impl DocumentState {
         None
     }
 
-    pub fn symbol_target_for_id(&self, id: varn_checker::SymbolId) -> Option<SymbolTarget> {
+    pub fn symbol_target_for_id(&self, id: varn_sem::symbol::SymbolId) -> Option<SymbolTarget> {
         if id >= self.db.bind.arena.len() {
             return None;
         }

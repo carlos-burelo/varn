@@ -1,13 +1,13 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
 use std::sync::Arc;
+use varn_sem::bind::BindResult;
 
 impl Checker<'_> {
     pub(crate) fn parent_type(
         &mut self,
-        parent: &crate::binder::ClassParent,
-    ) -> crate::types::Type {
-        crate::types::Type::named_with_origin(
+        parent: &varn_sem::bind::ClassParent,
+    ) -> varn_sem::types::Type {
+        varn_sem::types::Type::named_with_origin(
             parent.name.clone(),
             parent.origin.clone(),
             std::sync::Arc::make_mut(&mut self.ty_table),

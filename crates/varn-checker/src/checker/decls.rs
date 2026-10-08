@@ -1,6 +1,6 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
 use varn_core::ast::Decl;
+use varn_sem::bind::BindResult;
 
 impl<'r> Checker<'r> {
     pub(crate) fn check_decls(&mut self, decls: &[Decl], bind: &BindResult) {

@@ -1,7 +1,7 @@
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::Type;
 use varn_core::ast::ExprId;
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn infer_meta_access(
@@ -26,7 +26,7 @@ impl<'r> Checker<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 Type::fn_(
-                    crate::types::FunctionType {
+                    varn_sem::types::FunctionType {
                         params: vec![],
                         return_type: ret.0,
                         is_arrow: true,
@@ -41,7 +41,7 @@ impl<'r> Checker<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 Type::fn_(
-                    crate::types::FunctionType {
+                    varn_sem::types::FunctionType {
                         params: vec![],
                         return_type: ret.0,
                         is_arrow: true,
@@ -51,7 +51,7 @@ impl<'r> Checker<'r> {
                 )
             }
             Some(varn_core::MemberKey::Entries) => {
-                let ids: Vec<crate::types::CheckerTyId> = vec![Type::Str.0, Type::Dynamic.0];
+                let ids: Vec<varn_sem::types::CheckerTyId> = vec![Type::Str.0, Type::Dynamic.0];
                 let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
                 let entry = Type::resolved(
                     std::sync::Arc::make_mut(&mut self.ty_table)
@@ -59,7 +59,7 @@ impl<'r> Checker<'r> {
                 );
                 let ret = Type::array(entry, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 Type::fn_(
-                    crate::types::FunctionType {
+                    varn_sem::types::FunctionType {
                         params: vec![],
                         return_type: ret.0,
                         is_arrow: true,
@@ -69,8 +69,8 @@ impl<'r> Checker<'r> {
                 )
             }
             Some(varn_core::MemberKey::HasOwn) => Type::fn_(
-                crate::types::FunctionType {
-                    params: vec![crate::types::FunctionParam {
+                varn_sem::types::FunctionType {
+                    params: vec![varn_sem::types::FunctionParam {
                         name: Some(std::sync::Arc::from("key")),
                         ty: Type::Str.0,
                         optional: false,

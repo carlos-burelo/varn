@@ -2,9 +2,9 @@ use varn_core::ast::operators::{BinaryOp, UnaryOp};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
 
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
+use varn_sem::bind::BindResult;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn refine(&mut self, expr: ExprId, bind: &BindResult) -> Option<Type> {
@@ -134,8 +134,8 @@ impl<'r> Checker<'r> {
     }
 }
 
-fn numeric_result(l: &Type, r: &Type, table: &crate::types::CheckerTyTable) -> Option<Type> {
-    use crate::binder::type_inference::numeric_operand;
+fn numeric_result(l: &Type, r: &Type, table: &varn_sem::types::CheckerTyTable) -> Option<Type> {
+    use varn_binder::type_inference::numeric_operand;
     use varn_core::{binary_operand_kind, NumericOperand};
 
     let combined = binary_operand_kind(numeric_operand(l, table), numeric_operand(r, table))?;

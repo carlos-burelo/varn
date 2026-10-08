@@ -1,56 +1,51 @@
-pub(crate) mod compat;
 pub(crate) mod completion;
-pub(crate) mod decorator_receiver;
-mod foreign_classes;
-mod foreign_enums;
-pub use foreign_classes::InheritedField;
-pub use foreign_enums::ForeignEnum;
 mod decl_class;
 mod decl_enum;
 mod decl_fn;
 mod decl_misc;
 mod decl_var;
 mod decls;
+pub(crate) mod decorator_receiver;
 pub(crate) mod decorator_signature;
 mod definite_assignment;
-mod records;
+mod foreign_classes;
+mod foreign_enums;
 mod refine;
 mod scope_records;
 mod setup;
 mod stmts;
 mod type_queries;
 
-use crate::binder::Binder;
-use crate::scope::ScopeId;
-use crate::symbol::SymbolId;
-use crate::types::{ObjectTypeMember, Type};
-pub use records::{
-    CheckOptions, CheckProfile, CheckResult, Desugarings, ExprInfo, ScopeSpan, TestTarget,
-    TypeEntry,
-};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use varn_binder::Binder;
 use varn_core::ast::Program;
 use varn_core::ast::{AstArena, ExprId};
+use varn_sem::output::{
+    CheckOptions, CheckProfile, CheckResult, Desugarings, ExprInfo, ScopeSpan, TypeEntry,
+};
+use varn_sem::scope::ScopeId;
+use varn_sem::symbol::SymbolId;
+use varn_sem::types::{ObjectTypeMember, Type};
 
 pub(crate) use crate::checker_enrichment::enrich_call_returns;
 
-use crate::semantic_info::{CallResolution, MemberResolution};
+use varn_sem::semantic_info::{CallResolution, MemberResolution};
 
 pub(crate) type MemberTypeCacheEntry = Option<(Type, Option<usize>)>;
 
 pub struct Checker<'r> {
-    pub(crate) resolver: &'r dyn crate::module_resolver::ImportResolver,
+    pub(crate) resolver: &'r dyn varn_sem::resolver::ImportResolver,
 
     pub(crate) ast_arena: &'r AstArena,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
     pub(crate) source_file: std::sync::Arc<str>,
-    pub(crate) current_scope: crate::scope::ScopeId,
+    pub(crate) current_scope: varn_sem::scope::ScopeId,
     pub(crate) expected_return_type: Option<Type>,
     pub(crate) narrowed_types: FxHashMap<SymbolId, Vec<Type>>,
     pub(crate) narrowings_cache:
-        FxHashMap<(u32, bool, crate::scope::ScopeId), Vec<(SymbolId, Type)>>,
+        FxHashMap<(u32, bool, varn_sem::scope::ScopeId), Vec<(SymbolId, Type)>>,
     pub(crate) child_indices: FxHashMap<ScopeId, usize>,
     pub(crate) expr_types: FxHashMap<u32, ExprInfo>,
     pub(crate) infer_cache: FxHashMap<(ExprId, ScopeId, u32), Type>,
@@ -86,11 +81,11 @@ pub struct Checker<'r> {
     pub(crate) expected_object_members_cache: FxHashMap<Type, Vec<ObjectTypeMember>>,
     pub(crate) member_resolutions: FxHashMap<u32, MemberResolution>,
     pub(crate) call_resolutions: FxHashMap<u32, CallResolution>,
-    pub(crate) match_gaps: FxHashMap<varn_core::ast::AstId, crate::semantic_info::MatchGap>,
-    pub(crate) warned_deprecated: FxHashSet<(crate::symbol::SymbolId, u32)>,
-    pub(crate) pure_scope: Option<crate::scope::ScopeId>,
+    pub(crate) match_gaps: FxHashMap<varn_core::ast::AstId, varn_sem::semantic_info::MatchGap>,
+    pub(crate) warned_deprecated: FxHashSet<(varn_sem::symbol::SymbolId, u32)>,
+    pub(crate) pure_scope: Option<varn_sem::scope::ScopeId>,
     pub(crate) enclosing_caps: Option<Vec<String>>,
-    pub(crate) ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
+    pub(crate) ty_table: std::sync::Arc<varn_sem::types::CheckerTyTable>,
 }
 
 impl<'r> Checker<'r> {
@@ -98,7 +93,7 @@ impl<'r> Checker<'r> {
         program: &Program,
         ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
-        resolver: &'r dyn crate::module_resolver::ImportResolver,
+        resolver: &'r dyn varn_sem::resolver::ImportResolver,
     ) -> CheckResult {
         Self::check_with(
             program,
@@ -113,7 +108,7 @@ impl<'r> Checker<'r> {
         program: &Program,
         ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
-        resolver: &'r dyn crate::module_resolver::ImportResolver,
+        resolver: &'r dyn varn_sem::resolver::ImportResolver,
         options: CheckOptions,
     ) -> CheckResult {
         Self::check_internal(program, ast_arena, interner, resolver, options.record_types)
@@ -123,13 +118,13 @@ impl<'r> Checker<'r> {
         program: &Program,
         ast_arena: &'r AstArena,
         interner: varn_core::AtomInterner,
-        resolver: &'r dyn crate::module_resolver::ImportResolver,
+        resolver: &'r dyn varn_sem::resolver::ImportResolver,
         record_expr_types: bool,
     ) -> CheckResult {
         let mut profile = CheckProfile::default();
 
         let started = Instant::now();
-        let globals_ref = crate::core::loader::module_globals(&program.filename, resolver);
+        let globals_ref = varn_binder::core::loader::module_globals(&program.filename, resolver);
         profile.load_globals = started.elapsed();
 
         let started = Instant::now();
@@ -142,7 +137,7 @@ impl<'r> Checker<'r> {
         profile.bind = started.elapsed();
 
         let started = Instant::now();
-        crate::core::merge_core_members(&mut bind, resolver);
+        varn_binder::core::loader::merge_core_members(&mut bind, resolver);
         profile.merge_core_members = started.elapsed();
 
         let started = Instant::now();
@@ -197,7 +192,7 @@ impl<'r> Checker<'r> {
         let mut test_targets = Vec::new();
         for sym in bind.arena.all() {
             if sym.is_test && sym.origin_module.is_none() {
-                test_targets.push(crate::checker::TestTarget {
+                test_targets.push(varn_sem::output::TestTarget {
                     name: Arc::from(bind.interner.resolve(sym.name)),
                     file: source_file.clone(),
                     is_async: sym.is_async,

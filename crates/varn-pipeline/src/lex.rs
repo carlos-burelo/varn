@@ -1,7 +1,7 @@
 use crate::PipelineError;
 use std::sync::Arc;
+use varn_core::debug_flags::DebugFlags;
 use varn_core::Token;
-use varn_debug_flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 

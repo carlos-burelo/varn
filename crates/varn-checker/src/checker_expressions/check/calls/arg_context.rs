@@ -1,8 +1,8 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{FunctionParam, Type};
 use varn_core::ast::Arg;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::{FunctionParam, Type};
 
 impl<'r> Checker<'r> {
     pub(in super::super) fn check_call_args_with_context(

@@ -1,6 +1,7 @@
 pub mod loader;
 pub mod provider_impl;
 pub mod registry;
+pub mod runtime;
 mod std_manifest;
 
 pub use provider_impl::{register_embedded_stdlib, register_provider, std_load_error};

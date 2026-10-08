@@ -1,8 +1,8 @@
 use super::Checker;
-use crate::binder::BindResult;
 use varn_core::ast::decorators::{match_builtin, BuiltinDecorator};
 use varn_core::ast::Decorator;
 use varn_core::diagnostics::{Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
 
 pub(super) enum DecoratorTarget {
     Function,
@@ -163,7 +163,7 @@ impl<'r> Checker<'r> {
                 ErrorCode::InvalidDecoratorSignature,
                 format!(
                     "decorator on {target_kind} '{target_name}' returns '{}' which cannot replace the decorated value (return void, null, a function or a compatible value instead)",
-                    crate::types::Type::resolved(ft.return_type)
+                    varn_sem::types::Type::resolved(ft.return_type)
                         .display(&self.ty_table, &bind.interner),
                 ),
             )
@@ -173,7 +173,7 @@ impl<'r> Checker<'r> {
 
     pub(crate) fn warn_if_deprecated(
         &mut self,
-        sid: crate::symbol::SymbolId,
+        sid: varn_sem::symbol::SymbolId,
         name: &str,
         range: varn_core::SourceRange,
         bind: &BindResult,
@@ -233,28 +233,40 @@ impl<'r> Checker<'r> {
         }
     }
 
-    fn is_void_ty(table: &crate::types::CheckerTyTable, id: crate::types::CheckerTyId) -> bool {
+    fn is_void_ty(
+        table: &varn_sem::types::CheckerTyTable,
+        id: varn_sem::types::CheckerTyId,
+    ) -> bool {
         matches!(
             table.get(id),
             varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Void)
         )
     }
 
-    fn is_null_ty(table: &crate::types::CheckerTyTable, id: crate::types::CheckerTyId) -> bool {
+    fn is_null_ty(
+        table: &varn_sem::types::CheckerTyTable,
+        id: varn_sem::types::CheckerTyId,
+    ) -> bool {
         matches!(
             table.get(id),
             varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Null)
         )
     }
 
-    fn is_dynamic_ty(table: &crate::types::CheckerTyTable, id: crate::types::CheckerTyId) -> bool {
+    fn is_dynamic_ty(
+        table: &varn_sem::types::CheckerTyTable,
+        id: varn_sem::types::CheckerTyId,
+    ) -> bool {
         matches!(
             table.get(id),
             varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)
         )
     }
 
-    fn is_callable_ty(table: &crate::types::CheckerTyTable, id: crate::types::CheckerTyId) -> bool {
+    fn is_callable_ty(
+        table: &varn_sem::types::CheckerTyTable,
+        id: varn_sem::types::CheckerTyId,
+    ) -> bool {
         use varn_core::TypeKind;
         match table.get(id) {
             TypeKind::Fn(_)
@@ -388,17 +400,17 @@ impl<'r> Checker<'r> {
             if scope == pure {
                 if matches!(
                     bind.arena.get(sid).kind,
-                    crate::symbol::SymbolKind::Parameter
-                        | crate::symbol::SymbolKind::Let
-                        | crate::symbol::SymbolKind::Var
-                        | crate::symbol::SymbolKind::Const
+                    varn_sem::symbol::SymbolKind::Parameter
+                        | varn_sem::symbol::SymbolKind::Let
+                        | varn_sem::symbol::SymbolKind::Var
+                        | varn_sem::symbol::SymbolKind::Const
                 ) {
                     return;
                 }
                 break;
             }
             let sc = bind.scopes.get(scope);
-            if sc.kind == crate::scope::ScopeKind::Function {
+            if sc.kind == varn_sem::scope::ScopeKind::Function {
                 break;
             }
             match sc.parent {
@@ -431,7 +443,7 @@ impl<'r> Checker<'r> {
         }
         if !matches!(
             sym.kind,
-            crate::symbol::SymbolKind::Function | crate::symbol::SymbolKind::Method
+            varn_sem::symbol::SymbolKind::Function | varn_sem::symbol::SymbolKind::Method
         ) {
             return;
         }

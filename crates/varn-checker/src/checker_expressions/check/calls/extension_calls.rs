@@ -1,7 +1,7 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::source::SourceRange;
+use varn_sem::bind::BindResult;
 
 use super::super::members::extension_type_name;
 

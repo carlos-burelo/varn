@@ -1,17 +1,19 @@
 [workspace]
 members = [
-    "crates/varn-abi",
     "crates/varn-core",
     "crates/varn-lexer",
     "crates/varn-parser",
     "crates/varn-checker",
+    "crates/varn-emit",
     "crates/varn-types",
     "crates/varn-tir",
+    "crates/varn-sem",
+    "crates/varn-binder",
+    "crates/varn-resolver",
     "crates/varn-op-macros",
     "crates/varn-contract",
     "crates/varn-modules",
     "crates/varn-builtins",
-    "crates/varn-runtime",
     "crates/varn-cli",
     "crates/varn-lsp",
     "crates/varn-vm",
@@ -22,12 +24,35 @@ members = [
     "crates/varn-compiler",
     "crates/varn-rt",
     "crates/varn-shadow",
-    "crates/varn-debug-flags",
-    "crates/varn-fmt",
     "crates/varn-dap",
     "crates/xtask",
 ]
 resolver = "2"
+default-members = [
+    "crates/varn-core",
+    "crates/varn-lexer",
+    "crates/varn-parser",
+    "crates/varn-checker",
+    "crates/varn-emit",
+    "crates/varn-types",
+    "crates/varn-tir",
+    "crates/varn-sem",
+    "crates/varn-binder",
+    "crates/varn-resolver",
+    "crates/varn-op-macros",
+    "crates/varn-contract",
+    "crates/varn-modules",
+    "crates/varn-builtins",
+    "crates/varn-cli",
+    "crates/varn-lsp",
+    "crates/varn-vm",
+    "crates/varn-debug",
+    "crates/varn-pm",
+    "crates/varn-jit",
+    "crates/varn-pipeline",
+    "crates/varn-compiler",
+    "crates/varn-dap",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -46,7 +71,7 @@ serde_json   = "1"
 tower-lsp-f  = "0.26"
 ryu          = "1.0"
 postcard     = { version = "1", features = ["alloc"] }
-tokio        = { version = "1", features = ["full"] }
+tokio        = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util", "io-std", "sync", "time"] }
 semver       = "1"
 sha2         = "0.10"
 hex          = "0.4"

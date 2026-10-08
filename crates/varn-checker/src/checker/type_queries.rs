@@ -1,8 +1,8 @@
 use super::Checker;
-use crate::binder::{BindResult, BindView};
-use crate::types::Type;
 use std::sync::Arc;
 use varn_core::ast::ExprId;
+use varn_sem::bind::{BindResult, BindView};
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn infer_type(&mut self, expr: ExprId, bind: &BindResult) -> Type {
@@ -28,7 +28,7 @@ impl<'r> Checker<'r> {
             .unwrap_or(*declared);
         let resolver = self.resolver;
         let view = bind.map(|b| BindView::new(b, resolver));
-        super::compat::types_compatible_with_cache(
+        varn_sem::compat::types_compatible_with_cache(
             declared,
             inferred,
             view.as_ref(),
@@ -43,7 +43,7 @@ impl<'r> Checker<'r> {
         inferred: &Type,
         bind: &BindResult,
     ) -> Option<Type> {
-        use crate::types::TypeContext;
+        use varn_sem::types::TypeContext;
         let varn_core::TypeKind::Generic(name_atom, args_list, origin_atom) =
             self.ty_table.get(ty.0)
         else {
@@ -101,7 +101,7 @@ impl<'r> Checker<'r> {
         if self.types_compatible_cached(target_ty, init_ty, bind) {
             return true;
         }
-        super::compat::expr_satisfies_target_type(
+        varn_sem::compat::expr_satisfies_target_type(
             target_ty,
             init_ty,
             self.ast_arena,
@@ -152,8 +152,8 @@ impl<'r> Checker<'r> {
         if let Some(cached) = self.type_node_cache.get(&key) {
             return *cached;
         }
-        let view = crate::binder::BindView::new(bind, self.resolver);
-        let resolved = crate::binder::resolve_type_node(
+        let view = varn_sem::bind::BindView::new(bind, self.resolver);
+        let resolved = varn_binder::resolve_type_node(
             node,
             Some(&view),
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -165,7 +165,7 @@ impl<'r> Checker<'r> {
     pub(crate) fn symbol_type_params(
         &mut self,
         name: &str,
-        kind: crate::symbol::SymbolKind,
+        kind: varn_sem::symbol::SymbolKind,
         bind: &BindResult,
     ) -> Vec<Arc<str>> {
         let key = (Arc::from(name), symbol_kind_cache_key(kind));
@@ -229,23 +229,23 @@ impl<'r> Checker<'r> {
     }
 }
 
-fn symbol_kind_cache_key(kind: crate::symbol::SymbolKind) -> u8 {
+fn symbol_kind_cache_key(kind: varn_sem::symbol::SymbolKind) -> u8 {
     match kind {
-        crate::symbol::SymbolKind::Var => 0,
-        crate::symbol::SymbolKind::Let => 1,
-        crate::symbol::SymbolKind::Const => 2,
-        crate::symbol::SymbolKind::Function => 3,
-        crate::symbol::SymbolKind::Class => 4,
-        crate::symbol::SymbolKind::Interface => 5,
-        crate::symbol::SymbolKind::TypeAlias => 6,
-        crate::symbol::SymbolKind::Enum => 7,
-        crate::symbol::SymbolKind::Parameter => 8,
-        crate::symbol::SymbolKind::Property => 9,
-        crate::symbol::SymbolKind::Method => 10,
-        crate::symbol::SymbolKind::TypeParameter => 11,
-        crate::symbol::SymbolKind::Namespace => 12,
-        crate::symbol::SymbolKind::Struct => 13,
-        crate::symbol::SymbolKind::Extension => 14,
-        crate::symbol::SymbolKind::EnumMember => 15,
+        varn_sem::symbol::SymbolKind::Var => 0,
+        varn_sem::symbol::SymbolKind::Let => 1,
+        varn_sem::symbol::SymbolKind::Const => 2,
+        varn_sem::symbol::SymbolKind::Function => 3,
+        varn_sem::symbol::SymbolKind::Class => 4,
+        varn_sem::symbol::SymbolKind::Interface => 5,
+        varn_sem::symbol::SymbolKind::TypeAlias => 6,
+        varn_sem::symbol::SymbolKind::Enum => 7,
+        varn_sem::symbol::SymbolKind::Parameter => 8,
+        varn_sem::symbol::SymbolKind::Property => 9,
+        varn_sem::symbol::SymbolKind::Method => 10,
+        varn_sem::symbol::SymbolKind::TypeParameter => 11,
+        varn_sem::symbol::SymbolKind::Namespace => 12,
+        varn_sem::symbol::SymbolKind::Struct => 13,
+        varn_sem::symbol::SymbolKind::Extension => 14,
+        varn_sem::symbol::SymbolKind::EnumMember => 15,
     }
 }

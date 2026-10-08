@@ -8,62 +8,58 @@ use quote::{format_ident, quote};
 use std::path::Path;
 use syn::LitStr;
 
-use crate::contract_members::{collect_functions, collect_members, find_class};
+use crate::tables::LookupFailure;
 use input::ContractInput;
 
-pub(crate) use mapping::{classify, Mapped};
+pub(crate) use mapping::Mapped;
 
 pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as ContractInput);
 
-    let (source, abs_path_str) = if input.contract.trim().starts_with("declare")
+    let (is_inline, abs_path_str) = if input.contract.trim().starts_with("declare")
         || input.contract.trim().starts_with("export")
         || input.contract.contains('\n')
     {
-        (input.contract.clone(), "<inline>".to_string())
+        (true, "<inline>".to_string())
     } else {
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
         let abs_path = Path::new(&manifest_dir).join(&input.contract);
         let abs_path_str = abs_path.to_string_lossy().replace('\\', "/");
-        match std::fs::read_to_string(&abs_path) {
-            Ok(s) => (s, abs_path_str),
-            Err(e) => {
-                return err(format!("cannot read contract `{}`: {e}", abs_path_str));
-            }
+        if std::fs::read_to_string(&abs_path).is_err() {
+            return err(format!("cannot read contract `{abs_path_str}`"));
         }
+        (false, abs_path_str)
     };
+    if is_inline {
+        return err(
+            "inline contracts are not supported: move the contract to a .vn file listed in contracts.json".to_string(),
+        );
+    }
 
-    let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan(&source, &input.contract);
-
-    let (program, interner, arena) = match varn_parser::parse(
-        tokens,
-        lexeme_buf,
-        &input.contract,
-        varn_core::AtomInterner::new(),
-    ) {
-        Ok(p) => p,
-        Err(_) => return err(format!("failed to parse contract `{}`", abs_path_str)),
-    };
-
-    let members = match &input.class {
-        Some(class) => match find_class(&program.body, &arena, class, &interner) {
-            Some(decl) => collect_members(class, &decl, &arena, &interner),
-            None => {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+    let members =
+        match crate::tables::lookup(&input.contract, &manifest_dir, input.class.as_deref()) {
+            Ok(members) => members,
+            Err(LookupFailure::TablesUnreadable(reason)) => return err(reason),
+            Err(LookupFailure::ContractUnknown) => {
                 return err(format!(
-                    "class `{class}` not found in contract `{abs_path_str}`"
+                    "contract `{}` not found in contracts.json; run `vn gen-contract-tables`",
+                    input.contract
                 ))
             }
-        },
-        None => {
-            let fns = collect_functions(&program.body, &arena, &interner);
-            if fns.is_empty() {
+            Err(LookupFailure::ClassNotFound) => {
+                let class = input.class.clone().unwrap_or_default();
                 return err(format!(
-                    "no `declare function`s found in contract `{abs_path_str}`"
+                    "class `{class}` not found in contract `{abs_path_str}`"
                 ));
             }
-            fns
-        }
-    };
+            Err(LookupFailure::NoFunctions) => {
+                return err(format!(
+                    "no `declare function`s found in contract `{abs_path_str}`"
+                ))
+            }
+            Err(LookupFailure::BadEntry(reason)) => return err(reason),
+        };
 
     let prefix = input.class.clone().unwrap_or_else(|| input.module.clone());
     let trait_ident = format_ident!("__VarnContract_{}", sanitize(&prefix));

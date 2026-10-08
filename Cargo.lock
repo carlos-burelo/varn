@@ -1700,16 +1700,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
-name = "signal-hook-registry"
-version = "1.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4db69cba1110affc0e9f7bcd48bbf87b3f4fc7c61fc9155afd4c469eb3d6c1b"
-dependencies = [
- "errno",
- "libc",
-]
-
-[[package]]
 name = "simd-adler32"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1854,9 +1844,7 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
- "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",
@@ -2089,10 +2077,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "varn-abi"
+name = "varn-binder"
 version = "0.1.0"
 dependencies = [
+ "rustc-hash 1.1.0",
  "varn-core",
+ "varn-modules",
+ "varn-sem",
 ]
 
 [[package]]
@@ -2125,8 +2116,8 @@ dependencies = [
  "varn-contract",
  "varn-core",
  "varn-modules",
- "varn-runtime",
  "varn-types",
+ "xxhash-rust",
  "zip",
 ]
 
@@ -2134,17 +2125,11 @@ dependencies = [
 name = "varn-checker"
 version = "0.1.0"
 dependencies = [
- "parking_lot",
- "postcard",
  "rustc-hash 1.1.0",
- "serde",
- "varn-abi",
+ "varn-binder",
  "varn-core",
- "varn-lexer",
  "varn-modules",
- "varn-parser",
- "varn-tir",
- "xxhash-rust",
+ "varn-sem",
 ]
 
 [[package]]
@@ -2157,15 +2142,15 @@ dependencies = [
  "mimalloc",
  "postcard",
  "rustc-hash 1.1.0",
+ "serde_json",
  "tower-lsp-f",
+ "varn-binder",
  "varn-builtins",
  "varn-checker",
  "varn-compiler",
  "varn-core",
  "varn-dap",
  "varn-debug",
- "varn-debug-flags",
- "varn-fmt",
  "varn-jit",
  "varn-lexer",
  "varn-lsp",
@@ -2173,8 +2158,11 @@ dependencies = [
  "varn-parser",
  "varn-pipeline",
  "varn-pm",
+ "varn-resolver",
+ "varn-sem",
  "varn-types",
  "varn-vm",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -2195,10 +2183,8 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "serde_json",
  "syn",
- "varn-core",
- "varn-lexer",
- "varn-parser",
 ]
 
 [[package]]
@@ -2234,22 +2220,25 @@ dependencies = [
  "console",
  "iced-x86",
  "rustc-hash 1.1.0",
- "varn-checker",
  "varn-compiler",
  "varn-core",
- "varn-debug-flags",
+ "varn-emit",
  "varn-jit",
+ "varn-sem",
  "varn-tir",
  "varn-types",
 ]
 
 [[package]]
-name = "varn-debug-flags"
+name = "varn-emit"
 version = "0.1.0"
-
-[[package]]
-name = "varn-fmt"
-version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "varn-core",
+ "varn-modules",
+ "varn-sem",
+ "varn-tir",
+]
 
 [[package]]
 name = "varn-jit"
@@ -2261,7 +2250,6 @@ dependencies = [
  "cranelift-native",
  "cranelift-object",
  "rustc-hash 1.1.0",
- "varn-abi",
  "varn-core",
  "varn-op-macros",
  "varn-types",
@@ -2288,10 +2276,12 @@ dependencies = [
  "varn-checker",
  "varn-compiler",
  "varn-core",
- "varn-fmt",
+ "varn-emit",
  "varn-lexer",
  "varn-modules",
  "varn-parser",
+ "varn-resolver",
+ "varn-sem",
  "varn-tir",
  "varn-types",
 ]
@@ -2336,10 +2326,12 @@ dependencies = [
  "varn-checker",
  "varn-compiler",
  "varn-core",
- "varn-debug-flags",
+ "varn-emit",
  "varn-lexer",
  "varn-modules",
  "varn-parser",
+ "varn-resolver",
+ "varn-sem",
  "varn-types",
  "varn-vm",
 ]
@@ -2363,15 +2355,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "varn-resolver"
+version = "0.1.0"
+dependencies = [
+ "parking_lot",
+ "rustc-hash 1.1.0",
+ "varn-binder",
+ "varn-core",
+ "varn-lexer",
+ "varn-modules",
+ "varn-parser",
+ "varn-sem",
+]
+
+[[package]]
 name = "varn-rt"
 version = "0.1.0"
 
 [[package]]
-name = "varn-runtime"
+name = "varn-sem"
 version = "0.1.0"
 dependencies = [
+ "postcard",
  "rustc-hash 1.1.0",
- "varn-types",
+ "serde",
+ "varn-core",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -2411,13 +2420,11 @@ dependencies = [
  "ryu",
  "serde",
  "serde_json",
- "varn-abi",
  "varn-builtins",
  "varn-core",
  "varn-jit",
  "varn-modules",
  "varn-op-macros",
- "varn-runtime",
  "varn-types",
 ]
 

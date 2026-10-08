@@ -1,7 +1,7 @@
 use super::CallTypeCtx;
-use crate::types::Type;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::ExprId;
+use varn_sem::types::Type;
 
 pub(super) fn infer_binary(
     c: &mut CallTypeCtx,

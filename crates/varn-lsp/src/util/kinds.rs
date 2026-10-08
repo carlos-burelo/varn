@@ -1,5 +1,5 @@
 use tower_lsp_f::lsp_types::{CompletionItemKind, SymbolKind as LspSymbolKind};
-use varn_checker::SymbolKind;
+use varn_sem::symbol::SymbolKind;
 
 pub fn to_lsp_symbol_kind(kind: SymbolKind) -> LspSymbolKind {
     match kind {

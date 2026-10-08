@@ -9,7 +9,7 @@ use crate::pipeline::run_pipeline;
 use crate::query::exports::{ExportedSymbol, ModuleExports};
 use dashmap::DashMap;
 use std::sync::{Arc, RwLock};
-use varn_checker::module_resolver::DiskResolver;
+use varn_resolver::DiskResolver;
 
 pub use revision::{Cached, Revision};
 

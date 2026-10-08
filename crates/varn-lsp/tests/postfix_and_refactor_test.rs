@@ -8,8 +8,8 @@ use varn_lsp::features::completion::postfix::build_postfix_completions;
 use varn_lsp::features::formatting::build_formatting;
 use varn_lsp::pipeline::run_pipeline;
 
-fn test_resolver() -> std::sync::Arc<varn_checker::module_resolver::DiskResolver> {
-    std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new())
+fn test_resolver() -> std::sync::Arc<varn_resolver::DiskResolver> {
+    std::sync::Arc::new(varn_resolver::DiskResolver::new())
 }
 
 #[test]

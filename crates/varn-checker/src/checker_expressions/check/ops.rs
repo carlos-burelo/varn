@@ -1,10 +1,10 @@
 use super::const_int::overflows_int_literal;
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::TypeContext;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::operators::UnaryOp;
 use varn_core::ast::{ExprId, ExprKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::TypeContext;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_unary(
@@ -175,12 +175,12 @@ impl<'r> Checker<'r> {
             }
         }
         self.check_expr(callee, bind);
-        let view = crate::binder::BindView::new(bind, self.resolver);
+        let view = varn_sem::bind::BindView::new(bind, self.resolver);
         let ctor_params = cls_name
             .and_then(|cn| {
                 view.get_class_members(cn, None).and_then(|members| {
                     members.iter().find_map(|m| {
-                        if m.kind == crate::types::ClassMemberKind::Constructor {
+                        if m.kind == varn_sem::types::ClassMemberKind::Constructor {
                             if let varn_core::TypeKind::Fn(fid) = self.ty_table.get(m.ty.0) {
                                 return Some(self.ty_table.get_function(fid).params.clone());
                             }

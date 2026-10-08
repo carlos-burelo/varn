@@ -1,11 +1,11 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::checker_generics::build_call_mapping;
 use crate::generic_substitution::map_generics_cached;
-use crate::types::{FunctionParam, FunctionType, Type};
 use std::sync::Arc;
 use varn_core::ast::{ExprId, ExprKind, Param};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{FunctionParam, FunctionType, Type};
 
 impl<'r> Checker<'r> {
     pub(super) fn infer_call_type(&mut self, expr: ExprId, bind: &BindResult) -> Type {
@@ -140,7 +140,7 @@ impl<'r> Checker<'r> {
             .iter()
             .enumerate()
             .map(|(i, p)| {
-                let name = crate::binder::pattern_lead_name(&p.pattern, &bind.interner);
+                let name = varn_binder::pattern_lead_name(&p.pattern, &bind.interner);
                 let mut ty = p
                     .type_ann
                     .as_ref()
@@ -154,7 +154,7 @@ impl<'r> Checker<'r> {
                     .or_else(|| {
                         p.default.map(|d| {
                             let t = self.infer_type(d, bind);
-                            crate::binder::widen_literal(t)
+                            varn_binder::widen_literal(t)
                         })
                     })
                     .unwrap_or_else(|| {
@@ -191,7 +191,7 @@ impl<'r> Checker<'r> {
         if let Some(scope_id) = arrow_scope {
             self.current_scope = scope_id;
             for (p, fp) in params.iter().zip(ps.iter()) {
-                let name = crate::binder::pattern_lead_name(&p.pattern, &bind.interner);
+                let name = varn_binder::pattern_lead_name(&p.pattern, &bind.interner);
                 if name.is_empty() || name == "_" {
                     continue;
                 }
@@ -214,7 +214,7 @@ impl<'r> Checker<'r> {
             self.current_scope = saved_scope;
         }
 
-        let ret_ty = crate::types::async_fn_return(
+        let ret_ty = varn_sem::types::async_fn_return(
             ret_ty,
             is_async,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),

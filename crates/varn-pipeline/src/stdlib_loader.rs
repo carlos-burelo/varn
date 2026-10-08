@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use varn_checker::module_resolver::ImportResolver;
+use varn_sem::resolver::ImportResolver;
 
 use rustc_hash::FxHashMap;
 use varn_core::ModuleId;
@@ -245,7 +245,7 @@ pub fn compile_stdlib_bundle(
                 return Err(format!("cannot bind {}: {}", m.id, err_msg));
             }
         };
-        let interface = varn_checker::module_resolver::serialize_module_interface(&exports, &bind)
+        let interface = varn_sem::codec::serialize_module_interface(&exports, &bind)
             .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
 
         let proto = match compile_source_checked(&source, &m.id, session) {

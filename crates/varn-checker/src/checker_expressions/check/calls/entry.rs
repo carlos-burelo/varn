@@ -1,11 +1,11 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::checker_generics::build_call_mapping;
 use crate::generic_substitution::map_generics_cached;
-use crate::types::{FunctionParam, Type};
 use varn_core::ast::{Arg, ExprId, ExprKind, TypeNode};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{FunctionParam, Type};
 
 impl<'r> Checker<'r> {
     pub(in super::super) fn check_call_expr(
@@ -211,7 +211,7 @@ impl<'r> Checker<'r> {
                 let params = ft
                     .params
                     .iter()
-                    .map(|p| crate::semantic_info::CallParamInfo {
+                    .map(|p| varn_sem::semantic_info::CallParamInfo {
                         name: p.name.clone(),
                         ty: Type::resolved(p.ty),
                         optional: p.optional,
@@ -239,7 +239,7 @@ impl<'r> Checker<'r> {
                     }
                 }
 
-                let call_res = crate::semantic_info::CallResolution {
+                let call_res = varn_sem::semantic_info::CallResolution {
                     callee_name,
                     params,
                     return_ty: Type::resolved(ft.return_type),

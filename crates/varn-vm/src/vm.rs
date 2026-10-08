@@ -105,7 +105,7 @@ impl Vm {
                 task_prune_hit: tasks.prune_hit,
                 task_prune_miss: tasks.prune_miss,
                 task_yields: tasks.yields,
-                timer_purged: varn_runtime::timer::purged(),
+                timer_purged: varn_builtins::runtime::timer::purged(),
                 ..profile
             }
         })

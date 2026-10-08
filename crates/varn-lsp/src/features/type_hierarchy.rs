@@ -111,16 +111,16 @@ fn entry_to_item(e: &crate::index::ExportEntry) -> TypeHierarchyItem {
     }
 }
 
-fn is_typeable(k: varn_checker::SymbolKind) -> bool {
-    use varn_checker::SymbolKind as S;
+fn is_typeable(k: varn_sem::symbol::SymbolKind) -> bool {
+    use varn_sem::symbol::SymbolKind as S;
     matches!(
         k,
         S::Class | S::Struct | S::Interface | S::Enum | S::TypeAlias
     )
 }
 
-fn from_lsp_kind(k: LspKind) -> varn_checker::SymbolKind {
-    use varn_checker::SymbolKind as S;
+fn from_lsp_kind(k: LspKind) -> varn_sem::symbol::SymbolKind {
+    use varn_sem::symbol::SymbolKind as S;
     match k {
         LspKind::Class => S::Class,
         LspKind::Struct => S::Struct,

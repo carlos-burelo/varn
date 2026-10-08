@@ -1,7 +1,7 @@
 use super::CallTypeCtx;
-use crate::types::Type;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::{Atom, TypeKind};
+use varn_sem::types::Type;
 
 fn text_of(c: &CallTypeCtx, atom: Atom) -> Option<String> {
     c.ctx

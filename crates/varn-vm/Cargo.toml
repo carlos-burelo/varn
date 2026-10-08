@@ -5,14 +5,13 @@ edition.workspace = true
 
 [features]
 profiling = []
+clif = ["varn-jit/clif"]
 
 [dependencies]
-varn-abi      = { path = "../varn-abi" }
 varn-op-macros = { path = "../varn-op-macros" }
 varn-types    = { path = "../varn-types" }
 varn-core     = { path = "../varn-core" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
-varn-runtime  = { path = "../varn-runtime" }
 varn-modules  = { path = "../varn-modules" }
 bigdecimal    = { workspace = true }
 num-bigint    = { workspace = true }

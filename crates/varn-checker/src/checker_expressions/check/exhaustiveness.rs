@@ -1,10 +1,10 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{CheckerTyTable, Type};
 use varn_core::ast::pattern::MatchPattern;
 use varn_core::ast::{AstArena, ExprId, ExprKind, MatchCase};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeLiteral};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{CheckerTyTable, Type};
 
 impl<'r> Checker<'r> {
     fn report_gap(
@@ -16,7 +16,7 @@ impl<'r> Checker<'r> {
     ) {
         self.emit(Diagnostic::error(ErrorCode::NonExhaustiveMatch, message).with_range(*range));
         self.match_gaps
-            .insert(expr.index(), crate::semantic_info::MatchGap { missing });
+            .insert(expr.index(), varn_sem::semantic_info::MatchGap { missing });
     }
 
     fn require_catch_all(
@@ -307,7 +307,7 @@ fn pattern_covers(
                 c == *value
             }
             (TypeKind::Literal(TypeLiteral::Int(v)), _) => {
-                crate::types::numeric_literal::const_int_value(arena, *e) == Some(v)
+                varn_sem::types::numeric_literal::const_int_value(arena, *e) == Some(v)
             }
             _ => false,
         },

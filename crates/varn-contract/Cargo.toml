@@ -10,16 +10,7 @@ proc-macro = true
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full"] }
-
-# `varn_contract!` parses `.vn` contract files into a typed AST at
-# macro-expansion time (build-time only, never at runtime). Only
-# `varn-builtins` may use this crate: the runtime (varn-vm/varn-jit)
-# must never depend on it, directly or transitively, so compiling the
-# runtime never compiles the frontend. In particular `varn-parser` and
-# `varn-lexer` must never depend on this crate (that would be a cycle).
-varn-core = { path = "../varn-core" }
-varn-lexer = { path = "../varn-lexer" }
-varn-parser = { path = "../varn-parser" }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,9 +1,9 @@
-use crate::binder::BindResult;
-use crate::symbol::SymbolKind;
-use crate::types::{FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::symbol::SymbolKind;
+use varn_sem::types::{FunctionType, Type};
 
 pub(super) struct EnrichContext {
     pub fn_map: FxHashMap<Arc<str>, Type>,

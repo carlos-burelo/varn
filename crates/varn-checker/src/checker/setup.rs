@@ -1,18 +1,18 @@
-use super::records::ExprInfo;
 use super::Checker;
-use crate::types::Type;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 use varn_core::ast::AstArena;
+use varn_sem::output::ExprInfo;
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn new(
-        resolver: &'r dyn crate::module_resolver::ImportResolver,
+        resolver: &'r dyn varn_sem::resolver::ImportResolver,
         ast_arena: &'r AstArena,
         source_file: Arc<str>,
-        global_scope: crate::scope::ScopeId,
+        global_scope: varn_sem::scope::ScopeId,
         record_expr_types: bool,
-        ty_table: Arc<crate::types::CheckerTyTable>,
+        ty_table: Arc<varn_sem::types::CheckerTyTable>,
     ) -> Self {
         Checker {
             resolver,
@@ -39,7 +39,7 @@ impl<'r> Checker<'r> {
             is_assignment_target: false,
             in_pipeline_rhs: false,
             pipeline_value_type: None,
-            desugar: super::records::Desugarings::default(),
+            desugar: varn_sem::output::Desugarings::default(),
             member_exists_cache: FxHashMap::default(),
             member_type_cache: FxHashMap::default(),
             expected_type: None,
@@ -64,7 +64,7 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(crate) fn project_expr_types(&mut self, bind: &crate::binder::BindResult) {
+    pub(crate) fn project_expr_types(&mut self, bind: &varn_sem::bind::BindResult) {
         let mut entries: Vec<(u32, u32, u32, ExprInfo)> = self
             .expr_table
             .values()

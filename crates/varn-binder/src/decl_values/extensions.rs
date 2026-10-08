@@ -1,0 +1,233 @@
+use super::type_node_to_name;
+use std::sync::Arc;
+use varn_core::ast::{ExtensionDecl, ExtensionMember};
+use varn_sem::scope::ScopeKind;
+use varn_sem::symbol::{Symbol, SymbolKind};
+use varn_sem::types::Type;
+
+impl<'r> super::super::Binder<'r> {
+    pub(crate) fn bind_extension(&mut self, e: &ExtensionDecl) {
+        let type_name = type_node_to_name(&e.target, &self.interner);
+
+        let receiver_ty = self.resolve_type(&e.target);
+
+        if let Some(id) = e.id {
+            let line = e.range.start.line;
+            let ext_type = receiver_ty;
+            let mut sym = Symbol::new(SymbolKind::Extension, id, line).with_type(ext_type);
+            sym.col = e.range.start.column;
+            sym.offset = e.range.start.offset;
+            self.define(id, sym);
+        }
+
+        for member in &e.members {
+            match member {
+                ExtensionMember::Method(method) => {
+                    let mangled =
+                        format!("__ext_{}_{}", type_name, self.interner.resolve(method.id));
+                    let mut param_types: Vec<varn_sem::types::FunctionParam> =
+                        vec![varn_sem::types::FunctionParam {
+                            name: Some(Arc::from("this")),
+                            ty: receiver_ty.0,
+                            optional: false,
+                            is_rest: false,
+                        }];
+                    for p in &method.params {
+                        let ty = self.param_type(p, crate::ParamSite::Declared);
+                        param_types.push(varn_sem::types::FunctionParam {
+                            name: Some(Arc::from(
+                                super::super::type_inference::pattern_to_string(
+                                    &p.pattern,
+                                    Some(&self.interner),
+                                )
+                                .as_str(),
+                            )),
+                            ty: ty.0,
+                            optional: p.is_optional || p.default.is_some(),
+                            is_rest: p.is_rest,
+                        });
+                    }
+                    let declared_ret = method
+                        .return_type
+                        .as_ref()
+                        .map(|rt| self.resolve_type(rt))
+                        .unwrap_or(Type::Void);
+                    let ret_ty = varn_sem::types::async_fn_return(
+                        declared_ret,
+                        method.modifiers.is_async,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    let fn_type = Type::fn_(
+                        varn_sem::types::FunctionType {
+                            params: param_types,
+                            return_type: ret_ty.0,
+                            is_arrow: false,
+                            type_params: method
+                                .type_params
+                                .iter()
+                                .map(|t| Arc::from(self.interner.resolve(t.name)))
+                                .collect(),
+                        },
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    let line = method.range.start.line;
+                    let mangled_atom = self.intern_local(&mangled);
+                    let mut sym =
+                        Symbol::new(SymbolKind::Function, mangled_atom, line).with_type(fn_type);
+                    sym.col = method.range.start.column;
+                    sym.offset = method.range.start.offset;
+                    sym.has_explicit_type = method.return_type.is_some();
+                    sym.is_async = method.modifiers.is_async;
+                    sym.is_generator = method.modifiers.is_generator;
+                    self.define(mangled_atom, sym);
+                    self.extensions
+                        .methods
+                        .entry(Arc::from(type_name.as_str()))
+                        .or_default()
+                        .insert(
+                            Arc::from(self.interner.resolve(method.id)),
+                            Arc::from(mangled.as_str()),
+                        );
+                    self.bind_extension_function_scope(
+                        line,
+                        receiver_ty,
+                        &method.params,
+                        method.body,
+                    );
+                }
+                ExtensionMember::Getter {
+                    key,
+                    return_type,
+                    body,
+                    range,
+                    ..
+                } => {
+                    let key_str = self.interner.resolve(*key).to_string();
+                    let mangled = format!("__extget_{type_name}_{}", key_str);
+                    let ret_ty = return_type
+                        .as_ref()
+                        .map(|rt| self.resolve_type(rt))
+                        .unwrap_or(Type::Dynamic);
+                    let fn_type = Type::fn_(
+                        varn_sem::types::FunctionType {
+                            params: vec![varn_sem::types::FunctionParam {
+                                name: Some(Arc::from("this")),
+                                ty: receiver_ty.0,
+                                optional: false,
+                                is_rest: false,
+                            }],
+                            return_type: ret_ty.0,
+                            is_arrow: false,
+                            type_params: vec![],
+                        },
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    let mangled_atom = self.intern_local(&mangled);
+                    let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
+                        .with_type(fn_type);
+                    sym.col = range.start.column;
+                    sym.offset = range.start.offset;
+                    sym.has_explicit_type = return_type.is_some();
+                    self.define(mangled_atom, sym);
+                    self.extensions
+                        .getters
+                        .entry(Arc::from(type_name.as_str()))
+                        .or_default()
+                        .insert(Arc::from(key_str.as_str()), Arc::from(mangled.as_str()));
+                    self.bind_extension_function_scope(range.start.line, receiver_ty, &[], *body);
+                }
+                ExtensionMember::Setter {
+                    key,
+                    param,
+                    body,
+                    range,
+                    ..
+                } => {
+                    let key_str = self.interner.resolve(*key).to_string();
+                    let mangled = format!("__extset_{type_name}_{}", key_str);
+                    let param_ty = self.param_type(param, crate::ParamSite::Declared);
+                    let fn_type = Type::fn_(
+                        varn_sem::types::FunctionType {
+                            params: vec![
+                                varn_sem::types::FunctionParam {
+                                    name: Some(Arc::from("this")),
+                                    ty: receiver_ty.0,
+                                    optional: false,
+                                    is_rest: false,
+                                },
+                                varn_sem::types::FunctionParam {
+                                    name: Some(Arc::from(
+                                        super::super::type_inference::pattern_to_string(
+                                            &param.pattern,
+                                            Some(&self.interner),
+                                        )
+                                        .as_str(),
+                                    )),
+                                    ty: param_ty.0,
+                                    optional: param.is_optional,
+                                    is_rest: param.is_rest,
+                                },
+                            ],
+                            return_type: Type::Void.0,
+                            is_arrow: false,
+                            type_params: vec![],
+                        },
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    let mangled_atom = self.intern_local(&mangled);
+                    let mut sym = Symbol::new(SymbolKind::Function, mangled_atom, range.start.line)
+                        .with_type(fn_type);
+                    sym.col = range.start.column;
+                    sym.offset = range.start.offset;
+                    sym.has_explicit_type = true;
+                    self.define(mangled_atom, sym);
+                    self.extensions
+                        .setters
+                        .entry(Arc::from(type_name.as_str()))
+                        .or_default()
+                        .insert(Arc::from(key_str.as_str()), Arc::from(mangled.as_str()));
+                    self.bind_extension_function_scope(
+                        range.start.line,
+                        receiver_ty,
+                        std::slice::from_ref(param),
+                        *body,
+                    );
+                }
+            }
+        }
+    }
+
+    fn bind_extension_function_scope(
+        &mut self,
+        line: u32,
+        receiver_ty: Type,
+        params: &[varn_core::ast::Param],
+        body: varn_core::ast::StmtId,
+    ) {
+        let child = self.scopes.child(ScopeKind::Function, self.current);
+        let saved = self.current;
+        self.current = child;
+
+        let this_atom = self.intern_local("this");
+        let this_sym = Symbol::new(SymbolKind::Parameter, this_atom, line).with_type(receiver_ty);
+        self.define(this_atom, this_sym);
+
+        for p in params {
+            let ty = self.param_type(p, crate::ParamSite::Declared);
+            self.bind_pattern(
+                &p.pattern,
+                SymbolKind::Parameter,
+                line,
+                None,
+                Some(ty),
+                p.type_ann.is_some(),
+            );
+            if let Some(def) = p.default {
+                self.bind_expr(def);
+            }
+        }
+
+        self.bind_stmt(body);
+        self.current = saved;
+    }
+}

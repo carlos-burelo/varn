@@ -1,5 +1,5 @@
 use tower_lsp_f::lsp_types::{DocumentSymbol, DocumentSymbolResponse, Range};
-use varn_checker::SymbolKind;
+use varn_sem::symbol::SymbolKind;
 
 use crate::document::{DocumentState, SymbolView};
 use crate::util::converters::{range_on_line, to_lsp_symbol_kind};
@@ -82,7 +82,7 @@ fn insert_at_depth(nodes: &mut Vec<DocumentSymbol>, depth: usize, sym: DocumentS
 
 fn summary_to_doc(
     state: &DocumentState,
-    m: &varn_checker::ResolvedMemberSummary,
+    m: &varn_sem::semantic_info::ResolvedMemberSummary,
 ) -> Option<DocumentSymbol> {
     let line = m.def_line?.saturating_sub(1);
     let name_end = m.def_col + m.name.chars().count() as u32;
@@ -103,10 +103,10 @@ fn summary_to_doc(
 }
 
 fn summary_to_symbol_kind(
-    k: varn_checker::ResolvedMemberKind,
+    k: varn_sem::semantic_info::ResolvedMemberKind,
 ) -> tower_lsp_f::lsp_types::SymbolKind {
     use tower_lsp_f::lsp_types::SymbolKind as L;
-    use varn_checker::ResolvedMemberKind as R;
+    use varn_sem::semantic_info::ResolvedMemberKind as R;
     match k {
         R::Method | R::StaticMethod | R::ExtensionMethod => L::Method,
         R::EnumMember => L::EnumMember,

@@ -25,8 +25,8 @@ impl<'r> Checker<'r> {
 
 pub(super) fn closest_name(
     name: &str,
-    scope: &crate::scope::CheckerScope,
-    arena: &crate::scope::ScopeArena,
+    scope: &varn_sem::scope::CheckerScope,
+    arena: &varn_sem::scope::ScopeArena,
     interner: &varn_core::AtomInterner,
 ) -> Option<String> {
     let mut all: Vec<String> = Vec::new();

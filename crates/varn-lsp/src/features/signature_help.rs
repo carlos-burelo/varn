@@ -291,7 +291,7 @@ fn resolve_callee_signature(
     None
 }
 
-fn format_params(state: &DocumentState, ft: &varn_checker::types::FunctionType) -> String {
+fn format_params(state: &DocumentState, ft: &varn_sem::types::FunctionType) -> String {
     ft.params
         .iter()
         .map(|p| {

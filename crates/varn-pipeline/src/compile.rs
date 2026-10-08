@@ -2,17 +2,15 @@ use super::check::CheckResult;
 use crate::PipelineError;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_checker::module_resolver::ImportResolver;
 use varn_compiler::FunctionProto;
 use varn_core::ast::{AstArena, Program};
-use varn_debug_flags::DebugFlags;
+use varn_core::debug_flags::DebugFlags;
+use varn_sem::resolver::ImportResolver;
 use varn_types::ModuleGraphArtifact;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
-pub fn sorted_export_names(
-    exports: &varn_checker::module_resolver::ExportMap,
-) -> Vec<std::sync::Arc<str>> {
+pub fn sorted_export_names(exports: &varn_sem::exports::ExportMap) -> Vec<std::sync::Arc<str>> {
     let mut names: Vec<std::sync::Arc<str>> = exports
         .keys()
         .map(|k| std::sync::Arc::from(k.as_str()))
@@ -24,12 +22,12 @@ pub fn sorted_export_names(
 pub fn emit_and_compile(
     program: &Program,
     ast_arena: &AstArena,
-    check: &varn_checker::CheckResult,
+    check: &varn_sem::output::CheckResult,
     export_names: Vec<std::sync::Arc<str>>,
     source: &str,
     measure: bool,
 ) -> (Result<FunctionProto, String>, std::time::Duration) {
-    let tir = varn_checker::emit::emit_module(
+    let tir = varn_emit::emit_module(
         program,
         ast_arena,
         &check.bind,

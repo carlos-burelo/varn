@@ -1,30 +1,30 @@
 use rustc_hash::FxHashMap;
 
 pub struct SemanticDB {
-    pub expr_table: FxHashMap<varn_core::ast::AstId, varn_checker::TypeEntry>,
+    pub expr_table: FxHashMap<varn_core::ast::AstId, varn_sem::output::TypeEntry>,
 
-    pub expr_types: FxHashMap<u32, varn_checker::ExprInfo>,
-    pub node_scopes: FxHashMap<u32, varn_checker::ScopeId>,
-    pub scope_spans: Vec<varn_checker::checker::ScopeSpan>,
+    pub expr_types: FxHashMap<u32, varn_sem::output::ExprInfo>,
+    pub node_scopes: FxHashMap<u32, varn_sem::scope::ScopeId>,
+    pub scope_spans: Vec<varn_sem::output::ScopeSpan>,
 
-    pub symbol_types: FxHashMap<varn_checker::SymbolId, varn_checker::Type>,
+    pub symbol_types: FxHashMap<varn_sem::symbol::SymbolId, varn_sem::types::Type>,
 
-    pub global_scope: varn_checker::ScopeId,
+    pub global_scope: varn_sem::scope::ScopeId,
 
-    pub flattened_members: FxHashMap<String, Vec<varn_checker::types::ClassMemberInfo>>,
+    pub flattened_members: FxHashMap<String, Vec<varn_sem::types::ClassMemberInfo>>,
 
-    pub member_resolutions: FxHashMap<u32, varn_checker::MemberResolution>,
+    pub member_resolutions: FxHashMap<u32, varn_sem::semantic_info::MemberResolution>,
 
-    pub call_resolutions: FxHashMap<u32, varn_checker::CallResolution>,
+    pub call_resolutions: FxHashMap<u32, varn_sem::semantic_info::CallResolution>,
 
-    pub match_gaps: FxHashMap<varn_core::ast::AstId, varn_checker::MatchGap>,
+    pub match_gaps: FxHashMap<varn_core::ast::AstId, varn_sem::semantic_info::MatchGap>,
 
     pub call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
-    pub desugar: varn_checker::checker::Desugarings,
+    pub desugar: varn_sem::output::Desugarings,
 
-    pub bind: varn_checker::BindResult,
+    pub bind: varn_sem::bind::BindResult,
 
-    pub types: std::cell::RefCell<std::sync::Arc<varn_checker::types::CheckerTyTable>>,
+    pub types: std::cell::RefCell<std::sync::Arc<varn_sem::types::CheckerTyTable>>,
 }
 
 impl SemanticDB {
@@ -36,7 +36,7 @@ impl SemanticDB {
         &self,
         name: &str,
         cursor_offset: u32,
-    ) -> Option<(varn_checker::SymbolId, varn_checker::Type)> {
+    ) -> Option<(varn_sem::symbol::SymbolId, varn_sem::types::Type)> {
         let scope_id = self.scope_at_offset(cursor_offset);
         let scope = self.bind.scopes.get(scope_id);
         let atom = self.bind.interner.get(name)?;
@@ -50,7 +50,7 @@ impl SemanticDB {
         Some((sym_id, ty))
     }
 
-    pub fn scope_at_offset(&self, cursor_offset: u32) -> varn_checker::ScopeId {
+    pub fn scope_at_offset(&self, cursor_offset: u32) -> varn_sem::scope::ScopeId {
         let mut best_scope = self.global_scope;
         let mut best_span_len = u32::MAX;
         for span in &self.scope_spans {

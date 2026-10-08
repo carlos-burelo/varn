@@ -1,11 +1,11 @@
-use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::checker_expressions::name_suggestions::closest_in_list;
-use crate::types::{ObjectTypeMember, Type};
 use varn_core::ast::operators::Visibility;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, Suggestion, TypeKind};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{ObjectTypeMember, Type};
 
 impl<'r> Checker<'r> {
     pub(super) fn check_extension_assignment(&mut self, target: ExprId, bind: &BindResult) {
@@ -258,11 +258,11 @@ impl<'r> Checker<'r> {
                     .map(|sid| {
                         matches!(
                             bind.arena.get(sid).kind,
-                            crate::symbol::SymbolKind::Class
-                                | crate::symbol::SymbolKind::Interface
-                                | crate::symbol::SymbolKind::Enum
-                                | crate::symbol::SymbolKind::Namespace
-                                | crate::symbol::SymbolKind::Struct
+                            varn_sem::symbol::SymbolKind::Class
+                                | varn_sem::symbol::SymbolKind::Interface
+                                | varn_sem::symbol::SymbolKind::Enum
+                                | varn_sem::symbol::SymbolKind::Namespace
+                                | varn_sem::symbol::SymbolKind::Struct
                         )
                     })
                     .unwrap_or(false)
@@ -281,7 +281,7 @@ impl<'r> Checker<'r> {
                                 .get(bind.global_scope)
                                 .resolve(atom, &bind.scopes)
                         })
-                        .map(|sid| bind.arena.get(sid).kind == crate::symbol::SymbolKind::Enum)
+                        .map(|sid| bind.arena.get(sid).kind == varn_sem::symbol::SymbolKind::Enum)
                         .unwrap_or(false)
                 } else {
                     false
@@ -289,27 +289,27 @@ impl<'r> Checker<'r> {
 
             let final_mem_kind = self.ty_table.get(final_mem_ty.0);
             let member_kind = if is_enum {
-                crate::semantic_info::ResolvedMemberKind::EnumMember
+                varn_sem::semantic_info::ResolvedMemberKind::EnumMember
             } else if self
                 .desugar
                 .extension_members
                 .contains_key(&property_range.start.offset)
             {
                 if matches!(final_mem_kind, TypeKind::Fn(_)) {
-                    crate::semantic_info::ResolvedMemberKind::ExtensionMethod
+                    varn_sem::semantic_info::ResolvedMemberKind::ExtensionMethod
                 } else {
-                    crate::semantic_info::ResolvedMemberKind::ExtensionProperty
+                    varn_sem::semantic_info::ResolvedMemberKind::ExtensionProperty
                 }
             } else if is_static {
                 if matches!(final_mem_kind, TypeKind::Fn(_)) {
-                    crate::semantic_info::ResolvedMemberKind::StaticMethod
+                    varn_sem::semantic_info::ResolvedMemberKind::StaticMethod
                 } else {
-                    crate::semantic_info::ResolvedMemberKind::StaticProperty
+                    varn_sem::semantic_info::ResolvedMemberKind::StaticProperty
                 }
             } else if matches!(final_mem_kind, TypeKind::Fn(_)) {
-                crate::semantic_info::ResolvedMemberKind::Method
+                varn_sem::semantic_info::ResolvedMemberKind::Method
             } else {
-                crate::semantic_info::ResolvedMemberKind::Property
+                varn_sem::semantic_info::ResolvedMemberKind::Property
             };
 
             let origin_module = match check_kind {
@@ -339,7 +339,7 @@ impl<'r> Checker<'r> {
 
             self.member_resolutions.insert(
                 property_range.start.offset,
-                crate::semantic_info::MemberResolution {
+                varn_sem::semantic_info::MemberResolution {
                     receiver_ty: check_ty,
                     member_name: std::sync::Arc::from(prop_name),
                     member_kind,
@@ -432,7 +432,7 @@ impl<'r> Checker<'r> {
 pub(crate) fn extension_type_name(
     checker: &Checker,
     ty: &Type,
-    table: &crate::types::CheckerTyTable,
+    table: &varn_sem::types::CheckerTyTable,
     bind: &BindResult,
 ) -> Option<std::sync::Arc<str>> {
     match table.get(ty.0) {

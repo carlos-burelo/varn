@@ -2,7 +2,7 @@ use crate::document::{ChainResult, DocumentState};
 use crate::index::ProjectIndex;
 use crate::util::converters::zero_range;
 use tower_lsp_f::lsp_types::{Definition, Location, Position, Range, Uri};
-use varn_checker::symbol::SymbolId;
+use varn_sem::symbol::SymbolId;
 pub fn build_goto_definition(
     state: &DocumentState,
     index: Option<&ProjectIndex>,

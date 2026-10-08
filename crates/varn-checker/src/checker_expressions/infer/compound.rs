@@ -1,9 +1,9 @@
 use super::Checker;
-use crate::binder::BindResult;
-use crate::types::{ObjectTypeMember, Type, TypeContext};
 use std::sync::Arc;
 use varn_core::ast::ExprId;
 use varn_core::TypeKind;
+use varn_sem::bind::BindResult;
+use varn_sem::types::{ObjectTypeMember, Type, TypeContext};
 
 impl<'r> Checker<'r> {
     pub(crate) fn infer_computed_member(
@@ -168,7 +168,7 @@ impl<'r> Checker<'r> {
                         .as_ref()
                         .map(|rt| self.resolve_type_node_cached(rt, bind))
                         .unwrap_or(Type::Dynamic);
-                    let ret = crate::types::async_fn_return(
+                    let ret = varn_sem::types::async_fn_return(
                         ret,
                         *is_async,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -193,7 +193,7 @@ impl<'r> Checker<'r> {
                     } else if let varn_core::TypeKind::Named(name, origin) = spread_kind {
                         let name_str = bind.interner.resolve(name).to_string();
                         let origin_str = origin.map(|o| bind.interner.resolve(o).to_string());
-                        let view = crate::binder::BindView::new(bind, self.resolver);
+                        let view = varn_sem::bind::BindView::new(bind, self.resolver);
                         if let Some(cms) = view.get_class_members(&name_str, origin_str.as_deref())
                         {
                             for cm in cms {
@@ -226,13 +226,13 @@ impl<'r> Checker<'r> {
             .as_ref()
             .map(|rt| self.resolve_type_node_cached(rt, bind));
         let ret = if is_generator {
-            crate::types::generator_of(
+            varn_sem::types::generator_of(
                 declared.unwrap_or(Type::Dynamic),
                 is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             )
         } else {
-            crate::types::async_fn_return(
+            varn_sem::types::async_fn_return(
                 declared.unwrap_or(Type::Dynamic),
                 is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -240,7 +240,7 @@ impl<'r> Checker<'r> {
         };
         let params = self.signature_params(params, bind);
         Type::fn_(
-            crate::types::FunctionType {
+            varn_sem::types::FunctionType {
                 params,
                 return_type: ret.0,
                 is_arrow: false,
@@ -254,7 +254,7 @@ impl<'r> Checker<'r> {
         &mut self,
         params: &[varn_core::ast::Param],
         bind: &BindResult,
-    ) -> Vec<crate::types::FunctionParam> {
+    ) -> Vec<varn_sem::types::FunctionParam> {
         params
             .iter()
             .map(|p| {
@@ -269,8 +269,8 @@ impl<'r> Checker<'r> {
                         ty = Type::array(ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     }
                 }
-                crate::types::FunctionParam {
-                    name: Some(Arc::from(crate::binder::pattern_lead_name(
+                varn_sem::types::FunctionParam {
+                    name: Some(Arc::from(varn_binder::pattern_lead_name(
                         &p.pattern,
                         &bind.interner,
                     ))),

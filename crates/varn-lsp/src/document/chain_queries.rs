@@ -1,13 +1,13 @@
-use varn_checker::SymbolKind;
 use varn_core::TokenKind;
+use varn_sem::symbol::SymbolKind;
 
 use super::{ChainResult, DocumentState, TokenRecord};
 
 fn summary_from_resolution(
-    res: &varn_checker::MemberResolution,
-) -> varn_checker::ResolvedMemberSummary {
-    use varn_checker::ResolvedMemberKind as R;
-    varn_checker::ResolvedMemberSummary {
+    res: &varn_sem::semantic_info::MemberResolution,
+) -> varn_sem::semantic_info::ResolvedMemberSummary {
+    use varn_sem::semantic_info::ResolvedMemberKind as R;
+    varn_sem::semantic_info::ResolvedMemberSummary {
         name: res.member_name.clone(),
         ty: res.member_ty,
         kind: res.member_kind,
@@ -22,10 +22,11 @@ fn summary_from_resolution(
 }
 
 fn summary_from_class_member(
-    m: &varn_checker::types::ClassMemberInfo,
-) -> varn_checker::ResolvedMemberSummary {
-    use varn_checker::{ClassMemberKind as C, NestedTypeKind as N, ResolvedMemberKind as R};
-    varn_checker::ResolvedMemberSummary {
+    m: &varn_sem::types::ClassMemberInfo,
+) -> varn_sem::semantic_info::ResolvedMemberSummary {
+    use varn_sem::semantic_info::{NestedTypeKind as N, ResolvedMemberKind as R};
+    use varn_sem::types::ClassMemberKind as C;
+    varn_sem::semantic_info::ResolvedMemberSummary {
         name: m.name.clone(),
         ty: m.ty,
         kind: match m.kind {
@@ -52,12 +53,12 @@ fn summary_from_class_member(
 
 fn summary_of(
     name: std::sync::Arc<str>,
-    ty: varn_checker::Type,
-    kind: varn_checker::ResolvedMemberKind,
+    ty: varn_sem::types::Type,
+    kind: varn_sem::semantic_info::ResolvedMemberKind,
     line: u32,
     col: u32,
-) -> varn_checker::ResolvedMemberSummary {
-    varn_checker::ResolvedMemberSummary {
+) -> varn_sem::semantic_info::ResolvedMemberSummary {
+    varn_sem::semantic_info::ResolvedMemberSummary {
         name,
         ty,
         kind,
@@ -149,11 +150,11 @@ impl DocumentState {
                                 std::sync::Arc::from(self.name(sym.name)),
                                 entry.ty,
                                 if is_fn || sym.kind == SymbolKind::Method {
-                                    varn_checker::ResolvedMemberKind::Method
+                                    varn_sem::semantic_info::ResolvedMemberKind::Method
                                 } else if sym.kind == SymbolKind::EnumMember {
-                                    varn_checker::ResolvedMemberKind::EnumMember
+                                    varn_sem::semantic_info::ResolvedMemberKind::EnumMember
                                 } else {
-                                    varn_checker::ResolvedMemberKind::Property
+                                    varn_sem::semantic_info::ResolvedMemberKind::Property
                                 },
                                 sym.line,
                                 sym.col,
@@ -169,9 +170,9 @@ impl DocumentState {
                                 std::sync::Arc::from(self.lexeme(tok)),
                                 entry.ty,
                                 if is_fn {
-                                    varn_checker::ResolvedMemberKind::Method
+                                    varn_sem::semantic_info::ResolvedMemberKind::Method
                                 } else {
-                                    varn_checker::ResolvedMemberKind::Property
+                                    varn_sem::semantic_info::ResolvedMemberKind::Property
                                 },
                                 tok.line,
                                 tok.col,
@@ -204,9 +205,9 @@ impl DocumentState {
                         std::sync::Arc::from(self.lexeme(tok)),
                         entry.ty,
                         if is_fn {
-                            varn_checker::ResolvedMemberKind::Method
+                            varn_sem::semantic_info::ResolvedMemberKind::Method
                         } else {
-                            varn_checker::ResolvedMemberKind::Property
+                            varn_sem::semantic_info::ResolvedMemberKind::Property
                         },
                         tok.line,
                         tok.col,
@@ -273,7 +274,7 @@ impl DocumentState {
         &self,
         line: u32,
         col: u32,
-    ) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
+    ) -> Option<(String, varn_sem::semantic_info::ResolvedMemberSummary)> {
         let tok = self.identifier_token_at(line, col)?;
 
         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
@@ -290,7 +291,7 @@ impl DocumentState {
     fn declared_member_at(
         &self,
         tok: &TokenRecord,
-    ) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
+    ) -> Option<(String, varn_sem::semantic_info::ResolvedMemberSummary)> {
         let sid = self.resolve_symbol_id_at_offset(tok.offset)?;
         let members = &self.db.bind.type_members;
 
@@ -326,11 +327,11 @@ impl DocumentState {
     pub(crate) fn expr_info_at_token(
         &self,
         tok: &super::TokenRecord,
-    ) -> Option<&varn_checker::ExprInfo> {
+    ) -> Option<&varn_sem::output::ExprInfo> {
         if let Some(info) = self.db.expr_types.get(&tok.offset) {
             return Some(info);
         }
-        let mut best: Option<(u32, &varn_checker::ExprInfo)> = None;
+        let mut best: Option<(u32, &varn_sem::output::ExprInfo)> = None;
         for (&offset, info) in &self.db.expr_types {
             if offset >= tok.offset
                 && offset < tok.offset + tok.length

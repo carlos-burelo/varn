@@ -1,8 +1,8 @@
 use crate::document::SymbolView;
 use tower_lsp_f::lsp_types::{InlayHint, InlayHintKind, Label, Position};
-use varn_checker::SymbolKind;
 use varn_core::ast::ExprKind;
 use varn_core::TypeKind;
+use varn_sem::symbol::SymbolKind;
 
 use crate::document::DocumentState;
 
@@ -67,7 +67,7 @@ fn fn_return_hint(state: &DocumentState, sym: SymbolView<'_>) -> Option<InlayHin
         return None;
     }
 
-    let ret_ty = varn_checker::Type::resolved(state.db.fn_shape(sym.ty())?.return_type);
+    let ret_ty = varn_sem::types::Type::resolved(state.db.fn_shape(sym.ty())?.return_type);
     if !worth_hinting(state, &ret_ty) {
         return None;
     }
@@ -271,7 +271,7 @@ fn find_rparen_col_on_line(state: &DocumentState, line: u32, after_col: u32) -> 
     last_rparen_col
 }
 
-fn worth_hinting(state: &DocumentState, ty: &varn_checker::Type) -> bool {
+fn worth_hinting(state: &DocumentState, ty: &varn_sem::types::Type) -> bool {
     !matches!(
         state.db.ty_kind(ty),
         TypeKind::Primitive(varn_core::LangPrimitive::Void | varn_core::LangPrimitive::Dynamic)

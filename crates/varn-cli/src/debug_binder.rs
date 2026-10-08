@@ -3,8 +3,6 @@
 use std::fs::read_to_string;
 
 fn main() {
-    const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));
-    varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
     varn_builtins::register_provider();
 
     let filename = "tests/47-isolates-multithread.vn";
@@ -12,25 +10,26 @@ fn main() {
     let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, filename);
     println!("Lex errors: {:?}", lex_errs);
 
-    let (program, _interner, _ast_arena) =
+    let (program, interner, ast_arena) =
         varn_parser::parse(tokens, lexeme_buf, filename, varn_core::AtomInterner::new())
             .expect("Parse error");
 
-    let bind = varn_checker::Binder::bind(&program);
+    let resolver = varn_resolver::DiskResolver::new();
+    let bind = varn_binder::Binder::bind(&program, &ast_arena, interner, &resolver);
     println!("Bind diagnostics count: {}", bind.diagnostics.len());
     for d in bind.diagnostics.iter() {
         println!("  - {:?}", d);
     }
 
     println!("\n=== BINDER SCOPES ===");
-    let arena = &bind.scopes;
-    print_scope_tree(0, arena, &bind.arena, 0);
+    print_scope_tree(0, &bind.scopes, &bind.arena, &bind.interner, 0);
 }
 
 fn print_scope_tree(
     id: usize,
-    arena: &varn_checker::scope::ScopeArena,
-    symbol_arena: &varn_checker::symbol::SymbolArena,
+    arena: &varn_sem::scope::ScopeArena,
+    symbol_arena: &varn_sem::symbol::SymbolArena,
+    interner: &varn_core::AtomInterner,
     indent: usize,
 ) {
     let scope = arena.get(id);
@@ -41,13 +40,13 @@ fn print_scope_tree(
         println!(
             "{}  - Binding: {} (SymbolId: {}, Kind: {:?}, Type: {:?})",
             indent_str,
-            name,
+            interner.try_resolve(*name).unwrap_or("?"),
             sym_id,
-            sym.kind(),
-            sym.ty()
+            sym.kind,
+            sym.ty
         );
     }
     for &child_id in &scope.children {
-        print_scope_tree(child_id, arena, symbol_arena, indent + 1);
+        print_scope_tree(child_id, arena, symbol_arena, interner, indent + 1);
     }
 }

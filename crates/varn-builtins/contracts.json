@@ -1,0 +1,5017 @@
+{
+  "contracts": {
+    "src/modules/core/errors/errors.vn": {
+      "classes": {
+        "DivisionByZero": [
+          {
+            "fallible": false,
+            "kind": "constructor",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "constructor"
+          }
+        ],
+        "Error": [
+          {
+            "fallible": false,
+            "kind": "property",
+            "params": [],
+            "ret": "str",
+            "symbol": "message"
+          },
+          {
+            "fallible": false,
+            "kind": "property",
+            "params": [],
+            "ret": "str",
+            "symbol": "name"
+          },
+          {
+            "fallible": false,
+            "kind": "property",
+            "params": [],
+            "ret": "str",
+            "symbol": "stack"
+          },
+          {
+            "fallible": false,
+            "kind": "constructor",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "constructor"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          }
+        ],
+        "IntegerOverflow": [
+          {
+            "fallible": false,
+            "kind": "constructor",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "constructor"
+          }
+        ],
+        "MatchError": [
+          {
+            "fallible": false,
+            "kind": "constructor",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "constructor"
+          }
+        ],
+        "RangeError": [
+          {
+            "fallible": false,
+            "kind": "constructor",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "constructor"
+          }
+        ],
+        "TypeError": [
+          {
+            "fallible": false,
+            "kind": "constructor",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "constructor"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/globals/globals.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": true,
+              "ty": "array"
+            }
+          ],
+          "ret": "void",
+          "symbol": "print"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": true,
+              "ty": "array"
+            }
+          ],
+          "ret": "void",
+          "symbol": "debug"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "void",
+          "symbol": "assertSummary"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "opt(str)"
+            }
+          ],
+          "ret": "str",
+          "symbol": "input"
+        }
+      ]
+    },
+    "src/modules/core/types/array/array.vn": {
+      "classes": {
+        "Array": [
+          {
+            "fallible": false,
+            "kind": "getter",
+            "params": [],
+            "ret": "int",
+            "symbol": "length"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "void",
+            "symbol": "push"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "pop"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "shift"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "void",
+            "symbol": "unshift"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "join"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "array",
+            "symbol": "slice"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "opt(dynamic)",
+            "symbol": "at"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": true,
+                "ty": "array"
+              }
+            ],
+            "ret": "array",
+            "symbol": "concat"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "array",
+            "symbol": "fill"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "array",
+            "symbol": "filter"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "opt(dynamic)",
+            "symbol": "find"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "int",
+            "symbol": "findIndex"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "array",
+            "symbol": "flat"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "array",
+            "symbol": "flatMap"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "void",
+            "symbol": "forEach"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "array",
+            "symbol": "map"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              },
+              {
+                "rest": false,
+                "ty": "opt(dynamic)"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "reduce"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "array",
+            "symbol": "reverse"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(dynamic)"
+              }
+            ],
+            "ret": "array",
+            "symbol": "sort"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              },
+              {
+                "rest": true,
+                "ty": "array"
+              }
+            ],
+            "ret": "array",
+            "symbol": "splice"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "every"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "some"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "includes"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "int",
+            "symbol": "indexOf"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "int",
+            "symbol": "lastIndexOf"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "isArray"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "array",
+            "symbol": "from"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/bigint/bigint.vn": {
+      "classes": {
+        "bigint": [
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toStr"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "toInt"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "toFloat"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/bool/bool.vn": {
+      "classes": {
+        "bool": [
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "valueOf"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/bytes/bytes.vn": {
+      "classes": {
+        "Bytes": [
+          {
+            "fallible": false,
+            "kind": "getter",
+            "params": [],
+            "ret": "int",
+            "symbol": "length"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "getByte"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "void",
+            "symbol": "setByte"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "slice"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toHex"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toBase64"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "fill"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "int",
+            "symbol": "copy"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "alloc"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "fromString"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "array"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "fromBytes"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/char/char.vn": {
+      "classes": {
+        "char": [
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "char",
+            "symbol": "fromCode"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toStr"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "int",
+            "symbol": "charCodeAt"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isAlphabetic"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isAlphanumeric"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isDigit"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isWhitespace"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isUppercase"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isLowercase"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "toUppercase"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "toLowercase"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isAscii"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isPunctuation"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/decimal/decimal.vn": {
+      "classes": {
+        "decimal": [
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "toFixed"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "abs"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "sign"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "negate"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "ceil"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "floor"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "round"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "trunc"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "fract"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "scale"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isZero"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isPositive"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isNegative"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "pow"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "toInt"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "toFloat"
+          },
+          {
+            "fallible": true,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "parse"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "opt(dynamic)",
+            "symbol": "tryParse"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/float/float.vn": {
+      "classes": {
+        "float": [
+          {
+            "fallible": false,
+            "kind": "static_getter",
+            "params": [],
+            "ret": "float",
+            "symbol": "MAX_VALUE"
+          },
+          {
+            "fallible": false,
+            "kind": "static_getter",
+            "params": [],
+            "ret": "float",
+            "symbol": "MIN_VALUE"
+          },
+          {
+            "fallible": false,
+            "kind": "static_getter",
+            "params": [],
+            "ret": "float",
+            "symbol": "EPSILON"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "float",
+            "symbol": "parse"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "isNaN"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "isFinite"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "isInfinite"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "valueOf"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "toFixed"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "abs"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "sign"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "negate"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "float"
+              }
+            ],
+            "ret": "float",
+            "symbol": "min"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "float"
+              }
+            ],
+            "ret": "float",
+            "symbol": "max"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "float"
+              },
+              {
+                "rest": false,
+                "ty": "float"
+              }
+            ],
+            "ret": "float",
+            "symbol": "clamp"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "float"
+              }
+            ],
+            "ret": "float",
+            "symbol": "pow"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isInteger"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "floor"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "ceil"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "round"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "trunc"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "toInt"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/int/int.vn": {
+      "classes": {
+        "int": [
+          {
+            "fallible": false,
+            "kind": "static_getter",
+            "params": [],
+            "ret": "int",
+            "symbol": "MAX_VALUE"
+          },
+          {
+            "fallible": false,
+            "kind": "static_getter",
+            "params": [],
+            "ret": "int",
+            "symbol": "MIN_VALUE"
+          },
+          {
+            "fallible": true,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "int",
+            "symbol": "parse"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "opt(int)",
+            "symbol": "tryParse"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "isInteger"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "isSafeInteger"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "valueOf"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toLocaleString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "toFixed"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "abs"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "sign"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "negate"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "bitwiseNot"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "min"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "max"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "clamp"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toHex"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toBinary"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toOctal"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "toFloat"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "pow"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isEven"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isOdd"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "wrappingAdd"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "wrappingSub"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "wrappingMul"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "saturatingAdd"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "saturatingSub"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "saturatingMul"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "opt(int)",
+            "symbol": "checkedAdd"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "opt(int)",
+            "symbol": "checkedSub"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "opt(int)",
+            "symbol": "checkedMul"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "div"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "floorDiv"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "ceilDiv"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "rem"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "mod"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/map/map.vn": {
+      "classes": {
+        "Map": [
+          {
+            "fallible": false,
+            "kind": "constructor",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "constructor"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "opt(dynamic)",
+            "symbol": "get"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              },
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "void",
+            "symbol": "set"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "has"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "delete"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "void",
+            "symbol": "clear"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "array",
+            "symbol": "keys"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "array",
+            "symbol": "values"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "array",
+            "symbol": "entries"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "void",
+            "symbol": "forEach"
+          },
+          {
+            "fallible": false,
+            "kind": "getter",
+            "params": [],
+            "ret": "int",
+            "symbol": "size"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/range/range.vn": {
+      "classes": {
+        "Range": [
+          {
+            "fallible": false,
+            "kind": "getter",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "start"
+          },
+          {
+            "fallible": false,
+            "kind": "getter",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "end"
+          },
+          {
+            "fallible": false,
+            "kind": "getter",
+            "params": [],
+            "ret": "bool",
+            "symbol": "inclusive"
+          },
+          {
+            "fallible": false,
+            "kind": "getter",
+            "params": [],
+            "ret": "int",
+            "symbol": "length"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "contains"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "array",
+            "symbol": "toArray"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "step"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "void",
+            "symbol": "forEach"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "array",
+            "symbol": "map"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "from"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "fromInclusive"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/set/set.vn": {
+      "classes": {
+        "Set": [
+          {
+            "fallible": false,
+            "kind": "constructor",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "constructor"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "void",
+            "symbol": "add"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "has"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "delete"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "void",
+            "symbol": "clear"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "array",
+            "symbol": "values"
+          },
+          {
+            "fallible": true,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "void",
+            "symbol": "forEach"
+          },
+          {
+            "fallible": false,
+            "kind": "getter",
+            "params": [],
+            "ret": "int",
+            "symbol": "size"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/core/types/str/str.vn": {
+      "classes": {
+        "str": [
+          {
+            "fallible": false,
+            "kind": "static_getter",
+            "params": [],
+            "ret": "str",
+            "symbol": "EMPTY"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": true,
+                "ty": "array"
+              }
+            ],
+            "ret": "str",
+            "symbol": "fromCharCode"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "str",
+            "symbol": "from"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "str",
+            "symbol": "parse"
+          },
+          {
+            "fallible": false,
+            "kind": "static_method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "array"
+              },
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "join"
+          },
+          {
+            "fallible": false,
+            "kind": "getter",
+            "params": [],
+            "ret": "int",
+            "symbol": "length"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toString"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toStr"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "valueOf"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toLowerCase"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "toUpperCase"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "trim"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "trimStart"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "trimEnd"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "includes"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "contains"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "startsWith"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "bool",
+            "symbol": "endsWith"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "int",
+            "symbol": "indexOf"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "int",
+            "symbol": "lastIndexOf"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "substring"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "slice"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "opt(str)",
+            "symbol": "at"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              },
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "str",
+            "symbol": "replace"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              },
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "str",
+            "symbol": "replaceAll"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "array",
+            "symbol": "split"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "charCodeAt"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "charCode"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "int",
+            "symbol": "codePointAt"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "array",
+            "symbol": "lines"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "array",
+            "symbol": "words"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              }
+            ],
+            "ret": "str",
+            "symbol": "repeat"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "padStart"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "padLeft"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "padEnd"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "opt(str)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "padRight"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "str"
+              }
+            ],
+            "ret": "str",
+            "symbol": "concat"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "int"
+              },
+              {
+                "rest": false,
+                "ty": "opt(int)"
+              }
+            ],
+            "ret": "str",
+            "symbol": "substr"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isEmpty"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isBlank"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isDigit"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isLetter"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "bool",
+            "symbol": "isWhitespace"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "reverse"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "str",
+            "symbol": "capitalize"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "int",
+            "symbol": "toInt"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "float",
+            "symbol": "toFloat"
+          }
+        ]
+      },
+      "functions": []
+    },
+    "src/modules/runtime/buffer/buffer_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "alloc$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "fromBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "fromString$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "int",
+          "symbol": "len$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "getByte$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "setByte$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "slice$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "str",
+          "symbol": "toString$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "str",
+          "symbol": "toHex$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "str",
+          "symbol": "toBase64$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "fill$"
+        }
+      ]
+    },
+    "src/modules/runtime/compress/compress_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "gzip$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "gunzip$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "deflate$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "inflate$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "tarCreate$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "tarExtract$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "zipCreate$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "zipExtract$"
+        }
+      ]
+    },
+    "src/modules/runtime/crypto/crypto_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "sha256$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "sha512$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "uuid$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "uuidV4$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "uuidV7$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "uuidValidate$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "array",
+          "symbol": "randomBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "randomBytesBuffer$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "str",
+          "symbol": "randomHex$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "base64Enc$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "base64Dec$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "hmac$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "hmacBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "str",
+          "symbol": "base64EncBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "base64DecBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "pbkdf2$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "timingSafeEqual$"
+        }
+      ]
+    },
+    "src/modules/runtime/csv/csv_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "bool"
+            },
+            {
+              "rest": false,
+              "ty": "bool"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "parse$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "stringify$"
+        }
+      ]
+    },
+    "src/modules/runtime/ffi/ffi_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "dlopen$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "dlclose$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "dlsym$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "call$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "alloc$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "free$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "readInt$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "writeInt$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "bool"
+            }
+          ],
+          "ret": "float",
+          "symbol": "readFloat$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "bool"
+            }
+          ],
+          "ret": "void",
+          "symbol": "writeFloat$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "str",
+          "symbol": "readCString$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "allocCString$"
+        }
+      ]
+    },
+    "src/modules/runtime/fs/fs_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "open$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "str",
+          "symbol": "readFd$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "readFdBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "writeFd$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "int",
+          "symbol": "writeFdBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "readFileBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "void",
+          "symbol": "writeFileBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "readFileText$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "writeFileText$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "appendFileText$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "copyFile$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "array",
+          "symbol": "readLines$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "str",
+          "symbol": "readFdAll$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "readFdAllBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "seek$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "close$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "exists$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "stat$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "mkdir$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "mkdirAll$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "array",
+          "symbol": "readDir$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "remove$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "removeAll$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "rename$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "tempDir$"
+        }
+      ]
+    },
+    "src/modules/runtime/io/io_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": true,
+              "ty": "array"
+            }
+          ],
+          "ret": "void",
+          "symbol": "write$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": true,
+              "ty": "array"
+            }
+          ],
+          "ret": "void",
+          "symbol": "writeln$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "void",
+          "symbol": "flush$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "opt(str)"
+            }
+          ],
+          "ret": "str",
+          "symbol": "readLine$"
+        }
+      ]
+    },
+    "src/modules/runtime/json/json_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "parse$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "str",
+          "symbol": "stringify$"
+        }
+      ]
+    },
+    "src/modules/runtime/math/math_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "abs$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "sqrt$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "sin$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "cos$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "tan$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "floor$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "ceil$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "round$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "float",
+          "symbol": "random$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "acos$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "asin$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "atan$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "atan2$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "exp$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "log$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "log10$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "log2$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "pow$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "cbrt$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "hypot$"
+        }
+      ]
+    },
+    "src/modules/runtime/net/net_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "isIP$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "isIPv4$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "isIPv6$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "encodeURIComponent$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "decodeURIComponent$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "tcpListen$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "tcpAccept$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "tcpConnect$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "tcpRead$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "tcpWrite$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "tcpClose$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "tcpCloseListener$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "parseHttpRequest$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "sendHttpResponse$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "udpBind$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "int",
+          "symbol": "udpSendTo$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "udpRecvFrom$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "udpClose$"
+        }
+      ]
+    },
+    "src/modules/runtime/path/path_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "sep$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "delimiter$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "normalize$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "dirname$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "opt(str)"
+            }
+          ],
+          "ret": "str",
+          "symbol": "basename$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "extname$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "isAbsolute$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "str",
+          "symbol": "join$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "str",
+          "symbol": "resolve$"
+        }
+      ]
+    },
+    "src/modules/runtime/process/process_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "exec$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "int",
+          "symbol": "spawnProcess$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "waitProcess$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "killProcess$"
+        }
+      ]
+    },
+    "src/modules/runtime/reflect/reflect_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "void",
+          "symbol": "defineMetadata$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "getMetadata$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "hasMetadata$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "createMetaKey$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "void",
+          "symbol": "setMetaKey$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "getMetaKey$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "hasMetaKey$"
+        }
+      ]
+    },
+    "src/modules/runtime/regex/regex_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "compile$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "test$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "exec$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "findAll$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "replace$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "split$"
+        }
+      ]
+    },
+    "src/modules/runtime/sqlite/sqlite_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "open$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "close$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "exec$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "array",
+          "symbol": "queryAll$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "queryOne$"
+        }
+      ]
+    },
+    "src/modules/runtime/sys/sys_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "platform$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "cwd$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "array",
+          "symbol": "args$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "opt(int)"
+            }
+          ],
+          "ret": "void",
+          "symbol": "exit$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "env$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "setEnv$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "float",
+          "symbol": "now$"
+        }
+      ]
+    },
+    "src/modules/runtime/task/task_runtime.vn": {
+      "classes": {
+        "Channel": [
+          {
+            "fallible": false,
+            "kind": "property",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "tx"
+          },
+          {
+            "fallible": false,
+            "kind": "property",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "rx"
+          }
+        ],
+        "ChannelClosed": [],
+        "IsolateHandle": [
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "join"
+          }
+        ],
+        "Receiver": [
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "receive"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "dynamic",
+            "symbol": "next"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "void",
+            "symbol": "dispose"
+          }
+        ],
+        "Sender": [
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [
+              {
+                "rest": false,
+                "ty": "dynamic"
+              }
+            ],
+            "ret": "dynamic",
+            "symbol": "send"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "void",
+            "symbol": "close"
+          },
+          {
+            "fallible": false,
+            "kind": "method",
+            "params": [],
+            "ret": "void",
+            "symbol": "dispose"
+          }
+        ]
+      },
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": true,
+              "ty": "array"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "spawn$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "sleep$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "parallel$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "void",
+          "symbol": "cancelTask$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "dynamic",
+          "symbol": "yieldTask$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "spawnIsolate$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "channel$"
+        }
+      ]
+    },
+    "src/modules/runtime/time/time_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "int",
+          "symbol": "nowMs$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "parseIsoDuration$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "msToParts$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "int",
+          "symbol": "partsToMs$"
+        }
+      ]
+    },
+    "src/modules/runtime/ws/ws_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "wsKey$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "str",
+          "symbol": "wsAcceptResponse$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "void",
+          "symbol": "wsValidateResponse$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "wsFrameBytes$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "dynamic"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "wsParseFrame$"
+        }
+      ]
+    }
+  },
+  "files": {
+    "src/modules/core/errors/errors.vn": "10709538da2db0d3",
+    "src/modules/core/globals/globals.vn": "35b1bf2e72e3a1fe",
+    "src/modules/core/types/array/array.vn": "37f43737ed7fbf76",
+    "src/modules/core/types/bigint/bigint.vn": "25da9742878d3b47",
+    "src/modules/core/types/bool/bool.vn": "64cd036ece5aa3da",
+    "src/modules/core/types/bytes/bytes.vn": "ec49837e411bff77",
+    "src/modules/core/types/char/char.vn": "6525053db5a6f70f",
+    "src/modules/core/types/decimal/decimal.vn": "7f69d1cc1761ba48",
+    "src/modules/core/types/float/float.vn": "3145b5b41d1df1c8",
+    "src/modules/core/types/int/int.vn": "a2dccfe61bc20ff5",
+    "src/modules/core/types/map/map.vn": "d036e7b4a9f37f2c",
+    "src/modules/core/types/range/range.vn": "a42090fbdcfe421e",
+    "src/modules/core/types/set/set.vn": "ffef57063ef10859",
+    "src/modules/core/types/str/str.vn": "5c2c55955a7b91a0",
+    "src/modules/runtime/buffer/buffer_runtime.vn": "5157b78fe04bdbc3",
+    "src/modules/runtime/compress/compress_runtime.vn": "6554fc203fdbb972",
+    "src/modules/runtime/crypto/crypto_runtime.vn": "2d5fde9b9aa8f739",
+    "src/modules/runtime/csv/csv_runtime.vn": "b2b54bdac48c554c",
+    "src/modules/runtime/ffi/ffi_runtime.vn": "93aa79ed79baa8c7",
+    "src/modules/runtime/fs/fs_runtime.vn": "f3e97b53782fcbae",
+    "src/modules/runtime/io/io_runtime.vn": "1815b87646c5c725",
+    "src/modules/runtime/json/json_runtime.vn": "839713f2280e584e",
+    "src/modules/runtime/math/math_runtime.vn": "e9a027b63373cc9b",
+    "src/modules/runtime/net/net_runtime.vn": "1272e3e42415014d",
+    "src/modules/runtime/path/path_runtime.vn": "ea5d0d4d782e9559",
+    "src/modules/runtime/process/process_runtime.vn": "d5f18595b16490e3",
+    "src/modules/runtime/reflect/reflect_runtime.vn": "75e87be223cac492",
+    "src/modules/runtime/regex/regex_runtime.vn": "609a94e4b6ea8dad",
+    "src/modules/runtime/sqlite/sqlite_runtime.vn": "85b566f5fac5e032",
+    "src/modules/runtime/sys/sys_runtime.vn": "c8ee866f3bfb7849",
+    "src/modules/runtime/task/task_runtime.vn": "18090b06e3b71a8f",
+    "src/modules/runtime/time/time_runtime.vn": "63102a15b1bd3f56",
+    "src/modules/runtime/ws/ws_runtime.vn": "6f22dbfe8544d40e"
+  },
+  "version": 1
+}

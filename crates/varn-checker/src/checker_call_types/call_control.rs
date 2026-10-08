@@ -1,7 +1,7 @@
 use super::CallTypeCtx;
-use crate::types::Type;
 use varn_core::ast::ExprId;
 use varn_core::TypeKind;
+use varn_sem::types::Type;
 
 pub(super) fn infer_await(c: &mut CallTypeCtx, argument: ExprId) -> Option<Type> {
     let ty = c.infer(argument)?;

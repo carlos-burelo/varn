@@ -1,8 +1,10 @@
 use crate::document::{DocumentState, TokenRecord};
 use rustc_hash::FxHashSet;
 use tower_lsp_f::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
-use varn_checker::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary, SymbolKind, Type};
 use varn_core::{LangPrimitive, TokenKind};
+use varn_sem::semantic_info::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary};
+use varn_sem::symbol::SymbolKind;
+use varn_sem::types::Type;
 
 pub struct ReceiverInfo {
     pub ty: Type,

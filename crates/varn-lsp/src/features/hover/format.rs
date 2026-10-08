@@ -1,6 +1,6 @@
 use crate::document::{DocumentState, SymbolView};
-use varn_checker::SymbolKind;
-use varn_checker::{ResolvedMemberKind, ResolvedMemberSummary};
+use varn_sem::semantic_info::{ResolvedMemberKind, ResolvedMemberSummary};
+use varn_sem::symbol::SymbolKind;
 
 pub fn format_type_params(type_params: &[String]) -> String {
     if type_params.is_empty() {
@@ -10,7 +10,7 @@ pub fn format_type_params(type_params: &[String]) -> String {
     }
 }
 
-pub fn format_type_params_str(state: &DocumentState, ty: &varn_checker::Type) -> String {
+pub fn format_type_params_str(state: &DocumentState, ty: &varn_sem::types::Type) -> String {
     match state.db.ty_kind(ty) {
         varn_core::TypeKind::Generic(_, args, _) => {
             let names: Vec<String> = state

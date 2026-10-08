@@ -1,0 +1,251 @@
+use std::sync::Arc;
+use varn_core::ast::{Pattern, SumTypeDecl};
+
+use varn_sem::symbol::{Symbol, SymbolKind};
+use varn_sem::types::Type;
+
+impl<'r> super::super::Binder<'r> {
+    pub(crate) fn bind_pattern(
+        &mut self,
+        pattern: &Pattern,
+        kind: SymbolKind,
+        line: u32,
+        doc: Option<String>,
+        ty: Option<Type>,
+        explicit: bool,
+    ) {
+        match pattern {
+            Pattern::Identifier { name, range } => {
+                let mut sym = Symbol::new(kind, *name, line);
+                sym.doc = doc.map(|d| self.intern_local(&d));
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                sym.has_explicit_type = explicit;
+                sym.ty = ty;
+                self.define(*name, sym);
+            }
+            Pattern::Array { elements, rest, .. } => {
+                let elem_ty = ty.as_ref().and_then(|t| match self.ty_table.get(t.0) {
+                    varn_core::TypeKind::Array(inner) => Some(Type::resolved(inner)),
+                    varn_core::TypeKind::Generic(name, args, _)
+                        if self.interner.resolve(name) == varn_core::BuiltinType::Array.name()
+                            && self.ty_table.get_list(args).len() == 1 =>
+                    {
+                        Some(Type::resolved(self.ty_table.get_list(args)[0]))
+                    }
+                    varn_core::TypeKind::Primitive(_)
+                    | varn_core::TypeKind::Builtin(_)
+                    | varn_core::TypeKind::Literal(_)
+                    | varn_core::TypeKind::This
+                    | varn_core::TypeKind::Union(_)
+                    | varn_core::TypeKind::Intersection(_)
+                    | varn_core::TypeKind::Tuple(_)
+                    | varn_core::TypeKind::Named(..)
+                    | varn_core::TypeKind::Generic(..)
+                    | varn_core::TypeKind::TemplateLiteral(_)
+                    | varn_core::TypeKind::Fn(_)
+                    | varn_core::TypeKind::Object(_)
+                    | varn_core::TypeKind::Typeof(_)
+                    | varn_core::TypeKind::KeyOf(_)
+                    | varn_core::TypeKind::IndexedAccess { .. }
+                    | varn_core::TypeKind::Mapped { .. }
+                    | varn_core::TypeKind::Conditional { .. }
+                    | varn_core::TypeKind::Infer(_)
+                    | varn_core::TypeKind::EnumVariant { .. }
+                    | varn_core::TypeKind::TypePredicate { .. } => None,
+                });
+                for el in elements.iter().flatten() {
+                    self.bind_pattern(&el.pattern, kind, line, doc.clone(), elem_ty, false);
+                }
+                if let Some(r) = rest {
+                    self.bind_pattern(r, kind, line, doc.clone(), ty, false);
+                }
+            }
+            Pattern::Object {
+                properties, rest, ..
+            } => {
+                for prop in properties {
+                    let mut prop_kind = kind;
+                    let key_str = self.interner.resolve(prop.key).to_string();
+                    let ty_kind = ty.map(|t| self.ty_table.get(t.0));
+                    let prop_ty = match ty_kind {
+                        Some(varn_core::TypeKind::Object(mid)) => self
+                            .ty_table
+                            .get_object_members(mid)
+                            .to_vec()
+                            .iter()
+                            .find_map(|m| match m {
+                                varn_sem::types::ObjectTypeMember::Property {
+                                    name, ty, ..
+                                } if name.as_ref() == key_str => Some(Type::resolved(*ty)),
+                                varn_sem::types::ObjectTypeMember::Method {
+                                    name,
+                                    params,
+                                    return_type,
+                                    is_arrow,
+                                    ..
+                                } if name.as_ref() == key_str => Some(varn_sem::types::Type::fn_(
+                                    varn_sem::types::FunctionType {
+                                        params: params.clone(),
+                                        return_type: *return_type,
+                                        is_arrow: *is_arrow,
+                                        type_params: vec![],
+                                    },
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                )),
+                                varn_sem::types::ObjectTypeMember::Property { .. }
+                                | varn_sem::types::ObjectTypeMember::Method { .. }
+                                | varn_sem::types::ObjectTypeMember::Index { .. }
+                                | varn_sem::types::ObjectTypeMember::Callable { .. } => None,
+                            }),
+                        Some(varn_core::TypeKind::Named(name_atom, origin_atom))
+                        | Some(varn_core::TypeKind::Generic(name_atom, _, origin_atom)) => {
+                            let name: Arc<str> = Arc::from(self.interner.resolve(name_atom));
+                            let origin: Option<Arc<str>> =
+                                origin_atom.map(|o| Arc::from(self.interner.resolve(o)));
+                            self.local_class_members(name.as_ref())
+                                .or_else(|| self.local_interface_members(name.as_ref()))
+                                .and_then(|members| {
+                                    members
+                                        .iter()
+                                        .find(|m| m.name.as_ref() == key_str)
+                                        .map(|m| m.ty)
+                                })
+                                .or_else(|| {
+                                    if name.as_ref() != "*" {
+                                        return None;
+                                    }
+                                    let origin_path = origin.as_deref()?;
+                                    let mut visiting = vec![self.source_file.to_string()];
+                                    let exports =
+                                        self.resolver.module_exports(origin_path, &mut visiting);
+                                    if let Some(sym) = exports.get(key_str.as_str()) {
+                                        prop_kind = sym.kind;
+                                        sym.ty
+                                    } else {
+                                        let has_ns = self
+                                            .type_members
+                                            .namespaces
+                                            .get(key_str.as_str())
+                                            .and_then(|members| members.first())
+                                            .is_some();
+                                        if has_ns {
+                                            prop_kind = SymbolKind::Namespace;
+                                            Some(Type::named_with_origin(
+                                                key_str.clone(),
+                                                Some(Arc::from(origin_path)),
+                                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                            ))
+                                        } else {
+                                            None
+                                        }
+                                    }
+                                })
+                        }
+                        _ => None,
+                    };
+                    self.bind_pattern(&prop.value, prop_kind, line, doc.clone(), prop_ty, false);
+                }
+                if let Some(r) = rest {
+                    let _ = &ty;
+                    self.bind_pattern(r, kind, line, doc.clone(), None, false);
+                }
+            }
+            Pattern::Assignment { left, right, .. } => {
+                let resolved_ty = if ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()) {
+                    let inferred = self.infer_expr_type_self(*right);
+                    if inferred.is_dynamic() {
+                        ty
+                    } else {
+                        Some(inferred)
+                    }
+                } else {
+                    ty
+                };
+                self.bind_pattern(left, kind, line, doc, resolved_ty, false);
+            }
+            Pattern::Rest { argument, .. } => {
+                self.bind_pattern(argument, kind, line, doc, ty, false);
+            }
+        }
+    }
+
+    pub(crate) fn bind_sum_type(&mut self, t: &SumTypeDecl) {
+        let id_rc: Arc<str> = Arc::from(self.interner.resolve(t.id));
+        let alias_ty = Type::named_with_origin(
+            id_rc.clone(),
+            Some(Arc::from(self.source_file.as_ref())),
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        );
+        let mut pe_sym =
+            Symbol::new(SymbolKind::TypeAlias, t.id, t.range.start.line).with_type(alias_ty);
+
+        pe_sym.type_params = t.type_params.iter().map(|tp| tp.name).collect();
+        self.define(t.id, pe_sym);
+
+        let mut variant_names = Vec::new();
+
+        for v in &t.variants {
+            let variant_rc: Arc<str> = Arc::from(self.interner.resolve(v.name));
+            variant_names.push(variant_rc.clone());
+
+            let fields: Vec<(Arc<str>, Type)> = v
+                .fields
+                .iter()
+                .map(|f| {
+                    let ty = self.resolve_type(&f.ty);
+                    (Arc::from(self.interner.resolve(f.name)), ty)
+                })
+                .collect();
+
+            self.sum_variant_parent
+                .insert(variant_rc.clone(), id_rc.clone());
+            self.sum_variant_fields
+                .insert(variant_rc.clone(), fields.clone());
+
+            if v.fields.is_empty() {
+                let variant_ty = Type::named_with_origin(
+                    id_rc.clone(),
+                    Some(Arc::from(self.source_file.as_ref())),
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
+                let sym = Symbol::new(SymbolKind::Const, v.name, v.range.start.line)
+                    .with_type(variant_ty);
+                self.define(v.name, sym);
+            } else {
+                let params: Vec<varn_sem::types::FunctionParam> = fields
+                    .iter()
+                    .map(|(fname, fty)| varn_sem::types::FunctionParam {
+                        name: Some(fname.clone()),
+                        ty: fty.0,
+                        optional: false,
+                        is_rest: false,
+                    })
+                    .collect();
+                let ret_ty = Type::named_with_origin(
+                    id_rc.clone(),
+                    Some(Arc::from(self.source_file.as_ref())),
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
+                let fn_ty = Type::fn_(
+                    varn_sem::types::FunctionType {
+                        params,
+                        return_type: ret_ty.0,
+                        is_arrow: false,
+                        type_params: t
+                            .type_params
+                            .iter()
+                            .map(|tp| Arc::from(self.interner.resolve(tp.name)))
+                            .collect(),
+                    },
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
+                let sym =
+                    Symbol::new(SymbolKind::Function, v.name, v.range.start.line).with_type(fn_ty);
+                self.define(v.name, sym);
+            }
+        }
+
+        self.sum_type_variants.insert(id_rc, variant_names);
+    }
+}

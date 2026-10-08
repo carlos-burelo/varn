@@ -1,15 +1,9 @@
 use super::Checker;
-use crate::binder::{BindResult, ClassParent};
-use crate::types::{ClassMemberKind, Type};
 use std::collections::BTreeMap;
 use std::sync::Arc;
-
-#[derive(Clone, Debug)]
-pub struct InheritedField {
-    pub name: Arc<str>,
-    pub ty: Type,
-    pub optional: bool,
-}
+use varn_sem::bind::{BindResult, ClassParent};
+use varn_sem::output::InheritedField;
+use varn_sem::types::ClassMemberKind;
 
 impl Checker<'_> {
     pub(super) fn collect_foreign_inherited_fields(

@@ -1,4 +1,4 @@
-use crate::binder::BindResult;
+use varn_sem::bind::BindResult;
 
 pub(super) fn resolve_atom_text(bind: &BindResult, atom: varn_core::Atom) -> String {
     bind.interner
