@@ -29,6 +29,7 @@ pub(crate) async fn completion(
             let index = an.workspace.index.read().ok();
             Some(build_completion_response(
                 &state,
+                an.workspace.resolver(),
                 pos.line,
                 pos.character,
                 trigger_char.as_deref(),

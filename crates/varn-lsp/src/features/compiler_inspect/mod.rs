@@ -70,7 +70,7 @@ fn std_read(specifier: &str) -> Result<String, String> {
 
 fn memory_stats(workspace: &Workspace) -> serde_json::Value {
     let (graph_binds, graph_programs, graph_arenas, graph_exports) =
-        crate::workspace::resolver::with_resolver(|r| r.graph_stats());
+        workspace.resolver().graph_stats();
 
     let mut source_bytes: u64 = 0;
     let mut token_count: u64 = 0;

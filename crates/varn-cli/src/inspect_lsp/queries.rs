@@ -124,6 +124,7 @@ fn tag(name: &str, value: String) -> String {
 fn complete(ctx: &Ctx) -> (Vec<String>, Outcome) {
     let (resp, log) = varn_lsp::features::completion::build_completion_response(
         ctx.analysis,
+        ctx.analysis.resolver.as_ref(),
         ctx.line,
         ctx.col,
         ctx.trig_char,

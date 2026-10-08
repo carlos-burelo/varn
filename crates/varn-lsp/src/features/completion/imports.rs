@@ -106,21 +106,26 @@ fn relative_varn_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem>
     items
 }
 
-pub fn build_module_export_completions(module_path: &str, doc_uri: &str) -> Vec<CompletionItem> {
+pub fn build_module_export_completions(
+    resolver: &varn_checker::module_resolver::DiskResolver,
+    module_path: &str,
+    doc_uri: &str,
+) -> Vec<CompletionItem> {
     if module_path.is_empty() {
         return Vec::new();
     }
     if module_path.starts_with('.') || module_path.starts_with('/') {
-        build_relative_export_completions(module_path, doc_uri)
+        build_relative_export_completions(resolver, module_path, doc_uri)
     } else {
-        build_stdlib_export_completions(module_path)
+        build_stdlib_export_completions(resolver, module_path)
     }
 }
 
-fn build_stdlib_export_completions(module_path: &str) -> Vec<CompletionItem> {
-    let exports = crate::workspace::resolver::with_resolver(|r| r.stdlib_exports(module_path))
-        .as_ref()
-        .clone();
+fn build_stdlib_export_completions(
+    resolver: &varn_checker::module_resolver::DiskResolver,
+    module_path: &str,
+) -> Vec<CompletionItem> {
+    let exports = resolver.stdlib_exports(module_path).as_ref().clone();
     let mut items: Vec<CompletionItem> = exports
         .into_iter()
         .filter(|(name, _)| !name.contains('.'))
@@ -137,7 +142,11 @@ fn build_stdlib_export_completions(module_path: &str) -> Vec<CompletionItem> {
     items
 }
 
-fn build_relative_export_completions(module_path: &str, doc_uri: &str) -> Vec<CompletionItem> {
+fn build_relative_export_completions(
+    resolver: &varn_checker::module_resolver::DiskResolver,
+    module_path: &str,
+    doc_uri: &str,
+) -> Vec<CompletionItem> {
     use std::path::Path;
 
     let doc_path = uri_to_path(doc_uri);
@@ -158,10 +167,10 @@ fn build_relative_export_completions(module_path: &str, doc_uri: &str) -> Vec<Co
         joined.to_string_lossy().into_owned()
     };
 
-    let exports =
-        crate::workspace::resolver::with_resolver(|r| r.module_exports(&abs_str, &mut Vec::new()))
-            .as_ref()
-            .clone();
+    let exports = resolver
+        .module_exports(&abs_str, &mut Vec::new())
+        .as_ref()
+        .clone();
 
     let mut items: Vec<CompletionItem> = exports
         .into_iter()

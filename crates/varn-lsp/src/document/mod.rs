@@ -110,6 +110,8 @@ pub struct DocumentState {
 
     pub db: SemanticDB,
 
+    pub resolver: std::sync::Arc<varn_checker::module_resolver::DiskResolver>,
+
     pub import_paths: Vec<String>,
     pub spatial_index: crate::query::SpatialIndex,
     pub ast: Option<varn_core::ast::Program>,
@@ -143,14 +145,12 @@ impl DocumentState {
     }
 
     pub fn members_of_type(&self, ty: &Type) -> Vec<varn_checker::ResolvedMemberSummary> {
-        crate::workspace::resolver::with_resolver(|r| {
-            varn_checker::get_members_of_type(
-                r,
-                ty,
-                &self.db.bind,
-                std::sync::Arc::make_mut(&mut self.db.types.borrow_mut()),
-            )
-        })
+        varn_checker::get_members_of_type(
+            self.resolver.as_ref(),
+            ty,
+            &self.db.bind,
+            std::sync::Arc::make_mut(&mut self.db.types.borrow_mut()),
+        )
     }
 
     pub fn name(&self, atom: varn_core::Atom) -> &str {

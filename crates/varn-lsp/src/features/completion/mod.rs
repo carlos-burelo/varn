@@ -28,6 +28,7 @@ pub use reflection::build_reflection_completions;
 
 pub fn build_completion_response(
     state: &DocumentState,
+    resolver: &varn_checker::module_resolver::DiskResolver,
     line: u32,
     col: u32,
     trigger_char: Option<&str>,
@@ -90,7 +91,7 @@ pub fn build_completion_response(
     if let Some(module_path) = named_import_module_at(&state.source, line, col) {
         let already_imported = named_imported_names_at(&state.source, line, col);
         let doc_uri = state.uri.clone();
-        let all = build_module_export_completions(&module_path, &doc_uri);
+        let all = build_module_export_completions(resolver, &module_path, &doc_uri);
         let total = all.len();
         let items: Vec<_> = all
             .into_iter()

@@ -3,6 +3,10 @@
 use varn_lsp::features::inlay_hints::build_inlay_hints;
 use varn_lsp::pipeline::run_pipeline;
 
+fn test_resolver() -> std::sync::Arc<varn_checker::module_resolver::DiskResolver> {
+    std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new())
+}
+
 #[test]
 fn test_no_inlay_hints_when_explicit_type_present() {
     let source = r#"
@@ -25,7 +29,7 @@ class SortedPair<T> {
 }
 "#;
     let uri = "file:///test/sorted_pair.vn".to_string();
-    let state = run_pipeline(source.to_string(), uri);
+    let state = run_pipeline(source.to_string(), uri, test_resolver());
 
     let hints = build_inlay_hints(&state);
 
@@ -43,7 +47,7 @@ const num = 42;
 const greeting = "hello";
 "#;
     let uri = "file:///test/inferred.vn".to_string();
-    let state = run_pipeline(source.to_string(), uri);
+    let state = run_pipeline(source.to_string(), uri, test_resolver());
 
     let hints = build_inlay_hints(&state);
 

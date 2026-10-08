@@ -3,11 +3,15 @@
 use varn_lsp::features::completion::build_completion_response;
 use varn_lsp::pipeline::run_pipeline;
 
+fn test_resolver() -> std::sync::Arc<varn_checker::module_resolver::DiskResolver> {
+    std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new())
+}
+
 #[test]
 fn test_incomplete_variable_declaration() {
     let source = "const x = ";
     let uri = "file:///test/incomplete.vn".to_string();
-    let state = run_pipeline(source.to_string(), uri);
+    let state = run_pipeline(source.to_string(), uri, test_resolver());
 
     assert!(state.ast.is_some());
 }
@@ -24,10 +28,11 @@ const p = new Person();
 p.
 "#;
     let uri = "file:///test/person.vn".to_string();
-    let state = run_pipeline(source.to_string(), uri);
+    let state = run_pipeline(source.to_string(), uri, test_resolver());
 
     let (completions, _) = build_completion_response(
         &state,
+        state.resolver.as_ref(),
         7,
         2,
         Some("."),

@@ -1,6 +1,5 @@
 #![allow(clippy::arc_with_non_send_sync)]
 
-pub mod resolver;
 pub mod revision;
 pub mod std_sources;
 use crate::db::{CancellationToken, Database, FileId};
@@ -10,6 +9,7 @@ use crate::pipeline::run_pipeline;
 use crate::query::exports::{ExportedSymbol, ModuleExports};
 use dashmap::DashMap;
 use std::sync::{Arc, RwLock};
+use varn_checker::module_resolver::DiskResolver;
 
 pub use revision::{Cached, Revision};
 
@@ -19,6 +19,7 @@ pub struct Workspace {
     pub db: Arc<Database>,
     pub index: RwLock<ProjectIndex>,
     revision: RwLock<Revision>,
+    resolver: Arc<DiskResolver>,
 }
 
 impl Workspace {
@@ -29,7 +30,20 @@ impl Workspace {
             db: Arc::new(Database::new()),
             index: RwLock::new(ProjectIndex::new()),
             revision: RwLock::new(Revision::new()),
+            resolver: Arc::new(DiskResolver::new()),
         }
+    }
+
+    pub fn resolver(&self) -> &DiskResolver {
+        &self.resolver
+    }
+
+    pub fn resolver_handle(&self) -> Arc<DiskResolver> {
+        Arc::clone(&self.resolver)
+    }
+
+    pub fn invalidate(&self, id: &varn_core::ModuleId) {
+        self.resolver.invalidate(id);
     }
 
     pub fn update_source(&self, uri: &str, source: &str) -> (FileId, u64, CancellationToken) {
@@ -52,7 +66,7 @@ impl Workspace {
             }
         }
 
-        resolver::invalidate(&Self::module_id_of(&uri));
+        self.invalidate(&Self::module_id_of(&uri));
 
         let file_id = self.db.intern(&uri);
 
@@ -64,7 +78,7 @@ impl Workspace {
             self.db.set_source(file_id, source.clone());
         }
 
-        let state = Arc::new(run_pipeline(source, uri.clone()));
+        let state = Arc::new(run_pipeline(source, uri.clone(), self.resolver_handle()));
 
         let current_exports = extract_exports(&state);
         let exports_changed = match self.exports.get(&file_id) {
@@ -93,7 +107,11 @@ impl Workspace {
         self.files.insert(uri.clone(), state);
 
         for (dep_uri, dep_source) in dependents {
-            let dep_state = Arc::new(run_pipeline(dep_source, dep_uri.clone()));
+            let dep_state = Arc::new(run_pipeline(
+                dep_source,
+                dep_uri.clone(),
+                self.resolver_handle(),
+            ));
             {
                 let mut idx = self.index.write().unwrap_or_else(|e| e.into_inner());
                 idx.update_file(&dep_uri, &dep_state);
@@ -114,9 +132,9 @@ impl Workspace {
     }
 
     pub fn index_file(&self, uri: String, source: String) {
-        resolver::invalidate(&Self::module_id_of(&uri));
+        self.invalidate(&Self::module_id_of(&uri));
         let file_id = self.db.intern(&uri);
-        let state = run_pipeline(source, uri.clone());
+        let state = run_pipeline(source, uri.clone(), self.resolver_handle());
         let current_exports = extract_exports(&state);
         self.exports.insert(file_id, current_exports);
         {
@@ -130,7 +148,7 @@ impl Workspace {
     }
 
     pub fn remove_file(&self, uri: &str) {
-        resolver::invalidate(&Self::module_id_of(uri));
+        self.invalidate(&Self::module_id_of(uri));
         if let Some(file_id) = self.db.file_id(uri) {
             self.exports.remove(&file_id);
         }

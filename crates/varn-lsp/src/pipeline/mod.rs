@@ -8,7 +8,11 @@ use varn_checker::SymbolKind;
 use varn_core::ast::{AstArena, Decl, StmtId, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind};
 
-pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
+pub fn run_pipeline(
+    source: String,
+    uri: String,
+    resolver: std::sync::Arc<varn_checker::module_resolver::DiskResolver>,
+) -> DocumentAnalysis {
     varn_builtins::register_provider();
     let path = uri_to_path(&uri);
 
@@ -85,15 +89,13 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         });
     }
 
-    let result = crate::workspace::resolver::with_resolver(|r| {
-        varn_checker::Checker::check_with(
-            &program,
-            &ast_arena,
-            interner,
-            r,
-            varn_checker::CheckOptions::tooling(),
-        )
-    });
+    let result = varn_checker::Checker::check_with(
+        &program,
+        &ast_arena,
+        interner,
+        resolver.as_ref(),
+        varn_checker::CheckOptions::tooling(),
+    );
 
     for d in &result.diagnostics {
         let severity = match d.kind {
@@ -207,6 +209,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         symbol_map,
         type_param_names,
         db,
+        resolver,
         import_paths,
         spatial_index,
         ast: Some(program),

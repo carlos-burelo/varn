@@ -93,7 +93,8 @@ pub fn build_rename(
             continue;
         }
         scanned += 1;
-        let temp_state = crate::pipeline::run_pipeline(source, file_uri.clone());
+        let temp_state =
+            crate::pipeline::run_pipeline(source, file_uri.clone(), workspace.resolver_handle());
         collect_rename_edits_in_document(&temp_state, &target, target_name, &new_name, &mut docs);
     }
     if docs.is_empty() {

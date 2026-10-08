@@ -12,7 +12,11 @@ pub fn debug_interact(path: &str, source: &str, flags: &DebugFlags) {
     header(C_TYPES, "lsp editor session", path);
 
     let uri = varn_modules::resolver::path_to_uri(path);
-    let analysis = varn_lsp::pipeline::run_pipeline(source.to_string(), uri.clone());
+    let analysis = varn_lsp::pipeline::run_pipeline(
+        source.to_string(),
+        uri.clone(),
+        std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new()),
+    );
     let mut index = varn_lsp::index::ProjectIndex::new();
     index.update_file(&uri, &analysis);
 
@@ -158,7 +162,11 @@ fn build_stale(
 )> {
     let typed = typed?;
     let stale_source = remove_typed(source, line, col, typed)?;
-    let analysis = varn_lsp::pipeline::run_pipeline(stale_source, uri.to_owned());
+    let analysis = varn_lsp::pipeline::run_pipeline(
+        stale_source,
+        uri.to_owned(),
+        std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new()),
+    );
     let mut index = varn_lsp::index::ProjectIndex::new();
     index.update_file(uri, &analysis);
     Some((analysis, index))

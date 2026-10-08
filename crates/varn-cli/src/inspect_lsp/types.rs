@@ -6,7 +6,11 @@ use varn_debug::flags::DebugFlags;
 pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     let uri = varn_modules::resolver::path_to_uri(path);
 
-    let analysis = varn_lsp::pipeline::run_pipeline(source.to_owned(), uri);
+    let analysis = varn_lsp::pipeline::run_pipeline(
+        source.to_owned(),
+        uri,
+        std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new()),
+    );
     Section::new("type inference engine")
         .subtitle(path)
         .color(|c| c.blue())

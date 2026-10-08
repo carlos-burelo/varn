@@ -9,7 +9,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
 
     let uri = varn_modules::resolver::path_to_uri(path);
 
-    let analysis = varn_lsp::pipeline::run_pipeline(source.to_string(), uri);
+    let analysis = varn_lsp::pipeline::run_pipeline(
+        source.to_string(),
+        uri,
+        std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new()),
+    );
 
     if flags.lsp_symbols {
         terminal::log(format!(
@@ -102,6 +106,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 };
                 let (resp, _) = varn_lsp::features::completion::build_completion_response(
                     &analysis,
+                    analysis.resolver.as_ref(),
                     tok.line,
                     tok.col + 1,
                     Some(trigger),

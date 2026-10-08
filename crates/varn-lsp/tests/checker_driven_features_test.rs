@@ -5,9 +5,13 @@ use varn_lsp::features::code_action::match_arms::generate_match_arms_action;
 use varn_lsp::features::inlay_hints::param_hints::build_parameter_hints;
 use varn_lsp::pipeline::run_pipeline;
 
+fn test_resolver() -> std::sync::Arc<varn_checker::module_resolver::DiskResolver> {
+    std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new())
+}
+
 fn fill_arms_edit(source: &str, line: u32) -> Option<String> {
     let uri = "file:///test/match.vn".to_string();
-    let state = run_pipeline(source.to_string(), uri.clone());
+    let state = run_pipeline(source.to_string(), uri.clone(), test_resolver());
     let Uri = Uri::parse(&uri).unwrap();
     match generate_match_arms_action(&state, &Uri, line, 0)? {
         CodeActionResponse::CodeAction(action) => {
@@ -84,7 +88,11 @@ function area(width: int, height: int): int {
 }
 const a = area(2, 3);
 "#;
-    let state = run_pipeline(source.to_string(), "file:///test/hints.vn".to_string());
+    let state = run_pipeline(
+        source.to_string(),
+        "file:///test/hints.vn".to_string(),
+        test_resolver(),
+    );
     let labels: Vec<String> = build_parameter_hints(&state)
         .into_iter()
         .filter_map(|h| match h.label {

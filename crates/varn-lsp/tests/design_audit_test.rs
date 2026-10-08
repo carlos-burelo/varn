@@ -5,6 +5,10 @@ use std::mem::size_of;
 
 use varn_checker::module_resolver::ImportResolver;
 use varn_lsp::pipeline::run_pipeline;
+
+fn test_resolver() -> std::sync::Arc<varn_checker::module_resolver::DiskResolver> {
+    std::sync::Arc::new(varn_checker::module_resolver::DiskResolver::new())
+}
 use varn_lsp::workspace::Workspace;
 
 const ACCOUNT_SRC: &str = r#"
@@ -28,7 +32,7 @@ const b = acc.balance;
 #[test]
 fn h1_tokens_hold_no_lexeme_strings() {
     let uri = "file:///test/h1.vn".to_string();
-    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri);
+    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri, test_resolver());
     assert!(!state.tokens.is_empty(), "la muestra debe producir tokens");
 
     assert_eq!(
@@ -49,7 +53,7 @@ fn h1_tokens_hold_no_lexeme_strings() {
 #[test]
 fn h2_document_keeps_single_arena_copy() {
     let uri = "file:///test/h2.vn".to_string();
-    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri);
+    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri, test_resolver());
 
     assert!(
         !state.db.bind.arena.all().is_empty(),
@@ -72,7 +76,7 @@ fn h2_document_keeps_single_arena_copy() {
 #[test]
 fn h3_single_id_to_type_map() {
     let uri = "file:///test/h3.vn".to_string();
-    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri);
+    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri, test_resolver());
 
     let stored: HashSet<usize> = state.db.symbol_types.keys().copied().collect();
     assert!(!stored.is_empty(), "debe haber tipos resueltos");
@@ -139,19 +143,17 @@ fn h5_sources_survive_close_and_remove() {
 
 #[test]
 fn h10_evict_heavy_keeps_exports_drops_artifacts() {
-    use varn_lsp::workspace::resolver::with_resolver;
-
     let workspace = Workspace::new();
     workspace.index_file("file:///test/h10.vn".to_string(), ACCOUNT_SRC.to_string());
 
-    let (b, p, a, e) = with_resolver(|r| r.graph_stats());
+    let (b, p, a, e) = workspace.resolver().graph_stats();
     eprintln!("graph before: binds={b} programs={p} arenas={a} exports={e}");
     assert!(b + p + a > 0, "indexar debe memoizar artefactos pesados");
     assert!(e > 0, "indexar debe memoizar exports");
 
-    let evicted = with_resolver(|r| r.evict_heavy());
+    let evicted = workspace.resolver().evict_heavy();
     assert_eq!(evicted, (b, p, a), "evict_heavy reporta lo que suelta");
-    let (b2, p2, a2, e2) = with_resolver(|r| r.graph_stats());
+    let (b2, p2, a2, e2) = workspace.resolver().graph_stats();
     assert_eq!((b2, p2, a2), (0, 0, 0), "artefactos evictados");
     assert_eq!(e2, e, "exports sobreviven a la evicción");
 
@@ -164,7 +166,7 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
     }
 
     workspace.index_file("file:///test/h10b.vn".to_string(), ACCOUNT_SRC.to_string());
-    let (b3, p3, a3, e3) = with_resolver(|r| r.graph_stats());
+    let (b3, p3, a3, e3) = workspace.resolver().graph_stats();
     assert_eq!(
         (b3, p3, a3),
         (0, 0, 0),
