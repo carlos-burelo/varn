@@ -10,6 +10,7 @@ mod bench;
 mod cli;
 mod commands;
 mod cpu_freq;
+mod debug_sink;
 mod doctor_impl;
 mod env_file;
 mod error;

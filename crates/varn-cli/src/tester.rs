@@ -111,16 +111,19 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
                     break;
                 }
                 let t1 = Instant::now();
-                let run_res = pipeline::run(&RunOpts {
-                    file_path: path.to_string_lossy().to_string(),
-                    eval: None,
-                    append: append.clone(),
-                    verbose: false,
-                    no_run: false,
-                    debug: Default::default(),
-                    trace: false,
-                    capabilities: Default::default(),
-                });
+                let run_res = pipeline::run(
+                    &RunOpts {
+                        file_path: path.to_string_lossy().to_string(),
+                        eval: None,
+                        append: append.clone(),
+                        verbose: false,
+                        no_run: false,
+                        debug: Default::default(),
+                        trace: false,
+                        capabilities: Default::default(),
+                    },
+                    &crate::debug_sink::CliDebugSink,
+                );
                 let elapsed = t1.elapsed();
 
                 let passed = run_res.is_ok();

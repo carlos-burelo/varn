@@ -21,16 +21,19 @@ pub fn execute(args: RunArgs) -> Result<(), CliError> {
 
     let capabilities = build_capabilities(&args);
 
-    pipeline::run(&RunOpts {
-        file_path,
-        eval,
-        append: None,
-        verbose: args.verbose,
-        no_run: false,
-        debug: Default::default(),
-        trace: args.trace,
-        capabilities,
-    })
+    pipeline::run(
+        &RunOpts {
+            file_path,
+            eval,
+            append: None,
+            verbose: args.verbose,
+            no_run: false,
+            debug: Default::default(),
+            trace: args.trace,
+            capabilities,
+        },
+        &crate::debug_sink::CliDebugSink,
+    )
 }
 
 pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {

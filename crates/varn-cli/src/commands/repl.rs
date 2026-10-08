@@ -66,7 +66,7 @@ fn run_snippet(source: &str) {
         trace: false,
         capabilities: Default::default(),
     };
-    if let Err(e) = crate::pipeline::run(&opts) {
+    if let Err(e) = crate::pipeline::run(&opts, &crate::debug_sink::CliDebugSink) {
         terminal::error(&e);
     }
 }

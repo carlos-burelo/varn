@@ -7,7 +7,7 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
         return Ok(());
     }
 
-    let mut debug = varn_pipeline::parse_debug_opt(Some(&args.phase))?;
+    let mut debug = crate::debug_sink::parse_debug_opt(Some(&args.phase))?;
     debug.fn_filter = args.fn_filter;
 
     let (file_path, eval) = match (args.file, args.eval) {
@@ -25,14 +25,17 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
 
     let no_run = !debug.needs_execution();
 
-    pipeline::run(&RunOpts {
-        file_path,
-        eval,
-        append: None,
-        verbose: false,
-        no_run,
-        debug,
-        trace: false,
-        capabilities: Default::default(),
-    })
+    pipeline::run(
+        &RunOpts {
+            file_path,
+            eval,
+            append: None,
+            verbose: false,
+            no_run,
+            debug,
+            trace: false,
+            capabilities: Default::default(),
+        },
+        &crate::debug_sink::CliDebugSink,
+    )
 }

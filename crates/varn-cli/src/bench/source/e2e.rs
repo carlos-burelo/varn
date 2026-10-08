@@ -14,8 +14,14 @@ pub(super) fn measure_e2e(
             None => crate::pipeline::read_source_file(path).map_err(|e| e.message.clone())?,
         };
 
-        let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
-            .map_err(|e| e.message)?;
+        let (tokens, lexeme_buf) = crate::pipeline::phase_lex(
+            &source,
+            path,
+            false,
+            &debug_flags,
+            &varn_pipeline::NullSink,
+        )
+        .map_err(|e| e.message)?;
 
         let (program, _, interner, arena) =
             parse_shared(tokens, lexeme_buf, path).map_err(|errs| {

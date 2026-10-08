@@ -17,6 +17,7 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
         args.verbose,
         &Default::default(),
         &session,
+        &pipeline::NullSink,
     )?;
 
     let is_native = args.native || args.target.eq_ignore_ascii_case("native");

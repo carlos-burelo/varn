@@ -58,13 +58,14 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     })?;
 
     let lex_samples = time_n(runs, || {
-        crate::pipeline::phase_lex(&source, path, false, &debug_flags)
+        crate::pipeline::phase_lex(&source, path, false, &debug_flags, &varn_pipeline::NullSink)
             .map(|_| ())
             .map_err(|e| e.message)
     })?;
 
-    let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
-        .map_err(|e| CliError::fatal(e.message))?;
+    let (tokens, lexeme_buf) =
+        crate::pipeline::phase_lex(&source, path, false, &debug_flags, &varn_pipeline::NullSink)
+            .map_err(|e| CliError::fatal(e.message))?;
     let token_count = tokens.len();
 
     let tokens_ref = &tokens;
@@ -77,6 +78,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             path,
             false,
             &debug_flags,
+            &varn_pipeline::NullSink,
         )
         .map(|_| ())
         .map_err(|e| format!("{e}"))
@@ -106,6 +108,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             &source,
             &debug_flags,
             &session,
+            &varn_pipeline::NullSink,
         )
         .map(|_| ())
         .map_err(|e| format!("{e}"))
