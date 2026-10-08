@@ -1,15 +1,23 @@
-use std::cell::RefCell;
 use varn_checker::module_resolver::DiskResolver;
 
-thread_local! {
-    static RESOLVER: RefCell<DiskResolver> = RefCell::new(DiskResolver::new());
+pub struct Session {
+    resolver: DiskResolver,
 }
 
-pub fn with_resolver<R>(f: impl FnOnce(&DiskResolver) -> R) -> R {
-    RESOLVER.with(|r| f(&r.borrow()))
+impl Session {
+    pub fn new() -> Self {
+        Self {
+            resolver: DiskResolver::with_registry(varn_modules::loader::default_registry()),
+        }
+    }
+
+    pub fn resolver(&self) -> &DiskResolver {
+        &self.resolver
+    }
 }
 
-pub fn reset() {
-    RESOLVER.with(|r| r.borrow().clear());
-    varn_core::clear_interner();
+impl Default for Session {
+    fn default() -> Self {
+        Self::new()
+    }
 }

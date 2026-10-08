@@ -23,13 +23,15 @@ pub fn compile(
     check_result: CheckResult,
     verbose: bool,
     debug: &DebugFlags,
+    session: &crate::resolver::Session,
 ) -> PipelineResult<CompileOutput> {
     if verbose {
         varn_core::term::terminal::tagged("Varn", "generating bytecode...");
     }
 
-    let exports =
-        crate::resolver::with_resolver(|r| r.module_exports(&program.filename, &mut vec![]));
+    let exports = session
+        .resolver()
+        .module_exports(&program.filename, &mut vec![]);
     let mut export_names: Vec<std::sync::Arc<str>> = exports
         .keys()
         .map(|k| std::sync::Arc::from(k.as_str()))
@@ -119,6 +121,7 @@ pub fn compile(
         &program.filename,
         &proto,
         &check_result.checker_result.bind.interner,
+        session,
     )
     .map_err(|e| PipelineError::fatal(format!("module graph error: {e}")))?;
 

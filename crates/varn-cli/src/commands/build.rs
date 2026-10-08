@@ -10,8 +10,14 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
     let source = std::fs::read_to_string(&args.file)
         .map_err(|e| CliError::fatal(format!("cannot read '{}': {e}", args.file)))?;
 
-    let compiled =
-        pipeline::compile_source_for_build(&source, &args.file, args.verbose, &Default::default())?;
+    let session = pipeline::resolver::Session::new();
+    let compiled = pipeline::compile_source_for_build(
+        &source,
+        &args.file,
+        args.verbose,
+        &Default::default(),
+        &session,
+    )?;
 
     let is_native = args.native || args.target.eq_ignore_ascii_case("native");
     let ext = if is_native {

@@ -19,9 +19,11 @@ pub(super) fn compile_via_tir(
         .map_err(|e| format!("{e:?}"))
 }
 
-pub(super) fn export_names_of(filename: &str) -> Vec<Arc<str>> {
-    let exports =
-        varn_pipeline::resolver::with_resolver(|r| r.module_exports(filename, &mut vec![]));
+pub(super) fn export_names_of(
+    filename: &str,
+    session: &varn_pipeline::resolver::Session,
+) -> Vec<Arc<str>> {
+    let exports = session.resolver().module_exports(filename, &mut vec![]);
     let mut names: Vec<Arc<str>> = exports.keys().map(|k| Arc::from(k.as_str())).collect();
     names.sort();
     names

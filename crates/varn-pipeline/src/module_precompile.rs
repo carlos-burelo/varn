@@ -26,6 +26,7 @@ pub fn build_module_graph(
     entry_path: &str,
     entry_proto: &FunctionProto,
     entry_interner: &varn_core::AtomInterner,
+    session: &crate::resolver::Session,
 ) -> Result<ModuleGraphBuild, String> {
     let canonical_entry = varn_modules::canonical_or_original(Path::new(entry_path));
 
@@ -189,25 +190,24 @@ pub fn build_module_graph(
             continue;
         };
 
-        let check = crate::resolver::with_resolver(|r| {
-            varn_checker::Checker::check_with(
-                program,
-                arena,
-                interner.clone(),
-                r,
-                varn_checker::CheckOptions::compile(),
-            )
-        });
+        let check = varn_checker::Checker::check_with(
+            program,
+            arena,
+            interner.clone(),
+            session.resolver(),
+            varn_checker::CheckOptions::compile(),
+        );
 
         crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)
             .map_err(|e| e.message)?;
+        let resolver = session.resolver();
         let exports = if program.filename.starts_with("std:")
             || program.filename.starts_with("core:")
             || program.filename.starts_with("runtime:")
         {
-            crate::resolver::with_resolver(|r| r.stdlib_exports(&program.filename))
+            resolver.stdlib_exports(&program.filename)
         } else {
-            crate::resolver::with_resolver(|r| r.module_exports(&program.filename, &mut vec![]))
+            resolver.module_exports(&program.filename, &mut vec![])
         };
         let mut export_names: Vec<std::sync::Arc<str>> = exports
             .keys()

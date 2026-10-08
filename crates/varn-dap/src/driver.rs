@@ -39,8 +39,10 @@ impl Driver {
             .map_err(|e| format!("cannot resolve '{program}': {e}"))?;
         let source = std::fs::read_to_string(&canonical)
             .map_err(|e| format!("cannot read '{canonical}': {e}"))?;
-        let compiled = compile_source_for_build(&source, &canonical, false, &DebugFlags::default())
-            .map_err(|e| format!("compile failed: {e}"))?;
+        let session = varn_pipeline::resolver::Session::new();
+        let compiled =
+            compile_source_for_build(&source, &canonical, false, &DebugFlags::default(), &session)
+                .map_err(|e| format!("compile failed: {e}"))?;
         let mut machine = boot_machine(compiled.precompiled, CapabilitySet::allow_all(), false)
             .map_err(|e| format!("boot failed: {e}"))?;
         machine.ctx.settings.no_jit = true;

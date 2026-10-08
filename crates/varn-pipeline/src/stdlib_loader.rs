@@ -11,6 +11,7 @@ use varn_vm::loader::{ModuleError, ModuleLoader};
 pub struct PipelineLoader {
     registry: varn_modules::loader::ModuleRegistry,
     protos: Mutex<FxHashMap<String, (u64, Arc<[u8]>)>>,
+    session: crate::resolver::Session,
 }
 
 impl PipelineLoader {
@@ -18,6 +19,7 @@ impl PipelineLoader {
         Self {
             registry: varn_modules::loader::default_registry(),
             protos: Mutex::new(FxHashMap::default()),
+            session: crate::resolver::Session::new(),
         }
     }
 
@@ -84,7 +86,7 @@ impl ModuleLoader for PipelineLoader {
             ModuleId::Std(s) | ModuleId::Core(s) => s.as_ref(),
             _ => return Ok(None),
         };
-        let proto = compile_source(text.as_ref(), path)
+        let proto = compile_source(text.as_ref(), path, &self.session)
             .map(Rc::new)
             .map_err(|e| ModuleError::new(format!("compile error in '{path}': {e}")))?;
         self.store_proto(&key, fingerprint, &proto);
@@ -92,23 +94,30 @@ impl ModuleLoader for PipelineLoader {
     }
 }
 
-pub fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
-    compile_source_inner(source, path, false)
+pub fn compile_source(
+    source: &str,
+    path: &str,
+    session: &crate::resolver::Session,
+) -> Result<FunctionProto, String> {
+    compile_source_inner(source, path, false, session)
 }
 
-pub fn compile_source_checked(source: &str, path: &str) -> Result<FunctionProto, String> {
-    compile_source_inner(source, path, true)
+pub fn compile_source_checked(
+    source: &str,
+    path: &str,
+    session: &crate::resolver::Session,
+) -> Result<FunctionProto, String> {
+    compile_source_inner(source, path, true, session)
 }
 
 fn compile_source_inner(
     source: &str,
     path: &str,
     reject_type_errors: bool,
+    session: &crate::resolver::Session,
 ) -> Result<FunctionProto, String> {
     let (program, arena, interner) = crate::quiet_parse::parse_module(source, path, "")?;
-    let check = crate::resolver::with_resolver(|r| {
-        varn_checker::Checker::check(&program, &arena, interner, r)
-    });
+    let check = varn_checker::Checker::check(&program, &arena, interner, session.resolver());
     if reject_type_errors && check.diagnostics.has_errors() {
         let mut msg = String::new();
         for d in check.diagnostics.errors() {
@@ -119,11 +128,12 @@ fn compile_source_inner(
         }
         return Err(format!("type errors in stdlib module:{msg}"));
     }
+    let resolver = session.resolver();
     let exports =
         if path.starts_with("std:") || path.starts_with("core:") || path.starts_with("runtime:") {
-            crate::resolver::with_resolver(|r| r.stdlib_exports(path))
+            resolver.stdlib_exports(path)
         } else {
-            crate::resolver::with_resolver(|r| r.module_exports(path, &mut vec![]))
+            resolver.module_exports(path, &mut vec![])
         };
     let mut export_names: Vec<std::sync::Arc<str>> = exports
         .keys()
@@ -151,7 +161,10 @@ fn validate_imports(id: &str, source: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, String> {
+pub fn compile_stdlib_bundle(
+    std_dir: &std::path::Path,
+    session: &crate::resolver::Session,
+) -> Result<Vec<u8>, String> {
     #[derive(serde::Deserialize)]
     struct ManifestModule {
         id: String,
@@ -229,11 +242,12 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
             continue;
         }
 
-        let exports = crate::resolver::with_resolver(|r| r.stdlib_exports(&m.id));
-        let bind = match crate::resolver::with_resolver(|r| r.stdlib_bind(&m.id)) {
+        let resolver = session.resolver();
+        let exports = resolver.stdlib_exports(&m.id);
+        let bind = match resolver.stdlib_bind(&m.id) {
             Some(b) => b,
             None => {
-                let err_msg = match compile_source_checked(&source, &m.id) {
+                let err_msg = match compile_source_checked(&source, &m.id, session) {
                     Ok(_) => "unknown bind failure".to_string(),
                     Err(e) => e,
                 };
@@ -243,7 +257,7 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
         let interface = varn_checker::module_resolver::serialize_module_interface(&exports, &bind)
             .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
 
-        let proto = match compile_source_checked(&source, &m.id) {
+        let proto = match compile_source_checked(&source, &m.id, session) {
             Ok(p) => p,
             Err(e) => {
                 failures.push_str(&format!("\n{e}"));

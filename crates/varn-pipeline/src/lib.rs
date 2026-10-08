@@ -41,6 +41,7 @@ pub fn read_source_file(path: &str) -> PipelineResult<String> {
 }
 
 pub fn run(opts: &RunOpts) -> PipelineResult<()> {
+    let session = resolver::Session::new();
     if portable::is_portable(&opts.file_path) {
         return run_portable(opts);
     }
@@ -55,9 +56,15 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
         None => source,
     };
     let compiled = if opts.eval.is_none() && opts.append.is_none() && !opts.debug.any() {
-        compile_source_cached(&source, &opts.file_path, opts.verbose)?
+        compile_source_cached(&source, &opts.file_path, opts.verbose, &session)?
     } else {
-        compile_source(&source, &opts.file_path, opts.verbose, &opts.debug)?
+        compile_source(
+            &source,
+            &opts.file_path,
+            opts.verbose,
+            &opts.debug,
+            &session,
+        )?
     };
     if opts.no_run {
         return Ok(());
@@ -104,8 +111,9 @@ pub fn compile_source_for_build(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
+    session: &resolver::Session,
 ) -> PipelineResult<CompileOutput> {
-    compile_source(source, path, verbose, debug)
+    compile_source(source, path, verbose, debug, session)
 }
 
 fn compile_source(
@@ -113,6 +121,7 @@ fn compile_source(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
+    session: &resolver::Session,
 ) -> PipelineResult<CompileOutput> {
     let canonical_path = std::path::Path::new(path)
         .canonicalize()
@@ -122,13 +131,26 @@ fn compile_source(
     let (tokens, lexeme_buf) = lex::lex(source, path, verbose, debug)?;
     let (program, arena, interner) =
         parse::parse(tokens, lexeme_buf, source, path, verbose, debug)?;
-    let check_result = check::check(&program, &arena, interner, source, debug)?;
-    let compiled = compile::compile(&program, &arena, source, check_result, verbose, debug)?;
+    let check_result = check::check(&program, &arena, interner, source, debug, session)?;
+    let compiled = compile::compile(
+        &program,
+        &arena,
+        source,
+        check_result,
+        verbose,
+        debug,
+        session,
+    )?;
 
     Ok(compiled)
 }
 
-fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineResult<CompileOutput> {
+fn compile_source_cached(
+    source: &str,
+    path: &str,
+    verbose: bool,
+    session: &resolver::Session,
+) -> PipelineResult<CompileOutput> {
     let cache_path = cache::compile_cache_path(path);
 
     match cache::load_cached_graph(&cache_path, source, verbose) {
@@ -153,7 +175,7 @@ fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineRes
         varn_core::term::terminal::tagged("Varn", "compile cache miss");
     }
 
-    let compiled = compile_source(source, path, verbose, &DebugFlags::default())?;
+    let compiled = compile_source(source, path, verbose, &DebugFlags::default(), session)?;
     if let Err(e) = cache::store_cached_graph(&cache_path, &compiled.graph_artifact) {
         if verbose {
             varn_core::term::terminal::tagged(

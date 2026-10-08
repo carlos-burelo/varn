@@ -14,12 +14,14 @@ fn suite() -> Vec<(String, FunctionProto)> {
         .filter(|p| p.extension().is_some_and(|x| x == "vn"))
         .collect();
     files.sort();
+    let session = varn_pipeline::resolver::Session::new();
     files
         .into_iter()
         .filter_map(|path| {
             let source = std::fs::read_to_string(&path).ok()?;
             let name = path.to_string_lossy().to_string();
-            let proto = varn_pipeline::stdlib_loader::compile_source(&source, &name).ok()?;
+            let proto =
+                varn_pipeline::stdlib_loader::compile_source(&source, &name, &session).ok()?;
             Some((name, proto))
         })
         .collect()

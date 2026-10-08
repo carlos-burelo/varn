@@ -20,8 +20,12 @@ impl Default for DiskResolver {
 
 impl DiskResolver {
     pub fn new() -> Self {
+        Self::with_registry(varn_modules::loader::default_registry())
+    }
+
+    pub fn with_registry(loader: varn_modules::loader::ModuleRegistry) -> Self {
         Self {
-            loader: varn_modules::loader::default_registry(),
+            loader,
             graph: parking_lot::Mutex::default(),
             in_flight: parking_lot::Mutex::default(),
             core_exports: parking_lot::Mutex::default(),

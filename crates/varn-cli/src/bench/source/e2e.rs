@@ -6,6 +6,7 @@ pub(super) fn measure_e2e(
     path: &str,
     debug_flags: &varn_debug::flags::DebugFlags,
     factory: &VmFactory,
+    session: &varn_pipeline::resolver::Session,
 ) -> Result<Vec<Duration>, CliError> {
     time_n(runs, || {
         let source = match eval {
@@ -30,21 +31,19 @@ pub(super) fn measure_e2e(
                 format!("parse errors:\n{}", msgs.join("\n"))
             })?;
 
-        let check_result = varn_pipeline::resolver::with_resolver(|r| {
-            Checker::check_with(
-                &program,
-                &arena,
-                interner,
-                r,
-                varn_checker::CheckOptions::compile(),
-            )
-        });
+        let check_result = Checker::check_with(
+            &program,
+            &arena,
+            interner,
+            session.resolver(),
+            varn_checker::CheckOptions::compile(),
+        );
 
         let proto = compile_via_tir(
             &program,
             &arena,
             &check_result,
-            export_names_of(&program.filename),
+            export_names_of(&program.filename, session),
             &source,
         )
         .map_err(|e| format!("compile failed: {}", e))?;

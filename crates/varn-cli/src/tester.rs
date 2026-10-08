@@ -219,6 +219,7 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
 }
 
 fn test_units(path: &PathBuf, display_name: &str) -> Vec<(String, Option<String>)> {
+    let session = pipeline::resolver::Session::new();
     let file_unit = vec![(display_name.to_owned(), None)];
     let source = match std::fs::read_to_string(path) {
         Ok(s) => s,
@@ -228,7 +229,7 @@ fn test_units(path: &PathBuf, display_name: &str) -> Vec<(String, Option<String>
         return file_unit;
     }
     let path_str = path.to_string_lossy().to_string();
-    let targets = match pipeline::collect_test_targets(&path_str, &source) {
+    let targets = match pipeline::collect_test_targets(&path_str, &source, &session) {
         Ok(t) => t,
         Err(_) => return file_unit,
     };

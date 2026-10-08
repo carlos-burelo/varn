@@ -180,8 +180,10 @@ fn find<'a>(proto: &'a FunctionProto, name: &str) -> Option<&'a FunctionProto> {
 
 #[test]
 fn portable_ssa_and_bytecode_share_cache_slots() {
-    let module = varn_pipeline::stdlib_loader::compile_source(SOURCE, "ic_slots_agree.vn")
-        .expect("compiles");
+    let session = varn_pipeline::resolver::Session::new();
+    let module =
+        varn_pipeline::stdlib_loader::compile_source(SOURCE, "ic_slots_agree.vn", &session)
+            .expect("compiles");
     let walk = find(&module, "walk").expect("`walk` is compiled");
     let slots = index_order_slots(walk);
     assert!(

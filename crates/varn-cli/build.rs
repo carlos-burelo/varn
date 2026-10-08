@@ -10,7 +10,8 @@ fn main() {
         panic!("cannot build the stdlib bundle: {reason}");
     }
 
-    let bytes = varn_pipeline::stdlib_loader::compile_stdlib_bundle(std_dir)
+    let session = varn_pipeline::resolver::Session::new();
+    let bytes = varn_pipeline::stdlib_loader::compile_stdlib_bundle(std_dir, &session)
         .expect("failed to compile stdlib bundle");
 
     let out_dir = std::env::var("OUT_DIR").unwrap();

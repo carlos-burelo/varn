@@ -43,6 +43,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         None => crate::pipeline::read_source_file(path)?,
     };
     let debug_flags = varn_debug::flags::DebugFlags::default();
+    let session = varn_pipeline::resolver::Session::new();
 
     let read_samples = time_n(runs, || {
         match eval {
@@ -104,20 +105,19 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             interner.clone(),
             &source,
             &debug_flags,
+            &session,
         )
         .map(|_| ())
         .map_err(|e| format!("{e}"))
     })?;
 
-    let check_result = varn_pipeline::resolver::with_resolver(|r| {
-        Checker::check_with(
-            &program,
-            &arena,
-            interner,
-            r,
-            varn_checker::CheckOptions::compile(),
-        )
-    });
+    let check_result = Checker::check_with(
+        &program,
+        &arena,
+        interner,
+        session.resolver(),
+        varn_checker::CheckOptions::compile(),
+    );
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let compile_samples = time_n(runs, || {
@@ -128,7 +128,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             program_ref,
             arena_ref,
             &check_result,
-            export_names_of(&program_ref.filename),
+            export_names_of(&program_ref.filename, &session),
             &source,
         );
 
@@ -151,7 +151,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         &program,
         &arena,
         &check_result,
-        export_names_of(&program.filename),
+        export_names_of(&program.filename, &session),
         &source,
     )
     .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
@@ -164,6 +164,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         path,
         &proto,
         &check_result.bind.interner,
+        &session,
     )
     .map_err(|e| CliError::fatal(format!("module graph build error: {e}")))?;
     let precompile_dur = precompile_start.elapsed();
@@ -204,7 +205,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         |_done, _samples| {},
     )?;
 
-    let e2e_samples = e2e::measure_e2e(runs, eval, path, &debug_flags, &factory)?;
+    let e2e_samples = e2e::measure_e2e(runs, eval, path, &debug_flags, &factory, &session)?;
 
     let e2e_stats = PhaseStats::from_samples("e2e (cold)", |c| c.cyan(), &e2e_samples);
     let phases = vec![

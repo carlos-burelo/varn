@@ -18,8 +18,6 @@ fn scratch_dir(tag: &str) -> PathBuf {
 
 #[test]
 fn build_module_graph_resolves_named_reexport_origin_module_without_panicking() {
-    varn_pipeline::resolver::reset();
-
     let dir = scratch_dir("named-reexport");
 
     let leaf_path = dir.join("leaf.vn");
@@ -47,24 +45,22 @@ fn build_module_graph_resolves_named_reexport_origin_module_without_panicking() 
     let source = fs::read_to_string(&entry_path).expect("read entry.vn");
     let entry_str = entry_path.to_string_lossy().into_owned();
 
-    let result = std::panic::catch_unwind(|| {
-        varn_pipeline::compile_source_for_build(
-            &source,
-            &entry_str,
-            false,
-            &varn_pipeline::DebugFlags::default(),
-        )
-    });
+    let session = varn_pipeline::resolver::Session::new();
+    let compiled = varn_pipeline::compile_source_for_build(
+        &source,
+        &entry_str,
+        false,
+        &varn_pipeline::DebugFlags::default(),
+        &session,
+    );
 
     let _ = fs::remove_dir_all(&dir);
 
-    match result {
-        Err(_) => panic!(
-            "build_module_graph panicked while re-checking a module with a named \
-             re-exported import — this is the cross-interner Atom index bug \
-             Task 7e's quiet_parse fix closes"
+    match compiled {
+        Ok(_) => {}
+        Err(e) => panic!(
+            "expected the module graph to compile cleanly: {}",
+            e.message
         ),
-        Ok(Err(e)) => panic!("expected the module graph to compile cleanly, got: {e}"),
-        Ok(Ok(_compiled)) => {}
     }
 }
