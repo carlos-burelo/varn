@@ -34,7 +34,16 @@ impl<'m> Builder<'m> {
                 }
                 let inner = match self.value_ty(obj) {
                     HirType::Nullable(id) => self.ssa_types.get(id),
-                    t => t,
+                    t @ HirType::Int
+                    | t @ HirType::Float
+                    | t @ HirType::Bool
+                    | t @ HirType::Str
+                    | t @ HirType::Ref
+                    | t @ HirType::Dynamic
+                    | t @ HirType::Array(_)
+                    | t @ HirType::Map(..)
+                    | t @ HirType::Set(_)
+                    | t @ HirType::Class(_) => t,
                 };
                 match inner {
                     HirType::Str => {
@@ -43,13 +52,34 @@ impl<'m> Builder<'m> {
                     HirType::Array(_) => {
                         return Ok(self.emit(InstKind::ArrayLength { operand: obj }, HirType::Int))
                     }
-                    _ => InstKind::GetProperty {
+                    HirType::Int
+                    | HirType::Float
+                    | HirType::Bool
+                    | HirType::Ref
+                    | HirType::Dynamic
+                    | HirType::Map(..)
+                    | HirType::Set(_)
+                    | HirType::Class(_)
+                    | HirType::Nullable(_) => InstKind::GetProperty {
                         object: obj,
                         name: name.clone(),
                     },
                 }
             }
-            _ => InstKind::GetProperty {
+            Resolution::None
+            | Resolution::Local(_)
+            | Resolution::Param(_)
+            | Resolution::Upvalue(_)
+            | Resolution::GlobalSlot(_)
+            | Resolution::NativeGlobal(_)
+            | Resolution::ModuleSlot { .. }
+            | Resolution::StaticField(_)
+            | Resolution::VtableSlot(_)
+            | Resolution::DirectFn(_)
+            | Resolution::Intrinsic(_)
+            | Resolution::NativeOp(_)
+            | Resolution::EnumVariant { .. }
+            | Resolution::ByName { .. } => InstKind::GetProperty {
                 object: obj,
                 name: name.clone(),
             },

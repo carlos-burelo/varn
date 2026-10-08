@@ -105,7 +105,9 @@ pub(crate) fn binary_result_ty(op: HirBinOp, operand_ty: HirType) -> HirType {
     use HirBinOp::*;
     match op {
         Eq | Ne | Lt | Le | Gt | Ge | Instanceof | In => HirType::Bool,
-        _ => operand_ty,
+        Add | Sub | Mul | Div | Mod | Pow | BitAnd | BitOr | BitXor | Shl | Shr | Ushr => {
+            operand_ty
+        }
     }
 }
 

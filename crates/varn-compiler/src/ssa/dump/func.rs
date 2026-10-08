@@ -36,7 +36,16 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
         let lhs = match inst.dest {
             Some(v) => match func.value_ty(v) {
                 HirType::Dynamic => format!("{} = ", val(v)),
-                t => format!("{}: {} = ", val(v), ty(t)),
+                t @ HirType::Int
+                | t @ HirType::Float
+                | t @ HirType::Bool
+                | t @ HirType::Str
+                | t @ HirType::Ref
+                | t @ HirType::Array(_)
+                | t @ HirType::Map(..)
+                | t @ HirType::Set(_)
+                | t @ HirType::Class(_)
+                | t @ HirType::Nullable(_) => format!("{}: {} = ", val(v), ty(t)),
             },
             None => String::new(),
         };

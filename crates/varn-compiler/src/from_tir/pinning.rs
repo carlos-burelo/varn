@@ -53,7 +53,11 @@ pub(super) fn captured_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> {
                     walk_body(body, out);
                     walk_body(catch_body, out);
                 }
-                _ => {}
+                TirStmt::Let { .. }
+                | TirStmt::Return(_)
+                | TirStmt::Break
+                | TirStmt::Continue
+                | TirStmt::BuildClass(_) => {}
             }
         }
     }
@@ -72,7 +76,19 @@ pub(super) fn try_pinned_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> 
                 Resolution::Param(i) => {
                     out.insert(VarId::Param(*i));
                 }
-                _ => {}
+                Resolution::None
+                | Resolution::Upvalue(_)
+                | Resolution::GlobalSlot(_)
+                | Resolution::NativeGlobal(_)
+                | Resolution::ModuleSlot { .. }
+                | Resolution::FieldSlot(_)
+                | Resolution::StaticField(_)
+                | Resolution::VtableSlot(_)
+                | Resolution::DirectFn(_)
+                | Resolution::Intrinsic(_)
+                | Resolution::NativeOp(_)
+                | Resolution::EnumVariant { .. }
+                | Resolution::ByName { .. } => {}
             }
         }
     }
@@ -100,7 +116,10 @@ pub(super) fn try_pinned_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> 
                     scan_assigns(body, out);
                     scan_assigns(catch_body, out);
                 }
-                _ => {}
+                TirStmt::Return(_)
+                | TirStmt::Break
+                | TirStmt::Continue
+                | TirStmt::BuildClass(_) => {}
             }
         }
     }
@@ -140,7 +159,13 @@ pub(super) fn try_pinned_vars(func: &varn_tir::TirFunction) -> FxHashSet<VarId> 
                     walk(body, out);
                     walk(catch_body, out);
                 }
-                _ => {}
+                TirStmt::Expr(_)
+                | TirStmt::Let { .. }
+                | TirStmt::Return(_)
+                | TirStmt::Break
+                | TirStmt::Continue
+                | TirStmt::Throw(_)
+                | TirStmt::BuildClass(_) => {}
             }
         }
     }

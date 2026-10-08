@@ -46,7 +46,19 @@ impl<'m> Builder<'m> {
             Resolution::NativeGlobal(n) => {
                 self.emit(InstKind::LoadNativeGlobalIdx(*n), HirType::Ref)
             }
-            _ => self.lower_expr(callee)?,
+            Resolution::None
+            | Resolution::Local(_)
+            | Resolution::Param(_)
+            | Resolution::Upvalue(_)
+            | Resolution::GlobalSlot(_)
+            | Resolution::ModuleSlot { .. }
+            | Resolution::FieldSlot(_)
+            | Resolution::StaticField(_)
+            | Resolution::VtableSlot(_)
+            | Resolution::Intrinsic(_)
+            | Resolution::NativeOp(_)
+            | Resolution::EnumVariant { .. }
+            | Resolution::ByName { .. } => self.lower_expr(callee)?,
         };
         self.lower_call(cv, args, ty)
     }
@@ -109,7 +121,22 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         let (enum_id, tag) = match res {
             Resolution::EnumVariant { enum_id, tag } => (*enum_id, *tag),
-            _ => return Err(OptError::Unsupported("from_tir: MakeVariant without res")),
+            Resolution::None
+            | Resolution::Local(_)
+            | Resolution::Param(_)
+            | Resolution::Upvalue(_)
+            | Resolution::GlobalSlot(_)
+            | Resolution::NativeGlobal(_)
+            | Resolution::ModuleSlot { .. }
+            | Resolution::FieldSlot(_)
+            | Resolution::StaticField(_)
+            | Resolution::VtableSlot(_)
+            | Resolution::DirectFn(_)
+            | Resolution::Intrinsic(_)
+            | Resolution::NativeOp(_)
+            | Resolution::ByName { .. } => {
+                return Err(OptError::Unsupported("from_tir: MakeVariant without res"))
+            }
         };
         let ei = self
             .tir

@@ -71,7 +71,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
                 escaped.extend(then_args.iter().chain(else_args).map(|a| a.0));
             }
             Terminator::Jump { args, .. } => escaped.extend(args.iter().map(|a| a.0)),
-            _ => {}
+            Terminator::Return(_) | Terminator::Unreachable => {}
         }
     }
     sites.retain(|v, _| !escaped.contains(v));

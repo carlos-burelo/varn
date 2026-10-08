@@ -99,7 +99,90 @@ pub(crate) fn project(
                         off.and_then(|o| u32::try_from(o).ok())
                             .map(|o| (o, &lv.live_in[h]))
                     }
-                    _ => None,
+                    InstKind::ConstInt(_)
+                    | InstKind::ConstFloat(_)
+                    | InstKind::ConstBool(_)
+                    | InstKind::ConstStr(_)
+                    | InstKind::ConstChar(_)
+                    | InstKind::ConstDecimal(_)
+                    | InstKind::ConstBigInt(_)
+                    | InstKind::ConstNull
+                    | InstKind::Binary { .. }
+                    | InstKind::Unary { .. }
+                    | InstKind::LoadGlobal(_)
+                    | InstKind::LoadGlobalIdx(_)
+                    | InstKind::LoadNativeGlobalIdx(_)
+                    | InstKind::LoadUpvalue(_)
+                    | InstKind::StoreGlobal { .. }
+                    | InstKind::StoreGlobalIdx { .. }
+                    | InstKind::StoreUpvalue { .. }
+                    | InstKind::Call { .. }
+                    | InstKind::AllocInstance { .. }
+                    | InstKind::SelfCall { .. }
+                    | InstKind::GetProperty { .. }
+                    | InstKind::GetFixedField { .. }
+                    | InstKind::GetIndex { .. }
+                    | InstKind::ArrayGetIndex { .. }
+                    | InstKind::MapGetIndex { .. }
+                    | InstKind::SetProperty { .. }
+                    | InstKind::SetFixedField { .. }
+                    | InstKind::SetIndex { .. }
+                    | InstKind::ArraySetIndex { .. }
+                    | InstKind::MapSetIndex { .. }
+                    | InstKind::ArrayPush { .. }
+                    | InstKind::ObjectMerge { .. }
+                    | InstKind::MethodCall { .. }
+                    | InstKind::IsNull { .. }
+                    | InstKind::Cast { .. }
+                    | InstKind::Convert { .. }
+                    | InstKind::BuildArray { .. }
+                    | InstKind::BuildTuple { .. }
+                    | InstKind::BuildObject { .. }
+                    | InstKind::BuildRecord { .. }
+                    | InstKind::BuildMap { .. }
+                    | InstKind::ObjectRest { .. }
+                    | InstKind::ToString { .. }
+                    | InstKind::BuildStr { .. }
+                    | InstKind::MakeClosure { .. }
+                    | InstKind::LoadCaptured { .. }
+                    | InstKind::StoreCaptured { .. }
+                    | InstKind::MakeClass { .. }
+                    | InstKind::DeclareLayout { .. }
+                    | InstKind::DefineStatic { .. }
+                    | InstKind::DefineMethod { .. }
+                    | InstKind::DefineAccessor { .. }
+                    | InstKind::MakeEnumVariant { .. }
+                    | InstKind::PopTry
+                    | InstKind::CatchParam { .. }
+                    | InstKind::CloseUpvalues { .. }
+                    | InstKind::Dispose { .. }
+                    | InstKind::LoadModule { .. }
+                    | InstKind::StoreModuleSlot { .. }
+                    | InstKind::Await { .. }
+                    | InstKind::Spawn { .. }
+                    | InstKind::Yield { .. }
+                    | InstKind::IntrinsicCall { .. }
+                    | InstKind::CallNativeOp { .. }
+                    | InstKind::AssertNotNull { .. }
+                    | InstKind::GetPropertyMaybe { .. }
+                    | InstKind::ModuleSlot { .. }
+                    | InstKind::GetEnumTag { .. }
+                    | InstKind::IsArray { .. }
+                    | InstKind::StrLength { .. }
+                    | InstKind::ArrayLength { .. }
+                    | InstKind::BytesLength { .. }
+                    | InstKind::This
+                    | InstKind::Range { .. }
+                    | InstKind::ObjectKeys { .. }
+                    | InstKind::GetSymbol { .. }
+                    | InstKind::IterCall { .. }
+                    | InstKind::GetSuper { .. }
+                    | InstKind::SuperCall { .. }
+                    | InstKind::SuperMethodCall { .. }
+                    | InstKind::ExtensionCall { .. }
+                    | InstKind::CallSpread { .. }
+                    | InstKind::BuildArraySpread { .. }
+                    | InstKind::BuildObjectSpread { .. } => None,
                 },
                 own_ip: u32::try_from(own).unwrap_or(u32::MAX),
                 next_ip: u32::try_from(next).unwrap_or(u32::MAX),
@@ -112,7 +195,88 @@ pub(crate) fn project(
                             .map(|v| v.0)
                             .collect()
                     }
-                    _ => Vec::new(),
+                    InstKind::ConstInt(_)
+                    | InstKind::ConstFloat(_)
+                    | InstKind::ConstBool(_)
+                    | InstKind::ConstStr(_)
+                    | InstKind::ConstChar(_)
+                    | InstKind::ConstDecimal(_)
+                    | InstKind::ConstBigInt(_)
+                    | InstKind::ConstNull
+                    | InstKind::Binary { .. }
+                    | InstKind::Unary { .. }
+                    | InstKind::LoadGlobal(_)
+                    | InstKind::LoadGlobalIdx(_)
+                    | InstKind::LoadNativeGlobalIdx(_)
+                    | InstKind::LoadUpvalue(_)
+                    | InstKind::StoreGlobal { .. }
+                    | InstKind::StoreGlobalIdx { .. }
+                    | InstKind::StoreUpvalue { .. }
+                    | InstKind::Call { .. }
+                    | InstKind::AllocInstance { .. }
+                    | InstKind::SelfCall { .. }
+                    | InstKind::GetProperty { .. }
+                    | InstKind::GetFixedField { .. }
+                    | InstKind::GetIndex { .. }
+                    | InstKind::ArrayGetIndex { .. }
+                    | InstKind::MapGetIndex { .. }
+                    | InstKind::SetProperty { .. }
+                    | InstKind::SetFixedField { .. }
+                    | InstKind::SetIndex { .. }
+                    | InstKind::ArraySetIndex { .. }
+                    | InstKind::MapSetIndex { .. }
+                    | InstKind::ArrayPush { .. }
+                    | InstKind::ObjectMerge { .. }
+                    | InstKind::MethodCall { .. }
+                    | InstKind::IsNull { .. }
+                    | InstKind::Cast { .. }
+                    | InstKind::Convert { .. }
+                    | InstKind::BuildArray { .. }
+                    | InstKind::BuildTuple { .. }
+                    | InstKind::BuildObject { .. }
+                    | InstKind::BuildRecord { .. }
+                    | InstKind::BuildMap { .. }
+                    | InstKind::ObjectRest { .. }
+                    | InstKind::ToString { .. }
+                    | InstKind::BuildStr { .. }
+                    | InstKind::MakeClosure { .. }
+                    | InstKind::LoadCaptured { .. }
+                    | InstKind::StoreCaptured { .. }
+                    | InstKind::MakeClass { .. }
+                    | InstKind::DeclareLayout { .. }
+                    | InstKind::DefineStatic { .. }
+                    | InstKind::DefineMethod { .. }
+                    | InstKind::DefineAccessor { .. }
+                    | InstKind::MakeEnumVariant { .. }
+                    | InstKind::Try { .. }
+                    | InstKind::PopTry
+                    | InstKind::CatchParam { .. }
+                    | InstKind::CloseUpvalues { .. }
+                    | InstKind::Dispose { .. }
+                    | InstKind::StoreModuleSlot { .. }
+                    | InstKind::Spawn { .. }
+                    | InstKind::IntrinsicCall { .. }
+                    | InstKind::CallNativeOp { .. }
+                    | InstKind::AssertNotNull { .. }
+                    | InstKind::GetPropertyMaybe { .. }
+                    | InstKind::ModuleSlot { .. }
+                    | InstKind::GetEnumTag { .. }
+                    | InstKind::IsArray { .. }
+                    | InstKind::StrLength { .. }
+                    | InstKind::ArrayLength { .. }
+                    | InstKind::BytesLength { .. }
+                    | InstKind::This
+                    | InstKind::Range { .. }
+                    | InstKind::ObjectKeys { .. }
+                    | InstKind::GetSymbol { .. }
+                    | InstKind::IterCall { .. }
+                    | InstKind::GetSuper { .. }
+                    | InstKind::SuperCall { .. }
+                    | InstKind::SuperMethodCall { .. }
+                    | InstKind::ExtensionCall { .. }
+                    | InstKind::CallSpread { .. }
+                    | InstKind::BuildArraySpread { .. }
+                    | InstKind::BuildObjectSpread { .. } => Vec::new(),
                 },
             };
             let projected = project_inst(inst, &value_tys, site, &mut captured)
@@ -238,7 +402,89 @@ fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
         InstKind::Unary { op, operand, .. } => {
             format!("no portable form for {op:?} on {:?}", ty(operand))
         }
-        other => {
+        other @ InstKind::ConstInt(_)
+        | other @ InstKind::ConstFloat(_)
+        | other @ InstKind::ConstBool(_)
+        | other @ InstKind::ConstStr(_)
+        | other @ InstKind::ConstChar(_)
+        | other @ InstKind::ConstDecimal(_)
+        | other @ InstKind::ConstBigInt(_)
+        | other @ InstKind::ConstNull
+        | other @ InstKind::LoadGlobal(_)
+        | other @ InstKind::LoadGlobalIdx(_)
+        | other @ InstKind::LoadNativeGlobalIdx(_)
+        | other @ InstKind::LoadUpvalue(_)
+        | other @ InstKind::StoreGlobal { .. }
+        | other @ InstKind::StoreGlobalIdx { .. }
+        | other @ InstKind::StoreUpvalue { .. }
+        | other @ InstKind::Call { .. }
+        | other @ InstKind::AllocInstance { .. }
+        | other @ InstKind::SelfCall { .. }
+        | other @ InstKind::GetProperty { .. }
+        | other @ InstKind::GetFixedField { .. }
+        | other @ InstKind::GetIndex { .. }
+        | other @ InstKind::ArrayGetIndex { .. }
+        | other @ InstKind::MapGetIndex { .. }
+        | other @ InstKind::SetProperty { .. }
+        | other @ InstKind::SetFixedField { .. }
+        | other @ InstKind::SetIndex { .. }
+        | other @ InstKind::ArraySetIndex { .. }
+        | other @ InstKind::MapSetIndex { .. }
+        | other @ InstKind::ArrayPush { .. }
+        | other @ InstKind::ObjectMerge { .. }
+        | other @ InstKind::MethodCall { .. }
+        | other @ InstKind::IsNull { .. }
+        | other @ InstKind::Cast { .. }
+        | other @ InstKind::Convert { .. }
+        | other @ InstKind::BuildArray { .. }
+        | other @ InstKind::BuildTuple { .. }
+        | other @ InstKind::BuildObject { .. }
+        | other @ InstKind::BuildRecord { .. }
+        | other @ InstKind::BuildMap { .. }
+        | other @ InstKind::ObjectRest { .. }
+        | other @ InstKind::ToString { .. }
+        | other @ InstKind::BuildStr { .. }
+        | other @ InstKind::MakeClosure { .. }
+        | other @ InstKind::LoadCaptured { .. }
+        | other @ InstKind::StoreCaptured { .. }
+        | other @ InstKind::MakeClass { .. }
+        | other @ InstKind::DeclareLayout { .. }
+        | other @ InstKind::DefineStatic { .. }
+        | other @ InstKind::DefineMethod { .. }
+        | other @ InstKind::DefineAccessor { .. }
+        | other @ InstKind::MakeEnumVariant { .. }
+        | other @ InstKind::Try { .. }
+        | other @ InstKind::PopTry
+        | other @ InstKind::CatchParam { .. }
+        | other @ InstKind::CloseUpvalues { .. }
+        | other @ InstKind::Dispose { .. }
+        | other @ InstKind::LoadModule { .. }
+        | other @ InstKind::StoreModuleSlot { .. }
+        | other @ InstKind::Await { .. }
+        | other @ InstKind::Spawn { .. }
+        | other @ InstKind::Yield { .. }
+        | other @ InstKind::IntrinsicCall { .. }
+        | other @ InstKind::CallNativeOp { .. }
+        | other @ InstKind::AssertNotNull { .. }
+        | other @ InstKind::GetPropertyMaybe { .. }
+        | other @ InstKind::ModuleSlot { .. }
+        | other @ InstKind::GetEnumTag { .. }
+        | other @ InstKind::IsArray { .. }
+        | other @ InstKind::StrLength { .. }
+        | other @ InstKind::ArrayLength { .. }
+        | other @ InstKind::BytesLength { .. }
+        | other @ InstKind::This
+        | other @ InstKind::Range { .. }
+        | other @ InstKind::ObjectKeys { .. }
+        | other @ InstKind::GetSymbol { .. }
+        | other @ InstKind::IterCall { .. }
+        | other @ InstKind::GetSuper { .. }
+        | other @ InstKind::SuperCall { .. }
+        | other @ InstKind::SuperMethodCall { .. }
+        | other @ InstKind::ExtensionCall { .. }
+        | other @ InstKind::CallSpread { .. }
+        | other @ InstKind::BuildArraySpread { .. }
+        | other @ InstKind::BuildObjectSpread { .. } => {
             let full = format!("{other:?}");
             let end = full.find([' ', '(', '{']).unwrap_or(full.len());
             format!("no portable form for {}", &full[..end])

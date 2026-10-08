@@ -32,7 +32,24 @@ pub(super) fn immediate_operand(kind: &InstKind, imm: &[Option<i8>]) -> Option<(
             }
         }
         crate::hir::HirBinOp::Sub => get(rhs).map(|i| (*rhs, *lhs, i)),
-        _ => None,
+        crate::hir::HirBinOp::Mul
+        | crate::hir::HirBinOp::Div
+        | crate::hir::HirBinOp::Mod
+        | crate::hir::HirBinOp::Pow
+        | crate::hir::HirBinOp::Eq
+        | crate::hir::HirBinOp::Ne
+        | crate::hir::HirBinOp::Lt
+        | crate::hir::HirBinOp::Le
+        | crate::hir::HirBinOp::Gt
+        | crate::hir::HirBinOp::Ge
+        | crate::hir::HirBinOp::BitAnd
+        | crate::hir::HirBinOp::BitOr
+        | crate::hir::HirBinOp::BitXor
+        | crate::hir::HirBinOp::Shl
+        | crate::hir::HirBinOp::Shr
+        | crate::hir::HirBinOp::Ushr
+        | crate::hir::HirBinOp::Instanceof
+        | crate::hir::HirBinOp::In => None,
     }
 }
 

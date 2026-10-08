@@ -77,7 +77,14 @@ impl<'m> Builder<'m> {
                         HirType::Int => self.emit(InstKind::ConstInt(0), declared),
                         HirType::Float => self.emit(InstKind::ConstFloat(0.0), declared),
                         HirType::Bool => self.emit(InstKind::ConstBool(false), declared),
-                        _ => self.emit(InstKind::ConstNull, declared),
+                        HirType::Str
+                        | HirType::Ref
+                        | HirType::Dynamic
+                        | HirType::Array(_)
+                        | HirType::Map(..)
+                        | HirType::Set(_)
+                        | HirType::Class(_)
+                        | HirType::Nullable(_) => self.emit(InstKind::ConstNull, declared),
                     },
                 };
                 self.store_var(var, value);

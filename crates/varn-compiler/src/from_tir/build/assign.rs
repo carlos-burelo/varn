@@ -31,7 +31,18 @@ impl<'m> Builder<'m> {
                 Resolution::GlobalSlot(n) => {
                     self.emit_effect(InstKind::StoreGlobalIdx { slot: *n, value });
                 }
-                _ => return Err(OptError::Unsupported("from_tir: assign target var")),
+                Resolution::None
+                | Resolution::NativeGlobal(_)
+                | Resolution::ModuleSlot { .. }
+                | Resolution::FieldSlot(_)
+                | Resolution::StaticField(_)
+                | Resolution::VtableSlot(_)
+                | Resolution::DirectFn(_)
+                | Resolution::Intrinsic(_)
+                | Resolution::NativeOp(_)
+                | Resolution::EnumVariant { .. } => {
+                    return Err(OptError::Unsupported("from_tir: assign target var"))
+                }
             },
             TirExprKind::Field { object, name } => {
                 let obj = self.lower_expr(object)?;
@@ -50,7 +61,20 @@ impl<'m> Builder<'m> {
                             value,
                         },
                     },
-                    _ => InstKind::SetProperty {
+                    Resolution::None
+                    | Resolution::Local(_)
+                    | Resolution::Param(_)
+                    | Resolution::Upvalue(_)
+                    | Resolution::GlobalSlot(_)
+                    | Resolution::NativeGlobal(_)
+                    | Resolution::ModuleSlot { .. }
+                    | Resolution::StaticField(_)
+                    | Resolution::VtableSlot(_)
+                    | Resolution::DirectFn(_)
+                    | Resolution::Intrinsic(_)
+                    | Resolution::NativeOp(_)
+                    | Resolution::EnumVariant { .. }
+                    | Resolution::ByName { .. } => InstKind::SetProperty {
                         object: obj,
                         name: name.clone(),
                         value,
@@ -82,7 +106,43 @@ impl<'m> Builder<'m> {
                 };
                 self.emit_effect(kind);
             }
-            _ => return Err(OptError::Unsupported("from_tir: assign target")),
+            TirExprKind::IntLit(_)
+            | TirExprKind::FloatLit(_)
+            | TirExprKind::BoolLit(_)
+            | TirExprKind::StrLit(_)
+            | TirExprKind::CharLit(_)
+            | TirExprKind::NullLit
+            | TirExprKind::Binary { .. }
+            | TirExprKind::Unary { .. }
+            | TirExprKind::Call { .. }
+            | TirExprKind::MethodCall { .. }
+            | TirExprKind::Assign { .. }
+            | TirExprKind::ArrayLit(_)
+            | TirExprKind::TupleLit(_)
+            | TirExprKind::ObjectLit { .. }
+            | TirExprKind::RecordLit { .. }
+            | TirExprKind::Await { .. }
+            | TirExprKind::Yield { .. }
+            | TirExprKind::Discriminant { .. }
+            | TirExprKind::VariantPayload { .. }
+            | TirExprKind::TypeTest { .. }
+            | TirExprKind::Cast { .. }
+            | TirExprKind::Closure { .. }
+            | TirExprKind::New { .. }
+            | TirExprKind::MakeVariant { .. }
+            | TirExprKind::Select { .. }
+            | TirExprKind::Seq { .. }
+            | TirExprKind::ObjectKeys { .. }
+            | TirExprKind::IterInit { .. }
+            | TirExprKind::SuperCall { .. }
+            | TirExprKind::SuperMethodCall { .. }
+            | TirExprKind::DecimalLit(_)
+            | TirExprKind::BigIntLit(_)
+            | TirExprKind::RangeLit { .. }
+            | TirExprKind::ObjectRest { .. }
+            | TirExprKind::ExtensionCall { .. } => {
+                return Err(OptError::Unsupported("from_tir: assign target"))
+            }
         }
         Ok(())
     }
@@ -136,7 +196,14 @@ impl<'m> Builder<'m> {
                 Some(this) => Ok(this),
                 None => Ok(self.emit(InstKind::This, ty)),
             },
-            _ => Err(OptError::Unsupported("from_tir: var resolution")),
+            Resolution::FieldSlot(_)
+            | Resolution::StaticField(_)
+            | Resolution::VtableSlot(_)
+            | Resolution::Intrinsic(_)
+            | Resolution::NativeOp(_)
+            | Resolution::EnumVariant { .. } => {
+                Err(OptError::Unsupported("from_tir: var resolution"))
+            }
         }
     }
 

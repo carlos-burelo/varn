@@ -10,7 +10,10 @@ pub(super) fn split_phi_edges(ssa: &mut SsaFunc) {
                 !ssa.blocks[then_blk.0 as usize].params.is_empty(),
                 !ssa.blocks[else_blk.0 as usize].params.is_empty(),
             ),
-            _ => continue,
+            Terminator::Return(_)
+            | Terminator::Throw(_)
+            | Terminator::Jump { .. }
+            | Terminator::Unreachable => continue,
         };
         if then_has {
             split_one(ssa, BlockId(b as u32), true);
@@ -36,7 +39,10 @@ fn split_one(ssa: &mut SsaFunc, br: BlockId, is_then: bool) {
                 (*else_blk, std::mem::take(else_args))
             }
         }
-        _ => return,
+        Terminator::Return(_)
+        | Terminator::Throw(_)
+        | Terminator::Jump { .. }
+        | Terminator::Unreachable => return,
     };
     let pad = BlockId(ssa.blocks.len() as u32);
     let term_line = ssa.blocks[br.0 as usize].term_line;

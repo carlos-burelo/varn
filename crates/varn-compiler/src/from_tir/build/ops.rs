@@ -57,6 +57,20 @@ pub(super) fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> 
         BackendTy::Float => D::Float,
         BackendTy::BigInt => D::BigInt,
         BackendTy::Decimal => D::Decimal,
-        _ => return None,
+        BackendTy::Bool
+        | BackendTy::Char
+        | BackendTy::Str
+        | BackendTy::Bytes
+        | BackendTy::Array(_)
+        | BackendTy::Map(..)
+        | BackendTy::Set(_)
+        | BackendTy::Tuple(_)
+        | BackendTy::Class(_)
+        | BackendTy::Enum(_)
+        | BackendTy::Fn(_)
+        | BackendTy::Nullable(_)
+        | BackendTy::Void
+        | BackendTy::Never
+        | BackendTy::Dynamic(_) => return None,
     })
 }

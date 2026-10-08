@@ -172,7 +172,10 @@ impl<'m> Builder<'m> {
                     else_args.push(arg);
                 }
             }
-            _ => panic!("predecessor {pred:?} has no edge to {block:?}"),
+            Terminator::Return(_)
+            | Terminator::Throw(_)
+            | Terminator::Jump { .. }
+            | Terminator::Unreachable => panic!("predecessor {pred:?} has no edge to {block:?}"),
         }
     }
 

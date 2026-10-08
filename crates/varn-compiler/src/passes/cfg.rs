@@ -141,7 +141,10 @@ fn jump_forwarding(func: &mut SsaFunc) -> bool {
                                     ));
                                 }
                             }
-                            _ => {}
+                            Terminator::Return(_)
+                            | Terminator::Throw(_)
+                            | Terminator::Jump { .. }
+                            | Terminator::Unreachable => {}
                         }
                     }
 
@@ -193,7 +196,90 @@ fn merge_blocks(func: &mut SsaFunc) -> bool {
                         .iter()
                         .filter_map(|i| match &i.kind {
                             InstKind::Try { handler } => Some(*handler),
-                            _ => None,
+                            InstKind::ConstInt(_)
+                            | InstKind::ConstFloat(_)
+                            | InstKind::ConstBool(_)
+                            | InstKind::ConstStr(_)
+                            | InstKind::ConstChar(_)
+                            | InstKind::ConstDecimal(_)
+                            | InstKind::ConstBigInt(_)
+                            | InstKind::ConstNull
+                            | InstKind::Binary { .. }
+                            | InstKind::Unary { .. }
+                            | InstKind::LoadGlobal(_)
+                            | InstKind::LoadGlobalIdx(_)
+                            | InstKind::LoadNativeGlobalIdx(_)
+                            | InstKind::LoadUpvalue(_)
+                            | InstKind::StoreGlobal { .. }
+                            | InstKind::StoreGlobalIdx { .. }
+                            | InstKind::StoreUpvalue { .. }
+                            | InstKind::Call { .. }
+                            | InstKind::AllocInstance { .. }
+                            | InstKind::SelfCall { .. }
+                            | InstKind::GetProperty { .. }
+                            | InstKind::GetFixedField { .. }
+                            | InstKind::GetIndex { .. }
+                            | InstKind::ArrayGetIndex { .. }
+                            | InstKind::MapGetIndex { .. }
+                            | InstKind::SetProperty { .. }
+                            | InstKind::SetFixedField { .. }
+                            | InstKind::SetIndex { .. }
+                            | InstKind::ArraySetIndex { .. }
+                            | InstKind::MapSetIndex { .. }
+                            | InstKind::ArrayPush { .. }
+                            | InstKind::ObjectMerge { .. }
+                            | InstKind::MethodCall { .. }
+                            | InstKind::IsNull { .. }
+                            | InstKind::Cast { .. }
+                            | InstKind::Convert { .. }
+                            | InstKind::BuildArray { .. }
+                            | InstKind::BuildTuple { .. }
+                            | InstKind::BuildObject { .. }
+                            | InstKind::BuildRecord { .. }
+                            | InstKind::BuildMap { .. }
+                            | InstKind::ObjectRest { .. }
+                            | InstKind::ToString { .. }
+                            | InstKind::BuildStr { .. }
+                            | InstKind::MakeClosure { .. }
+                            | InstKind::LoadCaptured { .. }
+                            | InstKind::StoreCaptured { .. }
+                            | InstKind::MakeClass { .. }
+                            | InstKind::DeclareLayout { .. }
+                            | InstKind::DefineStatic { .. }
+                            | InstKind::DefineMethod { .. }
+                            | InstKind::DefineAccessor { .. }
+                            | InstKind::MakeEnumVariant { .. }
+                            | InstKind::PopTry
+                            | InstKind::CatchParam { .. }
+                            | InstKind::CloseUpvalues { .. }
+                            | InstKind::Dispose { .. }
+                            | InstKind::LoadModule { .. }
+                            | InstKind::StoreModuleSlot { .. }
+                            | InstKind::Await { .. }
+                            | InstKind::Spawn { .. }
+                            | InstKind::Yield { .. }
+                            | InstKind::IntrinsicCall { .. }
+                            | InstKind::CallNativeOp { .. }
+                            | InstKind::AssertNotNull { .. }
+                            | InstKind::GetPropertyMaybe { .. }
+                            | InstKind::ModuleSlot { .. }
+                            | InstKind::GetEnumTag { .. }
+                            | InstKind::IsArray { .. }
+                            | InstKind::StrLength { .. }
+                            | InstKind::ArrayLength { .. }
+                            | InstKind::BytesLength { .. }
+                            | InstKind::This
+                            | InstKind::Range { .. }
+                            | InstKind::ObjectKeys { .. }
+                            | InstKind::GetSymbol { .. }
+                            | InstKind::IterCall { .. }
+                            | InstKind::GetSuper { .. }
+                            | InstKind::SuperCall { .. }
+                            | InstKind::SuperMethodCall { .. }
+                            | InstKind::ExtensionCall { .. }
+                            | InstKind::CallSpread { .. }
+                            | InstKind::BuildArraySpread { .. }
+                            | InstKind::BuildObjectSpread { .. } => None,
                         })
                         .collect();
                     func.blocks[a_id.0 as usize].insts.extend(b_insts);
@@ -271,7 +357,7 @@ fn compact_cfg(func: &mut SsaFunc) -> bool {
                 *then_blk = old_to_new[then_blk.0 as usize].expect("reachable targets reachable");
                 *else_blk = old_to_new[else_blk.0 as usize].expect("reachable targets reachable");
             }
-            _ => {}
+            Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => {}
         }
 
         new_blocks.push(block);

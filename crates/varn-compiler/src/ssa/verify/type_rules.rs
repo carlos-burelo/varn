@@ -170,7 +170,79 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
                 ));
             }
         }
-        _ => {}
+        InstKind::ConstDecimal(_)
+        | InstKind::ConstBigInt(_)
+        | InstKind::ConstNull
+        | InstKind::LoadGlobal(_)
+        | InstKind::LoadGlobalIdx(_)
+        | InstKind::LoadNativeGlobalIdx(_)
+        | InstKind::LoadUpvalue(_)
+        | InstKind::StoreGlobal { .. }
+        | InstKind::StoreGlobalIdx { .. }
+        | InstKind::StoreUpvalue { .. }
+        | InstKind::Call { .. }
+        | InstKind::AllocInstance { .. }
+        | InstKind::SelfCall { .. }
+        | InstKind::GetProperty { .. }
+        | InstKind::GetFixedField { .. }
+        | InstKind::GetIndex { .. }
+        | InstKind::MapGetIndex { .. }
+        | InstKind::SetProperty { .. }
+        | InstKind::SetFixedField { .. }
+        | InstKind::SetIndex { .. }
+        | InstKind::MapSetIndex { .. }
+        | InstKind::ArrayPush { .. }
+        | InstKind::ObjectMerge { .. }
+        | InstKind::MethodCall { .. }
+        | InstKind::BuildArray { .. }
+        | InstKind::BuildTuple { .. }
+        | InstKind::BuildObject { .. }
+        | InstKind::BuildRecord { .. }
+        | InstKind::BuildMap { .. }
+        | InstKind::ObjectRest { .. }
+        | InstKind::ToString { .. }
+        | InstKind::BuildStr { .. }
+        | InstKind::MakeClosure { .. }
+        | InstKind::LoadCaptured { .. }
+        | InstKind::StoreCaptured { .. }
+        | InstKind::MakeClass { .. }
+        | InstKind::DeclareLayout { .. }
+        | InstKind::DefineStatic { .. }
+        | InstKind::DefineMethod { .. }
+        | InstKind::DefineAccessor { .. }
+        | InstKind::MakeEnumVariant { .. }
+        | InstKind::Try { .. }
+        | InstKind::PopTry
+        | InstKind::CatchParam { .. }
+        | InstKind::CloseUpvalues { .. }
+        | InstKind::Dispose { .. }
+        | InstKind::LoadModule { .. }
+        | InstKind::StoreModuleSlot { .. }
+        | InstKind::Await { .. }
+        | InstKind::Spawn { .. }
+        | InstKind::Yield { .. }
+        | InstKind::IntrinsicCall { .. }
+        | InstKind::CallNativeOp { .. }
+        | InstKind::AssertNotNull { .. }
+        | InstKind::GetPropertyMaybe { .. }
+        | InstKind::ModuleSlot { .. }
+        | InstKind::GetEnumTag { .. }
+        | InstKind::IsArray { .. }
+        | InstKind::StrLength { .. }
+        | InstKind::ArrayLength { .. }
+        | InstKind::BytesLength { .. }
+        | InstKind::This
+        | InstKind::Range { .. }
+        | InstKind::ObjectKeys { .. }
+        | InstKind::GetSymbol { .. }
+        | InstKind::IterCall { .. }
+        | InstKind::GetSuper { .. }
+        | InstKind::SuperCall { .. }
+        | InstKind::SuperMethodCall { .. }
+        | InstKind::ExtensionCall { .. }
+        | InstKind::CallSpread { .. }
+        | InstKind::BuildArraySpread { .. }
+        | InstKind::BuildObjectSpread { .. } => {}
     }
     Ok(())
 }

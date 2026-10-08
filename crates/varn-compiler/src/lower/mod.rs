@@ -64,7 +64,15 @@ fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
             Instanceof => OpCode::Instanceof,
             In => OpCode::In,
         },
-        _ => match op {
+        HirType::Bool
+        | HirType::Str
+        | HirType::Ref
+        | HirType::Dynamic
+        | HirType::Array(_)
+        | HirType::Map(..)
+        | HirType::Set(_)
+        | HirType::Class(_)
+        | HirType::Nullable(_) => match op {
             Add => OpCode::Add,
             Sub => OpCode::Sub,
             Mul => OpCode::Mul,

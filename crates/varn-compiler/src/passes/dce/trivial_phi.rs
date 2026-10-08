@@ -152,7 +152,7 @@ fn get_incoming_args(func: &SsaFunc, block: BlockId, pos: usize) -> Option<Vec<V
                     }
                 }
             }
-            _ => return None,
+            Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => return None,
         }
     }
     Some(args)
@@ -184,7 +184,10 @@ pub(super) fn remove_param(func: &mut SsaFunc, block: BlockId, pos: usize) {
                     else_args.remove(pos);
                 }
             }
-            _ => {}
+            Terminator::Return(_)
+            | Terminator::Throw(_)
+            | Terminator::Jump { .. }
+            | Terminator::Unreachable => {}
         }
     }
 }

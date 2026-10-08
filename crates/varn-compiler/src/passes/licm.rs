@@ -164,7 +164,78 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
         | InstKind::GetEnumTag { .. }
         | InstKind::StrLength { .. } => true,
         InstKind::MakeClosure { upvalues_src, .. } => upvalues_src.is_empty(),
-        _ => false,
+        InstKind::ConstInt(_)
+        | InstKind::ConstFloat(_)
+        | InstKind::ConstBool(_)
+        | InstKind::ConstStr(_)
+        | InstKind::ConstChar(_)
+        | InstKind::ConstDecimal(_)
+        | InstKind::ConstBigInt(_)
+        | InstKind::ConstNull
+        | InstKind::LoadUpvalue(_)
+        | InstKind::StoreGlobal { .. }
+        | InstKind::StoreGlobalIdx { .. }
+        | InstKind::StoreUpvalue { .. }
+        | InstKind::Call { .. }
+        | InstKind::AllocInstance { .. }
+        | InstKind::SelfCall { .. }
+        | InstKind::GetProperty { .. }
+        | InstKind::GetIndex { .. }
+        | InstKind::SetProperty { .. }
+        | InstKind::SetFixedField { .. }
+        | InstKind::SetIndex { .. }
+        | InstKind::ArraySetIndex { .. }
+        | InstKind::MapSetIndex { .. }
+        | InstKind::ArrayPush { .. }
+        | InstKind::ObjectMerge { .. }
+        | InstKind::MethodCall { .. }
+        | InstKind::Cast { .. }
+        | InstKind::Convert { .. }
+        | InstKind::BuildArray { .. }
+        | InstKind::BuildTuple { .. }
+        | InstKind::BuildObject { .. }
+        | InstKind::BuildRecord { .. }
+        | InstKind::BuildMap { .. }
+        | InstKind::ObjectRest { .. }
+        | InstKind::ToString { .. }
+        | InstKind::BuildStr { .. }
+        | InstKind::LoadCaptured { .. }
+        | InstKind::StoreCaptured { .. }
+        | InstKind::MakeClass { .. }
+        | InstKind::DeclareLayout { .. }
+        | InstKind::DefineStatic { .. }
+        | InstKind::DefineMethod { .. }
+        | InstKind::DefineAccessor { .. }
+        | InstKind::MakeEnumVariant { .. }
+        | InstKind::Try { .. }
+        | InstKind::PopTry
+        | InstKind::CatchParam { .. }
+        | InstKind::CloseUpvalues { .. }
+        | InstKind::Dispose { .. }
+        | InstKind::LoadModule { .. }
+        | InstKind::StoreModuleSlot { .. }
+        | InstKind::Await { .. }
+        | InstKind::Spawn { .. }
+        | InstKind::Yield { .. }
+        | InstKind::IntrinsicCall { .. }
+        | InstKind::CallNativeOp { .. }
+        | InstKind::AssertNotNull { .. }
+        | InstKind::GetPropertyMaybe { .. }
+        | InstKind::ModuleSlot { .. }
+        | InstKind::ArrayLength { .. }
+        | InstKind::BytesLength { .. }
+        | InstKind::This
+        | InstKind::Range { .. }
+        | InstKind::ObjectKeys { .. }
+        | InstKind::GetSymbol { .. }
+        | InstKind::IterCall { .. }
+        | InstKind::GetSuper { .. }
+        | InstKind::SuperCall { .. }
+        | InstKind::SuperMethodCall { .. }
+        | InstKind::ExtensionCall { .. }
+        | InstKind::CallSpread { .. }
+        | InstKind::BuildArraySpread { .. }
+        | InstKind::BuildObjectSpread { .. } => false,
     }
 }
 
@@ -212,6 +283,6 @@ fn successors(t: &Terminator) -> Vec<BlockId> {
         Terminator::Branch {
             then_blk, else_blk, ..
         } => vec![*then_blk, *else_blk],
-        _ => Vec::new(),
+        Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
     }
 }

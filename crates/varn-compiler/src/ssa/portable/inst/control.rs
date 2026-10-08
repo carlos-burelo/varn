@@ -66,6 +66,73 @@ pub(super) fn try_project(
             is_await: *is_await,
             cs: u16::from(site.ic_slot?),
         }),
-        _ => None,
+        InstKind::ConstInt(_)
+        | InstKind::ConstFloat(_)
+        | InstKind::ConstBool(_)
+        | InstKind::ConstStr(_)
+        | InstKind::ConstChar(_)
+        | InstKind::ConstDecimal(_)
+        | InstKind::ConstBigInt(_)
+        | InstKind::ConstNull
+        | InstKind::LoadGlobal(_)
+        | InstKind::LoadGlobalIdx(_)
+        | InstKind::LoadNativeGlobalIdx(_)
+        | InstKind::LoadUpvalue(_)
+        | InstKind::StoreGlobal { .. }
+        | InstKind::StoreGlobalIdx { .. }
+        | InstKind::StoreUpvalue { .. }
+        | InstKind::Call { .. }
+        | InstKind::AllocInstance { .. }
+        | InstKind::SelfCall { .. }
+        | InstKind::GetProperty { .. }
+        | InstKind::GetFixedField { .. }
+        | InstKind::GetIndex { .. }
+        | InstKind::ArrayGetIndex { .. }
+        | InstKind::MapGetIndex { .. }
+        | InstKind::SetProperty { .. }
+        | InstKind::SetFixedField { .. }
+        | InstKind::SetIndex { .. }
+        | InstKind::ArraySetIndex { .. }
+        | InstKind::MapSetIndex { .. }
+        | InstKind::ArrayPush { .. }
+        | InstKind::ObjectMerge { .. }
+        | InstKind::MethodCall { .. }
+        | InstKind::BuildArray { .. }
+        | InstKind::BuildTuple { .. }
+        | InstKind::BuildObject { .. }
+        | InstKind::BuildRecord { .. }
+        | InstKind::BuildMap { .. }
+        | InstKind::ObjectRest { .. }
+        | InstKind::BuildStr { .. }
+        | InstKind::MakeClosure { .. }
+        | InstKind::LoadCaptured { .. }
+        | InstKind::StoreCaptured { .. }
+        | InstKind::MakeClass { .. }
+        | InstKind::DeclareLayout { .. }
+        | InstKind::DefineStatic { .. }
+        | InstKind::DefineMethod { .. }
+        | InstKind::DefineAccessor { .. }
+        | InstKind::MakeEnumVariant { .. }
+        | InstKind::Try { .. }
+        | InstKind::CloseUpvalues { .. }
+        | InstKind::LoadModule { .. }
+        | InstKind::StoreModuleSlot { .. }
+        | InstKind::IntrinsicCall { .. }
+        | InstKind::CallNativeOp { .. }
+        | InstKind::GetPropertyMaybe { .. }
+        | InstKind::ModuleSlot { .. }
+        | InstKind::StrLength { .. }
+        | InstKind::ArrayLength { .. }
+        | InstKind::BytesLength { .. }
+        | InstKind::This
+        | InstKind::GetSymbol { .. }
+        | InstKind::IterCall { .. }
+        | InstKind::GetSuper { .. }
+        | InstKind::SuperCall { .. }
+        | InstKind::SuperMethodCall { .. }
+        | InstKind::ExtensionCall { .. }
+        | InstKind::CallSpread { .. }
+        | InstKind::BuildArraySpread { .. }
+        | InstKind::BuildObjectSpread { .. } => None,
     }
 }

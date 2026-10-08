@@ -113,7 +113,13 @@ impl<'m> Builder<'m> {
                         walk(body, pinned, out);
                         walk(catch_body, pinned, out);
                     }
-                    _ => {}
+                    TirStmt::Expr(_)
+                    | TirStmt::Return(_)
+                    | TirStmt::Loop { .. }
+                    | TirStmt::Break
+                    | TirStmt::Continue
+                    | TirStmt::Throw(_)
+                    | TirStmt::BuildClass(_) => {}
                 }
             }
         }

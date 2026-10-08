@@ -171,6 +171,70 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
         InstKind::LoadNativeGlobalIdx(slot) => Key::NativeGlobalIdx(*slot),
         InstKind::LoadUpvalue(i) => Key::Upvalue(*i),
 
-        _ => return None,
+        InstKind::ConstDecimal(_)
+        | InstKind::StoreGlobal { .. }
+        | InstKind::StoreGlobalIdx { .. }
+        | InstKind::StoreUpvalue { .. }
+        | InstKind::Call { .. }
+        | InstKind::AllocInstance { .. }
+        | InstKind::SelfCall { .. }
+        | InstKind::GetProperty { .. }
+        | InstKind::GetIndex { .. }
+        | InstKind::MapGetIndex { .. }
+        | InstKind::SetProperty { .. }
+        | InstKind::SetFixedField { .. }
+        | InstKind::SetIndex { .. }
+        | InstKind::ArraySetIndex { .. }
+        | InstKind::MapSetIndex { .. }
+        | InstKind::ArrayPush { .. }
+        | InstKind::ObjectMerge { .. }
+        | InstKind::MethodCall { .. }
+        | InstKind::Cast { .. }
+        | InstKind::Convert { .. }
+        | InstKind::BuildArray { .. }
+        | InstKind::BuildTuple { .. }
+        | InstKind::BuildObject { .. }
+        | InstKind::BuildRecord { .. }
+        | InstKind::BuildMap { .. }
+        | InstKind::ObjectRest { .. }
+        | InstKind::ToString { .. }
+        | InstKind::BuildStr { .. }
+        | InstKind::MakeClosure { .. }
+        | InstKind::LoadCaptured { .. }
+        | InstKind::StoreCaptured { .. }
+        | InstKind::MakeClass { .. }
+        | InstKind::DeclareLayout { .. }
+        | InstKind::DefineStatic { .. }
+        | InstKind::DefineMethod { .. }
+        | InstKind::DefineAccessor { .. }
+        | InstKind::MakeEnumVariant { .. }
+        | InstKind::Try { .. }
+        | InstKind::PopTry
+        | InstKind::CatchParam { .. }
+        | InstKind::CloseUpvalues { .. }
+        | InstKind::Dispose { .. }
+        | InstKind::LoadModule { .. }
+        | InstKind::StoreModuleSlot { .. }
+        | InstKind::Await { .. }
+        | InstKind::Spawn { .. }
+        | InstKind::Yield { .. }
+        | InstKind::IntrinsicCall { .. }
+        | InstKind::CallNativeOp { .. }
+        | InstKind::AssertNotNull { .. }
+        | InstKind::GetPropertyMaybe { .. }
+        | InstKind::ArrayLength { .. }
+        | InstKind::BytesLength { .. }
+        | InstKind::This
+        | InstKind::Range { .. }
+        | InstKind::ObjectKeys { .. }
+        | InstKind::GetSymbol { .. }
+        | InstKind::IterCall { .. }
+        | InstKind::GetSuper { .. }
+        | InstKind::SuperCall { .. }
+        | InstKind::SuperMethodCall { .. }
+        | InstKind::ExtensionCall { .. }
+        | InstKind::CallSpread { .. }
+        | InstKind::BuildArraySpread { .. }
+        | InstKind::BuildObjectSpread { .. } => return None,
     })
 }

@@ -58,7 +58,7 @@ impl<'m> Builder<'m> {
         let v = self.lower_expr(operand)?;
         match op {
             TirUnOp::IsNull => Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool)),
-            _ => {
+            TirUnOp::Neg | TirUnOp::Not | TirUnOp::BitNot | TirUnOp::Typeof => {
                 let result = self.emit(
                     InstKind::Unary {
                         op: super::ops::un_op(op),
@@ -83,7 +83,15 @@ impl<'m> Builder<'m> {
         let from = match self.value_ty(v) {
             HirType::Int => Some(D::Int),
             HirType::Float => Some(D::Float),
-            _ => super::ops::numeric_domain(operand.ty)
+            HirType::Bool
+            | HirType::Str
+            | HirType::Ref
+            | HirType::Dynamic
+            | HirType::Array(_)
+            | HirType::Map(..)
+            | HirType::Set(_)
+            | HirType::Class(_)
+            | HirType::Nullable(_) => super::ops::numeric_domain(operand.ty)
                 .filter(|d| matches!(d, D::BigInt | D::Decimal)),
         };
         let to = super::ops::numeric_domain(node_ty);

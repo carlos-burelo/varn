@@ -95,7 +95,23 @@ fn simplify(
                     _ => None,
                 },
 
-                _ => None,
+                HirBinOp::Div
+                | HirBinOp::Mod
+                | HirBinOp::Pow
+                | HirBinOp::Eq
+                | HirBinOp::Ne
+                | HirBinOp::Lt
+                | HirBinOp::Le
+                | HirBinOp::Gt
+                | HirBinOp::Ge
+                | HirBinOp::BitAnd
+                | HirBinOp::BitOr
+                | HirBinOp::BitXor
+                | HirBinOp::Shl
+                | HirBinOp::Shr
+                | HirBinOp::Ushr
+                | HirBinOp::Instanceof
+                | HirBinOp::In => None,
             }
         }
         HirType::Float => {
@@ -111,10 +127,35 @@ fn simplify(
                     }
                 }
                 HirBinOp::Div => is_one(r).then_some(Simplified::Use(l)),
-                _ => None,
+                HirBinOp::Add
+                | HirBinOp::Sub
+                | HirBinOp::Mod
+                | HirBinOp::Pow
+                | HirBinOp::Eq
+                | HirBinOp::Ne
+                | HirBinOp::Lt
+                | HirBinOp::Le
+                | HirBinOp::Gt
+                | HirBinOp::Ge
+                | HirBinOp::BitAnd
+                | HirBinOp::BitOr
+                | HirBinOp::BitXor
+                | HirBinOp::Shl
+                | HirBinOp::Shr
+                | HirBinOp::Ushr
+                | HirBinOp::Instanceof
+                | HirBinOp::In => None,
             }
         }
-        _ => None,
+        HirType::Bool
+        | HirType::Str
+        | HirType::Ref
+        | HirType::Dynamic
+        | HirType::Array(_)
+        | HirType::Map(..)
+        | HirType::Set(_)
+        | HirType::Class(_)
+        | HirType::Nullable(_) => None,
     }
 }
 
@@ -127,6 +168,82 @@ fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
         InstKind::ConstChar(_) => Some(HirType::Ref),
         InstKind::ConstDecimal(_) | InstKind::ConstBigInt(_) => Some(HirType::Dynamic),
         InstKind::ConstNull => Some(HirType::Dynamic),
-        _ => None,
+        InstKind::Binary { .. }
+        | InstKind::Unary { .. }
+        | InstKind::LoadGlobal(_)
+        | InstKind::LoadGlobalIdx(_)
+        | InstKind::LoadNativeGlobalIdx(_)
+        | InstKind::LoadUpvalue(_)
+        | InstKind::StoreGlobal { .. }
+        | InstKind::StoreGlobalIdx { .. }
+        | InstKind::StoreUpvalue { .. }
+        | InstKind::Call { .. }
+        | InstKind::AllocInstance { .. }
+        | InstKind::SelfCall { .. }
+        | InstKind::GetProperty { .. }
+        | InstKind::GetFixedField { .. }
+        | InstKind::GetIndex { .. }
+        | InstKind::ArrayGetIndex { .. }
+        | InstKind::MapGetIndex { .. }
+        | InstKind::SetProperty { .. }
+        | InstKind::SetFixedField { .. }
+        | InstKind::SetIndex { .. }
+        | InstKind::ArraySetIndex { .. }
+        | InstKind::MapSetIndex { .. }
+        | InstKind::ArrayPush { .. }
+        | InstKind::ObjectMerge { .. }
+        | InstKind::MethodCall { .. }
+        | InstKind::IsNull { .. }
+        | InstKind::Cast { .. }
+        | InstKind::Convert { .. }
+        | InstKind::BuildArray { .. }
+        | InstKind::BuildTuple { .. }
+        | InstKind::BuildObject { .. }
+        | InstKind::BuildRecord { .. }
+        | InstKind::BuildMap { .. }
+        | InstKind::ObjectRest { .. }
+        | InstKind::ToString { .. }
+        | InstKind::BuildStr { .. }
+        | InstKind::MakeClosure { .. }
+        | InstKind::LoadCaptured { .. }
+        | InstKind::StoreCaptured { .. }
+        | InstKind::MakeClass { .. }
+        | InstKind::DeclareLayout { .. }
+        | InstKind::DefineStatic { .. }
+        | InstKind::DefineMethod { .. }
+        | InstKind::DefineAccessor { .. }
+        | InstKind::MakeEnumVariant { .. }
+        | InstKind::Try { .. }
+        | InstKind::PopTry
+        | InstKind::CatchParam { .. }
+        | InstKind::CloseUpvalues { .. }
+        | InstKind::Dispose { .. }
+        | InstKind::LoadModule { .. }
+        | InstKind::StoreModuleSlot { .. }
+        | InstKind::Await { .. }
+        | InstKind::Spawn { .. }
+        | InstKind::Yield { .. }
+        | InstKind::IntrinsicCall { .. }
+        | InstKind::CallNativeOp { .. }
+        | InstKind::AssertNotNull { .. }
+        | InstKind::GetPropertyMaybe { .. }
+        | InstKind::ModuleSlot { .. }
+        | InstKind::GetEnumTag { .. }
+        | InstKind::IsArray { .. }
+        | InstKind::StrLength { .. }
+        | InstKind::ArrayLength { .. }
+        | InstKind::BytesLength { .. }
+        | InstKind::This
+        | InstKind::Range { .. }
+        | InstKind::ObjectKeys { .. }
+        | InstKind::GetSymbol { .. }
+        | InstKind::IterCall { .. }
+        | InstKind::GetSuper { .. }
+        | InstKind::SuperCall { .. }
+        | InstKind::SuperMethodCall { .. }
+        | InstKind::ExtensionCall { .. }
+        | InstKind::CallSpread { .. }
+        | InstKind::BuildArraySpread { .. }
+        | InstKind::BuildObjectSpread { .. } => None,
     }
 }

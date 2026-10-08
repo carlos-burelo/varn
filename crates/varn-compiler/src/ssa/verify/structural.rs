@@ -150,7 +150,10 @@ fn edge_arg_count(func: &SsaFunc, pred: BlockId, block: BlockId) -> Result<usize
                 Err(format!("pred b{} has no edge to b{}", pred.0, block.0))
             }
         }
-        _ => Err(format!("pred b{} has no edge to b{}", pred.0, block.0)),
+        Terminator::Return(_)
+        | Terminator::Throw(_)
+        | Terminator::Jump { .. }
+        | Terminator::Unreachable => Err(format!("pred b{} has no edge to b{}", pred.0, block.0)),
     }
 }
 
@@ -165,7 +168,7 @@ pub(crate) fn term_value_uses(t: &Terminator) -> Vec<Value> {
         Terminator::Return(Some(v)) => vec![*v],
         Terminator::Throw(v) => vec![*v],
         Terminator::Branch { cond, .. } => vec![*cond],
-        _ => Vec::new(),
+        Terminator::Return(_) | Terminator::Jump { .. } | Terminator::Unreachable => Vec::new(),
     }
 }
 
@@ -181,6 +184,6 @@ pub(crate) fn out_edges(t: &Terminator) -> Vec<(BlockId, &Vec<Value>)> {
         } => {
             vec![(*then_blk, then_args), (*else_blk, else_args)]
         }
-        _ => Vec::new(),
+        Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
     }
 }

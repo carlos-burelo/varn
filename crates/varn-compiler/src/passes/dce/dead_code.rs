@@ -92,6 +92,6 @@ fn add_term_uses(term: &Terminator, used: &mut FxHashSet<Value>) {
                 used.insert(arg);
             }
         }
-        _ => {}
+        Terminator::Return(_) | Terminator::Unreachable => {}
     }
 }
