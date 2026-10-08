@@ -17,7 +17,7 @@ impl<'r> super::super::Binder<'r> {
                     let value = *value;
                     let name = match key {
                         PropKey::Identifier(s) | PropKey::Str(s) => Arc::from(s.as_str()),
-                        _ => continue,
+                        PropKey::Int(_) | PropKey::Computed(_) => continue,
                     };
                     let ty = self.infer_expr_type_self(value);
                     let nested_members =
@@ -62,7 +62,7 @@ impl<'r> super::super::Binder<'r> {
                 } => {
                     let name = match key {
                         PropKey::Identifier(s) | PropKey::Str(s) => Arc::from(s.as_str()),
-                        _ => continue,
+                        PropKey::Int(_) | PropKey::Computed(_) => continue,
                     };
                     let ret_ty = ret_ann
                         .as_ref()
@@ -107,7 +107,7 @@ impl<'r> super::super::Binder<'r> {
                 ObjectProp::Getter { key, .. } => {
                     let name = match key {
                         PropKey::Identifier(s) | PropKey::Str(s) => Arc::from(s.as_str()),
-                        _ => continue,
+                        PropKey::Int(_) | PropKey::Computed(_) => continue,
                     };
                     Some(ClassMemberInfo {
                         name,
@@ -132,7 +132,7 @@ impl<'r> super::super::Binder<'r> {
                 ObjectProp::Setter { key, .. } => {
                     let name = match key {
                         PropKey::Identifier(s) | PropKey::Str(s) => Arc::from(s.as_str()),
-                        _ => continue,
+                        PropKey::Int(_) | PropKey::Computed(_) => continue,
                     };
                     Some(ClassMemberInfo {
                         name,

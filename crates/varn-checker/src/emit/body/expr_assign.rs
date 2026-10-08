@@ -58,7 +58,7 @@ impl<'a> FnEmitter<'a> {
             .clone();
         let recv = self.lower_expr(match &self.ast_arena.expr(target).kind {
             varn_core::ast::ExprKind::Member { object, .. } => *object,
-            _ => unreachable!(),
+            varn_core::ast::ExprKind::IntLiteral { .. } | varn_core::ast::ExprKind::FloatLiteral { .. } | varn_core::ast::ExprKind::BigIntLiteral { .. } | varn_core::ast::ExprKind::DecimalLiteral { .. } | varn_core::ast::ExprKind::StrLiteral { .. } | varn_core::ast::ExprKind::CharLiteral { .. } | varn_core::ast::ExprKind::BoolLiteral { .. } | varn_core::ast::ExprKind::NullLiteral | varn_core::ast::ExprKind::RegexLiteral { .. } | varn_core::ast::ExprKind::Template { .. } | varn_core::ast::ExprKind::TaggedTemplate { .. } | varn_core::ast::ExprKind::Identifier { .. } | varn_core::ast::ExprKind::Missing | varn_core::ast::ExprKind::This | varn_core::ast::ExprKind::Super | varn_core::ast::ExprKind::Array { .. } | varn_core::ast::ExprKind::Object { .. } | varn_core::ast::ExprKind::Tuple { .. } | varn_core::ast::ExprKind::Record { .. } | varn_core::ast::ExprKind::Unary { .. } | varn_core::ast::ExprKind::Update { .. } | varn_core::ast::ExprKind::Binary { .. } | varn_core::ast::ExprKind::Logical { .. } | varn_core::ast::ExprKind::Assign { .. } | varn_core::ast::ExprKind::Conditional { .. } | varn_core::ast::ExprKind::Call { .. } | varn_core::ast::ExprKind::New { .. } | varn_core::ast::ExprKind::Function { .. } | varn_core::ast::ExprKind::Arrow { .. } | varn_core::ast::ExprKind::Sequence { .. } | varn_core::ast::ExprKind::Paren { .. } | varn_core::ast::ExprKind::Await { .. } | varn_core::ast::ExprKind::Spawn { .. } | varn_core::ast::ExprKind::Yield { .. } | varn_core::ast::ExprKind::Spread { .. } | varn_core::ast::ExprKind::Pipeline { .. } | varn_core::ast::ExprKind::Range { .. } | varn_core::ast::ExprKind::NonNull { .. } | varn_core::ast::ExprKind::Try { .. } | varn_core::ast::ExprKind::As { .. } | varn_core::ast::ExprKind::Satisfies { .. } | varn_core::ast::ExprKind::ClassExpr { .. } | varn_core::ast::ExprKind::Match { .. } | varn_core::ast::ExprKind::Is { .. } | varn_core::ast::ExprKind::With { .. } | varn_core::ast::ExprKind::MetaAccess { .. } => unreachable!(),
         });
         let v = self.lower_expr(value);
         TirExpr {
@@ -88,7 +88,7 @@ impl<'a> FnEmitter<'a> {
         let node_ty = match obj.ty.non_nullable(self.tt) {
             BackendTy::Array(el) => self.tt.get(el),
             BackendTy::Map(_, val) => self.tt.get(val),
-            _ => v.ty,
+            BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Set(_) | BackendTy::Tuple(_) | BackendTy::Class(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Nullable(_) | BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => v.ty,
         };
         let index_target = |object: TirExpr, index: TirExpr| TirExpr {
             kind: TirExprKind::Index {
@@ -198,12 +198,12 @@ impl<'a> FnEmitter<'a> {
                 res: Resolution::None,
                 span,
             },
-            _ => self.cast_to(read.clone(), BackendTy::Bool),
+            AssignOp::Assign | AssignOp::AddAssign | AssignOp::SubAssign | AssignOp::MulAssign | AssignOp::DivAssign | AssignOp::ModAssign | AssignOp::PowAssign | AssignOp::BitAndAssign | AssignOp::BitOrAssign | AssignOp::BitXorAssign | AssignOp::ShlAssign | AssignOp::ShrAssign | AssignOp::UShrAssign | AssignOp::AndAssign | AssignOp::OrAssign => self.cast_to(read.clone(), BackendTy::Bool),
         };
         let v = self.cast_to(v, place_ty);
         let (then_val, else_val) = match op {
             AssignOp::OrAssign => (read, v),
-            _ => (v, read),
+            AssignOp::Assign | AssignOp::AddAssign | AssignOp::SubAssign | AssignOp::MulAssign | AssignOp::DivAssign | AssignOp::ModAssign | AssignOp::PowAssign | AssignOp::BitAndAssign | AssignOp::BitOrAssign | AssignOp::BitXorAssign | AssignOp::ShlAssign | AssignOp::ShrAssign | AssignOp::UShrAssign | AssignOp::AndAssign | AssignOp::NullishAssign => (v, read),
         };
         TirExpr {
             kind: TirExprKind::Select {

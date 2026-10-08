@@ -102,7 +102,7 @@ impl NestedTypes {
             .iter()
             .filter_map(|(_, s)| match &arena.stmt(*s).kind {
                 StmtKind::Decl(d) => Some(d.as_ref()),
-                _ => None,
+                StmtKind::Block { .. } | StmtKind::Empty | StmtKind::Expr { .. } | StmtKind::Error | StmtKind::If { .. } | StmtKind::While { .. } | StmtKind::DoWhile { .. } | StmtKind::For { .. } | StmtKind::ForIn { .. } | StmtKind::ForOf { .. } | StmtKind::Switch { .. } | StmtKind::Return { .. } | StmtKind::Break { .. } | StmtKind::Continue { .. } | StmtKind::Throw { .. } | StmtKind::Try { .. } | StmtKind::Using { .. } | StmtKind::Labeled { .. } | StmtKind::Debugger => None,
             })
             .collect()
     }

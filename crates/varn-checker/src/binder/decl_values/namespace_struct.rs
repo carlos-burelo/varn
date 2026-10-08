@@ -337,7 +337,7 @@ impl<'r> super::super::Binder<'r> {
                         members.extend(inner);
                     }
                 }
-                _ => {}
+                Decl::Import(_) | Decl::Extension(_) | Decl::SumType(_) => {}
             }
         }
         members

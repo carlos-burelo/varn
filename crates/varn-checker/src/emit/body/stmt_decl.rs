@@ -15,7 +15,7 @@ impl<'a> FnEmitter<'a> {
         use varn_core::ast::{Decl, ExportDecl};
         let unwrapped = match decl {
             Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
-            other => other,
+            other @ Decl::Variable(_) | other @ Decl::Function(_) | other @ Decl::Class(_) | other @ Decl::Interface(_) | other @ Decl::TypeAlias(_) | other @ Decl::Enum(_) | other @ Decl::Namespace(_) | other @ Decl::Import(_) | other @ Decl::Export(_) | other @ Decl::Extension(_) | other @ Decl::Struct(_) | other @ Decl::SumType(_) => other,
         };
 
         if let Decl::Function(f) = unwrapped {
@@ -126,9 +126,9 @@ impl<'a> FnEmitter<'a> {
             Decl::Variable(v) => v,
             Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
                 Decl::Variable(v) => v,
-                _ => return vec![],
+                Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => return vec![],
             },
-            _ => return vec![],
+            Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => return vec![],
         };
         let mut out = Vec::new();
         for d in &v.declarators {
@@ -231,7 +231,7 @@ impl<'a> FnEmitter<'a> {
                     out.push(TirStmt::Let { local, ty, init });
                 }
 
-                pat => {
+                pat @ Pattern::Array { .. } | pat @ Pattern::Object { .. } | pat @ Pattern::Assignment { .. } | pat @ Pattern::Rest { .. } => {
                     let src = match d.init {
                         Some(init) => self.lower_expr(init),
                         None => placeholder(DynReason::NotYetSupported),
@@ -339,7 +339,7 @@ impl<'a> FnEmitter<'a> {
             Pattern::Array { elements, rest, .. } => {
                 let elem_ty = match src.ty.non_nullable(self.tt) {
                     BackendTy::Array(e) => self.tt.get(e),
-                    _ => BackendTy::Dynamic(DynReason::NotYetSupported),
+                    BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Map(..) | BackendTy::Set(_) | BackendTy::Tuple(_) | BackendTy::Class(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Nullable(_) | BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => BackendTy::Dynamic(DynReason::NotYetSupported),
                 };
                 for (i, slot) in elements.iter().enumerate() {
                     let Some(el) = slot else { continue };
@@ -416,7 +416,7 @@ impl<'a> FnEmitter<'a> {
         let span = arr.span;
         let read_ty = match elem.ty {
             BackendTy::Nullable(_) | BackendTy::Dynamic(_) => elem.ty,
-            t => BackendTy::Nullable(self.tt.intern(t)),
+            t @ BackendTy::Int | t @ BackendTy::Float | t @ BackendTy::Bool | t @ BackendTy::Char | t @ BackendTy::Str | t @ BackendTy::Bytes | t @ BackendTy::Decimal | t @ BackendTy::BigInt | t @ BackendTy::Array(_) | t @ BackendTy::Map(..) | t @ BackendTy::Set(_) | t @ BackendTy::Tuple(_) | t @ BackendTy::Class(_) | t @ BackendTy::Enum(_) | t @ BackendTy::Fn(_) | t @ BackendTy::Void | t @ BackendTy::Never => BackendTy::Nullable(self.tt.intern(t)),
         };
         let len = self.field_access(arr, Arc::from("length"), BackendTy::Int, span);
         let present = TirExpr {

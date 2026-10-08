@@ -31,7 +31,7 @@ pub(crate) fn intern_signature(
                     match inner {
                         BackendTy::Dynamic(_) | BackendTy::Nullable(_) => inner,
                         _ if p.optional => BackendTy::Nullable(tt.intern(inner)),
-                        _ => inner,
+                        BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Array(_) | BackendTy::Map(..) | BackendTy::Set(_) | BackendTy::Tuple(_) | BackendTy::Class(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Void | BackendTy::Never => inner,
                     }
                 })
                 .collect();
@@ -39,7 +39,7 @@ pub(crate) fn intern_signature(
             let has_rest = ft.params.last().is_some_and(|p| p.is_rest);
             (p_tys, return_ty, has_rest)
         }
-        _ => (
+        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => (
             vec![],
             BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported),
             false,

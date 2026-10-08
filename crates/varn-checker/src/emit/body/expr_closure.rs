@@ -98,7 +98,7 @@ impl<'a> FnEmitter<'a> {
                 Resolution::Param(i) => varn_tir::TirUpvalue::ParentParam(i),
                 Resolution::Upvalue(i) => varn_tir::TirUpvalue::ParentUpvalue(i),
 
-                _ => varn_tir::TirUpvalue::ParentUpvalue(0),
+                Resolution::None | Resolution::GlobalSlot(_) | Resolution::NativeGlobal(_) | Resolution::ModuleSlot { .. } | Resolution::FieldSlot(_) | Resolution::StaticField(_) | Resolution::VtableSlot(_) | Resolution::DirectFn(_) | Resolution::Intrinsic(_) | Resolution::NativeOp(_) | Resolution::EnumVariant { .. } | Resolution::ByName { .. } => varn_tir::TirUpvalue::ParentUpvalue(0),
             })
             .collect();
 

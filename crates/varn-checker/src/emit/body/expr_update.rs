@@ -19,7 +19,7 @@ impl<'a> FnEmitter<'a> {
         let node_ty = match obj.ty.non_nullable(self.tt) {
             BackendTy::Array(el) => self.tt.get(el),
             BackendTy::Map(_, val) => self.tt.get(val),
-            _ => ty,
+            BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Set(_) | BackendTy::Tuple(_) | BackendTy::Class(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Nullable(_) | BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => ty,
         };
         let obj_h = self.pin(obj);
         let index_h = self.pin(index);

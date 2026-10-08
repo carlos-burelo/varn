@@ -81,7 +81,7 @@ pub fn infer_object_member_type(
             },
             table,
         )),
-        _ => None,
+        ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
     }
 }
 

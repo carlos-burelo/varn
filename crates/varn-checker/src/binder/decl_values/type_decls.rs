@@ -231,7 +231,7 @@ impl<'r> super::super::Binder<'r> {
                 } => {
                     self.bind_expr(*init);
                 }
-                _ => {}
+                ClassMember::Destructor { .. } | ClassMember::Method { .. } | ClassMember::Property { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. } | ClassMember::StaticBlock { .. } => {}
             }
         }
 

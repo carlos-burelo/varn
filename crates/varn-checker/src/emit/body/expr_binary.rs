@@ -179,7 +179,7 @@ impl<'a> FnEmitter<'a> {
                 let r = self.cast_to(r, BackendTy::Bool);
                 match op {
                     LogicalOp::And => (l, r, bool_lit(false)),
-                    _ => (l, bool_lit(true), r),
+                    LogicalOp::Or | LogicalOp::Nullish => (l, bool_lit(true), r),
                 }
             }
             LogicalOp::Nullish => {

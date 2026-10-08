@@ -47,7 +47,7 @@ fn splice_finally_impl(stmts: Vec<TirStmt>, fin: &[TirStmt], on_throw: bool) -> 
                 catch_local,
                 catch_body: splice_finally_impl(catch_body, fin, on_throw),
             }),
-            other => out.push(other),
+            other @ TirStmt::Expr(_) | other @ TirStmt::Let { .. } | other @ TirStmt::Throw(_) | other @ TirStmt::BuildClass(_) => out.push(other),
         }
     }
     out
@@ -83,7 +83,7 @@ fn splice_returns_only(stmts: Vec<TirStmt>, fin: &[TirStmt]) -> Vec<TirStmt> {
                 catch_local,
                 catch_body: splice_returns_only(catch_body, fin),
             }),
-            other => out.push(other),
+            other @ TirStmt::Expr(_) | other @ TirStmt::Let { .. } | other @ TirStmt::Break | other @ TirStmt::Continue | other @ TirStmt::Throw(_) | other @ TirStmt::BuildClass(_) => out.push(other),
         }
     }
     out

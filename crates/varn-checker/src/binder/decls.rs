@@ -236,7 +236,7 @@ impl<'r> super::Binder<'r> {
                     match prop {
                         ObjectProp::Property { value, .. } => self.bind_expr(*value),
                         ObjectProp::Spread { argument, .. } => self.bind_expr(*argument),
-                        _ => {}
+                        ObjectProp::Method { .. } | ObjectProp::Getter { .. } | ObjectProp::Setter { .. } => {}
                     }
                 }
             }

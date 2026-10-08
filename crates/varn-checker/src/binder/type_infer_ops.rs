@@ -17,7 +17,7 @@ pub(crate) fn numeric_operand(
         TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(NumericOperand::Float),
         TypeKind::Primitive(varn_core::LangPrimitive::Decimal) => Some(NumericOperand::Decimal),
         TypeKind::Primitive(varn_core::LangPrimitive::BigInt) => Some(NumericOperand::BigInt),
-        _ => None,
+        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
     }
 }
 
@@ -149,7 +149,7 @@ pub(crate) fn infer_new(
                 let arg_tys: Vec<Type> = arg_ids.into_iter().map(Type::resolved).collect();
                 return Type::generic_atom(name, arg_tys, origin, table);
             }
-            _ => {}
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => {}
         }
     }
     Type::Dynamic
@@ -178,7 +178,7 @@ pub(crate) fn infer_object(
                 }
                 let name = match key {
                     PropKey::Identifier(n) | PropKey::Str(n) => Arc::from(n.as_str()),
-                    _ => continue,
+                    PropKey::Int(_) | PropKey::Computed(_) => continue,
                 };
                 let ty = infer_expr_type(value, arena, ctx, table);
                 if let TypeKind::Fn(fid) = table.get(ty.0) {
@@ -207,7 +207,7 @@ pub(crate) fn infer_object(
             } => {
                 let name = match key {
                     PropKey::Identifier(n) | PropKey::Str(n) => Arc::from(n.as_str()),
-                    _ => continue,
+                    PropKey::Int(_) | PropKey::Computed(_) => continue,
                 };
                 let ps = build_method_params(params, ctx, table);
                 let ret = return_type
@@ -228,7 +228,7 @@ pub(crate) fn infer_object(
                     members.extend(table.get_object_members(mid).to_vec());
                 }
             }
-            _ => {}
+            ObjectProp::Getter { .. } | ObjectProp::Setter { .. } => {}
         }
     }
     Type::object(members, table)

@@ -167,7 +167,7 @@ fn build_one_class(
                 let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
                 push_method(Arc::from(format!("set {}", m.name)), sig, &mut method_names);
             }
-            _ => {}
+            ClassMemberKind::Class | ClassMemberKind::Interface | ClassMemberKind::Namespace | ClassMemberKind::Enum | ClassMemberKind::Struct => {}
         }
     }
 

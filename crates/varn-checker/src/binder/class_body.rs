@@ -89,7 +89,7 @@ impl<'r> Binder<'r> {
                 } => {
                     self.bind_expr(*init);
                 }
-                _ => {}
+                ClassMember::Destructor { .. } | ClassMember::Method { .. } | ClassMember::Property { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. } | ClassMember::StaticBlock { .. } => {}
             }
         }
     }
@@ -97,7 +97,7 @@ impl<'r> Binder<'r> {
     pub(super) fn mark_optional_fields(&mut self, c: &ClassDecl, members: &mut [ClassMemberInfo]) {
         let declared_ctor = c.body.iter().find_map(|m| match m {
             ClassMember::Constructor { body, .. } => Some(body),
-            _ => None,
+            ClassMember::Destructor { .. } | ClassMember::Method { .. } | ClassMember::Property { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. } | ClassMember::StaticBlock { .. } => None,
         });
         let candidate_fields: Vec<Arc<str>> = c
             .body
@@ -109,7 +109,7 @@ impl<'r> Binder<'r> {
                     modifiers,
                     ..
                 } if !modifiers.is_static => Some(Arc::from(self.interner.resolve(*key))),
-                _ => None,
+                ClassMember::Constructor { .. } | ClassMember::Destructor { .. } | ClassMember::Method { .. } | ClassMember::Property { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. } | ClassMember::StaticBlock { .. } => None,
             })
             .collect();
         if !candidate_fields.is_empty() && !c.modifiers.is_declare {

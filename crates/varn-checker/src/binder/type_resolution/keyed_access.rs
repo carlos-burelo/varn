@@ -48,7 +48,7 @@ pub(super) fn collect_type_keys(
             .filter_map(|m| match m {
                 ObjectTypeMember::Property { name, .. } => Some(name.clone()),
                 ObjectTypeMember::Method { name, .. } => Some(name.clone()),
-                _ => None,
+                ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
             })
             .collect(),
         TypeKind::Named(name, origin) => {
@@ -90,7 +90,7 @@ pub(super) fn collect_type_keys(
                 })
                 .collect()
         }
-        _ => vec![],
+        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Tuple(_) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => vec![],
     }
 }
 
@@ -102,7 +102,7 @@ pub(super) fn resolve_indexed_access(
 ) -> Type {
     let key_name_atom = match table.get(index.0) {
         TypeKind::Named(name, _) => Some(name),
-        _ => None,
+        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
     };
     let key_name = key_name_atom.and_then(|a| ctx.and_then(|c| c.interner()).map(|i| i.resolve(a)));
 
@@ -131,7 +131,7 @@ pub(super) fn resolve_indexed_access(
                             table,
                         );
                     }
-                    _ => {}
+                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => {}
                 }
             }
         }
@@ -150,7 +150,7 @@ pub(super) fn resolve_indexed_access(
                     _ => Type::union(resolved, table),
                 };
             }
-            _ => {
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => {
                 let value_from_index = members.iter().find_map(|m| match m {
                     ObjectTypeMember::Index {
                         key_ty, value_ty, ..
@@ -163,7 +163,7 @@ pub(super) fn resolve_indexed_access(
                     {
                         Some(*value_ty)
                     }
-                    _ => None,
+                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
                 });
                 if let Some(v) = value_from_index {
                     return Type::resolved(v);
@@ -204,7 +204,7 @@ pub(super) fn resolve_indexed_access(
                 _ => Type::union(types, table),
             }
         }
-        _ => {
+        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => {
             if matches!(
                 table.get(obj.0),
                 TypeKind::Primitive(varn_core::LangPrimitive::Str)

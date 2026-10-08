@@ -33,7 +33,7 @@ impl<'r> super::super::Binder<'r> {
                     {
                         Some(Type::resolved(self.ty_table.get_list(args)[0]))
                     }
-                    _ => None,
+                    varn_core::TypeKind::Primitive(_) | varn_core::TypeKind::Builtin(_) | varn_core::TypeKind::Literal(_) | varn_core::TypeKind::This | varn_core::TypeKind::Union(_) | varn_core::TypeKind::Intersection(_) | varn_core::TypeKind::Tuple(_) | varn_core::TypeKind::Named(..) | varn_core::TypeKind::Generic(..) | varn_core::TypeKind::TemplateLiteral(_) | varn_core::TypeKind::Fn(_) | varn_core::TypeKind::Object(_) | varn_core::TypeKind::Typeof(_) | varn_core::TypeKind::KeyOf(_) | varn_core::TypeKind::IndexedAccess { .. } | varn_core::TypeKind::Mapped { .. } | varn_core::TypeKind::Conditional { .. } | varn_core::TypeKind::Infer(_) | varn_core::TypeKind::EnumVariant { .. } | varn_core::TypeKind::TypePredicate { .. } => None,
                 });
                 for el in elements.iter().flatten() {
                     self.bind_pattern(&el.pattern, kind, line, doc.clone(), elem_ty, false);
@@ -74,7 +74,7 @@ impl<'r> super::super::Binder<'r> {
                                         },
                                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                     )),
-                                    _ => None,
+                                    crate::types::ObjectTypeMember::Property { .. } | crate::types::ObjectTypeMember::Method { .. } | crate::types::ObjectTypeMember::Index { .. } | crate::types::ObjectTypeMember::Callable { .. } => None,
                                 })
                         }
                         Some(varn_core::TypeKind::Named(name_atom, origin_atom))

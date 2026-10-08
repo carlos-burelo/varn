@@ -40,7 +40,7 @@ impl<'a> FnEmitter<'a> {
                 let stmts = stmts.clone();
                 self.lower_block(&stmts)
             }
-            _ => self.lower_stmt(s),
+            StmtKind::Empty | StmtKind::Expr { .. } | StmtKind::Decl(_) | StmtKind::Error | StmtKind::If { .. } | StmtKind::While { .. } | StmtKind::DoWhile { .. } | StmtKind::For { .. } | StmtKind::ForIn { .. } | StmtKind::ForOf { .. } | StmtKind::Switch { .. } | StmtKind::Return { .. } | StmtKind::Break { .. } | StmtKind::Continue { .. } | StmtKind::Throw { .. } | StmtKind::Try { .. } | StmtKind::Using { .. } | StmtKind::Labeled { .. } | StmtKind::Debugger => self.lower_stmt(s),
         }
     }
 
@@ -209,7 +209,7 @@ impl<'a> FnEmitter<'a> {
                             }
                         }
 
-                        pat => {
+                        pat @ Pattern::Array { .. } | pat @ Pattern::Object { .. } | pat @ Pattern::Assignment { .. } | pat @ Pattern::Rest { .. } => {
                             let src =
                                 init.unwrap_or_else(|| placeholder(DynReason::NotYetSupported));
                             out.extend(std::mem::take(&mut self.pending));

@@ -300,7 +300,7 @@ impl<'r> Binder<'r> {
                     ..Default::default()
                 });
             }
-            _ => {}
+            ClassMember::Destructor { .. } | ClassMember::StaticBlock { .. } => {}
         }
     }
 }

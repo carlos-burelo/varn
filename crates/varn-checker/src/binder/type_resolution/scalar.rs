@@ -17,7 +17,7 @@ pub(super) fn resolve_literal_type(
             }
             varn_core::TypeLiteral::Str(a)
         }
-        other => other,
+        other @ varn_core::TypeLiteral::Int(_) | other @ varn_core::TypeLiteral::Bool(_) | other @ varn_core::TypeLiteral::Char(_) => other,
     };
     Type::resolved(table.intern(TypeKind::Literal(l)))
 }

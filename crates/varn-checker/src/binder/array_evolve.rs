@@ -46,7 +46,7 @@ impl<'r> Binder<'r> {
         let normalized = match self.ty_table.get(value_ty.0) {
             TypeKind::Primitive(varn_core::LangPrimitive::Int) => Some(Type::Int),
             TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(Type::Float),
-            _ => None,
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
         };
         if let Some(c) = self.find_candidate_mut(name) {
             if c.escaped || c.conflict {

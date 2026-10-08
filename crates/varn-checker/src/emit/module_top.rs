@@ -90,7 +90,7 @@ pub(super) fn lower_top_level(
                 }
             }
             StmtKind::Decl(d) if variable_decl(d).is_none() => {}
-            _ => top_body.extend(top.lower_stmt_as_block(stmt)),
+            StmtKind::Block { .. } | StmtKind::Empty | StmtKind::Expr { .. } | StmtKind::Decl(_) | StmtKind::Error | StmtKind::If { .. } | StmtKind::While { .. } | StmtKind::DoWhile { .. } | StmtKind::For { .. } | StmtKind::ForIn { .. } | StmtKind::ForOf { .. } | StmtKind::Switch { .. } | StmtKind::Return { .. } | StmtKind::Break { .. } | StmtKind::Continue { .. } | StmtKind::Throw { .. } | StmtKind::Try { .. } | StmtKind::Using { .. } | StmtKind::Labeled { .. } | StmtKind::Debugger => top_body.extend(top.lower_stmt_as_block(stmt)),
         }
     }
     (std::mem::take(&mut top.locals), top.saw_await(), top_body)

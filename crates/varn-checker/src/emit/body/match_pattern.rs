@@ -92,7 +92,7 @@ impl<'a> FnEmitter<'a> {
                 self.match_enum_variant(s, enum_name, variant_name, bindings)
             }
 
-            _ => (bool_lit(false), vec![]),
+            MatchPattern::Record { .. } | MatchPattern::Sequence(_) => (bool_lit(false), vec![]),
         }
     }
 
@@ -109,7 +109,7 @@ impl<'a> FnEmitter<'a> {
             .enum_id(enum_name)
             .or_else(|| match s.ty.non_nullable(self.tt) {
                 BackendTy::Enum(e) => Some(e),
-                _ => None,
+                BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Array(_) | BackendTy::Map(..) | BackendTy::Set(_) | BackendTy::Tuple(_) | BackendTy::Class(_) | BackendTy::Fn(_) | BackendTy::Nullable(_) | BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => None,
             });
 
         let Some(eid) = eid else {

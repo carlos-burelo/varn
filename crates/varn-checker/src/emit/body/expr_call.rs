@@ -95,7 +95,7 @@ impl<'a> FnEmitter<'a> {
                 }
                 _ => match c.res {
                     Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),
-                    _ => Resolution::None,
+                    Resolution::None | Resolution::Local(_) | Resolution::Param(_) | Resolution::Upvalue(_) | Resolution::GlobalSlot(_) | Resolution::ModuleSlot { .. } | Resolution::FieldSlot(_) | Resolution::StaticField(_) | Resolution::VtableSlot(_) | Resolution::DirectFn(_) | Resolution::Intrinsic(_) | Resolution::NativeOp(_) | Resolution::EnumVariant { .. } | Resolution::ByName { .. } => Resolution::None,
                 },
             };
             return TirExpr {
@@ -116,7 +116,7 @@ impl<'a> FnEmitter<'a> {
                 computed: false,
                 ..
             } => (*object, *property),
-            _ => return self.by_name_call(call_id, callee, args, ty, span),
+            ExprKind::IntLiteral { .. } | ExprKind::FloatLiteral { .. } | ExprKind::BigIntLiteral { .. } | ExprKind::DecimalLiteral { .. } | ExprKind::StrLiteral { .. } | ExprKind::CharLiteral { .. } | ExprKind::BoolLiteral { .. } | ExprKind::NullLiteral | ExprKind::RegexLiteral { .. } | ExprKind::Template { .. } | ExprKind::TaggedTemplate { .. } | ExprKind::Identifier { .. } | ExprKind::Missing | ExprKind::This | ExprKind::Super | ExprKind::Array { .. } | ExprKind::Object { .. } | ExprKind::Tuple { .. } | ExprKind::Record { .. } | ExprKind::Unary { .. } | ExprKind::Update { .. } | ExprKind::Binary { .. } | ExprKind::Logical { .. } | ExprKind::Assign { .. } | ExprKind::Conditional { .. } | ExprKind::Member { .. } | ExprKind::Call { .. } | ExprKind::New { .. } | ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::Sequence { .. } | ExprKind::Paren { .. } | ExprKind::Await { .. } | ExprKind::Spawn { .. } | ExprKind::Yield { .. } | ExprKind::Spread { .. } | ExprKind::Pipeline { .. } | ExprKind::Range { .. } | ExprKind::NonNull { .. } | ExprKind::Try { .. } | ExprKind::As { .. } | ExprKind::Satisfies { .. } | ExprKind::ClassExpr { .. } | ExprKind::Match { .. } | ExprKind::Is { .. } | ExprKind::With { .. } | ExprKind::MetaAccess { .. } => return self.by_name_call(call_id, callee, args, ty, span),
         };
         let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner) else {
             return self.by_name_call(call_id, callee, args, ty, span);
@@ -287,7 +287,7 @@ impl<'a> FnEmitter<'a> {
                         {
                             TirArg::Expr(piped.clone())
                         }
-                        other => self.lower_arg(other),
+                        other @ Arg::Positional(_) | other @ Arg::Spread(_) | other @ Arg::Named { .. } => self.lower_arg(other),
                     })
                     .collect();
                 return TirExpr {

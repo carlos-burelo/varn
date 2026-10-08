@@ -80,7 +80,7 @@ pub(super) fn is_member_optional(
     match table.get(ty.0) {
         TypeKind::Object(mid) => table.get_object_members(mid).iter().any(|m| match m {
             ObjectTypeMember::Property { name, optional, .. } => name.as_ref() == key && *optional,
-            _ => false,
+            ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => false,
         }),
         TypeKind::Named(name, _) => {
             let name = ctx.and_then(|c| c.interner()).map(|i| i.resolve(name));
@@ -98,7 +98,7 @@ pub(super) fn is_member_optional(
             })
             .unwrap_or(false)
         }
-        _ => false,
+        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => false,
     }
 }
 

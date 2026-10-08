@@ -89,16 +89,16 @@ pub(crate) fn infer_member(
                 .iter()
                 .find_map(|m| match m {
                     crate::types::ObjectTypeMember::Index { value_ty, .. } => Some(*value_ty),
-                    _ => None,
+                    crate::types::ObjectTypeMember::Property { .. } | crate::types::ObjectTypeMember::Method { .. } | crate::types::ObjectTypeMember::Callable { .. } => None,
                 })
                 .map(Type::resolved)
                 .unwrap_or(Type::Dynamic),
-            _ => Type::Dynamic,
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => Type::Dynamic,
         };
     }
     let prop_name_atom = match &arena.expr(property).kind {
         varn_core::ast::ExprKind::Identifier { name } => *name,
-        _ => return Type::Dynamic,
+        varn_core::ast::ExprKind::IntLiteral { .. } | varn_core::ast::ExprKind::FloatLiteral { .. } | varn_core::ast::ExprKind::BigIntLiteral { .. } | varn_core::ast::ExprKind::DecimalLiteral { .. } | varn_core::ast::ExprKind::StrLiteral { .. } | varn_core::ast::ExprKind::CharLiteral { .. } | varn_core::ast::ExprKind::BoolLiteral { .. } | varn_core::ast::ExprKind::NullLiteral | varn_core::ast::ExprKind::RegexLiteral { .. } | varn_core::ast::ExprKind::Template { .. } | varn_core::ast::ExprKind::TaggedTemplate { .. } | varn_core::ast::ExprKind::Missing | varn_core::ast::ExprKind::This | varn_core::ast::ExprKind::Super | varn_core::ast::ExprKind::Array { .. } | varn_core::ast::ExprKind::Object { .. } | varn_core::ast::ExprKind::Tuple { .. } | varn_core::ast::ExprKind::Record { .. } | varn_core::ast::ExprKind::Unary { .. } | varn_core::ast::ExprKind::Update { .. } | varn_core::ast::ExprKind::Binary { .. } | varn_core::ast::ExprKind::Logical { .. } | varn_core::ast::ExprKind::Assign { .. } | varn_core::ast::ExprKind::Conditional { .. } | varn_core::ast::ExprKind::Member { .. } | varn_core::ast::ExprKind::Call { .. } | varn_core::ast::ExprKind::New { .. } | varn_core::ast::ExprKind::Function { .. } | varn_core::ast::ExprKind::Arrow { .. } | varn_core::ast::ExprKind::Sequence { .. } | varn_core::ast::ExprKind::Paren { .. } | varn_core::ast::ExprKind::Await { .. } | varn_core::ast::ExprKind::Spawn { .. } | varn_core::ast::ExprKind::Yield { .. } | varn_core::ast::ExprKind::Spread { .. } | varn_core::ast::ExprKind::Pipeline { .. } | varn_core::ast::ExprKind::Range { .. } | varn_core::ast::ExprKind::NonNull { .. } | varn_core::ast::ExprKind::Try { .. } | varn_core::ast::ExprKind::As { .. } | varn_core::ast::ExprKind::Satisfies { .. } | varn_core::ast::ExprKind::ClassExpr { .. } | varn_core::ast::ExprKind::Match { .. } | varn_core::ast::ExprKind::Is { .. } | varn_core::ast::ExprKind::With { .. } | varn_core::ast::ExprKind::MetaAccess { .. } => return Type::Dynamic,
     };
 
     if let Some(ctx) = ctx {
@@ -178,7 +178,7 @@ pub(crate) fn infer_member(
                     );
                 }
             }
-            _ => {}
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => {}
         }
     }
     Type::Dynamic
