@@ -14,7 +14,6 @@ use varn_types::chunk::ICKind;
 use varn_types::value::{BoundMethodTarget, ClassObj};
 
 impl ExecCtx {
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn exec_call_method_reg(
         &mut self,
         this_val: VmValue,

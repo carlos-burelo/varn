@@ -14,8 +14,6 @@ fn field_io<'a>(ctx: &'a Ctx<'_>) -> Result<FieldIo<'a>, String> {
         exec_ctx: exec_ctx(ctx),
     })
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn emit_get_fixed_field(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -123,8 +121,6 @@ fn emit_get_fixed_field_native(
     b.switch_to_block(cont);
     Ok(b.block_params(cont)[0])
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn emit_set_fixed_field(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,

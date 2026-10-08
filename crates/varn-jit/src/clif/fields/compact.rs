@@ -78,8 +78,6 @@ pub(crate) fn load_compact(
     b.switch_to_block(cont);
     b.block_params(cont)[0]
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn store_compact(
     b: &mut FunctionBuilder,
     io: &FieldIo,

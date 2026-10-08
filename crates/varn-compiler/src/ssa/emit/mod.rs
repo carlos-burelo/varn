@@ -284,8 +284,6 @@ fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
     }
     order
 }
-
-#[allow(clippy::too_many_arguments)]
 fn emit_inst(
     chunk: &mut Chunk,
     inst: &Inst,

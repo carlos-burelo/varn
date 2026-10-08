@@ -22,8 +22,6 @@ pub(super) fn emit_call_args(
         );
     }
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_terminator(
     chunk: &mut Chunk,
     ssa: &SsaFunc,
@@ -136,8 +134,6 @@ fn emit_goto(
         fixups.push((pos, target));
     }
 }
-
-#[allow(clippy::too_many_arguments)]
 fn emit_branch(
     chunk: &mut Chunk,
     cur_pos: usize,

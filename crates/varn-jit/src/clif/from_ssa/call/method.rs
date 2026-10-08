@@ -6,8 +6,6 @@ use super::super::{heap, props, store, Ctx, Out};
 use super::direct::{entry_out_slot, run_entered_or};
 use super::invoke::boxed_window;
 use super::native_entry::{self, NativeCall};
-
-#[allow(clippy::too_many_arguments)]
 fn emit_is_str(
     b: &mut FunctionBuilder,
     alay: &crate::JitArrayLayout,

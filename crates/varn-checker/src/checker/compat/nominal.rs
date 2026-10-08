@@ -175,8 +175,6 @@ pub(super) fn nominal_arms(
         _ => None,
     }
 }
-
-#[allow(clippy::too_many_arguments)]
 fn named_fallback(
     declared: &Type,
     inferred: &Type,

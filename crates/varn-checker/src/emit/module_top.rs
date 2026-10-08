@@ -10,8 +10,6 @@ use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, Program, StmtKind};
 use varn_core::{Atom, AtomInterner};
 use varn_tir::{BackendTy, Signature, TirFunction, TirStmt, TyTable};
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_top_level(
     program: &Program,
     ast_arena: &AstArena,

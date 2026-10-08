@@ -29,8 +29,6 @@ pub(super) fn top_level_type_builds(program: &Program, ast_arena: &AstArena) -> 
     }
     n
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn build_class_defs(
     program: &Program,
     ast_arena: &AstArena,
@@ -89,8 +87,6 @@ pub(super) fn build_class_defs(
     }
     class_defs
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_class(
     class: &varn_core::ast::ClassDecl,
     ast_arena: &AstArena,

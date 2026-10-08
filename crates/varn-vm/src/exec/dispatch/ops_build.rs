@@ -8,7 +8,6 @@ use varn_core::OpCode;
 
 impl ExecCtx {
     #[inline(always)]
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn exec_build_op(
         &mut self,
         op: OpCode,

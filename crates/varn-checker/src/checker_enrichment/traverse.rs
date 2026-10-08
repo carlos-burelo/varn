@@ -28,8 +28,6 @@ pub(super) fn collect_inferred_return_types_raw(
     );
     results
 }
-
-#[allow(clippy::too_many_arguments)]
 fn collect_returns_recursive(
     ctx: &EnrichContext,
     sym_map: &FxHashMap<Arc<str>, Type>,

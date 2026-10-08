@@ -332,10 +332,11 @@ impl DocumentState {
         }
         let mut best: Option<(u32, &varn_checker::ExprInfo)> = None;
         for (&offset, info) in &self.db.expr_types {
-            if offset >= tok.offset && offset < tok.offset + tok.length {
-                if best.map_or(true, |(b, _)| offset < b) {
-                    best = Some((offset, info));
-                }
+            if offset >= tok.offset
+                && offset < tok.offset + tok.length
+                && best.is_none_or(|(b, _)| offset < b)
+            {
+                best = Some((offset, info));
             }
         }
         best.map(|(_, info)| info)

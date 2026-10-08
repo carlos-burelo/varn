@@ -101,7 +101,6 @@ fn mark_young_value(v: VmValue, work: &mut Vec<HeapRef>) {
 
 #[cfg(test)]
 mod minor_gc_tests {
-    use super::super::structs::HeapInner;
     use varn_types::ClassObj;
 
     fn test_heap_with_class() -> (crate::heap::Heap, std::rc::Rc<ClassObj>) {
@@ -117,7 +116,7 @@ mod minor_gc_tests {
 
     #[test]
     fn minor_gc_with_colocated_instances() {
-        let (mut heap, cls) = test_heap_with_class();
+        let (heap, cls) = test_heap_with_class();
         let inner = unsafe { heap.inner_mut() };
         let mut refs = Vec::new();
         for _ in 0..100 {
@@ -134,7 +133,7 @@ mod minor_gc_tests {
 
     #[test]
     fn minor_gc_with_many_colocated_instances() {
-        let (mut heap, cls) = test_heap_with_class();
+        let (heap, cls) = test_heap_with_class();
         let inner = unsafe { heap.inner_mut() };
         let mut refs = Vec::with_capacity(60000);
         for _ in 0..60000 {
@@ -150,7 +149,7 @@ mod minor_gc_tests {
     #[test]
     fn minor_gc_with_array_root_of_instances() {
         use varn_types::VmValue;
-        let (mut heap, cls) = test_heap_with_class();
+        let (heap, cls) = test_heap_with_class();
         let inner = unsafe { heap.inner_mut() };
         let mut vals = Vec::with_capacity(60000);
         for _ in 0..60000 {

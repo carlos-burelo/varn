@@ -54,19 +54,14 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 if let Some(hover) =
                     varn_lsp::features::hover::build_hover(&analysis, tok.line, tok.col)
                 {
-                    let content = match hover.contents {
-                        Contents::MarkedString(c) => format_marked_string(c),
-                        Contents::MarkedStringList(arr) => arr
-                            .into_iter()
-                            .map(format_marked_string)
-                            .collect::<Vec<_>>()
-                            .join(" | "),
-                        Contents::MarkupContent(m) => m
-                            .value
+                    let content = if let Contents::MarkupContent(m) = hover.contents {
+                        m.value
                             .replace("```varn\n", "")
                             .replace("```Varn\n", "")
                             .replace("\n```", "")
-                            .replace("```", ""),
+                            .replace("```", "")
+                    } else {
+                        String::new()
                     };
                     terminal::log(format!(
                         "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {BOLD}{}{RESET}",
@@ -378,12 +373,4 @@ fn find_lexeme(
                 })
         })
         .unwrap_or_else(|| "???".to_string())
-}
-
-#[allow(deprecated)]
-fn format_marked_string(ms: tower_lsp_f::lsp_types::MarkedString) -> String {
-    match ms {
-        tower_lsp_f::lsp_types::MarkedString::String(s) => s,
-        tower_lsp_f::lsp_types::MarkedString::MarkedStringWithLanguage(ls) => ls.value,
-    }
 }

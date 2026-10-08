@@ -33,12 +33,14 @@ pub fn field_of(attr: TokenStream) -> Result<Option<String>, String> {
     if !nv.path.is_ident("field") {
         return Err("jit_slow: se admite solo `field = \"nombre\"`".to_owned());
     }
-    match nv.value {
-        syn::Expr::Lit(e) => match e.lit {
-            syn::Lit::Str(s) => Ok(Some(s.value())),
-            _ => Err("jit_slow: field debe ser string".to_owned()),
-        },
-        _ => Err("jit_slow: field debe ser string".to_owned()),
+    if let syn::Expr::Lit(e) = nv.value {
+        if let syn::Lit::Str(s) = e.lit {
+            Ok(Some(s.value()))
+        } else {
+            Err("jit_slow: field debe ser string".to_owned())
+        }
+    } else {
+        Err("jit_slow: field debe ser string".to_owned())
     }
 }
 

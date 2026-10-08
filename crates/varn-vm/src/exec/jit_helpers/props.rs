@@ -24,8 +24,6 @@ pub(crate) extern "C" fn jit_get_property_flat(
         }
     }
 }
-
-#[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "set_property_flat")]
 pub(crate) extern "C" fn jit_set_property_flat(
     ctx: *mut ExecCtx,

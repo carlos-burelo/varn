@@ -1,5 +1,4 @@
-#[allow(deprecated)]
-use tower_lsp_f::lsp_types::{CompletionResponse, Contents, Definition, MarkedString};
+use tower_lsp_f::lsp_types::{CompletionResponse, Contents, Definition};
 use varn_debug::colors::{DIM, GREEN, R, YELLOW};
 use varn_debug::flags::Verb;
 
@@ -223,21 +222,10 @@ fn log_branch(msg: &str) -> &'static str {
 }
 
 fn hover_text(h: &tower_lsp_f::lsp_types::Hover) -> String {
-    match &h.contents {
-        Contents::MarkedString(c) => marked_text(c),
-        Contents::MarkedStringList(arr) => {
-            arr.iter().map(marked_text).collect::<Vec<_>>().join(" | ")
-        }
-        Contents::MarkupContent(m) => m.value.clone(),
-    }
-}
-
-#[allow(deprecated)]
-#[allow(deprecated)]
-fn marked_text(ms: &MarkedString) -> String {
-    match ms {
-        MarkedString::String(s) => s.clone(),
-        MarkedString::MarkedStringWithLanguage(ls) => ls.value.clone(),
+    if let Contents::MarkupContent(m) = &h.contents {
+        m.value.clone()
+    } else {
+        String::new()
     }
 }
 

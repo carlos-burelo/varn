@@ -14,8 +14,6 @@ use std::sync::Arc;
 use varn_core::OpCode;
 use varn_types::chunk::Chunk;
 type Result<T> = std::result::Result<T, OptError>;
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_value(
     chunk: &mut Chunk,
     inst: &Inst,

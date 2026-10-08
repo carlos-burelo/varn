@@ -43,9 +43,12 @@ impl Parse for ContractInput {
         let fns = imp
             .items
             .into_iter()
-            .filter_map(|it| match it {
-                syn::ImplItem::Fn(f) => Some(f),
-                _ => None,
+            .filter_map(|it| {
+                if let syn::ImplItem::Fn(f) = it {
+                    Some(f)
+                } else {
+                    None
+                }
             })
             .collect();
 

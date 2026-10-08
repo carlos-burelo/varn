@@ -6,8 +6,6 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId};
 use varn_tir::{Signature, TirFunction, TyTable};
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_enum(
     en: &varn_core::ast::EnumDecl,
     ast_arena: &AstArena,

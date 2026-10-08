@@ -5,8 +5,6 @@ use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
 use varn_core::AtomInterner;
 use varn_core::TypeKind;
-
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn infer_call_type(
     fn_map: &FxHashMap<Arc<str>, Type>,
     fn_type_params: &FxHashMap<Arc<str>, Vec<Arc<str>>>,

@@ -10,9 +10,11 @@ use varn_vm::loader::{ModuleError, ModuleLoader};
 
 pub struct PipelineLoader {
     registry: varn_modules::loader::ModuleRegistry,
-    protos: Mutex<FxHashMap<String, (u64, Arc<[u8]>)>>,
+    protos: Mutex<ProtoBytesCache>,
     session: crate::resolver::Session,
 }
+
+type ProtoBytesCache = FxHashMap<String, (u64, Arc<[u8]>)>;
 
 impl PipelineLoader {
     pub fn new() -> Self {
@@ -65,7 +67,7 @@ impl ModuleLoader for PipelineLoader {
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError> {
         match id {
             ModuleId::Local(_) | ModuleId::Std(_) | ModuleId::Core(_) => {}
-            _ => return Ok(None),
+            ModuleId::Runtime(_) | ModuleId::Package { .. } => return Ok(None),
         }
         let source = CanonicalLoader::source(&self.registry, id)
             .map_err(|e| ModuleError::new(e.to_string()))?;
@@ -84,7 +86,7 @@ impl ModuleLoader for PipelineLoader {
         let path = match id {
             ModuleId::Local(p) => p.as_ref(),
             ModuleId::Std(s) | ModuleId::Core(s) => s.as_ref(),
-            _ => return Ok(None),
+            ModuleId::Runtime(_) | ModuleId::Package { .. } => return Ok(None),
         };
         let proto = compile_source(text.as_ref(), path, &self.session)
             .map(Rc::new)

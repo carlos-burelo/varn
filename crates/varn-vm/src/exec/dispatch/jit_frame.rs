@@ -71,8 +71,6 @@ unsafe fn restore_exit(ctx: *mut ExecCtx, exits_len: usize) {
     ctx.jit_exit = ctx.jit_exits_saved[exits_len];
     ctx.jit_exits_saved.truncate(exits_len);
 }
-
-#[allow(clippy::too_many_arguments)]
 #[allow(dangerous_implicit_autorefs)]
 pub(super) unsafe fn run_compiled_frame(
     ctx: *mut ExecCtx,

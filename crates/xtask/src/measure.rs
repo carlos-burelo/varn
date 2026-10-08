@@ -95,8 +95,6 @@ pub(super) fn calibrate_runtimes(
 
     Ok(startup_stats)
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn measure_benchmarks(
     opts: &Opts,
     runtimes: &[RuntimeInfo],

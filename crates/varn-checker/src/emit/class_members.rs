@@ -24,8 +24,6 @@ pub(super) fn class_info_sig(
         })
         .unwrap_or_else(|| fresh_sig(signatures, arity))
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_class_members(
     class: &varn_core::ast::ClassDecl,
     class_name: &Arc<str>,

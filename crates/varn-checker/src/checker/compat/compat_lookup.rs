@@ -38,8 +38,6 @@ pub(super) fn named_members(
         .or_else(|| bind.get_namespace_members(name, origin))
         .or_else(|| bind.get_enum_members(name, origin))
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn compatible_named(
     declared: &str,
     origin_decl: Option<&str>,
@@ -298,8 +296,6 @@ pub(super) fn object_matches_class_members(
     }
     true
 }
-
-#[allow(clippy::too_many_arguments)]
 fn fn_signature_compatible_type(
     params: &[FunctionParam],
     return_type: CheckerTyId,
@@ -365,8 +361,6 @@ fn fn_signature_compatible_type(
         }
     }
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn types_compatible_with_fn_signature(
     declared: &Type,
     params: &[FunctionParam],

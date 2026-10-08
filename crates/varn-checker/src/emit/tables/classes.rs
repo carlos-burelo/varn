@@ -9,8 +9,6 @@ use varn_core::AtomInterner;
 use varn_tir::{Ancestry, BackendTy, ClassInfo, Signature, TyTable};
 
 type ForeignFields = std::collections::BTreeMap<Arc<str>, Vec<crate::checker::InheritedField>>;
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn build_classes(
     bind: &BindResult,
     table: &CheckerTyTable,
@@ -41,8 +39,6 @@ pub(super) fn build_classes(
         .map(|c| c.expect("every class is built"))
         .collect()
 }
-
-#[allow(clippy::too_many_arguments)]
 fn build_with_parents(
     bind: &BindResult,
     table: &CheckerTyTable,
@@ -86,8 +82,6 @@ fn build_with_parents(
         }
     }
 }
-
-#[allow(clippy::too_many_arguments)]
 fn build_one_class(
     bind: &BindResult,
     table: &CheckerTyTable,

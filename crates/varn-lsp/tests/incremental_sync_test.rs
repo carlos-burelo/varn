@@ -22,6 +22,7 @@ fn test_incremental_edit_application() {
                     character: 13,
                 },
             },
+            #[allow(deprecated)]
             range_length: None,
             text: "100".to_string(),
         },

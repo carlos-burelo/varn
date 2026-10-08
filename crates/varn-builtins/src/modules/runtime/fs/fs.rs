@@ -14,11 +14,15 @@ fn coded(code: &str, msg: impl std::fmt::Display) -> String {
 }
 
 fn fs_io_err(e: std::io::Error) -> String {
-    let code = match e.kind() {
-        std::io::ErrorKind::NotFound => "E_FS_NOT_FOUND",
-        std::io::ErrorKind::PermissionDenied => "E_FS_DENIED",
-        std::io::ErrorKind::AlreadyExists => "E_FS_EXISTS",
-        _ => "E_FS_IO",
+    let kind = e.kind();
+    let code = if kind == std::io::ErrorKind::NotFound {
+        "E_FS_NOT_FOUND"
+    } else if kind == std::io::ErrorKind::PermissionDenied {
+        "E_FS_DENIED"
+    } else if kind == std::io::ErrorKind::AlreadyExists {
+        "E_FS_EXISTS"
+    } else {
+        "E_FS_IO"
     };
     coded(code, e)
 }

@@ -367,8 +367,6 @@ pub(crate) extern "C" fn jit_str_includes(
         )
     }
 }
-
-#[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "str_split")]
 pub(crate) extern "C" fn jit_str_split(
     ctx: *mut ExecCtx,
@@ -428,8 +426,6 @@ pub(crate) extern "C" fn jit_str_split(
             .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(out));
     }
 }
-
-#[allow(clippy::too_many_arguments)]
 #[varn_op_macros::jit_slow(field = "str_slice_range")]
 pub(crate) extern "C" fn jit_str_slice_range(
     ctx: *mut ExecCtx,

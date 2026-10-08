@@ -12,8 +12,8 @@ fn test_resolver() -> std::sync::Arc<varn_checker::module_resolver::DiskResolver
 fn fill_arms_edit(source: &str, line: u32) -> Option<String> {
     let uri = "file:///test/match.vn".to_string();
     let state = run_pipeline(source.to_string(), uri.clone(), test_resolver());
-    let Uri = Uri::parse(&uri).unwrap();
-    match generate_match_arms_action(&state, &Uri, line, 0)? {
+    let parsed = Uri::parse(&uri).unwrap();
+    match generate_match_arms_action(&state, &parsed, line, 0)? {
         CodeActionResponse::CodeAction(action) => {
             let document_changes = action.edit?.document_changes?;
             Some(

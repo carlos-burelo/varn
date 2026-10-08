@@ -51,11 +51,11 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 if !state.db.is_dynamic(&ty) {
                     return Some(make_lang_hover(
                         format!("this: {}", state.ty_text(&ty)),
-                        token_range.clone(),
+                        token_range,
                     ));
                 }
             }
-            return Some(make_lang_hover("this".to_owned(), token_range.clone()));
+            return Some(make_lang_hover("this".to_owned(), token_range));
         }
 
         let prev_is_at = idx
@@ -65,13 +65,13 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             .unwrap_or(false);
         if prev_is_at {
             if let Some(h) = decorator_hover(state.lexeme(tok)) {
-                return Some(with_range(h, token_range.clone()));
+                return Some(with_range(h, token_range));
             }
         }
 
         if let Some(mem_res) = state.db.member_resolutions.get(&tok.offset) {
             let sig = member_resolution_sig(state, mem_res);
-            return Some(make_lang_hover(sig, token_range.clone()));
+            return Some(make_lang_hover(sig, token_range));
         }
     }
 
@@ -81,11 +81,11 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 if sym.is_from_stdlib() {
                     if let Some((_, tok)) = tok_any {
                         if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
-                            return Some(with_range(h, token_range.clone()));
+                            return Some(with_range(h, token_range));
                         }
                     }
                 }
-                return Some(with_range(symbol_hover(state, sym), token_range.clone()));
+                return Some(with_range(symbol_hover(state, sym), token_range));
             }
             ChainResult::Member {
                 member,
@@ -96,7 +96,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 } else {
                     format_member_sig(state, &parent_name, &member)
                 };
-                return Some(make_lang_hover(sig, token_range.clone()));
+                return Some(make_lang_hover(sig, token_range));
             }
         }
     }
@@ -105,11 +105,11 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         if sym.is_from_stdlib() {
             if let Some((_, tok)) = tok_any {
                 if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
-                    return Some(with_range(h, token_range.clone()));
+                    return Some(with_range(h, token_range));
                 }
             }
         }
-        return Some(with_range(symbol_hover(state, sym), token_range.clone()));
+        return Some(with_range(symbol_hover(state, sym), token_range));
     }
 
     if let Some((parent_name, member)) = query::member_at(state, line, col) {
@@ -118,7 +118,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         } else {
             format_member_sig(state, &parent_name, &member)
         };
-        return Some(make_lang_hover(sig, token_range.clone()));
+        return Some(make_lang_hover(sig, token_range));
     }
 
     if let Some(param) = query::param_at(state, line, col) {
@@ -129,7 +129,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         } else {
             format!("{}: {}", param.name, param.type_str)
         };
-        return Some(make_lang_hover(sig, token_range.clone()));
+        return Some(make_lang_hover(sig, token_range));
     }
 
     if let Some((_, tok)) = tok_any {

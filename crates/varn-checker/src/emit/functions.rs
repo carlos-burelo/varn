@@ -138,8 +138,6 @@ pub(super) fn collect_free_functions<'a>(
         decorated: decorated_fns,
     }
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_member_fn(
     display_name: Arc<str>,
     params: &[Param],
@@ -271,8 +269,6 @@ pub(super) fn lower_outer(
     }
     em.lower_outer_expr(e)
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn static_method_sig(
     bind: &BindResult,
     class_name: &str,
@@ -302,8 +298,6 @@ pub(super) fn static_method_sig(
         signatures,
     ))
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_function(
     f: &FunctionDecl,
     ns: Option<&str>,

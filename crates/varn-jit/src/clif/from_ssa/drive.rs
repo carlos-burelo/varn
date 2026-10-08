@@ -17,8 +17,6 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaProto, SsaTerm};
 use varn_types::{FunctionProto, VmValue};
-
-#[allow(clippy::too_many_arguments)]
 pub(in crate::clif) fn try_lower(
     proto: &FunctionProto,
     ssa: &SsaProto,

@@ -92,8 +92,6 @@ pub(super) fn emit_fn_decorator_app(
         span: Span::EMPTY,
     }));
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn lower_decorator_exprs(
     decorators: &[varn_core::ast::Decorator],
     ast_arena: &varn_core::ast::AstArena,

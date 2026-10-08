@@ -6,7 +6,6 @@ use std::sync::Arc;
 use varn_core::ast::AstArena;
 
 impl<'r> Checker<'r> {
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         resolver: &'r dyn crate::module_resolver::ImportResolver,
         ast_arena: &'r AstArena,

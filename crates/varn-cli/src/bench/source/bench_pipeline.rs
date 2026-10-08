@@ -9,8 +9,6 @@ pub(super) fn export_names_of(
     names.sort();
     names
 }
-
-#[allow(clippy::too_many_arguments)]
 pub(super) fn verbose_sections(
     factory: &VmFactory,
     exec_jit: &varn_vm::varn_jit::JitStatsSnapshot,
