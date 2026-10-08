@@ -21,6 +21,7 @@ members = [
     "crates/varn-compiler",
     "crates/varn-rt",
     "crates/varn-shadow",
+    "crates/varn-debug-flags",
     "crates/varn-fmt",
     "crates/varn-dap",
     "crates/xtask",
