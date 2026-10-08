@@ -109,7 +109,7 @@ pub fn run_vm_to_completion(machine: &mut Vm, entry: Rc<FunctionProto>) -> Resul
 }
 
 fn compiled_keys() -> std::collections::BTreeSet<(String, usize)> {
-    varn_vm::varn_jit::stats::take_records()
+    varn_jit::stats::take_records()
         .into_iter()
         .map(|r| (r.name, r.words))
         .collect()
@@ -138,11 +138,11 @@ where
     F: Fn(&mut T) -> Result<(), String>,
     P: Fn(usize, &[Duration]),
 {
-    varn_vm::varn_jit::stats::start_recording();
+    varn_jit::stats::start_recording();
     let mut warm = setup();
     f(&mut warm).map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
     let warmed = compiled_keys();
-    varn_vm::varn_jit::stats::start_recording();
+    varn_jit::stats::start_recording();
 
     let mut samples = Vec::with_capacity(runs);
     let mut peak = None;
@@ -167,11 +167,11 @@ where
     S: Fn() -> T,
     F: Fn(&mut T) -> Result<(), String>,
 {
-    varn_vm::varn_jit::stats::start_recording();
+    varn_jit::stats::start_recording();
     let mut warm = setup();
     f(&mut warm).map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
     let warmed = compiled_keys();
-    varn_vm::varn_jit::stats::start_recording();
+    varn_jit::stats::start_recording();
 
     let mut samples = Vec::with_capacity(runs);
     let mut peak = None;

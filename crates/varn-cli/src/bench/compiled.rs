@@ -57,16 +57,16 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let execute = phases.iter().find(|p| p.name == "execute (warm)");
 
     let (exec_jit, records) = {
-        varn_vm::varn_jit::JIT_STATS.reset();
-        varn_vm::varn_jit::stats::start_recording();
+        varn_jit::JIT_STATS.reset();
+        varn_jit::stats::start_recording();
         varn_builtins::set_print_silent(true);
         varn_builtins::set_testing_silent(true);
         let _ = factory.run_once();
         varn_builtins::set_print_silent(!opts.show_output);
         varn_builtins::set_testing_silent(!opts.show_output);
         (
-            varn_vm::varn_jit::JIT_STATS.snapshot(),
-            varn_vm::varn_jit::stats::take_records(),
+            varn_jit::JIT_STATS.snapshot(),
+            varn_jit::stats::take_records(),
         )
     };
 

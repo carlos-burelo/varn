@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
-use varn_vm::varn_jit::JitStatsSnapshot;
+use varn_jit::JitStatsSnapshot;
 
 use super::fmt::{fmt_bytes, fmt_dur, fmt_num, fmt_pct, short_path};
 use crate::bench::stats::{PhaseStats, CV_UNRELIABLE};
@@ -17,7 +17,7 @@ impl BuildId {
     pub fn detect() -> Self {
         let backend = if varn_vm::ExecSettings::from_env(false).no_jit {
             "interp (VARN_NO_JIT)"
-        } else if varn_vm::varn_jit::clif::enabled() {
+        } else if varn_jit::clif::enabled() {
             "clif"
         } else {
             "interp"

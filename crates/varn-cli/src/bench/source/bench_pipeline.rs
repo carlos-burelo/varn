@@ -11,8 +11,8 @@ pub(super) fn export_names_of(
 }
 pub(super) fn verbose_sections(
     factory: &VmFactory,
-    exec_jit: &varn_vm::varn_jit::JitStatsSnapshot,
-    records: &[varn_vm::varn_jit::CompileRecord],
+    exec_jit: &varn_jit::JitStatsSnapshot,
+    records: &[varn_jit::CompileRecord],
     parse_profile: &varn_parser::ParseProfile,
     check_result: &varn_sem::output::CheckResult,
     phases: &[PhaseStats],

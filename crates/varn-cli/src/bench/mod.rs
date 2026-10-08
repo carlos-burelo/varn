@@ -23,7 +23,7 @@ pub fn run_bench(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(),
 }
 
 pub fn enforce_coverage_floor(
-    jit: &varn_vm::varn_jit::JitStatsSnapshot,
+    jit: &varn_jit::JitStatsSnapshot,
     min_pct: Option<f64>,
 ) -> Result<(), CliError> {
     let Some(min_pct) = min_pct else {

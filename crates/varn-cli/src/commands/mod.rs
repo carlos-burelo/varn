@@ -6,6 +6,8 @@ pub mod cache;
 pub mod check;
 pub mod compare_tiers;
 pub mod completions;
+pub mod contract_classify;
+pub mod contract_members;
 pub mod contract_tables;
 #[cfg(feature = "dap")]
 pub mod dap;
