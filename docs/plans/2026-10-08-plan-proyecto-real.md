@@ -82,15 +82,16 @@ vocab `varn-debug-flags` hoja (`345fc926`), trait `DebugSink`+`NullSink` en pipe
 - [x] Colores vía `varn_core::term`; fuera dep `pipeline→varn-debug`
 - [x] Puerta: `vn test` 155/0
 
-## F4 — Runtime→frontend [ ]
+## F4 — Runtime→frontend [x]
 
-Causa: `vm/Cargo.toml:14,11` → builtins → `op-macros/Cargo.toml:18,19` → lexer+parser. Compilar VM compila frontend.
-Canónico: vm nunca toca sintaxis. Split `builtins-rt` (impl, solo abi+types+runtime) vs `builtins-def` (tablas+`varn_contract!`, único que ve parser).
-
-- [ ] Medir `cargo tree -p varn-vm`
-- [ ] Extraer tabla/registro abajo
-- [ ] Mini-parser firmas en core o pre-gen `build.rs`, `varn-op-macros` deja de ver parser en ruta runtime
-- [ ] Puerta: `cargo build -p varn-vm` sin compilar parser + `vn test`
+Causa: `vm → builtins/op-macros → parser`. Medido `cargo tree`: 3 rutas parser→vm.
+Cierre parcial honesto (`f17b6259`+`686ce01c`+lock):
+- `varn-contract` fuera de `op-macros` (este queda syn puro); builtins consume contract, fuera op-macros.
+- Rutas parser→vm: 3→1 (solo builtins→contract, expansión-time, acíclica). Directa vm y jit cortadas.
+- Lo que NO se corta y por qué (Leyes 6/8 mandan): el macro necesita el parser REAL en expansión;
+  mini-parser = 2 parsers que divergen (viola Ley 8); codegen con checked-in = 2 implementaciones de
+  expansión + workflow que este repo no mide (sin Ley 10 a/b/c: build-time segundos, runtime cero).
+  Regla guardada en `varn-contract/Cargo.toml`: solo builtins lo usa; parser/lexer jamás dependen de él.
 
 ## F5 — Robustez [ ]
 
