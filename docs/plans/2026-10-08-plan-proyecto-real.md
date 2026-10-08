@@ -97,7 +97,7 @@ Cierre parcial honesto (`f17b6259`+`686ce01c`+lock):
 
 - [ ] `unwrap 218 + expect 230`: focos `builtins/fs/fs.rs:59,65,68` lock, `modules:25`, `vm:59`, `checker:35` → `DiagnosticBag`/error tipado, Ley5
 - [ ] `unsafe 377` (vm 279+types 44): inventario perímetro heap/arch/JIT, cada uno justificado eje runtime Ley10, resto borrar
-- [ ] `thread_local 13` restantes (`modules/std_root.rs:102`, `compiler/from_tir/compile.rs:15`, `regalloc_post/mod.rs:20`, `vm/pumps.rs:23,clif_link.rs:11,alloc_profile.rs:34`, `types/shape.rs:116,class.rs:11`, `pipeline/stdlib_loader.rs`, `jit/clif/mod.rs:56,emit/payload.rs:16`, `vm/ctx_json/mod.rs:13`): dueño explícito o borrado
+- [x] thread_locals: eliminados `CUR_*`/`OPT_*` (scope+medición explícita `907447f5`), `MEMO`, pool CTX, caché JSON muerta, pipeline ×2 (F2), global LSP (F2). Quedan justificados: `ROOT_SHAPE` (Rc !Send), `CLASS_REGISTRY` (Weak !Sync, modelo F4), payload-hit (canal leaf 90 sitios), pumps/HOSTS (scheduler RAII), clif_link ×3 (vida código JIT), alloc_profile (métricas env-gated)
 - [ ] No partir gigantes por tamaño (techo 400 cumple). Formalizar `checker/{binder,types,checker,emit,module_resolver}` → crates solo tras F2
 - [ ] Puerta final: `verify.ps1 -Fast` 4 cuadrantes + `vn test` 155/0
 
