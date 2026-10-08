@@ -48,3 +48,74 @@ pub(crate) extern "C" fn jit_str_length(ctx: *mut ExecCtx, v_tag: u64, v_payload
         }
     }
 }
+
+#[varn_op_macros::jit_slow(field = "str_substring")]
+pub(crate) extern "C" fn jit_str_substring(
+    ctx: *mut ExecCtx,
+    s_tag: u64,
+    s_payload: u64,
+    start_tag: u64,
+    start_payload: u64,
+    has_end: u64,
+    end_tag: u64,
+    end_payload: u64,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let heap = &ctx_ref.heap;
+        let s_val = VmValue::from_raw_parts(s_tag, s_payload);
+        let start_val = VmValue::from_raw_parts(start_tag, start_payload);
+        let end_val = VmValue::from_raw_parts(end_tag, end_payload);
+        let mut sso_buf = [0u8; 5];
+        let (text, ascii): (&str, bool) = if s_val.is_sso() {
+            let s = s_val.sso_as_str(&mut sso_buf);
+            (s, s.is_ascii())
+        } else if s_val.is_heap() {
+            match heap.get(s_val.as_heap()) {
+                Some(crate::heap::HeapObj::Str(hs)) => (hs.as_str(), hs.is_ascii()),
+                _ => {
+                    let msg = format!("expected str, got {s_val:?}");
+                    jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg));
+                }
+            }
+        } else {
+            let msg = format!("expected str, got {s_val:?}");
+            jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg));
+        };
+        let int_arg = |v: VmValue| {
+            if v.is_int() {
+                Some(v.as_int())
+            } else {
+                None
+            }
+        };
+        let Some(start) = int_arg(start_val) else {
+            let msg = format!("expected int, got {start_val:?}");
+            jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg));
+        };
+        let end_opt: Option<i64> = if has_end == 0 || end_val.is_null() {
+            None
+        } else if let Some(n) = int_arg(end_val) {
+            Some(n)
+        } else {
+            let msg = format!("expected int, got {end_val:?}");
+            jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg));
+        };
+        let total = if ascii {
+            text.len()
+        } else {
+            varn_types::str_util::char_len(text, false)
+        };
+        let st = start.max(0) as usize;
+        let en = end_opt.map(|e| e.max(0) as usize).unwrap_or(total);
+        let (s, e) = if st <= en { (st, en) } else { (en, st) };
+        let (bs, be) = if ascii {
+            (s.min(total), e.min(total))
+        } else {
+            let si = s.min(total);
+            let ei = e.min(total);
+            varn_types::str_util::char_range_to_bytes(text, false, si, ei)
+        };
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_str_view_of(s_val, bs, be - bs);
+    }
+}

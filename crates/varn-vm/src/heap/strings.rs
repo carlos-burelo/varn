@@ -49,6 +49,66 @@ impl HeapInner {
         VmValue::from_heap(self.alloc(HeapObj::Str(hs)))
     }
 
+    pub(crate) fn alloc_str_view_of(
+        &mut self,
+        v: VmValue,
+        byte_start: usize,
+        byte_len: usize,
+    ) -> VmValue {
+        if v.is_sso() {
+            let mut buf = [0u8; 5];
+            let s = v.sso_as_str(&mut buf);
+            let start = byte_start.min(s.len());
+            let len = byte_len.min(s.len() - start);
+            return self.alloc_str_dynamic(&s[start..start + len]);
+        }
+        if v.is_heap() {
+            if let Some(HeapObj::Str(hs)) = self.get(v.as_heap()) {
+                let (base, mut start, ascii_yes) = match hs {
+                    HeapStr::Shared(s, ascii) => (
+                        Arc::clone(s),
+                        0usize,
+                        ascii.get() == super::str::ascii_flag::YES,
+                    ),
+                    HeapStr::Ext { buf, len, ascii } => {
+                        let slice = unsafe { &(&*buf.get())[..*len] };
+                        (
+                            Arc::from(slice),
+                            0usize,
+                            ascii.get() == super::str::ascii_flag::YES,
+                        )
+                    }
+                    HeapStr::Inline { len, bytes, ascii } => {
+                        let slice =
+                            unsafe { std::str::from_utf8_unchecked(&bytes[..*len as usize]) };
+                        (
+                            Arc::from(slice),
+                            0usize,
+                            ascii.get() == super::str::ascii_flag::YES,
+                        )
+                    }
+                    HeapStr::View {
+                        base, start, ascii, ..
+                    } => (
+                        Arc::clone(base),
+                        *start,
+                        ascii.get() == super::str::ascii_flag::YES,
+                    ),
+                };
+                start += byte_start.min(base.len().saturating_sub(start));
+                let len = byte_len.min(base.len() - start);
+                if len == 0 {
+                    return VmValue::try_from_sso("").unwrap_or_else(VmValue::null);
+                }
+                if len <= varn_types::vm_value::SSO_MAX_LEN {
+                    return self.alloc_str_dynamic(&base[start..start + len]);
+                }
+                return self.alloc_str_view(HeapStr::view(base, start, len, ascii_yes));
+            }
+        }
+        VmValue::try_from_sso("").unwrap_or_else(VmValue::null)
+    }
+
     pub(crate) fn str_val(&self, nv: VmValue) -> Option<RuntimeString> {
         if nv.is_sso() {
             let mut buf = [0u8; 5];

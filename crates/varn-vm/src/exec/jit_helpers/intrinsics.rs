@@ -402,28 +402,32 @@ pub(crate) extern "C" fn jit_str_split(
             }
         };
         let mut out = Vec::new();
+        let base = text.as_ptr() as usize;
         match sep.as_deref() {
             Some(sep) if sep.len() == 1 => {
                 let byte = sep.as_bytes()[0];
                 for p in text.split(byte as char) {
-                    out.push(ctx_ref.heap.alloc_str(p));
+                    out.push((p.as_ptr() as usize - base, p.len()));
                 }
             }
             Some(sep) => {
                 for p in text.split(sep) {
-                    out.push(ctx_ref.heap.alloc_str(p));
+                    out.push((p.as_ptr() as usize - base, p.len()));
                 }
             }
             None => {
-                let mut cbuf = [0u8; 4];
-                for c in text.chars() {
-                    out.push(ctx_ref.heap.alloc_str(c.encode_utf8(&mut cbuf)));
+                for (b, c) in text.char_indices() {
+                    out.push((b, c.len_utf8()));
                 }
             }
         }
+        let mut vals = Vec::with_capacity(out.len());
+        for (off, len) in out {
+            vals.push(ctx_ref.heap.alloc_str_view_of(s_val, off, len));
+        }
         ctx_ref.jit_native_result = ctx_ref
             .heap
-            .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(out));
+            .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(vals));
     }
 }
 #[varn_op_macros::jit_slow(field = "str_slice_range")]
@@ -467,23 +471,22 @@ pub(crate) extern "C" fn jit_str_slice_range(
                 crate::error::RuntimeError::new("slice: bounds must be ints"),
             );
         };
-        let out = if text.is_ascii() {
+        let (bs, be) = if text.is_ascii() {
             let len = text.len() as i64;
             let si = normalize_idx(start, len).min(text.len());
             let ei = normalize_idx(end.unwrap_or(len), len)
                 .min(text.len())
                 .max(si);
-            text[si..ei].to_owned()
+            (si, ei)
         } else {
             let len = char_len(&text, false);
             let si = normalize_idx(start, len as i64).min(len);
             let ei = normalize_idx(end.unwrap_or(len as i64), len as i64)
                 .min(len)
                 .max(si);
-            let (bs, be) = char_range_to_bytes(&text, false, si, ei);
-            text[bs..be].to_owned()
+            char_range_to_bytes(&text, false, si, ei)
         };
-        ctx_ref.jit_native_result = ctx_ref.heap.alloc_str(&out);
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_str_view_of(s_val, bs, be - bs);
     }
 }
 

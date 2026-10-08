@@ -67,6 +67,11 @@ pub fn str_split_op_id() -> u64 {
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "split"))
 }
 
+pub fn str_substring_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "substring"))
+}
+
 pub fn str_char_code_at_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "charCodeAt"))

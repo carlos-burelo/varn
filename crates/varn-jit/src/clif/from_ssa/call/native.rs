@@ -97,6 +97,37 @@ pub(crate) fn emit_call_native_op(
             ctx.helpers.jit_native_result_offset as i32,
         ));
     }
+    if op_id == varn_core::op_id::str_substring_op_id() && (args.len() == 1 || args.len() == 2) {
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (start_tag, start_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
+        let has_end_v = b.ins().iconst(types::I64, (args.len() - 1) as i64);
+        let (end_tag, end_payload) = if args.len() == 2 {
+            heap::boxed_parts(b, ctx, values, args[1])?
+        } else {
+            (b.ins().iconst(types::I64, 0), b.ins().iconst(types::I64, 0))
+        };
+        call_helper_void(
+            b,
+            ctx.cc,
+            ctx.helpers.str_substring,
+            &[
+                frame.exec_ctx,
+                recv_tag,
+                recv_payload,
+                start_tag,
+                start_payload,
+                has_end_v,
+                end_tag,
+                end_payload,
+            ],
+        );
+        return Ok(b.ins().load(
+            types::I128,
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            frame.exec_ctx,
+            ctx.helpers.jit_native_result_offset as i32,
+        ));
+    }
     if op_id == varn_core::op_id::str_slice_op_id() && (args.len() == 1 || args.len() == 2) {
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
         let (start_tag, start_payload) = heap::boxed_parts(b, ctx, values, args[0])?;

@@ -213,6 +213,7 @@ pub struct JitHelpers {
     pub str_slice_range: usize,
     pub str_split: usize,
     pub str_starts_with: usize,
+    pub str_substring: usize,
     pub sub: usize,
     pub throw: usize,
     pub to_string: usize,

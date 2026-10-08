@@ -24,6 +24,13 @@ pub enum HeapStr {
         ascii: std::cell::Cell<u8>,
         bytes: [u8; INLINE_STR_CAP],
     },
+
+    View {
+        base: RuntimeString,
+        start: usize,
+        len: usize,
+        ascii: std::cell::Cell<u8>,
+    },
 }
 
 impl HeapStr {
@@ -64,6 +71,24 @@ impl HeapStr {
     }
 
     #[inline]
+    pub(crate) fn view(base: RuntimeString, start: usize, len: usize, ascii_known: bool) -> Self {
+        debug_assert!(start <= base.len());
+        debug_assert!(len <= base.len() - start);
+        debug_assert!(base.is_char_boundary(start));
+        debug_assert!(base.is_char_boundary(start + len));
+        HeapStr::View {
+            base,
+            start,
+            len,
+            ascii: std::cell::Cell::new(if ascii_known {
+                ascii_flag::YES
+            } else {
+                ascii_flag::UNKNOWN
+            }),
+        }
+    }
+
+    #[inline]
     pub(crate) fn as_str(&self) -> &str {
         match self {
             HeapStr::Shared(s, _) => s,
@@ -73,6 +98,10 @@ impl HeapStr {
             HeapStr::Inline { len, bytes, .. } => unsafe {
                 std::str::from_utf8_unchecked(&bytes[..*len as usize])
             },
+
+            HeapStr::View {
+                base, start, len, ..
+            } => &base[*start..*start + *len],
         }
     }
 
@@ -82,6 +111,7 @@ impl HeapStr {
             HeapStr::Shared(_, ascii) => ascii.get(),
             HeapStr::Ext { ascii, .. } => ascii.get(),
             HeapStr::Inline { ascii, .. } => ascii.get(),
+            HeapStr::View { ascii, .. } => ascii.get(),
         }
     }
 
@@ -109,6 +139,7 @@ impl HeapStr {
             HeapStr::Shared(s, _) => s.len(),
             HeapStr::Ext { len, .. } => *len,
             HeapStr::Inline { len, .. } => *len as usize,
+            HeapStr::View { len, .. } => *len,
         }
     }
 
@@ -133,6 +164,15 @@ impl HeapStr {
                 let slice = unsafe { std::str::from_utf8_unchecked(&bytes[..*len as usize]) };
                 Arc::from(slice)
             }
+            HeapStr::View {
+                base, start, len, ..
+            } => {
+                if *start == 0 && *len == base.len() {
+                    Arc::clone(base)
+                } else {
+                    Arc::from(&base[*start..*start + *len])
+                }
+            }
         }
     }
 
@@ -142,6 +182,7 @@ impl HeapStr {
             HeapStr::Shared(_, ascii) => ascii.set(state),
             HeapStr::Ext { ascii, .. } => ascii.set(state),
             HeapStr::Inline { ascii, .. } => ascii.set(state),
+            HeapStr::View { ascii, .. } => ascii.set(state),
         }
     }
 
@@ -149,7 +190,7 @@ impl HeapStr {
     pub(crate) fn is_tip(&self) -> bool {
         match self {
             HeapStr::Ext { buf, len, .. } => unsafe { (&*buf.get()).len() == *len },
-            HeapStr::Shared(..) | HeapStr::Inline { .. } => false,
+            HeapStr::Shared(..) | HeapStr::Inline { .. } | HeapStr::View { .. } => false,
         }
     }
 }

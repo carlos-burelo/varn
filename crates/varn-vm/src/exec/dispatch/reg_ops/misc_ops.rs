@@ -201,11 +201,28 @@ impl ExecCtx {
     }
 
     pub(crate) fn exec_str_slice(&mut self, s: VmValue, idx: VmValue) -> VmResult<VmValue> {
+        let start = idx.as_i32().max(0) as usize;
         if s.is_heap() {
             if let Some(HeapObj::Str(st)) = self.heap.get(s.as_heap()) {
-                let start = idx.as_i32().max(0) as usize;
-                let sliced: String = st.chars().skip(start).collect();
-                return Ok(self.heap.alloc_str(sliced));
+                if st.is_ascii() {
+                    let len = st.byte_len();
+                    let off = start.min(len);
+                    if off == 0 {
+                        return Ok(s);
+                    }
+                    return Ok(self.heap.alloc_str_view_of(s, off, len - off));
+                }
+                let text = st.as_str();
+                let total = text.len();
+                let boff = text
+                    .char_indices()
+                    .nth(start)
+                    .map(|(b, _)| b)
+                    .unwrap_or(total);
+                if boff == 0 {
+                    return Ok(s);
+                }
+                return Ok(self.heap.alloc_str_view_of(s, boff, total - boff));
             }
         } else if s.is_sso() {
             let mut buf = [0u8; 5];
