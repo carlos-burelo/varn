@@ -102,6 +102,9 @@ Cierre parcial honesto (`f17b6259`+`686ce01c`+lock):
       single-thread; transmutes core con `#[repr]`+rango verificado sound). Cero borrado: tumbaría el runtime (Ley 10).
 - [x] thread_locals: ver F2 y lote F5 (`907447f5`, `8d944cb5`).
 - [x] Puerta: `vn test` 155/0 + lsp verde + bench con split.
+- [x] `verify.ps1 -Fast` 4/4 cuadrantes (2290 passed c/u) + clippy cero (`4e1461b1`).
+      Nota red: test 112 (bind puerto) falla por sandbox −
+      probado con binario pre-cambios, idéntico fallo. No es regresión.
 
 ---
 
