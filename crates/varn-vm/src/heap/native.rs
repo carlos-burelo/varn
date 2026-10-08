@@ -132,6 +132,27 @@ impl NativeCtx for Heap {
         None
     }
 
+    fn str_sub(&mut self, base: &varn_types::marshal::VnStr, start: usize, len: usize) -> VmValue {
+        use super::str::HeapStr;
+        let s = base.as_str();
+        let start = start.min(s.len());
+        let len = len.min(s.len() - start);
+        if len == 0 {
+            return VmValue::try_from_sso("").unwrap_or_else(VmValue::null);
+        }
+        if len <= varn_types::vm_value::SSO_MAX_LEN {
+            return self.deref_mut().alloc_str_dynamic(&s[start..start + len]);
+        }
+        match base {
+            varn_types::marshal::VnStr::Shared(arc, ascii) => self
+                .deref_mut()
+                .alloc_str_view(HeapStr::view(Arc::clone(arc), start, len, *ascii)),
+            varn_types::marshal::VnStr::Sso { .. } => {
+                self.deref_mut().alloc_str_dynamic(&s[start..start + len])
+            }
+        }
+    }
+
     fn str_is_ascii(&self, v: VmValue) -> bool {
         if v.is_sso() {
             let mut buf = [0u8; 5];

@@ -112,7 +112,7 @@ pub(super) fn owned_ty(m: &Mapped) -> TS2 {
 
 pub(super) fn ret_ty(m: &Mapped) -> TS2 {
     match m {
-        Mapped::Str => quote!(String),
+        Mapped::Str => quote!(impl ::varn_types::marshal::IntoVm + use<Self>),
         Mapped::Array => quote!(::std::vec::Vec<::varn_types::VmValue>),
         Mapped::Opt(inner) => {
             let i = ret_ty(inner);

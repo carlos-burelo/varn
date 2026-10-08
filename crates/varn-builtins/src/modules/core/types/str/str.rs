@@ -82,9 +82,21 @@ varn_contract! {
                 this.to_uppercase()
             }
         }
-        fn trim(_ctx: &mut dyn NativeCtx, this: &VnStr) -> String { this.trim().to_string() }
-        fn trimStart(_ctx: &mut dyn NativeCtx, this: &VnStr) -> String { this.trim_start().to_string() }
-        fn trimEnd(_ctx: &mut dyn NativeCtx, this: &VnStr) -> String { this.trim_end().to_string() }
+        fn trim(ctx: &mut dyn NativeCtx, this: &VnStr) -> VmValue {
+            let s = this.as_str();
+            let t = s.trim();
+            ctx.str_sub(this, t.as_ptr() as usize - s.as_ptr() as usize, t.len())
+        }
+        fn trimStart(ctx: &mut dyn NativeCtx, this: &VnStr) -> VmValue {
+            let s = this.as_str();
+            let t = s.trim_start();
+            ctx.str_sub(this, t.as_ptr() as usize - s.as_ptr() as usize, t.len())
+        }
+        fn trimEnd(ctx: &mut dyn NativeCtx, this: &VnStr) -> VmValue {
+            let s = this.as_str();
+            let t = s.trim_end();
+            ctx.str_sub(this, t.as_ptr() as usize - s.as_ptr() as usize, t.len())
+        }
 
 
         fn includes(_ctx: &mut dyn NativeCtx, this: &VnStr, search: &str) -> bool { find_bytes(this, search).is_some() }
@@ -104,7 +116,7 @@ varn_contract! {
         }
 
 
-        fn substring(_ctx: &mut dyn NativeCtx, this: &VnStr, start: i64, end: Option<i64>) -> String {
+        fn substring(ctx: &mut dyn NativeCtx, this: &VnStr, start: i64, end: Option<i64>) -> VmValue {
             let b = this.as_bytes();
             let st = start.max(0) as usize;
             let en = end.map(|e| e.max(0) as usize).unwrap_or(b.len());
@@ -112,29 +124,29 @@ varn_contract! {
             if this.is_ascii() {
                 let s = s.min(b.len());
                 let e = e.min(b.len());
-                return this[s..e].to_owned();
+                return ctx.str_sub(this, s, e - s);
             }
             let len = char_len(this, false);
             let si = s.min(len);
             let ei = e.min(len);
             let (bs, be) = char_range_to_bytes(this, false, si, ei);
-            this[bs..be].to_owned()
+            ctx.str_sub(this, bs, be - bs)
         }
-        fn slice(_ctx: &mut dyn NativeCtx, this: &VnStr, start: i64, end: Option<i64>) -> String {
+        fn slice(ctx: &mut dyn NativeCtx, this: &VnStr, start: i64, end: Option<i64>) -> VmValue {
             let b = this.as_bytes();
             if this.is_ascii() {
                 let len = b.len() as i64;
                 let si = normalize_idx(start, len).min(b.len());
                 let ei = normalize_idx(end.unwrap_or(len), len).min(b.len()).max(si);
-                return this[si..ei].to_owned();
+                return ctx.str_sub(this, si, ei - si);
             }
             let len = char_len(this, false);
             let si = normalize_idx(start, len as i64).min(len);
             let ei = normalize_idx(end.unwrap_or(len as i64), len as i64).min(len).max(si);
             let (bs, be) = char_range_to_bytes(this, false, si, ei);
-            this[bs..be].to_owned()
+            ctx.str_sub(this, bs, be - bs)
         }
-        fn at(_ctx: &mut dyn NativeCtx, this: &VnStr, index: i64) -> Option<String> {
+        fn at(ctx: &mut dyn NativeCtx, this: &VnStr, index: i64) -> Option<VmValue> {
             let b = this.as_bytes();
             if this.is_ascii() {
                 let len = b.len() as i64;
@@ -143,7 +155,7 @@ varn_contract! {
                     return None;
                 }
                 let idx = idx as usize;
-                return Some(this[idx..idx + 1].to_owned());
+                return Some(ctx.str_sub(this, idx, 1));
             }
             let len = char_len(this, false) as i64;
             let idx = if index < 0 { len + index } else { index };
@@ -151,23 +163,23 @@ varn_contract! {
                 return None;
             }
             let (bs, be) = char_range_to_bytes(this, false, idx as usize, idx as usize + 1);
-            Some(this[bs..be].to_owned())
+            Some(ctx.str_sub(this, bs, be - bs))
         }
-        fn substr(_ctx: &mut dyn NativeCtx, this: &VnStr, start: i64, length: Option<i64>) -> String {
+        fn substr(ctx: &mut dyn NativeCtx, this: &VnStr, start: i64, length: Option<i64>) -> VmValue {
             let b = this.as_bytes();
             if this.is_ascii() {
                 let len = b.len() as i64;
                 let st = if start < 0 { (len + start).max(0) as usize } else { (start as usize).min(b.len()) };
                 let count = length.map(|c| c.max(0) as usize).unwrap_or(b.len() - st);
                 let end = (st + count).min(b.len());
-                return this[st..end].to_owned();
+                return ctx.str_sub(this, st, end - st);
             }
             let len = char_len(this, false);
             let st = if start < 0 { (len as i64 + start).max(0) as usize } else { (start as usize).min(len) };
             let count = length.map(|c| c.max(0) as usize).unwrap_or(len - st);
             let end = (st + count).min(len);
             let (bs, be) = char_range_to_bytes(this, false, st, end);
-            this[bs..be].to_owned()
+            ctx.str_sub(this, bs, be - bs)
         }
 
 
@@ -181,36 +193,44 @@ varn_contract! {
             this.replace(from, to)
         }
         fn split(ctx: &mut dyn NativeCtx, this: &VnStr, separator: Option<&str>) -> Vec<VmValue> {
+            let s = this.as_str();
+            let base = s.as_ptr() as usize;
             match separator {
                 Some(sep) => {
                     if sep.len() == 1 {
                         let byte = sep.as_bytes()[0];
                         let count = this.as_bytes().iter().filter(|&&b| b == byte).count() + 1;
                         let mut out = Vec::with_capacity(count);
-                        for p in this.split(byte as char) {
-                            out.push(ctx.alloc_str(p));
+                        for p in s.split(byte as char) {
+                            out.push(ctx.str_sub(this, p.as_ptr() as usize - base, p.len()));
                         }
                         out
                     } else {
-                        this.split(sep).map(|p| ctx.alloc_str(p)).collect()
+                        s.split(sep).map(|p| ctx.str_sub(this, p.as_ptr() as usize - base, p.len())).collect()
                     }
                 }
                 None => {
                     let count = this.chars().count();
                     let mut out = Vec::with_capacity(count);
-                    let mut buf = [0u8; 4];
-                    for c in this.chars() {
-                        out.push(ctx.alloc_str(c.encode_utf8(&mut buf)));
+                    let mut off = 0usize;
+                    for c in s.chars() {
+                        let l = c.len_utf8();
+                        out.push(ctx.str_sub(this, off, l));
+                        off += l;
                     }
                     out
                 }
             }
         }
         fn lines(ctx: &mut dyn NativeCtx, this: &VnStr) -> Vec<VmValue> {
-            this.lines().map(|l| ctx.alloc_str(l)).collect()
+            let s = this.as_str();
+            let base = s.as_ptr() as usize;
+            s.lines().map(|l| ctx.str_sub(this, l.as_ptr() as usize - base, l.len())).collect()
         }
         fn words(ctx: &mut dyn NativeCtx, this: &VnStr) -> Vec<VmValue> {
-            this.split_whitespace().map(|w| ctx.alloc_str(w)).collect()
+            let s = this.as_str();
+            let base = s.as_ptr() as usize;
+            s.split_whitespace().map(|w| ctx.str_sub(this, w.as_ptr() as usize - base, w.len())).collect()
         }
 
 

@@ -109,6 +109,15 @@ pub trait NativeCtx {
         self.str_owned(v).map(std::sync::Arc::from)
     }
 
+    fn str_sub(&mut self, base: &crate::marshal::VnStr, start: usize, len: usize) -> VmValue {
+        let s = base.as_str();
+        let start = start.min(s.len());
+        let len = len.min(s.len() - start);
+        debug_assert!(s.is_char_boundary(start));
+        debug_assert!(s.is_char_boundary(start + len));
+        self.alloc_str(&s[start..start + len])
+    }
+
     fn str_is_ascii(&self, v: VmValue) -> bool {
         self.str_repr_borrowed(v).is_ascii()
     }
