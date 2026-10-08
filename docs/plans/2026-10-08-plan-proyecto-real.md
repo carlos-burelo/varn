@@ -27,7 +27,7 @@ Ley 13 perfil `quick` para iterar (`cargo build --profile quick --bin vn`), matr
   - [ ] `varn-cli/src/bench/source/helpers.rs`
   - [ ] `varn-jit/src/clif/from_ssa/extra/common.rs`
   - [ ] `varn-tir/tests/verify_coherence/common.rs`
-- [ ] Migrar 36 `std::collections` → Fx/BTree (`jit/from_ssa/context.rs`, `cfg.rs`, `lsp/backend/insight.rs`, `lsp/pipeline/mod.rs`, `lsp/index/mod.rs`, resto)
+- [x] Migrar 36 `std::collections` → Fx/BTree (`d3728072`; quedan solo frontera wire lsp-types, tests, xtask, BTree/VecDeque ordenados)
 - [ ] Auditar 318 `_ =>` (Ley 7, cada brazo explícito ante variante nueva)
 - [ ] Puerta: `vn test` 155/0
 
