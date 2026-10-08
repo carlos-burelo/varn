@@ -128,8 +128,13 @@ impl AstJson<'_> {
             StmtKind::Continue { .. } => leaf("ContinueStmt".to_string(), "keyword", line),
             StmtKind::Empty => leaf("EmptyStmt".to_string(), "field", line),
             StmtKind::Error => leaf("ErrorStmt".to_string(), "field", line),
-            StmtKind::DoWhile { .. } | StmtKind::Switch { .. } | StmtKind::Throw { .. } | StmtKind::Try { .. }
-            | StmtKind::Using { .. } | StmtKind::Labeled { .. } | StmtKind::Debugger => leaf("Stmt".to_string(), "statement", line),
+            StmtKind::DoWhile { .. }
+            | StmtKind::Switch { .. }
+            | StmtKind::Throw { .. }
+            | StmtKind::Try { .. }
+            | StmtKind::Using { .. }
+            | StmtKind::Labeled { .. }
+            | StmtKind::Debugger => leaf("Stmt".to_string(), "statement", line),
         }
     }
 
@@ -189,7 +194,9 @@ impl AstJson<'_> {
                             range.start.line,
                             vec![self.stmt(*body)],
                         )),
-                        ClassMember::Destructor { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. }
+                        ClassMember::Destructor { .. }
+                        | ClassMember::Getter { .. }
+                        | ClassMember::Setter { .. }
                         | ClassMember::StaticBlock { .. } => None,
                     })
                     .collect();
@@ -348,17 +355,39 @@ impl AstJson<'_> {
                 }
                 node("MatchExpr".to_string(), "keyword", line, children)
             }
-            ExprKind::BigIntLiteral { .. } | ExprKind::DecimalLiteral { .. } | ExprKind::RegexLiteral { .. }
-            | ExprKind::Template { .. } | ExprKind::TaggedTemplate { .. } | ExprKind::Missing
-            | ExprKind::This | ExprKind::Super | ExprKind::Array { .. } | ExprKind::Object { .. }
-            | ExprKind::Tuple { .. } | ExprKind::Record { .. } | ExprKind::Update { .. }
-            | ExprKind::Logical { .. } | ExprKind::Conditional { .. } | ExprKind::New { .. }
-            | ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::Sequence { .. }
-            | ExprKind::Paren { .. } | ExprKind::Await { .. } | ExprKind::Spawn { .. }
-            | ExprKind::Yield { .. } | ExprKind::Spread { .. } | ExprKind::Range { .. }
-            | ExprKind::NonNull { .. } | ExprKind::Try { .. } | ExprKind::As { .. }
-            | ExprKind::Satisfies { .. } | ExprKind::ClassExpr { .. } | ExprKind::Is { .. }
-            | ExprKind::With { .. } | ExprKind::MetaAccess { .. } => leaf("Expr".to_string(), "statement", line),
+            ExprKind::BigIntLiteral { .. }
+            | ExprKind::DecimalLiteral { .. }
+            | ExprKind::RegexLiteral { .. }
+            | ExprKind::Template { .. }
+            | ExprKind::TaggedTemplate { .. }
+            | ExprKind::Missing
+            | ExprKind::This
+            | ExprKind::Super
+            | ExprKind::Array { .. }
+            | ExprKind::Object { .. }
+            | ExprKind::Tuple { .. }
+            | ExprKind::Record { .. }
+            | ExprKind::Update { .. }
+            | ExprKind::Logical { .. }
+            | ExprKind::Conditional { .. }
+            | ExprKind::New { .. }
+            | ExprKind::Function { .. }
+            | ExprKind::Arrow { .. }
+            | ExprKind::Sequence { .. }
+            | ExprKind::Paren { .. }
+            | ExprKind::Await { .. }
+            | ExprKind::Spawn { .. }
+            | ExprKind::Yield { .. }
+            | ExprKind::Spread { .. }
+            | ExprKind::Range { .. }
+            | ExprKind::NonNull { .. }
+            | ExprKind::Try { .. }
+            | ExprKind::As { .. }
+            | ExprKind::Satisfies { .. }
+            | ExprKind::ClassExpr { .. }
+            | ExprKind::Is { .. }
+            | ExprKind::With { .. }
+            | ExprKind::MetaAccess { .. } => leaf("Expr".to_string(), "statement", line),
         }
     }
 }

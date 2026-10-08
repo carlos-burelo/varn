@@ -214,7 +214,10 @@ impl<'r> Checker<'r> {
                                     false
                                 }
                             }
-                            MatchPattern::Identifier(_) | MatchPattern::Record { .. } | MatchPattern::Sequence(_) | MatchPattern::Type { .. } => false,
+                            MatchPattern::Identifier(_)
+                            | MatchPattern::Record { .. }
+                            | MatchPattern::Sequence(_)
+                            | MatchPattern::Type { .. } => false,
                         }
                     })
                 })
@@ -252,7 +255,26 @@ fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type
         TypeKind::Primitive(varn_core::LangPrimitive::Bool) => {
             split_bool(Type::Bool, &mut out, table)
         }
-        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => return None,
+        TypeKind::Primitive(_)
+        | TypeKind::Builtin(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Array(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Named(..)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => return None,
     }
     Some(out)
 }
@@ -295,7 +317,25 @@ fn pattern_covers(
                 TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
                     bind.interner.try_resolve(n) == Some(name)
                 }
-                kind @ TypeKind::Primitive(_) | kind @ TypeKind::Builtin(_) | kind @ TypeKind::Literal(_) | kind @ TypeKind::This | kind @ TypeKind::Array(_) | kind @ TypeKind::Union(_) | kind @ TypeKind::Intersection(_) | kind @ TypeKind::Tuple(_) | kind @ TypeKind::TemplateLiteral(_) | kind @ TypeKind::Fn(_) | kind @ TypeKind::Object(_) | kind @ TypeKind::Typeof(_) | kind @ TypeKind::KeyOf(_) | kind @ TypeKind::IndexedAccess { .. } | kind @ TypeKind::Mapped { .. } | kind @ TypeKind::Conditional { .. } | kind @ TypeKind::Infer(_) | kind @ TypeKind::EnumVariant { .. } | kind @ TypeKind::TypePredicate { .. } => kind.lang_name() == Some(name),
+                kind @ TypeKind::Primitive(_)
+                | kind @ TypeKind::Builtin(_)
+                | kind @ TypeKind::Literal(_)
+                | kind @ TypeKind::This
+                | kind @ TypeKind::Array(_)
+                | kind @ TypeKind::Union(_)
+                | kind @ TypeKind::Intersection(_)
+                | kind @ TypeKind::Tuple(_)
+                | kind @ TypeKind::TemplateLiteral(_)
+                | kind @ TypeKind::Fn(_)
+                | kind @ TypeKind::Object(_)
+                | kind @ TypeKind::Typeof(_)
+                | kind @ TypeKind::KeyOf(_)
+                | kind @ TypeKind::IndexedAccess { .. }
+                | kind @ TypeKind::Mapped { .. }
+                | kind @ TypeKind::Conditional { .. }
+                | kind @ TypeKind::Infer(_)
+                | kind @ TypeKind::EnumVariant { .. }
+                | kind @ TypeKind::TypePredicate { .. } => kind.lang_name() == Some(name),
             }
         }
         MatchPattern::Record { .. }

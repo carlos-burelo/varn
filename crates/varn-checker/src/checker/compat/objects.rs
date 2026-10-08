@@ -27,7 +27,10 @@ pub(super) fn object_arm(
                         ty: ity,
                         ..
                     } if iname == name => Some(*ity),
-                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
+                    ObjectTypeMember::Property { .. }
+                    | ObjectTypeMember::Method { .. }
+                    | ObjectTypeMember::Index { .. }
+                    | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
                     Some(inf_ty) => {
@@ -68,7 +71,10 @@ pub(super) fn object_arm(
                         optional: o2,
                         ..
                     } if iname == name => Some((p2.clone(), *r2, *o2)),
-                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
+                    ObjectTypeMember::Property { .. }
+                    | ObjectTypeMember::Method { .. }
+                    | ObjectTypeMember::Index { .. }
+                    | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
                     Some((p2, r2, o2)) => {
@@ -128,7 +134,9 @@ pub(super) fn object_arm(
                             table,
                         )
                     }
-                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => false,
+                    ObjectTypeMember::Property { .. }
+                    | ObjectTypeMember::Method { .. }
+                    | ObjectTypeMember::Callable { .. } => false,
                 });
                 if has_compatible_index {
                     continue;

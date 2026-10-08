@@ -44,7 +44,10 @@ impl ExecCtx {
                                 self.stage[0] = recv_nv;
                             }
                         }
-                        PreparedCall::Constructor(..) | PreparedCall::NativeConstructor(..) | PreparedCall::PushValue(_) | PreparedCall::Generator { .. } => {}
+                        PreparedCall::Constructor(..)
+                        | PreparedCall::NativeConstructor(..)
+                        | PreparedCall::PushValue(_)
+                        | PreparedCall::Generator { .. } => {}
                     }
                 }
             }

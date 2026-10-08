@@ -80,7 +80,23 @@ impl<'r> Checker<'r> {
                 .current_class
                 .as_deref()
                 .is_some_and(|c| self.is_subclass_or_same(c, "Error", bind)),
-            varn_core::TypeKind::Primitive(_) | varn_core::TypeKind::Builtin(_) | varn_core::TypeKind::Literal(_) | varn_core::TypeKind::Array(_) | varn_core::TypeKind::Intersection(_) | varn_core::TypeKind::Tuple(_) | varn_core::TypeKind::TemplateLiteral(_) | varn_core::TypeKind::Fn(_) | varn_core::TypeKind::Object(_) | varn_core::TypeKind::Typeof(_) | varn_core::TypeKind::KeyOf(_) | varn_core::TypeKind::IndexedAccess { .. } | varn_core::TypeKind::Mapped { .. } | varn_core::TypeKind::Conditional { .. } | varn_core::TypeKind::Infer(_) | varn_core::TypeKind::EnumVariant { .. } | varn_core::TypeKind::TypePredicate { .. } => ty.is_dynamic(),
+            varn_core::TypeKind::Primitive(_)
+            | varn_core::TypeKind::Builtin(_)
+            | varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::Array(_)
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::Tuple(_)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Fn(_)
+            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::EnumVariant { .. }
+            | varn_core::TypeKind::TypePredicate { .. } => ty.is_dynamic(),
         }
     }
 }

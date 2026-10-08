@@ -70,7 +70,9 @@ pub(crate) fn expr_satisfies_target_type(
                 varn_core::ast::PropKey::Identifier(s) | varn_core::ast::PropKey::Str(s) => {
                     s.as_str()
                 }
-                varn_core::ast::PropKey::Int(_) | varn_core::ast::PropKey::Computed(_) => return false,
+                varn_core::ast::PropKey::Int(_) | varn_core::ast::PropKey::Computed(_) => {
+                    return false
+                }
             };
             let matched = members.iter().any(|m| match m {
                 ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == key_str => {
@@ -78,7 +80,10 @@ pub(crate) fn expr_satisfies_target_type(
                     expr_satisfies_target_type(&ty, &ty, arena, Some(*value), table, interner)
                         || plain_literal_matches(&ty, arena, *value, table)
                 }
-                ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => false,
+                ObjectTypeMember::Property { .. }
+                | ObjectTypeMember::Method { .. }
+                | ObjectTypeMember::Index { .. }
+                | ObjectTypeMember::Callable { .. } => false,
             });
             if !matched {
                 return false;
@@ -96,7 +101,10 @@ pub(crate) fn expr_satisfies_target_type(
                 optional: false,
                 ..
             } => !present.contains(&name.as_ref()),
-            ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => false,
+            ObjectTypeMember::Property { .. }
+            | ObjectTypeMember::Method { .. }
+            | ObjectTypeMember::Index { .. }
+            | ObjectTypeMember::Callable { .. } => false,
         });
         return !required_missing;
     }

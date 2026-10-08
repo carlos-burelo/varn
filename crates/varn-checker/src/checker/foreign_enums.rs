@@ -22,7 +22,26 @@ impl Checker<'_> {
         for ty in types {
             let members = match self.ty_table.get(ty.0) {
                 TypeKind::Union(list) => self.ty_table.get_list(list).to_vec(),
-                TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => vec![ty.0],
+                TypeKind::Primitive(_)
+                | TypeKind::Builtin(_)
+                | TypeKind::Literal(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Tuple(_)
+                | TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Fn(_)
+                | TypeKind::Object(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Conditional { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => vec![ty.0],
             };
             for id in members {
                 let (TypeKind::Named(name, Some(origin))

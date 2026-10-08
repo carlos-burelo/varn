@@ -77,6 +77,9 @@ pub(crate) fn format_expr_short(
 pub(crate) fn format_pattern(pat: &Pattern, interner: &AtomInterner) -> String {
     match pat {
         Pattern::Identifier { name, .. } => interner.resolve(*name).to_owned(),
-        Pattern::Array { .. } | Pattern::Object { .. } | Pattern::Assignment { .. } | Pattern::Rest { .. } => "{...}".to_owned(),
+        Pattern::Array { .. }
+        | Pattern::Object { .. }
+        | Pattern::Assignment { .. }
+        | Pattern::Rest { .. } => "{...}".to_owned(),
     }
 }

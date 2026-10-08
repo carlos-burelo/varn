@@ -32,10 +32,10 @@ pub fn resolve_token(
         | LBracket | RBracket | LAngle | RAngle | Semicolon | Comma | Dot | DotDot | DotDotDot
         | DotDotEq | Colon | ColonColon | Question | QuestionDot | QuestionLBracket
         | QuestionQuestion | QuestionQuestionEq | Plus | PlusPlus | PlusEq | Minus | MinusMinus
-        | MinusEq | Star | StarStar | StarEq | StarStarEq | Slash | SlashEq | Percent | PercentEq
-        | Amp | AmpAmp | AmpEq | AmpAmpEq | Pipe | PipePipe | PipeEq | PipePipeEq | Caret
-        | CaretEq | Tilde | LtLt | LtLtEq | GtGt | GtGtEq | GtGtGt | GtGtGtEq | Eq | EqEq
-        | EqEqEq | Bang | BangEq | BangEqEq | Lt | LtEq | Gt | GtEq | Let | Const | Var
+        | MinusEq | Star | StarStar | StarEq | StarStarEq | Slash | SlashEq | Percent
+        | PercentEq | Amp | AmpAmp | AmpEq | AmpAmpEq | Pipe | PipePipe | PipeEq | PipePipeEq
+        | Caret | CaretEq | Tilde | LtLt | LtLtEq | GtGt | GtGtEq | GtGtGt | GtGtGtEq | Eq
+        | EqEq | EqEqEq | Bang | BangEq | BangEqEq | Lt | LtEq | Gt | GtEq | Let | Const | Var
         | Function | Class | Struct | Interface | Type | Enum | Namespace | Module | Extension
         | On | If | Else | Switch | Case | Default | While | For | Do | Break | Continue
         | Return | Throw | Try | Catch | Finally | Using | With | Import | Export | From | As

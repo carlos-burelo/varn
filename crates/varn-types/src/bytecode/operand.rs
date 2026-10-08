@@ -152,7 +152,11 @@ impl Layout {
     ) -> impl Iterator<Item = (u8, usize, RunKind)> + 'a {
         self.operands.iter().filter_map(move |o| match *o {
             Operand::Run { start, count, kind } => Some((start.read(code, offset), count, kind)),
-            Operand::Reg { .. } | Operand::Fixed { .. } | Operand::Const { .. } | Operand::Imm { .. } | Operand::Jump { .. } => None,
+            Operand::Reg { .. }
+            | Operand::Fixed { .. }
+            | Operand::Const { .. }
+            | Operand::Imm { .. }
+            | Operand::Jump { .. } => None,
         })
     }
 
@@ -163,7 +167,12 @@ impl Layout {
     ) -> impl Iterator<Item = u8> + 'a {
         self.operands.iter().filter_map(move |o| match *o {
             Operand::Reg { at, access } if access != Access::Write => Some(at.read(code, offset)),
-            Operand::Reg { .. } | Operand::Run { .. } | Operand::Fixed { .. } | Operand::Const { .. } | Operand::Imm { .. } | Operand::Jump { .. } => None,
+            Operand::Reg { .. }
+            | Operand::Run { .. }
+            | Operand::Fixed { .. }
+            | Operand::Const { .. }
+            | Operand::Imm { .. }
+            | Operand::Jump { .. } => None,
         })
     }
 
@@ -180,7 +189,11 @@ impl Layout {
                     end + disp
                 })
             }
-            Operand::Reg { .. } | Operand::Run { .. } | Operand::Fixed { .. } | Operand::Const { .. } | Operand::Imm { .. } => None,
+            Operand::Reg { .. }
+            | Operand::Run { .. }
+            | Operand::Fixed { .. }
+            | Operand::Const { .. }
+            | Operand::Imm { .. } => None,
         })
     }
 }

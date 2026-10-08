@@ -14,7 +14,10 @@ pub fn remap_registers(code: &mut [u16], constants: &[PoolEntry], map: impl Fn(u
             .iter()
             .filter_map(|o| match *o {
                 Operand::Reg { at, .. } | Operand::Run { start: at, .. } => Some(at),
-                Operand::Fixed { .. } | Operand::Const { .. } | Operand::Imm { .. } | Operand::Jump { .. } => None,
+                Operand::Fixed { .. }
+                | Operand::Const { .. }
+                | Operand::Imm { .. }
+                | Operand::Jump { .. } => None,
             })
             .filter(|at| offset + at.word < code.len())
             .collect();

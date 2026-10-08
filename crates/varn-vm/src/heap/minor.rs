@@ -165,7 +165,9 @@ mod minor_gc_tests {
             crate::heap::HeapObj::Array(a) => {
                 let items = match a.repr() {
                     varn_types::ArrayRepr::Boxed(v) => v.as_vec(),
-                    varn_types::ArrayRepr::I64(_) | varn_types::ArrayRepr::F64(_) => panic!("array repr cambio"),
+                    varn_types::ArrayRepr::I64(_) | varn_types::ArrayRepr::F64(_) => {
+                        panic!("array repr cambio")
+                    }
                 };
                 assert_eq!(items.len(), 60000);
                 let first = inner

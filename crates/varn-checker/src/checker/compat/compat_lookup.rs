@@ -142,7 +142,14 @@ fn class_members_compatible(
                     return false;
                 }
             }
-            ClassMemberKind::Constructor | ClassMemberKind::Function | ClassMemberKind::Variable | ClassMemberKind::Class | ClassMemberKind::Interface | ClassMemberKind::Namespace | ClassMemberKind::Enum | ClassMemberKind::Struct => {}
+            ClassMemberKind::Constructor
+            | ClassMemberKind::Function
+            | ClassMemberKind::Variable
+            | ClassMemberKind::Class
+            | ClassMemberKind::Interface
+            | ClassMemberKind::Namespace
+            | ClassMemberKind::Enum
+            | ClassMemberKind::Struct => {}
         }
     }
     true
@@ -161,7 +168,10 @@ pub(super) fn class_members_match_object(
             ClassMemberKind::Property | ClassMemberKind::Getter | ClassMemberKind::Setter => {
                 let found = inf_fields.iter().find_map(|im| match im {
                     ObjectTypeMember::Property { name, ty, .. } if name == &dm.name => Some(*ty),
-                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
+                    ObjectTypeMember::Property { .. }
+                    | ObjectTypeMember::Method { .. }
+                    | ObjectTypeMember::Index { .. }
+                    | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
                     Some(inf_ty) => {
@@ -192,7 +202,10 @@ pub(super) fn class_members_match_object(
                         is_arrow,
                         ..
                     } if name == &dm.name => Some((params.as_slice(), *return_type, *is_arrow)),
-                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
+                    ObjectTypeMember::Property { .. }
+                    | ObjectTypeMember::Method { .. }
+                    | ObjectTypeMember::Index { .. }
+                    | ObjectTypeMember::Callable { .. } => None,
                 });
                 let Some((params, return_type, is_arrow)) = found else {
                     return false;
@@ -210,7 +223,14 @@ pub(super) fn class_members_match_object(
                     return false;
                 }
             }
-            ClassMemberKind::Constructor | ClassMemberKind::Function | ClassMemberKind::Variable | ClassMemberKind::Class | ClassMemberKind::Interface | ClassMemberKind::Namespace | ClassMemberKind::Enum | ClassMemberKind::Struct => {}
+            ClassMemberKind::Constructor
+            | ClassMemberKind::Function
+            | ClassMemberKind::Variable
+            | ClassMemberKind::Class
+            | ClassMemberKind::Interface
+            | ClassMemberKind::Namespace
+            | ClassMemberKind::Enum
+            | ClassMemberKind::Struct => {}
         }
     }
     true
@@ -311,7 +331,26 @@ fn fn_signature_compatible_type(
                         && t1.optional == t2.optional
                 })
         }
-        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => {
+        TypeKind::Primitive(_)
+        | TypeKind::Builtin(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Array(_)
+        | TypeKind::Union(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Named(..)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => {
             let mut owned_table = table.clone();
             let declared = Type::fn_(
                 FunctionType {
@@ -355,7 +394,26 @@ pub(super) fn types_compatible_with_fn_signature(
                         && t1.optional == t2.optional
                 })
         }
-        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => {
+        TypeKind::Primitive(_)
+        | TypeKind::Builtin(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Array(_)
+        | TypeKind::Union(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Named(..)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => {
             let mut owned_table = table.clone();
             let inferred = Type::fn_(
                 FunctionType {

@@ -55,7 +55,20 @@ impl ExecCtx {
                     Some(varn_types::chunk::PoolEntry::Literal(
                         varn_types::chunk::Literal::Int(i),
                     )) => *i as u64,
-                    Some(varn_types::chunk::PoolEntry::Literal(varn_types::chunk::Literal::Null | varn_types::chunk::Literal::Bool(_) | varn_types::chunk::Literal::Float(_) | varn_types::chunk::Literal::Str(_) | varn_types::chunk::Literal::BigInt(_) | varn_types::chunk::Literal::Decimal(_) | varn_types::chunk::Literal::Symbol(_) | varn_types::chunk::Literal::Char(_))) | Some(varn_types::chunk::PoolEntry::Function(_)) | Some(varn_types::chunk::PoolEntry::Shape(_)) | Some(varn_types::chunk::PoolEntry::Layout(_)) | None => {
+                    Some(varn_types::chunk::PoolEntry::Literal(
+                        varn_types::chunk::Literal::Null
+                        | varn_types::chunk::Literal::Bool(_)
+                        | varn_types::chunk::Literal::Float(_)
+                        | varn_types::chunk::Literal::Str(_)
+                        | varn_types::chunk::Literal::BigInt(_)
+                        | varn_types::chunk::Literal::Decimal(_)
+                        | varn_types::chunk::Literal::Symbol(_)
+                        | varn_types::chunk::Literal::Char(_),
+                    ))
+                    | Some(varn_types::chunk::PoolEntry::Function(_))
+                    | Some(varn_types::chunk::PoolEntry::Shape(_))
+                    | Some(varn_types::chunk::PoolEntry::Layout(_))
+                    | None => {
                         return Err(crate::error::RuntimeError::new(format!(
                             "CallNativeOp: const {cidx} is not an op-id"
                         )))
@@ -78,7 +91,147 @@ impl ExecCtx {
                 (self.stack.unbox_into_reg(base, first_reg, result))?;
             }
 
-            OpCode::LoadConst | OpCode::LoadNull | OpCode::LoadTrue | OpCode::LoadFalse | OpCode::LoadInt | OpCode::Move | OpCode::LoadGlobal | OpCode::StoreGlobal | OpCode::DefineGlobal | OpCode::DefineGlobalIdx | OpCode::LoadGlobalIdx | OpCode::StoreGlobalIdx | OpCode::LoadUpvalue | OpCode::StoreUpvalue | OpCode::CloseUpvalue | OpCode::Add | OpCode::Sub | OpCode::Mul | OpCode::Div | OpCode::Mod | OpCode::Pow | OpCode::Negate | OpCode::Not | OpCode::ToString | OpCode::Eq | OpCode::Neq | OpCode::Lt | OpCode::Lte | OpCode::Gt | OpCode::Gte | OpCode::BitAnd | OpCode::BitOr | OpCode::BitXor | OpCode::Shl | OpCode::Shr | OpCode::Ushr | OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Loop | OpCode::Call | OpCode::CallMethod | OpCode::InvokeVirtual | OpCode::CallSpread | OpCode::Return | OpCode::BuildArray | OpCode::BuildTuple | OpCode::BuildObject | OpCode::BuildObjectWithShape | OpCode::BuildRecord | OpCode::GetIndex | OpCode::SetIndex | OpCode::ObjectRest | OpCode::ObjectKeys | OpCode::ObjectMerge | OpCode::GetProperty | OpCode::GetPropertyMaybe | OpCode::SetProperty | OpCode::GetFixedField | OpCode::SetFixedField | OpCode::GetSuper | OpCode::GetSymbol | OpCode::MakeClosure | OpCode::MakeClass | OpCode::Inherit | OpCode::Method | OpCode::DefineStatic | OpCode::DefineGetter | OpCode::DefineSetter | OpCode::DefineStaticGetter | OpCode::DefineStaticSetter | OpCode::DeclareLayout | OpCode::AllocInstance | OpCode::BindMethod | OpCode::Typeof | OpCode::Instanceof | OpCode::In | OpCode::IsNull | OpCode::IsArray | OpCode::AssertNotNull | OpCode::StrConcat | OpCode::StrLength | OpCode::StrSlice | OpCode::ArrayLength | OpCode::ArrayPush | OpCode::ArrayPop | OpCode::ArrayExtend | OpCode::WrapSpread | OpCode::MakeEnumVariant | OpCode::GetEnumTag | OpCode::Await | OpCode::Spawn | OpCode::Yield | OpCode::Try | OpCode::Throw | OpCode::PopTry | OpCode::LoadModule | OpCode::LoadModuleSlot | OpCode::StoreModuleSlot | OpCode::InvokeRuntimeStatic | OpCode::AddImm | OpCode::SubImm | OpCode::BuildStr | OpCode::LoadIntZero | OpCode::LoadIntOne | OpCode::LoadIntMinusOne | OpCode::AddInt | OpCode::SubInt | OpCode::MulInt | OpCode::DivInt | OpCode::LtInt | OpCode::GtInt | OpCode::LteInt | OpCode::GteInt | OpCode::EqInt | OpCode::NeqInt | OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat | OpCode::DivFloat | OpCode::ModFloat | OpCode::PowFloat | OpCode::LtFloat | OpCode::GtFloat | OpCode::LteFloat | OpCode::GteFloat | OpCode::EqFloat | OpCode::NeqFloat | OpCode::ModInt | OpCode::PowInt | OpCode::LoadStaticFn | OpCode::CallSelf | OpCode::Nop | OpCode::ArrayGetIndex | OpCode::ArraySetIndex | OpCode::LoadNativeGlobalIdx | OpCode::BuildMap | OpCode::MapGetIndex | OpCode::MapSetIndex | OpCode::Convert | OpCode::BytesLength => unreachable!("exec_native_op called with a non-native opcode"),
+            OpCode::LoadConst
+            | OpCode::LoadNull
+            | OpCode::LoadTrue
+            | OpCode::LoadFalse
+            | OpCode::LoadInt
+            | OpCode::Move
+            | OpCode::LoadGlobal
+            | OpCode::StoreGlobal
+            | OpCode::DefineGlobal
+            | OpCode::DefineGlobalIdx
+            | OpCode::LoadGlobalIdx
+            | OpCode::StoreGlobalIdx
+            | OpCode::LoadUpvalue
+            | OpCode::StoreUpvalue
+            | OpCode::CloseUpvalue
+            | OpCode::Add
+            | OpCode::Sub
+            | OpCode::Mul
+            | OpCode::Div
+            | OpCode::Mod
+            | OpCode::Pow
+            | OpCode::Negate
+            | OpCode::Not
+            | OpCode::ToString
+            | OpCode::Eq
+            | OpCode::Neq
+            | OpCode::Lt
+            | OpCode::Lte
+            | OpCode::Gt
+            | OpCode::Gte
+            | OpCode::BitAnd
+            | OpCode::BitOr
+            | OpCode::BitXor
+            | OpCode::Shl
+            | OpCode::Shr
+            | OpCode::Ushr
+            | OpCode::Jump
+            | OpCode::JumpIfFalse
+            | OpCode::JumpIfTrue
+            | OpCode::Loop
+            | OpCode::Call
+            | OpCode::CallMethod
+            | OpCode::InvokeVirtual
+            | OpCode::CallSpread
+            | OpCode::Return
+            | OpCode::BuildArray
+            | OpCode::BuildTuple
+            | OpCode::BuildObject
+            | OpCode::BuildObjectWithShape
+            | OpCode::BuildRecord
+            | OpCode::GetIndex
+            | OpCode::SetIndex
+            | OpCode::ObjectRest
+            | OpCode::ObjectKeys
+            | OpCode::ObjectMerge
+            | OpCode::GetProperty
+            | OpCode::GetPropertyMaybe
+            | OpCode::SetProperty
+            | OpCode::GetFixedField
+            | OpCode::SetFixedField
+            | OpCode::GetSuper
+            | OpCode::GetSymbol
+            | OpCode::MakeClosure
+            | OpCode::MakeClass
+            | OpCode::Inherit
+            | OpCode::Method
+            | OpCode::DefineStatic
+            | OpCode::DefineGetter
+            | OpCode::DefineSetter
+            | OpCode::DefineStaticGetter
+            | OpCode::DefineStaticSetter
+            | OpCode::DeclareLayout
+            | OpCode::AllocInstance
+            | OpCode::BindMethod
+            | OpCode::Typeof
+            | OpCode::Instanceof
+            | OpCode::In
+            | OpCode::IsNull
+            | OpCode::IsArray
+            | OpCode::AssertNotNull
+            | OpCode::StrConcat
+            | OpCode::StrLength
+            | OpCode::StrSlice
+            | OpCode::ArrayLength
+            | OpCode::ArrayPush
+            | OpCode::ArrayPop
+            | OpCode::ArrayExtend
+            | OpCode::WrapSpread
+            | OpCode::MakeEnumVariant
+            | OpCode::GetEnumTag
+            | OpCode::Await
+            | OpCode::Spawn
+            | OpCode::Yield
+            | OpCode::Try
+            | OpCode::Throw
+            | OpCode::PopTry
+            | OpCode::LoadModule
+            | OpCode::LoadModuleSlot
+            | OpCode::StoreModuleSlot
+            | OpCode::InvokeRuntimeStatic
+            | OpCode::AddImm
+            | OpCode::SubImm
+            | OpCode::BuildStr
+            | OpCode::LoadIntZero
+            | OpCode::LoadIntOne
+            | OpCode::LoadIntMinusOne
+            | OpCode::AddInt
+            | OpCode::SubInt
+            | OpCode::MulInt
+            | OpCode::DivInt
+            | OpCode::LtInt
+            | OpCode::GtInt
+            | OpCode::LteInt
+            | OpCode::GteInt
+            | OpCode::EqInt
+            | OpCode::NeqInt
+            | OpCode::AddFloat
+            | OpCode::SubFloat
+            | OpCode::MulFloat
+            | OpCode::DivFloat
+            | OpCode::ModFloat
+            | OpCode::PowFloat
+            | OpCode::LtFloat
+            | OpCode::GtFloat
+            | OpCode::LteFloat
+            | OpCode::GteFloat
+            | OpCode::EqFloat
+            | OpCode::NeqFloat
+            | OpCode::ModInt
+            | OpCode::PowInt
+            | OpCode::LoadStaticFn
+            | OpCode::CallSelf
+            | OpCode::Nop
+            | OpCode::ArrayGetIndex
+            | OpCode::ArraySetIndex
+            | OpCode::LoadNativeGlobalIdx
+            | OpCode::BuildMap
+            | OpCode::MapGetIndex
+            | OpCode::MapSetIndex
+            | OpCode::Convert
+            | OpCode::BytesLength => unreachable!("exec_native_op called with a non-native opcode"),
         }
         Ok(())
     }

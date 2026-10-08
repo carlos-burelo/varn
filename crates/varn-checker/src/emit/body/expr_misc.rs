@@ -7,7 +7,23 @@ impl<'a> FnEmitter<'a> {
         let lowered = self.lower_expr(e);
         match lowered.ty {
             BackendTy::Bool | BackendTy::Dynamic(_) => lowered,
-            BackendTy::Int | BackendTy::Float | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Array(_) | BackendTy::Map(..) | BackendTy::Set(_) | BackendTy::Tuple(_) | BackendTy::Class(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Nullable(_) | BackendTy::Void | BackendTy::Never => self.cast_to(lowered, BackendTy::Bool),
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never => self.cast_to(lowered, BackendTy::Bool),
         }
     }
 

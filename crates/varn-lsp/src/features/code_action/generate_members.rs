@@ -43,7 +43,9 @@ pub fn generate_class_member_actions(
             ClassMember::Method { key, .. } => {
                 methods.insert(state.name(*key).to_owned());
             }
-            ClassMember::Destructor { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. }
+            ClassMember::Destructor { .. }
+            | ClassMember::Getter { .. }
+            | ClassMember::Setter { .. }
             | ClassMember::StaticBlock { .. } => {}
         }
     }

@@ -96,7 +96,11 @@ pub(super) fn try_print(
                             interner,
                         );
                     }
-                    ObjectProp::Method { .. } | ObjectProp::Getter { .. } | ObjectProp::Setter { .. } => terminal::log(format!("{child_indent}{m}{}", chalk("<other prop>").dim())),
+                    ObjectProp::Method { .. }
+                    | ObjectProp::Getter { .. }
+                    | ObjectProp::Setter { .. } => {
+                        terminal::log(format!("{child_indent}{m}{}", chalk("<other prop>").dim()))
+                    }
                 }
             }
             true

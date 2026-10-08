@@ -60,7 +60,9 @@ pub(super) fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(
                 match p {
                     ObjectProp::Property { value, .. } => f(*value),
                     ObjectProp::Spread { argument, .. } => f(*argument),
-                    ObjectProp::Method { .. } | ObjectProp::Getter { .. } | ObjectProp::Setter { .. } => {}
+                    ObjectProp::Method { .. }
+                    | ObjectProp::Getter { .. }
+                    | ObjectProp::Setter { .. } => {}
                 }
             }
         }
@@ -151,6 +153,23 @@ pub(super) fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(
                 }
             }
         }
-        ExprKind::IntLiteral { .. } | ExprKind::FloatLiteral { .. } | ExprKind::BigIntLiteral { .. } | ExprKind::DecimalLiteral { .. } | ExprKind::StrLiteral { .. } | ExprKind::CharLiteral { .. } | ExprKind::BoolLiteral { .. } | ExprKind::NullLiteral | ExprKind::RegexLiteral { .. } | ExprKind::Identifier { .. } | ExprKind::Missing | ExprKind::This | ExprKind::Super | ExprKind::Assign { .. } | ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::Spread { .. } | ExprKind::ClassExpr { .. } => {}
+        ExprKind::IntLiteral { .. }
+        | ExprKind::FloatLiteral { .. }
+        | ExprKind::BigIntLiteral { .. }
+        | ExprKind::DecimalLiteral { .. }
+        | ExprKind::StrLiteral { .. }
+        | ExprKind::CharLiteral { .. }
+        | ExprKind::BoolLiteral { .. }
+        | ExprKind::NullLiteral
+        | ExprKind::RegexLiteral { .. }
+        | ExprKind::Identifier { .. }
+        | ExprKind::Missing
+        | ExprKind::This
+        | ExprKind::Super
+        | ExprKind::Assign { .. }
+        | ExprKind::Function { .. }
+        | ExprKind::Arrow { .. }
+        | ExprKind::Spread { .. }
+        | ExprKind::ClassExpr { .. } => {}
     }
 }

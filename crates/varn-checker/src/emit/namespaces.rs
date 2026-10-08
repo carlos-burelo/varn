@@ -20,12 +20,31 @@ pub(super) fn ns_nested_types(ns: &NamespaceDecl) -> Vec<&Decl> {
     for m in &ns.body {
         let inner = match m {
             Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
-            other @ Decl::Variable(_) | other @ Decl::Function(_) | other @ Decl::Class(_) | other @ Decl::Interface(_) | other @ Decl::TypeAlias(_) | other @ Decl::Enum(_) | other @ Decl::Namespace(_) | other @ Decl::Import(_) | other @ Decl::Export(_) | other @ Decl::Extension(_) | other @ Decl::Struct(_) | other @ Decl::SumType(_) => other,
+            other @ Decl::Variable(_)
+            | other @ Decl::Function(_)
+            | other @ Decl::Class(_)
+            | other @ Decl::Interface(_)
+            | other @ Decl::TypeAlias(_)
+            | other @ Decl::Enum(_)
+            | other @ Decl::Namespace(_)
+            | other @ Decl::Import(_)
+            | other @ Decl::Export(_)
+            | other @ Decl::Extension(_)
+            | other @ Decl::Struct(_)
+            | other @ Decl::SumType(_) => other,
         };
         match inner {
             Decl::Class(_) | Decl::Enum(_) => out.push(inner),
             Decl::Namespace(inner_ns) => out.extend(ns_nested_types(inner_ns)),
-            Decl::Variable(_) | Decl::Function(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => {}
+            Decl::Variable(_)
+            | Decl::Function(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => {}
         }
     }
     out
@@ -51,7 +70,18 @@ pub(super) fn emit_namespace_object(
     for m in &ns.body {
         let inner = match m {
             Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
-            other @ Decl::Variable(_) | other @ Decl::Function(_) | other @ Decl::Class(_) | other @ Decl::Interface(_) | other @ Decl::TypeAlias(_) | other @ Decl::Enum(_) | other @ Decl::Namespace(_) | other @ Decl::Import(_) | other @ Decl::Export(_) | other @ Decl::Extension(_) | other @ Decl::Struct(_) | other @ Decl::SumType(_) => other,
+            other @ Decl::Variable(_)
+            | other @ Decl::Function(_)
+            | other @ Decl::Class(_)
+            | other @ Decl::Interface(_)
+            | other @ Decl::TypeAlias(_)
+            | other @ Decl::Enum(_)
+            | other @ Decl::Namespace(_)
+            | other @ Decl::Import(_)
+            | other @ Decl::Export(_)
+            | other @ Decl::Extension(_)
+            | other @ Decl::Struct(_)
+            | other @ Decl::SumType(_) => other,
         };
         if let Decl::Namespace(inner_ns) = inner {
             emit_namespace_object(
@@ -74,7 +104,18 @@ pub(super) fn emit_namespace_object(
         let Decl::Export(_) = m else { continue };
         let inner = match m {
             Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
-            Decl::Variable(_) | Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => continue,
+            Decl::Variable(_)
+            | Decl::Function(_)
+            | Decl::Class(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Enum(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => continue,
         };
         match inner {
             Decl::Function(f) => {
@@ -108,7 +149,15 @@ pub(super) fn emit_namespace_object(
                     Decl::Class(c) => c.id,
                     Decl::Enum(e) => Some(e.id),
                     Decl::Namespace(n) => Some(n.id),
-                    Decl::Variable(_) | Decl::Function(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+                    Decl::Variable(_)
+                    | Decl::Function(_)
+                    | Decl::Interface(_)
+                    | Decl::TypeAlias(_)
+                    | Decl::Import(_)
+                    | Decl::Export(_)
+                    | Decl::Extension(_)
+                    | Decl::Struct(_)
+                    | Decl::SumType(_) => None,
                 };
                 if let Some(mname) = mname {
                     if let Some(&mslot) = global_slots.get(interner.resolve(mname)) {
@@ -130,7 +179,13 @@ pub(super) fn emit_namespace_object(
                     }
                 }
             }
-            Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => {}
+            Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => {}
         }
     }
 
@@ -227,7 +282,12 @@ pub(super) fn collect_decl_names(
         Decl::Export(ExportDecl::Decl { declaration, .. }) => {
             collect_decl_names(declaration, ast_arena, out, interner)
         }
-        Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => {}
+        Decl::Interface(_)
+        | Decl::TypeAlias(_)
+        | Decl::Export(_)
+        | Decl::Extension(_)
+        | Decl::Struct(_)
+        | Decl::SumType(_) => {}
     }
 }
 
@@ -277,7 +337,21 @@ pub(super) fn extension_target_label(
             k.lang_name().map(Arc::from)
         }
         TypeKind::Array(_) => Some(Arc::from("Array")),
-        TypeKind::This | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
+        TypeKind::This
+        | TypeKind::Union(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => None,
     }
 }
 
@@ -315,7 +389,24 @@ pub(super) fn emit_extensions(
         };
         let this_cid = match recv_ty {
             BackendTy::Class(cid) => Some(cid),
-            BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Array(_) | BackendTy::Map(..) | BackendTy::Set(_) | BackendTy::Tuple(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Nullable(_) | BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => None,
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => None,
         };
         for member in &ext.members {
             let (mangled, params, body): (Arc<str>, Vec<Arc<str>>, StmtId) = match member {
@@ -360,7 +451,25 @@ pub(super) fn emit_extensions(
                 }
                 let b = match &ast_arena.stmt(body).kind {
                     StmtKind::Block { stmts } => em.lower_block(stmts),
-                    StmtKind::Empty | StmtKind::Expr { .. } | StmtKind::Decl(_) | StmtKind::Error | StmtKind::If { .. } | StmtKind::While { .. } | StmtKind::DoWhile { .. } | StmtKind::For { .. } | StmtKind::ForIn { .. } | StmtKind::ForOf { .. } | StmtKind::Switch { .. } | StmtKind::Return { .. } | StmtKind::Break { .. } | StmtKind::Continue { .. } | StmtKind::Throw { .. } | StmtKind::Try { .. } | StmtKind::Using { .. } | StmtKind::Labeled { .. } | StmtKind::Debugger => em.lower_block(std::slice::from_ref(&body)),
+                    StmtKind::Empty
+                    | StmtKind::Expr { .. }
+                    | StmtKind::Decl(_)
+                    | StmtKind::Error
+                    | StmtKind::If { .. }
+                    | StmtKind::While { .. }
+                    | StmtKind::DoWhile { .. }
+                    | StmtKind::For { .. }
+                    | StmtKind::ForIn { .. }
+                    | StmtKind::ForOf { .. }
+                    | StmtKind::Switch { .. }
+                    | StmtKind::Return { .. }
+                    | StmtKind::Break { .. }
+                    | StmtKind::Continue { .. }
+                    | StmtKind::Throw { .. }
+                    | StmtKind::Try { .. }
+                    | StmtKind::Using { .. }
+                    | StmtKind::Labeled { .. }
+                    | StmtKind::Debugger => em.lower_block(std::slice::from_ref(&body)),
                 };
                 (b, std::mem::take(&mut em.locals))
             };

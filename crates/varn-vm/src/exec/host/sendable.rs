@@ -103,7 +103,23 @@ pub(super) fn to_sendable(
                 );
                 Ok(varn_types::value::SendValue::Object(fields))
             }
-            Some(HeapObj::Tuple(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Symbol(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => Err("Value cannot be sent to an isolate".to_string()),
+            Some(
+                HeapObj::Tuple(_)
+                | HeapObj::Record(_)
+                | HeapObj::Buffer(_)
+                | HeapObj::Module(_)
+                | HeapObj::FrozenModule(_)
+                | HeapObj::VmClosure(_)
+                | HeapObj::Class(_)
+                | HeapObj::NativeFn(..)
+                | HeapObj::BoundMethod(_)
+                | HeapObj::Task(_)
+                | HeapObj::TaskHandle(_)
+                | HeapObj::Symbol(_)
+                | HeapObj::Generator(_)
+                | HeapObj::Spread(_),
+            )
+            | None => Err("Value cannot be sent to an isolate".to_string()),
         }
     } else {
         Err("Value cannot be sent to an isolate".to_string())

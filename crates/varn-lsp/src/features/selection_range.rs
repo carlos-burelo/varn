@@ -124,18 +124,34 @@ fn collect_in_stmt(a: &AstArena, stmt: StmtId, line: u32, col: u32, ranges: &mut
                     }
                 }
             }
-            varn_core::ast::Decl::Variable(_) | varn_core::ast::Decl::Interface(_)
-            | varn_core::ast::Decl::TypeAlias(_) | varn_core::ast::Decl::Enum(_)
-            | varn_core::ast::Decl::Namespace(_) | varn_core::ast::Decl::Import(_)
-            | varn_core::ast::Decl::Export(_) | varn_core::ast::Decl::Extension(_)
-            | varn_core::ast::Decl::Struct(_) | varn_core::ast::Decl::SumType(_) => {}
+            varn_core::ast::Decl::Variable(_)
+            | varn_core::ast::Decl::Interface(_)
+            | varn_core::ast::Decl::TypeAlias(_)
+            | varn_core::ast::Decl::Enum(_)
+            | varn_core::ast::Decl::Namespace(_)
+            | varn_core::ast::Decl::Import(_)
+            | varn_core::ast::Decl::Export(_)
+            | varn_core::ast::Decl::Extension(_)
+            | varn_core::ast::Decl::Struct(_)
+            | varn_core::ast::Decl::SumType(_) => {}
         },
         StmtKind::Return { argument: Some(e) } => collect_in_expr(a, *e, line, col, ranges),
-            StmtKind::Return { argument: None, .. } | StmtKind::Empty | StmtKind::Error | StmtKind::While { .. }
-            | StmtKind::DoWhile { .. } | StmtKind::For { .. } | StmtKind::ForIn { .. }
-            | StmtKind::ForOf { .. } | StmtKind::Switch { .. } | StmtKind::Break { .. }
-            | StmtKind::Continue { .. } | StmtKind::Throw { .. } | StmtKind::Try { .. }
-            | StmtKind::Using { .. } | StmtKind::Labeled { .. } | StmtKind::Debugger => {}
+        StmtKind::Return { argument: None, .. }
+        | StmtKind::Empty
+        | StmtKind::Error
+        | StmtKind::While { .. }
+        | StmtKind::DoWhile { .. }
+        | StmtKind::For { .. }
+        | StmtKind::ForIn { .. }
+        | StmtKind::ForOf { .. }
+        | StmtKind::Switch { .. }
+        | StmtKind::Break { .. }
+        | StmtKind::Continue { .. }
+        | StmtKind::Throw { .. }
+        | StmtKind::Try { .. }
+        | StmtKind::Using { .. }
+        | StmtKind::Labeled { .. }
+        | StmtKind::Debugger => {}
     }
 
     ranges.push(to_lsp_range(&stmt.range));
@@ -174,18 +190,48 @@ fn collect_in_expr(a: &AstArena, expr: ExprId, line: u32, col: u32, ranges: &mut
                 }
             }
         }
-            ExprKind::IntLiteral { .. } | ExprKind::FloatLiteral { .. } | ExprKind::BigIntLiteral { .. }
-            | ExprKind::DecimalLiteral { .. } | ExprKind::StrLiteral { .. } | ExprKind::CharLiteral { .. } | ExprKind::BoolLiteral { .. } | ExprKind::NullLiteral | ExprKind::RegexLiteral { .. } | ExprKind::Template { .. } | ExprKind::TaggedTemplate { .. }
-            | ExprKind::Identifier { .. } | ExprKind::Missing | ExprKind::This | ExprKind::Super
-            | ExprKind::Array { .. } | ExprKind::Object { .. } | ExprKind::Tuple { .. }
-            | ExprKind::Record { .. } | ExprKind::Update { .. } | ExprKind::Logical { .. }
-            | ExprKind::Assign { .. } | ExprKind::Conditional { .. } | ExprKind::Member { .. }
-            | ExprKind::New { .. } | ExprKind::Function { .. } | ExprKind::Arrow { .. }
-            | ExprKind::Sequence { .. } | ExprKind::Paren { .. } | ExprKind::Await { .. }
-            | ExprKind::Spawn { .. } | ExprKind::Yield { .. } | ExprKind::Spread { .. }
-            | ExprKind::Range { .. } | ExprKind::NonNull { .. } | ExprKind::Try { .. }
-            | ExprKind::As { .. } | ExprKind::Satisfies { .. } | ExprKind::ClassExpr { .. }
-            | ExprKind::Is { .. } | ExprKind::With { .. } | ExprKind::MetaAccess { .. } => {}
+        ExprKind::IntLiteral { .. }
+        | ExprKind::FloatLiteral { .. }
+        | ExprKind::BigIntLiteral { .. }
+        | ExprKind::DecimalLiteral { .. }
+        | ExprKind::StrLiteral { .. }
+        | ExprKind::CharLiteral { .. }
+        | ExprKind::BoolLiteral { .. }
+        | ExprKind::NullLiteral
+        | ExprKind::RegexLiteral { .. }
+        | ExprKind::Template { .. }
+        | ExprKind::TaggedTemplate { .. }
+        | ExprKind::Identifier { .. }
+        | ExprKind::Missing
+        | ExprKind::This
+        | ExprKind::Super
+        | ExprKind::Array { .. }
+        | ExprKind::Object { .. }
+        | ExprKind::Tuple { .. }
+        | ExprKind::Record { .. }
+        | ExprKind::Update { .. }
+        | ExprKind::Logical { .. }
+        | ExprKind::Assign { .. }
+        | ExprKind::Conditional { .. }
+        | ExprKind::Member { .. }
+        | ExprKind::New { .. }
+        | ExprKind::Function { .. }
+        | ExprKind::Arrow { .. }
+        | ExprKind::Sequence { .. }
+        | ExprKind::Paren { .. }
+        | ExprKind::Await { .. }
+        | ExprKind::Spawn { .. }
+        | ExprKind::Yield { .. }
+        | ExprKind::Spread { .. }
+        | ExprKind::Range { .. }
+        | ExprKind::NonNull { .. }
+        | ExprKind::Try { .. }
+        | ExprKind::As { .. }
+        | ExprKind::Satisfies { .. }
+        | ExprKind::ClassExpr { .. }
+        | ExprKind::Is { .. }
+        | ExprKind::With { .. }
+        | ExprKind::MetaAccess { .. } => {}
     }
 
     ranges.push(to_lsp_range(&expr.range));

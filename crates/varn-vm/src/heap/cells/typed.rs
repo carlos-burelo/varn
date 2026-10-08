@@ -80,7 +80,26 @@ impl CellSpace {
         match &*obj {
             HeapObj::Object(o) | HeapObj::Record(o) => ObjData::drop_at(*o),
             HeapObj::Array(a) | HeapObj::Tuple(a) => a.drop_at(),
-            HeapObj::Str(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_) => {}
+            HeapObj::Str(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => {}
         }
         std::ptr::drop_in_place(obj);
     }

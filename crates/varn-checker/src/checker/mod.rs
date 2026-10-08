@@ -241,7 +241,26 @@ impl<'r> Checker<'r> {
                                 Type::resolved(checker.ty_table.get_function(fid).return_type)
                                     .is_dynamic()
                             }
-                            varn_core::TypeKind::Primitive(_) | varn_core::TypeKind::Builtin(_) | varn_core::TypeKind::Literal(_) | varn_core::TypeKind::This | varn_core::TypeKind::Array(_) | varn_core::TypeKind::Union(_) | varn_core::TypeKind::Intersection(_) | varn_core::TypeKind::Tuple(_) | varn_core::TypeKind::Named(..) | varn_core::TypeKind::Generic(..) | varn_core::TypeKind::TemplateLiteral(_) | varn_core::TypeKind::Object(_) | varn_core::TypeKind::Typeof(_) | varn_core::TypeKind::KeyOf(_) | varn_core::TypeKind::IndexedAccess { .. } | varn_core::TypeKind::Mapped { .. } | varn_core::TypeKind::Conditional { .. } | varn_core::TypeKind::Infer(_) | varn_core::TypeKind::EnumVariant { .. } | varn_core::TypeKind::TypePredicate { .. } => false,
+                            varn_core::TypeKind::Primitive(_)
+                            | varn_core::TypeKind::Builtin(_)
+                            | varn_core::TypeKind::Literal(_)
+                            | varn_core::TypeKind::This
+                            | varn_core::TypeKind::Array(_)
+                            | varn_core::TypeKind::Union(_)
+                            | varn_core::TypeKind::Intersection(_)
+                            | varn_core::TypeKind::Tuple(_)
+                            | varn_core::TypeKind::Named(..)
+                            | varn_core::TypeKind::Generic(..)
+                            | varn_core::TypeKind::TemplateLiteral(_)
+                            | varn_core::TypeKind::Object(_)
+                            | varn_core::TypeKind::Typeof(_)
+                            | varn_core::TypeKind::KeyOf(_)
+                            | varn_core::TypeKind::IndexedAccess { .. }
+                            | varn_core::TypeKind::Mapped { .. }
+                            | varn_core::TypeKind::Conditional { .. }
+                            | varn_core::TypeKind::Infer(_)
+                            | varn_core::TypeKind::EnumVariant { .. }
+                            | varn_core::TypeKind::TypePredicate { .. } => false,
                         }
                 }
             };

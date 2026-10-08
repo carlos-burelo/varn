@@ -56,7 +56,12 @@ impl ExecCtx {
     ) -> VmResult<VmValue> {
         let proto = match parent.proto.chunk.constants.get(proto_idx) {
             Some(varn_types::PoolEntry::Function(p)) => p.clone(),
-            Some(varn_types::PoolEntry::Literal(_) | varn_types::PoolEntry::Shape(_) | varn_types::PoolEntry::Layout(_)) | None => {
+            Some(
+                varn_types::PoolEntry::Literal(_)
+                | varn_types::PoolEntry::Shape(_)
+                | varn_types::PoolEntry::Layout(_),
+            )
+            | None => {
                 return Err(RuntimeError::new(format!(
                     "MakeClosure: const {proto_idx} is not a function"
                 )))

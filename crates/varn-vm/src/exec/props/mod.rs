@@ -21,7 +21,31 @@ pub(crate) fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValu
     match heap.get(obj.as_heap()) {
         Some(HeapObj::Object(o)) => o.borrow().class()?.find_getter(key),
         Some(HeapObj::Class(cls)) => cls.find_static_getter(key),
-        Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => get_class(obj, heap)?.find_getter(key),
+        Some(
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Record(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_),
+        )
+        | None => get_class(obj, heap)?.find_getter(key),
     }
 }
 
@@ -32,7 +56,31 @@ pub(crate) fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValu
     match heap.get(obj.as_heap()) {
         Some(HeapObj::Object(o)) => o.borrow().class()?.find_setter(key),
         Some(HeapObj::Class(cls)) => cls.find_static_setter(key),
-        Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => get_class(obj, heap)?.find_setter(key),
+        Some(
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Record(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_),
+        )
+        | None => get_class(obj, heap)?.find_setter(key),
     }
 }
 
@@ -42,7 +90,31 @@ pub(crate) fn payload_object(heap: &Heap, payload: VmValue) -> Option<ObjRef> {
     }
     match heap.get(payload.as_heap()) {
         Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(*o),
-        Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
+        Some(
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_),
+        )
+        | None => None,
     }
 }
 
@@ -128,7 +200,30 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
             c.add_static(key, val);
             Ok(())
         }
-        Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => Err(RuntimeError::new(format!(
+        Some(
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Record(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_),
+        )
+        | None => Err(RuntimeError::new(format!(
             "cannot set property '{}': not an object",
             key
         ))),
@@ -165,7 +260,30 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
                 None
             }
         }
-        Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
+        Some(
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_),
+        )
+        | None => None,
     }
 }
 
@@ -181,7 +299,26 @@ fn class_for_property(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
         HeapObj::BigInt(_) => varn_core::RuntimeKind::BigInt,
         HeapObj::Decimal(_) => varn_core::RuntimeKind::Decimal,
         HeapObj::Char(_) => varn_core::RuntimeKind::Char,
-        HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::EnumVariant(_) | HeapObj::Generator(_) | HeapObj::Spread(_) => return None,
+        HeapObj::Str(_)
+        | HeapObj::Array(_)
+        | HeapObj::Tuple(_)
+        | HeapObj::Object(_)
+        | HeapObj::Record(_)
+        | HeapObj::Buffer(_)
+        | HeapObj::Module(_)
+        | HeapObj::FrozenModule(_)
+        | HeapObj::VmClosure(_)
+        | HeapObj::Class(_)
+        | HeapObj::NativeFn(..)
+        | HeapObj::BoundMethod(_)
+        | HeapObj::Map(_)
+        | HeapObj::Set(_)
+        | HeapObj::Task(_)
+        | HeapObj::TaskHandle(_)
+        | HeapObj::Range(_)
+        | HeapObj::EnumVariant(_)
+        | HeapObj::Generator(_)
+        | HeapObj::Spread(_) => return None,
     };
     heap.get_intrinsic_class(kind.name())
 }
@@ -197,7 +334,33 @@ fn resolve_intrinsic_method_property(obj: VmValue, key: &str, heap: &mut Heap) -
                 ));
             }
             Some(HeapObj::EnumVariant(_)) if key == MemberKey::Name.as_str() => return None,
-            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => {}
+            Some(
+                HeapObj::Str(_)
+                | HeapObj::Array(_)
+                | HeapObj::Tuple(_)
+                | HeapObj::Object(_)
+                | HeapObj::Record(_)
+                | HeapObj::Buffer(_)
+                | HeapObj::Module(_)
+                | HeapObj::FrozenModule(_)
+                | HeapObj::VmClosure(_)
+                | HeapObj::Class(_)
+                | HeapObj::NativeFn(..)
+                | HeapObj::BoundMethod(_)
+                | HeapObj::Map(_)
+                | HeapObj::Set(_)
+                | HeapObj::Task(_)
+                | HeapObj::TaskHandle(_)
+                | HeapObj::Range(_)
+                | HeapObj::Symbol(_)
+                | HeapObj::EnumVariant(_)
+                | HeapObj::BigInt(_)
+                | HeapObj::Decimal(_)
+                | HeapObj::Char(_)
+                | HeapObj::Generator(_)
+                | HeapObj::Spread(_),
+            )
+            | None => {}
         }
     }
     let cls = class_for_property(obj, heap)?;
@@ -255,7 +418,27 @@ fn resolve_specialized_property(
             found.map(Ok)
         }
         Some(HeapObj::EnumVariant(ev)) => enum_variant_property(&ev, key, heap),
-        Some(HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
+        Some(
+            HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Record(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_),
+        )
+        | None => None,
     }
 }
 
@@ -288,7 +471,50 @@ fn enum_variant_property(
             Some(Ok(HeapInner::alloc_str(heap, &*ev.variant_name)))
         }
         Some(MemberKey::Value0) if ev.fields.is_empty() => Some(Ok(ev.payload)),
-        Some(MemberKey::Value0 | MemberKey::Length | MemberKey::Size | MemberKey::Variant | MemberKey::Callable | MemberKey::ToString | MemberKey::ValueOf | MemberKey::IterNext | MemberKey::IterDone | MemberKey::IterValue | MemberKey::Push | MemberKey::Pop | MemberKey::Shift | MemberKey::Unshift | MemberKey::Slice | MemberKey::Join | MemberKey::IndexOf | MemberKey::Includes | MemberKey::Split | MemberKey::Class | MemberKey::Type | MemberKey::Fields | MemberKey::Methods | MemberKey::Keys | MemberKey::Values | MemberKey::Entries | MemberKey::HasOwn | MemberKey::Repeat | MemberKey::PadStart | MemberKey::PadEnd | MemberKey::Start | MemberKey::End | MemberKey::StartsWith | MemberKey::EndsWith | MemberKey::CharCodeAt | MemberKey::CodePointAt | MemberKey::Substring | MemberKey::Substr | MemberKey::At | MemberKey::LastIndexOf | MemberKey::CharCode) | None => None,
+        Some(
+            MemberKey::Value0
+            | MemberKey::Length
+            | MemberKey::Size
+            | MemberKey::Variant
+            | MemberKey::Callable
+            | MemberKey::ToString
+            | MemberKey::ValueOf
+            | MemberKey::IterNext
+            | MemberKey::IterDone
+            | MemberKey::IterValue
+            | MemberKey::Push
+            | MemberKey::Pop
+            | MemberKey::Shift
+            | MemberKey::Unshift
+            | MemberKey::Slice
+            | MemberKey::Join
+            | MemberKey::IndexOf
+            | MemberKey::Includes
+            | MemberKey::Split
+            | MemberKey::Class
+            | MemberKey::Type
+            | MemberKey::Fields
+            | MemberKey::Methods
+            | MemberKey::Keys
+            | MemberKey::Values
+            | MemberKey::Entries
+            | MemberKey::HasOwn
+            | MemberKey::Repeat
+            | MemberKey::PadStart
+            | MemberKey::PadEnd
+            | MemberKey::Start
+            | MemberKey::End
+            | MemberKey::StartsWith
+            | MemberKey::EndsWith
+            | MemberKey::CharCodeAt
+            | MemberKey::CodePointAt
+            | MemberKey::Substring
+            | MemberKey::Substr
+            | MemberKey::At
+            | MemberKey::LastIndexOf
+            | MemberKey::CharCode,
+        )
+        | None => None,
     }
 }
 
@@ -321,7 +547,21 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
             Some(HeapObj::Range(_)) => intrinsic(varn_core::RuntimeKind::Range),
             Some(HeapObj::Buffer(_)) => intrinsic(varn_core::RuntimeKind::Bytes),
             Some(HeapObj::Generator(_)) => intrinsic(varn_core::RuntimeKind::Generator),
-            Some(HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Symbol(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Spread(_)) | None => None,
+            Some(
+                HeapObj::Module(_)
+                | HeapObj::FrozenModule(_)
+                | HeapObj::VmClosure(_)
+                | HeapObj::NativeFn(..)
+                | HeapObj::BoundMethod(_)
+                | HeapObj::Task(_)
+                | HeapObj::TaskHandle(_)
+                | HeapObj::Symbol(_)
+                | HeapObj::BigInt(_)
+                | HeapObj::Decimal(_)
+                | HeapObj::Char(_)
+                | HeapObj::Spread(_),
+            )
+            | None => None,
         };
     }
     let kind = if val.is_int() {
@@ -355,6 +595,30 @@ pub(crate) fn bind_method_to_receiver(
             let (f, name) = (*f, *name);
             heap.alloc_bound_native(receiver, f, name)
         }
-        Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::Class(_) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => method,
+        Some(
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Record(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::Class(_)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_),
+        )
+        | None => method,
     }
 }

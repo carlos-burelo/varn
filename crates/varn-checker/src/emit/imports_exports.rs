@@ -58,7 +58,18 @@ pub(super) fn collect_exports(
             Decl::Export(ExportDecl::Default { .. }) => {
                 push(Arc::from("default"), Arc::from("default"), None, false);
             }
-            Decl::Variable(_) | Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => {}
+            Decl::Variable(_)
+            | Decl::Function(_)
+            | Decl::Class(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Enum(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => {}
         }
     }
     out

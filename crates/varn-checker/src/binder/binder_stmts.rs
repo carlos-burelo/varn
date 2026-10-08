@@ -194,7 +194,11 @@ impl<'r> Binder<'r> {
             StmtKind::Using { declarations, .. } => {
                 self.bind_var_declarators(declarations, VarKind::Const, None);
             }
-            StmtKind::Empty | StmtKind::Error | StmtKind::Break { .. } | StmtKind::Continue { .. } | StmtKind::Debugger => {}
+            StmtKind::Empty
+            | StmtKind::Error
+            | StmtKind::Break { .. }
+            | StmtKind::Continue { .. }
+            | StmtKind::Debugger => {}
         }
     }
 }

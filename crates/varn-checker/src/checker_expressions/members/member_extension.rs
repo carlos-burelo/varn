@@ -122,6 +122,20 @@ fn extension_key(ty: &Type, table: &CheckerTyTable, bind: &BindResult) -> Option
         | varn_core::TypeKind::Builtin(_)
         | varn_core::TypeKind::Literal(_)) => k.lang_name().map(Arc::from),
         varn_core::TypeKind::Array(_) => Some(Arc::from(varn_core::BuiltinType::Array.name())),
-        varn_core::TypeKind::This | varn_core::TypeKind::Union(_) | varn_core::TypeKind::Intersection(_) | varn_core::TypeKind::Tuple(_) | varn_core::TypeKind::TemplateLiteral(_) | varn_core::TypeKind::Fn(_) | varn_core::TypeKind::Object(_) | varn_core::TypeKind::Typeof(_) | varn_core::TypeKind::KeyOf(_) | varn_core::TypeKind::IndexedAccess { .. } | varn_core::TypeKind::Mapped { .. } | varn_core::TypeKind::Conditional { .. } | varn_core::TypeKind::Infer(_) | varn_core::TypeKind::EnumVariant { .. } | varn_core::TypeKind::TypePredicate { .. } => None,
+        varn_core::TypeKind::This
+        | varn_core::TypeKind::Union(_)
+        | varn_core::TypeKind::Intersection(_)
+        | varn_core::TypeKind::Tuple(_)
+        | varn_core::TypeKind::TemplateLiteral(_)
+        | varn_core::TypeKind::Fn(_)
+        | varn_core::TypeKind::Object(_)
+        | varn_core::TypeKind::Typeof(_)
+        | varn_core::TypeKind::KeyOf(_)
+        | varn_core::TypeKind::IndexedAccess { .. }
+        | varn_core::TypeKind::Mapped { .. }
+        | varn_core::TypeKind::Conditional { .. }
+        | varn_core::TypeKind::Infer(_)
+        | varn_core::TypeKind::EnumVariant { .. }
+        | varn_core::TypeKind::TypePredicate { .. } => None,
     }
 }

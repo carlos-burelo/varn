@@ -55,7 +55,23 @@ impl fmt::Display for TypeDisplay<'_> {
                 | TypeKind::Intersection(_)
                 | TypeKind::Fn(_)
                 | TypeKind::Conditional { .. } => write!(f, "({})[]", self.child(t)),
-                TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => write!(f, "{}[]", self.child(t)),
+                TypeKind::Primitive(_)
+                | TypeKind::Builtin(_)
+                | TypeKind::Literal(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Tuple(_)
+                | TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Object(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => write!(f, "{}[]", self.child(t)),
             },
             TypeKind::Union(list) => {
                 let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
@@ -211,7 +227,26 @@ impl fmt::Display for TypeDisplay<'_> {
                     }
                     match table.get(*m) {
                         TypeKind::Union(_) => write!(f, "({})", self.child(*m))?,
-                        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => write!(f, "{}", self.child(*m))?,
+                        TypeKind::Primitive(_)
+                        | TypeKind::Builtin(_)
+                        | TypeKind::Literal(_)
+                        | TypeKind::This
+                        | TypeKind::Array(_)
+                        | TypeKind::Intersection(_)
+                        | TypeKind::Tuple(_)
+                        | TypeKind::Named(..)
+                        | TypeKind::Generic(..)
+                        | TypeKind::TemplateLiteral(_)
+                        | TypeKind::Fn(_)
+                        | TypeKind::Object(_)
+                        | TypeKind::Typeof(_)
+                        | TypeKind::KeyOf(_)
+                        | TypeKind::IndexedAccess { .. }
+                        | TypeKind::Mapped { .. }
+                        | TypeKind::Conditional { .. }
+                        | TypeKind::Infer(_)
+                        | TypeKind::EnumVariant { .. }
+                        | TypeKind::TypePredicate { .. } => write!(f, "{}", self.child(*m))?,
                     }
                 }
                 Ok(())

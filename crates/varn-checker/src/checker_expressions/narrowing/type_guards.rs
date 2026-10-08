@@ -74,7 +74,26 @@ impl<'r> Checker<'r> {
                                             }
                                         })
                                         .collect(),
-                                    TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => vec![target_type],
+                                    TypeKind::Primitive(_)
+                                    | TypeKind::Builtin(_)
+                                    | TypeKind::Literal(_)
+                                    | TypeKind::This
+                                    | TypeKind::Array(_)
+                                    | TypeKind::Intersection(_)
+                                    | TypeKind::Tuple(_)
+                                    | TypeKind::Named(..)
+                                    | TypeKind::Generic(..)
+                                    | TypeKind::TemplateLiteral(_)
+                                    | TypeKind::Fn(_)
+                                    | TypeKind::Object(_)
+                                    | TypeKind::Typeof(_)
+                                    | TypeKind::KeyOf(_)
+                                    | TypeKind::IndexedAccess { .. }
+                                    | TypeKind::Mapped { .. }
+                                    | TypeKind::Conditional { .. }
+                                    | TypeKind::Infer(_)
+                                    | TypeKind::EnumVariant { .. }
+                                    | TypeKind::TypePredicate { .. } => vec![target_type],
                                 };
                                 if !matched.is_empty() {
                                     let narrowed = if matched.len() == 1 {

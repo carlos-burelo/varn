@@ -11,7 +11,12 @@ use super::{Ctx, Out};
 fn bool_out(b: &mut FunctionBuilder, cond: Value, dest: Option<SlotKind>) -> Out {
     match dest {
         Some(SlotKind::Bool) => Out::Native(cond),
-        Some(SlotKind::Int) | Some(SlotKind::Float) | Some(SlotKind::Str) | Some(SlotKind::Ref) | Some(SlotKind::Dynamic) | None => Out::Boxed(box_bool(b, cond)),
+        Some(SlotKind::Int)
+        | Some(SlotKind::Float)
+        | Some(SlotKind::Str)
+        | Some(SlotKind::Ref)
+        | Some(SlotKind::Dynamic)
+        | None => Out::Boxed(box_bool(b, cond)),
     }
 }
 

@@ -237,12 +237,37 @@ impl<'r> Checker<'r> {
                     TypeKind::Fn(fid) => {
                         Type::resolved(self.ty_table.get_function(fid).return_type)
                     }
-                    TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => res,
+                    TypeKind::Primitive(_)
+                    | TypeKind::Builtin(_)
+                    | TypeKind::Literal(_)
+                    | TypeKind::This
+                    | TypeKind::Array(_)
+                    | TypeKind::Union(_)
+                    | TypeKind::Intersection(_)
+                    | TypeKind::Tuple(_)
+                    | TypeKind::Named(..)
+                    | TypeKind::Generic(..)
+                    | TypeKind::TemplateLiteral(_)
+                    | TypeKind::Object(_)
+                    | TypeKind::Typeof(_)
+                    | TypeKind::KeyOf(_)
+                    | TypeKind::IndexedAccess { .. }
+                    | TypeKind::Mapped { .. }
+                    | TypeKind::Conditional { .. }
+                    | TypeKind::Infer(_)
+                    | TypeKind::EnumVariant { .. }
+                    | TypeKind::TypePredicate { .. } => res,
                 }
             }
 
             ExprKind::Missing => Type::Dynamic,
-            ExprKind::RegexLiteral { .. } | ExprKind::Sequence { .. } | ExprKind::Spawn { .. } | ExprKind::Yield { .. } | ExprKind::Spread { .. } | ExprKind::ClassExpr { .. } | ExprKind::Is { .. } => Type::Dynamic,
+            ExprKind::RegexLiteral { .. }
+            | ExprKind::Sequence { .. }
+            | ExprKind::Spawn { .. }
+            | ExprKind::Yield { .. }
+            | ExprKind::Spread { .. }
+            | ExprKind::ClassExpr { .. }
+            | ExprKind::Is { .. } => Type::Dynamic,
         }
     }
 }

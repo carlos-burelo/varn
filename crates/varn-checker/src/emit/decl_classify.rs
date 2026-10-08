@@ -13,9 +13,29 @@ pub(super) fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
         Decl::Function(f) => Some(f),
         Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
             Decl::Function(f) => Some(f),
-            Decl::Variable(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+            Decl::Variable(_)
+            | Decl::Class(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Enum(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => None,
         },
-        Decl::Variable(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+        Decl::Variable(_)
+        | Decl::Class(_)
+        | Decl::Interface(_)
+        | Decl::TypeAlias(_)
+        | Decl::Enum(_)
+        | Decl::Namespace(_)
+        | Decl::Import(_)
+        | Decl::Export(_)
+        | Decl::Extension(_)
+        | Decl::Struct(_)
+        | Decl::SumType(_) => None,
     }
 }
 
@@ -24,9 +44,29 @@ pub(super) fn namespace_decl(decl: &Decl) -> Option<&varn_core::ast::NamespaceDe
         Decl::Namespace(n) => Some(n),
         Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
             Decl::Namespace(n) => Some(n),
-            Decl::Variable(_) | Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+            Decl::Variable(_)
+            | Decl::Function(_)
+            | Decl::Class(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Enum(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => None,
         },
-        Decl::Variable(_) | Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+        Decl::Variable(_)
+        | Decl::Function(_)
+        | Decl::Class(_)
+        | Decl::Interface(_)
+        | Decl::TypeAlias(_)
+        | Decl::Enum(_)
+        | Decl::Import(_)
+        | Decl::Export(_)
+        | Decl::Extension(_)
+        | Decl::Struct(_)
+        | Decl::SumType(_) => None,
     }
 }
 
@@ -35,9 +75,29 @@ pub(super) fn variable_decl(decl: &Decl) -> Option<&varn_core::ast::VariableDecl
         Decl::Variable(v) => Some(v),
         Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
             Decl::Variable(v) => Some(v),
-            Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+            Decl::Function(_)
+            | Decl::Class(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Enum(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => None,
         },
-        Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+        Decl::Function(_)
+        | Decl::Class(_)
+        | Decl::Interface(_)
+        | Decl::TypeAlias(_)
+        | Decl::Enum(_)
+        | Decl::Namespace(_)
+        | Decl::Import(_)
+        | Decl::Export(_)
+        | Decl::Extension(_)
+        | Decl::Struct(_)
+        | Decl::SumType(_) => None,
     }
 }
 
@@ -46,9 +106,29 @@ pub(super) fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
         Decl::Class(c) => Some(c),
         Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
             Decl::Class(c) => Some(c),
-            Decl::Variable(_) | Decl::Function(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+            Decl::Variable(_)
+            | Decl::Function(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Enum(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => None,
         },
-        Decl::Variable(_) | Decl::Function(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+        Decl::Variable(_)
+        | Decl::Function(_)
+        | Decl::Interface(_)
+        | Decl::TypeAlias(_)
+        | Decl::Enum(_)
+        | Decl::Namespace(_)
+        | Decl::Import(_)
+        | Decl::Export(_)
+        | Decl::Extension(_)
+        | Decl::Struct(_)
+        | Decl::SumType(_) => None,
     }
 }
 
@@ -57,9 +137,29 @@ pub(super) fn enum_decl(decl: &Decl) -> Option<&varn_core::ast::EnumDecl> {
         Decl::Enum(e) => Some(e),
         Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
             Decl::Enum(e) => Some(e),
-            Decl::Variable(_) | Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+            Decl::Variable(_)
+            | Decl::Function(_)
+            | Decl::Class(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => None,
         },
-        Decl::Variable(_) | Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
+        Decl::Variable(_)
+        | Decl::Function(_)
+        | Decl::Class(_)
+        | Decl::Interface(_)
+        | Decl::TypeAlias(_)
+        | Decl::Namespace(_)
+        | Decl::Import(_)
+        | Decl::Export(_)
+        | Decl::Extension(_)
+        | Decl::Struct(_)
+        | Decl::SumType(_) => None,
     }
 }
 

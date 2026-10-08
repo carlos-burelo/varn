@@ -362,7 +362,10 @@ impl<'a> FnEmitter<'a> {
                 return self.lower_try_expr(*expression, ty, span);
             }
 
-            ExprKind::Missing | ExprKind::Update { .. } | ExprKind::Assign { .. } | ExprKind::Spread { .. } => None,
+            ExprKind::Missing
+            | ExprKind::Update { .. }
+            | ExprKind::Assign { .. }
+            | ExprKind::Spread { .. } => None,
         };
 
         match kind {

@@ -33,7 +33,31 @@ impl ExecCtx {
                     }
                     varn_types::value::BoundMethodTarget::Native { .. } => None,
                 },
-                Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
+                Some(
+                    HeapObj::Str(_)
+                    | HeapObj::Array(_)
+                    | HeapObj::Tuple(_)
+                    | HeapObj::Object(_)
+                    | HeapObj::Record(_)
+                    | HeapObj::Buffer(_)
+                    | HeapObj::Module(_)
+                    | HeapObj::FrozenModule(_)
+                    | HeapObj::Class(_)
+                    | HeapObj::NativeFn(..)
+                    | HeapObj::Map(_)
+                    | HeapObj::Set(_)
+                    | HeapObj::Task(_)
+                    | HeapObj::TaskHandle(_)
+                    | HeapObj::Range(_)
+                    | HeapObj::Symbol(_)
+                    | HeapObj::EnumVariant(_)
+                    | HeapObj::BigInt(_)
+                    | HeapObj::Decimal(_)
+                    | HeapObj::Char(_)
+                    | HeapObj::Generator(_)
+                    | HeapObj::Spread(_),
+                )
+                | None => None,
             }
         } else {
             None
@@ -83,7 +107,27 @@ impl ExecCtx {
                     HeapObj::Object(ref oref) => {
                         format!("obj:{:p}", oref.read() as *const _ as *const u8)
                     }
-                    HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_) => format!("heap:{:x}", v.as_heap().addr()),
+                    HeapObj::Str(_)
+                    | HeapObj::Array(_)
+                    | HeapObj::Tuple(_)
+                    | HeapObj::Record(_)
+                    | HeapObj::Buffer(_)
+                    | HeapObj::Module(_)
+                    | HeapObj::FrozenModule(_)
+                    | HeapObj::NativeFn(..)
+                    | HeapObj::BoundMethod(_)
+                    | HeapObj::Map(_)
+                    | HeapObj::Set(_)
+                    | HeapObj::Task(_)
+                    | HeapObj::TaskHandle(_)
+                    | HeapObj::Range(_)
+                    | HeapObj::Symbol(_)
+                    | HeapObj::EnumVariant(_)
+                    | HeapObj::BigInt(_)
+                    | HeapObj::Decimal(_)
+                    | HeapObj::Char(_)
+                    | HeapObj::Generator(_)
+                    | HeapObj::Spread(_) => format!("heap:{:x}", v.as_heap().addr()),
                 }
             } else {
                 format!("heap:{:x}", v.as_heap().addr())

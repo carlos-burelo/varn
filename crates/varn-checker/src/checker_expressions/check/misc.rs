@@ -78,7 +78,9 @@ impl<'r> Checker<'r> {
                 varn_core::ast::ObjectProp::Spread { argument, .. } => {
                     self.check_expr(*argument, bind);
                 }
-                varn_core::ast::ObjectProp::Method { .. } | varn_core::ast::ObjectProp::Getter { .. } | varn_core::ast::ObjectProp::Setter { .. } => {}
+                varn_core::ast::ObjectProp::Method { .. }
+                | varn_core::ast::ObjectProp::Getter { .. }
+                | varn_core::ast::ObjectProp::Setter { .. } => {}
             }
         }
         let obj_ty = self.infer_type(object, bind);

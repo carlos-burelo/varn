@@ -19,7 +19,10 @@ pub(super) fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<Comp
                     }
                     call_reloc_offsets.push(reloc.offset as usize);
                 }
-                other @ cranelift_codegen::FinalizedRelocTarget::ExternalName(_) | other @ cranelift_codegen::FinalizedRelocTarget::Func(_) => return Err(format!("clif: unsupported reloc target {other:?}")),
+                other @ cranelift_codegen::FinalizedRelocTarget::ExternalName(_)
+                | other @ cranelift_codegen::FinalizedRelocTarget::Func(_) => {
+                    return Err(format!("clif: unsupported reloc target {other:?}"))
+                }
             }
         }
         let mut safepoints = Vec::new();

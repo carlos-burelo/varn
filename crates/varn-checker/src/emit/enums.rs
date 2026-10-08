@@ -315,7 +315,10 @@ pub(super) fn emit_enum(
                 );
                 def.static_blocks.push(id);
             }
-            ClassMember::Destructor { .. } | ClassMember::Method { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. } => {}
+            ClassMember::Destructor { .. }
+            | ClassMember::Method { .. }
+            | ClassMember::Getter { .. }
+            | ClassMember::Setter { .. } => {}
         }
     }
     def

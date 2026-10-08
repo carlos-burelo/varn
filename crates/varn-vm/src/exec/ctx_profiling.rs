@@ -67,7 +67,9 @@ impl ExecCtx {
         if let Some(ref h) = self.hotspot_counters {
             let resolved = match name {
                 Some(n) if !n.is_empty() => n,
-                Some(_) | None => varn_builtins::native_op_name_by_fn(f).unwrap_or("<nativo sin nombre>"),
+                Some(_) | None => {
+                    varn_builtins::native_op_name_by_fn(f).unwrap_or("<nativo sin nombre>")
+                }
             };
             h.borrow_mut().record_native_call(resolved);
         }

@@ -82,7 +82,32 @@ impl ExecCtx {
                                         break 'entries;
                                     }
                                 }
-                                Some(crate::heap::HeapObj::Str(_) | crate::heap::HeapObj::Array(_) | crate::heap::HeapObj::Tuple(_) | crate::heap::HeapObj::Record(_) | crate::heap::HeapObj::Buffer(_) | crate::heap::HeapObj::Module(_) | crate::heap::HeapObj::FrozenModule(_) | crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::Class(_) | crate::heap::HeapObj::NativeFn(..) | crate::heap::HeapObj::BoundMethod(_) | crate::heap::HeapObj::Map(_) | crate::heap::HeapObj::Set(_) | crate::heap::HeapObj::Task(_) | crate::heap::HeapObj::TaskHandle(_) | crate::heap::HeapObj::Range(_) | crate::heap::HeapObj::Symbol(_) | crate::heap::HeapObj::EnumVariant(_) | crate::heap::HeapObj::BigInt(_) | crate::heap::HeapObj::Decimal(_) | crate::heap::HeapObj::Char(_) | crate::heap::HeapObj::Generator(_) | crate::heap::HeapObj::Spread(_)) | None => {}
+                                Some(
+                                    crate::heap::HeapObj::Str(_)
+                                    | crate::heap::HeapObj::Array(_)
+                                    | crate::heap::HeapObj::Tuple(_)
+                                    | crate::heap::HeapObj::Record(_)
+                                    | crate::heap::HeapObj::Buffer(_)
+                                    | crate::heap::HeapObj::Module(_)
+                                    | crate::heap::HeapObj::FrozenModule(_)
+                                    | crate::heap::HeapObj::VmClosure(_)
+                                    | crate::heap::HeapObj::Class(_)
+                                    | crate::heap::HeapObj::NativeFn(..)
+                                    | crate::heap::HeapObj::BoundMethod(_)
+                                    | crate::heap::HeapObj::Map(_)
+                                    | crate::heap::HeapObj::Set(_)
+                                    | crate::heap::HeapObj::Task(_)
+                                    | crate::heap::HeapObj::TaskHandle(_)
+                                    | crate::heap::HeapObj::Range(_)
+                                    | crate::heap::HeapObj::Symbol(_)
+                                    | crate::heap::HeapObj::EnumVariant(_)
+                                    | crate::heap::HeapObj::BigInt(_)
+                                    | crate::heap::HeapObj::Decimal(_)
+                                    | crate::heap::HeapObj::Char(_)
+                                    | crate::heap::HeapObj::Generator(_)
+                                    | crate::heap::HeapObj::Spread(_),
+                                )
+                                | None => {}
                             },
                         }
                     }
@@ -129,7 +154,32 @@ impl ExecCtx {
                             self.heap.write_barrier(obj.as_heap(), val);
                             return Ok(false);
                         }
-                        Some(crate::heap::HeapObj::Str(_) | crate::heap::HeapObj::Array(_) | crate::heap::HeapObj::Tuple(_) | crate::heap::HeapObj::Record(_) | crate::heap::HeapObj::Buffer(_) | crate::heap::HeapObj::Module(_) | crate::heap::HeapObj::FrozenModule(_) | crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::Class(_) | crate::heap::HeapObj::NativeFn(..) | crate::heap::HeapObj::BoundMethod(_) | crate::heap::HeapObj::Map(_) | crate::heap::HeapObj::Set(_) | crate::heap::HeapObj::Task(_) | crate::heap::HeapObj::TaskHandle(_) | crate::heap::HeapObj::Range(_) | crate::heap::HeapObj::Symbol(_) | crate::heap::HeapObj::EnumVariant(_) | crate::heap::HeapObj::BigInt(_) | crate::heap::HeapObj::Decimal(_) | crate::heap::HeapObj::Char(_) | crate::heap::HeapObj::Generator(_) | crate::heap::HeapObj::Spread(_)) | None => {}
+                        Some(
+                            crate::heap::HeapObj::Str(_)
+                            | crate::heap::HeapObj::Array(_)
+                            | crate::heap::HeapObj::Tuple(_)
+                            | crate::heap::HeapObj::Record(_)
+                            | crate::heap::HeapObj::Buffer(_)
+                            | crate::heap::HeapObj::Module(_)
+                            | crate::heap::HeapObj::FrozenModule(_)
+                            | crate::heap::HeapObj::VmClosure(_)
+                            | crate::heap::HeapObj::Class(_)
+                            | crate::heap::HeapObj::NativeFn(..)
+                            | crate::heap::HeapObj::BoundMethod(_)
+                            | crate::heap::HeapObj::Map(_)
+                            | crate::heap::HeapObj::Set(_)
+                            | crate::heap::HeapObj::Task(_)
+                            | crate::heap::HeapObj::TaskHandle(_)
+                            | crate::heap::HeapObj::Range(_)
+                            | crate::heap::HeapObj::Symbol(_)
+                            | crate::heap::HeapObj::EnumVariant(_)
+                            | crate::heap::HeapObj::BigInt(_)
+                            | crate::heap::HeapObj::Decimal(_)
+                            | crate::heap::HeapObj::Char(_)
+                            | crate::heap::HeapObj::Generator(_)
+                            | crate::heap::HeapObj::Spread(_),
+                        )
+                        | None => {}
                     }
                 }
             } else if let Some(setter_val) = found_setter {
@@ -323,7 +373,12 @@ impl ExecCtx {
                             self.frames.push(frame);
                             return Ok(true);
                         }
-                        crate::exec::calls::PreparedCall::Constructor(..) | crate::exec::calls::PreparedCall::NativeImmediate(..) | crate::exec::calls::PreparedCall::RawNativeImmediate(..) | crate::exec::calls::PreparedCall::NativeConstructor(..) | crate::exec::calls::PreparedCall::PushValue(_) | crate::exec::calls::PreparedCall::Generator { .. } => None,
+                        crate::exec::calls::PreparedCall::Constructor(..)
+                        | crate::exec::calls::PreparedCall::NativeImmediate(..)
+                        | crate::exec::calls::PreparedCall::RawNativeImmediate(..)
+                        | crate::exec::calls::PreparedCall::NativeConstructor(..)
+                        | crate::exec::calls::PreparedCall::PushValue(_)
+                        | crate::exec::calls::PreparedCall::Generator { .. } => None,
                     }
                 }
             } else {

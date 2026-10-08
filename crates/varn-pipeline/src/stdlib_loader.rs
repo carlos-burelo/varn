@@ -67,7 +67,10 @@ impl ModuleLoader for FileLoader {
             .map_err(ModuleError::new)
             .and_then(|id| match id {
                 ModuleId::Local(_) => Ok(id),
-                ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_) | ModuleId::Package { .. } => Err(ModuleError::new(format!(
+                ModuleId::Core(_)
+                | ModuleId::Std(_)
+                | ModuleId::Runtime(_)
+                | ModuleId::Package { .. } => Err(ModuleError::new(format!(
                     "FileLoader cannot resolve non-local specifier: {spec}"
                 ))),
             })
@@ -76,7 +79,10 @@ impl ModuleLoader for FileLoader {
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError> {
         let path = match id {
             ModuleId::Local(p) => p.as_ref(),
-            ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_) | ModuleId::Package { .. } => return Ok(None),
+            ModuleId::Core(_)
+            | ModuleId::Std(_)
+            | ModuleId::Runtime(_)
+            | ModuleId::Package { .. } => return Ok(None),
         };
 
         let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)

@@ -55,7 +55,18 @@ impl<'r> Checker<'r> {
             TypeKind::Tuple(_) if key == varn_core::MemberKey::Length.as_str() => {
                 Some((Type::Int, None))
             }
-            TypeKind::This | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::TypePredicate { .. } => None,
+            TypeKind::This
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::TypePredicate { .. } => None,
         };
         if res.is_none() {
             if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
@@ -222,7 +233,23 @@ impl<'r> Checker<'r> {
                 }
                 None
             }
-            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::TypePredicate { .. } => None,
+            TypeKind::Primitive(_)
+            | TypeKind::Builtin(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::TypePredicate { .. } => None,
         };
         if res.is_none() {
             if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
@@ -244,7 +271,28 @@ impl<'r> Checker<'r> {
                                 let ft = self.ty_table.get_function(fid).clone();
                                 (ft.params, ft.return_type)
                             }
-                            varn_core::TypeKind::Primitive(_) | varn_core::TypeKind::Builtin(_) | varn_core::TypeKind::Literal(_) | varn_core::TypeKind::This | varn_core::TypeKind::Array(_) | varn_core::TypeKind::Union(_) | varn_core::TypeKind::Intersection(_) | varn_core::TypeKind::Tuple(_) | varn_core::TypeKind::Named(..) | varn_core::TypeKind::Generic(..) | varn_core::TypeKind::TemplateLiteral(_) | varn_core::TypeKind::Object(_) | varn_core::TypeKind::Typeof(_) | varn_core::TypeKind::KeyOf(_) | varn_core::TypeKind::IndexedAccess { .. } | varn_core::TypeKind::Mapped { .. } | varn_core::TypeKind::Conditional { .. } | varn_core::TypeKind::Infer(_) | varn_core::TypeKind::EnumVariant { .. } | varn_core::TypeKind::TypePredicate { .. } => (vec![], Type::Dynamic.0),
+                            varn_core::TypeKind::Primitive(_)
+                            | varn_core::TypeKind::Builtin(_)
+                            | varn_core::TypeKind::Literal(_)
+                            | varn_core::TypeKind::This
+                            | varn_core::TypeKind::Array(_)
+                            | varn_core::TypeKind::Union(_)
+                            | varn_core::TypeKind::Intersection(_)
+                            | varn_core::TypeKind::Tuple(_)
+                            | varn_core::TypeKind::Named(..)
+                            | varn_core::TypeKind::Generic(..)
+                            | varn_core::TypeKind::TemplateLiteral(_)
+                            | varn_core::TypeKind::Object(_)
+                            | varn_core::TypeKind::Typeof(_)
+                            | varn_core::TypeKind::KeyOf(_)
+                            | varn_core::TypeKind::IndexedAccess { .. }
+                            | varn_core::TypeKind::Mapped { .. }
+                            | varn_core::TypeKind::Conditional { .. }
+                            | varn_core::TypeKind::Infer(_)
+                            | varn_core::TypeKind::EnumVariant { .. }
+                            | varn_core::TypeKind::TypePredicate { .. } => {
+                                (vec![], Type::Dynamic.0)
+                            }
                         };
                         return Some(ObjectTypeMember::Method {
                             name: Arc::from(key),

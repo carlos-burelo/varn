@@ -63,7 +63,15 @@ impl<'a> ImportCollector<'a> {
                     self.visit_decl(decl);
                 }
             }
-            Decl::Variable(_) | Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => {}
+            Decl::Variable(_)
+            | Decl::Function(_)
+            | Decl::Class(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Enum(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => {}
         }
     }
 }

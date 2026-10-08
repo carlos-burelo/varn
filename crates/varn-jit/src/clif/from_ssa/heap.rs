@@ -54,7 +54,9 @@ pub(super) fn unbox_dest(
         varn_types::register_meta::SlotKind::Int => unbox_int(b, boxed),
         varn_types::register_meta::SlotKind::Float => unbox_f64_coerce(b, boxed),
         varn_types::register_meta::SlotKind::Bool => super::super::emit::unbox_bool(b, boxed),
-        varn_types::register_meta::SlotKind::Str | varn_types::register_meta::SlotKind::Ref | varn_types::register_meta::SlotKind::Dynamic => boxed,
+        varn_types::register_meta::SlotKind::Str
+        | varn_types::register_meta::SlotKind::Ref
+        | varn_types::register_meta::SlotKind::Dynamic => boxed,
     })
 }
 
@@ -168,7 +170,9 @@ pub(super) fn emit_build_object(
             varn_types::PoolEntry::Shape(k) => {
                 k.len() == keys.len() && k.iter().zip(keys).all(|(a, b)| a.as_ref() == b.as_ref())
             }
-            varn_types::PoolEntry::Literal(_) | varn_types::PoolEntry::Function(_) | varn_types::PoolEntry::Layout(_) => false,
+            varn_types::PoolEntry::Literal(_)
+            | varn_types::PoolEntry::Function(_)
+            | varn_types::PoolEntry::Layout(_) => false,
         })
         .ok_or("from_ssa: object shape not in pool")?;
     let shape = ctx

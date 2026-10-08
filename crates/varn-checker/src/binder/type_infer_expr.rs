@@ -38,7 +38,27 @@ pub fn infer_expr_type(
                 {
                     Type::resolved(table.get_list(args)[0])
                 }
-                TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => inner,
+                TypeKind::Primitive(_)
+                | TypeKind::Builtin(_)
+                | TypeKind::Literal(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Union(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Tuple(_)
+                | TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Fn(_)
+                | TypeKind::Object(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Conditional { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => inner,
             }
         }
         ExprKind::NonNull { expression } => infer_expr_type(*expression, arena, ctx, table),
@@ -88,7 +108,27 @@ pub fn infer_expr_type(
                 UnaryOp::Not => Type::Bool,
                 UnaryOp::BitNot => match table.get(inner.0) {
                     TypeKind::Primitive(varn_core::LangPrimitive::Int) => Type::Int,
-                    TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => Type::Dynamic,
+                    TypeKind::Primitive(_)
+                    | TypeKind::Builtin(_)
+                    | TypeKind::Literal(_)
+                    | TypeKind::This
+                    | TypeKind::Array(_)
+                    | TypeKind::Union(_)
+                    | TypeKind::Intersection(_)
+                    | TypeKind::Tuple(_)
+                    | TypeKind::Named(..)
+                    | TypeKind::Generic(..)
+                    | TypeKind::TemplateLiteral(_)
+                    | TypeKind::Fn(_)
+                    | TypeKind::Object(_)
+                    | TypeKind::Typeof(_)
+                    | TypeKind::KeyOf(_)
+                    | TypeKind::IndexedAccess { .. }
+                    | TypeKind::Mapped { .. }
+                    | TypeKind::Conditional { .. }
+                    | TypeKind::Infer(_)
+                    | TypeKind::EnumVariant { .. }
+                    | TypeKind::TypePredicate { .. } => Type::Dynamic,
                 },
                 _ => Type::Dynamic,
             }
@@ -180,6 +220,20 @@ pub fn infer_expr_type(
             Type::range_over(&bound, table)
         }
         ExprKind::Pipeline { right, .. } => infer_expr_type(*right, arena, ctx, table),
-        ExprKind::RegexLiteral { .. } | ExprKind::TaggedTemplate { .. } | ExprKind::Missing | ExprKind::Super | ExprKind::Record { .. } | ExprKind::Update { .. } | ExprKind::Assign { .. } | ExprKind::Conditional { .. } | ExprKind::Sequence { .. } | ExprKind::Spawn { .. } | ExprKind::Yield { .. } | ExprKind::Spread { .. } | ExprKind::ClassExpr { .. } | ExprKind::With { .. } | ExprKind::MetaAccess { .. } => Type::Dynamic,
+        ExprKind::RegexLiteral { .. }
+        | ExprKind::TaggedTemplate { .. }
+        | ExprKind::Missing
+        | ExprKind::Super
+        | ExprKind::Record { .. }
+        | ExprKind::Update { .. }
+        | ExprKind::Assign { .. }
+        | ExprKind::Conditional { .. }
+        | ExprKind::Sequence { .. }
+        | ExprKind::Spawn { .. }
+        | ExprKind::Yield { .. }
+        | ExprKind::Spread { .. }
+        | ExprKind::ClassExpr { .. }
+        | ExprKind::With { .. }
+        | ExprKind::MetaAccess { .. } => Type::Dynamic,
     }
 }

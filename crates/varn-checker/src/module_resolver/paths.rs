@@ -18,7 +18,10 @@ pub(super) fn resolve_relative(
             resolve_package_specifier_path(base_dir, specifier)
                 .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned())
         }
-        varn_core::ImportSpecifier::Relative(_) | varn_core::ImportSpecifier::Stdlib(_) | varn_core::ImportSpecifier::Core(_) | varn_core::ImportSpecifier::Runtime(_) => resolver
+        varn_core::ImportSpecifier::Relative(_)
+        | varn_core::ImportSpecifier::Stdlib(_)
+        | varn_core::ImportSpecifier::Core(_)
+        | varn_core::ImportSpecifier::Runtime(_) => resolver
             .resolve_specifier(base_dir, specifier)
             .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned()),
     };

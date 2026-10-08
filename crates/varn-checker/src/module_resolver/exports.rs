@@ -242,7 +242,10 @@ fn decl_primary_name(decl: &Decl) -> Option<Atom> {
     match decl {
         Decl::Variable(v) => v.declarators.first().and_then(|d| match &d.id {
             Pattern::Identifier { name, .. } => Some(*name),
-            Pattern::Array { .. } | Pattern::Object { .. } | Pattern::Assignment { .. } | Pattern::Rest { .. } => None,
+            Pattern::Array { .. }
+            | Pattern::Object { .. }
+            | Pattern::Assignment { .. }
+            | Pattern::Rest { .. } => None,
         }),
         Decl::Function(f) => Some(f.id),
         Decl::Class(c) => c.id,

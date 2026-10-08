@@ -61,7 +61,24 @@ pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
                 Mapped::Dynamic
             }
         }
-        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } => Mapped::Dynamic,
+        TypeKind::Primitive(_)
+        | TypeKind::Builtin(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Union(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. } => Mapped::Dynamic,
     }
 }
 
@@ -116,7 +133,13 @@ pub(super) fn owned_ty(m: &Mapped) -> TS2 {
             let i = owned_ty(inner);
             quote!(::core::option::Option<#i>)
         }
-        Mapped::Int | Mapped::Float | Mapped::Bool | Mapped::Char | Mapped::Array | Mapped::Dynamic | Mapped::Void => param_ty(m),
+        Mapped::Int
+        | Mapped::Float
+        | Mapped::Bool
+        | Mapped::Char
+        | Mapped::Array
+        | Mapped::Dynamic
+        | Mapped::Void => param_ty(m),
     }
 }
 
@@ -128,7 +151,13 @@ pub(super) fn ret_ty(m: &Mapped) -> TS2 {
             let i = ret_ty(inner);
             quote!(::core::option::Option<#i>)
         }
-        Mapped::Int | Mapped::Float | Mapped::Bool | Mapped::Char | Mapped::StrRecv | Mapped::Dynamic | Mapped::Void => param_ty(m),
+        Mapped::Int
+        | Mapped::Float
+        | Mapped::Bool
+        | Mapped::Char
+        | Mapped::StrRecv
+        | Mapped::Dynamic
+        | Mapped::Void => param_ty(m),
     }
 }
 
@@ -140,7 +169,14 @@ pub(super) fn call_expr(binding: &Ident, m: &Mapped) -> TS2 {
         Mapped::Opt(inner) if matches!(**inner, Mapped::Str) => {
             quote!(#binding.as_ref().map(|s| s.as_str()))
         }
-        Mapped::Int | Mapped::Float | Mapped::Bool | Mapped::Char | Mapped::Array | Mapped::Dynamic | Mapped::Void | Mapped::Opt(_) => quote!(#binding),
+        Mapped::Int
+        | Mapped::Float
+        | Mapped::Bool
+        | Mapped::Char
+        | Mapped::Array
+        | Mapped::Dynamic
+        | Mapped::Void
+        | Mapped::Opt(_) => quote!(#binding),
     }
 }
 
@@ -210,6 +246,14 @@ pub(super) fn signature_token(m: &Member) -> TS2 {
 pub(super) fn default_value_token(m: &Mapped) -> TS2 {
     match m {
         Mapped::Dynamic => quote!(::varn_types::VmValue::null()),
-        Mapped::Int | Mapped::Float | Mapped::Bool | Mapped::Char | Mapped::Str | Mapped::StrRecv | Mapped::Array | Mapped::Void | Mapped::Opt(_) => quote!(Default::default()),
+        Mapped::Int
+        | Mapped::Float
+        | Mapped::Bool
+        | Mapped::Char
+        | Mapped::Str
+        | Mapped::StrRecv
+        | Mapped::Array
+        | Mapped::Void
+        | Mapped::Opt(_) => quote!(Default::default()),
     }
 }

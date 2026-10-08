@@ -114,6 +114,15 @@ fn collect_returns(
             }
         }
 
-        StmtKind::Empty | StmtKind::Expr { .. } | StmtKind::Decl(_) | StmtKind::Error | StmtKind::Return { .. } | StmtKind::Break { .. } | StmtKind::Continue { .. } | StmtKind::Throw { .. } | StmtKind::Using { .. } | StmtKind::Debugger => {}
+        StmtKind::Empty
+        | StmtKind::Expr { .. }
+        | StmtKind::Decl(_)
+        | StmtKind::Error
+        | StmtKind::Return { .. }
+        | StmtKind::Break { .. }
+        | StmtKind::Continue { .. }
+        | StmtKind::Throw { .. }
+        | StmtKind::Using { .. }
+        | StmtKind::Debugger => {}
     }
 }

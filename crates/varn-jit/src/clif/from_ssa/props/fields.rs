@@ -84,7 +84,11 @@ fn emit_get_fixed_field_native(
     let ectx = exec_ctx(ctx);
     let merge_ty = match dest {
         varn_types::register_meta::SlotKind::Float => types::F64,
-        varn_types::register_meta::SlotKind::Int | varn_types::register_meta::SlotKind::Bool | varn_types::register_meta::SlotKind::Str | varn_types::register_meta::SlotKind::Ref | varn_types::register_meta::SlotKind::Dynamic => types::I64,
+        varn_types::register_meta::SlotKind::Int
+        | varn_types::register_meta::SlotKind::Bool
+        | varn_types::register_meta::SlotKind::Str
+        | varn_types::register_meta::SlotKind::Ref
+        | varn_types::register_meta::SlotKind::Dynamic => types::I64,
     };
     let slow = b.create_block();
     let cont = b.create_block();

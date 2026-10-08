@@ -7,7 +7,10 @@ use varn_tir::{BackendTy, DynReason, Resolution, Span, TirBinOp, TirExpr, TirExp
 pub(super) fn pattern_lead(p: &Pattern, interner: &AtomInterner) -> Arc<str> {
     match p {
         Pattern::Identifier { name, .. } => Arc::from(interner.resolve(*name)),
-        Pattern::Array { .. } | Pattern::Object { .. } | Pattern::Assignment { .. } | Pattern::Rest { .. } => Arc::from("_"),
+        Pattern::Array { .. }
+        | Pattern::Object { .. }
+        | Pattern::Assignment { .. }
+        | Pattern::Rest { .. } => Arc::from("_"),
     }
 }
 
@@ -139,7 +142,15 @@ pub(super) fn has_continue(ast_arena: &AstArena, stmt: StmtId) -> bool {
             | StmtKind::For { body, .. }
             | StmtKind::ForIn { body, .. }
             | StmtKind::ForOf { body, .. } => check(ast_arena, *body, true),
-            StmtKind::Empty | StmtKind::Expr { .. } | StmtKind::Decl(_) | StmtKind::Error | StmtKind::Return { .. } | StmtKind::Break { .. } | StmtKind::Throw { .. } | StmtKind::Using { .. } | StmtKind::Debugger => false,
+            StmtKind::Empty
+            | StmtKind::Expr { .. }
+            | StmtKind::Decl(_)
+            | StmtKind::Error
+            | StmtKind::Return { .. }
+            | StmtKind::Break { .. }
+            | StmtKind::Throw { .. }
+            | StmtKind::Using { .. }
+            | StmtKind::Debugger => false,
         }
     }
     check(ast_arena, stmt, false)

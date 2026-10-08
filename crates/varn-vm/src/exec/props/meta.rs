@@ -32,7 +32,27 @@ fn class_of(obj: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     }
     match heap.get(obj.as_heap())? {
         HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Class(_) => get_class(obj, heap),
-        HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_) => None,
+        HeapObj::Str(_)
+        | HeapObj::Array(_)
+        | HeapObj::Tuple(_)
+        | HeapObj::Buffer(_)
+        | HeapObj::Module(_)
+        | HeapObj::FrozenModule(_)
+        | HeapObj::VmClosure(_)
+        | HeapObj::NativeFn(..)
+        | HeapObj::BoundMethod(_)
+        | HeapObj::Map(_)
+        | HeapObj::Set(_)
+        | HeapObj::Task(_)
+        | HeapObj::TaskHandle(_)
+        | HeapObj::Range(_)
+        | HeapObj::Symbol(_)
+        | HeapObj::EnumVariant(_)
+        | HeapObj::BigInt(_)
+        | HeapObj::Decimal(_)
+        | HeapObj::Char(_)
+        | HeapObj::Generator(_)
+        | HeapObj::Spread(_) => None,
     }
 }
 
@@ -121,7 +141,29 @@ pub(crate) fn resolve_meta_property(
                         cls.as_ref()
                             .map_or_else(|| "Object".into(), |c| c.name.as_str().into()),
                     ),
-                    Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
+                    Some(
+                        HeapObj::Str(_)
+                        | HeapObj::Array(_)
+                        | HeapObj::Tuple(_)
+                        | HeapObj::Buffer(_)
+                        | HeapObj::Module(_)
+                        | HeapObj::FrozenModule(_)
+                        | HeapObj::VmClosure(_)
+                        | HeapObj::NativeFn(..)
+                        | HeapObj::BoundMethod(_)
+                        | HeapObj::Map(_)
+                        | HeapObj::Set(_)
+                        | HeapObj::Task(_)
+                        | HeapObj::TaskHandle(_)
+                        | HeapObj::Range(_)
+                        | HeapObj::Symbol(_)
+                        | HeapObj::BigInt(_)
+                        | HeapObj::Decimal(_)
+                        | HeapObj::Char(_)
+                        | HeapObj::Generator(_)
+                        | HeapObj::Spread(_),
+                    )
+                    | None => None,
                 };
             Ok(name.map_or(VmValue::null(), |n| HeapInner::alloc_str(heap, &n)))
         }
@@ -159,7 +201,48 @@ pub(crate) fn resolve_meta_property(
                 MemberKey::Keys => meta_keys_native,
                 MemberKey::Values => meta_values_native,
                 MemberKey::Entries => meta_entries_native,
-                MemberKey::Tag | MemberKey::Value0 | MemberKey::RawValue | MemberKey::Length | MemberKey::Size | MemberKey::Name | MemberKey::VariantName | MemberKey::Variant | MemberKey::Callable | MemberKey::ToString | MemberKey::ValueOf | MemberKey::IterNext | MemberKey::IterDone | MemberKey::IterValue | MemberKey::Push | MemberKey::Pop | MemberKey::Shift | MemberKey::Unshift | MemberKey::Slice | MemberKey::Join | MemberKey::IndexOf | MemberKey::Includes | MemberKey::Split | MemberKey::Class | MemberKey::Type | MemberKey::Fields | MemberKey::Methods | MemberKey::HasOwn | MemberKey::Repeat | MemberKey::PadStart | MemberKey::PadEnd | MemberKey::Start | MemberKey::End | MemberKey::StartsWith | MemberKey::EndsWith | MemberKey::CharCodeAt | MemberKey::CodePointAt | MemberKey::Substring | MemberKey::Substr | MemberKey::At | MemberKey::LastIndexOf | MemberKey::CharCode => meta_has_own_native,
+                MemberKey::Tag
+                | MemberKey::Value0
+                | MemberKey::RawValue
+                | MemberKey::Length
+                | MemberKey::Size
+                | MemberKey::Name
+                | MemberKey::VariantName
+                | MemberKey::Variant
+                | MemberKey::Callable
+                | MemberKey::ToString
+                | MemberKey::ValueOf
+                | MemberKey::IterNext
+                | MemberKey::IterDone
+                | MemberKey::IterValue
+                | MemberKey::Push
+                | MemberKey::Pop
+                | MemberKey::Shift
+                | MemberKey::Unshift
+                | MemberKey::Slice
+                | MemberKey::Join
+                | MemberKey::IndexOf
+                | MemberKey::Includes
+                | MemberKey::Split
+                | MemberKey::Class
+                | MemberKey::Type
+                | MemberKey::Fields
+                | MemberKey::Methods
+                | MemberKey::HasOwn
+                | MemberKey::Repeat
+                | MemberKey::PadStart
+                | MemberKey::PadEnd
+                | MemberKey::Start
+                | MemberKey::End
+                | MemberKey::StartsWith
+                | MemberKey::EndsWith
+                | MemberKey::CharCodeAt
+                | MemberKey::CodePointAt
+                | MemberKey::Substring
+                | MemberKey::Substr
+                | MemberKey::At
+                | MemberKey::LastIndexOf
+                | MemberKey::CharCode => meta_has_own_native,
             };
             let receiver = match (&cls, is_instance, is_class) {
                 (Some(c), true, _) => instance_snapshot(obj, c, heap),
@@ -168,7 +251,42 @@ pub(crate) fn resolve_meta_property(
             };
             Ok(heap.alloc_bound_native(receiver, native, key.as_str()))
         }
-        MemberKey::Tag | MemberKey::Value0 | MemberKey::RawValue | MemberKey::Length | MemberKey::Size | MemberKey::VariantName | MemberKey::Variant | MemberKey::Callable | MemberKey::ToString | MemberKey::ValueOf | MemberKey::IterNext | MemberKey::IterDone | MemberKey::IterValue | MemberKey::Push | MemberKey::Pop | MemberKey::Shift | MemberKey::Unshift | MemberKey::Slice | MemberKey::Join | MemberKey::IndexOf | MemberKey::Includes | MemberKey::Split | MemberKey::Repeat | MemberKey::PadStart | MemberKey::PadEnd | MemberKey::Start | MemberKey::End | MemberKey::StartsWith | MemberKey::EndsWith | MemberKey::CharCodeAt | MemberKey::CodePointAt | MemberKey::Substring | MemberKey::Substr | MemberKey::At | MemberKey::LastIndexOf | MemberKey::CharCode => Ok(VmValue::null()),
+        MemberKey::Tag
+        | MemberKey::Value0
+        | MemberKey::RawValue
+        | MemberKey::Length
+        | MemberKey::Size
+        | MemberKey::VariantName
+        | MemberKey::Variant
+        | MemberKey::Callable
+        | MemberKey::ToString
+        | MemberKey::ValueOf
+        | MemberKey::IterNext
+        | MemberKey::IterDone
+        | MemberKey::IterValue
+        | MemberKey::Push
+        | MemberKey::Pop
+        | MemberKey::Shift
+        | MemberKey::Unshift
+        | MemberKey::Slice
+        | MemberKey::Join
+        | MemberKey::IndexOf
+        | MemberKey::Includes
+        | MemberKey::Split
+        | MemberKey::Repeat
+        | MemberKey::PadStart
+        | MemberKey::PadEnd
+        | MemberKey::Start
+        | MemberKey::End
+        | MemberKey::StartsWith
+        | MemberKey::EndsWith
+        | MemberKey::CharCodeAt
+        | MemberKey::CodePointAt
+        | MemberKey::Substring
+        | MemberKey::Substr
+        | MemberKey::At
+        | MemberKey::LastIndexOf
+        | MemberKey::CharCode => Ok(VmValue::null()),
     }
 }
 

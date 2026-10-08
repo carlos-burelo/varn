@@ -115,7 +115,26 @@ fn check_args(
     }
     let element = match sig.params.get(fixed) {
         Some(BackendTy::Array(elem)) if sig.has_rest => Some(m.types.get(*elem)),
-        Some(BackendTy::Int) | Some(BackendTy::Float) | Some(BackendTy::Bool) | Some(BackendTy::Char) | Some(BackendTy::Str) | Some(BackendTy::Bytes) | Some(BackendTy::Decimal) | Some(BackendTy::BigInt) | Some(BackendTy::Array(_)) | Some(BackendTy::Map(..)) | Some(BackendTy::Set(_)) | Some(BackendTy::Tuple(_)) | Some(BackendTy::Class(_)) | Some(BackendTy::Enum(_)) | Some(BackendTy::Fn(_)) | Some(BackendTy::Nullable(_)) | Some(BackendTy::Void) | Some(BackendTy::Never) | Some(BackendTy::Dynamic(_)) | None => None,
+        Some(BackendTy::Int)
+        | Some(BackendTy::Float)
+        | Some(BackendTy::Bool)
+        | Some(BackendTy::Char)
+        | Some(BackendTy::Str)
+        | Some(BackendTy::Bytes)
+        | Some(BackendTy::Decimal)
+        | Some(BackendTy::BigInt)
+        | Some(BackendTy::Array(_))
+        | Some(BackendTy::Map(..))
+        | Some(BackendTy::Set(_))
+        | Some(BackendTy::Tuple(_))
+        | Some(BackendTy::Class(_))
+        | Some(BackendTy::Enum(_))
+        | Some(BackendTy::Fn(_))
+        | Some(BackendTy::Nullable(_))
+        | Some(BackendTy::Void)
+        | Some(BackendTy::Never)
+        | Some(BackendTy::Dynamic(_))
+        | None => None,
     };
     for (i, a) in args.iter().enumerate() {
         let expected = if i < fixed {
