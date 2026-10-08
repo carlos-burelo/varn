@@ -149,6 +149,41 @@ impl CallSite {
     }
 }
 
+pub const NATIVE_GLOBALS: &[&str] = &[
+    "print",
+    "Array",
+    "Bytes",
+    "DivisionByZero",
+    "Error",
+    "Infinity",
+    "IntegerOverflow",
+    "Map",
+    "MatchError",
+    "NaN",
+    "Range",
+    "RangeError",
+    "Set",
+    "TypeError",
+    "assertSummary",
+    "bigint",
+    "bool",
+    "char",
+    "debug",
+    "decimal",
+    "float",
+    "input",
+    "int",
+    "isIsolate",
+    "str",
+];
+
+pub fn native_global_index(name: &str) -> Option<u32> {
+    NATIVE_GLOBALS
+        .iter()
+        .position(|n| *n == name)
+        .map(|i| i as u32)
+}
+
 const _: () = {
     assert!(size_of::<AbiValue>() == 16, "AbiValue: 16 B tag+payload");
     assert!(align_of::<AbiValue>() == 8, "AbiValue: align 8");

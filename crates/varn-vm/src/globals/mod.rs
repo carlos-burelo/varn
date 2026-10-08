@@ -22,7 +22,7 @@ impl GlobalStore {
 
     pub(crate) fn with_native_layout(heap: &mut Heap) -> Self {
         let mut native_map = varn_builtins::register_globals_vm(heap);
-        let order = varn_builtins::native_global_layout();
+        let order = varn_abi::NATIVE_GLOBALS;
 
         let mut values = Vec::with_capacity(order.len());
         let mut names = FxHashMap::default();
@@ -30,7 +30,9 @@ impl GlobalStore {
 
         for &name in order {
             let rc_name: Arc<str> = Arc::from(name);
-            let val = native_map.remove(name).unwrap_or(VmValue::null());
+            let Some(val) = native_map.remove(name) else {
+                panic!("native global '{name}' sin valor en builtins");
+            };
             names.insert(rc_name.clone(), values.len());
             idx_to_name.push(rc_name);
             values.push(val);

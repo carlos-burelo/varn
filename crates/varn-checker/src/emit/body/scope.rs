@@ -69,7 +69,43 @@ impl<'a> FnEmitter<'a> {
     pub(super) fn pin(&mut self, e: TirExpr) -> TirExpr {
         match e.kind {
             TirExprKind::Var => e,
-            TirExprKind::IntLit(_) | TirExprKind::FloatLit(_) | TirExprKind::BoolLit(_) | TirExprKind::StrLit(_) | TirExprKind::CharLit(_) | TirExprKind::NullLit | TirExprKind::Binary { .. } | TirExprKind::Unary { .. } | TirExprKind::Field { .. } | TirExprKind::Index { .. } | TirExprKind::Call { .. } | TirExprKind::MethodCall { .. } | TirExprKind::Assign { .. } | TirExprKind::ArrayLit(_) | TirExprKind::TupleLit(_) | TirExprKind::ObjectLit { .. } | TirExprKind::RecordLit { .. } | TirExprKind::Await { .. } | TirExprKind::Yield { .. } | TirExprKind::Discriminant { .. } | TirExprKind::VariantPayload { .. } | TirExprKind::TypeTest { .. } | TirExprKind::Cast { .. } | TirExprKind::Closure { .. } | TirExprKind::New { .. } | TirExprKind::MakeVariant { .. } | TirExprKind::Select { .. } | TirExprKind::Seq { .. } | TirExprKind::ObjectKeys { .. } | TirExprKind::IterInit { .. } | TirExprKind::SuperCall { .. } | TirExprKind::SuperMethodCall { .. } | TirExprKind::DecimalLit(_) | TirExprKind::BigIntLit(_) | TirExprKind::RangeLit { .. } | TirExprKind::ObjectRest { .. } | TirExprKind::ExtensionCall { .. } => self.hoist(e),
+            TirExprKind::IntLit(_)
+            | TirExprKind::FloatLit(_)
+            | TirExprKind::BoolLit(_)
+            | TirExprKind::StrLit(_)
+            | TirExprKind::CharLit(_)
+            | TirExprKind::NullLit
+            | TirExprKind::Binary { .. }
+            | TirExprKind::Unary { .. }
+            | TirExprKind::Field { .. }
+            | TirExprKind::Index { .. }
+            | TirExprKind::Call { .. }
+            | TirExprKind::MethodCall { .. }
+            | TirExprKind::Assign { .. }
+            | TirExprKind::ArrayLit(_)
+            | TirExprKind::TupleLit(_)
+            | TirExprKind::ObjectLit { .. }
+            | TirExprKind::RecordLit { .. }
+            | TirExprKind::Await { .. }
+            | TirExprKind::Yield { .. }
+            | TirExprKind::Discriminant { .. }
+            | TirExprKind::VariantPayload { .. }
+            | TirExprKind::TypeTest { .. }
+            | TirExprKind::Cast { .. }
+            | TirExprKind::Closure { .. }
+            | TirExprKind::New { .. }
+            | TirExprKind::MakeVariant { .. }
+            | TirExprKind::Select { .. }
+            | TirExprKind::Seq { .. }
+            | TirExprKind::ObjectKeys { .. }
+            | TirExprKind::IterInit { .. }
+            | TirExprKind::SuperCall { .. }
+            | TirExprKind::SuperMethodCall { .. }
+            | TirExprKind::DecimalLit(_)
+            | TirExprKind::BigIntLit(_)
+            | TirExprKind::RangeLit { .. }
+            | TirExprKind::ObjectRest { .. }
+            | TirExprKind::ExtensionCall { .. } => self.hoist(e),
         }
     }
 
@@ -89,7 +125,42 @@ impl<'a> FnEmitter<'a> {
                 object: Box::new(self.pin(*object)),
                 index: Box::new(self.pin(*index)),
             },
-            other @ TirExprKind::IntLit(_) | other @ TirExprKind::FloatLit(_) | other @ TirExprKind::BoolLit(_) | other @ TirExprKind::StrLit(_) | other @ TirExprKind::CharLit(_) | other @ TirExprKind::NullLit | other @ TirExprKind::Var | other @ TirExprKind::Binary { .. } | other @ TirExprKind::Unary { .. } | other @ TirExprKind::Call { .. } | other @ TirExprKind::MethodCall { .. } | other @ TirExprKind::Assign { .. } | other @ TirExprKind::ArrayLit(_) | other @ TirExprKind::TupleLit(_) | other @ TirExprKind::ObjectLit { .. } | other @ TirExprKind::RecordLit { .. } | other @ TirExprKind::Await { .. } | other @ TirExprKind::Yield { .. } | other @ TirExprKind::Discriminant { .. } | other @ TirExprKind::VariantPayload { .. } | other @ TirExprKind::TypeTest { .. } | other @ TirExprKind::Cast { .. } | other @ TirExprKind::Closure { .. } | other @ TirExprKind::New { .. } | other @ TirExprKind::MakeVariant { .. } | other @ TirExprKind::Select { .. } | other @ TirExprKind::Seq { .. } | other @ TirExprKind::ObjectKeys { .. } | other @ TirExprKind::IterInit { .. } | other @ TirExprKind::SuperCall { .. } | other @ TirExprKind::SuperMethodCall { .. } | other @ TirExprKind::DecimalLit(_) | other @ TirExprKind::BigIntLit(_) | other @ TirExprKind::RangeLit { .. } | other @ TirExprKind::ObjectRest { .. } | other @ TirExprKind::ExtensionCall { .. } => other,
+            other @ TirExprKind::IntLit(_)
+            | other @ TirExprKind::FloatLit(_)
+            | other @ TirExprKind::BoolLit(_)
+            | other @ TirExprKind::StrLit(_)
+            | other @ TirExprKind::CharLit(_)
+            | other @ TirExprKind::NullLit
+            | other @ TirExprKind::Var
+            | other @ TirExprKind::Binary { .. }
+            | other @ TirExprKind::Unary { .. }
+            | other @ TirExprKind::Call { .. }
+            | other @ TirExprKind::MethodCall { .. }
+            | other @ TirExprKind::Assign { .. }
+            | other @ TirExprKind::ArrayLit(_)
+            | other @ TirExprKind::TupleLit(_)
+            | other @ TirExprKind::ObjectLit { .. }
+            | other @ TirExprKind::RecordLit { .. }
+            | other @ TirExprKind::Await { .. }
+            | other @ TirExprKind::Yield { .. }
+            | other @ TirExprKind::Discriminant { .. }
+            | other @ TirExprKind::VariantPayload { .. }
+            | other @ TirExprKind::TypeTest { .. }
+            | other @ TirExprKind::Cast { .. }
+            | other @ TirExprKind::Closure { .. }
+            | other @ TirExprKind::New { .. }
+            | other @ TirExprKind::MakeVariant { .. }
+            | other @ TirExprKind::Select { .. }
+            | other @ TirExprKind::Seq { .. }
+            | other @ TirExprKind::ObjectKeys { .. }
+            | other @ TirExprKind::IterInit { .. }
+            | other @ TirExprKind::SuperCall { .. }
+            | other @ TirExprKind::SuperMethodCall { .. }
+            | other @ TirExprKind::DecimalLit(_)
+            | other @ TirExprKind::BigIntLit(_)
+            | other @ TirExprKind::RangeLit { .. }
+            | other @ TirExprKind::ObjectRest { .. }
+            | other @ TirExprKind::ExtensionCall { .. } => other,
         };
         TirExpr {
             kind,
@@ -165,7 +236,24 @@ impl<'a> FnEmitter<'a> {
     pub(super) fn class_of(&self, ty: BackendTy) -> Option<&'a ClassInfo> {
         match ty.non_nullable(self.tt) {
             BackendTy::Class(c) => self.m.classes.get(c.0 as usize),
-            BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Array(_) | BackendTy::Map(..) | BackendTy::Set(_) | BackendTy::Tuple(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Nullable(_) | BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => None,
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => None,
         }
     }
 
@@ -176,7 +264,21 @@ impl<'a> FnEmitter<'a> {
             BackendTy::Str => T::Str,
             BackendTy::Map(..) => T::Map,
             BackendTy::Set(_) => T::Set,
-            BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Tuple(_) | BackendTy::Class(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Nullable(_) | BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => return None,
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => return None,
         };
         varn_core::op_id::core_class_name(tag)
     }
@@ -213,7 +315,7 @@ impl<'a> FnEmitter<'a> {
         if let Some(&slot) = self.m.globals.get(name) {
             return Resolution::GlobalSlot(slot);
         }
-        if let Some(idx) = varn_builtins::native_global_index(name) {
+        if let Some(idx) = varn_abi::native_global_index(name) {
             return Resolution::NativeGlobal(idx);
         }
         Resolution::ByName {

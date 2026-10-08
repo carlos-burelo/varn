@@ -93,49 +93,6 @@ pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Arc
     out
 }
 
-pub fn native_global_layout() -> &'static [&'static str] {
-    static LAYOUT: OnceLock<Vec<&'static str>> = OnceLock::new();
-    LAYOUT.get_or_init(|| {
-        const SKIP_KINDS: &[u8] = &[0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14, 0x15];
-
-        let mut names: Vec<&'static str> = vec!["isIsolate"];
-        names.extend(FLOAT_CONSTANTS.iter().map(|(name, _)| *name));
-        let mut has_core = false;
-        for e in all_native_ops() {
-            if e.module_id() == "core" {
-                has_core = true;
-            }
-            if e.module_id() == "globals"
-                && e.namespace_path().is_empty()
-                && !SKIP_KINDS.contains(&e.entry_kind)
-            {
-                names.push(e.symbol_name());
-            }
-        }
-        if has_core {
-            names.push("core");
-        }
-        names.sort_unstable();
-        names.dedup();
-
-        let mut out: Vec<&'static str> = Vec::with_capacity(names.len());
-        for p in ["print"] {
-            if let Some(pos) = names.iter().position(|n| *n == p) {
-                out.push(names.remove(pos));
-            }
-        }
-        out.extend(names);
-        out
-    })
-}
-
-pub fn native_global_index(name: &str) -> Option<u32> {
-    native_global_layout()
-        .iter()
-        .position(|n| *n == name)
-        .map(|i| i as u32)
-}
-
 fn collect_module_fields(
     module_id: &str,
     module_nv: VmValue,

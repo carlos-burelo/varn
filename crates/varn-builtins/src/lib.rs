@@ -24,8 +24,6 @@ pub use dispatch::{
     register_globals_vm,
 };
 #[cfg(feature = "runtime")]
-pub use dispatch::{native_global_index, native_global_layout};
-#[cfg(feature = "runtime")]
 pub use modules::build_module;
 #[cfg(feature = "runtime")]
 pub use modules::globals::{is_print_silent, set_print_silent};

@@ -4,16 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+varn-abi      = { path = "../varn-abi" }
 varn-core     = { path = "../varn-core" }
 varn-lexer    = { path = "../varn-lexer" }
 varn-parser   = { path = "../varn-parser" }
 varn-modules  = { path = "../varn-modules" }
 varn-tir      = { path = "../varn-tir" }
-# For `native_global_layout()` — the prelude-global order the compiler emits
-# `LoadNativeGlobalIdx` against. Builds under `--workspace` (feature-unified);
-# `cargo -p varn-checker` in isolation needs `-p varn-cli` context because
-# varn-builtins is not standalone-buildable.
-varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 rustc-hash    = { workspace = true }
 xxhash-rust   = { workspace = true }
 parking_lot   = { workspace = true }
