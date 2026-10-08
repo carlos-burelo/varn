@@ -44,7 +44,7 @@ pub unsafe fn for_each_slot(exit: JitExit, mut visit: impl FnMut(*mut VmValue)) 
     let code = CODE.read().expect("stack roots registry");
     let mut sp = exit.sp;
     let mut fp = exit.fp;
-    let mut ra = *((sp - 8) as *const usize);
+    let mut ra = unsafe { *((sp - 8) as *const usize) };
     loop {
         let Some((start, range)) = code.range(..=ra).next_back() else {
             return;
@@ -61,8 +61,8 @@ pub unsafe fn for_each_slot(exit: JitExit, mut visit: impl FnMut(*mut VmValue)) 
                 visit((sp + slot as usize) as *mut VmValue);
             }
         }
-        ra = *((fp + 8) as *const usize);
+        ra = unsafe { *((fp + 8) as *const usize) };
         sp = fp + 16;
-        fp = *(fp as *const usize);
+        fp = unsafe { *(fp as *const usize) };
     }
 }
