@@ -4,6 +4,8 @@ mod imports;
 mod keywords;
 pub mod members;
 pub mod postfix;
+pub mod receiver_literals;
+pub mod receivers;
 use rustc_hash::FxHashSet;
 pub mod reflection;
 pub(crate) mod scope;
@@ -24,6 +26,7 @@ pub use imports::{
 };
 pub use members::build_member_completions;
 pub use postfix::build_postfix_completions;
+pub use receivers::{dot_receiver, pattern_receiver, DotVerdict};
 pub use reflection::build_reflection_completions;
 
 pub fn build_completion_response(
@@ -133,7 +136,7 @@ pub fn build_completion_response(
         );
     }
 
-    let verdict = members::dot_receiver(state, line, col, trigger_char);
+    let verdict = receivers::dot_receiver(state, line, col, trigger_char);
     let dot_miss = verdict.info.is_none().then(|| {
         format!(
             "dotmiss={}({})",
@@ -176,7 +179,7 @@ pub fn build_completion_response(
         );
     }
 
-    if let Some(info) = members::pattern_receiver(state, line, col) {
+    if let Some(info) = receivers::pattern_receiver(state, line, col) {
         let ty_text = state.db.ty_text(&info.ty);
         let items = build_member_completions(state, info, false, &prefix);
         let log = format!(
