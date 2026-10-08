@@ -27,9 +27,12 @@ Ley 13 perfil `quick` para iterar (`cargo build --profile quick --bin vn`), matr
   - [ ] `varn-cli/src/bench/source/helpers.rs`
   - [ ] `varn-jit/src/clif/from_ssa/extra/common.rs`
   - [ ] `varn-tir/tests/verify_coherence/common.rs`
-- [x] Migrar 36 `std::collections` → Fx/BTree (`d3728072`; quedan solo frontera wire lsp-types, tests, xtask, BTree/VecDeque ordenados)
+- [x] Migrar 36 `std::collections` → Fx/BTree (`d3728072` + `a1879997` absoluto: cero std en `lsp/src`, wire via `document_changes` ordenado por URI; quedan solo tests, xtask, BTree/VecDeque ordenados)
 - [ ] Auditar 318 `_ =>` (Ley 7, cada brazo explícito ante variante nueva)
 - [ ] Puerta: `vn test` 155/0
+
+Deuda preexistente detectada (no de este plan, no tocar aquí): `design_audit_test::h7_small_types_are_copy_sized` falla en HEAD limpio
+(`size_of::<Atom>()` 16 vs 4 esperado). Toca F2 (identidad portable / NameId), no F0.
 
 ## F1 — ABI hoja, rompe checker→builtins [ ]
 
