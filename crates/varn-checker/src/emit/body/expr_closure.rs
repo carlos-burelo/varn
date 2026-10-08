@@ -38,6 +38,7 @@ impl<'a> FnEmitter<'a> {
             is_async,
             is_generator,
             has_rest: params.last().is_some_and(|p| p.is_rest),
+            force_inline: false,
         });
         let slot = self.out_closures.len() - 1;
 
@@ -87,6 +88,7 @@ impl<'a> FnEmitter<'a> {
             is_async,
             is_generator,
             has_rest: params.last().is_some_and(|p| p.is_rest),
+            force_inline: false,
         };
 
         let upvalues: Vec<varn_tir::TirUpvalue> = captures

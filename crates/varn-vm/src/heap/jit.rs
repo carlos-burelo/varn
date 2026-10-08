@@ -187,63 +187,17 @@ impl Heap {
         let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
         assert_ne!(object_tag, none_tag, "Option<HeapObj> niche probe failed");
 
-        const PROBE_CLASS_ID: u32 = 0x005E_ED1D;
-        let mut probe = [0u64; 2];
-        let inst = unsafe {
-            varn_types::value::InstanceData::init_at(
-                probe.as_mut_ptr() as *mut u8,
-                PROBE_CLASS_ID,
-                0,
-            )
-        };
-        let data = probe.as_ptr() as usize;
-        let inst_slot: Option<HeapObj> = Some(HeapObj::Instance(inst));
-        let inst_bytes =
-            unsafe { std::slice::from_raw_parts(&inst_slot as *const _ as *const u8, size) };
-        let instance_tag = inst_bytes[0] as usize;
-        let instance_data_off = varn_types::cell::instance_data_off(std::mem::size_of::<HeapObj>());
-
-        let instance_values_off = varn_types::INST_PAYLOAD_OFF;
-        let instance_class_id_off = varn_types::INST_CLASS_ID_OFF;
-        assert_eq!(
-            unsafe { *((data + instance_class_id_off) as *const u32) },
-            PROBE_CLASS_ID,
-            "instance class_id offset does not resolve to InstanceData.class_id"
-        );
-
         varn_jit::JitObjectLayout {
             object_tag,
-            instance_tag,
             payload_off,
-            instance_data_off,
             len_off,
             values_off,
-            instance_values_off,
-            instance_class_id_off,
             shape_off,
             shape_id_off,
         }
     }
 
     pub(crate) fn jit_instance_alloc() -> varn_jit::JitInstanceAlloc {
-        use varn_types::value::InstanceData;
-        const PROBE_CLASS_ID: u32 = 0x005E_ED1D;
-        let mut probe = [0u64; 4];
-        let inst =
-            unsafe { InstanceData::init_at(probe.as_mut_ptr() as *mut u8, PROBE_CLASS_ID, 0) };
-        let data = probe.as_ptr() as usize;
-        let slot = HeapObj::Instance(inst);
-        let size = std::mem::size_of::<HeapObj>();
-        let bytes = unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
-        let instance_tag = bytes[0] as usize;
-        let instance_ref_off = (0..=size - 8)
-            .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == data)
-            .expect("instance payload probe failed");
-        assert_eq!(
-            unsafe { *((data + varn_types::INST_CLASS_ID_OFF) as *const u32) },
-            PROBE_CLASS_ID,
-            "instance class_id offset does not resolve to InstanceData.class_id"
-        );
         let cls = std::rc::Rc::new(varn_types::ClassObj::new("jit-probe"));
         let cls_id = cls.id;
         let cls_val = std::rc::Rc::as_ptr(&cls) as usize;
@@ -252,12 +206,7 @@ impl Heap {
         let cls_size = std::mem::size_of::<HeapObj>();
         let cls_bytes =
             unsafe { std::slice::from_raw_parts(&cls_slot as *const _ as *const u8, cls_size) };
-        assert_eq!(cls_size, size, "HeapObj size must be uniform");
         let class_tag = cls_bytes[0] as usize;
-        assert_ne!(
-            class_tag, instance_tag,
-            "HeapObj::Class and HeapObj::Instance share a tag"
-        );
         let class_ref_off = (0..=cls_size - 8)
             .find(|&off| {
                 usize::from_ne_bytes(cls_bytes[off..off + 8].try_into().unwrap()) == rc_base
@@ -271,14 +220,11 @@ impl Heap {
             "class id offset does not resolve to ClassObj.id"
         );
         varn_jit::JitInstanceAlloc {
-            heap_obj_bytes: size,
             cells_off: RCBOX_PREFIX + std::mem::offset_of!(HeapInner, cells),
             classes_off: std::mem::offset_of!(CellSpace, classes),
             young_off: RCBOX_PREFIX + std::mem::offset_of!(HeapInner, young),
             born_off: std::mem::offset_of!(YoungGen, born),
             native_off: std::mem::offset_of!(CellSpace, native),
-            instance_tag,
-            instance_ref_off,
             class_tag,
             class_ref_off,
             class_id_off,
@@ -305,15 +251,8 @@ mod tests {
         assert_eq!(o.shape_off, varn_types::OBJ_SHAPE_OFF);
         assert_eq!(o.len_off, varn_types::OBJ_INLINE_LEN_OFF);
         assert_eq!(o.shape_id_off, RCBOX_PREFIX + varn_types::SHAPE_ID_OFF);
-        assert_eq!(o.instance_values_off, varn_types::INST_PAYLOAD_OFF);
-        assert_eq!(o.instance_class_id_off, varn_types::INST_CLASS_ID_OFF);
         let ia = Heap::jit_instance_alloc();
-        assert_eq!(ia.instance_tag, o.instance_tag);
-        assert_eq!(ia.heap_obj_bytes, std::mem::size_of::<HeapObj>());
-        assert_eq!(ia.heap_obj_bytes % 8, 0);
-        assert!(ia.instance_ref_off + 8 <= ia.heap_obj_bytes);
-        assert_eq!(ia.instance_ref_off % 8, 0);
-        assert!(ia.class_ref_off + 8 <= ia.heap_obj_bytes);
+        assert!(ia.class_ref_off + 8 <= std::mem::size_of::<HeapObj>());
         assert_eq!(ia.class_ref_off % 8, 0);
         assert_eq!(ia.class_id_off % 4, 0);
         assert_ne!(ia.cells_off, ia.young_off);

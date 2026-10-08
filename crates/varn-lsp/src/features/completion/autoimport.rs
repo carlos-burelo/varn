@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use tower_lsp::lsp_types::{CompletionItem, Position, Range, TextEdit};
+use tower_lsp_f::lsp_types::{CompletionItem, Position, Range, TextEdit};
 
 use varn_modules::resolver::relative_import_path;
 
@@ -17,32 +17,35 @@ pub fn build_autoimport_completions(
     prefix_filter: Option<&str>,
 ) -> Vec<CompletionItem> {
     let insert_pos = import_insert_position(source);
-    let mut items: Vec<CompletionItem> = Vec::new();
 
     let filter_lower = prefix_filter
         .map(|p| p.to_lowercase())
         .filter(|p| !p.is_empty());
 
-    if filter_lower.is_none() {
-        return items;
-    }
-    let query = filter_lower.unwrap();
+    let Some(query) = filter_lower else {
+        return Vec::new();
+    };
 
     const MAX_AUTOIMPORT_ITEMS: usize = 50;
 
-    for (name, entries) in &index.name_index {
-        if items.len() >= MAX_AUTOIMPORT_ITEMS {
-            break;
-        }
+    let mut ranked: Vec<(u8, String, CompletionItem)> = Vec::new();
 
+    for (name, entries) in &index.name_index {
         if already_known.contains(name) {
             continue;
         }
 
-        let name_lower = name.to_lowercase();
-        if !name_lower.starts_with(&query) && !name_lower.contains(&query) {
+        let name_lower = entries
+            .first()
+            .map(|e| e.name_lower.as_str())
+            .unwrap_or(name.as_str());
+        let rank = if name_lower.starts_with(&query) {
+            0u8
+        } else if name_lower.contains(&query) {
+            1u8
+        } else {
             continue;
-        }
+        };
 
         let entry_opt = entries
             .iter()
@@ -54,6 +57,9 @@ pub fn build_autoimport_completions(
         };
 
         let specifier = uri_to_specifier(doc_uri, &entry.uri);
+        let Some(specifier) = specifier else {
+            continue;
+        };
         let import_text = format!("import {{ {name} }} from \"{specifier}\";\n");
 
         let kind = Some(to_completion_kind(entry.kind));
@@ -65,25 +71,30 @@ pub fn build_autoimport_completions(
         };
         let detail = format!("{name}{type_hint}  ↳ \"{specifier}\"");
 
-        items.push(CompletionItem {
-            label: name.clone(),
-            kind,
-            detail: Some(detail),
-            additional_text_edits: Some(vec![TextEdit {
-                range: Range {
-                    start: insert_pos,
-                    end: insert_pos,
-                },
-                new_text: import_text,
-            }]),
-            sort_text: Some(format!("{SORT_AUTOIMPORT}{name}")),
-            filter_text: Some(name.clone()),
-            ..Default::default()
-        });
+        ranked.push((
+            rank,
+            name.clone(),
+            CompletionItem {
+                label: name.clone(),
+                kind,
+                detail: Some(detail),
+                additional_text_edits: Some(vec![TextEdit {
+                    range: Range {
+                        start: insert_pos,
+                        end: insert_pos,
+                    },
+                    new_text: import_text,
+                }]),
+                sort_text: Some(format!("{SORT_AUTOIMPORT}{rank}_{name}")),
+                filter_text: Some(name.clone()),
+                ..Default::default()
+            },
+        ));
     }
 
-    items.sort_by(|a, b| a.label.cmp(&b.label));
-    items
+    ranked.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    ranked.truncate(MAX_AUTOIMPORT_ITEMS);
+    ranked.into_iter().map(|(_, _, item)| item).collect()
 }
 
 fn import_insert_position(source: &str) -> Position {
@@ -106,12 +117,16 @@ fn is_stdlib_uri(uri: &str) -> bool {
     crate::workspace::std_sources::is_mirrored_uri(uri)
 }
 
-fn uri_to_specifier(from_uri: &str, target_uri: &str) -> String {
+fn uri_to_specifier(from_uri: &str, target_uri: &str) -> Option<String> {
     let target_path = uri_to_path(target_uri);
     if let Some(spec) = crate::workspace::std_sources::specifier_from_path(&target_path) {
-        return spec;
+        return Some(spec);
     }
 
     let from_path = uri_to_path(from_uri);
-    relative_import_path(&from_path, &target_path)
+    let rel = relative_import_path(&from_path, &target_path);
+    if rel.is_empty() || rel.contains(":/") || rel.starts_with('/') || rel.starts_with('\\') {
+        return None;
+    }
+    Some(rel)
 }

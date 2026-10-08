@@ -1,5 +1,6 @@
 pub mod arena;
 pub mod decl;
+pub mod decorators;
 pub mod expr;
 pub mod operators;
 pub mod pattern;

@@ -33,10 +33,11 @@ impl ExecCtx {
 
         let cache_len = closure.ic_cache_len();
         let obj_is_heap_object = obj.is_heap()
-            && matches!(
-                self.heap.get(obj.as_heap()),
-                Some(crate::heap::HeapObj::Object(_) | crate::heap::HeapObj::Instance(_))
-            );
+            && (self.heap.instance(obj.as_heap()).is_some()
+                || matches!(
+                    self.heap.get(obj.as_heap()),
+                    Some(crate::heap::HeapObj::Object(_))
+                ));
         if obj_is_heap_object && cs_idx < cache_len && !is_megamorphic {
             let mut found_slot: Option<(usize, u8)> = None;
             let mut found_setter: Option<VmValue> = None;

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use tower_lsp::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, Position, Range, TextEdit, WorkspaceEdit,
+use tower_lsp_f::lsp_types::{
+    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, WorkspaceEdit,
 };
 use varn_core::ast::{AstArena, Decl, Program, StmtKind};
 use varn_core::SourceRange;
@@ -9,8 +9,8 @@ use crate::document::DocumentState;
 
 pub fn generate_organize_imports_action(
     state: &DocumentState,
-    uri: &tower_lsp::lsp_types::Url,
-) -> Option<CodeActionOrCommand> {
+    uri: &tower_lsp_f::lsp_types::Uri,
+) -> Option<CodeActionResponse> {
     let program = state.ast.as_ref()?;
     let ranges = import_ranges(program, &state.ast_arena);
     let imports = collect_imports(&ranges, &state.source)?;
@@ -69,9 +69,9 @@ pub fn generate_organize_imports_action(
         }],
     );
 
-    Some(CodeActionOrCommand::CodeAction(CodeAction {
+    Some(CodeActionResponse::CodeAction(CodeAction {
         title: "Organize Imports".to_string(),
-        kind: Some(CodeActionKind::SOURCE_ORGANIZE_IMPORTS),
+        kind: Some(CodeActionKind::SourceOrganizeImports),
         diagnostics: None,
         edit: Some(WorkspaceEdit {
             changes: Some(changes),
@@ -81,6 +81,7 @@ pub fn generate_organize_imports_action(
         command: None,
         is_preferred: Some(false),
         disabled: None,
+        tags: None,
         data: None,
     }))
 }

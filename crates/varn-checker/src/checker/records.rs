@@ -43,6 +43,13 @@ pub struct Desugarings {
     pub match_arm_subjects: FxHashMap<varn_core::ast::AstId, Vec<crate::types::Type>>,
 }
 
+#[derive(Clone, Debug)]
+pub struct TestTarget {
+    pub name: Arc<str>,
+    pub file: Arc<str>,
+    pub is_async: bool,
+}
+
 pub struct CheckResult {
     pub bind: BindResult,
     pub diagnostics: varn_core::DiagnosticBag,
@@ -58,6 +65,7 @@ pub struct CheckResult {
     pub expr_table: FxHashMap<varn_core::ast::AstId, TypeEntry>,
     pub call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
     pub desugar: Desugarings,
+    pub test_targets: Vec<TestTarget>,
 }
 
 impl CheckResult {

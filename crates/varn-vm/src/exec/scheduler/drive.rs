@@ -135,7 +135,7 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
         };
         let (value, dest_reg) = match ctx.vm_suspend.take() {
             Some(VmSuspend::Await { value, dest_reg }) => (value, dest_reg),
-            None | Some(VmSuspend::Yield { .. }) => {
+            None | Some(VmSuspend::Yield { .. }) | Some(VmSuspend::DebugBreak) => {
                 return finish(queue, ctx, &output, Ok(result));
             }
         };

@@ -1,6 +1,6 @@
 #![allow(unused_crate_dependencies)]
 
-use tower_lsp::lsp_types::HoverContents;
+use tower_lsp_f::lsp_types::Contents;
 use varn_lsp::features::hover::build_hover;
 use varn_lsp::pipeline::run_pipeline;
 
@@ -27,7 +27,7 @@ const res = c.get_value();
         "Hover over c.get_value() should return Some"
     );
     let hover_val = hover.unwrap();
-    if let HoverContents::Markup(markup) = hover_val.contents {
+    if let Contents::MarkupContent(markup) = hover_val.contents {
         assert!(
             markup.value.contains("get_value"),
             "Hover should describe get_value method: {}",

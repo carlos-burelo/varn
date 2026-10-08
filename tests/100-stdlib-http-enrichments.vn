@@ -1,5 +1,6 @@
-import { HttpServer, Request, Response, json, HttpStatus } from "std:http";
+import { HttpServer, Request, Response, json, HttpStatus, fetch } from "std:http";
 import { describe, it, expect } from "std:test";
+import { delay } from "std:task";
 
 
 // 1. Request Cookies parsing
@@ -51,6 +52,20 @@ await describe("100 stdlib http enrichments", async () => {
         middlewareLog.push("handler");
         return json({ ok: true });
         });
+    });
+
+    await it("middleware executes on live request", async () => {
+        server.listen(19878);
+        await delay(150);
+        let res = await fetch("http://127.0.0.1:19878/test");
+        expect(res.status).toBe(200);
+        server.close();
+        expect(middlewareLog.length).toBe(5);
+        expect(middlewareLog[0]).toBe("mw1_before");
+        expect(middlewareLog[1]).toBe("mw2_before");
+        expect(middlewareLog[2]).toBe("handler");
+        expect(middlewareLog[3]).toBe("mw2_after");
+        expect(middlewareLog[4]).toBe("mw1_after");
     });
 
 

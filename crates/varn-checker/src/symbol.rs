@@ -72,6 +72,21 @@ pub struct Symbol {
 
     #[serde(default)]
     pub intrinsic_wire: Option<u8>,
+
+    #[serde(default)]
+    pub deprecated: Option<String>,
+
+    #[serde(default)]
+    pub is_pure: bool,
+
+    #[serde(default)]
+    pub force_inline: bool,
+
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+
+    #[serde(default)]
+    pub is_test: bool,
 }
 
 impl Symbol {
@@ -96,6 +111,11 @@ impl Symbol {
             alias_node: None,
             slot_idx: None,
             intrinsic_wire: None,
+            deprecated: None,
+            is_pure: false,
+            force_inline: false,
+            capabilities: Vec::new(),
+            is_test: false,
         }
     }
 

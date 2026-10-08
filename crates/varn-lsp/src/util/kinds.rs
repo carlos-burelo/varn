@@ -1,43 +1,43 @@
-use tower_lsp::lsp_types::{CompletionItemKind, SymbolKind as LspSymbolKind};
+use tower_lsp_f::lsp_types::{CompletionItemKind, SymbolKind as LspSymbolKind};
 use varn_checker::SymbolKind;
 
 pub fn to_lsp_symbol_kind(kind: SymbolKind) -> LspSymbolKind {
     match kind {
-        SymbolKind::Let | SymbolKind::Var => LspSymbolKind::VARIABLE,
-        SymbolKind::Const => LspSymbolKind::CONSTANT,
-        SymbolKind::Function => LspSymbolKind::FUNCTION,
-        SymbolKind::Class => LspSymbolKind::CLASS,
-        SymbolKind::Interface => LspSymbolKind::INTERFACE,
-        SymbolKind::TypeAlias => LspSymbolKind::TYPE_PARAMETER,
-        SymbolKind::Enum => LspSymbolKind::ENUM,
-        SymbolKind::Parameter => LspSymbolKind::VARIABLE,
-        SymbolKind::Property => LspSymbolKind::PROPERTY,
-        SymbolKind::Method => LspSymbolKind::METHOD,
-        SymbolKind::TypeParameter => LspSymbolKind::TYPE_PARAMETER,
-        SymbolKind::Namespace => LspSymbolKind::NAMESPACE,
-        SymbolKind::Struct => LspSymbolKind::STRUCT,
-        SymbolKind::Extension => LspSymbolKind::CLASS,
-        SymbolKind::EnumMember => LspSymbolKind::ENUM_MEMBER,
+        SymbolKind::Let | SymbolKind::Var => LspSymbolKind::Variable,
+        SymbolKind::Const => LspSymbolKind::Constant,
+        SymbolKind::Function => LspSymbolKind::Function,
+        SymbolKind::Class => LspSymbolKind::Class,
+        SymbolKind::Interface => LspSymbolKind::Interface,
+        SymbolKind::TypeAlias => LspSymbolKind::TypeParameter,
+        SymbolKind::Enum => LspSymbolKind::Enum,
+        SymbolKind::Parameter => LspSymbolKind::Variable,
+        SymbolKind::Property => LspSymbolKind::Property,
+        SymbolKind::Method => LspSymbolKind::Method,
+        SymbolKind::TypeParameter => LspSymbolKind::TypeParameter,
+        SymbolKind::Namespace => LspSymbolKind::Namespace,
+        SymbolKind::Struct => LspSymbolKind::Struct,
+        SymbolKind::Extension => LspSymbolKind::Class,
+        SymbolKind::EnumMember => LspSymbolKind::EnumMember,
     }
 }
 
 pub fn to_completion_kind(kind: SymbolKind) -> CompletionItemKind {
     match kind {
-        SymbolKind::Let | SymbolKind::Var => CompletionItemKind::VARIABLE,
-        SymbolKind::Const => CompletionItemKind::CONSTANT,
-        SymbolKind::Function => CompletionItemKind::FUNCTION,
-        SymbolKind::Class => CompletionItemKind::CLASS,
-        SymbolKind::Interface => CompletionItemKind::INTERFACE,
-        SymbolKind::TypeAlias => CompletionItemKind::TYPE_PARAMETER,
-        SymbolKind::Enum => CompletionItemKind::ENUM,
-        SymbolKind::Parameter => CompletionItemKind::VARIABLE,
-        SymbolKind::Property => CompletionItemKind::PROPERTY,
-        SymbolKind::Method => CompletionItemKind::METHOD,
-        SymbolKind::TypeParameter => CompletionItemKind::TYPE_PARAMETER,
-        SymbolKind::Namespace => CompletionItemKind::MODULE,
-        SymbolKind::Struct => CompletionItemKind::STRUCT,
-        SymbolKind::Extension => CompletionItemKind::CLASS,
-        SymbolKind::EnumMember => CompletionItemKind::ENUM_MEMBER,
+        SymbolKind::Let | SymbolKind::Var => CompletionItemKind::Variable,
+        SymbolKind::Const => CompletionItemKind::Constant,
+        SymbolKind::Function => CompletionItemKind::Function,
+        SymbolKind::Class => CompletionItemKind::Class,
+        SymbolKind::Interface => CompletionItemKind::Interface,
+        SymbolKind::TypeAlias => CompletionItemKind::TypeParameter,
+        SymbolKind::Enum => CompletionItemKind::Enum,
+        SymbolKind::Parameter => CompletionItemKind::Variable,
+        SymbolKind::Property => CompletionItemKind::Property,
+        SymbolKind::Method => CompletionItemKind::Method,
+        SymbolKind::TypeParameter => CompletionItemKind::TypeParameter,
+        SymbolKind::Namespace => CompletionItemKind::Module,
+        SymbolKind::Struct => CompletionItemKind::Struct,
+        SymbolKind::Extension => CompletionItemKind::Class,
+        SymbolKind::EnumMember => CompletionItemKind::EnumMember,
     }
 }
 

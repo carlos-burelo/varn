@@ -1,6 +1,6 @@
 use crate::document::DocumentState;
 use rustc_hash::FxHashSet;
-use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
+use tower_lsp_f::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
 use varn_core::{TokenKind, TypeKind};
 
 pub fn build_call_argument_completions(
@@ -75,10 +75,14 @@ pub fn build_call_argument_completions(
             push_constructor_params(state, state.name(name), &mut fn_params);
         }
     } else if callee_tok.kind == TokenKind::Identifier || callee_tok.kind.can_be_identifier() {
-        if let Some(sym) = state
-            .symbols()
-            .find(|s| s.name() == state.lexeme(callee_tok))
+        if let Some((sid, _)) = state
+            .db
+            .resolve_at(state.lexeme(callee_tok), callee_tok.offset)
         {
+            if sid >= state.db.bind.arena.len() {
+                return None;
+            }
+            let sym = state.symbol(sid);
             if let Some(f) = state.db.fn_shape(sym.ty()) {
                 fn_params.extend(
                     f.params
@@ -107,14 +111,15 @@ pub fn build_call_argument_completions(
     }
 
     let mut items = Vec::new();
-    for param in fn_params {
-        if !provided_named_args.contains(&param) {
+    for (idx, param) in fn_params.iter().enumerate() {
+        if !provided_named_args.contains(param) {
             items.push(CompletionItem {
                 label: format!("{}:", param),
-                kind: Some(CompletionItemKind::FIELD),
+                kind: Some(CompletionItemKind::Field),
                 insert_text: Some(format!("{}: $1", param)),
-                insert_text_format: Some(InsertTextFormat::SNIPPET),
+                insert_text_format: Some(InsertTextFormat::Snippet),
                 detail: Some("named argument".to_string()),
+                sort_text: Some(format!("0_{idx:02}")),
                 ..Default::default()
             });
         }

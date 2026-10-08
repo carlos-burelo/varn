@@ -1,6 +1,6 @@
 #![allow(unused_crate_dependencies)]
 
-use tower_lsp::lsp_types::{FormattingOptions, Position, Range, Url};
+use tower_lsp_f::lsp_types::{FormattingOptions, Position, Range, Uri};
 use varn_lsp::features::code_action::extract_function::generate_extract_function_action;
 use varn_lsp::features::code_action::extract_variable::generate_extract_variable_action;
 use varn_lsp::features::code_action::generate_members::generate_class_member_actions;
@@ -32,7 +32,7 @@ fn test_postfix_completions() {
 fn test_extract_variable_action() {
     let src = "let total = price * 0.15;\n";
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
-    let uri = Url::parse("file:///test.vn").unwrap();
+    let uri = Uri::parse("file:///test.vn").unwrap();
     let range = Range {
         start: Position {
             line: 0,
@@ -51,7 +51,7 @@ fn test_extract_variable_action() {
 fn test_extract_function_action() {
     let src = "fn main() {\n    let a = 10;\n    let b = 20;\n    let c = a + b;\n}\n";
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
-    let uri = Url::parse("file:///test.vn").unwrap();
+    let uri = Uri::parse("file:///test.vn").unwrap();
     let range = Range {
         start: Position {
             line: 1,
@@ -70,7 +70,7 @@ fn test_extract_function_action() {
 fn test_generate_class_members() {
     let src = "class User {\n    name: str;\n    age: int;\n}\n";
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
-    let uri = Url::parse("file:///test.vn").unwrap();
+    let uri = Uri::parse("file:///test.vn").unwrap();
     let actions = generate_class_member_actions(&state, &uri, 1);
     assert!(
         !actions.is_empty(),
@@ -84,7 +84,6 @@ fn test_formatting_engine() {
     let options = FormattingOptions {
         tab_size: 4,
         insert_spaces: true,
-        properties: Default::default(),
         trim_trailing_whitespace: Some(true),
         insert_final_newline: Some(true),
         trim_final_newlines: Some(true),
@@ -105,11 +104,17 @@ fn test_reflection_colon_colon_completion() {
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
     let receiver =
         varn_lsp::features::completion::reflection::colon_colon_receiver(&state, 4, 27, Some(":"));
-    assert_eq!(receiver.as_deref(), Some("SampleUser"));
+    assert_eq!(
+        receiver.map(|(name, _)| name).as_deref(),
+        Some("SampleUser")
+    );
 
+    let recv_offset = src.find("SampleUser::").unwrap_or(0) as u32;
     let items = varn_lsp::features::completion::reflection::build_reflection_completions(
         &state,
         "SampleUser",
+        recv_offset,
+        "",
     );
     assert!(!items.is_empty(), "Should generate reflection items");
 
@@ -130,7 +135,7 @@ fn test_root_scope_isolation_from_unreachable_type_parameters() {
     let src = "function compose<A, B, C>(f: (a: B) => C, g: (b: A) => B): (c: A) => C {\n    return (x: A) => f(g(x));\n}\nconst double: (n: int) => int = (n: int) => n * 2;\n\n";
     let state = run_pipeline(src.to_string(), "file:///test.vn".to_string());
 
-    let root_items = varn_lsp::features::completion::build_completions(&state, 4, 0);
+    let (root_items, _) = varn_lsp::features::completion::build_completions(&state, 4, 0);
     let root_labels: Vec<&str> = root_items.iter().map(|i| i.label.as_str()).collect();
 
     assert!(

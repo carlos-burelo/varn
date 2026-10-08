@@ -59,7 +59,8 @@ pub fn debug_tir(
         }
 
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            varn_compiler::from_tir::compile_module(&module, vec![])
+            let source = std::fs::read_to_string(program.filename.as_ref()).unwrap_or_default();
+            varn_compiler::from_tir::compile_module(&module, vec![], &source)
         })) {
             Ok(Ok(_)) => terminal::info("from_tir(proto): OK"),
             Ok(Err(e)) => terminal::warn(format!("from_tir(proto): {e:?}")),

@@ -18,6 +18,8 @@ pub(crate) struct Builder<'m> {
     pub(super) tir: &'m TirModule,
     pub(super) self_fn: Option<varn_tir::FnId>,
     pub(super) ssa_types: crate::hir::TyTable,
+    pub(super) line_starts: Vec<u32>,
+    pub(super) cur_line: u32,
 
     pub(super) blocks: Vec<Block>,
     pub(super) values: Vec<ValueDef>,
@@ -48,6 +50,8 @@ impl<'m> Builder<'m> {
             tir,
             self_fn: None,
             ssa_types: crate::hir::TyTable::default(),
+            line_starts: super::super::compile::cur_line_starts(),
+            cur_line: 1,
             blocks: Vec::new(),
             values: Vec::new(),
             sealed: Vec::new(),
@@ -72,6 +76,14 @@ impl<'m> Builder<'m> {
 
     pub(super) fn ty(&mut self, bt: BackendTy) -> HirType {
         lower_ty(bt, self.tir, &mut self.ssa_types)
+    }
+
+    pub(super) fn line_of(&self, offset: u32) -> u32 {
+        self.line_starts.partition_point(|&s| s <= offset) as u32
+    }
+
+    pub(super) fn set_line_at(&mut self, offset: u32) {
+        self.cur_line = self.line_of(offset);
     }
 
     pub(super) fn loop_body_pinned(&self, body: &[TirStmt]) -> Vec<VarId> {

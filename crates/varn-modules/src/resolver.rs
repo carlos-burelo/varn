@@ -88,8 +88,23 @@ pub fn relative_import_path(from_file: &str, to_file: &str) -> String {
     let common = from_parts
         .iter()
         .zip(to_parts.iter())
-        .take_while(|(a, b)| a == b)
+        .enumerate()
+        .take_while(|(i, (a, b))| {
+            if *i == 0 && is_drive_segment(a) && is_drive_segment(b) {
+                a.eq_ignore_ascii_case(b)
+            } else {
+                a == b
+            }
+        })
         .count();
+
+    if common == 0 && to_parts.first().is_some_and(|s| is_drive_segment(s)) {
+        let mut absolute = to;
+        if absolute.ends_with(".vn") {
+            absolute.truncate(absolute.len() - 3);
+        }
+        return absolute;
+    }
 
     let ups = from_parts.len() - common;
     let downs = &to_parts[common..];
@@ -109,6 +124,11 @@ pub fn relative_import_path(from_file: &str, to_file: &str) -> String {
     }
 
     result
+}
+
+fn is_drive_segment(seg: &str) -> bool {
+    let b = seg.as_bytes();
+    b.len() == 2 && b[1] == b':' && b[0].is_ascii_alphabetic()
 }
 
 pub fn is_known_module(specifier: &str) -> bool {

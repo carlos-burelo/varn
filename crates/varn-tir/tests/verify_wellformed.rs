@@ -37,6 +37,7 @@ fn empty_module() -> TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
     }
 }

@@ -1,6 +1,6 @@
 #![allow(unused_crate_dependencies)]
 
-use tower_lsp::lsp_types::{CodeActionOrCommand, InlayHintLabel, Url};
+use tower_lsp_f::lsp_types::{CodeActionResponse, Label, Uri};
 use varn_lsp::features::code_action::match_arms::generate_match_arms_action;
 use varn_lsp::features::inlay_hints::param_hints::build_parameter_hints;
 use varn_lsp::pipeline::run_pipeline;
@@ -8,9 +8,9 @@ use varn_lsp::pipeline::run_pipeline;
 fn fill_arms_edit(source: &str, line: u32) -> Option<String> {
     let uri = "file:///test/match.vn".to_string();
     let state = run_pipeline(source.to_string(), uri.clone());
-    let url = Url::parse(&uri).unwrap();
-    match generate_match_arms_action(&state, &url, line, 0)? {
-        CodeActionOrCommand::CodeAction(action) => {
+    let Uri = Uri::parse(&uri).unwrap();
+    match generate_match_arms_action(&state, &Uri, line, 0)? {
+        CodeActionResponse::CodeAction(action) => {
             let changes = action.edit?.changes?;
             Some(
                 changes
@@ -20,7 +20,7 @@ fn fill_arms_edit(source: &str, line: u32) -> Option<String> {
                     .collect(),
             )
         }
-        CodeActionOrCommand::Command(_) => None,
+        CodeActionResponse::Command(_) => None,
     }
 }
 
@@ -79,8 +79,8 @@ const a = area(2, 3);
     let labels: Vec<String> = build_parameter_hints(&state)
         .into_iter()
         .filter_map(|h| match h.label {
-            InlayHintLabel::String(s) => Some(s),
-            InlayHintLabel::LabelParts(_) => None,
+            Label::String(s) => Some(s),
+            Label::InlayHintLabelPartList(_) => None,
         })
         .collect();
     assert_eq!(labels, vec!["width: ", "height: "]);

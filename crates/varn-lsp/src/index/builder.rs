@@ -10,15 +10,32 @@ use super::{ExportEntry, ProjectIndex};
 
 pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
     let uri_shared: Arc<str> = Arc::from(uri);
+    let heritage: std::collections::BTreeMap<String, String> =
+        crate::document::classes::top_level_classes(state)
+            .filter_map(|c| {
+                Some((
+                    crate::document::classes::class_name(state, c)?,
+                    crate::document::classes::super_name(state, c)?,
+                ))
+            })
+            .collect();
     let mut exports: Vec<Arc<ExportEntry>> = state
         .symbols()
         .filter(|s| is_indexable(s.kind(), s.line()))
         .map(|s| {
+            let parent = match s.kind() {
+                SymbolKind::Class | SymbolKind::Struct => {
+                    heritage.get(s.name()).map(|p| Arc::from(p.as_str()))
+                }
+                _ => None,
+            };
+            let name = s.name().to_owned();
             Arc::new(ExportEntry {
-                name: s.name().to_owned(),
+                name_lower: name.to_lowercase(),
+                name,
                 kind: s.kind(),
                 uri: Arc::clone(&uri_shared),
-                parent: None,
+                parent,
                 line: s.line(),
                 col: s.col(),
                 type_str: s.type_str(),
@@ -82,8 +99,10 @@ fn collect_member_exports(
     for m in state.members_of(sym) {
         let Some(line) = m.def_line else { continue };
         let parent = parent.get_or_insert_with(|| Arc::from(sym.name()));
+        let name = m.name.to_string();
         out.push(Arc::new(ExportEntry {
-            name: m.name.to_string(),
+            name_lower: name.to_lowercase(),
+            name,
             kind: summary_to_symbol_kind(m.kind),
             uri: Arc::clone(uri),
             parent: Some(Arc::clone(parent)),

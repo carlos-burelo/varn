@@ -19,6 +19,7 @@ pub(super) fn lower_top_level(
     fn_index: &FxHashMap<Atom, (u32, u32)>,
     global_slots: &FxHashMap<Arc<str>, u32>,
     interner: &AtomInterner,
+    shadowed: &rustc_hash::FxHashSet<u32>,
     types: &mut TyTable,
     signatures: &mut Vec<Signature>,
     expr_table: &FxHashMap<AstId, crate::checker::TypeEntry>,
@@ -55,6 +56,7 @@ pub(super) fn lower_top_level(
                     fn_index,
                     global_slots,
                     interner,
+                    shadowed,
                     &mut top,
                     &mut top_body,
                 );
@@ -64,9 +66,27 @@ pub(super) fn lower_top_level(
                 class_ord += 1;
                 top_body.extend(top.lower_stmt_as_block(stmt));
             }
-            StmtKind::Decl(d) if free_function(d).is_some_and(|f| !f.decorators.is_empty()) => {
+            StmtKind::Decl(d)
+                if free_function(d).is_some_and(|f| {
+                    f.decorators.iter().any(|dd| {
+                        !varn_core::ast::decorators::is_active_builtin(
+                            ast_arena,
+                            interner,
+                            |off| shadowed.contains(&off),
+                            dd,
+                        )
+                    })
+                }) =>
+            {
                 if let Some(f) = free_function(d) {
-                    emit_fn_decorator_app(f, global_slots, interner, &mut top, &mut top_body);
+                    emit_fn_decorator_app(
+                        f,
+                        global_slots,
+                        interner,
+                        shadowed,
+                        &mut top,
+                        &mut top_body,
+                    );
                 }
             }
             StmtKind::Decl(d) if variable_decl(d).is_none() => {}

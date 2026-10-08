@@ -171,9 +171,6 @@ pub fn parse_class_member(
 
     if s.check(TokenKind::Constructor) {
         s.advance();
-        if !decorators.is_empty() {
-            return Err("decorators are not supported on constructors".to_owned());
-        }
         let params = super::super::patterns::parse_params(s)?;
         let body = if class_is_declare {
             if s.check(TokenKind::LBrace) {
@@ -188,6 +185,7 @@ pub fn parse_class_member(
         return Ok(ClassMember::Constructor {
             params,
             body,
+            decorators,
             range: full_range,
         });
     }
@@ -223,9 +221,6 @@ pub fn parse_class_member(
 
     if is_get {
         s.advance();
-        if !decorators.is_empty() {
-            return Err("decorators are not supported on getters".to_owned());
-        }
         let key = member_key_name(s)?;
         s.expect(TokenKind::LParen)?;
         s.expect(TokenKind::RParen)?;
@@ -249,14 +244,12 @@ pub fn parse_class_member(
             return_type,
             body,
             modifiers: mods,
+            decorators,
             range: full_range,
         });
     }
     if is_set {
         s.advance();
-        if !decorators.is_empty() {
-            return Err("decorators are not supported on setters".to_owned());
-        }
         let key = member_key_name(s)?;
         s.expect(TokenKind::LParen)?;
         let param = super::super::patterns::parse_single_param(s)?;
@@ -276,6 +269,7 @@ pub fn parse_class_member(
             param,
             body,
             modifiers: mods,
+            decorators,
             range: full_range,
         });
     }
@@ -331,9 +325,6 @@ pub fn parse_class_member(
     };
     s.eat_semicolon();
     let full_range = s.span_from(range);
-    if !decorators.is_empty() {
-        return Err("decorators are not supported on properties".to_owned());
-    }
     Ok(ClassMember::Property {
         key: s.interner.intern(&key),
         type_ann,

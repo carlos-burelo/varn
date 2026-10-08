@@ -11,6 +11,7 @@ mod decl_fn;
 mod decl_misc;
 mod decl_var;
 mod decls;
+pub(crate) mod decorator_signature;
 mod definite_assignment;
 mod records;
 mod refine;
@@ -24,7 +25,8 @@ use crate::scope::ScopeId;
 use crate::symbol::SymbolId;
 use crate::types::{ObjectTypeMember, Type};
 pub use records::{
-    CheckOptions, CheckProfile, CheckResult, Desugarings, ExprInfo, ScopeSpan, TypeEntry,
+    CheckOptions, CheckProfile, CheckResult, Desugarings, ExprInfo, ScopeSpan, TestTarget,
+    TypeEntry,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -85,6 +87,9 @@ pub struct Checker<'r> {
     pub(crate) member_resolutions: FxHashMap<u32, MemberResolution>,
     pub(crate) call_resolutions: FxHashMap<u32, CallResolution>,
     pub(crate) match_gaps: FxHashMap<varn_core::ast::AstId, crate::semantic_info::MatchGap>,
+    pub(crate) warned_deprecated: FxHashSet<(crate::symbol::SymbolId, u32)>,
+    pub(crate) pure_scope: Option<crate::scope::ScopeId>,
+    pub(crate) enclosing_caps: Option<Vec<String>>,
     pub(crate) ty_table: std::sync::Arc<crate::types::CheckerTyTable>,
 }
 
@@ -189,6 +194,16 @@ impl<'r> Checker<'r> {
         }
 
         let expr_table = std::mem::take(&mut checker.expr_table);
+        let mut test_targets = Vec::new();
+        for sym in bind.arena.all() {
+            if sym.is_test && sym.origin_module.is_none() {
+                test_targets.push(crate::checker::TestTarget {
+                    name: Arc::from(bind.interner.resolve(sym.name)),
+                    file: source_file.clone(),
+                    is_async: sym.is_async,
+                });
+            }
+        }
         if !final_diagnostics.has_errors() {
             if let Some(&id) = expr_table
                 .iter()
@@ -267,6 +282,7 @@ impl<'r> Checker<'r> {
             expr_table,
             call_mappings: checker.call_mappings,
             desugar: checker.desugar,
+            test_targets,
         }
     }
 }

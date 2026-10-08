@@ -22,12 +22,14 @@ pub(crate) fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
         return RuntimeKind::Str.name();
     }
     if val.is_heap() {
-        return match heap.get(val.as_heap()) {
+        let r = val.as_heap();
+        return match heap.get(r) {
             Some(obj) => obj.tag().name(),
-            None => RuntimeKind::Object.name(),
+            None if heap.instance(r).is_some() => RuntimeKind::Object.name(),
+            None => varn_core::UNKNOWN,
         };
     }
-    "unknown"
+    varn_core::UNKNOWN
 }
 
 pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {

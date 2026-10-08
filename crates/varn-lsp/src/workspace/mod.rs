@@ -39,13 +39,19 @@ impl Workspace {
     }
 
     pub fn source_of(&self, uri: &str) -> Option<String> {
-        let file_id = self.db.intern(uri);
+        let file_id = self.db.file_id(uri)?;
         self.db
             .get_source(file_id)
             .map(|(_, text)| text.to_string())
     }
 
     pub fn update_file(&self, uri: String, source: String) {
+        if let Some(existing) = self.files.get(&uri) {
+            if existing.source == source {
+                return;
+            }
+        }
+
         resolver::invalidate(&Self::module_id_of(&uri));
 
         let file_id = self.db.intern(&uri);
@@ -68,7 +74,7 @@ impl Workspace {
         self.exports.insert(file_id, current_exports);
 
         let dependents: Vec<(String, String)> = if exports_changed {
-            let idx = self.index.read().unwrap();
+            let idx = self.index.read().unwrap_or_else(|e| e.into_inner());
             idx.dependents_of(&uri)
                 .filter_map(|dep_uri: &str| {
                     self.files
@@ -81,7 +87,7 @@ impl Workspace {
         };
 
         {
-            let mut idx = self.index.write().unwrap();
+            let mut idx = self.index.write().unwrap_or_else(|e| e.into_inner());
             idx.update_file(&uri, &state);
         }
         self.files.insert(uri.clone(), state);
@@ -89,14 +95,14 @@ impl Workspace {
         for (dep_uri, dep_source) in dependents {
             let dep_state = Arc::new(run_pipeline(dep_source, dep_uri.clone()));
             {
-                let mut idx = self.index.write().unwrap();
+                let mut idx = self.index.write().unwrap_or_else(|e| e.into_inner());
                 idx.update_file(&dep_uri, &dep_state);
             }
             self.files.insert(dep_uri, dep_state);
         }
 
         {
-            let mut rev = self.revision.write().unwrap();
+            let mut rev = self.revision.write().unwrap_or_else(|e| e.into_inner());
             rev.bump();
         }
     }
@@ -114,7 +120,7 @@ impl Workspace {
         let current_exports = extract_exports(&state);
         self.exports.insert(file_id, current_exports);
         {
-            let mut idx = self.index.write().unwrap();
+            let mut idx = self.index.write().unwrap_or_else(|e| e.into_inner());
             idx.update_file(&uri, &state);
         }
     }
@@ -125,15 +131,23 @@ impl Workspace {
 
     pub fn remove_file(&self, uri: &str) {
         resolver::invalidate(&Self::module_id_of(uri));
-        let file_id = self.db.intern(uri);
-        self.exports.remove(&file_id);
+        if let Some(file_id) = self.db.file_id(uri) {
+            self.exports.remove(&file_id);
+        }
         self.files.remove(uri);
-        let mut idx = self.index.write().unwrap();
+        let mut idx = self.index.write().unwrap_or_else(|e| e.into_inner());
         idx.remove_file(uri);
     }
 
     pub fn get(&self, uri: &str) -> Option<Arc<DocumentState>> {
         self.files.get(uri).map(|r| Arc::clone(r.value()))
+    }
+
+    pub fn get_fresh(&self, uri: &str) -> Option<Arc<DocumentState>> {
+        if let Some(source) = self.source_of(uri) {
+            self.update_file(uri.to_owned(), source);
+        }
+        self.get(uri)
     }
 
     pub fn iter(&self) -> dashmap::iter::Iter<'_, String, Arc<DocumentState>> {
@@ -145,7 +159,10 @@ impl Workspace {
     }
 
     pub fn revision(&self) -> u32 {
-        self.revision.read().unwrap().current()
+        self.revision
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .current()
     }
 }
 

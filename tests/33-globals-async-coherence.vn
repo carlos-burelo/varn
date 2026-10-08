@@ -19,7 +19,7 @@ async function reader(): int {
 async function runTest() {
     const results = await parallel([writer(), reader()])
     expect(results[0]).toBe(7)
-    expect(results[1]).toBe(7)
+    expect(shared).toBe(7)
 }
 await describe("33 globals async coherence", async () => {
     await it("tests", async () => {

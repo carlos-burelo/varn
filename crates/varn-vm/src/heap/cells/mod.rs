@@ -12,9 +12,6 @@ use varn_types::cell::{
 };
 use varn_types::HeapRef;
 
-pub(crate) const INSTANCE_DATA_OFF: usize =
-    varn_types::cell::instance_data_off(std::mem::size_of::<HeapObj>());
-
 const MAJOR_MARK: u8 = 0x80;
 
 const _: () = assert!(HEADER_BYTES == 8);
@@ -22,7 +19,6 @@ const _: () = assert!(HEADER_BYTES == std::mem::size_of::<ObjHeader>());
 const _: () = assert!(HEADER_STATE_OFF == std::mem::offset_of!(ObjHeader, state));
 const _: () = assert!(HEADER_KIND_OFF == std::mem::offset_of!(ObjHeader, kind));
 const _: () = assert!(HEADER_CLASS_OFF == std::mem::offset_of!(ObjHeader, class));
-const _: () = assert!(INSTANCE_DATA_OFF == HEADER_BYTES + std::mem::size_of::<HeapObj>());
 
 #[repr(C)]
 pub(in crate::heap) struct ObjHeader {
@@ -130,18 +126,33 @@ impl CellSpace {
     #[inline(always)]
     pub(crate) fn get(&self, r: HeapRef) -> &HeapObj {
         debug_assert_ne!(self.state(r), SlotState::Free, "reference to a freed cell");
+        debug_assert_ne!(
+            header(r).kind,
+            varn_types::cell::CELL_KIND_INSTANCE,
+            "colocated instance has no HeapObj; use instance()"
+        );
         unsafe { &*body::<HeapObj>(r) }
     }
 
     #[inline(always)]
     pub(crate) fn get_mut(&mut self, r: HeapRef) -> &mut HeapObj {
         debug_assert_ne!(self.state(r), SlotState::Free, "reference to a freed cell");
+        debug_assert_ne!(
+            header(r).kind,
+            varn_types::cell::CELL_KIND_INSTANCE,
+            "colocated instance has no HeapObj; use instance()"
+        );
         unsafe { &mut *body::<HeapObj>(r) }
     }
 
     #[inline(always)]
     pub(crate) fn state(&self, r: HeapRef) -> SlotState {
         SlotState::from_byte(header(r).state)
+    }
+
+    #[inline(always)]
+    pub(crate) fn header_kind(&self, r: HeapRef) -> u8 {
+        header(r).kind
     }
 
     #[inline(always)]
@@ -157,7 +168,9 @@ impl CellSpace {
     pub(crate) fn release(&mut self, r: HeapRef) {
         let h = header(r);
         let class = h.class;
-        unsafe { Self::drop_object(r) };
+        if h.kind != varn_types::cell::CELL_KIND_INSTANCE {
+            unsafe { Self::drop_object(r) };
+        }
         h.state = SlotState::Free as u8;
         if class == CELL_CLASS_LARGE {
             let at = self
@@ -217,10 +230,6 @@ impl CellSpace {
             .filter(|&r| header(r).state != SlotState::Free as u8)
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (HeapRef, &HeapObj, SlotState)> + '_ {
-        self.refs().map(move |r| (r, self.get(r), self.state(r)))
-    }
-
     pub(crate) fn sweep_major(&mut self) -> usize {
         let mut dead: Vec<HeapRef> = Vec::new();
         let mut survivors = 0;
@@ -245,6 +254,9 @@ impl Drop for CellSpace {
     fn drop(&mut self) {
         let live: Vec<HeapRef> = self.refs().collect();
         for r in live {
+            if header(r).kind == varn_types::cell::CELL_KIND_INSTANCE {
+                continue;
+            }
             unsafe { Self::drop_object(r) };
         }
         for class in &self.classes {
@@ -260,23 +272,22 @@ impl Drop for CellSpace {
 
 #[cfg(test)]
 mod geometry_tests {
-    use super::*;
-    use varn_types::value::InstanceData;
-
     #[test]
     fn shared_instance_math_matches_slow_path() {
-        let hob = std::mem::size_of::<HeapObj>();
-        for payload in [0u32, 1, 7, 8, 9, 15, 16, 24, 64, 1000, 5000] {
-            let tail = INSTANCE_DATA_OFF - HEADER_BYTES;
-            let slow_body = tail + InstanceData::bytes_for(payload);
-            let shared_body = varn_types::cell::instance_body_bytes(hob, payload);
-            assert_eq!(shared_body, slow_body, "payload {payload}");
-            let slow_total = HEADER_BYTES + slow_body;
-            let shared_total = varn_types::cell::instance_cell_bytes(hob, payload);
-            assert_eq!(shared_total, slow_total, "payload {payload}");
-            assert_eq!(
-                varn_types::cell::class_for(shared_total),
-                varn_types::cell::class_for(slow_total),
+        use varn_types::cell;
+        for payload in [0u32, 1, 7, 8, 9, 15, 16, 24, 64] {
+            let body = cell::instance_colocated_body_bytes(payload);
+            assert_eq!(body, 8 + (payload as usize).div_ceil(8) * 8);
+            let total = cell::HEADER_BYTES + body;
+            let cls = cell::class_for(total).expect("instance fits a class");
+            assert!(cell::CELL_CLASSES[cls] >= total);
+        }
+        for payload in [100000u32, 500000] {
+            let body = cell::instance_colocated_body_bytes(payload);
+            let total = cell::HEADER_BYTES + body;
+            assert!(
+                cell::class_for(total).is_none(),
+                "payload {payload} goes large"
             );
         }
     }

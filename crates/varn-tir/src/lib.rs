@@ -16,7 +16,7 @@ pub use node::{
 mod module;
 pub use module::{
     TirClassAccessor, TirClassDef, TirClassMember, TirExport, TirFunction, TirImport,
-    TirImportKind, TirImportSpec, TirModule, TirVariantDef,
+    TirImportKind, TirImportSpec, TirModule, TirPropertyDecorator, TirVariantDef,
 };
 
 mod tables;

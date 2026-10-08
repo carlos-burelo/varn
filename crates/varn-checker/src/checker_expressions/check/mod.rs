@@ -84,9 +84,14 @@ impl<'r> Checker<'r> {
                 type_ann,
             } => self.check_satisfies(*expression, type_ann, range, bind),
             ExprKind::Await { argument } => self.check_await(*argument, range, bind),
-            ExprKind::Spawn { argument } => self.check_expr(*argument, bind),
+            ExprKind::Spawn { argument } => {
+                if self.pure_scope.is_some() {
+                    self.forbid_pure("spawn tasks (pure functions are synchronous)", range);
+                }
+                self.check_expr(*argument, bind)
+            }
             ExprKind::Try { expression } => self.check_try(*expression, range, bind),
-            ExprKind::Yield { argument, .. } => self.check_yield(*argument, bind),
+            ExprKind::Yield { argument, .. } => self.check_yield(*argument, range, bind),
             ExprKind::Unary { op, operand, .. } => {
                 self.check_unary(expr, *op, *operand, arena, bind)
             }

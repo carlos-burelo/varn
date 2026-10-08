@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{Position, Range, SelectionRange};
+use tower_lsp_f::lsp_types::{Position, Range, SelectionRange};
 use varn_core::ast::{Arg, AstArena, ExprId, ExprKind, Program, StmtId, StmtKind};
 use varn_core::source::SourceRange;
 

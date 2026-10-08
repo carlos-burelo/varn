@@ -37,8 +37,14 @@ impl Heap {
         };
 
         let mut counts: FxHashMap<&'static str, (usize, usize)> = FxHashMap::default();
-        for (_, obj, state) in inner.cells.iter() {
-            let row = counts.entry(type_name(obj)).or_default();
+        for r in inner.cells.refs() {
+            let state = inner.cells.state(r);
+            let name = if inner.cells.header_kind(r) == varn_types::cell::CELL_KIND_INSTANCE {
+                "instance"
+            } else {
+                type_name(inner.cells.get(r))
+            };
+            let row = counts.entry(name).or_default();
             match state {
                 SlotState::Young | SlotState::Marked => row.0 += 1,
                 SlotState::Old | SlotState::Remembered => row.1 += 1,

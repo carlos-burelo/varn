@@ -137,6 +137,9 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
     if !obj.is_heap() {
         return Err(RuntimeError::new("OpGetIndex: not indexable"));
     }
+    if heap.instance(obj.as_heap()).is_some() {
+        return index_instance_fallback(obj, key, heap);
+    }
     match heap.get(obj.as_heap()) {
         Some(HeapObj::Object(o) | HeapObj::Record(o)) => {
             let mut buf = [0u8; 5];
@@ -187,34 +190,33 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
                 .and_then(|k| m.borrow().get(&k).copied());
             Ok(found.unwrap_or_else(VmValue::null))
         }
-        Some(
-            HeapObj::Instance(_)
-            | HeapObj::Class(_)
-            | HeapObj::Module(_)
-            | HeapObj::FrozenModule(_),
-        ) => {
-            let mut buf = [0u8; 5];
-            let key_str: String = if key.is_sso() {
-                key.sso_as_str(&mut buf).to_string()
-            } else if key.is_heap() {
-                match heap.get(key.as_heap()) {
-                    Some(HeapObj::Str(s)) => s.as_str().to_string(),
-                    _ => heap.str_repr(key),
-                }
-            } else {
-                heap.str_repr(key)
-            };
-            match crate::exec::props::get_property(obj, &key_str, heap) {
-                Ok(v) if !v.is_null() => Ok(v),
-                _ => match crate::exec::props::find_getter(obj, &key_str, heap) {
-                    Some(g) => Ok(crate::exec::props::bind_method_to_receiver(
-                        heap, obj, g, None,
-                    )),
-                    None => Ok(VmValue::null()),
-                },
-            }
+        Some(HeapObj::Class(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_)) => {
+            index_instance_fallback(obj, key, heap)
         }
         _ => Err(RuntimeError::new("OpGetIndex: not indexable")),
+    }
+}
+
+fn index_instance_fallback(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    let mut buf = [0u8; 5];
+    let key_str: String = if key.is_sso() {
+        key.sso_as_str(&mut buf).to_string()
+    } else if key.is_heap() {
+        match heap.get(key.as_heap()) {
+            Some(HeapObj::Str(s)) => s.as_str().to_string(),
+            _ => heap.str_repr(key),
+        }
+    } else {
+        heap.str_repr(key)
+    };
+    match crate::exec::props::get_property(obj, &key_str, heap) {
+        Ok(v) if !v.is_null() => Ok(v),
+        _ => match crate::exec::props::find_getter(obj, &key_str, heap) {
+            Some(g) => Ok(crate::exec::props::bind_method_to_receiver(
+                heap, obj, g, None,
+            )),
+            None => Ok(VmValue::null()),
+        },
     }
 }
 

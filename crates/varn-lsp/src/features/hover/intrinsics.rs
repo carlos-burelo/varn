@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
+use tower_lsp_f::lsp_types::{Contents, Hover, MarkupContent, MarkupKind};
 use varn_core::TokenKind;
 
 use crate::document::{DocumentState, TokenRecord};
@@ -128,23 +128,23 @@ pub fn decorator_hover(name: &str) -> Option<Hover> {
     match name {
         "inline" => Some(make_doc_hover(
             "@inline",
-            "Instruye al compilador y al JIT a expandir el cuerpo de la función directamente en el sitio de llamada para eliminar sobrecoste de llamadas.",
+            "Garantiza la expansión del cuerpo en el sitio de llamada o falla la compilación. Solo funciones libres con un único `return`; nada de async, generadores, rest ni recursión.",
         )),
         "deprecated" => Some(make_doc_hover(
             "@deprecated(reason?: str)",
-            "Marca el símbolo como obsoleto. El compilador y el LSP emitirán advertencias diagnósticas en sitios de uso.",
+            "Marca el símbolo como obsoleto. El compilador emite advertencia `deprecated-use` en cada uso.",
         )),
         "test" => Some(make_doc_hover(
-            "@test(name?: str)",
-            "Registra la función como caso de prueba automatizado para el comando `vn test`.",
+            "@test",
+            "Registra la función sin parámetros como caso de prueba: `vn test` la ejecuta aislada con estado de módulo fresco.",
         )),
         "pure" => Some(make_doc_hover(
             "@pure",
-            "Declara que la función no tiene efectos secundarios observables, habilitando optimizaciones agresivas de eliminación de código muerto (DCE) y subexpresiones comunes (CSE).",
+            "Declara la función pura. El compilador rechaza throw, await/spawn/yield, `new`, mutación no local y llamadas a funciones no marcadas `@pure`.",
         )),
         "capability" => Some(make_doc_hover(
-            "@capability(domain: str)",
-            "Especifica el permiso de seguridad necesario para que un isolate pueda invocar esta función en la frontera del sistema host.",
+            "@capability(domain: str, ...)",
+            "Declara la capacidad de host que la función requiere. Quien la llame debe declararla también para propagar; el toplevel tiene autoridad ambiental.",
         )),
         _ => None,
     }
@@ -152,7 +152,7 @@ pub fn decorator_hover(name: &str) -> Option<Hover> {
 
 fn make_doc_hover(sig: &str, doc: &str) -> Hover {
     Hover {
-        contents: HoverContents::Markup(MarkupContent {
+        contents: Contents::MarkupContent(MarkupContent {
             kind: MarkupKind::Markdown,
             value: format!("```varn\n{}\n```\n***\n{}", sig, doc),
         }),

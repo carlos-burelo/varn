@@ -37,7 +37,7 @@ await describe("35 decimal bigint", async () => {
         const pi_d: decimal = 3.14159d
         expect(pi_d.toFixed(2)).toBe("3.14")
         expect(pi_d.toFixed(0)).toBe("3")
-        expect(pi_d.toFixed(4) === "3.1415" || pi_d.toFixed(4) === "3.1416").toBeTruthy()
+        expect(pi_d.toFixed(4)).toBe("3.1416")
         
         // Instance methods
         const neg: decimal = -7.5d

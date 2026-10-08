@@ -1,7 +1,6 @@
-use super::{body, header, CellSpace, SlotState, INSTANCE_DATA_OFF};
+use super::{body, header, CellSpace, SlotState};
 use crate::heap::obj::HeapObj;
 use std::rc::Rc;
-use varn_types::cell::HEADER_BYTES;
 use varn_types::value::{InstanceData, InstanceRef, ObjData, Shape};
 use varn_types::HeapRef;
 
@@ -20,11 +19,14 @@ impl CellSpace {
         payload_size: u32,
         state: SlotState,
     ) -> (HeapRef, InstanceRef) {
-        let tail = INSTANCE_DATA_OFF - HEADER_BYTES;
-        let r = self.take_cell(tail + InstanceData::bytes_for(payload_size), 0, state);
-        let data = (r.addr() as usize + INSTANCE_DATA_OFF) as *mut u8;
+        use varn_types::cell::CELL_KIND_INSTANCE;
+        let r = self.take_cell(
+            varn_types::cell::instance_colocated_body_bytes(payload_size),
+            CELL_KIND_INSTANCE,
+            state,
+        );
+        let data = (r.addr() as usize + varn_types::cell::INST_CELL_DATA_OFF) as *mut u8;
         let inst = unsafe { InstanceData::init_at(data, class_id, payload_size) };
-        Self::place(r, HeapObj::Instance(inst));
         (r, inst)
     }
 

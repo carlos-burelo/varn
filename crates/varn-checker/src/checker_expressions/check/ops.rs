@@ -55,6 +55,12 @@ impl<'r> Checker<'r> {
         arena: &varn_core::ast::AstArena,
         bind: &BindResult,
     ) {
+        if self.pure_scope.is_some() {
+            self.forbid_pure(
+                "allocate with 'new' (constructors cannot prove purity)",
+                range,
+            );
+        }
         let cls_name = match &arena.expr(callee).kind {
             ExprKind::Identifier { name } => Some(bind.interner.resolve(*name)),
             ExprKind::Member {

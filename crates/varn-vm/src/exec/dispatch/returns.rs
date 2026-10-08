@@ -51,11 +51,13 @@ impl ExecCtx {
             return RuntimeKind::Str.name();
         }
         if !v.is_heap() {
-            return "unknown";
+            return varn_core::UNKNOWN;
         }
-        match self.heap.get(v.as_heap()) {
+        let r = v.as_heap();
+        match self.heap.get(r) {
             Some(obj) => obj.tag().name(),
-            None => "unknown",
+            None if self.heap.instance(r).is_some() => RuntimeKind::Object.name(),
+            None => varn_core::UNKNOWN,
         }
     }
 }

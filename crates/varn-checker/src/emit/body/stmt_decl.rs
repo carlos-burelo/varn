@@ -30,17 +30,52 @@ impl<'a> FnEmitter<'a> {
                 None,
                 Span::EMPTY,
             );
-            return vec![TirStmt::Let {
+            let mut stmts = vec![TirStmt::Let {
                 local,
                 ty: dyn_ty,
                 init: Some(closure),
             }];
+            for d in f.decorators.iter().rev().filter(|d| {
+                !varn_core::ast::decorators::is_active_builtin(
+                    self.ast_arena,
+                    self.m.interner,
+                    |off| self.m.shadowed.contains(&off),
+                    d,
+                )
+            }) {
+                let prev = TirExpr {
+                    kind: TirExprKind::Var,
+                    ty: dyn_ty,
+                    res: Resolution::Local(local),
+                    span: Span::EMPTY,
+                };
+                let deco = self.lower_expr(d.expression);
+                let applied = super::super::decorators::apply_one_decorator(self, prev, deco);
+                stmts.extend(std::mem::take(&mut self.pending));
+                stmts.push(TirStmt::Expr(TirExpr {
+                    kind: TirExprKind::Assign {
+                        target: Box::new(TirExpr {
+                            kind: TirExprKind::Var,
+                            ty: dyn_ty,
+                            res: Resolution::Local(local),
+                            span: Span::EMPTY,
+                        }),
+                        value: Box::new(applied),
+                    },
+                    ty: BackendTy::Void,
+                    res: Resolution::None,
+                    span: Span::EMPTY,
+                }));
+                stmts.extend(std::mem::take(&mut self.pending));
+            }
+            return stmts;
         }
 
         if let Decl::Namespace(ns) = unwrapped {
             let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
             let local = self.bind_local(Arc::from(self.m.interner.resolve(ns.id)), dyn_ty);
             let mut entries: Vec<varn_tir::TirObjectEntry> = Vec::new();
+            let mut pre: Vec<TirStmt> = Vec::new();
             for m in &ns.body {
                 let Decl::Export(ExportDecl::Decl { declaration, .. }) = m else {
                     continue;
@@ -55,9 +90,22 @@ impl<'a> FnEmitter<'a> {
                         None,
                         Span::EMPTY,
                     );
+                    let mut value = closure;
+                    for d in f.decorators.iter().rev().filter(|d| {
+                        !varn_core::ast::decorators::is_active_builtin(
+                            self.ast_arena,
+                            self.m.interner,
+                            |off| self.m.shadowed.contains(&off),
+                            d,
+                        )
+                    }) {
+                        let deco = self.lower_expr(d.expression);
+                        value = super::super::decorators::apply_one_decorator(self, value, deco);
+                        pre.extend(std::mem::take(&mut self.pending));
+                    }
                     entries.push(varn_tir::TirObjectEntry::Field {
                         name: Arc::from(self.m.interner.resolve(f.id)),
-                        value: closure,
+                        value,
                     });
                 }
             }
@@ -67,11 +115,12 @@ impl<'a> FnEmitter<'a> {
                 res: Resolution::None,
                 span: Span::EMPTY,
             };
-            return vec![TirStmt::Let {
+            pre.push(TirStmt::Let {
                 local,
                 ty: dyn_ty,
                 init: Some(obj),
-            }];
+            });
+            return pre;
         }
         let v = match decl {
             Decl::Variable(v) => v,

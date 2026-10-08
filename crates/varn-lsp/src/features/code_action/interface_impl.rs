@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use tower_lsp::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, Position, Range, TextEdit, WorkspaceEdit,
+use tower_lsp_f::lsp_types::{
+    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, WorkspaceEdit,
 };
 use varn_core::ast::{ClassDecl, ClassMember, Decl, InterfaceDecl, InterfaceMember, StmtKind};
 
@@ -10,10 +10,10 @@ use crate::index::ProjectIndex;
 pub fn generate_interface_impl_action(
     state: &DocumentState,
     index: Option<&ProjectIndex>,
-    uri: &tower_lsp::lsp_types::Url,
+    uri: &tower_lsp_f::lsp_types::Uri,
     cursor_line: u32,
     _cursor_col: u32,
-) -> Option<CodeActionOrCommand> {
+) -> Option<CodeActionResponse> {
     let program = state.ast.as_ref()?;
     let class_decl = find_class_at_line(state, program, cursor_line)?;
 
@@ -117,9 +117,9 @@ pub fn generate_interface_impl_action(
                 }],
             );
 
-            return Some(CodeActionOrCommand::CodeAction(CodeAction {
+            return Some(CodeActionResponse::CodeAction(CodeAction {
                 title: format!("💡 Implement missing members of interface '{}'", iface_name),
-                kind: Some(CodeActionKind::QUICKFIX),
+                kind: Some(CodeActionKind::QuickFix),
                 diagnostics: None,
                 edit: Some(WorkspaceEdit {
                     changes: Some(changes),
@@ -129,6 +129,7 @@ pub fn generate_interface_impl_action(
                 command: None,
                 is_preferred: Some(true),
                 disabled: None,
+                tags: None,
                 data: None,
             }));
         }

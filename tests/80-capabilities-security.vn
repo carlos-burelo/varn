@@ -38,8 +38,8 @@ await describe("80 capabilities security", async () => {
         
         // 4. Comprobación de lectura de variables de entorno
         let os_val = Env.get("OS");
-        // En Windows OS es "Windows_NT", en Unix puede ser vacío pero no debe crashear
-        expect(typeof os_val).toBe("str");
+        // En Windows OS es "Windows_NT", en Unix puede estar ausente ("" o null) pero no debe crashear
+        expect(os_val === null || typeof os_val === "str").toBeTruthy();
         
         
     });

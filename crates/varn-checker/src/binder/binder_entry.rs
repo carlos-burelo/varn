@@ -80,6 +80,8 @@ impl<'r> Binder<'r> {
             array_watch: Vec::new(),
             evolved_array_types: FxHashMap::default(),
             type_decls: FxHashMap::default(),
+            pending_decorator_roles: Vec::new(),
+            user_decorators: rustc_hash::FxHashSet::default(),
         };
 
         let global = b.scopes.push(CheckerScope::new(ScopeKind::Global, None));
@@ -98,6 +100,7 @@ impl<'r> Binder<'r> {
 
         b.bind_stmts(&program.body);
         b.finalize_array_watch(global);
+        b.resolve_decorator_roles();
         Arc::make_mut(&mut b.ty_table).absorb_names(&b.interner);
 
         super::BindResult {
@@ -121,6 +124,7 @@ impl<'r> Binder<'r> {
             core: None,
             pending_enrich: b.pending_enrich,
             evolved_array_types: b.evolved_array_types,
+            user_decorators: b.user_decorators,
         }
     }
 }

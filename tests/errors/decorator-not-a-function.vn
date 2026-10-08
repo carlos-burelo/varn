@@ -1,0 +1,5 @@
+// expect: error[VN4401]
+const notFn = 42;
+
+@notFn
+class A {}

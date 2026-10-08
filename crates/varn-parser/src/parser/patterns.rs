@@ -236,7 +236,7 @@ fn parse_decorator_expr(s: &mut TokenStream) -> Result<ExprId, String> {
 
     while s.eat(TokenKind::Dot) {
         let prop_range = s.range();
-        let prop = s.consume_lexeme();
+        let prop = s.expect_id()?;
         let start_range = s.expr_range(expr);
         let prop_expr = s.expr(prop_range, ExprKind::Identifier { name: prop });
         expr = s.expr(
@@ -250,6 +250,9 @@ fn parse_decorator_expr(s: &mut TokenStream) -> Result<ExprId, String> {
         );
     }
 
+    if s.check(TokenKind::LAngle) {
+        return Err("decorators do not support generic type arguments".to_owned());
+    }
     if s.check(TokenKind::LParen) {
         let (type_args, args, call_range) = parse_call_args_pub(s)?;
         let start_range = s.expr_range(expr);

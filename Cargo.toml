@@ -21,6 +21,8 @@ members = [
     "crates/varn-compiler",
     "crates/varn-rt",
     "crates/varn-shadow",
+    "crates/varn-fmt",
+    "crates/varn-dap",
     "crates/xtask",
 ]
 resolver = "2"
@@ -39,7 +41,7 @@ num-traits   = "0.2"
 parking_lot  = "0.12.5"
 serde        = { version = "1", features = ["derive"] }
 serde_json   = "1"
-tower-lsp    = "0.20"
+tower-lsp-f  = "0.26"
 ryu          = "1.0"
 postcard     = { version = "1", features = ["alloc"] }
 tokio        = { version = "1", features = ["full"] }
@@ -108,6 +110,14 @@ codegen-units = 16
 debug = 0
 
 [profile.quick.build-override]
+opt-level = 0
+
+# Iteration profile for day-to-day editing (LSP/DAP/extension dev loop).
+# Same shape as `quick` (no LTO, no debuginfo) but without optimization,
+# so codegen is ~2-3x faster. Runtime is slower: never use it for the
+# validation matrix (`verify.ps1` pins `quick`/`release`) or benchmarks.
+[profile.dev-it]
+inherits = "quick"
 opt-level = 0
 
 # Distribution profile: maximum optimization for published binaries.

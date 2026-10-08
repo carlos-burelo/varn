@@ -155,7 +155,6 @@ pub(in crate::clif) fn guard_overflow(
 pub(in crate::clif) fn emit_instance_payload(
     b: &mut FunctionBuilder,
     obj: cranelift_codegen::ir::Value,
-    olay: &crate::JitObjectLayout,
     alay: &crate::JitArrayLayout,
     invalid: cranelift_codegen::ir::Block,
 ) -> cranelift_codegen::ir::Value {
@@ -174,15 +173,17 @@ pub(in crate::clif) fn emit_instance_payload(
     let kind = b
         .ins()
         .uload8(types::I64, m, obj_payload, alay.kind_off as i32);
-    let is_inst = b
-        .ins()
-        .icmp_imm_u(IntCC::Equal, kind, olay.instance_tag as i64);
+    let is_inst = b.ins().icmp_imm_u(
+        IntCC::Equal,
+        kind,
+        varn_types::cell::CELL_KIND_INSTANCE as i64,
+    );
     let ok = b.create_block();
     b.ins().brif(is_inst, ok, &[], invalid, &[]);
     b.switch_to_block(ok);
     b.ins().iadd_imm_u(
         obj_payload,
-        (olay.instance_data_off + olay.instance_values_off) as i64,
+        (varn_types::cell::INST_CELL_DATA_OFF + varn_types::INST_PAYLOAD_OFF) as i64,
     )
 }
 

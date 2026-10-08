@@ -10,8 +10,7 @@ export {
     getMetaKey,
     hasMetaKey,
     getMetadataKeys,
-    MetaKey,
-    MethodContext
+    MetaKey
 } from "std:reflect/meta";
 
 export { Reflect } from "std:reflect/introspect";

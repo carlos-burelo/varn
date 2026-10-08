@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use tower_lsp::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, Position, Range, TextEdit, Url, WorkspaceEdit,
+use tower_lsp_f::lsp_types::{
+    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, Uri, WorkspaceEdit,
 };
 use varn_core::ast::{AstArena, ClassMember, Decl, Program, StmtId, StmtKind};
 
@@ -8,9 +8,9 @@ use crate::document::DocumentState;
 
 pub fn generate_class_member_actions(
     state: &DocumentState,
-    uri: &Url,
+    uri: &Uri,
     cursor_line: u32,
-) -> Vec<CodeActionOrCommand> {
+) -> Vec<CodeActionResponse> {
     let mut actions = Vec::new();
     let program = match &state.ast {
         Some(p) => p,
@@ -81,9 +81,9 @@ pub fn generate_class_member_actions(
         let mut changes = HashMap::new();
         changes.insert(uri.clone(), vec![edit]);
 
-        actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+        actions.push(CodeActionResponse::CodeAction(CodeAction {
             title: format!("Generate constructor for class '{class_name}'"),
-            kind: Some(CodeActionKind::REFACTOR_REWRITE),
+            kind: Some(CodeActionKind::RefactorRewrite),
             diagnostics: None,
             edit: Some(WorkspaceEdit {
                 changes: Some(changes),
@@ -93,6 +93,7 @@ pub fn generate_class_member_actions(
             command: None,
             is_preferred: Some(false),
             disabled: None,
+            tags: None,
             data: None,
         }));
     }
@@ -124,9 +125,9 @@ pub fn generate_class_member_actions(
         let mut changes = HashMap::new();
         changes.insert(uri.clone(), vec![edit]);
 
-        actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+        actions.push(CodeActionResponse::CodeAction(CodeAction {
             title: format!("Generate getters/setters for class '{class_name}'"),
-            kind: Some(CodeActionKind::REFACTOR_REWRITE),
+            kind: Some(CodeActionKind::RefactorRewrite),
             diagnostics: None,
             edit: Some(WorkspaceEdit {
                 changes: Some(changes),
@@ -136,6 +137,7 @@ pub fn generate_class_member_actions(
             command: None,
             is_preferred: Some(false),
             disabled: None,
+            tags: None,
             data: None,
         }));
     }

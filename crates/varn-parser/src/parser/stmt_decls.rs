@@ -55,6 +55,9 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Class(decl)))))
         }
         TokenKind::Interface => {
+            if !decorators.is_empty() {
+                return Some(Err("decorators are not supported on interfaces".to_owned()));
+            }
             let mut decl = match super::decls::parse_interface_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
@@ -64,6 +67,11 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Interface(decl)))))
         }
         TokenKind::Type => {
+            if !decorators.is_empty() {
+                return Some(Err(
+                    "decorators are not supported on type aliases".to_owned()
+                ));
+            }
             let mut decl = match super::decls::parse_type_alias_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
@@ -75,6 +83,9 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(decl))))
         }
         TokenKind::Enum => {
+            if !decorators.is_empty() {
+                return Some(Err("decorators are not supported on enums".to_owned()));
+            }
             let mut decl = match super::decls::parse_enum_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
@@ -84,6 +95,9 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Enum(decl)))))
         }
         TokenKind::Namespace | TokenKind::Module => {
+            if !decorators.is_empty() {
+                return Some(Err("decorators are not supported on namespaces".to_owned()));
+            }
             let mut decl = match super::decls::parse_namespace_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
@@ -93,6 +107,9 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Namespace(decl)))))
         }
         TokenKind::Struct => {
+            if !decorators.is_empty() {
+                return Some(Err("decorators are not supported on structs".to_owned()));
+            }
             let mut decl = match super::decls::parse_struct_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
@@ -102,6 +119,9 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Struct(decl)))))
         }
         TokenKind::Extension => {
+            if !decorators.is_empty() {
+                return Some(Err("decorators are not supported on extensions".to_owned()));
+            }
             let decl = match super::decls::parse_extension_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
@@ -110,6 +130,11 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Extension(decl)))))
         }
         TokenKind::Let | TokenKind::Const | TokenKind::Var => {
+            if !decorators.is_empty() {
+                return Some(Err(
+                    "decorators are not supported on variable declarations".to_owned()
+                ));
+            }
             let mut decl = match super::decls::parse_var_decl_with_declare(s, is_declare) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
@@ -120,6 +145,9 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Variable(decl)))))
         }
         TokenKind::Import => {
+            if !decorators.is_empty() {
+                return Some(Err("decorators are not supported on imports".to_owned()));
+            }
             let decl = match super::decls::parse_import_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),

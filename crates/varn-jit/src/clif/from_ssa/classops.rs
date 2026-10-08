@@ -55,8 +55,9 @@ pub(super) fn emit_alloc_instance(
 ) -> Result<cranelift_codegen::ir::Value, String> {
     use varn_types::cell;
     let ia = &ctx.helpers.instance_alloc;
-    let total_bytes = cell::instance_cell_bytes(ia.heap_obj_bytes, payload_size) as i64;
-    let data_off = cell::instance_data_off(ia.heap_obj_bytes) as i64;
+    let body_bytes = cell::instance_colocated_body_bytes(payload_size) as i64;
+    let total_bytes = (cell::HEADER_BYTES as i64) + body_bytes;
+    let data_off = cell::INST_CELL_DATA_OFF as i64;
     let Some(class_idx) = cell::class_for(total_bytes as usize) else {
         return emit_alloc_instance_slow(b, ctx, values, class);
     };
@@ -186,7 +187,7 @@ pub(super) fn emit_alloc_instance(
 
     b.switch_to_block(header_blk);
     let r = b.block_params(header_blk)[0];
-    let header_imm = 3i64 | ((ia.instance_tag as i64) << 8) | ((class_idx as i64) << 16);
+    let header_imm = 3i64 | ((cell::CELL_KIND_INSTANCE as i64) << 8) | ((class_idx as i64) << 16);
     let header_v = b.ins().iconst(types::I64, header_imm);
     b.ins().store(flags, header_v, r, 0);
     let data = b.ins().iadd_imm_u(r, data_off);
@@ -230,33 +231,6 @@ pub(super) fn emit_alloc_instance(
     if rem >= 1 {
         b.ins().store(flags, zero8, data, rem_off as i32);
     }
-    let body = r;
-    let body_plus = b.ins().iadd_imm_u(body, 8);
-    let hob = ia.heap_obj_bytes as i64;
-    let mut boff = 0i64;
-    while boff + 8 <= hob {
-        b.ins().store(flags, zero64, body_plus, boff as i32);
-        boff += 8;
-    }
-    let mut brem = (hob - boff) as u32;
-    let mut broff = boff;
-    if brem >= 4 {
-        b.ins().store(flags, zero32, body_plus, broff as i32);
-        broff += 4;
-        brem -= 4;
-    }
-    if brem >= 2 {
-        b.ins().store(flags, zero16, body_plus, broff as i32);
-        broff += 2;
-        brem -= 2;
-    }
-    if brem >= 1 {
-        b.ins().store(flags, zero8, body_plus, broff as i32);
-    }
-    let tag_v = b.ins().iconst(types::I8, ia.instance_tag as i64);
-    b.ins().store(flags, tag_v, body_plus, 0);
-    b.ins()
-        .store(flags, data, body_plus, ia.instance_ref_off as i32);
     let full = b
         .ins()
         .icmp(IntCC::UnsignedGreaterThanOrEqual, born_len, born_cap);

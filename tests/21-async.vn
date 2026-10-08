@@ -52,30 +52,33 @@ async function runAsync(): void {
     using failGroup = new TaskGroup<int>();
     failGroup.spawn(asyncAdd(2, 3));
     failGroup.spawn(asyncBoom());
+    let joinThrew = false;
     try {
         await failGroup.join();
-        expect(false).toBeTruthy();
     } catch (e) {
-        expect(true).toBeTruthy();
+        joinThrew = true;
     }
+    expect(joinThrew).toBeTruthy();
     using cancelGroup = new TaskGroup<int>();
     const c1 = cancelGroup.spawn(asyncAdd(10, 20));
     cancelGroup.cancel();
+    let cancelThrew = false;
     try {
         await c1;
-        expect(false).toBeTruthy();
     } catch (e) {
-        expect(true).toBeTruthy();
+        cancelThrew = true;
     }
+    expect(cancelThrew).toBeTruthy();
     using disposeGroup = new TaskGroup<int>();
     const d1 = disposeGroup.spawn(asyncAdd(30, 40));
     await disposeGroup.disposeAsync();
+    let disposeThrew = false;
     try {
         await d1;
-        expect(false).toBeTruthy();
     } catch (e) {
-        expect(true).toBeTruthy();
+        disposeThrew = true;
     }
+    expect(disposeThrew).toBeTruthy();
 }
 
 await describe("21 Async", async () => {

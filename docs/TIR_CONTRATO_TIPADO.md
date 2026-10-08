@@ -646,3 +646,42 @@ tiempo: en este repositorio hay registro de un cambio que eliminó 72
 generado se cierra con `cargo xtask compare`, que además verifica integridad.
 Los bugs de la etapa 0 son de corrección y no necesitan justificación de
 rendimiento.
+
+---
+
+## 12. Decoradores: contrato de aplicación
+
+Regla única: `decorators` viaja en orden fuente en el TIR; la aplicación es
+bottom-up (el más cercano al objetivo primero). `tests/27-decorators.vn`
+pinea el orden para clases, métodos y funciones libres.
+
+* `TirClassDef.decorators` / `TirClassMember.decorators` /
+  `TirClassAccessor.decorators` / `TirPropertyDecorator`: orden fuente; el
+  backend aplica `.rev()`. El ctor viaja en su `TirClassMember`
+  (`key == "constructor"`, `kind == "constructor"`): una sola vía, sin lista
+  separada.
+* Funciones libres y de namespace: el checker ya emite la aplicación anidada
+  en orden bottom-up (`checker/emit/decorators.rs`, `namespaces.rs`).
+* Protocolo: `Call(deco, [target])` para funciones y clases;
+  `Call(deco, [target, ctx{name, kind, isStatic, isPrivate}])` para métodos,
+  getters, setters, constructores y propiedades (en propiedades `target` es la
+  clase y el efecto es registro, sin reemplazo).
+* Contextos tipados globales (`core:decorators`, sin importar):
+  `MethodContext`, `GetterContext`, `SetterContext`, `ConstructorContext`,
+  `PropertyContext` (`{name: str; isStatic: bool; isPrivate: bool; kind: str}`).
+  `tests/116-decorator-builtins.vn` pinea formas y valores por target.
+* Un miembro decorado de instancia no puede usar `this`/`super`
+  (`InvalidDecoratorTarget`): el envoltorio pierde el receptor. Vale para
+  métodos, getters, setters y constructores, en clases y enums.
+* `null`/`void` como resultado conserva el valor previo (null-coalescencia);
+  cualquier otro resultado lo reemplaza.
+* El checker valida firma (`InvalidDecoratorSignature`): resolución del
+  decorador, aridad del protocolo y retorno callable o nulo.
+* Desambiguación por valor: un decorador cuyo nombre coincide con un builtin
+  (`deprecated`, `pure`, `inline`, `capability`, `test`) pero resuelve a un
+  valor de usuario es un decorador de usuario (se aplica en runtime y no
+  produce efectos builtin). La decisión se toma una vez en el binder
+  post-scopes (`BindResult.user_decorators`, sin hoisting porque los scopes
+  están completos) y la consumen el checker y el emit. Sin valor resoluble,
+  el nombre builtin actúa como marcador de compilación sin presencia en
+  runtime.

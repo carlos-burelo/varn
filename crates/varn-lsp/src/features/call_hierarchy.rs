@@ -1,7 +1,7 @@
 use std::sync::Arc;
-use tower_lsp::lsp_types::{
+use tower_lsp_f::lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, Position, Range,
-    SymbolKind as LspSymbolKind, Url,
+    SymbolKind as LspSymbolKind, Uri,
 };
 use varn_checker::SymbolKind;
 use varn_core::ast::{ClassMember, Decl, ExprId, ExprKind, StmtKind};
@@ -23,7 +23,7 @@ pub fn prepare_call_hierarchy(
             && matches!(sym.kind(), SymbolKind::Function | SymbolKind::Method)
             && sym.line() != u32::MAX
         {
-            let url = Url::parse(&state.uri).ok()?;
+            let uri = Uri::parse(&state.uri).ok()?;
             let range = Range {
                 start: Position {
                     line: sym.line(),
@@ -47,10 +47,10 @@ pub fn prepare_call_hierarchy(
 
             let item = CallHierarchyItem {
                 name: sym.name().to_owned(),
-                kind: LspSymbolKind::FUNCTION,
+                kind: LspSymbolKind::Function,
                 tags: None,
                 detail: Some(sym.type_str()),
-                uri: url,
+                uri,
                 range,
                 selection_range,
 
@@ -76,7 +76,7 @@ pub fn incoming_calls(
         .collect();
 
     for (file_uri, file_state) in &entries {
-        let url = match Url::parse(file_uri) {
+        let uri = match Uri::parse(file_uri) {
             Ok(u) => u,
             Err(_) => continue,
         };
@@ -84,10 +84,10 @@ pub fn incoming_calls(
         for (caller_fn_name, caller_range, call_range) in find_calls_to(file_state, target_name) {
             let caller_item = CallHierarchyItem {
                 name: caller_fn_name,
-                kind: LspSymbolKind::FUNCTION,
+                kind: LspSymbolKind::Function,
                 tags: None,
                 detail: None,
-                uri: url.clone(),
+                uri: uri.clone(),
                 range: caller_range,
                 selection_range: caller_range,
                 data: None,
@@ -123,7 +123,7 @@ pub fn outgoing_calls(
         let call_range = to_lsp_range(&call_range);
         let callee_item = CallHierarchyItem {
             name: callee_name,
-            kind: LspSymbolKind::FUNCTION,
+            kind: LspSymbolKind::Function,
             tags: None,
             detail: None,
             uri: item.uri.clone(),

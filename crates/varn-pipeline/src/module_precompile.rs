@@ -222,8 +222,9 @@ pub fn build_module_graph(
             &check.call_mappings,
             &check.desugar,
         );
-        let module_proto = varn_compiler::from_tir::compile_module(&tir, export_names)
-            .map_err(|e| format!("compile error (tir) in '{module_path}': {e:?}"))?;
+        let module_proto =
+            varn_compiler::from_tir::compile_module(&tir, export_names, module_source)
+                .map_err(|e| format!("compile error (tir) in '{module_path}': {e:?}"))?;
 
         modules.insert(module_path, module_proto);
     }

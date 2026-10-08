@@ -59,6 +59,7 @@ fn run_snippet(source: &str) {
     let opts = RunOpts {
         file_path: "(repl)".to_owned(),
         eval: Some(source.to_owned()),
+        append: None,
         verbose: false,
         no_run: false,
         debug: DebugFlags::default(),

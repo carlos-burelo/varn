@@ -7,8 +7,8 @@ pub mod match_arms;
 pub mod organize_imports;
 
 use std::collections::HashMap;
-use tower_lsp::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, Position, Range, TextEdit,
+use tower_lsp_f::lsp_types::{
+    CodeAction, CodeActionKind, CodeActionParams, CodeActionResponse, Position, Range, TextEdit,
     WorkspaceEdit,
 };
 
@@ -19,7 +19,7 @@ pub fn build_code_action(
     params: CodeActionParams,
     state: Option<&DocumentState>,
     index: Option<&ProjectIndex>,
-) -> Option<Vec<CodeActionOrCommand>> {
+) -> Option<Vec<CodeActionResponse>> {
     let mut actions = Vec::new();
     let uri = &params.text_document.uri;
     let cursor_line = params.range.start.line;
@@ -35,12 +35,13 @@ pub fn build_code_action(
                         .unwrap_or("Fix issue");
                     let mut action = CodeAction {
                         title: msg.to_string(),
-                        kind: Some(CodeActionKind::QUICKFIX),
+                        kind: Some(CodeActionKind::QuickFix),
                         diagnostics: Some(vec![diag.clone()]),
                         edit: None,
                         command: None,
                         is_preferred: Some(true),
                         disabled: None,
+                        tags: None,
                         data: None,
                     };
 
@@ -98,7 +99,7 @@ pub fn build_code_action(
                         });
                     }
 
-                    actions.push(CodeActionOrCommand::CodeAction(action));
+                    actions.push(CodeActionResponse::CodeAction(action));
                 }
             }
         }

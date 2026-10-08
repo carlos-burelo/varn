@@ -1,9 +1,9 @@
 use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
 use crate::document::DocumentState;
 use crate::util::converters::range_on_line;
-use tower_lsp::lsp_types::{
+use tower_lsp_f::lsp_types::{
     Diagnostic as LspDiagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
-    Location, Position, Range, Url,
+    Location, Position, Range, Uri,
 };
 
 pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
@@ -12,10 +12,10 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
         .iter()
         .map(|d| {
             let severity = match d.severity {
-                s if s == SEVERITY_ERROR => DiagnosticSeverity::ERROR,
-                s if s == SEVERITY_WARNING => DiagnosticSeverity::WARNING,
-                s if s == SEVERITY_HINT => DiagnosticSeverity::HINT,
-                _ => DiagnosticSeverity::INFORMATION,
+                s if s == SEVERITY_ERROR => DiagnosticSeverity::Error,
+                s if s == SEVERITY_WARNING => DiagnosticSeverity::Warning,
+                s if s == SEVERITY_HINT => DiagnosticSeverity::Hint,
+                _ => DiagnosticSeverity::Information,
             };
 
             let related_information = if d.related.is_empty() {
@@ -25,14 +25,14 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
                     .related
                     .iter()
                     .filter_map(|r| {
-                        let url = Url::parse(&r.uri).ok()?;
+                        let uri = Uri::parse(&r.uri).ok()?;
                         let pos = Position {
                             line: r.line,
                             character: r.col,
                         };
                         Some(DiagnosticRelatedInformation {
                             location: Location::new(
-                                url,
+                                uri,
                                 Range {
                                     start: pos,
                                     end: pos,
@@ -85,22 +85,22 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
                 || lower_msg.contains("never read")
                 || lower_msg.contains("never used")
             {
-                tags.push(DiagnosticTag::UNNECESSARY);
+                tags.push(DiagnosticTag::Unnecessary);
             }
             if lower_msg.contains("deprecated") {
-                tags.push(DiagnosticTag::DEPRECATED);
+                tags.push(DiagnosticTag::Deprecated);
             }
             let tags = if tags.is_empty() { None } else { Some(tags) };
             let code = d
                 .code
-                .map(|c| tower_lsp::lsp_types::NumberOrString::String(c.to_string()));
+                .map(|c| tower_lsp_f::lsp_types::Code::String(c.to_string()));
 
             LspDiagnostic {
                 range: range_on_line(d.line, d.col, d.end_col),
                 severity: Some(severity),
                 code,
                 code_description: None,
-                message: d.message.clone(),
+                message: d.message.clone().into(),
                 source: Some("varn".into()),
                 tags,
                 related_information,

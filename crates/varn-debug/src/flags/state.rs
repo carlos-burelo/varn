@@ -30,6 +30,8 @@ pub struct DebugFlags {
     pub lsp_symbols: bool,
     pub lsp_colorize: bool,
     pub lsp_hints: bool,
+    pub lsp_interact: bool,
+    pub lsp_cursors: Vec<Step>,
 
     pub tir: bool,
     pub tir_check: bool,
@@ -53,6 +55,8 @@ pub struct DebugFlags {
     pub fn_filter: Option<String>,
 }
 
+use super::steps::Step;
+
 impl DebugFlags {
     pub fn needs_execution(&self) -> bool {
         self.gc
@@ -70,6 +74,7 @@ impl DebugFlags {
         self.lsp_symbols = true;
         self.lsp_colorize = true;
         self.lsp_hints = true;
+        self.lsp_interact = true;
     }
 
     pub fn clif_all(&mut self) {

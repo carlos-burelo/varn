@@ -58,6 +58,9 @@ impl<'r> Checker<'r> {
             member_resolutions: FxHashMap::default(),
             call_resolutions: FxHashMap::default(),
             match_gaps: FxHashMap::default(),
+            warned_deprecated: FxHashSet::default(),
+            pure_scope: None,
+            enclosing_caps: None,
             ty_table,
         }
     }

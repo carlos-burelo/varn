@@ -96,11 +96,37 @@ impl<'r> Checker<'r> {
                 .with_range(range),
             );
         }
+
+        if self.pure_scope.is_some() {
+            match &arena.expr(target).kind {
+                varn_core::ast::ExprKind::Identifier { name } => {
+                    self.pure_assign_target_ok(*name, range, bind)
+                }
+                varn_core::ast::ExprKind::Member { .. } => self.forbid_pure(
+                    "mutate reachable state (only parameters and function locals can be assigned)",
+                    range,
+                ),
+                _ => {}
+            }
+        }
     }
 
     pub(super) fn check_update(&mut self, operand: ExprId, bind: &BindResult) {
         let arena = self.ast_arena;
         self.check_expr(operand, bind);
+        if self.pure_scope.is_some() {
+            let range = arena.expr(operand).range;
+            match &arena.expr(operand).kind {
+                varn_core::ast::ExprKind::Identifier { name } => {
+                    self.pure_assign_target_ok(*name, range, bind)
+                }
+                varn_core::ast::ExprKind::Member { .. } => self.forbid_pure(
+                    "mutate reachable state (only parameters and function locals can be assigned)",
+                    range,
+                ),
+                _ => {}
+            }
+        }
         if !matches!(
             &arena.expr(operand).kind,
             varn_core::ast::ExprKind::Identifier { .. } | varn_core::ast::ExprKind::Member { .. }

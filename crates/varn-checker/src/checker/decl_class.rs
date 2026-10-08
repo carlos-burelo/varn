@@ -42,6 +42,17 @@ impl<'r> Checker<'r> {
     }
 
     fn check_class_decorators(&mut self, c: &varn_core::ast::ClassDecl, bind: &BindResult) {
+        if !c.decorators.is_empty() {
+            let name =
+                c.id.map(|id| bind.interner.resolve(id))
+                    .unwrap_or("<anonymous>");
+            self.check_decorator_signatures(
+                &c.decorators,
+                super::decorator_signature::DecoratorTarget::Class,
+                name,
+                bind,
+            );
+        }
         for member in &c.body {
             match member {
                 ClassMember::Method {
@@ -75,12 +86,18 @@ impl<'r> Checker<'r> {
                     range,
                     ..
                 } if !decorators.is_empty() => {
+                    let key_str = bind.interner.resolve(*key);
+                    self.check_decorator_signatures(
+                        decorators,
+                        super::decorator_signature::DecoratorTarget::Method,
+                        key_str,
+                        bind,
+                    );
                     if super::decorator_receiver::method_uses_receiver(
                         self.ast_arena,
                         params,
                         *body,
                     ) {
-                        let key_str = bind.interner.resolve(*key);
                         self.emit(
                             Diagnostic::error(
                                 ErrorCode::InvalidDecoratorTarget,
@@ -90,20 +107,85 @@ impl<'r> Checker<'r> {
                         );
                     }
                 }
-                ClassMember::Property {
+                ClassMember::Constructor {
+                    decorators,
+                    body,
+                    params,
+                    range,
+                    ..
+                } if !decorators.is_empty() => {
+                    self.check_decorator_signatures(
+                        decorators,
+                        super::decorator_signature::DecoratorTarget::Constructor,
+                        "constructor",
+                        bind,
+                    );
+                    if super::decorator_receiver::method_uses_receiver(
+                        self.ast_arena,
+                        params,
+                        *body,
+                    ) {
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::InvalidDecoratorTarget,
+                                "decorated constructor cannot use 'this' or 'super': the wrapper loses the receiver".to_owned(),
+                            )
+                            .with_range(*range),
+                        );
+                    }
+                }
+                ClassMember::Getter {
                     key,
                     decorators,
+                    body: Some(body),
                     range,
                     ..
                 } if !decorators.is_empty() => {
                     let key_str = bind.interner.resolve(*key);
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::InvalidDecoratorTarget,
-                            format!("decorators are not supported on property '{key_str}'"),
-                        )
-                        .with_range(*range),
+                    self.check_decorator_signatures(
+                        decorators,
+                        super::decorator_signature::DecoratorTarget::Getter,
+                        key_str,
+                        bind,
                     );
+                    if super::decorator_receiver::method_uses_receiver(self.ast_arena, &[], *body) {
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::InvalidDecoratorTarget,
+                                format!("decorated getter '{key_str}' cannot use 'this' or 'super': the wrapper loses the receiver"),
+                            )
+                            .with_range(*range),
+                        );
+                    }
+                }
+                ClassMember::Setter {
+                    key,
+                    decorators,
+                    body: Some(body),
+                    param,
+                    range,
+                    ..
+                } if !decorators.is_empty() => {
+                    let key_str = bind.interner.resolve(*key);
+                    self.check_decorator_signatures(
+                        decorators,
+                        super::decorator_signature::DecoratorTarget::Setter,
+                        key_str,
+                        bind,
+                    );
+                    if super::decorator_receiver::method_uses_receiver(
+                        self.ast_arena,
+                        std::slice::from_ref(param),
+                        *body,
+                    ) {
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::InvalidDecoratorTarget,
+                                format!("decorated setter '{key_str}' cannot use 'this' or 'super': the wrapper loses the receiver"),
+                            )
+                            .with_range(*range),
+                        );
+                    }
                 }
                 _ => {}
             }
@@ -174,8 +256,18 @@ impl<'r> Checker<'r> {
                     type_ann,
                     init,
                     range,
+                    decorators,
                     ..
                 } => {
+                    if !decorators.is_empty() {
+                        let key_str = bind.interner.resolve(*key);
+                        self.check_decorator_signatures(
+                            decorators,
+                            super::decorator_signature::DecoratorTarget::Property,
+                            key_str,
+                            bind,
+                        );
+                    }
                     if let Some(init_expr) = *init {
                         if let Some(ann) = type_ann {
                             let prop_ty = self.resolve_type_node_cached(ann, bind);
@@ -198,7 +290,9 @@ impl<'r> Checker<'r> {
                         }
                     }
                 }
-                ClassMember::Constructor { body, .. } => {
+                ClassMember::Constructor {
+                    body, decorators, ..
+                } => {
                     let body = *body;
                     let saved_scope = self.current_scope;
                     let body_range = self.ast_arena.stmt(body).range;
@@ -210,13 +304,22 @@ impl<'r> Checker<'r> {
                             ctor_scope,
                         );
                     }
+                    let saved_caps =
+                        self.enclosing_caps
+                            .replace(super::decorator_signature::caps_of(
+                                decorators,
+                                self.ast_arena,
+                                bind,
+                            ));
                     self.in_function_body(false, |c| c.check_stmt(body, bind));
+                    self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;
                 }
                 ClassMember::Method {
                     return_type,
                     body: Some(body),
                     modifiers,
+                    decorators,
                     ..
                 } => {
                     let body = *body;
@@ -241,14 +344,29 @@ impl<'r> Checker<'r> {
                         );
                     }
 
+                    let saved_caps =
+                        self.enclosing_caps
+                            .replace(super::decorator_signature::caps_of(
+                                decorators,
+                                self.ast_arena,
+                                bind,
+                            ));
+                    let saved_pure = self.pure_scope.take();
+                    if super::decorator_signature::is_pure_fn(decorators, self.ast_arena, bind) {
+                        self.pure_scope = Some(self.current_scope);
+                    }
+
                     self.in_function_body(modifiers.is_async, |c| c.check_stmt(body, bind));
 
+                    self.pure_scope = saved_pure;
+                    self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;
                 }
                 ClassMember::Getter {
                     return_type,
                     body: Some(body),
+                    decorators,
                     ..
                 } => {
                     let body = *body;
@@ -267,14 +385,29 @@ impl<'r> Checker<'r> {
                             g_scope,
                         );
                     }
+                    let saved_caps =
+                        self.enclosing_caps
+                            .replace(super::decorator_signature::caps_of(
+                                decorators,
+                                self.ast_arena,
+                                bind,
+                            ));
+                    let saved_pure = self.pure_scope.take();
+                    if super::decorator_signature::is_pure_fn(decorators, self.ast_arena, bind) {
+                        self.pure_scope = Some(self.current_scope);
+                    }
 
                     self.in_function_body(false, |c| c.check_stmt(body, bind));
 
+                    self.pure_scope = saved_pure;
+                    self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;
                 }
                 ClassMember::Setter {
-                    body: Some(body), ..
+                    body: Some(body),
+                    decorators,
+                    ..
                 } => {
                     let body = *body;
                     let saved_scope = self.current_scope;
@@ -287,9 +420,22 @@ impl<'r> Checker<'r> {
                             s_scope,
                         );
                     }
+                    let saved_caps =
+                        self.enclosing_caps
+                            .replace(super::decorator_signature::caps_of(
+                                decorators,
+                                self.ast_arena,
+                                bind,
+                            ));
+                    let saved_pure = self.pure_scope.take();
+                    if super::decorator_signature::is_pure_fn(decorators, self.ast_arena, bind) {
+                        self.pure_scope = Some(self.current_scope);
+                    }
 
                     self.in_function_body(false, |c| c.check_stmt(body, bind));
 
+                    self.pure_scope = saved_pure;
+                    self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;
                 }
                 _ => {}

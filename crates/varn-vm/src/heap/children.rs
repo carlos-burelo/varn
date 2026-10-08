@@ -1,3 +1,4 @@
+use super::cells::CellSpace;
 use super::obj::HeapObj;
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;
@@ -11,6 +12,33 @@ pub(crate) enum Reach {
 }
 
 pub(crate) fn for_each_child(
+    cells: &CellSpace,
+    r: HeapRef,
+    identity: &FxHashMap<usize, HeapRef>,
+    reach: Reach,
+    f: &mut impl FnMut(HeapRef),
+) {
+    if cells.header_kind(r) == varn_types::cell::CELL_KIND_INSTANCE {
+        let inst = unsafe {
+            varn_types::value::InstanceRef::from_data_ptr(
+                (r.addr() as usize + varn_types::cell::INST_CELL_DATA_OFF) as *mut u8,
+            )
+        };
+        let mut value = |v: VmValue| {
+            if v.is_heap() {
+                f(v.as_heap());
+            }
+        };
+        inst.for_each_reference(&mut value);
+        if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
+            class_child(&cls, identity, &mut value);
+        }
+        return;
+    }
+    for_each_heap_child(cells.get(r), identity, reach, f)
+}
+
+fn for_each_heap_child(
     obj: &HeapObj,
     identity: &FxHashMap<usize, HeapRef>,
     reach: Reach,
@@ -44,12 +72,6 @@ pub(crate) fn for_each_child(
             let guard = obj_ref.borrow();
             guard.for_each_field(|_, v| value(v));
             if let Some(cls) = guard.class() {
-                class_child(&cls, identity, &mut value);
-            }
-        }
-        HeapObj::Instance(inst) => {
-            inst.for_each_reference(&mut value);
-            if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
                 class_child(&cls, identity, &mut value);
             }
         }

@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{InlayHint, InlayHintKind, InlayHintLabel, Position};
+use tower_lsp_f::lsp_types::{InlayHint, InlayHintKind, Label, Position};
 use varn_core::ast::{Arg, ExprId, ExprKind};
 
 use crate::document::DocumentState;
@@ -38,8 +38,8 @@ fn call_hints(state: &DocumentState, callee: ExprId, args: &[Arg], hints: &mut V
                 line: arg_start.line.saturating_sub(1),
                 character: arg_start.column,
             },
-            label: InlayHintLabel::String(format!("{param_name}: ")),
-            kind: Some(InlayHintKind::PARAMETER),
+            label: Label::String(format!("{param_name}: ")),
+            kind: Some(InlayHintKind::Parameter),
             text_edits: None,
             tooltip: None,
             padding_left: Some(false),

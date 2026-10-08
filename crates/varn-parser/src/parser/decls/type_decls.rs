@@ -190,6 +190,9 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
         if s.eat(TokenKind::Semicolon) {
             break;
         }
+        if s.check(TokenKind::At) {
+            break;
+        }
 
         let mem_range = s.range();
         let name = s.expect_id()?;

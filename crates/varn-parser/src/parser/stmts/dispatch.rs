@@ -26,10 +26,14 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<StmtId, String> {
     let kind = s.kind();
     let next_kind = s.peek_kind(1);
 
+    let has_decorators = !decorators.is_empty();
     if let Some(decl_stmt) =
         super::super::stmt_decls::try_parse_decl_stmt(s, kind, next_kind, decorators)
     {
         return decl_stmt;
+    }
+    if has_decorators {
+        return Err("expected a declaration after decorators".to_owned());
     }
 
     let _ = s.current_doc();

@@ -127,6 +127,9 @@ impl<'r> Checker<'r> {
         range: varn_core::SourceRange,
         bind: &BindResult,
     ) {
+        if self.pure_scope.is_some() {
+            self.forbid_pure("suspend on 'await' (pure functions are synchronous)", range);
+        }
         if !self.in_async {
             self.emit(
                 Diagnostic::error(
@@ -152,7 +155,15 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn check_yield(&mut self, argument: Option<ExprId>, bind: &BindResult) {
+    pub(super) fn check_yield(
+        &mut self,
+        argument: Option<ExprId>,
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        if self.pure_scope.is_some() {
+            self.forbid_pure("suspend on 'yield' (pure functions are synchronous)", range);
+        }
         let ty = if let Some(arg) = argument {
             self.check_expr(arg, bind);
             self.infer_type(arg, bind)

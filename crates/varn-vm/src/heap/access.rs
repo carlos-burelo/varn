@@ -8,12 +8,19 @@ use varn_types::HeapRef;
 impl HeapInner {
     #[inline(always)]
     pub(crate) fn get(&self, r: HeapRef) -> Option<&HeapObj> {
-        (self.cells.state(r) != SlotState::Free).then(|| self.cells.get(r))
+        if self.cells.state(r) == SlotState::Free
+            || self.cells.header_kind(r) == varn_types::cell::CELL_KIND_INSTANCE
+        {
+            return None;
+        }
+        Some(self.cells.get(r))
     }
 
     #[inline(always)]
     pub(crate) fn get_mut(&mut self, r: HeapRef) -> Option<&mut HeapObj> {
-        if self.cells.state(r) == SlotState::Free {
+        if self.cells.state(r) == SlotState::Free
+            || self.cells.header_kind(r) == varn_types::cell::CELL_KIND_INSTANCE
+        {
             return None;
         }
         Some(self.cells.get_mut(r))
@@ -27,10 +34,17 @@ impl HeapInner {
     }
 
     pub(crate) fn instance(&self, r: HeapRef) -> Option<varn_types::value::InstanceRef> {
-        match self.get(r)? {
-            HeapObj::Instance(inst) => Some(*inst),
-            _ => None,
+        if self.cells.state(r) == SlotState::Free {
+            return None;
         }
+        if self.cells.header_kind(r) != varn_types::cell::CELL_KIND_INSTANCE {
+            return None;
+        }
+        Some(unsafe {
+            varn_types::value::InstanceRef::from_data_ptr(
+                (r.addr() as usize + varn_types::cell::INST_CELL_DATA_OFF) as *mut u8,
+            )
+        })
     }
 
     pub(crate) fn instance_of(&self, v: VmValue) -> Option<varn_types::value::InstanceRef> {

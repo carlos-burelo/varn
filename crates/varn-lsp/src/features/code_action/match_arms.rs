@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use tower_lsp::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, Position, Range, TextEdit, WorkspaceEdit,
+use tower_lsp_f::lsp_types::{
+    CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, WorkspaceEdit,
 };
 use varn_core::ast::{ExprId, ExprKind};
 
@@ -8,10 +8,10 @@ use crate::document::DocumentState;
 
 pub fn generate_match_arms_action(
     state: &DocumentState,
-    uri: &tower_lsp::lsp_types::Url,
+    uri: &tower_lsp_f::lsp_types::Uri,
     cursor_line: u32,
     _cursor_col: u32,
-) -> Option<CodeActionOrCommand> {
+) -> Option<CodeActionResponse> {
     let id = match_at_line(state, cursor_line)?;
     let gap = state.db.match_gaps.get(&id.index())?;
     if gap.missing.is_empty() {
@@ -58,9 +58,9 @@ pub fn generate_match_arms_action(
         }],
     );
 
-    Some(CodeActionOrCommand::CodeAction(CodeAction {
+    Some(CodeActionResponse::CodeAction(CodeAction {
         title: format!("💡 Fill missing match arms ({})", gap.missing.join(", ")),
-        kind: Some(CodeActionKind::QUICKFIX),
+        kind: Some(CodeActionKind::QuickFix),
         diagnostics: None,
         edit: Some(WorkspaceEdit {
             changes: Some(changes),
@@ -70,6 +70,7 @@ pub fn generate_match_arms_action(
         command: None,
         is_preferred: Some(true),
         disabled: None,
+        tags: None,
         data: None,
     }))
 }

@@ -80,6 +80,7 @@ pub(super) fn emit_enum(
                 params,
                 body: Some(body),
                 modifiers,
+                decorators,
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
@@ -105,10 +106,25 @@ pub(super) fn emit_enum(
                     func: id,
                     is_static: modifiers.is_static,
                     is_private: false,
-                    decorators: vec![],
+                    decorators: super::decorators::lower_decorator_exprs(
+                        decorators,
+                        ast_arena,
+                        ctx,
+                        expr_table,
+                        types,
+                        signatures,
+                        out,
+                        &mut def.prelude,
+                        None,
+                    ),
                 });
             }
-            ClassMember::Constructor { params, body, .. } => {
+            ClassMember::Constructor {
+                params,
+                body,
+                decorators,
+                ..
+            } => {
                 let sig = fresh_sig(signatures, params.len());
                 let id = emit_member_fn(
                     Arc::from(format!("{name}.constructor")),
@@ -131,13 +147,24 @@ pub(super) fn emit_enum(
                     func: id,
                     is_static: false,
                     is_private: false,
-                    decorators: vec![],
+                    decorators: super::decorators::lower_decorator_exprs(
+                        decorators,
+                        ast_arena,
+                        ctx,
+                        expr_table,
+                        types,
+                        signatures,
+                        out,
+                        &mut def.prelude,
+                        None,
+                    ),
                 });
             }
             ClassMember::Getter {
                 key,
                 body: Some(body),
                 modifiers,
+                decorators,
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
@@ -163,6 +190,17 @@ pub(super) fn emit_enum(
                     func: id,
                     is_getter: true,
                     is_static: modifiers.is_static,
+                    decorators: super::decorators::lower_decorator_exprs(
+                        decorators,
+                        ast_arena,
+                        ctx,
+                        expr_table,
+                        types,
+                        signatures,
+                        out,
+                        &mut def.prelude,
+                        None,
+                    ),
                 });
             }
             ClassMember::Setter {
@@ -170,6 +208,7 @@ pub(super) fn emit_enum(
                 param,
                 body: Some(body),
                 modifiers,
+                decorators,
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
@@ -195,31 +234,66 @@ pub(super) fn emit_enum(
                     func: id,
                     is_getter: false,
                     is_static: modifiers.is_static,
-                });
-            }
-            ClassMember::Property {
-                key,
-                init,
-                modifiers,
-                ..
-            } if modifiers.is_static => {
-                let init_x = init.map(|e| {
-                    let (pre, x) = lower_outer(
-                        e,
+                    decorators: super::decorators::lower_decorator_exprs(
+                        decorators,
                         ast_arena,
                         ctx,
                         expr_table,
                         types,
                         signatures,
                         out,
-                        out.len() as u32,
+                        &mut def.prelude,
+                        None,
+                    ),
+                });
+            }
+            ClassMember::Property {
+                key,
+                init,
+                modifiers,
+                decorators,
+                ..
+            } => {
+                if !decorators.is_empty() {
+                    let decos = super::decorators::lower_decorator_exprs(
+                        decorators,
+                        ast_arena,
+                        ctx,
+                        expr_table,
+                        types,
+                        signatures,
+                        out,
+                        &mut def.prelude,
                         None,
                     );
-                    def.prelude.extend(pre);
-                    x
-                });
-                def.statics
-                    .push((Arc::from(ctx.interner.resolve(*key)), init_x));
+                    if !decos.is_empty() {
+                        def.property_decorators
+                            .push(varn_tir::TirPropertyDecorator {
+                                key: Arc::from(ctx.interner.resolve(*key)),
+                                is_static: modifiers.is_static,
+                                decorators: decos,
+                            });
+                    }
+                }
+                if modifiers.is_static {
+                    let init_x = init.map(|e| {
+                        let (pre, x) = lower_outer(
+                            e,
+                            ast_arena,
+                            ctx,
+                            expr_table,
+                            types,
+                            signatures,
+                            out,
+                            out.len() as u32,
+                            None,
+                        );
+                        def.prelude.extend(pre);
+                        x
+                    });
+                    def.statics
+                        .push((Arc::from(ctx.interner.resolve(*key)), init_x));
+                }
             }
             ClassMember::StaticBlock { body, .. } => {
                 let sig = fresh_sig(signatures, 0);

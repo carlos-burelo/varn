@@ -36,6 +36,7 @@ pub(super) fn emit_namespace_object(
     fn_index: &FxHashMap<Atom, (u32, u32)>,
     global_slots: &FxHashMap<Arc<str>, u32>,
     interner: &AtomInterner,
+    shadowed: &rustc_hash::FxHashSet<u32>,
     top: &mut FnEmitter,
     top_body: &mut Vec<TirStmt>,
 ) {
@@ -53,7 +54,15 @@ pub(super) fn emit_namespace_object(
             other => other,
         };
         if let Decl::Namespace(inner_ns) = inner {
-            emit_namespace_object(inner_ns, fn_index, global_slots, interner, top, top_body);
+            emit_namespace_object(
+                inner_ns,
+                fn_index,
+                global_slots,
+                interner,
+                shadowed,
+                top,
+                top_body,
+            );
         }
     }
 
@@ -76,7 +85,14 @@ pub(super) fn emit_namespace_object(
                         res: Resolution::DirectFn(FnId(fnid)),
                         span: Span::EMPTY,
                     };
-                    for d in f.decorators.iter().rev() {
+                    for d in f.decorators.iter().rev().filter(|d| {
+                        !varn_core::ast::decorators::is_active_builtin(
+                            top.ast_arena,
+                            interner,
+                            |off| shadowed.contains(&off),
+                            d,
+                        )
+                    }) {
                         let deco = top.lower_expression(d.expression);
                         value = apply_one_decorator(top, value, deco);
                         top_body.extend(top.take_pending());
@@ -360,6 +376,7 @@ pub(super) fn emit_extensions(
                 is_async: false,
                 is_generator: false,
                 has_rest: matches!(member, ExtensionMember::Method(f) if f.params.last().is_some_and(|p| p.is_rest)),
+                force_inline: false,
             });
             out.extend(mcls);
         }

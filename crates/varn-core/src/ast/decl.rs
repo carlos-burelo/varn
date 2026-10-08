@@ -122,6 +122,7 @@ pub enum ClassMember {
     Constructor {
         params: Vec<Param>,
         body: StmtId,
+        decorators: Vec<Decorator>,
         range: SourceRange,
     },
     Destructor {
@@ -151,6 +152,7 @@ pub enum ClassMember {
         return_type: Option<TypeNode>,
         body: Option<StmtId>,
         modifiers: Modifiers,
+        decorators: Vec<Decorator>,
         range: SourceRange,
     },
     Setter {
@@ -158,6 +160,7 @@ pub enum ClassMember {
         param: Param,
         body: Option<StmtId>,
         modifiers: Modifiers,
+        decorators: Vec<Decorator>,
         range: SourceRange,
     },
     StaticBlock {

@@ -133,7 +133,7 @@ impl TokenKind {
             TokenKind::Match => "match",
             TokenKind::At => "@",
             TokenKind::RawStr => "string",
-            _ => "unknown",
+            _ => crate::UNKNOWN,
         }
     }
 }

@@ -24,7 +24,7 @@ import { Database } from "std:sqlite"
 import { WebSocketClient } from "std:ws"
 import { read, write, remove, exists } from "std:fs"
 import { env, platform, cwd } from "std:sys"
-import { MetaKey, MethodContext, ClassRef } from "std:reflect"
+import { MetaKey, ClassRef } from "std:reflect"
 import { describe, test, expect, assertEqual } from "std:test"
 ```
 
@@ -269,9 +269,11 @@ let v = env("OS")     // str: valor de la variable de entorno "OS"
 ### `std:reflect` — Metaprogramación
 
 ```varn
-import { MetaKey, MethodContext, ClassRef } from "std:reflect"
+import { MetaKey, ClassRef } from "std:reflect"
 const RouteKey = MetaKey.create<str>()
 RouteKey.set(MyClass, "/api/items")
 RouteKey.get(MyClass)    // "/api/items" o null
 // tests/27-decorators.vn
+// Los contextos de decorador (MethodContext, GetterContext, SetterContext,
+// ConstructorContext, PropertyContext) son globales: se usan sin importar.
 ```

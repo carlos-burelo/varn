@@ -29,6 +29,7 @@ pub(super) fn collect_free_functions<'a>(
     program: &Program,
     ast_arena: &'a AstArena,
     interner: &'a AtomInterner,
+    shadowed: &FxHashSet<u32>,
 ) -> FreeFunctions<'a> {
     use super::decl_classify::{free_function, namespace_decl};
     use varn_core::ast::NamespaceDecl;
@@ -77,7 +78,17 @@ pub(super) fn collect_free_functions<'a>(
     }
     let decorated_fns: FxHashSet<Atom> = free_fns
         .iter()
-        .filter(|(f, ns)| ns.is_none() && !f.decorators.is_empty())
+        .filter(|(f, ns)| {
+            ns.is_none()
+                && f.decorators.iter().any(|d| {
+                    !varn_core::ast::decorators::is_active_builtin(
+                        ast_arena,
+                        interner,
+                        |off| shadowed.contains(&off),
+                        d,
+                    )
+                })
+        })
         .map(|(f, _)| f.id)
         .collect();
     FreeFunctions {
@@ -159,6 +170,7 @@ pub(super) fn emit_member_fn(
         is_async,
         is_generator,
         has_rest: params.last().is_some_and(|p| p.is_rest),
+        force_inline: false,
     });
     out.extend(mcls);
     fn_id
@@ -338,5 +350,19 @@ pub(super) fn emit_function(
         is_async: f.modifiers.is_async,
         is_generator: f.modifiers.is_generator,
         has_rest: f.params.last().is_some_and(|p| p.is_rest),
+        force_inline: varn_core::ast::decorators::match_builtin(
+            ast_arena,
+            ctx.interner,
+            &f.decorators,
+        )
+        .into_iter()
+        .zip(f.decorators.iter())
+        .any(|(m, d)| {
+            !bind.user_decorators.contains(&d.range.start.offset)
+                && matches!(
+                    m.result,
+                    Some(Ok(varn_core::ast::decorators::BuiltinDecorator::Inline))
+                )
+        }),
     }
 }

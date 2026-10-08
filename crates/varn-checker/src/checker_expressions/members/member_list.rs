@@ -186,6 +186,20 @@ pub fn get_members_of_type(
                     add_declared(&mut results, &mut seen, m, mapped, kind);
                 }
             }
+            if let Some(entry) = bind.type_members.enums.get(&cn) {
+                for m in entry {
+                    let kind = super::member_kind::map_class_member_kind(m.kind);
+                    let mapped = map_ty(&m.ty, table);
+                    add_declared(&mut results, &mut seen, m, mapped, kind);
+                }
+            }
+            if let Some(entry) = bind.type_members.namespaces.get(&cn) {
+                for m in entry {
+                    let kind = super::member_kind::map_class_member_kind(m.kind);
+                    let mapped = map_ty(&m.ty, table);
+                    add_declared(&mut results, &mut seen, m, mapped, kind);
+                }
+            }
 
             if let Some(b) = &bind.core {
                 if let Some(entry) = b.class_members.get(cn.as_ref()) {
@@ -247,6 +261,33 @@ pub fn get_members_of_type(
             let name = kind.lang_name().unwrap_or_default();
             let named_ty = Type::named(name.to_owned(), table);
             return get_members_of_type(resolver, &named_ty, bind, table);
+        }
+        TypeKind::Union(list) | TypeKind::Intersection(list) => {
+            let variants: Vec<Type> = table
+                .get_list(list)
+                .to_vec()
+                .iter()
+                .map(|id| Type::resolved(*id))
+                .collect();
+            let mut per_variant = Vec::with_capacity(variants.len());
+            for v in &variants {
+                if matches!(
+                    table.get(v.0),
+                    TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)
+                ) {
+                    continue;
+                }
+                per_variant.push(get_members_of_type(resolver, v, bind, table));
+            }
+            if let Some((first, rest)) = per_variant.split_first() {
+                for m in first {
+                    if rest.iter().all(|o| o.iter().any(|x| x.name == m.name))
+                        && seen.insert(m.name.clone())
+                    {
+                        results.push(m.clone());
+                    }
+                }
+            }
         }
         _ => {}
     }

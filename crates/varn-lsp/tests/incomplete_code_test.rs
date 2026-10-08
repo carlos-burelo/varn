@@ -40,10 +40,10 @@ p.
     );
     let items = completions.unwrap();
     let names: Vec<String> = match items {
-        tower_lsp::lsp_types::CompletionResponse::Array(arr) => {
+        tower_lsp_f::lsp_types::CompletionResponse::CompletionItemList(arr) => {
             arr.into_iter().map(|i| i.label).collect()
         }
-        tower_lsp::lsp_types::CompletionResponse::List(list) => {
+        tower_lsp_f::lsp_types::CompletionResponse::CompletionList(list) => {
             list.items.into_iter().map(|i| i.label).collect()
         }
     };

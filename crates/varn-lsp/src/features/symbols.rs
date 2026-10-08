@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{DocumentSymbol, DocumentSymbolResponse, Range};
+use tower_lsp_f::lsp_types::{DocumentSymbol, DocumentSymbolResponse, Range};
 use varn_checker::SymbolKind;
 
 use crate::document::{DocumentState, SymbolView};
@@ -13,7 +13,7 @@ pub fn build_document_symbols(state: &DocumentState) -> DocumentSymbolResponse {
         .collect();
     sorted.sort_by_key(|s| (s.line(), s.col()));
 
-    DocumentSymbolResponse::Nested(nest_symbols(state, &sorted))
+    DocumentSymbolResponse::DocumentSymbolList(nest_symbols(state, &sorted))
 }
 
 fn is_outlinable(name: &str, kind: SymbolKind) -> bool {
@@ -102,13 +102,15 @@ fn summary_to_doc(
     })
 }
 
-fn summary_to_symbol_kind(k: varn_checker::ResolvedMemberKind) -> tower_lsp::lsp_types::SymbolKind {
-    use tower_lsp::lsp_types::SymbolKind as L;
+fn summary_to_symbol_kind(
+    k: varn_checker::ResolvedMemberKind,
+) -> tower_lsp_f::lsp_types::SymbolKind {
+    use tower_lsp_f::lsp_types::SymbolKind as L;
     use varn_checker::ResolvedMemberKind as R;
     match k {
-        R::Method | R::StaticMethod | R::ExtensionMethod => L::METHOD,
-        R::EnumMember => L::ENUM_MEMBER,
-        _ => L::PROPERTY,
+        R::Method | R::StaticMethod | R::ExtensionMethod => L::Method,
+        R::EnumMember => L::EnumMember,
+        _ => L::Property,
     }
 }
 
@@ -117,11 +119,11 @@ fn sym_to_doc(state: &DocumentState, sym: SymbolView<'_>) -> DocumentSymbol {
 
     let full_range = if sym.end_line() > sym.line() {
         Range {
-            start: tower_lsp::lsp_types::Position {
+            start: tower_lsp_f::lsp_types::Position {
                 line: sym.line(),
                 character: 0,
             },
-            end: tower_lsp::lsp_types::Position {
+            end: tower_lsp_f::lsp_types::Position {
                 line: sym.end_line(),
                 character: sym.end_col(),
             },

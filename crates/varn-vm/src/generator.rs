@@ -103,6 +103,7 @@ impl GeneratorDriver for NanGenDriver {
                             .to_string(),
                     );
                 }
+                Some(VmSuspend::DebugBreak) => {}
                 None => {
                     inner.done = true;
                     let ret = result.map_err(|e| e.message)?;

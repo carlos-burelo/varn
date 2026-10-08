@@ -3,6 +3,7 @@ use crate::scope::{ScopeArena, ScopeId};
 use crate::symbol::{Symbol, SymbolArena, SymbolId};
 use crate::types::{ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 use std::sync::Arc;
 use varn_core::ast::{ExprId, StmtId, TypeNode};
 use varn_core::Atom;
@@ -94,6 +95,8 @@ pub struct BindResult {
 
     #[serde(skip, default)]
     pub evolved_array_types: FxHashMap<u32, Type>,
+    #[serde(skip, default)]
+    pub user_decorators: FxHashSet<u32>,
 }
 
 impl BindResult {

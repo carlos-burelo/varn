@@ -174,6 +174,9 @@ pub(crate) fn freeze(ctx: &mut ExecCtx, dest_reg: u16) -> Result<Box<Frozen>, &'
     }
     let try_handlers = std::mem::take(&mut ctx.try_handlers);
     let open_upvalues = std::mem::take(&mut ctx.open_upvalues);
+    for (_, uv) in &open_upvalues {
+        uv.close(&ctx.stack);
+    }
     ctx.stack.gpr.clear();
     ctx.stack.fpr.clear();
     ctx.stack.refs.clear();
@@ -199,6 +202,7 @@ pub(crate) fn thaw(ctx: &mut ExecCtx, frozen: Frozen) {
         open_upvalues,
         ..
     } = frozen;
+    let reopen = ctx.stack.allocs.is_empty();
     for sf in std::iter::once(first).chain(rest) {
         let id = ctx.stack.allocs.len();
         let bases = [
@@ -272,5 +276,10 @@ pub(crate) fn thaw(ctx: &mut ExecCtx, frozen: Frozen) {
         ctx.frames.push(frame);
     }
     ctx.try_handlers = try_handlers;
+    if reopen {
+        for (slot, uv) in &open_upvalues {
+            uv.inner.borrow_mut().stack_slot = Some(*slot);
+        }
+    }
     ctx.open_upvalues = open_upvalues;
 }

@@ -21,6 +21,7 @@ pub(super) struct MCtx<'a> {
     pub(super) checker_table: &'a crate::types::CheckerTyTable,
     pub(super) annotation_types: &'a FxHashMap<AstId, crate::types::Type>,
     pub(super) nested_types: &'a NestedTypes,
+    pub(super) shadowed: &'a rustc_hash::FxHashSet<u32>,
 }
 
 impl<'a> MCtx<'a> {
@@ -40,6 +41,7 @@ impl<'a> MCtx<'a> {
             checker_table: self.checker_table,
             annotation_types: self.annotation_types,
             nested_types: self.nested_types,
+            shadowed: self.shadowed,
         }
     }
 }

@@ -1,0 +1,7 @@
+// expect: error[VN2013]
+class A {
+    @inline
+    m(): int {
+        return 1;
+    }
+}

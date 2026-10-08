@@ -72,6 +72,10 @@ pub struct ExecCtx {
     pub stage: Vec<VmValue>,
 
     pub(crate) task_queue: std::cell::OnceCell<super::scheduler::TaskQueue>,
+
+    pub debug_breaks: Option<std::rc::Rc<crate::debug::BreakTable>>,
+    pub debug_step: Option<crate::debug::StepState>,
+    pub debug_skip: Option<(usize, usize)>,
 }
 
 impl ExecCtx {
@@ -121,6 +125,9 @@ impl ExecCtx {
             hashable_keys: Rc::new(std::cell::UnsafeCell::new(FxHashMap::default())),
             stage: Vec::with_capacity(32),
             task_queue: std::cell::OnceCell::new(),
+            debug_breaks: None,
+            debug_step: None,
+            debug_skip: None,
         };
 
         if fresh {
@@ -274,6 +281,9 @@ impl ExecCtx {
             hashable_keys: Rc::clone(&self.hashable_keys),
             stage: Vec::new(),
             task_queue: std::cell::OnceCell::new(),
+            debug_breaks: None,
+            debug_step: None,
+            debug_skip: None,
         }
     }
 }

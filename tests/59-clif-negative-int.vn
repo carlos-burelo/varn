@@ -3,10 +3,10 @@ import { describe, it, expect } from "std:test";
 
 // Negative `int` results crossing the Cranelift return boundary.
 //
-// The regression: a raw clif function returning `int` always yields an
-// UNBOXED i48 payload — every arm of `emit_return_value`'s `SlotKind::Int`
+// The regression: a raw clif function returning `int` always yields a
+// full-width i64 payload — every arm of `emit_return_value`'s `SlotKind::Int`
 // case produces one. The wrapper re-tagged it only when the high bits were
-// clear, on the theory that a set NaN-box tag meant "already boxed". That
+// clear, on the theory that set high bits meant "already boxed". That
 // test cannot tell a boxed value from a negative payload: `-3` is
 // `0xFFFF_FFFF_FFFF_FFFD`, whose high bits are all set. So every negative
 // `int` return escaped untagged and decoded as null.
@@ -29,7 +29,7 @@ function mulNeg(a: int, b: int): int { return a * b }
 // A negative int returned through a chain of calls: each hop re-tags.
 function outer(n: int): int { return sub(0, negParam(n)) }
 
-// Large magnitudes, still inside i48.
+// Large magnitudes, well inside i64.
 function bigNeg(): int { return -140737488355327 }
 
 function negFloat(f: float): float { return -f }

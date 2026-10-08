@@ -1,7 +1,7 @@
 use crate::document::DocumentState;
 use crate::util::converters::range_on_line;
 use std::collections::HashSet;
-use tower_lsp::lsp_types::{DocumentHighlight, DocumentHighlightKind};
+use tower_lsp_f::lsp_types::{DocumentHighlight, DocumentHighlightKind};
 use varn_core::TokenKind;
 
 pub fn build_document_highlights(
@@ -44,9 +44,9 @@ pub fn build_document_highlights(
                     let kind = if decl_positions.contains(&(t.line, t.col))
                         || is_assignment_lhs(state, t)
                     {
-                        DocumentHighlightKind::WRITE
+                        DocumentHighlightKind::Write
                     } else {
-                        DocumentHighlightKind::READ
+                        DocumentHighlightKind::Read
                     };
                     highlights.push(DocumentHighlight {
                         range: range_on_line(t.line, t.col, t.col + t.length),
@@ -75,9 +75,9 @@ pub fn build_document_highlights(
         })
         .map(|t| {
             let kind = if decl_positions.contains(&(t.line, t.col)) || is_assignment_lhs(state, t) {
-                DocumentHighlightKind::WRITE
+                DocumentHighlightKind::Write
             } else {
-                DocumentHighlightKind::READ
+                DocumentHighlightKind::Read
             };
             DocumentHighlight {
                 range: range_on_line(t.line, t.col, t.col + t.length),

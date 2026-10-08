@@ -1,0 +1,5 @@
+// expect: error[VN4401]
+@inline
+async function f(): int {
+    return 1;
+}

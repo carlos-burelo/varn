@@ -39,6 +39,12 @@ impl<'r> Checker<'r> {
     }
 
     pub(super) fn check_throw_stmt(&mut self, argument: ExprId, bind: &BindResult) {
+        if self.pure_scope.is_some() {
+            self.forbid_pure(
+                "throw (pure functions cannot raise)",
+                self.ast_arena.expr(argument).range,
+            );
+        }
         self.check_expr(argument, bind);
         let thrown = self.infer_type(argument, bind);
         if !self.is_throwable(&thrown, bind) {

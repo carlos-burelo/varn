@@ -122,6 +122,9 @@ impl<'r> Checker<'r> {
         }
 
         let scope = bind.scopes.get(self.current_scope);
+        if let Some(sid) = scope.resolve(name, &bind.scopes) {
+            self.warn_if_deprecated(sid, name_str, range, bind);
+        }
         if scope.resolve(name, &bind.scopes).is_none() && !self.is_assignment_target {
             let mut diag = Diagnostic::error(
                 ErrorCode::UnknownSymbol,

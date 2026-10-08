@@ -1,7 +1,7 @@
 mod classify;
 
 use once_cell::sync::Lazy;
-use tower_lsp::lsp_types::{SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend};
+use tower_lsp_f::lsp_types::{SemanticTokenModifiers, SemanticTokenTypes, SemanticTokensLegend};
 use varn_checker::SymbolKind;
 use varn_core::TokenKind;
 
@@ -9,26 +9,26 @@ use crate::document::DocumentState;
 
 pub static LEGEND: Lazy<SemanticTokensLegend> = Lazy::new(|| SemanticTokensLegend {
     token_types: vec![
-        SemanticTokenType::KEYWORD,
-        SemanticTokenType::TYPE,
-        SemanticTokenType::VARIABLE,
-        SemanticTokenType::FUNCTION,
-        SemanticTokenType::CLASS,
-        SemanticTokenType::PARAMETER,
-        SemanticTokenType::PROPERTY,
-        SemanticTokenType::NUMBER,
-        SemanticTokenType::STRING,
-        SemanticTokenType::ENUM_MEMBER,
-        SemanticTokenType::NAMESPACE,
-        SemanticTokenType::INTERFACE,
-        SemanticTokenType::TYPE_PARAMETER,
+        SemanticTokenTypes::Keyword.into(),
+        SemanticTokenTypes::Type.into(),
+        SemanticTokenTypes::Variable.into(),
+        SemanticTokenTypes::Function.into(),
+        SemanticTokenTypes::Class.into(),
+        SemanticTokenTypes::Parameter.into(),
+        SemanticTokenTypes::Property.into(),
+        SemanticTokenTypes::Number.into(),
+        SemanticTokenTypes::String.into(),
+        SemanticTokenTypes::EnumMember.into(),
+        SemanticTokenTypes::Namespace.into(),
+        SemanticTokenTypes::Interface.into(),
+        SemanticTokenTypes::TypeParameter.into(),
     ],
     token_modifiers: vec![
-        SemanticTokenModifier::DECLARATION,
-        SemanticTokenModifier::READONLY,
-        SemanticTokenModifier::ASYNC,
-        SemanticTokenModifier::STATIC,
-        SemanticTokenModifier::ABSTRACT,
+        SemanticTokenModifiers::Declaration.into(),
+        SemanticTokenModifiers::Readonly.into(),
+        SemanticTokenModifiers::Async.into(),
+        SemanticTokenModifiers::Static.into(),
+        SemanticTokenModifiers::Abstract.into(),
     ],
 });
 

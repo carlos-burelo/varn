@@ -28,6 +28,7 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
     pipeline::run(&RunOpts {
         file_path,
         eval,
+        append: None,
         verbose: false,
         no_run,
         debug,

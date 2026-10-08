@@ -1,0 +1,8 @@
+// expect: error[VN3026]
+let g = 0;
+
+@pure
+function f(n: int): int {
+    g = n;
+    return g;
+}

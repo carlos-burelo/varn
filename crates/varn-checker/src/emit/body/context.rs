@@ -37,6 +37,8 @@ pub(crate) struct ModuleCtx<'a> {
     pub annotation_types: &'a FxHashMap<AstId, crate::types::Type>,
 
     pub nested_types: &'a NestedTypes,
+
+    pub shadowed: &'a FxHashSet<u32>,
 }
 
 pub(crate) struct FnEmitter<'a> {

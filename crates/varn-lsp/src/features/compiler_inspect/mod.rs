@@ -34,8 +34,38 @@ pub fn execute_command(
         )?))),
         "varn.getCFG" => Ok(Some(compile_and_get_cfg_json(&*document()?)?)),
         "varn.memoryStats" => Ok(Some(memory_stats(workspace))),
+        "varn.stdList" => Ok(Some(std_list())),
+        "varn.stdRead" => {
+            let spec = arguments
+                .first()
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "Missing specifier argument".to_string())?;
+            Ok(Some(serde_json::Value::String(std_read(spec)?)))
+        }
         _ => Err(format!("Unknown command: {command}")),
     }
+}
+
+fn std_list() -> serde_json::Value {
+    let mut specs: Vec<&str> = varn_modules::provider::get()
+        .map(|p| p.all_specs().iter().map(|s| s.id).collect())
+        .unwrap_or_default();
+    specs.sort();
+    serde_json::Value::Array(specs.into_iter().map(serde_json::Value::from).collect())
+}
+
+fn std_read(specifier: &str) -> Result<String, String> {
+    if let Some(provider) = varn_modules::provider::get() {
+        if let Some(source) = provider
+            .bundled_source(specifier)
+            .or_else(|| provider.embedded_source(specifier))
+        {
+            return Ok(source.to_owned());
+        }
+    }
+    let path = crate::workspace::std_sources::resolve_module_file(specifier)
+        .ok_or_else(|| format!("Unknown std module: {specifier}"))?;
+    std::fs::read_to_string(&path).map_err(|e| format!("Cannot read {specifier}: {e}"))
 }
 
 fn memory_stats(workspace: &Workspace) -> serde_json::Value {
@@ -139,8 +169,9 @@ fn build_ssa(state: &DocumentState) -> Result<Vec<varn_compiler::ssa::ir::SsaFun
 }
 
 pub fn compile_and_disassemble(state: &DocumentState) -> Result<String, String> {
-    let proto = varn_compiler::from_tir::compile_module(&emit_tir(state)?, Vec::new())
-        .map_err(|e| format!("Compilation failed: {e:?}"))?;
+    let proto =
+        varn_compiler::from_tir::compile_module(&emit_tir(state)?, Vec::new(), &state.source)
+            .map_err(|e| format!("Compilation failed: {e:?}"))?;
     Ok(varn_types::bytecode::disasm::render(&proto))
 }
 

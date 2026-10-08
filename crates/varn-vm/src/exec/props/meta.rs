@@ -27,10 +27,11 @@ fn class_of(obj: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     if !obj.is_heap() {
         return None;
     }
+    if heap.instance(obj.as_heap()).is_some() {
+        return get_class(obj, heap);
+    }
     match heap.get(obj.as_heap())? {
-        HeapObj::Instance(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Class(_) => {
-            get_class(obj, heap)
-        }
+        HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Class(_) => get_class(obj, heap),
         _ => None,
     }
 }
@@ -51,9 +52,12 @@ pub(crate) fn type_name(obj: VmValue, heap: &Heap) -> String {
     if obj.is_null() {
         return RuntimeKind::Null.name().into();
     }
+    if obj.is_heap() && heap.instance(obj.as_heap()).is_some() {
+        return class_of(obj, heap).map_or_else(|| "Object".into(), |c| c.name.as_str().into());
+    }
     match obj.is_heap().then(|| heap.get(obj.as_heap())).flatten() {
         Some(HeapObj::Class(cls)) => cls.name.as_str().into(),
-        Some(HeapObj::Instance(_) | HeapObj::Object(_) | HeapObj::Record(_)) => {
+        Some(HeapObj::Object(_) | HeapObj::Record(_)) => {
             class_of(obj, heap).map_or_else(|| "Object".into(), |c| c.name.as_str().into())
         }
         Some(HeapObj::EnumVariant(ev)) => ev.enum_name.to_string(),
@@ -104,15 +108,16 @@ pub(crate) fn resolve_meta_property(
             Ok(HeapInner::alloc_str(heap, &name))
         }
         MemberKey::Name => {
+            if obj.is_heap() && heap.instance(obj.as_heap()).is_some() {
+                let name: String = cls
+                    .as_ref()
+                    .map_or_else(|| "Object".into(), |c| c.name.as_str().into());
+                return Ok(HeapInner::alloc_str(heap, &name));
+            }
             let name: Option<String> =
                 match obj.is_heap().then(|| heap.get(obj.as_heap())).flatten() {
                     Some(HeapObj::EnumVariant(ev)) => Some(ev.variant_name.to_string()),
-                    Some(
-                        HeapObj::Instance(_)
-                        | HeapObj::Object(_)
-                        | HeapObj::Record(_)
-                        | HeapObj::Class(_),
-                    ) => Some(
+                    Some(HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Class(_)) => Some(
                         cls.as_ref()
                             .map_or_else(|| "Object".into(), |c| c.name.as_str().into()),
                     ),
@@ -130,11 +135,16 @@ pub(crate) fn resolve_meta_property(
             Ok(target.unwrap_or(VmValue::null()))
         }
         MemberKey::Fields => {
+            if let Some(c) = &cls {
+                if obj.is_heap() && heap.instance(obj.as_heap()).is_some() {
+                    return Ok(str_array(heap, class_field_names(c).into_iter()));
+                }
+            }
             let names = match (
                 &cls,
                 obj.is_heap().then(|| heap.get(obj.as_heap())).flatten(),
             ) {
-                (Some(c), Some(HeapObj::Instance(_) | HeapObj::Class(_))) => class_field_names(c),
+                (Some(c), Some(HeapObj::Class(_))) => class_field_names(c),
                 (_, Some(HeapObj::Object(o) | HeapObj::Record(o))) => o.keys().collect(),
                 _ => Vec::new(),
             };

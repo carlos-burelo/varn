@@ -3,23 +3,13 @@ import { describe, it, expect } from "std:test";
 
 await describe("32 premium apis test", async () => {
     await it("tests", async () => {
-        
-        // let d1 = decimal.parse("10.50");
-        // let d2 = decimal.parse("2.00");
-        
-        // let r = 1..5; 
-        
-        // let r2 = 1..=5;
-        
-        // // Int
-        // let n = 42;
-        
-        // // Float
-        // let f = 3.14159;
-        
-        // // String
-        // let s = "  hello world  ";
-        
-        
+        const d1: decimal = 10.50d;
+        const d2: decimal = 2.00d;
+        expect(d1 + d2).toBe(12.50d);
+        const r = 1..5;
+        const r2 = 1..=5;
+        expect(r.length).toBe(4);
+        expect(r2.length).toBe(5);
+        expect("  hello world  ".trim()).toBe("hello world");
     });
 });

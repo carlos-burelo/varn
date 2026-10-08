@@ -8,6 +8,11 @@ await describe("45 simple file test", async () => {
             using file = File.open("temp_simple.txt", "w");
             file.write("Hello simple using!");
         }
+        {
+            using file = File.open("temp_simple.txt", "r");
+            let contenido = file.readAll();
+            expect(contenido).toBe("Hello simple using!");
+        }
         
     });
 });

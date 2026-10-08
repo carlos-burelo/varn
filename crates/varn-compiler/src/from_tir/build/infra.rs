@@ -54,7 +54,10 @@ impl<'m> Builder<'m> {
 
     pub(super) fn set_term(&mut self, term: Terminator) {
         self.terminated[self.current.0 as usize] = true;
-        self.block_mut(self.current).term = term;
+        let line = self.cur_line;
+        let blk = self.block_mut(self.current);
+        blk.term = term;
+        blk.term_line = line;
     }
 
     pub(super) fn add_pred(&mut self, block: BlockId, pred: BlockId) {
@@ -63,19 +66,21 @@ impl<'m> Builder<'m> {
 
     pub(super) fn emit(&mut self, kind: InstKind, ty: HirType) -> Value {
         let dest = self.new_value(ty);
+        let line = self.cur_line;
         self.block_mut(self.current).insts.push(Inst {
             dest: Some(dest),
             kind,
-            line: 0,
+            line,
         });
         dest
     }
 
     pub(super) fn emit_effect(&mut self, kind: InstKind) {
+        let line = self.cur_line;
         self.block_mut(self.current).insts.push(Inst {
             dest: None,
             kind,
-            line: 0,
+            line,
         });
     }
 

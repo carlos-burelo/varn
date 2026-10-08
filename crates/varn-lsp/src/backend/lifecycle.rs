@@ -1,5 +1,5 @@
-use tower_lsp::lsp_types::*;
-use tower_lsp::Client;
+use tower_lsp_f::lsp_types::*;
+use tower_lsp_f::Client;
 
 use crate::analysis::AnalysisHandle;
 use crate::backend::progress::Progress;
@@ -19,7 +19,7 @@ pub fn supports_configuration(caps: &ClientCapabilities) -> bool {
         .unwrap_or(false)
 }
 
-const INDEX_SIZE_LIMIT_BYTES: u64 = 256 * 1024;
+const INDEX_SIZE_LIMIT_BYTES: u64 = 512 * 1024;
 
 pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_supported: bool) {
     let Ok(root) = std::env::current_dir() else {
@@ -27,7 +27,7 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
     };
     client
         .log_message(
-            MessageType::INFO,
+            MessageType::Info,
             format!("Indexing workspace: scanning {root:?}"),
         )
         .await;
@@ -51,13 +51,13 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
             if size > INDEX_SIZE_LIMIT_BYTES {
                 return Some(Err((abs_path, size)));
             }
-            let uri = Url::from_file_path(&abs_path).ok()?;
+            let uri = Uri::from_file_path(&abs_path).ok()?;
             let source = std::fs::read_to_string(&abs_path).ok()?;
             Some(Ok((abs_path, uri, source)))
         });
     }
     let mut skipped: Vec<(std::path::PathBuf, u64)> = Vec::new();
-    let mut ready: Vec<(std::path::PathBuf, Url, String)> = Vec::new();
+    let mut ready: Vec<(std::path::PathBuf, Uri, String)> = Vec::new();
     while let Some(joined) = read_set.join_next().await {
         match joined.ok().flatten() {
             Some(Ok(row)) => ready.push(row),
@@ -68,7 +68,7 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
     for (abs_path, size) in &skipped {
         client
             .log_message(
-                MessageType::INFO,
+                MessageType::Info,
                 format!(
                     "[index] skipping {} ({} KB > {} KB startup-scan limit)",
                     abs_path.display(),
@@ -99,10 +99,10 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
             })
             .await;
         if let Some(elapsed) = elapsed {
-            if elapsed.as_millis() >= SLOW_REQUEST_MS {
+            if super::state::verbose() && elapsed.as_millis() >= SLOW_REQUEST_MS {
                 client
                     .log_message(
-                        MessageType::WARNING,
+                        MessageType::Warning,
                         format!(
                             "[perf] slow index {} ({}ms)",
                             abs_path.display(),
@@ -140,7 +140,7 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
         .unwrap_or_default();
     client
         .log_message(
-            MessageType::INFO,
+            MessageType::Info,
             format!(
                 "Workspace indexed successfully in {:?}{mem_msg} \
                  (evicted binds:{ev_b} programs:{ev_p} arenas:{ev_a})",

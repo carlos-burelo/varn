@@ -1,6 +1,8 @@
 #![allow(unused_crate_dependencies)]
 
-use tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent};
+use tower_lsp_f::lsp_types::{
+    Position, Range, TextDocumentContentChangeEvent, TextDocumentContentChangePartial,
+};
 use varn_lsp::backend::sync::edits::apply_change;
 use varn_lsp::document::position::byte_offset;
 
@@ -8,20 +10,22 @@ use varn_lsp::document::position::byte_offset;
 fn test_incremental_edit_application() {
     let mut doc = "function hello() {\n    return 42;\n}\n".to_string();
 
-    let change = TextDocumentContentChangeEvent {
-        range: Some(Range {
-            start: Position {
-                line: 1,
-                character: 11,
+    let change = TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+        TextDocumentContentChangePartial {
+            range: Range {
+                start: Position {
+                    line: 1,
+                    character: 11,
+                },
+                end: Position {
+                    line: 1,
+                    character: 13,
+                },
             },
-            end: Position {
-                line: 1,
-                character: 13,
-            },
-        }),
-        range_length: None,
-        text: "100".to_string(),
-    };
+            range_length: None,
+            text: "100".to_string(),
+        },
+    );
 
     apply_change(&mut doc, change);
     assert_eq!(doc, "function hello() {\n    return 100;\n}\n");

@@ -118,6 +118,7 @@ pub(super) fn invoke_once(
 }
 
 pub(super) fn get_cpu_info() -> String {
+    const UNKNOWN_CPU: &str = "unknown";
     #[cfg(windows)]
     {
         let out = Command::new("reg")
@@ -144,5 +145,5 @@ pub(super) fn get_cpu_info() -> String {
             return id;
         }
     }
-    "unknown".to_string()
+    UNKNOWN_CPU.to_string()
 }

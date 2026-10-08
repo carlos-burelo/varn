@@ -70,3 +70,22 @@ pub fn check(
         checker_result: check_result,
     })
 }
+
+pub fn collect_test_targets(path: &str, source: &str) -> PipelineResult<Vec<(String, bool)>> {
+    let debug = DebugFlags::default();
+    let (tokens, lexeme_buf) = crate::lex::lex(source, path, false, &debug)?;
+    let (program, arena, interner) =
+        crate::parse::parse(tokens, lexeme_buf, source, path, false, &debug)?;
+    let options = varn_checker::CheckOptions::compile();
+    let checked = crate::resolver::with_resolver(|r| {
+        Checker::check_with(&program, &arena, interner, r, options)
+    });
+    if checked.diagnostics.has_errors() {
+        report_diagnostics(&checked.diagnostics, &program.filename, source)?;
+    }
+    Ok(checked
+        .test_targets
+        .iter()
+        .map(|t| (t.name.to_string(), t.is_async))
+        .collect())
+}

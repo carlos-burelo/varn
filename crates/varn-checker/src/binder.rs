@@ -21,6 +21,7 @@ mod declared_types;
 mod decls;
 mod decls_array;
 mod decls_fn;
+pub(crate) mod decorator_attrs;
 mod definite_field_assignment;
 mod diagnostics;
 mod imports;
@@ -71,4 +72,12 @@ pub struct Binder<'r> {
     pub(crate) evolved_array_types: FxHashMap<u32, Type>,
 
     pub(crate) type_decls: FxHashMap<Arc<str>, (crate::scope::ScopeId, varn_core::SourceRange)>,
+
+    pub(crate) pending_decorator_roles: Vec<(
+        crate::symbol::SymbolId,
+        Vec<varn_core::ast::Decorator>,
+        crate::scope::ScopeId,
+    )>,
+
+    pub(crate) user_decorators: rustc_hash::FxHashSet<u32>,
 }

@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::Position;
+use tower_lsp_f::lsp_types::Position;
 
 pub fn byte_offset(text: &str, pos: Position) -> usize {
     let line_start = line_start(text, pos.line);

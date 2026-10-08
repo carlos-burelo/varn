@@ -5,7 +5,7 @@ use crate::document::uri_to_path;
 use varn_modules::resolver::normalize_display_path;
 
 use super::make_lang_hover;
-use tower_lsp::lsp_types::Hover;
+use tower_lsp_f::lsp_types::Hover;
 
 pub fn import_path_hover(specifier: &str, doc_uri: &str) -> Option<Hover> {
     let display = if specifier.starts_with(STD_PREFIX) || is_incomplete_import_specifier(specifier)
@@ -14,7 +14,7 @@ pub fn import_path_hover(specifier: &str, doc_uri: &str) -> Option<Hover> {
     } else {
         resolve_import_module_path(specifier, doc_uri)
     };
-    Some(make_lang_hover(format!("module \"{display}\"")))
+    Some(make_lang_hover(format!("module \"{display}\""), None))
 }
 
 fn is_incomplete_import_specifier(specifier: &str) -> bool {

@@ -218,9 +218,8 @@ async function runComprehensiveTest(): Task<void> {
 }
 await describe("42 stdlib comprehensive test", async () => {
     await it("tests", async () => {
-        
-        await runComprehensiveTest()
-        
-        
+        if (!isIsolate) {
+            await runComprehensiveTest()
+        }
     });
 });

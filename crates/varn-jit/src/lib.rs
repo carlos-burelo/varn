@@ -54,8 +54,6 @@ pub struct JitArrayLayout {
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct JitInstanceAlloc {
-    pub heap_obj_bytes: usize,
-
     pub cells_off: usize,
     pub classes_off: usize,
 
@@ -63,9 +61,6 @@ pub struct JitInstanceAlloc {
     pub born_off: usize,
 
     pub native_off: usize,
-
-    pub instance_tag: usize,
-    pub instance_ref_off: usize,
 
     pub class_tag: usize,
 
@@ -80,19 +75,11 @@ pub struct JitInstanceAlloc {
 pub struct JitObjectLayout {
     pub object_tag: usize,
 
-    pub instance_tag: usize,
-
     pub payload_off: usize,
-
-    pub instance_data_off: usize,
 
     pub len_off: usize,
 
     pub values_off: usize,
-
-    pub instance_values_off: usize,
-
-    pub instance_class_id_off: usize,
 
     pub shape_off: usize,
 

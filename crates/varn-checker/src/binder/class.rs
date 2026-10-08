@@ -26,7 +26,8 @@ impl<'r> super::Binder<'r> {
             .iter()
             .map(|t| t.constraint.as_ref().map(|con| self.resolve_type(con)))
             .collect();
-        self.define(name_atom, sym);
+        let sym_id = self.define(name_atom, sym);
+        crate::binder::decorator_attrs::record_decorators(self, sym_id, &c.decorators);
         if c.id.is_some() {
             self.note_type_decl(&name, self.current, c.range);
         }

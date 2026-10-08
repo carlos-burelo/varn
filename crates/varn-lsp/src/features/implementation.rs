@@ -1,7 +1,8 @@
 use std::sync::Arc;
-use tower_lsp::lsp_types::{GotoDefinitionResponse, Location, Position, Range, Url};
-use varn_core::ast::{ClassDecl, ClassMember, Decl, StmtKind};
+use tower_lsp_f::lsp_types::{Definition, Location, Position, Range, Uri};
+use varn_core::ast::{ClassDecl, ClassMember};
 
+use crate::document::classes::top_level_classes;
 use crate::document::DocumentState;
 use crate::workspace::Workspace;
 
@@ -10,7 +11,7 @@ pub fn build_goto_implementation(
     workspace: &Workspace,
     line: u32,
     col: u32,
-) -> Option<GotoDefinitionResponse> {
+) -> Option<Definition> {
     let token = state.identifier_token_at(line, col)?;
     let target_name = state.lexeme(token);
 
@@ -36,49 +37,31 @@ pub fn build_goto_implementation(
         .collect();
 
     for (file_uri, file_state) in &entries {
-        let url = match Url::parse(file_uri) {
+        let uri = match Uri::parse(file_uri) {
             Ok(u) => u,
             Err(_) => continue,
         };
 
         if is_interface {
-            find_interface_implementations(file_state, target_name, &url, &mut locations);
+            find_interface_implementations(file_state, target_name, &uri, &mut locations);
         } else if is_class_or_method {
-            find_class_subtypes(file_state, target_name, &url, &mut locations);
+            find_class_subtypes(file_state, target_name, &uri, &mut locations);
         }
     }
 
     if locations.is_empty() {
         None
     } else if locations.len() == 1 {
-        Some(GotoDefinitionResponse::Scalar(
-            locations.into_iter().next().unwrap(),
-        ))
+        Some(Definition::Location(locations.swap_remove(0)))
     } else {
-        Some(GotoDefinitionResponse::Array(locations))
+        Some(Definition::LocationList(locations))
     }
-}
-
-fn top_level_classes(file: &DocumentState) -> impl Iterator<Item = &ClassDecl> {
-    let body = file
-        .ast
-        .as_ref()
-        .map(|p| p.body.as_slice())
-        .unwrap_or_default();
-    body.iter()
-        .filter_map(|&id| match &file.ast_arena.stmt(id).kind {
-            StmtKind::Decl(decl) => match decl.as_ref() {
-                Decl::Class(c) => Some(c),
-                _ => None,
-            },
-            _ => None,
-        })
 }
 
 fn find_interface_implementations(
     file: &DocumentState,
     iface_name: &str,
-    url: &Url,
+    uri: &Uri,
     locations: &mut Vec<Location>,
 ) {
     for c in top_level_classes(file) {
@@ -86,7 +69,7 @@ fn find_interface_implementations(
             .iter()
             .any(|t| file.type_node_decl_name(t) == Some(iface_name))
         {
-            locations.push(class_location(file, c, url));
+            locations.push(class_location(file, c, uri));
         }
     }
 }
@@ -94,7 +77,7 @@ fn find_interface_implementations(
 fn find_class_subtypes(
     file: &DocumentState,
     class_or_method_name: &str,
-    url: &Url,
+    uri: &Uri,
     locations: &mut Vec<Location>,
 ) {
     for c in top_level_classes(file) {
@@ -103,7 +86,7 @@ fn find_class_subtypes(
                 &file.ast_arena.expr(super_expr).kind
             {
                 if file.name(*name) == class_or_method_name {
-                    locations.push(class_location(file, c, url));
+                    locations.push(class_location(file, c, uri));
                 }
             }
         }
@@ -112,7 +95,7 @@ fn find_class_subtypes(
             if let ClassMember::Method { key, range, .. } = member {
                 if file.name(*key) == class_or_method_name {
                     locations.push(Location::new(
-                        url.clone(),
+                        uri.clone(),
                         Range {
                             start: Position {
                                 line: range.start.line.saturating_sub(1),
@@ -130,13 +113,13 @@ fn find_class_subtypes(
     }
 }
 
-fn class_location(file: &DocumentState, c: &ClassDecl, url: &Url) -> Location {
+fn class_location(file: &DocumentState, c: &ClassDecl, uri: &Uri) -> Location {
     let s_line = c.range.start.line.saturating_sub(1);
     let s_col = c.range.start.column;
     let name_len = c.id.map_or(5, |n| file.name(n).len()) as u32;
 
     Location::new(
-        url.clone(),
+        uri.clone(),
         Range {
             start: Position {
                 line: s_line,

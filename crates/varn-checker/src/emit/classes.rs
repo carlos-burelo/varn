@@ -132,6 +132,14 @@ pub(super) fn emit_class(
         def.super_class = Some(x);
     }
     for deco in &class.decorators {
+        if varn_core::ast::decorators::is_active_builtin(
+            ast_arena,
+            ctx.interner,
+            |off| ctx.shadowed.contains(&off),
+            deco,
+        ) {
+            continue;
+        }
         let (pre, x) = lower_outer(
             deco.expression,
             ast_arena,

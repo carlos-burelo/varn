@@ -54,8 +54,9 @@ await describe("25 Extensions", async () => {
         expect(slot.doubled()).toBe(10);
         expect(slot.add(3)).toBe(8);
         expect(slot.label).toBe("Slot(5)");
-        slot.label = "hello";
-        expect(slot.value).toBe(5);
+        slot.label = "hello!";
+        expect(slot.value).toBe(6);
+        expect(slot.label).toBe("Slot(6)");
     });
 
     await it("int extensions", () => {

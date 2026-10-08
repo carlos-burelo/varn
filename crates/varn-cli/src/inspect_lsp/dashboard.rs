@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::HoverContents;
+use tower_lsp_f::lsp_types::Contents;
 use varn_core::term::terminal;
 use varn_debug::colors::{BLUE, BOLD, C_TYPES, DIM, GREEN, R, YELLOW};
 use varn_debug::flags::DebugFlags;
@@ -51,13 +51,13 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                     varn_lsp::features::hover::build_hover(&analysis, tok.line, tok.col)
                 {
                     let content = match hover.contents {
-                        HoverContents::Scalar(c) => format_marked_string(c),
-                        HoverContents::Array(arr) => arr
+                        Contents::MarkedString(c) => format_marked_string(c),
+                        Contents::MarkedStringList(arr) => arr
                             .into_iter()
                             .map(format_marked_string)
                             .collect::<Vec<_>>()
                             .join(" | "),
-                        HoverContents::Markup(m) => m
+                        Contents::MarkupContent(m) => m
                             .value
                             .replace("```varn\n", "")
                             .replace("```Varn\n", "")
@@ -108,7 +108,9 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                     "Invoked".to_string(),
                     None,
                 );
-                if let Some(tower_lsp::lsp_types::CompletionResponse::Array(items)) = resp {
+                if let Some(tower_lsp_f::lsp_types::CompletionResponse::CompletionItemList(items)) =
+                    resp
+                {
                     let labels: Vec<_> = items.iter().map(|it| it.label.clone()).collect();
                     if !labels.is_empty() {
                         terminal::log(format!(
@@ -172,7 +174,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 .token_types
                 .get(chunk[3] as usize)
                 .map(|t| t.as_str())
-                .unwrap_or("dynamic");
+                .unwrap_or(varn_core::UNKNOWN);
             let lexeme = find_lexeme(&analysis, curr_line, curr_col, chunk[2]);
             terminal::log(format!(
                 "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {GREEN}{}{RESET}",
@@ -250,7 +252,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         let inlay_hints = varn_lsp::features::inlay_hints::build_inlay_hints(&analysis);
         for hint in inlay_hints {
             let label = match hint.label {
-                tower_lsp::lsp_types::InlayHintLabel::String(s) => s,
+                tower_lsp_f::lsp_types::Label::String(s) => s,
                 _ => "".to_string(),
             };
             terminal::log(format!(
@@ -373,9 +375,10 @@ fn find_lexeme(
         .unwrap_or_else(|| "???".to_string())
 }
 
-fn format_marked_string(ms: tower_lsp::lsp_types::MarkedString) -> String {
+#[allow(deprecated)]
+fn format_marked_string(ms: tower_lsp_f::lsp_types::MarkedString) -> String {
     match ms {
-        tower_lsp::lsp_types::MarkedString::String(s) => s,
-        tower_lsp::lsp_types::MarkedString::LanguageString(ls) => ls.value,
+        tower_lsp_f::lsp_types::MarkedString::String(s) => s,
+        tower_lsp_f::lsp_types::MarkedString::MarkedStringWithLanguage(ls) => ls.value,
     }
 }

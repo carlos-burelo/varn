@@ -45,6 +45,7 @@ pub(super) fn measure_e2e(
             &arena,
             &check_result,
             export_names_of(&program.filename),
+            &source,
         )
         .map_err(|e| format!("compile failed: {}", e))?;
 

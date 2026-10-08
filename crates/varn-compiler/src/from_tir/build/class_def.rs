@@ -57,7 +57,8 @@ impl<'m> Builder<'m> {
         }
 
         self.build_class_methods(def, class_v)?;
-        self.build_class_accessors(def, class_v);
+        self.build_class_accessors(def, class_v)?;
+        self.build_property_decorators(def, class_v)?;
         class_v = self.build_class_decorators(def, class_v)?;
 
         let store = self.global_store(&def.name, class_v);

@@ -24,7 +24,7 @@ pub fn collect(check_result: &CheckResult) -> Report {
                 t.display(&check_result.bind.ty_table, &check_result.bind.interner)
                     .to_string()
             })
-            .unwrap_or_else(|| "dynamic".to_string());
+            .unwrap_or_else(|| varn_core::LangPrimitive::Dynamic.name().to_string());
 
         let origin = sym
             .origin_module

@@ -36,6 +36,7 @@ pub use ctx::ExecCtx;
 pub enum VmSuspend {
     Yield { value: VmValue, dest_reg: u8 },
     Await { value: VmValue, dest_reg: u16 },
+    DebugBreak,
 }
 
 #[derive(Debug, Clone)]

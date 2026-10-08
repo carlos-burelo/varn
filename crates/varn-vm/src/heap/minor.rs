@@ -53,7 +53,8 @@ impl HeapInner {
 
     fn mark_children(&self, r: HeapRef, work: &mut Vec<HeapRef>) {
         for_each_child(
-            self.cells.get(r),
+            &self.cells,
+            r,
             &self.identity_index,
             Reach::Minor,
             &mut |child| CellSpace::mark_young(child, work),
@@ -67,9 +68,13 @@ impl HeapInner {
                 SlotState::Marked => {
                     self.cells.promote(r);
                     self.young.minor_gc_promoted += 1;
-                    let obj = self.cells.get(r);
-                    let track = Self::needs_minor_scan(obj);
-                    let identity = Self::identity_key(obj);
+                    let (track, identity) = match self.instance(r) {
+                        Some(_) => (false, None),
+                        None => {
+                            let obj = self.cells.get(r);
+                            (Self::needs_minor_scan(obj), Self::identity_key(obj))
+                        }
+                    };
                     if track {
                         self.scan_roots.push(r);
                     }
@@ -91,5 +96,84 @@ impl HeapInner {
 fn mark_young_value(v: VmValue, work: &mut Vec<HeapRef>) {
     if v.is_heap() {
         CellSpace::mark_young(v.as_heap(), work);
+    }
+}
+
+#[cfg(test)]
+mod minor_gc_tests {
+    use super::super::structs::HeapInner;
+    use varn_types::ClassObj;
+
+    fn test_heap_with_class() -> (crate::heap::Heap, std::rc::Rc<ClassObj>) {
+        let heap = crate::heap::Heap::new();
+        let cls = ClassObj::new_rc("Probe");
+        let layout = std::rc::Rc::new(varn_core::layout::ClassLayout::from_fields(&[(
+            std::sync::Arc::from("x"),
+            Some(varn_core::RuntimeKind::Int),
+        )]));
+        cls.set_layout(layout);
+        (heap, cls)
+    }
+
+    #[test]
+    fn minor_gc_with_colocated_instances() {
+        let (mut heap, cls) = test_heap_with_class();
+        let inner = unsafe { heap.inner_mut() };
+        let mut refs = Vec::new();
+        for _ in 0..100 {
+            let (r, inst) = inner.alloc_instance(&cls);
+            assert_eq!(inst.class_id, cls.id);
+            refs.push(r);
+        }
+        assert_eq!(inner.instance(refs[3]).unwrap().class_id, cls.id);
+        inner.minor_gc(&refs);
+        for r in &refs {
+            assert_eq!(inner.instance(*r).unwrap().class_id, cls.id);
+        }
+    }
+
+    #[test]
+    fn minor_gc_with_many_colocated_instances() {
+        let (mut heap, cls) = test_heap_with_class();
+        let inner = unsafe { heap.inner_mut() };
+        let mut refs = Vec::with_capacity(60000);
+        for _ in 0..60000 {
+            let (r, _) = inner.alloc_instance(&cls);
+            refs.push(r);
+        }
+        inner.minor_gc(&refs);
+        for r in refs.iter().step_by(997) {
+            assert_eq!(inner.instance(*r).unwrap().class_id, cls.id);
+        }
+    }
+
+    #[test]
+    fn minor_gc_with_array_root_of_instances() {
+        use varn_types::VmValue;
+        let (mut heap, cls) = test_heap_with_class();
+        let inner = unsafe { heap.inner_mut() };
+        let mut vals = Vec::with_capacity(60000);
+        for _ in 0..60000 {
+            let (r, _) = inner.alloc_instance(&cls);
+            vals.push(VmValue::from_heap(r));
+        }
+        let arr = inner.alloc_array_vm(vals);
+        let arr_ref = arr.as_heap();
+        inner.minor_gc(&[arr_ref]);
+        let expected = cls.id;
+        match inner.cells.get(arr_ref) {
+            crate::heap::HeapObj::Array(a) => {
+                let items = match a.repr() {
+                    varn_types::ArrayRepr::Boxed(v) => v.as_vec(),
+                    _ => panic!("array repr cambio"),
+                };
+                assert_eq!(items.len(), 60000);
+                let first = inner
+                    .instance(items[0].as_heap())
+                    .expect("instance survives");
+                assert_eq!(first.class_id, expected);
+            }
+            other => panic!("array sobrevivio como {other:?}"),
+        }
     }
 }

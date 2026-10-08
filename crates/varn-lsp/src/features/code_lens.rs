@@ -1,16 +1,17 @@
-use tower_lsp::lsp_types::{CodeLens, Command, Position, Range, Url};
+use tower_lsp_f::lsp_types::{CodeLens, Command, Position, Range, Uri};
 use varn_checker::SymbolKind;
 
 use crate::document::DocumentState;
 use crate::workspace::Workspace;
 
 pub fn build_code_lenses(
-    uri: &Url,
+    uri: &Uri,
     analysis: &DocumentState,
     workspace: Option<&Workspace>,
 ) -> Vec<CodeLens> {
     let mut lenses = Vec::new();
     let uri_str = uri.to_string();
+    let uri_arg = || serde_json::Value::String(uri_str.clone());
 
     lenses.push(CodeLens {
         range: Range {
@@ -25,8 +26,9 @@ pub fn build_code_lenses(
         },
         command: Some(Command {
             title: "▶ Run File".to_string(),
+            tooltip: None,
             command: "varn.runFile".to_string(),
-            arguments: Some(vec![serde_json::to_value(uri_str.clone()).unwrap()]),
+            arguments: Some(vec![uri_arg()]),
         }),
         data: None,
     });
@@ -44,8 +46,9 @@ pub fn build_code_lenses(
         },
         command: Some(Command {
             title: "🔍 View Bytecode".to_string(),
+            tooltip: None,
             command: "varn.showBytecode".to_string(),
-            arguments: Some(vec![serde_json::to_value(uri_str.clone()).unwrap()]),
+            arguments: Some(vec![uri_arg()]),
         }),
         data: None,
     });
@@ -63,8 +66,9 @@ pub fn build_code_lenses(
         },
         command: Some(Command {
             title: "🔍 View SSA".to_string(),
+            tooltip: None,
             command: "varn.showSSA".to_string(),
-            arguments: Some(vec![serde_json::to_value(uri_str.clone()).unwrap()]),
+            arguments: Some(vec![uri_arg()]),
         }),
         data: None,
     });
@@ -90,8 +94,9 @@ pub fn build_code_lenses(
                 range: sym_range,
                 command: Some(Command {
                     title: "▶ Run Main".to_string(),
+                    tooltip: None,
                     command: "varn.runMain".to_string(),
-                    arguments: Some(vec![serde_json::to_value(uri_str.clone()).unwrap()]),
+                    arguments: Some(vec![uri_arg()]),
                 }),
                 data: None,
             });
@@ -99,8 +104,9 @@ pub fn build_code_lenses(
                 range: sym_range,
                 command: Some(Command {
                     title: "⏱️ Benchmark".to_string(),
+                    tooltip: None,
                     command: "varn.runBenchmark".to_string(),
-                    arguments: Some(vec![serde_json::to_value(uri_str.clone()).unwrap()]),
+                    arguments: Some(vec![uri_arg()]),
                 }),
                 data: None,
             });
@@ -109,10 +115,11 @@ pub fn build_code_lenses(
                 range: sym_range,
                 command: Some(Command {
                     title: "▶ Run Test".to_string(),
+                    tooltip: None,
                     command: "varn.runTest".to_string(),
                     arguments: Some(vec![
-                        serde_json::to_value(uri_str.clone()).unwrap(),
-                        serde_json::to_value(sym.name().to_owned()).unwrap(),
+                        uri_arg(),
+                        serde_json::Value::String(sym.name().to_owned()),
                     ]),
                 }),
                 data: None,
@@ -122,10 +129,11 @@ pub fn build_code_lenses(
                 range: sym_range,
                 command: Some(Command {
                     title: "⏱️ Benchmark".to_string(),
+                    tooltip: None,
                     command: "varn.runBenchmark".to_string(),
                     arguments: Some(vec![
-                        serde_json::to_value(uri_str.clone()).unwrap(),
-                        serde_json::to_value(sym.name().to_owned()).unwrap(),
+                        uri_arg(),
+                        serde_json::Value::String(sym.name().to_owned()),
                     ]),
                 }),
                 data: None,
@@ -148,11 +156,12 @@ pub fn build_code_lenses(
                         range: sym_range,
                         command: Some(Command {
                             title,
+                            tooltip: None,
                             command: "varn.findReferences".to_string(),
                             arguments: Some(vec![
-                                serde_json::to_value(uri_str.clone()).unwrap(),
-                                serde_json::to_value(sym.line()).unwrap(),
-                                serde_json::to_value(sym.col()).unwrap(),
+                                uri_arg(),
+                                serde_json::Value::from(sym.line()),
+                                serde_json::Value::from(sym.col()),
                             ]),
                         }),
                         data: None,

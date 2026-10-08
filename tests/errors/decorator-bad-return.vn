@@ -1,0 +1,11 @@
+// expect: error[VN4401]
+function strDeco(fn: Function, ctx: dynamic): str {
+    return "nope";
+}
+
+class A {
+    @strDeco
+    m(): int {
+        return 1;
+    }
+}

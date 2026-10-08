@@ -44,14 +44,15 @@ pub fn compile(
         &check_result.checker_result.call_mappings,
         &check_result.checker_result.desugar,
     );
-    let proto = varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| {
-        PipelineError::fatal(format!(
-            "{}: {e:?}",
-            varn_core::term::chalk::chalk("error[emit:tir]")
-                .red()
-                .bold()
-        ))
-    })?;
+    let proto =
+        varn_compiler::from_tir::compile_module(&tir, export_names, source).map_err(|e| {
+            PipelineError::fatal(format!(
+                "{}: {e:?}",
+                varn_core::term::chalk::chalk("error[emit:tir]")
+                    .red()
+                    .bold()
+            ))
+        })?;
 
     if debug.bytecode {
         varn_debug::bytecode::debug_bytecode(&proto, debug);

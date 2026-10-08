@@ -119,6 +119,7 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         )),
         Commands::Init(args) => commands::init::execute(args),
         Commands::Completions(args) => commands::completions::execute(args),
+        Commands::Dap => commands::dap::execute(),
     }
 }
 
@@ -139,6 +140,7 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
         "cache",
         "lsp",
         "completions",
+        "dap",
         "help",
         "--help",
         "-h",

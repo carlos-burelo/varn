@@ -80,8 +80,63 @@ impl DebugFlags {
                 flags.expr_range = Some(parse_line_range(range_str)?);
             } else if let Some(sub) = phase.strip_prefix("lsp:") {
                 flags.lsp = true;
-                for sub_part in sub.split('+') {
-                    match sub_part {
+                let mut sub_parts = sub.split('+').peekable();
+                while let Some(head) = sub_parts.next() {
+                    if head == "interact" {
+                        flags.lsp_interact = true;
+                        continue;
+                    }
+                    if head.starts_with("interact@") {
+                        let mut body = head
+                            .strip_prefix("interact@")
+                            .unwrap_or("")
+                            .to_owned();
+                        for next in sub_parts.by_ref() {
+                            body.push('+');
+                            body.push_str(next);
+                        }
+                        flags.lsp_interact = true;
+                        if let Some(path) = body.strip_prefix("file:") {
+                            let text = std::fs::read_to_string(path).map_err(|e| {
+                                CliError::usage(format!(
+                                    "cannot read interact file {path:?}: {e}"
+                                ))
+                            })?;
+                            for (idx, raw) in text.lines().enumerate() {
+                                let raw = raw.trim();
+                                if raw.is_empty() || raw.starts_with('#') {
+                                    continue;
+                                }
+                                match super::steps::parse_step(raw) {
+                                    Ok(step) => flags.lsp_cursors.push(step),
+                                    Err(e) => {
+                                        return Err(CliError::usage(format!(
+                                            "invalid interact step ({path}:{idx1}): {e}",
+                                            idx1 = idx + 1
+                                        )));
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                        for raw in body.split(';') {
+                            let raw = raw.trim();
+                            if raw.is_empty() || raw.starts_with('#') {
+                                continue;
+                            }
+                            match super::steps::parse_step(raw) {
+                                Ok(step) => flags.lsp_cursors.push(step),
+                                Err(e) => {
+                                    return Err(CliError::usage(format!(
+                                        "invalid interact step {raw:?}: {e}\n\
+                                         Step syntax: Ln:Col [type=TEXT] [ask=v] [expect=..] (1-based; quote values with spaces; repeat ask/expect keys)"
+                                    )));
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                    match head {
                         "hovers" => flags.lsp_hovers = true,
                         "semantic" => flags.lsp_semantic = true,
                         "types" => flags.lsp_types = true,
@@ -93,7 +148,7 @@ impl DebugFlags {
                         unknown => {
                             return Err(CliError::usage(format!(
                                 "unknown lsp debug sub-phase: '{unknown}'\n\
-                                 Valid sub-phases: hovers, semantic, types, completions, symbols, colorize, hints, all"
+                                 Valid sub-phases: hovers, semantic, types, completions, symbols, colorize, hints, interact[@STEP[;STEP...]] (interact@ must be last), all"
                             )));
                         }
                     }

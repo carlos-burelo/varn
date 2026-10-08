@@ -69,7 +69,6 @@ pub(crate) fn emit_method_call(
     let out = entry_out_slot(b);
 
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
-    let olay = &ctx.helpers.object_layout;
     let ectx = frame.exec_ctx;
 
     if args.len() == 1
@@ -126,9 +125,11 @@ pub(crate) fn emit_method_call(
         slot_addr,
         ctx.helpers.array_layout.kind_off as i32,
     );
-    let is_inst = b
-        .ins()
-        .icmp_imm_u(IntCC::Equal, tagb, olay.instance_tag as i64);
+    let is_inst = b.ins().icmp_imm_u(
+        IntCC::Equal,
+        tagb,
+        varn_types::cell::CELL_KIND_INSTANCE as i64,
+    );
     let ok = b.create_block();
     b.ins().brif(is_inst, ok, &[], slow, &[]);
     b.switch_to_block(ok);
@@ -136,7 +137,7 @@ pub(crate) fn emit_method_call(
         types::I32,
         m,
         slot_addr,
-        (olay.instance_data_off + olay.instance_class_id_off) as i32,
+        (varn_types::cell::INST_CELL_DATA_OFF + varn_types::INST_CLASS_ID_OFF) as i32,
     );
     let cid = b.ins().uextend(types::I64, cid32);
 

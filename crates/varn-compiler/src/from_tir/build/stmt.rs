@@ -4,6 +4,32 @@ use crate::ssa::ir::{InstKind, Terminator, VarId};
 use crate::OptError;
 use varn_tir::TirStmt;
 
+fn stmt_offset(s: &TirStmt) -> Option<u32> {
+    match s {
+        TirStmt::Expr(e) => first_real_span(e),
+        TirStmt::Let { init: Some(e), .. } => first_real_span(e),
+        TirStmt::Return(Some(e)) => first_real_span(e),
+        TirStmt::Throw(e) => first_real_span(e),
+        TirStmt::If { cond, .. } => first_real_span(cond),
+        TirStmt::Loop { cond, .. } => first_real_span(cond),
+        TirStmt::Try { body, .. } => body.first().and_then(stmt_offset),
+        TirStmt::Let { .. }
+        | TirStmt::Return(None)
+        | TirStmt::Break
+        | TirStmt::Continue
+        | TirStmt::BuildClass(_) => None,
+    }
+}
+
+fn first_real_span(e: &varn_tir::TirExpr) -> Option<u32> {
+    if e.span.end > 0 {
+        return Some(e.span.start);
+    }
+    crate::from_tir::tir_children::child_exprs(e)
+        .into_iter()
+        .find_map(first_real_span)
+}
+
 impl<'m> Builder<'m> {
     pub(super) fn lower_block(&mut self, stmts: &[TirStmt]) -> Result<()> {
         for s in stmts {
@@ -30,6 +56,9 @@ impl<'m> Builder<'m> {
     }
 
     pub(super) fn lower_stmt(&mut self, s: &TirStmt) -> Result<()> {
+        if let Some(offset) = stmt_offset(s) {
+            self.set_line_at(offset);
+        }
         match s {
             TirStmt::Expr(e) => {
                 self.lower_expr(e)?;

@@ -1,19 +1,25 @@
-use std::cell::RefCell;
+use std::sync::{OnceLock, RwLock};
 use varn_checker::module_resolver::DiskResolver;
 
-thread_local! {
-    static RESOLVER: RefCell<DiskResolver> = RefCell::new(DiskResolver::new());
+fn global_resolver() -> &'static RwLock<DiskResolver> {
+    static RESOLVER: OnceLock<RwLock<DiskResolver>> = OnceLock::new();
+    RESOLVER.get_or_init(|| RwLock::new(DiskResolver::new()))
 }
 
 pub fn with_resolver<R>(f: impl FnOnce(&DiskResolver) -> R) -> R {
-    RESOLVER.with(|r| f(&r.borrow()))
+    let guard = global_resolver().read().unwrap_or_else(|e| e.into_inner());
+    f(&guard)
 }
 
 pub fn reset() {
-    RESOLVER.with(|r| r.borrow().clear());
+    if let Ok(guard) = global_resolver().write() {
+        guard.clear();
+    }
     varn_core::clear_interner();
 }
 
 pub fn invalidate(id: &varn_core::ModuleId) {
-    RESOLVER.with(|r| r.borrow().invalidate(id));
+    if let Ok(guard) = global_resolver().read() {
+        guard.invalidate(id);
+    }
 }

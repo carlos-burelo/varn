@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind};
+use tower_lsp_f::lsp_types::{CompletionItem, CompletionItemKind};
 use varn_checker::module_resolver::ImportResolver;
 
 use crate::constants::STD_PREFIX;
@@ -8,7 +8,7 @@ use crate::util::kinds::to_completion_kind;
 pub fn build_import_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem> {
     let mut items: Vec<CompletionItem> = Vec::new();
 
-    if prefix.is_empty() || prefix.starts_with(STD_PREFIX) {
+    if prefix.is_empty() || prefix.starts_with(STD_PREFIX) || STD_PREFIX.starts_with(prefix) {
         items.extend(stdlib_module_completions(prefix));
     }
 
@@ -23,17 +23,19 @@ fn stdlib_module_completions(prefix: &str) -> Vec<CompletionItem> {
     let Some(provider) = varn_modules::provider::get() else {
         return Vec::new();
     };
-    provider
+    let mut items: Vec<CompletionItem> = provider
         .all_specs()
         .iter()
         .filter(|m| matches!(m.kind, varn_modules::ModuleKind::Stdlib) && m.id.starts_with(prefix))
         .map(|m| CompletionItem {
             label: m.id.to_owned(),
-            kind: Some(CompletionItemKind::MODULE),
+            kind: Some(CompletionItemKind::Module),
             detail: Some("stdlib module".into()),
             ..Default::default()
         })
-        .collect()
+        .collect();
+    items.sort_by(|a, b| a.label.cmp(&b.label));
+    items
 }
 
 fn relative_varn_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem> {
@@ -79,7 +81,7 @@ fn relative_varn_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem>
             if label.starts_with(prefix) {
                 items.push(CompletionItem {
                     label,
-                    kind: Some(CompletionItemKind::FOLDER),
+                    kind: Some(CompletionItemKind::Folder),
                     ..Default::default()
                 });
             }
@@ -92,7 +94,7 @@ fn relative_varn_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem>
             if label.starts_with(prefix) {
                 items.push(CompletionItem {
                     label,
-                    kind: Some(CompletionItemKind::FILE),
+                    kind: Some(CompletionItemKind::File),
                     detail: Some(file_name.clone()),
                     ..Default::default()
                 });
@@ -100,6 +102,7 @@ fn relative_varn_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem>
         }
     }
 
+    items.sort_by(|a, b| a.label.cmp(&b.label));
     items
 }
 

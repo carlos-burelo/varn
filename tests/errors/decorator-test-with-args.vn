@@ -1,0 +1,4 @@
+// expect: error[VN2013]
+@test
+function withArgs(x: int): void {
+}

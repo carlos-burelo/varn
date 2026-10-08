@@ -18,10 +18,11 @@ pub mod stdlib_loader;
 mod lex;
 
 pub use check::check as phase_check;
+pub use check::collect_test_targets;
 pub use compile::CompileOutput;
 pub use core::core_protos_owned;
 pub use error::PipelineError;
-pub use execute::{execute, execute_with_caps};
+pub use execute::{boot_machine, enter_main, execute, execute_with_caps};
 pub use lex::lex as phase_lex;
 pub use opts::{parse_debug_opt, CapabilitySet, DebugFlags, RunOpts};
 pub use parse::parse as phase_parse;
@@ -49,7 +50,11 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
     } else {
         read_source(&opts.file_path)?
     };
-    let compiled = if opts.eval.is_none() && !opts.debug.any() {
+    let source = match &opts.append {
+        Some(extra) => format!("{source}\n{extra}\n"),
+        None => source,
+    };
+    let compiled = if opts.eval.is_none() && opts.append.is_none() && !opts.debug.any() {
         compile_source_cached(&source, &opts.file_path, opts.verbose)?
     } else {
         compile_source(&source, &opts.file_path, opts.verbose, &opts.debug)?

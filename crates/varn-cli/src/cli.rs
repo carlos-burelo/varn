@@ -46,6 +46,8 @@ pub enum Commands {
     Lsp(LspArgs),
 
     Completions(CompletionsArgs),
+
+    Dap,
 }
 
 #[derive(Args)]

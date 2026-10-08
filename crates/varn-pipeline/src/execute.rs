@@ -36,21 +36,52 @@ pub fn execute_with_caps(
     _debug: &DebugFlags,
     capabilities: CapabilitySet,
 ) -> PipelineResult<()> {
+    let mut machine = boot_machine(precompiled, capabilities, _debug.trace)?;
+    let main_proto = enter_main(&mut machine, proto);
+    if _debug.trace {
+        varn_core::term::terminal::tagged(
+            "pipeline:execute",
+            format_args!(
+                "running main {}",
+                main_proto.name.as_deref().unwrap_or("<main>")
+            ),
+        );
+    }
+    let mut resume = |_: &mut Vm| varn_vm::debug::BreakAction::Resume;
+    match varn_vm::debug::drive_main(&mut machine, &main_proto, &mut resume) {
+        varn_vm::debug::DriveResult::Done(_) => {}
+        varn_vm::debug::DriveResult::Stopped => {}
+        varn_vm::debug::DriveResult::Failed(e) => {
+            let msg = format_runtime_error(None, &e.message, &e.frames);
+            return Err(PipelineError::fatal(msg));
+        }
+    }
+    if _debug.gc {
+        eprintln!("{}", machine.gc_report());
+    }
+    Ok(())
+}
+
+pub fn boot_machine(
+    precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
+    capabilities: CapabilitySet,
+    trace: bool,
+) -> PipelineResult<Vm> {
     let loader = std::sync::Arc::new(CompositeLoader::new(vec![
         Box::new(crate::stdlib_loader::FileLoader),
         Box::new(crate::stdlib_loader::StdlibLoader),
     ]));
-    let settings = varn_vm::ExecSettings::from_env(_debug.trace);
+    let settings = varn_vm::ExecSettings::from_env(trace);
     let mut machine = Vm::new(precompiled.clone(), settings).with_loader(loader);
     machine.ctx.capabilities = Rc::new(capabilities);
     varn_vm::prefill_native_modules(&mut machine);
 
-    if _debug.trace {
+    if trace {
         varn_core::term::terminal::tagged("pipeline:execute", "starting builtin initialization");
     }
 
     for builtin_proto in core::core_protos_owned()? {
-        if _debug.trace {
+        if trace {
             let name = builtin_proto.name.as_deref().unwrap_or("<builtin>");
             varn_core::term::terminal::tagged(
                 "pipeline:execute",
@@ -62,7 +93,10 @@ pub fn execute_with_caps(
             .run(closure)
             .map_err(|e| PipelineError::fatal(format!("failed to run builtin: {}", e)))?;
     }
+    Ok(machine)
+}
 
+pub fn enter_main(machine: &mut Vm, proto: FunctionProto) -> Rc<FunctionProto> {
     let main_proto = Rc::new(proto);
 
     let main_module_id = ModuleId::local_str(&main_proto.chunk.source_file);
@@ -76,65 +110,7 @@ pub fn execute_with_caps(
     let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
     unsafe { &mut *machine.ctx.modules.get() }.insert(main_module_id, module_val);
     machine.ctx.module_exports.insert(0, module_val);
-
-    if _debug.trace {
-        let name = main_proto.name.as_deref().unwrap_or("<main>");
-        varn_core::term::terminal::tagged("pipeline:execute", format_args!("running main {name}"));
-    }
-
-    loop {
-        let res = machine.run(main_proto.clone());
-        match res {
-            Ok(_) => match machine.ctx.vm_suspend.take() {
-                None => break,
-                Some(varn_vm::exec::VmSuspend::Await { value, dest_reg }) => {
-                    match machine.ctx.settle_awaited(value) {
-                        Ok(resolved) => {
-                            if let Some(frame) = machine.ctx.frames.last() {
-                                let base = frame.base;
-                                let _ = machine.ctx.stack.unbox_into_reg(
-                                    base,
-                                    dest_reg as usize,
-                                    resolved,
-                                );
-                            }
-                        }
-                        Err(thrown) => {
-                            let err = varn_vm::exec::exceptions::build_thrown_error(
-                                thrown,
-                                &machine.ctx.heap,
-                                &machine.ctx.frames,
-                            );
-                            if let Some(handler) = machine.ctx.try_handlers.pop() {
-                                let thrown_val = err.thrown.unwrap_or(varn_types::VmValue::null());
-                                let _ = varn_vm::exec::frame_ctrl::unwind_to_handler(
-                                    &mut machine.ctx,
-                                    handler,
-                                    thrown_val,
-                                );
-                            } else {
-                                let msg = format_runtime_error(
-                                    Some("awaited task failed"),
-                                    &err.message,
-                                    &err.frames,
-                                );
-                                return Err(PipelineError::fatal(msg));
-                            }
-                        }
-                    }
-                }
-                Some(varn_vm::exec::VmSuspend::Yield { .. }) => {}
-            },
-            Err(e) => {
-                let msg = format_runtime_error(None, &e.message, &e.frames);
-                return Err(PipelineError::fatal(msg));
-            }
-        }
-    }
-    if _debug.gc {
-        eprintln!("{}", machine.gc_report());
-    }
-    Ok(())
+    main_proto
 }
 
 fn format_runtime_error(

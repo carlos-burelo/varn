@@ -12,6 +12,7 @@ pub fn parse_debug_opt(spec: Option<&str>) -> Result<DebugFlags, PipelineError> 
 pub struct RunOpts {
     pub file_path: String,
     pub eval: Option<String>,
+    pub append: Option<String>,
     pub verbose: bool,
     pub no_run: bool,
     pub debug: DebugFlags,
@@ -24,6 +25,7 @@ impl Default for RunOpts {
         Self {
             file_path: String::new(),
             eval: None,
+            append: None,
             verbose: false,
             no_run: false,
             debug: DebugFlags::default(),

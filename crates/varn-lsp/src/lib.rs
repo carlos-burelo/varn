@@ -25,8 +25,8 @@ pub async fn run_server() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
     let (service, socket) =
-        tower_lsp::LspService::new(|client| backend::Backend::new(client, std_error));
-    tower_lsp::Server::new(stdin, stdout, socket)
+        tower_lsp_f::LspService::new(|client| backend::Backend::new(client, std_error));
+    tower_lsp_f::Server::new(stdin, stdout, socket)
         .serve(service)
         .await;
 }
@@ -49,8 +49,8 @@ pub async fn run_server_tcp(addr: &str) {
         eprintln!("LSP client connected from {client_addr}");
         let (read, write) = stream.into_split();
         let (service, socket) =
-            tower_lsp::LspService::new(|client| backend::Backend::new(client, std_error));
-        let service = tower_lsp::Server::new(read, write, socket).serve(service);
+            tower_lsp_f::LspService::new(|client| backend::Backend::new(client, std_error));
+        let service = tower_lsp_f::Server::new(read, write, socket).serve(service);
         tokio::spawn(async move {
             service.await;
             eprintln!("LSP client disconnected: {client_addr}");

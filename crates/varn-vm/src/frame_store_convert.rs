@@ -13,7 +13,7 @@ pub(crate) fn value_kind_name(v: VmValue) -> &'static str {
         KIND_HEAP => "reference",
         KIND_SSO => "str",
         KIND_SYMBOL => "symbol",
-        _ => "dynamic",
+        _ => varn_core::LangPrimitive::Dynamic.name(),
     }
 }
 

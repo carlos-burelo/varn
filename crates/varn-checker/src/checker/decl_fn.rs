@@ -39,7 +39,22 @@ impl<'r> Checker<'r> {
             None
         };
 
+        let saved_caps = self
+            .enclosing_caps
+            .replace(super::decorator_signature::caps_of(
+                &f.decorators,
+                self.ast_arena,
+                bind,
+            ));
+        let saved_pure = self.pure_scope.take();
+        if super::decorator_signature::is_pure_fn(&f.decorators, self.ast_arena, bind) {
+            self.pure_scope = next_scope.or(Some(self.current_scope));
+        }
+
         self.in_function_body(f.modifiers.is_async, |c| c.check_stmt(f.body, bind));
+
+        self.pure_scope = saved_pure;
+        self.enclosing_caps = saved_caps;
 
         if is_gen {
             let yields = self.yielded_types.take().unwrap_or_default();
@@ -80,6 +95,111 @@ impl<'r> Checker<'r> {
         self.expected_return_type = saved_expected;
         for tp in &injected_tps {
             self.active_type_params.remove(tp.as_ref());
+        }
+        if !f.decorators.is_empty() {
+            let name = bind.interner.resolve(f.id);
+            self.check_decorator_signatures(
+                &f.decorators,
+                super::decorator_signature::DecoratorTarget::Function,
+                name,
+                bind,
+            );
+            let has_test = varn_core::ast::decorators::match_builtin(
+                self.ast_arena,
+                &bind.interner,
+                &f.decorators,
+            )
+            .into_iter()
+            .zip(f.decorators.iter())
+            .any(|(m, d)| {
+                !bind.user_decorators.contains(&d.range.start.offset)
+                    && matches!(
+                        m.result,
+                        Some(Ok(varn_core::ast::decorators::BuiltinDecorator::Test))
+                    )
+            });
+            if has_test
+                && f.params
+                    .iter()
+                    .any(|p| p.default.is_none() && !p.is_optional && !p.is_rest)
+            {
+                self.emit(
+                    varn_core::diagnostics::Diagnostic::error(
+                        varn_core::diagnostics::ErrorCode::InvalidDecoratorTarget,
+                        format!(
+                            "`@test` function '{name}' must take no required arguments (the runner calls it with none)"
+                        ),
+                    )
+                    .with_range(f.range),
+                );
+            }
+            if self.has_builtin(&f.decorators, bind, "inline") {
+                self.check_inline_shape(f, name);
+            }
+        }
+    }
+
+    fn has_builtin(
+        &self,
+        decorators: &[varn_core::ast::Decorator],
+        bind: &BindResult,
+        want: &str,
+    ) -> bool {
+        decorators.iter().any(|d| {
+            if bind.user_decorators.contains(&d.range.start.offset) {
+                return false;
+            }
+            let expr = &self.ast_arena.expr(d.expression);
+            let head = match &expr.kind {
+                varn_core::ast::ExprKind::Identifier { name } => Some(*name),
+                varn_core::ast::ExprKind::Call { callee, .. } => {
+                    match &self.ast_arena.expr(*callee).kind {
+                        varn_core::ast::ExprKind::Identifier { name } => Some(*name),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            };
+            head.is_some_and(|h| bind.interner.resolve(h) == want)
+        })
+    }
+
+    fn check_inline_shape(&mut self, f: &varn_core::ast::FunctionDecl, name: &str) {
+        let mut reason: Option<&str> = None;
+        if f.modifiers.is_async {
+            reason = Some("async functions");
+        } else if f.modifiers.is_generator {
+            reason = Some("generators");
+        } else if f.params.iter().any(|p| p.is_rest) {
+            reason = Some("rest parameters");
+        } else {
+            match &self.ast_arena.stmt(f.body).kind {
+                varn_core::ast::StmtKind::Block { stmts } if stmts.len() == 1 => {
+                    match &self.ast_arena.stmt(stmts[0]).kind {
+                        varn_core::ast::StmtKind::Return {
+                            argument: Some(arg),
+                        } => match &self.ast_arena.expr(*arg).kind {
+                            varn_core::ast::ExprKind::Arrow { .. }
+                            | varn_core::ast::ExprKind::Function { .. }
+                            | varn_core::ast::ExprKind::ClassExpr { .. } => {
+                                reason = Some("closures returned by value");
+                            }
+                            _ => {}
+                        },
+                        _ => reason = Some("bodies that are not a single `return`"),
+                    }
+                }
+                _ => reason = Some("bodies that are not a single `return`"),
+            }
+        }
+        if let Some(what) = reason {
+            self.emit(
+                varn_core::diagnostics::Diagnostic::error(
+                    varn_core::diagnostics::ErrorCode::InvalidDecoratorSignature,
+                    format!("`@inline` cannot apply to {what} (function '{name}')"),
+                )
+                .with_range(f.range),
+            );
         }
     }
 }

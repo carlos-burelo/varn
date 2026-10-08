@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{FormattingOptions, Position, Range, TextEdit};
+use tower_lsp_f::lsp_types::{FormattingOptions, Position, Range, TextEdit};
 
 pub fn build_on_type_formatting(
     source: &str,

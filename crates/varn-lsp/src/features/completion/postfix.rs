@@ -1,5 +1,5 @@
-use tower_lsp::lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionTextEdit, Documentation, InsertTextFormat,
+use tower_lsp_f::lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionItemTextEdit, Documentation, InsertTextFormat,
     MarkupContent, MarkupKind, Position, Range, TextEdit,
 };
 
@@ -133,17 +133,17 @@ pub fn build_postfix_completions(
         let snippet = (tmpl.snippet_format)(target_expr);
         items.push(CompletionItem {
             label: tmpl.name.to_string(),
-            kind: Some(CompletionItemKind::SNIPPET),
+            kind: Some(CompletionItemKind::Snippet),
             detail: Some(format!("{} (postfix)", tmpl.detail)),
             documentation: Some(Documentation::MarkupContent(MarkupContent {
                 kind: MarkupKind::Markdown,
                 value: tmpl.description.to_string(),
             })),
-            text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+            text_edit: Some(CompletionItemTextEdit::TextEdit(TextEdit {
                 range: replace_range,
                 new_text: snippet,
             })),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            insert_text_format: Some(InsertTextFormat::Snippet),
             sort_text: Some(format!("zz_{:02}_{}", idx, tmpl.name)),
             ..Default::default()
         });

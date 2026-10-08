@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{FoldingRange, FoldingRangeKind};
+use tower_lsp_f::lsp_types::{FoldingRange, FoldingRangeKind};
 use varn_core::{TokenKind, Trivia, TriviaKind};
 
 use crate::document::{DocumentState, TokenRecord};

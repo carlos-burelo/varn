@@ -5,6 +5,7 @@ pub mod cache;
 pub mod check;
 pub mod compare_tiers;
 pub mod completions;
+pub mod dap;
 pub mod debug;
 pub mod doctor;
 pub mod eval;

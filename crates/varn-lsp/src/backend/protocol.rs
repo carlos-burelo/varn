@@ -1,12 +1,11 @@
-use tower_lsp::jsonrpc::Result as LspResult;
-use tower_lsp::lsp_types::*;
-use tower_lsp::LanguageServer;
+use tower_lsp_f::jsonrpc::Result as LspResult;
+use tower_lsp_f::lsp_types::*;
+use tower_lsp_f::LanguageServer;
 
 use super::Backend;
 use super::{edit, insight, navigate};
 use crate::backend::{capabilities, lifecycle, sync};
 
-#[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> LspResult<InitializeResult> {
         if let Some(opts) = &params.initialization_options {
@@ -21,7 +20,21 @@ impl LanguageServer for Backend {
             std::sync::atomic::Ordering::Relaxed,
         );
 
-        if let Some(root_uri) = params.root_uri {
+        if let Some(root_uri) = params
+            .workspace_folders_initialize_params
+            .workspace_folders
+            .as_ref()
+            .and_then(|folders| match folders {
+                WorkspaceFolders::WorkspaceFolderList(list) => {
+                    list.first().map(|folder| folder.uri.clone())
+                }
+                WorkspaceFolders::Null => None,
+            })
+            .or_else(|| {
+                #[allow(deprecated)]
+                params.root_uri.clone()
+            })
+        {
             if let Ok(path) = root_uri.to_file_path() {
                 let _ = std::env::set_current_dir(path);
             }
@@ -38,15 +51,15 @@ impl LanguageServer for Backend {
 
     async fn initialized(&self, _: InitializedParams) {
         self.client
-            .log_message(MessageType::INFO, "Varn Language Server initialized")
+            .log_message(MessageType::Info, "Varn Language Server initialized")
             .await;
         self.pull_configuration().await;
 
         if let Some(reason) = self.std_error {
             let msg =
                 format!("Varn stdlib unavailable — `std:` imports will not resolve: {reason}");
-            self.client.log_message(MessageType::ERROR, &msg).await;
-            self.client.show_message(MessageType::ERROR, msg).await;
+            self.client.log_message(MessageType::Error, &msg).await;
+            self.client.show_message(MessageType::Error, msg).await;
         }
 
         let analysis = self.analysis.clone();
@@ -103,9 +116,23 @@ impl LanguageServer for Backend {
 
     async fn goto_definition(
         &self,
-        params: GotoDefinitionParams,
-    ) -> LspResult<Option<GotoDefinitionResponse>> {
+        params: DefinitionParams,
+    ) -> LspResult<Option<DefinitionResponse>> {
         navigate::goto_definition(self, params).await
+    }
+
+    async fn goto_declaration(
+        &self,
+        params: DeclarationParams,
+    ) -> LspResult<Option<DeclarationResponse>> {
+        navigate::goto_declaration(self, params).await
+    }
+
+    async fn document_link(
+        &self,
+        params: DocumentLinkParams,
+    ) -> LspResult<Option<Vec<DocumentLink>>> {
+        navigate::document_link(self, params).await
     }
 
     async fn references(&self, params: ReferenceParams) -> LspResult<Option<Vec<Location>>> {
@@ -115,7 +142,7 @@ impl LanguageServer for Backend {
     async fn prepare_rename(
         &self,
         params: TextDocumentPositionParams,
-    ) -> LspResult<Option<PrepareRenameResponse>> {
+    ) -> LspResult<Option<PrepareRenameResult>> {
         edit::prepare_rename(self, params).await
     }
 
@@ -130,15 +157,58 @@ impl LanguageServer for Backend {
         navigate::document_symbol(self, params).await
     }
 
-    async fn code_action(&self, params: CodeActionParams) -> LspResult<Option<CodeActionResponse>> {
+    async fn code_action(
+        &self,
+        params: CodeActionParams,
+    ) -> LspResult<Option<Vec<CodeActionResponse>>> {
         edit::code_action(self, params).await
     }
 
     async fn semantic_tokens_full(
         &self,
         params: SemanticTokensParams,
-    ) -> LspResult<Option<SemanticTokensResult>> {
+    ) -> LspResult<Option<SemanticTokens>> {
         insight::semantic_tokens_full(self, params).await
+    }
+
+    async fn semantic_tokens_range(
+        &self,
+        params: SemanticTokensRangeParams,
+    ) -> LspResult<Option<SemanticTokens>> {
+        insight::semantic_tokens_range(self, params).await
+    }
+
+    async fn semantic_tokens_full_delta(
+        &self,
+        params: SemanticTokensDeltaParams,
+    ) -> LspResult<Option<SemanticTokensDeltaResponse>> {
+        insight::semantic_tokens_full_delta(self, params).await
+    }
+
+    async fn diagnostic(
+        &self,
+        params: DocumentDiagnosticParams,
+    ) -> LspResult<DocumentDiagnosticReport> {
+        insight::diagnostic(self, params).await
+    }
+
+    async fn workspace_diagnostic(
+        &self,
+        params: WorkspaceDiagnosticParams,
+    ) -> LspResult<WorkspaceDiagnosticReport> {
+        insight::workspace_diagnostic(self, params).await
+    }
+
+    async fn completion_resolve(&self, params: CompletionItem) -> LspResult<CompletionItem> {
+        edit::completion_resolve(self, params).await
+    }
+
+    async fn code_lens_resolve(&self, params: CodeLens) -> LspResult<CodeLens> {
+        edit::code_lens_resolve(self, params).await
+    }
+
+    async fn inlay_hint_resolve(&self, params: InlayHint) -> LspResult<InlayHint> {
+        insight::inlay_hint_resolve(self, params).await
     }
 
     async fn document_highlight(
@@ -158,7 +228,7 @@ impl LanguageServer for Backend {
     async fn symbol(
         &self,
         params: WorkspaceSymbolParams,
-    ) -> LspResult<Option<Vec<SymbolInformation>>> {
+    ) -> LspResult<Option<WorkspaceSymbolResponse>> {
         navigate::symbol(self, params).await
     }
 
@@ -179,16 +249,51 @@ impl LanguageServer for Backend {
 
     async fn goto_type_definition(
         &self,
-        params: GotoDefinitionParams,
-    ) -> LspResult<Option<GotoDefinitionResponse>> {
+        params: TypeDefinitionParams,
+    ) -> LspResult<Option<TypeDefinitionResponse>> {
         navigate::goto_type_definition(self, params).await
     }
 
     async fn goto_implementation(
         &self,
-        params: GotoDefinitionParams,
-    ) -> LspResult<Option<GotoDefinitionResponse>> {
+        params: ImplementationParams,
+    ) -> LspResult<Option<ImplementationResponse>> {
         navigate::goto_implementation(self, params).await
+    }
+
+    async fn prepare_type_hierarchy(
+        &self,
+        params: TypeHierarchyPrepareParams,
+    ) -> LspResult<Option<Vec<TypeHierarchyItem>>> {
+        navigate::prepare_type_hierarchy(self, params).await
+    }
+
+    async fn supertypes(
+        &self,
+        params: TypeHierarchySupertypesParams,
+    ) -> LspResult<Option<Vec<TypeHierarchyItem>>> {
+        navigate::supertypes(self, params).await
+    }
+
+    async fn subtypes(
+        &self,
+        params: TypeHierarchySubtypesParams,
+    ) -> LspResult<Option<Vec<TypeHierarchyItem>>> {
+        navigate::subtypes(self, params).await
+    }
+
+    async fn linked_editing_range(
+        &self,
+        params: LinkedEditingRangeParams,
+    ) -> LspResult<Option<LinkedEditingRanges>> {
+        navigate::linked_editing_range(self, params).await
+    }
+
+    async fn range_formatting(
+        &self,
+        params: DocumentRangeFormattingParams,
+    ) -> LspResult<Option<Vec<TextEdit>>> {
+        edit::range_formatting(self, params).await
     }
 
     async fn prepare_call_hierarchy(
@@ -226,10 +331,26 @@ impl LanguageServer for Backend {
         edit::on_type_formatting(self, params).await
     }
 
-    async fn execute_command(
-        &self,
-        params: ExecuteCommandParams,
-    ) -> LspResult<Option<serde_json::Value>> {
+    async fn execute_command(&self, params: ExecuteCommandParams) -> LspResult<Option<LspAny>> {
         edit::execute_command(self, params).await
+    }
+
+    async fn did_create_files(&self, params: CreateFilesParams) {
+        sync::did_create_files(self, params).await;
+    }
+
+    async fn did_delete_files(&self, params: DeleteFilesParams) {
+        sync::did_delete_files(self, params).await;
+    }
+
+    async fn did_rename_files(&self, params: RenameFilesParams) {
+        sync::did_rename_files(self, params).await;
+    }
+
+    async fn will_rename_files(
+        &self,
+        params: RenameFilesParams,
+    ) -> LspResult<Option<WorkspaceEdit>> {
+        sync::will_rename_files(self, params).await
     }
 }

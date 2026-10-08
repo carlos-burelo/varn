@@ -140,8 +140,8 @@ impl<'r> super::super::Binder<'r> {
             .iter()
             .map(|t| t.constraint.as_ref().map(|c| self.resolve_type(c)))
             .collect();
-
         let sym_id = self.define(f.id, sym);
+        crate::binder::decorator_attrs::record_decorators(self, sym_id, &f.decorators);
 
         if f.return_type.is_none() && !f.modifiers.is_declare && !f.modifiers.is_generator {
             self.pending_enrich.push(PendingEnrich::Fn {

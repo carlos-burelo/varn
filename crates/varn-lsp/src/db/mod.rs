@@ -28,7 +28,7 @@ impl FileInterner {
             return *id.value();
         }
 
-        let mut vec = self.vec.write().unwrap();
+        let mut vec = self.vec.write().unwrap_or_else(|e| e.into_inner());
 
         if let Some(id) = self.map.get(uri) {
             return *id.value();
@@ -40,8 +40,12 @@ impl FileInterner {
         id
     }
 
+    pub fn get(&self, uri: &str) -> Option<FileId> {
+        self.map.get(uri).map(|r| *r.value())
+    }
+
     pub fn lookup(&self, id: FileId) -> Option<String> {
-        let vec = self.vec.read().unwrap();
+        let vec = self.vec.read().unwrap_or_else(|e| e.into_inner());
         vec.get(id.0 as usize).cloned()
     }
 }
@@ -69,6 +73,10 @@ impl Database {
 
     pub fn lookup(&self, id: FileId) -> Option<String> {
         self.interner.lookup(id)
+    }
+
+    pub fn file_id(&self, uri: &str) -> Option<FileId> {
+        self.interner.get(uri)
     }
 
     pub fn set_source(&self, file_id: FileId, source: String) -> (u64, CancellationToken) {

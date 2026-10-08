@@ -266,6 +266,12 @@ impl InstanceRef {
     pub fn read(&self) -> &InstanceData {
         unsafe { self.0.as_ref() }
     }
+
+    pub unsafe fn from_data_ptr(data: *mut u8) -> Self {
+        let payload_size = (data.add(4) as *const u32).read();
+        let inst = ptr::slice_from_raw_parts_mut(data, payload_size as usize) as *mut InstanceData;
+        Self(ptr::NonNull::new_unchecked(inst))
+    }
 }
 
 impl std::ops::Deref for InstanceRef {

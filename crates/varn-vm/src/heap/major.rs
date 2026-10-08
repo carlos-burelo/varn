@@ -14,7 +14,8 @@ impl HeapInner {
         }
         while let Some(r) = work.pop() {
             for_each_child(
-                self.cells.get(r),
+                &self.cells,
+                r,
                 &self.identity_index,
                 Reach::Major,
                 &mut |child| {

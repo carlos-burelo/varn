@@ -91,66 +91,21 @@ impl VmFactory {
 }
 
 pub fn run_vm_to_completion(machine: &mut Vm, entry: Rc<FunctionProto>) -> Result<(), String> {
-    loop {
-        let res = machine.run(entry.clone());
-        match res {
-            Ok(_) => match machine.ctx.vm_suspend.take() {
-                None => break,
-                Some(varn_vm::exec::VmSuspend::Await { value, dest_reg }) => {
-                    match machine.ctx.settle_awaited(value) {
-                        Ok(resolved) => {
-                            if let Some(frame) = machine.ctx.frames.last() {
-                                let base = frame.base;
-                                let _ = machine.ctx.stack.unbox_into_reg(
-                                    base,
-                                    dest_reg as usize,
-                                    resolved,
-                                );
-                            }
-                        }
-                        Err(thrown) => {
-                            let err = varn_vm::exec::exceptions::build_thrown_error(
-                                thrown,
-                                &machine.ctx.heap,
-                                &machine.ctx.frames,
-                            );
-                            if let Some(handler) =
-                                machine.ctx.try_handlers.pop_if(|h| h.frame_depth > 0)
-                            {
-                                let thrown_val = err.thrown.unwrap_or(varn_types::VmValue::null());
-                                let _ = varn_vm::exec::frame_ctrl::unwind_to_handler(
-                                    &mut machine.ctx,
-                                    handler,
-                                    thrown_val,
-                                );
-                            } else {
-                                let mut msg = format!("awaited task failed: {}", err.message);
-                                for frame in &err.frames {
-                                    msg.push_str(&format!(
-                                        "\n  at {} ({}:{})",
-                                        frame.fn_name, frame.file, frame.line
-                                    ));
-                                }
-                                return Err(msg);
-                            }
-                        }
-                    }
-                }
-                Some(varn_vm::exec::VmSuspend::Yield { .. }) => {}
-            },
-            Err(e) => {
-                let mut msg = format!("runtime error: {}", e.message);
-                for frame in &e.frames {
-                    msg.push_str(&format!(
-                        "\n  at {} ({}:{})",
-                        frame.fn_name, frame.file, frame.line
-                    ));
-                }
-                return Err(msg);
+    let mut resume = |_: &mut Vm| varn_vm::debug::BreakAction::Resume;
+    match varn_vm::debug::drive_main(machine, &entry, &mut resume) {
+        varn_vm::debug::DriveResult::Done(_) => Ok(()),
+        varn_vm::debug::DriveResult::Stopped => Ok(()),
+        varn_vm::debug::DriveResult::Failed(e) => {
+            let mut msg = format!("runtime error: {}", e.message);
+            for frame in &e.frames {
+                msg.push_str(&format!(
+                    "\n  at {} ({}:{})",
+                    frame.fn_name, frame.file, frame.line
+                ));
             }
+            Err(msg)
         }
     }
-    Ok(())
 }
 
 fn compiled_keys() -> std::collections::BTreeSet<(String, usize)> {

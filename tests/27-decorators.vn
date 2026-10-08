@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { MetaKey, MethodContext, ClassRef } from "std:reflect";
+import { MetaKey, ClassRef } from "std:reflect";
 
 let deco_log: str[] = [];
 function trackClass(cls: ClassRef): void {
@@ -49,6 +49,25 @@ class DecoratedPassthrough {
     @passthrough
     double(n: int): int { return n * 2; }
 }
+let fnLog: str[] = [];
+function tagFn(label: str) {
+    return (fn: FunctionRef): FunctionRef => {
+        fnLog.push(label);
+        return fn;
+    };
+}
+function noteFn(fn: FunctionRef): void {
+    fnLog.push("noted");
+}
+@tagFn("outer")
+@tagFn("inner")
+function decoratedFn(): int {
+    return 7;
+}
+@noteFn
+function keptFn(): int {
+    return 8;
+}
 
 await describe("27 Decorators", async () => {
     await it("class decorators", () => {
@@ -84,5 +103,14 @@ await describe("27 Decorators", async () => {
         decoCalc.mul(4, 4);
         expect(method_log.length).toBe(3);
         expect((new DecoratedPassthrough()).double(6)).toBe(12);
+    });
+
+    await it("free function decorators apply bottom-up", () => {
+        expect(fnLog.length).toBe(3);
+        expect(fnLog[0]).toBe("inner");
+        expect(fnLog[1]).toBe("outer");
+        expect(fnLog[2]).toBe("noted");
+        expect(decoratedFn()).toBe(7);
+        expect(keptFn()).toBe(8);
     });
 });

@@ -6,8 +6,11 @@ use varn_types::HeapRef;
 impl HeapInner {
     pub(crate) fn rebuild_scan_roots(&mut self) {
         self.scan_roots.clear();
-        for (r, obj, _) in self.cells.iter() {
-            if Self::needs_minor_scan(obj) {
+        for r in self.cells.refs() {
+            if self.cells.header_kind(r) == varn_types::cell::CELL_KIND_INSTANCE {
+                continue;
+            }
+            if Self::needs_minor_scan(self.cells.get(r)) {
                 self.scan_roots.push(r);
             }
         }

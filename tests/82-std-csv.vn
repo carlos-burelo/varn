@@ -87,7 +87,7 @@ await describe("82 std csv", async () => {
 
     await it("group 1 part 3", async () => {
         expect(serialized.includes("1,Alice,30,true,95.5")).toBeTruthy();
-        expect(serialized.includes("2,Bob,25,false,88")).toBeTruthy();
+        expect(serialized.includes("2,Bob,25,false,88.0")).toBeTruthy();
         expect(roundtrip.length).toBe(3);
         expect(roundtrip[0].id).toBe(1);
         expect(roundtrip[0].name).toBe("Alice");

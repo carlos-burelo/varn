@@ -1,0 +1,11 @@
+// expect: error[VN2013]
+function wrap(fn: Function, ctx: dynamic): Function {
+    return fn;
+}
+class A {
+    @wrap
+    constructor() {
+        this.x = 1;
+    }
+    x: int = 0;
+}

@@ -1,0 +1,9 @@
+// expect: error[VN4401]
+function oneArg(fn: Function): void {}
+
+class A {
+    @oneArg
+    m(a: int, b: int): int {
+        return a * b;
+    }
+}

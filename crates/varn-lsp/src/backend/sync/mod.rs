@@ -2,14 +2,14 @@ pub mod edits;
 
 use std::time::Instant;
 
-use tower_lsp::lsp_types::*;
+use tower_lsp_f::lsp_types::*;
 
 use crate::backend::Backend;
 use crate::features::diagnostics::convert_diagnostics;
 
 const DEBOUNCE_MS: u64 = 150;
 
-pub async fn analyze_and_publish(backend: &Backend, uri: Url, source: String, is_eager: bool) {
+pub async fn analyze_and_publish(backend: &Backend, uri: Uri, source: String, is_eager: bool) {
     let uri_str = uri.to_string();
 
     let cancel_token = backend
@@ -64,17 +64,19 @@ pub async fn analyze_and_publish(backend: &Backend, uri: Url, source: String, is
         .next()
         .unwrap_or(&uri_str)
         .to_owned();
-    backend
-        .client
-        .log_message(
-            MessageType::LOG,
-            format!(
-                "── {file_name}  ({tokens} tokens | {user_syms} user symbols | {stdlib_syms} stdlib) [{}ms]",
-                start.elapsed().as_millis(),
-            ),
-        )
-        .await;
     backend.client.publish_diagnostics(uri, diags, None).await;
+    if super::state::verbose() {
+        backend
+            .client
+            .log_message(
+                MessageType::Log,
+                format!(
+                    "── {file_name}  ({tokens} tokens | {user_syms} user symbols | {stdlib_syms} stdlib) [{}ms]",
+                    start.elapsed().as_millis(),
+                ),
+            )
+            .await;
+    }
 }
 
 pub async fn did_open(backend: &Backend, params: DidOpenTextDocumentParams) {
@@ -88,7 +90,7 @@ pub async fn did_open(backend: &Backend, params: DidOpenTextDocumentParams) {
 }
 
 pub async fn did_change(backend: &Backend, params: DidChangeTextDocumentParams) {
-    let uri = params.text_document.uri;
+    let uri = params.text_document.text_document_identifier.uri;
     let uri_str = uri.to_string();
     let changes = params.content_changes;
 
@@ -126,7 +128,7 @@ pub async fn did_change_watched_files(backend: &Backend, params: DidChangeWatche
         let uri = event.uri.clone();
         let uri_str = uri.to_string();
 
-        if event.typ == FileChangeType::DELETED {
+        if event.kind == FileChangeType::Deleted {
             backend
                 .analysis
                 .submit(move |a| a.workspace.remove_file(&uri_str));
@@ -144,4 +146,67 @@ pub async fn did_change_watched_files(backend: &Backend, params: DidChangeWatche
 
         analyze_and_publish(backend, uri, source, true).await;
     }
+}
+
+pub async fn did_create_files(backend: &Backend, params: CreateFilesParams) {
+    for file in params.files {
+        let Ok(uri) = Uri::parse(&file.uri) else {
+            continue;
+        };
+        let Ok(path) = uri.to_file_path() else {
+            continue;
+        };
+        let Ok(Ok(source)) =
+            tokio::task::spawn_blocking(move || std::fs::read_to_string(path)).await
+        else {
+            continue;
+        };
+        analyze_and_publish(backend, uri, source, true).await;
+    }
+}
+
+pub async fn did_delete_files(backend: &Backend, params: DeleteFilesParams) {
+    for file in params.files {
+        let uri_str = file.uri.clone();
+        backend
+            .analysis
+            .submit(move |a| a.workspace.remove_file(&uri_str));
+    }
+}
+
+pub async fn did_rename_files(backend: &Backend, params: RenameFilesParams) {
+    for file in params.files {
+        let old_str = file.old_uri.clone();
+        let Ok(new_uri) = Uri::parse(&file.new_uri) else {
+            continue;
+        };
+        backend
+            .analysis
+            .submit(move |a| a.workspace.remove_file(&old_str));
+        let Ok(path) = new_uri.to_file_path() else {
+            continue;
+        };
+        let Ok(Ok(source)) =
+            tokio::task::spawn_blocking(move || std::fs::read_to_string(path)).await
+        else {
+            continue;
+        };
+        analyze_and_publish(backend, new_uri, source, true).await;
+    }
+}
+
+pub async fn will_rename_files(
+    backend: &Backend,
+    params: RenameFilesParams,
+) -> tower_lsp_f::jsonrpc::Result<Option<WorkspaceEdit>> {
+    let renames: Vec<(String, String)> = params
+        .files
+        .iter()
+        .map(|f| (f.old_uri.clone(), f.new_uri.clone()))
+        .collect();
+    Ok(backend
+        .query("will_rename", move |an| {
+            crate::features::file_operations::rename_edits(&an.workspace, &renames)
+        })
+        .await)
 }

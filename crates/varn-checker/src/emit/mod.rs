@@ -69,7 +69,7 @@ pub fn emit_module(
         list: free_fns,
         index: fn_index,
         decorated: decorated_fns,
-    } = functions::collect_free_functions(program, ast_arena, interner);
+    } = functions::collect_free_functions(program, ast_arena, interner, &bind.user_decorators);
 
     let ctx = MCtx {
         names: &names,
@@ -86,6 +86,7 @@ pub fn emit_module(
         checker_table: &bind.ty_table,
         annotation_types: &bind.annotation_types,
         nested_types: &nested,
+        shadowed: &bind.user_decorators,
     };
 
     let n_free = free_fns.len() as u32;
@@ -116,6 +117,7 @@ pub fn emit_module(
         &fn_index,
         &global_slots,
         interner,
+        &bind.user_decorators,
         &mut types,
         &mut signatures,
         expr_table,
@@ -134,6 +136,7 @@ pub fn emit_module(
         is_async: top_has_await,
         is_generator: false,
         has_rest: false,
+        force_inline: false,
     };
 
     functions.extend(closures);

@@ -17,6 +17,8 @@ pub struct TirFunction {
     pub is_generator: bool,
 
     pub has_rest: bool,
+
+    pub force_inline: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -40,6 +42,8 @@ pub struct TirClassDef {
 
     pub decorators: Vec<TirExpr>,
 
+    pub property_decorators: Vec<TirPropertyDecorator>,
+
     pub static_blocks: Vec<FnId>,
 
     pub variants: Vec<TirVariantDef>,
@@ -61,6 +65,15 @@ pub struct TirClassAccessor {
     pub func: FnId,
     pub is_getter: bool,
     pub is_static: bool,
+
+    pub decorators: Vec<TirExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TirPropertyDecorator {
+    pub key: Arc<str>,
+    pub is_static: bool,
+    pub decorators: Vec<TirExpr>,
 }
 
 #[derive(Debug, Clone)]

@@ -5,6 +5,7 @@ pub fn execute(args: CheckArgs) -> Result<(), CliError> {
     pipeline::run(&RunOpts {
         file_path: args.file,
         eval: None,
+        append: None,
         verbose: args.verbose,
         no_run: true,
         debug: Default::default(),

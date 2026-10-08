@@ -23,6 +23,7 @@ await describe("121 float ieee", async () => {
 
     await it("group 1 part 2", async () => {
         expect(negZero).toBe(0.0);
+        expect(negZero.toString()).toBe("-0");
         expect(fdiv(1.0, negZero)).toBe(0.0 - Infinity);
         expect(tiny > 0.0 && tiny / 2.0).toBe(0.0);
         while (i < 500) { hotInf = fdiv(1.0, 0.0); i = i + 1 }

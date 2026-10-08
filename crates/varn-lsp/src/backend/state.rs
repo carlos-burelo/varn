@@ -1,7 +1,7 @@
 use std::time::Instant;
 
-use tower_lsp::lsp_types::*;
-use tower_lsp::Client;
+use tower_lsp_f::lsp_types::*;
+use tower_lsp_f::Client;
 
 use crate::analysis::{AnalysisHandle, Analyzer};
 
@@ -63,10 +63,13 @@ impl Backend {
     }
 
     pub(crate) async fn log_slow(&self, op: &str, elapsed: std::time::Duration) {
+        if !verbose() {
+            return;
+        }
         if elapsed.as_millis() >= SLOW_REQUEST_MS {
             self.client
                 .log_message(
-                    MessageType::WARNING,
+                    MessageType::Warning,
                     format!("[perf] {op} took {}ms", elapsed.as_millis()),
                 )
                 .await;
@@ -76,4 +79,8 @@ impl Backend {
 
 pub(crate) fn at(params: TextDocumentPositionParams) -> (String, Position) {
     (params.text_document.uri.to_string(), params.position)
+}
+
+pub(crate) fn verbose() -> bool {
+    std::env::var_os("VARN_LSP_DEBUG").is_some()
 }

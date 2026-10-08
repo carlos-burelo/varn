@@ -129,6 +129,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             arena_ref,
             &check_result,
             export_names_of(&program_ref.filename),
+            &source,
         );
 
         varn_compiler::regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
@@ -151,6 +152,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         &arena,
         &check_result,
         export_names_of(&program.filename),
+        &source,
     )
     .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
 

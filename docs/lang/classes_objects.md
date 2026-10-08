@@ -292,6 +292,9 @@ assert("meta route", RouteKey.get(ItemController) === "/api/items")
 
 ### Decoradores de métodos
 
+Los contextos (`MethodContext`, `GetterContext`, `SetterContext`,
+`ConstructorContext`, `PropertyContext`) son globales: no se importan.
+
 ```varn
 function logMethod(fn: FunctionRef, ctx: MethodContext): FunctionRef {
     const name = ctx.name
@@ -306,6 +309,36 @@ class DecoratedCalc {
     mul(a: int, b: int): int { return a * b }
 }
 assert("method deco result", (new DecoratedCalc()).mul(3, 5) === 15)
+```
+
+### Decoradores de accessors y propiedades
+
+```varn
+function watchGet(fn: FunctionRef, ctx: GetterContext): FunctionRef {
+    return (...args: dynamic[]) => {
+        getter_log.push(ctx.name + ":" + ctx.kind)
+        return fn(...args)
+    }
+}
+
+function watchSet(fn: FunctionRef, ctx: SetterContext): FunctionRef {
+    return fn
+}
+
+function tagProp(target: dynamic, ctx: PropertyContext): void {
+    prop_log.push(ctx.name + ":" + ctx.kind + ":static=" + ctx.isStatic)
+}
+
+class Watched {
+    @watchGet
+    get v(): int { return 1 }
+
+    @watchSet
+    set v(x: int) {}
+
+    @tagProp
+    label: str = "a"
+}
 ```
 
 ---

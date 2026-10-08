@@ -104,20 +104,26 @@ await describe("11 Errors", async () => {
         expect(divCaught).toBeTruthy();
         expect(divMsg).toBe("division by zero");
         let modCaught = false;
+        let modMsg = "";
         try {
             let q = 10 % zeros[0];
         } catch (e) {
             modCaught = true;
+            modMsg = e.message;
         }
         expect(modCaught).toBeTruthy();
+        expect(modMsg).toBe("modulo by zero");
         expect(divideOrDefault(10, 0)).toBe(-1);
         expect(10.0 / 0.0 === Infinity).toBeTruthy();
         let nestedCaught = false;
+        let nestedMsg = "";
         try {
             let v = inner();
         } catch (e) {
             nestedCaught = true;
+            nestedMsg = e.message;
         }
         expect(nestedCaught).toBeTruthy();
+        expect(nestedMsg).toBe("modulo by zero");
     });
 });

@@ -105,55 +105,62 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| path.to_string_lossy().to_string());
 
-            let t0 = Instant::now();
-            let run_res = pipeline::run(&RunOpts {
-                file_path: path.to_string_lossy().to_string(),
-                eval: None,
-                verbose: false,
-                no_run: false,
-                debug: Default::default(),
-                trace: false,
-                capabilities: Default::default(),
-            });
-            let elapsed = t0.elapsed();
+            let units = test_units(&path, &display_name);
+            for (unit_name, append) in units {
+                if fail_fast && has_failure_flag.load(Ordering::SeqCst) {
+                    break;
+                }
+                let t1 = Instant::now();
+                let run_res = pipeline::run(&RunOpts {
+                    file_path: path.to_string_lossy().to_string(),
+                    eval: None,
+                    append: append.clone(),
+                    verbose: false,
+                    no_run: false,
+                    debug: Default::default(),
+                    trace: false,
+                    capabilities: Default::default(),
+                });
+                let elapsed = t1.elapsed();
 
-            let passed = run_res.is_ok();
-            let output = run_res.err().map(|e| format!("{e}")).unwrap_or_default();
+                let passed = run_res.is_ok();
+                let output = run_res.err().map(|e| format!("{e}")).unwrap_or_default();
 
-            if passed {
-                suites_passed_cnt.fetch_add(1, Ordering::SeqCst);
-            } else {
-                suites_failed_cnt.fetch_add(1, Ordering::SeqCst);
-                has_failure_flag.store(true, Ordering::SeqCst);
-            }
+                if passed {
+                    suites_passed_cnt.fetch_add(1, Ordering::SeqCst);
+                } else {
+                    suites_failed_cnt.fetch_add(1, Ordering::SeqCst);
+                    has_failure_flag.store(true, Ordering::SeqCst);
+                }
 
-            results_store.lock().unwrap().push(TestResult {
-                idx,
-                display_name: display_name.clone(),
-                passed,
-                duration: elapsed,
-                output: output.clone(),
-            });
+                results_store.lock().unwrap().push(TestResult {
+                    idx,
+                    display_name: unit_name.clone(),
+                    passed,
+                    duration: elapsed,
+                    output: output.clone(),
+                });
 
-            let ms = elapsed.as_millis();
-            let _guard = out_lock.lock().unwrap();
-            if passed {
-                log(format!(
-                    "  {} {} {}",
-                    chalk("ok").green(),
-                    display_name,
-                    chalk(format_args!("({ms}ms)")).dim()
-                ));
-            } else {
-                log(format!(
-                    "  {} {} {}",
-                    chalk("FAILED").red(),
-                    display_name,
-                    chalk(format_args!("({ms}ms)")).dim()
-                ));
-                if verbose && !output.is_empty() {
-                    for line in output.lines() {
-                        log(format!("    {}", chalk(line).dim()));
+                let ms = elapsed.as_millis();
+                let _guard = out_lock.lock().unwrap();
+                if passed {
+                    log(format!(
+                        "  {} {} {}",
+                        chalk("ok").green(),
+                        unit_name,
+                        chalk(format_args!("({ms}ms)")).dim()
+                    ));
+                } else {
+                    log(format!(
+                        "  {} {} {}",
+                        chalk("FAILED").red(),
+                        unit_name,
+                        chalk(format_args!("({ms}ms)")).dim()
+                    ));
+                    if verbose && !output.is_empty() {
+                        for line in output.lines() {
+                            log(format!("    {}", chalk(line).dim()));
+                        }
                     }
                 }
             }
@@ -209,6 +216,35 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
     } else {
         Ok(())
     }
+}
+
+fn test_units(path: &PathBuf, display_name: &str) -> Vec<(String, Option<String>)> {
+    let file_unit = vec![(display_name.to_owned(), None)];
+    let source = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(_) => return file_unit,
+    };
+    if !source.contains("@test") {
+        return file_unit;
+    }
+    let path_str = path.to_string_lossy().to_string();
+    let targets = match pipeline::collect_test_targets(&path_str, &source) {
+        Ok(t) => t,
+        Err(_) => return file_unit,
+    };
+    if targets.is_empty() {
+        return file_unit;
+    }
+    let mut units = file_unit;
+    for (name, is_async) in targets {
+        let call = if is_async {
+            format!("await {name}();")
+        } else {
+            format!("{name}();")
+        };
+        units.push((format!("{display_name}::{name}"), Some(call)));
+    }
+    units
 }
 
 fn discover_test_files(path: Option<&str>) -> Result<Vec<PathBuf>, CliError> {

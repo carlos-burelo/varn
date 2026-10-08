@@ -25,13 +25,7 @@ pub(crate) fn load_compact(
     let cont = b.create_block();
     b.append_block_param(cont, types::I128);
 
-    let data_base = emit::emit_instance_payload(
-        b,
-        obj,
-        &io.helpers.object_layout,
-        &io.helpers.array_layout,
-        slow,
-    );
+    let data_base = emit::emit_instance_payload(b, obj, &io.helpers.array_layout, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let pair = match TypeLayout::of_field(tag).repr {
@@ -110,13 +104,7 @@ pub(crate) fn store_compact(
     b.ins().brif(young, inline, &[], slow, &[]);
 
     b.switch_to_block(inline);
-    let data_base = emit::emit_instance_payload(
-        b,
-        obj,
-        &io.helpers.object_layout,
-        &io.helpers.array_layout,
-        slow,
-    );
+    let data_base = emit::emit_instance_payload(b, obj, &io.helpers.array_layout, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::new();
     match TypeLayout::of_field(tag).repr {

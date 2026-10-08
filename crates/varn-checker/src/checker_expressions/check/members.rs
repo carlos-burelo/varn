@@ -175,6 +175,11 @@ impl<'r> Checker<'r> {
 
         if let Some((ty, maybe_sid)) = self.find_member_info(&check_ty, prop_name, bind) {
             if let Some(sid) = maybe_sid {
+                if sid < bind.arena.len()
+                    && bind.interner.get(prop_name) == Some(bind.arena.get(sid).name)
+                {
+                    self.warn_if_deprecated(sid, prop_name, property_range, bind);
+                }
                 self.record_member_type(property_range.start.offset, ty, sid);
             } else {
                 self.record_type(property_range.start.offset, ty);

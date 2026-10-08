@@ -53,12 +53,12 @@ const greeting = "hello";
         "Expected 2 inlay hints for inferred consts, got: {:?}",
         hints
     );
-    if let tower_lsp::lsp_types::InlayHintLabel::String(s) = &hints[0].label {
+    if let tower_lsp_f::lsp_types::Label::String(s) = &hints[0].label {
         assert_eq!(s, ": int");
     } else {
         panic!("Expected String label");
     }
-    if let tower_lsp::lsp_types::InlayHintLabel::String(s) = &hints[1].label {
+    if let tower_lsp_f::lsp_types::Label::String(s) = &hints[1].label {
         assert_eq!(s, ": str");
     } else {
         panic!("Expected String label");

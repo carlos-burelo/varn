@@ -55,6 +55,8 @@ pub enum ErrorCode {
     VoidValueUsed = 3022,
     ForbiddenRecordGeneric = 3023,
     InferOutsideConditional = 3024,
+    DeprecatedUse = 3025,
+    ImpureOperation = 3026,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -250,6 +252,8 @@ impl ErrorCode {
             ErrorCode::VoidValueUsed => "void-value-used",
             ErrorCode::ForbiddenRecordGeneric => "forbidden-record-generic",
             ErrorCode::InferOutsideConditional => "infer-outside-conditional",
+            ErrorCode::DeprecatedUse => "deprecated-use",
+            ErrorCode::ImpureOperation => "impure-operation",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }

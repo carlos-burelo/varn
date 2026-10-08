@@ -1,5 +1,5 @@
 use crate::document::SymbolView;
-use tower_lsp::lsp_types::{InlayHint, InlayHintKind, InlayHintLabel, Position};
+use tower_lsp_f::lsp_types::{InlayHint, InlayHintKind, Label, Position};
 use varn_checker::SymbolKind;
 use varn_core::ast::ExprKind;
 use varn_core::TypeKind;
@@ -24,8 +24,8 @@ pub fn build_type_hints(state: &DocumentState) -> Vec<InlayHint> {
                         line: s.line(),
                         character: hint_col,
                     },
-                    label: InlayHintLabel::String(format!(": {}", s.type_str())),
-                    kind: Some(InlayHintKind::TYPE),
+                    label: Label::String(format!(": {}", s.type_str())),
+                    kind: Some(InlayHintKind::Type),
                     text_edits: None,
                     tooltip: None,
                     padding_left: Some(false),
@@ -67,8 +67,8 @@ fn fn_return_hint(state: &DocumentState, sym: SymbolView<'_>) -> Option<InlayHin
             line: sym.line(),
             character: rparen_col + 1,
         },
-        label: InlayHintLabel::String(format!(": {ret_str}")),
-        kind: Some(InlayHintKind::TYPE),
+        label: Label::String(format!(": {ret_str}")),
+        kind: Some(InlayHintKind::Type),
         text_edits: None,
         tooltip: None,
         padding_left: Some(false),
@@ -125,8 +125,8 @@ fn collect_pipeline_hints(state: &DocumentState, hints: &mut Vec<InlayHint>) {
                 line: r_end.line.saturating_sub(1),
                 character: r_end.column,
             },
-            label: InlayHintLabel::String(format!(": {}", state.ty_text(&entry.ty))),
-            kind: Some(InlayHintKind::TYPE),
+            label: Label::String(format!(": {}", state.ty_text(&entry.ty))),
+            kind: Some(InlayHintKind::Type),
             text_edits: None,
             tooltip: None,
             padding_left: Some(true),

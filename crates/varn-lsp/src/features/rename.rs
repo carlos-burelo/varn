@@ -1,17 +1,15 @@
 use crate::document::{DocumentState, SymbolTarget, TokenRecord};
 use crate::util::converters::range_on_line;
 use std::collections::HashMap;
-use tower_lsp::lsp_types::{PrepareRenameResponse, TextEdit, Url, WorkspaceEdit};
+use tower_lsp_f::lsp_types::{PrepareRenameResult, TextEdit, Uri, WorkspaceEdit};
 use varn_core::TokenKind;
-
 pub fn build_prepare_rename(
     state: &DocumentState,
     line: u32,
     col: u32,
-) -> Option<PrepareRenameResponse> {
+) -> Option<PrepareRenameResult> {
     let token = find_ident_at(state, line, col)?;
     let target = state.symbol_target_at_offset(token.offset)?;
-
     match &target {
         SymbolTarget::Local { symbol_id, .. } => {
             if *symbol_id >= state.db.bind.arena.len() {
@@ -32,11 +30,9 @@ pub fn build_prepare_rename(
         }
         SymbolTarget::Member { .. } => {}
     }
-
     let range = range_on_line(line, token.col, token.col + token.length);
-    Some(PrepareRenameResponse::Range(range))
+    Some(PrepareRenameResult::Range(range))
 }
-
 pub fn build_rename(
     state: &DocumentState,
     workspace: &crate::workspace::Workspace,
@@ -47,14 +43,12 @@ pub fn build_rename(
 ) -> Option<WorkspaceEdit> {
     let token = find_ident_at(state, line, col)?;
     let target = state.symbol_target_at_offset(token.offset)?;
-
     let target_name = match &target {
         SymbolTarget::Local { .. } => state.lexeme(token),
         SymbolTarget::Global { canonical_name, .. } => canonical_name.as_str(),
         SymbolTarget::Member { member_name, .. } => member_name.as_str(),
     };
-    let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
-
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::new();
     if matches!(target, SymbolTarget::Local { .. }) {
         collect_rename_edits_in_document(state, &target, target_name, &new_name, &mut changes);
         return if changes.is_empty() {
@@ -66,35 +60,43 @@ pub fn build_rename(
             })
         };
     }
-
     let mut checked_uris = rustc_hash::FxHashSet::default();
-
     let open_entries: Vec<(String, std::sync::Arc<DocumentState>)> = workspace
         .iter()
         .map(|entry| (entry.key().clone(), std::sync::Arc::clone(entry.value())))
         .collect();
-
     for (file_uri, file_state) in &open_entries {
         checked_uris.insert(file_uri.clone());
         collect_rename_edits_in_document(file_state, &target, target_name, &new_name, &mut changes);
     }
-
-    let all_uris: Vec<String> = {
-        let idx = workspace.index.read().unwrap();
-        idx.module_exports.keys().cloned().collect()
+    let mut all_uris: Vec<String> = {
+        let guard = workspace.index.read().unwrap_or_else(|e| e.into_inner());
+        guard.module_exports.keys().cloned().collect()
     };
-
+    all_uris.sort();
+    let mut scanned = 0usize;
     for file_uri in all_uris {
         if checked_uris.contains(&file_uri) {
             continue;
         }
+        if scanned >= 50 {
+            break;
+        }
         let doc_path = crate::document::uri_to_path(&file_uri);
+        if std::fs::metadata(&doc_path)
+            .map(|m| m.len())
+            .unwrap_or(u64::MAX)
+            > 256 * 1024
+        {
+            continue;
+        }
         let Ok(source) = std::fs::read_to_string(&doc_path) else {
             continue;
         };
         if !source.contains(target_name) {
             continue;
         }
+        scanned += 1;
         let temp_state = crate::pipeline::run_pipeline(source, file_uri.clone());
         collect_rename_edits_in_document(
             &temp_state,
@@ -104,28 +106,24 @@ pub fn build_rename(
             &mut changes,
         );
     }
-
     if changes.is_empty() {
         return None;
     }
-
     Some(WorkspaceEdit {
         changes: Some(changes),
         ..Default::default()
     })
 }
-
 fn collect_rename_edits_in_document(
     file_state: &DocumentState,
     target: &SymbolTarget,
     target_name: &str,
     new_name: &str,
-    changes: &mut HashMap<Url, Vec<TextEdit>>,
+    changes: &mut HashMap<Uri, Vec<TextEdit>>,
 ) {
-    let Ok(url) = Url::parse(&file_state.uri) else {
+    let Ok(uri) = Uri::parse(&file_state.uri) else {
         return;
     };
-
     let mut edits: Vec<TextEdit> = file_state
         .tokens
         .iter()
@@ -143,13 +141,11 @@ fn collect_rename_edits_in_document(
             new_text: new_name.to_string(),
         })
         .collect();
-
     if !edits.is_empty() {
         edits.dedup_by(|a, b| a.range == b.range);
-        changes.entry(url).or_default().extend(edits);
+        changes.entry(uri).or_default().extend(edits);
     }
 }
-
 fn find_ident_at(state: &DocumentState, line: u32, col: u32) -> Option<&TokenRecord> {
     state.tokens.iter().find(|t| {
         t.line == line

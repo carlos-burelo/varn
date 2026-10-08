@@ -14,17 +14,41 @@ type Result<T> = std::result::Result<T, OptError>;
 
 thread_local! {
     static CUR_TIR: std::cell::Cell<*const TirModule> = const { std::cell::Cell::new(std::ptr::null()) };
+    static CUR_LINES: std::cell::Cell<*const Vec<u32>> = const { std::cell::Cell::new(std::ptr::null()) };
 }
 
-struct ModuleScope(*const TirModule);
+struct ModuleScope(*const TirModule, *const Vec<u32>);
 impl Drop for ModuleScope {
     fn drop(&mut self) {
         CUR_TIR.with(|c| c.set(self.0));
+        CUR_LINES.with(|c| c.set(self.1));
     }
 }
-fn enter_module(tir: &TirModule) -> ModuleScope {
+fn enter_module(tir: &TirModule, lines: &Vec<u32>) -> ModuleScope {
     let prev = CUR_TIR.with(|c| c.replace(tir as *const TirModule));
-    ModuleScope(prev)
+    let prev_lines = CUR_LINES.with(|c| c.replace(lines as *const Vec<u32>));
+    ModuleScope(prev, prev_lines)
+}
+
+pub(crate) fn cur_line_starts() -> Vec<u32> {
+    CUR_LINES.with(|c| {
+        let ptr = c.get();
+        if ptr.is_null() {
+            vec![0]
+        } else {
+            unsafe { (*ptr).clone() }
+        }
+    })
+}
+
+pub fn line_starts_of(source: &str) -> Vec<u32> {
+    let mut starts = vec![0u32];
+    for (i, b) in source.bytes().enumerate() {
+        if b == b'\n' {
+            starts.push(i as u32 + 1);
+        }
+    }
+    starts
 }
 
 pub(crate) fn emit_tir_closure(idx: u32, source_file: Arc<str>) -> Result<FunctionProto> {
@@ -110,7 +134,11 @@ pub(crate) fn compile_closure(
     compile_one(tir, f, false, source_file, &[], Some(varn_tir::FnId(idx)))
 }
 
-pub fn compile_module(tir: &TirModule, export_names: Vec<Arc<str>>) -> Result<FunctionProto> {
+pub fn compile_module(
+    tir: &TirModule,
+    export_names: Vec<Arc<str>>,
+    source: &str,
+) -> Result<FunctionProto> {
     varn_tir::verify_module(tir).map_err(|errors| {
         crate::OptError::InvalidTir(
             errors
@@ -124,7 +152,8 @@ pub fn compile_module(tir: &TirModule, export_names: Vec<Arc<str>>) -> Result<Fu
                 .collect(),
         )
     })?;
-    let _scope = enter_module(tir);
+    let lines = line_starts_of(source);
+    let _scope = enter_module(tir, &lines);
     let source_file = tir.source_file.clone();
     let mut proto = compile_one(tir, &tir.top_level, true, source_file, &export_names, None)?;
     proto.export_names = export_names

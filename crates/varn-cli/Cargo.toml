@@ -18,7 +18,7 @@ required-features = ["dev-tools"]
 [features]
 default = ["lsp"]
 dev-tools = []
-lsp = ["dep:varn-lsp", "dep:tower-lsp"]
+lsp = ["dep:varn-lsp", "dep:tower-lsp-f"]
 # Real heap profiling (dhat-rs), for when RSS doesn't add up to counted
 # structures — mimalloc retains freed pages instead of returning them to the
 # OS, so `Task Manager`/`GetProcessMemoryInfo` numbers can include a lot of
@@ -29,6 +29,7 @@ lsp = ["dep:varn-lsp", "dep:tower-lsp"]
 dhat-heap = ["dep:dhat"]
 
 [dependencies]
+varn-fmt = { path = "../varn-fmt" }
 varn-pipeline = { path = "../varn-pipeline" }
 varn-core     = { path = "../varn-core" }
 varn-lexer    = { path = "../varn-lexer" }
@@ -40,10 +41,11 @@ varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-types    = { path = "../varn-types" }
 varn-debug    = { path = "../varn-debug" }
 varn-lsp      = { path = "../varn-lsp", optional = true }
+varn-dap      = { path = "../varn-dap" }
 varn-pm       = { path = "../varn-pm" }
 varn-modules  = { path = "../varn-modules" }
 varn-jit      = { path = "../varn-jit" }
-tower-lsp     = { workspace = true, optional = true }
+tower-lsp-f   = { workspace = true, optional = true }
 postcard      = { workspace = true }
 clap          = { version = "4", features = ["derive"] }
 clap_complete = "4"

@@ -5,6 +5,7 @@ pub(super) fn compile_via_tir(
     ast_arena: &varn_core::ast::AstArena,
     check: &varn_checker::CheckResult,
     export_names: Vec<Arc<str>>,
+    source: &str,
 ) -> Result<FunctionProto, String> {
     let tir = varn_checker::emit::emit_module(
         program,
@@ -14,7 +15,8 @@ pub(super) fn compile_via_tir(
         &check.call_mappings,
         &check.desugar,
     );
-    varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
+    varn_compiler::from_tir::compile_module(&tir, export_names, source)
+        .map_err(|e| format!("{e:?}"))
 }
 
 pub(super) fn export_names_of(filename: &str) -> Vec<Arc<str>> {

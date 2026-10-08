@@ -1,0 +1,5 @@
+// expect: error[VN4401]
+@pure("x")
+function f(): int {
+    return 1;
+}

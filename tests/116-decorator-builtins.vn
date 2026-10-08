@@ -1,0 +1,185 @@
+import { describe, it, expect } from "std:test";
+import { FunctionRef } from "std:reflect";
+
+@deprecated("use add instead")
+function oldAdd(a: int, b: int): int {
+    return a + b;
+}
+
+function add(a: int, b: int): int {
+    return a + b;
+}
+
+@pure
+function pureMul(a: int, b: int): int {
+    let t = a * b;
+    return t;
+}
+
+@pure
+function pureCompose(n: int): int {
+    return pureMul(n, n + 1);
+}
+
+@capability("fs")
+function readPath(p: str): str {
+    return p;
+}
+
+@capability("fs")
+function readTwice(p: str): str {
+    return readPath(p) + readPath(p);
+}
+
+@inline
+function triple(n: int): int {
+    return n * 3;
+}
+
+@test
+function builtinSum(): void {
+    if (add(20, 22) !== 42) {
+        throw new Error("builtin sum broke");
+    }
+}
+
+@test
+async function builtinAsync(): void {
+    let v = pureMul(6, 7);
+    if (v !== 42) {
+        throw new Error("builtin async broke");
+    }
+}
+
+class WithOld {
+    @deprecated
+    legacy(): int {
+        return 1;
+    }
+
+    @pure
+    clean(n: int): int {
+        return n + 1;
+    }
+
+    @capability("net")
+    fetchIt(u: str): str {
+        return u;
+    }
+}
+
+let shadowLog: str[] = [];
+
+let ctxLog: str[] = [];
+
+function ctxMethod(fn: FunctionRef, ctx: MethodContext): FunctionRef {
+    ctxLog.push("method:" + ctx.name + ":" + ctx.kind + ":static=" + ctx.isStatic);
+    return fn;
+}
+
+function ctxGetter(fn: FunctionRef, ctx: GetterContext): FunctionRef {
+    ctxLog.push("getter:" + ctx.name + ":" + ctx.kind);
+    return fn;
+}
+
+function ctxSetter(fn: FunctionRef, ctx: SetterContext): FunctionRef {
+    ctxLog.push("setter:" + ctx.name + ":" + ctx.kind);
+    return fn;
+}
+
+function ctxCtor(fn: FunctionRef, ctx: ConstructorContext): FunctionRef {
+    ctxLog.push("ctor:" + ctx.name + ":" + ctx.kind);
+    return fn;
+}
+
+function ctxProp(target: dynamic, ctx: PropertyContext): void {
+    ctxLog.push("prop:" + ctx.name + ":" + ctx.kind + ":static=" + ctx.isStatic);
+}
+
+class WithCtx {
+    @ctxCtor
+    constructor() {}
+
+    @ctxMethod
+    m(): int {
+        return 1;
+    }
+
+    @ctxGetter
+    get v(): int {
+        return 2;
+    }
+
+    @ctxSetter
+    set v(x: int) {}
+
+    @ctxProp
+    field: int = 3;
+
+    @ctxProp
+    static sf: int = 4;
+}
+
+function shadowScope(): int {
+    function pure(fn: Function): Function {
+        shadowLog.push("wrapped");
+        return fn;
+    }
+
+    @pure
+    function shadowedFn(): int {
+        return 11;
+    }
+
+    return shadowedFn();
+}
+
+await describe("116 decorator builtins", async () => {
+    await it("deprecated still runs", () => {
+        expect(oldAdd(1, 2)).toBe(3);
+        expect(add(1, 2)).toBe(3);
+        expect((new WithOld()).legacy()).toBe(1);
+    });
+
+    await it("pure composes", () => {
+        expect(pureMul(6, 7)).toBe(42);
+        expect(pureCompose(6)).toBe(42);
+        expect((new WithOld()).clean(41)).toBe(42);
+    });
+
+    await it("capabilities propagate and top level is ambient", () => {
+        expect(readTwice("/x")).toBe("/x/x");
+        expect(readPath("/y")).toBe("/y");
+    });
+
+    await it("inline runs", () => {
+        expect(triple(14)).toBe(42);
+    });
+
+    await it("test targets run", async () => {
+        builtinSum();
+        await builtinAsync();
+    });
+
+    await it("user values shadow builtin names", () => {
+        expect(shadowScope()).toBe(11);
+        expect(shadowLog.length).toBe(1);
+        expect(shadowLog[0]).toBe("wrapped");
+    });
+
+    await it("typed decorator contexts", () => {
+        const w = new WithCtx();
+        expect(w.m()).toBe(1);
+        expect(w.v).toBe(2);
+        w.v = 9;
+        expect(w.field).toBe(3);
+        expect(WithCtx.sf).toBe(4);
+        expect(ctxLog.length).toBe(6);
+        expect(ctxLog[0]).toBe("ctor:constructor:constructor");
+        expect(ctxLog[1]).toBe("method:m:method:static=false");
+        expect(ctxLog[2]).toBe("getter:v:getter");
+        expect(ctxLog[3]).toBe("setter:v:setter");
+        expect(ctxLog[4]).toBe("prop:field:property:static=false");
+        expect(ctxLog[5]).toBe("prop:sf:property:static=true");
+    });
+});

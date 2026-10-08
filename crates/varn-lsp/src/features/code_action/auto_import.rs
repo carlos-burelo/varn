@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use tower_lsp::lsp_types::{
-    CodeAction, CodeActionKind, CodeActionOrCommand, Diagnostic, Position, Range, TextEdit,
+use tower_lsp_f::lsp_types::{
+    CodeAction, CodeActionKind, CodeActionResponse, Diagnostic, Position, Range, TextEdit,
     WorkspaceEdit,
 };
 
@@ -40,12 +40,12 @@ const STDLIB_COMMON_EXPORTS: &[(&str, &str)] = &[
 pub fn generate_auto_imports_action(
     state: &DocumentState,
     index: Option<&ProjectIndex>,
-    uri: &tower_lsp::lsp_types::Url,
+    uri: &tower_lsp_f::lsp_types::Uri,
     diag: &Diagnostic,
-) -> Vec<CodeActionOrCommand> {
+) -> Vec<CodeActionResponse> {
     let mut actions = Vec::new();
 
-    let missing_name = extract_undefined_symbol_name(&diag.message);
+    let missing_name = extract_undefined_symbol_name(diag_message_text(&diag.message));
     let sym_name = match missing_name {
         Some(n) => n.trim(),
         None => return actions,
@@ -90,6 +90,13 @@ pub fn generate_auto_imports_action(
     actions
 }
 
+fn diag_message_text(message: &tower_lsp_f::lsp_types::Message) -> &str {
+    match message {
+        tower_lsp_f::lsp_types::Message::String(s) => s,
+        tower_lsp_f::lsp_types::Message::MarkupContent(m) => &m.value,
+    }
+}
+
 fn extract_undefined_symbol_name(message: &str) -> Option<&str> {
     if let Some(rest) = message.split("undefined variable:").nth(1) {
         return Some(rest);
@@ -104,11 +111,11 @@ fn extract_undefined_symbol_name(message: &str) -> Option<&str> {
 }
 
 fn create_import_action(
-    uri: &tower_lsp::lsp_types::Url,
+    uri: &tower_lsp_f::lsp_types::Uri,
     diag: &Diagnostic,
     sym_name: &str,
     module: &str,
-) -> Option<CodeActionOrCommand> {
+) -> Option<CodeActionResponse> {
     let mut changes = HashMap::new();
     changes.insert(
         uri.clone(),
@@ -127,9 +134,9 @@ fn create_import_action(
         }],
     );
 
-    Some(CodeActionOrCommand::CodeAction(CodeAction {
+    Some(CodeActionResponse::CodeAction(CodeAction {
         title: format!("💡 Import {{ {sym_name} }} from \"{module}\""),
-        kind: Some(CodeActionKind::QUICKFIX),
+        kind: Some(CodeActionKind::QuickFix),
         diagnostics: Some(vec![diag.clone()]),
         edit: Some(WorkspaceEdit {
             changes: Some(changes),
@@ -139,6 +146,7 @@ fn create_import_action(
         command: None,
         is_preferred: Some(true),
         disabled: None,
+        tags: None,
         data: None,
     }))
 }

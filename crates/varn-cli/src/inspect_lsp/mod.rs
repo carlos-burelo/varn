@@ -1,4 +1,7 @@
 mod dashboard;
+mod expect;
+mod interact;
+mod queries;
 mod types;
 
 use varn_debug::flags::DebugFlags;
@@ -16,5 +19,8 @@ pub fn run_for(path: &str, eval: Option<&str>, flags: &DebugFlags) {
     }
     if flags.lsp {
         dashboard::debug_lsp(path, &source, flags);
+    }
+    if flags.lsp_interact {
+        interact::debug_interact(path, &source, flags);
     }
 }

@@ -1,4 +1,5 @@
 mod chain_queries;
+pub mod classes;
 pub mod import;
 pub mod position;
 mod resolution;

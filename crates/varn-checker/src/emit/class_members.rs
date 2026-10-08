@@ -1,3 +1,4 @@
+use super::decorators::lower_decorator_exprs;
 use super::functions::{emit_member_fn, fresh_sig, lower_outer};
 use super::module_ctx::MCtx;
 use crate::binder::BindResult;
@@ -41,7 +42,12 @@ pub(super) fn emit_class_members(
     use varn_core::ast::ClassMember;
     for member in &class.body {
         match member {
-            ClassMember::Constructor { params, body, .. } => {
+            ClassMember::Constructor {
+                params,
+                body,
+                decorators,
+                ..
+            } => {
                 let sig = class_id
                     .and_then(|cid| ctx.classes[cid.0 as usize].constructor)
                     .unwrap_or_else(|| fresh_sig(signatures, params.len()));
@@ -66,7 +72,17 @@ pub(super) fn emit_class_members(
                     func: id,
                     is_static: false,
                     is_private: false,
-                    decorators: vec![],
+                    decorators: lower_decorator_exprs(
+                        decorators,
+                        ast_arena,
+                        ctx,
+                        expr_table,
+                        types,
+                        signatures,
+                        out,
+                        &mut def.prelude,
+                        class_id,
+                    ),
                 });
             }
             ClassMember::Method {
@@ -104,24 +120,17 @@ pub(super) fn emit_class_members(
                     signatures,
                     out,
                 );
-                let decos: Vec<varn_tir::TirExpr> = decorators
-                    .iter()
-                    .map(|d| {
-                        let (pre, x) = lower_outer(
-                            d.expression,
-                            ast_arena,
-                            ctx,
-                            expr_table,
-                            types,
-                            signatures,
-                            out,
-                            out.len() as u32,
-                            class_id,
-                        );
-                        def.prelude.extend(pre);
-                        x
-                    })
-                    .collect();
+                let decos = lower_decorator_exprs(
+                    decorators,
+                    ast_arena,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
+                    &mut def.prelude,
+                    class_id,
+                );
                 def.methods.push(varn_tir::TirClassMember {
                     key: Arc::from(key_str),
                     func: id,
@@ -137,6 +146,7 @@ pub(super) fn emit_class_members(
                 key,
                 body: Some(body),
                 modifiers,
+                decorators,
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
@@ -157,11 +167,23 @@ pub(super) fn emit_class_members(
                     signatures,
                     out,
                 );
+                let decos = lower_decorator_exprs(
+                    decorators,
+                    ast_arena,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
+                    &mut def.prelude,
+                    class_id,
+                );
                 def.accessors.push(varn_tir::TirClassAccessor {
                     key: Arc::from(key_str),
                     func: id,
                     is_getter: true,
                     is_static: modifiers.is_static,
+                    decorators: decos,
                 });
             }
             ClassMember::Setter {
@@ -169,6 +191,7 @@ pub(super) fn emit_class_members(
                 param,
                 body: Some(body),
                 modifiers,
+                decorators,
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
@@ -190,36 +213,72 @@ pub(super) fn emit_class_members(
                     signatures,
                     out,
                 );
+                let decos = lower_decorator_exprs(
+                    decorators,
+                    ast_arena,
+                    ctx,
+                    expr_table,
+                    types,
+                    signatures,
+                    out,
+                    &mut def.prelude,
+                    class_id,
+                );
                 def.accessors.push(varn_tir::TirClassAccessor {
                     key: Arc::from(key_str),
                     func: id,
                     is_getter: false,
                     is_static: modifiers.is_static,
+                    decorators: decos,
                 });
             }
             ClassMember::Property {
                 key,
                 init,
                 modifiers,
+                decorators,
                 ..
-            } if modifiers.is_static => {
-                let init_x = init.map(|e| {
-                    let (pre, x) = lower_outer(
-                        e,
+            } => {
+                if !decorators.is_empty() {
+                    let decos = lower_decorator_exprs(
+                        decorators,
                         ast_arena,
                         ctx,
                         expr_table,
                         types,
                         signatures,
                         out,
-                        out.len() as u32,
+                        &mut def.prelude,
                         class_id,
                     );
-                    def.prelude.extend(pre);
-                    x
-                });
-                def.statics
-                    .push((Arc::from(ctx.interner.resolve(*key)), init_x));
+                    if !decos.is_empty() {
+                        def.property_decorators
+                            .push(varn_tir::TirPropertyDecorator {
+                                key: Arc::from(ctx.interner.resolve(*key)),
+                                is_static: modifiers.is_static,
+                                decorators: decos,
+                            });
+                    }
+                }
+                if modifiers.is_static {
+                    let init_x = init.map(|e| {
+                        let (pre, x) = lower_outer(
+                            e,
+                            ast_arena,
+                            ctx,
+                            expr_table,
+                            types,
+                            signatures,
+                            out,
+                            out.len() as u32,
+                            class_id,
+                        );
+                        def.prelude.extend(pre);
+                        x
+                    });
+                    def.statics
+                        .push((Arc::from(ctx.interner.resolve(*key)), init_x));
+                }
             }
             ClassMember::StaticBlock { body, .. } => {
                 let sig = fresh_sig(signatures, 0);

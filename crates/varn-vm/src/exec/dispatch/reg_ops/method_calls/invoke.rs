@@ -93,13 +93,16 @@ impl ExecCtx {
                 if v.is_sso() {
                     ":sso"
                 } else if v.is_heap() {
-                    match self.heap.get(v.as_heap()) {
-                        Some(crate::heap::HeapObj::Str(_)) => ":str",
-                        Some(crate::heap::HeapObj::Array(_)) => ":array",
-                        Some(crate::heap::HeapObj::Object(_)) => ":object",
-                        Some(crate::heap::HeapObj::Instance(_)) => ":instance",
-                        Some(_) => ":heap-other",
-                        None => ":heap-none",
+                    if self.heap.instance(v.as_heap()).is_some() {
+                        ":instance"
+                    } else {
+                        match self.heap.get(v.as_heap()) {
+                            Some(crate::heap::HeapObj::Str(_)) => ":str",
+                            Some(crate::heap::HeapObj::Array(_)) => ":array",
+                            Some(crate::heap::HeapObj::Object(_)) => ":object",
+                            Some(_) => ":heap-other",
+                            None => ":heap-none",
+                        }
                     }
                 } else {
                     ""

@@ -129,6 +129,10 @@ impl ExecCtx {
                     continue 'frame_loop;
                 }
 
+                if crate::debug::check_break(ctx, closure_ptr, frame_idx, ip) {
+                    return Ok(VmValue::null());
+                }
+
                 let code = &closure.proto.chunk.code;
                 let raw_op = code[ip];
                 ip += 1;

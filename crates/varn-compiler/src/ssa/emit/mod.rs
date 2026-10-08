@@ -167,7 +167,7 @@ pub fn emit_function_meta(
     };
 
     let suspend_live = if f.is_async || f.is_generator {
-        suspend_live_table(&ssa, &reg, &inst_next)
+        suspend_live_table(&ssa, &reg, &inst_next, nparams)
     } else {
         Vec::new()
     };
@@ -223,8 +223,9 @@ fn suspend_live_table(
     ssa: &SsaFunc,
     reg: &[u8],
     inst_next: &[Vec<usize>],
+    nparams: usize,
 ) -> Vec<varn_types::chunk::SuspendLive> {
-    super::suspend::suspend_live_regs(ssa, reg, inst_next)
+    super::suspend::suspend_live_regs(ssa, reg, inst_next, nparams)
         .into_iter()
         .map(|(resume_ip, regs)| varn_types::chunk::SuspendLive { resume_ip, regs })
         .collect()

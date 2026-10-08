@@ -1,12 +1,13 @@
 pub mod builder;
 use crate::document::DocumentState;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use varn_checker::SymbolKind;
 
 #[derive(Debug, Clone)]
 pub struct ExportEntry {
     pub name: String,
+    pub name_lower: String,
     pub kind: SymbolKind,
 
     pub uri: Arc<str>,
@@ -19,19 +20,19 @@ pub struct ExportEntry {
 }
 
 pub struct ProjectIndex {
-    pub module_exports: HashMap<String, Vec<Arc<ExportEntry>>>,
-    pub name_index: HashMap<String, Vec<Arc<ExportEntry>>>,
-    pub reverse_deps: HashMap<String, HashSet<String>>,
-    pub module_cache: HashMap<String, String>,
+    pub module_exports: BTreeMap<String, Vec<Arc<ExportEntry>>>,
+    pub name_index: BTreeMap<String, Vec<Arc<ExportEntry>>>,
+    pub reverse_deps: BTreeMap<String, BTreeSet<String>>,
+    pub module_cache: BTreeMap<String, String>,
 }
 
 impl ProjectIndex {
     pub fn new() -> Self {
         Self {
-            module_exports: HashMap::new(),
-            name_index: HashMap::new(),
-            reverse_deps: HashMap::new(),
-            module_cache: HashMap::new(),
+            module_exports: BTreeMap::new(),
+            name_index: BTreeMap::new(),
+            reverse_deps: BTreeMap::new(),
+            module_cache: BTreeMap::new(),
         }
     }
 

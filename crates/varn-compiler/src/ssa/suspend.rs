@@ -1,4 +1,5 @@
-use super::ir::{InstKind, SsaFunc, Value};
+use super::emit::var_reg;
+use super::ir::{InstKind, SsaFunc, Value, VarId};
 use super::liveness::Liveness;
 
 #[derive(Debug, Clone)]
@@ -30,9 +31,11 @@ pub fn suspend_live_regs(
     ssa: &SsaFunc,
     reg: &[u8],
     inst_next: &[Vec<usize>],
+    nparams: usize,
 ) -> Vec<(u32, Vec<u16>)> {
     let lv = Liveness::analyze(ssa);
     let handlers = try_handlers(ssa);
+    let homes = captured_home_regs(ssa, nparams);
     let mut table = Vec::new();
     for (b, block) in ssa.blocks.iter().enumerate() {
         for (i, inst) in block.insts.iter().enumerate() {
@@ -56,6 +59,7 @@ pub fn suspend_live_regs(
                 continue;
             }
             regs.push(0);
+            regs.extend(homes.iter().copied());
             let ip = inst_next
                 .get(b)
                 .and_then(|row| row.get(i))
@@ -89,6 +93,34 @@ pub fn try_handlers(ssa: &SsaFunc) -> Vec<usize> {
         }
     }
     handlers
+}
+
+fn captured_home_regs(ssa: &SsaFunc, nparams: usize) -> Vec<u16> {
+    let mut vars: Vec<VarId> = Vec::new();
+    let mut note = |v: VarId| {
+        if !vars.contains(&v) {
+            vars.push(v);
+        }
+    };
+    for block in &ssa.blocks {
+        for inst in &block.insts {
+            match &inst.kind {
+                InstKind::LoadCaptured { var } | InstKind::StoreCaptured { var, .. } => note(*var),
+                InstKind::CloseUpvalues { targets } => {
+                    for v in targets {
+                        note(*v);
+                    }
+                }
+                InstKind::Dispose { target, .. } => {
+                    note(VarId::Local(crate::hir::LocalId(target.0)))
+                }
+                _ => {}
+            }
+        }
+    }
+    vars.into_iter()
+        .map(|v| var_reg(v, nparams) as u16)
+        .collect()
 }
 
 pub fn resume_live(

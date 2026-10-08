@@ -16,7 +16,12 @@ impl<'r> Binder<'r> {
         members: &mut Vec<ClassMemberInfo>,
     ) {
         match member {
-            ClassMember::Constructor { params, range, .. } => {
+            ClassMember::Constructor {
+                params,
+                range,
+                decorators,
+                ..
+            } => {
                 let ps: Vec<FunctionParam> = params
                     .iter()
                     .map(|p| self.function_param(p, super::binding_types::ParamSite::Declared))
@@ -39,6 +44,7 @@ impl<'r> Binder<'r> {
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = true;
                 let symbol_id = self.arena.push(sym);
+                crate::binder::decorator_attrs::record_decorators(self, symbol_id, decorators);
 
                 members.push(ClassMemberInfo {
                     name: Arc::from("constructor"),
@@ -102,6 +108,7 @@ impl<'r> Binder<'r> {
                 type_ann,
                 modifiers,
                 range,
+                decorators,
                 ..
             } => {
                 let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
@@ -116,6 +123,7 @@ impl<'r> Binder<'r> {
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = type_ann.is_some();
                 let symbol_id = self.arena.push(sym);
+                crate::binder::decorator_attrs::record_decorators(self, symbol_id, decorators);
 
                 members.push(ClassMemberInfo {
                     name: key_rc,
@@ -144,6 +152,7 @@ impl<'r> Binder<'r> {
                 return_type,
                 modifiers,
                 range,
+                decorators,
                 ..
             } => {
                 let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
@@ -186,6 +195,7 @@ impl<'r> Binder<'r> {
                 sym.is_async = modifiers.is_async;
                 sym.is_generator = modifiers.is_generator;
                 let symbol_id = self.arena.push(sym);
+                crate::binder::decorator_attrs::record_decorators(self, symbol_id, decorators);
 
                 members.push(ClassMemberInfo {
                     name: key_rc,
@@ -212,6 +222,7 @@ impl<'r> Binder<'r> {
                 return_type,
                 modifiers,
                 range,
+                decorators,
                 ..
             } => {
                 let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
@@ -226,6 +237,7 @@ impl<'r> Binder<'r> {
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = return_type.is_some();
                 let symbol_id = self.arena.push(sym);
+                crate::binder::decorator_attrs::record_decorators(self, symbol_id, decorators);
 
                 members.push(ClassMemberInfo {
                     name: key_rc,
@@ -252,6 +264,7 @@ impl<'r> Binder<'r> {
                 param,
                 modifiers,
                 range,
+                decorators,
                 ..
             } => {
                 let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
@@ -265,6 +278,7 @@ impl<'r> Binder<'r> {
                 sym.offset = range.start.offset;
                 sym.has_explicit_type = has_explicit;
                 let symbol_id = self.arena.push(sym);
+                crate::binder::decorator_attrs::record_decorators(self, symbol_id, decorators);
 
                 members.push(ClassMemberInfo {
                     name: key_rc,

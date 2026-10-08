@@ -60,22 +60,47 @@ impl<'m> Builder<'m> {
         args: &[varn_tir::TirArg],
         call_ty: HirType,
     ) -> Result<Option<Value>> {
-        if self.inlining.len() >= 4 || self.inlining.iter().any(|frame| frame.func == f) {
+        let force = self
+            .tir
+            .function(f)
+            .map(|tf| tf.force_inline)
+            .unwrap_or(false);
+        if self.inlining.iter().any(|frame| frame.func == f) || Some(f) == self.self_fn {
+            if force {
+                return Err(crate::OptError::Unsupported(
+                    "`@inline` cannot apply to recursive functions",
+                ));
+            }
             return Ok(None);
         }
-        if Some(f) == self.self_fn {
+        if self.inlining.len() >= 4 && !force {
             return Ok(None);
         }
         let Some(tf) = self.tir.function(f) else {
             return Ok(None);
         };
         if tf.is_async || tf.is_generator || tf.has_rest || tf.has_this {
+            if force {
+                return Err(crate::OptError::Unsupported(
+                    "`@inline` cannot apply to async, generator, rest or this-bound functions",
+                ));
+            }
             return Ok(None);
         }
         if tf.body.len() != 1 {
+            if force {
+                return Err(crate::OptError::Unsupported(
+                    "`@inline` requires a single-`return` body",
+                ));
+            }
             return Ok(None);
         }
         let TirStmt::Return(Some(ref ret_expr)) = tf.body[0] else {
+            if force {
+                return Err(crate::OptError::Unsupported(
+                    "`@inline` requires a single-`return` body",
+                ));
+            }
             return Ok(None);
         };
         if args.len() != tf.params.len()
@@ -83,9 +108,19 @@ impl<'m> Builder<'m> {
                 .iter()
                 .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))
         {
+            if force {
+                return Err(crate::OptError::Unsupported(
+                    "`@inline` cannot apply to spread or arity-mismatched calls",
+                ));
+            }
             return Ok(None);
         }
         if matches!(ret_expr.kind, varn_tir::TirExprKind::Closure { .. }) {
+            if force {
+                return Err(crate::OptError::Unsupported(
+                    "`@inline` cannot apply to functions returning closures",
+                ));
+            }
             return Ok(None);
         }
 

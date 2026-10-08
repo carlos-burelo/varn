@@ -26,23 +26,16 @@ pub const SLOT_STATE_YOUNG: u8 = 3;
 pub const SLOT_STATE_MARKED: u8 = 4;
 pub const CELL_CLASS_LARGE: u8 = u8::MAX;
 
-pub const INST_CLASS_ID_OFF: usize = 0;
-pub const INST_PAYLOAD_OFF: usize = 8;
+pub const CELL_KIND_INSTANCE: u8 = 0xFF;
 
-pub const fn instance_data_off(heap_obj_bytes: usize) -> usize {
-    HEADER_BYTES + heap_obj_bytes
-}
+pub const INST_CELL_DATA_OFF: usize = HEADER_BYTES;
 
-pub fn instance_body_bytes(heap_obj_bytes: usize, payload_size: u32) -> usize {
-    heap_obj_bytes + instance_bytes_for(payload_size)
+pub fn instance_colocated_body_bytes(payload_size: u32) -> usize {
+    8 + (payload_size as usize).div_ceil(8) * 8
 }
 
 pub fn instance_bytes_for(payload_size: u32) -> usize {
-    INST_PAYLOAD_OFF + (payload_size as usize).div_ceil(8) * 8
-}
-
-pub fn instance_cell_bytes(heap_obj_bytes: usize, payload_size: u32) -> usize {
-    HEADER_BYTES + instance_body_bytes(heap_obj_bytes, payload_size)
+    crate::INST_PAYLOAD_OFF + (payload_size as usize).div_ceil(8) * 8
 }
 
 pub const LANE_FREE_OFF: usize = 0;

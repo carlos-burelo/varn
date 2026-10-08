@@ -1,5 +1,6 @@
-use tower_lsp::lsp_types::{
-    ParameterInformation, ParameterLabel, SignatureHelp, SignatureInformation,
+use tower_lsp_f::lsp_types::{
+    ActiveParameter, ParameterInformation, ParameterInformationLabel, SignatureHelp,
+    SignatureInformation,
 };
 use varn_core::TokenKind;
 
@@ -158,13 +159,13 @@ fn build_signature_response(
     let parameters: Vec<ParameterInformation> = param_strs
         .iter()
         .map(|p| ParameterInformation {
-            label: ParameterLabel::Simple(p.clone()),
+            label: ParameterInformationLabel::String(p.clone()),
             documentation: None,
         })
         .collect();
 
     let active = if active_param < parameters.len() as u32 {
-        Some(active_param)
+        Some(ActiveParameter::from(active_param))
     } else {
         None
     };

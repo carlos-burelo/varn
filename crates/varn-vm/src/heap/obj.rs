@@ -6,8 +6,8 @@ use std::sync::Arc;
 use varn_types::{
     generator::GeneratorObj,
     value::{
-        BoundMethod, EnumVariantData, FrozenModuleObj, InstanceRef, MapRef, ModuleObj, ObjRef,
-        RangeData, RuntimeSymbol, SetRef,
+        BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData,
+        RuntimeSymbol, SetRef,
     },
     ClassObj, NativeFn, VmArray,
 };
@@ -19,7 +19,6 @@ pub enum HeapObj {
     Array(VmArray),
     Tuple(VmArray),
     Object(ObjRef),
-    Instance(InstanceRef),
     Record(ObjRef),
     Buffer(varn_types::VmBuffer),
 
@@ -52,7 +51,6 @@ impl HeapObj {
             HeapObj::Array(_) => RuntimeKind::Array,
             HeapObj::Tuple(_) => RuntimeKind::Tuple,
             HeapObj::Object(_)
-            | HeapObj::Instance(_)
             | HeapObj::Record(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_) => RuntimeKind::Object,

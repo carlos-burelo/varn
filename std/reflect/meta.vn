@@ -78,10 +78,3 @@ export class MetaKey<T> {
         return [];
     }
 }
-
-export interface MethodContext {
-    name: str;
-    isStatic: bool;
-    isPrivate: bool;
-    kind: str;
-}

@@ -8,8 +8,9 @@ import { describe, it, expect } from "std:test";
 // must NOT.
 //
 // On the float side only the NaN-producing cases are testable from Varn
-// today: `-0.0` is not observable (it compares equal to `0.0`, prints as
-// "0", and `1.0 / 0.0` raises at runtime instead of yielding an infinity).
+// today: `-0.0` is not observable (it compares equal to `0.0` and prints
+// as "0"). `1.0 / 0.0` yields an infinity (line 59 relies on it); only
+// the `f2i` conversion of an infinity raises (see `122:38-40`).
 // The pass still refuses `x + 0.0`, which is the rule `-0.0` would break —
 // see the note in `algebraic.rs`.
 

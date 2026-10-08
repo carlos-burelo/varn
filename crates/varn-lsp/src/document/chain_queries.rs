@@ -77,7 +77,7 @@ impl DocumentState {
     pub fn offset_at_line_col(&self, line: u32, col: u32) -> u32 {
         crate::document::position::byte_offset(
             &self.source,
-            tower_lsp::lsp_types::Position::new(line, col),
+            tower_lsp_f::lsp_types::Position::new(line, col),
         ) as u32
     }
 
@@ -330,11 +330,14 @@ impl DocumentState {
         if let Some(info) = self.db.expr_types.get(&tok.offset) {
             return Some(info);
         }
+        let mut best: Option<(u32, &varn_checker::ExprInfo)> = None;
         for (&offset, info) in &self.db.expr_types {
             if offset >= tok.offset && offset < tok.offset + tok.length {
-                return Some(info);
+                if best.map_or(true, |(b, _)| offset < b) {
+                    best = Some((offset, info));
+                }
             }
         }
-        None
+        best.map(|(_, info)| info)
     }
 }

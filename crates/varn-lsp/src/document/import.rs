@@ -52,6 +52,18 @@ pub fn import_path_at(source: &str, line: u32, col: u32) -> Option<ImportPathCon
             });
         }
     }
+
+    if let Some(start) = start_idx {
+        if end_idx.is_none() && col as usize > start {
+            let end = (col as usize).min(src_line.len());
+            let prefix = &src_line[start + 1..end];
+            return Some(ImportPathContext {
+                prefix: prefix.to_owned(),
+                specifier: prefix.to_owned(),
+                content_start_col: (start + 1) as u32,
+            });
+        }
+    }
     None
 }
 
@@ -76,7 +88,7 @@ pub fn named_import_module_at(source: &str, line: u32, col: u32) -> Option<Strin
 
     let from_part = source.lines().skip(line as usize).find_map(|l| {
         if let Some(idx) = l.find("from") {
-            let rest = &l[idx + 4..].trim();
+            let rest = l[idx + 4..].trim().trim_end_matches(';').trim();
             if (rest.starts_with('\'') && rest.ends_with('\''))
                 || (rest.starts_with('"') && rest.ends_with('"'))
             {

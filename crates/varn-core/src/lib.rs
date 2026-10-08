@@ -52,4 +52,6 @@ pub use trivia::{Trivia, TriviaKind};
 
 pub const HOST_API_VERSION: u32 = 3;
 
+pub const UNKNOWN: &str = "unknown";
+
 pub fn clear_interner() {}

@@ -1,0 +1,6 @@
+// expect: error[VN3026]
+@pure
+function f(n: int): int {
+    print(n);
+    return n;
+}

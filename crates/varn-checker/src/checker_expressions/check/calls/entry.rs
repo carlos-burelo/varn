@@ -26,6 +26,36 @@ impl<'r> Checker<'r> {
             callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let callee_kind = self.ty_table.get(callee_ty.0);
 
+        let callee_sid: Option<usize> = match &arena.expr(callee).kind {
+            ExprKind::Identifier { name } => bind
+                .scopes
+                .get(self.current_scope)
+                .resolve(*name, &bind.scopes),
+            ExprKind::Member {
+                object,
+                property,
+                computed: false,
+                ..
+            } => {
+                if let ExprKind::Identifier { name: prop } = &arena.expr(*property).kind {
+                    let prop_name = bind.interner.resolve(*prop);
+                    let obj_ty = self.infer_type(*object, bind);
+                    self.find_member_info(&obj_ty, prop_name, bind)
+                        .and_then(|(_, sid)| {
+                            sid.filter(|s| {
+                                *s < bind.arena.len()
+                                    && bind.interner.get(prop_name) == Some(bind.arena.get(*s).name)
+                            })
+                        })
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        self.check_pure_callee(callee_sid, *range, bind);
+        self.check_capability_callee(callee_sid, *range, bind);
+
         if !matches!(
             callee_kind,
             TypeKind::Fn(_)

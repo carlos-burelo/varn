@@ -1,0 +1,9 @@
+// expect: error[VN4302]
+@capability("fs")
+function readIt(p: str): str {
+    return p;
+}
+
+function caller(p: str): str {
+    return readIt(p);
+}

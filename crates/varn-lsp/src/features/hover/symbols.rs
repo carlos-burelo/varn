@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
+use tower_lsp_f::lsp_types::{Contents, Hover, MarkupContent, MarkupKind};
 
 use crate::document::{DocumentState, SymbolView};
 
@@ -23,7 +23,7 @@ pub fn symbol_hover(state: &DocumentState, sym: SymbolView<'_>) -> Hover {
     }
 
     Hover {
-        contents: HoverContents::Markup(MarkupContent {
+        contents: Contents::MarkupContent(MarkupContent {
             kind: MarkupKind::Markdown,
             value,
         }),

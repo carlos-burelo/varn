@@ -2,6 +2,7 @@ pub mod alloc_profile;
 pub mod arch;
 pub(crate) mod clif_link;
 pub(crate) mod closure;
+pub mod debug;
 pub(crate) mod error;
 pub mod exec;
 pub(crate) mod frame;

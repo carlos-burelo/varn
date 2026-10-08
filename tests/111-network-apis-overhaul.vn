@@ -2,6 +2,7 @@ import { TcpListener, TcpStream, connect, listen, isIP, isIPv4, isIPv6 } from "s
 import { HttpServer, Request, Response, HttpStatus, json, get, post, put, patch, del, fetch } from "std:http";
 import { WebSocket, WebSocketReadyState } from "std:ws";
 import { Process } from "std:process";
+import { platform } from "std:sys";
 import { delay, Task } from "std:task";
 import { describe, it, expect } from "std:test";
 
@@ -30,10 +31,10 @@ function testHttpServerAndClientApis(): void {
     let parsedJson: dynamic = res.json();
         expect(parsedJson.message).toBe("Success");;
 
-    let errRes = new Response("Bad Request", 400);
-        expect(errRes.status).toBe(400);;
+    let errRes = new Response("boom", 404);
+        expect(errRes.status).toBe(404);;
         expect(errRes.ok).toBeFalsy();;
-        expect(errRes.statusText).toBe("Bad Request");;
+        expect(errRes.statusText).toBe("Not Found");;
 
     // 2. HttpServer Routing & CORS
     let app = new HttpServer();
@@ -60,11 +61,11 @@ function testHttpServerAndClientApis(): void {
         expect(app.isListening).toBeFalsy();;
 
     // 3. http client free helpers
-        expect(get !== null).toBeTruthy();;
-        expect(post !== null).toBeTruthy();;
-        expect(put !== null).toBeTruthy();;
-        expect(patch !== null).toBeTruthy();;
-        expect(del !== null).toBeTruthy();;
+        expect(typeof get).toBe("function");;
+        expect(typeof post).toBe("function");;
+        expect(typeof put).toBe("function");;
+        expect(typeof patch).toBe("function");;
+        expect(typeof del).toBe("function");;
 
 }
 
@@ -78,7 +79,8 @@ function testWebSocket(): void {
 
 }
 let testPort = 19876;
-let proc = Process.spawn("target/debug/vn.exe", ["run", "tests/helpers/tcp_echo_server.vn"]);
+let vnBin = platform() == "windows" ? "target/debug/vn.exe" : "target/debug/vn";
+let proc = Process.spawn(vnBin, ["run", "tests/helpers/tcp_echo_server.vn"]);
 
 async function main(): Task<void> {
     testNetIpUtils();
@@ -89,17 +91,26 @@ async function main(): Task<void> {
 await describe("111 network apis overhaul", async () => {
 
     await it("Give child process a small moment to start listening", async () => {
-        await delay(150);
-        let clientSock = await TcpStream.connect("127.0.0.1", testPort);
-        expect(clientSock.isOpen).toBeTruthy();
-        expect(clientSock.remoteHost).toBe("127.0.0.1");
-        expect(clientSock.remotePort).toBe(testPort);
-        await clientSock.writeAll("varn_test\n");
-        let echoMsg = await clientSock.readText();
-        expect(echoMsg.trim()).toBe("ECHO:varn_test");
-        clientSock.close();
-        let exitInfo = proc.wait();
-        expect(exitInfo.exitCode).toBe(0);
+        let attempts = 0;
+        let ok = false;
+        while (!ok && attempts < 25) {
+            attempts = attempts + 1;
+            try {
+                let clientSock = await TcpStream.connect("127.0.0.1", testPort);
+                expect(clientSock.isOpen).toBeTruthy();
+                expect(clientSock.remoteHost).toBe("127.0.0.1");
+                expect(clientSock.remotePort).toBe(testPort);
+                await clientSock.writeAll("varn_test\n");
+                let echoMsg = await clientSock.readText();
+                expect(echoMsg.trim()).toBe("ECHO:varn_test");
+                clientSock.close();
+                ok = true;
+            } catch (e) {
+                await delay(200);
+            }
+        }
+        expect(ok).toBeTruthy();
+        expect(proc.kill()).toBeTruthy();
     });
 
     await it("network apis main flow", async () => {

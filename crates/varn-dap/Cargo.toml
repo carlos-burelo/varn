@@ -1,0 +1,16 @@
+[package]
+name = "varn-dap"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+varn-core = { path = "../varn-core" }
+varn-pipeline = { path = "../varn-pipeline" }
+varn-types = { path = "../varn-types" }
+varn-vm = { path = "../varn-vm" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rustc-hash = { workspace = true }
+
+[lints]
+workspace = true

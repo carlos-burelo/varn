@@ -104,6 +104,9 @@ pub fn parse_export_decl(
     let is_declare = s.eat(TokenKind::Declare);
 
     if s.check(TokenKind::Type) && s.peek_kind(1) == TokenKind::LBrace {
+        if !decorators.is_empty() {
+            return Err("decorators are not supported on type exports".to_owned());
+        }
         s.advance();
         s.advance();
         while !s.check(TokenKind::RBrace) && !s.is_eof() {
@@ -144,6 +147,11 @@ pub fn parse_export_decl(
                 ExportDefaultDecl::Class(cls)
             }
             _ => {
+                if !decorators.is_empty() {
+                    return Err(
+                        "decorators are not supported on default export expressions".to_owned()
+                    );
+                }
                 let expr = parse_expr(s)?;
                 s.eat_semicolon();
                 ExportDefaultDecl::Expr(expr)
@@ -158,6 +166,9 @@ pub fn parse_export_decl(
     }
 
     if s.eat(TokenKind::Star) {
+        if !decorators.is_empty() {
+            return Err("decorators are not supported on export all".to_owned());
+        }
         let alias = if s.eat(TokenKind::As) {
             Some(s.consume_lexeme())
         } else {
@@ -176,6 +187,9 @@ pub fn parse_export_decl(
     }
 
     if s.check(TokenKind::LBrace) {
+        if !decorators.is_empty() {
+            return Err("decorators are not supported on named exports".to_owned());
+        }
         s.advance();
         let mut specifiers = vec![];
         while !s.check(TokenKind::RBrace) && !s.is_eof() {
@@ -212,6 +226,7 @@ pub fn parse_export_decl(
         });
     }
 
+    let has_outer_decorators = !decorators.is_empty();
     let decl = if is_declare {
         match super::super::stmt_decls::try_parse_decl_stmt_mode(
             s,
@@ -234,7 +249,12 @@ pub fn parse_export_decl(
         ) {
             Some(Ok(stmt)) => stmt,
             Some(Err(e)) => return Err(e),
-            None => super::super::stmts::parse_stmt_or_decl_inner(s)?,
+            None => {
+                if has_outer_decorators {
+                    return Err("expected a declaration after decorators".to_owned());
+                }
+                super::super::stmts::parse_stmt_or_decl_inner(s)?
+            }
         }
     };
     if let StmtKind::Decl(d) = s.arena.stmt(decl).kind.clone() {

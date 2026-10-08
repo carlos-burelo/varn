@@ -186,7 +186,8 @@ fn compile_source_inner(
         &check.call_mappings,
         &check.desugar,
     );
-    varn_compiler::from_tir::compile_module(&tir, export_names).map_err(|e| format!("{e:?}"))
+    varn_compiler::from_tir::compile_module(&tir, export_names, source)
+        .map_err(|e| format!("{e:?}"))
 }
 
 fn validate_imports(id: &str, source: &str) -> Result<(), String> {

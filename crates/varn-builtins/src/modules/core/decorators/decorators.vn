@@ -1,0 +1,34 @@
+export interface MethodContext {
+    name: str;
+    isStatic: bool;
+    isPrivate: bool;
+    kind: str;
+}
+
+export interface GetterContext {
+    name: str;
+    isStatic: bool;
+    isPrivate: bool;
+    kind: str;
+}
+
+export interface SetterContext {
+    name: str;
+    isStatic: bool;
+    isPrivate: bool;
+    kind: str;
+}
+
+export interface ConstructorContext {
+    name: str;
+    isStatic: bool;
+    isPrivate: bool;
+    kind: str;
+}
+
+export interface PropertyContext {
+    name: str;
+    isStatic: bool;
+    isPrivate: bool;
+    kind: str;
+}
