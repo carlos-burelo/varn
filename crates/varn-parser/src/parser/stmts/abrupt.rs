@@ -1,4 +1,4 @@
-use super::dispatch::parse_block;
+use super::block::parse_block;
 use crate::stream::TokenStream;
 use varn_core::ast::{CatchClause, StmtId, StmtKind, VarDeclarator};
 use varn_core::TokenKind;

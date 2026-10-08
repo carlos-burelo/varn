@@ -1,62 +1,23 @@
-mod class;
-mod class_key;
-mod class_member;
-mod class_mods;
-mod enum_decl;
-mod export;
-mod extension;
-mod import;
-pub mod type_decls;
-
-pub use class::parse_class_decl;
-pub(super) use enum_decl::parse_enum_decl;
-pub(super) use export::parse_export_decl;
-pub(super) use extension::parse_extension_decl;
-pub(super) use import::parse_import_decl;
-pub(super) use type_decls::{
-    parse_interface_decl, parse_namespace_decl, parse_struct_decl, parse_type_alias_decl,
-};
-
-use crate::expressions::parse_expr;
 use crate::stream::TokenStream;
-use crate::types::{parse_type, parse_type_params};
-use varn_core::ast::operators::{Modifiers, VarKind};
-use varn_core::ast::{Decorator, FunctionDecl, Pattern, VarDeclarator, VariableDecl};
 use varn_core::TokenKind;
 
-pub(super) fn parse_var_decl_with_declare(
-    s: &mut TokenStream,
-    is_declare: bool,
-) -> Result<VariableDecl, String> {
-    let range = s.range();
-    let kind = match s.kind() {
-        TokenKind::Let => {
+pub(super) fn member_key_name(s: &mut TokenStream) -> Result<String, String> {
+    match s.kind() {
+        TokenKind::Identifier => Ok(s.consume_str()),
+        TokenKind::Str => Ok(s.consume_str()),
+        TokenKind::IntegerLiteral => Ok(s.consume_str()),
+        TokenKind::Hash => {
             s.advance();
-            VarKind::Let
+            Ok(format!("#{}", s.consume_str()))
         }
-        TokenKind::Const => {
-            s.advance();
-            VarKind::Const
-        }
-        TokenKind::Var => {
-            let err_range = s.range();
-            s.push_error(
-                "`var` is not supported; use `let` or `const`".to_owned(),
-                err_range,
-            );
-            s.advance();
-            VarKind::Let
-        }
+        _ if s.kind().can_be_identifier() || s.kind().is_keyword() => Ok(s.consume_str()),
         TokenKind::EOF
         | TokenKind::Dynamic
-        | TokenKind::Identifier
-        | TokenKind::IntegerLiteral
         | TokenKind::FloatLiteral
         | TokenKind::BinaryLiteral
         | TokenKind::OctalLiteral
         | TokenKind::HexLiteral
         | TokenKind::BigIntLiteral
-        | TokenKind::Str
         | TokenKind::Char
         | TokenKind::Template
         | TokenKind::TemplateHead
@@ -128,6 +89,9 @@ pub(super) fn parse_var_decl_with_declare(
         | TokenKind::GtEq
         | TokenKind::Arrow
         | TokenKind::FatArrow
+        | TokenKind::Let
+        | TokenKind::Const
+        | TokenKind::Var
         | TokenKind::Function
         | TokenKind::Class
         | TokenKind::Struct
@@ -192,7 +156,6 @@ pub(super) fn parse_var_decl_with_declare(
         | TokenKind::Destructor
         | TokenKind::Match
         | TokenKind::At
-        | TokenKind::Hash
         | TokenKind::Backslash
         | TokenKind::Dollar
         | TokenKind::Backtick
@@ -204,125 +167,6 @@ pub(super) fn parse_var_decl_with_declare(
         | TokenKind::Spawn
         | TokenKind::Parallel
         | TokenKind::Start
-        | TokenKind::RawStr => return Err("Expected `let` or `const`".to_owned()),
-    };
-
-    let dec_range = s.range();
-    let id = super::patterns::parse_pattern(s)?;
-    parse_var_decl_after_head(s, range, kind, dec_range, id, is_declare)
-}
-
-pub(super) fn parse_var_decl_after_head(
-    s: &mut TokenStream,
-    range: varn_core::SourceRange,
-    kind: VarKind,
-    first_range: varn_core::SourceRange,
-    first_id: Pattern,
-    is_declare: bool,
-) -> Result<VariableDecl, String> {
-    let mut declarators = vec![parse_var_declarator_suffix(
-        s,
-        first_range,
-        first_id,
-        is_declare,
-    )?];
-
-    while s.eat(TokenKind::Comma) {
-        let dec_range = s.range();
-        let id = super::patterns::parse_pattern(s)?;
-        declarators.push(parse_var_declarator_suffix(s, dec_range, id, is_declare)?);
+        | TokenKind::RawStr => Err(format!("Expected class member name, got {:?}", s.kind())),
     }
-
-    let full_range = s.span_from(range);
-    Ok(VariableDecl {
-        kind,
-        ast_id: s.next_ast_id(),
-        declarators,
-        is_declare,
-        doc: None,
-        range: full_range,
-    })
-}
-
-fn parse_var_declarator_suffix(
-    s: &mut TokenStream,
-    range: varn_core::SourceRange,
-    id: Pattern,
-    is_declare: bool,
-) -> Result<VarDeclarator, String> {
-    let type_ann = if s.eat(TokenKind::Colon) {
-        Some(parse_type(s)?)
-    } else {
-        None
-    };
-    let init = if s.eat(TokenKind::Eq) {
-        if is_declare {
-            return Err("declare variables cannot have initializers".to_owned());
-        }
-        Some(parse_expr(s)?)
-    } else {
-        None
-    };
-
-    let full_range = s.span_from(range);
-    Ok(VarDeclarator {
-        id,
-        type_ann,
-        init,
-        range: full_range,
-    })
-}
-
-pub(super) fn parse_function_decl(
-    s: &mut TokenStream,
-    decorators: Vec<Decorator>,
-    is_async_pre: bool,
-    is_declare: bool,
-) -> Result<FunctionDecl, String> {
-    let range = s.range();
-    s.expect(TokenKind::Function)?;
-    let is_generator = s.eat(TokenKind::Star);
-
-    let id_offset = s.range().start.offset;
-    let id = s.expect_id()?;
-    let type_params = if s.check(TokenKind::LAngle) {
-        parse_type_params(s)?
-    } else {
-        vec![]
-    };
-    let params = super::params::parse_params(s)?;
-    let return_type = if s.eat(TokenKind::Colon) {
-        Some(parse_type(s)?)
-    } else {
-        None
-    };
-    let body = if is_declare {
-        if s.check(TokenKind::LBrace) {
-            return Err("declare function cannot have a body".to_owned());
-        }
-        s.eat_semicolon();
-        s.stmt(s.range(), varn_core::ast::StmtKind::Empty)
-    } else {
-        super::stmts::parse_block(s)?
-    };
-
-    let full_range = s.span_from(range);
-    Ok(FunctionDecl {
-        id,
-        ast_id: s.next_ast_id(),
-        id_offset,
-        type_params,
-        params,
-        return_type,
-        body,
-        modifiers: Modifiers {
-            is_async: is_async_pre,
-            is_generator,
-            is_declare,
-            ..Default::default()
-        },
-        decorators,
-        doc: None,
-        range: full_range,
-    })
 }

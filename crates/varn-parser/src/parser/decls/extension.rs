@@ -101,7 +101,7 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
         s.advance();
         let key = s.expect_id()?;
         s.expect(TokenKind::LParen)?;
-        let param = super::super::patterns::parse_single_param(s)?;
+        let param = super::super::params::parse_single_param(s)?;
         s.expect(TokenKind::RParen)?;
         let body = super::super::stmts::parse_block(s)?;
         let full_range = s.span_from(range);
@@ -121,7 +121,7 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
     } else {
         vec![]
     };
-    let params = super::super::patterns::parse_params(s)?;
+    let params = super::super::params::parse_params(s)?;
     let return_type = if s.eat(TokenKind::Colon) {
         Some(parse_type(s)?)
     } else {

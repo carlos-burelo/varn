@@ -1,10 +1,11 @@
 pub mod decls;
+mod params;
 mod patterns;
 mod stmt_decls;
 mod stmts;
 
 pub use decls::parse_class_decl;
-pub use patterns::{parse_params, parse_single_param};
+pub use params::{parse_params, parse_single_param};
 pub use stmts::parse_block;
 
 use crate::stream::TokenStream;
