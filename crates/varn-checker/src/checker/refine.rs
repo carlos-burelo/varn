@@ -2,25 +2,31 @@ use varn_core::ast::operators::{BinaryOp, UnaryOp};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
 
+use super::recorder::Recorder;
 use crate::checker::Checker;
 use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn refine(&mut self, expr: ExprId, bind: &BindResult) -> Option<Type> {
+    pub(crate) fn refine(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        bind: &BindResult,
+    ) -> Option<Type> {
         let arena = self.ast_arena;
         match &arena.expr(expr).kind {
             ExprKind::Identifier { name } => {
                 self.evolved_array_of(bind.interner.resolve(*name), bind)
             }
 
-            ExprKind::Paren { expression } => self.refine(*expression, bind),
+            ExprKind::Paren { expression } => self.refine(rec, *expression, bind),
 
             ExprKind::Unary {
                 op: UnaryOp::Minus | UnaryOp::Plus,
                 operand,
                 ..
-            } => self.refine(*operand, bind),
+            } => self.refine(rec, *operand, bind),
             ExprKind::Unary { .. } => None,
 
             ExprKind::Member {
@@ -30,7 +36,7 @@ impl<'r> Checker<'r> {
                 ..
             } => {
                 let (object, property, computed) = (*object, *property, *computed);
-                let obj = self.refine(object, bind)?;
+                let obj = self.refine(rec, object, bind)?;
                 let TypeKind::Array(elem) = self.ty_table.get(obj.0) else {
                     return None;
                 };
@@ -60,13 +66,13 @@ impl<'r> Checker<'r> {
                 ) {
                     return None;
                 }
-                let l_ref = self.refine(left, bind);
-                let r_ref = self.refine(right, bind);
+                let l_ref = self.refine(rec, left, bind);
+                let r_ref = self.refine(rec, right, bind);
                 if l_ref.is_none() && r_ref.is_none() {
                     return None;
                 }
-                let l = l_ref.unwrap_or_else(|| self.checked_ty(left));
-                let r = r_ref.unwrap_or_else(|| self.checked_ty(right));
+                let l = l_ref.unwrap_or_else(|| self.checked_ty(rec, left));
+                let r = r_ref.unwrap_or_else(|| self.checked_ty(rec, right));
                 numeric_result(&l, &r, &self.ty_table)
             }
 
@@ -115,8 +121,8 @@ impl<'r> Checker<'r> {
         }
     }
 
-    fn checked_ty(&self, expr: ExprId) -> Type {
-        self.expr_table
+    fn checked_ty(&self, rec: &Recorder, expr: ExprId) -> Type {
+        rec.expr_table
             .get(&expr.index())
             .map(|e| e.ty)
             .unwrap_or(Type::Dynamic)

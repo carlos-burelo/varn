@@ -1,5 +1,6 @@
 use rustc_hash::FxHashSet;
 
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::{Arg, ExprKind};
 use varn_core::source::SourceRange;
@@ -10,6 +11,7 @@ use varn_sem::types::{FunctionParam, Type};
 impl<'r> Checker<'r> {
     pub(super) fn validate_call_arguments(
         &mut self,
+        rec: &mut Recorder,
         args: &[Arg],
         params: &[FunctionParam],
         range: &SourceRange,
@@ -22,6 +24,7 @@ impl<'r> Checker<'r> {
 
         let has_error = if has_named {
             self.validate_named_call_arguments(
+                rec,
                 args,
                 params,
                 &call_info.named_labels,
@@ -30,7 +33,7 @@ impl<'r> Checker<'r> {
                 bind,
             )
         } else {
-            self.validate_positional_call_arguments(args, params, range, bind)
+            self.validate_positional_call_arguments(rec, args, params, range, bind)
         };
 
         if !has_error && !call_info.has_spread {
@@ -67,6 +70,7 @@ impl<'r> Checker<'r> {
 
     fn validate_named_call_arguments(
         &mut self,
+        rec: &mut Recorder,
         args: &[Arg],
         params: &[FunctionParam],
         named_labels: &FxHashSet<&str>,
@@ -82,11 +86,11 @@ impl<'r> Checker<'r> {
         for arg in args {
             let (label_opt, arg_ty) = match arg {
                 Arg::Named { label, value } => {
-                    (Some(label.as_str()), self.infer_type(*value, bind))
+                    (Some(label.as_str()), self.infer_type(rec, *value, bind))
                 }
-                Arg::Positional(e) => (None, self.infer_type(*e, bind)),
+                Arg::Positional(e) => (None, self.infer_type(rec, *e, bind)),
                 Arg::Spread(e) => {
-                    let arg_ty = self.infer_type(*e, bind);
+                    let arg_ty = self.infer_type(rec, *e, bind);
                     if !arg_ty.is_dynamic()
                         && !matches!(self.ty_table.get(arg_ty.0), TypeKind::Array(_))
                     {
@@ -165,20 +169,21 @@ impl<'r> Checker<'r> {
             }
         }
 
-        self.call_mappings.insert(call_id, mapping);
+        rec.call_mappings.insert(call_id, mapping);
 
         has_error
     }
 
     fn validate_positional_call_arguments(
         &mut self,
+        rec: &mut Recorder,
         args: &[Arg],
         params: &[FunctionParam],
         range: &SourceRange,
         bind: &BindResult,
     ) -> bool {
         for (i, arg) in args.iter().enumerate() {
-            let (arg_ty, spread_inner) = match self.infer_arg_type(arg, bind) {
+            let (arg_ty, spread_inner) = match self.infer_arg_type(rec, arg, bind) {
                 Ok(value) => value,
                 Err(arg_ty) => {
                     self.emit(
@@ -257,15 +262,16 @@ impl<'r> Checker<'r> {
 
     fn infer_arg_type(
         &mut self,
+        rec: &mut Recorder,
         arg: &Arg,
         bind: &BindResult,
     ) -> Result<(Type, Option<Type>), Type> {
         match arg {
             Arg::Positional(expr) | Arg::Named { value: expr, .. } => {
-                Ok((self.infer_type(*expr, bind), None))
+                Ok((self.infer_type(rec, *expr, bind), None))
             }
             Arg::Spread(expr) => {
-                let arg_ty = self.infer_type(*expr, bind);
+                let arg_ty = self.infer_type(rec, *expr, bind);
                 let spread_inner = match self.ty_table.get(arg_ty.0) {
                     TypeKind::Array(inner) => Some(Type::resolved(inner)),
                     TypeKind::Primitive(_)

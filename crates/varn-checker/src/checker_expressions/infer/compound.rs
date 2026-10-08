@@ -1,4 +1,5 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use std::sync::Arc;
 use varn_core::ast::ExprId;
 use varn_core::TypeKind;
@@ -8,20 +9,21 @@ use varn_sem::types::{ObjectTypeMember, Type, TypeContext};
 impl<'r> Checker<'r> {
     pub(crate) fn infer_computed_member(
         &mut self,
+        rec: &mut Recorder,
         object: ExprId,
         property: ExprId,
         _expr: ExprId,
         bind: &BindResult,
     ) -> Type {
         let arena = self.ast_arena;
-        let obj_ty = self.infer_type(object, bind);
+        let obj_ty = self.infer_type(rec, object, bind);
         if matches!(
             arena.expr(property).kind,
             varn_core::ast::ExprKind::Range { .. }
         ) {
             return obj_ty;
         }
-        let prop_ty = self.infer_type(property, bind);
+        let prop_ty = self.infer_type(rec, property, bind);
         let obj_kind = self.ty_table.get(obj_ty.0);
         match obj_kind {
             TypeKind::Array(inner) if prop_ty.is_int() => Type::resolved(inner),
@@ -86,6 +88,7 @@ impl<'r> Checker<'r> {
 
     pub(crate) fn infer_object_type(
         &mut self,
+        rec: &mut Recorder,
         properties: &[varn_core::ast::ObjectProp],
         bind: &BindResult,
         _expr: ExprId,
@@ -132,7 +135,7 @@ impl<'r> Checker<'r> {
                 if is_index_signature {
                     for prop in properties {
                         if let varn_core::ast::ObjectProp::Property { value, .. } = prop {
-                            self.infer_type(*value, bind);
+                            self.infer_type(rec, *value, bind);
                         }
                     }
                     return exp;
@@ -146,7 +149,7 @@ impl<'r> Checker<'r> {
                     let Some(name) = prop_key_name(key) else {
                         continue;
                     };
-                    let ty = self.infer_type(*value, bind);
+                    let ty = self.infer_type(rec, *value, bind);
                     members.push(ObjectTypeMember::Property {
                         name,
                         ty: ty.0,
@@ -184,7 +187,7 @@ impl<'r> Checker<'r> {
                 varn_core::ast::ObjectProp::Getter { .. }
                 | varn_core::ast::ObjectProp::Setter { .. } => {}
                 varn_core::ast::ObjectProp::Spread { argument, .. } => {
-                    let spread_ty = self.infer_type(*argument, bind);
+                    let spread_ty = self.infer_type(rec, *argument, bind);
                     let spread_kind = self.ty_table.get(spread_ty.0);
                     if let varn_core::TypeKind::Object(mid) = spread_kind {
                         for m in self.ty_table.get_object_members(mid).to_vec() {

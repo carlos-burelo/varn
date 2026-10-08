@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_binder::pattern_lead_name;
 use varn_core::ast::{ArrayEl, ObjectProp, Param, PropKey};
@@ -8,6 +9,7 @@ use varn_sem::types::{FunctionType, ObjectTypeMember, Type, TypeContext};
 impl<'r> Checker<'r> {
     pub(super) fn apply_contextual_arrow_params(
         &mut self,
+        rec: &mut Recorder,
         params: &[Param],
         expected_fn: &FunctionType,
         bind: &BindResult,
@@ -26,13 +28,18 @@ impl<'r> Checker<'r> {
                 .get(name)
                 .and_then(|atom| scope.resolve(atom, &bind.scopes))
             {
-                self.symbol_types.insert(sym_id, ep_ty);
+                rec.symbol_types.insert(sym_id, ep_ty);
                 self.mark_infer_env_dirty();
             }
         }
     }
 
-    pub(super) fn check_array_with_context(&mut self, elements: &[ArrayEl], bind: &BindResult) {
+    pub(super) fn check_array_with_context(
+        &mut self,
+        rec: &mut Recorder,
+        elements: &[ArrayEl],
+        bind: &BindResult,
+    ) {
         let elem_expected = self
             .expected_type
             .and_then(|t| match self.ty_table.get(t.0) {
@@ -68,9 +75,9 @@ impl<'r> Checker<'r> {
         for el in elements {
             match el {
                 ArrayEl::Expr(e) => {
-                    self.with_expected(elem_expected, |c| c.check_expr(*e, bind));
+                    self.with_expected(elem_expected, |c| c.check_expr(rec, *e, bind));
                     if let Some(expected) = &elem_expected {
-                        let actual = self.infer_type(*e, bind);
+                        let actual = self.infer_type(rec, *e, bind);
 
                         if !actual.is_dynamic()
                             && !self.value_assignable_to(expected, &actual, Some(*e), Some(bind))
@@ -86,7 +93,7 @@ impl<'r> Checker<'r> {
                         }
                     }
                 }
-                ArrayEl::Spread(e) => self.check_expr(*e, bind),
+                ArrayEl::Spread(e) => self.check_expr(rec, *e, bind),
                 ArrayEl::Hole => {}
             }
         }
@@ -94,6 +101,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_object_with_context(
         &mut self,
+        rec: &mut Recorder,
         properties: &[ObjectProp],
         bind: &BindResult,
     ) {
@@ -203,9 +211,9 @@ impl<'r> Checker<'r> {
                             | ObjectTypeMember::Callable { .. } => None,
                         })
                     });
-                    self.with_expected(prop_expected, |c| c.check_expr(*value, bind));
+                    self.with_expected(prop_expected, |c| c.check_expr(rec, *value, bind));
                     if let Some(expected) = &prop_expected {
-                        let actual = self.infer_type(*value, bind);
+                        let actual = self.infer_type(rec, *value, bind);
                         if !actual.is_dynamic()
                             && !self.value_assignable_to(
                                 expected,
@@ -251,7 +259,7 @@ impl<'r> Checker<'r> {
                     if let Some(fn_scope) = self.next_child_scope(bind) {
                         self.current_scope = fn_scope;
                     }
-                    self.in_function_body(*is_async, |c| c.check_stmt(*body, bind));
+                    self.in_function_body(*is_async, |c| c.check_stmt(rec, *body, bind));
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;
                 }
@@ -267,10 +275,10 @@ impl<'r> Checker<'r> {
                         .with_range(*range),
                     );
                     let saved_expected = self.expected_return_type.take();
-                    self.in_function_body(false, |c| c.check_stmt(*body, bind));
+                    self.in_function_body(false, |c| c.check_stmt(rec, *body, bind));
                     self.expected_return_type = saved_expected;
                 }
-                ObjectProp::Spread { argument, .. } => self.check_expr(*argument, bind),
+                ObjectProp::Spread { argument, .. } => self.check_expr(rec, *argument, bind),
             }
         }
     }

@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::pattern::MatchPattern;
 use varn_core::ast::{AstArena, ExprId, ExprKind, MatchCase};
@@ -9,18 +10,20 @@ use varn_sem::types::{CheckerTyTable, Type};
 impl<'r> Checker<'r> {
     fn report_gap(
         &mut self,
+        rec: &mut Recorder,
         expr: ExprId,
         missing: Vec<String>,
         message: String,
         range: &SourceRange,
     ) {
         self.emit(Diagnostic::error(ErrorCode::NonExhaustiveMatch, message).with_range(*range));
-        self.match_gaps
+        rec.match_gaps
             .insert(expr.index(), varn_sem::semantic_info::MatchGap { missing });
     }
 
     fn require_catch_all(
         &mut self,
+        rec: &mut Recorder,
         expr: ExprId,
         subject_ty: &Type,
         cases: &[MatchCase],
@@ -37,12 +40,13 @@ impl<'r> Checker<'r> {
         if !catch_all {
             let ty = subject_ty.display(&self.ty_table, &bind.interner);
             let message = format!("non-exhaustive match: a match on '{ty}' needs a `_` arm");
-            self.report_gap(expr, vec!["_".to_owned()], message, range);
+            self.report_gap(rec, expr, vec!["_".to_owned()], message, range);
         }
     }
 
     pub(super) fn check_match_exhaustiveness(
         &mut self,
+        rec: &mut Recorder,
         expr: ExprId,
         subject_ty: &Type,
         cases: &[MatchCase],
@@ -84,7 +88,7 @@ impl<'r> Checker<'r> {
                     "non-exhaustive match: missing cases for {}",
                     names.join(", ")
                 );
-                self.report_gap(expr, missing, message, range);
+                self.report_gap(rec, expr, missing, message, range);
             }
             return;
         }
@@ -92,7 +96,7 @@ impl<'r> Checker<'r> {
         let (TypeKind::Named(type_name_atom, origin_atom)
         | TypeKind::Generic(type_name_atom, _, origin_atom)) = self.ty_table.get(subject_ty.0)
         else {
-            self.require_catch_all(expr, subject_ty, cases, range, bind);
+            self.require_catch_all(rec, expr, subject_ty, cases, range, bind);
             return;
         };
         let type_name: std::sync::Arc<str> = self.resolve_bind_atom(bind, type_name_atom);
@@ -167,7 +171,7 @@ impl<'r> Checker<'r> {
                     "non-exhaustive match: missing cases for {}",
                     uncovered.join(", ")
                 );
-                self.report_gap(expr, missing, message, range);
+                self.report_gap(rec, expr, missing, message, range);
             }
             return;
         }
@@ -228,11 +232,11 @@ impl<'r> Checker<'r> {
                     "non-exhaustive match: missing cases for {}",
                     uncovered.join(", ")
                 );
-                self.report_gap(expr, uncovered, message, range);
+                self.report_gap(rec, expr, uncovered, message, range);
             }
             return;
         }
-        self.require_catch_all(expr, subject_ty, cases, range, bind);
+        self.require_catch_all(rec, expr, subject_ty, cases, range, bind);
     }
 }
 

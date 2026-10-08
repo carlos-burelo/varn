@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::Arg;
 use varn_core::TypeKind;
@@ -7,6 +8,7 @@ use varn_sem::types::{FunctionParam, Type};
 impl<'r> Checker<'r> {
     pub(in super::super) fn check_call_args_with_context(
         &mut self,
+        rec: &mut Recorder,
         args: &[Arg],
         params: &[FunctionParam],
         bind: &BindResult,
@@ -52,9 +54,9 @@ impl<'r> Checker<'r> {
             match arg {
                 Arg::Positional(e) | Arg::Spread(e) => {
                     let e = *e;
-                    self.with_expected(expected, |c| c.check_expr(e, bind));
+                    self.with_expected(expected, |c| c.check_expr(rec, e, bind));
                 }
-                Arg::Named { value, .. } => self.check_expr(*value, bind),
+                Arg::Named { value, .. } => self.check_expr(rec, *value, bind),
             }
         }
     }

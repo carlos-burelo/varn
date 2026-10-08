@@ -1,4 +1,5 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::ExprId;
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
@@ -7,13 +8,14 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(super) fn infer_logical(
         &mut self,
+        rec: &mut Recorder,
         op: varn_core::ast::LogicalOp,
         left: ExprId,
         right: ExprId,
         bind: &BindResult,
     ) -> Type {
-        let l_ty = self.infer_type(left, bind);
-        let r_ty = self.infer_type(right, bind);
+        let l_ty = self.infer_type(rec, left, bind);
+        let r_ty = self.infer_type(rec, right, bind);
         match op {
             varn_core::ast::LogicalOp::And => {
                 if l_ty == r_ty {
@@ -50,8 +52,13 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn infer_try(&mut self, expression: ExprId, bind: &BindResult) -> Type {
-        let ty = self.infer_type(expression, bind);
+    pub(super) fn infer_try(
+        &mut self,
+        rec: &mut Recorder,
+        expression: ExprId,
+        bind: &BindResult,
+    ) -> Type {
+        let ty = self.infer_type(rec, expression, bind);
         match ty.core_sum(&self.ty_table, |a| bind.interner.try_resolve(a)) {
             Some((_, args)) => args.first().copied().unwrap_or(Type::Dynamic),
             None if ty.is_nullable(&self.ty_table) => {
@@ -61,8 +68,13 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn infer_non_null(&mut self, expression: ExprId, bind: &BindResult) -> Type {
-        let ty = self.infer_type(expression, bind);
+    pub(super) fn infer_non_null(
+        &mut self,
+        rec: &mut Recorder,
+        expression: ExprId,
+        bind: &BindResult,
+    ) -> Type {
+        let ty = self.infer_type(rec, expression, bind);
         if let TypeKind::Union(list) = self.ty_table.get(ty.0) {
             let ids = self.ty_table.get_list(list).to_vec();
             let filtered: Vec<Type> = ids

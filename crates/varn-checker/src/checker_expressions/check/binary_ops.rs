@@ -1,5 +1,6 @@
 use super::super::expr_labels::{base_type, op_str};
 use super::super::infer::member_binary::normalize_for_binary;
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::ExprId;
@@ -11,14 +12,15 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(super) fn check_binary_operands(
         &mut self,
+        rec: &mut Recorder,
         op: BinaryOp,
         left: ExprId,
         right: ExprId,
         range: SourceRange,
         bind: &BindResult,
     ) {
-        let l_ty = self.infer_type(left, bind);
-        let r_ty = self.infer_type(right, bind);
+        let l_ty = self.infer_type(rec, left, bind);
+        let r_ty = self.infer_type(rec, right, bind);
 
         let l_base_raw = base_type(&l_ty);
         let r_base_raw = base_type(&r_ty);

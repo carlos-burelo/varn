@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use crate::checker_type_inferences::collect_type_inferences;
 use crate::generic_substitution::map_generics_cached;
@@ -16,6 +17,7 @@ pub(crate) fn build_call_mapping(
     args: &[Arg],
     ft: &FunctionType,
     checker: &mut Checker,
+    rec: &mut Recorder,
     bind: &BindResult,
 ) -> FxHashMap<Arc<str>, Type> {
     let fn_type_params: Vec<Arc<str>> = if !ft.type_params.is_empty() {
@@ -41,7 +43,8 @@ pub(crate) fn build_call_mapping(
             .map(|(k, v)| (k.clone(), v))
             .collect()
     } else if type_args.is_empty() {
-        let mut mapping = infer_mapping_from_args(&fn_type_params, &ft.params, args, checker, bind);
+        let mut mapping =
+            infer_mapping_from_args(&fn_type_params, &ft.params, args, checker, rec, bind);
         for tp in &fn_type_params {
             mapping.entry(tp.clone()).or_insert(Type::Dynamic);
         }
@@ -56,6 +59,7 @@ pub(crate) fn infer_mapping_from_args(
     param_types: &[FunctionParam],
     args: &[Arg],
     checker: &mut Checker,
+    rec: &mut Recorder,
     bind: &BindResult,
 ) -> FxHashMap<Arc<str>, Type> {
     let mut mapping = FxHashMap::default();
@@ -72,8 +76,8 @@ pub(crate) fn infer_mapping_from_args(
             continue;
         }
         let arg_ty = match arg {
-            Arg::Positional(e) => checker.infer_type(*e, bind),
-            Arg::Named { value, .. } => checker.infer_type(*value, bind),
+            Arg::Positional(e) => checker.infer_type(rec, *e, bind),
+            Arg::Named { value, .. } => checker.infer_type(rec, *value, bind),
             Arg::Spread(_) => continue,
         };
         collect_type_inferences(
@@ -105,7 +109,7 @@ pub(crate) fn infer_mapping_from_args(
                 if let TypeKind::Fn(fid) = mapped_kind {
                     let expected_fn = checker.ty_table.get_function(fid).clone();
                     if let Some(concrete) =
-                        infer_arrow_with_context(*e, &expected_fn, checker, bind)
+                        infer_arrow_with_context(*e, &expected_fn, checker, rec, bind)
                     {
                         collect_type_inferences(
                             &Type::resolved(param.ty),
@@ -118,9 +122,9 @@ pub(crate) fn infer_mapping_from_args(
                         continue;
                     }
                 }
-                checker.infer_type(*e, bind)
+                checker.infer_type(rec, *e, bind)
             }
-            Arg::Named { value, .. } => checker.infer_type(*value, bind),
+            Arg::Named { value, .. } => checker.infer_type(rec, *value, bind),
             Arg::Spread(_) => continue,
         };
         collect_type_inferences(
@@ -140,6 +144,7 @@ fn infer_arrow_with_context(
     expr: ExprId,
     expected_fn: &FunctionType,
     checker: &mut Checker,
+    rec: &mut Recorder,
     bind: &BindResult,
 ) -> Option<Type> {
     let ExprKind::Arrow { params, body, .. } = &checker.ast_arena.expr(expr).kind else {
@@ -183,13 +188,14 @@ fn infer_arrow_with_context(
                         .map(|m| checker.resolve_type_node_cached(m, bind));
 
                     let ty = explicit_ty.unwrap_or(Type::resolved(ep.ty));
-                    checker.symbol_types.insert(sym_id, ty);
+                    rec.symbol_types.insert(sym_id, ty);
                 }
             }
         }
     }
 
-    let ret_ty = crate::checker_expressions::infer::arrow_body_return_type(body, checker, bind);
+    let ret_ty =
+        crate::checker_expressions::infer::arrow_body_return_type(body, checker, rec, bind);
 
     if arrow_scope.is_some() {
         checker.current_scope = saved_scope;

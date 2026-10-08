@@ -1,3 +1,4 @@
+use super::recorder::Recorder;
 use super::Checker;
 use std::sync::Arc;
 use varn_core::ast::ClassMember;
@@ -6,7 +7,12 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::ClassMemberKind;
 
 impl<'r> Checker<'r> {
-    pub(super) fn check_class(&mut self, c: &varn_core::ast::ClassDecl, bind: &BindResult) {
+    pub(super) fn check_class(
+        &mut self,
+        rec: &mut Recorder,
+        c: &varn_core::ast::ClassDecl,
+        bind: &BindResult,
+    ) {
         if c.modifiers.is_abstract {
             if let Some(id) = &c.id {
                 self.abstract_classes
@@ -33,20 +39,26 @@ impl<'r> Checker<'r> {
             parent = bind.class_parents.get(&p.name);
         }
 
-        self.check_class_decorators(c, bind);
+        self.check_class_decorators(rec, c, bind);
         self.check_class_overrides(c, &superclass_members, bind);
-        self.check_class_members(c, bind);
+        self.check_class_members(rec, c, bind);
 
         self.current_scope = saved_scope;
         self.current_class = saved_class;
     }
 
-    fn check_class_decorators(&mut self, c: &varn_core::ast::ClassDecl, bind: &BindResult) {
+    fn check_class_decorators(
+        &mut self,
+        rec: &mut Recorder,
+        c: &varn_core::ast::ClassDecl,
+        bind: &BindResult,
+    ) {
         if !c.decorators.is_empty() {
             let name =
                 c.id.map(|id| bind.interner.resolve(id))
                     .unwrap_or("<anonymous>");
             self.check_decorator_signatures(
+                rec,
                 &c.decorators,
                 super::decorator_signature::DecoratorTarget::Class,
                 name,
@@ -88,6 +100,7 @@ impl<'r> Checker<'r> {
                 } if !decorators.is_empty() => {
                     let key_str = bind.interner.resolve(*key);
                     self.check_decorator_signatures(
+                        rec,
                         decorators,
                         super::decorator_signature::DecoratorTarget::Method,
                         key_str,
@@ -115,6 +128,7 @@ impl<'r> Checker<'r> {
                     ..
                 } if !decorators.is_empty() => {
                     self.check_decorator_signatures(
+                        rec,
                         decorators,
                         super::decorator_signature::DecoratorTarget::Constructor,
                         "constructor",
@@ -143,6 +157,7 @@ impl<'r> Checker<'r> {
                 } if !decorators.is_empty() => {
                     let key_str = bind.interner.resolve(*key);
                     self.check_decorator_signatures(
+                        rec,
                         decorators,
                         super::decorator_signature::DecoratorTarget::Getter,
                         key_str,
@@ -168,6 +183,7 @@ impl<'r> Checker<'r> {
                 } if !decorators.is_empty() => {
                     let key_str = bind.interner.resolve(*key);
                     self.check_decorator_signatures(
+                        rec,
                         decorators,
                         super::decorator_signature::DecoratorTarget::Setter,
                         key_str,
@@ -257,7 +273,12 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn check_class_members(&mut self, c: &varn_core::ast::ClassDecl, bind: &BindResult) {
+    pub(super) fn check_class_members(
+        &mut self,
+        rec: &mut Recorder,
+        c: &varn_core::ast::ClassDecl,
+        bind: &BindResult,
+    ) {
         for member in &c.body {
             match member {
                 ClassMember::Property {
@@ -271,6 +292,7 @@ impl<'r> Checker<'r> {
                     if !decorators.is_empty() {
                         let key_str = bind.interner.resolve(*key);
                         self.check_decorator_signatures(
+                            rec,
                             decorators,
                             super::decorator_signature::DecoratorTarget::Property,
                             key_str,
@@ -282,8 +304,8 @@ impl<'r> Checker<'r> {
                             let prop_ty = self.resolve_type_node_cached(ann, bind);
                             let key_str = bind.interner.resolve(*key);
                             self.with_expected(Some(prop_ty), |checker| {
-                                checker.check_expr(init_expr, bind);
-                                let init_ty = checker.infer_type(init_expr, bind);
+                                checker.check_expr(rec, init_expr, bind);
+                                let init_ty = checker.infer_type(rec, init_expr, bind);
                                 if !checker.value_assignable_to(&prop_ty, &init_ty, Some(init_expr), Some(bind)) {
                                     let prop_ty_s = prop_ty.display(&checker.ty_table, &bind.interner);
                                     let init_ty_s = init_ty.display(&checker.ty_table, &bind.interner);
@@ -308,6 +330,7 @@ impl<'r> Checker<'r> {
                     if let Some(ctor_scope) = self.next_child_scope(bind) {
                         self.current_scope = ctor_scope;
                         self.record_scope_span(
+                            rec,
                             body_range.start.offset,
                             body_range.end.offset,
                             ctor_scope,
@@ -320,7 +343,7 @@ impl<'r> Checker<'r> {
                                 self.ast_arena,
                                 bind,
                             ));
-                    self.in_function_body(false, |c| c.check_stmt(body, bind));
+                    self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
                     self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;
                 }
@@ -347,6 +370,7 @@ impl<'r> Checker<'r> {
                     if let Some(m_scope) = self.next_child_scope(bind) {
                         self.current_scope = m_scope;
                         self.record_scope_span(
+                            rec,
                             body_range.start.offset,
                             body_range.end.offset,
                             m_scope,
@@ -365,7 +389,7 @@ impl<'r> Checker<'r> {
                         self.pure_scope = Some(self.current_scope);
                     }
 
-                    self.in_function_body(modifiers.is_async, |c| c.check_stmt(body, bind));
+                    self.in_function_body(modifiers.is_async, |c| c.check_stmt(rec, body, bind));
 
                     self.pure_scope = saved_pure;
                     self.enclosing_caps = saved_caps;
@@ -389,6 +413,7 @@ impl<'r> Checker<'r> {
                     if let Some(g_scope) = self.next_child_scope(bind) {
                         self.current_scope = g_scope;
                         self.record_scope_span(
+                            rec,
                             body_range.start.offset,
                             body_range.end.offset,
                             g_scope,
@@ -406,7 +431,7 @@ impl<'r> Checker<'r> {
                         self.pure_scope = Some(self.current_scope);
                     }
 
-                    self.in_function_body(false, |c| c.check_stmt(body, bind));
+                    self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
 
                     self.pure_scope = saved_pure;
                     self.enclosing_caps = saved_caps;
@@ -424,6 +449,7 @@ impl<'r> Checker<'r> {
                     if let Some(s_scope) = self.next_child_scope(bind) {
                         self.current_scope = s_scope;
                         self.record_scope_span(
+                            rec,
                             body_range.start.offset,
                             body_range.end.offset,
                             s_scope,
@@ -441,7 +467,7 @@ impl<'r> Checker<'r> {
                         self.pure_scope = Some(self.current_scope);
                     }
 
-                    self.in_function_body(false, |c| c.check_stmt(body, bind));
+                    self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
 
                     self.pure_scope = saved_pure;
                     self.enclosing_caps = saved_caps;

@@ -1,4 +1,5 @@
 use super::super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::ExprId;
 use varn_core::{Diagnostic, ErrorCode, SourceRange, TypeKind};
 use varn_sem::bind::BindResult;
@@ -7,6 +8,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(super) fn check_return_stmt(
         &mut self,
+        rec: &mut Recorder,
         argument: Option<ExprId>,
         range: SourceRange,
         bind: &BindResult,
@@ -23,8 +25,8 @@ impl<'r> Checker<'r> {
 
         let actual = if let Some(arg) = argument {
             let expected_ret = self.expected_return_type;
-            self.with_expected(expected_ret, |c| c.check_expr(arg, bind));
-            self.infer_type(arg, bind)
+            self.with_expected(expected_ret, |c| c.check_expr(rec, arg, bind));
+            self.infer_type(rec, arg, bind)
         } else {
             Type::Void
         };

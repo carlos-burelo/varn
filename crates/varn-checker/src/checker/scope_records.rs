@@ -1,3 +1,4 @@
+use super::recorder::Recorder;
 use super::Checker;
 use varn_core::Diagnostic;
 use varn_sem::bind::BindResult;
@@ -15,49 +16,51 @@ impl<'r> Checker<'r> {
         self.diagnostics.push(diag);
     }
 
-    pub(crate) fn record_scope(&mut self, offset: u32) {
-        if self.record_expr_types {
-            self.node_scopes.insert(offset, self.current_scope);
-        }
+    pub(crate) fn record_scope(&mut self, rec: &mut Recorder, offset: u32) {
+        rec.record_scope(offset, self.current_scope);
     }
 
-    pub(crate) fn record_scope_span(&mut self, start: u32, end: u32, scope: ScopeId) {
-        if self.record_expr_types {
-            self.scope_spans
-                .push(varn_sem::output::ScopeSpan { start, end, scope });
-            self.node_scopes.insert(start, scope);
-        }
+    pub(crate) fn record_scope_span(
+        &mut self,
+        rec: &mut Recorder,
+        start: u32,
+        end: u32,
+        scope: ScopeId,
+    ) {
+        rec.record_scope_span(start, end, scope);
     }
 
     pub(crate) fn with_next_child_scope<R>(
         &mut self,
+        rec: &mut Recorder,
         bind: &BindResult,
         offset: u32,
-        f: impl FnOnce(&mut Self) -> R,
+        f: impl FnOnce(&mut Self, &mut Recorder) -> R,
     ) -> R {
         let saved_scope = self.current_scope;
         if let Some(child) = self.next_child_scope(bind) {
             self.current_scope = child;
-            self.record_scope(offset);
+            self.record_scope(rec, offset);
         }
-        let res = f(self);
+        let res = f(self, rec);
         self.current_scope = saved_scope;
         res
     }
 
     pub(crate) fn with_next_child_scope_span<R>(
         &mut self,
+        rec: &mut Recorder,
         bind: &BindResult,
         start: u32,
         end: u32,
-        f: impl FnOnce(&mut Self) -> R,
+        f: impl FnOnce(&mut Self, &mut Recorder) -> R,
     ) -> R {
         let saved_scope = self.current_scope;
         if let Some(child) = self.next_child_scope(bind) {
             self.current_scope = child;
-            self.record_scope_span(start, end, child);
+            self.record_scope_span(rec, start, end, child);
         }
-        let res = f(self);
+        let res = f(self, rec);
         self.current_scope = saved_scope;
         res
     }

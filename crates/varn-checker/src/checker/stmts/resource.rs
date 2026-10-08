@@ -1,4 +1,5 @@
 use super::super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::VarDeclarator;
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
@@ -6,6 +7,7 @@ use varn_sem::bind::BindResult;
 impl<'r> Checker<'r> {
     pub(super) fn check_using_stmt(
         &mut self,
+        rec: &mut Recorder,
         declarations: Vec<VarDeclarator>,
         is_await: bool,
         bind: &BindResult,
@@ -31,8 +33,8 @@ impl<'r> Checker<'r> {
             let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
             let init = d.init.unwrap();
-            self.with_expected(ann_ty_opt, |c| c.check_expr(init, bind));
-            let init_ty = self.infer_type(init, bind);
+            self.with_expected(ann_ty_opt, |c| c.check_expr(rec, init, bind));
+            let init_ty = self.infer_type(rec, init, bind);
 
             if !init_ty.is_dynamic() && !self.member_exists_cached(&init_ty, dispose_method, bind) {
                 let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
@@ -55,9 +57,9 @@ impl<'r> Checker<'r> {
                         .with_range(d.range),
                     );
                 }
-                self.check_pattern(&d.id, ann_ty, bind);
+                self.check_pattern(rec, &d.id, ann_ty, bind);
             } else {
-                self.check_pattern(&d.id, &init_ty, bind);
+                self.check_pattern(rec, &d.id, &init_ty, bind);
             }
         }
     }

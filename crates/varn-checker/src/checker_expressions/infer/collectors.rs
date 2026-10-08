@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::{ArrowBody, StmtId, StmtKind};
 use varn_sem::types::Type;
@@ -5,6 +6,7 @@ use varn_sem::types::Type;
 pub(crate) fn arrow_body_return_type(
     body: ArrowBody,
     checker: &mut Checker,
+    rec: &mut Recorder,
     bind: &varn_sem::bind::BindResult,
 ) -> Type {
     match body {
@@ -13,14 +15,14 @@ pub(crate) fn arrow_body_return_type(
             let saved_pipe_ty = checker.pipeline_value_type;
             checker.in_pipeline_rhs = false;
             checker.pipeline_value_type = None;
-            let t = checker.infer_type(e, bind);
+            let t = checker.infer_type(rec, e, bind);
             checker.in_pipeline_rhs = saved_pipeline;
             checker.pipeline_value_type = saved_pipe_ty;
             t
         }
         ArrowBody::Block(block) => {
             let mut returns = Returns::default();
-            collect_returns(block, checker, bind, &mut returns);
+            collect_returns(block, checker, rec, bind, &mut returns);
             let mut return_tys = returns.typed;
             match return_tys.len() {
                 0 if returns.dynamic => Type::Dynamic,
@@ -51,6 +53,7 @@ struct Returns {
 fn collect_returns(
     stmt: StmtId,
     checker: &mut Checker,
+    rec: &mut Recorder,
     bind: &varn_sem::bind::BindResult,
     out: &mut Returns,
 ) {
@@ -58,13 +61,13 @@ fn collect_returns(
     match &arena.stmt(stmt).kind {
         StmtKind::Block { stmts, .. } => {
             for s in stmts.clone() {
-                collect_returns(s, checker, bind, out);
+                collect_returns(s, checker, rec, bind, out);
             }
         }
         StmtKind::Return {
             argument: Some(e), ..
         } => {
-            let ty = checker.infer_type(*e, bind);
+            let ty = checker.infer_type(rec, *e, bind);
             if ty.is_dynamic() {
                 out.dynamic = true;
             } else {
@@ -77,18 +80,18 @@ fn collect_returns(
             ..
         } => {
             let (consequent, alternate) = (*consequent, *alternate);
-            collect_returns(consequent, checker, bind, out);
+            collect_returns(consequent, checker, rec, bind, out);
             if let Some(alt) = alternate {
-                collect_returns(alt, checker, bind, out);
+                collect_returns(alt, checker, rec, bind, out);
             }
         }
         StmtKind::While { body, .. } | StmtKind::DoWhile { body, .. } => {
-            collect_returns(*body, checker, bind, out);
+            collect_returns(*body, checker, rec, bind, out);
         }
         StmtKind::For { body, .. }
         | StmtKind::ForIn { body, .. }
         | StmtKind::ForOf { body, .. } => {
-            collect_returns(*body, checker, bind, out);
+            collect_returns(*body, checker, rec, bind, out);
         }
         StmtKind::Try {
             block,
@@ -97,19 +100,19 @@ fn collect_returns(
             ..
         } => {
             let (block, catches, finally) = (*block, catches.clone(), *finally);
-            collect_returns(block, checker, bind, out);
+            collect_returns(block, checker, rec, bind, out);
             for c in &catches {
-                collect_returns(c.body, checker, bind, out);
+                collect_returns(c.body, checker, rec, bind, out);
             }
             if let Some(f) = finally {
-                collect_returns(f, checker, bind, out);
+                collect_returns(f, checker, rec, bind, out);
             }
         }
-        StmtKind::Labeled { body, .. } => collect_returns(*body, checker, bind, out),
+        StmtKind::Labeled { body, .. } => collect_returns(*body, checker, rec, bind, out),
         StmtKind::Switch { cases, .. } => {
             for case in cases.clone() {
                 for s in &case.body {
-                    collect_returns(*s, checker, bind, out);
+                    collect_returns(*s, checker, rec, bind, out);
                 }
             }
         }

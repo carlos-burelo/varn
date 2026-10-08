@@ -8,6 +8,7 @@ pub(crate) mod member_binary;
 mod meta;
 mod new_ty;
 
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_sem::bind::BindResult;
@@ -16,7 +17,12 @@ use varn_sem::types::Type;
 pub(crate) use self::collectors::arrow_body_return_type;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn infer_type_internal(&mut self, expr: ExprId, bind: &BindResult) -> Type {
+    pub(crate) fn infer_type_internal(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        bind: &BindResult,
+    ) -> Type {
         let arena = self.ast_arena;
         if let ExprKind::Identifier { name } = &arena.expr(expr).kind {
             let scope = bind.scopes.get(self.current_scope);
@@ -26,18 +32,18 @@ impl<'r> Checker<'r> {
                         return *ty;
                     }
                 }
-                if let Some(ty) = self.symbol_types.get(&id).cloned() {
+                if let Some(ty) = rec.symbol_types.get(&id).cloned() {
                     return ty;
                 }
             }
         }
 
         if let ExprKind::NonNull { expression } = &arena.expr(expr).kind {
-            let inner = self.infer_type(*expression, bind);
+            let inner = self.infer_type(rec, *expression, bind);
             return inner.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         }
 
-        let ty = self.infer_type_impl(expr, bind);
+        let ty = self.infer_type_impl(rec, expr, bind);
         let is_opt_call = matches!(
             &arena.expr(expr).kind,
             ExprKind::Call {

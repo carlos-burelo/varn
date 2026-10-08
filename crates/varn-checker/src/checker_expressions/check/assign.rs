@@ -1,4 +1,5 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::ExprId;
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
@@ -6,6 +7,7 @@ use varn_sem::bind::BindResult;
 impl<'r> Checker<'r> {
     pub(super) fn check_assign(
         &mut self,
+        rec: &mut Recorder,
         target: ExprId,
         value: ExprId,
         range: varn_core::SourceRange,
@@ -14,7 +16,7 @@ impl<'r> Checker<'r> {
         let arena = self.ast_arena;
         let prev = self.is_assignment_target;
         self.is_assignment_target = true;
-        self.check_expr(target, bind);
+        self.check_expr(rec, target, bind);
         self.is_assignment_target = prev;
 
         let target_ty =
@@ -24,14 +26,14 @@ impl<'r> Checker<'r> {
                 scope
                     .resolve(name, &bind.scopes)
                     .and_then(|id| {
-                        self.symbol_types
+                        rec.symbol_types
                             .get(&id)
                             .cloned()
                             .or_else(|| bind.arena.get(id).ty)
                     })
-                    .unwrap_or_else(|| self.infer_type(target, bind))
+                    .unwrap_or_else(|| self.infer_type(rec, target, bind))
             } else {
-                self.infer_type(target, bind)
+                self.infer_type(rec, target, bind)
             };
 
         let target_expected = if target_ty.is_dynamic() {
@@ -39,9 +41,9 @@ impl<'r> Checker<'r> {
         } else {
             Some(target_ty)
         };
-        self.with_expected(target_expected, |c| c.check_expr(value, bind));
+        self.with_expected(target_expected, |c| c.check_expr(rec, value, bind));
 
-        self.check_extension_assignment(target, bind);
+        self.check_extension_assignment(rec, target, bind);
 
         if !matches!(
             &arena.expr(target).kind,
@@ -94,7 +96,7 @@ impl<'r> Checker<'r> {
             }
         }
 
-        let value_ty = self.infer_type(value, bind);
+        let value_ty = self.infer_type(rec, value, bind);
         let is_empty_array_val = value_ty.is_dynamic()
             && matches!(&arena.expr(value).kind, varn_core::ast::ExprKind::Array { elements } if elements.is_empty());
         if !is_empty_array_val && !self.types_compatible_cached(&target_ty, &value_ty, Some(bind)) {
@@ -167,9 +169,9 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn check_update(&mut self, operand: ExprId, bind: &BindResult) {
+    pub(super) fn check_update(&mut self, rec: &mut Recorder, operand: ExprId, bind: &BindResult) {
         let arena = self.ast_arena;
-        self.check_expr(operand, bind);
+        self.check_expr(rec, operand, bind);
         if self.pure_scope.is_some() {
             let range = arena.expr(operand).range;
             match &arena.expr(operand).kind {

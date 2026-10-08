@@ -1,4 +1,5 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_binder::widen_literal;
 use varn_core::ast::ExprId;
 use varn_sem::bind::BindResult;
@@ -7,6 +8,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(super) fn infer_array(
         &mut self,
+        rec: &mut Recorder,
         elements: &[varn_core::ast::ArrayEl],
         bind: &BindResult,
     ) -> Type {
@@ -14,13 +16,13 @@ impl<'r> Checker<'r> {
         for el in elements {
             match el {
                 varn_core::ast::ArrayEl::Expr(e) => {
-                    let ty = self.infer_type(*e, bind);
+                    let ty = self.infer_type(rec, *e, bind);
                     if !ty.is_dynamic() {
                         elem_tys.push(ty);
                     }
                 }
                 varn_core::ast::ArrayEl::Spread(e) => {
-                    let ty = self.infer_type(*e, bind);
+                    let ty = self.infer_type(rec, *e, bind);
                     if let varn_core::TypeKind::Array(inner) = self.ty_table.get(ty.0) {
                         elem_tys.push(Type::resolved(inner));
                     }
@@ -63,8 +65,16 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn infer_tuple(&mut self, elements: &[ExprId], bind: &BindResult) -> Type {
-        let elem_tys: Vec<Type> = elements.iter().map(|e| self.infer_type(*e, bind)).collect();
+    pub(super) fn infer_tuple(
+        &mut self,
+        rec: &mut Recorder,
+        elements: &[ExprId],
+        bind: &BindResult,
+    ) -> Type {
+        let elem_tys: Vec<Type> = elements
+            .iter()
+            .map(|e| self.infer_type(rec, *e, bind))
+            .collect();
         let ids: Vec<varn_sem::types::CheckerTyId> = elem_tys.iter().map(|t| t.0).collect();
         let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
         Type::resolved(
@@ -74,13 +84,14 @@ impl<'r> Checker<'r> {
 
     pub(super) fn infer_record(
         &mut self,
+        rec: &mut Recorder,
         properties: &[varn_core::ast::ObjectProp],
         bind: &BindResult,
     ) -> Type {
         let mut members = Vec::new();
         for prop in properties {
             if let varn_core::ast::ObjectProp::Property { key, value, .. } = prop {
-                let ty = self.infer_type(*value, bind);
+                let ty = self.infer_type(rec, *value, bind);
                 let name: std::sync::Arc<str> = match &key {
                     varn_core::ast::PropKey::Identifier(s) | varn_core::ast::PropKey::Str(s) => {
                         std::sync::Arc::from(s.as_str())
@@ -101,6 +112,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn infer_match(
         &mut self,
+        rec: &mut Recorder,
         subject: varn_core::ast::ExprId,
         cases: &[varn_core::ast::MatchCase],
         arena: &varn_core::ast::AstArena,
@@ -115,7 +127,7 @@ impl<'r> Checker<'r> {
                     if let Some(&scope) = arm_scopes.and_then(|s| s.get(i)) {
                         self.current_scope = scope;
                     }
-                    let ty = self.infer_type(*e, bind);
+                    let ty = self.infer_type(rec, *e, bind);
                     self.current_scope = saved_scope;
                     tys.push(ty);
                 }

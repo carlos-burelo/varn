@@ -1,4 +1,5 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::ExprId;
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
@@ -7,11 +8,12 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(super) fn infer_new_type(
         &mut self,
+        rec: &mut Recorder,
         callee: ExprId,
         type_args: &[varn_core::ast::TypeNode],
         bind: &BindResult,
     ) -> Type {
-        let callee_ty = self.infer_type(callee, bind);
+        let callee_ty = self.infer_type(rec, callee, bind);
         if callee_ty.is_dynamic() {
             return Type::Dynamic;
         }

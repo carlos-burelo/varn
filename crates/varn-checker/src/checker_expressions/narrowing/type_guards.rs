@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::{Arg, ExprId, ExprKind};
 use varn_core::TypeKind;
@@ -8,6 +9,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_type_guard(
         &mut self,
+        rec: &mut Recorder,
         callee: ExprId,
         args: &[Arg],
         bind: &BindResult,
@@ -15,7 +17,7 @@ impl<'r> Checker<'r> {
         out: &mut Vec<(SymbolId, Type)>,
     ) {
         let arena = self.ast_arena;
-        let callee_ty_raw = self.infer_type(callee, bind);
+        let callee_ty_raw = self.infer_type(rec, callee, bind);
         let callee_ty =
             callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         if let TypeKind::Fn(fid) = self.ty_table.get(callee_ty.0) {
@@ -50,7 +52,7 @@ impl<'r> Checker<'r> {
                 {
                     let scope = bind.scopes.get(self.current_scope);
                     if let Some(id) = scope.resolve(*arg_name, &bind.scopes) {
-                        let original_ty = self
+                        let original_ty = rec
                             .symbol_types
                             .get(&id)
                             .cloned()

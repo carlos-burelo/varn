@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
@@ -11,6 +12,7 @@ type VariantSubst = (
 impl<'r> Checker<'r> {
     pub(crate) fn check_pattern(
         &mut self,
+        rec: &mut Recorder,
         pattern: &varn_core::ast::Pattern,
         value_ty: &Type,
         bind: &BindResult,
@@ -23,18 +25,18 @@ impl<'r> Checker<'r> {
                 }
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(id) = scope.resolve(*name, &bind.scopes) {
-                    self.record_type_with_symbol(range.start.offset, *value_ty, id);
+                    self.record_type_with_symbol(rec, range.start.offset, *value_ty, id);
                 } else {
-                    self.record_type(range.start.offset, *value_ty);
+                    self.record_type(rec, range.start.offset, *value_ty);
                 }
             }
             Pattern::Array { elements, rest, .. } => {
                 let elem_ty = value_ty.get_array_element_type(&self.ty_table);
                 for el in elements.iter().flatten() {
-                    self.check_pattern(&el.pattern, &elem_ty, bind);
+                    self.check_pattern(rec, &el.pattern, &elem_ty, bind);
                 }
                 if let Some(r) = rest {
-                    self.check_pattern(r, value_ty, bind);
+                    self.check_pattern(rec, r, value_ty, bind);
                 }
             }
             Pattern::Object {
@@ -45,21 +47,22 @@ impl<'r> Checker<'r> {
                         .find_member_info(value_ty, bind.interner.resolve(prop.key), bind)
                         .map(|(t, _)| t)
                         .unwrap_or(Type::Dynamic);
-                    self.check_pattern(&prop.value, &prop_ty, bind);
+                    self.check_pattern(rec, &prop.value, &prop_ty, bind);
                 }
                 if let Some(r) = rest {
-                    self.check_pattern(r, &Type::Dynamic, bind);
+                    self.check_pattern(rec, r, &Type::Dynamic, bind);
                 }
             }
-            Pattern::Rest { argument, .. } => self.check_pattern(argument, value_ty, bind),
+            Pattern::Rest { argument, .. } => self.check_pattern(rec, argument, value_ty, bind),
             Pattern::Assignment { left, .. } => {
-                self.check_pattern(left, value_ty, bind);
+                self.check_pattern(rec, left, value_ty, bind);
             }
         }
     }
 
     pub(crate) fn check_pattern_match(
         &mut self,
+        rec: &mut Recorder,
         pattern: &varn_core::ast::MatchPattern,
         value_ty: &Type,
         bind: &BindResult,
@@ -72,7 +75,7 @@ impl<'r> Checker<'r> {
                 }
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(id) = scope.resolve(*name, &bind.scopes) {
-                    self.record_type_with_symbol(0, *value_ty, id);
+                    self.record_type_with_symbol(rec, 0, *value_ty, id);
                 }
             }
             MatchPattern::EnumVariant {
@@ -100,7 +103,12 @@ impl<'r> Checker<'r> {
                         };
                         let scope = bind.scopes.get(self.current_scope);
                         if let Some(id) = scope.resolve(binding.name, &bind.scopes) {
-                            self.record_type_with_symbol(binding.range.start.offset, resolved, id);
+                            self.record_type_with_symbol(
+                                rec,
+                                binding.range.start.offset,
+                                resolved,
+                                id,
+                            );
                         }
                     }
                 }
@@ -113,11 +121,11 @@ impl<'r> Checker<'r> {
                         .map(|(t, _)| t)
                         .unwrap_or(Type::Dynamic);
                     if let Some(sub) = sub_pat {
-                        self.check_pattern_match(sub, &member_ty, bind);
+                        self.check_pattern_match(rec, sub, &member_ty, bind);
                     } else if key_str != "_" && key_str != "__variant__" {
                         let scope = bind.scopes.get(self.current_scope);
                         if let Some(id) = scope.resolve(*key, &bind.scopes) {
-                            self.record_type_with_symbol(0, member_ty, id);
+                            self.record_type_with_symbol(rec, 0, member_ty, id);
                         }
                     }
                 }
@@ -125,11 +133,11 @@ impl<'r> Checker<'r> {
             MatchPattern::Sequence(pats) => {
                 let elem_ty = value_ty.get_array_element_type(&self.ty_table);
                 for p in pats {
-                    self.check_pattern_match(p, &elem_ty, bind);
+                    self.check_pattern_match(rec, p, &elem_ty, bind);
                 }
             }
             MatchPattern::Literal(expr) => {
-                self.check_expr(*expr, bind);
+                self.check_expr(rec, *expr, bind);
             }
             MatchPattern::Wildcard | MatchPattern::Type { .. } => {}
         }

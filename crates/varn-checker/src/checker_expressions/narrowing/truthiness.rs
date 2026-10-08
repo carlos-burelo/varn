@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::Atom;
 use varn_sem::bind::BindResult;
@@ -7,6 +8,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_identifier(
         &mut self,
+        rec: &mut Recorder,
         name: Atom,
         bind: &BindResult,
         is_true_branch: bool,
@@ -14,7 +16,7 @@ impl<'r> Checker<'r> {
     ) {
         let scope = bind.scopes.get(self.current_scope);
         if let Some(id) = scope.resolve(name, &bind.scopes) {
-            let original_ty = self
+            let original_ty = rec
                 .symbol_types
                 .get(&id)
                 .cloned()

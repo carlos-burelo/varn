@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{ExprId, ExprKind};
@@ -8,6 +9,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_null_comparison(
         &mut self,
+        rec: &mut Recorder,
         left: ExprId,
         right: ExprId,
         op: BinaryOp,
@@ -29,7 +31,7 @@ impl<'r> Checker<'r> {
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(id) = scope.resolve(name, &bind.scopes) {
                     if (is_neq && is_true_branch) || (is_eq && !is_true_branch) {
-                        let original_ty = self
+                        let original_ty = rec
                             .symbol_types
                             .get(&id)
                             .cloned()

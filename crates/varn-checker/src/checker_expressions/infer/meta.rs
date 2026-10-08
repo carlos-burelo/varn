@@ -1,4 +1,5 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::ExprId;
 use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
@@ -6,11 +7,12 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(super) fn infer_meta_access(
         &mut self,
+        rec: &mut Recorder,
         target: ExprId,
         property: varn_core::Atom,
         bind: &BindResult,
     ) -> Type {
-        let _target_ty = self.infer_type(target, bind);
+        let _target_ty = self.infer_type(rec, target, bind);
         match varn_core::MemberKey::from_str(bind.interner.resolve(property)) {
             Some(varn_core::MemberKey::Name) | Some(varn_core::MemberKey::Type) => Type::Str,
             Some(varn_core::MemberKey::Class) => Type::Dynamic,

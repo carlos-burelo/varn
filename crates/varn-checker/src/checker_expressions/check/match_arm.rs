@@ -1,10 +1,12 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::ExprId;
 use varn_sem::bind::BindResult;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_match(
         &mut self,
+        rec: &mut Recorder,
         subject: ExprId,
         cases: &[varn_core::ast::MatchCase],
         expr: ExprId,
@@ -12,9 +14,9 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         let arena = self.ast_arena;
-        self.check_expr(subject, bind);
+        self.check_expr(rec, subject, bind);
         let disc_narrowings = self.collect_match_disc_narrowings(subject, bind);
-        let base_subject_ty = self.infer_type(subject, bind);
+        let base_subject_ty = self.infer_type(rec, subject, bind);
         let mut arm_subjects = Vec::with_capacity(cases.len());
         let mut null_handled = false;
         for case in cases {
@@ -29,7 +31,7 @@ impl<'r> Checker<'r> {
             }
 
             if let Some(g) = &case.guard {
-                self.check_expr(*g, bind);
+                self.check_expr(rec, *g, bind);
             }
 
             let arm_disc_ty = match &case.pattern {
@@ -127,20 +129,20 @@ impl<'r> Checker<'r> {
 
             self.with_narrowings(&narrowing_vec, |checker| {
                 if let Some(g) = &case.guard {
-                    checker.check_expr(*g, bind);
+                    checker.check_expr(rec, *g, bind);
                 }
 
-                let subject_ty = checker.infer_type(subject, bind);
+                let subject_ty = checker.infer_type(rec, subject, bind);
                 let subject_ty = if null_handled {
                     subject_ty.non_nullified(std::sync::Arc::make_mut(&mut checker.ty_table))
                 } else {
                     subject_ty
                 };
-                checker.check_pattern_match(&case.pattern, &subject_ty, bind);
+                checker.check_pattern_match(rec, &case.pattern, &subject_ty, bind);
 
                 match &case.body {
-                    varn_core::ast::MatchBody::Expr(e) => checker.check_expr(*e, bind),
-                    varn_core::ast::MatchBody::Block(stmt) => checker.check_stmt(*stmt, bind),
+                    varn_core::ast::MatchBody::Expr(e) => checker.check_expr(rec, *e, bind),
+                    varn_core::ast::MatchBody::Block(stmt) => checker.check_stmt(rec, *stmt, bind),
                 }
             });
             self.current_scope = saved_scope;
@@ -151,10 +153,10 @@ impl<'r> Checker<'r> {
                         if matches!(arena.expr(*e).kind, varn_core::ast::ExprKind::NullLiteral)
                 );
         }
-        self.desugar
+        rec.desugar
             .match_arm_subjects
             .insert(subject.index(), arm_subjects);
-        let subject_ty = self.infer_type(subject, bind);
-        self.check_match_exhaustiveness(expr, &subject_ty, cases, &range, bind);
+        let subject_ty = self.infer_type(rec, subject, bind);
+        self.check_match_exhaustiveness(rec, expr, &subject_ty, cases, &range, bind);
     }
 }

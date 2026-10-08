@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::ExprId;
 use varn_core::capability::{OperatorMethod, OperatorShape};
@@ -77,6 +78,7 @@ impl Checker<'_> {
 
     pub(super) fn check_binary_capability(
         &mut self,
+        rec: &mut Recorder,
         expr: ExprId,
         op: varn_core::ast::operators::BinaryOp,
         left: ExprId,
@@ -86,8 +88,8 @@ impl Checker<'_> {
         let Some(method) = varn_core::capability::binary_operator_method(op) else {
             return false;
         };
-        let l_ty = self.infer_type(left, bind);
-        let r_ty = self.infer_type(right, bind);
+        let l_ty = self.infer_type(rec, left, bind);
+        let r_ty = self.infer_type(rec, right, bind);
 
         if matches!(
             method.shape,
@@ -116,12 +118,13 @@ impl Checker<'_> {
                 );
             }
         }
-        self.desugar.operator_calls.insert(expr.index());
+        rec.desugar.operator_calls.insert(expr.index());
         true
     }
 
     pub(super) fn check_unary_capability(
         &mut self,
+        rec: &mut Recorder,
         expr: ExprId,
         op: varn_core::ast::operators::UnaryOp,
         operand: ExprId,
@@ -130,9 +133,9 @@ impl Checker<'_> {
         let Some(method) = varn_core::capability::unary_operator_method(op) else {
             return;
         };
-        let ty = self.infer_type(operand, bind);
+        let ty = self.infer_type(rec, operand, bind);
         if self.resolve_operator(&ty, method, bind).is_some() {
-            self.desugar.operator_calls.insert(expr.index());
+            rec.desugar.operator_calls.insert(expr.index());
         }
     }
 }

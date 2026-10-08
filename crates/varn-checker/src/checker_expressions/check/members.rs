@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use crate::checker_expressions::name_suggestions::closest_in_list;
 use varn_core::ast::operators::Visibility;
@@ -8,7 +9,12 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::{ObjectTypeMember, Type};
 
 impl<'r> Checker<'r> {
-    pub(super) fn check_extension_assignment(&mut self, target: ExprId, bind: &BindResult) {
+    pub(super) fn check_extension_assignment(
+        &mut self,
+        rec: &mut Recorder,
+        target: ExprId,
+        bind: &BindResult,
+    ) {
         let arena = self.ast_arena;
         let target_range = arena.expr(target).range;
         if let ExprKind::Member {
@@ -17,7 +23,7 @@ impl<'r> Checker<'r> {
             ..
         } = &arena.expr(target).kind
         {
-            let obj_ty = self.infer_type(*object, bind);
+            let obj_ty = self.infer_type(rec, *object, bind);
             if matches!(self.ty_table.get(obj_ty.0), TypeKind::Tuple(_)) {
                 self.emit(
                     Diagnostic::error(
@@ -44,12 +50,12 @@ impl<'r> Checker<'r> {
         };
         let prop_name = bind.interner.resolve(*prop_name);
 
-        let obj_ty = self.infer_type(object, bind);
+        let obj_ty = self.infer_type(rec, object, bind);
         let non_null = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         if let Some(tn) = extension_type_name(self, &non_null, &self.ty_table, bind) {
             if let Some(setter_map) = bind.extensions.setters.get(tn.as_ref()) {
                 if let Some(mangled) = setter_map.get(prop_name) {
-                    self.desugar
+                    rec.desugar
                         .extension_set_members
                         .insert(target_range.start.offset, mangled.clone());
                 }
@@ -69,6 +75,7 @@ impl<'r> Checker<'r> {
     }
     pub(super) fn check_member_expr(
         &mut self,
+        rec: &mut Recorder,
         expr: ExprId,
         object: ExprId,
         property: ExprId,
@@ -79,13 +86,13 @@ impl<'r> Checker<'r> {
     ) {
         let arena = self.ast_arena;
         let property_range = arena.expr(property).range;
-        self.check_expr(object, bind);
+        self.check_expr(rec, object, bind);
         if computed {
             if matches!(arena.expr(property).kind, ExprKind::Range { .. }) {
-                self.check_expr(property, bind);
+                self.check_expr(rec, property, bind);
                 return;
             }
-            let obj_ty = self.infer_type(object, bind);
+            let obj_ty = self.infer_type(rec, object, bind);
             let check_ty = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
             let check_kind = self.ty_table.get(check_ty.0);
             let key_expected = match check_kind {
@@ -134,8 +141,8 @@ impl<'r> Checker<'r> {
                 | TypeKind::TypePredicate { .. } => None,
             };
             if let Some(expected_k) = key_expected {
-                self.with_expected(Some(expected_k), |c| c.check_expr(property, bind));
-                let actual_k = self.infer_type(property, bind);
+                self.with_expected(Some(expected_k), |c| c.check_expr(rec, property, bind));
+                let actual_k = self.infer_type(rec, property, bind);
                 let is_range_slice = matches!(
                     check_kind,
                     TypeKind::Array(_)
@@ -159,19 +166,19 @@ impl<'r> Checker<'r> {
                     );
                 }
             } else {
-                self.check_expr(property, bind);
+                self.check_expr(rec, property, bind);
             }
             return;
         }
 
         let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
-            let prop_ty = self.infer_type(expr, bind);
-            self.record_type(property_range.start.offset, prop_ty);
+            let prop_ty = self.infer_type(rec, expr, bind);
+            self.record_type(rec, property_range.start.offset, prop_ty);
             return;
         };
         let prop_name = bind.interner.resolve(*prop_name);
 
-        let obj_ty = self.infer_type(object, bind);
+        let obj_ty = self.infer_type(rec, object, bind);
         if !optional && obj_ty.is_nullable(&self.ty_table) {
             self.emit(
                 Diagnostic::error(
@@ -198,13 +205,13 @@ impl<'r> Checker<'r> {
                 {
                     self.warn_if_deprecated(sid, prop_name, property_range, bind);
                 }
-                self.record_member_type(property_range.start.offset, ty, sid);
+                self.record_member_type(rec, property_range.start.offset, ty, sid);
             } else {
-                self.record_type(property_range.start.offset, ty);
+                self.record_type(rec, property_range.start.offset, ty);
             }
         } else {
-            let prop_ty = self.infer_type(expr, bind);
-            self.record_type(property_range.start.offset, prop_ty);
+            let prop_ty = self.infer_type(rec, expr, bind);
+            self.record_type(rec, property_range.start.offset, prop_ty);
         }
         let should_check = !matches!(
             self.ty_table.get(check_ty.0),
@@ -214,13 +221,13 @@ impl<'r> Checker<'r> {
         if let Some(tn) = extension_type_name(self, &check_ty, &self.ty_table, bind) {
             if let Some(getter_map) = bind.extensions.getters.get(tn.as_ref()) {
                 if let Some(mangled) = getter_map.get(prop_name) {
-                    self.desugar
+                    rec.desugar
                         .extension_members
                         .insert(property_range.start.offset, mangled.clone());
                 }
             } else if let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) {
                 if let Some(mangled) = method_map.get(prop_name) {
-                    self.desugar
+                    rec.desugar
                         .extension_members
                         .insert(property_range.start.offset, mangled.clone());
                 }
@@ -245,11 +252,11 @@ impl<'r> Checker<'r> {
             self.emit(diag);
         }
 
-        if self.record_expr_types {
+        if rec.enabled {
             let final_mem_ty = self
                 .find_member_info(&check_ty, prop_name, bind)
                 .map(|(t, _)| t)
-                .unwrap_or_else(|| self.infer_type(expr, bind));
+                .unwrap_or_else(|| self.infer_type(rec, expr, bind));
 
             let is_static = if let ExprKind::Identifier { name } = &arena.expr(object).kind {
                 bind.scopes
@@ -290,7 +297,7 @@ impl<'r> Checker<'r> {
             let final_mem_kind = self.ty_table.get(final_mem_ty.0);
             let member_kind = if is_enum {
                 varn_sem::semantic_info::ResolvedMemberKind::EnumMember
-            } else if self
+            } else if rec
                 .desugar
                 .extension_members
                 .contains_key(&property_range.start.offset)
@@ -337,7 +344,7 @@ impl<'r> Checker<'r> {
                 | TypeKind::TypePredicate { .. } => None,
             };
 
-            self.member_resolutions.insert(
+            rec.member_resolutions.insert(
                 property_range.start.offset,
                 varn_sem::semantic_info::MemberResolution {
                     receiver_ty: check_ty,

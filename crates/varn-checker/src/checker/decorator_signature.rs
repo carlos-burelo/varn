@@ -1,3 +1,4 @@
+use super::recorder::Recorder;
 use super::Checker;
 use varn_core::ast::decorators::{match_builtin, BuiltinDecorator};
 use varn_core::ast::Decorator;
@@ -46,6 +47,7 @@ impl DecoratorTarget {
 impl<'r> Checker<'r> {
     pub(super) fn check_decorator_signatures(
         &mut self,
+        rec: &mut Recorder,
         decorators: &[Decorator],
         target: DecoratorTarget,
         target_name: &str,
@@ -58,6 +60,7 @@ impl<'r> Checker<'r> {
         for (d, b) in decorators.iter().zip(builtins.iter()) {
             if bind.user_decorators.contains(&d.range.start.offset) {
                 self.check_user_decorator(
+                    rec,
                     d,
                     expected_arity,
                     check_return,
@@ -79,6 +82,7 @@ impl<'r> Checker<'r> {
                 continue;
             }
             self.check_user_decorator(
+                rec,
                 d,
                 expected_arity,
                 check_return,
@@ -91,6 +95,7 @@ impl<'r> Checker<'r> {
 
     fn check_user_decorator(
         &mut self,
+        rec: &mut Recorder,
         d: &Decorator,
         expected_arity: usize,
         check_return: bool,
@@ -98,8 +103,8 @@ impl<'r> Checker<'r> {
         target_name: &str,
         bind: &BindResult,
     ) {
-        self.check_expr(d.expression, bind);
-        let deco_ty = self.infer_type(d.expression, bind);
+        self.check_expr(rec, d.expression, bind);
+        let deco_ty = self.infer_type(rec, d.expression, bind);
         if deco_ty.is_error() {
             return;
         }

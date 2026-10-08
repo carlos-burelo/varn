@@ -1,4 +1,5 @@
 use super::profile;
+use super::recorder::Recorder;
 use super::Checker;
 use std::sync::Arc;
 use varn_binder::Binder;
@@ -40,7 +41,6 @@ pub(super) fn init_checker<'r>(
     ast_arena: &'r AstArena,
     source_file: Arc<str>,
     bind: &varn_sem::bind::BindResult,
-    record_expr_types: bool,
     profile: &mut CheckProfile,
 ) -> Checker<'r> {
     profile::timed(&mut profile.init, || {
@@ -49,7 +49,6 @@ pub(super) fn init_checker<'r>(
             ast_arena,
             source_file,
             bind.global_scope,
-            record_expr_types,
             bind.ty_table.clone(),
         );
 
@@ -64,37 +63,37 @@ pub(super) fn init_checker<'r>(
 
 pub(super) fn run_pass(
     checker: &mut Checker<'_>,
+    rec: &mut Recorder,
     program: &Program,
     bind: &mut varn_sem::bind::BindResult,
-    record_expr_types: bool,
     profile: &mut CheckProfile,
 ) {
     profile::timed(&mut profile.check_stmts, || {
-        checker.check_stmts(&program.body, bind);
+        checker.check_stmts(rec, &program.body, bind);
         checker.check_definite_assignment(program, bind);
     });
 
-    if record_expr_types {
-        checker.project_expr_types(bind);
+    if rec.enabled {
+        rec.project_expr_types(bind);
     }
 
-    checker.desugar.foreign_inherited_fields = checker.collect_foreign_inherited_fields(bind);
+    rec.desugar.foreign_inherited_fields = checker.collect_foreign_inherited_fields(bind);
     bind.ty_table = checker.ty_table.clone();
     bind.interner.absorb(checker.ty_table.names());
 
-    checker.desugar.foreign_enums =
-        checker.collect_foreign_enums(bind, checker.expr_table.values().map(|entry| &entry.ty));
+    rec.desugar.foreign_enums =
+        checker.collect_foreign_enums(bind, rec.expr_table.values().map(|entry| &entry.ty));
 }
 
 pub(super) fn assemble(
     checker: Checker<'_>,
+    rec: Recorder,
     mut bind: varn_sem::bind::BindResult,
     ast_arena: &AstArena,
     source_file: Arc<str>,
-    record_expr_types: bool,
     profile: &mut CheckProfile,
 ) -> CheckResult {
-    let mut checker = checker;
+    let mut rec = rec;
     let mut final_diagnostics = std::mem::take(&mut bind.diagnostics);
     final_diagnostics.extend(checker.diagnostics);
     for (kept, rejected) in bind.interner.collisions() {
@@ -104,7 +103,7 @@ pub(super) fn assemble(
         ));
     }
 
-    let expr_table = std::mem::take(&mut checker.expr_table);
+    let expr_table = std::mem::take(&mut rec.expr_table);
     let mut test_targets = Vec::new();
     for sym in bind.arena.all() {
         if sym.is_test && sym.origin_module.is_none() {
@@ -136,7 +135,7 @@ pub(super) fn assemble(
     let flattened = std::mem::take(&mut bind.type_members.flattened);
 
     profile::timed(&mut profile.finalize, || {
-        for (sid, ty) in &checker.symbol_types {
+        for (sid, ty) in &rec.symbol_types {
             let sym = bind.arena.get_mut(*sid);
 
             if sym.origin_module.is_some() {
@@ -183,14 +182,14 @@ pub(super) fn assemble(
     });
 
     let (symbol_types, node_scopes, scope_spans) = profile::timed(&mut profile.cleanup, || {
-        let symbol_types = checker.symbol_types.clone();
-        let node_scopes = if record_expr_types {
-            checker.node_scopes.clone()
+        let symbol_types = rec.symbol_types.clone();
+        let node_scopes = if rec.enabled {
+            rec.node_scopes.clone()
         } else {
             rustc_hash::FxHashMap::default()
         };
-        let scope_spans = if record_expr_types {
-            checker.scope_spans
+        let scope_spans = if rec.enabled {
+            std::mem::take(&mut rec.scope_spans)
         } else {
             Vec::new()
         };
@@ -200,18 +199,18 @@ pub(super) fn assemble(
     CheckResult {
         bind,
         diagnostics: final_diagnostics,
-        expr_types: checker.expr_types,
+        expr_types: rec.expr_types,
         flattened_members: flattened,
         profile: std::mem::take(profile),
         node_scopes,
         scope_spans,
         symbol_types,
-        member_resolutions: checker.member_resolutions,
-        call_resolutions: checker.call_resolutions,
-        match_gaps: checker.match_gaps,
+        member_resolutions: rec.member_resolutions,
+        call_resolutions: rec.call_resolutions,
+        match_gaps: rec.match_gaps,
         expr_table,
-        call_mappings: checker.call_mappings,
-        desugar: checker.desugar,
+        call_mappings: rec.call_mappings,
+        desugar: rec.desugar,
         test_targets,
     }
 }

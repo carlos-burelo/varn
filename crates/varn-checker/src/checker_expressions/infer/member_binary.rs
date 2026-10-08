@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
@@ -8,13 +9,14 @@ use super::super::expr_labels::base_type;
 
 pub(super) fn infer_member_type(
     checker: &mut Checker<'_>,
+    rec: &mut Recorder,
     expr: ExprId,
     object: ExprId,
     property: ExprId,
     bind: &BindResult,
 ) -> Type {
     let arena = checker.ast_arena;
-    let obj_ty_raw = checker.infer_type(object, bind);
+    let obj_ty_raw = checker.infer_type(rec, object, bind);
     let obj_ty = obj_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut checker.ty_table));
     let obj_ty = if matches!(
         checker.ty_table.get(obj_ty.0),
@@ -109,6 +111,7 @@ pub(crate) fn normalize_for_binary(
 
 pub(super) fn infer_binary_type(
     checker: &mut Checker<'_>,
+    rec: &mut Recorder,
     op: varn_core::ast::operators::BinaryOp,
     left: ExprId,
     right: ExprId,
@@ -137,8 +140,8 @@ pub(super) fn infer_binary_type(
         | BinaryOp::Shl
         | BinaryOp::Shr
         | BinaryOp::UShr => {
-            let l_raw = base_type(&checker.infer_type(left, bind));
-            let r_raw = base_type(&checker.infer_type(right, bind));
+            let l_raw = base_type(&checker.infer_type(rec, left, bind));
+            let r_raw = base_type(&checker.infer_type(rec, right, bind));
             let l = normalize_for_binary(&l_raw, &checker.ty_table, &bind.interner);
             let r = normalize_for_binary(&r_raw, &checker.ty_table, &bind.interner);
             if l_raw.is_error() || r_raw.is_error() {

@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use rustc_hash::FxHashMap;
 use varn_core::ast::ExprId;
@@ -9,6 +10,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_logical_and(
         &mut self,
+        rec: &mut Recorder,
         left: ExprId,
         right: ExprId,
         bind: &BindResult,
@@ -16,17 +18,18 @@ impl<'r> Checker<'r> {
         out: &mut Vec<(SymbolId, Type)>,
     ) {
         if is_true_branch {
-            out.extend(self.extract_narrowings(left, bind, true));
-            out.extend(self.extract_narrowings(right, bind, true));
+            out.extend(self.extract_narrowings(rec, left, bind, true));
+            out.extend(self.extract_narrowings(rec, right, bind, true));
         } else {
-            let left_n = self.extract_narrowings(left, bind, false);
-            let right_n = self.extract_narrowings(right, bind, false);
+            let left_n = self.extract_narrowings(rec, left, bind, false);
+            let right_n = self.extract_narrowings(rec, right, bind, false);
             out.extend(self.merge_narrowings(left_n, right_n, false));
         }
     }
 
     pub(crate) fn narrow_logical_or(
         &mut self,
+        rec: &mut Recorder,
         left: ExprId,
         right: ExprId,
         bind: &BindResult,
@@ -34,12 +37,12 @@ impl<'r> Checker<'r> {
         out: &mut Vec<(SymbolId, Type)>,
     ) {
         if is_true_branch {
-            let left_n = self.extract_narrowings(left, bind, true);
-            let right_n = self.extract_narrowings(right, bind, true);
+            let left_n = self.extract_narrowings(rec, left, bind, true);
+            let right_n = self.extract_narrowings(rec, right, bind, true);
             out.extend(self.merge_narrowings(left_n, right_n, true));
         } else {
-            out.extend(self.extract_narrowings(left, bind, false));
-            out.extend(self.extract_narrowings(right, bind, false));
+            out.extend(self.extract_narrowings(rec, left, bind, false));
+            out.extend(self.extract_narrowings(rec, right, bind, false));
         }
     }
 

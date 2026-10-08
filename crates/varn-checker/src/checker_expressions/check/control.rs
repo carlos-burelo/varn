@@ -1,4 +1,5 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::ExprId;
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
@@ -6,12 +7,13 @@ use varn_sem::bind::BindResult;
 impl<'r> Checker<'r> {
     pub(super) fn check_try(
         &mut self,
+        rec: &mut Recorder,
         expression: ExprId,
         range: varn_core::SourceRange,
         bind: &BindResult,
     ) {
-        self.check_expr(expression, bind);
-        let expr_ty = self.infer_type(expression, bind);
+        self.check_expr(rec, expression, bind);
+        let expr_ty = self.infer_type(rec, expression, bind);
 
         let resolve = |a| bind.interner.try_resolve(a);
         let operand = expr_ty.core_sum(&self.ty_table, resolve);

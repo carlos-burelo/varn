@@ -1,3 +1,4 @@
+use super::recorder::Recorder;
 use super::Checker;
 use std::sync::Arc;
 use varn_sem::bind::BindResult;
@@ -6,6 +7,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(super) fn check_function_decl(
         &mut self,
+        rec: &mut Recorder,
         f: &varn_core::ast::FunctionDecl,
         bind: &BindResult,
     ) {
@@ -23,7 +25,7 @@ impl<'r> Checker<'r> {
         let next_scope = self.next_child_scope(bind);
         if let Some(fn_scope) = next_scope {
             self.current_scope = fn_scope;
-            self.record_scope_span(f.range.start.offset, f.range.end.offset, fn_scope);
+            self.record_scope_span(rec, f.range.start.offset, f.range.end.offset, fn_scope);
         }
         let mut injected_tps = Vec::new();
         for tp in &f.type_params {
@@ -51,7 +53,7 @@ impl<'r> Checker<'r> {
             self.pure_scope = next_scope.or(Some(self.current_scope));
         }
 
-        self.in_function_body(f.modifiers.is_async, |c| c.check_stmt(f.body, bind));
+        self.in_function_body(f.modifiers.is_async, |c| c.check_stmt(rec, f.body, bind));
 
         self.pure_scope = saved_pure;
         self.enclosing_caps = saved_caps;
@@ -66,7 +68,7 @@ impl<'r> Checker<'r> {
                 };
                 let scope = bind.scopes.get(saved_scope);
                 if let Some(sym_id) = scope.resolve(f.id, &bind.scopes) {
-                    if let Some(fn_ty) = self
+                    if let Some(fn_ty) = rec
                         .symbol_types
                         .get(&sym_id)
                         .cloned()
@@ -82,8 +84,8 @@ impl<'r> Checker<'r> {
                             ft.return_type = new_ret.0;
                             let new_fn_ty =
                                 Type::fn_(ft, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                            self.symbol_types.insert(sym_id, new_fn_ty);
-                            self.record_type_with_symbol(f.id_offset, new_fn_ty, sym_id);
+                            rec.symbol_types.insert(sym_id, new_fn_ty);
+                            self.record_type_with_symbol(rec, f.id_offset, new_fn_ty, sym_id);
                         }
                     }
                 }
@@ -99,6 +101,7 @@ impl<'r> Checker<'r> {
         if !f.decorators.is_empty() {
             let name = bind.interner.resolve(f.id);
             self.check_decorator_signatures(
+                rec,
                 &f.decorators,
                 super::decorator_signature::DecoratorTarget::Function,
                 name,

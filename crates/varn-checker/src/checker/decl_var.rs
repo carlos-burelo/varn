@@ -1,3 +1,4 @@
+use super::recorder::Recorder;
 use super::Checker;
 use varn_core::ast::ExprKind;
 use varn_core::{Diagnostic, ErrorCode};
@@ -19,6 +20,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_variable(
         &mut self,
+        rec: &mut Recorder,
         v: &varn_core::ast::VariableDecl,
         decl_range: &varn_core::SourceRange,
         bind: &BindResult,
@@ -28,10 +30,10 @@ impl<'r> Checker<'r> {
             let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
             if let Some(init_expr) = d.init {
-                self.with_expected(ann_ty_opt, |c| c.check_expr(init_expr, bind));
+                self.with_expected(ann_ty_opt, |c| c.check_expr(rec, init_expr, bind));
 
                 if let Some(ann_ty) = &ann_ty_opt {
-                    let init_ty = self.infer_type(init_expr, bind);
+                    let init_ty = self.infer_type(rec, init_expr, bind);
                     let is_empty_array = init_ty.is_dynamic()
                         && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty());
                     let is_compatible =
@@ -46,16 +48,16 @@ impl<'r> Checker<'r> {
                             .with_range(*decl_range),
                         );
                     }
-                    self.check_pattern(&d.id, ann_ty, bind);
+                    self.check_pattern(rec, &d.id, ann_ty, bind);
                 } else {
-                    let init_ty = self.infer_type(init_expr, bind);
+                    let init_ty = self.infer_type(rec, init_expr, bind);
                     self.reject_void_value(&init_ty, *decl_range);
                     let final_ty = if v.kind == varn_core::ast::VarKind::Let {
                         varn_binder::widen_literal(init_ty)
                     } else {
                         init_ty
                     };
-                    self.check_pattern(&d.id, &final_ty, bind);
+                    self.check_pattern(rec, &d.id, &final_ty, bind);
                 }
             }
         }

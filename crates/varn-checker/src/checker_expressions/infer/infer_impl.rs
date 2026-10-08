@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
@@ -7,7 +8,12 @@ use varn_sem::types::{Type, TypeContext};
 use super::member_binary::{infer_binary_type, infer_member_type};
 
 impl<'r> Checker<'r> {
-    pub(super) fn infer_type_impl(&mut self, expr: ExprId, bind: &BindResult) -> Type {
+    pub(super) fn infer_type_impl(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        bind: &BindResult,
+    ) -> Type {
         let arena = self.ast_arena;
         match &arena.expr(expr).kind {
             ExprKind::Identifier { name } => {
@@ -18,7 +24,7 @@ impl<'r> Checker<'r> {
                 }
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(sid) = scope.resolve(*name, &bind.scopes) {
-                    if let Some(ty) = self.symbol_types.get(&sid) {
+                    if let Some(ty) = rec.symbol_types.get(&sid) {
                         return *ty;
                     }
                     if let Some(ty) = bind.arena.get(sid).ty {
@@ -52,10 +58,10 @@ impl<'r> Checker<'r> {
                 .unwrap_or(Type::Dynamic),
             ExprKind::New {
                 callee, type_args, ..
-            } => self.infer_new_type(*callee, type_args, bind),
-            ExprKind::Call { .. } => self.infer_call_type(expr, bind),
+            } => self.infer_new_type(rec, *callee, type_args, bind),
+            ExprKind::Call { .. } => self.infer_call_type(rec, expr, bind),
             ExprKind::TaggedTemplate { tag, .. } => {
-                let tag_ty = self.infer_type(*tag, bind);
+                let tag_ty = self.infer_type(rec, *tag, bind);
                 let tag_ty =
                     tag_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 if let TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
@@ -65,15 +71,15 @@ impl<'r> Checker<'r> {
                     Type::Dynamic
                 }
             }
-            ExprKind::With { object, .. } => self.infer_type(*object, bind),
+            ExprKind::With { object, .. } => self.infer_type(rec, *object, bind),
             ExprKind::Conditional {
                 consequent,
                 alternate,
                 ..
             } => {
                 let (consequent, alternate) = (*consequent, *alternate);
-                let t_ty = self.infer_type(consequent, bind);
-                let f_ty = self.infer_type(alternate, bind);
+                let t_ty = self.infer_type(rec, consequent, bind);
+                let f_ty = self.infer_type(rec, alternate, bind);
                 if self.source_file.as_ref() != bind.source_file.as_ref() {
                     t_ty
                 } else if t_ty.is_dynamic() {
@@ -95,9 +101,9 @@ impl<'r> Checker<'r> {
             } => {
                 let (object, property, computed) = (*object, *property, *computed);
                 if !computed {
-                    infer_member_type(self, expr, object, property, bind)
+                    infer_member_type(self, rec, expr, object, property, bind)
                 } else {
-                    self.infer_computed_member(object, property, expr, bind)
+                    self.infer_computed_member(rec, object, property, expr, bind)
                 }
             }
             ExprKind::Arrow {
@@ -112,7 +118,7 @@ impl<'r> Checker<'r> {
                     (**body).clone(),
                     *is_async,
                 );
-                self.infer_arrow_type(expr, &params, &return_type, body, is_async, bind)
+                self.infer_arrow_type(rec, expr, &params, &return_type, body, is_async, bind)
             }
             ExprKind::Function {
                 params,
@@ -123,17 +129,17 @@ impl<'r> Checker<'r> {
             } => self.infer_function_expr_type(params, return_type, *is_async, *is_generator, bind),
             ExprKind::Object { properties } => {
                 let properties = properties.clone();
-                self.infer_object_type(&properties, bind, expr)
+                self.infer_object_type(rec, &properties, bind, expr)
             }
-            ExprKind::Tuple { elements } => self.infer_tuple(elements, bind),
-            ExprKind::Record { properties } => self.infer_record(properties, bind),
+            ExprKind::Tuple { elements } => self.infer_tuple(rec, elements, bind),
+            ExprKind::Record { properties } => self.infer_record(rec, properties, bind),
             ExprKind::As {
                 expression,
                 type_ann,
                 ..
             } => {
                 let (expression, type_ann) = (*expression, type_ann.clone());
-                self.check_expr(expression, bind);
+                self.check_expr(rec, expression, bind);
                 self.resolve_type_node_cached(&type_ann, bind)
             }
             ExprKind::Satisfies {
@@ -142,7 +148,7 @@ impl<'r> Checker<'r> {
                 ..
             } => {
                 let (expression, type_ann) = (*expression, type_ann.clone());
-                let ty = self.infer_type(expression, bind);
+                let ty = self.infer_type(rec, expression, bind);
                 let target = self.resolve_type_node_cached(&type_ann, bind);
                 if !self.types_compatible_cached(&target, &ty, Some(bind)) {
                     let range = arena.expr(expression).range;
@@ -161,24 +167,26 @@ impl<'r> Checker<'r> {
                 ty
             }
             ExprKind::MetaAccess { target, property } => {
-                self.infer_meta_access(*target, *property, bind)
+                self.infer_meta_access(rec, *target, *property, bind)
             }
             ExprKind::Await { argument } => {
-                let inner = self.infer_type(*argument, bind);
+                let inner = self.infer_type(rec, *argument, bind);
                 varn_sem::types::awaited(&inner, &self.ty_table)
             }
-            ExprKind::NonNull { expression } => self.infer_non_null(*expression, bind),
-            ExprKind::Try { expression } => self.infer_try(*expression, bind),
-            ExprKind::Logical { op, left, right } => self.infer_logical(*op, *left, *right, bind),
+            ExprKind::NonNull { expression } => self.infer_non_null(rec, *expression, bind),
+            ExprKind::Try { expression } => self.infer_try(rec, *expression, bind),
+            ExprKind::Logical { op, left, right } => {
+                self.infer_logical(rec, *op, *left, *right, bind)
+            }
             ExprKind::Binary { op, left, right } => {
                 let (op, left, right) = (*op, *left, *right);
                 let capability = varn_core::capability::binary_operator_method(op).and_then(|m| {
-                    let l = self.infer_type(left, bind);
+                    let l = self.infer_type(rec, left, bind);
                     self.resolve_operator(&l, m, bind)
                 });
                 match capability {
                     Some(resolved) => resolved.result,
-                    None => infer_binary_type(self, op, left, right, bind),
+                    None => infer_binary_type(self, rec, op, left, right, bind),
                 }
             }
             ExprKind::Unary { op, operand, .. } => {
@@ -186,15 +194,15 @@ impl<'r> Checker<'r> {
                 match op {
                     varn_core::ast::operators::UnaryOp::Not => Type::Bool,
                     varn_core::ast::operators::UnaryOp::Minus => {
-                        let inner = self.infer_type(operand, bind);
+                        let inner = self.infer_type(rec, operand, bind);
                         varn_core::capability::unary_operator_method(op)
                             .and_then(|m| self.resolve_operator(&inner, m, bind))
                             .map_or(inner, |resolved| resolved.result)
                     }
-                    varn_core::ast::operators::UnaryOp::Plus => self.infer_type(operand, bind),
+                    varn_core::ast::operators::UnaryOp::Plus => self.infer_type(rec, operand, bind),
                     varn_core::ast::operators::UnaryOp::Typeof => Type::Str,
                     varn_core::ast::operators::UnaryOp::BitNot => {
-                        let inner = self.infer_type(operand, bind);
+                        let inner = self.infer_type(rec, operand, bind);
                         if inner.is_int() {
                             Type::primitive(
                                 varn_core::LangPrimitive::Int,
@@ -206,11 +214,11 @@ impl<'r> Checker<'r> {
                     }
                 }
             }
-            ExprKind::Update { operand, .. } => self.infer_type(*operand, bind),
-            ExprKind::Assign { value, .. } => self.infer_type(*value, bind),
-            ExprKind::Array { elements } => self.infer_array(elements, bind),
+            ExprKind::Update { operand, .. } => self.infer_type(rec, *operand, bind),
+            ExprKind::Assign { value, .. } => self.infer_type(rec, *value, bind),
+            ExprKind::Array { elements } => self.infer_array(rec, elements, bind),
             ExprKind::Template { .. } => Type::Str,
-            ExprKind::Paren { expression } => self.infer_type(*expression, bind),
+            ExprKind::Paren { expression } => self.infer_type(rec, *expression, bind),
             ExprKind::IntLiteral { .. } => Type::Int,
             ExprKind::FloatLiteral { .. } => Type::Float,
             ExprKind::DecimalLiteral { .. } => Type::Decimal,
@@ -220,17 +228,19 @@ impl<'r> Checker<'r> {
             ExprKind::BoolLiteral { .. } => Type::Bool,
             ExprKind::NullLiteral => Type::Null,
             ExprKind::Range { start, .. } => {
-                let bound = self.infer_type(*start, bind);
+                let bound = self.infer_type(rec, *start, bind);
                 Type::range_over(&bound, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
             }
-            ExprKind::Match { subject, cases } => self.infer_match(*subject, cases, arena, bind),
+            ExprKind::Match { subject, cases } => {
+                self.infer_match(rec, *subject, cases, arena, bind)
+            }
             ExprKind::Pipeline { left, right } => {
                 let (left, right) = (*left, *right);
-                let lhs_ty = self.infer_type(left, bind);
+                let lhs_ty = self.infer_type(rec, left, bind);
                 let saved_pipeline = self.in_pipeline_rhs;
                 let saved_pipe_ty = self.pipeline_value_type.replace(lhs_ty);
                 self.in_pipeline_rhs = true;
-                let res = self.infer_type(right, bind);
+                let res = self.infer_type(rec, right, bind);
                 self.in_pipeline_rhs = saved_pipeline;
                 self.pipeline_value_type = saved_pipe_ty;
                 match self.ty_table.get(res.0) {

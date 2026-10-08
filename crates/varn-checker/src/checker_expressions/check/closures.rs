@@ -1,4 +1,5 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use std::sync::Arc;
 use varn_core::ast::{ArrowBody, ExprId};
 use varn_core::{Diagnostic, ErrorCode};
@@ -8,6 +9,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(super) fn check_arrow(
         &mut self,
+        rec: &mut Recorder,
         params: &[varn_core::ast::Param],
         return_type: &Option<varn_core::ast::TypeNode>,
         body: &ArrowBody,
@@ -33,7 +35,7 @@ impl<'r> Checker<'r> {
         let saved_scope = self.current_scope;
         if let Some(fn_scope) = self.next_child_scope(bind) {
             self.current_scope = fn_scope;
-            self.record_scope_span(range.start.offset, range.end.offset, fn_scope);
+            self.record_scope_span(rec, range.start.offset, range.end.offset, fn_scope);
         }
 
         let mut injected_type_params: Vec<Arc<str>> = vec![];
@@ -55,10 +57,10 @@ impl<'r> Checker<'r> {
             for tp in &injected_type_params {
                 self.active_type_params.insert(tp.clone());
             }
-            self.apply_contextual_arrow_params(&params, &expected_fn, bind);
+            self.apply_contextual_arrow_params(rec, &params, &expected_fn, bind);
         }
 
-        self.in_function_body(is_async, |c| c.check_arrow_body(body, range, bind));
+        self.in_function_body(is_async, |c| c.check_arrow_body(rec, body, range, bind));
 
         self.current_scope = saved_scope;
         self.expected_return_type = saved_expected;
@@ -69,6 +71,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_function_expr(
         &mut self,
+        rec: &mut Recorder,
         return_type: &Option<varn_core::ast::TypeNode>,
         body: varn_core::ast::StmtId,
         is_async: bool,
@@ -89,10 +92,10 @@ impl<'r> Checker<'r> {
         let saved_scope = self.current_scope;
         if let Some(fn_scope) = self.next_child_scope(bind) {
             self.current_scope = fn_scope;
-            self.record_scope_span(range.start.offset, range.end.offset, fn_scope);
+            self.record_scope_span(rec, range.start.offset, range.end.offset, fn_scope);
         }
 
-        self.in_function_body(is_async, |c| c.check_stmt(body, bind));
+        self.in_function_body(is_async, |c| c.check_stmt(rec, body, bind));
 
         self.current_scope = saved_scope;
         self.expected_return_type = saved_expected;
@@ -100,14 +103,15 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_satisfies(
         &mut self,
+        rec: &mut Recorder,
         expression: ExprId,
         type_ann: &varn_core::ast::TypeNode,
         range: varn_core::SourceRange,
         bind: &BindResult,
     ) {
-        self.check_expr(expression, bind);
+        self.check_expr(rec, expression, bind);
         let declared_ty = self.resolve_type_node_cached(type_ann, bind);
-        let inferred_ty = self.infer_type(expression, bind);
+        let inferred_ty = self.infer_type(rec, expression, bind);
         if !self.types_compatible_cached(&declared_ty, &inferred_ty, Some(bind)) {
             let declared_s = declared_ty.display(&self.ty_table, &bind.interner);
             let inferred_s = inferred_ty.display(&self.ty_table, &bind.interner);
@@ -123,6 +127,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_await(
         &mut self,
+        rec: &mut Recorder,
         argument: ExprId,
         range: varn_core::SourceRange,
         bind: &BindResult,
@@ -139,8 +144,8 @@ impl<'r> Checker<'r> {
                 .with_range(range),
             );
         }
-        self.check_expr(argument, bind);
-        let arg_ty = self.infer_type(argument, bind);
+        self.check_expr(rec, argument, bind);
+        let arg_ty = self.infer_type(rec, argument, bind);
         if !arg_ty.is_dynamic() && !varn_sem::types::is_awaitable(&arg_ty, &self.ty_table) {
             let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
             self.emit(
@@ -155,6 +160,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_yield(
         &mut self,
+        rec: &mut Recorder,
         argument: Option<ExprId>,
         range: varn_core::SourceRange,
         bind: &BindResult,
@@ -163,8 +169,8 @@ impl<'r> Checker<'r> {
             self.forbid_pure("suspend on 'yield' (pure functions are synchronous)", range);
         }
         let ty = if let Some(arg) = argument {
-            self.check_expr(arg, bind);
-            self.infer_type(arg, bind)
+            self.check_expr(rec, arg, bind);
+            self.infer_type(rec, arg, bind)
         } else {
             Type::Void
         };
@@ -175,16 +181,17 @@ impl<'r> Checker<'r> {
 
     fn check_arrow_body(
         &mut self,
+        rec: &mut Recorder,
         body: ArrowBody,
         range: varn_core::SourceRange,
         bind: &BindResult,
     ) {
         match body {
-            ArrowBody::Block(stmt) => self.check_stmt(stmt, bind),
+            ArrowBody::Block(stmt) => self.check_stmt(rec, stmt, bind),
             ArrowBody::Expr(e) => {
                 let expected_ret = self.expected_return_type;
-                self.with_expected(expected_ret, |c| c.check_expr(e, bind));
-                let actual = self.infer_type(e, bind);
+                self.with_expected(expected_ret, |c| c.check_expr(rec, e, bind));
+                let actual = self.infer_type(rec, e, bind);
                 if let Some(expected) = self.expected_return_type {
                     let expected_kind = self.ty_table.get(expected.0);
                     let is_tp = matches!(expected_kind, varn_core::TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()));

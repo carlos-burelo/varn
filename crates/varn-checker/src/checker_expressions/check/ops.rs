@@ -1,5 +1,6 @@
 use super::const_int::overflows_int_literal;
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::operators::UnaryOp;
 use varn_core::ast::{ExprId, ExprKind};
@@ -9,14 +10,15 @@ use varn_sem::types::TypeContext;
 impl<'r> Checker<'r> {
     pub(super) fn check_unary(
         &mut self,
+        rec: &mut Recorder,
         expr: ExprId,
         op: UnaryOp,
         operand: ExprId,
         arena: &varn_core::ast::AstArena,
         bind: &BindResult,
     ) {
-        self.check_expr(operand, bind);
-        self.check_unary_capability(expr, op, operand, bind);
+        self.check_expr(rec, operand, bind);
+        self.check_unary_capability(rec, expr, op, operand, bind);
         if overflows_int_literal(expr, arena) && !overflows_int_literal(operand, arena) {
             self.report_int_overflow(expr);
         }
@@ -24,6 +26,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_binary(
         &mut self,
+        rec: &mut Recorder,
         expr: ExprId,
         left: ExprId,
         right: ExprId,
@@ -32,8 +35,8 @@ impl<'r> Checker<'r> {
         arena: &varn_core::ast::AstArena,
         bind: &BindResult,
     ) {
-        self.check_expr(left, bind);
-        self.check_expr(right, bind);
+        self.check_expr(rec, left, bind);
+        self.check_expr(rec, right, bind);
 
         if overflows_int_literal(expr, arena)
             && !overflows_int_literal(left, arena)
@@ -42,13 +45,14 @@ impl<'r> Checker<'r> {
             self.report_int_overflow(expr);
         }
 
-        if !self.check_binary_capability(expr, op, left, right, bind) {
-            self.check_binary_operands(op, left, right, range, bind);
+        if !self.check_binary_capability(rec, expr, op, left, right, bind) {
+            self.check_binary_operands(rec, op, left, right, range, bind);
         }
     }
 
     pub(super) fn check_new(
         &mut self,
+        rec: &mut Recorder,
         callee: ExprId,
         args: &[varn_core::ast::Arg],
         range: varn_core::SourceRange,
@@ -174,7 +178,7 @@ impl<'r> Checker<'r> {
                 );
             }
         }
-        self.check_expr(callee, bind);
+        self.check_expr(rec, callee, bind);
         let view = varn_sem::bind::BindView::new(bind, self.resolver);
         let ctor_params = cls_name
             .and_then(|cn| {
@@ -190,6 +194,6 @@ impl<'r> Checker<'r> {
                 })
             })
             .unwrap_or_default();
-        self.check_call_args_with_context(args, &ctor_params, bind);
+        self.check_call_args_with_context(rec, args, &ctor_params, bind);
     }
 }

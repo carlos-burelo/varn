@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::operators::UnaryOp;
 use varn_core::ast::{ExprId, ExprKind};
@@ -7,6 +8,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(crate) fn extract_narrowings(
         &mut self,
+        rec: &mut Recorder,
         expr: ExprId,
         bind: &BindResult,
         is_true_branch: bool,
@@ -26,17 +28,25 @@ impl<'r> Checker<'r> {
                 ..
             } => {
                 let operand = *operand;
-                narrowings.extend(self.extract_narrowings(operand, bind, !is_true_branch));
+                narrowings.extend(self.extract_narrowings(rec, operand, bind, !is_true_branch));
             }
 
             ExprKind::Identifier { name } => {
-                self.narrow_identifier(*name, bind, is_true_branch, &mut narrowings);
+                self.narrow_identifier(rec, *name, bind, is_true_branch, &mut narrowings);
             }
 
             ExprKind::Binary { left, right, op } => {
                 let (left, right, op) = (*left, *right, *op);
                 self.narrow_typeof(left, right, op, bind, is_true_branch, &mut narrowings);
-                self.narrow_null_comparison(left, right, op, bind, is_true_branch, &mut narrowings);
+                self.narrow_null_comparison(
+                    rec,
+                    left,
+                    right,
+                    op,
+                    bind,
+                    is_true_branch,
+                    &mut narrowings,
+                );
                 self.narrow_discriminant(left, right, op, bind, is_true_branch, &mut narrowings);
                 self.narrow_instanceof(left, right, op, bind, is_true_branch, &mut narrowings);
             }
@@ -46,7 +56,7 @@ impl<'r> Checker<'r> {
                 right,
                 op: varn_core::ast::operators::LogicalOp::And,
             } => {
-                self.narrow_logical_and(*left, *right, bind, is_true_branch, &mut narrowings);
+                self.narrow_logical_and(rec, *left, *right, bind, is_true_branch, &mut narrowings);
             }
 
             ExprKind::Logical {
@@ -54,7 +64,7 @@ impl<'r> Checker<'r> {
                 right,
                 op: varn_core::ast::operators::LogicalOp::Or,
             } => {
-                self.narrow_logical_or(*left, *right, bind, is_true_branch, &mut narrowings);
+                self.narrow_logical_or(rec, *left, *right, bind, is_true_branch, &mut narrowings);
             }
 
             ExprKind::Is {
@@ -67,7 +77,7 @@ impl<'r> Checker<'r> {
 
             ExprKind::Call { callee, args, .. } => {
                 let (callee, args) = (*callee, args.clone());
-                self.narrow_type_guard(callee, &args, bind, is_true_branch, &mut narrowings);
+                self.narrow_type_guard(rec, callee, &args, bind, is_true_branch, &mut narrowings);
             }
 
             ExprKind::IntLiteral { .. }

@@ -1,3 +1,4 @@
+use super::recorder::Recorder;
 use super::Checker;
 use std::sync::Arc;
 use varn_core::TypeKind;
@@ -7,6 +8,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(super) fn check_extension(
         &mut self,
+        rec: &mut Recorder,
         ext: &varn_core::ast::ExtensionDecl,
         bind: &BindResult,
     ) {
@@ -58,10 +60,10 @@ impl<'r> Checker<'r> {
                     let saved_scope = self.current_scope;
                     if let Some(m_scope) = self.next_child_scope(bind) {
                         self.current_scope = m_scope;
-                        self.record_scope(self.ast_arena.stmt(method.body).range.start.offset);
+                        self.record_scope(rec, self.ast_arena.stmt(method.body).range.start.offset);
                     }
                     self.in_function_body(method.modifiers.is_async, |c| {
-                        c.check_stmt(method.body, bind)
+                        c.check_stmt(rec, method.body, bind)
                     });
                     self.current_scope = saved_scope;
                 }
@@ -75,9 +77,9 @@ impl<'r> Checker<'r> {
                     let saved_scope = self.current_scope;
                     if let Some(m_scope) = self.next_child_scope(bind) {
                         self.current_scope = m_scope;
-                        self.record_scope(self.ast_arena.stmt(body).range.start.offset);
+                        self.record_scope(rec, self.ast_arena.stmt(body).range.start.offset);
                     }
-                    self.in_function_body(false, |c| c.check_stmt(body, bind));
+                    self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
                     self.current_scope = saved_scope;
                 }
                 varn_core::ast::ExtensionMember::Setter { body, .. } => {
@@ -86,9 +88,9 @@ impl<'r> Checker<'r> {
                     let saved_scope = self.current_scope;
                     if let Some(m_scope) = self.next_child_scope(bind) {
                         self.current_scope = m_scope;
-                        self.record_scope(self.ast_arena.stmt(body).range.start.offset);
+                        self.record_scope(rec, self.ast_arena.stmt(body).range.start.offset);
                     }
-                    self.in_function_body(false, |c| c.check_stmt(body, bind));
+                    self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
                     self.current_scope = saved_scope;
                 }
             }
@@ -98,20 +100,25 @@ impl<'r> Checker<'r> {
         self.current_class = saved_class;
     }
 
-    pub(super) fn check_export(&mut self, e: &varn_core::ast::ExportDecl, bind: &BindResult) {
+    pub(super) fn check_export(
+        &mut self,
+        rec: &mut Recorder,
+        e: &varn_core::ast::ExportDecl,
+        bind: &BindResult,
+    ) {
         match e {
             varn_core::ast::ExportDecl::Decl { declaration, .. } => {
-                self.check_decl(declaration, bind);
+                self.check_decl(rec, declaration, bind);
             }
             varn_core::ast::ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
                 varn_core::ast::ExportDefaultDecl::Function(f) => {
-                    self.check_decl(&varn_core::ast::Decl::Function(f.clone()), bind);
+                    self.check_decl(rec, &varn_core::ast::Decl::Function(f.clone()), bind);
                 }
                 varn_core::ast::ExportDefaultDecl::Class(c) => {
-                    self.check_decl(&varn_core::ast::Decl::Class(c.clone()), bind);
+                    self.check_decl(rec, &varn_core::ast::Decl::Class(c.clone()), bind);
                 }
                 varn_core::ast::ExportDefaultDecl::Expr(expr) => {
-                    self.check_expr(*expr, bind);
+                    self.check_expr(rec, *expr, bind);
                 }
             },
             varn_core::ast::ExportDecl::Named { .. } | varn_core::ast::ExportDecl::All { .. } => {}

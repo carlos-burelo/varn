@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use crate::checker_generics::build_call_mapping;
 use crate::generic_substitution::map_generics_cached;
@@ -8,7 +9,12 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::{FunctionParam, FunctionType, Type};
 
 impl<'r> Checker<'r> {
-    pub(super) fn infer_call_type(&mut self, expr: ExprId, bind: &BindResult) -> Type {
+    pub(super) fn infer_call_type(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        bind: &BindResult,
+    ) -> Type {
         let arena = self.ast_arena;
         let (callee, type_args, args) = match &arena.expr(expr).kind {
             ExprKind::Call {
@@ -65,7 +71,7 @@ impl<'r> Checker<'r> {
             | ExprKind::MetaAccess { .. } => return Type::Dynamic,
         };
 
-        let callee_ty_raw = self.infer_type(callee, bind);
+        let callee_ty_raw = self.infer_type(rec, callee, bind);
         let callee_ty =
             callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let callee_kind = self.ty_table.get(callee_ty.0);
@@ -93,13 +99,13 @@ impl<'r> Checker<'r> {
         };
         let ft = self.ty_table.get_function(fid).clone();
 
-        let mapping = build_call_mapping(callee, &type_args, &args, &ft, self, bind);
+        let mapping = build_call_mapping(callee, &type_args, &args, &ft, self, rec, bind);
         let ret = map_generics_cached(self, &Type::resolved(ft.return_type), &mapping);
 
         let ret_kind = self.ty_table.get(ret.0);
         let ret = if matches!(ret_kind, TypeKind::This) {
             if let ExprKind::Member { object, .. } = &arena.expr(callee).kind {
-                let receiver_ty = self.infer_type(*object, bind);
+                let receiver_ty = self.infer_type(rec, *object, bind);
                 if !receiver_ty.is_dynamic() {
                     receiver_ty
                 } else {
@@ -117,6 +123,7 @@ impl<'r> Checker<'r> {
 
     pub(super) fn infer_arrow_type(
         &mut self,
+        rec: &mut Recorder,
         _expr: ExprId,
         params: &[Param],
         return_type: &Option<varn_core::ast::TypeNode>,
@@ -153,7 +160,7 @@ impl<'r> Checker<'r> {
                     })
                     .or_else(|| {
                         p.default.map(|d| {
-                            let t = self.infer_type(d, bind);
+                            let t = self.infer_type(rec, d, bind);
                             varn_binder::widen_literal(t)
                         })
                     })
@@ -200,14 +207,14 @@ impl<'r> Checker<'r> {
                     .get(name)
                     .and_then(|atom| bind.scopes.get(scope_id).resolve(atom, &bind.scopes))
                 {
-                    self.symbol_types.insert(sym_id, Type::resolved(fp.ty));
+                    rec.symbol_types.insert(sym_id, Type::resolved(fp.ty));
                 }
             }
         }
 
         let ret_ty = match return_type {
             Some(rt) => self.resolve_type_node_cached(rt, bind),
-            None => super::arrow_body_return_type(body, self, bind),
+            None => super::arrow_body_return_type(body, self, rec, bind),
         };
 
         if arrow_scope.is_some() {

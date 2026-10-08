@@ -1,3 +1,4 @@
+use super::recorder::Recorder;
 use super::Checker;
 use std::sync::Arc;
 use varn_core::ast::ClassMember;
@@ -6,7 +7,12 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    pub(super) fn check_enum(&mut self, e: &varn_core::ast::EnumDecl, bind: &BindResult) {
+    pub(super) fn check_enum(
+        &mut self,
+        rec: &mut Recorder,
+        e: &varn_core::ast::EnumDecl,
+        bind: &BindResult,
+    ) {
         let saved_class = self
             .current_class
             .replace(Arc::from(bind.interner.resolve(e.id)));
@@ -28,6 +34,7 @@ impl<'r> Checker<'r> {
                     if !decorators.is_empty() {
                         let key_str = bind.interner.resolve(*key);
                         self.check_decorator_signatures(
+                            rec,
                             decorators,
                             super::decorator_signature::DecoratorTarget::Property,
                             key_str,
@@ -39,8 +46,8 @@ impl<'r> Checker<'r> {
                             let prop_ty = self.resolve_type_node_cached(ann, bind);
                             let key_str = bind.interner.resolve(*key);
                             self.with_expected(Some(prop_ty), |checker| {
-                                checker.check_expr(init_expr, bind);
-                                let init_ty = checker.infer_type(init_expr, bind);
+                                checker.check_expr(rec, init_expr, bind);
+                                let init_ty = checker.infer_type(rec, init_expr, bind);
                                 if !checker.value_assignable_to(&prop_ty, &init_ty, Some(init_expr), Some(bind)) {
                                     let prop_ty_s = prop_ty.display(&checker.ty_table, &bind.interner);
                                     let init_ty_s = init_ty.display(&checker.ty_table, &bind.interner);
@@ -70,6 +77,7 @@ impl<'r> Checker<'r> {
                     if !decorators.is_empty() {
                         let key_str = bind.interner.resolve(*key);
                         self.check_decorator_signatures(
+                            rec,
                             decorators,
                             super::decorator_signature::DecoratorTarget::Method,
                             key_str,
@@ -95,7 +103,7 @@ impl<'r> Checker<'r> {
                         let saved_method_scope = self.current_scope;
                         if let Some(m_scope) = self.next_child_scope(bind) {
                             self.current_scope = m_scope;
-                            self.record_scope(range.start.offset);
+                            self.record_scope(rec, range.start.offset);
                         }
 
                         let saved_expected = self.expected_return_type.take();
@@ -122,7 +130,7 @@ impl<'r> Checker<'r> {
                         }
 
                         self.in_function_body(modifiers.is_async, |c| {
-                            c.check_stmt(body_stmt, bind)
+                            c.check_stmt(rec, body_stmt, bind)
                         });
 
                         self.pure_scope = saved_pure;
@@ -148,6 +156,7 @@ impl<'r> Checker<'r> {
                     if !decorators.is_empty() {
                         let key_str = bind.interner.resolve(*key);
                         self.check_decorator_signatures(
+                            rec,
                             decorators,
                             super::decorator_signature::DecoratorTarget::Getter,
                             key_str,
@@ -173,7 +182,7 @@ impl<'r> Checker<'r> {
                         let saved_getter_scope = self.current_scope;
                         if let Some(g_scope) = self.next_child_scope(bind) {
                             self.current_scope = g_scope;
-                            self.record_scope(range.start.offset);
+                            self.record_scope(rec, range.start.offset);
                         }
 
                         let saved_expected = self.expected_return_type.take();
@@ -194,7 +203,7 @@ impl<'r> Checker<'r> {
                             self.pure_scope = Some(self.current_scope);
                         }
 
-                        self.in_function_body(false, |c| c.check_stmt(body_stmt, bind));
+                        self.in_function_body(false, |c| c.check_stmt(rec, body_stmt, bind));
 
                         self.pure_scope = saved_pure;
                         self.enclosing_caps = saved_caps;
@@ -213,6 +222,7 @@ impl<'r> Checker<'r> {
                     if !decorators.is_empty() {
                         let key_str = bind.interner.resolve(*key);
                         self.check_decorator_signatures(
+                            rec,
                             decorators,
                             super::decorator_signature::DecoratorTarget::Setter,
                             key_str,
@@ -238,7 +248,7 @@ impl<'r> Checker<'r> {
                         let saved_setter_scope = self.current_scope;
                         if let Some(s_scope) = self.next_child_scope(bind) {
                             self.current_scope = s_scope;
-                            self.record_scope(range.start.offset);
+                            self.record_scope(rec, range.start.offset);
                         }
 
                         let mut param_ty = param
@@ -262,7 +272,7 @@ impl<'r> Checker<'r> {
                             }
                         }
 
-                        self.check_pattern(&param.pattern, &param_ty, bind);
+                        self.check_pattern(rec, &param.pattern, &param_ty, bind);
 
                         let saved_caps =
                             self.enclosing_caps
@@ -277,7 +287,7 @@ impl<'r> Checker<'r> {
                             self.pure_scope = Some(self.current_scope);
                         }
 
-                        self.in_function_body(false, |c| c.check_stmt(body_stmt, bind));
+                        self.in_function_body(false, |c| c.check_stmt(rec, body_stmt, bind));
 
                         self.pure_scope = saved_pure;
                         self.enclosing_caps = saved_caps;
@@ -292,6 +302,7 @@ impl<'r> Checker<'r> {
                 } => {
                     if !decorators.is_empty() {
                         self.check_decorator_signatures(
+                            rec,
                             decorators,
                             super::decorator_signature::DecoratorTarget::Constructor,
                             "constructor",
@@ -315,7 +326,7 @@ impl<'r> Checker<'r> {
                     let saved_scope = self.current_scope;
                     if let Some(ctor_scope) = self.next_child_scope(bind) {
                         self.current_scope = ctor_scope;
-                        self.record_scope(self.ast_arena.stmt(body).range.start.offset);
+                        self.record_scope(rec, self.ast_arena.stmt(body).range.start.offset);
                     }
                     let saved_caps =
                         self.enclosing_caps
@@ -324,7 +335,7 @@ impl<'r> Checker<'r> {
                                 self.ast_arena,
                                 bind,
                             ));
-                    self.in_function_body(false, |c| c.check_stmt(body, bind));
+                    self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
                     self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;
                 }
@@ -333,9 +344,9 @@ impl<'r> Checker<'r> {
                     let saved_block_scope = self.current_scope;
                     if let Some(m_scope) = self.next_child_scope(bind) {
                         self.current_scope = m_scope;
-                        self.record_scope(range.start.offset);
+                        self.record_scope(rec, range.start.offset);
                     }
-                    self.check_stmt(body, bind);
+                    self.check_stmt(rec, body, bind);
                     self.current_scope = saved_block_scope;
                 }
                 ClassMember::Destructor { .. } => {}

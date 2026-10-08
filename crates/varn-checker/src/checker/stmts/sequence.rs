@@ -1,4 +1,5 @@
 use super::super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::{StmtId, StmtKind};
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
@@ -6,11 +7,11 @@ use varn_sem::symbol::SymbolId;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn check_stmts(&mut self, stmts: &[StmtId], bind: &BindResult) {
-        self.check_stmts_with_guards(stmts, bind);
+    pub(crate) fn check_stmts(&mut self, rec: &mut Recorder, stmts: &[StmtId], bind: &BindResult) {
+        self.check_stmts_with_guards(rec, stmts, bind);
     }
 
-    fn check_stmts_with_guards(&mut self, stmts: &[StmtId], bind: &BindResult) {
+    fn check_stmts_with_guards(&mut self, rec: &mut Recorder, stmts: &[StmtId], bind: &BindResult) {
         let arena = self.ast_arena;
         let mut i = 0;
         while i < stmts.len() {
@@ -18,7 +19,7 @@ impl<'r> Checker<'r> {
             let stmt = arena.stmt(stmt_id);
 
             if matches!(&stmt.kind, StmtKind::Throw { .. } | StmtKind::Return { .. }) {
-                self.check_stmt(stmt_id, bind);
+                self.check_stmt(rec, stmt_id, bind);
 
                 for &later_id in &stmts[i + 1..] {
                     let later = arena.stmt(later_id);
@@ -30,22 +31,23 @@ impl<'r> Checker<'r> {
                 return;
             }
 
-            if let Some(guard_narrowings) = self.extract_guard_narrowings(stmt_id, bind) {
-                self.check_stmt(stmt_id, bind);
+            if let Some(guard_narrowings) = self.extract_guard_narrowings(rec, stmt_id, bind) {
+                self.check_stmt(rec, stmt_id, bind);
 
                 self.push_narrowings(&guard_narrowings);
-                self.check_stmts_with_guards(&stmts[i + 1..], bind);
+                self.check_stmts_with_guards(rec, &stmts[i + 1..], bind);
                 self.pop_narrowings(&guard_narrowings);
                 return;
             }
 
-            self.check_stmt(stmt_id, bind);
+            self.check_stmt(rec, stmt_id, bind);
             i += 1;
         }
     }
 
     fn extract_guard_narrowings(
         &mut self,
+        rec: &mut Recorder,
         stmt: StmtId,
         bind: &BindResult,
     ) -> Option<Vec<(SymbolId, Type)>> {
@@ -84,7 +86,7 @@ impl<'r> Checker<'r> {
         if !self.can_extract_narrowings(test) {
             return None;
         }
-        let narrowings = self.extract_narrowings(test, bind, false);
+        let narrowings = self.extract_narrowings(rec, test, bind, false);
         if narrowings.is_empty() {
             None
         } else {

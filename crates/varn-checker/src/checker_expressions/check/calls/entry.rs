@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use crate::checker_generics::build_call_mapping;
 use crate::generic_substitution::map_generics_cached;
@@ -10,6 +11,7 @@ use varn_sem::types::{FunctionParam, Type};
 impl<'r> Checker<'r> {
     pub(in super::super) fn check_call_expr(
         &mut self,
+        rec: &mut Recorder,
         callee: ExprId,
         args: &[Arg],
         type_args: &[TypeNode],
@@ -18,10 +20,10 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         let arena = self.ast_arena;
-        self.check_expr(callee, bind);
-        self.record_extension_call(callee, range, bind);
+        self.check_expr(rec, callee, bind);
+        self.record_extension_call(rec, callee, range, bind);
 
-        let callee_ty_raw = self.infer_type(callee, bind);
+        let callee_ty_raw = self.infer_type(rec, callee, bind);
         let callee_ty =
             callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let callee_kind = self.ty_table.get(callee_ty.0);
@@ -39,7 +41,7 @@ impl<'r> Checker<'r> {
             } => {
                 if let ExprKind::Identifier { name: prop } = &arena.expr(*property).kind {
                     let prop_name = bind.interner.resolve(*prop);
-                    let obj_ty = self.infer_type(*object, bind);
+                    let obj_ty = self.infer_type(rec, *object, bind);
                     self.find_member_info(&obj_ty, prop_name, bind)
                         .and_then(|(_, sid)| {
                             sid.filter(|s| {
@@ -122,7 +124,7 @@ impl<'r> Checker<'r> {
 
         let effective_callee_ty = if let TypeKind::Fn(fid) = callee_kind {
             let ft = self.ty_table.get_function(fid).clone();
-            let mapping = build_call_mapping(callee, type_args, args, &ft, self, bind);
+            let mapping = build_call_mapping(callee, type_args, args, &ft, self, rec, bind);
             map_generics_cached(self, &callee_ty, &mapping)
         } else {
             callee_ty
@@ -130,9 +132,17 @@ impl<'r> Checker<'r> {
 
         if let ExprKind::Member { property, .. } = &arena.expr(callee).kind {
             let property = *property;
-            self.record_type(arena.expr(property).range.start.offset, effective_callee_ty);
+            self.record_type(
+                rec,
+                arena.expr(property).range.start.offset,
+                effective_callee_ty,
+            );
         } else {
-            self.record_type(arena.expr(callee).range.start.offset, effective_callee_ty);
+            self.record_type(
+                rec,
+                arena.expr(callee).range.start.offset,
+                effective_callee_ty,
+            );
         }
 
         let effective_kind = self.ty_table.get(effective_callee_ty.0);
@@ -141,14 +151,14 @@ impl<'r> Checker<'r> {
         } else {
             vec![]
         };
-        self.check_call_args_with_context(args, &params_for_context, bind);
+        self.check_call_args_with_context(rec, args, &params_for_context, bind);
 
         if let TypeKind::Fn(fid) = effective_kind {
             let params = self.ty_table.get_function(fid).params.clone();
-            self.validate_call_arguments(args, &params, range, call_id, bind);
+            self.validate_call_arguments(rec, args, &params, range, call_id, bind);
         }
 
-        if self.record_expr_types {
+        if rec.enabled {
             if let TypeKind::Fn(fid) = effective_kind {
                 let ft = self.ty_table.get_function(fid).clone();
                 let callee_name = match &arena.expr(callee).kind {
@@ -245,9 +255,9 @@ impl<'r> Checker<'r> {
                     return_ty: Type::resolved(ft.return_type),
                     arg_to_param_map,
                 };
-                self.call_resolutions
+                rec.call_resolutions
                     .insert(range.start.offset, call_res.clone());
-                self.call_resolutions
+                rec.call_resolutions
                     .insert(arena.expr(callee).range.start.offset, call_res);
             }
         }

@@ -11,6 +11,7 @@ mod definite_assignment;
 mod foreign_classes;
 mod foreign_enums;
 mod profile;
+pub(crate) mod recorder;
 mod refine;
 mod scope_records;
 mod setup;
@@ -22,16 +23,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 use varn_core::ast::Program;
 use varn_core::ast::{AstArena, ExprId};
-use varn_sem::output::{
-    CheckOptions, CheckProfile, CheckResult, Desugarings, ExprInfo, ScopeSpan, TypeEntry,
-};
+use varn_sem::output::{CheckOptions, CheckProfile, CheckResult};
 use varn_sem::scope::ScopeId;
 use varn_sem::symbol::SymbolId;
 use varn_sem::types::{ObjectTypeMember, Type};
 
 pub(crate) use crate::checker_enrichment::enrich_call_returns;
-
-use varn_sem::semantic_info::{CallResolution, MemberResolution};
 
 pub(crate) type MemberTypeCacheEntry = Option<(Type, Option<usize>)>;
 
@@ -47,31 +44,22 @@ pub struct Checker<'r> {
     pub(crate) narrowings_cache:
         FxHashMap<(u32, bool, varn_sem::scope::ScopeId), Vec<(SymbolId, Type)>>,
     pub(crate) child_indices: FxHashMap<ScopeId, usize>,
-    pub(crate) expr_types: FxHashMap<u32, ExprInfo>,
     pub(crate) infer_cache: FxHashMap<(ExprId, ScopeId, u32), Type>,
     pub(crate) infer_env_rev: u32,
     pub(crate) compat_cache: FxHashMap<(Type, Type, usize), bool>,
     pub(crate) type_node_cache: FxHashMap<(u32, usize), Type>,
     pub(crate) symbol_type_params_cache: FxHashMap<(Arc<str>, u8), Vec<Arc<str>>>,
-    pub(crate) symbol_types: FxHashMap<SymbolId, Type>,
-    pub(crate) expr_table: FxHashMap<varn_core::ast::AstId, TypeEntry>,
 
-    pub(crate) expr_seq: u32,
     pub(crate) current_class: Option<Arc<str>>,
     pub(crate) active_type_params: FxHashSet<Arc<str>>,
     pub(crate) abstract_classes: FxHashSet<Arc<str>>,
     pub(crate) is_assignment_target: bool,
     pub(crate) in_pipeline_rhs: bool,
     pub(crate) pipeline_value_type: Option<Type>,
-    pub(crate) desugar: Desugarings,
     pub(crate) member_exists_cache: FxHashMap<(Type, Arc<str>), bool>,
     pub(crate) member_type_cache: FxHashMap<(Type, Arc<str>), MemberTypeCacheEntry>,
     pub(crate) expected_type: Option<Type>,
 
-    pub(crate) call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
-    pub(crate) record_expr_types: bool,
-    pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
-    pub(crate) scope_spans: Vec<ScopeSpan>,
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
     pub(crate) yielded_types: Option<Vec<Type>>,
     pub(crate) loop_depth: u32,
@@ -79,9 +67,6 @@ pub struct Checker<'r> {
     pub(crate) in_function: bool,
     pub(crate) in_async: bool,
     pub(crate) expected_object_members_cache: FxHashMap<Type, Vec<ObjectTypeMember>>,
-    pub(crate) member_resolutions: FxHashMap<u32, MemberResolution>,
-    pub(crate) call_resolutions: FxHashMap<u32, CallResolution>,
-    pub(crate) match_gaps: FxHashMap<varn_core::ast::AstId, varn_sem::semantic_info::MatchGap>,
     pub(crate) warned_deprecated: FxHashSet<(varn_sem::symbol::SymbolId, u32)>,
     pub(crate) pure_scope: Option<varn_sem::scope::ScopeId>,
     pub(crate) enclosing_caps: Option<Vec<String>>,
@@ -129,23 +114,10 @@ impl<'r> Checker<'r> {
             ast_arena,
             source_file.clone(),
             &bind,
-            record_expr_types,
             &mut profile,
         );
-        stages::run_pass(
-            &mut checker,
-            program,
-            &mut bind,
-            record_expr_types,
-            &mut profile,
-        );
-        stages::assemble(
-            checker,
-            bind,
-            ast_arena,
-            source_file,
-            record_expr_types,
-            &mut profile,
-        )
+        let mut rec = recorder::Recorder::new(record_expr_types);
+        stages::run_pass(&mut checker, &mut rec, program, &mut bind, &mut profile);
+        stages::assemble(checker, rec, bind, ast_arena, source_file, &mut profile)
     }
 }

@@ -1,3 +1,4 @@
+use super::recorder::Recorder;
 use super::Checker;
 use std::sync::Arc;
 use varn_core::ast::ExprId;
@@ -5,13 +6,18 @@ use varn_sem::bind::{BindResult, BindView};
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn infer_type(&mut self, expr: ExprId, bind: &BindResult) -> Type {
+    pub(crate) fn infer_type(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        bind: &BindResult,
+    ) -> Type {
         let key = (expr, self.current_scope, self.infer_env_rev);
         if let Some(ty) = self.infer_cache.get(&key) {
             return *ty;
         }
 
-        let ty = self.infer_type_internal(expr, bind);
+        let ty = self.infer_type_internal(rec, expr, bind);
 
         self.infer_cache.insert(key, ty);
         ty

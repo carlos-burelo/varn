@@ -1,4 +1,5 @@
 use super::super::Checker;
+use crate::checker::recorder::Recorder;
 use varn_core::ast::{AstArena, ExprId, SwitchCase};
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
@@ -6,16 +7,17 @@ use varn_sem::bind::BindResult;
 impl<'r> Checker<'r> {
     pub(super) fn check_switch_stmt(
         &mut self,
+        rec: &mut Recorder,
         discriminant: ExprId,
         cases: Vec<SwitchCase>,
         bind: &BindResult,
     ) {
-        self.check_expr(discriminant, bind);
+        self.check_expr(rec, discriminant, bind);
         self.switch_depth += 1;
         let mut seen_cases = rustc_hash::FxHashSet::default();
         for case in &cases {
             if let Some(t) = case.test {
-                self.check_expr(t, bind);
+                self.check_expr(rec, t, bind);
                 if let Some(lit_val) = get_literal_value_key(t, self.ast_arena) {
                     if !seen_cases.insert(lit_val.clone()) {
                         self.emit(
@@ -28,7 +30,7 @@ impl<'r> Checker<'r> {
                     }
                 }
             }
-            self.check_stmts(&case.body, bind);
+            self.check_stmts(rec, &case.body, bind);
         }
         self.switch_depth -= 1;
     }
