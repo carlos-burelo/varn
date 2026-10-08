@@ -3,9 +3,7 @@ use core::mem::{align_of, offset_of, size_of};
 use varn_core as _;
 
 pub const ABI_MAGIC: u32 = 0x5641_524E;
-
 pub const ABI_VERSION: u16 = 2;
-
 pub const CLASS_GPR: usize = 0;
 pub const CLASS_FPR: usize = 1;
 pub const CLASS_REF: usize = 2;

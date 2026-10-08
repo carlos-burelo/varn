@@ -323,11 +323,15 @@ pub fn read_artifact(expected: ArtifactKind, bytes: &[u8]) -> Result<&[u8], Arti
     if &bytes[..4] != MAGIC {
         return Err(ArtifactError::BadMagic);
     }
-    let envelope = u16::from_le_bytes(bytes[4..6].try_into().unwrap());
+    let Ok(envelope) = bytes[4..6].try_into().map(u16::from_le_bytes) else {
+        return Err(ArtifactError::Corrupt);
+    };
     if envelope != ENVELOPE_VERSION {
         return Err(ArtifactError::UnknownEnvelope(envelope));
     }
-    let raw_kind = u16::from_le_bytes(bytes[6..8].try_into().unwrap());
+    let Ok(raw_kind) = bytes[6..8].try_into().map(u16::from_le_bytes) else {
+        return Err(ArtifactError::Corrupt);
+    };
     let Some(kind) = ArtifactKind::from_u16(raw_kind) else {
         return Err(ArtifactError::UnknownKind(raw_kind));
     };
@@ -340,15 +344,21 @@ pub fn read_artifact(expected: ArtifactKind, bytes: &[u8]) -> Result<&[u8], Arti
     let Some(class) = ArtifactClass::from_u8(bytes[8]) else {
         return Err(ArtifactError::UnknownClass(bytes[8]));
     };
-    let schema = u32::from_le_bytes(bytes[9..13].try_into().unwrap());
+    let Ok(schema) = bytes[9..13].try_into().map(u32::from_le_bytes) else {
+        return Err(ArtifactError::Corrupt);
+    };
     if schema != BUILD_FINGERPRINT {
         return Err(ArtifactError::Superseded);
     }
-    let producer = u32::from_le_bytes(bytes[13..17].try_into().unwrap());
+    let Ok(producer) = bytes[13..17].try_into().map(u32::from_le_bytes) else {
+        return Err(ArtifactError::Corrupt);
+    };
     if producer != class.producer_stamp() {
         return Err(ArtifactError::Superseded);
     }
-    let expected_sum = u32::from_le_bytes(bytes[17..21].try_into().unwrap());
+    let Ok(expected_sum) = bytes[17..21].try_into().map(u32::from_le_bytes) else {
+        return Err(ArtifactError::Corrupt);
+    };
     let payload = &bytes[HEADER_LEN..];
 
     if payload_checksum(payload) != expected_sum {
