@@ -152,7 +152,7 @@ pub(crate) extern "C" fn jit_range(
         let start_val = VmValue::from_raw_parts(start_tag, start_payload);
         let end_val = VmValue::from_raw_parts(end_tag, end_payload);
         let mut temp = vec![start_val, end_val];
-        match crate::exec::advanced::invoke_runtime_static(
+        match crate::exec::method_bind::invoke_runtime_static(
             "__range__",
             &mut temp,
             &mut ctx_ref.heap,

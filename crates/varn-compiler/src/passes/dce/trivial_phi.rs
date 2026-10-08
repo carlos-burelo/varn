@@ -1,4 +1,4 @@
-use super::super::cfg::{dominates, dominators};
+use super::super::cfg_dom::{dominates, dominators};
 use crate::ssa::ir::{BlockId, SsaFunc, Terminator, Value};
 
 pub(crate) fn eliminate_trivial_phis(func: &mut SsaFunc) -> bool {

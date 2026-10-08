@@ -118,14 +118,13 @@ impl<'r> Checker<'r> {
 
                         let saved_caps =
                             self.enclosing_caps
-                                .replace(super::decorator_signature::caps_of(
+                                .replace(super::decorator_purity::caps_of(
                                     decorators,
                                     self.ast_arena,
                                     bind,
                                 ));
                         let saved_pure = self.pure_scope.take();
-                        if super::decorator_signature::is_pure_fn(decorators, self.ast_arena, bind)
-                        {
+                        if super::decorator_purity::is_pure_fn(decorators, self.ast_arena, bind) {
                             self.pure_scope = Some(self.current_scope);
                         }
 
@@ -192,14 +191,13 @@ impl<'r> Checker<'r> {
 
                         let saved_caps =
                             self.enclosing_caps
-                                .replace(super::decorator_signature::caps_of(
+                                .replace(super::decorator_purity::caps_of(
                                     decorators,
                                     self.ast_arena,
                                     bind,
                                 ));
                         let saved_pure = self.pure_scope.take();
-                        if super::decorator_signature::is_pure_fn(decorators, self.ast_arena, bind)
-                        {
+                        if super::decorator_purity::is_pure_fn(decorators, self.ast_arena, bind) {
                             self.pure_scope = Some(self.current_scope);
                         }
 
@@ -276,14 +274,13 @@ impl<'r> Checker<'r> {
 
                         let saved_caps =
                             self.enclosing_caps
-                                .replace(super::decorator_signature::caps_of(
+                                .replace(super::decorator_purity::caps_of(
                                     decorators,
                                     self.ast_arena,
                                     bind,
                                 ));
                         let saved_pure = self.pure_scope.take();
-                        if super::decorator_signature::is_pure_fn(decorators, self.ast_arena, bind)
-                        {
+                        if super::decorator_purity::is_pure_fn(decorators, self.ast_arena, bind) {
                             self.pure_scope = Some(self.current_scope);
                         }
 
@@ -328,13 +325,13 @@ impl<'r> Checker<'r> {
                         self.current_scope = ctor_scope;
                         self.record_scope(rec, self.ast_arena.stmt(body).range.start.offset);
                     }
-                    let saved_caps =
-                        self.enclosing_caps
-                            .replace(super::decorator_signature::caps_of(
-                                decorators,
-                                self.ast_arena,
-                                bind,
-                            ));
+                    let saved_caps = self
+                        .enclosing_caps
+                        .replace(super::decorator_purity::caps_of(
+                            decorators,
+                            self.ast_arena,
+                            bind,
+                        ));
                     self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
                     self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;

@@ -26,10 +26,13 @@ pub(crate) mod host_tasks;
 pub(crate) mod intrinsics;
 pub(crate) mod jit_helpers;
 pub(crate) mod method_args;
+pub(crate) mod method_bind;
+pub(crate) mod module_freeze;
 pub(crate) mod modules;
 pub(crate) mod props;
 pub mod scheduler;
 pub(crate) mod strings;
+pub(crate) mod symbol_iterator;
 use crate::value::VmValue;
 pub use ctx::ExecCtx;
 

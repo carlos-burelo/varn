@@ -1,4 +1,4 @@
-use super::cfg::{dominates, dominators};
+use super::cfg_dom::{dominates, dominators};
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator};
 

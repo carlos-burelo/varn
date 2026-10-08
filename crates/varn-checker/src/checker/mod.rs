@@ -1,10 +1,13 @@
 pub(crate) mod completion;
 mod decl_class;
+mod decl_class_decorators;
+mod decl_class_members;
 mod decl_enum;
 mod decl_fn;
 mod decl_misc;
 mod decl_var;
 mod decls;
+pub(crate) mod decorator_purity;
 pub(crate) mod decorator_receiver;
 pub(crate) mod decorator_signature;
 mod definite_assignment;

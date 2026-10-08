@@ -43,13 +43,13 @@ impl<'r> Checker<'r> {
 
         let saved_caps = self
             .enclosing_caps
-            .replace(super::decorator_signature::caps_of(
+            .replace(super::decorator_purity::caps_of(
                 &f.decorators,
                 self.ast_arena,
                 bind,
             ));
         let saved_pure = self.pure_scope.take();
-        if super::decorator_signature::is_pure_fn(&f.decorators, self.ast_arena, bind) {
+        if super::decorator_purity::is_pure_fn(&f.decorators, self.ast_arena, bind) {
             self.pure_scope = next_scope.or(Some(self.current_scope));
         }
 

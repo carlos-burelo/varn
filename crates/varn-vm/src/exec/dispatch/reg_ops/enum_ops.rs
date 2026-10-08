@@ -335,7 +335,7 @@ impl ExecCtx {
             }
         }
 
-        let result = crate::exec::advanced::invoke_runtime_static(
+        let result = crate::exec::method_bind::invoke_runtime_static(
             &name,
             &mut self.stage,
             &mut self.heap,

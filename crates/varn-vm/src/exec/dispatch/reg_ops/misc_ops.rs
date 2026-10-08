@@ -73,7 +73,7 @@ impl ExecCtx {
     ) -> VmResult<VmValue> {
         let sym_nv = closure.constants[sym_idx];
         match self.heap.symbol_of(sym_nv) {
-            Some(s) => crate::exec::advanced::get_symbol_property(obj, s, &mut self.heap),
+            Some(s) => crate::exec::symbol_iterator::get_symbol_property(obj, s, &mut self.heap),
             None => Err(crate::error::RuntimeError::new(
                 "GetSymbol: non-symbol constant",
             )),

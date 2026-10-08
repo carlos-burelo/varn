@@ -1,5 +1,6 @@
 pub mod algebraic;
 pub mod cfg;
+pub mod cfg_dom;
 pub mod const_fold;
 pub mod cse;
 pub mod dce;

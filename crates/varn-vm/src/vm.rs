@@ -180,7 +180,7 @@ fn freeze_pure_modules(vm: &mut Vm) {
     for (id, &val) in unsafe { &*vm.ctx.modules.get() }.iter() {
         if matches!(id, varn_core::ModuleId::Runtime(_)) {
             if let Some(frozen_arc) =
-                crate::exec::ctx_modules::freeze_module(val, id.clone(), &vm.ctx.heap)
+                crate::exec::module_freeze::freeze_module(val, id.clone(), &vm.ctx.heap)
             {
                 let fv = scratch.ctx.heap.alloc_frozen_module(frozen_arc);
                 unsafe { &mut *scratch.ctx.modules.get() }.insert(id.clone(), fv);
@@ -206,7 +206,7 @@ fn freeze_pure_modules(vm: &mut Vm) {
             Err(_) => continue,
         };
 
-        let Some(frozen) = crate::exec::ctx_modules::freeze_module(
+        let Some(frozen) = crate::exec::module_freeze::freeze_module(
             module_val,
             resolved.clone(),
             &scratch.ctx.heap,

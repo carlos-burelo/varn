@@ -175,7 +175,7 @@ pub(crate) extern "C" fn jit_get_symbol(
         let Some(s) = ctx_ref.heap.symbol_of(sym_nv) else {
             panic!("GetSymbol: non-symbol constant");
         };
-        match crate::exec::advanced::get_symbol_property(obj, s, &mut ctx_ref.heap) {
+        match crate::exec::symbol_iterator::get_symbol_property(obj, s, &mut ctx_ref.heap) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
@@ -200,7 +200,7 @@ pub(crate) extern "C" fn jit_bind_method(
             Ok(m) => m,
             Err(e) => jit_propagate_error(ctx_ref, e),
         };
-        match crate::exec::advanced::bind_method(obj, method, &mut ctx_ref.heap) {
+        match crate::exec::method_bind::bind_method(obj, method, &mut ctx_ref.heap) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
