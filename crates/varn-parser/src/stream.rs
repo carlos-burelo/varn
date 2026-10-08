@@ -5,6 +5,25 @@ use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, AstTypeKind, ExprId, ExprKind, StmtId, StmtKind, TypeNode};
 use varn_core::{ErrorCode, ParsedNumber, SourceRange, Token, TokenKind};
 
+static EOF_SENTINEL: Token = Token {
+    kind: TokenKind::EOF,
+    range: SourceRange {
+        start: varn_core::SourceLocation {
+            offset: 0,
+            line: 0,
+            column: 0,
+        },
+        end: varn_core::SourceLocation {
+            offset: 0,
+            line: 0,
+            column: 0,
+        },
+    },
+    parsed_num: None,
+    lex_start: 0,
+    lex_len: 0,
+};
+
 pub struct TokenStream {
     tokens: Vec<Token>,
     lexeme_buf: Arc<[u8]>,
@@ -166,7 +185,7 @@ impl TokenStream {
         if self.pos < self.tokens.len() {
             &self.tokens[self.pos]
         } else {
-            self.tokens.last().expect("empty token stream")
+            self.tokens.last().unwrap_or(&EOF_SENTINEL)
         }
     }
 

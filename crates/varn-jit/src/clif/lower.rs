@@ -225,10 +225,10 @@ fn finish_artifact(
         slice[..raw.code.len()].copy_from_slice(&raw.code);
         slice[wrapper_off..wrapper_off + wrapper.code.len()].copy_from_slice(&wrapper.code);
         for r in &raw.call_reloc_offsets {
-            patch_rel32(slice, *r, 0);
+            patch_rel32(slice, *r, 0)?;
         }
         for r in &wrapper.call_reloc_offsets {
-            patch_rel32(slice, wrapper_off + *r, 0);
+            patch_rel32(slice, wrapper_off + *r, 0)?;
         }
     }
     super::debug::capture_code(&mut debug, &mut buf, raw.code.len(), wrapper_off, total);

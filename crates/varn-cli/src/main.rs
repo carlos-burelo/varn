@@ -34,12 +34,20 @@ fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    std::thread::Builder::new()
+    match std::thread::Builder::new()
         .stack_size(varn_vm::VM_STACK_BYTES)
         .spawn(run_cli)
-        .expect("failed to spawn the VM thread")
-        .join()
-        .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
+    {
+        Ok(handle) => {
+            if let Err(panic) = handle.join() {
+                std::panic::resume_unwind(panic);
+            }
+        }
+        Err(e) => {
+            eprintln!("failed to spawn the VM thread: {e}");
+            std::process::exit(1);
+        }
+    }
 }
 
 fn run_cli() {

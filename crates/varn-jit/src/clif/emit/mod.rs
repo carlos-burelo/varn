@@ -9,10 +9,11 @@ pub(in crate::clif) use payload::*;
 pub(super) const KIND_MASK: i64 = varn_types::vm_value::KIND_MASK as i64;
 pub(super) const HEAP_KIND: i64 = varn_types::vm_value::KIND_HEAP as i64;
 
-pub(super) fn patch_rel32(buf: &mut [u8], site: usize, target: usize) {
+pub(super) fn patch_rel32(buf: &mut [u8], site: usize, target: usize) -> Result<(), String> {
     let disp = target as i64 - (site as i64 + 4);
-    let disp = i32::try_from(disp).expect("clif: rel32 out of range");
+    let disp = i32::try_from(disp).map_err(|_| "clif: rel32 out of range".to_string())?;
     buf[site..site + 4].copy_from_slice(&disp.to_le_bytes());
+    Ok(())
 }
 
 #[allow(unused_variables)]

@@ -350,7 +350,7 @@ pub(super) fn spawn_isolate(
                 Err(e) => done_t.reject(worker_error(&e.to_string())),
             }
         })
-        .expect("failed to spawn isolate thread");
+        .map_err(|e| format!("failed to spawn isolate thread: {e}"))?;
 
     Ok(done)
 }
