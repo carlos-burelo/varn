@@ -8,6 +8,7 @@ members = [
     "crates/varn-types",
     "crates/varn-tir",
     "crates/varn-op-macros",
+    "crates/varn-contract",
     "crates/varn-modules",
     "crates/varn-builtins",
     "crates/varn-runtime",
