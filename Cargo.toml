@@ -77,6 +77,7 @@ should_implement_trait = "allow"
 box_collection = "allow"
 collapsible_match = "allow"
 missing_safety_doc = "allow"
+wildcard_enum_match_arm = "warn"
 
 [profile.release]
 opt-level = 3
