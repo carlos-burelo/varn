@@ -34,7 +34,11 @@ Ley 13 perfil `quick` para iterar (`cargo build --profile quick --bin vn`), matr
 Deuda preexistente detectada (no de este plan, no tocar aquí): `design_audit_test::h7_small_types_are_copy_sized` falla en HEAD limpio
 (`size_of::<Atom>()` 16 vs 4 esperado). Toca F2 (identidad portable / NameId), no F0.
 
-## F1 — ABI hoja, rompe checker→builtins [ ]
+## F1 — ABI hoja, rompe checker→builtins [x]
+
+Causa: `checker/emit/body/scope.rs:216` contra orden owned por `builtins/dispatch/modules.rs:96,132`.
+(`1a1bcaa0`: const `NATIVE_GLOBALS` en `varn-abi`, checker→abi, borradas funciones builtins,
+fail-fast en arranque VM si falta global, checker compila aislado `cargo check -p varn-checker`.)
 
 Causa: `checker/src/emit/body/scope.rs:216` `varn_builtins::native_global_index` contra orden owned por `builtins/src/dispatch/modules.rs:96,132`.
 Canónico: layout en `varn-abi/src/lib.rs` (hoy 151 LOC, solo→core). Sin `OnceLock`, sin `all_native_ops`.
