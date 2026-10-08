@@ -12,7 +12,7 @@ impl HeapInner {
             match self.get(a.as_heap()) {
                 Some(HeapObj::Str(HeapStr::Ext { .. })) => return None,
                 Some(HeapObj::Str(hs)) => hs.as_str().as_bytes(),
-                _ => return None,
+                Some(HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => return None,
             }
         } else {
             return None;
@@ -32,7 +32,7 @@ impl HeapInner {
             match self.get(b.as_heap()) {
                 Some(HeapObj::Str(HeapStr::Ext { .. })) => return None,
                 Some(HeapObj::Str(hs)) => hs.as_str().as_bytes(),
-                _ => return None,
+                Some(HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => return None,
             }
         } else {
             return None;

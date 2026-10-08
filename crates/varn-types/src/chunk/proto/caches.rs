@@ -39,7 +39,7 @@ impl FunctionProto {
         }
         let keys = match self.chunk.constants.get(idx) {
             Some(PoolEntry::Shape(k)) => k,
-            _ => return None,
+            Some(PoolEntry::Literal(_) | PoolEntry::Function(_) | PoolEntry::Layout(_)) | None => return None,
         };
         let mut shape = crate::root_shape();
         for k in keys {

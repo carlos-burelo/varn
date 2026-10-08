@@ -9,7 +9,7 @@ pub(in crate::clif) fn retag_raw_return(
         SlotKind::Int => box_int(b, raw_res),
         SlotKind::Float => box_f64(b, raw_res),
         SlotKind::Bool => box_bool(b, raw_res),
-        _ => raw_res,
+        SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => raw_res,
     }
 }
 

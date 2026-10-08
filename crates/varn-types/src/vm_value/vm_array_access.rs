@@ -85,7 +85,7 @@ impl VmArray {
             } else {
                 match self.repr_mut() {
                     ArrayRepr::Boxed(v) => v.items.push(val),
-                    _ => unreachable!("checked Boxed above"),
+                    ArrayRepr::I64(_) | ArrayRepr::F64(_) => unreachable!("checked Boxed above"),
                 }
             }
             return;
@@ -125,7 +125,7 @@ impl VmArray {
                 v.clean_prefix = 0;
                 &mut v.items
             }
-            _ => unreachable!(),
+            ArrayRepr::I64(_) | ArrayRepr::F64(_) => unreachable!(),
         }
     }
 
@@ -133,7 +133,7 @@ impl VmArray {
     pub fn get_i64(&self, idx: usize) -> Option<i64> {
         match self.repr() {
             ArrayRepr::I64(v) => v.get(idx).copied(),
-            _ => None,
+            ArrayRepr::Boxed(_) | ArrayRepr::F64(_) => None,
         }
     }
 
@@ -144,7 +144,7 @@ impl VmArray {
                 v[idx] = val;
                 true
             }
-            _ => false,
+            ArrayRepr::Boxed(_) | ArrayRepr::I64(_) | ArrayRepr::F64(_) => false,
         }
     }
 
@@ -152,7 +152,7 @@ impl VmArray {
     pub fn get_f64(&self, idx: usize) -> Option<f64> {
         match self.repr() {
             ArrayRepr::F64(v) => v.get(idx).copied(),
-            _ => None,
+            ArrayRepr::Boxed(_) | ArrayRepr::I64(_) => None,
         }
     }
 
@@ -163,7 +163,7 @@ impl VmArray {
                 v[idx] = val;
                 true
             }
-            _ => false,
+            ArrayRepr::Boxed(_) | ArrayRepr::I64(_) | ArrayRepr::F64(_) => false,
         }
     }
 }

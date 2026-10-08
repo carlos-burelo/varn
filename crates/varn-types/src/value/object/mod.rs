@@ -95,7 +95,7 @@ impl PartialEq for ObjData {
         for (k, v) in self.iter() {
             match other.get(&k) {
                 Some(ov) if ov == v => {}
-                _ => return false,
+                Some(_) | None => return false,
             }
         }
         true

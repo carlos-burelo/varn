@@ -89,7 +89,7 @@ impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
             TypeKind::Primitive(p) => Some(p.name()),
             TypeKind::Builtin(b) => Some(b.name()),
             TypeKind::Literal(l) => Some(l.base().name()),
-            _ => None,
+            TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
         }
     }
 

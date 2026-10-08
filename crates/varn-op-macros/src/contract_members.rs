@@ -135,7 +135,7 @@ pub(crate) fn collect_members(
                     fallible: false,
                 });
             }
-            _ => {}
+            ClassMember::Destructor { .. } | ClassMember::Property { .. } | ClassMember::Setter { .. } | ClassMember::StaticBlock { .. } => {}
         }
     }
     let _ = class_name;
@@ -153,7 +153,7 @@ pub(crate) fn collect_functions(
             Decl::Export(ExportDecl::Decl { declaration, .. }) => {
                 from_decl(declaration, interner, out)
             }
-            _ => {}
+            Decl::Variable(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => {}
         }
     }
     let mut out = Vec::new();
@@ -233,6 +233,6 @@ pub(crate) fn class_from_decl(
         Decl::Export(ExportDecl::Decl { declaration, .. }) => {
             class_from_decl(declaration, name, interner)
         }
-        _ => None,
+        Decl::Variable(_) | Decl::Function(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => None,
     }
 }

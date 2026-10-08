@@ -15,7 +15,7 @@ pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
             Some(HeapObj::Array(arr)) => {
                 return Some(VmValue::from_int(arr.len() as i64));
             }
-            _ => {}
+            Some(HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => {}
         }
     }
     None

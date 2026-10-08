@@ -5,7 +5,7 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
         let heap_idx = obj.as_heap();
         let maybe_obj = match heap.get(heap_idx) {
             Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(*o),
-            _ => None,
+            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
         };
         if let Some(o) = maybe_obj {
             let keys: Vec<VmValue> = o
@@ -17,7 +17,7 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
         }
         let maybe_map = match heap.get(heap_idx) {
             Some(HeapObj::Map(m)) => Some(m.clone()),
-            _ => None,
+            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
         };
         if let Some(m) = maybe_map {
             let keys: Vec<VmValue> = m.borrow().keys().map(|k| k.0).collect();
@@ -33,7 +33,7 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
         let maybe_obj = match heap.get(heap_idx) {
             Some(HeapObj::Object(o)) => Some((false, *o)),
             Some(HeapObj::Record(o)) => Some((true, *o)),
-            _ => None,
+            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
         };
         if let Some((is_record, o)) = maybe_obj {
             let kept: Vec<(Arc<str>, VmValue)> = o
@@ -46,7 +46,7 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
         }
         let maybe_map = match heap.get(heap_idx) {
             Some(HeapObj::Map(m)) => Some(m.clone()),
-            _ => None,
+            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
         };
         if let Some(m) = maybe_map {
             let entries: Vec<(varn_types::value::MapKey, VmValue)> =
@@ -70,7 +70,7 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
     }
     let target_obj = match heap.get(target.as_heap()) {
         Some(HeapObj::Object(o)) => *o,
-        _ => return Ok(target),
+        Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => return Ok(target),
     };
 
     if spread.is_heap() {
@@ -87,7 +87,7 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
         }
         let maybe_map = match heap.get(spread_idx) {
             Some(HeapObj::Map(m)) => Some(m.clone()),
-            _ => None,
+            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
         };
         if let Some(m) = maybe_map {
             let entries: Vec<(varn_types::value::MapKey, VmValue)> =

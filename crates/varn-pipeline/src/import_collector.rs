@@ -56,14 +56,14 @@ impl<'a> ImportCollector<'a> {
                     self.imports
                         .insert(self.interner.resolve(*source).to_owned());
                 }
-                _ => {}
+                ExportDecl::Default { .. } | ExportDecl::Decl { .. } => {}
             },
             Decl::Namespace(ns) => {
                 for decl in &ns.body {
                     self.visit_decl(decl);
                 }
             }
-            _ => {}
+            Decl::Variable(_) | Decl::Function(_) | Decl::Class(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => {}
         }
     }
 }

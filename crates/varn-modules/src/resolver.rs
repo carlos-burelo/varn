@@ -32,7 +32,7 @@ impl ModuleResolver {
                 } else {
                     let base = match referrer {
                         ModuleId::Local(s) => PathBuf::from(s.as_ref()),
-                        _ => PathBuf::from("."),
+                        ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_) | ModuleId::Package { .. } => PathBuf::from("."),
                     };
                     let base_dir = base.parent().unwrap_or(Path::new("."));
                     base_dir.join(&rel)
@@ -44,7 +44,7 @@ impl ModuleResolver {
             ImportSpecifier::Package(s) => {
                 let base = match referrer {
                     ModuleId::Local(s) => PathBuf::from(s.as_ref()),
-                    _ => PathBuf::from("."),
+                    ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_) | ModuleId::Package { .. } => PathBuf::from("."),
                 };
                 let base_dir = base.parent().unwrap_or(Path::new("."));
                 super::resolve_pkg_specifier(base_dir, s.as_ref())
@@ -63,7 +63,7 @@ fn normalize_components(path: &Path) -> PathBuf {
                 out.pop();
             }
             Component::CurDir => {}
-            other => out.push(other),
+            other @ Component::Prefix(_) | other @ Component::RootDir | other @ Component::Normal(_) => out.push(other),
         }
     }
     out

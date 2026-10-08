@@ -50,7 +50,7 @@ pub(crate) fn map_set_index(
                 }
                 Some(mref.clone())
             }
-            _ => None,
+            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
         };
         if let Some(m) = maybe_m {
             let k = heap.canonical_map_key(key);
@@ -193,7 +193,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
         Some(HeapObj::Class(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_)) => {
             index_instance_fallback(obj, key, heap)
         }
-        _ => Err(RuntimeError::new("OpGetIndex: not indexable")),
+        Some(HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Buffer(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => Err(RuntimeError::new("OpGetIndex: not indexable")),
     }
 }
 
@@ -204,14 +204,14 @@ fn index_instance_fallback(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmRes
     } else if key.is_heap() {
         match heap.get(key.as_heap()) {
             Some(HeapObj::Str(s)) => s.as_str().to_string(),
-            _ => heap.str_repr(key),
+            Some(HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => heap.str_repr(key),
         }
     } else {
         heap.str_repr(key)
     };
     match crate::exec::props::get_property(obj, &key_str, heap) {
         Ok(v) if !v.is_null() => Ok(v),
-        _ => match crate::exec::props::find_getter(obj, &key_str, heap) {
+        Ok(_) | Err(_) => match crate::exec::props::find_getter(obj, &key_str, heap) {
             Some(g) => Ok(crate::exec::props::bind_method_to_receiver(
                 heap, obj, g, None,
             )),
@@ -287,6 +287,6 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
             }
             Ok(())
         }
-        _ => Err(RuntimeError::new("OpSetIndex: not indexable")),
+        Some(HeapObj::Str(_) | HeapObj::Tuple(_) | HeapObj::Record(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => Err(RuntimeError::new("OpSetIndex: not indexable")),
     }
 }

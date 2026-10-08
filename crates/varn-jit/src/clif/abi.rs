@@ -136,7 +136,7 @@ pub(super) fn build_wrapper(
                     {
                         super::emit::unbox_f64_coerce(&mut b, boxed)
                     }
-                    _ => b.ins().isplit(boxed).1,
+                    Some(SlotKind::Float) | Some(SlotKind::Str) | Some(SlotKind::Ref) | Some(SlotKind::Dynamic) | None => b.ins().isplit(boxed).1,
                 };
                 args.push(un);
             }

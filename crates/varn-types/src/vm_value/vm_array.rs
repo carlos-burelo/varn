@@ -83,7 +83,7 @@ impl VmArray {
     pub fn as_boxed(&self) -> Option<&Vec<VmValue>> {
         match self.repr() {
             ArrayRepr::Boxed(v) => Some(&v.items),
-            _ => None,
+            ArrayRepr::I64(_) | ArrayRepr::F64(_) => None,
         }
     }
 
@@ -101,7 +101,7 @@ impl VmArray {
     pub fn borrow(&self) -> &Vec<VmValue> {
         match self.repr() {
             ArrayRepr::Boxed(v) => &v.items,
-            _ => unreachable_typed("borrow"),
+            ArrayRepr::I64(_) | ArrayRepr::F64(_) => unreachable_typed("borrow"),
         }
     }
 }

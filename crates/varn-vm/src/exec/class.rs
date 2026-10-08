@@ -106,7 +106,7 @@ pub(crate) fn pool_layout(
 ) -> VmResult<Rc<varn_core::layout::ClassLayout>> {
     match proto.chunk.constants.get(idx) {
         Some(varn_types::PoolEntry::Layout(layout)) => Ok(Rc::clone(layout)),
-        _ => Err(RuntimeError::new("DeclareLayout: not a layout constant")),
+        Some(varn_types::PoolEntry::Literal(_) | varn_types::PoolEntry::Function(_) | varn_types::PoolEntry::Shape(_)) | None => Err(RuntimeError::new("DeclareLayout: not a layout constant")),
     }
 }
 

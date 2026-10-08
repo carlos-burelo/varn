@@ -110,7 +110,7 @@ impl ProviderLoader {
     fn specifier(id: &ModuleId) -> Option<&str> {
         match id {
             ModuleId::Core(s) | ModuleId::Std(s) | ModuleId::Runtime(s) => Some(s.as_ref()),
-            _ => None,
+            ModuleId::Local(_) | ModuleId::Package { .. } => None,
         }
     }
 }

@@ -129,7 +129,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
                 out.push('}');
                 return;
             }
-            _ => {}
+            Some(HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => {}
         }
     }
     out.push_str("null");

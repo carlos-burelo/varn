@@ -63,7 +63,7 @@ impl ExecCtx {
                 {
                     closure.osr_jit_fn(osr_ip)
                 }
-                _ => None,
+                Some(_) | None => None,
             };
             let is_osr = osr_fn.is_some();
 

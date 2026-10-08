@@ -68,7 +68,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                 } else if key.is_heap() {
                     match ctx_ref.heap.get(key.as_heap()) {
                         Some(crate::heap::HeapObj::Str(s)) => Some(s.as_str()),
-                        _ => None,
+                        Some(crate::heap::HeapObj::Array(_) | crate::heap::HeapObj::Tuple(_) | crate::heap::HeapObj::Object(_) | crate::heap::HeapObj::Record(_) | crate::heap::HeapObj::Buffer(_) | crate::heap::HeapObj::Module(_) | crate::heap::HeapObj::FrozenModule(_) | crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::Class(_) | crate::heap::HeapObj::NativeFn(..) | crate::heap::HeapObj::BoundMethod(_) | crate::heap::HeapObj::Map(_) | crate::heap::HeapObj::Set(_) | crate::heap::HeapObj::Task(_) | crate::heap::HeapObj::TaskHandle(_) | crate::heap::HeapObj::Range(_) | crate::heap::HeapObj::Symbol(_) | crate::heap::HeapObj::EnumVariant(_) | crate::heap::HeapObj::BigInt(_) | crate::heap::HeapObj::Decimal(_) | crate::heap::HeapObj::Char(_) | crate::heap::HeapObj::Generator(_) | crate::heap::HeapObj::Spread(_)) | None => None,
                     }
                 } else {
                     None
@@ -86,7 +86,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                 (*ctx).jit_native_result = found.unwrap_or_else(VmValue::null);
                 return;
             }
-            _ => {}
+            Some(crate::heap::HeapObj::Str(_) | crate::heap::HeapObj::Tuple(_) | crate::heap::HeapObj::Buffer(_) | crate::heap::HeapObj::Module(_) | crate::heap::HeapObj::FrozenModule(_) | crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::Class(_) | crate::heap::HeapObj::NativeFn(..) | crate::heap::HeapObj::BoundMethod(_) | crate::heap::HeapObj::Set(_) | crate::heap::HeapObj::Task(_) | crate::heap::HeapObj::TaskHandle(_) | crate::heap::HeapObj::Range(_) | crate::heap::HeapObj::Symbol(_) | crate::heap::HeapObj::EnumVariant(_) | crate::heap::HeapObj::BigInt(_) | crate::heap::HeapObj::Decimal(_) | crate::heap::HeapObj::Char(_) | crate::heap::HeapObj::Generator(_) | crate::heap::HeapObj::Spread(_)) | None => {}
         }
     }
 
@@ -158,7 +158,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
             } else if key.is_heap() {
                 match ctx_ref.heap.get(key.as_heap()) {
                     Some(crate::heap::HeapObj::Str(s)) => Some(s.as_str()),
-                    _ => None,
+                    Some(crate::heap::HeapObj::Array(_) | crate::heap::HeapObj::Tuple(_) | crate::heap::HeapObj::Object(_) | crate::heap::HeapObj::Record(_) | crate::heap::HeapObj::Buffer(_) | crate::heap::HeapObj::Module(_) | crate::heap::HeapObj::FrozenModule(_) | crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::Class(_) | crate::heap::HeapObj::NativeFn(..) | crate::heap::HeapObj::BoundMethod(_) | crate::heap::HeapObj::Map(_) | crate::heap::HeapObj::Set(_) | crate::heap::HeapObj::Task(_) | crate::heap::HeapObj::TaskHandle(_) | crate::heap::HeapObj::Range(_) | crate::heap::HeapObj::Symbol(_) | crate::heap::HeapObj::EnumVariant(_) | crate::heap::HeapObj::BigInt(_) | crate::heap::HeapObj::Decimal(_) | crate::heap::HeapObj::Char(_) | crate::heap::HeapObj::Generator(_) | crate::heap::HeapObj::Spread(_)) | None => None,
                 }
             } else {
                 None

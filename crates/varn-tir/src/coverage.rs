@@ -138,7 +138,7 @@ impl Coverage {
                 self.name_dispatch += 1;
                 self.by_name[reason_index(*why)] += 1;
             }
-            _ => self.static_dispatch += 1,
+            Resolution::Local(_) | Resolution::Param(_) | Resolution::Upvalue(_) | Resolution::GlobalSlot(_) | Resolution::NativeGlobal(_) | Resolution::ModuleSlot { .. } | Resolution::FieldSlot(_) | Resolution::StaticField(_) | Resolution::VtableSlot(_) | Resolution::DirectFn(_) | Resolution::Intrinsic(_) | Resolution::NativeOp(_) | Resolution::EnumVariant { .. } => self.static_dispatch += 1,
         }
 
         match &e.kind {

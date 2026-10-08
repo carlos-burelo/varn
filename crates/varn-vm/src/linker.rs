@@ -41,7 +41,7 @@ impl Linker {
     pub(crate) fn cached(&self, id: &ModuleId) -> Option<VmValue> {
         match self.table().get(id) {
             Some(ModuleLinkState::Done(v)) => Some(*v),
-            _ => None,
+            Some(ModuleLinkState::Evaluating) | None => None,
         }
     }
 

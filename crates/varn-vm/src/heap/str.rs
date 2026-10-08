@@ -149,7 +149,7 @@ impl HeapStr {
     pub(crate) fn is_tip(&self) -> bool {
         match self {
             HeapStr::Ext { buf, len, .. } => unsafe { (&*buf.get()).len() == *len },
-            _ => false,
+            HeapStr::Shared(..) | HeapStr::Inline { .. } => false,
         }
     }
 }

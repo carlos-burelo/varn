@@ -60,7 +60,7 @@ impl CoreSourceLocator {
                     acc.pop();
                 }
                 CurDir => {}
-                c => acc.push(c),
+                c @ Prefix(_) | c @ RootDir | c @ Normal(_) => acc.push(c),
             }
             acc
         });

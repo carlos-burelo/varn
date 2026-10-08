@@ -67,7 +67,7 @@ impl ModuleLoader for FileLoader {
             .map_err(ModuleError::new)
             .and_then(|id| match id {
                 ModuleId::Local(_) => Ok(id),
-                _ => Err(ModuleError::new(format!(
+                ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_) | ModuleId::Package { .. } => Err(ModuleError::new(format!(
                     "FileLoader cannot resolve non-local specifier: {spec}"
                 ))),
             })
@@ -76,7 +76,7 @@ impl ModuleLoader for FileLoader {
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError> {
         let path = match id {
             ModuleId::Local(p) => p.as_ref(),
-            _ => return Ok(None),
+            ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_) | ModuleId::Package { .. } => return Ok(None),
         };
 
         let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)
@@ -104,7 +104,7 @@ impl ModuleLoader for StdlibLoader {
             .map_err(ModuleError::new)
             .and_then(|id| match id {
                 ModuleId::Std(_) | ModuleId::Core(_) | ModuleId::Runtime(_) => Ok(id),
-                _ => Err(ModuleError::new(format!(
+                ModuleId::Local(_) | ModuleId::Package { .. } => Err(ModuleError::new(format!(
                     "StdlibLoader cannot resolve non-stdlib specifier: {specifier}"
                 ))),
             })
@@ -114,7 +114,7 @@ impl ModuleLoader for StdlibLoader {
         let spec = match id {
             ModuleId::Std(s) | ModuleId::Core(s) => s.as_ref(),
             ModuleId::Runtime(_) => return Ok(None),
-            _ => return Ok(None),
+            ModuleId::Local(_) | ModuleId::Package { .. } => return Ok(None),
         };
 
         let key = varn_modules::artifact::module_key(id, STD_FINGERPRINT);

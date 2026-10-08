@@ -135,7 +135,7 @@ impl IoDriver {
                                 Ok(_) => Ok(SendValue::Int(id)),
                                 Err(_) => match stream_state.stream.take_error() {
                                     Ok(None) => Ok(SendValue::Int(id)),
-                                    _ => Ok(SendValue::Int(-1)),
+                                    Ok(Some(_)) | Err(_) => Ok(SendValue::Int(-1)),
                                 },
                             };
                             deferred.push((task, res));

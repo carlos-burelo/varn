@@ -13,7 +13,7 @@ pub fn parse_bigint_literal(text: &str) -> Option<BigInt> {
         Some("0x") | Some("0X") => (16, &body[2..]),
         Some("0o") | Some("0O") => (8, &body[2..]),
         Some("0b") | Some("0B") => (2, &body[2..]),
-        _ => (10, body),
+        Some(_) | None => (10, body),
     };
     let v = BigInt::from_str_radix(digits, radix).ok()?;
     Some(if neg { -v } else { v })

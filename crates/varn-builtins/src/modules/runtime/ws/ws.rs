@@ -56,7 +56,7 @@ varn_contract! {
             let expected = accept_key(key);
             match header_value(head, "sec-websocket-accept") {
                 Some(got) if got == expected => Ok(()),
-                _ => Err(coded("E_WS_CONNECT", "bad Sec-WebSocket-Accept")),
+                Some(_) | None => Err(coded("E_WS_CONNECT", "bad Sec-WebSocket-Accept")),
             }
         }
 

@@ -62,7 +62,7 @@ fn check_ty_recursive(
                 }
             }
         }
-        _ => {}
+        BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Class(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => {}
     }
 }
 
@@ -74,7 +74,7 @@ pub(super) fn check_res(
 ) {
     let receiver_class = |recv: &TirExpr| match recv.ty.non_nullable(&m.types) {
         BackendTy::Class(c) => Some(c),
-        _ => None,
+        BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char | BackendTy::Str | BackendTy::Bytes | BackendTy::Decimal | BackendTy::BigInt | BackendTy::Array(_) | BackendTy::Map(..) | BackendTy::Set(_) | BackendTy::Tuple(_) | BackendTy::Enum(_) | BackendTy::Fn(_) | BackendTy::Nullable(_) | BackendTy::Void | BackendTy::Never | BackendTy::Dynamic(_) => None,
     };
 
     match &e.res {

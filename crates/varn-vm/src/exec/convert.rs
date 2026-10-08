@@ -40,7 +40,7 @@ fn numeric_of(v: VmValue, heap: &Heap) -> VmResult<Numeric> {
     match obj {
         Some(HeapObj::BigInt(b)) => Ok(Numeric::Big((**b).clone())),
         Some(HeapObj::Decimal(d)) => Ok(Numeric::Dec((**d).clone())),
-        _ => Err(RuntimeError::new("convert: value is not numeric")),
+        Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => Err(RuntimeError::new("convert: value is not numeric")),
     }
 }
 

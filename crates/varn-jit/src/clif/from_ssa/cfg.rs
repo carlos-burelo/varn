@@ -59,7 +59,7 @@ pub(super) fn order(ssa: &SsaProto, entry: usize) -> Vec<usize> {
             SsaTerm::Branch {
                 then_blk, else_blk, ..
             } => vec![*else_blk as usize, *then_blk as usize],
-            _ => Vec::new(),
+            SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => Vec::new(),
         };
         match succs.get(stage as usize) {
             Some(&s) => {

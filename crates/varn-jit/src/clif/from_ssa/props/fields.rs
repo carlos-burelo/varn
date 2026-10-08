@@ -84,7 +84,7 @@ fn emit_get_fixed_field_native(
     let ectx = exec_ctx(ctx);
     let merge_ty = match dest {
         varn_types::register_meta::SlotKind::Float => types::F64,
-        _ => types::I64,
+        varn_types::register_meta::SlotKind::Int | varn_types::register_meta::SlotKind::Bool | varn_types::register_meta::SlotKind::Str | varn_types::register_meta::SlotKind::Ref | varn_types::register_meta::SlotKind::Dynamic => types::I64,
     };
     let slow = b.create_block();
     let cont = b.create_block();
@@ -99,7 +99,7 @@ fn emit_get_fixed_field_native(
             let b8 = b.ins().load(types::I8, m, data_base, off);
             b.ins().uextend(types::I64, b8)
         }
-        _ => {
+        ScalarRepr::Ref | ScalarRepr::Boxed => {
             return Err("from_ssa: native field read of a non-scalar repr".into());
         }
     };

@@ -42,7 +42,7 @@ impl Resolution {
     pub fn dyn_reason(&self) -> Option<DynReason> {
         match self {
             Resolution::ByName { why, .. } => Some(*why),
-            _ => None,
+            Resolution::None | Resolution::Local(_) | Resolution::Param(_) | Resolution::Upvalue(_) | Resolution::GlobalSlot(_) | Resolution::NativeGlobal(_) | Resolution::ModuleSlot { .. } | Resolution::FieldSlot(_) | Resolution::StaticField(_) | Resolution::VtableSlot(_) | Resolution::DirectFn(_) | Resolution::Intrinsic(_) | Resolution::NativeOp(_) | Resolution::EnumVariant { .. } => None,
         }
     }
 

@@ -133,7 +133,7 @@ impl TokenKind {
             TokenKind::Match => "match",
             TokenKind::At => "@",
             TokenKind::RawStr => "string",
-            _ => crate::UNKNOWN,
+            TokenKind::Dynamic | TokenKind::BinaryLiteral | TokenKind::OctalLiteral | TokenKind::HexLiteral | TokenKind::Template | TokenKind::TemplateHead | TokenKind::TemplateMiddle | TokenKind::TemplateTail | TokenKind::RegularExpression | TokenKind::QuestionLBracket | TokenKind::QuestionQuestionEq | TokenKind::StarStarEq | TokenKind::AmpAmpEq | TokenKind::PipePipeEq | TokenKind::LtLt | TokenKind::LtLtEq | TokenKind::GtGt | TokenKind::GtGtEq | TokenKind::GtGtGt | TokenKind::GtGtGtEq | TokenKind::On | TokenKind::Hash | TokenKind::Backslash | TokenKind::Dollar | TokenKind::Backtick | TokenKind::Newline | TokenKind::Whitespace | TokenKind::DocComment | TokenKind::Placeholder | TokenKind::Spawn | TokenKind::Parallel | TokenKind::Start => crate::UNKNOWN,
         }
     }
 }

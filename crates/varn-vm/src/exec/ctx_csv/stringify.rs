@@ -19,7 +19,7 @@ pub(crate) fn stringify_csv(
             let repr = arr.repr();
             let items = match repr {
                 varn_types::ArrayRepr::Boxed(v) => v.as_vec(),
-                _ => return Err("CSV stringify expects a boxed array".to_string()),
+                varn_types::ArrayRepr::I64(_) | varn_types::ArrayRepr::F64(_) => return Err("CSV stringify expects a boxed array".to_string()),
             };
 
             if items.is_empty() {
@@ -153,12 +153,12 @@ pub(crate) fn stringify_csv(
                         }
                     }
                 }
-                _ => return Err("Unsupported row type for CSV stringify".to_string()),
+                Some(HeapObj::Str(_) | HeapObj::Tuple(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => return Err("Unsupported row type for CSV stringify".to_string()),
             }
 
             Ok(out)
         }
-        _ => Err("CSV stringify expects an array".to_string()),
+        Some(HeapObj::Str(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => Err("CSV stringify expects an array".to_string()),
     }
 }
 

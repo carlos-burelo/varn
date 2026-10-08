@@ -31,7 +31,7 @@ fn canonical_id_str(id: &ModuleId) -> String {
                 format!("runtime:{s}")
             }
         }
-        _ => id.as_str(),
+        ModuleId::Local(_) | ModuleId::Package { .. } => id.as_str(),
     }
 }
 
@@ -76,7 +76,7 @@ impl ExecCtx {
                 let module_val = self.heap.alloc_module(std::rc::Rc::new(module_obj));
                 Ok(module_val)
             }
-            _ => Ok(val),
+            Some(crate::heap::HeapObj::Str(_) | crate::heap::HeapObj::Array(_) | crate::heap::HeapObj::Tuple(_) | crate::heap::HeapObj::Record(_) | crate::heap::HeapObj::Buffer(_) | crate::heap::HeapObj::FrozenModule(_) | crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::Class(_) | crate::heap::HeapObj::NativeFn(..) | crate::heap::HeapObj::BoundMethod(_) | crate::heap::HeapObj::Map(_) | crate::heap::HeapObj::Set(_) | crate::heap::HeapObj::Task(_) | crate::heap::HeapObj::TaskHandle(_) | crate::heap::HeapObj::Range(_) | crate::heap::HeapObj::Symbol(_) | crate::heap::HeapObj::EnumVariant(_) | crate::heap::HeapObj::BigInt(_) | crate::heap::HeapObj::Decimal(_) | crate::heap::HeapObj::Char(_) | crate::heap::HeapObj::Generator(_) | crate::heap::HeapObj::Spread(_)) | None => Ok(val),
         }
     }
 
@@ -126,7 +126,7 @@ impl ExecCtx {
                         None
                     }
                 }
-                _ => None,
+                ModuleId::Local(_) | ModuleId::Package { .. } => None,
             })
         } else {
             None
@@ -248,7 +248,7 @@ pub(crate) fn freeze_module(
     let raw_idx = module_val.as_heap();
     let m = match heap.get(raw_idx) {
         Some(HeapObj::Module(m)) => m.clone(),
-        _ => return None,
+        Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => return None,
     };
 
     let mut frozen_exports = Vec::with_capacity(m.exports.len());
@@ -288,7 +288,7 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
             }
             Some(FrozenExport::Nested(Arc::new(nested)))
         }
-        _ => None,
+        Some(HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
     }
 }
 

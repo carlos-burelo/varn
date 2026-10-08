@@ -45,7 +45,7 @@ pub(super) fn in_range_steps(
         let (k, bound) = match op {
             SsaBinOp::IntLt => (*lhs, Bound::Below),
             SsaBinOp::IntGt => (*lhs, Bound::Above),
-            _ => continue,
+            SsaBinOp::IntAdd | SsaBinOp::IntSub | SsaBinOp::IntMul | SsaBinOp::IntDiv | SsaBinOp::IntMod | SsaBinOp::IntPow | SsaBinOp::IntEq | SsaBinOp::IntNe | SsaBinOp::IntLe | SsaBinOp::IntGe | SsaBinOp::IntAnd | SsaBinOp::IntOr | SsaBinOp::IntXor | SsaBinOp::IntShl | SsaBinOp::IntShr | SsaBinOp::IntUshr | SsaBinOp::FloatAdd | SsaBinOp::FloatSub | SsaBinOp::FloatMul | SsaBinOp::FloatDiv | SsaBinOp::FloatMod | SsaBinOp::FloatPow | SsaBinOp::FloatEq | SsaBinOp::FloatNe | SsaBinOp::FloatLt | SsaBinOp::FloatLe | SsaBinOp::FloatGt | SsaBinOp::FloatGe | SsaBinOp::StrConcat | SsaBinOp::Dyn(_) => continue,
         };
         let (k, bound) = if blk.params.contains(&k) {
             (k, bound)

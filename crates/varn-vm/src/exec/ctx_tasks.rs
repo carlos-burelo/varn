@@ -18,7 +18,7 @@ impl ExecCtx {
             let cell = match self.heap.get(value.as_heap()) {
                 Some(HeapObj::Task(lazy)) => Some(self.run_lazy_task_sync(Rc::clone(lazy))),
                 Some(HeapObj::TaskHandle(cell)) => Some(Rc::clone(cell)),
-                _ => None,
+                Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
             };
             if let Some(cell) = cell {
                 if cell.is_pending() {

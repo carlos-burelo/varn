@@ -28,7 +28,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             let raw_text = s.interner.resolve(raw);
             let value: i64 = match pre_parsed {
                 Some(ParsedNumber::Int(v)) => v,
-                _ => parse_int_radix(raw_text)
+                Some(ParsedNumber::Float(_)) | None => parse_int_radix(raw_text)
                     .ok_or_else(|| format!("integer literal `{}` overflows i64", raw_text))?,
             };
             Ok(s.expr(range, ExprKind::IntLiteral { value, raw }))
@@ -39,7 +39,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             let raw_text = s.interner.resolve(raw);
             let value: f64 = match pre_parsed {
                 Some(ParsedNumber::Float(v)) => v,
-                _ => raw_text
+                Some(ParsedNumber::Int(_)) | None => raw_text
                     .parse()
                     .map_err(|_| format!("invalid float literal: {}", raw_text))?,
             };
@@ -167,7 +167,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             }
         }
 
-        _ => {
+        TokenKind::EOF | TokenKind::Dynamic | TokenKind::TemplateMiddle | TokenKind::TemplateTail | TokenKind::RParen | TokenKind::RBrace | TokenKind::RBracket | TokenKind::LAngle | TokenKind::RAngle | TokenKind::Semicolon | TokenKind::Comma | TokenKind::Dot | TokenKind::DotDot | TokenKind::DotDotDot | TokenKind::DotDotEq | TokenKind::Colon | TokenKind::ColonColon | TokenKind::Question | TokenKind::QuestionDot | TokenKind::QuestionLBracket | TokenKind::QuestionQuestion | TokenKind::QuestionQuestionEq | TokenKind::Plus | TokenKind::PlusPlus | TokenKind::PlusEq | TokenKind::Minus | TokenKind::MinusMinus | TokenKind::MinusEq | TokenKind::Star | TokenKind::StarStar | TokenKind::StarEq | TokenKind::StarStarEq | TokenKind::Slash | TokenKind::SlashEq | TokenKind::Percent | TokenKind::PercentEq | TokenKind::Amp | TokenKind::AmpAmp | TokenKind::AmpEq | TokenKind::AmpAmpEq | TokenKind::Pipe | TokenKind::PipePipe | TokenKind::PipeEq | TokenKind::PipePipeEq | TokenKind::PipeGt | TokenKind::Caret | TokenKind::CaretEq | TokenKind::Tilde | TokenKind::LtLt | TokenKind::LtLtEq | TokenKind::GtGt | TokenKind::GtGtEq | TokenKind::GtGtGt | TokenKind::GtGtGtEq | TokenKind::Eq | TokenKind::EqEq | TokenKind::EqEqEq | TokenKind::Bang | TokenKind::BangEq | TokenKind::BangEqEq | TokenKind::Lt | TokenKind::LtEq | TokenKind::Gt | TokenKind::GtEq | TokenKind::Arrow | TokenKind::FatArrow | TokenKind::Let | TokenKind::Const | TokenKind::Var | TokenKind::Struct | TokenKind::Interface | TokenKind::Type | TokenKind::Enum | TokenKind::Namespace | TokenKind::Module | TokenKind::Extension | TokenKind::On | TokenKind::If | TokenKind::Else | TokenKind::Switch | TokenKind::Case | TokenKind::Default | TokenKind::While | TokenKind::For | TokenKind::Do | TokenKind::Break | TokenKind::Continue | TokenKind::Return | TokenKind::Throw | TokenKind::Try | TokenKind::Catch | TokenKind::Finally | TokenKind::Using | TokenKind::With | TokenKind::Import | TokenKind::Export | TokenKind::From | TokenKind::As | TokenKind::Await | TokenKind::Yield | TokenKind::Delete | TokenKind::Typeof | TokenKind::Instanceof | TokenKind::In | TokenKind::Of | TokenKind::Void | TokenKind::Is | TokenKind::Public | TokenKind::Private | TokenKind::Protected | TokenKind::Static | TokenKind::Abstract | TokenKind::Override | TokenKind::Readonly | TokenKind::Declare | TokenKind::Native | TokenKind::Extends | TokenKind::Implements | TokenKind::Get | TokenKind::Set | TokenKind::Constructor | TokenKind::Destructor | TokenKind::At | TokenKind::Backslash | TokenKind::Dollar | TokenKind::Backtick | TokenKind::Newline | TokenKind::Whitespace | TokenKind::DocComment | TokenKind::Spawn | TokenKind::Parallel | TokenKind::Start => {
             let kind = s.kind();
             if kind.can_be_identifier() {
                 let name = s.consume_lexeme();
@@ -220,7 +220,7 @@ fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<
             Ok(ta) if s.check(TokenKind::LParen) => {
                 type_args = ta;
             }
-            _ => {
+            Ok(_) | Err(_) => {
                 s.restore(save);
             }
         }

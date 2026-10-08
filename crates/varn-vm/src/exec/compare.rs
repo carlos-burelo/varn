@@ -113,7 +113,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 return **da == rhs;
             }
             Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(b),
-            _ => return false,
+            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => return false,
         }
     }
     if heap.is_int(a) && b.is_heap() {
@@ -127,7 +127,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 return lhs == **db;
             }
             Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(a),
-            _ => return false,
+            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::Class(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => return false,
         }
     }
     false

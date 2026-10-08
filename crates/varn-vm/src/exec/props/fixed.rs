@@ -64,7 +64,7 @@ pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmR
                     .get(slot)
                     .and_then(|name| cls.statics.borrow().get(name).copied())
             }
-            _ => None,
+            Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
         };
         if let Some(v) = found {
             return Ok(v);
@@ -114,7 +114,7 @@ pub(crate) fn set_fixed_field(
                     payload_object(heap, ev.payload).map(|o| Target::Obj(o, ev.payload.as_heap()))
                 }
                 Some(HeapObj::Class(cls)) => Some(Target::Class(cls.clone())),
-                _ => None,
+                Some(HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Tuple(_) | HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::BigInt(_) | HeapObj::Decimal(_) | HeapObj::Char(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => None,
             },
         };
 

@@ -181,7 +181,7 @@ impl HeapInner {
                 Some(HeapObj::Class(c)) => format!("[class {}]", c.name),
                 Some(HeapObj::BigInt(n)) => n.to_string(),
                 Some(HeapObj::Decimal(d)) => d.to_plain_string(),
-                _ => "[object]".into(),
+                Some(HeapObj::Record(_) | HeapObj::Buffer(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) | HeapObj::Map(_) | HeapObj::Set(_) | HeapObj::Task(_) | HeapObj::TaskHandle(_) | HeapObj::Range(_) | HeapObj::Symbol(_) | HeapObj::EnumVariant(_) | HeapObj::Generator(_) | HeapObj::Spread(_)) | None => "[object]".into(),
             };
         }
         "null".into()

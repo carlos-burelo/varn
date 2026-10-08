@@ -203,7 +203,7 @@ impl ExecCtx {
                             return Ok(true);
                         }
                     }
-                    _ => {}
+                    Some(crate::heap::HeapObj::Str(_) | crate::heap::HeapObj::Array(_) | crate::heap::HeapObj::Tuple(_) | crate::heap::HeapObj::Object(_) | crate::heap::HeapObj::Record(_) | crate::heap::HeapObj::Buffer(_) | crate::heap::HeapObj::Module(_) | crate::heap::HeapObj::FrozenModule(_) | crate::heap::HeapObj::VmClosure(_) | crate::heap::HeapObj::Class(_) | crate::heap::HeapObj::BoundMethod(_) | crate::heap::HeapObj::Map(_) | crate::heap::HeapObj::Set(_) | crate::heap::HeapObj::Task(_) | crate::heap::HeapObj::TaskHandle(_) | crate::heap::HeapObj::Range(_) | crate::heap::HeapObj::Symbol(_) | crate::heap::HeapObj::EnumVariant(_) | crate::heap::HeapObj::BigInt(_) | crate::heap::HeapObj::Decimal(_) | crate::heap::HeapObj::Char(_) | crate::heap::HeapObj::Generator(_) | crate::heap::HeapObj::Spread(_)) | None => {}
                 }
             }
         }
