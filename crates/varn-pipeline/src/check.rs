@@ -3,7 +3,7 @@ use varn_core::ast::{AstArena, Program};
 
 use crate::PipelineError;
 use varn_core::term::chalk::chalk;
-use varn_debug::flags::DebugFlags;
+use varn_debug_flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
@@ -52,19 +52,14 @@ pub fn check(
     source: &str,
     debug: &DebugFlags,
     session: &crate::resolver::Session,
+    sink: &dyn crate::debug_sink::DebugSink,
 ) -> PipelineResult<CheckResult> {
     let options = varn_checker::CheckOptions::compile();
     let check_result =
         Checker::check_with(program, ast_arena, interner, session.resolver(), options);
     report_diagnostics(&check_result.diagnostics, &program.filename, source)?;
 
-    if debug.symbols {
-        varn_debug::symbols::debug_symbols(&check_result, &program.filename, debug);
-    }
-
-    if debug.check_types {
-        varn_debug::expr::debug_check_types(program, source, &check_result);
-    }
+    sink.check(program, source, &check_result, debug);
 
     Ok(CheckResult {
         checker_result: check_result,
@@ -77,9 +72,10 @@ pub fn collect_test_targets(
     session: &crate::resolver::Session,
 ) -> PipelineResult<Vec<(String, bool)>> {
     let debug = DebugFlags::default();
-    let (tokens, lexeme_buf) = crate::lex::lex(source, path, false, &debug)?;
+    let sink = crate::debug_sink::NullSink;
+    let (tokens, lexeme_buf) = crate::lex::lex(source, path, false, &debug, &sink)?;
     let (program, arena, interner) =
-        crate::parse::parse(tokens, lexeme_buf, source, path, false, &debug)?;
+        crate::parse::parse(tokens, lexeme_buf, source, path, false, &debug, &sink)?;
     let options = varn_checker::CheckOptions::compile();
     let checked = Checker::check_with(&program, &arena, interner, session.resolver(), options);
     if checked.diagnostics.has_errors() {

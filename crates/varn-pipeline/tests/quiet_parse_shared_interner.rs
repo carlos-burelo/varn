@@ -52,6 +52,7 @@ fn build_module_graph_resolves_named_reexport_origin_module_without_panicking() 
         false,
         &varn_pipeline::DebugFlags::default(),
         &session,
+        &varn_pipeline::NullSink,
     );
 
     let _ = fs::remove_dir_all(&dir);

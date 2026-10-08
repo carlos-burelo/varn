@@ -5,7 +5,7 @@ use std::rc::Rc;
 use varn_checker::module_resolver::ImportResolver;
 use varn_compiler::FunctionProto;
 use varn_core::ast::{AstArena, Program};
-use varn_debug::flags::DebugFlags;
+use varn_debug_flags::DebugFlags;
 use varn_types::ModuleGraphArtifact;
 
 type PipelineResult<T> = Result<T, PipelineError>;
@@ -54,6 +54,7 @@ pub fn compile(
     verbose: bool,
     debug: &DebugFlags,
     session: &crate::resolver::Session,
+    sink: &dyn crate::debug_sink::DebugSink,
 ) -> PipelineResult<CompileOutput> {
     if verbose {
         varn_core::term::terminal::tagged("Varn", "generating bytecode...");
@@ -80,61 +81,6 @@ pub fn compile(
         ))
     })?;
 
-    if debug.bytecode {
-        varn_debug::bytecode::debug_bytecode(&proto, debug);
-    }
-
-    if debug.clif {
-        let helpers = varn_vm::jit::table_build::build_jit_helpers();
-        varn_debug::clif::debug_clif(&proto, debug, &helpers);
-    }
-
-    if debug.typeloss {
-        varn_debug::typeloss::debug_typeloss(&proto, debug, None);
-    }
-
-    if debug.summary {
-        varn_debug::summary::debug_summary(&proto);
-    }
-
-    if debug.tiers || debug.bails {
-        let helpers = varn_vm::jit::table_build::build_jit_helpers();
-        if debug.tiers {
-            varn_debug::tiers::debug_tiers(&proto, debug, &helpers, None);
-        }
-        if debug.bails {
-            varn_debug::tiers::debug_bails(&proto, debug, &helpers, None);
-        }
-    }
-
-    if debug.tir || debug.tir_check {
-        varn_debug::tir::debug_tir(
-            program,
-            ast_arena,
-            &check_result.checker_result.bind,
-            &check_result.checker_result.expr_table,
-            &check_result.checker_result.call_mappings,
-            &check_result.checker_result.desugar,
-            debug,
-        );
-    }
-
-    if debug.cap_trace {
-        varn_debug::debug_cap_trace(&proto, &program.filename);
-    }
-
-    if debug.binds {
-        varn_debug::binds::debug_binds(&program.filename);
-    }
-
-    if debug.consts {
-        varn_debug::consts::debug_consts(&program.filename);
-    }
-
-    if debug.scope {
-        varn_debug::scope::debug_scopes(&proto, &program.filename);
-    }
-
     if verbose {
         varn_core::term::terminal::tagged("Varn", "resolving module graph...");
     }
@@ -149,60 +95,14 @@ pub fn compile(
     )
     .map_err(|e| PipelineError::fatal(format!("module graph error: {e}")))?;
 
-    if debug.graph {
-        print_module_graph(&graph_build);
-    }
-
-    if debug.bytecode {
-        let mut paths: Vec<&String> = graph_build.modules.keys().collect();
-        paths.sort_unstable();
-        for path in paths {
-            if path != &graph_build.entry_path {
-                eprintln!("\n=== MODULE BYTECODE: {} ===", path);
-                varn_debug::bytecode::debug_bytecode(&graph_build.modules[path], debug);
-            }
-        }
-    }
-
-    if debug.clif {
-        let helpers = varn_vm::jit::table_build::build_jit_helpers();
-        for (path, module_proto) in graph_build.modules.iter() {
-            if path != &graph_build.entry_path {
-                eprintln!("\n=== MODULE CLIF: {} ===", path);
-                varn_debug::clif::debug_clif(module_proto, debug, &helpers);
-            }
-        }
-    }
-
-    if debug.tiers || debug.bails || debug.summary {
-        let helpers = varn_vm::jit::table_build::build_jit_helpers();
-        for (path, module_proto) in graph_build.modules.iter() {
-            if path == &graph_build.entry_path {
-                continue;
-            }
-            if debug.summary {
-                eprintln!("\n=== MODULE: {} ===", path);
-                varn_debug::summary::debug_summary(module_proto);
-            }
-
-            if debug.tiers {
-                varn_debug::tiers::debug_tiers(module_proto, debug, &helpers, Some(path));
-            }
-            if debug.bails {
-                varn_debug::tiers::debug_bails(module_proto, debug, &helpers, Some(path));
-            }
-        }
-    }
-
-    if debug.typeloss {
-        let mut paths: Vec<&String> = graph_build.modules.keys().collect();
-        paths.sort_unstable();
-        for path in paths {
-            if path != &graph_build.entry_path {
-                varn_debug::typeloss::debug_typeloss(&graph_build.modules[path], debug, Some(path));
-            }
-        }
-    }
+    sink.compile(
+        program,
+        ast_arena,
+        &check_result.checker_result,
+        &proto,
+        &graph_build,
+        debug,
+    );
 
     let mut precompiled_map: FxHashMap<varn_core::ModuleId, Rc<FunctionProto>> =
         FxHashMap::default();
@@ -231,58 +131,4 @@ pub fn compile(
         precompiled: Rc::new(precompiled_map),
         graph_artifact,
     })
-}
-
-fn print_module_graph(build: &crate::module_precompile::ModuleGraphBuild) {
-    use varn_debug::colors::{BOLD, C_MODULES, R};
-    println!("\n{BOLD}Module Dependency Graph{R}");
-    println!("  Entry: {C_MODULES}{}{R}", shorten_path(&build.entry_path));
-    println!();
-    print_graph_node(
-        &build.entry_path,
-        &build.deps,
-        &mut rustc_hash::FxHashSet::default(),
-        "",
-        true,
-    );
-    println!();
-    println!("  {} modules total", build.deps.len());
-}
-
-fn print_graph_node(
-    node: &str,
-    deps: &rustc_hash::FxHashMap<String, Vec<String>>,
-    visited: &mut rustc_hash::FxHashSet<String>,
-    prefix: &str,
-    is_last: bool,
-) {
-    use varn_debug::colors::{C_ERRORS, C_MODULES, R};
-    let connector = if is_last { "└─" } else { "├─" };
-    let short = shorten_path(node);
-    if visited.contains(node) {
-        println!("  {prefix}{connector} {C_ERRORS}(cycle){R} {short}");
-        return;
-    }
-    println!("  {prefix}{connector} {C_MODULES}{short}{R}");
-    visited.insert(node.to_owned());
-
-    let children = deps.get(node).map(|v| v.as_slice()).unwrap_or(&[]);
-    let child_prefix = format!("{prefix}{}", if is_last { "   " } else { "│  " });
-    for (i, child) in children.iter().enumerate() {
-        let last = i + 1 == children.len();
-        print_graph_node(child, deps, visited, &child_prefix, last);
-    }
-}
-
-fn shorten_path(path: &str) -> String {
-    if path.contains(':') && !path.contains('/') && !path.contains('\\') {
-        return path.to_owned();
-    }
-    let normalized = path.replace('\\', "/");
-    let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
-    if parts.len() <= 2 {
-        path.to_owned()
-    } else {
-        format!("…/{}", parts[parts.len() - 2..].join("/"))
-    }
 }

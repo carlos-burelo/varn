@@ -2,6 +2,7 @@ pub mod cache;
 mod check;
 mod compile;
 mod core;
+mod debug_sink;
 mod error;
 mod execute;
 pub mod fmt;
@@ -22,10 +23,11 @@ pub use check::collect_test_targets;
 pub use compile::CompileOutput;
 pub use compile::{emit_and_compile, sorted_export_names};
 pub use core::core_protos_owned;
+pub use debug_sink::{DebugSink, NullSink};
 pub use error::PipelineError;
 pub use execute::{boot_machine, enter_main, execute, execute_with_caps};
 pub use lex::lex as phase_lex;
-pub use opts::{parse_debug_opt, CapabilitySet, DebugFlags, RunOpts};
+pub use opts::{CapabilitySet, DebugFlags, RunOpts};
 pub use parse::parse as phase_parse;
 
 type PipelineResult<T> = Result<T, PipelineError>;
@@ -41,7 +43,7 @@ pub fn read_source_file(path: &str) -> PipelineResult<String> {
     read_source(path)
 }
 
-pub fn run(opts: &RunOpts) -> PipelineResult<()> {
+pub fn run(opts: &RunOpts, sink: &dyn debug_sink::DebugSink) -> PipelineResult<()> {
     let session = resolver::Session::new();
     if portable::is_portable(&opts.file_path) {
         return run_portable(opts);
@@ -57,7 +59,7 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
         None => source,
     };
     let compiled = if opts.eval.is_none() && opts.append.is_none() && !opts.debug.any() {
-        compile_source_cached(&source, &opts.file_path, opts.verbose, &session)?
+        compile_source_cached(&source, &opts.file_path, opts.verbose, &session, sink)?
     } else {
         compile_source(
             &source,
@@ -65,6 +67,7 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
             opts.verbose,
             &opts.debug,
             &session,
+            sink,
         )?
     };
     if opts.no_run {
@@ -113,8 +116,9 @@ pub fn compile_source_for_build(
     verbose: bool,
     debug: &DebugFlags,
     session: &resolver::Session,
+    sink: &dyn debug_sink::DebugSink,
 ) -> PipelineResult<CompileOutput> {
-    compile_source(source, path, verbose, debug, session)
+    compile_source(source, path, verbose, debug, session, sink)
 }
 
 fn compile_source(
@@ -123,16 +127,17 @@ fn compile_source(
     verbose: bool,
     debug: &DebugFlags,
     session: &resolver::Session,
+    sink: &dyn debug_sink::DebugSink,
 ) -> PipelineResult<CompileOutput> {
     let canonical_path = std::path::Path::new(path)
         .canonicalize()
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|_| path.to_owned());
     let path = canonical_path.as_str();
-    let (tokens, lexeme_buf) = lex::lex(source, path, verbose, debug)?;
+    let (tokens, lexeme_buf) = lex::lex(source, path, verbose, debug, sink)?;
     let (program, arena, interner) =
-        parse::parse(tokens, lexeme_buf, source, path, verbose, debug)?;
-    let check_result = check::check(&program, &arena, interner, source, debug, session)?;
+        parse::parse(tokens, lexeme_buf, source, path, verbose, debug, sink)?;
+    let check_result = check::check(&program, &arena, interner, source, debug, session, sink)?;
     let compiled = compile::compile(
         &program,
         &arena,
@@ -141,6 +146,7 @@ fn compile_source(
         verbose,
         debug,
         session,
+        sink,
     )?;
 
     Ok(compiled)
@@ -151,6 +157,7 @@ fn compile_source_cached(
     path: &str,
     verbose: bool,
     session: &resolver::Session,
+    sink: &dyn debug_sink::DebugSink,
 ) -> PipelineResult<CompileOutput> {
     let cache_path = cache::compile_cache_path(path);
 
@@ -176,7 +183,7 @@ fn compile_source_cached(
         varn_core::term::terminal::tagged("Varn", "compile cache miss");
     }
 
-    let compiled = compile_source(source, path, verbose, &DebugFlags::default(), session)?;
+    let compiled = compile_source(source, path, verbose, &DebugFlags::default(), session, sink)?;
     if let Err(e) = cache::store_cached_graph(&cache_path, &compiled.graph_artifact) {
         if verbose {
             varn_core::term::terminal::tagged(

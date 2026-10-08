@@ -1,7 +1,7 @@
 use crate::PipelineError;
 use std::sync::Arc;
 use varn_core::Token;
-use varn_debug::flags::DebugFlags;
+use varn_debug_flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
@@ -10,6 +10,7 @@ pub fn lex(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
+    sink: &dyn crate::debug_sink::DebugSink,
 ) -> PipelineResult<(Vec<Token>, Arc<[u8]>)> {
     let (tokens, lexeme_buf, errors) = varn_lexer::scan(source, path);
 
@@ -36,9 +37,7 @@ pub fn lex(
         varn_core::term::terminal::tagged("Varn", format_args!("scanned {} tokens", tokens.len()));
     }
 
-    if debug.tokens {
-        varn_debug::tokens::debug_tokens(&tokens, &lexeme_buf, path);
-    }
+    sink.lex(&tokens, &lexeme_buf, path, debug);
 
     Ok((tokens, lexeme_buf))
 }

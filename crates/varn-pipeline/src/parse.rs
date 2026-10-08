@@ -1,6 +1,6 @@
 use crate::PipelineError;
 use std::sync::Arc;
-use varn_debug::flags::DebugFlags;
+use varn_debug_flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
@@ -11,6 +11,7 @@ pub fn parse(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
+    sink: &dyn crate::debug_sink::DebugSink,
 ) -> PipelineResult<(
     varn_core::ast::Program,
     varn_core::ast::AstArena,
@@ -42,13 +43,7 @@ pub fn parse(
         );
     }
 
-    if debug.ast {
-        varn_debug::ast::debug_ast(&program, &arena, &interner);
-    }
-
-    if debug.modules {
-        varn_debug::modules::debug_modules(&program, &arena);
-    }
+    sink.parse(&program, &arena, &interner, debug);
 
     Ok((program, arena, interner))
 }
