@@ -50,6 +50,14 @@ Canónico: layout en `varn-abi/src/lib.rs` (hoy 151 LOC, solo→core). Sin `Once
 
 ## F2 — Loader único, núcleo [ ]
 
+- [x] `PipelineLoader` único sobre registry canónico (`5342032c`): File/Std fuera, caché instancia, `VmFactory` contra trait
+- [x] Sesión explícita en pipeline (`e607ec59`): `Session::new()` por run, fuera `thread_local`/`with_resolver`/`reset`; `DiskResolver::with_registry`
+- [ ] Workspace LSP dueño del resolver (fuera global `OnceLock`)
+- [ ] Una sola función compila-módulo en pipeline (dedup `compile_source_inner`)
+- [ ] Puerta: `vn test` 155/0 (verde) + pipeline tests (verde salvo preexistentes abajo)
+
+Deuda preexistente (HEAD limpio, no tocar aquí): `bytecode_layout_agrees` pánico Atom interner; `h7` tamaño Atom.
+
 Causa: 3 traits mismo hecho: `modules/loader.rs:94` `ModuleLoader: Send+Sync resolve+source` (canónico, existe)
 vs `vm/loader.rs:22` `resolve+load→Proto` vs `checker/module_resolver/resolver_trait.rs:9` `ImportResolver for DiskResolver`
 (`resolver_disk.rs:5`). Más `pipeline/resolver.rs:4` `thread_local! RESOLVER`, `stdlib_loader.rs:12` `PROTO_CACHE`,
