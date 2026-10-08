@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 static SILENT: AtomicBool = AtomicBool::new(false);

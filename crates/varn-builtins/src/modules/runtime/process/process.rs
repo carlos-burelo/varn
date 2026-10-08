@@ -1,6 +1,6 @@
 use parking_lot::RwLock;
 use std::process::{Child, Command};
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{NativeCtx, VmValue, VnArray};
 
 static PROCESS_POOL: RwLock<Vec<Option<Child>>> = RwLock::new(Vec::new());

@@ -4,7 +4,7 @@ use flate2::Compression;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct CompressRuntime;

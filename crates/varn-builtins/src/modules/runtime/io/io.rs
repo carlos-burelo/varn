@@ -1,5 +1,5 @@
 use std::io::Write as IoWrite;
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct IoRuntime;

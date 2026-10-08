@@ -36,7 +36,7 @@ fn valid_class(name: &str) -> bool {
 fn fn_module_rs(mod_name: &str) -> String {
     let struct_name = format!("{}Runtime", pascal(mod_name));
     format!(
-        "use varn_op_macros::varn_contract;\nuse varn_types::NativeCtx;\n\npub struct {struct_name};\n\nvarn_contract! {{\n    module: \"runtime:{mod_name}\",\n    contract: \"src/modules/runtime/{mod_name}/{mod_name}_runtime.vn\",\n    impl {struct_name} {{\n        fn ping(_ctx: &mut dyn NativeCtx) -> Result<String, String> {{\n            Ok(\"pong\".to_string())\n        }}\n    }}\n}}\n"
+        "use varn_contract::varn_contract;\nuse varn_types::NativeCtx;\n\npub struct {struct_name};\n\nvarn_contract! {{\n    module: \"runtime:{mod_name}\",\n    contract: \"src/modules/runtime/{mod_name}/{mod_name}_runtime.vn\",\n    impl {struct_name} {{\n        fn ping(_ctx: &mut dyn NativeCtx) -> Result<String, String> {{\n            Ok(\"pong\".to_string())\n        }}\n    }}\n}}\n"
     )
 }
 

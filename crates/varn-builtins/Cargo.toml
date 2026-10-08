@@ -31,7 +31,7 @@ runtime = [
 varn-core      = { path = "../varn-core" }
 varn-types     = { path = "../varn-types" }
 varn-modules   = { path = "../varn-modules" }
-varn-op-macros = { path = "../varn-op-macros" }
+varn-contract  = { path = "../varn-contract" }
 varn-runtime   = { path = "../varn-runtime" }
 
 bigdecimal   = { workspace = true, optional = true }

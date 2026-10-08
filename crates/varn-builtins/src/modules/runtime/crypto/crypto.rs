@@ -2,7 +2,7 @@ use base64::Engine;
 use hmac::{Hmac, Mac};
 use rand::RngCore;
 use sha2::{Digest, Sha256, Sha512};
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct CryptoRuntime;

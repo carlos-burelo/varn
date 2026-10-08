@@ -1,7 +1,7 @@
 use parking_lot::Mutex;
 use rusqlite::types::ValueRef;
 use rusqlite::Connection;
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{NativeCtx, VmValue, VnArray};
 
 static DB_POOL: Mutex<Vec<Option<Connection>>> = Mutex::new(Vec::new());

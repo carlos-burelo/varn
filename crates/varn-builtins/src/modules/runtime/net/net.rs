@@ -3,7 +3,7 @@ pub mod http_parser;
 
 use driver::driver;
 use urlencoding::{decode, encode};
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{HostOpen, NativeCtx, VmValue};
 
 pub struct NetRuntime;

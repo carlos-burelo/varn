@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use std::fs;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, RwLock};
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 static NEXT_FD: AtomicI64 = AtomicI64::new(1);

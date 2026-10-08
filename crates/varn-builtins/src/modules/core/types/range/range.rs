@@ -1,4 +1,4 @@
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::value::{RangeData, RangeElem};
 use varn_types::{NativeCtx, NativeError, VmValue};
 

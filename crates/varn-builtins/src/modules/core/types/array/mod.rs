@@ -2,7 +2,7 @@
 
 mod ordering;
 
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 pub struct Array;

@@ -1,5 +1,5 @@
 use parking_lot::RwLock;
-use varn_op_macros::varn_contract;
+use varn_contract::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 static REGEX_POOL: RwLock<Vec<regex::Regex>> = RwLock::new(Vec::new());
