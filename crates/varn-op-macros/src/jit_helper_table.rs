@@ -66,8 +66,8 @@ fn is_jit_slow(attr: &syn::Attribute) -> bool {
 pub fn expand(input: TokenStream) -> TokenStream {
     let inv = parse_macro_input!(input as Invocation);
     let mode = inv.mode.to_string();
-    if mode != "define" && mode != "fill" {
-        return quote! { compile_error!("jit_helper_table: modo `define` o `fill`"); }.into();
+    if mode != "fill" {
+        return quote! { compile_error!("jit_helper_table: solo modo `fill`"); }.into();
     }
     let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_owned());
     let dir = std::path::PathBuf::from(manifest).join(inv.dir.value());
@@ -136,14 +136,6 @@ pub fn expand(input: TokenStream) -> TokenStream {
             }
             by_field.insert(field, (module.clone(), func_name));
         }
-    }
-
-    if mode == "define" {
-        let fields = by_field.keys().map(|f| {
-            let ident = format_ident!("{}", f);
-            quote! { #ident, }
-        });
-        return quote! { define_tail! { #(#fields)* } }.into();
     }
 
     let fills = by_field.iter().map(|(field, (module, func))| {

@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 varn-core = { path = "../varn-core" }
-varn-op-macros = { path = "../varn-op-macros" }
+varn-jit-abi = { path = "../varn-jit-abi" }
 varn-types = { path = "../varn-types" }
 cranelift-codegen = { version = "0.136.2", default-features = false, features = ["x86", "arm64", "std"], optional = true }
 cranelift-frontend = { version = "0.136.2", optional = true }

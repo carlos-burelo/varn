@@ -1,0 +1,10 @@
+[package]
+name = "varn-jit-abi"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+varn-types = { path = "../varn-types" }
+
+[lints]
+workspace = true

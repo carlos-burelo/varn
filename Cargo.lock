@@ -2250,7 +2250,14 @@ dependencies = [
  "cranelift-object",
  "rustc-hash 1.1.0",
  "varn-core",
- "varn-op-macros",
+ "varn-jit-abi",
+ "varn-types",
+]
+
+[[package]]
+name = "varn-jit-abi"
+version = "0.1.0"
+dependencies = [
  "varn-types",
 ]
 
