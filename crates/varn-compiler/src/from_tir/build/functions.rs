@@ -35,12 +35,17 @@ pub fn build_function(
     tir: &TirModule,
     func: &TirFunction,
     self_fn: Option<varn_tir::FnId>,
+    lines: &[u32],
 ) -> Result<SsaFunc> {
-    build_inner(tir, func, false, &[], self_fn)
+    build_inner(tir, func, false, &[], self_fn, lines)
 }
 
-pub fn build_top_level(tir: &TirModule, export_slots: &[Arc<str>]) -> Result<SsaFunc> {
-    build_inner(tir, &tir.top_level, true, export_slots, None)
+pub fn build_top_level(
+    tir: &TirModule,
+    export_slots: &[Arc<str>],
+    lines: &[u32],
+) -> Result<SsaFunc> {
+    build_inner(tir, &tir.top_level, true, export_slots, None, lines)
 }
 
 fn build_inner(
@@ -49,10 +54,11 @@ fn build_inner(
     register_module_fns: bool,
     export_slots: &[Arc<str>],
     self_fn: Option<varn_tir::FnId>,
+    lines: &[u32],
 ) -> Result<SsaFunc> {
     let mut pinned = super::super::pinning::captured_vars(func);
     pinned.extend(super::super::pinning::try_pinned_vars(func));
-    let mut b = Builder::with_pinned(tir, pinned.clone());
+    let mut b = Builder::with_pinned(tir, pinned.clone(), lines);
     b.self_fn = self_fn;
     b.locals_bt = func.locals.clone();
     b.return_bt = Some(func.return_ty);
@@ -114,11 +120,16 @@ fn build_inner(
     })
 }
 
-pub fn build_module(tir: &TirModule) -> Result<Vec<SsaFunc>> {
+pub fn build_module(tir: &TirModule, lines: &[u32]) -> Result<Vec<SsaFunc>> {
     let mut out = Vec::with_capacity(tir.functions.len() + 1);
-    out.push(build_function(tir, &tir.top_level, None)?);
+    out.push(build_function(tir, &tir.top_level, None, lines)?);
     for (i, f) in tir.functions.iter().enumerate() {
-        out.push(build_function(tir, f, Some(varn_tir::FnId(i as u32)))?);
+        out.push(build_function(
+            tir,
+            f,
+            Some(varn_tir::FnId(i as u32)),
+            lines,
+        )?);
     }
     Ok(out)
 }

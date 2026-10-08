@@ -164,14 +164,20 @@ fn emit_tir(state: &DocumentState) -> Result<TirModule, String> {
 }
 
 fn build_ssa(state: &DocumentState) -> Result<Vec<varn_compiler::ssa::ir::SsaFunc>, String> {
-    varn_compiler::from_tir::build_module(&emit_tir(state)?)
+    let lines = varn_compiler::from_tir::compile::line_starts_of(&state.source);
+    varn_compiler::from_tir::build_module(&emit_tir(state)?, &lines)
         .map_err(|e| format!("SSA build failed: {e:?}"))
 }
 
 pub fn compile_and_disassemble(state: &DocumentState) -> Result<String, String> {
-    let proto =
-        varn_compiler::from_tir::compile_module(&emit_tir(state)?, Vec::new(), &state.source)
-            .map_err(|e| format!("Compilation failed: {e:?}"))?;
+    let proto = varn_compiler::from_tir::compile_module(
+        &emit_tir(state)?,
+        Vec::new(),
+        &state.source,
+        false,
+    )
+    .0
+    .map_err(|e| format!("Compilation failed: {e:?}"))?;
     Ok(varn_types::bytecode::disasm::render(&proto))
 }
 

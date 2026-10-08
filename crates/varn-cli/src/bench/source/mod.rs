@@ -124,23 +124,17 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let compile_samples = time_n(runs, || {
-        varn_compiler::regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
-        varn_compiler::regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
-
-        let res = varn_pipeline::emit_and_compile(
+        let (res, opt_dur) = varn_pipeline::emit_and_compile(
             program_ref,
             arena_ref,
             &check_result,
             export_names_of(&program_ref.filename, &session),
             &source,
+            true,
         );
-
-        varn_compiler::regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
-        let opt_dur = varn_compiler::regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
         optimize_samples.borrow_mut().push(opt_dur);
 
-        res.map(|_| ())
-            .map_err(|e| format!("compile failed: {}", e))
+        res.map(|_| ()).map_err(|e| format!("compile failed: {e}"))
     })?;
 
     let optimize_samples = optimize_samples.into_inner();
@@ -150,14 +144,15 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
-    let proto = varn_pipeline::emit_and_compile(
+    let (final_result, _) = varn_pipeline::emit_and_compile(
         &program,
         &arena,
         &check_result,
         export_names_of(&program.filename, &session),
         &source,
-    )
-    .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
+        false,
+    );
+    let proto = final_result.map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
 
     let precompile_start = Instant::now();
     let graph_build = varn_pipeline::module_precompile::build_module_graph(

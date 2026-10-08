@@ -27,7 +27,8 @@ pub fn emit_and_compile(
     check: &varn_checker::CheckResult,
     export_names: Vec<std::sync::Arc<str>>,
     source: &str,
-) -> Result<FunctionProto, String> {
+    measure: bool,
+) -> (Result<FunctionProto, String>, std::time::Duration) {
     let tir = varn_checker::emit::emit_module(
         program,
         ast_arena,
@@ -36,8 +37,9 @@ pub fn emit_and_compile(
         &check.call_mappings,
         &check.desugar,
     );
-    varn_compiler::from_tir::compile_module(&tir, export_names, source)
-        .map_err(|e| format!("{e:?}"))
+    let (result, opt_time) =
+        varn_compiler::from_tir::compile_module(&tir, export_names, source, measure);
+    (result.map_err(|e| format!("{e:?}")), opt_time)
 }
 
 pub struct CompileOutput {
@@ -65,14 +67,15 @@ pub fn compile(
         .module_exports(&program.filename, &mut vec![]);
     let export_names = sorted_export_names(&exports);
 
-    let proto = emit_and_compile(
+    let (proto_result, _) = emit_and_compile(
         program,
         ast_arena,
         &check_result.checker_result,
         export_names,
         source,
-    )
-    .map_err(|e| {
+        false,
+    );
+    let proto = proto_result.map_err(|e| {
         PipelineError::fatal(format!(
             "{}: {e:?}",
             varn_core::term::chalk::chalk("error[emit:tir]")

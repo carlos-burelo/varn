@@ -34,10 +34,11 @@ pub struct FnMeta {
     pub upvalue_count: u32,
 }
 
-pub fn emit_function_meta(
+pub(crate) fn emit_function_meta(
     mut ssa: SsaFunc,
     f: &FnMeta,
     source_file: Arc<str>,
+    scope: &crate::from_tir::compile::ModuleScope,
 ) -> Result<FunctionProto> {
     phi_edges::split_phi_edges(&mut ssa);
 
@@ -109,6 +110,7 @@ pub fn emit_function_meta(
                 &mut fixups,
                 &imms,
                 &mut closure_consts[b][idx],
+                scope,
             )?;
             inst_next[b][idx] = chunk.code.len();
         }
@@ -300,6 +302,7 @@ fn emit_inst(
     imms: &Immediates,
 
     closure_const: &mut Option<u16>,
+    scope: &crate::from_tir::compile::ModuleScope,
 ) -> Result<()> {
     if let (Some(d), InstKind::ConstInt(_)) = (inst.dest, &inst.kind) {
         if imms.is_elided(d) {
@@ -428,5 +431,6 @@ fn emit_inst(
         nparams,
         fixups,
         closure_const,
+        scope,
     )
 }

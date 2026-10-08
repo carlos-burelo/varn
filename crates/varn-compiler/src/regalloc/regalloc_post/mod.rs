@@ -1,5 +1,4 @@
 use rustc_hash::FxHashMap as HashMap;
-use std::cell::Cell;
 use std::time::{Duration, Instant};
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
@@ -17,24 +16,12 @@ pub(crate) use validate::*;
 
 use crate::regalloc::liveness::LivenessAnalyzer;
 
-thread_local! {
-    pub static OPTIMIZE_TIME: Cell<Duration> = const { Cell::new(Duration::ZERO) };
-    pub static OPTIMIZE_ENABLED: Cell<bool> = const { Cell::new(true) };
-}
-
-pub fn optimize_function(proto: &mut FunctionProto) {
-    let start = if OPTIMIZE_ENABLED.with(|e| e.get()) {
-        Some(Instant::now())
-    } else {
-        None
-    };
+pub fn optimize_function(proto: &mut FunctionProto, measure: bool) -> Duration {
+    let start = if measure { Some(Instant::now()) } else { None };
 
     optimize_function_inner(proto);
 
-    if let Some(start) = start {
-        let elapsed = start.elapsed();
-        OPTIMIZE_TIME.with(|t| t.set(t.get() + elapsed));
-    }
+    start.map(|s| s.elapsed()).unwrap_or_default()
 }
 
 fn optimize_function_inner(proto: &mut FunctionProto) {

@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use varn_tir::{BackendTy, TirFunction, TirModule};
 use varn_types::chunk::FunctionProto;
@@ -12,33 +13,9 @@ use super::ty::lower as lower_ty;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-thread_local! {
-    static CUR_TIR: std::cell::Cell<*const TirModule> = const { std::cell::Cell::new(std::ptr::null()) };
-    static CUR_LINES: std::cell::Cell<*const Vec<u32>> = const { std::cell::Cell::new(std::ptr::null()) };
-}
-
-struct ModuleScope(*const TirModule, *const Vec<u32>);
-impl Drop for ModuleScope {
-    fn drop(&mut self) {
-        CUR_TIR.with(|c| c.set(self.0));
-        CUR_LINES.with(|c| c.set(self.1));
-    }
-}
-fn enter_module(tir: &TirModule, lines: &Vec<u32>) -> ModuleScope {
-    let prev = CUR_TIR.with(|c| c.replace(tir as *const TirModule));
-    let prev_lines = CUR_LINES.with(|c| c.replace(lines as *const Vec<u32>));
-    ModuleScope(prev, prev_lines)
-}
-
-pub(crate) fn cur_line_starts() -> Vec<u32> {
-    CUR_LINES.with(|c| {
-        let ptr = c.get();
-        if ptr.is_null() {
-            vec![0]
-        } else {
-            unsafe { (*ptr).clone() }
-        }
-    })
+pub(crate) struct ModuleScope<'m> {
+    pub tir: &'m TirModule,
+    pub lines: &'m [u32],
 }
 
 pub fn line_starts_of(source: &str) -> Vec<u32> {
@@ -51,15 +28,19 @@ pub fn line_starts_of(source: &str) -> Vec<u32> {
     starts
 }
 
-pub(crate) fn emit_tir_closure(idx: u32, source_file: Arc<str>) -> Result<FunctionProto> {
-    let ptr = CUR_TIR.with(|c| c.get());
-    assert!(
-        !ptr.is_null(),
-        "from_tir: closure emitted outside a module scope"
-    );
-
-    let tir: &TirModule = unsafe { &*ptr };
-    compile_closure(tir, idx, source_file)
+pub(crate) fn compile_closure(
+    scope: &ModuleScope,
+    idx: u32,
+    source_file: Arc<str>,
+) -> Result<FunctionProto> {
+    let tir = scope.tir;
+    let f = tir
+        .functions
+        .get(idx as usize)
+        .ok_or(OptError::Unsupported(
+            "from_tir: closure index out of range",
+        ))?;
+    compile_one(scope, f, false, source_file, &[], Some(varn_tir::FnId(idx)))
 }
 
 fn fn_meta(tir: &TirModule, f: &TirFunction) -> FnMeta {
@@ -93,17 +74,18 @@ fn fn_meta(tir: &TirModule, f: &TirFunction) -> FnMeta {
 }
 
 fn compile_one(
-    tir: &TirModule,
+    scope: &ModuleScope,
     f: &TirFunction,
     is_top_level: bool,
     source_file: Arc<str>,
     export_slots: &[Arc<str>],
     self_fn: Option<varn_tir::FnId>,
 ) -> Result<FunctionProto> {
+    let tir = scope.tir;
     let mut ssa = if is_top_level {
-        build_top_level(tir, export_slots)?
+        build_top_level(tir, export_slots, scope.lines)?
     } else {
-        build_function(tir, f, self_fn)?
+        build_function(tir, f, self_fn, scope.lines)?
     };
     crate::ssa::verify::recompute_preds(&mut ssa);
     crate::passes::optimize(&mut ssa);
@@ -112,7 +94,7 @@ fn compile_one(
     if let Err(why) = crate::ssa::verify::verify(&ssa) {
         panic!("from_tir: ssa verify failed for {}: {}", f.name, why);
     }
-    let mut proto = emit_function_meta(ssa, &fn_meta(tir, f), source_file)?;
+    let mut proto = emit_function_meta(ssa, &fn_meta(tir, f), source_file, scope)?;
     proto.state_size = state_size;
     if is_top_level {
         proto.global_count = tir.global_names.len() as u32;
@@ -120,47 +102,47 @@ fn compile_one(
     Ok(proto)
 }
 
-pub(crate) fn compile_closure(
-    tir: &TirModule,
-    idx: u32,
-    source_file: Arc<str>,
-) -> Result<FunctionProto> {
-    let f = tir
-        .functions
-        .get(idx as usize)
-        .ok_or(OptError::Unsupported(
-            "from_tir: closure index out of range",
-        ))?;
-    compile_one(tir, f, false, source_file, &[], Some(varn_tir::FnId(idx)))
-}
-
 pub fn compile_module(
     tir: &TirModule,
     export_names: Vec<Arc<str>>,
     source: &str,
-) -> Result<FunctionProto> {
-    varn_tir::verify_module(tir).map_err(|errors| {
-        crate::OptError::InvalidTir(
-            errors
-                .iter()
-                .map(|e| {
-                    format!(
-                        "{}:{}..{}: {}",
-                        tir.source_file, e.span.start, e.span.end, e.message
-                    )
-                })
-                .collect(),
-        )
-    })?;
+    measure: bool,
+) -> (std::result::Result<FunctionProto, OptError>, Duration) {
+    if let Err(errors) = varn_tir::verify_module(tir) {
+        return (
+            Err(crate::OptError::InvalidTir(
+                errors
+                    .iter()
+                    .map(|e| {
+                        format!(
+                            "{}:{}..{}: {}",
+                            tir.source_file, e.span.start, e.span.end, e.message
+                        )
+                    })
+                    .collect(),
+            )),
+            Duration::ZERO,
+        );
+    }
     let lines = line_starts_of(source);
-    let _scope = enter_module(tir, &lines);
+    let scope = ModuleScope { tir, lines: &lines };
     let source_file = tir.source_file.clone();
-    let mut proto = compile_one(tir, &tir.top_level, true, source_file, &export_names, None)?;
+    let mut proto = match compile_one(
+        &scope,
+        &tir.top_level,
+        true,
+        source_file,
+        &export_names,
+        None,
+    ) {
+        Ok(p) => p,
+        Err(e) => return (Err(e), Duration::ZERO),
+    };
     proto.export_names = export_names
         .into_iter()
         .map(|s| Arc::from(s.as_ref()))
         .collect();
 
-    crate::regalloc::run_post_passes(&mut proto);
-    Ok(proto)
+    let opt_time = crate::regalloc::run_post_passes(&mut proto, measure);
+    (Ok(proto), opt_time)
 }

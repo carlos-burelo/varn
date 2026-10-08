@@ -29,6 +29,7 @@ pub(super) fn emit_value(
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
     closure_const: &mut Option<u16>,
+    scope: &crate::from_tir::compile::ModuleScope,
 ) -> Result<()> {
     let line = inst.line;
     match &inst.kind {
@@ -132,6 +133,7 @@ pub(super) fn emit_value(
                 nparams,
                 closure_const,
                 line,
+                scope,
             )?;
         }
 

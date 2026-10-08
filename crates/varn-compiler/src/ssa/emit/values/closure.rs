@@ -17,8 +17,9 @@ pub(super) fn emit_make_closure(
     nparams: usize,
     closure_const: &mut Option<u16>,
     line: u32,
+    scope: &crate::from_tir::compile::ModuleScope,
 ) -> Result<()> {
-    let proto = crate::from_tir::compile::emit_tir_closure(func, source_file.clone())?;
+    let proto = crate::from_tir::compile::compile_closure(scope, func, source_file.clone())?;
     let idx = chunk.add_constant(PoolEntry::Function(Rc::new(proto)));
     *closure_const = Some(idx);
     if upvalues_src.is_empty() {

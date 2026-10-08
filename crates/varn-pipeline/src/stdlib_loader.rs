@@ -136,7 +136,9 @@ fn compile_source_inner(
             resolver.module_exports(path, &mut vec![])
         };
     let export_names = crate::compile::sorted_export_names(&exports);
-    crate::compile::emit_and_compile(&program, &arena, &check, export_names, source)
+    let (result, _) =
+        crate::compile::emit_and_compile(&program, &arena, &check, export_names, source, false);
+    result
 }
 
 fn validate_imports(id: &str, source: &str) -> Result<(), String> {

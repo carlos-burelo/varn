@@ -45,14 +45,15 @@ pub(super) fn measure_e2e(
             varn_checker::CheckOptions::compile(),
         );
 
-        let proto = varn_pipeline::emit_and_compile(
+        let (e2e_result, _) = varn_pipeline::emit_and_compile(
             &program,
             &arena,
             &check_result,
             export_names_of(&program.filename, session),
             &source,
-        )
-        .map_err(|e| format!("compile failed: {}", e))?;
+            false,
+        );
+        let proto = e2e_result.map_err(|e| format!("compile failed: {}", e))?;
 
         varn_builtins::reset_testing_counters();
 

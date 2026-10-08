@@ -33,6 +33,8 @@ pub fn debug_tir(
     }
 
     if flags.tir_check {
+        let source = std::fs::read_to_string(program.filename.as_ref()).unwrap_or_default();
+        let lines = varn_compiler::from_tir::compile::line_starts_of(&source);
         Section::new("tir check")
             .subtitle(module.source_file.clone())
             .color(|c| c.magenta())
@@ -53,14 +55,13 @@ pub fn debug_tir(
             terminal::log(line.to_string());
         }
 
-        match varn_compiler::from_tir::build_module(&module) {
+        match varn_compiler::from_tir::build_module(&module, &lines) {
             Ok(fns) => terminal::info(format!("from_tir(ssa): OK ({} ssa fn(s))", fns.len())),
             Err(e) => terminal::warn(format!("from_tir(ssa): {e:?}")),
         }
 
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let source = std::fs::read_to_string(program.filename.as_ref()).unwrap_or_default();
-            varn_compiler::from_tir::compile_module(&module, vec![], &source)
+            varn_compiler::from_tir::compile_module(&module, vec![], &source, false).0
         })) {
             Ok(Ok(_)) => terminal::info("from_tir(proto): OK"),
             Ok(Err(e)) => terminal::warn(format!("from_tir(proto): {e:?}")),

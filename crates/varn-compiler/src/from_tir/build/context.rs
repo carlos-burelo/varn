@@ -45,12 +45,12 @@ pub(super) struct InlineFrame {
 }
 
 impl<'m> Builder<'m> {
-    pub(super) fn with_pinned(tir: &'m TirModule, pinned: FxHashSet<VarId>) -> Self {
+    pub(super) fn with_pinned(tir: &'m TirModule, pinned: FxHashSet<VarId>, lines: &[u32]) -> Self {
         let mut b = Builder {
             tir,
             self_fn: None,
             ssa_types: crate::hir::TyTable::default(),
-            line_starts: super::super::compile::cur_line_starts(),
+            line_starts: lines.to_vec(),
             cur_line: 1,
             blocks: Vec::new(),
             values: Vec::new(),
