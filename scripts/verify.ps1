@@ -94,7 +94,7 @@ if (-not $SkipLint) {
     Write-WarningMsg "Saltando pasos de formateo y clippy (-SkipLint activo)."
 }
 
-# 3. Auditoria de Tamano de Archivos
+# 3. Auditoria de Tamano de Archivos (techo AGENTS §6: 400; >1000 falla)
 Write-StepHeader "3/6: Auditoria de Gobernanza de Tamano de Archivos (Anti-God Files)"
 $largeFiles = Get-ChildItem -Path "crates" -Recurse -Filter "*.rs" |
     ForEach-Object {
@@ -102,9 +102,9 @@ $largeFiles = Get-ChildItem -Path "crates" -Recurse -Filter "*.rs" |
         [PSCustomObject]@{
             Path   = $_.FullName.Replace("$RootDir\", "")
             Lines  = $lines
-            Status = if ($lines -gt 1000) { "ERROR (>1000 lineas)" } elseif ($lines -gt 700) { "ADVERTENCIA (>700 lineas)" } else { "OK" }
+            Status = if ($lines -gt 1000) { "ERROR (>1000 lineas)" } elseif ($lines -gt 400) { "ADVERTENCIA (>400 lineas)" } else { "OK" }
         }
-    } | Where-Object { $_.Lines -gt 700 } | Sort-Object Lines -Descending
+    } | Where-Object { $_.Lines -gt 400 } | Sort-Object Lines -Descending
 
 if ($largeFiles) {
     $largeFiles | Format-Table -AutoSize
@@ -113,10 +113,10 @@ if ($largeFiles) {
         Write-Failure "Se detectaron archivos que superan el limite estricto de 1000 lineas (Regla Anti-God File)."
         $failedSteps += "File Size Governance (>1000 lines)"
     } else {
-        Write-WarningMsg "Archivos entre 700 y 1000 lineas detectados. Se recomienda evaluar modularizacion."
+        Write-WarningMsg "Archivos entre 400 y 1000 lineas detectados. Techo AGENTS §6: 400 por dominio."
     }
 } else {
-    Write-Success "Todos los archivos de crates cumplen con la gobernanza de tamano (<700 lineas)."
+    Write-Success "Todos los archivos de crates cumplen con la gobernanza de tamano (<400 lineas)."
 }
 
 # 4. Compilacion en Modo Release

@@ -48,8 +48,8 @@ jobs:
                 echo "::error file=$file::File exceeds 1000 lines ($LINES lines). Governance rule forbids files > 1000 lines."
                 FAIL=1
               fi
-            elif [ "$LINES" -gt 700 ]; then
-              echo "::warning file=$file::File has $LINES lines (>700 lines). Modularization refactoring recommended."
+            elif [ "$LINES" -gt 400 ]; then
+              echo "::warning file=$file::File has $LINES lines (>400 lines, AGENTS §6 ceiling). Modularization by domain required."
             fi
           done < <(find crates -name "*.rs")
           if [ $FAIL -ne 0 ]; then

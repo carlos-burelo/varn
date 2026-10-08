@@ -30,9 +30,9 @@ Para evitar la creación de *God Files*, el proyecto aplica reglas estrictas sob
 | Líneas de Código | Clasificación | Acción Requerida |
 |---|---|---|
 | `< 300` | **Ideal** | Tamaño óptimo y enfocado. |
-| `300 - 500` | **Advertencia** | Monitorear responsabilidad del módulo. |
-| `500 - 700` | **Refactor Recomendado** | Evaluar extracción de funciones o estructuras a submódulos. |
-| `> 1000` | **Refactor Obligatorio** | **Prohibido** añadir nuevas funciones sin dividir el archivo. |
+| `300 - 400` | **Advertencia** | Monitorear responsabilidad del módulo. |
+| `400 - 1000` | **Refactor Requerido (AGENTS §6)** | Partir por dominio antes de agregar nada. Puerta CI avisa; `verify.ps1`/`verify.sh`/`ci.yml` advierten >400. |
+| `> 1000` | **Refactor Obligatorio** | **Prohibido** añadir nuevas funciones sin dividir el archivo. Puerta CI falla. |
 
 ---
 

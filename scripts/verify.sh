@@ -88,8 +88,8 @@ while IFS= read -r file; do
     if [ "$LINES" -gt 1000 ]; then
         fail "$file tiene $LINES líneas (>1000 líneas - PROHIBIDO)"
         CRITICAL_FILES=$((CRITICAL_FILES + 1))
-    elif [ "$LINES" -gt 700 ]; then
-        warn "$file tiene $LINES líneas (>700 líneas - Refactor recomendado)"
+    elif [ "$LINES" -gt 400 ]; then
+        warn "$file tiene $LINES líneas (>400 líneas - techo AGENTS §6)"
         LARGE_FILES=$((LARGE_FILES + 1))
     fi
 done < <(find crates -name "*.rs")
