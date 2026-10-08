@@ -63,23 +63,23 @@ pub(super) fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> Con
             use varn_core::ast::operators::UnaryOp;
             let v = match const_int_expr(*operand, arena) {
                 Value(v) => v,
-                other => return other,
+                other @ Overflow | other @ NotConst => return other,
             };
             match op {
                 UnaryOp::Minus => lift(varn_core::neg_int(v)),
                 UnaryOp::Plus => Value(v),
-                _ => NotConst,
+                UnaryOp::Not | UnaryOp::BitNot | UnaryOp::Typeof => NotConst,
             }
         }
         ExprKind::Paren { expression } => const_int_expr(*expression, arena),
         ExprKind::Binary { left, right, op } => {
             let a = match const_int_expr(*left, arena) {
                 Value(v) => v,
-                other => return other,
+                other @ Overflow | other @ NotConst => return other,
             };
             let b = match const_int_expr(*right, arena) {
                 Value(v) => v,
-                other => return other,
+                other @ Overflow | other @ NotConst => return other,
             };
             match op {
                 BinaryOp::Add => lift(varn_core::add_int(a, b)),
@@ -89,10 +89,10 @@ pub(super) fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> Con
                     Ok(e) => lift(varn_core::pow_int(a, e)),
                     Err(_) => NotConst,
                 },
-                _ => NotConst,
+                BinaryOp::Div | BinaryOp::Mod | BinaryOp::Eq | BinaryOp::NotEq | BinaryOp::Lt | BinaryOp::Gt | BinaryOp::LtEq | BinaryOp::GtEq | BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor | BinaryOp::Shl | BinaryOp::Shr | BinaryOp::UShr | BinaryOp::Instanceof | BinaryOp::In => NotConst,
             }
         }
-        _ => NotConst,
+        ExprKind::FloatLiteral { .. } | ExprKind::BigIntLiteral { .. } | ExprKind::DecimalLiteral { .. } | ExprKind::StrLiteral { .. } | ExprKind::CharLiteral { .. } | ExprKind::BoolLiteral { .. } | ExprKind::NullLiteral | ExprKind::RegexLiteral { .. } | ExprKind::Template { .. } | ExprKind::TaggedTemplate { .. } | ExprKind::Identifier { .. } | ExprKind::Missing | ExprKind::This | ExprKind::Super | ExprKind::Array { .. } | ExprKind::Object { .. } | ExprKind::Tuple { .. } | ExprKind::Record { .. } | ExprKind::Update { .. } | ExprKind::Logical { .. } | ExprKind::Assign { .. } | ExprKind::Conditional { .. } | ExprKind::Member { .. } | ExprKind::Call { .. } | ExprKind::New { .. } | ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::Sequence { .. } | ExprKind::Await { .. } | ExprKind::Spawn { .. } | ExprKind::Yield { .. } | ExprKind::Spread { .. } | ExprKind::Pipeline { .. } | ExprKind::Range { .. } | ExprKind::NonNull { .. } | ExprKind::Try { .. } | ExprKind::As { .. } | ExprKind::Satisfies { .. } | ExprKind::ClassExpr { .. } | ExprKind::Match { .. } | ExprKind::Is { .. } | ExprKind::With { .. } | ExprKind::MetaAccess { .. } => NotConst,
     }
 }
 

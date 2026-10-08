@@ -338,7 +338,7 @@ impl<'r> Checker<'r> {
                     self.check_stmt(body, bind);
                     self.current_scope = saved_block_scope;
                 }
-                _ => {}
+                ClassMember::Destructor { .. } => {}
             }
         }
 

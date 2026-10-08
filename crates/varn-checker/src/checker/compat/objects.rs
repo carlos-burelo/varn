@@ -27,7 +27,7 @@ pub(super) fn object_arm(
                         ty: ity,
                         ..
                     } if iname == name => Some(*ity),
-                    _ => None,
+                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
                     Some(inf_ty) => {
@@ -68,7 +68,7 @@ pub(super) fn object_arm(
                         optional: o2,
                         ..
                     } if iname == name => Some((p2.clone(), *r2, *o2)),
-                    _ => None,
+                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
                     Some((p2, r2, o2)) => {
@@ -128,7 +128,7 @@ pub(super) fn object_arm(
                             table,
                         )
                     }
-                    _ => false,
+                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => false,
                 });
                 if has_compatible_index {
                     continue;
@@ -158,14 +158,14 @@ pub(super) fn object_arm(
                         in_progress,
                         table,
                     ),
-                    _ => true,
+                    ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => true,
                 });
                 if !explicit_members_compatible {
                     ok = false;
                     break 'outer;
                 }
             }
-            _ => {}
+            ObjectTypeMember::Callable { .. } => {}
         }
     }
 
@@ -179,7 +179,7 @@ pub(super) fn object_arm(
                     let exists_in_decl = decl_fields.iter().any(|dm| match dm {
                         ObjectTypeMember::Property { name: dname, .. } => dname == iname,
                         ObjectTypeMember::Method { name: dname, .. } => dname == iname,
-                        _ => false,
+                        ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => false,
                     });
                     if !exists_in_decl {
                         ok = false;

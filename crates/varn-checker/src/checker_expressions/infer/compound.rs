@@ -56,10 +56,10 @@ impl<'r> Checker<'r> {
                 .iter()
                 .find_map(|m| match m {
                     ObjectTypeMember::Index { value_ty, .. } => Some(Type::resolved(*value_ty)),
-                    _ => None,
+                    ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => None,
                 })
                 .unwrap_or(Type::Dynamic),
-            _ => Type::Dynamic,
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => Type::Dynamic,
         }
     }
 
@@ -87,7 +87,7 @@ impl<'r> Checker<'r> {
                         let members = self.ty_table.get_object_members(mid);
                         members.len() == 1 && matches!(&members[0], ObjectTypeMember::Index { .. })
                     }
-                    _ => false,
+                    TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => false,
                 };
                 if is_index_signature {
                     for prop in properties {
@@ -250,6 +250,6 @@ pub(super) fn prop_key_name(key: &varn_core::ast::expr::PropKey) -> Option<Arc<s
         varn_core::ast::expr::PropKey::Identifier(n) | varn_core::ast::expr::PropKey::Str(n) => {
             Some(Arc::from(n.as_str()))
         }
-        _ => None,
+        varn_core::ast::expr::PropKey::Int(_) | varn_core::ast::expr::PropKey::Computed(_) => None,
     }
 }

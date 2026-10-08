@@ -25,7 +25,7 @@ impl<'r> Checker<'r> {
                         elem_tys.push(Type::resolved(inner));
                     }
                 }
-                _ => {}
+                varn_core::ast::ArrayEl::Hole => {}
             }
         }
         if elem_tys.is_empty() {

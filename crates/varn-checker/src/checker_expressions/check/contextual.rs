@@ -42,7 +42,7 @@ impl<'r> Checker<'r> {
                 {
                     Some(Type::resolved(self.ty_table.get_list(args)[0]))
                 }
-                _ => None,
+                TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
             });
 
         for el in elements {
@@ -139,7 +139,7 @@ impl<'r> Checker<'r> {
                             })
                             .collect()
                     }
-                    _ => Vec::new(),
+                    TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => Vec::new(),
                 };
                 self.expected_object_members_cache
                     .insert(ty, resolved.clone());
@@ -161,7 +161,7 @@ impl<'r> Checker<'r> {
                             ObjectTypeMember::Index { value_ty, .. } => {
                                 Some(Type::resolved(*value_ty))
                             }
-                            _ => None,
+                            ObjectTypeMember::Property { .. } | ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => None,
                         })
                     });
                     self.with_expected(prop_expected, |c| c.check_expr(*value, bind));
@@ -256,6 +256,6 @@ impl<'r> Checker<'r> {
 fn prop_key_str(key: &PropKey) -> Option<&str> {
     match key {
         PropKey::Identifier(s) | PropKey::Str(s) => Some(s.as_str()),
-        _ => None,
+        PropKey::Int(_) | PropKey::Computed(_) => None,
     }
 }

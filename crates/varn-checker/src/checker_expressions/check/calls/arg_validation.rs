@@ -268,7 +268,7 @@ impl<'r> Checker<'r> {
                 let arg_ty = self.infer_type(*expr, bind);
                 let spread_inner = match self.ty_table.get(arg_ty.0) {
                     TypeKind::Array(inner) => Some(Type::resolved(inner)),
-                    _ => None,
+                    TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
                 };
                 match spread_inner {
                     Some(inner) => Ok((arg_ty, Some(inner))),

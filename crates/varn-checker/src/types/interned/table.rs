@@ -190,7 +190,11 @@ mod tests {
                 ObjectTypeMember::Property { name, .. } => {
                     assert_eq!(name.as_ref(), format!("f{i}"));
                 }
-                other => panic!("expected Property, got {other:?}"),
+                ObjectTypeMember::Method { .. }
+                | ObjectTypeMember::Index { .. }
+                | ObjectTypeMember::Callable { .. } => {
+                    panic!("expected Property")
+                }
             }
         }
     }
@@ -217,7 +221,11 @@ mod tests {
                 ObjectTypeMember::Property { name, .. } => {
                     assert_eq!(name.as_ref(), format!("g{i}"));
                 }
-                other => panic!("expected Property, got {other:?}"),
+                ObjectTypeMember::Method { .. }
+                | ObjectTypeMember::Index { .. }
+                | ObjectTypeMember::Callable { .. } => {
+                    panic!("expected Property")
+                }
             }
         }
         assert!(

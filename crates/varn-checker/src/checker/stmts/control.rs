@@ -106,7 +106,7 @@ impl<'r> Checker<'r> {
                 Type::resolved(self.ty_table.get_list(args)[0])
             }
             TypeKind::Builtin(varn_core::BuiltinType::Range) => Type::Int,
-            _ => Type::Dynamic,
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => Type::Dynamic,
         };
         self.loop_depth += 1;
         self.with_next_child_scope_span(bind, range.start.offset, range.end.offset, |checker| {

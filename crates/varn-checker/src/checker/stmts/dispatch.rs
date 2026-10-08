@@ -104,7 +104,7 @@ impl<'r> Checker<'r> {
                 self.check_using_stmt(declarations.clone(), *is_await, bind);
             }
 
-            _ => {}
+            StmtKind::Empty | StmtKind::Error | StmtKind::Debugger => {}
         }
     }
 }

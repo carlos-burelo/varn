@@ -55,7 +55,7 @@ impl<'r> Checker<'r> {
                 consequent,
                 alternate,
             } => (*test, *consequent, *alternate),
-            _ => return None,
+            StmtKind::Block { .. } | StmtKind::Empty | StmtKind::Expr { .. } | StmtKind::Decl(_) | StmtKind::Error | StmtKind::While { .. } | StmtKind::DoWhile { .. } | StmtKind::For { .. } | StmtKind::ForIn { .. } | StmtKind::ForOf { .. } | StmtKind::Switch { .. } | StmtKind::Return { .. } | StmtKind::Break { .. } | StmtKind::Continue { .. } | StmtKind::Throw { .. } | StmtKind::Try { .. } | StmtKind::Using { .. } | StmtKind::Labeled { .. } | StmtKind::Debugger => return None,
         };
         if alternate.is_some() {
             return None;

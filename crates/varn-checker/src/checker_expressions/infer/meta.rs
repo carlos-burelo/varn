@@ -82,7 +82,7 @@ impl<'r> Checker<'r> {
                 },
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             ),
-            _ => Type::Dynamic,
+            None | Some(_) => Type::Dynamic,
         }
     }
 }

@@ -187,7 +187,7 @@ impl<'r> Checker<'r> {
                         );
                     }
                 }
-                _ => {}
+                ClassMember::Constructor { .. } | ClassMember::Destructor { .. } | ClassMember::Method { .. } | ClassMember::Property { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. } | ClassMember::StaticBlock { .. } => {}
             }
         }
     }
@@ -243,7 +243,7 @@ impl<'r> Checker<'r> {
                         );
                     }
                 }
-                _ => {}
+                ClassMember::Constructor { .. } | ClassMember::Destructor { .. } | ClassMember::Property { .. } | ClassMember::StaticBlock { .. } => {}
             }
         }
     }
@@ -438,7 +438,7 @@ impl<'r> Checker<'r> {
                     self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;
                 }
-                _ => {}
+                ClassMember::Destructor { .. } | ClassMember::Method { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. } | ClassMember::StaticBlock { .. } => {}
             }
         }
     }

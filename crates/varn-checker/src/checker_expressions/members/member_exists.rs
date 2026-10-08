@@ -301,7 +301,7 @@ impl<'r> Checker<'r> {
                 ids.iter()
                     .any(|id| self.member_exists(&Type::resolved(*id), key, bind))
             }
-            _ => false,
+            TypeKind::This | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::TypePredicate { .. } => false,
         };
         if !res {
             if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(

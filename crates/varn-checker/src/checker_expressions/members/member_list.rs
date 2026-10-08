@@ -109,7 +109,7 @@ pub fn get_members_of_type(
                             true,
                         );
                     }
-                    _ => {}
+                    ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => {}
                 }
             }
         }
@@ -289,7 +289,7 @@ pub fn get_members_of_type(
                 }
             }
         }
-        _ => {}
+        TypeKind::This | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => {}
     }
 
     super::member_extension::collect_extension_members(&mut results, &mut seen, ty, bind, table);

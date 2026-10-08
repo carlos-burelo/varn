@@ -65,7 +65,7 @@ pub(crate) fn infer_mapping_from_args(
             Arg::Named { value, .. } => {
                 matches!(checker.ast_arena.expr(*value).kind, ExprKind::Arrow { .. })
             }
-            _ => false,
+            Arg::Spread(_) => false,
         };
         if is_arrow {
             continue;
@@ -91,7 +91,7 @@ pub(crate) fn infer_mapping_from_args(
             Arg::Named { value, .. } => {
                 matches!(checker.ast_arena.expr(*value).kind, ExprKind::Arrow { .. })
             }
-            _ => false,
+            Arg::Spread(_) => false,
         };
         if !is_arrow {
             continue;

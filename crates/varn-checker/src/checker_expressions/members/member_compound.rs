@@ -97,7 +97,7 @@ impl<'r> Checker<'r> {
                     },
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 ),
-                _ => Type::Dynamic,
+                ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => Type::Dynamic,
             };
             (ty, None)
         })
@@ -170,7 +170,7 @@ impl<'r> Checker<'r> {
                 let name = kind.lang_name().unwrap_or_default();
                 intrinsic_member_info(bind, name, key)
             }
-            _ => None,
+            TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
         }
     }
 

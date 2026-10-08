@@ -16,7 +16,7 @@ impl<'r> Checker<'r> {
                 .filter_map(|m| match m {
                     ObjectTypeMember::Property { name, .. }
                     | ObjectTypeMember::Method { name, .. } => Some(name.clone()),
-                    _ => None,
+                    ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
                 })
                 .collect(),
             TypeKind::Named(cn, _) | TypeKind::Generic(cn, _, _) => {
@@ -37,7 +37,7 @@ impl<'r> Checker<'r> {
                 names.dedup();
                 names
             }
-            _ => Vec::new(),
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => Vec::new(),
         }
     }
 }

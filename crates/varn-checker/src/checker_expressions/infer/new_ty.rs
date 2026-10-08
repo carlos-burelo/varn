@@ -60,7 +60,7 @@ impl<'r> Checker<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 )
             }
-            _ => {
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => {
                 if let varn_core::ast::ExprKind::Identifier { name } =
                     &self.ast_arena.expr(callee).kind
                 {
@@ -99,7 +99,7 @@ impl<'r> Checker<'r> {
             .non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         match self.ty_table.get(expected.0) {
             TypeKind::Generic(expected_name, _, _) if expected_name == name => Some(expected),
-            _ => None,
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
         }
     }
 }

@@ -37,7 +37,7 @@ impl<'r> Checker<'r> {
                     let disc_ty: Option<Type> = match &arena.expr(right).kind {
                         ExprKind::StrLiteral { .. } => Some(Type::Str),
                         ExprKind::IntLiteral { .. } => Some(Type::Int),
-                        _ => None,
+                        ExprKind::FloatLiteral { .. } | ExprKind::BigIntLiteral { .. } | ExprKind::DecimalLiteral { .. } | ExprKind::CharLiteral { .. } | ExprKind::BoolLiteral { .. } | ExprKind::NullLiteral | ExprKind::RegexLiteral { .. } | ExprKind::Template { .. } | ExprKind::TaggedTemplate { .. } | ExprKind::Identifier { .. } | ExprKind::Missing | ExprKind::This | ExprKind::Super | ExprKind::Array { .. } | ExprKind::Object { .. } | ExprKind::Tuple { .. } | ExprKind::Record { .. } | ExprKind::Unary { .. } | ExprKind::Update { .. } | ExprKind::Binary { .. } | ExprKind::Logical { .. } | ExprKind::Assign { .. } | ExprKind::Conditional { .. } | ExprKind::Member { .. } | ExprKind::Call { .. } | ExprKind::New { .. } | ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::Sequence { .. } | ExprKind::Paren { .. } | ExprKind::Await { .. } | ExprKind::Spawn { .. } | ExprKind::Yield { .. } | ExprKind::Spread { .. } | ExprKind::Pipeline { .. } | ExprKind::Range { .. } | ExprKind::NonNull { .. } | ExprKind::Try { .. } | ExprKind::As { .. } | ExprKind::Satisfies { .. } | ExprKind::ClassExpr { .. } | ExprKind::Match { .. } | ExprKind::Is { .. } | ExprKind::With { .. } | ExprKind::MetaAccess { .. } => None,
                     };
                     if let Some(disc_ty) = disc_ty {
                         let prop_name_str = bind.interner.resolve(prop_name);
@@ -47,7 +47,7 @@ impl<'r> Checker<'r> {
                             let union_list =
                                 original_ty.and_then(|t| match self.ty_table.get(t.0) {
                                     TypeKind::Union(list) => Some(list),
-                                    _ => None,
+                                    TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Object(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => None,
                                 });
                             if let Some(list) = union_list {
                                 let members: Vec<Type> = self
@@ -70,7 +70,7 @@ impl<'r> Checker<'r> {
                                                     name.as_ref() == prop_name_str
                                                         && *ty == disc_ty.0
                                                 }
-                                                _ => false,
+                                                ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => false,
                                             }),
                                         TypeKind::Named(cn, _) => {
                                             let cn_str = bind.interner.resolve(cn).to_string();
@@ -86,7 +86,7 @@ impl<'r> Checker<'r> {
                                                     })
                                                 })
                                         }
-                                        _ => false,
+                                        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => false,
                                     };
                                     if hits {
                                         matched.push(*m);
@@ -201,7 +201,7 @@ impl<'r> Checker<'r> {
                         ObjectTypeMember::Property { name, ty, .. } => {
                             name.as_ref() == prop_name && *ty == disc_ty.0
                         }
-                        _ => false,
+                        ObjectTypeMember::Method { .. } | ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => false,
                     })
             }
             TypeKind::Named(cn, _) => {
@@ -213,7 +213,7 @@ impl<'r> Checker<'r> {
                             .any(|cm| cm.name.as_ref() == prop_name && cm.ty == *disc_ty)
                     })
             }
-            _ => false,
+            TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This | TypeKind::Array(_) | TypeKind::Union(_) | TypeKind::Intersection(_) | TypeKind::Tuple(_) | TypeKind::Generic(..) | TypeKind::TemplateLiteral(_) | TypeKind::Fn(_) | TypeKind::Typeof(_) | TypeKind::KeyOf(_) | TypeKind::IndexedAccess { .. } | TypeKind::Mapped { .. } | TypeKind::Conditional { .. } | TypeKind::Infer(_) | TypeKind::EnumVariant { .. } | TypeKind::TypePredicate { .. } => false,
         }
     }
 }

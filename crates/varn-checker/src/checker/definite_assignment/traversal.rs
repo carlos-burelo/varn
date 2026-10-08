@@ -43,7 +43,7 @@ impl<'r> Checker<'r> {
 
             ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::ClassExpr { .. } => {}
 
-            _ => walk_expr_children(e, arena, &mut |c| self.da_expr(c, flow, bind)),
+            ExprKind::IntLiteral { .. } | ExprKind::FloatLiteral { .. } | ExprKind::BigIntLiteral { .. } | ExprKind::DecimalLiteral { .. } | ExprKind::StrLiteral { .. } | ExprKind::CharLiteral { .. } | ExprKind::BoolLiteral { .. } | ExprKind::NullLiteral | ExprKind::RegexLiteral { .. } | ExprKind::Template { .. } | ExprKind::TaggedTemplate { .. } | ExprKind::Missing | ExprKind::This | ExprKind::Super | ExprKind::Array { .. } | ExprKind::Object { .. } | ExprKind::Tuple { .. } | ExprKind::Record { .. } | ExprKind::Unary { .. } | ExprKind::Update { .. } | ExprKind::Binary { .. } | ExprKind::Logical { .. } | ExprKind::Conditional { .. } | ExprKind::Member { .. } | ExprKind::Call { .. } | ExprKind::New { .. } | ExprKind::Sequence { .. } | ExprKind::Paren { .. } | ExprKind::Await { .. } | ExprKind::Spawn { .. } | ExprKind::Yield { .. } | ExprKind::Spread { .. } | ExprKind::Pipeline { .. } | ExprKind::Range { .. } | ExprKind::NonNull { .. } | ExprKind::Try { .. } | ExprKind::As { .. } | ExprKind::Satisfies { .. } | ExprKind::Match { .. } | ExprKind::Is { .. } | ExprKind::With { .. } | ExprKind::MetaAccess { .. } => walk_expr_children(e, arena, &mut |c| self.da_expr(c, flow, bind)),
         }
     }
 
@@ -62,7 +62,7 @@ impl<'r> Checker<'r> {
                         | ClassMember::Setter { body: Some(b), .. } => Some(*b),
                         ClassMember::Constructor { body, .. }
                         | ClassMember::StaticBlock { body, .. } => Some(*body),
-                        _ => None,
+                        ClassMember::Destructor { .. } | ClassMember::Method { .. } | ClassMember::Property { .. } | ClassMember::Getter { .. } | ClassMember::Setter { .. } => None,
                     };
                     if let Some(b) = body {
                         let mut flow = Flow::default();
@@ -73,7 +73,7 @@ impl<'r> Checker<'r> {
             Decl::Export(varn_core::ast::ExportDecl::Decl { declaration, .. }) => {
                 self.da_nested_decl(declaration, bind);
             }
-            _ => {}
+            Decl::Variable(_) | Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Enum(_) | Decl::Namespace(_) | Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) | Decl::Struct(_) | Decl::SumType(_) => {}
         }
     }
 

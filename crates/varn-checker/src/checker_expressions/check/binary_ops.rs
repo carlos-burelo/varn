@@ -73,7 +73,7 @@ impl<'r> Checker<'r> {
                             || self.value_assignable_to(&r_ty, &l_ty, Some(left), Some(bind))
                     }
                 }
-                _ => true,
+                BinaryOp::Instanceof | BinaryOp::In => true,
             };
             if !valid {
                 let l_ty_s = l_ty.display(&self.ty_table, &bind.interner);

@@ -200,7 +200,7 @@ fn collect_returns_recursive(
                 table,
             );
         }
-        _ => {}
+        StmtKind::Empty | StmtKind::Expr { .. } | StmtKind::Decl(_) | StmtKind::Error | StmtKind::Break { .. } | StmtKind::Continue { .. } | StmtKind::Throw { .. } | StmtKind::Using { .. } | StmtKind::Debugger => {}
     }
 }
 
@@ -373,6 +373,6 @@ fn enrich_vars_recursive(
                 current_class,
             );
         }
-        _ => {}
+        StmtKind::Empty | StmtKind::Expr { .. } | StmtKind::Error | StmtKind::Return { .. } | StmtKind::Break { .. } | StmtKind::Continue { .. } | StmtKind::Throw { .. } | StmtKind::Using { .. } | StmtKind::Debugger => {}
     }
 }
