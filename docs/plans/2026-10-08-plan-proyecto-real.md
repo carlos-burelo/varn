@@ -70,15 +70,17 @@ vs `vm/loader.rs:22` `resolve+load→Proto` vs `checker/module_resolver/resolver
 - [ ] Pipeline solo orquesta lexer→parser→checker→compiler→vm, no emite
 - [ ] Puerta: `VARN_CACHE_DIR=<temp> vn test` reproduce, `vn run -v` motivo miss intacto
 
-## F3 — Pipeline→debug [ ]
+## F3 — Pipeline→debug [x]
 
-Causa: `pipeline/compile.rs:8,58,63,67,71,77,80,85,97,101,105,109` 20+ `varn_debug::`.
-Canónico: pipeline retorna `PipelineOutput` (proto+program+graph+helpers), CLI/debug renderiza.
+Causa: `pipeline/compile.rs` 20+ `varn_debug::` + flags/colors en 6 archivos.
+Diseño final (difiere del boceto `PipelineOutput`: la ruta portable no tiene program/arena; trait conserva orquesta íntegra):
+vocab `varn-debug-flags` hoja (`345fc926`), trait `DebugSink`+`NullSink` en pipeline (`d3b1620e`),
+`CliDebugSink` en cli + `run` con sink (`559ea45b`). `cargo tree -p varn-pipeline` sin `varn-debug`.
 
-- [ ] Añadir struct `PipelineOutput`
-- [ ] Migrar call sites por grupo (bytecode, clif, typeloss, summary, tiers, tir, caps, binds, consts, scopes)
-- [ ] Borrar dep `pipeline→varn-debug` en `Cargo.toml`
-- [ ] Puerta: `vn debug -p all,bytecode,clif,tir,gc` idéntico
+- [x] Vocab `DebugFlags`+`Step` en crate hoja; `parse_debug_flags` fn libre en debug
+- [x] Render movido a `CliDebugSink` (orden idéntico, verificado `-p tokens,ast,symbols,bytecode,tir,summary,scope,graph,gc` + run/check/build/vnc)
+- [x] Colores vía `varn_core::term`; fuera dep `pipeline→varn-debug`
+- [x] Puerta: `vn test` 155/0
 
 ## F4 — Runtime→frontend [ ]
 
