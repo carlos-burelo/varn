@@ -92,7 +92,10 @@ fn compile_one(
     let state_size = crate::passes::state_machine::run(&mut ssa);
     crate::ssa::verify::recompute_preds(&mut ssa);
     if let Err(why) = crate::ssa::verify::verify(&ssa) {
-        panic!("from_tir: ssa verify failed for {}: {}", f.name, why);
+        return Err(crate::OptError::Internal(format!(
+            "from_tir: ssa verify failed for {}: {}",
+            f.name, why
+        )));
     }
     let mut proto = emit_function_meta(ssa, &fn_meta(tir, f), source_file, scope)?;
     proto.state_size = state_size;

@@ -11,4 +11,5 @@ pub mod ssa;
 pub enum OptError {
     Unsupported(&'static str),
     InvalidTir(Vec<String>),
+    Internal(String),
 }
