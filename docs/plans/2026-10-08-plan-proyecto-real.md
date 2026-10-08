@@ -56,7 +56,7 @@ Canónico: layout en `varn-abi/src/lib.rs` (hoy 151 LOC, solo→core). Sin `Once
 - [x] Una sola función compila-módulo en pipeline (`b236e3be`): `emit_and_compile` + `sorted_export_names` únicos (entry, grafo, stdlib, bench); fuera `compile_via_tir` duplicado
 - [x] Puerta F2: `vn test` 155/0 (verde) + pipeline/lsp tests (verdes salvo preexistentes abajo)
 
-Deuda preexistente (HEAD limpio, no tocar aquí): `bytecode_layout_agrees` pánico Atom interner; `h7` tamaño Atom.
+Deuda preexistente (HEAD limpio, no tocar aquí): `bytecode_layout_agrees` pánico Atom interner.
 
 Causa: 3 traits mismo hecho: `modules/loader.rs:94` `ModuleLoader: Send+Sync resolve+source` (canónico, existe)
 vs `vm/loader.rs:22` `resolve+load→Proto` vs `checker/module_resolver/resolver_trait.rs:9` `ImportResolver for DiskResolver`
