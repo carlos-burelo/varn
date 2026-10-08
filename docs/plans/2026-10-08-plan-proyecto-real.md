@@ -18,8 +18,8 @@ Ley 13 perfil `quick` para iterar (`cargo build --profile quick --bin vn`), matr
 
 ## F0 — Higiene [ ]
 
-- [ ] Borrar comentario desync `crates/varn-compiler/Cargo.toml:8` (`varn-regalloc` no existe, código `src/lib.rs:7` `pub mod regalloc`)
-- [ ] Renombrar 7 genéricos por dominio:
+- [x] Borrar comentario desync `crates/varn-compiler/Cargo.toml:8` (`varn-regalloc` no existe, código `src/lib.rs:7` `pub mod regalloc`)
+- [x] Renombrar 7 genéricos por dominio (`50bd6143`):
   - [ ] `varn-checker/src/checker/compat/helpers.rs`
   - [ ] `varn-checker/src/checker_expressions/helpers.rs`
   - [ ] `varn-parser/src/expressions/helpers.rs`
