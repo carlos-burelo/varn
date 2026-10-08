@@ -1,5 +1,8 @@
 pub mod disasm;
 mod layout;
+mod opcode_infix;
+mod opcode_nullary;
+mod opcode_prefix;
 mod operand;
 mod remap;
 

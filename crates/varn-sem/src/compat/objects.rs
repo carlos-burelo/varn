@@ -1,4 +1,4 @@
-use super::compat_lookup::types_compatible_with_fn_signature;
+use super::compat_fn_sig::types_compatible_with_fn_signature;
 use super::core::types_compatible_impl;
 use super::scalar::t;
 use crate::bind::BindView;

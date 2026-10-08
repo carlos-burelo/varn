@@ -1,6 +1,7 @@
 use super::classes::top_level_type_builds;
 use super::decl_classify::is_value_symbol;
-use super::namespaces::{collect_decl_names, collect_extension_names};
+use super::extensions::collect_extension_names;
+use super::namespaces::collect_decl_names;
 use super::nested_types::NestedTypes;
 use super::tables::NameIndex;
 use super::ty::lower_type;

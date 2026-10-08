@@ -1,4 +1,5 @@
 mod arrays;
+mod compat_fn_sig;
 mod compat_lookup;
 mod core;
 mod expr_sat;

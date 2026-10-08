@@ -19,6 +19,7 @@ mod expr_try;
 mod expr_update;
 mod finally_splice;
 mod match_pattern;
+mod pattern_bind;
 mod scope;
 mod small_utils;
 mod stmt_block;

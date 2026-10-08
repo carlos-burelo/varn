@@ -4,6 +4,8 @@ mod classes;
 mod decl_classify;
 mod decorators;
 mod enums;
+mod extensions;
+mod free_functions;
 mod functions;
 mod imports_exports;
 mod module_ctx;
@@ -17,9 +19,9 @@ mod ty;
 
 pub use ty::{lower_type, NameResolver, NoNames};
 
+use extensions::emit_extensions;
 use imports_exports::{collect_exports, collect_imports, math_intrinsic_imports};
 use module_ctx::MCtx;
-use namespaces::emit_extensions;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, Program};
@@ -65,11 +67,11 @@ pub fn emit_module(
     let core_ops = module_globals::core_method_ops(bind);
     let math_intrinsics = math_intrinsic_imports(program, ast_arena, interner);
 
-    let functions::FreeFunctions {
+    let free_functions::FreeFunctions {
         list: free_fns,
         index: fn_index,
         decorated: decorated_fns,
-    } = functions::collect_free_functions(program, ast_arena, interner, &bind.user_decorators);
+    } = free_functions::collect_free_functions(program, ast_arena, interner, &bind.user_decorators);
 
     let ctx = MCtx {
         names: &names,
