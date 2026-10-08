@@ -2122,9 +2122,9 @@ dependencies = [
  "tar",
  "urlencoding",
  "uuid",
+ "varn-contract",
  "varn-core",
  "varn-modules",
- "varn-op-macros",
  "varn-runtime",
  "varn-types",
  "zip",
@@ -2187,6 +2187,18 @@ dependencies = [
  "varn-core",
  "varn-tir",
  "varn-types",
+]
+
+[[package]]
+name = "varn-contract"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "varn-core",
+ "varn-lexer",
+ "varn-parser",
 ]
 
 [[package]]
@@ -2303,9 +2315,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "varn-core",
- "varn-lexer",
- "varn-parser",
 ]
 
 [[package]]
