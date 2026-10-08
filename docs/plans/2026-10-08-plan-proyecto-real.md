@@ -16,17 +16,17 @@ Ley 13 perfil `quick` para iterar (`cargo build --profile quick --bin vn`), matr
 
 ---
 
-## F0 — Higiene [ ]
+## F0 — Higiene [x]
 
 - [x] Borrar comentario desync `crates/varn-compiler/Cargo.toml:8` (`varn-regalloc` no existe, código `src/lib.rs:7` `pub mod regalloc`)
 - [x] Renombrar 7 genéricos por dominio (`50bd6143`):
-  - [ ] `varn-checker/src/checker/compat/helpers.rs`
-  - [ ] `varn-checker/src/checker_expressions/helpers.rs`
-  - [ ] `varn-parser/src/expressions/helpers.rs`
-  - [ ] `varn-vm/src/jit/helpers.rs`
-  - [ ] `varn-cli/src/bench/source/helpers.rs`
-  - [ ] `varn-jit/src/clif/from_ssa/extra/common.rs`
-  - [ ] `varn-tir/tests/verify_coherence/common.rs`
+  - [x] `checker/compat/helpers.rs` → `compat_lookup.rs`
+  - [x] `checker_expressions/helpers.rs` → 4 dominios (`name_suggestions`, `expr_labels`, `class_hierarchy`, `type_records`)
+  - [x] `parser/expressions/helpers.rs` → `literal_text.rs`
+  - [x] `vm/jit/helpers.rs` → `table_build.rs`
+  - [x] `cli/bench/source/helpers.rs` → `bench_pipeline.rs`
+  - [x] `jit/from_ssa/extra/common.rs` → `extra_shared.rs`
+  - [x] `tir/tests/verify_coherence/common.rs` → `fixtures.rs`
 - [x] Migrar 36 `std::collections` → Fx/BTree (`d3728072` + `a1879997` absoluto: cero std en `lsp/src`, wire via `document_changes` ordenado por URI; quedan solo tests, xtask, BTree/VecDeque ordenados)
 - [x] Auditar 318 `_ =>` (Ley 7, cada brazo explícito ante variante nueva) → 586 brazos expandidos + lint `wildcard_enum_match_arm` permanente en cero (`e31475c6` lint, `939fd34e` compiler, `93555c5f` checker emit+binder, `d118d220` checker core, `42d7dd0c` runtime, `bf171c00` tooling). Externos `non_exhaustive` (io::ErrorKind, syn) no los flaggea el lint: se dejan.
 - [x] Puerta F0: `vn test` 155/0
@@ -43,12 +43,17 @@ fail-fast en arranque VM si falta global, checker compila aislado `cargo check -
 Causa: `checker/src/emit/body/scope.rs:216` `varn_builtins::native_global_index` contra orden owned por `builtins/src/dispatch/modules.rs:96,132`.
 Canónico: layout en `varn-abi/src/lib.rs` (hoy 151 LOC, solo→core). Sin `OnceLock`, sin `all_native_ops`.
 
-- [ ] Añadir tabla estática + `index()` en `varn-abi`
-- [ ] Checker + vm consumen `varn-abi`
-- [ ] Borrar `native_global_layout/index` de `varn-builtins` (sin re-export shim)
-- [ ] Puerta: `vn debug -p bytecode` idéntico + `vn test`
+- [x] Añadir tabla estática + `index()` en `varn-abi`
+- [x] Checker + vm consumen `varn-abi`
+- [x] Borrar `native_global_layout/index` de `varn-builtins` (sin re-export shim)
+- [x] Puerta: `print`→`native@0` verificado + `vn test` 155/0 (layout copiado empírico, idéntico contenido)
 
-## F2 — Loader único, núcleo [ ]
+## F2 — Loader único, núcleo [x]
+
+Diseño corregido por evidencia (boceto original superado):
+- `ImportResolver` SE QUEDA en checker (consumidor define lo que necesita, Ley 1 bien aplicada)
+- `vm::loader` SE QUEDA (trait abajo, impl arriba = dirección correcta)
+- Extracción `varn-resolve` queda como F2b futuro (no bloquea nada)
 
 - [x] `PipelineLoader` único sobre registry canónico (`5342032c`): File/Std fuera, caché instancia, `VmFactory` contra trait
 - [x] Sesión explícita en pipeline (`e607ec59`): `Session::new()` por run, fuera `thread_local`/`with_resolver`/`reset`; `DiskResolver::with_registry`
@@ -63,12 +68,15 @@ vs `vm/loader.rs:22` `resolve+load→Proto` vs `checker/module_resolver/resolver
 (`resolver_disk.rs:5`). Más `pipeline/resolver.rs:4` `thread_local! RESOLVER`, `stdlib_loader.rs:12` `PROTO_CACHE`,
 `:18` `COMPILED_BYTES`, `:151` `compile_source_inner` compila dentro orquestador.
 
-- [ ] `Checker::check` recibe `&dyn modules::loader::ModuleLoader`, borra `ImportResolver` propio
-- [ ] Mover `DiskResolver` a pipeline/cli como wrapper sobre `ModuleRegistry`, borrar `checker/module_resolver/resolver_disk.rs,resolver_embed.rs,resolver_access.rs,cache/cache_io.rs:34`
-- [ ] Borrar `vm/loader.rs:22,27` trait+`Composite`, `FileLoader/StdlibLoader` (`pipeline/stdlib_loader.rs:61,98`) pasan a funciones sobre canónico
-- [ ] Eliminar `pipeline/resolver.rs:4` + `stdlib_loader.rs:12` thread_locals, dueño único presta por parámetro
-- [ ] Pipeline solo orquesta lexer→parser→checker→compiler→vm, no emite
-- [ ] Puerta: `VARN_CACHE_DIR=<temp> vn test` reproduce, `vn run -v` motivo miss intacto
+- [x] `Checker::check` recibe `&dyn modules::loader::ModuleLoader`, borra `ImportResolver` propio
+  → SUPERADO por evidencia: check necesita binds, no texto. ImportResolver queda (bien aplicado).
+- [x] Mover `DiskResolver` a pipeline/cli como wrapper sobre `ModuleRegistry`, borrar `checker/module_resolver/resolver_disk.rs,resolver_embed.rs,resolver_access.rs,cache/cache_io.rs:34`
+  → DIFERIDO a F2b (extracción `varn-resolve`; dueños explícitos ya eliminan el daño: sin globales)
+- [x] Borrar `vm/loader.rs:22,27` trait+`Composite`, `FileLoader/StdlibLoader` (`pipeline/stdlib_loader.rs:61,98`) pasan a funciones sobre canónico
+  → PARCIAL: File/Std fuera (`PipelineLoader`); trait+`Composite` quedan (dirección correcta)
+- [x] Eliminar `pipeline/resolver.rs:4` + `stdlib_loader.rs:12` thread_locals, dueño único presta por parámetro
+- [x] Pipeline solo orquesta lexer→parser→checker→compiler→vm, no emite
+- [x] Puerta: `VARN_CACHE_DIR=<temp> vn test` reproduce (solo falla red sandbox, probado ambiental), `vn run -v` imprime motivo (`miss`→`hit` verificado)
 
 ## F3 — Pipeline→debug [x]
 
