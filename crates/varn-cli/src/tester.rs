@@ -95,7 +95,7 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
             }
 
             let item = {
-                let mut guard = queue.lock().unwrap();
+                let mut guard = queue.lock().unwrap_or_else(|e| e.into_inner());
                 guard.pop()
             };
             let Some((idx, path)) = item else { break };
@@ -136,16 +136,19 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
                     has_failure_flag.store(true, Ordering::SeqCst);
                 }
 
-                results_store.lock().unwrap().push(TestResult {
-                    idx,
-                    display_name: unit_name.clone(),
-                    passed,
-                    duration: elapsed,
-                    output: output.clone(),
-                });
+                results_store
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .push(TestResult {
+                        idx,
+                        display_name: unit_name.clone(),
+                        passed,
+                        duration: elapsed,
+                        output: output.clone(),
+                    });
 
                 let ms = elapsed.as_millis();
-                let _guard = out_lock.lock().unwrap();
+                let _guard = out_lock.lock().unwrap_or_else(|e| e.into_inner());
                 if passed {
                     log(format!(
                         "  {} {} {}",
@@ -183,7 +186,7 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
     let passed_count = suites_passed.load(Ordering::SeqCst);
     let failed_count = suites_failed.load(Ordering::SeqCst);
 
-    let mut all_results = results.lock().unwrap().clone();
+    let mut all_results = results.lock().unwrap_or_else(|e| e.into_inner()).clone();
     all_results.sort_by_key(|r| r.idx);
 
     if failed_count == 0 {

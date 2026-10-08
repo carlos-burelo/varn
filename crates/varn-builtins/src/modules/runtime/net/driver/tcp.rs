@@ -9,7 +9,7 @@ impl IoDriver {
         let id = next_socket_id();
 
         {
-            let mut reg = self.registry.lock().unwrap();
+            let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
             reg.listeners.insert(
                 id,
                 ListenerState {
@@ -25,7 +25,7 @@ impl IoDriver {
     }
 
     pub fn accept(&self, listener_id: i64) -> HostPromise {
-        let mut reg = self.registry.lock().unwrap();
+        let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         let listener_state = match reg.listeners.get_mut(&listener_id) {
             Some(l) => l,
             None => {
@@ -99,7 +99,7 @@ impl IoDriver {
         let task = HostPromise::pending();
 
         if stream.peer_addr().is_ok() {
-            let mut reg = self.registry.lock().unwrap();
+            let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
             reg.streams.insert(
                 conn_id,
                 StreamState {
@@ -117,7 +117,7 @@ impl IoDriver {
             return task;
         }
 
-        let mut reg = self.registry.lock().unwrap();
+        let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         reg.streams.insert(
             conn_id,
             StreamState {
@@ -135,7 +135,7 @@ impl IoDriver {
     }
 
     pub fn read(&self, conn_id: i64, len: usize) -> HostPromise {
-        let mut reg = self.registry.lock().unwrap();
+        let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         let stream_state = match reg.streams.get_mut(&conn_id) {
             Some(s) => s,
             None => {
@@ -167,7 +167,7 @@ impl IoDriver {
     }
 
     pub fn write(&self, conn_id: i64, data: Vec<u8>) -> HostPromise {
-        let mut reg = self.registry.lock().unwrap();
+        let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         let stream_state = match reg.streams.get_mut(&conn_id) {
             Some(s) => s,
             None => {
@@ -206,7 +206,7 @@ impl IoDriver {
     }
 
     pub fn close(&self, conn_id: i64) {
-        let mut reg = self.registry.lock().unwrap();
+        let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(mut stream_state) = reg.streams.remove(&conn_id) {
             let _ = stream_state.stream.shutdown(std::net::Shutdown::Both);
             if let Some(task) = stream_state.pending_connect.take() {
@@ -227,7 +227,7 @@ impl IoDriver {
     }
 
     pub fn close_listener(&self, listener_id: i64) {
-        let mut reg = self.registry.lock().unwrap();
+        let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(mut listener_state) = reg.listeners.remove(&listener_id) {
             for task in listener_state.pending_accepts.drain(..) {
                 task.complete(Ok(SendValue::Int(-1)));

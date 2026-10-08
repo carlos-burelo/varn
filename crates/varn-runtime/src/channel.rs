@@ -41,18 +41,27 @@ fn registry() -> &'static Table {
 }
 
 fn core_of(id: u64) -> Option<std::sync::Arc<ChannelCore>> {
-    registry().0.lock().unwrap().get(&id).cloned()
+    registry()
+        .0
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&id)
+        .cloned()
 }
 
 pub fn create(capacity: usize) -> u64 {
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-    registry().0.lock().unwrap().insert(
-        id,
-        std::sync::Arc::new(ChannelCore {
-            capacity: capacity.max(1),
-            state: Mutex::new(ChannelState::default()),
-        }),
-    );
+    registry()
+        .0
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(
+            id,
+            std::sync::Arc::new(ChannelCore {
+                capacity: capacity.max(1),
+                state: Mutex::new(ChannelState::default()),
+            }),
+        );
     id
 }
 
@@ -60,7 +69,7 @@ pub fn send(id: u64, val: SendValue) -> SendOutcome {
     let Some(core) = core_of(id) else {
         return SendOutcome::Closed;
     };
-    let mut st = core.state.lock().unwrap();
+    let mut st = core.state.lock().unwrap_or_else(|e| e.into_inner());
     if st.closed {
         return SendOutcome::Closed;
     }
@@ -83,7 +92,7 @@ pub fn try_receive(id: u64) -> RecvOutcome {
     let Some(core) = core_of(id) else {
         return RecvOutcome::Closed;
     };
-    let mut st = core.state.lock().unwrap();
+    let mut st = core.state.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(v) = st.queue.pop_front() {
         if let Some((pv, ptask)) = st.send_waiters.pop_front() {
             st.queue.push_back(pv);
@@ -102,7 +111,7 @@ pub fn try_receive(id: u64) -> RecvOutcome {
 
 pub fn close(id: u64) {
     let Some(core) = core_of(id) else { return };
-    let mut st = core.state.lock().unwrap();
+    let mut st = core.state.lock().unwrap_or_else(|e| e.into_inner());
     if st.closed {
         return;
     }

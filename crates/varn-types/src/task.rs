@@ -92,7 +92,7 @@ impl HostPromise {
 
     #[inline(always)]
     fn slot(&self) -> std::sync::MutexGuard<'_, Slot> {
-        unsafe { (*self.0).slot.lock().unwrap() }
+        unsafe { (*self.0).slot.lock().unwrap_or_else(|e| e.into_inner()) }
     }
 
     #[inline(always)]

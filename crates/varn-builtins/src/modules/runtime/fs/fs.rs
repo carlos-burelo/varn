@@ -56,16 +56,16 @@ varn_contract! {
             }.map_err(fs_io_err)?;
 
             let fd = NEXT_FD.fetch_add(1, Ordering::Relaxed);
-            FILES.write().unwrap().insert(fd, Arc::new(Mutex::new(file)));
+            FILES.write().unwrap_or_else(|e| e.into_inner()).insert(fd, Arc::new(Mutex::new(file)));
             Ok(fd)
         }
 
         fn readFd(_ctx: &mut dyn NativeCtx, fd: i64, len: i64) -> Result<String, String> {
             let file_arc = {
-                let map = FILES.read().unwrap();
+                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
                 map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
             };
-            let mut file = file_arc.lock().unwrap();
+            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
 
             use std::io::Read;
             let mut buf = vec![0u8; len as usize];
@@ -76,10 +76,10 @@ varn_contract! {
 
         fn readFdBytes(ctx: &mut dyn NativeCtx, fd: i64, len: i64) -> Result<VmValue, String> {
             let file_arc = {
-                let map = FILES.read().unwrap();
+                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
                 map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
             };
-            let mut file = file_arc.lock().unwrap();
+            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
 
             use std::io::Read;
             let mut buf = vec![0u8; len as usize];
@@ -90,10 +90,10 @@ varn_contract! {
 
         fn writeFd(_ctx: &mut dyn NativeCtx, fd: i64, data: &str) -> Result<i64, String> {
             let file_arc = {
-                let map = FILES.read().unwrap();
+                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
                 map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
             };
-            let mut file = file_arc.lock().unwrap();
+            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
 
             use std::io::Write;
             file.write_all(data.as_bytes()).map_err(fs_io_err)?;
@@ -102,10 +102,10 @@ varn_contract! {
 
         fn writeFdBytes(ctx: &mut dyn NativeCtx, fd: i64, data: VmValue) -> Result<i64, String> {
             let file_arc = {
-                let map = FILES.read().unwrap();
+                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
                 map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
             };
-            let mut file = file_arc.lock().unwrap();
+            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
 
             let bytes = ctx.buffer_to_bytes(data).ok_or_else(|| coded("E_FS_BAD_ARG", "expected Bytes"))?;
             use std::io::Write;
@@ -131,10 +131,10 @@ varn_contract! {
 
         fn seek(_ctx: &mut dyn NativeCtx, fd: i64, offset: i64, whence: i64) -> Result<i64, String> {
             let file_arc = {
-                let map = FILES.read().unwrap();
+                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
                 map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
             };
-            let mut file = file_arc.lock().unwrap();
+            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
 
             use std::io::{Seek, SeekFrom};
             let seek_from = match whence {
@@ -148,7 +148,7 @@ varn_contract! {
         }
 
         fn close(_ctx: &mut dyn NativeCtx, fd: i64) -> Result<(), String> {
-            if FILES.write().unwrap().remove(&fd).is_some() {
+            if FILES.write().unwrap_or_else(|e| e.into_inner()).remove(&fd).is_some() {
                 Ok(())
             } else {
                 Err(coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))
@@ -289,10 +289,10 @@ varn_contract! {
 
         fn readFdAll(_ctx: &mut dyn NativeCtx, fd: i64) -> Result<String, String> {
             let file_arc = {
-                let map = FILES.read().unwrap();
+                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
                 map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
             };
-            let mut file = file_arc.lock().unwrap();
+            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
             use std::io::Read;
             let mut buf = Vec::new();
             file.read_to_end(&mut buf).map_err(fs_io_err)?;
@@ -301,10 +301,10 @@ varn_contract! {
 
         fn readFdAllBytes(ctx: &mut dyn NativeCtx, fd: i64) -> Result<VmValue, String> {
             let file_arc = {
-                let map = FILES.read().unwrap();
+                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
                 map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
             };
-            let mut file = file_arc.lock().unwrap();
+            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
             use std::io::Read;
             let mut buf = Vec::new();
             file.read_to_end(&mut buf).map_err(fs_io_err)?;

@@ -13,7 +13,7 @@ impl IoDriver {
             while let Ok(cmd) = cmd_rx.try_recv() {
                 match cmd {
                     DriverCommand::RegisterListener(id) => {
-                        let mut reg = registry.lock().unwrap();
+                        let mut reg = registry.lock().unwrap_or_else(|e| e.into_inner());
                         if let Some(lstate) = reg.listeners.get_mut(&id) {
                             let _ = poll.registry().register(
                                 &mut lstate.listener,
@@ -23,7 +23,7 @@ impl IoDriver {
                         }
                     }
                     DriverCommand::RegisterStream(id) => {
-                        let mut reg = registry.lock().unwrap();
+                        let mut reg = registry.lock().unwrap_or_else(|e| e.into_inner());
                         if let Some(sstate) = reg.streams.get_mut(&id) {
                             let _ = poll.registry().register(
                                 &mut sstate.stream,
@@ -33,7 +33,7 @@ impl IoDriver {
                         }
                     }
                     DriverCommand::RegisterUdp(id) => {
-                        let mut reg = registry.lock().unwrap();
+                        let mut reg = registry.lock().unwrap_or_else(|e| e.into_inner());
                         if let Some(ustate) = reg.udps.get_mut(&id) {
                             let _ = poll.registry().register(
                                 &mut ustate.socket,
@@ -75,7 +75,7 @@ impl IoDriver {
                 }
 
                 let id = token.0 as i64;
-                let mut reg = registry.lock().unwrap();
+                let mut reg = registry.lock().unwrap_or_else(|e| e.into_inner());
 
                 if let Some(listener_state) = reg.listeners.get_mut(&id) {
                     if event.is_readable() {

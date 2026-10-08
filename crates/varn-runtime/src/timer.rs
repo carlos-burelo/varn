@@ -65,7 +65,7 @@ pub fn sleep_task(ms: u64) -> HostPromise {
     let task = HostPromise::pending();
     let deadline = Instant::now() + Duration::from_millis(ms);
     let becomes_earliest = {
-        let mut guard = wheel().lock().unwrap();
+        let mut guard = wheel().lock().unwrap_or_else(|e| e.into_inner());
         let seq = guard.seq;
         guard.seq = guard.seq.wrapping_add(1);
         let earliest = guard
@@ -96,7 +96,7 @@ pub fn next_deadline() -> Option<Instant> {
 
 pub fn take_due() -> Vec<HostPromise> {
     let mut due = Vec::new();
-    let mut guard = wheel().lock().unwrap();
+    let mut guard = wheel().lock().unwrap_or_else(|e| e.into_inner());
     let now = Instant::now();
     while let Some(entry) = guard.queue.peek() {
         if entry.0.deadline > now && entry.0.task.is_pending() {
@@ -124,7 +124,7 @@ pub fn note_cancel() {
         .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         .is_multiple_of(1024)
     {
-        let mut guard = wheel().lock().unwrap();
+        let mut guard = wheel().lock().unwrap_or_else(|e| e.into_inner());
         let before = guard.queue.len();
         guard.queue.retain(|entry| entry.0.task.is_pending());
         PURGED.fetch_add(

@@ -21,7 +21,7 @@ impl WakeQueue {
     }
 
     pub fn push(&self, token: u64) {
-        let mut pending = self.pending.lock().unwrap();
+        let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
         pending.tokens.push_back(token);
         pending.generation = pending.generation.wrapping_add(1);
         drop(pending);
@@ -29,16 +29,19 @@ impl WakeQueue {
     }
 
     pub fn generation(&self) -> u64 {
-        self.pending.lock().unwrap().generation
+        self.pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .generation
     }
 
     pub fn drain_into(&self, out: &mut VecDeque<u64>) {
-        let mut pending = self.pending.lock().unwrap();
+        let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
         out.append(&mut pending.tokens);
     }
 
     pub fn wait_past(&self, entered: u64, done: impl Fn() -> bool) {
-        let mut pending = self.pending.lock().unwrap();
+        let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
         while !done() && pending.generation == entered {
             pending = self.changed.wait(pending).unwrap();
         }

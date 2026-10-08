@@ -8,7 +8,7 @@ impl IoDriver {
         let socket = MioUdpSocket::bind(addr)?;
         let id = next_socket_id();
         {
-            let mut reg = self.registry.lock().unwrap();
+            let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
             reg.udps.insert(
                 id,
                 UdpState {
@@ -32,7 +32,7 @@ impl IoDriver {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
             .map_err(|e| std::io::Error::new(ErrorKind::InvalidInput, e))?;
-        let reg = self.registry.lock().unwrap();
+        let reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         let ustate = reg.udps.get(&id).ok_or_else(|| {
             std::io::Error::new(ErrorKind::NotFound, format!("invalid UDP socket id {id}"))
         })?;
@@ -40,7 +40,7 @@ impl IoDriver {
     }
 
     pub fn udp_recv(&self, id: i64, max_len: usize) -> HostPromise {
-        let mut reg = self.registry.lock().unwrap();
+        let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         let ustate = match reg.udps.get_mut(&id) {
             Some(u) => u,
             None => {
@@ -70,7 +70,7 @@ impl IoDriver {
     }
 
     pub fn udp_close(&self, id: i64) {
-        let mut reg = self.registry.lock().unwrap();
+        let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(ustate) = reg.udps.remove(&id) {
             for pr in ustate.pending_recvs {
                 pr.task.complete(Ok(SendValue::Null));
