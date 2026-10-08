@@ -6,7 +6,6 @@ use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
 use varn_debug::flags::DebugFlags;
 use varn_types::capabilities::CapabilitySet;
-use varn_vm::loader::CompositeLoader;
 use varn_vm::Vm;
 
 type PipelineResult<T> = Result<T, PipelineError>;
@@ -67,10 +66,7 @@ pub fn boot_machine(
     capabilities: CapabilitySet,
     trace: bool,
 ) -> PipelineResult<Vm> {
-    let loader = std::sync::Arc::new(CompositeLoader::new(vec![
-        Box::new(crate::stdlib_loader::FileLoader),
-        Box::new(crate::stdlib_loader::StdlibLoader),
-    ]));
+    let loader = std::sync::Arc::new(crate::stdlib_loader::PipelineLoader::new());
     let settings = varn_vm::ExecSettings::from_env(trace);
     let mut machine = Vm::new(precompiled.clone(), settings).with_loader(loader);
     machine.ctx.capabilities = Rc::new(capabilities);

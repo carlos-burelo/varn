@@ -29,10 +29,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     })?;
 
     let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;
-    let loader = std::sync::Arc::new(varn_vm::loader::CompositeLoader::new(vec![
-        Box::new(varn_pipeline::stdlib_loader::FileLoader),
-        Box::new(varn_pipeline::stdlib_loader::StdlibLoader),
-    ]));
+    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new());
     varn_builtins::set_print_silent(!opts.show_output);
     varn_builtins::set_testing_silent(!opts.show_output);
     let factory = VmFactory::new(

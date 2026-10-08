@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use varn_checker::module_resolver::ImportResolver;
@@ -9,141 +8,88 @@ use varn_modules::loader::ModuleLoader as CanonicalLoader;
 use varn_types::FunctionProto;
 use varn_vm::loader::{ModuleError, ModuleLoader};
 
-thread_local! {
-    static PROTO_CACHE: RefCell<FxHashMap<String, (u64, Rc<FunctionProto>)>> =
-        RefCell::new(FxHashMap::default());
+pub struct PipelineLoader {
+    registry: varn_modules::loader::ModuleRegistry,
+    protos: Mutex<FxHashMap<String, (u64, Arc<[u8]>)>>,
 }
 
-type CompiledBytesMap = FxHashMap<String, (u64, Arc<[u8]>)>;
-static COMPILED_BYTES: Mutex<Option<CompiledBytesMap>> = Mutex::new(None);
-
-const STD_FINGERPRINT: u64 = 0;
-
-fn cached_proto(key: &str, fingerprint: u64) -> Option<Rc<FunctionProto>> {
-    let thread_hit = PROTO_CACHE.with(|c| c.borrow().get(key).cloned());
-    if let Some((fp, proto)) = thread_hit {
-        if fp == fingerprint {
-            return Some(proto);
+impl PipelineLoader {
+    pub fn new() -> Self {
+        Self {
+            registry: varn_modules::loader::default_registry(),
+            protos: Mutex::new(FxHashMap::default()),
         }
     }
-    let bytes = {
-        let guard = COMPILED_BYTES.lock().ok()?;
-        let map = guard.as_ref()?;
-        let (fp, bytes) = map.get(key)?;
-        if *fp != fingerprint {
-            return None;
-        }
-        bytes.clone()
-    };
-    let proto = Rc::new(postcard::from_bytes::<FunctionProto>(&bytes).ok()?);
-    PROTO_CACHE.with(|c| {
-        c.borrow_mut()
-            .insert(key.to_owned(), (fingerprint, proto.clone()));
-    });
-    Some(proto)
-}
 
-fn store_proto(key: &str, fingerprint: u64, proto: &Rc<FunctionProto>) {
-    if let Ok(bytes) = postcard::to_allocvec(proto.as_ref()) {
-        if let Ok(mut guard) = COMPILED_BYTES.lock() {
-            guard.get_or_insert_with(FxHashMap::default).insert(
-                key.to_owned(),
-                (fingerprint, Arc::from(bytes.into_boxed_slice())),
-            );
+    fn cached_proto(&self, key: &str, fingerprint: u64) -> Option<Rc<FunctionProto>> {
+        let bytes = {
+            let guard = self.protos.lock().ok()?;
+            let (fp, bytes) = guard.get(key)?;
+            if *fp != fingerprint {
+                return None;
+            }
+            bytes.clone()
+        };
+        postcard::from_bytes::<FunctionProto>(&bytes)
+            .ok()
+            .map(Rc::new)
+    }
+
+    fn store_proto(&self, key: &str, fingerprint: u64, proto: &Rc<FunctionProto>) {
+        if let Ok(bytes) = postcard::to_allocvec(proto.as_ref()) {
+            if let Ok(mut guard) = self.protos.lock() {
+                guard.insert(
+                    key.to_owned(),
+                    (fingerprint, Arc::from(bytes.into_boxed_slice())),
+                );
+            }
         }
     }
-    PROTO_CACHE.with(|c| {
-        c.borrow_mut()
-            .insert(key.to_owned(), (fingerprint, proto.clone()));
-    });
 }
 
-pub struct FileLoader;
+impl Default for PipelineLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-impl ModuleLoader for FileLoader {
-    fn resolve(&self, spec: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
-        varn_modules::resolver::ModuleResolver::new()
-            .resolve(spec, from)
-            .map_err(ModuleError::new)
-            .and_then(|id| match id {
-                ModuleId::Local(_) => Ok(id),
-                ModuleId::Core(_)
-                | ModuleId::Std(_)
-                | ModuleId::Runtime(_)
-                | ModuleId::Package { .. } => Err(ModuleError::new(format!(
-                    "FileLoader cannot resolve non-local specifier: {spec}"
-                ))),
-            })
+impl ModuleLoader for PipelineLoader {
+    fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
+        self.registry
+            .resolve(specifier, from)
+            .map_err(|e| ModuleError::new(e.to_string()))
     }
 
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError> {
+        match id {
+            ModuleId::Local(_) | ModuleId::Std(_) | ModuleId::Core(_) => {}
+            _ => return Ok(None),
+        }
+        let source = CanonicalLoader::source(&self.registry, id)
+            .map_err(|e| ModuleError::new(e.to_string()))?;
+        if let Some(blob) = source.bytecode.as_ref() {
+            return postcard::from_bytes(blob)
+                .map(Rc::new)
+                .map(Some)
+                .map_err(|e| ModuleError::new(format!("corrupt bytecode for {id:?}: {e}")));
+        }
+        let text = source.text;
+        let fingerprint = varn_modules::artifact::source_fingerprint(text.as_ref());
+        let key = varn_modules::artifact::module_key(id, fingerprint);
+        if let Some(hit) = self.cached_proto(&key, fingerprint) {
+            return Ok(Some(hit));
+        }
         let path = match id {
             ModuleId::Local(p) => p.as_ref(),
-            ModuleId::Core(_)
-            | ModuleId::Std(_)
-            | ModuleId::Runtime(_)
-            | ModuleId::Package { .. } => return Ok(None),
+            ModuleId::Std(s) | ModuleId::Core(s) => s.as_ref(),
+            _ => return Ok(None),
         };
-
-        let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)
-            .map_err(|e| ModuleError::new(e.to_string()))?
-            .text;
-        let fingerprint = varn_modules::artifact::source_fingerprint(source.as_ref());
-        let key = varn_modules::artifact::module_key(id, fingerprint);
-        if let Some(hit) = cached_proto(&key, fingerprint) {
-            return Ok(Some(hit));
-        }
-        let proto = compile_source(source.as_ref(), path)
+        let proto = compile_source(text.as_ref(), path)
             .map(Rc::new)
             .map_err(|e| ModuleError::new(format!("compile error in '{path}': {e}")))?;
-        store_proto(&key, fingerprint, &proto);
+        self.store_proto(&key, fingerprint, &proto);
         Ok(Some(proto))
     }
-}
-
-pub struct StdlibLoader;
-
-impl ModuleLoader for StdlibLoader {
-    fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
-        varn_modules::resolver::ModuleResolver::new()
-            .resolve(specifier, from)
-            .map_err(ModuleError::new)
-            .and_then(|id| match id {
-                ModuleId::Std(_) | ModuleId::Core(_) | ModuleId::Runtime(_) => Ok(id),
-                ModuleId::Local(_) | ModuleId::Package { .. } => Err(ModuleError::new(format!(
-                    "StdlibLoader cannot resolve non-stdlib specifier: {specifier}"
-                ))),
-            })
-    }
-
-    fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError> {
-        let spec = match id {
-            ModuleId::Std(s) | ModuleId::Core(s) => s.as_ref(),
-            ModuleId::Runtime(_) => return Ok(None),
-            ModuleId::Local(_) | ModuleId::Package { .. } => return Ok(None),
-        };
-
-        let key = varn_modules::artifact::module_key(id, STD_FINGERPRINT);
-        if let Some(hit) = cached_proto(&key, STD_FINGERPRINT) {
-            return Ok(Some(hit));
-        }
-        let proto = Rc::new(load_uncached(id, spec)?);
-        store_proto(&key, STD_FINGERPRINT, &proto);
-        Ok(Some(proto))
-    }
-}
-
-fn load_uncached(id: &ModuleId, spec: &str) -> Result<FunctionProto, ModuleError> {
-    let source = CanonicalLoader::source(&varn_modules::loader::default_registry(), id)
-        .map_err(|e| ModuleError::new(e.to_string()))?;
-
-    if let Some(blob) = source.bytecode.as_ref() {
-        return postcard::from_bytes(blob)
-            .map_err(|e| ModuleError::new(format!("corrupt std bundle bytecode for {spec}: {e}")));
-    }
-
-    compile_source(source.text.as_ref(), spec)
-        .map_err(|e| ModuleError::new(format!("stdlib compile error in {spec}: {e}")))
 }
 
 pub fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {

@@ -182,10 +182,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     );
 
     let builtin_protos: Vec<FunctionProto> = crate::pipeline::core_protos_owned()?;
-    let loader = std::sync::Arc::new(varn_vm::loader::CompositeLoader::new(vec![
-        Box::new(varn_pipeline::stdlib_loader::FileLoader),
-        Box::new(varn_pipeline::stdlib_loader::StdlibLoader),
-    ]));
+    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new());
     varn_builtins::set_print_silent(!opts.show_output);
     varn_builtins::set_testing_silent(!opts.show_output);
     let factory = VmFactory::new(

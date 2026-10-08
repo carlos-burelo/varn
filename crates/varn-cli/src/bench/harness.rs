@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use rustc_hash::FxHashMap;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
-use varn_vm::loader::CompositeLoader;
+use varn_vm::loader::ModuleLoader;
 use varn_vm::Vm;
 
 use crate::error::CliError;
@@ -13,7 +13,7 @@ use crate::error::CliError;
 pub struct VmFactory {
     precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     builtins: Vec<Rc<FunctionProto>>,
-    loader: Arc<CompositeLoader>,
+    loader: Arc<dyn ModuleLoader + Send + Sync>,
     module_id: ModuleId,
     proto: Rc<FunctionProto>,
 }
@@ -22,7 +22,7 @@ impl VmFactory {
     pub fn new(
         precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
         builtins: Vec<FunctionProto>,
-        loader: Arc<CompositeLoader>,
+        loader: Arc<dyn ModuleLoader + Send + Sync>,
         module_id: ModuleId,
         proto: Rc<FunctionProto>,
     ) -> Result<Self, CliError> {
