@@ -52,7 +52,7 @@ Canónico: layout en `varn-abi/src/lib.rs` (hoy 151 LOC, solo→core). Sin `Once
 
 - [x] `PipelineLoader` único sobre registry canónico (`5342032c`): File/Std fuera, caché instancia, `VmFactory` contra trait
 - [x] Sesión explícita en pipeline (`e607ec59`): `Session::new()` por run, fuera `thread_local`/`with_resolver`/`reset`; `DiskResolver::with_registry`
-- [ ] Workspace LSP dueño del resolver (fuera global `OnceLock`)
+- [x] Workspace LSP dueño del resolver (`0b6ae413`, fuera global `OnceLock`): `Workspace.resolver: Arc<DiskResolver>`, `DocumentState.resolver` compartido (precedente `db`), `run_pipeline` + `build_completion_response` con resolver explícito
 - [ ] Una sola función compila-módulo en pipeline (dedup `compile_source_inner`)
 - [ ] Puerta: `vn test` 155/0 (verde) + pipeline tests (verde salvo preexistentes abajo)
 
