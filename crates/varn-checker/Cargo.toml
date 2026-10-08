@@ -5,7 +5,6 @@ edition.workspace = true
 
 [dependencies]
 varn-core     = { path = "../varn-core" }
-varn-modules  = { path = "../varn-modules" }
 rustc-hash    = { workspace = true }
 
 varn-sem      = { path = "../varn-sem" }

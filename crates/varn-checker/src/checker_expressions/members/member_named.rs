@@ -186,50 +186,60 @@ impl<'r> Checker<'r> {
         }
 
         let ext_bind_opt = self.resolver.find_bind_for_type(&name, &origin_modules);
-        let candidates: Box<dyn Iterator<Item = Arc<varn_sem::bind::BindResult>>> =
-            if let Some(b) = ext_bind_opt {
-                Box::new(std::iter::once(b))
-            } else if origin.is_none() {
-                Box::new(
-                    varn_modules::std_module_ids()
-                        .into_iter()
-                        .filter_map(|spec| self.resolver.stdlib_bind(spec)),
-                )
-            } else {
-                Box::new(std::iter::empty())
-            };
-        for ext_bind in candidates {
-            if let Some(members) = ext_bind.type_members.classes.get(&name) {
-                if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
-                    let ty = m.ty;
-                    return Some((self.reintern_foreign_ty(&ext_bind, ty), m.symbol_id));
-                }
+        if let Some(ext_bind) = ext_bind_opt {
+            if let Some(found) = self.search_named_in(&ext_bind, &name, key) {
+                return Some(found);
             }
-            if let Some(entry) = ext_bind.get_class_entry(&name) {
-                if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
-                    let ty = m.ty;
-                    return Some((self.reintern_foreign_ty(&ext_bind, ty), m.symbol_id));
-                }
+        } else if origin.is_none() {
+            let resolver = self.resolver;
+            let mut found = None;
+            resolver.find_stdlib_bind(&mut |ext_bind| {
+                found = self.search_named_in(ext_bind, &name, key);
+                found.is_some()
+            });
+            if let Some(found) = found {
+                return Some(found);
             }
-            if let Some(members) = ext_bind.type_members.interfaces.get(&name) {
-                if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                    let ty = m.ty;
-                    return Some((self.reintern_foreign_ty(&ext_bind, ty), m.symbol_id));
-                }
+        }
+        None
+    }
+
+    fn search_named_in(
+        &mut self,
+        ext_bind: &BindResult,
+        name: &Arc<str>,
+        key: &str,
+    ) -> Option<(Type, Option<usize>)> {
+        if let Some(members) = ext_bind.type_members.classes.get(name) {
+            if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
+                let ty = m.ty;
+                return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
             }
-            if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
-                if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                    let ty = m.ty;
-                    return Some((self.reintern_foreign_ty(&ext_bind, ty), m.symbol_id));
-                }
+        }
+        if let Some(entry) = ext_bind.get_class_entry(name) {
+            if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
+                let ty = m.ty;
+                return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
             }
-            if let Some(ty) = ext_bind
-                .get_class_methods_for(name.as_ref())
-                .and_then(|m| m.get(key))
-            {
-                let ty = *ty;
-                return Some((self.reintern_foreign_ty(&ext_bind, ty), None));
+        }
+        if let Some(members) = ext_bind.type_members.interfaces.get(name) {
+            if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
+                let ty = m.ty;
+                return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
             }
+        }
+        if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
+            if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
+                let ty = m.ty;
+                return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
+            }
+        }
+        if let Some(ty) = ext_bind
+            .get_class_methods_for(name.as_ref())
+            .and_then(|m| m.get(key))
+        {
+            let ty = *ty;
+            return Some((self.reintern_foreign_ty(ext_bind, ty), None));
         }
         None
     }

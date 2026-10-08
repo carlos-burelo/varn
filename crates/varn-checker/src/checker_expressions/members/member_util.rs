@@ -26,13 +26,8 @@ pub(super) fn class_type_params(
         return params_in(name, &b);
     }
     if origin.is_none() {
-        for spec in varn_modules::std_module_ids() {
-            if let Some(b) = resolver.stdlib_bind(spec) {
-                let params = params_in(name, &b);
-                if !params.is_empty() {
-                    return params;
-                }
-            }
+        if let Some(found) = resolver.find_stdlib_bind(&mut |b| !params_in(name, b).is_empty()) {
+            return params_in(name, &found);
         }
     }
     Vec::new()

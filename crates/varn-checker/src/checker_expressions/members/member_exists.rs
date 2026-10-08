@@ -53,13 +53,9 @@ fn check_origin_module(
     }
 
     if origin.is_none() {
-        for spec in varn_modules::std_module_ids() {
-            if let Some(bind) = resolver.stdlib_bind(spec) {
-                if check_in_bind(name, key, &bind) {
-                    return true;
-                }
-            }
-        }
+        return resolver
+            .find_stdlib_bind(&mut |ext_bind| check_in_bind(name, key, ext_bind))
+            .is_some();
     }
     false
 }

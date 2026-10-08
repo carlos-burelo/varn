@@ -42,4 +42,20 @@ pub trait ImportResolver {
         }
         None
     }
+
+    fn stdlib_specs(&self) -> Vec<String>;
+
+    fn find_stdlib_bind(
+        &self,
+        check: &mut dyn FnMut(&BindResult) -> bool,
+    ) -> Option<Arc<BindResult>> {
+        for spec in self.stdlib_specs() {
+            if let Some(bind) = self.stdlib_bind(&spec) {
+                if check(&bind) {
+                    return Some(bind);
+                }
+            }
+        }
+        None
+    }
 }

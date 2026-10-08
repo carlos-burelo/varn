@@ -47,17 +47,18 @@ impl<'r> Checker<'r> {
         if let Some(parent) = bind.get_class_parent(&class.name) {
             return Some(parent.clone());
         }
-        for spec in varn_modules::std_module_ids() {
-            if let Some(rb) = self.resolver.stdlib_bind(spec) {
-                if let Some(parent) = rb.class_parents.get(class.name.as_ref()) {
-                    return Some(varn_sem::bind::ClassParent {
-                        name: parent.name.clone(),
-                        origin: parent
-                            .origin
-                            .clone()
-                            .or_else(|| Some(rb.source_file.clone())),
-                    });
-                }
+        if let Some(rb) = self
+            .resolver
+            .find_stdlib_bind(&mut |rb| rb.class_parents.contains_key(class.name.as_ref()))
+        {
+            if let Some(parent) = rb.class_parents.get(class.name.as_ref()) {
+                return Some(varn_sem::bind::ClassParent {
+                    name: parent.name.clone(),
+                    origin: parent
+                        .origin
+                        .clone()
+                        .or_else(|| Some(rb.source_file.clone())),
+                });
             }
         }
         None

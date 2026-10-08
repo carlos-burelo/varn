@@ -89,6 +89,13 @@ impl ImportResolver for DiskResolver {
         result
     }
 
+    fn stdlib_specs(&self) -> Vec<String> {
+        varn_modules::std_module_ids()
+            .into_iter()
+            .map(str::to_owned)
+            .collect()
+    }
+
     fn stdlib_bind(&self, specifier: &str) -> Option<Arc<BindResult>> {
         let key = ModuleId::stdlib(specifier).as_str();
         if let Some(cached) = self.cached_bind(&key) {

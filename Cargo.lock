@@ -2128,7 +2128,6 @@ dependencies = [
  "rustc-hash 1.1.0",
  "varn-binder",
  "varn-core",
- "varn-modules",
  "varn-sem",
 ]
 
