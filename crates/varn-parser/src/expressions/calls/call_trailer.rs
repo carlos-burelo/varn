@@ -1,0 +1,387 @@
+use super::super::parse_expr;
+use super::super::primary::{parse_object_body, parse_primary_expr, parse_template};
+use super::generic_args::{looks_like_generic_call, parse_call_args, try_parse_generic_call};
+use super::property_name::parse_property_name;
+use crate::stream::TokenStream;
+use varn_core::ast::{ExprId, ExprKind};
+use varn_core::TokenKind;
+
+pub(super) fn parse_call_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+    let mut expr = parse_primary_expr(s)?;
+
+    loop {
+        match s.kind() {
+            TokenKind::Dot => {
+                s.advance();
+                let prop_expr = parse_property_name(s);
+                let prop_range = s.expr_range(prop_expr);
+                let start_range = s.expr_range(expr);
+                expr = s.expr(
+                    start_range.to(prop_range),
+                    ExprKind::Member {
+                        object: expr,
+                        property: prop_expr,
+                        computed: false,
+                        optional: false,
+                    },
+                );
+            }
+            TokenKind::QuestionDot => {
+                s.advance();
+                if s.check(TokenKind::LBracket) {
+                    s.advance();
+                    let idx = parse_expr(s)?;
+                    let bracket_tok = s.expect_token(TokenKind::RBracket)?;
+                    let start_range = s.expr_range(expr);
+                    expr = s.expr(
+                        start_range.to(bracket_tok.range),
+                        ExprKind::Member {
+                            object: expr,
+                            property: idx,
+                            computed: true,
+                            optional: true,
+                        },
+                    );
+                } else if s.check(TokenKind::LParen) {
+                    let (type_args, args, call_range) = parse_call_args(s)?;
+                    let start_range = s.expr_range(expr);
+                    expr = s.expr(
+                        start_range.to(call_range),
+                        ExprKind::Call {
+                            callee: expr,
+                            type_args,
+                            args,
+                            optional: true,
+                        },
+                    );
+                } else {
+                    let prop_expr = parse_property_name(s);
+                    let prop_range = s.expr_range(prop_expr);
+                    let start_range = s.expr_range(expr);
+                    expr = s.expr(
+                        start_range.to(prop_range),
+                        ExprKind::Member {
+                            object: expr,
+                            property: prop_expr,
+                            computed: false,
+                            optional: true,
+                        },
+                    );
+                }
+            }
+            TokenKind::ColonColon => {
+                s.advance();
+                let prop_expr = parse_property_name(s);
+                let prop_name = match &s.arena.expr(prop_expr).kind {
+                    ExprKind::Identifier { name } => *name,
+                    ExprKind::IntLiteral { .. }
+                    | ExprKind::FloatLiteral { .. }
+                    | ExprKind::BigIntLiteral { .. }
+                    | ExprKind::DecimalLiteral { .. }
+                    | ExprKind::StrLiteral { .. }
+                    | ExprKind::CharLiteral { .. }
+                    | ExprKind::BoolLiteral { .. }
+                    | ExprKind::NullLiteral
+                    | ExprKind::RegexLiteral { .. }
+                    | ExprKind::Template { .. }
+                    | ExprKind::TaggedTemplate { .. }
+                    | ExprKind::Missing
+                    | ExprKind::This
+                    | ExprKind::Super
+                    | ExprKind::Array { .. }
+                    | ExprKind::Object { .. }
+                    | ExprKind::Tuple { .. }
+                    | ExprKind::Record { .. }
+                    | ExprKind::Unary { .. }
+                    | ExprKind::Update { .. }
+                    | ExprKind::Binary { .. }
+                    | ExprKind::Logical { .. }
+                    | ExprKind::Assign { .. }
+                    | ExprKind::Conditional { .. }
+                    | ExprKind::Member { .. }
+                    | ExprKind::Call { .. }
+                    | ExprKind::New { .. }
+                    | ExprKind::Function { .. }
+                    | ExprKind::Arrow { .. }
+                    | ExprKind::Sequence { .. }
+                    | ExprKind::Paren { .. }
+                    | ExprKind::Await { .. }
+                    | ExprKind::Spawn { .. }
+                    | ExprKind::Yield { .. }
+                    | ExprKind::Spread { .. }
+                    | ExprKind::Pipeline { .. }
+                    | ExprKind::Range { .. }
+                    | ExprKind::NonNull { .. }
+                    | ExprKind::Try { .. }
+                    | ExprKind::As { .. }
+                    | ExprKind::Satisfies { .. }
+                    | ExprKind::ClassExpr { .. }
+                    | ExprKind::Match { .. }
+                    | ExprKind::Is { .. }
+                    | ExprKind::With { .. }
+                    | ExprKind::MetaAccess { .. } => {
+                        let text = s.lexeme().to_owned();
+                        s.interner.intern(&text)
+                    }
+                };
+                let prop_range = s.expr_range(prop_expr);
+                let start_range = s.expr_range(expr);
+                expr = s.expr(
+                    start_range.to(prop_range),
+                    ExprKind::MetaAccess {
+                        target: expr,
+                        property: prop_name,
+                    },
+                );
+            }
+            TokenKind::LBracket => {
+                if s.line() > s.prev_line() {
+                    break;
+                }
+                s.advance();
+                let idx = parse_expr(s)?;
+                let bracket_tok = s.expect_token(TokenKind::RBracket)?;
+                let start_range = s.expr_range(expr);
+                expr = s.expr(
+                    start_range.to(bracket_tok.range),
+                    ExprKind::Member {
+                        object: expr,
+                        property: idx,
+                        computed: true,
+                        optional: false,
+                    },
+                );
+            }
+            TokenKind::QuestionLBracket => {
+                s.advance();
+                let idx = parse_expr(s)?;
+                let bracket_tok = s.expect_token(TokenKind::RBracket)?;
+                let start_range = s.expr_range(expr);
+                expr = s.expr(
+                    start_range.to(bracket_tok.range),
+                    ExprKind::Member {
+                        object: expr,
+                        property: idx,
+                        computed: true,
+                        optional: true,
+                    },
+                );
+            }
+            TokenKind::LParen => {
+                let (type_args, args, call_range) = parse_call_args(s)?;
+                let start_range = s.expr_range(expr);
+                expr = s.expr(
+                    start_range.to(call_range),
+                    ExprKind::Call {
+                        callee: expr,
+                        type_args,
+                        args,
+                        optional: false,
+                    },
+                );
+            }
+            TokenKind::LAngle => {
+                if !looks_like_generic_call(s) {
+                    break;
+                }
+                let save = s.save();
+                let start_range = s.expr_range(expr);
+                match try_parse_generic_call(s, expr, start_range) {
+                    Ok(call) => {
+                        expr = call;
+                    }
+                    Err(_) => {
+                        s.restore(save);
+                        break;
+                    }
+                }
+            }
+
+            TokenKind::Bang => {
+                let op_range = s.range();
+                s.advance();
+                let full_range = s.expr_range(expr).to(op_range);
+                expr = s.expr(full_range, ExprKind::NonNull { expression: expr });
+            }
+
+            TokenKind::Template | TokenKind::TemplateHead => {
+                let template_expr = parse_template(s)?;
+                let start_range = s.expr_range(expr);
+                let full_range = start_range.to(s.expr_range(template_expr));
+                expr = s.expr(
+                    full_range,
+                    ExprKind::TaggedTemplate {
+                        tag: expr,
+                        template: template_expr,
+                    },
+                );
+            }
+            TokenKind::With => {
+                s.advance();
+                s.expect(TokenKind::LBrace)?;
+                let properties = parse_object_body(s)?;
+                let rbrace_tok = s.expect_token(TokenKind::RBrace)?;
+                let start_range = s.expr_range(expr);
+                let full_range = start_range.to(rbrace_tok.range);
+                expr = s.expr(
+                    full_range,
+                    ExprKind::With {
+                        object: expr,
+                        properties,
+                    },
+                );
+            }
+            TokenKind::EOF
+            | TokenKind::Dynamic
+            | TokenKind::Identifier
+            | TokenKind::IntegerLiteral
+            | TokenKind::FloatLiteral
+            | TokenKind::BinaryLiteral
+            | TokenKind::OctalLiteral
+            | TokenKind::HexLiteral
+            | TokenKind::BigIntLiteral
+            | TokenKind::Str
+            | TokenKind::Char
+            | TokenKind::TemplateMiddle
+            | TokenKind::TemplateTail
+            | TokenKind::RegularExpression
+            | TokenKind::RParen
+            | TokenKind::LBrace
+            | TokenKind::RBrace
+            | TokenKind::RBracket
+            | TokenKind::RAngle
+            | TokenKind::Semicolon
+            | TokenKind::Comma
+            | TokenKind::DotDot
+            | TokenKind::DotDotDot
+            | TokenKind::DotDotEq
+            | TokenKind::Colon
+            | TokenKind::Question
+            | TokenKind::QuestionQuestion
+            | TokenKind::QuestionQuestionEq
+            | TokenKind::Plus
+            | TokenKind::PlusPlus
+            | TokenKind::PlusEq
+            | TokenKind::Minus
+            | TokenKind::MinusMinus
+            | TokenKind::MinusEq
+            | TokenKind::Star
+            | TokenKind::StarStar
+            | TokenKind::StarEq
+            | TokenKind::StarStarEq
+            | TokenKind::Slash
+            | TokenKind::SlashEq
+            | TokenKind::Percent
+            | TokenKind::PercentEq
+            | TokenKind::Amp
+            | TokenKind::AmpAmp
+            | TokenKind::AmpEq
+            | TokenKind::AmpAmpEq
+            | TokenKind::Pipe
+            | TokenKind::PipePipe
+            | TokenKind::PipeEq
+            | TokenKind::PipePipeEq
+            | TokenKind::PipeGt
+            | TokenKind::Caret
+            | TokenKind::CaretEq
+            | TokenKind::Tilde
+            | TokenKind::LtLt
+            | TokenKind::LtLtEq
+            | TokenKind::GtGt
+            | TokenKind::GtGtEq
+            | TokenKind::GtGtGt
+            | TokenKind::GtGtGtEq
+            | TokenKind::Eq
+            | TokenKind::EqEq
+            | TokenKind::EqEqEq
+            | TokenKind::BangEq
+            | TokenKind::BangEqEq
+            | TokenKind::Lt
+            | TokenKind::LtEq
+            | TokenKind::Gt
+            | TokenKind::GtEq
+            | TokenKind::Arrow
+            | TokenKind::FatArrow
+            | TokenKind::Let
+            | TokenKind::Const
+            | TokenKind::Var
+            | TokenKind::Function
+            | TokenKind::Class
+            | TokenKind::Struct
+            | TokenKind::Interface
+            | TokenKind::Type
+            | TokenKind::Enum
+            | TokenKind::Namespace
+            | TokenKind::Module
+            | TokenKind::Extension
+            | TokenKind::On
+            | TokenKind::If
+            | TokenKind::Else
+            | TokenKind::Switch
+            | TokenKind::Case
+            | TokenKind::Default
+            | TokenKind::While
+            | TokenKind::For
+            | TokenKind::Do
+            | TokenKind::Break
+            | TokenKind::Continue
+            | TokenKind::Return
+            | TokenKind::Throw
+            | TokenKind::Try
+            | TokenKind::Catch
+            | TokenKind::Finally
+            | TokenKind::Using
+            | TokenKind::Import
+            | TokenKind::Export
+            | TokenKind::From
+            | TokenKind::As
+            | TokenKind::Async
+            | TokenKind::Await
+            | TokenKind::Yield
+            | TokenKind::New
+            | TokenKind::This
+            | TokenKind::Super
+            | TokenKind::Delete
+            | TokenKind::Typeof
+            | TokenKind::Instanceof
+            | TokenKind::In
+            | TokenKind::Of
+            | TokenKind::Void
+            | TokenKind::Is
+            | TokenKind::True
+            | TokenKind::False
+            | TokenKind::Null
+            | TokenKind::Public
+            | TokenKind::Private
+            | TokenKind::Protected
+            | TokenKind::Static
+            | TokenKind::Abstract
+            | TokenKind::Override
+            | TokenKind::Readonly
+            | TokenKind::Declare
+            | TokenKind::Native
+            | TokenKind::Extends
+            | TokenKind::Implements
+            | TokenKind::Get
+            | TokenKind::Set
+            | TokenKind::Constructor
+            | TokenKind::Destructor
+            | TokenKind::Match
+            | TokenKind::At
+            | TokenKind::Hash
+            | TokenKind::Backslash
+            | TokenKind::Dollar
+            | TokenKind::Backtick
+            | TokenKind::Newline
+            | TokenKind::Whitespace
+            | TokenKind::DocComment
+            | TokenKind::Placeholder
+            | TokenKind::DecimalLiteral
+            | TokenKind::Spawn
+            | TokenKind::Parallel
+            | TokenKind::Start
+            | TokenKind::RawStr => break,
+        }
+    }
+    Ok(expr)
+}

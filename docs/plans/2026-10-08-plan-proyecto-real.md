@@ -121,3 +121,12 @@ Cierre parcial honesto (`f17b6259`+`686ce01c`+lock):
 
 Orden: F0 → F1 → F2 → F3 → F4 → F5. Si un paso pide adapter/flag dual, parar: modelo mal, simplificar Ley8.
 Estado se actualiza marcando `[x]` arriba conforme avanza cada paso verde.
+
+## F6 — Gobierno tamaño (Ley 6 AGENTS.md: techo 400) [ ]
+- [x] `parser/expressions`: `mod.rs` 856→173 (precedence/binary/logical/assign por dominio);
+  `ops.rs` 437→lookahead(366)+arrow_parse+`yield_expr`; `calls/trailer.rs` 589→call_trailer(383)+new_callee+property_name+hub;
+  `calls/unary.rs` 444→prefix(252)+postfix+hub; `primary/mod.rs` 423→dispatch(310)+array/new/function/class por dominio.
+  Todo `expressions/` <400, check cero warnings, `vn test` 153/2-solo-red.
+- [x] `checker/checker_call_types.rs` 616→hub(145)+7 dominios (member/binary/invoke/new/control/closure/composite)
+  vía `CallTypeCtx` (firma `infer_call_type` intacta para call sites). `bytecode_layout_agrees` + `vn test` 153/2-solo-red.
+- [ ] Resto >400 fuera de este workstream (auditar y partir por dominio uno por uno).

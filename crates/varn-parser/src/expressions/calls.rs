@@ -1,4 +1,9 @@
+mod call_trailer;
 mod generic_args;
+mod new_callee;
+mod postfix_update;
+mod prefix_unary;
+mod property_name;
 mod trailer;
 mod unary;
 

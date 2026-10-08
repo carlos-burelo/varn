@@ -1,12 +1,19 @@
+mod array_expr;
+mod class_expr;
+mod function_expr;
 mod match_expr;
+mod new_expr;
 mod object;
 mod template;
 
 use super::literal_text::{parse_int_radix, split_regex, unescape_string};
-use super::{parse_call_args, parse_seq_expr, try_parse_arrow};
+use super::{parse_seq_expr, try_parse_arrow};
 use crate::stream::TokenStream;
-use crate::types::parse_type_args;
-use varn_core::ast::{ArrayEl, ExprId, ExprKind};
+use array_expr::parse_array_expr;
+use class_expr::parse_class_expr;
+use function_expr::{parse_function_expr, parse_function_expr_inner_with_start};
+use new_expr::parse_new_expr;
+use varn_core::ast::{ExprId, ExprKind};
 use varn_core::ParsedNumber;
 use varn_core::TokenKind;
 
@@ -314,110 +321,4 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             }
         }
     }
-}
-
-fn parse_array_expr(s: &mut TokenStream) -> Result<ExprId, String> {
-    let start_range = s.range();
-    s.advance();
-    let mut elements = vec![];
-
-    while !s.check(TokenKind::RBracket) && !s.is_eof() {
-        if s.check(TokenKind::Comma) {
-            elements.push(ArrayEl::Hole);
-            s.advance();
-            continue;
-        }
-        if s.check(TokenKind::DotDotDot) {
-            s.advance();
-            elements.push(ArrayEl::Spread(super::parse_assign_expr(s)?));
-        } else {
-            elements.push(ArrayEl::Expr(super::parse_assign_expr(s)?));
-        }
-        s.eat(TokenKind::Comma);
-    }
-
-    s.expect(TokenKind::RBracket)?;
-    let full_range = s.span_from(start_range);
-    Ok(s.expr(full_range, ExprKind::Array { elements }))
-}
-
-fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<ExprId, String> {
-    s.advance();
-    let callee = super::parse_new_callee_expr(s)?;
-    let mut type_args = vec![];
-    if s.check(TokenKind::LAngle) {
-        let save = s.save();
-        match parse_type_args(s) {
-            Ok(ta) if s.check(TokenKind::LParen) => {
-                type_args = ta;
-            }
-            Ok(_) | Err(_) => {
-                s.restore(save);
-            }
-        }
-    }
-    let args = if s.check(TokenKind::LParen) {
-        let (_, a, _) = parse_call_args(s)?;
-        a
-    } else {
-        vec![]
-    };
-    let full_range = s.span_from(range);
-    Ok(s.expr(
-        full_range,
-        ExprKind::New {
-            callee,
-            type_args,
-            args,
-        },
-    ))
-}
-
-fn parse_function_expr(s: &mut TokenStream) -> Result<ExprId, String> {
-    let start_range = s.range();
-    s.advance();
-    parse_function_expr_inner_with_start(s, false, start_range)
-}
-
-fn parse_function_expr_inner_with_start(
-    s: &mut TokenStream,
-    is_async: bool,
-    start_range: varn_core::SourceRange,
-) -> Result<ExprId, String> {
-    let is_generator = s.eat(TokenKind::Star);
-    let id = if s.check(TokenKind::Identifier) {
-        Some(s.consume_lexeme())
-    } else {
-        None
-    };
-    let params = crate::parser::parse_params(s)?;
-    let return_type = if s.eat(TokenKind::Colon) {
-        Some(crate::types::parse_type(s)?)
-    } else {
-        None
-    };
-    let body = crate::parser::parse_block(s)?;
-    let full_range = s.span_from(start_range);
-    Ok(s.expr(
-        full_range,
-        ExprKind::Function {
-            fn_id: id,
-            params,
-            return_type,
-            body,
-            is_async,
-            is_generator,
-        },
-    ))
-}
-
-fn parse_class_expr(s: &mut TokenStream) -> Result<ExprId, String> {
-    let decl = crate::parser::parse_class_decl(s, vec![], false)?;
-    let full_range = decl.range;
-    Ok(s.expr(
-        full_range,
-        ExprKind::ClassExpr {
-            declaration: Box::new(decl),
-        },
-    ))
 }
