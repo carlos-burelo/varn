@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::fs;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, RwLock};
@@ -6,8 +6,8 @@ use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 static NEXT_FD: AtomicI64 = AtomicI64::new(1);
-static FILES: LazyLock<RwLock<HashMap<i64, Arc<Mutex<fs::File>>>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
+static FILES: LazyLock<RwLock<FxHashMap<i64, Arc<Mutex<fs::File>>>>> =
+    LazyLock::new(|| RwLock::new(FxHashMap::default()));
 
 fn coded(code: &str, msg: impl std::fmt::Display) -> String {
     format!("{code}|{msg}")

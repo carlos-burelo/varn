@@ -8,7 +8,7 @@ mod symbol_queries;
 mod symbol_view;
 mod types;
 
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use varn_checker::{SymbolKind, Type};
 use varn_core::TokenKind;
@@ -104,9 +104,9 @@ pub struct DocumentState {
     pub tokens: Vec<TokenRecord>,
 
     pub trivia: Vec<varn_core::Trivia>,
-    pub symbol_map: HashMap<String, SymbolKind>,
+    pub symbol_map: FxHashMap<String, SymbolKind>,
 
-    pub type_param_names: HashSet<String>,
+    pub type_param_names: FxHashSet<String>,
 
     pub db: SemanticDB,
 

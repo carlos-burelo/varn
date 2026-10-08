@@ -1,6 +1,6 @@
 use crate::document::DocumentState;
 use crate::util::converters::range_on_line;
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 use tower_lsp_f::lsp_types::{DocumentHighlight, DocumentHighlightKind};
 use varn_core::TokenKind;
 
@@ -27,7 +27,7 @@ pub fn build_document_highlights(
         .and_then(|info| info.symbol_id);
 
     if let Some(target_sid) = target_sid {
-        let mut decl_positions = HashSet::new();
+        let mut decl_positions = FxHashSet::default();
         if target_sid < state.db.bind.arena.len() {
             let sym = state.db.bind.arena.get(target_sid);
 
@@ -60,7 +60,7 @@ pub fn build_document_highlights(
         }
     }
 
-    let decl_positions: HashSet<(u32, u32)> = state
+    let decl_positions: FxHashSet<(u32, u32)> = state
         .symbols()
         .filter(|s| s.name() == name && s.line() != u32::MAX)
         .map(|s| (s.line(), s.col()))

@@ -1,3 +1,4 @@
+use rustc_hash::FxHashSet;
 use varn_types::ssa::{SsaProto, SsaTerm};
 
 use super::store::clif_ty;
@@ -120,7 +121,7 @@ pub(super) fn loop_body(
     rpo_pos: &[usize],
     reached: &[bool],
     header: usize,
-) -> std::collections::HashSet<usize> {
+) -> FxHashSet<usize> {
     let live = |p: &usize| reached[*p];
     let latches: Vec<usize> = preds[header]
         .iter()
@@ -128,7 +129,7 @@ pub(super) fn loop_body(
         .copied()
         .filter(|&p| rpo_pos[header] <= rpo_pos[p])
         .collect();
-    let mut body = std::collections::HashSet::new();
+    let mut body = FxHashSet::default();
     if latches.is_empty() {
         return body;
     }

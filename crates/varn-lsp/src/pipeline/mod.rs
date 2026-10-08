@@ -1,6 +1,6 @@
 mod params;
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
 use crate::document::{uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, TokenRecord};
@@ -145,7 +145,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     let mut resolved_types: rustc_hash::FxHashMap<varn_checker::SymbolId, varn_checker::Type> =
         rustc_hash::FxHashMap::default();
     let mut all_symbols: Vec<varn_checker::SymbolId> = Vec::new();
-    let mut symbol_map: HashMap<String, SymbolKind> = HashMap::new();
+    let mut symbol_map: FxHashMap<String, SymbolKind> = FxHashMap::default();
 
     for (id, sym) in result.bind.arena.all().iter().enumerate() {
         let recorded = result

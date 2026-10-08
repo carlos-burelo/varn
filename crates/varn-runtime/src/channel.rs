@@ -1,4 +1,5 @@
-use std::collections::{HashMap, VecDeque};
+use rustc_hash::FxHashMap;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
@@ -30,13 +31,13 @@ struct ChannelCore {
     state: Mutex<ChannelState>,
 }
 
-struct Table(Mutex<HashMap<u64, std::sync::Arc<ChannelCore>>>);
+struct Table(Mutex<FxHashMap<u64, std::sync::Arc<ChannelCore>>>);
 
 static REGISTRY: OnceLock<Table> = OnceLock::new();
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 fn registry() -> &'static Table {
-    REGISTRY.get_or_init(|| Table(Mutex::new(HashMap::new())))
+    REGISTRY.get_or_init(|| Table(Mutex::new(FxHashMap::default())))
 }
 
 fn core_of(id: u64) -> Option<std::sync::Arc<ChannelCore>> {

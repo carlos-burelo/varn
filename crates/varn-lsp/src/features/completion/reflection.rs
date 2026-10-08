@@ -1,3 +1,4 @@
+use rustc_hash::FxHashSet;
 use tower_lsp_f::lsp_types::{
     CompletionItem, CompletionItemKind, Documentation, InsertTextFormat, MarkupContent, MarkupKind,
 };
@@ -134,7 +135,7 @@ pub fn build_reflection_completions(
     prefix: &str,
 ) -> Vec<CompletionItem> {
     let mut items = Vec::new();
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = FxHashSet::default();
 
     for (idx, meta) in META_PROPERTIES.iter().enumerate() {
         seen.insert(meta.name.to_string());

@@ -1,4 +1,4 @@
-use std::collections::hash_map::DefaultHasher;
+use rustc_hash::FxHasher;
 use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Default)]
@@ -34,7 +34,7 @@ impl<T> Cached<T> {
 }
 
 fn hash_str(s: &str) -> u64 {
-    let mut h = DefaultHasher::new();
+    let mut h = FxHasher::default();
     s.hash(&mut h);
     h.finish()
 }

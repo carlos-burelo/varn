@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaProto, SsaTerm};
 
@@ -14,7 +14,7 @@ pub(super) fn in_range_steps(
     preds: &[Vec<usize>],
     rpo_pos: &[usize],
     reached: &[bool],
-) -> HashSet<u32> {
+) -> FxHashSet<u32> {
     let mut def: Vec<Option<&SsaOp>> = vec![None; ssa.values.len()];
     for inst in ssa.blocks.iter().flat_map(|blk| &blk.insts) {
         if let Some(d) = inst.dest {
@@ -23,7 +23,7 @@ pub(super) fn in_range_steps(
     }
     let is_one = |v: u32| matches!(def[v as usize], Some(SsaOp::ConstInt(1)));
 
-    let mut steps = HashSet::new();
+    let mut steps = FxHashSet::default();
     for (header, blk) in ssa.blocks.iter().enumerate() {
         if !reached[header] {
             continue;

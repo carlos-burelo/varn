@@ -1,4 +1,5 @@
 use crate::document::{DocumentState, TokenRecord};
+use rustc_hash::FxHashSet;
 use tower_lsp_f::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
 use varn_checker::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary, SymbolKind, Type};
 use varn_core::{LangPrimitive, TokenKind};
@@ -22,7 +23,7 @@ pub fn build_member_completions(
         .filter(|m| m.is_static != info.is_instance)
         .collect();
     members.sort_by(|a, b| a.name.cmp(&b.name));
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = FxHashSet::default();
     members
         .iter()
         .filter(|m| seen.insert(m.name.clone()))

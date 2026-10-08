@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 use tower_lsp_f::lsp_types::{CompletionItem, Position, Range, TextEdit};
 
@@ -13,7 +13,7 @@ pub fn build_autoimport_completions(
     source: &str,
     doc_uri: &str,
     index: &ProjectIndex,
-    already_known: &HashSet<String>,
+    already_known: &FxHashSet<String>,
     prefix_filter: Option<&str>,
 ) -> Vec<CompletionItem> {
     let insert_pos = import_insert_position(source);

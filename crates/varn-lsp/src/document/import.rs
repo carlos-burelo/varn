@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 use super::ImportPathContext;
 
@@ -101,8 +101,8 @@ pub fn named_import_module_at(source: &str, line: u32, col: u32) -> Option<Strin
     from_part
 }
 
-pub fn named_imported_names_at(source: &str, line: u32, _col: u32) -> HashSet<String> {
-    let mut names = HashSet::new();
+pub fn named_imported_names_at(source: &str, line: u32, _col: u32) -> FxHashSet<String> {
+    let mut names = FxHashSet::default();
     let src_line = match source.lines().nth(line as usize) {
         Some(l) => l,
         None => return names,

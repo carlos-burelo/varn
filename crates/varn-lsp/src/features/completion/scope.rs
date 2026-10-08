@@ -1,3 +1,4 @@
+use rustc_hash::FxHashSet;
 use tower_lsp_f::lsp_types::{CompletionItem, InsertTextFormat};
 use varn_checker::SymbolKind;
 
@@ -15,7 +16,7 @@ pub fn build_scope_completions(
     let cursor_offset = state.offset_at_line_col(line, col);
     let mut scope_id = state.db.scope_at_offset(cursor_offset);
 
-    let mut seen_names = std::collections::HashSet::new();
+    let mut seen_names = FxHashSet::default();
 
     loop {
         let scope = state.db.bind.scopes.get(scope_id);

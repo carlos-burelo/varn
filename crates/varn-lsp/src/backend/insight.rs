@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use tower_lsp_f::jsonrpc::Result as LspResult;
 use tower_lsp_f::lsp_types::*;
 
@@ -110,9 +111,9 @@ pub(crate) async fn semantic_tokens_full_delta(
 }
 
 fn diagnostic_result_id(items: &[tower_lsp_f::lsp_types::Diagnostic]) -> String {
-    use std::collections::hash_map::DefaultHasher;
+    use rustc_hash::FxHasher;
     use std::hash::{Hash, Hasher};
-    let mut h = DefaultHasher::new();
+    let mut h = FxHasher::default();
     h.write_usize(items.len());
     for d in items {
         d.range.start.line.hash(&mut h);
@@ -170,7 +171,7 @@ pub(crate) async fn workspace_diagnostic(
     params: WorkspaceDiagnosticParams,
 ) -> LspResult<WorkspaceDiagnosticReport> {
     use crate::features::diagnostics::convert_diagnostics;
-    let previous: std::collections::HashMap<String, String> = params
+    let previous: FxHashMap<String, String> = params
         .previous_result_ids
         .into_iter()
         .map(|p| (p.uri.to_string(), p.value))
@@ -239,9 +240,9 @@ fn encode_tokens(raw: &[u32]) -> Vec<SemanticToken> {
 }
 
 fn data_id(data: &[SemanticToken]) -> String {
-    use std::collections::hash_map::DefaultHasher;
+    use rustc_hash::FxHasher;
     use std::hash::{Hash, Hasher};
-    let mut h = DefaultHasher::new();
+    let mut h = FxHasher::default();
     h.write_usize(data.len());
     for t in data.iter().take(64) {
         t.delta_line.hash(&mut h);

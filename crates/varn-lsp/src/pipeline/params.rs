@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::document::{token_lexeme, TokenRecord};
 use varn_core::TokenKind;
@@ -6,9 +6,9 @@ use varn_core::TokenKind;
 pub fn collect_type_params(
     source: &str,
     tokens: &[TokenRecord],
-) -> (HashMap<String, Vec<String>>, HashSet<String>) {
-    let mut name_to_params: HashMap<String, Vec<String>> = HashMap::new();
-    let mut all_names: HashSet<String> = HashSet::new();
+) -> (FxHashMap<String, Vec<String>>, FxHashSet<String>) {
+    let mut name_to_params: FxHashMap<String, Vec<String>> = FxHashMap::default();
+    let mut all_names: FxHashSet<String> = FxHashSet::default();
     let n = tokens.len();
 
     let mut i = 0;

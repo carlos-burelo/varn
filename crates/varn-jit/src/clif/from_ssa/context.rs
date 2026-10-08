@@ -1,5 +1,6 @@
 use cranelift_codegen::ir::{FuncRef, Value};
 use cranelift_codegen::isa::CallConv;
+use rustc_hash::{FxHashMap, FxHashSet};
 use varn_types::register_meta::FrameLayout;
 use varn_types::ssa::SsaProto;
 use varn_types::{FunctionProto, VmValue};
@@ -40,11 +41,11 @@ pub(super) struct Ctx<'a> {
 
     pub views: views::Views,
 
-    pub in_range_steps: std::collections::HashSet<u32>,
+    pub in_range_steps: FxHashSet<u32>,
 
-    pub carried: std::collections::HashMap<u32, cranelift_frontend::Variable>,
+    pub carried: FxHashMap<u32, cranelift_frontend::Variable>,
 
-    pub home_addrs: std::cell::RefCell<std::collections::HashMap<u32, Value>>,
+    pub home_addrs: std::cell::RefCell<FxHashMap<u32, Value>>,
 
     pub scratch: Option<call::ScratchWin>,
 }

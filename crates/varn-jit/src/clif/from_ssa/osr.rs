@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use cranelift_codegen::ir::{Block, BlockArg, InstBuilder, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
@@ -12,9 +12,9 @@ pub(super) fn carried(
     ssa: &SsaProto,
     header: &SsaLoopHeader,
     reached: &[bool],
-) -> HashMap<u32, Variable> {
+) -> FxHashMap<u32, Variable> {
     let def = super::cfg::def_blocks(ssa);
-    let mut carried = HashMap::new();
+    let mut carried = FxHashMap::default();
     for &v in &header.live {
         let kind = ssa.value_ty(v);
         let redefined = def[v as usize].is_some_and(|blk| reached[blk]);

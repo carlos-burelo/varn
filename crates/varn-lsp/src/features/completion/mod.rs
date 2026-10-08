@@ -4,6 +4,7 @@ mod imports;
 mod keywords;
 pub mod members;
 pub mod postfix;
+use rustc_hash::FxHashSet;
 pub mod reflection;
 pub(crate) mod scope;
 
@@ -206,8 +207,7 @@ pub fn build_completion_response(
     let mut auto_n = 0;
     if let Some(idx) = index {
         if !prefix.is_empty() {
-            let already_known: std::collections::HashSet<String> =
-                state.symbol_map.keys().cloned().collect();
+            let already_known: FxHashSet<String> = state.symbol_map.keys().cloned().collect();
             let auto = autoimport::build_autoimport_completions(
                 &state.source,
                 &state.uri,

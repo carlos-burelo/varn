@@ -1,3 +1,4 @@
+use rustc_hash::FxHashSet;
 use std::collections::HashMap;
 use tower_lsp_f::lsp_types::{
     CodeAction, CodeActionKind, CodeActionResponse, Position, Range, TextEdit, Uri, WorkspaceEdit,
@@ -26,7 +27,7 @@ pub fn generate_class_member_actions(
     let class_name = class.id.map_or("Anonymous", |id| state.name(id));
     let mut fields = Vec::new();
     let mut has_constructor = false;
-    let mut methods = std::collections::HashSet::new();
+    let mut methods = FxHashSet::default();
 
     for member in &class.body {
         match member {
