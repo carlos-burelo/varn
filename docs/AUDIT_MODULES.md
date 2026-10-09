@@ -466,7 +466,9 @@ Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED`
 - 18-ranges `slot 3 OOB` en `Range`: stub core de tipos nativos tiene `class entry` pero runtime usa representación nativa. Fix: guard `is_lang_type_name` en `collect_foreign_classes`.
 - 109-try-operator `int = Class`: `Result` es sum-type con `class entry`; se colectaba como clase y ganaba a enum. Fix: guards sum-type/enum en `collect_foreign_classes`.
 
-### Pendiente (solo F3-F5 + release)
+### Pendiente (solo release-Fast)
+
+F3/F4 cerrados con medición (Ley10 contrapeso): micro-bench local vs foráneo (5M iters, campo + método: 50ms vs 49ms, ruido) demuestra que el JIT converge ambas formas; sin ganancia medible no se justifica la reescritura. Quedan como optimización futura si un bench real muestra gap. F5b (`LoadModule` tipado por `ModuleId`) igual: cargas una vez por módulo/VM, ganancia negligible; TOCTOU cubierto por F5a.
 
 R1 + H2 resto (F3: reescritura TIR a ids globales, F4: registro en VM, F5: `ModuleSlot`; F0-F2 hechos, §8). Todo lo demás hecho o cerrado con justificación medida: H7, H8 (incl. namespace único), H9, H10, H11 (silence + backstop; `Box::leak` y `capability_mask` documentados), H12/H14 (cerrados), A3b (omitido: incompatible), B1, from_tir asserts, DynReason (preexistente), E_STALE_ATOM (diferido: fail-loud). Guards representación en `collect_foreign_classes` se quedan hasta F4.
 
