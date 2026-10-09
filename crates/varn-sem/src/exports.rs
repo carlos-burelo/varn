@@ -9,6 +9,14 @@ pub struct ExportMap {
     symbols: FxHashMap<String, Symbol>,
     #[serde(skip)]
     pub table: Arc<CheckerTyTable>,
+    pub collisions: Vec<ExportCollision>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ExportCollision {
+    pub name: String,
+    pub kept_from: String,
+    pub dropped_from: String,
 }
 
 impl ExportMap {
@@ -16,6 +24,21 @@ impl ExportMap {
         ExportMap {
             symbols: FxHashMap::default(),
             table,
+            collisions: Vec::new(),
+        }
+    }
+
+    pub fn record_collision(&mut self, name: String, kept_from: String, dropped_from: String) {
+        if self
+            .collisions
+            .iter()
+            .all(|c| c.name != name || c.dropped_from != dropped_from)
+        {
+            self.collisions.push(ExportCollision {
+                name,
+                kept_from,
+                dropped_from,
+            });
         }
     }
 }

@@ -138,8 +138,19 @@ fn compile_source_inner(
             resolver.module_exports(path, &mut vec![])
         };
     let export_names = crate::compile::sorted_export_names(&exports);
-    let (result, _, _) =
-        crate::compile::emit_and_compile(&program, &arena, &check, export_names, source, false);
+    crate::compile::report_export_collisions(&exports, path)?;
+    let mut tir = crate::compile::emit_tir(&program, &arena, &check);
+    crate::layer_link::verify_synthetic_imports(
+        path,
+        &program,
+        &arena,
+        &check.bind.interner,
+        crate::compile::tir_import_sources(&tir)
+            .iter()
+            .map(|s| s.as_ref()),
+    )?;
+    crate::compile::inject_star_reexports(&mut tir, &exports);
+    let (result, _) = crate::compile::compile_tir(&tir, export_names, source, false);
     result
 }
 

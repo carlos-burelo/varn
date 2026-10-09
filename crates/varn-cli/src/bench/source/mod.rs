@@ -26,7 +26,7 @@ use crate::error::CliError;
 mod bench_pipeline;
 mod e2e;
 
-use bench_pipeline::{export_names_of, parse_shared, verbose_sections};
+use bench_pipeline::{export_names_of, exports_of, parse_shared, verbose_sections};
 
 pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliError> {
     let runs = opts.runs;
@@ -124,10 +124,13 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let compile_samples = time_n(runs, || {
-        let (res, opt_dur, _) = varn_pipeline::emit_and_compile(
-            program_ref,
-            arena_ref,
-            &check_result,
+        let mut tir = varn_pipeline::emit_tir(program_ref, arena_ref, &check_result);
+        varn_pipeline::inject_star_reexports(
+            &mut tir,
+            &exports_of(&program_ref.filename, &session),
+        );
+        let (res, opt_dur) = varn_pipeline::compile_tir(
+            &tir,
             export_names_of(&program_ref.filename, &session),
             &source,
             true,
@@ -144,10 +147,10 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
-    let (final_result, _, _) = varn_pipeline::emit_and_compile(
-        &program,
-        &arena,
-        &check_result,
+    let mut final_tir = varn_pipeline::emit_tir(&program, &arena, &check_result);
+    varn_pipeline::inject_star_reexports(&mut final_tir, &exports_of(&program.filename, &session));
+    let (final_result, _) = varn_pipeline::compile_tir(
+        &final_tir,
         export_names_of(&program.filename, &session),
         &source,
         false,

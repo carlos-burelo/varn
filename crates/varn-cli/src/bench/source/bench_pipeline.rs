@@ -4,10 +4,17 @@ pub(super) fn export_names_of(
     filename: &str,
     session: &varn_pipeline::resolver::Session,
 ) -> Vec<Arc<str>> {
-    let exports = session.resolver().module_exports(filename, &mut vec![]);
+    let exports = exports_of(filename, session);
     let mut names: Vec<Arc<str>> = exports.keys().map(|k| Arc::from(k.as_str())).collect();
     names.sort();
     names
+}
+
+pub(super) fn exports_of(
+    filename: &str,
+    session: &varn_pipeline::resolver::Session,
+) -> std::sync::Arc<varn_sem::exports::ExportMap> {
+    session.resolver().module_exports(filename, &mut vec![])
 }
 pub(super) fn verbose_sections(
     factory: &VmFactory,

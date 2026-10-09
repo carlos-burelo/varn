@@ -45,10 +45,10 @@ pub(super) fn measure_e2e(
             varn_sem::output::CheckOptions::compile(),
         );
 
-        let (e2e_result, _, _) = varn_pipeline::emit_and_compile(
-            &program,
-            &arena,
-            &check_result,
+        let mut e2e_tir = varn_pipeline::emit_tir(&program, &arena, &check_result);
+        varn_pipeline::inject_star_reexports(&mut e2e_tir, &exports_of(&program.filename, session));
+        let (e2e_result, _) = varn_pipeline::compile_tir(
+            &e2e_tir,
             export_names_of(&program.filename, session),
             &source,
             false,

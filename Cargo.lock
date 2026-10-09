@@ -2339,6 +2339,7 @@ dependencies = [
  "varn-parser",
  "varn-resolver",
  "varn-sem",
+ "varn-tir",
  "varn-types",
  "varn-vm",
 ]

@@ -19,39 +19,91 @@ pub fn sorted_export_names(exports: &varn_sem::exports::ExportMap) -> Vec<std::s
     names
 }
 
-pub fn emit_and_compile(
+pub fn report_export_collisions(
+    exports: &varn_sem::exports::ExportMap,
+    module_path: &str,
+) -> Result<(), String> {
+    if exports.collisions.is_empty() {
+        return Ok(());
+    }
+    let mut collisions: Vec<String> = exports
+        .collisions
+        .iter()
+        .map(|c| {
+            format!(
+                "'{}' kept from '{}', dropped from '{}'",
+                c.name, c.kept_from, c.dropped_from
+            )
+        })
+        .collect();
+    collisions.sort();
+    collisions.dedup();
+    Err(format!(
+        "E_EXPORT_COLLISION in '{module_path}': {}; disambiguate with explicit named re-exports",
+        collisions.join("; ")
+    ))
+}
+
+pub fn emit_tir(
     program: &Program,
     ast_arena: &AstArena,
     check: &varn_sem::output::CheckResult,
-    export_names: Vec<std::sync::Arc<str>>,
-    source: &str,
-    measure: bool,
-) -> (
-    Result<FunctionProto, String>,
-    std::time::Duration,
-    Vec<std::sync::Arc<str>>,
-) {
-    let tir = varn_emit::emit_module(
+) -> varn_tir::TirModule {
+    varn_emit::emit_module(
         program,
         ast_arena,
         &check.bind,
         &check.expr_table,
         &check.call_mappings,
         &check.desugar,
-    );
-    let import_sources: Vec<std::sync::Arc<str>> = tir
-        .imports
+    )
+}
+
+pub fn tir_import_sources(tir: &varn_tir::TirModule) -> Vec<std::sync::Arc<str>> {
+    tir.imports
         .iter()
         .filter(|i| !i.is_type_only && !i.specs.is_empty())
         .map(|i| std::sync::Arc::from(i.source.as_ref()))
+        .collect()
+}
+
+pub fn inject_star_reexports(
+    tir: &mut varn_tir::TirModule,
+    exports: &varn_sem::exports::ExportMap,
+) {
+    use std::collections::BTreeSet;
+    let covered: BTreeSet<&str> = tir.exports.iter().map(|e| e.exported.as_ref()).collect();
+    let mut missing: Vec<(&String, Option<varn_core::Atom>)> = exports
+        .keys()
+        .filter(|k| !k.contains('.') && !covered.contains(k.as_str()))
+        .map(|k| {
+            let origin = exports.get(k).and_then(|s| s.origin_module);
+            (k, origin)
+        })
         .collect();
+    missing.sort_by(|a, b| a.0.cmp(b.0));
+    for (name, origin) in missing {
+        let Some(src) = origin.and_then(|a| exports.table.name(a).map(str::to_owned)) else {
+            continue;
+        };
+        tir.exports.push(varn_tir::TirExport {
+            exported: std::sync::Arc::from(name.as_str()),
+            local: std::sync::Arc::from(name.as_str()),
+            reexport_from: Some(std::sync::Arc::from(src)),
+            namespace: false,
+        });
+    }
+}
+
+pub fn compile_tir(
+    tir: &varn_tir::TirModule,
+    export_names: Vec<std::sync::Arc<str>>,
+    source: &str,
+    measure: bool,
+) -> (Result<FunctionProto, String>, std::time::Duration) {
     let (result, opt_time) =
-        varn_compiler::from_tir::compile_module(&tir, export_names, source, measure);
-    (
-        result.map_err(|e| format!("{e:?}")),
-        opt_time,
-        import_sources,
-    )
+        varn_compiler::from_tir::compile_module(tir, export_names, source, measure);
+    (result.map_err(|e| format!("{e:?}")), opt_time)
 }
 
 pub struct CompileOutput {
@@ -77,16 +129,21 @@ pub fn compile(
     let exports = session
         .resolver()
         .module_exports(&program.filename, &mut vec![]);
+    crate::compile::report_export_collisions(&exports, &program.filename)
+        .map_err(PipelineError::fatal)?;
     let export_names = sorted_export_names(&exports);
 
-    let (proto_result, _, import_sources) = emit_and_compile(
+    let mut tir = emit_tir(program, ast_arena, &check_result.checker_result);
+    crate::layer_link::verify_synthetic_imports(
+        &program.filename,
         program,
         ast_arena,
-        &check_result.checker_result,
-        export_names,
-        source,
-        false,
-    );
+        &check_result.checker_result.bind.interner,
+        tir_import_sources(&tir).iter().map(|s| s.as_ref()),
+    )
+    .map_err(PipelineError::fatal)?;
+    inject_star_reexports(&mut tir, &exports);
+    let (proto_result, _) = compile_tir(&tir, export_names, source, false);
     let proto = proto_result.map_err(|e| {
         PipelineError::fatal(format!(
             "{}: {e:?}",
@@ -95,15 +152,6 @@ pub fn compile(
                 .bold()
         ))
     })?;
-    crate::layer_link::verify_synthetic_imports(
-        &program.filename,
-        program,
-        ast_arena,
-        &check_result.checker_result.bind.interner,
-        import_sources.iter().map(|s| s.as_ref()),
-    )
-    .map_err(PipelineError::fatal)?;
-
     if verbose {
         varn_core::term::terminal::tagged("Varn", "resolving module graph...");
     }

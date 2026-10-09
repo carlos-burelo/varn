@@ -45,6 +45,16 @@ fn rehome_to_declaring_module(
     found
 }
 
+fn origin_text(bind: &BindResult, out: &ExportMap, atom: Option<Atom>, fallback: &str) -> String {
+    atom.and_then(|a| {
+        bind.interner
+            .try_resolve(a)
+            .or_else(|| out.table.name(a))
+            .map(str::to_owned)
+    })
+    .unwrap_or_else(|| fallback.to_owned())
+}
+
 pub(super) fn assign_slots(exports: &mut ExportMap) {
     let mut keys: Vec<String> = exports.keys().cloned().collect();
     keys.sort();
@@ -75,7 +85,7 @@ pub(super) fn collect_exports(
 
         match e {
             ExportDecl::Decl { declaration, .. } => {
-                if let Some(name) = decl_primary_name(declaration) {
+                for name in decl_export_names(declaration) {
                     let name_str = bind.interner.resolve(name);
                     if let Some(sym) = lookup_global(bind, name_str) {
                         let mut s = sym.clone();
@@ -168,7 +178,13 @@ pub(super) fn collect_exports(
                 let mut sorted_names: Vec<String> = src_exports.keys().cloned().collect();
                 sorted_names.sort();
                 for name in sorted_names {
-                    if out.contains_key(&name) {
+                    if let Some(kept) = out.get(&name) {
+                        let kept_from = origin_text(bind, out, kept.origin_module, abs_path);
+                        let dropped_from = src_exports
+                            .get(&name)
+                            .map(|s| origin_text(bind, out, s.origin_module, source_str))
+                            .unwrap_or_else(|| source_str.to_owned());
+                        out.record_collision(name.clone(), kept_from, dropped_from);
                         continue;
                     }
                     let sym = src_exports.get(&name).expect("sorted export key missing");
@@ -209,15 +225,30 @@ pub(super) fn collect_exports(
                 let mut sorted_sub: Vec<String> = src_exports.keys().cloned().collect();
                 sorted_sub.sort();
                 for sub_name in sorted_sub {
+                    let dotted = format!("{ns_str}.{sub_name}");
+                    if let Some(kept) = out.get(&dotted) {
+                        let kept_from = origin_text(bind, out, kept.origin_module, abs_path);
+                        let dropped_from = src_exports
+                            .get(&sub_name)
+                            .map(|s| origin_text(bind, out, s.origin_module, &src_abs))
+                            .unwrap_or_else(|| src_abs.clone());
+                        out.record_collision(dotted.clone(), kept_from, dropped_from);
+                        continue;
+                    }
                     let sub_sym = src_exports
                         .get(&sub_name)
                         .expect("sorted sub export missing");
                     let mut s = rehome_to_declaring_module(resolver, bind, visiting, sub_sym, out)
                         .unwrap_or_else(|| sub_sym.clone());
                     s.re_export_path.push(intern_origin(out, abs_path));
-                    out.insert(format!("{ns_str}.{sub_name}"), s);
+                    out.insert(dotted, s);
                 }
-                out.insert(ns_str.to_string(), ns_sym);
+                if let Some(kept) = out.get(ns_str) {
+                    let kept_from = origin_text(bind, out, kept.origin_module, abs_path);
+                    out.record_collision(ns_str.to_string(), kept_from, src_abs.clone());
+                } else {
+                    out.insert(ns_str.to_string(), ns_sym);
+                }
             }
             ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
                 ExportDefaultDecl::Function(f) => {
@@ -248,24 +279,28 @@ pub(super) fn collect_exports(
     }
 }
 
-fn decl_primary_name(decl: &Decl) -> Option<Atom> {
+fn decl_export_names(decl: &Decl) -> Vec<Atom> {
     match decl {
-        Decl::Variable(v) => v.declarators.first().and_then(|d| match &d.id {
-            Pattern::Identifier { name, .. } => Some(*name),
-            Pattern::Array { .. }
-            | Pattern::Object { .. }
-            | Pattern::Assignment { .. }
-            | Pattern::Rest { .. } => None,
-        }),
-        Decl::Function(f) => Some(f.id),
-        Decl::Class(c) => c.id,
-        Decl::Enum(e) => Some(e.id),
-        Decl::Interface(i) => Some(i.id),
-        Decl::TypeAlias(t) => Some(t.id),
-        Decl::Namespace(n) => Some(n.id),
-        Decl::Struct(s) => Some(s.id),
-        Decl::SumType(s) => Some(s.id),
-        Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) => None,
+        Decl::Variable(v) => v
+            .declarators
+            .iter()
+            .filter_map(|d| match &d.id {
+                Pattern::Identifier { name, .. } => Some(*name),
+                Pattern::Array { .. }
+                | Pattern::Object { .. }
+                | Pattern::Assignment { .. }
+                | Pattern::Rest { .. } => None,
+            })
+            .collect(),
+        Decl::Function(f) => vec![f.id],
+        Decl::Class(c) => c.id.into_iter().collect(),
+        Decl::Enum(e) => vec![e.id],
+        Decl::Interface(i) => vec![i.id],
+        Decl::TypeAlias(t) => vec![t.id],
+        Decl::Namespace(n) => vec![n.id],
+        Decl::Struct(s) => vec![s.id],
+        Decl::SumType(s) => vec![s.id],
+        Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) => Vec::new(),
     }
 }
 
