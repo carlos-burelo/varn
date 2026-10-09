@@ -4,6 +4,7 @@ pub use super::{
     resolve_pkg_specifier_detailed, resolve_specifier_path,
 };
 
+use super::contain::check_within_root;
 use std::path::{Component, Path, PathBuf};
 use varn_core::ModuleId;
 
@@ -42,6 +43,17 @@ impl ModuleResolver {
                 };
                 let normalized = normalize_components(&joined);
                 let path_str = normalize_path_string(normalized.to_string_lossy().into_owned());
+                let base_dir = match referrer {
+                    ModuleId::Local(s) => PathBuf::from(s.as_ref())
+                        .parent()
+                        .unwrap_or(Path::new("."))
+                        .to_path_buf(),
+                    ModuleId::Core(_)
+                    | ModuleId::Std(_)
+                    | ModuleId::Runtime(_)
+                    | ModuleId::Package { .. } => PathBuf::from("."),
+                };
+                check_within_root(&base_dir, &path_str)?;
                 Ok(ModuleId::local_str(&path_str))
             }
             ImportSpecifier::Package(s) => {

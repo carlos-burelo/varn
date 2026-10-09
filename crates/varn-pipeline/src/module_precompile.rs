@@ -303,13 +303,16 @@ pub fn resolve_import_specifier(
             };
             if joined.exists() {
                 if let Ok(canonical) = std::fs::canonicalize(&joined) {
-                    return Ok(Some(varn_modules::normalize_path_string(
+                    let resolved = varn_modules::normalize_path_string(
                         canonical.to_string_lossy().into_owned(),
-                    )));
+                    );
+                    varn_modules::contain::check_within_root(module_dir, &resolved)?;
+                    return Ok(Some(resolved));
                 }
-                return Ok(Some(varn_modules::normalize_path_string(
-                    joined.to_string_lossy().into_owned(),
-                )));
+                let resolved =
+                    varn_modules::normalize_path_string(joined.to_string_lossy().into_owned());
+                varn_modules::contain::check_within_root(module_dir, &resolved)?;
+                return Ok(Some(resolved));
             }
             Ok(None)
         }

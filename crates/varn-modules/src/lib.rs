@@ -1,5 +1,6 @@
 pub mod artifact;
 pub mod bundle;
+pub mod contain;
 pub mod ids;
 pub mod layer;
 pub mod loader;

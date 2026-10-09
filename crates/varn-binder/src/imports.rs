@@ -31,6 +31,21 @@ impl<'r> super::Binder<'r> {
             None
         };
 
+        if is_relative {
+            if let Some(abs) = &resolved_target {
+                let base_path = std::path::Path::new(self.source_file.as_ref())
+                    .parent()
+                    .unwrap_or(std::path::Path::new("."));
+                if let Err(message) = varn_modules::contain::check_within_root(base_path, abs) {
+                    self.emit(
+                        Diagnostic::error(ErrorCode::InvalidImportPath, message)
+                            .with_range(i.range),
+                    );
+                    return;
+                }
+            }
+        }
+
         let is_stdlib = !is_relative && crate::paths::is_known_module(&source_str);
 
         let relative_exports = if let Some(abs) = &resolved_target {
@@ -200,23 +215,44 @@ impl<'r> super::Binder<'r> {
                     self.escape_array_candidate(s.local);
                 }
                 if let Some(source) = source {
-                    self.check_reexport_layer(*source, e.range());
-                    self.record_reexport_dep(*source);
+                    if self.check_reexport_layer(*source, e.range()) {
+                        self.record_reexport_dep(*source);
+                    }
                 }
             }
             ExportDecl::All { source, .. } => {
-                self.check_reexport_layer(*source, e.range());
-                self.record_reexport_dep(*source);
+                if self.check_reexport_layer(*source, e.range()) {
+                    self.record_reexport_dep(*source);
+                }
             }
         }
     }
 
-    fn check_reexport_layer(&mut self, source: varn_core::Atom, range: &varn_core::SourceRange) {
+    fn check_reexport_layer(
+        &mut self,
+        source: varn_core::Atom,
+        range: &varn_core::SourceRange,
+    ) -> bool {
         use varn_modules::layer::{check_import, Layer};
         let source_str = self.interner.resolve(source).to_string();
         if let Err(message) = check_import(Layer::of_module(&self.source_file), &source_str) {
             self.emit(Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(*range));
+            return false;
         }
+        if source_str.starts_with('.') || source_str.starts_with('/') {
+            let base_path = std::path::Path::new(self.source_file.as_ref())
+                .parent()
+                .unwrap_or(std::path::Path::new("."));
+            let joined = base_path.join(&source_str);
+            let resolved = varn_modules::canonical_or_original(&joined);
+            if let Err(message) = varn_modules::contain::check_within_root(base_path, &resolved) {
+                self.emit(
+                    Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(*range),
+                );
+                return false;
+            }
+        }
+        true
     }
 
     fn record_reexport_dep(&mut self, source: varn_core::Atom) {
