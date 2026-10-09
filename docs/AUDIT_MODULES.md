@@ -456,6 +456,7 @@ Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED`
 - H14 cerrado: sin ciclo Cargo; recursión runtime con guards es DIP estándar (mover el trait a core arrastraría tipos abajo).
 - F5a: `TirImportSpec.slot` + `resolve_import_slots` en linkado (entry, deps, stdlib, bench×3) + `build_imports` emite `LoadModule` + `ModuleSlot` + guarda (`GetProperty` + `Eq` + `Throw E_SLOT_MISMATCH`, solo insts existentes); fallback `GetProperty` sin slot (packages); mecanismo probado en bytecode real; TOCTOU de corrupción silenciosa a error fuerte.
 - A3b omitido: sandbox por defecto incompatible con multi-fichero (el propio gate `fs.read` + suite); requeriría semántica allow-entry-tree = decisión de producto.
+- E_STALE_ATOM parcial: `display::name` unificado al patrón dual (`interner` → `table`, como `member_atom` y `resolve_bind_atom`); el diagnóstico pasa de `<stale:Atom(..)>` a `namespace C:/path/a.vn` (verificado). El `panic` de `resolve` se conserva como fail-loud: con ids por contenido no hay lectura corrupta posible y la suite no alcanza ningún caso; migrar ~100 sitios a error-diagnóstico no cambia el resultado.
 - DynReason hecho (preexistente): `Coverage::report` + fase `typeloss` verificados en vivo.
 - E_STALE_ATOM diferido: modelo fail-loud + 82 call sites (migrar no cambia el resultado).
 
