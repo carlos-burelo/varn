@@ -201,11 +201,12 @@ impl ExecCtx {
     ) -> VmResult<VmValue> {
         let module_base = self.globals_mut().reserve_region(proto.global_count);
 
-        debug_assert!(
-            proto.export_names.windows(2).all(|w| w[0] <= w[1]),
-            "FunctionProto export_names must be sorted alphabetically (slot contract violated for {})",
-            resolved.as_str()
-        );
+        if !proto.export_names.windows(2).all(|w| w[0] <= w[1]) {
+            return Err(crate::error::RuntimeError::new(format!(
+                "E_SLOT_MISMATCH: export_names not sorted for {}",
+                resolved.as_str()
+            )));
+        }
 
         let mut export_map = rustc_hash::FxHashMap::default();
         for (idx, name) in proto.export_names.iter().enumerate() {

@@ -142,6 +142,7 @@ use std::rc::Rc;
 pub use varn_jit_abi::{
     JitArrayLayout, JitCallLayout, JitFrameLayout, JitGetIndexArgs, JitHelpers, JitInstanceAlloc,
     JitInvokeVirtualArgs, JitObjectLayout, JitSetIndexArgs, JitSetPropertyArgs,
+    JIT_HELPERS_VERSION,
 };
 use varn_types::FunctionProto;
 use varn_types::VmValue;

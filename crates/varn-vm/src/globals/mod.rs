@@ -86,9 +86,11 @@ impl GlobalStore {
 
     #[inline(always)]
     pub(crate) fn set_by_index(&mut self, idx: usize, value: VmValue) {
-        if idx >= self.values.len() {
-            self.values.resize(idx + 1, VmValue::null());
-        }
+        assert!(
+            idx < self.values.len(),
+            "E_GLOBAL_OOB: set_by_index {idx} >= {}",
+            self.values.len()
+        );
         self.values[idx] = value;
     }
 
@@ -104,24 +106,22 @@ impl GlobalStore {
 
     #[inline(always)]
     pub(crate) fn get_by_index_unchecked(&self, idx: usize) -> VmValue {
-        debug_assert!(
+        assert!(
             idx < self.values.len(),
-            "global index OOB: {idx} >= {}",
+            "E_GLOBAL_OOB: get {idx} >= {}",
             self.values.len()
         );
-        unsafe { *self.values.get_unchecked(idx) }
+        self.values[idx]
     }
 
     #[inline(always)]
     pub(crate) fn set_by_index_unchecked(&mut self, idx: usize, value: VmValue) {
-        debug_assert!(
+        assert!(
             idx < self.values.len(),
-            "global index OOB: {idx} >= {}",
+            "E_GLOBAL_OOB: set {idx} >= {}",
             self.values.len()
         );
-        unsafe {
-            *self.values.get_unchecked_mut(idx) = value;
-        }
+        self.values[idx] = value;
     }
 }
 

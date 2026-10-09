@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap;
-use std::cell::UnsafeCell;
+use std::cell::RefCell;
 use std::rc::Rc;
 use varn_core::ModuleId;
 
@@ -13,7 +13,7 @@ pub enum ModuleLinkState {
 }
 
 pub struct Linker {
-    state: Rc<UnsafeCell<FxHashMap<ModuleId, ModuleLinkState>>>,
+    state: Rc<RefCell<FxHashMap<ModuleId, ModuleLinkState>>>,
 }
 
 impl Default for Linker {
@@ -25,41 +25,42 @@ impl Default for Linker {
 impl Linker {
     pub(crate) fn new() -> Self {
         Self {
-            state: Rc::new(UnsafeCell::new(FxHashMap::default())),
+            state: Rc::new(RefCell::new(FxHashMap::default())),
         }
     }
 
-    fn table(&self) -> &FxHashMap<ModuleId, ModuleLinkState> {
-        unsafe { &*self.state.get() }
-    }
-
-    #[allow(clippy::mut_from_ref)]
-    fn table_mut(&self) -> &mut FxHashMap<ModuleId, ModuleLinkState> {
-        unsafe { &mut *self.state.get() }
-    }
-
     pub(crate) fn cached(&self, id: &ModuleId) -> Option<VmValue> {
-        match self.table().get(id) {
+        match self.state.borrow().get(id) {
             Some(ModuleLinkState::Done(v)) => Some(*v),
             Some(ModuleLinkState::Evaluating) | None => None,
         }
     }
 
     pub(crate) fn is_evaluating(&self, id: &ModuleId) -> bool {
-        matches!(self.table().get(id), Some(ModuleLinkState::Evaluating))
+        matches!(
+            self.state.borrow().get(id),
+            Some(ModuleLinkState::Evaluating)
+        )
     }
 
     pub(crate) fn set_evaluating(&mut self, id: ModuleId) {
-        self.table_mut().insert(id, ModuleLinkState::Evaluating);
+        self.state
+            .borrow_mut()
+            .insert(id, ModuleLinkState::Evaluating);
     }
 
     pub(crate) fn set_done(&mut self, id: ModuleId, val: VmValue) {
-        self.table_mut().insert(id, ModuleLinkState::Done(val));
+        self.state
+            .borrow_mut()
+            .insert(id, ModuleLinkState::Done(val));
     }
 
     pub(crate) fn cancel_evaluating(&mut self, id: &ModuleId) {
-        if matches!(self.table().get(id), Some(ModuleLinkState::Evaluating)) {
-            self.table_mut().remove(id);
+        if matches!(
+            self.state.borrow().get(id),
+            Some(ModuleLinkState::Evaluating)
+        ) {
+            self.state.borrow_mut().remove(id);
         }
     }
 
