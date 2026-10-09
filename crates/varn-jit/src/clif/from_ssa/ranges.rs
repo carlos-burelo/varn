@@ -160,31 +160,13 @@ fn apply_cap(r: (i128, i128), c: &Check) -> Option<(i128, i128)> {
     }
 }
 
-pub(super) fn analyze(
+pub(super) fn loop_sets(
     ssa: &SsaProto,
     preds: &[Vec<usize>],
     rpo_pos: &[usize],
     reached: &[bool],
-) -> (FxHashSet<u32>, Vec<VersionPlan>) {
+) -> (Vec<usize>, FxHashMap<usize, rustc_hash::FxHashSet<usize>>) {
     let def = def_map(ssa);
-    let dblk = def_block(ssa);
-    let pred_edges: Vec<Vec<(u32, Vec<u32>, Edge)>> = (0..ssa.blocks.len())
-        .map(|from| match &ssa.blocks[from].term {
-            SsaTerm::Jump { target, args } => vec![(*target, args.clone(), Edge::Jump)],
-            SsaTerm::Branch {
-                then_blk,
-                then_args,
-                else_blk,
-                else_args,
-                ..
-            } => vec![
-                (*then_blk, then_args.clone(), Edge::Then),
-                (*else_blk, else_args.clone(), Edge::Else),
-            ],
-            SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => vec![],
-        })
-        .collect();
-
     let mut headers: Vec<usize> = Vec::new();
     for header in 0..ssa.blocks.len() {
         if !reached[header] {
@@ -221,11 +203,39 @@ pub(super) fn analyze(
         }
         headers.push(header);
     }
-
     let bodies: FxHashMap<usize, rustc_hash::FxHashSet<usize>> = headers
         .iter()
         .map(|&h| (h, super::cfg::loop_body(preds, rpo_pos, reached, h)))
         .collect();
+    (headers, bodies)
+}
+
+pub(super) fn analyze(
+    ssa: &SsaProto,
+    preds: &[Vec<usize>],
+    rpo_pos: &[usize],
+    reached: &[bool],
+) -> (FxHashSet<u32>, Vec<VersionPlan>) {
+    let def = def_map(ssa);
+    let dblk = def_block(ssa);
+    let pred_edges: Vec<Vec<(u32, Vec<u32>, Edge)>> = (0..ssa.blocks.len())
+        .map(|from| match &ssa.blocks[from].term {
+            SsaTerm::Jump { target, args } => vec![(*target, args.clone(), Edge::Jump)],
+            SsaTerm::Branch {
+                then_blk,
+                then_args,
+                else_blk,
+                else_args,
+                ..
+            } => vec![
+                (*then_blk, then_args.clone(), Edge::Then),
+                (*else_blk, else_args.clone(), Edge::Else),
+            ],
+            SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => vec![],
+        })
+        .collect();
+
+    let (headers, bodies) = loop_sets(ssa, preds, rpo_pos, reached);
 
     let mut ranges: FxHashMap<u32, (i128, i128)> = FxHashMap::default();
     for (v, op) in def.iter().enumerate() {
@@ -435,7 +445,7 @@ fn step_contrib(
     }
 }
 
-fn version_op_ok(ssa: &SsaProto, op: &SsaOp) -> bool {
+pub(super) fn version_op_ok(ssa: &SsaProto, op: &SsaOp) -> bool {
     if super::views::keeps_views(ssa, op) {
         return true;
     }

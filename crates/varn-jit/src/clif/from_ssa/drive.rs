@@ -5,8 +5,8 @@ use super::super::piece::compile_piece;
 use super::frame_policy::{may_push_frame, needs_frame};
 use super::store::{clif_ty, drop_home_addrs, is_heap, land};
 use super::{
-    arrays, call, cfg, heap, induction, osr, pinned, ranges, scalar, stack_exit, store, term,
-    views, Ctx, FrameIo, Lowered, NEEDS_ACTIVATION,
+    arrays, call, cfg, globals, heap, induction, osr, pinned, ranges, scalar, stack_exit, store,
+    term, views, Ctx, FrameIo, Lowered, NEEDS_ACTIVATION,
 };
 use crate::JitHelpers;
 use cranelift_codegen::ir::{
@@ -217,6 +217,58 @@ pub(in crate::clif) fn try_lower(
         }
     }
 
+    let (loop_headers, loop_bodies) = ranges::loop_sets(ssa, &preds, &rpo_pos, &reached);
+    let mut hoist_at: std::collections::BTreeMap<usize, Vec<(usize, u32)>> =
+        std::collections::BTreeMap::new();
+    for &h in &loop_headers {
+        let body = &loop_bodies[&h];
+        let outside: Vec<usize> = preds[h]
+            .iter()
+            .copied()
+            .filter(|p| reached[*p] && !body.contains(p))
+            .collect();
+        if outside.len() != 1 || ctx.frame.is_none() {
+            continue;
+        }
+        let mut stored: rustc_hash::FxHashSet<u32> = rustc_hash::FxHashSet::default();
+        let mut loaded: Vec<u32> = Vec::new();
+        let mut pure = true;
+        for &b in body {
+            if !reached[b] {
+                continue;
+            }
+            for inst in &ssa.blocks[b].insts {
+                match &inst.op {
+                    varn_types::ssa::SsaOp::LoadGlobalIdx(slot) => {
+                        if !loaded.contains(slot) {
+                            loaded.push(*slot);
+                        }
+                    }
+                    varn_types::ssa::SsaOp::StoreGlobalIdx { slot, .. } => {
+                        stored.insert(*slot);
+                    }
+                    op => {
+                        if !ranges::version_op_ok(ssa, op) {
+                            pure = false;
+                        }
+                    }
+                }
+            }
+        }
+        if !pure {
+            continue;
+        }
+        let slots: Vec<u32> = loaded.into_iter().filter(|s| !stored.contains(s)).collect();
+        if !slots.is_empty() {
+            hoist_at
+                .entry(outside[0])
+                .or_default()
+                .extend(slots.into_iter().map(|s| (h, s)));
+        }
+    }
+    let mut hoisted: std::collections::BTreeMap<(usize, u32), Value> =
+        std::collections::BTreeMap::new();
+
     let mut plans = version_plans;
     plans.retain(|pl| {
         pins.get(&pl.preheader).map_or(false, |objs| {
@@ -229,8 +281,8 @@ pub(in crate::clif) fn try_lower(
         plan_by_pre.entry(pl.preheader).or_insert(idx);
         ctx.fast_bounds.extend(pl.elide.iter().copied());
     }
-    if super::super::trace() && !plans.is_empty() {
-        eprintln!("clif: versions {}", plans.len());
+    if super::super::trace() && (!plans.is_empty() || !hoist_at.is_empty()) {
+        eprintln!("clif: versions {} hoists {:?}", plans.len(), hoist_at);
     }
     let mut vmaps: Vec<VersionClones> = Vec::new();
     for pl in &plans {
@@ -283,10 +335,14 @@ pub(in crate::clif) fn try_lower(
                 &shape,
                 &global_src,
                 &pins,
+                &mut hoisted,
+                &hoist_at,
+                &loop_bodies,
                 i,
                 cb,
                 is_call_entry,
                 true,
+                false,
                 false,
                 n,
             )?;
@@ -310,10 +366,14 @@ pub(in crate::clif) fn try_lower(
                     &shape,
                     &global_src,
                     &pins,
+                    &mut hoisted,
+                    &hoist_at,
+                    &loop_bodies,
                     ssa_b,
                     fast_blk,
                     false,
                     false,
+                    true,
                     true,
                     n,
                 )?;
@@ -337,11 +397,15 @@ pub(in crate::clif) fn try_lower(
                     &shape,
                     &global_src,
                     &pins,
+                    &mut hoisted,
+                    &hoist_at,
+                    &loop_bodies,
                     ssa_b,
                     slow_blk,
                     false,
                     false,
                     false,
+                    true,
                     n,
                 )?;
                 emitted[ssa_b] = true;
@@ -361,10 +425,14 @@ pub(in crate::clif) fn try_lower(
             &shape,
             &global_src,
             &pins,
+            &mut hoisted,
+            &hoist_at,
+            &loop_bodies,
             i,
             cb,
             is_call_entry,
             true,
+            false,
             false,
             n,
         )?;
@@ -436,11 +504,15 @@ fn lower_block(
     shape: &NativeShape,
     global_src: &std::collections::BTreeMap<u32, u32>,
     pins: &std::collections::BTreeMap<usize, Vec<u32>>,
+    hoisted: &mut std::collections::BTreeMap<(usize, u32), Value>,
+    hoist_at: &std::collections::BTreeMap<usize, Vec<(usize, u32)>>,
+    loop_bodies: &rustc_hash::FxHashMap<usize, rustc_hash::FxHashSet<usize>>,
     ssa_idx: usize,
     clif_blk: Block,
     is_call_entry: bool,
     do_prefill: bool,
     elide_flag: bool,
+    is_clone: bool,
     rpo_n: usize,
 ) -> Result<(), String> {
     let blk = &ssa.blocks[ssa_idx];
@@ -476,6 +548,28 @@ fn lower_block(
                 }
             }
         }
+        if let (Some(d), varn_types::ssa::SsaOp::LoadGlobalIdx(slot)) = (inst.dest, &inst.op) {
+            let mut best: Option<(Value, usize)> = None;
+            for ((h, s), v) in hoisted.iter() {
+                if *s != *slot {
+                    continue;
+                }
+                let Some(bd) = loop_bodies.get(h) else {
+                    continue;
+                };
+                if !bd.contains(&ssa_idx) {
+                    continue;
+                }
+                match &best {
+                    Some((_, bs)) if *bs <= bd.len() => {}
+                    _ => best = Some((*v, bd.len())),
+                }
+            }
+            if let Some((v, _)) = best {
+                land(b, ctx, values, Some(d), store::Out::Boxed(v))?;
+                continue;
+            }
+        }
         match scalar::emit_inst(b, ctx, values, &inst.op, inst.dest)? {
             Some(out) => land(b, ctx, values, inst.dest, out)?,
             None if inst.dest.is_some() => {
@@ -501,12 +595,14 @@ fn lower_block(
                 let g = 0x8000_0000u32 | slot;
                 fwd.retain(|k, _| k.0 != g);
                 ctx.views.invalidate_global(b, *slot);
+                hoisted.retain(|(_, s), _| s != slot);
             }
             varn_types::ssa::SsaOp::LoadGlobalIdx(..) => {}
             _ => {
                 if !views::keeps_views(ssa, &inst.op) {
                     fwd.clear();
                     ctx.views.clear_instances(b);
+                    hoisted.clear();
                 }
             }
         }
@@ -518,6 +614,20 @@ fn lower_block(
         }
     }
     ctx.elide.set(old_elide);
+
+    if !is_clone {
+        if let Some(hh) = hoist_at.get(&ssa_idx) {
+            if ctx.frame.is_some() {
+                for (h, slot) in hh {
+                    if hoisted.contains_key(&(*h, *slot)) {
+                        continue;
+                    }
+                    let v = globals::emit_load(b, ctx, *slot, globals::Region::Module)?;
+                    hoisted.insert((*h, *slot), v);
+                }
+            }
+        }
+    }
 
     let polls = |target: u32| {
         rpo_pos[target as usize] <= rpo_pos[ssa_idx]
