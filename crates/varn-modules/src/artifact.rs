@@ -234,17 +234,21 @@ pub fn get_types_cache_dir(project_root: &Path) -> PathBuf {
 }
 
 pub fn source_fingerprint(source: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    source.hash(&mut h);
-    h.finish()
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for b in source.as_bytes() {
+        hash ^= *b as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
 }
 
 pub fn module_key(id: &ModuleId, fingerprint: u64) -> String {
-    use std::hash::{Hash, Hasher};
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    id.hash(&mut h);
-    format!("{:016x}_{:016x}", h.finish(), fingerprint)
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for b in id.as_str().as_bytes() {
+        hash ^= *b as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{:016x}_{:016x}", hash, fingerprint)
 }
 
 pub fn module_artifact_path(
