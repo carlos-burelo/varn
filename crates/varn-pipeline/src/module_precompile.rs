@@ -111,34 +111,44 @@ pub fn build_module_graph(
         }
     }
 
-    let mut topo_queue: VecDeque<&str> = in_degree
-        .iter()
-        .filter(|(_, deg)| **deg == 0)
-        .map(|(&n, _)| n)
-        .collect();
+    let mut topo_queue: VecDeque<&str> = {
+        let mut zeros: Vec<&str> = in_degree
+            .iter()
+            .filter(|(_, deg)| **deg == 0)
+            .map(|(&n, _)| n)
+            .collect();
+        zeros.sort();
+        zeros.into_iter().collect()
+    };
 
     let mut sorted: Vec<String> = Vec::with_capacity(graph.len());
 
     while let Some(node) = topo_queue.pop_front() {
         sorted.push(node.to_owned());
         if let Some(deps) = graph.get(node) {
+            let mut newly_ready: Vec<&str> = Vec::new();
             for dep in deps {
                 if let Some(deg) = in_degree.get_mut(dep.as_str()) {
                     *deg = deg.saturating_sub(1);
                     if *deg == 0 {
-                        topo_queue.push_back(dep.as_str());
+                        newly_ready.push(dep.as_str());
                     }
                 }
+            }
+            newly_ready.sort();
+            for r in newly_ready {
+                topo_queue.push_back(r);
             }
         }
     }
 
     if sorted.len() != graph.len() {
-        let cycle_nodes: Vec<&str> = graph
+        let mut cycle_nodes: Vec<&str> = graph
             .keys()
             .filter(|k| !sorted.contains(*k))
             .map(|s| s.as_str())
             .collect();
+        cycle_nodes.sort();
         let cycle_set: rustc_hash::FxHashSet<&str> = cycle_nodes.iter().copied().collect();
         let mut cycle_path: Vec<String> = Vec::new();
         if let Some(&start) = cycle_nodes.first() {

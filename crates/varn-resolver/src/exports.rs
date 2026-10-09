@@ -165,10 +165,13 @@ pub(super) fn collect_exports(
                     resolver.module_exports(&src_abs, visiting)
                 };
                 adopt_exports(out, &src_exports);
-                for (name, sym) in src_exports.iter() {
-                    if out.contains_key(name) {
+                let mut sorted_names: Vec<String> = src_exports.keys().cloned().collect();
+                sorted_names.sort();
+                for name in sorted_names {
+                    if out.contains_key(&name) {
                         continue;
                     }
+                    let sym = src_exports.get(&name).expect("sorted export key missing");
                     let mut s = rehome_to_declaring_module(resolver, bind, visiting, sym, out)
                         .unwrap_or_else(|| sym.clone());
                     s.re_export_path.push(intern_origin(out, abs_path));
@@ -203,7 +206,12 @@ pub(super) fn collect_exports(
                 let ns_ty = table.intern(varn_core::TypeKind::Named(name_atom, Some(origin_atom)));
                 ns_sym.ty = Some(Type::resolved(ns_ty));
                 ns_sym.origin_module = Some(intern_origin(out, &src_abs));
-                for (sub_name, sub_sym) in src_exports.iter() {
+                let mut sorted_sub: Vec<String> = src_exports.keys().cloned().collect();
+                sorted_sub.sort();
+                for sub_name in sorted_sub {
+                    let sub_sym = src_exports
+                        .get(&sub_name)
+                        .expect("sorted sub export missing");
                     let mut s = rehome_to_declaring_module(resolver, bind, visiting, sub_sym, out)
                         .unwrap_or_else(|| sub_sym.clone());
                     s.re_export_path.push(intern_origin(out, abs_path));

@@ -116,7 +116,10 @@ pub fn compile(
         }
     }
 
-    let graph_hash = graph_build.source_hashes.values().fold(0u64, |acc, &h| {
+    let mut hash_keys: Vec<&String> = graph_build.source_hashes.keys().collect();
+    hash_keys.sort();
+    let graph_hash = hash_keys.iter().fold(0u64, |acc, k| {
+        let h = graph_build.source_hashes[*k];
         acc.wrapping_mul(0x9e3779b97f4a7c15).wrapping_add(h)
     });
     let graph_artifact = ModuleGraphArtifact {

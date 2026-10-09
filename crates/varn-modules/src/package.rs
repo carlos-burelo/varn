@@ -121,16 +121,20 @@ fn resolve_export_target(
         }
     }
 
-    for (key, val) in &manifest.exports {
-        if key.contains('*') {
-            let prefix = key.trim_end_matches('*');
-            if let Some(matched_suffix) = export_key.strip_prefix(prefix) {
-                let resolved_val = val.replace('*', matched_suffix);
-                let entry =
-                    package_root.join(resolved_val.trim_start_matches(RELATIVE_EXPORT_PREFIX));
-                if entry.exists() {
-                    return Ok(entry);
-                }
+    let mut wildcard_keys: Vec<&String> = manifest
+        .exports
+        .keys()
+        .filter(|k| k.contains('*'))
+        .collect();
+    wildcard_keys.sort();
+    for key in wildcard_keys {
+        let val = &manifest.exports[key];
+        let prefix = key.trim_end_matches('*');
+        if let Some(matched_suffix) = export_key.strip_prefix(prefix) {
+            let resolved_val = val.replace('*', matched_suffix);
+            let entry = package_root.join(resolved_val.trim_start_matches(RELATIVE_EXPORT_PREFIX));
+            if entry.exists() {
+                return Ok(entry);
             }
         }
     }
