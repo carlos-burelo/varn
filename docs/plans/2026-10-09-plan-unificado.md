@@ -92,8 +92,14 @@ no se copian de documentos).
   Elegibilidad en `ranges.rs` (solo innermost, sin calls/push/
   stores-globales, índices acotados ≥0, objetos invariantes,
   preheader único con Jump; sin OSR).
-- **C1-hoist total**: queda 1 check/iter + heap/young por store
-  + poll GC; mismo versionado lo cerraría.
+- **C1-hoist-total class_fields 1.25×** (A/B quick ABA
+  7.25→5.78→5.87ms, checksums intactos): LICM de `LoadGlobalIdx`
+  en `drive.rs` (preheader por loop, slots nunca-escritos en el
+  body + cuerpos puros sin user-code; kills en stores/calls) +
+  `ranges::loop_sets` compartido. Regla de sanidad: reuso en
+  header solo si el slot no se escribe en el loop (si no, loop
+  infinito con valor pre-loop) — lo confirma un `run` colgado
+  durante el desarrollo.
 - **`ArrayPush` inline**: exige auditar barrera GC (riesgo).
 - **`matrix_local`**: duplicado exacto de `matrix`; dedupe con
   dueño de benches, no borrar unilateral.
@@ -108,6 +114,6 @@ no se copian de documentos).
 
 ## 7. Orden
 
-C1 ✓ → C2-overflow ✓ → C2-bounds ✓ → O-items (ajenos) → C4 → C3 → C5 →
+C1 ✓ → C2-overflow ✓ → C2-bounds ✓ → C1-hoist-total ✓ → O-items (ajenos) → C4 → C3 → C5 →
 re-medir C6. Cada item: pareado + checksum + 4 cuadrantes +
 commit atómico.
