@@ -63,13 +63,16 @@ es calidad de código máquina, no tiering.
   3. Overflow-check de int fuera del camino caliente o con bail
      especulativo (inducción ya es `iadd` pelado: no tocar).
 - Verifica: `bench_matrix` + `bench_matrix_local` pareados + tiers.
-- Alcance 2026-10-09 (sin implementar): `bench_matrix.vn` y
-  `bench_matrix_local.vn` son idénticos hoy. El win pide (a)
-  análisis de rangos que pruebe `0 ≤ row*n+k < len` con
-  `row,k ∈ [0,n)` (mul/add, más allá de `in_range_steps` que
-  solo cubre pasos ±1) + (b) guarda de `len ≥ n²` una vez en
-  preheader (len ya hoisted vía `pinned`/vistas; pushes fuera
-  del loop). Ítem propio tras C1, no peephole.
+- Estado 2026-10-09 (C2-overflow VERDE, perfil `quick`, A/B misma
+  sesión vía stash: 14.67ms → 12.01ms → 12.01ms ABA, ~1.22×,
+  checksums `c[0]=166325` intactos): nuevo análisis
+  `varn-jit/src/clif/from_ssa/ranges.rs` (intervalos con bounds
+  de headers, merge entry/latch, síntesis ±1, vacío si no
+  converge) elide `smul/sadd_overflow` en aritmética de índices
+  (`scalar.rs` vía `no_overflow` en `Ctx`); matrix 12→5 sitios
+  overflow en CLIF (acumulo y bordes siguen verificados).
+  Bounds elision aparcada (pide versionado con guarda `len`).
+  Base de array ya hoisted vía vistas/`pinned` (no tocar).
 
 ## C3 — http_routing 2.50×
 
