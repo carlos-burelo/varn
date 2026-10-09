@@ -295,26 +295,14 @@ pub fn resolve_import_specifier(
         }
 
         ImportSpecifier::Runtime(_) => Ok(Some(specifier.to_owned())),
-        ImportSpecifier::Relative(rel) => {
-            let joined = if rel.is_absolute() {
-                rel.clone()
-            } else {
-                module_dir.join(&rel)
-            };
-            if joined.exists() {
-                if let Ok(canonical) = std::fs::canonicalize(&joined) {
-                    let resolved = varn_modules::normalize_path_string(
-                        canonical.to_string_lossy().into_owned(),
-                    );
+        ImportSpecifier::Relative(_) => {
+            match varn_modules::resolver::resolve_specifier_path(module_dir, specifier) {
+                None => Ok(None),
+                Some(resolved) => {
                     varn_modules::contain::check_within_root(module_dir, &resolved)?;
-                    return Ok(Some(resolved));
+                    Ok(Some(resolved))
                 }
-                let resolved =
-                    varn_modules::normalize_path_string(joined.to_string_lossy().into_owned());
-                varn_modules::contain::check_within_root(module_dir, &resolved)?;
-                return Ok(Some(resolved));
             }
-            Ok(None)
         }
         ImportSpecifier::Package(_) => {
             let resolved = varn_modules::resolve_pkg_specifier_detailed(module_dir, specifier)?;
