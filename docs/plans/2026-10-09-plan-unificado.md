@@ -83,9 +83,15 @@ no se copian de documentos).
 
 ## 5. Aparcado con causa atribuida
 
-- **C2-bounds**: elidir `ult` por acceso pide versionado con
-  guarda `len` (sin infra deopt: duplicar loop); rangos
-  almacenados sirven overflow pero no quitan bounds.
+- **C2-bounds matrix ~1.13× adicional** (quick 12.01→10.6ms,
+  checksums intactos, 100% JIT 0 bails): versionado innermost en
+  `drive.rs` (`lower_block` + `emit_version_guard` + clones
+  fast/slow): guarda `len ≥ maxidx+1` en preheader (vistas ya
+  resueltas por `pinned`), fast elide `ult` (`arrays.rs` vía
+  `Ctx::elide` + `fast_bounds`), slow intacto como fallback.
+  Elegibilidad en `ranges.rs` (solo innermost, sin calls/push/
+  stores-globales, índices acotados ≥0, objetos invariantes,
+  preheader único con Jump; sin OSR).
 - **C1-hoist total**: queda 1 check/iter + heap/young por store
   + poll GC; mismo versionado lo cerraría.
 - **`ArrayPush` inline**: exige auditar barrera GC (riesgo).
@@ -102,6 +108,6 @@ no se copian de documentos).
 
 ## 7. Orden
 
-C1 ✓ → C2-overflow ✓ → O-items (ajenos) → C4 → C3 → C5 →
+C1 ✓ → C2-overflow ✓ → C2-bounds ✓ → O-items (ajenos) → C4 → C3 → C5 →
 re-medir C6. Cada item: pareado + checksum + 4 cuadrantes +
 commit atómico.
