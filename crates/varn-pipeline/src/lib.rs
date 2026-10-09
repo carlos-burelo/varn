@@ -22,6 +22,7 @@ mod lex;
 
 pub use check::check as phase_check;
 pub use check::collect_test_targets;
+pub use class_link::verify_foreign_layouts;
 pub use compile::CompileOutput;
 pub use compile::{
     compile_tir, emit_tir, inject_star_reexports, report_export_collisions, sorted_export_names,
@@ -31,7 +32,6 @@ pub use core::core_protos_owned;
 pub use debug_sink::{DebugSink, NullSink};
 pub use error::PipelineError;
 pub use execute::{boot_machine, enter_main, execute, execute_with_caps};
-pub use class_link::verify_foreign_layouts;
 pub use layer_link::verify_synthetic_imports;
 pub use lex::lex as phase_lex;
 pub use opts::{CapabilitySet, DebugFlags, RunOpts};

@@ -179,8 +179,7 @@ pub fn compile(
             types: tir.types.clone(),
         },
     );
-    crate::class_link::verify_foreign_layouts(&class_tables)
-        .map_err(PipelineError::fatal)?;
+    crate::class_link::verify_foreign_layouts(&class_tables).map_err(PipelineError::fatal)?;
 
     sink.compile(
         program,

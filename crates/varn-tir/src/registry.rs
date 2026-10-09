@@ -33,8 +33,7 @@ impl ClassRegistryBuilder {
     }
 
     pub fn build(mut self) -> ClassRegistry {
-        self.entries
-            .sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
+        self.entries.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
         let mut registry = ClassRegistry::default();
         for (module, name, is_local, info) in self.entries {
             if let Some(&id) = registry.ids.get(&(module.clone(), name.clone())) {
@@ -104,7 +103,10 @@ mod tests {
         b.push_class("a.vn", "Foo", true, local.clone());
         let r = b.build();
         assert_eq!(r.len(), 1);
-        assert_eq!(r.class(r.global_id("a.vn", "Foo").unwrap()).unwrap().name, local.name);
+        assert_eq!(
+            r.class(r.global_id("a.vn", "Foo").unwrap()).unwrap().name,
+            local.name
+        );
     }
 
     #[test]
@@ -113,9 +115,6 @@ mod tests {
         b.push_class("a.vn", "Foo", true, sample_class("Foo"));
         b.push_class("b.vn", "Foo", true, sample_class("Foo"));
         let r = b.build();
-        assert_ne!(
-            r.global_id("a.vn", "Foo"),
-            r.global_id("b.vn", "Foo")
-        );
+        assert_ne!(r.global_id("a.vn", "Foo"), r.global_id("b.vn", "Foo"));
     }
 }
