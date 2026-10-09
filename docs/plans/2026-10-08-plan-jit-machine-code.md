@@ -106,6 +106,13 @@ idéntico al baseline. Sin (a) ganancia (b) medida (c) borrado, no se acepta.
 - `verify.ps1 -Fast`: 4 cuadrantes 2287/0, clippy PASS, contratos PASS, fmt verde.
 - v2 (pendiente): slice/substr/split por el mismo patrón.
 
+## JSON — claves: state machine simplificada (neutral en pared)
+
+- `parse_object` (`exec/ctx_json/fast.rs`): `Option<usize>` + `and_then` anidado →
+  `bool hot` + contador. Mismo comportamiento (sonda de tortura: mezclas, swaps,
+  spill>16, vacíos, unicode, escapes, roundtrip), suite 2287/0 ×2.
+- Pared no resoluble en esta máquina (±40% deriva); sin claim de ms.
+
 ## Cimientos — bridge str con vistas (edición 2024, `use<>`)
 
 - Desbloqueo: `ret_ty(Str)` → `-> impl IntoVm + use<Self>` (`varn-contract/mapping.rs`).

@@ -233,7 +233,8 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         let mut spilled: Vec<VmValue> = Vec::new();
         let mut n = 0usize;
 
-        let mut matched: Option<usize> = Some(0);
+        let mut matched: usize = 0;
+        let mut hot = self.cached_shape.is_some();
         let mut owned_keys: Vec<String> = Vec::new();
 
         loop {
@@ -267,29 +268,17 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             }
             n += 1;
 
-            let cached_match = matched.and_then(|k| {
-                self.cached_shape
-                    .as_ref()
-                    .and_then(|(keys, _)| keys.get(k))
-                    .map(|expected| (k, expected.as_str() == key_str))
-            });
-
-            match cached_match {
-                Some((k, true)) => {
-                    matched = Some(k + 1);
-                }
-                Some((k, false)) => {
-                    owned_keys = key_prefix(&self.cached_shape, k);
+            if hot {
+                let keys = &self.cached_shape.as_ref().unwrap().0;
+                if matched < keys.len() && keys[matched].as_str() == key_str {
+                    matched += 1;
+                } else {
+                    owned_keys = key_prefix(&self.cached_shape, matched);
                     owned_keys.push(key_str.to_owned());
-                    matched = None;
+                    hot = false;
                 }
-                None => {
-                    if let Some(k) = matched {
-                        owned_keys = key_prefix(&self.cached_shape, k);
-                        matched = None;
-                    }
-                    owned_keys.push(key_str.to_owned());
-                }
+            } else {
+                owned_keys.push(key_str.to_owned());
             }
 
             self.skip_whitespace();
@@ -314,7 +303,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             &spilled
         };
 
-        if matched == Some(n) {
+        if hot && matched == n {
             if let Some((keys, shape)) = &self.cached_shape {
                 if keys.len() == n {
                     return Some(self.ctx.heap.alloc_object_with_shape_slice(shape, values));
@@ -322,8 +311,8 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             }
         }
 
-        if let Some(k) = matched {
-            owned_keys = key_prefix(&self.cached_shape, k);
+        if hot {
+            owned_keys = key_prefix(&self.cached_shape, matched);
         }
         let obj = self.ctx.alloc_object();
         for (k, v) in owned_keys.iter().zip(values.iter()) {
