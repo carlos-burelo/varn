@@ -38,15 +38,7 @@ pub(crate) fn reintern_member_type(
     if !b.ty_table.contains(ty.0) {
         return ty;
     }
-    table.absorb(&b.ty_table);
-    if matches!(
-        table.get(ty.0),
-        varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
-    ) {
-        let origin = table.intern_name(b.source_file.as_ref());
-        return ty.with_origin(origin, table);
-    }
-    ty
+    varn_sem::rehome::rehome_ty_with_origin(ty, &b.ty_table, b.source_file.as_ref(), table)
 }
 
 pub(crate) fn infer_member(

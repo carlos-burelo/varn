@@ -5,6 +5,7 @@ pub mod cores;
 pub mod exports;
 pub mod output;
 pub mod portable;
+pub mod rehome;
 pub mod resolver;
 pub mod scope;
 pub mod semantic_info;

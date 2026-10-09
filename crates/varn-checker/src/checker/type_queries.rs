@@ -128,18 +128,13 @@ impl<'r> Checker<'r> {
     }
 
     pub(crate) fn reintern_foreign_ty(&mut self, bind: &BindResult, ty: Type) -> Type {
-        if !self.ty_table.contains(ty.0) {
-            std::sync::Arc::make_mut(&mut self.ty_table).absorb(&bind.ty_table);
-        }
-        if matches!(
-            self.ty_table.get(ty.0),
-            varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
-        ) {
-            let table = std::sync::Arc::make_mut(&mut self.ty_table);
-            let origin = table.intern_name(bind.source_file.as_ref());
-            return ty.with_origin(origin, table);
-        }
-        ty
+        let table = std::sync::Arc::make_mut(&mut self.ty_table);
+        varn_sem::rehome::rehome_ty_with_origin(
+            ty,
+            &bind.ty_table,
+            bind.source_file.as_ref(),
+            table,
+        )
     }
 
     pub(crate) fn mark_infer_env_dirty(&mut self) {
