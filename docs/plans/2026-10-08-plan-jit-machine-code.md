@@ -114,3 +114,12 @@ idéntico al baseline. Sin (a) ganancia (b) medida (c) borrado, no se acepta.
   devuelven `VmValue` (vistas). `.vn`/contratos/tipos estáticos intactos.
 - Medida NO_JIT misma sesión: slice 60→28ms, split 34→14ms (~2.2× intérprete).
   Sonda 30 casos idéntica JIT/NO_JIT/dinámico; suite 2287/0 ×2.
+
+## Cimientos — nursery ×16 (196k→786k celdas)
+
+- `YOUNG_THRESHOLD` 49152→786432 (`varn-vm/src/heap/young.rs`, única fuente).
+- Tabla mismo perfil (quick): json minors 23→2, promociones 2.2M→300k, majors 7→3;
+  http 30→1, 707k→536k; str 22→1, 200k→21. Pared −16/−32/−23%.
+- Criterio de saturación: lo que aún promociona es live por diseño (grafo parseado,
+  reqs retenidas); más nursery no separaría nada. Coste: pico joven mayor
+  (bajo demanda, sin pre-alloc); pausas minor más largas.

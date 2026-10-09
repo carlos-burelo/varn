@@ -1,6 +1,6 @@
 use varn_types::HeapRef;
 
-pub const YOUNG_THRESHOLD: usize = 49152;
+pub const YOUNG_THRESHOLD: usize = 786432;
 
 #[derive(Default)]
 pub struct YoungGen {
