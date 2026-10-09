@@ -17,7 +17,6 @@ no se copian de documentos).
 - Un item sin ganancia medida se aparca, no se insiste.
 
 ## 1. Estado medido
-
 - Baselines rivales históricas (release, i7-1355U): class_fields
   11.3ms vs node 3.0ms (1.88× vs bun); matrix 15.2 vs 7.9
   (1.43× vs bun 10.6); http_routing 286.6 vs 115.4 (2.30× vs bun);
@@ -32,6 +31,18 @@ no se copian de documentos).
   `toString`/5 allocs; http 16/16, 1.34M vm-fast, 0 slow; str_ops
   12/12, `toString` 611k); sin ops JSON en el JIT; `matrix` y
   `matrix_local` son el mismo fichero.
+- Comparativa oficial (`xtask compare --skip-python`, release,
+  7 runs/2 warmup, i7-1355U): primera pasada 7-2-4 con 1 MISMATCH
+  (`new_retained`, bug de versionado ya fixeado en `b00f7d6b`);
+  segunda pasada **3-2-9, integridad 100% verificada, cero
+  mismatches**. Absolutos entre pasadas NO comparables (térmica:
+  bun startup 44→67ms entre sesiones; lo válido es pareado por
+  fila + A/B por item).
+- Caveats de medición: `class_fields` reporta bun/node ~0.0ms
+  (JSC/V8 eliminan el loop sin escape — veredicto `--`;
+  README ya avisa; el bench necesita objetos que escapen para
+  medir alloc de verdad). `new_retained` verificado 1.32×
+  slower (9.8 vs 7.4ms) tras el fix.
 
 ## 2. Verde (hecho, con commits)
 
@@ -109,8 +120,10 @@ no se copian de documentos).
 
 ## 6. No tocar
 
-- fib, dto, json_pure, gc_alloc, new_retained (ganan o empatan;
-  outputs re-verificados post-rangos).
+- fib, dto, json_pure, gc_alloc (ganan o empatan;
+  outputs re-verificados post-rangos). `new_retained`: era
+  MISMATCH por el bug de versionado, hoy verificado 1.32× slower
+  — pasa a rivales (gap pequeño, sin item hasta O-items).
 - task_soak/task_spawn: 100% intérprete hasta B1–B3.
 - task_soak 346ms / task_spawn 114ms; async gates intactos.
 - Modelo tasks FIFO; AOT bailea async/generadores.
