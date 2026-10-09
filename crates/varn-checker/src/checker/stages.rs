@@ -78,7 +78,7 @@ pub(super) fn run_pass(
     }
 
     rec.desugar.foreign_inherited_fields = checker.collect_foreign_inherited_fields(bind);
-    bind.ty_table = checker.ty_table.clone();
+    std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&checker.ty_table);
     bind.interner.absorb(checker.ty_table.names());
 
     rec.desugar.foreign_classes =

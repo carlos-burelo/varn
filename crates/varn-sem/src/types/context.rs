@@ -15,6 +15,12 @@ pub trait TypeContext {
     fn get_enum_members(&self, _name: &str, _origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
         None
     }
+
+    /// Contrato de frontera (Ley 2): los miembros devueltos pueden llevar
+    /// `Type` con ids de OTRA tabla cuando `origin` es foráneo. Todo `Type`
+    /// extraído de aquí debe pasar por `crate::rehome` antes de usarse
+    /// contra la tabla local. Los puntos canónicos son
+    /// `reintern_member_type` (binder) y `reintern_foreign_ty` (checker).
     fn resolve_symbol(&self, name: &str) -> Option<Type>;
 
     fn symbol_origin(&self, _name: &str) -> Option<varn_core::Atom> {
