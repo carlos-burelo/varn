@@ -454,6 +454,7 @@ Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED`
 - H7 hecho: DIP por trait ya era correcto (sin ciclo Cargo); rama `Relative` de `module_precompile` delega al funnel `resolve_specifier_path` (-12 líneas); los dos `ModuleLoader` se quedan separados (fases distintas).
 - H12 cerrado: `unwrap_or(Dynamic)` falla hacia permisivo + `BackendTy` sin variante `Unknown` (ripple sin ganancia, contrapeso Ley10).
 - H14 cerrado: sin ciclo Cargo; recursión runtime con guards es DIP estándar (mover el trait a core arrastraría tipos abajo).
+- F5a: `TirImportSpec.slot` + `resolve_import_slots` en linkado (entry, deps, stdlib, bench×3) + `build_imports` emite `LoadModule` + `ModuleSlot` + guarda (`GetProperty` + `Eq` + `Throw E_SLOT_MISMATCH`, solo insts existentes); fallback `GetProperty` sin slot (packages); mecanismo probado en bytecode real; TOCTOU de corrupción silenciosa a error fuerte.
 - A3b omitido: sandbox por defecto incompatible con multi-fichero (el propio gate `fs.read` + suite); requeriría semántica allow-entry-tree = decisión de producto.
 - DynReason hecho (preexistente): `Coverage::report` + fase `typeloss` verificados en vivo.
 - E_STALE_ATOM diferido: modelo fail-loud + 82 call sites (migrar no cambia el resultado).
