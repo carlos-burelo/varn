@@ -11,6 +11,32 @@ Reglas: cada item declara (a) ganancia, (b) medida, (c) qué se borra
 Medido hoy: los 9 perdedores van 100% JIT, 0 bails, 0 bloqueos — el gap
 es calidad de código máquina, no tiering.
 
+## Re-auditoría 2026-10-09 (código + ejecución, Ley 12)
+
+- 24/24 benches corren con checksums sanos post-rangos (muestra:
+  `Class field sum: 1500031500000`, `c[0]=166325/c[last]=646100`,
+  fib `9227465`, dto `43332/3245034`, http 100k/100k).
+- Perfiles re-verificados hoy (`bench -v`, quick): class_fields
+  100% JIT, 1 `toString`, 5 allocs por tipo; http_routing 16/16,
+  1.34M vm-fast, 0 slow; str_ops 12/12, `toString` 611k (47ns
+  hot-quick vs 46ns del plan: re-medir en frío, no es regresión —
+  el helper no se tocó).
+- `bench_matrix.vn` y `bench_matrix_local.vn` son idénticos
+  (mismos outputs); se tratan como uno.
+- Sin ops JSON en el JIT (`from_ssa` no menciona Json): C5 vive
+  en puente nativo + O5.
+- CONVIVENCIA: `scalar.rs:emit_bin` ahora lo toca C2-ranges
+  (además de la inducción que cita el plan O). Si la otra sesión
+  edita `scalar.rs` (O6 u otros), coordinar: `in_range_steps`
+  y `no_overflow` comparten el mismo `match`.
+- Plan O ajeno (`2026-10-08-...`, sucio en otra sesión, NO
+  TOCADO aquí): su sección "No objetivos" quedó parcialmente
+  stale — `GetFixedField compacto nativo` ahora es C1 (store
+  nativo + forwarding + caché base) y la elisión overflow ya no
+  es solo `i+1` (ver `ranges.rs`); `scalar.rs:288` como ref de
+  línea también caducó. Avisar a su dueño, no editarlo desde
+  esta sesión.
+
 ## C1 — class_fields 3.70× (peor caso)
 
 - Baseline: 11.3ms vs node 3.0ms (1.88× vs bun 6.0ms).
@@ -22,9 +48,14 @@ es calidad de código máquina, no tiering.
   1. Hoist del shape-check fuera del loop cuando el objeto no escapa
      (licencia: `emit_get/set_fixed_field` en
      `varn-jit/src/clif/from_ssa/props/fields.rs:17,124`).
+     HECHO parcial: caché de base por `Variable` para objetos
+     globales (1 check por iteración); hoist total aparcado
+     (resto: heap/young por store + poll GC).
   2. Fast path int sin box en RMW (`x = x + 1` con kinds probados).
+     HECHO: `store_compact_native`.
   3. Store-load forwarding `pt.x` leído tras escribirlo (eliminar el
-     segundo load).
+     segundo load). HECHO: mapa en `drive.rs` con clave canónica
+     de global + invalidación en `StoreGlobalIdx`.
 - Verifica: `bench_class_fields` pareado + `debug -p clif --fn` sin
   checks en el loop + 4 cuadrantes.
 - Estado 2026-10-09 (C1 VERDE parcial, perfil `quick`, mismo binario
@@ -50,6 +81,9 @@ es calidad de código máquina, no tiering.
   Hoist completo fuera del loop (1 check total) aparcado: el
   caché actual deja 1 check por iteración; el resto del gap es
   heap/young por store + poll GC.
+- Re-auditoría: perfil intacto hoy (100%/1/5); `matrix_local`
+  es el mismo fichero que `matrix` (dedupe pendiente, no borrar
+  sin dueño de benches).
 
 ## C2 — matrix 1.92×
 
@@ -124,12 +158,18 @@ es calidad de código máquina, no tiering.
   O1 (alloc arrays/maps) y O5. Re-medir tras C3–C5; abrir item propio
   solo si algún gap supera 1.2× con causa atribuida.
 - Verifica: re-medir en la misma sesión que C3–C5.
+- Re-auditoría hoy (quick): csv_pipeline, csv_etl y
+  collection_pipeline corren con outputs sanos post-rangos;
+  gaps y causas pendientes de O1/O3/O5 + máquina fría.
 
 ## No tocar (empatados/ganados o fuera de alcance)
 
 fib, dto, json_pure, gc_alloc, new_retained (ganan o empatan);
 task_soak/task_spawn (100% intérprete: territorio plan async B1–B3,
 no peepholes aquí); O7 bails y O8 ya tienen dueño en sus planes.
+Re-auditoría hoy: outputs intactos post-rangos (fib `9227465`,
+dto `43332/3245034`); standing vs rivales sin cambios medidos
+(rangos solo elide overflow probado, checksums mandan).
 
 ## Orden sugerido (por peso × riesgo)
 
@@ -137,7 +177,8 @@ C1 → C4 → C3 → C2 → C5 → re-medir C6. Cada item: bench pareado
 antes/después mismo perfil + checksum + 4 cuadrantes + commit
 atómico. Un item sin ganancia medida se aparca, no se insiste.
 
-Nota 2026-10-09: C4/C3/C5 dependen de O2/O3/O4/O5 del plan
+Nota 2026-10-09: C1 y C2-overflow VERDES (commits
+`f91f7ee2`, `1f3a8e05`). C4/C3/C5 dependen de O2/O3/O4/O5 del plan
 `2026-10-08-plan-jit-machine-code.md` con dueño en otra sesión —
-no tocar sin coordinar. C2 (bounds hoist matricial) requiere
-análisis de rangos nuevo; scoped para después de C1.
+no tocar sin coordinar. C2-bounds y hoist total aparcados
+(piden versionado con guarda). C6 se re-mide tras O-items.
