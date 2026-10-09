@@ -32,7 +32,10 @@ pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
         }
         BackendTy::Class(cid) => match tir.class(cid) {
             Some(ci) => HirType::Class(out.class_id(&ci.name)),
-            None => HirType::Ref,
+            None => {
+                debug_assert!(false, "from_tir: ClassId({}) missing after verify", cid.0);
+                HirType::Ref
+            }
         },
         BackendTy::Nullable(inner) => {
             let inner = resolve(inner, tir, out);
@@ -45,6 +48,7 @@ pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
 
 fn resolve(id: varn_tir::TyId, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
     if !tir.types.contains(id) {
+        debug_assert!(false, "from_tir: TyId({}) missing after verify", id.0);
         return HirType::Dynamic;
     }
     lower(tir.types.get(id), tir, out)
