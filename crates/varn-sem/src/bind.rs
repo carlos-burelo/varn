@@ -99,7 +99,45 @@ pub struct BindResult {
     pub user_decorators: FxHashSet<u32>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeclKind {
+    SumType,
+    Enum,
+    Class,
+    Interface,
+    Namespace,
+}
+
 impl BindResult {
+    pub fn classify_decl(&self, name: &str) -> Option<DeclKind> {
+        let mut found = None;
+        let mut set = |kind| {
+            debug_assert!(
+                found.is_none(),
+                "type '{name}' registered as multiple decl kinds"
+            );
+            if found.is_none() {
+                found = Some(kind);
+            }
+        };
+        if self.sum_type_variants.contains_key(name) {
+            set(DeclKind::SumType);
+        }
+        if self.type_members.enums.contains_key(name) {
+            set(DeclKind::Enum);
+        }
+        if self.type_members.classes.contains_key(name) {
+            set(DeclKind::Class);
+        }
+        if self.type_members.interfaces.contains_key(name) {
+            set(DeclKind::Interface);
+        }
+        if self.type_members.namespaces.contains_key(name) {
+            set(DeclKind::Namespace);
+        }
+        found
+    }
+
     pub fn declares_type(&self, name: &str) -> bool {
         self.type_members.classes.contains_key(name)
             || self.type_members.interfaces.contains_key(name)

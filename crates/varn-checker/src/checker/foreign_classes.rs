@@ -83,9 +83,11 @@ impl Checker<'_> {
                 let Some(owner) = owner.as_deref() else {
                     continue;
                 };
-                if owner.sum_type_variants.contains_key(name.as_ref())
-                    || owner.type_members.enums.contains_key(name.as_ref())
-                {
+                use varn_sem::bind::DeclKind;
+                if !matches!(
+                    owner.classify_decl(name.as_ref()),
+                    Some(DeclKind::Class)
+                ) {
                     continue;
                 }
                 if owner.get_class_parent(name.as_ref()).is_some() {

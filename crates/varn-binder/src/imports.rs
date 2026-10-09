@@ -133,9 +133,10 @@ impl<'r> super::Binder<'r> {
                             s.original_name = Some(self.intern_local(&imported));
                             s.origin_module = s.origin_module.or(module_path_atom);
                             if let (Some(ty), Some(origin)) = (&mut s.ty, &s.origin_module) {
-                                *ty = ty.with_origin(
-                                    *origin,
-                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                let table = &mut *std::sync::Arc::make_mut(&mut self.ty_table);
+                                *ty = varn_sem::rehome::canonicalize_lang_named(
+                                    ty.with_origin(*origin, table),
+                                    table,
                                 );
                             }
 

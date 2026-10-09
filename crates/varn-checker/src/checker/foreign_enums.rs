@@ -56,7 +56,16 @@ impl Checker<'_> {
                     .resolver
                     .module_bind(&origin)
                     .or_else(|| self.resolver.stdlib_bind(&origin));
-                let Some(layout) = owner.and_then(|b| b.enum_layout(&name)) else {
+                let Some(layout) = owner.as_deref().and_then(|b| {
+                    use varn_sem::bind::DeclKind;
+                    if !matches!(
+                        b.classify_decl(name.as_ref()),
+                        Some(DeclKind::Enum) | Some(DeclKind::SumType)
+                    ) {
+                        return None;
+                    }
+                    b.enum_layout(&name)
+                }) else {
                     continue;
                 };
                 let variants = layout
