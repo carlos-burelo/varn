@@ -1,3 +1,4 @@
+#![allow(refining_impl_trait)]
 pub mod loader;
 pub mod provider_impl;
 pub mod registry;

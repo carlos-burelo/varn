@@ -387,7 +387,6 @@ pub(crate) extern "C" fn jit_str_split(
             );
         };
 
-        let text = text.to_owned();
         let sep: Option<String> = if argc == 0 {
             None
         } else {
@@ -448,12 +447,22 @@ pub(crate) extern "C" fn jit_str_slice_range(
         let s_val = VmValue::from_raw_parts(s_tag, s_payload);
         let start_val = VmValue::from_raw_parts(start_tag, start_payload);
         let end_val = VmValue::from_raw_parts(end_tag, end_payload);
-        let text = match borrow_str_fast(s_val, &ctx_ref.heap, &mut buf) {
-            Some(t) => t.to_owned(),
-            None => jit_propagate_error(
+        let (text, ascii): (&str, bool) = if s_val.is_sso() {
+            let s = s_val.sso_as_str(&mut buf);
+            (s, s.is_ascii())
+        } else if s_val.is_heap() {
+            match ctx_ref.heap.get(s_val.as_heap()) {
+                Some(crate::heap::HeapObj::Str(h)) => (h.as_str(), h.is_ascii()),
+                _ => jit_propagate_error(
+                    ctx_ref,
+                    crate::error::RuntimeError::new("slice: receiver must be a string"),
+                ),
+            }
+        } else {
+            jit_propagate_error(
                 ctx_ref,
                 crate::error::RuntimeError::new("slice: receiver must be a string"),
-            ),
+            )
         };
         let Some(start) = start_val.is_int().then(|| start_val.as_int()) else {
             jit_propagate_error(
@@ -471,7 +480,7 @@ pub(crate) extern "C" fn jit_str_slice_range(
                 crate::error::RuntimeError::new("slice: bounds must be ints"),
             );
         };
-        let (bs, be) = if text.is_ascii() {
+        let (bs, be) = if ascii {
             let len = text.len() as i64;
             let si = normalize_idx(start, len).min(text.len());
             let ei = normalize_idx(end.unwrap_or(len), len)
