@@ -5,12 +5,41 @@ use varn_types::ssa::{SsaBinOp, SsaOp, SsaProto, SsaTerm};
 const I64_LO: i128 = i64::MIN as i128;
 const I64_HI: i128 = i64::MAX as i128;
 
+#[derive(Clone, Copy, PartialEq)]
+enum Edge {
+    Jump,
+    Then,
+    Else,
+}
+
+pub(super) struct VersionPlan {
+    pub header: usize,
+    pub preheader: usize,
+    pub guards: Vec<(u32, i128)>,
+    pub elide: FxHashSet<u32>,
+}
+
 fn def_map(ssa: &SsaProto) -> Vec<Option<&SsaOp>> {
     let mut def = vec![None; ssa.values.len()];
     for blk in &ssa.blocks {
         for inst in &blk.insts {
             if let Some(d) = inst.dest {
                 def[d as usize] = Some(&inst.op);
+            }
+        }
+    }
+    def
+}
+
+fn def_block(ssa: &SsaProto) -> Vec<Option<usize>> {
+    let mut def = vec![None; ssa.values.len()];
+    for (b, blk) in ssa.blocks.iter().enumerate() {
+        for &p in &blk.params {
+            def[p as usize] = Some(b);
+        }
+        for inst in &blk.insts {
+            if let Some(d) = inst.dest {
+                def[d as usize] = Some(b);
             }
         }
     }
@@ -49,16 +78,99 @@ fn is_one(def: &[Option<&SsaOp>], ranges: &FxHashMap<u32, (i128, i128)>, v: u32)
     as_const(ranges, v) == Some(1)
 }
 
-pub(super) fn no_overflow_steps(
+struct Check {
+    param: u32,
+    bound: i128,
+    below: bool,
+    le: bool,
+}
+
+fn header_check(
+    ssa: &SsaProto,
+    def: &[Option<&SsaOp>],
+    ranges: &FxHashMap<u32, (i128, i128)>,
+    header: usize,
+    param: u32,
+) -> Option<Check> {
+    let blk = &ssa.blocks[header];
+    let SsaTerm::Branch { cond, .. } = &blk.term else {
+        return None;
+    };
+    let Some(SsaOp::Binary { op, lhs, rhs }) = def[*cond as usize] else {
+        return None;
+    };
+    if !blk.params.contains(&param) {
+        return None;
+    }
+    let le = matches!(op, SsaBinOp::IntLe | SsaBinOp::IntGe);
+    match op {
+        SsaBinOp::IntLt | SsaBinOp::IntLe => {
+            if *lhs == param {
+                Some(Check {
+                    param,
+                    bound: as_const(ranges, *rhs)?,
+                    below: true,
+                    le,
+                })
+            } else if *rhs == param {
+                Some(Check {
+                    param,
+                    bound: as_const(ranges, *lhs)?,
+                    below: false,
+                    le,
+                })
+            } else {
+                None
+            }
+        }
+        SsaBinOp::IntGt | SsaBinOp::IntGe => {
+            if *lhs == param {
+                Some(Check {
+                    param,
+                    bound: as_const(ranges, *rhs)?,
+                    below: false,
+                    le,
+                })
+            } else if *rhs == param {
+                Some(Check {
+                    param,
+                    bound: as_const(ranges, *lhs)?,
+                    below: true,
+                    le,
+                })
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn apply_cap(r: (i128, i128), c: &Check) -> Option<(i128, i128)> {
+    let (l, h) = r;
+    let (l, h) = if c.below {
+        (l, h.min(if c.le { c.bound } else { c.bound - 1 }))
+    } else {
+        (l.max(if c.le { c.bound } else { c.bound + 1 }), h)
+    };
+    if l > h {
+        None
+    } else {
+        Some((l, h))
+    }
+}
+
+pub(super) fn analyze(
     ssa: &SsaProto,
     preds: &[Vec<usize>],
     rpo_pos: &[usize],
     reached: &[bool],
-) -> FxHashSet<u32> {
+) -> (FxHashSet<u32>, Vec<VersionPlan>) {
     let def = def_map(ssa);
-    let pred_args: Vec<Vec<(u32, Vec<u32>)>> = (0..ssa.blocks.len())
+    let dblk = def_block(ssa);
+    let pred_edges: Vec<Vec<(u32, Vec<u32>, Edge)>> = (0..ssa.blocks.len())
         .map(|from| match &ssa.blocks[from].term {
-            SsaTerm::Jump { target, args } => vec![(*target, args.clone())],
+            SsaTerm::Jump { target, args } => vec![(*target, args.clone(), Edge::Jump)],
             SsaTerm::Branch {
                 then_blk,
                 then_args,
@@ -66,8 +178,8 @@ pub(super) fn no_overflow_steps(
                 else_args,
                 ..
             } => vec![
-                (*then_blk, then_args.clone()),
-                (*else_blk, else_args.clone()),
+                (*then_blk, then_args.clone(), Edge::Then),
+                (*else_blk, else_args.clone(), Edge::Else),
             ],
             SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => vec![],
         })
@@ -127,6 +239,17 @@ pub(super) fn no_overflow_steps(
     let mut converged = false;
     for _ in 0..64 {
         let mut changed = false;
+        let mut checks: FxHashMap<(usize, u32), Check> = FxHashMap::default();
+        for &h in &headers {
+            for &p in &ssa.blocks[h].params {
+                if ssa.value_ty(p) != SlotKind::Int {
+                    continue;
+                }
+                if let Some(c) = header_check(ssa, &def, &ranges, h, p) {
+                    checks.insert((h, p), c);
+                }
+            }
+        }
         for (b, blk) in ssa.blocks.iter().enumerate() {
             if !reached[b] {
                 continue;
@@ -135,16 +258,16 @@ pub(super) fn no_overflow_steps(
                 if ssa.value_ty(p) != SlotKind::Int {
                     continue;
                 }
-                let body = bodies.get(&b);
+                let latched = bodies.get(&b).is_some();
                 let mut elo: Option<i128> = None;
                 let mut ehi: Option<i128> = None;
                 let mut ok = true;
                 for pred in preds[b].iter().filter(|p| reached[**p]) {
-                    let in_body = body.map_or(false, |bd| bd.contains(pred));
-                    if in_body {
+                    let pred_in_body = bodies.get(&b).map_or(false, |bd| bd.contains(pred));
+                    if latched && pred_in_body {
                         continue;
                     }
-                    for (t, args) in pred_args[*pred].iter() {
+                    for (t, args, _) in pred_edges[*pred].iter() {
                         if *t as usize != b {
                             continue;
                         }
@@ -169,40 +292,44 @@ pub(super) fn no_overflow_steps(
                 let mut l = elo.unwrap();
                 let mut h = ehi.unwrap();
                 let entry = (l, h);
-                for pred in preds[b].iter().filter(|p| reached[**p]) {
-                    let in_body = body.map_or(false, |bd| bd.contains(pred));
-                    if !in_body {
+                if latched {
+                    for pred in preds[b].iter().filter(|p| reached[**p]) {
+                        let pred_in_body = bodies.get(&b).map_or(false, |bd| bd.contains(pred));
+                        if !pred_in_body {
+                            continue;
+                        }
+                        for (t, args, _) in pred_edges[*pred].iter() {
+                            if *t as usize != b {
+                                continue;
+                            }
+                            let Some(&a) = args.get(pi) else {
+                                ok = false;
+                                continue;
+                            };
+                            if a == p {
+                                continue;
+                            }
+                            if let Some((cl, ch)) =
+                                step_contrib(ssa, &def, &ranges, &checks, b, p, a, entry)
+                            {
+                                l = l.min(cl);
+                                h = h.max(ch);
+                                continue;
+                            }
+                            match ranges.get(&a) {
+                                Some(&(al, ah)) => {
+                                    l = l.min(al);
+                                    h = h.max(ah);
+                                }
+                                None => {
+                                    ok = false;
+                                }
+                            }
+                        }
+                    }
+                    if !ok {
                         continue;
                     }
-                    for (t, args) in pred_args[*pred].iter() {
-                        if *t as usize != b {
-                            continue;
-                        }
-                        let Some(&a) = args.get(pi) else {
-                            ok = false;
-                            continue;
-                        };
-                        if a == p {
-                            continue;
-                        }
-                        if let Some((cl, ch)) = step_contrib(ssa, &def, &ranges, b, p, a, entry) {
-                            l = l.min(cl);
-                            h = h.max(ch);
-                            continue;
-                        }
-                        match ranges.get(&a) {
-                            Some(&(al, ah)) => {
-                                l = l.min(al);
-                                h = h.max(ah);
-                            }
-                            None => {
-                                ok = false;
-                            }
-                        }
-                    }
-                }
-                if !ok {
-                    continue;
                 }
                 if l > h {
                     continue;
@@ -241,68 +368,49 @@ pub(super) fn no_overflow_steps(
             break;
         }
     }
-    if !converged {
-        return FxHashSet::default();
-    }
 
-    let out: FxHashSet<u32> = ranges
-        .iter()
-        .filter(|&(_, &(l, h))| l >= I64_LO && h <= I64_HI)
-        .filter(|(v, _)| {
-            matches!(def[**v as usize], Some(SsaOp::Binary { op, .. }) if matches!(op, SsaBinOp::IntAdd | SsaBinOp::IntSub | SsaBinOp::IntMul))
-        })
-        .map(|(v, _)| *v)
-        .collect();
+    let no_overflow: FxHashSet<u32> = if converged {
+        ranges
+            .iter()
+            .filter(|&(_, &(l, h))| l >= I64_LO && h <= I64_HI)
+            .filter(|(v, _)| {
+                matches!(def[**v as usize], Some(SsaOp::Binary { op, .. }) if matches!(op, SsaBinOp::IntAdd | SsaBinOp::IntSub | SsaBinOp::IntMul))
+            })
+            .map(|(v, _)| *v)
+            .collect()
+    } else {
+        FxHashSet::default()
+    };
+
+    let plans = if converged {
+        version_plans(ssa, preds, reached, &def, &dblk, &bodies, &headers, &ranges)
+    } else {
+        Vec::new()
+    };
+
     if super::super::trace() {
         eprintln!(
-            "clif: ranges headers={} known={} no_overflow={}",
+            "clif: ranges headers={} known={} no_overflow={} versions={}",
             headers.len(),
             ranges.len(),
-            out.len()
+            no_overflow.len(),
+            plans.len()
         );
     }
-    out
+    (no_overflow, plans)
 }
 
 fn step_contrib(
     ssa: &SsaProto,
     def: &[Option<&SsaOp>],
     ranges: &FxHashMap<u32, (i128, i128)>,
+    checks: &FxHashMap<(usize, u32), Check>,
     header: usize,
     param: u32,
     arg: u32,
     entry: (i128, i128),
 ) -> Option<(i128, i128)> {
-    let blk = &ssa.blocks[header];
-    let SsaTerm::Branch { cond, .. } = &blk.term else {
-        return None;
-    };
-    let Some(SsaOp::Binary { op, lhs, rhs }) = def[*cond as usize] else {
-        return None;
-    };
-    let le = matches!(op, SsaBinOp::IntLe | SsaBinOp::IntGe);
-    let (k, bound, below) = match op {
-        SsaBinOp::IntLt | SsaBinOp::IntLe => {
-            if *lhs == param && blk.params.contains(&param) {
-                (param, as_const(ranges, *rhs)?, true)
-            } else if *rhs == param && blk.params.contains(&param) {
-                (param, as_const(ranges, *lhs)?, false)
-            } else {
-                return None;
-            }
-        }
-        SsaBinOp::IntGt | SsaBinOp::IntGe => {
-            if *lhs == param && blk.params.contains(&param) {
-                (param, as_const(ranges, *rhs)?, false)
-            } else if *rhs == param && blk.params.contains(&param) {
-                (param, as_const(ranges, *lhs)?, true)
-            } else {
-                return None;
-            }
-        }
-        _ => return None,
-    };
-    let _ = k;
+    let c = checks.get(&(header, param))?;
     let (elo, ehi) = entry;
     let Some(SsaOp::Binary {
         op: step,
@@ -316,13 +424,212 @@ fn step_contrib(
         && ((*sl == param && is_one(def, ranges, *sr))
             || (*sr == param && is_one(def, ranges, *sl)));
     let is_dec = matches!(step, SsaBinOp::IntSub) && *sl == param && is_one(def, ranges, *sr);
-    if below && is_inc {
-        let top = if le { bound + 1 } else { bound };
+    if c.below && is_inc {
+        let top = if c.le { c.bound + 1 } else { c.bound };
         Some((elo + 1, top))
-    } else if !below && is_dec {
-        let floor = if le { bound - 1 } else { bound };
+    } else if !c.below && is_dec {
+        let floor = if c.le { c.bound - 1 } else { c.bound };
         Some((floor, ehi - 1))
     } else {
         None
     }
+}
+
+fn version_op_ok(ssa: &SsaProto, op: &SsaOp) -> bool {
+    if super::views::keeps_views(ssa, op) {
+        return true;
+    }
+    matches!(
+        op,
+        SsaOp::SetFixedField { .. } | SsaOp::LoadGlobalIdx(_) | SsaOp::StoreGlobalIdx { .. }
+    )
+}
+
+fn version_plans(
+    ssa: &SsaProto,
+    preds: &[Vec<usize>],
+    reached: &[bool],
+    def: &[Option<&SsaOp>],
+    dblk: &[Option<usize>],
+    bodies: &FxHashMap<usize, rustc_hash::FxHashSet<usize>>,
+    headers: &[usize],
+    ranges: &FxHashMap<u32, (i128, i128)>,
+) -> Vec<VersionPlan> {
+    let _ = def;
+    let mut narrowed: FxHashMap<u32, (i128, i128)> = ranges.clone();
+    let mut checks: FxHashMap<(usize, u32), Check> = FxHashMap::default();
+    let mut nconverged = false;
+    for _ in 0..64 {
+        let mut changed = false;
+        checks.clear();
+        for &h in headers {
+            for &p in &ssa.blocks[h].params {
+                if ssa.value_ty(p) != SlotKind::Int {
+                    continue;
+                }
+                if let Some(c) = header_check(ssa, def, &narrowed, h, p) {
+                    checks.insert((h, p), c);
+                }
+            }
+        }
+        for &h in headers {
+            let body = &bodies[&h];
+            for &b in body {
+                if !reached[b] || b == h {
+                    continue;
+                }
+                let blk = &ssa.blocks[b];
+                for inst in &blk.insts {
+                    let (Some(d), SsaOp::Binary { op, lhs, rhs }) = (inst.dest, &inst.op) else {
+                        continue;
+                    };
+                    if ssa.value_ty(d) != SlotKind::Int {
+                        continue;
+                    }
+                    if !matches!(op, SsaBinOp::IntAdd | SsaBinOp::IntSub | SsaBinOp::IntMul) {
+                        continue;
+                    }
+                    let read = |v: u32| -> Option<(i128, i128)> {
+                        let mut r = *narrowed.get(&v)?;
+                        for ((hh, kk), c) in checks.iter() {
+                            if *kk == v && bodies[hh].contains(&b) && b != *hh {
+                                r = apply_cap(r, c)?;
+                            }
+                        }
+                        Some(r)
+                    };
+                    let (Some(a), Some(c)) = (read(*lhs), read(*rhs)) else {
+                        continue;
+                    };
+                    let r = match op {
+                        SsaBinOp::IntAdd => add_range(a, c),
+                        SsaBinOp::IntSub => sub_range(a, c),
+                        _ => mul_range(a, c),
+                    };
+                    if let Some(r) = r {
+                        if narrowed.get(&d) != Some(&r) {
+                            if r.0 > r.1 {
+                                return Vec::new();
+                            }
+                            narrowed.insert(d, r);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+        if !changed {
+            nconverged = true;
+            break;
+        }
+    }
+    if !nconverged {
+        return Vec::new();
+    }
+
+    let use_range = |v: u32, b: usize| -> Option<(i128, i128)> {
+        let mut r = *narrowed.get(&v)?;
+        for ((hh, kk), c) in checks.iter() {
+            if *kk == v && bodies[hh].contains(&b) && b != *hh {
+                r = apply_cap(r, c)?;
+            }
+        }
+        Some(r)
+    };
+
+    let mut plans = Vec::new();
+    for &h in headers {
+        if headers
+            .iter()
+            .any(|&h2| h2 != h && bodies[&h].contains(&h2))
+        {
+            continue;
+        }
+        let body = &bodies[&h];
+        let mut ok = true;
+        let mut elide = FxHashSet::default();
+        let mut arrays: FxHashMap<u32, i128> = FxHashMap::default();
+        for &b in body {
+            if !reached[b] {
+                continue;
+            }
+            let blk = &ssa.blocks[b];
+            match &blk.term {
+                SsaTerm::Jump { .. } | SsaTerm::Branch { .. } => {}
+                SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => {
+                    ok = false;
+                    break;
+                }
+            }
+            for inst in &blk.insts {
+                if !version_op_ok(ssa, &inst.op) {
+                    ok = false;
+                    break;
+                }
+                if matches!(inst.op, SsaOp::StoreGlobalIdx { .. }) {
+                    ok = false;
+                    break;
+                }
+                match &inst.op {
+                    SsaOp::ArrayGetIndex { object, index }
+                    | SsaOp::ArraySetIndex { object, index, .. } => {
+                        if ssa.value_ty(*index) != SlotKind::Int {
+                            ok = false;
+                            break;
+                        }
+                        if b == h {
+                            ok = false;
+                            break;
+                        }
+                        let Some((lo, hi)) = use_range(*index, b) else {
+                            ok = false;
+                            break;
+                        };
+                        if lo < 0 || hi + 1 > I64_HI {
+                            ok = false;
+                            break;
+                        }
+                        if dblk[*object as usize].map_or(true, |db| body.contains(&db)) {
+                            ok = false;
+                            break;
+                        }
+                        elide.insert(*index);
+                        arrays
+                            .entry(*object)
+                            .and_modify(|m| *m = (*m).max(hi + 1))
+                            .or_insert(hi + 1);
+                    }
+                    _ => {}
+                }
+            }
+            if !ok {
+                break;
+            }
+        }
+        if !ok || arrays.is_empty() {
+            continue;
+        }
+        let outside: Vec<usize> = preds[h]
+            .iter()
+            .copied()
+            .filter(|p| reached[*p] && !body.contains(p))
+            .collect();
+        if outside.len() != 1 {
+            continue;
+        }
+        let pre = outside[0];
+        if !matches!(
+            ssa.blocks[pre].term,
+            SsaTerm::Jump { target, .. } if target as usize == h
+        ) {
+            continue;
+        }
+        plans.push(VersionPlan {
+            header: h,
+            preheader: pre,
+            guards: arrays.into_iter().collect(),
+            elide,
+        });
+    }
+    plans
 }

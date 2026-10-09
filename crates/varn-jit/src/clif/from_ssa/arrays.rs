@@ -143,7 +143,9 @@ pub(super) fn emit_get(
     b.append_block_param(merge, want.clif_ty());
 
     let (data, len, disc) = view(b, ctx, values, object, slow)?;
-    bounds(b, key, len, slow);
+    if !(ctx.elide.get() && ctx.fast_bounds.contains(&index)) {
+        bounds(b, key, len, slow);
+    }
 
     let matched = b.create_block();
     let other = b.create_block();
@@ -231,7 +233,9 @@ pub(super) fn emit_set(
     if src != Elem::Boxed {
         let raw = load_value(b, ctx, values, value)?;
         let (data, len, disc) = view(b, ctx, values, object, slow)?;
-        bounds(b, key, len, slow);
+        if !(ctx.elide.get() && ctx.fast_bounds.contains(&index)) {
+            bounds(b, key, len, slow);
+        }
 
         let matched = b.create_block();
         let other = b.create_block();

@@ -10,7 +10,8 @@ use super::{
 };
 use crate::JitHelpers;
 use cranelift_codegen::ir::{
-    ExtFuncData, ExternalName, Function, InstBuilder, UserExternalName, UserFuncName, Value,
+    types, Block, BlockArg, ExtFuncData, ExternalName, Function, InstBuilder, UserExternalName,
+    UserFuncName, Value,
 };
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
@@ -153,7 +154,12 @@ pub(in crate::clif) fn try_lower(
         }
     };
     let scratch = call::ScratchWin::create(&mut b, call::scratch_max(ssa));
-    let ctx = Ctx {
+    let (no_overflow, version_plans) = if osr.is_some() {
+        (rustc_hash::FxHashSet::default(), Vec::new())
+    } else {
+        ranges::analyze(ssa, &preds, &rpo_pos, &reached)
+    };
+    let mut ctx = Ctx {
         cc,
         helpers,
         ssa,
@@ -167,7 +173,9 @@ pub(in crate::clif) fn try_lower(
         has_round: super::super::floats::has_round_support(isa),
         views,
         in_range_steps: induction::in_range_steps(ssa, &preds, &rpo_pos, &reached),
-        no_overflow: ranges::no_overflow_steps(ssa, &preds, &rpo_pos, &reached),
+        no_overflow,
+        fast_bounds: rustc_hash::FxHashSet::default(),
+        elide: std::cell::Cell::new(false),
         home_addrs: Default::default(),
         scratch,
         carried: match osr {
@@ -209,93 +217,158 @@ pub(in crate::clif) fn try_lower(
         }
     }
 
+    let mut plans = version_plans;
+    plans.retain(|pl| {
+        pins.get(&pl.preheader).map_or(false, |objs| {
+            pl.guards.iter().all(|(o, _)| objs.contains(o))
+        })
+    });
+    let mut plan_by_pre: std::collections::BTreeMap<usize, usize> =
+        std::collections::BTreeMap::new();
+    for (idx, pl) in plans.iter().enumerate() {
+        plan_by_pre.entry(pl.preheader).or_insert(idx);
+        ctx.fast_bounds.extend(pl.elide.iter().copied());
+    }
+    if super::super::trace() && !plans.is_empty() {
+        eprintln!("clif: versions {}", plans.len());
+    }
+    let mut vmaps: Vec<VersionClones> = Vec::new();
+    for pl in &plans {
+        let body = cfg::loop_body(&preds, &rpo_pos, &reached, pl.header);
+        let mut fast = std::collections::BTreeMap::new();
+        let mut slow = std::collections::BTreeMap::new();
+        for s in &body {
+            for (map, _) in [(&mut fast, true), (&mut slow, false)] {
+                let cb = b.create_block();
+                for &p in &ssa.blocks[*s].params {
+                    let ty = clif_ty(ssa.value_ty(p)).ok_or("from_ssa: unsupported block param")?;
+                    b.append_block_param(cb, ty);
+                }
+                map.insert(*s, cb);
+            }
+        }
+        let mut fast_view = blocks.clone();
+        let mut slow_view = blocks.clone();
+        for (s, c) in &fast {
+            fast_view[*s] = Some(*c);
+        }
+        for (s, c) in &slow {
+            slow_view[*s] = Some(*c);
+        }
+        vmaps.push(VersionClones {
+            fast,
+            slow,
+            fast_view,
+            slow_view,
+        });
+    }
+    let mut emitted = vec![false; ssa.blocks.len()];
+
     for (n, i) in rpo.iter().enumerate() {
         let i = *i;
-        let blk = &ssa.blocks[i];
+        if emitted[i] {
+            continue;
+        }
+        if let Some(&pi) = plan_by_pre.get(&i) {
+            let cb = blocks[i].expect("block created");
+            let is_call_entry = Some(i) == call_entry;
+            lower_block(
+                &mut b,
+                &ctx,
+                &mut values,
+                &blocks,
+                ssa,
+                &preds,
+                &rpo_pos,
+                &shape,
+                &global_src,
+                &pins,
+                i,
+                cb,
+                is_call_entry,
+                true,
+                false,
+                n,
+            )?;
+            emitted[i] = true;
+            emit_version_guard(&mut b, &ctx, &mut values, ssa, &plans[pi], &vmaps[pi])?;
+            let fast_order: Vec<(usize, Block)> = vmaps[pi]
+                .fast
+                .iter()
+                .filter(|(s, _)| rpo.contains(s))
+                .map(|(s, c)| (*s, *c))
+                .collect();
+            for (ssa_b, fast_blk) in fast_order {
+                lower_block(
+                    &mut b,
+                    &ctx,
+                    &mut values,
+                    &vmaps[pi].fast_view,
+                    ssa,
+                    &preds,
+                    &rpo_pos,
+                    &shape,
+                    &global_src,
+                    &pins,
+                    ssa_b,
+                    fast_blk,
+                    false,
+                    false,
+                    true,
+                    n,
+                )?;
+                emitted[ssa_b] = true;
+            }
+            let slow_order: Vec<(usize, Block)> = vmaps[pi]
+                .slow
+                .iter()
+                .filter(|(s, _)| rpo.contains(s))
+                .map(|(s, c)| (*s, *c))
+                .collect();
+            for (ssa_b, slow_blk) in slow_order {
+                lower_block(
+                    &mut b,
+                    &ctx,
+                    &mut values,
+                    &vmaps[pi].slow_view,
+                    ssa,
+                    &preds,
+                    &rpo_pos,
+                    &shape,
+                    &global_src,
+                    &pins,
+                    ssa_b,
+                    slow_blk,
+                    false,
+                    false,
+                    false,
+                    n,
+                )?;
+                emitted[ssa_b] = true;
+            }
+            continue;
+        }
         let cb = blocks[i].expect("block created");
-
-        if !(n == 0 && Some(i) == call_entry) {
-            b.switch_to_block(cb);
-        }
-
-        drop_home_addrs(&ctx);
-
-        let params: Vec<Value> = b.block_params(cb).to_vec();
         let is_call_entry = Some(i) == call_entry;
-        let mut word = 4;
-        for (k, &p) in blk.params.iter().enumerate() {
-            let kind = ssa.value_ty(p);
-            let pv = if is_call_entry {
-                entry_param(&mut b, &ctx, &shape, &params, &mut word, k, kind)?
-            } else {
-                params[k]
-            };
-            store::define(&mut b, &ctx, &mut values, p, pv);
-        }
-
-        let mut fwd: std::collections::BTreeMap<(u32, u16), u32> = Default::default();
-        let canon = |o: u32| -> u32 { global_src.get(&o).map(|s| 0x8000_0000u32 | s).unwrap_or(o) };
-        for inst in &blk.insts {
-            if let varn_types::ssa::SsaOp::GetFixedField { object, slot, .. } = &inst.op {
-                let k = (canon(*object), *slot);
-                if let (Some(d), Some(&src)) = (inst.dest, fwd.get(&k)) {
-                    if ctx.ssa.value_ty(d) == ctx.ssa.value_ty(src) {
-                        let v = store::load_value(&mut b, &ctx, &values, src)?;
-                        store::define(&mut b, &ctx, &mut values, d, v);
-                        continue;
-                    }
-                }
-            }
-            match scalar::emit_inst(&mut b, &ctx, &mut values, &inst.op, inst.dest)? {
-                Some(out) => land(&mut b, &ctx, &mut values, inst.dest, out)?,
-                None if inst.dest.is_some() => {
-                    return Err(format!("from_ssa: {:?} defines no value", inst.op));
-                }
-                None => {}
-            }
-            match &inst.op {
-                varn_types::ssa::SsaOp::GetFixedField { object, slot, .. } => {
-                    if let Some(d) = inst.dest {
-                        fwd.insert((canon(*object), *slot), d);
-                    }
-                }
-                varn_types::ssa::SsaOp::SetFixedField {
-                    object,
-                    value,
-                    slot,
-                    ..
-                } => {
-                    fwd.insert((canon(*object), *slot), *value);
-                }
-                varn_types::ssa::SsaOp::StoreGlobalIdx { slot, .. } => {
-                    let g = 0x8000_0000u32 | slot;
-                    fwd.retain(|k, _| k.0 != g);
-                    ctx.views.invalidate_global(&mut b, *slot);
-                }
-                varn_types::ssa::SsaOp::LoadGlobalIdx(..) => {}
-                _ => {
-                    if !views::keeps_views(ssa, &inst.op) {
-                        fwd.clear();
-                        ctx.views.clear_instances(&mut b);
-                    }
-                }
-            }
-            if !views::keeps_views(ssa, &inst.op) {
-                ctx.views.clear(&mut b);
-            }
-            if may_push_frame(&ctx, &inst.op) {
-                drop_home_addrs(&ctx);
-            }
-        }
-
-        let polls = |target: u32| {
-            rpo_pos[target as usize] <= rpo_pos[i]
-                && cfg::loop_may_collect(ssa, &preds, target as usize, i)
-        };
-        if let Some(objects) = pins.get(&i) {
-            arrays::prefill(&mut b, &ctx, &values, objects)?;
-        }
-        term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, polls)?;
+        lower_block(
+            &mut b,
+            &ctx,
+            &mut values,
+            &blocks,
+            ssa,
+            &preds,
+            &rpo_pos,
+            &shape,
+            &global_src,
+            &pins,
+            i,
+            cb,
+            is_call_entry,
+            true,
+            false,
+            n,
+        )?;
+        emitted[i] = true;
     }
 
     for (i, cb) in blocks.iter().enumerate() {
@@ -314,6 +387,156 @@ pub(in crate::clif) fn try_lower(
         piece: compile_piece(func, isa)?,
         frameless,
     })
+}
+
+fn emit_version_guard(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    ssa: &SsaProto,
+    plan: &ranges::VersionPlan,
+    vm: &VersionClones,
+) -> Result<(), String> {
+    use cranelift_codegen::ir::condcodes::IntCC;
+    let mut ok = b.ins().iconst(types::I64, 1);
+    for (object, need) in &plan.guards {
+        let view = ctx
+            .views
+            .of(*object)
+            .ok_or("from_ssa: version guard without array view")?;
+        let len_v = b.use_var(view.len);
+        let need_v = b.ins().iconst(types::I64, *need as i64);
+        let c = b
+            .ins()
+            .icmp(IntCC::UnsignedGreaterThanOrEqual, len_v, need_v);
+        ok = b.ins().band(ok, c);
+    }
+    let args: Vec<BlockArg> = match &ssa.blocks[plan.preheader].term {
+        SsaTerm::Jump { args, .. } => args
+            .iter()
+            .map(|v| store::load_value(b, ctx, values, *v).map(BlockArg::from))
+            .collect::<Result<_, _>>()?,
+        _ => return Err("from_ssa: version preheader without jump".into()),
+    };
+    let fh = vm.fast.get(&plan.header).copied().expect("fast header");
+    let sh = vm.slow.get(&plan.header).copied().expect("slow header");
+    b.ins().brif(ok, fh, &args, sh, &args);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lower_block(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &mut [Option<Value>],
+    view: &[Option<Block>],
+    ssa: &SsaProto,
+    preds: &[Vec<usize>],
+    rpo_pos: &[usize],
+    shape: &NativeShape,
+    global_src: &std::collections::BTreeMap<u32, u32>,
+    pins: &std::collections::BTreeMap<usize, Vec<u32>>,
+    ssa_idx: usize,
+    clif_blk: Block,
+    is_call_entry: bool,
+    do_prefill: bool,
+    elide_flag: bool,
+    rpo_n: usize,
+) -> Result<(), String> {
+    let blk = &ssa.blocks[ssa_idx];
+    if !(rpo_n == 0 && is_call_entry) {
+        b.switch_to_block(clif_blk);
+    }
+
+    drop_home_addrs(ctx);
+
+    let params: Vec<Value> = b.block_params(clif_blk).to_vec();
+    let mut word = 4;
+    for (k, &p) in blk.params.iter().enumerate() {
+        let kind = ssa.value_ty(p);
+        let pv = if is_call_entry {
+            entry_param(b, ctx, shape, &params, &mut word, k, kind)?
+        } else {
+            params[k]
+        };
+        store::define(b, ctx, values, p, pv);
+    }
+
+    let old_elide = ctx.elide.replace(elide_flag);
+    let mut fwd: std::collections::BTreeMap<(u32, u16), u32> = Default::default();
+    let canon = |o: u32| -> u32 { global_src.get(&o).map(|s| 0x8000_0000u32 | s).unwrap_or(o) };
+    for inst in &blk.insts {
+        if let varn_types::ssa::SsaOp::GetFixedField { object, slot, .. } = &inst.op {
+            let k = (canon(*object), *slot);
+            if let (Some(d), Some(&src)) = (inst.dest, fwd.get(&k)) {
+                if ctx.ssa.value_ty(d) == ctx.ssa.value_ty(src) {
+                    let v = store::load_value(b, ctx, values, src)?;
+                    store::define(b, ctx, values, d, v);
+                    continue;
+                }
+            }
+        }
+        match scalar::emit_inst(b, ctx, values, &inst.op, inst.dest)? {
+            Some(out) => land(b, ctx, values, inst.dest, out)?,
+            None if inst.dest.is_some() => {
+                return Err(format!("from_ssa: {:?} defines no value", inst.op));
+            }
+            None => {}
+        }
+        match &inst.op {
+            varn_types::ssa::SsaOp::GetFixedField { object, slot, .. } => {
+                if let Some(d) = inst.dest {
+                    fwd.insert((canon(*object), *slot), d);
+                }
+            }
+            varn_types::ssa::SsaOp::SetFixedField {
+                object,
+                value,
+                slot,
+                ..
+            } => {
+                fwd.insert((canon(*object), *slot), *value);
+            }
+            varn_types::ssa::SsaOp::StoreGlobalIdx { slot, .. } => {
+                let g = 0x8000_0000u32 | slot;
+                fwd.retain(|k, _| k.0 != g);
+                ctx.views.invalidate_global(b, *slot);
+            }
+            varn_types::ssa::SsaOp::LoadGlobalIdx(..) => {}
+            _ => {
+                if !views::keeps_views(ssa, &inst.op) {
+                    fwd.clear();
+                    ctx.views.clear_instances(b);
+                }
+            }
+        }
+        if !views::keeps_views(ssa, &inst.op) {
+            ctx.views.clear(b);
+        }
+        if may_push_frame(ctx, &inst.op) {
+            drop_home_addrs(ctx);
+        }
+    }
+    ctx.elide.set(old_elide);
+
+    let polls = |target: u32| {
+        rpo_pos[target as usize] <= rpo_pos[ssa_idx]
+            && cfg::loop_may_collect(ssa, preds, target as usize, ssa_idx)
+    };
+    if do_prefill {
+        if let Some(objects) = pins.get(&ssa_idx) {
+            arrays::prefill(b, ctx, values, objects)?;
+        }
+    }
+    term::emit_term(b, ctx, view, values, &blk.term, polls)?;
+    Ok(())
+}
+
+struct VersionClones {
+    fast: std::collections::BTreeMap<usize, Block>,
+    slow: std::collections::BTreeMap<usize, Block>,
+    fast_view: Vec<Option<Block>>,
+    slow_view: Vec<Option<Block>>,
 }
 
 fn entry_param(

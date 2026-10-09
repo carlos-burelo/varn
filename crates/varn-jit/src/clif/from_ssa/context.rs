@@ -45,6 +45,10 @@ pub(super) struct Ctx<'a> {
 
     pub no_overflow: FxHashSet<u32>,
 
+    pub fast_bounds: FxHashSet<u32>,
+
+    pub elide: std::cell::Cell<bool>,
+
     pub carried: FxHashMap<u32, cranelift_frontend::Variable>,
 
     pub home_addrs: std::cell::RefCell<FxHashMap<u32, Value>>,
