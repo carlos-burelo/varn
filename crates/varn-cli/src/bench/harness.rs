@@ -89,12 +89,6 @@ impl VmFactory {
         self.proto.clone()
     }
 
-    pub fn run_once(&self) -> Result<Vm, String> {
-        let mut machine = self.build();
-        run_vm_to_completion(&mut machine, self.entry_proto())?;
-        Ok(machine)
-    }
-
     pub fn run_once_silent(&self) -> Result<Vm, String> {
         let mut machine = self.build_silent();
         run_vm_to_completion(&mut machine, self.entry_proto())?;
