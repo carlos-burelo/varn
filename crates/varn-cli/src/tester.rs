@@ -72,10 +72,6 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
     let print_lock: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
 
     let quiet = !args.verbose;
-    if quiet {
-        varn_builtins::set_print_silent(true);
-        varn_builtins::set_testing_silent(true);
-    }
 
     let mut handles = Vec::with_capacity(num_workers);
 
@@ -120,7 +116,8 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
                         no_run: false,
                         debug: Default::default(),
                         trace: false,
-                        capabilities: Default::default(),
+                        capabilities: varn_pipeline::CapabilitySet::allow_all(),
+                        print_silent: quiet,
                     },
                     &crate::debug_sink::CliDebugSink,
                 );
@@ -175,11 +172,6 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
 
     for h in handles {
         let _ = h.join();
-    }
-
-    if quiet {
-        varn_builtins::set_print_silent(false);
-        varn_builtins::set_testing_silent(false);
     }
 
     let total_elapsed = start_time.elapsed();

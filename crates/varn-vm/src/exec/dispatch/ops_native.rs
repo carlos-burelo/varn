@@ -2,6 +2,7 @@ use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_core::OpCode;
+use varn_types::NativeCtx;
 
 impl ExecCtx {
     pub(super) fn exec_native_op(
@@ -77,6 +78,9 @@ impl ExecCtx {
                 let f = (varn_builtins::native_op_fn(op_id).ok_or_else(|| {
                     crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}"))
                 }))?;
+                if let Err(e) = varn_builtins::check_native_op_capability(op_id, &mut *self) {
+                    return Err(crate::error::RuntimeError::new(e));
+                }
                 let receiver = self.stack.box_reg(base, first_reg);
 
                 let result = (self.call_native_with_receiver(

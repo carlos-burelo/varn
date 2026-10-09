@@ -10,6 +10,7 @@ pub struct RunOpts {
     pub debug: DebugFlags,
     pub trace: bool,
     pub capabilities: CapabilitySet,
+    pub print_silent: bool,
 }
 
 impl Default for RunOpts {
@@ -23,6 +24,7 @@ impl Default for RunOpts {
             debug: DebugFlags::default(),
             trace: false,
             capabilities: CapabilitySet::allow_all(),
+            print_silent: false,
         }
     }
 }

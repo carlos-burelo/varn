@@ -398,6 +398,10 @@ impl NativeCtx for ExecCtx {
         &self.capabilities
     }
 
+    fn print_silent(&self) -> bool {
+        self.print_silent
+    }
+
     fn define_metadata(&mut self, target: VmValue, key: &str, value: VmValue) {
         self.host_define_metadata(target, key, value)
     }

@@ -94,7 +94,6 @@ pub struct NativeOpEntry {
     pub func_ptr: *const u8,
     pub raw_func_ptr: *const u8,
     pub signature: SignatureDescriptor,
-    pub capability_mask: u64,
 
     pub entry_kind: u8,
     pub flags: u32,

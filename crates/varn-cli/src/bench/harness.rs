@@ -16,6 +16,7 @@ pub struct VmFactory {
     loader: Arc<dyn ModuleLoader + Send + Sync>,
     module_id: ModuleId,
     proto: Rc<FunctionProto>,
+    print_silent: bool,
 }
 
 impl VmFactory {
@@ -25,6 +26,7 @@ impl VmFactory {
         loader: Arc<dyn ModuleLoader + Send + Sync>,
         module_id: ModuleId,
         proto: Rc<FunctionProto>,
+        print_silent: bool,
     ) -> Result<Self, CliError> {
         let factory = Self {
             precompiled,
@@ -32,6 +34,7 @@ impl VmFactory {
             loader,
             module_id,
             proto,
+            print_silent,
         };
         factory.try_build().map_err(CliError::fatal)?;
         Ok(factory)
@@ -42,15 +45,19 @@ impl VmFactory {
             .expect("initialization already succeeded in VmFactory::new")
     }
 
+    pub fn build_silent(&self) -> Vm {
+        let mut machine = self.build();
+        machine.ctx.print_silent = true;
+        machine
+    }
+
     fn try_build(&self) -> Result<Vm, String> {
-        let silent = varn_builtins::is_print_silent();
-        varn_builtins::set_print_silent(true);
-        varn_builtins::set_testing_silent(true);
         let mut machine = Vm::new(
             self.precompiled.clone(),
             varn_vm::ExecSettings::from_env(false),
         )
         .with_loader(self.loader.clone());
+        machine.ctx.print_silent = true;
         let init = self.builtins.iter().try_for_each(|bp| {
             machine
                 .run(bp.clone())
@@ -61,8 +68,7 @@ impl VmFactory {
             varn_vm::prefill_native_modules(&mut machine);
             machine.collect_gc();
         }
-        varn_builtins::set_print_silent(silent);
-        varn_builtins::set_testing_silent(silent);
+        machine.ctx.print_silent = self.print_silent;
         init?;
 
         let mut export_map = FxHashMap::default();
@@ -85,6 +91,12 @@ impl VmFactory {
 
     pub fn run_once(&self) -> Result<Vm, String> {
         let mut machine = self.build();
+        run_vm_to_completion(&mut machine, self.entry_proto())?;
+        Ok(machine)
+    }
+
+    pub fn run_once_silent(&self) -> Result<Vm, String> {
+        let mut machine = self.build_silent();
         run_vm_to_completion(&mut machine, self.entry_proto())?;
         Ok(machine)
     }

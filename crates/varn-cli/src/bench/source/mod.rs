@@ -185,14 +185,13 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
     let builtin_protos: Vec<FunctionProto> = crate::pipeline::core_protos_owned()?;
     let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new());
-    varn_builtins::set_print_silent(!opts.show_output);
-    varn_builtins::set_testing_silent(!opts.show_output);
     let factory = VmFactory::new(
         Rc::clone(&precompiled),
         builtin_protos,
         loader.clone(),
         ModuleId::local_str(path),
         Rc::new(proto.clone()),
+        !opts.show_output,
     )?;
 
     varn_core::term::log(format!("  running {runs} runs..."));
@@ -224,11 +223,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     let (exec_jit, records) = {
         varn_jit::JIT_STATS.reset();
         varn_jit::stats::start_recording();
-        varn_builtins::set_print_silent(true);
-        varn_builtins::set_testing_silent(true);
-        let _ = factory.run_once();
-        varn_builtins::set_print_silent(!opts.show_output);
-        varn_builtins::set_testing_silent(!opts.show_output);
+        let _ = factory.run_once_silent();
         (
             varn_jit::JIT_STATS.snapshot(),
             varn_jit::stats::take_records(),
@@ -286,9 +281,6 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             opts,
         )?;
     }
-
-    varn_builtins::set_print_silent(false);
-    varn_builtins::set_testing_silent(false);
 
     super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
 }

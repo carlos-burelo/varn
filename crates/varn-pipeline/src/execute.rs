@@ -24,6 +24,7 @@ pub fn execute(
         path,
         debug,
         CapabilitySet::allow_all(),
+        false,
     )
 }
 
@@ -34,8 +35,10 @@ pub fn execute_with_caps(
     _path: &str,
     _debug: &DebugFlags,
     capabilities: CapabilitySet,
+    print_silent: bool,
 ) -> PipelineResult<()> {
     let mut machine = boot_machine(precompiled, capabilities, _debug.trace)?;
+    machine.ctx.print_silent = print_silent;
     let main_proto = enter_main(&mut machine, proto);
     if _debug.trace {
         varn_core::term::terminal::tagged(

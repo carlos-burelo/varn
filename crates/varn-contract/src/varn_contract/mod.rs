@@ -136,7 +136,6 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 func_ptr: #builder_ident as *const u8,
                 raw_func_ptr: ::core::ptr::null(),
                 signature: ::varn_types::SignatureDescriptor::empty(),
-                capability_mask: 0,
                 entry_kind: 0x10,
                 flags: 0,
                 _reserved: [0; 7],

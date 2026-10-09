@@ -22,16 +22,14 @@ pub mod runtime_ops;
 pub use dispatch::all_native_module_ids;
 #[cfg(feature = "runtime")]
 pub use dispatch::{
-    describe_op, dispatch_runtime_op, find_native_op_entry, native_op_fn, native_op_name_by_fn,
-    register_globals_vm,
+    capability_for_op, check_native_op_capability, describe_op, dispatch_runtime_op,
+    find_native_op_entry, native_op_fn, native_op_name_by_fn, register_globals_vm,
 };
 #[cfg(feature = "runtime")]
 pub use modules::build_module;
 #[cfg(feature = "runtime")]
-pub use modules::globals::{is_print_silent, set_print_silent};
-#[cfg(feature = "runtime")]
 pub use modules::has_native_builder;
 #[cfg(feature = "runtime")]
-pub use modules::testing::{reset_testing_counters, set_testing_silent};
+pub use modules::testing::reset_testing_counters;
 #[cfg(feature = "runtime")]
 pub use varn_types::ResourceStore;

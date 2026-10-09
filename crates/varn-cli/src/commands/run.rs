@@ -31,6 +31,7 @@ pub fn execute(args: RunArgs) -> Result<(), CliError> {
             debug: Default::default(),
             trace: args.trace,
             capabilities,
+            print_silent: false,
         },
         &crate::debug_sink::CliDebugSink,
     )

@@ -179,6 +179,10 @@ pub trait NativeCtx {
         &DEFAULT_CAPS
     }
 
+    fn print_silent(&self) -> bool {
+        false
+    }
+
     fn has_capability(&self, cap: &str) -> bool {
         self.capabilities().has_capability(cap)
     }

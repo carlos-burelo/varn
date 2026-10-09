@@ -1,16 +1,5 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use varn_contract::varn_contract;
 use varn_types::{NativeCtx, VmValue};
-
-static SILENT: AtomicBool = AtomicBool::new(false);
-
-pub fn set_print_silent(silent: bool) {
-    SILENT.store(silent, Ordering::Relaxed);
-}
-
-pub fn is_print_silent() -> bool {
-    SILENT.load(Ordering::Relaxed)
-}
 
 pub struct Globals;
 
@@ -19,7 +8,7 @@ varn_contract! {
     contract: "src/modules/core/globals/globals.vn",
     impl Globals {
         fn print(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<(), String> {
-            if !SILENT.load(Ordering::Relaxed) {
+            if !ctx.print_silent() {
                 use std::io::Write;
                 let stdout = std::io::stdout();
                 let mut out = stdout.lock();
@@ -50,10 +39,10 @@ varn_contract! {
             Ok(())
         }
 
-        fn input(_ctx: &mut dyn NativeCtx, prompt: Option<&str>) -> Result<String, String> {
+        fn input(ctx: &mut dyn NativeCtx, prompt: Option<&str>) -> Result<String, String> {
             use std::io::Write;
             if let Some(p) = prompt {
-                if !is_print_silent() {
+                if !ctx.print_silent() {
                     print!("{p}");
                     let _ = std::io::stdout().flush();
                 }

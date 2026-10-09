@@ -35,6 +35,7 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
             debug,
             trace: false,
             capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
+            print_silent: false,
         },
         &crate::debug_sink::CliDebugSink,
     )

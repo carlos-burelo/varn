@@ -12,6 +12,7 @@ pub fn execute(args: CheckArgs) -> Result<(), CliError> {
             debug: Default::default(),
             trace: false,
             capabilities: Default::default(),
+            print_silent: false,
         },
         &crate::debug_sink::CliDebugSink,
     )

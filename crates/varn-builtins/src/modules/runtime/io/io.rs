@@ -9,7 +9,7 @@ varn_contract! {
     contract: "src/modules/runtime/io/io_runtime.vn",
     impl IoRuntime {
         fn write(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<(), String> {
-            if !crate::modules::globals::is_print_silent() {
+            if !ctx.print_silent() {
                 for &v in args {
                     print!("{}", ctx.str_repr_borrowed(v));
                 }
@@ -18,7 +18,7 @@ varn_contract! {
         }
 
         fn writeln(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<(), String> {
-            if !crate::modules::globals::is_print_silent() {
+            if !ctx.print_silent() {
                 for &v in args {
                     print!("{}", ctx.str_repr_borrowed(v));
                 }
@@ -27,16 +27,16 @@ varn_contract! {
             Ok(())
         }
 
-        fn flush(_ctx: &mut dyn NativeCtx) -> Result<(), String> {
-            if !crate::modules::globals::is_print_silent() {
+        fn flush(ctx: &mut dyn NativeCtx) -> Result<(), String> {
+            if !ctx.print_silent() {
                 std::io::stdout().flush().map_err(|e| format!("E_IO_FLUSH|io.flush: {e}"))?;
             }
             Ok(())
         }
 
-        fn readLine(_ctx: &mut dyn NativeCtx, prompt: Option<&str>) -> Result<String, String> {
+        fn readLine(ctx: &mut dyn NativeCtx, prompt: Option<&str>) -> Result<String, String> {
             if let Some(p) = prompt {
-                if !crate::modules::globals::is_print_silent() {
+                if !ctx.print_silent() {
                     print!("{p}");
                     let _ = std::io::stdout().flush();
                 }
@@ -52,7 +52,7 @@ varn_contract! {
 
 pub fn read_line(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
     if let Some(&p) = args.first() {
-        if !p.is_null() && !crate::modules::globals::is_print_silent() {
+        if !p.is_null() && !ctx.print_silent() {
             print!("{}", ctx.str_repr_borrowed(p));
             let _ = std::io::stdout().flush();
         }

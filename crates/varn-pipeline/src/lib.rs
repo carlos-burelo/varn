@@ -90,6 +90,7 @@ pub fn run(opts: &RunOpts, sink: &dyn debug_sink::DebugSink) -> PipelineResult<(
         &opts.file_path,
         &debug,
         opts.capabilities.clone(),
+        opts.print_silent,
     )
 }
 
@@ -112,6 +113,7 @@ fn run_portable(opts: &RunOpts) -> PipelineResult<()> {
         &opts.file_path,
         &debug,
         opts.capabilities.clone(),
+        opts.print_silent,
     )
 }
 

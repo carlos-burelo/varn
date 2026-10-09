@@ -65,6 +65,7 @@ pub struct ExecCtx {
 
     pub gc_inhibited: bool,
     pub capabilities: Rc<varn_types::capabilities::CapabilitySet>,
+    pub print_silent: bool,
     pub metadata: SharedMetadata,
 
     pub(crate) hashable_keys: SharedHashableKeys,
@@ -121,6 +122,7 @@ impl ExecCtx {
             resources: Rc::new(std::cell::UnsafeCell::new(varn_types::ResourceStore::new())),
             gc_inhibited: false,
             capabilities: Rc::new(varn_types::capabilities::CapabilitySet::allow_all()),
+            print_silent: false,
             metadata: Rc::new(std::cell::UnsafeCell::new(FxHashMap::default())),
             hashable_keys: Rc::new(std::cell::UnsafeCell::new(FxHashMap::default())),
             stage: Vec::with_capacity(32),
@@ -298,6 +300,7 @@ impl ExecCtx {
             resources: Rc::clone(&self.resources),
             gc_inhibited: false,
             capabilities: Rc::clone(&self.capabilities),
+            print_silent: self.print_silent,
             metadata: Rc::clone(&self.metadata),
             hashable_keys: Rc::clone(&self.hashable_keys),
             stage: Vec::new(),

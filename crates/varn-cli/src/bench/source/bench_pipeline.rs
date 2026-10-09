@@ -26,10 +26,8 @@ pub(super) fn verbose_sections(
     opts: &BenchOpts,
 ) -> Result<(), CliError> {
     varn_builtins::reset_testing_counters();
-    varn_builtins::set_print_silent(true);
-    varn_builtins::set_testing_silent(true);
 
-    let mut profile_vm = factory.build();
+    let mut profile_vm = factory.build_silent();
     profile_vm.enable_opcode_profiling();
     profile_vm.enable_profiling();
     profile_vm.enable_hotspot_profiling();
@@ -39,9 +37,6 @@ pub(super) fn verbose_sections(
     let opcode_counts = profile_vm.take_opcode_counts();
     let mut vm_profile = profile_vm.take_profile();
     let hotspots = profile_vm.take_hotspots();
-
-    varn_builtins::set_print_silent(!opts.show_output);
-    varn_builtins::set_testing_silent(!opts.show_output);
 
     let breakdown = BreakdownOpts {
         all_rows: opts.all_rows,

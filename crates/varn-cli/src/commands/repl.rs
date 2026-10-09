@@ -65,6 +65,7 @@ fn run_snippet(source: &str) {
         debug: DebugFlags::default(),
         trace: false,
         capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
+        print_silent: false,
     };
     if let Err(e) = crate::pipeline::run(&opts, &crate::debug_sink::CliDebugSink) {
         terminal::error(&e);

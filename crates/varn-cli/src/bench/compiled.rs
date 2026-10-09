@@ -30,14 +30,13 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
 
     let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;
     let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new());
-    varn_builtins::set_print_silent(!opts.show_output);
-    varn_builtins::set_testing_silent(!opts.show_output);
     let factory = VmFactory::new(
         compile_output.precompiled.clone(),
         builtin_protos,
         loader.clone(),
         ModuleId::local_str(path),
         Rc::new(compile_output.entry_proto.clone()),
+        !opts.show_output,
     )?;
 
     let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup(
@@ -59,11 +58,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let (exec_jit, records) = {
         varn_jit::JIT_STATS.reset();
         varn_jit::stats::start_recording();
-        varn_builtins::set_print_silent(true);
-        varn_builtins::set_testing_silent(true);
-        let _ = factory.run_once();
-        varn_builtins::set_print_silent(!opts.show_output);
-        varn_builtins::set_testing_silent(!opts.show_output);
+        let _ = factory.run_once_silent();
         (
             varn_jit::JIT_STATS.snapshot(),
             varn_jit::stats::take_records(),
@@ -104,10 +99,8 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
             },
         );
         varn_builtins::reset_testing_counters();
-        varn_builtins::set_print_silent(true);
-        varn_builtins::set_testing_silent(true);
 
-        let mut profile_vm = factory.build();
+        let mut profile_vm = factory.build_silent();
         profile_vm.enable_opcode_profiling();
         profile_vm.enable_profiling();
         profile_vm.enable_hotspot_profiling();
@@ -117,9 +110,6 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
         let opcode_counts = profile_vm.take_opcode_counts();
         let mut vm_profile = profile_vm.take_profile();
         let hotspots = profile_vm.take_hotspots();
-
-        varn_builtins::set_print_silent(!opts.show_output);
-        varn_builtins::set_testing_silent(!opts.show_output);
 
         print_coverage(&exec_jit, &records, "bundle .vnc");
 
@@ -139,9 +129,6 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
         }
         terminal::blank();
     }
-
-    varn_builtins::set_print_silent(false);
-    varn_builtins::set_testing_silent(false);
 
     super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
 }
