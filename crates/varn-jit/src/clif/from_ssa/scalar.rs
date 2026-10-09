@@ -94,7 +94,8 @@ pub(super) fn emit_inst(
             let a = load_value(b, ctx, values, *lhs)?;
             let c = load_value(b, ctx, values, *rhs)?;
             let in_range = dest.is_some_and(|d| ctx.in_range_steps.contains(&d));
-            emit_bin(b, ctx, *op, a, c, in_range)?
+            let no_overflow = dest.is_some_and(|d| ctx.no_overflow.contains(&d));
+            emit_bin(b, ctx, *op, a, c, in_range, no_overflow)?
         }
         SsaOp::Unary { op, operand } => {
             let a = load_value(b, ctx, values, *operand)?;
@@ -275,6 +276,7 @@ fn emit_bin(
     c: Value,
 
     in_range: bool,
+    no_overflow: bool,
 ) -> Result<Value, String> {
     use SsaBinOp::*;
     if matches!(op, IntDiv | IntMod) {
@@ -285,8 +287,9 @@ fn emit_bin(
         return boxed::emit_bin(b, ctx, op, a, c, dest_float);
     }
     Ok(match op {
-        IntAdd if in_range => b.ins().iadd(a, c),
-        IntSub if in_range => b.ins().isub(a, c),
+        IntAdd if in_range || no_overflow => b.ins().iadd(a, c),
+        IntSub if in_range || no_overflow => b.ins().isub(a, c),
+        IntMul if no_overflow => b.ins().imul(a, c),
         IntAdd | IntSub | IntMul => checked_int(b, ctx, op, a, c),
         IntAnd => b.ins().band(a, c),
         IntOr => b.ins().bor(a, c),

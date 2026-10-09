@@ -5,8 +5,8 @@ use super::super::piece::compile_piece;
 use super::frame_policy::{may_push_frame, needs_frame};
 use super::store::{clif_ty, drop_home_addrs, is_heap, land};
 use super::{
-    arrays, call, cfg, heap, induction, osr, pinned, scalar, stack_exit, store, term, views, Ctx,
-    FrameIo, Lowered, NEEDS_ACTIVATION,
+    arrays, call, cfg, heap, induction, osr, pinned, ranges, scalar, stack_exit, store, term,
+    views, Ctx, FrameIo, Lowered, NEEDS_ACTIVATION,
 };
 use crate::JitHelpers;
 use cranelift_codegen::ir::{
@@ -167,6 +167,7 @@ pub(in crate::clif) fn try_lower(
         has_round: super::super::floats::has_round_support(isa),
         views,
         in_range_steps: induction::in_range_steps(ssa, &preds, &rpo_pos, &reached),
+        no_overflow: ranges::no_overflow_steps(ssa, &preds, &rpo_pos, &reached),
         home_addrs: Default::default(),
         scratch,
         carried: match osr {

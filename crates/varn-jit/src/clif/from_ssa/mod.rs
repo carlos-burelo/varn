@@ -20,6 +20,7 @@ mod osr;
 mod pinned;
 mod pool;
 mod props;
+mod ranges;
 mod scalar;
 mod stack_exit;
 mod store;
