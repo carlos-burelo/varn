@@ -344,6 +344,7 @@ pub(in crate::clif) fn try_lower(
                 true,
                 false,
                 false,
+                true,
                 n,
             )?;
             emitted[i] = true;
@@ -354,11 +355,12 @@ pub(in crate::clif) fn try_lower(
                 .filter(|(s, _)| rpo.contains(s))
                 .map(|(s, c)| (*s, *c))
                 .collect();
+            let mut fast_values = values.clone();
             for (ssa_b, fast_blk) in fast_order {
                 lower_block(
                     &mut b,
                     &ctx,
-                    &mut values,
+                    &mut fast_values,
                     &vmaps[pi].fast_view,
                     ssa,
                     &preds,
@@ -375,6 +377,7 @@ pub(in crate::clif) fn try_lower(
                     false,
                     true,
                     true,
+                    false,
                     n,
                 )?;
                 emitted[ssa_b] = true;
@@ -385,11 +388,12 @@ pub(in crate::clif) fn try_lower(
                 .filter(|(s, _)| rpo.contains(s))
                 .map(|(s, c)| (*s, *c))
                 .collect();
+            let mut slow_values = values.clone();
             for (ssa_b, slow_blk) in slow_order {
                 lower_block(
                     &mut b,
                     &ctx,
-                    &mut values,
+                    &mut slow_values,
                     &vmaps[pi].slow_view,
                     ssa,
                     &preds,
@@ -406,6 +410,7 @@ pub(in crate::clif) fn try_lower(
                     false,
                     false,
                     true,
+                    false,
                     n,
                 )?;
                 emitted[ssa_b] = true;
@@ -434,6 +439,7 @@ pub(in crate::clif) fn try_lower(
             true,
             false,
             false,
+            false,
             n,
         )?;
         emitted[i] = true;
@@ -450,6 +456,14 @@ pub(in crate::clif) fn try_lower(
     b.seal_all_blocks();
     b.finalize(isa.frontend_config());
     super::super::debug::capture_ir(&mut debug, &func);
+    if std::env::var("VARN_DUMP_IR").is_ok() {
+        if let Err(e) = cranelift_codegen::verify_function(&func, &**isa) {
+            let _ = std::fs::write(
+                "C:\\Users\\x\\dev\\varn\\varn-lang\\target\\irfail.clif",
+                format!("{}\nVERIFY-FAIL: {}\n", func.display(), e),
+            );
+        }
+    }
     super::super::debug::capture_kinds_ssa(&mut debug, ssa);
     Ok(Lowered {
         piece: compile_piece(func, isa)?,
@@ -477,6 +491,7 @@ fn emit_version_guard(
         let c = b
             .ins()
             .icmp(IntCC::UnsignedGreaterThanOrEqual, len_v, need_v);
+        let c = b.ins().uextend(types::I64, c);
         ok = b.ins().band(ok, c);
     }
     let args: Vec<BlockArg> = match &ssa.blocks[plan.preheader].term {
@@ -513,6 +528,7 @@ fn lower_block(
     do_prefill: bool,
     elide_flag: bool,
     is_clone: bool,
+    skip_term: bool,
     rpo_n: usize,
 ) -> Result<(), String> {
     let blk = &ssa.blocks[ssa_idx];
@@ -638,7 +654,9 @@ fn lower_block(
             arrays::prefill(b, ctx, values, objects)?;
         }
     }
-    term::emit_term(b, ctx, view, values, &blk.term, polls)?;
+    if !skip_term {
+        term::emit_term(b, ctx, view, values, &blk.term, polls)?;
+    }
     Ok(())
 }
 
