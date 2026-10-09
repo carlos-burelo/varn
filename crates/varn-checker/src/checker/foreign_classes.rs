@@ -84,10 +84,7 @@ impl Checker<'_> {
                     continue;
                 };
                 use varn_sem::bind::DeclKind;
-                if !matches!(
-                    owner.classify_decl(name.as_ref()),
-                    Some(DeclKind::Class)
-                ) {
+                if !matches!(owner.classify_decl(name.as_ref()), Some(DeclKind::Class)) {
                     continue;
                 }
                 if owner.get_class_parent(name.as_ref()).is_some() {

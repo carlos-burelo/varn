@@ -215,9 +215,7 @@ impl<'r> super::Binder<'r> {
         use varn_modules::layer::{check_import, Layer};
         let source_str = self.interner.resolve(source).to_string();
         if let Err(message) = check_import(Layer::of_module(&self.source_file), &source_str) {
-            self.emit(
-                Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(*range),
-            );
+            self.emit(Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(*range));
         }
     }
 

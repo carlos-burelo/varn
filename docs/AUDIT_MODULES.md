@@ -429,7 +429,7 @@ Sin flags duales, sin `Carrier` extra, sin segunda ruta resolución. Migración 
 
 ## 6. Estado implementación (2026-10-09, implementado + verificado)
 
-Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED` en dev-checkout+JIT, dev-checkout+No-JIT, @embedded+JIT, @embedded+No-JIT. `cargo check --workspace --all-targets` limpio. `cargo clippy` sin errores nuevos (solo `collapsible_if` preexistentes). `gen-contract-tables --check` limpio. Matriz `release -Fast` pendiente (sin `git` no hay commit; regla convivencia). Sin commits (regla convivencia: sin `git` sin autorización).
+Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED` en dev-checkout+JIT, dev-checkout+No-JIT, @embedded+JIT, @embedded+No-JIT. `cargo check --workspace --all-targets` limpio. `cargo clippy` sin errores nuevos (solo `collapsible_if` preexistentes). `gen-contract-tables --check` limpio. Commits atómicos en `main` (Ley9). Matriz `release -Fast` pendiente.
 
 ### Implementado
 
@@ -437,12 +437,15 @@ Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED`
 - A2: `pipeline/compile.rs:119` `graph_hash` con keys sorted. `module_precompile.rs:104-134` topo con `zeros.sort()` + `newly_ready.sort()` + `cycle_nodes.sort()`. `resolver/exports.rs` copia `export *` (con y sin alias) con keys sorted. `binder/core/loader.rs` `build_core_exports` con keys sorted. `modules/package.rs` wildcard con keys sorted. `encode.rs` sin cambio: `slice()` ya usa `BTreeMap` (determinista verificado en `slice.rs:15-22,173-178`).
 - A3 parcial: `capabilities.rs` `Default=sandbox()`, `has_capability _=>false`, `check_net_connect` exige `==`, `*`, `dominio.` o `.sufijo` (no `ends_with` crudo), `path_matches_any` deniega si no canonicaliza. `native_ctx.rs:176` `DEFAULT_CAPS=sandbox()`. `cli/run.rs` parse `host:port` → `net_hosts`+`net_ports`. `cli/eval.rs,repl.rs,debug.rs` `allow_all()` explícito (herramientas dev preservan conducta). `check.rs` mantiene `Default` (ahora sandbox, correcto: `no_run`). `dap/driver.rs` ya era `allow_all()` explícito. `vm/isolates.rs` hereda caps padre por valor clonado (`CapabilitySet: Send`, `Rc` no cruza `spawn`; `precompiled` no heredado por `Rc:!Send`, fallback por loader — documentado). Desviación consciente: `run.rs:50` mantiene `allow_all` por defecto sin flags para no romper suite/`verify.ps1` (llama `vn run` sin flags); fail-closed total de `run` queda como A3b pendiente con anotación caps en suite.
 - A4: `vm/linker.rs` `Rc<UnsafeCell>` → `Rc<RefCell>`, borrado `table()/table_mut()/mut_from_ref`. `vm/globals/mod.rs` `set_by_index` ya no `resize` (assert `E_GLOBAL_OOB`), `get/set_by_index_unchecked` con assert en vez de `get_unchecked` (sin UB).
-- B1 parcial: nuevo `varn-sem/src/rehome.rs` (`rehome_ty`, `rehome_ty_with_origin`, `rehome_symbol`) + `lib.rs: pub mod rehome`. Migrados `checker/type_queries.rs:reintern_foreign_ty` y `binder/type_infer_member.rs:reintern_member_type` a llamar canónica. Resto call sites (`binder_intern`, `imports`, `context`, `exports`, `cache_io`, `stages:81`) pendientes.
-- B2: `sem/output.rs: ForeignClass{name,origin,fields,methods}` + `Desugarings.foreign_classes`. `checker/foreign_classes.rs: collect_foreign_classes` (BTreeMap, `reintern_foreign_ty`, guards: salta sum-types/enums, clases con padre, `is_lang_type_name`, builtin/intrinsic). `stages.rs` puebla `foreign_classes` antes de `foreign_enums`. `emit/ty/resolve.rs: foreign_class_id` en trait + `NoNames`. `emit/tables/index.rs: foreign_classes` en `NameIndex` + `parent_class_id` (local, foráneo con origin, fallback por nombre) + `foreign_parent_info`, build foráneas primero (Root) y luego locales con herencia enlazada. `emit/ty/lower.rs: resolve_type_ref` resuelve `foreign_class_id` antes que `foreign_enum_id`. `emit/tables/classes.rs: build_classes/with_parents/one_class` aceptan `foreign_parent_infos`, chain corta en foráneo, `Ancestry::Local` a padre foráneo (sin duplicar prefix).
+- B1 parcial: `varn-sem/src/rehome.rs` (`rehome_ty`, `rehome_ty_with_origin`, `rehome_symbol`, `canonicalize_lang_named`) + `lib.rs: pub mod rehome`. Migrados `checker/type_queries.rs:reintern_foreign_ty`, `binder/type_infer_member.rs:reintern_member_type` e `imports.rs:135-140` (con `with_origin`) a la canónica. Resto call sites (`binder_intern`, `context`, `exports`, `cache_io`, `stages:81`) pendientes.
+- B2: `sem/output.rs: ForeignClass{name,origin,fields,methods}` + `Desugarings.foreign_classes`. `checker/foreign_classes.rs: collect_foreign_classes` (BTreeMap, `reintern_foreign_ty`, guards representación: `classify==Class`, sin padre, no lang-name, no builtin/intrinsic). `stages.rs` puebla `foreign_classes` antes de `foreign_enums`. `emit/ty/resolve.rs: foreign_class_id` en trait + `NoNames`. `emit/tables/index.rs: foreign_classes` en `NameIndex` + `parent_class_id` (local, foráneo con origin, fallback por nombre) + `foreign_parent_info`, build foráneas primero (Root) y luego locales con herencia enlazada. `emit/ty/lower.rs: resolve_type_ref` resuelve `foreign_class_id` antes que `foreign_enum_id`. `emit/tables/classes.rs: build_classes/with_parents/one_class` aceptan `foreign_parent_infos`, chain corta en foráneo, `Ancestry::Local` a padre foráneo (sin duplicar prefix).
 - H2 parcial: `vm/ctx_modules.rs:204` `debug_assert sorted` → error `E_SLOT_MISMATCH` en release también.
 - H9 parcial: `vm/exec/modules.rs: resolve_specifier_to_id` aplica regla seguridad `Runtime→solo-Std` (`E_LAYER`). Matriz completa no aplicada en runtime porque el prelude del compilador carga `core:` desde módulos User sin pasar por binder (falso positivo verificado en `tests/41-advanced-enums.vn`).
 - H11 parcial: `jit-abi/lib.rs: JIT_HELPERS_VERSION=1`, re-export en `jit/lib.rs`, assert en `vm/jit/table_build.rs`. `contract/fast.rs` sin cambio: fast path solo escalares no-falibles, `DummyCtx` ahora sandbox sin efecto en decode.
 - Hallazgo nuevo B4 (verificador TIR): `tir/verify/coherence/ops.rs: check_binary` eximía solo comparaciones y `Dynamic`; `Instanceof`/`In` heterogéneos fallaban (`e instanceof Error` con ambos lados `Class` distintos) enmascarado antes por `Dynamic`. Ahora exentos con check `e.ty==Bool`. Sin esto H5 es imposible.
+- R2: `rehome::canonicalize_lang_named`: `Named` lang-name + origen == `core_module()` → `Builtin`/`Primitive`. Cableado en `rehome_ty`, `rehome_ty_with_origin` e `imports.rs` (tras `with_origin`). Los tipos nativos ya no viajan como `Named` foráneo.
+- R3: `BindResult::classify_decl` (`DeclKind`: prioridad `SumType > Enum > Class > Interface > Namespace`, `debug_assert` unicidad para builds dev). Ambos colectores la usan: clases exige `Class`, enums exige `Enum|SumType`. Hallazgo raíz medido: `bind_enum` (`binder/decl_values/type_decls.rs:46,268,272`) registra cada enum en TRES mapas (`sum_type_variants` + `classes` + `enums`); el colector viejo leía mapas espejo y la primera versión de `classify` tenía bug last-wins (devolvía `Class` para `Result`, rompiendo `try`; verificado con `VARN_DEBUG_FOREIGN` temporal, ya retirado). Con first-wins, `Result`/`Option` van solo a enum y `try`/`match` vuelven precisos.
+- R4: `modules::is_prelude_module` (misma lista que usa `emit/prelude.rs`). `pipeline/layer_link.rs: verify_synthetic_imports`: toda arista TIR no declarada en el AST debe ser prelude (cierra contrabando `runtime:` sintético). Cableado en `compile.rs` (entry) y `module_precompile.rs` (deps) vía tercer retorno de `emit_and_compile` (actualizados también `stdlib_loader.rs` y bench `mod.rs`/`e2e.rs`). `binder/imports.rs: check_reexport_layer`: `export ... from` pasa `check_import` (antes sin check; verificado negativo `export * from "runtime:sys"` → `VN2010` en `run` y `check`). Runtime mantiene regla `Runtime→solo-Std` como backstop.
 
 ### Regresiones encontradas y causa raíz (evidencia para H5 completo)
 
@@ -453,7 +456,7 @@ Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED`
 
 ### Pendiente (no tocado)
 
-H2 completo (`ModuleSlot` emitido), H7, H8, H9 completo, H10 (`interface_hash`, `project_root`, `fsync`), H11 (`capability_mask`, `Box::leak`, `SILENT`), H12-H14, A3b (`run` fail-closed), `from_tir/ty.rs` + `register_meta` error en vez de `Dynamic` (B2 resto), métrica `DynReason`, `E_STALE_ATOM`, `E_EXPORT_COLLISION`.
+R1 + H2 completo (registro global clases + `ModuleSlot` emitido, §8 con plan F1-F5), H7, H8 (resto: `decl_primary_name` N declarators, `E_EXPORT_COLLISION`, namespace único), H9 resto (`Relative` con `..` fuera de root), H10 (`interface_hash`, `project_root`, `fsync`), H11 (`capability_mask`, `Box::leak`, `SILENT`), H12-H14, A3b (`run` fail-closed), B1 resto call sites, `from_tir/ty.rs` + `register_meta` error en vez de `Dynamic` (B2 resto), métrica `DynReason`, `E_STALE_ATOM`. Guards representación en `collect_foreign_classes` (lang-name, sin-padre, builtin) se quedan hasta R1: no son mecanismos duplicados, son restricciones de representación sin registro global.
 
 ---
 
@@ -484,4 +487,27 @@ Raíz: **verificación en linkado, no en runtime**. El grafo cerrado (`build_mod
 
 ### R5 (marco). Linkado cerrado H2
 
-R1+R4 son casos de H2: emitir `ModuleSlot` verificado contra `ExportMap` en linkado + `interface_hash` en caché = closed-world. El runtime pasa a lookup en tabla, cero strings, cero re-resolución. Orden sugerido: R2+R3 (barato, ya) → R4 (medio) → R1+H2 (grande, el fix verdadero de identidad).
+R1+R4 son casos de H2: emitir `ModuleSlot` verificado contra `ExportMap` en linkado + `interface_hash` en caché = closed-world. El runtime pasa a lookup en tabla, cero strings, cero re-resolución. Orden ejecutado: R2+R3 (verde, commit `5bbe91db`) → R4 (verde: `verify_synthetic_imports` en linkado + `check_import` en reexports, commit pendiente abajo) → R1+H2 (§8).
+
+---
+
+## 8. R1/H2: plan de implementación (alcance medido, no implementado)
+
+Mecanismo probado con evidencia (no especulación):
+
+- `compiler/from_tir/build.rs:117-134` `TypeTest` baja a `global_load(cname)` + `HirBinOp::Instanceof`: el `instanceof` runtime compara IDENTIDAD de objeto clase, resuelto POR NOMBRE en los globals del módulo actual.
+- `compiler/from_tir/build/class_def.rs:13-23` cada módulo ejecuta `MakeClass { name, super_class }` propio: los objetos clase se crean por módulo, no hay identidad compartida.
+- `compiler/from_tir/ty.rs:33-36` el `ClassId` local muere en la frontera TIR→SSA (`HirType::Class` por nombre); el slot fixo (`GetFixedField`) se congela contra el `ClassInfo` local.
+- Hecho medido: `ve instanceof Error == false` (repro t4, §6) con padre foráneo, la única divergencia runtime restante con suite verde. La cadena de padres del objeto no contiene EL objeto que `global_load("Error")` devuelve en el módulo importador.
+
+Paso 0 (diagnóstico, sin cambio): instrumentar `MakeClass` (contar creaciones por nombre de clase por proceso). Si `Error` se crea >1 vez, hay doble evaluación de core (loader/precompiled) y el fix puede ser deduplicar en el loader (medio, no grande). Si se crea 1 vez, el problema es qué objeto guarda el import (`build_imports`: `LoadModule+GetProperty+global_store`) vs qué objeto enlaza `super_class`.
+
+Fases (cada una verde + commit):
+
+- F1: retener `TirModule.classes/enums` en pipeline (`emit_and_compile` ya devuelve imports; extender a retener tablas por módulo; sin cambio de conducta).
+- F2: `ClassRegistry` en `varn-tir` o crate nuevo bajo: `intern((module,name)) -> GlobalClassId` determinista + tabla única; construir en linkado desde las tablas retenidas; test unitario standalone.
+- F3: `from_tir` mapea `ClassId` local→global al compilar cada módulo (necesita registro construido ANTES de compilar: reordenar `module_precompile`: emitir todos → registro → compilar todos). `FunctionProto` lleva ids globales (breaking formato + caché: invalida por `BUILD_FINGERPRINT`, ya automático).
+- F4: VM: `ExecCtx` con registro compartido (`Rc`); `TypeTest`/`GetFixedField`/vtable consultan registro; `MakeClass` unifica shapes por id global (un solo layout por clase = Ley6); borrar copias foráneas (`ForeignClass`, `parent_class_id`, `foreign_parent_info`) y fallback dinámico en `expr_binary` (Ley8).
+- F5: `ModuleSlot`: emitir `LoadModuleSlot/StoreModuleSlot` verificados contra `ExportMap` + `interface_hash` en caché; borrar `LoadModule+GetProperty Dynamic` para estáticos y `loader.load` fallback sin hash.
+
+Verificación F4/F5: t4 `true` con `TypeTest` estático, suite 4 cuadrantes, bench campo/método cross-module == local, caché limpio `VARN_CACHE_DIR=<tmp>`.
