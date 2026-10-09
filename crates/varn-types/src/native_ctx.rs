@@ -175,7 +175,7 @@ pub trait NativeCtx {
 
     fn capabilities(&self) -> &crate::capabilities::CapabilitySet {
         static DEFAULT_CAPS: crate::capabilities::CapabilitySet =
-            crate::capabilities::CapabilitySet::allow_all();
+            crate::capabilities::CapabilitySet::sandbox();
         &DEFAULT_CAPS
     }
 

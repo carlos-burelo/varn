@@ -241,6 +241,7 @@ pub(super) fn spawn_isolate(
     }
 
     let loader = ctx.loader.clone();
+    let parent_caps_inner: varn_types::capabilities::CapabilitySet = (*ctx.capabilities).clone();
 
     let module_path_str = module_path.to_string();
     let export_name_str = export_name.to_string();
@@ -255,6 +256,7 @@ pub(super) fn spawn_isolate(
         .spawn(move || {
             let mut machine =
                 crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()), settings);
+            machine.ctx.capabilities = std::rc::Rc::new(parent_caps_inner);
             machine
                 .ctx
                 .globals_mut()

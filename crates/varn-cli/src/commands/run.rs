@@ -54,7 +54,8 @@ pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {
     let mut mask = 0u64;
     let mut fs_read_paths = None;
     let mut fs_write_paths = None;
-    let mut net_hosts = None;
+    let mut net_hosts: Option<Vec<String>> = None;
+    let mut net_ports: Option<Vec<i64>> = None;
     let mut env_vars = None;
 
     if let Some(ref read_spec) = args.allow_read {
@@ -84,7 +85,30 @@ pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {
     if let Some(ref net_spec) = args.allow_net {
         mask |= CAP_NET_CLIENT | CAP_NET_SERVER;
         if net_spec != "*" && !net_spec.is_empty() {
-            net_hosts = Some(net_spec.split(',').map(|s| s.trim().to_string()).collect());
+            let mut hosts = Vec::new();
+            let mut ports = Vec::new();
+            for part in net_spec.split(',') {
+                let p = part.trim();
+                if p.is_empty() {
+                    continue;
+                }
+                if let Some((h, port_str)) = p.rsplit_once(':') {
+                    if let Ok(port) = port_str.parse::<i64>() {
+                        if !h.is_empty() {
+                            hosts.push(h.to_string());
+                        }
+                        ports.push(port);
+                        continue;
+                    }
+                }
+                hosts.push(p.to_string());
+            }
+            if !hosts.is_empty() {
+                net_hosts = Some(hosts);
+            }
+            if !ports.is_empty() {
+                net_ports = Some(ports);
+            }
         }
     }
 
@@ -104,7 +128,7 @@ pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {
         fs_read_paths,
         fs_write_paths,
         net_hosts,
-        net_ports: None,
+        net_ports,
         env_vars,
     }
 }

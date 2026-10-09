@@ -11,7 +11,7 @@ pub fn execute(args: EvalArgs) -> Result<(), CliError> {
             no_run: false,
             debug: Default::default(),
             trace: false,
-            capabilities: Default::default(),
+            capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
         },
         &crate::debug_sink::CliDebugSink,
     )

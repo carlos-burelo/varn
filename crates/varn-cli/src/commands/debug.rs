@@ -34,7 +34,7 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
             no_run,
             debug,
             trace: false,
-            capabilities: Default::default(),
+            capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
         },
         &crate::debug_sink::CliDebugSink,
     )

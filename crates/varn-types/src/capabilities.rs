@@ -27,7 +27,7 @@ pub struct CapabilitySet {
 
 impl Default for CapabilitySet {
     fn default() -> Self {
-        Self::allow_all()
+        Self::sandbox()
     }
 }
 
@@ -68,7 +68,7 @@ impl CapabilitySet {
             "sys.env" | "sys:env" => self.has_mask(CAP_SYS_ENV),
             "sys.exec" | "sys:exec" => self.has_mask(CAP_SYS_EXEC),
             "sys.ffi" | "sys:ffi" => self.has_mask(CAP_SYS_FFI),
-            _ => true,
+            _ => false,
         }
     }
 
@@ -100,7 +100,13 @@ impl CapabilitySet {
             return true;
         };
         allowed_hosts.iter().any(|allowed| {
-            allowed == "*" || allowed.eq_ignore_ascii_case(host) || host.ends_with(allowed.as_str())
+            allowed == "*"
+                || allowed.eq_ignore_ascii_case(host)
+                || host.len() > allowed.len()
+                    && host.ends_with(allowed.as_str())
+                    && host.as_bytes()[host.len() - allowed.len() - 1] == b'.'
+                    && allowed.as_bytes()[0] != b'.'
+                || allowed.starts_with('.') && host.ends_with(allowed.as_str())
         })
     }
 
@@ -138,17 +144,11 @@ impl CapabilitySet {
 }
 
 fn path_matches_any(path: &Path, allowed: &[PathBuf]) -> bool {
-    let Ok(canonical) = path
-        .canonicalize()
-        .or_else(|_| Ok::<_, ()>(path.to_path_buf()))
-    else {
+    let Ok(canonical) = path.canonicalize() else {
         return false;
     };
     for prefix in allowed {
-        let Ok(canonical_prefix) = prefix
-            .canonicalize()
-            .or_else(|_| Ok::<_, ()>(prefix.clone()))
-        else {
+        let Ok(canonical_prefix) = prefix.canonicalize() else {
             continue;
         };
         if canonical.starts_with(&canonical_prefix) {
