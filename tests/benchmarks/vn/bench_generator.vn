@@ -1,0 +1,128 @@
+// B0 battery: generators (JIT-impossible today, interpreter baseline).
+// Covers: ping-pong values, map/filter, loop-carry through resume,
+// nested generators, upvalue captures, try outside yield.
+// Every section prints a checksum; JIT vs NO_JIT must be bit-identical.
+import { now } from "std:time";
+
+function* pingpong() {
+    let x = yield 0;
+    while (true) {
+        x = yield x;
+    }
+}
+
+function* range_gen(start: int, end: int) {
+    let i = start;
+    while (i < end) {
+        yield i;
+        i = i + 1;
+    }
+}
+
+function* fib_gen() {
+    let a = 0;
+    let b = 1;
+    while (true) {
+        yield a;
+        const tmp = a + b;
+        a = b;
+        b = tmp;
+    }
+}
+
+function* nested_inner(n: int) {
+    yield n * 10;
+    yield n * 20;
+}
+
+function* nested_outer() {
+    yield 1;
+    const inner = nested_inner(5);
+    yield inner.next().value + 100;
+    yield inner.next().value + 100;
+}
+
+function make_counter(step: int): () => Generator<int> {
+    const base = step * 1000;
+    function* counter() {
+        let i = 0;
+        while (true) {
+            yield base + i;
+            i = i + 1;
+        }
+    }
+    return counter;
+}
+
+function* guarded() {
+    yield 7;
+    yield 8;
+}
+
+const PING_N = 100000;
+let t0 = now();
+const pp = pingpong();
+let last = pp.next().value;
+for (let i = 1; i <= PING_N; i = i + 1) {
+    last = pp.next(i).value;
+}
+let t1 = now();
+print("pingpong checksum=" + last + " ms=" + (t1 - t0));
+
+const MAP_N = 100000;
+t0 = now();
+let map_sum = 0;
+let filt_sum = 0;
+const rg = range_gen(0, MAP_N);
+let step = rg.next();
+while (!step.done) {
+    const v = step.value;
+    map_sum = map_sum + v * 2;
+    if ((v % 2) === 0) {
+        filt_sum = filt_sum + v;
+    }
+    step = rg.next();
+}
+t1 = now();
+print("mapfilter map_sum=" + map_sum + " filt_sum=" + filt_sum + " ms=" + (t1 - t0));
+
+const FIB_N = 80;
+t0 = now();
+let fib_carry = 0;
+const fg = fib_gen();
+for (let i = 0; i < FIB_N; i = i + 1) {
+    fib_carry = fg.next().value;
+}
+t1 = now();
+print("fibcarry checksum=" + fib_carry + " ms=" + (t1 - t0));
+
+t0 = now();
+let nest_sum = 0;
+const no = nested_outer();
+let nstep = no.next();
+while (!nstep.done) {
+    nest_sum = nest_sum + nstep.value;
+    nstep = no.next();
+}
+t1 = now();
+print("nested checksum=" + nest_sum + " ms=" + (t1 - t0));
+
+t0 = now();
+const counter = make_counter(3);
+const c1 = counter();
+const c2 = counter();
+let cap_sum = c1.next().value + c1.next().value + c2.next().value;
+t1 = now();
+print("upvalue checksum=" + cap_sum + " ms=" + (t1 - t0));
+
+t0 = now();
+let try_sum = 0;
+try {
+    const gg = guarded();
+    try_sum = try_sum + gg.next().value;
+    try_sum = try_sum + gg.next().value;
+} catch (e) {
+    try_sum = -1;
+}
+t1 = now();
+print("tryoutside checksum=" + try_sum + " ms=" + (t1 - t0));
