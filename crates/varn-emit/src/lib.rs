@@ -43,6 +43,7 @@ pub fn emit_module(
 
     let tables::Tables {
         classes,
+        class_origins,
         enums,
         mut signatures,
         names,
@@ -176,6 +177,7 @@ pub fn emit_module(
         exports,
         types,
         classes,
+        class_origins,
         enums,
         signatures,
         functions,

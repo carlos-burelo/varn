@@ -16,6 +16,7 @@ mod quiet_parse;
 pub mod resolver;
 pub mod stdlib_loader;
 
+mod class_link;
 mod layer_link;
 mod lex;
 
@@ -30,6 +31,7 @@ pub use core::core_protos_owned;
 pub use debug_sink::{DebugSink, NullSink};
 pub use error::PipelineError;
 pub use execute::{boot_machine, enter_main, execute, execute_with_caps};
+pub use class_link::verify_foreign_layouts;
 pub use layer_link::verify_synthetic_imports;
 pub use lex::lex as phase_lex;
 pub use opts::{CapabilitySet, DebugFlags, RunOpts};

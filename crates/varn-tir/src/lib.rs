@@ -27,3 +27,6 @@ pub use verify::{verify_module, VerifyError};
 
 mod coverage;
 pub use coverage::Coverage;
+
+mod registry;
+pub use registry::{ClassRegistry, ClassRegistryBuilder, GlobalClassId};

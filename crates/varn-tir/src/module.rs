@@ -121,6 +121,7 @@ pub struct TirModule {
     pub exports: Vec<TirExport>,
     pub types: TyTable,
     pub classes: Vec<crate::tables::ClassInfo>,
+    pub class_origins: Vec<Option<Arc<str>>>,
     pub enums: Vec<crate::tables::EnumInfo>,
     pub signatures: Vec<crate::tables::Signature>,
     pub functions: Vec<TirFunction>,

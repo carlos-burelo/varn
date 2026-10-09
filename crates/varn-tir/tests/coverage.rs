@@ -9,6 +9,7 @@ fn module() -> TirModule {
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
+        class_origins: vec![],
         classes: vec![ClassInfo::new(
             Arc::from("P"),
             varn_tir::Ancestry::Root,

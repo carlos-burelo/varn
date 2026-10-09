@@ -11,6 +11,7 @@ fn let_with_nullable_declared_and_nonnull_init_is_valid() {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {
@@ -54,6 +55,7 @@ fn let_with_nonnull_declared_and_nullable_init_is_rejected() {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {
@@ -106,6 +108,7 @@ fn let_declared_nullable_int_init_str_should_fail() {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {
@@ -160,6 +163,7 @@ fn let_declared_nullable_int_init_nullable_str_should_fail() {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {
@@ -216,6 +220,7 @@ fn deeply_nested_nullable_chain_terminates_without_false_positive() {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {

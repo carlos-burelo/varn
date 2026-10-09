@@ -70,6 +70,7 @@ mod tests {
             imports: vec![],
             exports: vec![],
             types,
+            class_origins: vec![],
             classes: vec![ClassInfo::new(
                 Arc::from("Point"),
                 varn_tir::Ancestry::Root,

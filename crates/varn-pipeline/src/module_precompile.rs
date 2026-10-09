@@ -17,6 +17,7 @@ pub struct ModuleGraphBuild {
     pub package_nodes: Vec<varn_types::PackageNode>,
 
     pub deps: HashMap<String, Vec<String>>,
+    pub class_tables: HashMap<String, crate::class_link::ModuleClasses>,
 }
 
 pub fn build_module_graph(
@@ -191,6 +192,7 @@ pub fn build_module_graph(
 
     let mut modules: HashMap<String, FunctionProto> = HashMap::default();
     modules.insert(canonical_entry.clone(), entry_proto.clone());
+    let mut class_tables: HashMap<String, crate::class_link::ModuleClasses> = HashMap::default();
 
     for module_path in sorted.into_iter().rev() {
         if module_path == canonical_entry {
@@ -232,6 +234,18 @@ pub fn build_module_graph(
                 .map(|s| s.as_ref()),
         )?;
         crate::compile::inject_star_reexports(&mut tir, &exports);
+        class_tables.insert(
+            module_path.clone(),
+            crate::class_link::ModuleClasses {
+                classes: tir.classes.clone(),
+                origins: tir
+                    .class_origins
+                    .iter()
+                    .map(|o| o.as_ref().map(|s| s.to_string()))
+                    .collect(),
+                types: tir.types.clone(),
+            },
+        );
         let (module_result, _) =
             crate::compile::compile_tir(&tir, export_names, module_source, false);
         let module_proto =
@@ -246,6 +260,7 @@ pub fn build_module_graph(
         source_hashes,
         package_nodes: package_nodes.into_values().collect(),
         deps: graph,
+        class_tables,
     })
 }
 

@@ -39,6 +39,7 @@ fn module(top_level: TirFunction) -> TirModule {
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {
@@ -135,6 +136,7 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![],
         enums: vec![EnumInfo {
             name: Arc::from("Shape"),

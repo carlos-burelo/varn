@@ -101,6 +101,7 @@ fn return_with_correct_type_verifies() {
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {
@@ -143,6 +144,7 @@ fn bare_return_in_non_void_function_is_rejected() {
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {
@@ -184,6 +186,7 @@ fn return_of_never_type_is_valid_anywhere() {
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {
@@ -226,6 +229,7 @@ fn return_nonnull_when_function_returns_nullable_is_valid() {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {
@@ -264,6 +268,7 @@ fn return_nullable_when_function_returns_nonnull_is_rejected() {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![],
         enums: vec![],
         signatures: vec![Signature {

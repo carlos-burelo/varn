@@ -130,7 +130,7 @@ impl BackendTy {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct TyTable {
     entries: Vec<BackendTy>,
     dedup: rustc_hash::FxHashMap<BackendTy, u32>,

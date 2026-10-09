@@ -166,6 +166,22 @@ pub fn compile(
     )
     .map_err(|e| PipelineError::fatal(format!("module graph error: {e}")))?;
 
+    let mut class_tables = graph_build.class_tables.clone();
+    class_tables.insert(
+        program.filename.to_string(),
+        crate::class_link::ModuleClasses {
+            classes: tir.classes.clone(),
+            origins: tir
+                .class_origins
+                .iter()
+                .map(|o| o.as_ref().map(|s| s.to_string()))
+                .collect(),
+            types: tir.types.clone(),
+        },
+    );
+    crate::class_link::verify_foreign_layouts(&class_tables)
+        .map_err(PipelineError::fatal)?;
+
     sink.compile(
         program,
         ast_arena,

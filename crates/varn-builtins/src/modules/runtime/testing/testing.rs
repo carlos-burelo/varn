@@ -1,5 +1,4 @@
 use std::sync::atomic::{AtomicU64, Ordering};
-use varn_types::NativeCtx;
 
 static PASSED: AtomicU64 = AtomicU64::new(0);
 static FAILED: AtomicU64 = AtomicU64::new(0);

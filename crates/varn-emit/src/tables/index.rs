@@ -76,6 +76,7 @@ impl NameIndex {
 
 pub struct Tables {
     pub classes: Vec<ClassInfo>,
+    pub class_origins: Vec<Option<Arc<str>>>,
     pub enums: Vec<EnumInfo>,
     pub signatures: Vec<Signature>,
     pub names: NameIndex,
@@ -162,6 +163,12 @@ pub fn build(
         &mut signatures,
     );
     classes.extend(foreign_parent_infos);
+    let mut class_origins: Vec<Option<Arc<str>>> = vec![None; class_names.len()];
+    class_origins.extend(
+        foreign_classes_sorted
+            .iter()
+            .map(|f| Some(f.origin.clone())),
+    );
     let mut enums = build_enums(
         bind,
         &bind.ty_table,
@@ -191,6 +198,7 @@ pub fn build(
 
     Tables {
         classes,
+        class_origins,
         enums,
         signatures,
         names,

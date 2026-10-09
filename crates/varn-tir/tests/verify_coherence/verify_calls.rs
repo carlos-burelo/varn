@@ -8,6 +8,7 @@ fn method_call_arity_mismatch_is_rejected() {
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
+        class_origins: vec![],
         classes: vec![ClassInfo::new_with_methods(
             Arc::from("Point"),
             varn_tir::Ancestry::Root,
@@ -77,6 +78,7 @@ fn method_call_with_correct_arity_verifies() {
         imports: vec![],
         exports: vec![],
         types: TyTable::default(),
+        class_origins: vec![],
         classes: vec![ClassInfo::new_with_methods(
             Arc::from("Point"),
             varn_tir::Ancestry::Root,
@@ -142,6 +144,7 @@ fn method_call_arg_nonnull_into_nullable_param_passes() {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![ClassInfo::new_with_methods(
             Arc::from("Point"),
             varn_tir::Ancestry::Root,
@@ -207,6 +210,7 @@ fn method_call_arg_nullable_into_nonnull_param_rejected() {
         imports: vec![],
         exports: vec![],
         types,
+        class_origins: vec![],
         classes: vec![ClassInfo::new_with_methods(
             Arc::from("Point"),
             varn_tir::Ancestry::Root,
