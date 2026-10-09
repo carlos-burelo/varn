@@ -124,7 +124,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let compile_samples = time_n(runs, || {
-        let (res, opt_dur) = varn_pipeline::emit_and_compile(
+        let (res, opt_dur, _) = varn_pipeline::emit_and_compile(
             program_ref,
             arena_ref,
             &check_result,
@@ -144,7 +144,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
-    let (final_result, _) = varn_pipeline::emit_and_compile(
+    let (final_result, _, _) = varn_pipeline::emit_and_compile(
         &program,
         &arena,
         &check_result,

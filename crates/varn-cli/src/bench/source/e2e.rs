@@ -45,7 +45,7 @@ pub(super) fn measure_e2e(
             varn_sem::output::CheckOptions::compile(),
         );
 
-        let (e2e_result, _) = varn_pipeline::emit_and_compile(
+        let (e2e_result, _, _) = varn_pipeline::emit_and_compile(
             &program,
             &arena,
             &check_result,

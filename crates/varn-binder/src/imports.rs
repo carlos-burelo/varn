@@ -200,10 +200,24 @@ impl<'r> super::Binder<'r> {
                     self.escape_array_candidate(s.local);
                 }
                 if let Some(source) = source {
+                    self.check_reexport_layer(*source, e.range());
                     self.record_reexport_dep(*source);
                 }
             }
-            ExportDecl::All { source, .. } => self.record_reexport_dep(*source),
+            ExportDecl::All { source, .. } => {
+                self.check_reexport_layer(*source, e.range());
+                self.record_reexport_dep(*source);
+            }
+        }
+    }
+
+    fn check_reexport_layer(&mut self, source: varn_core::Atom, range: &varn_core::SourceRange) {
+        use varn_modules::layer::{check_import, Layer};
+        let source_str = self.interner.resolve(source).to_string();
+        if let Err(message) = check_import(Layer::of_module(&self.source_file), &source_str) {
+            self.emit(
+                Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(*range),
+            );
         }
     }
 

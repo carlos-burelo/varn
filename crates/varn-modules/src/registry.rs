@@ -17,6 +17,10 @@ pub fn core_module_ids() -> Vec<&'static str> {
     module_ids_of_kind(ModuleKind::Core)
 }
 
+pub fn is_prelude_module(id: &str) -> bool {
+    prelude_modules().iter().any(|s| s.id == id)
+}
+
 pub fn prelude_modules() -> Vec<&'static ModuleSpec> {
     provider::get()
         .map(|p| {

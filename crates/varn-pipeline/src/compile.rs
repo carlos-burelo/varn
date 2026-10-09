@@ -26,7 +26,11 @@ pub fn emit_and_compile(
     export_names: Vec<std::sync::Arc<str>>,
     source: &str,
     measure: bool,
-) -> (Result<FunctionProto, String>, std::time::Duration) {
+) -> (
+    Result<FunctionProto, String>,
+    std::time::Duration,
+    Vec<std::sync::Arc<str>>,
+) {
     let tir = varn_emit::emit_module(
         program,
         ast_arena,
@@ -35,9 +39,19 @@ pub fn emit_and_compile(
         &check.call_mappings,
         &check.desugar,
     );
+    let import_sources: Vec<std::sync::Arc<str>> = tir
+        .imports
+        .iter()
+        .filter(|i| !i.is_type_only && !i.specs.is_empty())
+        .map(|i| std::sync::Arc::from(i.source.as_ref()))
+        .collect();
     let (result, opt_time) =
         varn_compiler::from_tir::compile_module(&tir, export_names, source, measure);
-    (result.map_err(|e| format!("{e:?}")), opt_time)
+    (
+        result.map_err(|e| format!("{e:?}")),
+        opt_time,
+        import_sources,
+    )
 }
 
 pub struct CompileOutput {
@@ -65,7 +79,7 @@ pub fn compile(
         .module_exports(&program.filename, &mut vec![]);
     let export_names = sorted_export_names(&exports);
 
-    let (proto_result, _) = emit_and_compile(
+    let (proto_result, _, import_sources) = emit_and_compile(
         program,
         ast_arena,
         &check_result.checker_result,
@@ -81,6 +95,14 @@ pub fn compile(
                 .bold()
         ))
     })?;
+    crate::layer_link::verify_synthetic_imports(
+        &program.filename,
+        program,
+        ast_arena,
+        &check_result.checker_result.bind.interner,
+        import_sources.iter().map(|s| s.as_ref()),
+    )
+    .map_err(PipelineError::fatal)?;
 
     if verbose {
         varn_core::term::terminal::tagged("Varn", "resolving module graph...");

@@ -220,7 +220,7 @@ pub fn build_module_graph(
             resolver.module_exports(&program.filename, &mut vec![])
         };
         let export_names = crate::compile::sorted_export_names(&exports);
-        let (module_result, _) = crate::compile::emit_and_compile(
+        let (module_result, _, import_sources) = crate::compile::emit_and_compile(
             program,
             arena,
             &check,
@@ -230,6 +230,14 @@ pub fn build_module_graph(
         );
         let module_proto =
             module_result.map_err(|e| format!("compile error (tir) in '{module_path}': {e:?}"))?;
+        crate::layer_link::verify_synthetic_imports(
+            &program.filename,
+            program,
+            arena,
+            interner,
+            import_sources.iter().map(|s| s.as_ref()),
+        )
+        .map_err(|e| format!("module graph error: {e}"))?;
 
         modules.insert(module_path, module_proto);
     }

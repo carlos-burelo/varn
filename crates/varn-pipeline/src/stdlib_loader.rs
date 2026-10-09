@@ -138,7 +138,7 @@ fn compile_source_inner(
             resolver.module_exports(path, &mut vec![])
         };
     let export_names = crate::compile::sorted_export_names(&exports);
-    let (result, _) =
+    let (result, _, _) =
         crate::compile::emit_and_compile(&program, &arena, &check, export_names, source, false);
     result
 }
