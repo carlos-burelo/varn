@@ -76,6 +76,9 @@ es calidad de código máquina, no tiering.
 
 ## C3 — http_routing 2.50×
 
+- BLOQUEADO 2026-10-09: depende de O2/O3/O5 (otra sesión).
+  Alcance propio (memcmp de segmentos, params inline) tras O-items.
+
 - Baseline: 286.6ms vs 115.4ms (2.30× vs bun). 1.34M llamadas vm-fast,
   0 slow: pura densidad de calls/str/map/closures.
 - Qué (composición de O-items + específico):
@@ -87,6 +90,10 @@ es calidad de código máquina, no tiering.
 
 ## C4 — str_ops 1.59×
 
+- BLOQUEADO 2026-10-09: depende de O3/O4 del plan
+  `2026-10-08-plan-jit-machine-code.md` (otra sesión). No tocar
+  sin coordinar.
+
 - Baseline: 124.0ms vs 78.6ms. Medido hoy: `toString` 611k×25ns =
   15.6ms (12.6% del total); resto concat/charCode/slice/join.
 - Qué: O3 (charCode/toString/substring/slice inline) + O4 (concat
@@ -95,6 +102,12 @@ es calidad de código máquina, no tiering.
 - Verifica: `bench_str_ops` por sección con checksums 12/12 intactos.
 
 ## C5 — json_api_payloads 1.79× + json_native 1.47×
+
+- BLOQUEADO 2026-10-09: sin ops JSON en el JIT (`from_ssa` no
+  menciona Json; todo vía helpers nativos). El trabajo vive en
+  el puente nativo (materialización string→campo, números sin
+  `BigDecimal`) + O5 (Map) para el traversal — otra sesión.
+  Medir parse vs stringify vs traversal antes de diseñar.
 
 - Baseline: 40.1 vs 22.3ms; 35.1 vs 24.0ms.
 - Qué:
