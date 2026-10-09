@@ -123,10 +123,17 @@ idéntico al baseline. Sin (a) ganancia (b) medida (c) borrado, no se acepta.
   Sonda 30 casos idéntica JIT/NO_JIT/dinámico; suite 2287/0 ×2.
 
 ## Cimientos — nursery ×16 (196k→786k celdas)
-
 - `YOUNG_THRESHOLD` 49152→786432 (`varn-vm/src/heap/young.rs`, única fuente).
 - Tabla mismo perfil (quick): json minors 23→2, promociones 2.2M→300k, majors 7→3;
   http 30→1, 707k→536k; str 22→1, 200k→21. Pared −16/−32/−23%.
 - Criterio de saturación: lo que aún promociona es live por diseño (grafo parseado,
   reqs retenidas); más nursery no separaría nada. Coste: pico joven mayor
   (bajo demanda, sin pre-alloc); pausas minor más largas.
+
+## Máquina — ArrayLength inline (bisección http)
+
+- `emit_array_length` (`varn-jit/.../props/lengths.rs`): resolve+load con slow
+  al helper; `Out::Native` directo (sin box/unbox); `arrays::view` reutilizada.
+- Bisección (quick): v3split 135→102ms, v4match 50→42, v2 cuadra al ns
+  (100k×35ns); CLIF muestra fast sin call + slow intacto; suite 2287/0 ×2.
+- `ArrayPush` aparcado: exige auditar barrera GC en stores inline (riesgo).

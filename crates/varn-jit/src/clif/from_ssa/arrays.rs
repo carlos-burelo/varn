@@ -57,7 +57,7 @@ impl Elem {
     }
 }
 
-fn view(
+pub(super) fn view(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &[Option<Value>],

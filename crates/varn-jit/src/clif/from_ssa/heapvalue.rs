@@ -253,10 +253,7 @@ pub(super) fn emit(
             let boxed = heap::emit_unary_boxed(b, ctx, values, *operand, ctx.helpers.get_enum_tag)?;
             Out::Native(unbox_int(b, boxed))
         }
-        SsaOp::ArrayLength { operand } => {
-            let boxed = props::emit_array_length(b, ctx, values, *operand)?;
-            Out::Native(unbox_int(b, boxed))
-        }
+        SsaOp::ArrayLength { operand } => props::emit_array_length(b, ctx, values, *operand)?,
         SsaOp::BytesLength { operand } => {
             let boxed = props::emit_bytes_length(b, ctx, values, *operand)?;
             Out::Native(unbox_int(b, boxed))
