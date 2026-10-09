@@ -96,10 +96,13 @@ no se copian de documentos).
   7.25→5.78→5.87ms, checksums intactos): LICM de `LoadGlobalIdx`
   en `drive.rs` (preheader por loop, slots nunca-escritos en el
   body + cuerpos puros sin user-code; kills en stores/calls) +
-  `ranges::loop_sets` compartido. Regla de sanidad: reuso en
+  `ranges::loop_sets` compartido. Reglas de sanidad: reuso en
   header solo si el slot no se escribe en el loop (si no, loop
-  infinito con valor pre-loop) — lo confirma un `run` colgado
-  durante el desarrollo.
+  infinito con valor pre-loop); al reusar global boxeada en slot
+  Int, pasar por `land`+unbox (si no, confusión I128/I64 que el
+  backend peta); mapas `values` por versión (el compartido
+  contaminaba sucesores con valores de clones y rompía
+  `new_retained`: guarda sin `skip_term`, `band` sin `uextend`).
 - **`ArrayPush` inline**: exige auditar barrera GC (riesgo).
 - **`matrix_local`**: duplicado exacto de `matrix`; dedupe con
   dueño de benches, no borrar unilateral.
