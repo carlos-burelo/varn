@@ -2,7 +2,6 @@ use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_core::OpCode;
-use varn_types::NativeCtx;
 
 impl ExecCtx {
     pub(super) fn exec_native_op(
