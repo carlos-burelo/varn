@@ -14,6 +14,7 @@ pub struct NameIndex {
     classes: FxHashMap<Arc<str>, ClassId>,
     enums: FxHashMap<Arc<str>, EnumId>,
     foreign_enums: FxHashMap<(Arc<str>, Arc<str>), EnumId>,
+    foreign_classes: FxHashMap<(Arc<str>, Arc<str>), ClassId>,
 }
 
 impl NameResolver for NameIndex {
@@ -28,8 +29,48 @@ impl NameResolver for NameIndex {
             .get(&(Arc::from(name), Arc::from(origin)))
             .copied()
     }
+    fn foreign_class_id(&self, name: &str, origin: &str) -> Option<ClassId> {
+        self.foreign_classes
+            .get(&(Arc::from(name), Arc::from(origin)))
+            .copied()
+    }
     fn is_local_origin(&self, origin: &str) -> bool {
         origin == self.module.as_ref()
+    }
+}
+
+impl NameIndex {
+    pub fn parent_class_id(&self, parent: &varn_sem::bind::ClassParent) -> Option<ClassId> {
+        if let Some(id) = self.classes.get(parent.name.as_ref()).copied() {
+            return Some(id);
+        }
+        if let Some(origin) = parent.origin.as_deref() {
+            if let Some(id) = self
+                .foreign_classes
+                .get(&(parent.name.clone(), Arc::from(origin)))
+                .copied()
+            {
+                return Some(id);
+            }
+        }
+        self.foreign_classes
+            .iter()
+            .find(|((name, _), _)| name.as_ref() == parent.name.as_ref())
+            .map(|(_, &id)| id)
+    }
+
+    pub fn foreign_parent_info<'a>(
+        &'a self,
+        id: ClassId,
+        local_count: usize,
+        foreign_infos: &'a [ClassInfo],
+    ) -> Option<&'a ClassInfo> {
+        let idx = id.0 as usize;
+        if idx >= local_count {
+            foreign_infos.get(idx - local_count)
+        } else {
+            None
+        }
     }
 }
 
@@ -46,6 +87,9 @@ pub fn build(
     tt: &mut TyTable,
 ) -> Tables {
     let foreign = &desugar.foreign_enums;
+    let mut foreign_classes_sorted: Vec<&varn_sem::output::ForeignClass> =
+        desugar.foreign_classes.iter().collect();
+    foreign_classes_sorted.sort_by(|a, b| (&a.origin, &a.name).cmp(&(&b.origin, &b.name)));
     let mut class_names: Vec<Arc<str>> = bind.type_members.classes.keys().cloned().collect();
     class_names.sort();
     class_names.retain(|n| !bind.type_members.enums.contains_key(n));
@@ -74,12 +118,39 @@ pub fn build(
     for (i, n) in class_names.iter().enumerate() {
         names.classes.insert(n.clone(), ClassId(i as u32));
     }
+    for (i, f) in foreign_classes_sorted.iter().enumerate() {
+        names.foreign_classes.insert(
+            (f.name.clone(), f.origin.clone()),
+            ClassId((class_names.len() + i) as u32),
+        );
+    }
     for (i, n) in enum_names.iter().enumerate() {
         names.enums.insert(n.clone(), EnumId(i as u32));
     }
 
     let mut signatures = seed_signatures();
-    let classes = build_classes(
+    let mut foreign_parent_infos: Vec<ClassInfo> = Vec::with_capacity(foreign_classes_sorted.len());
+    for f in &foreign_classes_sorted {
+        let mut fields: Vec<(Arc<str>, BackendTy)> = Vec::with_capacity(f.fields.len());
+        for field in &f.fields {
+            let inner =
+                crate::ty::lower_type(&field.ty, &bind.ty_table, &bind.interner, tt, &names);
+            let bt = if field.optional && !matches!(inner, BackendTy::Nullable(_)) {
+                BackendTy::Nullable(tt.intern(inner))
+            } else {
+                inner
+            };
+            fields.push((field.name.clone(), bt));
+        }
+        foreign_parent_infos.push(ClassInfo::new_with_methods(
+            f.name.clone(),
+            varn_tir::Ancestry::Root,
+            fields,
+            Vec::new(),
+            tt,
+        ));
+    }
+    let mut classes = build_classes(
         bind,
         &bind.ty_table,
         &bind.interner,
@@ -87,8 +158,10 @@ pub fn build(
         &names,
         &class_names,
         &desugar.foreign_inherited_fields,
+        &foreign_parent_infos,
         &mut signatures,
     );
+    classes.extend(foreign_parent_infos);
     let mut enums = build_enums(
         bind,
         &bind.ty_table,

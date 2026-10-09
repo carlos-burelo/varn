@@ -81,6 +81,8 @@ pub(super) fn run_pass(
     bind.ty_table = checker.ty_table.clone();
     bind.interner.absorb(checker.ty_table.names());
 
+    rec.desugar.foreign_classes =
+        checker.collect_foreign_classes(bind, rec.expr_table.values().map(|entry| &entry.ty));
     rec.desugar.foreign_enums =
         checker.collect_foreign_enums(bind, rec.expr_table.values().map(|entry| &entry.ty));
 }

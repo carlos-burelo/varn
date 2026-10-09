@@ -40,8 +40,9 @@ fn resolve_type_ref(
         .filter(|o| !names.is_local_origin(o))
     {
         Some(origin) => names
-            .foreign_enum_id(name, origin)
-            .map(BackendTy::Enum)
+            .foreign_class_id(name, origin)
+            .map(BackendTy::Class)
+            .or_else(|| names.foreign_enum_id(name, origin).map(BackendTy::Enum))
             .unwrap_or_else(opaque),
         None => resolve_named(name, names),
     }

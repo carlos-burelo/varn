@@ -1,6 +1,6 @@
 use super::signatures::intern_signature;
 use super::NameIndex;
-use crate::ty::{lower_type, NameResolver};
+use crate::ty::lower_type;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::AtomInterner;
@@ -17,6 +17,7 @@ pub(super) fn build_classes(
     names: &NameIndex,
     class_names: &[Arc<str>],
     foreign: &ForeignFields,
+    foreign_parent_infos: &[ClassInfo],
     signatures: &mut Vec<Signature>,
 ) -> Vec<ClassInfo> {
     let mut built: Vec<Option<ClassInfo>> = vec![None; class_names.len()];
@@ -29,6 +30,7 @@ pub(super) fn build_classes(
             names,
             class_names,
             foreign,
+            foreign_parent_infos,
             i,
             signatures,
             &mut built,
@@ -47,6 +49,7 @@ fn build_with_parents(
     names: &NameIndex,
     class_names: &[Arc<str>],
     foreign: &ForeignFields,
+    foreign_parent_infos: &[ClassInfo],
     i: usize,
     signatures: &mut Vec<Signature>,
     built: &mut [Option<ClassInfo>],
@@ -56,10 +59,10 @@ fn build_with_parents(
     while let Some(p) = bind
         .class_parents
         .get(&class_names[cur])
-        .and_then(|p| names.class_id(&p.name))
+        .and_then(|p| names.parent_class_id(p))
         .map(|id| id.0 as usize)
     {
-        if built[p].is_some() || chain.contains(&p) {
+        if p >= class_names.len() || built[p].is_some() || chain.contains(&p) {
             break;
         }
         chain.push(p);
@@ -73,8 +76,10 @@ fn build_with_parents(
                 interner,
                 tt,
                 names,
+                class_names,
                 &class_names[c],
                 foreign.get(&class_names[c]).map(Vec::as_slice),
+                foreign_parent_infos,
                 signatures,
                 built,
             );
@@ -88,14 +93,23 @@ fn build_one_class(
     interner: &AtomInterner,
     tt: &mut TyTable,
     names: &NameIndex,
+    class_names: &[Arc<str>],
     name: &Arc<str>,
     foreign: Option<&[varn_sem::output::InheritedField]>,
+    foreign_parent_infos: &[ClassInfo],
     signatures: &mut Vec<Signature>,
     built: &[Option<ClassInfo>],
 ) -> ClassInfo {
     let parent_name = bind.class_parents.get(name);
-    let parent_id = parent_name.and_then(|p| names.class_id(&p.name));
-    let parent_info = parent_id.and_then(|id| built.get(id.0 as usize)?.as_ref());
+    let parent_id = parent_name.and_then(|p| names.parent_class_id(p));
+    let parent_info = parent_id.and_then(|id| {
+        let idx = id.0 as usize;
+        if idx < class_names.len() {
+            built.get(idx)?.as_ref()
+        } else {
+            names.foreign_parent_info(id, class_names.len(), foreign_parent_infos)
+        }
+    });
     let mut inherited_fields: FxHashMap<Arc<str>, ()> = parent_info
         .map(|p| p.fields.iter().map(|f| (f.name.clone(), ())).collect())
         .unwrap_or_default();

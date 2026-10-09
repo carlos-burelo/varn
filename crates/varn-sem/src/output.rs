@@ -44,6 +44,14 @@ pub struct InheritedField {
     pub optional: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct ForeignClass {
+    pub name: Arc<str>,
+    pub origin: Arc<str>,
+    pub fields: Vec<InheritedField>,
+    pub methods: Vec<Arc<str>>,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Desugarings {
     pub extension_calls: FxHashMap<u32, Arc<str>>,
@@ -51,6 +59,7 @@ pub struct Desugarings {
     pub extension_set_members: FxHashMap<u32, Arc<str>>,
     pub operator_calls: FxHashSet<varn_core::ast::AstId>,
     pub foreign_enums: Vec<ForeignEnum>,
+    pub foreign_classes: Vec<ForeignClass>,
     pub foreign_inherited_fields: std::collections::BTreeMap<Arc<str>, Vec<InheritedField>>,
     pub match_arm_subjects: FxHashMap<varn_core::ast::AstId, Vec<Type>>,
 }

@@ -4,6 +4,7 @@ pub trait NameResolver {
     fn class_id(&self, name: &str) -> Option<ClassId>;
     fn enum_id(&self, name: &str) -> Option<EnumId>;
     fn foreign_enum_id(&self, name: &str, origin: &str) -> Option<EnumId>;
+    fn foreign_class_id(&self, name: &str, origin: &str) -> Option<ClassId>;
     fn is_local_origin(&self, origin: &str) -> bool;
 }
 
@@ -17,6 +18,9 @@ impl NameResolver for NoNames {
         None
     }
     fn foreign_enum_id(&self, _: &str, _: &str) -> Option<EnumId> {
+        None
+    }
+    fn foreign_class_id(&self, _: &str, _: &str) -> Option<ClassId> {
         None
     }
     fn is_local_origin(&self, _: &str) -> bool {

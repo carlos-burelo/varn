@@ -1,9 +1,10 @@
 use super::Checker;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use varn_core::TypeKind;
 use varn_sem::bind::{BindResult, ClassParent};
-use varn_sem::output::InheritedField;
-use varn_sem::types::ClassMemberKind;
+use varn_sem::output::{ForeignClass, InheritedField};
+use varn_sem::types::{ClassMemberKind, Type};
 
 impl Checker<'_> {
     pub(super) fn collect_foreign_inherited_fields(
@@ -25,6 +26,115 @@ impl Checker<'_> {
             out.insert(class, fields);
         }
         out
+    }
+
+    pub(super) fn collect_foreign_classes<'t>(
+        &mut self,
+        bind: &BindResult,
+        types: impl Iterator<Item = &'t Type>,
+    ) -> Vec<ForeignClass> {
+        let mut found: BTreeMap<(Arc<str>, Arc<str>), ForeignClass> = BTreeMap::new();
+        for ty in types {
+            let members = match self.ty_table.get(ty.0) {
+                TypeKind::Union(list) => self.ty_table.get_list(list).to_vec(),
+                TypeKind::Primitive(_)
+                | TypeKind::Builtin(_)
+                | TypeKind::Literal(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Tuple(_)
+                | TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Fn(_)
+                | TypeKind::Object(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Conditional { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => vec![ty.0],
+            };
+            for id in members {
+                let (TypeKind::Named(name, Some(origin))
+                | TypeKind::Generic(name, _, Some(origin))) = self.ty_table.get(id)
+                else {
+                    continue;
+                };
+                let origin = self.resolve_bind_atom(bind, origin);
+                if origin.as_ref() == bind.source_file.as_ref() {
+                    continue;
+                }
+                let name = self.resolve_bind_atom(bind, name);
+                if varn_core::is_lang_type_name(name.as_ref()) {
+                    continue;
+                }
+                let key = (name.clone(), origin.clone());
+                if found.contains_key(&key) {
+                    continue;
+                }
+                let owner = self
+                    .resolver
+                    .module_bind(&origin)
+                    .or_else(|| self.resolver.stdlib_bind(&origin));
+                let Some(owner) = owner.as_deref() else {
+                    continue;
+                };
+                if owner.sum_type_variants.contains_key(name.as_ref())
+                    || owner.type_members.enums.contains_key(name.as_ref())
+                {
+                    continue;
+                }
+                if owner.get_class_parent(name.as_ref()).is_some() {
+                    continue;
+                }
+                let Some(entry) = owner.get_class_entry(&name) else {
+                    continue;
+                };
+                if entry.is_builtin_or_intrinsic {
+                    continue;
+                }
+                let mut fields = Vec::new();
+                let mut methods = Vec::new();
+                for m in &entry.members {
+                    if m.is_static {
+                        continue;
+                    }
+                    match m.kind {
+                        ClassMemberKind::Property | ClassMemberKind::Variable => {
+                            if fields.iter().any(|f: &InheritedField| f.name == m.name) {
+                                continue;
+                            }
+                            fields.push(InheritedField {
+                                name: m.name.clone(),
+                                ty: self.reintern_foreign_ty(owner, m.ty),
+                                optional: m.is_optional,
+                            });
+                        }
+                        ClassMemberKind::Method | ClassMemberKind::Function => {
+                            if !methods.contains(&m.name) {
+                                methods.push(m.name.clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                methods.sort();
+                found.insert(
+                    key,
+                    ForeignClass {
+                        name,
+                        origin,
+                        fields,
+                        methods,
+                    },
+                );
+            }
+        }
+        found.into_values().collect()
     }
 
     fn ancestor_fields(
