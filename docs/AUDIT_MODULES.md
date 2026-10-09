@@ -445,7 +445,8 @@ Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED`
 - Hallazgo nuevo B4 (verificador TIR): `tir/verify/coherence/ops.rs: check_binary` eximía solo comparaciones y `Dynamic`; `Instanceof`/`In` heterogéneos fallaban (`e instanceof Error` con ambos lados `Class` distintos) enmascarado antes por `Dynamic`. Ahora exentos con check `e.ty==Bool`. Sin esto H5 es imposible.
 - R2: `rehome::canonicalize_lang_named`: `Named` lang-name + origen == `core_module()` → `Builtin`/`Primitive`. Cableado en `rehome_ty`, `rehome_ty_with_origin` e `imports.rs` (tras `with_origin`). Los tipos nativos ya no viajan como `Named` foráneo.
 - R3: `BindResult::classify_decl` (`DeclKind`: prioridad `SumType > Enum > Class > Interface > Namespace`, `debug_assert` unicidad para builds dev). Ambos colectores la usan: clases exige `Class`, enums exige `Enum|SumType`. Hallazgo raíz medido: `bind_enum` (`binder/decl_values/type_decls.rs:46,268,272`) registra cada enum en TRES mapas (`sum_type_variants` + `classes` + `enums`); el colector viejo leía mapas espejo y la primera versión de `classify` tenía bug last-wins (devolvía `Class` para `Result`, rompiendo `try`; verificado con `VARN_DEBUG_FOREIGN` temporal, ya retirado). Con first-wins, `Result`/`Option` van solo a enum y `try`/`match` vuelven precisos.
-- R4: `modules::is_prelude_module` (misma lista que usa `emit/prelude.rs`). `pipeline/layer_link.rs: verify_synthetic_imports`: toda arista TIR no declarada en el AST debe ser prelude (cierra contrabando `runtime:` sintético). Cableado en `compile.rs` (entry) y `module_precompile.rs` (deps) vía tercer retorno de `emit_and_compile` (actualizados también `stdlib_loader.rs` y bench `mod.rs`/`e2e.rs`). `binder/imports.rs: check_reexport_layer`: `export ... from` pasa `check_import` (antes sin check; verificado negativo `export * from "runtime:sys"` → `VN2010` en `run` y `check`). Runtime mantiene regla `Runtime→solo-Std` como backstop.
+- R4: `modules::is_prelude_module` (misma lista que usa `emit/prelude.rs`). `pipeline/layer_link.rs: verify_synthetic_imports` en linkado (entry + deps): arista TIR no declarada en AST debe ser prelude. `binder/imports.rs: check_reexport_layer` (`export...from` sin check antes; negativo verificado → `VN2010`). Runtime mantiene `Runtime→solo-Std` como backstop.
+- H8: `decl_primary_name → decl_export_names` (N declarators; antes pérdida silenciosa desde el 2º). `ExportMap.collisions` + first-wins + `E_EXPORT_COLLISION` en linkado (entry, deps, stdlib). Hallazgo raíz medido: `export *` sin alias NO emitía `TirExport` (`emit/imports_exports.rs` sin rama `All`, suite sin cobertura) → slots siempre null (preexistente, expuesto al probar H8a). Fix: `pipeline: emit_and_compile` dividido en `emit_tir` + `inject_star_reexports` + `compile_tir` (+ `tir_import_sources`; wrapper borrado; `varn-tir` dep directa de pipeline), que materializa star vía `reexport_from` con el mecanismo existente.
 
 ### Regresiones encontradas y causa raíz (evidencia para H5 completo)
 
@@ -456,7 +457,7 @@ Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED`
 
 ### Pendiente (no tocado)
 
-R1 + H2 completo (registro global clases + `ModuleSlot` emitido, §8 con plan F1-F5), H7, H8 (resto: `decl_primary_name` N declarators, `E_EXPORT_COLLISION`, namespace único), H9 resto (`Relative` con `..` fuera de root), H10 (`interface_hash`, `project_root`, `fsync`), H11 (`capability_mask`, `Box::leak`, `SILENT`), H12-H14, A3b (`run` fail-closed), B1 resto call sites, `from_tir/ty.rs` + `register_meta` error en vez de `Dynamic` (B2 resto), métrica `DynReason`, `E_STALE_ATOM`. Guards representación en `collect_foreign_classes` (lang-name, sin-padre, builtin) se quedan hasta R1: no son mecanismos duplicados, son restricciones de representación sin registro global.
+R1 + H2 completo (registro global clases + `ModuleSlot` emitido, §8 con plan F1-F5), H7, H8 resto (namespace único: rama alias aplana `ns.sub` además del objeto — unificar a una representación), H9 resto (`Relative` con `..` fuera de root), H10 (`interface_hash`, `project_root`, `fsync`), H11 (`capability_mask`, `Box::leak`, `SILENT`), H12-H14, A3b (`run` fail-closed), B1 resto call sites, `from_tir/ty.rs` + `register_meta` error en vez de `Dynamic` (B2 resto), métrica `DynReason`, `E_STALE_ATOM`. Guards representación en `collect_foreign_classes` (lang-name, sin-padre, builtin) se quedan hasta R1: no son mecanismos duplicados, son restricciones de representación sin registro global. Guards representación en `collect_foreign_classes` (lang-name, sin-padre, builtin) se quedan hasta R1: no son mecanismos duplicados, son restricciones de representación sin registro global.
 
 ---
 
@@ -487,20 +488,20 @@ Raíz: **verificación en linkado, no en runtime**. El grafo cerrado (`build_mod
 
 ### R5 (marco). Linkado cerrado H2
 
-R1+R4 son casos de H2: emitir `ModuleSlot` verificado contra `ExportMap` en linkado + `interface_hash` en caché = closed-world. El runtime pasa a lookup en tabla, cero strings, cero re-resolución. Orden ejecutado: R2+R3 (verde, commit `5bbe91db`) → R4 (verde: `verify_synthetic_imports` en linkado + `check_import` en reexports, commit pendiente abajo) → R1+H2 (§8).
+R1+R4 son casos de H2: emitir `ModuleSlot` verificado contra `ExportMap` en linkado + `interface_hash` en caché = closed-world. El runtime pasa a lookup en tabla, cero strings, cero re-resolución. Orden ejecutado: R2+R3 (commit `5bbe91db`) → R4 (`verify_synthetic_imports` + `check_import` en reexports) → H8 (star materializado + colisiones) → R1/H2 (§8).
 
 ---
 
-## 8. R1/H2: plan de implementación (alcance medido, no implementado)
+## 8. R1/H2: plan de implementación (alcance medido, F0 ejecutado)
 
 Mecanismo probado con evidencia (no especulación):
 
-- `compiler/from_tir/build.rs:117-134` `TypeTest` baja a `global_load(cname)` + `HirBinOp::Instanceof`: el `instanceof` runtime compara IDENTIDAD de objeto clase, resuelto POR NOMBRE en los globals del módulo actual.
-- `compiler/from_tir/build/class_def.rs:13-23` cada módulo ejecuta `MakeClass { name, super_class }` propio: los objetos clase se crean por módulo, no hay identidad compartida.
+- `compiler/from_tir/build.rs:117-134` `TypeTest` baja a `global_load(cname)` + `HirBinOp::Instanceof`: el `instanceof` runtime compara IDENTIDAD de objeto clase (`advanced.rs:125-132` camina `superclass` comparando `c.id == cls.id`), resuelto POR NOMBRE en los globals del módulo actual.
+- `compiler/from_tir/build/class_def.rs:13-23` cada módulo ejecuta `MakeClass { name, super_class }` propio (`exec/class.rs:8-11` `op_class` crea SIEMPRE fresco vía `new_rc`, sin consultar ningún registro).
+- Dos mecanismos de creación conviven (Ley8): nativas por registro (`contract/mod.rs:116-122` `get_class`/`register_class` en `heap.intrinsic_classes`, singletons por nombre) vs fuente siempre-fresco. No unificar a ciegas por `(module,name)`: la frescura por evaluación es LOAD-BEARING para REPL/eval (redefinir `class Foo` por snippet debe crear objeto nuevo; internar por `(module,name)` acumularía métodos entre snippets).
 - `compiler/from_tir/ty.rs:33-36` el `ClassId` local muere en la frontera TIR→SSA (`HirType::Class` por nombre); el slot fixo (`GetFixedField`) se congela contra el `ClassInfo` local.
-- Hecho medido: `ve instanceof Error == false` (repro t4, §6) con padre foráneo, la única divergencia runtime restante con suite verde. La cadena de padres del objeto no contiene EL objeto que `global_load("Error")` devuelve en el módulo importador.
-
-Paso 0 (diagnóstico, sin cambio): instrumentar `MakeClass` (contar creaciones por nombre de clase por proceso). Si `Error` se crea >1 vez, hay doble evaluación de core (loader/precompiled) y el fix puede ser deduplicar en el loader (medio, no grande). Si se crea 1 vez, el problema es qué objeto guarda el import (`build_imports`: `LoadModule+GetProperty+global_store`) vs qué objeto enlaza `super_class`.
+- F0 medido (instrumento `VARN_DEBUG_CLASS` temporal, ya retirado): `Error#4, TypeError#5...` vía `new_native_rc` UNA vez; `ValidationError#24` vía `new_rc` UNA vez; cero `INSTANCEOF_MISS`; t4 `true`. Creación única por VM (linker/evaluación única funciona); heaps no cruzan threads (`SendValue`); `freeze` rechaza módulos con clases (`module_freeze.rs:70-71` → recargan normal) y `thaw` preserva el `Rc` (`thaw_export: Class`, misma identidad). Identidad runtime SANA bajo evaluación única; el t4-falso histórico fue artefacto de compile-time (ids `ClassId` duplicados entre tablas por módulo), ya fijado con `TypeTest` local-only + dinámico.
+- Restricción que queda: sin registro global, la unicidad depende de "un módulo se evalúa una vez" (linker) + frescura por evaluación (REPL). R1 completo = mover esa garantía de runtime-accidental a linkado-explícito (F1-F5).
 
 Fases (cada una verde + commit):
 
