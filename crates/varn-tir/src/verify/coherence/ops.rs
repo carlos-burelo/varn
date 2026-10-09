@@ -29,6 +29,16 @@ pub(super) fn check_binary(
         return;
     }
 
+    if matches!(op, TirBinOp::Instanceof | TirBinOp::In) {
+        if e.ty != BackendTy::Bool {
+            errors.push(VerifyError::new(
+                format!("{op:?} must produce Bool, node says {:?}", e.ty),
+                e.span,
+            ));
+        }
+        return;
+    }
+
     let l = lhs.ty.non_nullable(&m.types);
     let r = rhs.ty.non_nullable(&m.types);
 

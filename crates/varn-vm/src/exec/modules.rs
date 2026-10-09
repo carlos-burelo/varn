@@ -2,6 +2,16 @@ use crate::error::{RuntimeError, VmResult};
 use varn_core::ModuleId;
 
 pub(crate) fn resolve_specifier_to_id(specifier: &str, from: &ModuleId) -> VmResult<ModuleId> {
+    let from_str = from.as_str().to_string();
+    let from_layer = varn_modules::layer::Layer::of_module(&from_str);
+    let target_layer = varn_modules::layer::Layer::of_module(specifier);
+    if matches!(target_layer, varn_modules::layer::Layer::Runtime)
+        && !matches!(from_layer, varn_modules::layer::Layer::Std)
+    {
+        return Err(RuntimeError::new(format!(
+            "E_LAYER: '{specifier}' is a host module reserved for the standard library"
+        )));
+    }
     varn_modules::resolver::ModuleResolver::new()
         .resolve(specifier, from)
         .map_err(RuntimeError::new)
