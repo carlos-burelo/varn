@@ -222,27 +222,6 @@ pub(super) fn collect_exports(
                 let ns_ty = table.intern(varn_core::TypeKind::Named(name_atom, Some(origin_atom)));
                 ns_sym.ty = Some(Type::resolved(ns_ty));
                 ns_sym.origin_module = Some(intern_origin(out, &src_abs));
-                let mut sorted_sub: Vec<String> = src_exports.keys().cloned().collect();
-                sorted_sub.sort();
-                for sub_name in sorted_sub {
-                    let dotted = format!("{ns_str}.{sub_name}");
-                    if let Some(kept) = out.get(&dotted) {
-                        let kept_from = origin_text(bind, out, kept.origin_module, abs_path);
-                        let dropped_from = src_exports
-                            .get(&sub_name)
-                            .map(|s| origin_text(bind, out, s.origin_module, &src_abs))
-                            .unwrap_or_else(|| src_abs.clone());
-                        out.record_collision(dotted.clone(), kept_from, dropped_from);
-                        continue;
-                    }
-                    let sub_sym = src_exports
-                        .get(&sub_name)
-                        .expect("sorted sub export missing");
-                    let mut s = rehome_to_declaring_module(resolver, bind, visiting, sub_sym, out)
-                        .unwrap_or_else(|| sub_sym.clone());
-                    s.re_export_path.push(intern_origin(out, abs_path));
-                    out.insert(dotted, s);
-                }
                 if let Some(kept) = out.get(ns_str) {
                     let kept_from = origin_text(bind, out, kept.origin_module, abs_path);
                     out.record_collision(ns_str.to_string(), kept_from, src_abs.clone());
