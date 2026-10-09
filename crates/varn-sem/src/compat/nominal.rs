@@ -24,6 +24,9 @@ pub(super) fn nominal_arms(
         (TypeKind::Named(dn, origin_d), TypeKind::Named(in_, origin_i))
         | (TypeKind::Named(dn, origin_d), TypeKind::Generic(in_, _, origin_i))
         | (TypeKind::Generic(dn, _, origin_d), TypeKind::Named(in_, origin_i)) => {
+            if dn == in_ && origin_d == origin_i {
+                return Some(true);
+            }
             Some(match (resolve_atom(bind, dn), resolve_atom(bind, in_)) {
                 (Some(dn_s), Some(in_s)) => compatible_named(
                     &dn_s,
