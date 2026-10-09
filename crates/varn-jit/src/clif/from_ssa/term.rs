@@ -76,7 +76,7 @@ pub(super) fn emit_term(
                     &[exec_ctx],
                 );
 
-                ctx.views.clear(b);
+                ctx.views.clear_all(b);
             });
         }
     }

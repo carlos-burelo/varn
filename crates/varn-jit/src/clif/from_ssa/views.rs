@@ -13,11 +13,41 @@ pub(crate) struct View {
 
 pub(crate) struct Views {
     by_value: BTreeMap<u32, View>,
+    instance_by_canon: BTreeMap<u32, Variable>,
+    global_src: BTreeMap<u32, u32>,
 }
+
+pub(crate) const GLOBAL_CANON_BIT: u32 = 0x8000_0000;
 
 impl Views {
     pub(super) fn declare(b: &mut FunctionBuilder, ssa: &SsaProto) -> Self {
+        let mut global_src = BTreeMap::new();
+        for inst in ssa.blocks.iter().flat_map(|blk| &blk.insts) {
+            if let (Some(d), SsaOp::LoadGlobalIdx(slot)) = (inst.dest, &inst.op) {
+                global_src.insert(d, *slot);
+            }
+        }
+        let canon = |o: u32| -> u32 {
+            global_src
+                .get(&o)
+                .map(|s| GLOBAL_CANON_BIT | s)
+                .unwrap_or(o)
+        };
         let mut by_value = BTreeMap::new();
+        let mut instance_by_canon = BTreeMap::new();
+        for inst in ssa.blocks.iter().flat_map(|blk| &blk.insts) {
+            match &inst.op {
+                SsaOp::GetFixedField { object, .. } | SsaOp::SetFixedField { object, .. } => {
+                    let c = canon(*object);
+                    if c & GLOBAL_CANON_BIT != 0 {
+                        instance_by_canon
+                            .entry(c)
+                            .or_insert_with(|| b.declare_var(types::I64));
+                    }
+                }
+                _ => {}
+            }
+        }
         for inst in ssa.blocks.iter().flat_map(|blk| &blk.insts) {
             let object = match &inst.op {
                 SsaOp::ArrayGetIndex { object, .. } | SsaOp::ArraySetIndex { object, .. } => {
@@ -112,9 +142,32 @@ impl Views {
                 disc: b.declare_var(types::I64),
             });
         }
-        let views = Views { by_value };
+        let views = Views {
+            by_value,
+            instance_by_canon,
+            global_src,
+        };
         views.clear(b);
         views
+    }
+
+    pub(crate) fn canon(&self, object: u32) -> u32 {
+        self.global_src
+            .get(&object)
+            .map(|s| GLOBAL_CANON_BIT | s)
+            .unwrap_or(object)
+    }
+
+    pub(crate) fn instance_var(&self, canon: u32) -> Option<Variable> {
+        self.instance_by_canon.get(&canon).copied()
+    }
+
+    pub(super) fn invalidate_global(&self, b: &mut FunctionBuilder, slot: u32) {
+        let c = GLOBAL_CANON_BIT | slot;
+        if let Some(v) = self.instance_by_canon.get(&c) {
+            let zero = b.ins().iconst(types::I64, 0);
+            b.def_var(*v, zero);
+        }
     }
 
     pub(super) fn of(&self, object: u32) -> Option<View> {
@@ -131,6 +184,21 @@ impl Views {
             b.def_var(view.len, zero);
             b.def_var(view.disc, zero);
         }
+    }
+
+    pub(super) fn clear_instances(&self, b: &mut FunctionBuilder) {
+        if self.instance_by_canon.is_empty() {
+            return;
+        }
+        let zero = b.ins().iconst(types::I64, 0);
+        for v in self.instance_by_canon.values() {
+            b.def_var(*v, zero);
+        }
+    }
+
+    pub(super) fn clear_all(&self, b: &mut FunctionBuilder) {
+        self.clear(b);
+        self.clear_instances(b);
     }
 }
 

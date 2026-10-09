@@ -1,6 +1,6 @@
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
+use cranelift_codegen::ir::{condcodes::IntCC, types, Block, InstBuilder, Value};
 use cranelift_codegen::isa::CallConv;
-use cranelift_frontend::FunctionBuilder;
+use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::layout::{ScalarRepr, TypeLayout, COMPACT_REF_NULL};
 use varn_types::vm_value::{KIND_HEAP, KIND_NULL};
 
@@ -13,9 +13,34 @@ pub(crate) struct FieldIo<'a> {
     pub exec_ctx: Value,
 }
 
+pub(crate) fn cached_base(
+    b: &mut FunctionBuilder,
+    var: Option<Variable>,
+    io: &FieldIo,
+    obj: Value,
+    slow: Block,
+) -> Value {
+    let Some(var) = var else {
+        return emit::emit_instance_payload(b, obj, &io.helpers.array_layout, slow);
+    };
+    let cached = b.use_var(var);
+    let ready = b.create_block();
+    b.append_block_param(ready, types::I64);
+    let miss = b.create_block();
+    let hit = b.ins().icmp_imm_u(IntCC::NotEqual, cached, 0);
+    b.ins().brif(hit, ready, &[cached.into()], miss, &[]);
+    b.switch_to_block(miss);
+    let base = emit::emit_instance_payload(b, obj, &io.helpers.array_layout, slow);
+    b.def_var(var, base);
+    b.ins().jump(ready, &[base.into()]);
+    b.switch_to_block(ready);
+    b.block_params(ready)[0]
+}
+
 pub(crate) fn load_compact(
     b: &mut FunctionBuilder,
     io: &FieldIo,
+    instance_var: Option<Variable>,
     obj: Value,
     offset: u32,
     tag: Option<varn_core::RuntimeKind>,
@@ -25,7 +50,7 @@ pub(crate) fn load_compact(
     let cont = b.create_block();
     b.append_block_param(cont, types::I128);
 
-    let data_base = emit::emit_instance_payload(b, obj, &io.helpers.array_layout, slow);
+    let data_base = cached_base(b, instance_var, io, obj, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let pair = match TypeLayout::of_field(tag).repr {
@@ -78,9 +103,96 @@ pub(crate) fn load_compact(
     b.switch_to_block(cont);
     b.block_params(cont)[0]
 }
+pub(crate) fn store_compact_native(
+    b: &mut FunctionBuilder,
+    io: &FieldIo,
+    instance_var: Option<Variable>,
+    obj: Value,
+    native: Value,
+    value_is_float: bool,
+    offset: u32,
+    tag: Option<varn_core::RuntimeKind>,
+    slot: usize,
+) {
+    let slow = b.create_block();
+    let cont = b.create_block();
+    let inline = b.create_block();
+
+    let (obj_tag, obj_payload) = b.ins().isplit(obj);
+    let kind = b.ins().band_imm_u(obj_tag, emit::KIND_MASK);
+    let heap_ok = b.ins().icmp_imm_u(IntCC::Equal, kind, KIND_HEAP as i64);
+    let heap = b.create_block();
+    b.ins().brif(heap_ok, heap, &[], slow, &[]);
+    b.switch_to_block(heap);
+    let young = emit::is_young(b, obj_payload, &io.helpers.array_layout);
+    b.ins().brif(young, inline, &[], slow, &[]);
+
+    b.switch_to_block(inline);
+    let data_base = cached_base(b, instance_var, io, obj, slow);
+    let off = offset as i32;
+    let m = cranelift_codegen::ir::MemFlagsData::new();
+    match TypeLayout::of_field(tag).repr {
+        ScalarRepr::Bool => {
+            b.ins().istore8(m, native, data_base, off);
+        }
+        ScalarRepr::I64 => {
+            b.ins().store(m, native, data_base, off);
+        }
+        ScalarRepr::F64 => {
+            let f = if value_is_float {
+                native
+            } else {
+                b.ins().fcvt_from_sint(types::F64, native)
+            };
+            b.ins().store(m, f, data_base, off);
+        }
+        ScalarRepr::Ref | ScalarRepr::Boxed => {
+            b.ins().jump(slow, &[]);
+            b.switch_to_block(slow);
+            let slot_v = b.ins().iconst(types::I64, slot as i64);
+            let (vt, vp) = if value_is_float {
+                let boxed = emit::box_f64(b, native);
+                b.ins().isplit(boxed)
+            } else {
+                let boxed = emit::box_int(b, native);
+                b.ins().isplit(boxed)
+            };
+            call_helper_void(
+                b,
+                io.cc,
+                io.helpers.set_fixed_field,
+                &[io.exec_ctx, obj_tag, obj_payload, slot_v, vt, vp],
+            );
+            b.ins().jump(cont, &[]);
+            b.switch_to_block(cont);
+            return;
+        }
+    }
+    b.ins().jump(cont, &[]);
+
+    b.switch_to_block(slow);
+    let slot_v = b.ins().iconst(types::I64, slot as i64);
+    let (vt, vp) = if value_is_float {
+        let boxed = emit::box_f64(b, native);
+        b.ins().isplit(boxed)
+    } else {
+        let boxed = emit::box_int(b, native);
+        b.ins().isplit(boxed)
+    };
+    call_helper_void(
+        b,
+        io.cc,
+        io.helpers.set_fixed_field,
+        &[io.exec_ctx, obj_tag, obj_payload, slot_v, vt, vp],
+    );
+    b.ins().jump(cont, &[]);
+
+    b.switch_to_block(cont);
+}
 pub(crate) fn store_compact(
     b: &mut FunctionBuilder,
     io: &FieldIo,
+    instance_var: Option<Variable>,
     obj: Value,
     value: Value,
     offset: u32,
@@ -102,7 +214,7 @@ pub(crate) fn store_compact(
     b.ins().brif(young, inline, &[], slow, &[]);
 
     b.switch_to_block(inline);
-    let data_base = emit::emit_instance_payload(b, obj, &io.helpers.array_layout, slow);
+    let data_base = cached_base(b, instance_var, io, obj, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::new();
     match TypeLayout::of_field(tag).repr {

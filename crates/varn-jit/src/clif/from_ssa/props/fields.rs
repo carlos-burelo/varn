@@ -1,10 +1,12 @@
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{call_helper_void, emit_instance_payload};
-use super::super::super::fields::{load_compact, store_compact, FieldIo};
+use super::super::super::emit::call_helper_void;
+use super::super::super::fields::{
+    cached_base, load_compact, store_compact, store_compact_native, FieldIo,
+};
 use super::super::heap::{boxed_value, exec_ctx};
-use super::super::store::Out;
+use super::super::store::{load_value, Out};
 use super::super::Ctx;
 
 fn field_io<'a>(ctx: &'a Ctx<'_>) -> Result<FieldIo<'a>, String> {
@@ -27,6 +29,7 @@ pub(crate) fn emit_get_fixed_field(
     use varn_core::layout::{ScalarRepr, TypeLayout};
     use varn_types::register_meta::SlotKind;
     let obj = boxed_value(b, ctx, values, object)?;
+    let ivar = ctx.views.instance_var(ctx.views.canon(object));
     if let (Some(d), varn_core::FieldAccess::Compact(tag)) = (dest, access) {
         let native = matches!(
             (ctx.ssa.value_ty(d), TypeLayout::of_field(tag).repr),
@@ -35,8 +38,16 @@ pub(crate) fn emit_get_fixed_field(
                 | (SlotKind::Bool, ScalarRepr::Bool)
         );
         if native {
-            let v =
-                emit_get_fixed_field_native(b, ctx, obj, offset, tag, slot, ctx.ssa.value_ty(d))?;
+            let v = emit_get_fixed_field_native(
+                b,
+                ctx,
+                obj,
+                ivar,
+                offset,
+                tag,
+                slot,
+                ctx.ssa.value_ty(d),
+            )?;
             return Ok(Out::Native(v));
         }
     }
@@ -44,6 +55,7 @@ pub(crate) fn emit_get_fixed_field(
         return Ok(Out::Boxed(load_compact(
             b,
             &field_io(ctx)?,
+            ivar,
             obj,
             offset,
             kind,
@@ -71,6 +83,7 @@ fn emit_get_fixed_field_native(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     obj: Value,
+    ivar: Option<cranelift_frontend::Variable>,
     offset: u32,
     tag: Option<varn_core::RuntimeKind>,
     slot: u16,
@@ -91,7 +104,7 @@ fn emit_get_fixed_field_native(
     let slow = b.create_block();
     let cont = b.create_block();
     b.append_block_param(cont, merge_ty);
-    let data_base = emit_instance_payload(b, obj, &h.array_layout, slow);
+    let data_base = cached_base(b, ivar, &field_io(ctx)?, obj, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let v = match TypeLayout::of_field(tag).repr {
@@ -131,8 +144,46 @@ pub(crate) fn emit_set_fixed_field(
     offset: u32,
     kind: Option<varn_core::RuntimeKind>,
 ) -> Result<(), String> {
+    use varn_core::layout::{ScalarRepr, TypeLayout};
+    use varn_types::register_meta::SlotKind;
     let obj = boxed_value(b, ctx, values, object)?;
+    let ivar = ctx.views.instance_var(ctx.views.canon(object));
+    let vk = ctx.ssa.value_ty(value);
+    let repr = TypeLayout::of_field(kind).repr;
+    let native = matches!(
+        (vk, repr),
+        (SlotKind::Int, ScalarRepr::I64)
+            | (SlotKind::Bool, ScalarRepr::Bool)
+            | (SlotKind::Bool, ScalarRepr::I64)
+            | (SlotKind::Int, ScalarRepr::Bool)
+            | (SlotKind::Float, ScalarRepr::F64)
+            | (SlotKind::Int, ScalarRepr::F64)
+    );
+    if native {
+        let raw = load_value(b, ctx, values, value)?;
+        store_compact_native(
+            b,
+            &field_io(ctx)?,
+            ivar,
+            obj,
+            raw,
+            matches!(vk, SlotKind::Float),
+            offset,
+            kind,
+            slot as usize,
+        );
+        return Ok(());
+    }
     let val = boxed_value(b, ctx, values, value)?;
-    store_compact(b, &field_io(ctx)?, obj, val, offset, kind, slot as usize);
+    store_compact(
+        b,
+        &field_io(ctx)?,
+        ivar,
+        obj,
+        val,
+        offset,
+        kind,
+        slot as usize,
+    );
     Ok(())
 }

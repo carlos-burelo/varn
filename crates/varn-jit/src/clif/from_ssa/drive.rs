@@ -199,6 +199,15 @@ pub(in crate::clif) fn try_lower(
         );
     }
 
+    let mut global_src: std::collections::BTreeMap<u32, u32> = Default::default();
+    for blk in &ssa.blocks {
+        for inst in &blk.insts {
+            if let (Some(d), varn_types::ssa::SsaOp::LoadGlobalIdx(slot)) = (inst.dest, &inst.op) {
+                global_src.insert(d, *slot);
+            }
+        }
+    }
+
     for (n, i) in rpo.iter().enumerate() {
         let i = *i;
         let blk = &ssa.blocks[i];
@@ -223,13 +232,52 @@ pub(in crate::clif) fn try_lower(
             store::define(&mut b, &ctx, &mut values, p, pv);
         }
 
+        let mut fwd: std::collections::BTreeMap<(u32, u16), u32> = Default::default();
+        let canon = |o: u32| -> u32 { global_src.get(&o).map(|s| 0x8000_0000u32 | s).unwrap_or(o) };
         for inst in &blk.insts {
+            if let varn_types::ssa::SsaOp::GetFixedField { object, slot, .. } = &inst.op {
+                let k = (canon(*object), *slot);
+                if let (Some(d), Some(&src)) = (inst.dest, fwd.get(&k)) {
+                    if ctx.ssa.value_ty(d) == ctx.ssa.value_ty(src) {
+                        let v = store::load_value(&mut b, &ctx, &values, src)?;
+                        store::define(&mut b, &ctx, &mut values, d, v);
+                        continue;
+                    }
+                }
+            }
             match scalar::emit_inst(&mut b, &ctx, &mut values, &inst.op, inst.dest)? {
                 Some(out) => land(&mut b, &ctx, &mut values, inst.dest, out)?,
                 None if inst.dest.is_some() => {
                     return Err(format!("from_ssa: {:?} defines no value", inst.op));
                 }
                 None => {}
+            }
+            match &inst.op {
+                varn_types::ssa::SsaOp::GetFixedField { object, slot, .. } => {
+                    if let Some(d) = inst.dest {
+                        fwd.insert((canon(*object), *slot), d);
+                    }
+                }
+                varn_types::ssa::SsaOp::SetFixedField {
+                    object,
+                    value,
+                    slot,
+                    ..
+                } => {
+                    fwd.insert((canon(*object), *slot), *value);
+                }
+                varn_types::ssa::SsaOp::StoreGlobalIdx { slot, .. } => {
+                    let g = 0x8000_0000u32 | slot;
+                    fwd.retain(|k, _| k.0 != g);
+                    ctx.views.invalidate_global(&mut b, *slot);
+                }
+                varn_types::ssa::SsaOp::LoadGlobalIdx(..) => {}
+                _ => {
+                    if !views::keeps_views(ssa, &inst.op) {
+                        fwd.clear();
+                        ctx.views.clear_instances(&mut b);
+                    }
+                }
             }
             if !views::keeps_views(ssa, &inst.op) {
                 ctx.views.clear(&mut b);
