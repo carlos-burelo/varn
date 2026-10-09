@@ -1,8 +1,8 @@
 
   [1mtiers[0m [2m──────────────────────────────────────────── <module> · 3/3 ruteadas[0m
-  [2mfunción   [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                      [0m
-  ───────────┼───────┼──────┼────────────────────────────
-  <module>   │   111 │ clif │  (frame-aware: alloc+boxed)
-  sum        │    33 │ clif │  (frame-aware: boxed)      
-  firstAbove │    37 │ clif │  (frame-aware: boxed)      
+  [2mfunción   [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                 [0m
+  ───────────┼───────┼──────┼───────────────────────
+  <module>   │   111 │ clif │  (native: alloc+boxed)
+  sum        │    33 │ clif │  (native: boxed)      
+  firstAbove │    37 │ clif │  (native: boxed)      
   [2m── end: tiers ──[0m

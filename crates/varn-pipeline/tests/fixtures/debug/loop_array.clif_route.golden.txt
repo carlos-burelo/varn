@@ -1,9 +1,9 @@
 
   [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
-  [1m<module>[0m[2m (frame-aware)[0m
+  [1m<module>[0m[2m (native)[0m
   info ROUTE
-  [1msum[0m[2m (frame-aware)[0m
+  [1msum[0m[2m (native)[0m
   info ROUTE
-  [1mfirstAbove[0m[2m (frame-aware)[0m
+  [1mfirstAbove[0m[2m (native)[0m
   info ROUTE
   [2m── end: clif ──[0m

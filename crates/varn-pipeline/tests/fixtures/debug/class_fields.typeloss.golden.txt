@@ -2,6 +2,6 @@
   [34mtypeloss[0m [2m───────────────────────────────────────── <module>[0m
   [2mfunción [0m │ [2mgenérico[0m │ [2mtipado[0m │ [2mqué quedó genérico                              [0m
   ─────────┼──────────┼────────┼─────────────────────────────────────────────────
-  <module> │        4 │      0 │ GetProperty×3 SetProperty  ·  celsius fahrenheit
+  <module> │        4 │      1 │ GetProperty×3 SetProperty  ·  celsius fahrenheit
   [2mEl siguiente paso es `-p check:types` sobre uno de estos accesos: un `cg=` sin `fixed_field` es la puerta de anotación, y sin `cg=` es inferencia.[0m
   [2m── end: typeloss ──[0m

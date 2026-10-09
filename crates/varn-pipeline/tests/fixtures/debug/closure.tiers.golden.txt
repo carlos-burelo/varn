@@ -1,10 +1,10 @@
 
   [1mtiers[0m [2m──────────────────────────────────────────── <module> · 5/5 ruteadas[0m
-  [2mfunción    [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                      [0m
-  ────────────┼───────┼──────┼────────────────────────────
-  <module>    │   126 │ clif │  (frame-aware: alloc+boxed)
-  makeAdder   │     9 │ clif │  (frame-aware: alloc+boxed)
-  <closure>   │    11 │ clif │  (frame-aware: alloc+boxed)
-  makeCounter │    12 │ clif │  (frame-aware: alloc+boxed)
-  <closure>   │    13 │ clif │  (frame-aware: alloc+boxed)
+  [2mfunción    [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                 [0m
+  ────────────┼───────┼──────┼───────────────────────
+  <module>    │   126 │ clif │  (native: alloc+boxed)
+  makeAdder   │     9 │ clif │  (framed: alloc+boxed)
+  <closure>   │     9 │ clif │  (native: alloc)      
+  makeCounter │    12 │ clif │  (framed: alloc+boxed)
+  <closure>   │    13 │ clif │  (native: alloc)      
   [2m── end: tiers ──[0m

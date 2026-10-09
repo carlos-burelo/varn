@@ -1,6 +1,6 @@
 
   [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
-  [1m<module>[0m[2m (frame-aware)[0m
+  [1m<module>[0m[2m (native)[0m
   info ROUTE
   [1madd[0m[2m[0m
   info ROUTE

@@ -1,7 +1,7 @@
 
   [35mtir check[0m [2m──────────────────────────────────────── <fixtures>/class_fields.vn[0m
-nodes 48   static 16   by name 7   static 70%
-  unannotated        dynamic     7   by name     7
+nodes 48   static 16   by name 4   static 80%
+  not yet supported  dynamic     1   by name     4
   info from_tir(ssa): OK (5 ssa fn(s))
   info from_tir(proto): OK
   [2m── end: tir check ──[0m

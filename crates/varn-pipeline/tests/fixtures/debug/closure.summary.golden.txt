@@ -3,7 +3,7 @@
   [2mmétrica                 [0m │ [2m              valor[0m
   ─────────────────────────┼────────────────────
   funciones                │                   5
-  bytecode (words)         │                 171
+  bytecode (words)         │                 169
   constantes               │                   8
   exports                  │                   0
   fuera de clif por tamaño │ 0 (gate 8192 words)
@@ -13,6 +13,6 @@
   <module>    │ 126 words │     
   <closure>   │  13 words │     
   makeCounter │  12 words │     
-  <closure>   │  11 words │     
   makeAdder   │   9 words │     
+  <closure>   │   9 words │     
   [2m── end: summary ──[0m

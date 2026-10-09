@@ -1,7 +1,7 @@
 
   [35mtir check[0m [2m──────────────────────────────────────── <fixtures>/loop_array.vn[0m
-nodes 73   static 33   by name 4   static 89%
-  unannotated        dynamic     7   by name     4
+nodes 73   static 33   by name 2   static 94%
+  not yet supported  dynamic     3   by name     2
   info from_tir(ssa): OK (3 ssa fn(s))
   info from_tir(proto): OK
   [2m── end: tir check ──[0m

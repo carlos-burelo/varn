@@ -8,20 +8,23 @@
   [2m1:0     [0m │ class           │ [2m[core][0m [1mRangeError          [0m │ [33mRangeError[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mMul                 [0m │ [33mMul[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mError               [0m │ [33mError[0m
-  [2m1:0     [0m │ interface       │ [2m[core][0m [1mHashable            [0m │ [33mHashable[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mDebug               [0m │ [33mDebug[0m
-  [2m1:0     [0m │ type            │ [2m[core][0m [1mNonNullable         [0m │ [33mdynamic[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mHashable            [0m │ [33mHashable[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mMutable             [0m │ [33mdynamic[0m
+  [2m1:0     [0m │ type            │ [2m[core][0m [1mNonNullable         [0m │ [33mdynamic[0m
   [2m1:0     [0m │ const           │ [2m[core][0m [1mNaN                 [0m │ [33mfloat[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mint                 [0m │ [33mint[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mAdd                 [0m │ [33mAdd[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1mprint               [0m │ [33m(...args: dynamic[]) => void[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mEquatable           [0m │ [33mEquatable[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mGetterContext       [0m │ [33mGetterContext[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mbigint              [0m │ [33mbigint[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mSet                 [0m │ [33mSet[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mSetterContext       [0m │ [33mSetterContext[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mReturnType          [0m │ [33mdynamic[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mExtract             [0m │ [33mdynamic[0m
   [2m1:0     [0m │ const           │ [2m[core][0m [1mNone                [0m │ [33mdynamic[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mPropertyContext     [0m │ [33mPropertyContext[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mAsyncIterator       [0m │ [33mAsyncIterator[0m
   [2m1:0     [0m │ enum            │ [2m[core][0m [1mOption              [0m │ [33mOption[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mTaskHandle          [0m │ [33mTaskHandle[0m
@@ -37,12 +40,14 @@
   [2m1:0     [0m │ enum            │ [2m[core][0m [1mResult              [0m │ [33mResult[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mOmit                [0m │ [33mdynamic[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mAsyncDisposable     [0m │ [33mAsyncDisposable[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mMethodContext       [0m │ [33mMethodContext[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mbool                [0m │ [33mbool[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mCloneable           [0m │ [33mCloneable[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mIntegerOverflow     [0m │ [33mIntegerOverflow[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mfloat               [0m │ [33mfloat[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1mOk                  [0m │ [33m(value: T) => Result<T, E>[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mAwaited             [0m │ [33mdynamic[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mConstructorContext  [0m │ [33mConstructorContext[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mTypeError           [0m │ [33mTypeError[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mSub                 [0m │ [33mSub[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mIterator            [0m │ [33mIterator[0m
@@ -65,8 +70,8 @@
   [2m1:0     [0m │ type            │ [2m[core][0m [1mExclude             [0m │ [33mdynamic[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mDisplay             [0m │ [33mDisplay[0m
   [2m1:0     [0m │ const           │ [2m[core][0m [1mInfinity            [0m │ [33mfloat[0m
-  [2m1:0     [0m │ class           │ [2m[core][0m [1mGenerator           [0m │ [33mGenerator[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mAsyncGenerator      [0m │ [33mAsyncGenerator[0m
+  [2m1:0     [0m │ class           │ [2m[core][0m [1mGenerator           [0m │ [33mGenerator[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1minput               [0m │ [33m(prompt: str?) => str[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1madd                 [0m │ [33m(a: int, b: int) => int[0m
   [2m1:0     [0m │ param           │ [2m[core][0m [1ma                   [0m │ [33mint[0m

@@ -21,10 +21,9 @@ TirModule {
                 FieldInfo {
                     name: "value",
                     ty: Dynamic(
-                        Unannotated,
+                        NotYetSupported,
                     ),
                     slot: 0,
-                    offset: 0,
                 },
             ],
             vtable: [
@@ -41,38 +40,151 @@ TirModule {
                     ),
                 },
             ],
-            payload_size: 16,
+            layout: ClassLayout {
+                payload_size: 16,
+                alignment: 8,
+                fields: [
+                    FieldLayout {
+                        name: "value",
+                        kind: None,
+                        offset: 0,
+                        layout: TypeLayout {
+                            size: 16,
+                            align: 8,
+                            repr: Boxed,
+                        },
+                    },
+                ],
+                gc: GcLayout {
+                    slots: [
+                        GcSlot {
+                            offset: 0,
+                            repr: Boxed,
+                        },
+                    ],
+                },
+            },
             constructor: Some(
                 SigId(
                     1,
                 ),
             ),
         },
+        ClassInfo {
+            name: "Error",
+            parent: None,
+            fields: [
+                FieldInfo {
+                    name: "message",
+                    ty: Str,
+                    slot: 0,
+                },
+                FieldInfo {
+                    name: "name",
+                    ty: Str,
+                    slot: 1,
+                },
+                FieldInfo {
+                    name: "stack",
+                    ty: Str,
+                    slot: 2,
+                },
+            ],
+            vtable: [],
+            layout: ClassLayout {
+                payload_size: 48,
+                alignment: 8,
+                fields: [
+                    FieldLayout {
+                        name: "message",
+                        kind: Some(
+                            Str,
+                        ),
+                        offset: 0,
+                        layout: TypeLayout {
+                            size: 16,
+                            align: 8,
+                            repr: Boxed,
+                        },
+                    },
+                    FieldLayout {
+                        name: "name",
+                        kind: Some(
+                            Str,
+                        ),
+                        offset: 16,
+                        layout: TypeLayout {
+                            size: 16,
+                            align: 8,
+                            repr: Boxed,
+                        },
+                    },
+                    FieldLayout {
+                        name: "stack",
+                        kind: Some(
+                            Str,
+                        ),
+                        offset: 32,
+                        layout: TypeLayout {
+                            size: 16,
+                            align: 8,
+                            repr: Boxed,
+                        },
+                    },
+                ],
+                gc: GcLayout {
+                    slots: [
+                        GcSlot {
+                            offset: 0,
+                            repr: Boxed,
+                        },
+                        GcSlot {
+                            offset: 16,
+                            repr: Boxed,
+                        },
+                        GcSlot {
+                            offset: 32,
+                            repr: Boxed,
+                        },
+                    ],
+                },
+            },
+            constructor: None,
+        },
+    ],
+    class_origins: [
+        None,
+        Some(
+            "core:errors",
+        ),
     ],
     enums: [],
     signatures: [
         Signature {
             params: [],
             return_ty: Void,
+            has_rest: false,
         },
         Signature {
             params: [
                 Dynamic(
-                    Unannotated,
+                    NotYetSupported,
                 ),
             ],
             return_ty: Void,
+            has_rest: false,
         },
         Signature {
             params: [],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
+            has_rest: false,
         },
         Signature {
             params: [
                 Dynamic(
-                    Unannotated,
+                    NotYetSupported,
                 ),
             ],
             return_ty: Class(
@@ -80,16 +192,25 @@ TirModule {
                     0,
                 ),
             ),
+            has_rest: false,
         },
         Signature {
             params: [
                 Dynamic(
-                    Unannotated,
+                    NotYetSupported,
                 ),
             ],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Int,
+            ],
+            return_ty: Str,
+            has_rest: false,
         },
     ],
     functions: [
@@ -100,11 +221,11 @@ TirModule {
             ),
             params: [
                 Dynamic(
-                    Unannotated,
+                    NotYetSupported,
                 ),
             ],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
             locals: [],
             body: [
@@ -113,7 +234,7 @@ TirModule {
                         TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                Unannotated,
+                                NotYetSupported,
                             ),
                             res: Param(
                                 0,
@@ -131,20 +252,17 @@ TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
         TirFunction {
             name: "<closure>",
             sig: SigId(
-                0,
+                5,
             ),
             params: [
-                Dynamic(
-                    Unannotated,
-                ),
+                Int,
             ],
-            return_ty: Dynamic(
-                Unannotated,
-            ),
+            return_ty: Str,
             locals: [],
             body: [
                 Return(
@@ -222,6 +340,7 @@ TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
         TirFunction {
             name: "Box.constructor",
@@ -230,7 +349,7 @@ TirModule {
             ),
             params: [
                 Dynamic(
-                    Unannotated,
+                    NotYetSupported,
                 ),
             ],
             return_ty: Void,
@@ -257,7 +376,7 @@ TirModule {
                                     name: "value",
                                 },
                                 ty: Dynamic(
-                                    Unannotated,
+                                    NotYetSupported,
                                 ),
                                 res: FieldSlot(
                                     0,
@@ -270,7 +389,7 @@ TirModule {
                             value: TirExpr {
                                 kind: Var,
                                 ty: Dynamic(
-                                    Unannotated,
+                                    NotYetSupported,
                                 ),
                                 res: Param(
                                     0,
@@ -282,7 +401,7 @@ TirModule {
                             },
                         },
                         ty: Dynamic(
-                            Unannotated,
+                            NotYetSupported,
                         ),
                         res: None,
                         span: Span {
@@ -301,6 +420,7 @@ TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
         TirFunction {
             name: "Box.get",
@@ -309,7 +429,7 @@ TirModule {
             ),
             params: [],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
             locals: [],
             body: [
@@ -333,7 +453,7 @@ TirModule {
                                 name: "value",
                             },
                             ty: Dynamic(
-                                Unannotated,
+                                NotYetSupported,
                             ),
                             res: FieldSlot(
                                 0,
@@ -355,6 +475,7 @@ TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
         TirFunction {
             name: "Box.map",
@@ -363,7 +484,7 @@ TirModule {
             ),
             params: [
                 Dynamic(
-                    Unannotated,
+                    NotYetSupported,
                 ),
             ],
             return_ty: Class(
@@ -387,7 +508,7 @@ TirModule {
                                                 callee: TirExpr {
                                                     kind: Var,
                                                     ty: Dynamic(
-                                                        Unannotated,
+                                                        NotYetSupported,
                                                     ),
                                                     res: Param(
                                                         0,
@@ -417,7 +538,7 @@ TirModule {
                                                                 name: "value",
                                                             },
                                                             ty: Dynamic(
-                                                                Unannotated,
+                                                                NotYetSupported,
                                                             ),
                                                             res: FieldSlot(
                                                                 0,
@@ -431,12 +552,9 @@ TirModule {
                                                 ],
                                             },
                                             ty: Dynamic(
-                                                Unannotated,
+                                                NotYetSupported,
                                             ),
-                                            res: ByName {
-                                                name: "f",
-                                                why: Unannotated,
-                                            },
+                                            res: None,
                                             span: Span {
                                                 start: 191,
                                                 end: 204,
@@ -468,6 +586,7 @@ TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
     ],
     globals: [
@@ -477,7 +596,7 @@ TirModule {
             ),
         ),
         Dynamic(
-            Unannotated,
+            NotYetSupported,
         ),
         Class(
             ClassId(
@@ -540,6 +659,7 @@ TirModule {
             ],
             accessors: [],
             decorators: [],
+            property_decorators: [],
             static_blocks: [],
             variants: [],
         },
@@ -673,8 +793,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Unannotated,
+                                    ty: Class(
+                                        ClassId(
+                                            1,
+                                        ),
                                     ),
                                     res: NativeGlobal(
                                         4,
@@ -700,13 +822,12 @@ TirModule {
                                     ),
                                 ],
                             },
-                            ty: Dynamic(
-                                Unannotated,
+                            ty: Class(
+                                ClassId(
+                                    1,
+                                ),
                             ),
-                            res: ByName {
-                                name: "<new>",
-                                why: Unannotated,
-                            },
+                            res: None,
                             span: Span {
                                 start: 326,
                                 end: 351,
@@ -725,7 +846,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        Unannotated,
+                                        NotYetSupported,
                                     ),
                                     res: GlobalSlot(
                                         1,
@@ -787,8 +908,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Unannotated,
+                                    ty: Class(
+                                        ClassId(
+                                            1,
+                                        ),
                                     ),
                                     res: NativeGlobal(
                                         4,
@@ -814,13 +937,12 @@ TirModule {
                                     ),
                                 ],
                             },
-                            ty: Dynamic(
-                                Unannotated,
+                            ty: Class(
+                                ClassId(
+                                    1,
+                                ),
                             ),
-                            res: ByName {
-                                name: "<new>",
-                                why: Unannotated,
-                            },
+                            res: None,
                             span: Span {
                                 start: 388,
                                 end: 418,
@@ -876,7 +998,7 @@ TirModule {
                                                 upvalues: [],
                                             },
                                             ty: Dynamic(
-                                                Unannotated,
+                                                NotYetSupported,
                                             ),
                                             res: None,
                                             span: Span {
@@ -967,8 +1089,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Unannotated,
+                                    ty: Class(
+                                        ClassId(
+                                            1,
+                                        ),
                                     ),
                                     res: NativeGlobal(
                                         4,
@@ -994,13 +1118,12 @@ TirModule {
                                     ),
                                 ],
                             },
-                            ty: Dynamic(
-                                Unannotated,
+                            ty: Class(
+                                ClassId(
+                                    1,
+                                ),
                             ),
-                            res: ByName {
-                                name: "<new>",
-                                why: Unannotated,
-                            },
+                            res: None,
                             span: Span {
                                 start: 505,
                                 end: 530,
@@ -1016,7 +1139,7 @@ TirModule {
                         callee: TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                Unannotated,
+                                NotYetSupported,
                             ),
                             res: NativeGlobal(
                                 0,
@@ -1058,6 +1181,7 @@ TirModule {
         is_async: false,
         is_generator: false,
         has_rest: false,
+        force_inline: false,
     },
 }
   [2m── end: tir ──[0m

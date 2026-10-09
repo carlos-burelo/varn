@@ -1,10 +1,10 @@
 
   [33mbytecode[0m [2m───────────────────────────────────────── ...[0m
-[1mfn[0m [34m<module>[0m (arity: 1, regs: 15, upvalues: 0)
+[1mfn[0m [34m<module>[0m (arity: 1, regs: 13, upvalues: 0)
   [2mconstants (14)[0m
   [2m[000][0m [34mfn identity[0m(arity=2)
   [2m[001][0m [32m"Box"[0m
-  [2m[002][0m [32m"value"[0m
+  [2m[002][0m [2mlayout[1][0m
   [2m[003][0m [34mfn Box.constructor[0m(arity=2)
   [2m[004][0m [32m"constructor"[0m
   [2m[005][0m [34mfn Box.get[0m(arity=1)
@@ -19,64 +19,63 @@
   [2mcode (119) words[0m
   [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
   ────────────────────────────────────────────────────────────────────────
-  0000 │   0 │ [34mLoadStaticFn        [0m │ r1 = #0  [2m;[0m [34mfn identity[0m(arity=2)
-  0002 │   0 │ [36mDefineGlobalIdx     [0m │ r1, global@1
-  0005 │   0 │ [34mMakeClass           [0m │ r1 = #1, r0  [2m;[0m [32m"Box"[0m
-  0008 │   0 │ [34mDeclareField        [0m │ r1, #2, :dynamic  [2m;[0m [32m"value"[0m
-  0011 │   0 │ [34mLoadStaticFn        [0m │ r2 = #3  [2m;[0m [34mfn Box.constructor[0m(arity=2)
-  0013 │   0 │ [34mMethod              [0m │ r1, #4, r2  [2m;[0m [32m"constructor"[0m
-  0016 │   0 │ [34mLoadStaticFn        [0m │ r2 = #5  [2m;[0m [34mfn Box.get[0m(arity=1)
-  0018 │   0 │ [34mMethod              [0m │ r1, #6, r2  [2m;[0m [32m"get"[0m
-  0021 │   0 │ [34mLoadStaticFn        [0m │ r2 = #7  [2m;[0m [34mfn Box.map[0m(arity=2)
-  0023 │   0 │ [34mMethod              [0m │ r1, #8, r2  [2m;[0m [32m"map"[0m
-  0026 │   0 │ [36mDefineGlobalIdx     [0m │ r1, global@0
-  0029 │   0 │ [36mLoadGlobalIdx       [0m │ r1 = global@0
-  0031 │   0 │ [36mLoadInt             [0m │ r3 = 10
-  0033 │   0 │ LoadNull            [0m │ r13 = null
-  0034 │   0 │ Move                [0m │ r14 = r3
-  0036 │   0 │ [35mCall                [0m │ r2 = r1, (r13..r14)
-  0039 │   0 │ [36mDefineGlobalIdx     [0m │ r2, global@2
-  0042 │   0 │ [36mLoadGlobalIdx       [0m │ r1 = global@2
-  0044 │   0 │ [35mInvokeVirtual       [0m │ r4 = r1, #6, (), ic0  [2m;[0m [32m"get"[0m
-  0048 │   0 │ [32mNeqInt              [0m │ r5 = r4 != r3
-  0050 │   1 │ [33mJumpIfFalse         [0m │ r5, → 0065
-  0053 │   0 │ [36mLoadNativeGlobalIdx [0m │ r6 = native@4
-  0055 │   0 │ [36mLoadConst           [0m │ r7 = #9  [2m;[0m [32m"generics get"[0m
-  0057 │   0 │ LoadNull            [0m │ r13 = null
-  0058 │   0 │ Move                [0m │ r14 = r7
-  0060 │   0 │ [35mCall                [0m │ r8 = r6, (r13..r14)
-  0063 │   1 │ [33mThrow               [0m │ r8
-  0065 │   0 │ [36mLoadGlobalIdx       [0m │ r1 = global@2
-  0067 │   0 │ [34mLoadStaticFn        [0m │ r2 = #10  [2m;[0m [34mfn <closure>[0m(arity=2)
-  0069 │   0 │ Move                [0m │ r13 = r2
-  0071 │   0 │ [35mInvokeVirtual       [0m │ r9 = r1, #8, (r13), ic1  [2m;[0m [32m"map"[0m
-  0075 │   0 │ [36mDefineGlobalIdx     [0m │ r9, global@3
-  0078 │   0 │ [36mLoadGlobalIdx       [0m │ r1 = global@3
-  0080 │   0 │ [35mInvokeVirtual       [0m │ r7 = r1, #6, (), ic2  [2m;[0m [32m"get"[0m
-  0084 │   0 │ [36mLoadConst           [0m │ r10 = #11  [2m;[0m [32m"value=10"[0m
-  0086 │   0 │ [32mNeq                 [0m │ r5 = r7 != r10
-  0088 │   1 │ [33mJumpIfFalse         [0m │ r5, → 0103
-  0091 │   0 │ [36mLoadNativeGlobalIdx [0m │ r6 = native@4
-  0093 │   0 │ [36mLoadConst           [0m │ r7 = #12  [2m;[0m [32m"generics map"[0m
-  0095 │   0 │ LoadNull            [0m │ r13 = null
-  0096 │   0 │ Move                [0m │ r14 = r7
-  0098 │   0 │ [35mCall                [0m │ r8 = r6, (r13..r14)
-  0101 │   1 │ [33mThrow               [0m │ r8
-  0103 │   0 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@0
-  0105 │   0 │ [36mLoadConst           [0m │ r7 = #13  [2m;[0m [32m"generics ok"[0m
-  0107 │   0 │ LoadNull            [0m │ r13 = null
-  0108 │   0 │ Move                [0m │ r14 = r7
-  0110 │   0 │ [35mCall                [0m │ r11 = r1, (r13..r14)
-  0113 │   1 │ LoadNull            [0m │ r12 = null
-  0114 │   1 │ [33mReturn              [0m │ r12
-  0116 │   1 │ LoadNull            [0m │ r12 = null
-  0117 │   1 │ [33mReturn              [0m │ r12
+  0000 │   1 │ [34mLoadStaticFn        [0m │ r1 = #0  [2m;[0m [34mfn identity[0m(arity=2)
+  0002 │   1 │ [36mDefineGlobalIdx     [0m │ r1, global@1
+  0005 │   1 │ [34mMakeClass           [0m │ r1 = #1, r0  [2m;[0m [32m"Box"[0m
+  0008 │   1 │ [34mDeclareLayout       [0m │ r1, #2  [2m;[0m [2mlayout[1][0m
+  0011 │   1 │ [34mLoadStaticFn        [0m │ r2 = #3  [2m;[0m [34mfn Box.constructor[0m(arity=2)
+  0013 │   1 │ [34mMethod              [0m │ r1, #4, r2  [2m;[0m [32m"constructor"[0m
+  0016 │   1 │ [34mLoadStaticFn        [0m │ r2 = #5  [2m;[0m [34mfn Box.get[0m(arity=1)
+  0018 │   1 │ [34mMethod              [0m │ r1, #6, r2  [2m;[0m [32m"get"[0m
+  0021 │   1 │ [34mLoadStaticFn        [0m │ r2 = #7  [2m;[0m [34mfn Box.map[0m(arity=2)
+  0023 │   1 │ [34mMethod              [0m │ r1, #8, r2  [2m;[0m [32m"map"[0m
+  0026 │   1 │ [36mDefineGlobalIdx     [0m │ r1, global@0
+  0029 │  21 │ [36mLoadGlobalIdx       [0m │ r1 = global@0
+  0031 │  21 │ [36mLoadInt             [0m │ r3 = 10
+  0033 │  21 │ AllocInstance       [0m │ r2 = r1
+  0035 │   5 │ SetFixedField       [0m │ r2, r3, field0, +0, :dynamic
+  0039 │   5 │ [36mDefineGlobalIdx     [0m │ r2, global@2
+  0042 │  22 │ [36mLoadGlobalIdx       [0m │ r1 = global@2
+  0044 │  22 │ [35mInvokeVirtual       [0m │ r4 = r1, #6, (), ic0  [2m;[0m [32m"get"[0m
+  0048 │  22 │ [32mNeqInt              [0m │ r5 = r4 != r3
+  0050 │  22 │ [33mJumpIfFalse         [0m │ r5, → 0065
+  0053 │  22 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
+  0055 │  22 │ [36mLoadConst           [0m │ r6 = #9  [2m;[0m [32m"generics get"[0m
+  0057 │  22 │ LoadNull            [0m │ r11 = null
+  0058 │  22 │ Move                [0m │ r12 = r6
+  0060 │  22 │ [35mCall                [0m │ r2 = r1, (r11..r12)
+  0063 │  22 │ [33mThrow               [0m │ r2
+  0065 │  24 │ [36mLoadGlobalIdx       [0m │ r1 = global@2
+  0067 │  24 │ [34mLoadStaticFn        [0m │ r2 = #10  [2m;[0m [34mfn <closure>[0m(arity=2)
+  0069 │  24 │ Move                [0m │ r11 = r2
+  0071 │  24 │ [35mInvokeVirtual       [0m │ r7 = r1, #8, (r11), ic1  [2m;[0m [32m"map"[0m
+  0075 │  24 │ [36mDefineGlobalIdx     [0m │ r7, global@3
+  0078 │  25 │ [36mLoadGlobalIdx       [0m │ r1 = global@3
+  0080 │  25 │ [35mInvokeVirtual       [0m │ r6 = r1, #6, (), ic2  [2m;[0m [32m"get"[0m
+  0084 │  25 │ [36mLoadConst           [0m │ r8 = #11  [2m;[0m [32m"value=10"[0m
+  0086 │  25 │ [32mNeq                 [0m │ r5 = r6 != r8
+  0088 │  25 │ [33mJumpIfFalse         [0m │ r5, → 0103
+  0091 │  25 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
+  0093 │  25 │ [36mLoadConst           [0m │ r6 = #12  [2m;[0m [32m"generics map"[0m
+  0095 │  25 │ LoadNull            [0m │ r11 = null
+  0096 │  25 │ Move                [0m │ r12 = r6
+  0098 │  25 │ [35mCall                [0m │ r2 = r1, (r11..r12)
+  0101 │  25 │ [33mThrow               [0m │ r2
+  0103 │  26 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@0
+  0105 │  26 │ [36mLoadConst           [0m │ r6 = #13  [2m;[0m [32m"generics ok"[0m
+  0107 │  26 │ LoadNull            [0m │ r11 = null
+  0108 │  26 │ Move                [0m │ r12 = r6
+  0110 │  26 │ [35mCall                [0m │ r9 = r1, (r11..r12)
+  0113 │  26 │ LoadNull            [0m │ r10 = null
+  0114 │  26 │ [33mReturn              [0m │ r10
+  0116 │   1 │ LoadNull            [0m │ r10 = null
+  0117 │   1 │ [33mReturn              [0m │ r10
 
   [1mfn[0m [34midentity[0m (arity: 2, regs: 3, upvalues: 0)
     [2mcode (5) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
-    0000 │   1 │ [33mReturn              [0m │ r1
+    0000 │  18 │ [33mReturn              [0m │ r1
     0002 │   1 │ LoadNull            [0m │ r2 = null
     0003 │   1 │ [33mReturn              [0m │ r2
 
@@ -84,10 +83,10 @@
     [2mcode (12) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
-    0000 │   0 │ Move                [0m │ r2 = r0
-    0002 │   0 │ SetFixedField       [0m │ r2, r1, field0, +0, :dynamic
-    0006 │   1 │ LoadNull            [0m │ r3 = null
-    0007 │   1 │ [33mReturn              [0m │ r3
+    0000 │   5 │ Move                [0m │ r2 = r0
+    0002 │   5 │ SetFixedField       [0m │ r2, r1, field0, +0, :dynamic
+    0006 │   5 │ LoadNull            [0m │ r3 = null
+    0007 │   5 │ [33mReturn              [0m │ r3
     0009 │   1 │ LoadNull            [0m │ r3 = null
     0010 │   1 │ [33mReturn              [0m │ r3
 
@@ -95,9 +94,9 @@
     [2mcode (11) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
-    0000 │   0 │ Move                [0m │ r1 = r0
-    0002 │   0 │ GetFixedField       [0m │ r2 = r1, field0, +0, :dynamic
-    0006 │   1 │ [33mReturn              [0m │ r2
+    0000 │   9 │ Move                [0m │ r1 = r0
+    0002 │   9 │ GetFixedField       [0m │ r2 = r1, field0, +0, :dynamic
+    0006 │   9 │ [33mReturn              [0m │ r2
     0008 │   1 │ LoadNull            [0m │ r2 = null
     0009 │   1 │ [33mReturn              [0m │ r2
 
@@ -105,16 +104,15 @@
     [2mcode (25) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
-    0000 │   0 │ [36mLoadGlobalIdx       [0m │ r2 = global@0
-    0002 │   0 │ Move                [0m │ r3 = r0
-    0004 │   0 │ GetFixedField       [0m │ r4 = r3, field0, +0, :dynamic
-    0008 │   0 │ LoadNull            [0m │ r8 = null
-    0009 │   0 │ Move                [0m │ r9 = r4
-    0011 │   0 │ [35mCall                [0m │ r5 = r1, (r8..r9)
-    0014 │   0 │ LoadNull            [0m │ r8 = null
-    0015 │   0 │ Move                [0m │ r9 = r5
-    0017 │   0 │ [35mCall                [0m │ r3 = r2, (r8..r9)
-    0020 │   1 │ [33mReturn              [0m │ r3
+    0000 │  13 │ [36mLoadGlobalIdx       [0m │ r2 = global@0
+    0002 │  13 │ Move                [0m │ r3 = r0
+    0004 │  13 │ GetFixedField       [0m │ r4 = r3, field0, +0, :dynamic
+    0008 │  13 │ LoadNull            [0m │ r8 = null
+    0009 │  13 │ Move                [0m │ r9 = r4
+    0011 │  13 │ [35mCall                [0m │ r5 = r1, (r8..r9)
+    0014 │  13 │ AllocInstance       [0m │ r3 = r2
+    0016 │   5 │ SetFixedField       [0m │ r3, r5, field0, +0, :dynamic
+    0020 │   5 │ [33mReturn              [0m │ r3
     0022 │   1 │ LoadNull            [0m │ r7 = null
     0023 │   1 │ [33mReturn              [0m │ r7
 
@@ -125,12 +123,12 @@
     [2mcode (15) words[0m
     [2mOff  │ Lin │ Opcode               │ Operands / Hint[0m
     ────────────────────────────────────────────────────────────────────────
-    0000 │   0 │ [36mLoadConst           [0m │ r2 = #0  [2m;[0m [32m"value="[0m
-    0002 │   0 │ Move                [0m │ r3 = r1
-    0004 │   0 │ [32mStrConcat           [0m │ r4 = r2 + r3
-    0006 │   0 │ [36mLoadConst           [0m │ r2 = #1  [2m;[0m [32m""[0m
-    0008 │   0 │ [32mStrConcat           [0m │ r3 = r4 + r2
-    0010 │   1 │ [33mReturn              [0m │ r3
+    0000 │  24 │ [36mLoadConst           [0m │ r2 = #0  [2m;[0m [32m"value="[0m
+    0002 │  24 │ Move                [0m │ r3 = r1
+    0004 │  24 │ [32mStrConcat           [0m │ r4 = r2 + r3
+    0006 │  24 │ [36mLoadConst           [0m │ r2 = #1  [2m;[0m [32m""[0m
+    0008 │  24 │ [32mStrConcat           [0m │ r3 = r4 + r2
+    0010 │  24 │ [33mReturn              [0m │ r3
     0012 │   1 │ LoadNull            [0m │ r5 = null
     0013 │   1 │ [33mReturn              [0m │ r5
 

@@ -22,7 +22,6 @@ TirModule {
                     name: "_celsius",
                     ty: Float,
                     slot: 0,
-                    offset: 0,
                 },
             ],
             vtable: [
@@ -45,65 +44,180 @@ TirModule {
                     ),
                 },
             ],
-            payload_size: 16,
+            layout: ClassLayout {
+                payload_size: 8,
+                alignment: 8,
+                fields: [
+                    FieldLayout {
+                        name: "_celsius",
+                        kind: Some(
+                            Float,
+                        ),
+                        offset: 0,
+                        layout: TypeLayout {
+                            size: 8,
+                            align: 8,
+                            repr: F64,
+                        },
+                    },
+                ],
+                gc: GcLayout {
+                    slots: [],
+                },
+            },
             constructor: Some(
                 SigId(
                     1,
                 ),
             ),
         },
+        ClassInfo {
+            name: "Error",
+            parent: None,
+            fields: [
+                FieldInfo {
+                    name: "message",
+                    ty: Str,
+                    slot: 0,
+                },
+                FieldInfo {
+                    name: "name",
+                    ty: Str,
+                    slot: 1,
+                },
+                FieldInfo {
+                    name: "stack",
+                    ty: Str,
+                    slot: 2,
+                },
+            ],
+            vtable: [],
+            layout: ClassLayout {
+                payload_size: 48,
+                alignment: 8,
+                fields: [
+                    FieldLayout {
+                        name: "message",
+                        kind: Some(
+                            Str,
+                        ),
+                        offset: 0,
+                        layout: TypeLayout {
+                            size: 16,
+                            align: 8,
+                            repr: Boxed,
+                        },
+                    },
+                    FieldLayout {
+                        name: "name",
+                        kind: Some(
+                            Str,
+                        ),
+                        offset: 16,
+                        layout: TypeLayout {
+                            size: 16,
+                            align: 8,
+                            repr: Boxed,
+                        },
+                    },
+                    FieldLayout {
+                        name: "stack",
+                        kind: Some(
+                            Str,
+                        ),
+                        offset: 32,
+                        layout: TypeLayout {
+                            size: 16,
+                            align: 8,
+                            repr: Boxed,
+                        },
+                    },
+                ],
+                gc: GcLayout {
+                    slots: [
+                        GcSlot {
+                            offset: 0,
+                            repr: Boxed,
+                        },
+                        GcSlot {
+                            offset: 16,
+                            repr: Boxed,
+                        },
+                        GcSlot {
+                            offset: 32,
+                            repr: Boxed,
+                        },
+                    ],
+                },
+            },
+            constructor: None,
+        },
+    ],
+    class_origins: [
+        None,
+        Some(
+            "core:errors",
+        ),
     ],
     enums: [],
     signatures: [
         Signature {
             params: [],
             return_ty: Void,
+            has_rest: false,
         },
         Signature {
             params: [
                 Float,
             ],
             return_ty: Void,
+            has_rest: false,
         },
         Signature {
             params: [],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
+            has_rest: false,
         },
         Signature {
             params: [],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
+            has_rest: false,
         },
         Signature {
             params: [],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
+            has_rest: false,
         },
         Signature {
             params: [],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
+            has_rest: false,
         },
         Signature {
             params: [
                 Dynamic(
-                    Unannotated,
+                    NotYetSupported,
                 ),
             ],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
+            has_rest: false,
         },
         Signature {
             params: [],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
+            has_rest: false,
         },
     ],
     functions: [
@@ -177,6 +291,7 @@ TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
         TirFunction {
             name: "Temperature.get celsius",
@@ -185,7 +300,7 @@ TirModule {
             ),
             params: [],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
             locals: [],
             body: [
@@ -229,6 +344,7 @@ TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
         TirFunction {
             name: "Temperature.set celsius",
@@ -237,11 +353,11 @@ TirModule {
             ),
             params: [
                 Dynamic(
-                    Unannotated,
+                    NotYetSupported,
                 ),
             ],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
             locals: [],
             body: [
@@ -304,6 +420,7 @@ TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
         TirFunction {
             name: "Temperature.get fahrenheit",
@@ -312,7 +429,7 @@ TirModule {
             ),
             params: [],
             return_ty: Dynamic(
-                Unannotated,
+                NotYetSupported,
             ),
             locals: [],
             body: [
@@ -400,6 +517,7 @@ TirModule {
             is_async: false,
             is_generator: false,
             has_rest: false,
+            force_inline: false,
         },
     ],
     globals: [
@@ -450,6 +568,7 @@ TirModule {
                     ),
                     is_getter: true,
                     is_static: false,
+                    decorators: [],
                 },
                 TirClassAccessor {
                     key: "celsius",
@@ -458,6 +577,7 @@ TirModule {
                     ),
                     is_getter: false,
                     is_static: false,
+                    decorators: [],
                 },
                 TirClassAccessor {
                     key: "fahrenheit",
@@ -466,9 +586,11 @@ TirModule {
                     ),
                     is_getter: true,
                     is_static: false,
+                    decorators: [],
                 },
             ],
             decorators: [],
+            property_decorators: [],
             static_blocks: [],
             variants: [],
         },
@@ -570,7 +692,7 @@ TirModule {
                             ty: Float,
                             res: ByName {
                                 name: "celsius",
-                                why: Unannotated,
+                                why: NotYetSupported,
                             },
                             span: Span {
                                 start: 352,
@@ -602,8 +724,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Unannotated,
+                                    ty: Class(
+                                        ClassId(
+                                            1,
+                                        ),
                                     ),
                                     res: NativeGlobal(
                                         4,
@@ -629,13 +753,12 @@ TirModule {
                                     ),
                                 ],
                             },
-                            ty: Dynamic(
-                                Unannotated,
+                            ty: Class(
+                                ClassId(
+                                    1,
+                                ),
                             ),
-                            res: ByName {
-                                name: "<new>",
-                                why: Unannotated,
-                            },
+                            res: None,
                             span: Span {
                                 start: 379,
                                 end: 404,
@@ -671,7 +794,7 @@ TirModule {
                             ty: Float,
                             res: ByName {
                                 name: "fahrenheit",
-                                why: Unannotated,
+                                why: NotYetSupported,
                             },
                             span: Span {
                                 start: 409,
@@ -703,8 +826,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Unannotated,
+                                    ty: Class(
+                                        ClassId(
+                                            1,
+                                        ),
                                     ),
                                     res: NativeGlobal(
                                         4,
@@ -730,13 +855,12 @@ TirModule {
                                     ),
                                 ],
                             },
-                            ty: Dynamic(
-                                Unannotated,
+                            ty: Class(
+                                ClassId(
+                                    1,
+                                ),
                             ),
-                            res: ByName {
-                                name: "<new>",
-                                why: Unannotated,
-                            },
+                            res: None,
                             span: Span {
                                 start: 439,
                                 end: 465,
@@ -771,7 +895,7 @@ TirModule {
                             ty: Float,
                             res: ByName {
                                 name: "celsius",
-                                why: Unannotated,
+                                why: NotYetSupported,
                             },
                             span: Span {
                                 start: 466,
@@ -824,7 +948,7 @@ TirModule {
                             ty: Float,
                             res: ByName {
                                 name: "fahrenheit",
-                                why: Unannotated,
+                                why: NotYetSupported,
                             },
                             span: Span {
                                 start: 486,
@@ -856,8 +980,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Unannotated,
+                                    ty: Class(
+                                        ClassId(
+                                            1,
+                                        ),
                                     ),
                                     res: NativeGlobal(
                                         4,
@@ -883,13 +1009,12 @@ TirModule {
                                     ),
                                 ],
                             },
-                            ty: Dynamic(
-                                Unannotated,
+                            ty: Class(
+                                ClassId(
+                                    1,
+                                ),
                             ),
-                            res: ByName {
-                                name: "<new>",
-                                why: Unannotated,
-                            },
+                            res: None,
                             span: Span {
                                 start: 515,
                                 end: 540,
@@ -905,7 +1030,7 @@ TirModule {
                         callee: TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                Unannotated,
+                                NotYetSupported,
                             ),
                             res: NativeGlobal(
                                 0,
@@ -947,6 +1072,7 @@ TirModule {
         is_async: false,
         is_generator: false,
         has_rest: false,
+        force_inline: false,
     },
 }
   [2m── end: tir ──[0m

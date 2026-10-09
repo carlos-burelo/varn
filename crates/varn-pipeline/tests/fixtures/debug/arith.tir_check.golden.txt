@@ -1,7 +1,7 @@
 
   [35mtir check[0m [2m──────────────────────────────────────── <fixtures>/arith.vn[0m
-nodes 31   static 13   by name 2   static 87%
-  unannotated        dynamic     7   by name     2
+nodes 31   static 13   by name 0   static 100%
+  not yet supported  dynamic     3   by name     0
   info from_tir(ssa): OK (3 ssa fn(s))
   info from_tir(proto): OK
   [2m── end: tir check ──[0m
