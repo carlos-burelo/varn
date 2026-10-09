@@ -199,6 +199,17 @@ impl ExecCtx {
         resolved: ModuleId,
         proto: std::rc::Rc<varn_types::FunctionProto>,
     ) -> VmResult<VmValue> {
+        if let Some(fs_path) = module_fs_path(&resolved) {
+            if !self
+                .capabilities
+                .check_fs_read(std::path::Path::new(fs_path.as_ref()))
+            {
+                return Err(crate::error::RuntimeError::new(format!(
+                    "E_PERMISSION_DENIED: loading module '{}' requires fs.read access (allow with --allow-read)",
+                    resolved.as_str()
+                )));
+            }
+        }
         let module_base = self.globals_mut().reserve_region(proto.global_count);
 
         if !proto.export_names.windows(2).all(|w| w[0] <= w[1]) {
@@ -246,6 +257,14 @@ impl ExecCtx {
 
         self.linker.set_done(resolved, final_val);
         Ok(final_val)
+    }
+}
+
+fn module_fs_path(id: &ModuleId) -> Option<std::sync::Arc<str>> {
+    match id {
+        ModuleId::Local(path) => Some(path.clone()),
+        ModuleId::Package { entry, .. } => Some(entry.clone()),
+        ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_) => None,
     }
 }
 
