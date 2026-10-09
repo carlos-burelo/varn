@@ -25,8 +25,8 @@ pub use check::collect_test_targets;
 pub use class_link::verify_foreign_layouts;
 pub use compile::CompileOutput;
 pub use compile::{
-    compile_tir, emit_tir, inject_star_reexports, report_export_collisions, sorted_export_names,
-    tir_import_sources,
+    compile_tir, emit_tir, inject_star_reexports, report_export_collisions, resolve_import_slots,
+    sorted_export_names, tir_import_sources,
 };
 pub use core::core_protos_owned;
 pub use debug_sink::{DebugSink, NullSink};

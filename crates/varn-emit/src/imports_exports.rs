@@ -109,7 +109,11 @@ pub(super) fn collect_imports(
                         varn_tir::TirImportKind::Named(Arc::from(interner.resolve(*imported))),
                     ),
                 };
-                varn_tir::TirImportSpec { local, kind }
+                varn_tir::TirImportSpec {
+                    local,
+                    kind,
+                    slot: None,
+                }
             })
             .collect();
         out.push(varn_tir::TirImport {

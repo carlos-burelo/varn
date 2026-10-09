@@ -150,6 +150,7 @@ fn compile_source_inner(
             .map(|s| s.as_ref()),
     )?;
     crate::compile::inject_star_reexports(&mut tir, &exports);
+    crate::compile::resolve_import_slots(&mut tir, session.resolver(), path);
     let (result, _) = crate::compile::compile_tir(&tir, export_names, source, false);
     result
 }

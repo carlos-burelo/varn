@@ -1,6 +1,6 @@
 use super::context::Builder;
-use crate::hir::HirType;
-use crate::ssa::ir::InstKind;
+use crate::hir::{HirBinOp, HirType};
+use crate::ssa::ir::{InstKind, Terminator, Value};
 use std::sync::Arc;
 
 impl<'m> Builder<'m> {
@@ -51,26 +51,94 @@ impl<'m> Builder<'m> {
                 HirType::Ref,
             );
             for spec in &imp.specs {
-                let val = match &spec.kind {
-                    varn_tir::TirImportKind::Namespace => mod_v,
-                    varn_tir::TirImportKind::Default => self.emit(
-                        InstKind::GetProperty {
-                            object: mod_v,
-                            name: Arc::from("default"),
-                        },
-                        HirType::Dynamic,
-                    ),
-                    varn_tir::TirImportKind::Named(n) => self.emit(
-                        InstKind::GetProperty {
-                            object: mod_v,
-                            name: n.clone(),
-                        },
-                        HirType::Dynamic,
-                    ),
+                let imported_name: Option<Arc<str>> = match &spec.kind {
+                    varn_tir::TirImportKind::Namespace => None,
+                    varn_tir::TirImportKind::Default => Some(Arc::from("default")),
+                    varn_tir::TirImportKind::Named(n) => Some(n.clone()),
+                };
+                let val = match (imported_name, spec.slot) {
+                    (Some(name), Some(slot)) => {
+                        let slot_v = self.emit(
+                            InstKind::ModuleSlot {
+                                object: mod_v,
+                                slot,
+                            },
+                            HirType::Dynamic,
+                        );
+                        let name_v = self.emit(
+                            InstKind::GetProperty {
+                                object: mod_v,
+                                name: name.clone(),
+                            },
+                            HirType::Dynamic,
+                        );
+                        self.emit_slot_guard(&imp.source, &name, slot, slot_v, name_v);
+                        slot_v
+                    }
+                    _ => {
+                        let name: Arc<str> = match &spec.kind {
+                            varn_tir::TirImportKind::Namespace => {
+                                let store = self.global_store(&spec.local, mod_v);
+                                self.emit_effect(store);
+                                continue;
+                            }
+                            varn_tir::TirImportKind::Default => Arc::from("default"),
+                            varn_tir::TirImportKind::Named(n) => n.clone(),
+                        };
+                        self.emit(
+                            InstKind::GetProperty {
+                                object: mod_v,
+                                name,
+                            },
+                            HirType::Dynamic,
+                        )
+                    }
                 };
                 let store = self.global_store(&spec.local, val);
                 self.emit_effect(store);
             }
         }
+    }
+
+    fn emit_slot_guard(
+        &mut self,
+        source: &Arc<str>,
+        name: &Arc<str>,
+        slot: u16,
+        slot_v: Value,
+        name_v: Value,
+    ) {
+        let cond = self.emit(
+            InstKind::Binary {
+                op: HirBinOp::Eq,
+                lhs: slot_v,
+                rhs: name_v,
+                ty: HirType::Dynamic,
+            },
+            HirType::Bool,
+        );
+        let throw_blk = self.new_block();
+        let join_blk = self.new_block();
+        let from = self.current;
+        self.set_term(Terminator::Branch {
+            cond,
+            then_blk: join_blk,
+            then_args: vec![],
+            else_blk: throw_blk,
+            else_args: vec![],
+        });
+        self.add_pred(join_blk, from);
+        self.add_pred(throw_blk, from);
+        self.seal_block(join_blk);
+        self.seal_block(throw_blk);
+        self.current = throw_blk;
+        let msg = self.emit(
+            InstKind::ConstStr(Arc::from(format!(
+                "E_SLOT_MISMATCH: '{name}' from '{source}' is not at slot {slot} anymore"
+            ))),
+            HirType::Str,
+        );
+        self.set_term(Terminator::Throw(msg));
+        self.current = join_blk;
     }
 }

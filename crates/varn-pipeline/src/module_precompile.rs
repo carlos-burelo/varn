@@ -234,6 +234,7 @@ pub fn build_module_graph(
                 .map(|s| s.as_ref()),
         )?;
         crate::compile::inject_star_reexports(&mut tir, &exports);
+        crate::compile::resolve_import_slots(&mut tir, session.resolver(), &program.filename);
         class_tables.insert(
             module_path.clone(),
             crate::class_link::ModuleClasses {

@@ -95,6 +95,7 @@ pub enum TirImportKind {
 pub struct TirImportSpec {
     pub local: Arc<str>,
     pub kind: TirImportKind,
+    pub slot: Option<u16>,
 }
 
 #[derive(Debug, Clone)]

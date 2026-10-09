@@ -47,6 +47,7 @@ pub(super) fn measure_e2e(
 
         let mut e2e_tir = varn_pipeline::emit_tir(&program, &arena, &check_result);
         varn_pipeline::inject_star_reexports(&mut e2e_tir, &exports_of(&program.filename, session));
+        varn_pipeline::resolve_import_slots(&mut e2e_tir, session.resolver(), &program.filename);
         let (e2e_result, _) = varn_pipeline::compile_tir(
             &e2e_tir,
             export_names_of(&program.filename, session),

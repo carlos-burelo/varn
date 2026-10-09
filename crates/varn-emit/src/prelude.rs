@@ -78,6 +78,7 @@ pub(super) fn prelude_imports(
                 .map(|name| TirImportSpec {
                     local: Arc::from(*name),
                     kind: TirImportKind::Named(Arc::from(*name)),
+                    slot: None,
                 })
                 .collect(),
         })
