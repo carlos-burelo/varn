@@ -30,7 +30,11 @@ impl<'t> TypeDisplay<'t> {
     }
 
     fn name(&self, atom: varn_core::Atom) -> std::borrow::Cow<'t, str> {
-        match self.interner.try_resolve(atom) {
+        match self
+            .interner
+            .try_resolve(atom)
+            .or_else(|| self.table.name(atom))
+        {
             Some(s) => std::borrow::Cow::Borrowed(s),
             None => std::borrow::Cow::Owned(format!("<stale:{atom:?}>")),
         }
