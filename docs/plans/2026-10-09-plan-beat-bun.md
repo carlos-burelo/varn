@@ -27,6 +27,29 @@ es calidad de código máquina, no tiering.
      segundo load).
 - Verifica: `bench_class_fields` pareado + `debug -p clif --fn` sin
   checks en el loop + 4 cuadrantes.
+- Estado 2026-10-09 (C1 VERDE parcial, perfil `quick`, mismo binario
+  antes/después, checksum `Class field sum: 1500031500000` intacto):
+  execute p50 21.0ms → 9.9ms tras store nativo + forwarding →
+  7.2ms tras caché de base por objeto global (~2.9× acumulado).
+  Cambios solo en `varn-jit`: `clif/fields/compact.rs`
+  (`store_compact_native` sin box/unbox + `cached_base` con
+  `Variable` por objeto global), `clif/from_ssa/props/fields.rs`
+  (usa vía `instance_var`), `clif/from_ssa/views.rs` (mapa
+  instancia-por-canónico-global + `clear_instances`/`clear_all`/
+  `invalidate_global`), `clif/from_ssa/drive.rs` (forwarding
+  store→load con clave canónica de global + invalidación),
+  `clif/from_ssa/term.rs` (poll GC limpia ambas vistas).
+  Restricción de corrección: la base solo se cachea para objetos
+  cargados desde global (`GLOBAL_CANON_BIT`); vars de loop (`m`
+  en test 139) no se cachean — sin esto 139
+  (`gc instance layout`) corrompía tras evacuación.
+  Suite `tests/main.vn`: 2287/0 en JIT y en `VARN_NO_JIT=1`
+  (perfil `quick`, std `dev-checkout`). Cuadrantes `@embedded`
+  pendientes de build `release` (`verify.ps1 -Fast`) antes de
+  commitear; `cargo fmt` limpio, `clippy` sin avisos nuevos.
+  Hoist completo fuera del loop (1 check total) aparcado: el
+  caché actual deja 1 check por iteración; el resto del gap es
+  heap/young por store + poll GC.
 
 ## C2 — matrix 1.92×
 
@@ -40,6 +63,13 @@ es calidad de código máquina, no tiering.
   3. Overflow-check de int fuera del camino caliente o con bail
      especulativo (inducción ya es `iadd` pelado: no tocar).
 - Verifica: `bench_matrix` + `bench_matrix_local` pareados + tiers.
+- Alcance 2026-10-09 (sin implementar): `bench_matrix.vn` y
+  `bench_matrix_local.vn` son idénticos hoy. El win pide (a)
+  análisis de rangos que pruebe `0 ≤ row*n+k < len` con
+  `row,k ∈ [0,n)` (mul/add, más allá de `in_range_steps` que
+  solo cubre pasos ±1) + (b) guarda de `len ≥ n²` una vez en
+  preheader (len ya hoisted vía `pinned`/vistas; pushes fuera
+  del loop). Ítem propio tras C1, no peephole.
 
 ## C3 — http_routing 2.50×
 
@@ -90,3 +120,8 @@ no peepholes aquí); O7 bails y O8 ya tienen dueño en sus planes.
 C1 → C4 → C3 → C2 → C5 → re-medir C6. Cada item: bench pareado
 antes/después mismo perfil + checksum + 4 cuadrantes + commit
 atómico. Un item sin ganancia medida se aparca, no se insiste.
+
+Nota 2026-10-09: C4/C3/C5 dependen de O2/O3/O4/O5 del plan
+`2026-10-08-plan-jit-machine-code.md` con dueño en otra sesión —
+no tocar sin coordinar. C2 (bounds hoist matricial) requiere
+análisis de rangos nuevo; scoped para después de C1.
