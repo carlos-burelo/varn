@@ -377,8 +377,18 @@ pub fn write_artifact_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let seq = WRITE_SEQ.fetch_add(1, Ordering::Relaxed);
     let tmp = path.with_extension(format!("tmp{}_{}", std::process::id(), seq));
     std::fs::write(&tmp, bytes)?;
+    if let Ok(f) = std::fs::File::open(&tmp) {
+        let _ = f.sync_all();
+    }
     match std::fs::rename(&tmp, path) {
-        Ok(()) => Ok(()),
+        Ok(()) => {
+            if let Some(dir) = path.parent() {
+                if let Ok(dir_f) = std::fs::File::open(dir) {
+                    let _ = dir_f.sync_all();
+                }
+            }
+            Ok(())
+        }
         Err(e) => {
             let _ = std::fs::remove_file(&tmp);
             Err(e)

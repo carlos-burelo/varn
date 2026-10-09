@@ -12,6 +12,8 @@ varn-lexer   = { path = "../varn-lexer" }
 varn-parser  = { path = "../varn-parser" }
 rustc-hash   = { workspace = true }
 parking_lot  = { workspace = true }
+serde        = { workspace = true }
+postcard     = { workspace = true }
 
 [lints]
 workspace = true

@@ -30,6 +30,36 @@ pub(super) fn cache_fingerprint(source: &str, carrier: CarrierKind) -> u64 {
     varn_modules::artifact::source_fingerprint(source) ^ ((carrier as u64) << 56)
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CachedInterfaceEnvelope {
+    interface: Vec<u8>,
+    dep_hashes: Vec<(String, u64)>,
+}
+
+fn dep_source_fingerprint(dep: &str) -> Option<u64> {
+    if varn_binder::paths::is_known_module(dep) {
+        let provider = varn_modules::provider::get()?;
+        if let Some(src) = provider.embedded_source(dep) {
+            return Some(varn_modules::artifact::source_fingerprint(src));
+        }
+        let path = provider.source_path(dep)?;
+        let text = std::fs::read_to_string(path).ok()?;
+        return Some(varn_modules::artifact::source_fingerprint(&text));
+    }
+    let text = std::fs::read_to_string(dep).ok()?;
+    Some(varn_modules::artifact::source_fingerprint(&text))
+}
+
+fn current_dep_hashes(bind: &BindResult) -> Option<Vec<(String, u64)>> {
+    bind.deps
+        .iter()
+        .map(|dep| {
+            let dep = dep.to_string();
+            dep_source_fingerprint(&dep).map(|h| (dep, h))
+        })
+        .collect()
+}
+
 pub(crate) fn try_load_cache(
     resolver: &super::super::resolver_disk::DiskResolver,
     virtual_id: &str,
@@ -47,7 +77,13 @@ pub(crate) fn try_load_cache(
         &id,
         fingerprint,
     )?;
-    match deserialize_module_interface(&payload) {
+    let envelope: CachedInterfaceEnvelope = postcard::from_bytes(&payload).ok()?;
+    for (dep, saved_hash) in &envelope.dep_hashes {
+        if dep_source_fingerprint(dep) != Some(*saved_hash) {
+            return None;
+        }
+    }
+    match deserialize_module_interface(&envelope.interface) {
         Ok((mut exports, mut bind)) => {
             let expected = varn_modules::canonical_or_original(std::path::Path::new(virtual_id));
             let got = bind.source_file.to_string();
@@ -102,12 +138,21 @@ pub(crate) fn save_to_cache(
     let id = cache_module_id(virtual_id);
     let fingerprint = cache_fingerprint(source, carrier);
     if let Ok(payload) = serialize_module_interface(exports, bind) {
-        varn_modules::artifact::write_module_artifact(
-            &get_cache_dir(resolver),
-            varn_modules::artifact::ArtifactKind::CheckerInterface,
-            &id,
-            fingerprint,
-            &payload,
-        );
+        let Some(dep_hashes) = current_dep_hashes(bind) else {
+            return;
+        };
+        let envelope = CachedInterfaceEnvelope {
+            interface: payload,
+            dep_hashes,
+        };
+        if let Ok(wrapped) = postcard::to_allocvec(&envelope) {
+            varn_modules::artifact::write_module_artifact(
+                &get_cache_dir(resolver),
+                varn_modules::artifact::ArtifactKind::CheckerInterface,
+                &id,
+                fingerprint,
+                &wrapped,
+            );
+        }
     }
 }

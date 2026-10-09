@@ -2367,7 +2367,9 @@ name = "varn-resolver"
 version = "0.1.0"
 dependencies = [
  "parking_lot",
+ "postcard",
  "rustc-hash 1.1.0",
+ "serde",
  "varn-binder",
  "varn-core",
  "varn-lexer",
