@@ -454,3 +454,34 @@ Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED`
 ### Pendiente (no tocado)
 
 H2 completo (`ModuleSlot` emitido), H7, H8, H9 completo, H10 (`interface_hash`, `project_root`, `fsync`), H11 (`capability_mask`, `Box::leak`, `SILENT`), H12-H14, A3b (`run` fail-closed), `from_tir/ty.rs` + `register_meta` error en vez de `Dynamic` (B2 resto), métrica `DynReason`, `E_STALE_ATOM`, `E_EXPORT_COLLISION`.
+
+---
+
+## 7. Rediseño raíz de las regresiones (breaking, Ley8/Ley10)
+
+Las 5 regresiones halladas al implementar B2/H9 son parches sobre una causa común: **no hay identidad única cross-module** (cada módulo duplica layouts, runtime re-resuelve por nombre). Todo lo de abajo es breaking y declara (a) ganancia, (b) verificación, (c) borrado.
+
+### R1. Identidad clases duplicada → `instanceof` falso, riesgo slots
+
+Parche actual: copiar `ClassInfo` foránea por módulo + `instanceof` dinámico para RHS foráneo.
+Raíz: **registro global de clases en linkado**. En `build_module_graph`/`compile`, asignar `ClassId` global (internado `(ModuleId, name)`, orden determinista) y UNA tabla `ClassInfo` compartida por programa; los protos referencian ids globales; la VM lleva la tabla compartida (`TypeTest`, field slots y `assignable` consultan el registro, nunca copias locales).
+(a) Corrección identidad + perf (slot access en vez de `ByName` en cross-module). (b) `ve instanceof Error == true` con `TypeTest` estático, suite 4 cuadrantes, bench campo cross-module == local. (c) Borrar `ForeignClass`, copias foráneas en `tables/index.rs`, `parent_class_id`/`foreign_parent_info`, fallback dinámico en `expr_binary`.
+
+### R2. Tipos nativos con stub clase (`Range` → slot OOB)
+
+Parche actual: guard `is_lang_type_name` en el colector.
+Raíz: **canonización en binder**: `Named("Range","core:types/range")` → `Builtin(Range)` (igual para todo `BuiltinType`/primitivo con origen core conocido). Una sola representación (Ley8); `lower_builtin` ya mapea a `BackendTy` correcto/`Dynamic` donde no hay variante. (a) Elimina clase de bugs stub-vs-nativo. (b) Suite + assert `ForeignClass` nunca contiene lang-name. (c) Borrar rama `Named` para lang-names en `lower`/`resolve_type_ref`.
+
+### R3. Sum-type registrado como clase+enum (`Result`)
+
+Parche actual: guards de exclusión en un colector.
+Raíz: **query canónica única** `classify(name, origin) -> Class|Enum|Sum|Builtin` en `varn-sem` (Ley6), usada por AMBOS colectores; `emit` con `debug_assert` de registro exclusivo (un tipo, un kind). (a) Imposibilita la dualidad por construcción. (b) Test colector con `Result`/`Option`/clase real. (c) Borrar condiciones espejo en `foreign_enums.rs`/`foreign_classes.rs`.
+
+### R4. Capas en runtime vs prelude (check debilitado a subset)
+
+Parche actual: solo regla `Runtime→solo-Std` en `resolve_specifier_to_id`.
+Raíz: **verificación en linkado, no en runtime**. El grafo cerrado (`build_module_graph`, que SÍ distingue aristas sintéticas de prelude/intrínsecos de imports de usuario) verifica la matriz completa y sella `layer_digest` en el artefacto; el runtime confía en el grafo sellado + hashes interfaz y no re-verifica strings (el check runtime es TOCTOU por diseño: el fichero puede cambiar entre check y load). (a) Sin falsos positivos, sin TOCTOU. (b) Test prelude `core:` desde User pasa, `runtime:` directo desde User falla en linkado. (c) Borrar `E_LAYER` runtime por string.
+
+### R5 (marco). Linkado cerrado H2
+
+R1+R4 son casos de H2: emitir `ModuleSlot` verificado contra `ExportMap` en linkado + `interface_hash` en caché = closed-world. El runtime pasa a lookup en tabla, cero strings, cero re-resolución. Orden sugerido: R2+R3 (barato, ya) → R4 (medio) → R1+H2 (grande, el fix verdadero de identidad).
