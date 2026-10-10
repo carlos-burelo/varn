@@ -106,9 +106,18 @@ impl<'r> Checker<'r> {
             ExprKind::Binary { left, right, op } => {
                 self.check_binary(rec, expr, *left, *right, *op, range, arena, bind)
             }
-            ExprKind::Logical { left, right, .. } => {
-                self.check_expr(rec, *left, bind);
-                self.check_expr(rec, *right, bind);
+            ExprKind::Logical { left, right, op } => {
+                let (left, right) = (*left, *right);
+                self.check_expr(rec, left, bind);
+                match op {
+                    varn_core::ast::LogicalOp::And => {
+                        self.in_branch(rec, left, bind, true, |c, rec| c.check_expr(rec, right, bind))
+                    }
+                    varn_core::ast::LogicalOp::Or => {
+                        self.in_branch(rec, left, bind, false, |c, rec| c.check_expr(rec, right, bind))
+                    }
+                    varn_core::ast::LogicalOp::Nullish => self.check_expr(rec, right, bind),
+                }
             }
             ExprKind::Assign { target, value, .. } => {
                 self.check_assign(rec, *target, *value, range, bind)
@@ -131,9 +140,14 @@ impl<'r> Checker<'r> {
                 consequent,
                 alternate,
             } => {
-                self.check_expr(rec, *test, bind);
-                self.check_expr(rec, *consequent, bind);
-                self.check_expr(rec, *alternate, bind);
+                let (test, consequent, alternate) = (*test, *consequent, *alternate);
+                self.check_expr(rec, test, bind);
+                self.in_branch(rec, test, bind, true, |c, rec| {
+                    c.check_expr(rec, consequent, bind)
+                });
+                self.in_branch(rec, test, bind, false, |c, rec| {
+                    c.check_expr(rec, alternate, bind)
+                });
             }
 
             ExprKind::Member {

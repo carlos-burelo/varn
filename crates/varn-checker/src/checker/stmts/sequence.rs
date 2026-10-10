@@ -109,6 +109,27 @@ impl<'r> Checker<'r> {
         self.pop_narrowings(narrowings);
     }
 
+    pub(crate) fn in_branch<R>(
+        &mut self,
+        rec: &mut Recorder,
+        test: varn_core::ast::ExprId,
+        bind: &BindResult,
+        taken: bool,
+        f: impl FnOnce(&mut Self, &mut Recorder) -> R,
+    ) -> R {
+        if !self.can_extract_narrowings(test) {
+            return f(self, rec);
+        }
+        let narrowings = self.extract_narrowings(rec, test, bind, taken);
+        if narrowings.is_empty() {
+            return f(self, rec);
+        }
+        self.push_narrowings(&narrowings);
+        let out = f(self, rec);
+        self.pop_narrowings(&narrowings);
+        out
+    }
+
     fn push_narrowings(&mut self, narrowings: &[(varn_sem::symbol::SymbolId, Type)]) {
         for (id, ty) in narrowings {
             self.narrowed_types.entry(*id).or_default().push(*ty);

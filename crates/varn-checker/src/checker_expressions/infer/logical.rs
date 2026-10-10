@@ -15,7 +15,15 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> Type {
         let l_ty = self.infer_type(rec, left, bind);
-        let r_ty = self.infer_type(rec, right, bind);
+        let r_ty = match op {
+            varn_core::ast::LogicalOp::And => {
+                self.in_branch(rec, left, bind, true, |c, rec| c.infer_type(rec, right, bind))
+            }
+            varn_core::ast::LogicalOp::Or => {
+                self.in_branch(rec, left, bind, false, |c, rec| c.infer_type(rec, right, bind))
+            }
+            varn_core::ast::LogicalOp::Nullish => self.infer_type(rec, right, bind),
+        };
         match op {
             varn_core::ast::LogicalOp::And => {
                 if l_ty == r_ty {

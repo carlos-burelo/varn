@@ -1,0 +1,2 @@
+// expect: error[VN3301]
+function f(s: str?): int { return s == null ? s.length : 0 }

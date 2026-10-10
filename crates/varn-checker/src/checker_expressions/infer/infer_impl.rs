@@ -73,13 +73,17 @@ impl<'r> Checker<'r> {
             }
             ExprKind::With { object, .. } => self.infer_type(rec, *object, bind),
             ExprKind::Conditional {
+                test,
                 consequent,
                 alternate,
-                ..
             } => {
-                let (consequent, alternate) = (*consequent, *alternate);
-                let t_ty = self.infer_type(rec, consequent, bind);
-                let f_ty = self.infer_type(rec, alternate, bind);
+                let (test, consequent, alternate) = (*test, *consequent, *alternate);
+                let t_ty = self.in_branch(rec, test, bind, true, |c, rec| {
+                    c.infer_type(rec, consequent, bind)
+                });
+                let f_ty = self.in_branch(rec, test, bind, false, |c, rec| {
+                    c.infer_type(rec, alternate, bind)
+                });
                 if self.source_file.as_ref() != bind.source_file.as_ref() {
                     t_ty
                 } else if t_ty.is_dynamic() {
