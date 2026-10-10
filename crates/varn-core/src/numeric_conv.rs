@@ -28,10 +28,12 @@ pub enum ValueConv {
 
     DynToStr = 14,
     DynToBool = 15,
+    DynToStrOrNull = 16,
+    DynToBoolOrNull = 17,
 }
 
 impl ValueConv {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 18] = [
         Self::IntToFloat,
         Self::FloatToInt,
         Self::IntToBigInt,
@@ -48,6 +50,8 @@ impl ValueConv {
         Self::DecimalToBigInt,
         Self::DynToStr,
         Self::DynToBool,
+        Self::DynToStrOrNull,
+        Self::DynToBoolOrNull,
     ];
 
     pub const fn from_u8(raw: u8) -> Option<Self> {
@@ -87,6 +91,8 @@ impl ValueConv {
                 | Self::DynToFloat
                 | Self::DynToStr
                 | Self::DynToBool
+                | Self::DynToStrOrNull
+                | Self::DynToBoolOrNull
                 | Self::FloatToBigInt
                 | Self::FloatToDecimal
         )

@@ -65,6 +65,20 @@ class Taker {
 
 const arrowLen = (s: str): int => s.length
 
+function optStr(d: dynamic): str {
+    let s: str? = d
+    return s ?? "none"
+}
+
+function optBool(d: dynamic): bool {
+    let b: bool? = d
+    return b ?? false
+}
+
+function optArg(s: str?): int { return (s ?? "").length }
+function passOpt(d: dynamic): int { return optArg(d) }
+function retOpt(d: dynamic): str? { return d }
+
 function asStr(d: dynamic): str { return d as str }
 function asBool(d: dynamic): bool { return d as bool }
 
@@ -128,6 +142,20 @@ await describe("162 dynamic boundary", async () => {
         expect(failed(() => { new Taker("t").measure(d) })).toBe(true)
         expect(failed(() => { arrowLen(d) })).toBe(true)
         expect(identity(d)).toBe(5)
+    })
+
+    await it("nullable targets take null or the type, nothing else", () => {
+        expect(optStr(null)).toBe("none")
+        expect(optStr("ab")).toBe("ab")
+        expect(optBool(null)).toBe(false)
+        expect(optBool(true)).toBe(true)
+        expect(passOpt(null)).toBe(0)
+        expect(passOpt("abc")).toBe(3)
+        expect(retOpt(null) ?? "n").toBe("n")
+        expect(failed(() => { optStr(5) })).toBe(true)
+        expect(failed(() => { optBool("x") })).toBe(true)
+        expect(failed(() => { passOpt(5) })).toBe(true)
+        expect(failed(() => { retOpt(5) })).toBe(true)
     })
 
     await it("holds in a hot loop", () => {

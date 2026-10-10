@@ -80,13 +80,33 @@ impl<'m> Builder<'m> {
             HirType::Bool => varn_core::ValueConv::DynToBool,
             HirType::Int => varn_core::ValueConv::DynToInt,
             HirType::Float => varn_core::ValueConv::DynToFloat,
+            HirType::Nullable(inner) => {
+                let conv = match self.ssa_types.get(inner) {
+                    HirType::Str => varn_core::ValueConv::DynToStrOrNull,
+                    HirType::Bool => varn_core::ValueConv::DynToBoolOrNull,
+                    HirType::Int
+                    | HirType::Float
+                    | HirType::Ref
+                    | HirType::Dynamic
+                    | HirType::Array(_)
+                    | HirType::Map(..)
+                    | HirType::Set(_)
+                    | HirType::Class(_)
+                    | HirType::Nullable(_) => {
+                        return Err(crate::OptError::Unsupported(
+                            "from_tir: Checked to an unsupported nullable type",
+                        ));
+                    }
+                };
+                let checked = self.emit(InstKind::Convert { operand: v, conv }, HirType::Dynamic);
+                return Ok(self.emit(InstKind::Cast { operand: checked, ty }, ty));
+            }
             HirType::Ref
             | HirType::Dynamic
             | HirType::Array(_)
             | HirType::Map(..)
             | HirType::Set(_)
-            | HirType::Class(_)
-            | HirType::Nullable(_) => {
+            | HirType::Class(_) => {
                 return Err(crate::OptError::Unsupported("from_tir: Checked to a non-scalar type"));
             }
         };

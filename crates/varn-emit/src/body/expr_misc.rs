@@ -44,15 +44,16 @@ impl<'a> FnEmitter<'a> {
     }
 
     pub(super) fn assert_type(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
-        if Self::crosses_dynamic_boundary(&e, ty) {
+        if self.crosses_dynamic_boundary(&e, ty) {
             self.guard_dynamic(e, ty)
         } else {
             self.cast_to(e, ty)
         }
     }
 
-    fn crosses_dynamic_boundary(e: &TirExpr, ty: BackendTy) -> bool {
-        matches!(e.ty, BackendTy::Dynamic(_)) && matches!(ty, BackendTy::Str | BackendTy::Bool)
+    fn crosses_dynamic_boundary(&self, e: &TirExpr, ty: BackendTy) -> bool {
+        matches!(e.ty, BackendTy::Dynamic(_))
+            && matches!(ty.non_nullable(self.tt), BackendTy::Str | BackendTy::Bool)
     }
 
     pub(super) fn guard_args(
@@ -84,7 +85,7 @@ impl<'a> FnEmitter<'a> {
     }
 
     pub(super) fn guard_dynamic(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
-        if !Self::crosses_dynamic_boundary(&e, ty) {
+        if !self.crosses_dynamic_boundary(&e, ty) {
             return e;
         }
         let span = e.span;

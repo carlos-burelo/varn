@@ -256,6 +256,7 @@ pub(crate) fn convert_result_ty(conv: varn_core::ValueConv) -> HirType {
         | DecimalToBigInt => HirType::Dynamic,
         DynToStr => HirType::Str,
         DynToBool => HirType::Bool,
+        DynToStrOrNull | DynToBoolOrNull => HirType::Dynamic,
     }
 }
 
@@ -266,6 +267,6 @@ fn convert_operand_ty(conv: varn_core::ValueConv) -> Option<HirType> {
         FloatToInt | FloatToBigInt | FloatToDecimal => Some(HirType::Float),
         IntToBigInt | IntToDecimal | BigIntToInt | DecimalToInt | DynToInt | DynToFloat
         | BigIntToFloat | DecimalToFloat | BigIntToDecimal | DecimalToBigInt | DynToStr
-        | DynToBool => None,
+        | DynToBool | DynToStrOrNull | DynToBoolOrNull => None,
     }
 }

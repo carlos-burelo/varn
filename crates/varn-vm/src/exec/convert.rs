@@ -132,18 +132,20 @@ fn not_a(expected: &str, v: VmValue, heap: &Heap) -> RuntimeError {
 
 pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     match conv {
-        ValueConv::DynToStr => {
-            return if heap.is_string(v) {
+        ValueConv::DynToStr | ValueConv::DynToStrOrNull => {
+            let nullable = conv == ValueConv::DynToStrOrNull;
+            return if heap.is_string(v) || (nullable && v.is_null()) {
                 Ok(v)
             } else {
-                Err(not_a("str", v, heap))
+                Err(not_a(if nullable { "str?" } else { "str" }, v, heap))
             };
         }
-        ValueConv::DynToBool => {
-            return if v.is_bool() {
+        ValueConv::DynToBool | ValueConv::DynToBoolOrNull => {
+            let nullable = conv == ValueConv::DynToBoolOrNull;
+            return if v.is_bool() || (nullable && v.is_null()) {
                 Ok(v)
             } else {
-                Err(not_a("bool", v, heap))
+                Err(not_a(if nullable { "bool?" } else { "bool" }, v, heap))
             };
         }
         ValueConv::IntToFloat
@@ -163,7 +165,10 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
     }
     let n = numeric_of(v, heap)?;
     match conv {
-        ValueConv::DynToStr | ValueConv::DynToBool => Ok(v),
+        ValueConv::DynToStr
+        | ValueConv::DynToBool
+        | ValueConv::DynToStrOrNull
+        | ValueConv::DynToBoolOrNull => Ok(v),
         ValueConv::FloatToInt | ValueConv::BigIntToInt | ValueConv::DecimalToInt | ValueConv::DynToInt => {
             to_int(n)
         }
