@@ -152,6 +152,7 @@ import "./157-task-value-handles.vn"
 import "./158-expr-sequencing.vn"
 import "./159-closure-in-object-literal.vn"
 import "./160-map-set-representation.vn"
+import "./161-string-length-chars.vn"
 
 summary()
 

@@ -185,7 +185,7 @@ impl ExecCtx {
 
     pub(crate) fn exec_str_length(&mut self, v: VmValue) -> VmResult<VmValue> {
         if v.is_sso() {
-            return Ok(VmValue::from_int(v.sso_len() as i64));
+            return Ok(VmValue::from_int(v.sso_char_len() as i64));
         }
         if v.is_heap() {
             if let Some(HeapObj::Str(s)) = self.heap.get(v.as_heap()) {

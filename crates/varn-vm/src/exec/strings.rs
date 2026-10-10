@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
     if val.is_sso() {
-        return Some(VmValue::from_i32(val.sso_len() as i32));
+        return Some(VmValue::from_i32(val.sso_char_len() as i32));
     }
     if val.is_heap() {
         match heap.get(val.as_heap()) {

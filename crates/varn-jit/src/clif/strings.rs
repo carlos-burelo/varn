@@ -27,7 +27,15 @@ pub(super) fn str_length_boxed(
 
     b.switch_to_block(fast);
     let s = b.ins().ushr_imm_u(tag, 8);
-    let sso_len = b.ins().band_imm_u(s, 0xFF);
+    let byte_len = b.ins().band_imm_u(s, 0xFF);
+    let inverted = b.ins().bnot(payload);
+    let shifted = b.ins().ishl_imm_u(inverted, 1);
+    let lead_clear = b.ins().band(payload, shifted);
+    let continuation = b
+        .ins()
+        .band_imm_u(lead_clear, varn_types::vm_value::SSO_HIGH_BITS as i64);
+    let continuation = b.ins().popcnt(continuation);
+    let sso_len = b.ins().isub(byte_len, continuation);
     let boxed_len = box_int(b, sso_len);
     b.ins().jump(merge, &[boxed_len.into()]);
 

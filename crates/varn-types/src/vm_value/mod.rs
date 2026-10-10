@@ -21,6 +21,8 @@ const SSO_LEN_SHIFT: u32 = 8;
 
 pub const SSO_MAX_LEN: usize = 5;
 
+pub const SSO_HIGH_BITS: u64 = 0x0000_0080_8080_8080;
+
 impl VmValue {
     #[inline(always)]
     pub const fn from_raw_parts(tag: u64, payload: u64) -> Self {
@@ -183,6 +185,11 @@ impl VmValue {
     #[inline(always)]
     pub fn sso_len(self) -> usize {
         ((self.tag >> SSO_LEN_SHIFT) & 0xFF) as usize
+    }
+
+    #[inline(always)]
+    pub fn sso_char_len(self) -> usize {
+        self.sso_len() - (self.payload & (!self.payload << 1) & SSO_HIGH_BITS).count_ones() as usize
     }
 
     #[inline(always)]
