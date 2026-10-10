@@ -123,14 +123,74 @@ impl<'m> Builder<'m> {
         } else {
             is_instance
         };
-        self.emit(
-            InstKind::Convert {
-                operand: holds,
-                conv: varn_core::ValueConv::AssertInstance,
-            },
-            HirType::Bool,
-        );
+        let expected = if nullable { format!("{name}?") } else { name.to_string() };
+        self.throw_type_mismatch_unless(holds, v, &expected)?;
         Ok(self.emit(InstKind::Cast { operand: v, ty }, ty))
+    }
+
+    fn throw_type_mismatch_unless(
+        &mut self,
+        holds: Value,
+        v: Value,
+        expected: &str,
+    ) -> Result<()> {
+        let throw_blk = self.new_block();
+        let join_blk = self.new_block();
+        let from = self.current;
+        self.set_term(crate::ssa::ir::Terminator::Branch {
+            cond: holds,
+            then_blk: join_blk,
+            then_args: vec![],
+            else_blk: throw_blk,
+            else_args: vec![],
+        });
+        self.add_pred(join_blk, from);
+        self.add_pred(throw_blk, from);
+        self.seal_block(join_blk);
+        self.seal_block(throw_blk);
+        self.current = throw_blk;
+        let got = self.emit(
+            InstKind::Unary {
+                op: crate::hir::HirUnOp::Typeof,
+                operand: v,
+                ty: HirType::Str,
+            },
+            HirType::Str,
+        );
+        let head = self.emit(
+            InstKind::ConstStr(std::sync::Arc::from(format!(
+                "type mismatch: expected '{expected}', got '"
+            ))),
+            HirType::Str,
+        );
+        let tail = self.emit(InstKind::ConstStr(std::sync::Arc::from("'")), HirType::Str);
+        let mut message = head;
+        for part in [got, tail] {
+            message = self.emit(
+                InstKind::Binary {
+                    op: crate::hir::HirBinOp::Add,
+                    lhs: message,
+                    rhs: part,
+                    ty: HirType::Str,
+                },
+                HirType::Str,
+            );
+        }
+        let type_error = varn_core::abi::native_global_index(varn_core::well_known::TYPE_ERROR)
+            .ok_or(crate::OptError::Unsupported(
+                "from_tir: TypeError is not a native global",
+            ))?;
+        let ctor = self.emit(InstKind::LoadNativeGlobalIdx(type_error), HirType::Ref);
+        let error = self.emit(
+            InstKind::Call {
+                callee: ctor,
+                args: vec![message],
+            },
+            HirType::Ref,
+        );
+        self.set_term(crate::ssa::ir::Terminator::Throw(error));
+        self.current = join_blk;
+        Ok(())
     }
 
     pub(super) fn lower_checked(

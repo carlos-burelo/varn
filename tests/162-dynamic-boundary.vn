@@ -79,6 +79,15 @@ function optArg(s: str?): int { return (s ?? "").length }
 function passOpt(d: dynamic): int { return optArg(d) }
 function retOpt(d: dynamic): str? { return d }
 
+function messageOf(f: () => void): str {
+    try {
+        f()
+        return "none"
+    } catch (e) {
+        return e.message
+    }
+}
+
 function kindOf(f: () => void): str {
     try {
         f()
@@ -282,6 +291,13 @@ await describe("162 dynamic boundary", async () => {
         expect(kindOf(() => { declBool(1) })).toBe("TypeError")
         expect(kindOf(() => { optStr(5) })).toBe("TypeError")
         expect(kindOf(() => { asStr("ok") })).toBe("none")
+    })
+
+    await it("a class mismatch names the expected class", () => {
+        expect(messageOf(() => { declAnimal(new Rock()) })).toBe("type mismatch: expected 'Animal', got 'object'")
+        expect(messageOf(() => { declAnimal(5) })).toBe("type mismatch: expected 'Animal', got 'int'")
+        expect(messageOf(() => { optAnimal(new Rock()) })).toBe("type mismatch: expected 'Animal?', got 'object'")
+        expect(kindOf(() => { optAnimal(new Rock()) })).toBe("TypeError")
     })
 
     await it("holds in a hot loop", () => {

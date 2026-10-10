@@ -166,15 +166,6 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
                 Err(not_a(if nullable { "float?" } else { "float" }, v, heap))
             };
         }
-        ValueConv::AssertInstance => {
-            return if v.is_bool() && v.as_bool() {
-                Ok(v)
-            } else {
-                Err(RuntimeError::type_error(
-                    "type mismatch: value is not an instance of the declared class",
-                ))
-            };
-        }
         ValueConv::IntToFloat
         | ValueConv::FloatToInt
         | ValueConv::IntToBigInt
@@ -196,7 +187,6 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
         | ValueConv::ExpectBool
         | ValueConv::ExpectStrOrNull
         | ValueConv::ExpectBoolOrNull
-        | ValueConv::AssertInstance
         | ValueConv::ExpectInt
         | ValueConv::ExpectFloat
         | ValueConv::ExpectIntOrNull

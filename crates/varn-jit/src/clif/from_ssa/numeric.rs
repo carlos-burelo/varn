@@ -186,8 +186,7 @@ impl Expected {
             | ValueConv::DecimalToFloat
             | ValueConv::FloatToDecimal
             | ValueConv::BigIntToDecimal
-            | ValueConv::DecimalToBigInt
-            | ValueConv::AssertInstance => return None,
+            | ValueConv::DecimalToBigInt => return None,
         };
         Some(Expected { kind, nullable })
     }

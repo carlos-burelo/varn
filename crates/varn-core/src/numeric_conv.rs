@@ -30,15 +30,14 @@ pub enum ValueConv {
     ExpectBool = 15,
     ExpectStrOrNull = 16,
     ExpectBoolOrNull = 17,
-    AssertInstance = 18,
-    ExpectInt = 19,
-    ExpectFloat = 20,
-    ExpectIntOrNull = 21,
-    ExpectFloatOrNull = 22,
+    ExpectInt = 18,
+    ExpectFloat = 19,
+    ExpectIntOrNull = 20,
+    ExpectFloatOrNull = 21,
 }
 
 impl ValueConv {
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 22] = [
         Self::IntToFloat,
         Self::FloatToInt,
         Self::IntToBigInt,
@@ -57,7 +56,6 @@ impl ValueConv {
         Self::ExpectBool,
         Self::ExpectStrOrNull,
         Self::ExpectBoolOrNull,
-        Self::AssertInstance,
         Self::ExpectInt,
         Self::ExpectFloat,
         Self::ExpectIntOrNull,
@@ -103,7 +101,6 @@ impl ValueConv {
                 | Self::ExpectBool
                 | Self::ExpectStrOrNull
                 | Self::ExpectBoolOrNull
-                | Self::AssertInstance
                 | Self::ExpectInt
                 | Self::ExpectFloat
                 | Self::ExpectIntOrNull
