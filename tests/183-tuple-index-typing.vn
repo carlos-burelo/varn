@@ -1,0 +1,36 @@
+import { describe, it, expect } from "std:test";
+
+function describePair(p: #[int, str, float]): str { return p[1] + p[0] + p[2] }
+function sumPair(p: #[int, int]): int {
+    let total = 0
+    for (let i = 0; i < 3000; i = i + 1) { total = total + p[0] + p[1] }
+    return total
+}
+function pick(p: #[int, int], at: int): int { return p[at] }
+function arity(p: #[int, str, float]): int { return p.length }
+
+await describe("183 tuple index typing", async () => {
+    await it("a literal index has the type of its slot", () => {
+        const p: #[int, str, float] = #[1, "a", 2.5]
+        const n: int = p[0] + 1
+        const s: str = p[1] + "!"
+        const f: float = p[2] * 2.0
+        expect(n).toBe(2)
+        expect(s).toBe("a!")
+        expect(f).toBe(5.0)
+        expect(describePair(p)).toBe("a12.5")
+    })
+
+    await it("a computed index over equal slots keeps their type", () => {
+        const p: #[int, int] = #[7, 9]
+        expect(pick(p, 0) + pick(p, 1)).toBe(16)
+    })
+
+    await it("length is the arity", () => {
+        expect(arity(#[1, "a", 2.5])).toBe(3)
+    })
+
+    await it("holds in a hot loop", () => {
+        expect(sumPair(#[1, 2])).toBe(9000)
+    })
+})

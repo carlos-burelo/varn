@@ -43,13 +43,14 @@ impl<'m> Builder<'m> {
                     | t @ HirType::Array(_)
                     | t @ HirType::Map(..)
                     | t @ HirType::Set(_)
+                    | t @ HirType::Tuple
                     | t @ HirType::Class(_) => t,
                 };
                 match inner {
                     HirType::Str => {
                         return Ok(self.emit(InstKind::StrLength { operand: obj }, HirType::Int))
                     }
-                    HirType::Array(_) => {
+                    HirType::Array(_) | HirType::Tuple => {
                         return Ok(self.emit(InstKind::ArrayLength { operand: obj }, HirType::Int))
                     }
                     HirType::Int
@@ -95,7 +96,7 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         let obj = self.lower_expr(object)?;
         let idx = self.lower_expr(index)?;
-        let kind = if matches!(self.value_ty(obj), HirType::Array(_)) {
+        let kind = if matches!(self.value_ty(obj), HirType::Array(_) | HirType::Tuple) {
             InstKind::ArrayGetIndex {
                 object: obj,
                 index: idx,

@@ -44,6 +44,7 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
                 | t @ HirType::Array(_)
                 | t @ HirType::Map(..)
                 | t @ HirType::Set(_)
+                | t @ HirType::Tuple
                 | t @ HirType::Class(_)
                 | t @ HirType::Nullable(_) => format!("{}: {} = ", val(v), ty(t)),
             },

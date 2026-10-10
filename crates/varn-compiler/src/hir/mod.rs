@@ -18,6 +18,7 @@ pub enum HirType {
     Array(TyId),
     Map(TyId, TyId),
     Set(TyId),
+    Tuple,
 
     Class(ClassId),
 

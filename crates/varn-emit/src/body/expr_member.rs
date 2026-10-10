@@ -172,6 +172,17 @@ impl<'a> FnEmitter<'a> {
             let node_ty = match obj.ty.non_nullable(self.tt) {
                 BackendTy::Array(el) => self.tt.get(el),
                 BackendTy::Map(_, val) | BackendTy::Dict(val) => self.tt.get(val),
+                BackendTy::Tuple(slots) => {
+                    let literal = if let TirExprKind::IntLit(at) = index.kind {
+                        usize::try_from(at).ok()
+                    } else {
+                        None
+                    };
+                    literal
+                        .filter(|_| self.tt.contains_list(slots))
+                        .and_then(|at| self.tt.get_list(slots).get(at).copied())
+                        .unwrap_or(ty)
+                }
                 BackendTy::Int
                 | BackendTy::Float
                 | BackendTy::Bool
@@ -181,7 +192,6 @@ impl<'a> FnEmitter<'a> {
                 | BackendTy::Decimal
                 | BackendTy::BigInt
                 | BackendTy::Set(_)
-                | BackendTy::Tuple(_)
                 | BackendTy::Class(_)
                 | BackendTy::Enum(_)
                 | BackendTy::Fn(_)

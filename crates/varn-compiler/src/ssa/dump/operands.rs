@@ -26,6 +26,7 @@ pub(super) fn ty(t: HirType) -> &'static str {
         HirType::Array(_) => "array",
         HirType::Map(_, _) => "map",
         HirType::Set(_) => "set",
+        HirType::Tuple => "tuple",
         HirType::Class(_) => "class",
         HirType::Nullable(_) => "nullable",
     }

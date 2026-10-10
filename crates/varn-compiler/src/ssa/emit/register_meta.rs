@@ -52,7 +52,8 @@ pub(crate) fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta
         | HirType::Array(_)
         | HirType::Ref
         | HirType::Map(_, _)
-        | HirType::Set(_) => SlotKind::Ref,
+        | HirType::Set(_)
+        | HirType::Tuple => SlotKind::Ref,
 
         HirType::Nullable(_) => SlotKind::Dynamic,
         HirType::Dynamic => SlotKind::Dynamic,

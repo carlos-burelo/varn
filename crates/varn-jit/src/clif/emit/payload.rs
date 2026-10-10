@@ -90,8 +90,10 @@ pub(in crate::clif) fn emit_array_payload(
     let slot = obj_payload;
     let tagb = b.ins().uload8(types::I64, m, slot, lay.kind_off as i32);
     let is_arr = b.ins().icmp_imm_u(IntCC::Equal, tagb, lay.array_tag as i64);
+    let is_tuple = b.ins().icmp_imm_u(IntCC::Equal, tagb, lay.tuple_tag as i64);
+    let indexable = b.ins().bor(is_arr, is_tuple);
     let ok = b.create_block();
-    b.ins().brif(is_arr, ok, &[], slow, &[]);
+    b.ins().brif(indexable, ok, &[], slow, &[]);
     b.switch_to_block(ok);
     b.ins().load(types::I64, m, slot, lay.payload_off as i32)
 }

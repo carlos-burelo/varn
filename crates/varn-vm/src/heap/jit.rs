@@ -99,6 +99,12 @@ impl Heap {
             .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == data)
             .expect("array payload probe failed")
             + varn_types::cell::HEADER_BYTES;
+        let tuple_slot: Option<HeapObj> = Some(HeapObj::Tuple(arr));
+        let tuple_tag = unsafe { *(&tuple_slot as *const _ as *const u8) } as usize;
+        assert_ne!(
+            tuple_tag, array_tag,
+            "HeapObj::Tuple and HeapObj::Array share a tag"
+        );
         unsafe { arr.drop_at() };
 
         let none_slot: Option<HeapObj> = None;
@@ -119,6 +125,7 @@ impl Heap {
             young_state: super::cells::SlotState::Young as usize,
             vec_ptr_off: slots_ptr_off,
             array_tag,
+            tuple_tag,
             str_tag,
             payload_off,
             disc_off,

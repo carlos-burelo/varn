@@ -154,6 +154,7 @@ fn simplify(
         | HirType::Array(_)
         | HirType::Map(..)
         | HirType::Set(_)
+        | HirType::Tuple
         | HirType::Class(_)
         | HirType::Nullable(_) => None,
     }

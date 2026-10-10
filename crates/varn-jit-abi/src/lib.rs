@@ -14,6 +14,7 @@ pub struct JitArrayLayout {
     pub vec_ptr_off: usize,
 
     pub array_tag: usize,
+    pub tuple_tag: usize,
 
     pub str_tag: usize,
 

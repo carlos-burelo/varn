@@ -2,7 +2,7 @@ use super::*;
 
 pub(crate) fn array_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     if val.is_heap() {
-        if let Some(HeapObj::Array(a)) = heap.get(val.as_heap()) {
+        if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get(val.as_heap()) {
             return Ok(VmValue::from_i32(a.len() as i32));
         }
         if let Some(HeapObj::Str(s)) = heap.get(val.as_heap()) {

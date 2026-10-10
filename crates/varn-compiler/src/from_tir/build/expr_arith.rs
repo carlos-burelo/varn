@@ -262,6 +262,7 @@ impl<'m> Builder<'m> {
                     | HirType::Array(_)
                     | HirType::Map(..)
                     | HirType::Set(_)
+                    | HirType::Tuple
                     | HirType::Class(_)
                     | HirType::Nullable(_) => {
                         return Err(crate::OptError::Unsupported(
@@ -277,6 +278,7 @@ impl<'m> Builder<'m> {
             | HirType::Array(_)
             | HirType::Map(..)
             | HirType::Set(_)
+            | HirType::Tuple
             | HirType::Class(_) => {
                 return Err(crate::OptError::Unsupported("from_tir: Checked to a non-scalar type"));
             }
@@ -303,6 +305,7 @@ impl<'m> Builder<'m> {
             | HirType::Array(_)
             | HirType::Map(..)
             | HirType::Set(_)
+            | HirType::Tuple
             | HirType::Class(_)
             | HirType::Nullable(_) => super::ops::numeric_domain(operand.ty)
                 .filter(|d| matches!(d, D::BigInt | D::Decimal)),

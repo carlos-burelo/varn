@@ -83,6 +83,7 @@ impl<'m> Builder<'m> {
                         | HirType::Array(_)
                         | HirType::Map(..)
                         | HirType::Set(_)
+                        | HirType::Tuple
                         | HirType::Class(_)
                         | HirType::Nullable(_) => self.emit(InstKind::ConstNull, declared),
                     },
