@@ -168,6 +168,7 @@ import "./173-super-method-spread.vn"
 import "./174-typed-register-guards.vn"
 import "./175-enum-instanceof.vn"
 import "./176-tuple-spread-arguments.vn"
+import "./177-recursive-type-alias.vn"
 
 summary()
 

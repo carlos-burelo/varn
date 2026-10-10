@@ -78,6 +78,18 @@ pub(super) fn nominal_arms(
                         in_progress,
                         table,
                     )
+                } else if named_alias(bind, &dn_s, origin_d_s.as_deref()).is_some() {
+                    named_fallback(
+                        declared,
+                        inferred,
+                        dn,
+                        origin_d,
+                        Some(bind),
+                        cache,
+                        in_progress,
+                        table,
+                        true,
+                    )
                 } else {
                     !is_known_named(bind, &dn_s)
                 }
@@ -97,6 +109,18 @@ pub(super) fn nominal_arms(
                         cache,
                         in_progress,
                         table,
+                    )
+                } else if named_alias(bind, &in_s, origin_i_s.as_deref()).is_some() {
+                    named_fallback(
+                        declared,
+                        inferred,
+                        in_,
+                        origin_i,
+                        Some(bind),
+                        cache,
+                        in_progress,
+                        table,
+                        false,
                     )
                 } else {
                     !is_known_named(bind, &in_s)
@@ -178,6 +202,11 @@ pub(super) fn nominal_arms(
         _ => None,
     }
 }
+fn named_alias(bind: &BindView, name: &str, origin: Option<&str>) -> Option<Type> {
+    use crate::types::TypeContext;
+    bind.resolve_type_alias(name, origin)
+}
+
 fn named_fallback(
     declared: &Type,
     inferred: &Type,
