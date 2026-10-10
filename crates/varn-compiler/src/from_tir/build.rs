@@ -157,6 +157,17 @@ impl<'m> Builder<'m> {
                 ))
             }
 
+            TirExprKind::SuperCall { args }
+                if args.iter().any(|a| matches!(a, varn_tir::TirArg::Spread(_))) =>
+            {
+                let ctor = self.emit(
+                    InstKind::GetSuper {
+                        name: Arc::from("constructor"),
+                    },
+                    HirType::Ref,
+                );
+                self.lower_call(ctor, args, ty)
+            }
             TirExprKind::SuperCall { args } => {
                 let argv = self.lower_args(args)?;
                 Ok(self.emit(InstKind::SuperCall { args: argv }, ty))
