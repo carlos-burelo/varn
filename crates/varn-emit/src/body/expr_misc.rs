@@ -55,6 +55,34 @@ impl<'a> FnEmitter<'a> {
         matches!(e.ty, BackendTy::Dynamic(_)) && matches!(ty, BackendTy::Str | BackendTy::Bool)
     }
 
+    pub(super) fn guard_args(
+        &self,
+        args: Vec<varn_tir::TirArg>,
+        sig: Option<varn_tir::SigId>,
+    ) -> Vec<varn_tir::TirArg> {
+        let Some(params) = sig
+            .and_then(|s| self.signatures.get(s.0 as usize))
+            .map(|s| s.params.clone())
+        else {
+            return args;
+        };
+        if args
+            .iter()
+            .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))
+        {
+            return args;
+        }
+        args.into_iter()
+            .enumerate()
+            .map(|(i, arg)| match (arg, params.get(i)) {
+                (varn_tir::TirArg::Expr(e), Some(&ty)) => {
+                    varn_tir::TirArg::Expr(self.guard_dynamic(e, ty))
+                }
+                (other, _) => other,
+            })
+            .collect()
+    }
+
     pub(super) fn guard_dynamic(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
         if !Self::crosses_dynamic_boundary(&e, ty) {
             return e;

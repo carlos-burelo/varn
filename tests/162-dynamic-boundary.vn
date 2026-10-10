@@ -51,6 +51,20 @@ class Returner {
 
 const arrowStr = (d: dynamic): str => d
 
+function lenOf(s: str): int { return s.length }
+function pick(a: int, flag: bool): int { return flag ? a : 0 }
+function passStr(d: dynamic): int { return lenOf(d) }
+function passBool(d: dynamic): int { return pick(7, d) }
+function identity<T>(x: T): T { return x }
+
+class Taker {
+    label: str
+    constructor(label: str) { this.label = label }
+    measure(s: str): int { return s.length }
+}
+
+const arrowLen = (s: str): int => s.length
+
 function asStr(d: dynamic): str { return d as str }
 function asBool(d: dynamic): bool { return d as bool }
 
@@ -98,6 +112,22 @@ await describe("162 dynamic boundary", async () => {
         expect(failed(() => { retBool("no") })).toBe(true)
         expect(failed(() => { new Returner().name(5) })).toBe(true)
         expect(failed(() => { arrowStr(5) })).toBe(true)
+    })
+
+    await it("typed parameters check dynamic arguments", () => {
+        expect(passStr("hola")).toBe(4)
+        expect(passBool(true)).toBe(7)
+        expect(failed(() => { passStr(5) })).toBe(true)
+        expect(failed(() => { passBool("x") })).toBe(true)
+        const d: dynamic = 5
+        const ok: dynamic = "abc"
+        expect(new Taker(ok).label.length).toBe(3)
+        expect(new Taker("t").measure(ok)).toBe(3)
+        expect(arrowLen(ok)).toBe(3)
+        expect(failed(() => { new Taker(d) })).toBe(true)
+        expect(failed(() => { new Taker("t").measure(d) })).toBe(true)
+        expect(failed(() => { arrowLen(d) })).toBe(true)
+        expect(identity(d)).toBe(5)
     })
 
     await it("holds in a hot loop", () => {

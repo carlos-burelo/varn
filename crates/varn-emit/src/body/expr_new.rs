@@ -69,6 +69,10 @@ impl<'a> FnEmitter<'a> {
             | ExprKind::MetaAccess { .. } => None,
         };
         let targs = self.lower_call_args(call_id, args);
+        let ctor_sig = class
+            .and_then(|c| self.m.classes.get(c.0 as usize))
+            .and_then(|ci| ci.constructor);
+        let targs = self.guard_args(targs, ctor_sig);
         match class {
             Some(class) => TirExpr {
                 kind: TirExprKind::New { class, args: targs },

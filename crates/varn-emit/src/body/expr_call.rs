@@ -81,6 +81,22 @@ impl<'a> FnEmitter<'a> {
         if let ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind {
             let c = self.lower_expr(callee);
             let targs = self.lower_call_args(call_id, args);
+            let callee_sig = self
+                .expr_table
+                .get(&callee.index())
+                .map(|entry| entry.ty)
+                .filter(|t| matches!(self.m.checker_table.get(t.0), varn_core::TypeKind::Fn(_)))
+                .map(|t| {
+                    crate::tables::intern_signature(
+                        &t,
+                        self.m.checker_table,
+                        self.m.interner,
+                        self.tt,
+                        self.m.names,
+                        self.signatures,
+                    )
+                });
+            let targs = self.guard_args(targs, callee_sig);
             let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
             let res = match self.m.fns.get(name) {
                 Some(&(fn_id, arity))
@@ -246,6 +262,11 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
+        let method_sig = self.class_of(recv.ty).and_then(|ci| {
+            let slot = ci.method_slot(&name)?;
+            Some(ci.method_at(slot)?.sig)
+        });
+        let targs = self.guard_args(targs, method_sig);
         let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
         let res = self
             .class_of(recv.ty)
