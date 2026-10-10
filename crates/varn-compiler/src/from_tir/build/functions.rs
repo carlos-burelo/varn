@@ -6,25 +6,31 @@ use varn_tir::{
     BackendTy, Resolution, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt, TirUnOp,
 };
 
+pub(super) fn absent_param(cond: &TirExpr) -> Option<u32> {
+    let TirExprKind::Unary {
+        op: TirUnOp::IsNull,
+        operand,
+    } = &cond.kind
+    else {
+        return None;
+    };
+    if let TirExpr {
+        kind: TirExprKind::Var,
+        res: Resolution::Param(i),
+        ..
+    } = operand.as_ref()
+    {
+        return Some(*i);
+    }
+    None
+}
+
 pub(crate) fn defaulted_param_mask(body: &[TirStmt], nparams: usize) -> Vec<bool> {
     let mut mask = vec![false; nparams];
     for stmt in body {
         if let TirStmt::If { cond, .. } = stmt {
-            if let TirExprKind::Unary {
-                op: TirUnOp::IsNull,
-                operand,
-            } = &cond.kind
-            {
-                if let TirExpr {
-                    kind: TirExprKind::Var,
-                    res: Resolution::Param(i),
-                    ..
-                } = operand.as_ref()
-                {
-                    if (*i as usize) < nparams {
-                        mask[*i as usize] = true;
-                    }
-                }
+            if let Some(i) = absent_param(cond).filter(|i| (*i as usize) < nparams) {
+                mask[i as usize] = true;
             }
         }
     }
@@ -66,6 +72,12 @@ fn build_inner(
     let entry = b.current;
 
     let defaulted = defaulted_param_mask(&func.body, func.params.len());
+    b.defaulted = func
+        .params
+        .iter()
+        .zip(&defaulted)
+        .map(|(pty, defaulted)| defaulted.then_some(*pty))
+        .collect();
     for (i, pty) in func.params.iter().enumerate() {
         let t = if defaulted[i] {
             HirType::Dynamic
@@ -132,4 +144,49 @@ pub fn build_module(tir: &TirModule, lines: &[u32]) -> Result<Vec<SsaFunc>> {
         )?);
     }
     Ok(out)
+}
+
+impl<'m> Builder<'m> {
+    pub(super) fn restore_supplied_param(&mut self, cond: &TirExpr) -> Result<()> {
+        let Some(i) = absent_param(cond) else {
+            return Ok(());
+        };
+        let Some(declared) = self.defaulted.get_mut(i as usize).and_then(Option::take) else {
+            return Ok(());
+        };
+        let ty = self.ty(declared.non_nullable(&self.tir.types));
+        let var = VarId::Param(i);
+        let supplied = self.read_var(var, self.current)?;
+        let conv = match ty {
+            HirType::Int => Some(varn_core::ValueConv::ExpectInt),
+            HirType::Float => Some(varn_core::ValueConv::ExpectFloat),
+            HirType::Bool => Some(varn_core::ValueConv::ExpectBool),
+            HirType::Str => Some(varn_core::ValueConv::ExpectStr),
+            HirType::Dynamic | HirType::Nullable(_) => return Ok(()),
+            HirType::Ref
+            | HirType::Array(_)
+            | HirType::Map(..)
+            | HirType::Set(_)
+            | HirType::Tuple
+            | HirType::Class(_) => None,
+        };
+        let typed = match conv {
+            Some(conv) => self.emit(
+                InstKind::Convert {
+                    operand: supplied,
+                    conv,
+                },
+                crate::ssa::verify::convert_result_ty(conv),
+            ),
+            None => self.emit(
+                InstKind::Cast {
+                    operand: supplied,
+                    ty,
+                },
+                ty,
+            ),
+        };
+        self.write_var(var, self.current, typed);
+        Ok(())
+    }
 }

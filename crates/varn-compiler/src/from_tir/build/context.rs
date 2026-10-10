@@ -17,6 +17,7 @@ pub(crate) struct LoopCtx {
 pub(crate) struct Builder<'m> {
     pub(super) tir: &'m TirModule,
     pub(super) self_fn: Option<varn_tir::FnId>,
+    pub(super) defaulted: Vec<Option<varn_tir::BackendTy>>,
     pub(super) ssa_types: crate::hir::TyTable,
     pub(super) line_starts: Vec<u32>,
     pub(super) cur_line: u32,
@@ -49,6 +50,7 @@ impl<'m> Builder<'m> {
         let mut b = Builder {
             tir,
             self_fn: None,
+            defaulted: Vec::new(),
             ssa_types: crate::hir::TyTable::default(),
             line_starts: lines.to_vec(),
             cur_line: 1,

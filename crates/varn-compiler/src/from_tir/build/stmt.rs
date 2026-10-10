@@ -170,6 +170,7 @@ impl<'m> Builder<'m> {
                 }
 
                 self.current = else_blk;
+                self.restore_supplied_param(cond)?;
                 self.lower_block(else_body)?;
                 if self.is_open() {
                     let cur = self.current;
