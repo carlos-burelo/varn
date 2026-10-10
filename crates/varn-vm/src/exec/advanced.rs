@@ -91,6 +91,9 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
     if !obj.is_heap() {
         return false;
     }
+    if let Some(HeapObj::EnumVariant(variant)) = heap.get(obj.as_heap()) {
+        return variant.enum_class_id == Some(cls.id);
+    }
     let obj_class = match heap.instance(obj.as_heap()) {
         Some(inst) => ClassObj::find_by_id(inst.class_id),
         None => match heap.get(obj.as_heap()) {

@@ -17,7 +17,7 @@ pub enum TypeDesc {
     Set(Box<TypeDesc>),
     Tuple(Vec<TypeDesc>),
     Class { witness: u32, name: String },
-    Enum(String),
+    Enum { witness: u32, name: String },
     Nullable(Box<TypeDesc>),
     Args {
         fixed: Vec<TypeDesc>,
@@ -84,8 +84,10 @@ impl TypeDesc {
                 out.push_str(name);
                 out.push(';');
             }
-            TypeDesc::Enum(name) => {
+            TypeDesc::Enum { witness, name } => {
                 out.push('E');
+                out.push_str(&witness.to_string());
+                out.push(':');
                 out.push_str(name);
                 out.push(';');
             }
@@ -171,7 +173,11 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
             let name = take_until(rest, ';')?.to_string();
             TypeDesc::Class { witness, name }
         }
-        'E' => TypeDesc::Enum(take_until(rest, ';')?.to_string()),
+        'E' => {
+            let witness = take_until(rest, ':')?.parse().ok()?;
+            let name = take_until(rest, ';')?.to_string();
+            TypeDesc::Enum { witness, name }
+        }
         '?' => TypeDesc::Nullable(Box::new(decode_one(rest)?)),
         'A' => {
             let count: usize = take_until(rest, ';')?.parse().ok()?;
@@ -241,7 +247,7 @@ impl fmt::Display for TypeDesc {
                 f.write_str("]")
             }
             TypeDesc::Class { name, .. } => f.write_str(name),
-            TypeDesc::Enum(name) => f.write_str(name),
+            TypeDesc::Enum { name, .. } => f.write_str(name),
             TypeDesc::Nullable(inner) => write!(f, "{inner}?"),
             TypeDesc::Args { fixed, rest } => {
                 f.write_str("(")?;

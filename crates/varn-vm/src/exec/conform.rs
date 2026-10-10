@@ -162,14 +162,18 @@ pub(crate) fn fit(
             let class = *witnesses.get(*witness as usize)?;
             exact(class.is_null() || instanceof(v, class, heap))
         }
-        TypeDesc::Enum(name) => {
+        TypeDesc::Enum { witness, name } => {
             if !v.is_heap() {
                 return None;
             }
             let Some(HeapObj::EnumVariant(data)) = heap.get(v.as_heap()) else {
                 return None;
             };
-            exact(data.enum_name.as_ref() == name.as_str())
+            let class = *witnesses.get(*witness as usize)?;
+            if class.is_null() {
+                return exact(data.enum_name.as_ref() == name.as_str());
+            }
+            exact(instanceof(v, class, heap))
         }
         TypeDesc::Nullable(inner) => {
             if v.is_null() {

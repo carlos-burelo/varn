@@ -81,7 +81,13 @@ impl<'m> Describer<'m> {
                 None => TypeDesc::Any,
             },
             BackendTy::Enum(id) => match self.tir.enum_info(id) {
-                Some(info) => TypeDesc::Enum(info.name.to_string()),
+                Some(info) => {
+                    let name = info.name.clone();
+                    TypeDesc::Enum {
+                        witness: self.witness(&name),
+                        name: name.to_string(),
+                    }
+                }
                 None => TypeDesc::Any,
             },
             BackendTy::Fn(_) | BackendTy::Dynamic(DynReason::Callable) => TypeDesc::Callable,

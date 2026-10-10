@@ -166,6 +166,7 @@ import "./171-dynamic-boundary-object-types.vn"
 import "./172-dynamic-boundary-callee.vn"
 import "./173-super-method-spread.vn"
 import "./174-typed-register-guards.vn"
+import "./175-enum-instanceof.vn"
 
 summary()
 
