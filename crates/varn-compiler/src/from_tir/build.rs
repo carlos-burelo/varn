@@ -8,6 +8,7 @@ mod assign;
 mod call;
 mod class_def;
 mod classdef_methods;
+mod conform;
 mod construct;
 mod context;
 mod exports;

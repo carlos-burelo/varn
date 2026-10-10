@@ -205,9 +205,22 @@ impl<'m> Builder<'m> {
                 return self.lower_checked_class(v, class, false, ty);
             }
             varn_tir::BackendTy::Nullable(inner) if self.tir.types.contains(inner) => {
-                if let varn_tir::BackendTy::Class(class) = self.tir.types.get(inner) {
+                let inner = self.tir.types.get(inner);
+                if let varn_tir::BackendTy::Class(class) = inner {
                     return self.lower_checked_class(v, class, true, ty);
                 }
+                if super::conform::is_structural(inner) {
+                    return self.lower_conform(v, node_ty, ty);
+                }
+            }
+            varn_tir::BackendTy::Array(_)
+            | varn_tir::BackendTy::Map(..)
+            | varn_tir::BackendTy::Set(_)
+            | varn_tir::BackendTy::Tuple(_)
+            | varn_tir::BackendTy::Enum(_)
+            | varn_tir::BackendTy::Fn(_)
+            | varn_tir::BackendTy::Dynamic(varn_tir::DynReason::Callable) => {
+                return self.lower_conform(v, node_ty, ty);
             }
             varn_tir::BackendTy::Int
             | varn_tir::BackendTy::Float
@@ -217,16 +230,16 @@ impl<'m> Builder<'m> {
             | varn_tir::BackendTy::Bytes
             | varn_tir::BackendTy::Decimal
             | varn_tir::BackendTy::BigInt
-            | varn_tir::BackendTy::Array(_)
-            | varn_tir::BackendTy::Map(..)
-            | varn_tir::BackendTy::Set(_)
-            | varn_tir::BackendTy::Tuple(_)
-            | varn_tir::BackendTy::Enum(_)
-            | varn_tir::BackendTy::Fn(_)
             | varn_tir::BackendTy::Nullable(_)
             | varn_tir::BackendTy::Void
             | varn_tir::BackendTy::Never
-            | varn_tir::BackendTy::Dynamic(_) => {}
+            | varn_tir::BackendTy::Dynamic(
+                varn_tir::DynReason::HostBoundary
+                | varn_tir::DynReason::Union
+                | varn_tir::DynReason::IndexSignature
+                | varn_tir::DynReason::Declared
+                | varn_tir::DynReason::NotYetSupported,
+            ) => {}
         }
         let conv = match ty {
             HirType::Str => varn_core::ValueConv::ExpectStr,

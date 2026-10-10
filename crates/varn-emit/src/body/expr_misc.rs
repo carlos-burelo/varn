@@ -53,15 +53,44 @@ impl<'a> FnEmitter<'a> {
     }
 
     fn crosses_dynamic_boundary(&self, e: &TirExpr, ty: BackendTy) -> bool {
-        matches!(e.ty, BackendTy::Dynamic(_))
-            && matches!(
-                ty.non_nullable(self.tt),
-                BackendTy::Str
-                    | BackendTy::Bool
-                    | BackendTy::Int
-                    | BackendTy::Float
-                    | BackendTy::Class(_)
+        let BackendTy::Dynamic(reason) = e.ty else {
+            return false;
+        };
+        let untyped = match reason {
+            varn_tir::DynReason::Declared | varn_tir::DynReason::HostBoundary => true,
+            varn_tir::DynReason::Union
+            | varn_tir::DynReason::IndexSignature
+            | varn_tir::DynReason::Callable
+            | varn_tir::DynReason::NotYetSupported => false,
+        };
+        match ty.non_nullable(self.tt) {
+            BackendTy::Str
+            | BackendTy::Bool
+            | BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Class(_) => true,
+            BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Dynamic(varn_tir::DynReason::Callable) => untyped,
+            BackendTy::Dynamic(
+                varn_tir::DynReason::HostBoundary
+                | varn_tir::DynReason::Union
+                | varn_tir::DynReason::IndexSignature
+                | varn_tir::DynReason::Declared
+                | varn_tir::DynReason::NotYetSupported,
             )
+            | BackendTy::Char
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never => false,
+        }
     }
 
     pub(super) fn guard_args(

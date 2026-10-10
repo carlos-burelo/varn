@@ -79,6 +79,15 @@ impl NativeCtx for ExecCtx {
         self.heap.str_is_ascii(v)
     }
 
+    fn conform(
+        &mut self,
+        value: VmValue,
+        desc: &str,
+        witnesses: &[VmValue],
+    ) -> varn_types::NativeFnResult {
+        crate::exec::conform::conform(&self.heap, value, desc, witnesses)
+    }
+
     fn is_string(&self, v: VmValue) -> bool {
         v.is_sso() || (v.is_heap() && matches!(self.heap.get(v.as_heap()), Some(HeapObj::Str(_))))
     }

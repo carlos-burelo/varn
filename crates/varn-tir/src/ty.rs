@@ -32,6 +32,8 @@ pub enum DynReason {
 
     Declared,
 
+    Callable,
+
     NotYetSupported,
 }
 

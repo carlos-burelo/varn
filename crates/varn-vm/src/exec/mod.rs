@@ -6,6 +6,7 @@ pub(crate) mod class;
 pub(crate) mod closures;
 pub(crate) mod collections;
 pub(crate) mod compare;
+pub(crate) mod conform;
 pub(crate) mod convert;
 pub(crate) mod ctx;
 pub(crate) mod ctx_csv;

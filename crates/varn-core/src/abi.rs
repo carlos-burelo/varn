@@ -171,7 +171,10 @@ pub const NATIVE_GLOBALS: &[&str] = &[
     "int",
     "isIsolate",
     "str",
+    CONFORM_GLOBAL,
 ];
+
+pub const CONFORM_GLOBAL: &str = "<conform>";
 
 pub fn native_global_index(name: &str) -> Option<u32> {
     NATIVE_GLOBALS

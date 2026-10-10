@@ -1,0 +1,116 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+class Beast { legs: int = 4 }
+class Stone {}
+enum Tint { Red, Green }
+enum Figure { Circle(r: float), Square }
+
+function outcome(f: () => void): str {
+    try {
+        f()
+        return "ok"
+    } catch (e) {
+        if (e instanceof TypeError) { return e.message }
+        return "other: " + e.message
+    }
+}
+
+function ints(d: dynamic): int { const xs: int[] = d; return xs.length }
+function floatSum(d: dynamic): float {
+    const xs: float[] = d
+    let total = 0.0
+    for (const x of xs) { total = total + x }
+    return total
+}
+function strs(d: dynamic): str[] { return d }
+function legs(d: dynamic): int {
+    const xs: Beast[] = d
+    let total = 0
+    for (const b of xs) { total = total + b.legs }
+    return total
+}
+function mapSize(d: dynamic): int { const m: Map<str, int> = d; return m.size }
+function setSize(d: dynamic): int { const s: Set<int> = d; return s.size }
+function first(d: dynamic): int { const t: #[int, str] = d; return t[0] }
+function tint(d: dynamic): Tint { return d }
+function apply(d: dynamic): int { const f: (x: int) => int = d; return f(2) }
+function absent(d: dynamic): bool { const xs: int[]? = d; return xs == null }
+function rows(d: dynamic): int { const xs: int[][] = d; return xs.length }
+function takeInts(xs: int[]): int { return xs.length }
+function passInts(d: dynamic): int { return takeInts(d) }
+
+await describe("167 dynamic boundary: collections", async () => {
+    await it("an array is checked as a container and by element", () => {
+        expect(ints(Json.parse("[1, 2, 3]"))).toBe(3)
+        expect(ints([])).toBe(0)
+        expect(outcome(() => { ints(["a"]) })).toBe("type mismatch: expected 'int[]', got 'Array'")
+        expect(outcome(() => { ints(5) })).toBe("type mismatch: expected 'int[]', got 'int'")
+        expect(outcome(() => { ints(null) })).toBe("type mismatch: expected 'int[]', got 'null'")
+        expect(strs(["a", "b"]).length).toBe(2)
+        expect(outcome(() => { strs([1]) })).toBe("type mismatch: expected 'str[]', got 'Array'")
+    })
+
+    await it("a float array widens the ints it holds", () => {
+        expect(floatSum(Json.parse("[1, 2.5]"))).toBe(3.5)
+        expect(outcome(() => { floatSum(["x"]) })).toBe("type mismatch: expected 'float[]', got 'Array'")
+    })
+
+    await it("class elements are checked against the class", () => {
+        expect(legs([new Beast(), new Beast()])).toBe(8)
+        expect(outcome(() => { legs([new Beast(), new Stone()]) }))
+            .toBe("type mismatch: expected 'Beast[]', got 'Array'")
+    })
+
+    await it("maps and sets are checked by key and value", () => {
+        const good = new Map<str, int>()
+        good.set("a", 1)
+        const bad = new Map<str, str>()
+        bad.set("a", "b")
+        expect(mapSize(good)).toBe(1)
+        expect(outcome(() => { mapSize(bad) })).toBe("type mismatch: expected 'Map<str, int>', got 'Map'")
+        expect(outcome(() => { mapSize([1]) })).toBe("type mismatch: expected 'Map<str, int>', got 'Array'")
+        const numbers = new Set<int>()
+        numbers.add(1)
+        expect(setSize(numbers)).toBe(1)
+        expect(outcome(() => { setSize(good) })).toBe("type mismatch: expected 'Set<int>', got 'Map'")
+    })
+
+    await it("a tuple is checked by arity and slot", () => {
+        expect(first(#[1, "a"])).toBe(1)
+        expect(outcome(() => { first(#[1, 2]) })).toBe("type mismatch: expected '#[int, str]', got 'Tuple'")
+        expect(outcome(() => { first(#[1]) })).toBe("type mismatch: expected '#[int, str]', got 'Tuple'")
+        expect(outcome(() => { first([1, "a"]) })).toBe("type mismatch: expected '#[int, str]', got 'Array'")
+    })
+
+    await it("an enum only accepts its own variants", () => {
+        expect(tint(Tint.Red) == Tint.Red).toBe(true)
+        expect(outcome(() => { tint(Figure.Square) })).toBe("type mismatch: expected 'Tint', got 'enum'")
+        expect(outcome(() => { tint(1) })).toBe("type mismatch: expected 'Tint', got 'int'")
+    })
+
+    await it("a function type only accepts something callable", () => {
+        expect(apply((x: int) => x * 2)).toBe(4)
+        expect(outcome(() => { apply(3) })).toBe("type mismatch: expected 'function', got 'int'")
+    })
+
+    await it("nullable and nested collections", () => {
+        expect(absent(null)).toBe(true)
+        expect(absent([1])).toBe(false)
+        expect(outcome(() => { absent("x") })).toBe("type mismatch: expected 'int[]?', got 'str'")
+        expect(rows([[1], [2, 3]])).toBe(2)
+        expect(outcome(() => { rows([[1], ["a"]]) })).toBe("type mismatch: expected 'int[][]', got 'Array'")
+    })
+
+    await it("arguments are checked like declarations", () => {
+        expect(passInts([1, 2])).toBe(2)
+        expect(outcome(() => { passInts(["a"]) })).toBe("type mismatch: expected 'int[]', got 'Array'")
+    })
+
+    await it("holds in a hot loop", () => {
+        const data: dynamic = Json.parse("[1, 2, 3]")
+        let total = 0
+        for (let i = 0; i < 5000; i = i + 1) { total = total + ints(data) }
+        expect(total).toBe(15000)
+    })
+})

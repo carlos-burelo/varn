@@ -16,6 +16,7 @@ pub mod module_id;
 pub mod numeric;
 pub mod numeric_big;
 pub mod numeric_conv;
+pub mod type_desc;
 pub mod op_id;
 pub mod op_meta;
 pub mod opcode;
@@ -48,6 +49,7 @@ pub use numeric::{
     mul_int, neg_int, pow_int, rem_int, sub_int, IntDivFault, NumericOperand, INT_MAX, INT_MIN,
 };
 pub use numeric_conv::{float_to_int, ValueConv, NumericDomain};
+pub use type_desc::TypeDesc;
 pub use runtime_kind::{FieldAccess, RuntimeKind};
 pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};

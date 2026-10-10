@@ -131,8 +131,9 @@ fn lower_kind(
             BackendTy::Dynamic(DynReason::IndexSignature)
         }
 
-        TypeKind::Fn(_)
-        | TypeKind::Intersection(_)
+        TypeKind::Fn(_) => BackendTy::Dynamic(DynReason::Callable),
+
+        TypeKind::Intersection(_)
         | TypeKind::This
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Typeof(_)

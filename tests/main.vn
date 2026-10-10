@@ -158,6 +158,7 @@ import "./163-implicit-constructor-chain.vn"
 import "./164-inline-callee-locals.vn"
 import "./165-optional-method-call.vn"
 import "./166-tuple-literal-in-compiled-code.vn"
+import "./167-dynamic-boundary-collections.vn"
 
 summary()
 

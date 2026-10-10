@@ -222,7 +222,7 @@ impl<'a> FnEmitter<'a> {
                                 self.m.names,
                             )
                         })
-                        .filter(|t| !matches!(t, BackendTy::Dynamic(_)))
+                        .filter(|t| !matches!(t, BackendTy::Dynamic(why) if *why != DynReason::Callable))
                         .or_else(|| init.as_ref().map(|e| e.ty))
                         .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
                     let init = init.map(|e| self.guard_dynamic(e, ty));
