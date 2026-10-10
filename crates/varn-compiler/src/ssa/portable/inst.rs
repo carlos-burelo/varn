@@ -16,13 +16,14 @@ pub(super) fn project_inst(
 ) -> Option<SsaInst> {
     if let InstKind::Try { .. } = &inst.kind {
         let (catch_ip, live) = site.landing?;
-        let mut live: Vec<u32> = live.iter().copied().collect();
+        let catch_value = inst.dest?.0;
+        let mut live: Vec<u32> = live.iter().copied().filter(|v| *v != catch_value).collect();
         live.sort_unstable();
         return Some(SsaInst {
             dest: None,
             op: SsaOp::Try {
                 catch_ip,
-                catch_value: inst.dest?.0,
+                catch_value,
                 live,
             },
             line: inst.line,

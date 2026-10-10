@@ -36,7 +36,7 @@ pub(in crate::clif) fn try_lower(
                 .ok_or_else(|| format!("from_ssa: no loop header at ip {ip}"))?,
         ),
     };
-    if osr.is_some() && activation == Activation::Native {
+    if (osr.is_some() || proto.resumes_in_interpreter()) && activation == Activation::Native {
         return Err(NEEDS_ACTIVATION.into());
     }
     let nparams = proto.arity.saturating_sub(1);

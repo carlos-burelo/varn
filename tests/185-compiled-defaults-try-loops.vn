@@ -1,0 +1,113 @@
+import { describe, it, expect } from "std:test";
+
+class Box {
+    n: int
+    constructor(n: int) { this.n = n }
+}
+
+function stepInt(x: int, step: int = 1): int { return x + step }
+function scale(x: float, by: float = 2.0): float { return x * by }
+function pick(on: bool = true): int { return on ? 1 : 0 }
+function greet(name: str = "nadie"): str { return "hola " + name }
+function unbox(b: Box = new Box(7)): int { return b.n }
+function total(items: int[] = [1, 2, 3]): int {
+    let sum = 0
+    for (let i = 0; i < items.length; i = i + 1) { sum = sum + items[i] }
+    return sum
+}
+
+function fixedBound(): int {
+    let items: int[] = []
+    for (let i = 0; i < 1000; i = i + 1) { items.push(i) }
+    let sum = 0
+    let last = 0
+    for (let i = 0; i < 1000; i = i + 1) {
+        last = items[i]
+        sum = sum + last
+    }
+    return sum + last
+}
+function shortArray(): int {
+    let items: int[] = [1, 2, 3]
+    let sum = 0
+    for (let i = 0; i < 5; i = i + 1) {
+        if (i < items.length) { sum = sum + items[i] }
+    }
+    return sum
+}
+
+class Refused extends Error {}
+function boom(n: int): int {
+    if (n % 3 == 0) { throw new Refused("no " + n) }
+    return n
+}
+function guarded(n: int): int {
+    try { return boom(n) } catch (e) { return -1 }
+}
+function rethrown(n: int): int {
+    try { return boom(n) } catch (e) { throw new Error("envuelto: " + (e as Error).message) }
+}
+function keepsLocals(n: int): int {
+    let before = n * 2
+    let seen = 0
+    try {
+        seen = boom(n)
+        before = before + 1
+    } catch (e) {
+        seen = before
+    } finally {
+        before = before + 100
+    }
+    return before + seen
+}
+
+await describe("185 compiled defaults, try/catch and fixed-bound loops", async () => {
+    await it("defaults fill in and supplied values keep their type, hot", () => {
+        let acc = 0
+        let f = 0.0
+        for (let i = 0; i < 20000; i = i + 1) {
+            acc = acc + stepInt(i) - stepInt(i, 3) + pick() + pick(false) + unbox() + unbox(new Box(1))
+            f = f + scale(1.0) + scale(1.0, 0.5)
+        }
+        expect(acc).toBe(20000 * (1 - 3 + 1 + 0 + 7 + 1))
+        expect(f).toBe(20000.0 * 2.5)
+        expect(greet()).toBe("hola nadie")
+        expect(greet("ana")).toBe("hola ana")
+        expect(total()).toBe(6)
+        expect(total([10, 20])).toBe(30)
+    })
+
+    await it("a supplied value of the wrong type is rejected", () => {
+        const loose: dynamic = "tres"
+        let caught = ""
+        try { stepInt(1, loose) } catch (e) { caught = (e as Error).name }
+        expect(caught).toBe("TypeError")
+    })
+
+    await it("values defined inside a fixed-bound loop survive it", () => {
+        for (let r = 0; r < 300; r = r + 1) { fixedBound() }
+        expect(fixedBound()).toBe(499500 + 999)
+        for (let r = 0; r < 300; r = r + 1) { shortArray() }
+        expect(shortArray()).toBe(6)
+    })
+
+    await it("try/catch behaves the same once compiled", () => {
+        let sum = 0
+        for (let i = 1; i <= 3000; i = i + 1) { sum = sum + guarded(i) }
+        expect(sum).toBe(3000 * 3001 / 2 - 1000 * 1001 * 3 / 2 - 1000)
+        let wrapped = 0
+        for (let i = 1; i <= 3000; i = i + 1) {
+            try { rethrown(i) } catch (e) {
+                if ((e as Error).message == "envuelto: no " + i) { wrapped = wrapped + 1 }
+            }
+        }
+        expect(wrapped).toBe(1000)
+        let locals = 0
+        for (let i = 1; i <= 3000; i = i + 1) { locals = locals + keepsLocals(i) }
+        let want = 0
+        for (let i = 1; i <= 3000; i = i + 1) {
+            want = want + (i % 3 == 0 ? i * 2 + 100 + i * 2 : i * 2 + 1 + 100 + i)
+        }
+        expect(locals).toBe(want)
+    })
+})
