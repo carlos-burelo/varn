@@ -1,0 +1,74 @@
+import { describe, it, expect } from "std:test";
+
+class Point {
+    n: int
+    constructor(n: int) { this.n = n }
+}
+
+function ifInt(n: int): int { if (n) { return 1 } return 0 }
+function ifFloat(n: float): int { if (n) { return 1 } return 0 }
+function ifStr(s: str): int { if (s) { return 1 } return 0 }
+function ifMaybe(n: int?): int { if (n) { return 1 } return 0 }
+function whileInt(n: int): int { let c = 0; while (n) { n = n - 1; c = c + 1 } return c }
+function notInt(n: int): bool { return !n }
+function pickFloat(n: float): int { return n ? 5 : 6 }
+
+function orInt(n: int): int { return n || 7 }
+function andInt(n: int, m: int): int { return n && m }
+function orAssign(n: int): int { let x = n; x ||= 9; return x }
+function orStr(s: str?): str { return s || "vacio" }
+function throughPoint(p: Point?): int { return (p && p.n) || -1 }
+function bools(a: bool, b: bool): bool { return a && b || !a }
+function mixed(n: int, s: str): dynamic { return n || s }
+
+let calls = 0
+function counted(v: int): int { calls = calls + 1; return v }
+function shortCircuit(): int { calls = 0; const r = counted(3) || counted(4); return r * 10 + calls }
+function bothSides(): int { calls = 0; const r = counted(0) || counted(4); return r * 10 + calls }
+
+await describe("186 truthiness and logical values", async () => {
+    await it("zero, 0.0 and NaN are false; every string is true", () => {
+        for (let r = 0; r < 300; r = r + 1) { ifInt(r); ifFloat(0.5); ifMaybe(r); whileInt(3); pickFloat(1.0) }
+        expect(ifInt(0)).toBe(0)
+        expect(ifInt(2)).toBe(1)
+        expect(ifInt(-1)).toBe(1)
+        expect(ifFloat(0.0)).toBe(0)
+        expect(ifFloat(0.5)).toBe(1)
+        expect(ifFloat(0.0 / 0.0)).toBe(0)
+        expect(ifStr("")).toBe(1)
+        expect(ifStr("a")).toBe(1)
+        expect(ifMaybe(null)).toBe(0)
+        expect(ifMaybe(0)).toBe(0)
+        expect(ifMaybe(3)).toBe(1)
+        expect(whileInt(3)).toBe(3)
+        expect(notInt(0)).toBe(true)
+        expect(notInt(3)).toBe(false)
+        expect(pickFloat(0.0)).toBe(6)
+        expect(pickFloat(2.5)).toBe(5)
+    })
+
+    await it("|| and && give back one of their operands", () => {
+        for (let r = 0; r < 300; r = r + 1) { orInt(r); andInt(r, 2); orAssign(r); orStr(null); throughPoint(null); bools(true, false) }
+        expect(orInt(0)).toBe(7)
+        expect(orInt(3)).toBe(3)
+        expect(andInt(0, 3)).toBe(0)
+        expect(andInt(2, 3)).toBe(3)
+        expect(orAssign(0)).toBe(9)
+        expect(orAssign(4)).toBe(4)
+        expect(orStr(null)).toBe("vacio")
+        expect(orStr("x")).toBe("x")
+        expect(throughPoint(null)).toBe(-1)
+        expect(throughPoint(new Point(5))).toBe(5)
+        expect(bools(true, true)).toBe(true)
+        expect(bools(true, false)).toBe(false)
+        expect(bools(false, false)).toBe(true)
+        expect(mixed(0, "s")).toBe("s")
+        expect(mixed(4, "s")).toBe(4)
+    })
+
+    await it("the right side runs only when the left does not decide", () => {
+        for (let r = 0; r < 300; r = r + 1) { shortCircuit(); bothSides() }
+        expect(shortCircuit()).toBe(31)
+        expect(bothSides()).toBe(42)
+    })
+})

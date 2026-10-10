@@ -177,12 +177,19 @@ impl<'a> FnEmitter<'a> {
         let (cond, then_val, else_val) = match op {
             LogicalOp::And | LogicalOp::Or => {
                 let l = self.lower_expr(left);
-                let l = self.cast_to(l, BackendTy::Bool);
                 let r = self.lower_expr(right);
-                let r = self.cast_to(r, BackendTy::Bool);
-                match op {
-                    LogicalOp::And => (l, r, bool_lit(false)),
-                    LogicalOp::Or | LogicalOp::Nullish => (l, bool_lit(true), r),
+                if l.ty == BackendTy::Bool && r.ty == BackendTy::Bool {
+                    match op {
+                        LogicalOp::And => (l, r, bool_lit(false)),
+                        LogicalOp::Or | LogicalOp::Nullish => (l, bool_lit(true), r),
+                    }
+                } else {
+                    let l = self.pin(l);
+                    let holds = self.cast_to(l.clone(), BackendTy::Bool);
+                    match op {
+                        LogicalOp::And => (holds, r, l),
+                        LogicalOp::Or | LogicalOp::Nullish => (holds, l, r),
+                    }
                 }
             }
             LogicalOp::Nullish => {

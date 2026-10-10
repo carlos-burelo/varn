@@ -26,8 +26,14 @@ impl<'r> Checker<'r> {
         };
         match op {
             varn_core::ast::LogicalOp::And => {
-                if l_ty == r_ty {
-                    l_ty
+                let present =
+                    l_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                let always_truthy = self.is_class_instance(present, bind);
+                let table = &mut *std::sync::Arc::make_mut(&mut self.ty_table);
+                if always_truthy && l_ty.is_nullable(table) {
+                    Type::make_nullable(r_ty, table)
+                } else if always_truthy || l_ty == r_ty {
+                    r_ty
                 } else {
                     Type::union(
                         vec![l_ty, r_ty],
@@ -48,6 +54,7 @@ impl<'r> Checker<'r> {
                 }
             }
             varn_core::ast::LogicalOp::Or => {
+                let l_ty = l_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 if l_ty == r_ty {
                     l_ty
                 } else {
@@ -58,6 +65,20 @@ impl<'r> Checker<'r> {
                 }
             }
         }
+    }
+
+    fn is_class_instance(&self, ty: Type, bind: &BindResult) -> bool {
+        use varn_sem::types::TypeContext;
+        let (TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin)) =
+            self.ty_table.get(ty.0)
+        else {
+            return false;
+        };
+        let name = self.resolve_bind_atom(bind, name);
+        let origin = origin.map(|o| self.resolve_bind_atom(bind, o));
+        varn_sem::bind::BindView::new(bind, self.resolver)
+            .get_class_members(&name, origin.as_deref())
+            .is_some()
     }
 
     pub(super) fn infer_try(
