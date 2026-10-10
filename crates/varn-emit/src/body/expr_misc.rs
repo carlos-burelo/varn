@@ -53,7 +53,10 @@ impl<'a> FnEmitter<'a> {
 
     fn crosses_dynamic_boundary(&self, e: &TirExpr, ty: BackendTy) -> bool {
         matches!(e.ty, BackendTy::Dynamic(_))
-            && matches!(ty.non_nullable(self.tt), BackendTy::Str | BackendTy::Bool)
+            && matches!(
+                ty.non_nullable(self.tt),
+                BackendTy::Str | BackendTy::Bool | BackendTy::Class(_)
+            )
     }
 
     pub(super) fn guard_args(

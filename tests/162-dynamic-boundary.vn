@@ -89,6 +89,30 @@ function kindOf(f: () => void): str {
     }
 }
 
+class Animal {
+    legs: int = 4
+}
+
+class Dog extends Animal {
+    name: str = "rex"
+}
+
+class Rock {
+    weight: int = 9
+}
+
+function legsOf(a: Animal): int { return a.legs }
+function declAnimal(d: dynamic): int {
+    let a: Animal = d
+    return a.legs
+}
+function passAnimal(d: dynamic): int { return legsOf(d) }
+function castAnimal(d: dynamic): int { return (d as Animal).legs }
+function optAnimal(d: dynamic): bool {
+    let a: Animal? = d
+    return a == null
+}
+
 function asStr(d: dynamic): str { return d as str }
 function asBool(d: dynamic): bool { return d as bool }
 
@@ -166,6 +190,21 @@ await describe("162 dynamic boundary", async () => {
         expect(failed(() => { optBool("x") })).toBe(true)
         expect(failed(() => { passOpt(5) })).toBe(true)
         expect(failed(() => { retOpt(5) })).toBe(true)
+    })
+
+    await it("a class target takes instances of the class or a subclass", () => {
+        expect(declAnimal(new Animal())).toBe(4)
+        expect(passAnimal(new Dog())).toBe(4)
+        expect(castAnimal(new Animal())).toBe(4)
+        expect(optAnimal(null)).toBe(true)
+        expect(optAnimal(new Dog())).toBe(false)
+        expect(failed(() => { declAnimal(new Rock()) })).toBe(true)
+        expect(failed(() => { declAnimal({ legs: 4 }) })).toBe(true)
+        expect(failed(() => { declAnimal(null) })).toBe(true)
+        expect(failed(() => { passAnimal(new Rock()) })).toBe(true)
+        expect(failed(() => { castAnimal(5) })).toBe(true)
+        expect(failed(() => { optAnimal(new Rock()) })).toBe(true)
+        expect(kindOf(() => { declAnimal(new Rock()) })).toBe("TypeError")
     })
 
     await it("the failure is a TypeError", () => {

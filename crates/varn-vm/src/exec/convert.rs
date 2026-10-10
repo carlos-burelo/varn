@@ -148,6 +148,15 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
                 Err(not_a(if nullable { "bool?" } else { "bool" }, v, heap))
             };
         }
+        ValueConv::AssertInstance => {
+            return if v.is_bool() && v.as_bool() {
+                Ok(v)
+            } else {
+                Err(RuntimeError::type_error(
+                    "type mismatch: value is not an instance of the declared class",
+                ))
+            };
+        }
         ValueConv::IntToFloat
         | ValueConv::FloatToInt
         | ValueConv::IntToBigInt
@@ -168,7 +177,8 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
         ValueConv::DynToStr
         | ValueConv::DynToBool
         | ValueConv::DynToStrOrNull
-        | ValueConv::DynToBoolOrNull => Ok(v),
+        | ValueConv::DynToBoolOrNull
+        | ValueConv::AssertInstance => Ok(v),
         ValueConv::FloatToInt | ValueConv::BigIntToInt | ValueConv::DecimalToInt | ValueConv::DynToInt => {
             to_int(n)
         }

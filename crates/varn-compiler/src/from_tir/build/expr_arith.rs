@@ -73,8 +73,95 @@ impl<'m> Builder<'m> {
         }
     }
 
-    pub(super) fn lower_checked(&mut self, operand: &TirExpr, ty: HirType) -> Result<Value> {
+    fn lower_checked_class(
+        &mut self,
+        v: Value,
+        class: varn_tir::ClassId,
+        nullable: bool,
+        ty: HirType,
+    ) -> Result<Value> {
+        let name = self
+            .tir
+            .class(class)
+            .map(|ci| ci.name.clone())
+            .ok_or(crate::OptError::Unsupported("from_tir: Checked to an unknown class"))?;
+        let cls = self.emit(self.global_load(&name), HirType::Ref);
+        let is_instance = self.emit(
+            InstKind::Binary {
+                op: crate::hir::HirBinOp::Instanceof,
+                lhs: v,
+                rhs: cls,
+                ty: HirType::Dynamic,
+            },
+            HirType::Bool,
+        );
+        let holds = if nullable {
+            let is_null = self.emit(InstKind::IsNull { operand: v }, HirType::Bool);
+            let not_null = self.emit(
+                InstKind::Unary {
+                    op: crate::hir::HirUnOp::Not,
+                    operand: is_null,
+                    ty: HirType::Bool,
+                },
+                HirType::Bool,
+            );
+            self.emit(
+                InstKind::Binary {
+                    op: crate::hir::HirBinOp::Eq,
+                    lhs: is_instance,
+                    rhs: not_null,
+                    ty: HirType::Bool,
+                },
+                HirType::Bool,
+            )
+        } else {
+            is_instance
+        };
+        self.emit(
+            InstKind::Convert {
+                operand: holds,
+                conv: varn_core::ValueConv::AssertInstance,
+            },
+            HirType::Bool,
+        );
+        Ok(self.emit(InstKind::Cast { operand: v, ty }, ty))
+    }
+
+    pub(super) fn lower_checked(
+        &mut self,
+        operand: &TirExpr,
+        node_ty: varn_tir::BackendTy,
+        ty: HirType,
+    ) -> Result<Value> {
         let v = self.lower_expr(operand)?;
+        match node_ty {
+            varn_tir::BackendTy::Class(class) => {
+                return self.lower_checked_class(v, class, false, ty);
+            }
+            varn_tir::BackendTy::Nullable(inner) if self.tir.types.contains(inner) => {
+                if let varn_tir::BackendTy::Class(class) = self.tir.types.get(inner) {
+                    return self.lower_checked_class(v, class, true, ty);
+                }
+            }
+            varn_tir::BackendTy::Int
+            | varn_tir::BackendTy::Float
+            | varn_tir::BackendTy::Bool
+            | varn_tir::BackendTy::Char
+            | varn_tir::BackendTy::Str
+            | varn_tir::BackendTy::Bytes
+            | varn_tir::BackendTy::Decimal
+            | varn_tir::BackendTy::BigInt
+            | varn_tir::BackendTy::Array(_)
+            | varn_tir::BackendTy::Map(..)
+            | varn_tir::BackendTy::Set(_)
+            | varn_tir::BackendTy::Tuple(_)
+            | varn_tir::BackendTy::Enum(_)
+            | varn_tir::BackendTy::Fn(_)
+            | varn_tir::BackendTy::Nullable(_)
+            | varn_tir::BackendTy::Void
+            | varn_tir::BackendTy::Never
+            | varn_tir::BackendTy::Dynamic(_) => {}
+        }
         let conv = match ty {
             HirType::Str => varn_core::ValueConv::DynToStr,
             HirType::Bool => varn_core::ValueConv::DynToBool,
