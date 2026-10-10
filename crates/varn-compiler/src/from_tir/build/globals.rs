@@ -24,7 +24,10 @@ impl<'m> Builder<'m> {
     pub(super) fn global_load(&self, bare: &str) -> InstKind {
         match self.gslot(bare) {
             Some(slot) => InstKind::LoadGlobalIdx(slot),
-            None => InstKind::LoadGlobal(self.gname(bare)),
+            None => match varn_core::abi::native_global_index(bare) {
+                Some(native) => InstKind::LoadNativeGlobalIdx(native),
+                None => InstKind::LoadGlobal(self.gname(bare)),
+            },
         }
     }
 
