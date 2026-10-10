@@ -156,8 +156,11 @@ impl<'a> FnEmitter<'a> {
         } else {
             l
         };
-        let lhs = self.cast_to(lhs, common);
-        let rhs = self.cast_to(rhs, common);
+        let (lhs, rhs) = if op == TirBinOp::Add && common == BackendTy::Str {
+            (self.to_str(lhs), self.to_str(rhs))
+        } else {
+            (self.cast_to(lhs, common), self.cast_to(rhs, common))
+        };
         let ty = if is_cmp { BackendTy::Bool } else { common };
         let _ = checked;
         (lhs, rhs, ty)

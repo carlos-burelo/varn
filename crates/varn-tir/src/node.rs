@@ -55,6 +55,8 @@ pub enum TirUnOp {
     Typeof,
 
     IsNull,
+
+    ToStr,
 }
 
 #[derive(Debug, Clone)]

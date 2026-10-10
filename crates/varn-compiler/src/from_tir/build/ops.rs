@@ -32,7 +32,7 @@ pub(super) fn un_op(op: TirUnOp) -> HirUnOp {
         TirUnOp::Not => HirUnOp::Not,
         TirUnOp::BitNot => HirUnOp::BitNot,
         TirUnOp::Typeof => HirUnOp::Typeof,
-        TirUnOp::IsNull => unreachable!("handled by lower_expr"),
+        TirUnOp::IsNull | TirUnOp::ToStr => unreachable!("handled by lower_expr"),
     }
 }
 

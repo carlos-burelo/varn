@@ -27,6 +27,22 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    pub(super) fn to_str(&self, e: TirExpr) -> TirExpr {
+        if e.ty == BackendTy::Str {
+            return e;
+        }
+        let span = e.span;
+        TirExpr {
+            kind: TirExprKind::Unary {
+                op: varn_tir::TirUnOp::ToStr,
+                operand: Box::new(e),
+            },
+            ty: BackendTy::Str,
+            res: varn_tir::Resolution::None,
+            span,
+        }
+    }
+
     pub(super) fn cast_to(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
         if e.ty == ty {
             return e;

@@ -104,16 +104,7 @@ impl<'a> FnEmitter<'a> {
                 }
                 TemplatePart::Interpolation(e) => {
                     let le = self.lower_expr(*e);
-                    if le.ty == BackendTy::Str {
-                        le
-                    } else {
-                        str_expr(
-                            TirExprKind::Cast {
-                                operand: Box::new(le),
-                            },
-                            span,
-                        )
-                    }
+                    self.to_str(le)
                 }
             };
             acc = Some(match acc {
