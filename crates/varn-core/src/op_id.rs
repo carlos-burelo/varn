@@ -37,6 +37,11 @@ pub fn array_push_op_id() -> u64 {
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Array.name(), "push"))
 }
 
+pub fn int_to_string_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Int.name(), "toString"))
+}
+
 pub fn str_starts_with_op_id() -> u64 {
     static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "startsWith"))

@@ -17,6 +17,9 @@ pub(crate) fn emit_call_native_op(
         .frame
         .as_ref()
         .ok_or("from_ssa: native call without a frame")?;
+    if args.is_empty() && op_id == varn_core::op_id::int_to_string_op_id() {
+        return heap::emit_unary_boxed(b, ctx, values, object, ctx.helpers.to_string);
+    }
     let receiver = heap::boxed_value(b, ctx, values, object)?;
     if args.len() == 1 && varn_core::op_id::is_str_char_index_op_id(op_id) {
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
