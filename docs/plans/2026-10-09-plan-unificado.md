@@ -97,9 +97,13 @@ no se copian de documentos).
 - **C2-bounds matrix ~1.13× adicional** (quick 12.01→10.6ms,
   checksums intactos, 100% JIT 0 bails): versionado innermost en
   `drive.rs` (`lower_block` + `emit_version_guard` + clones
-  fast/slow): guarda `len ≥ maxidx+1` en preheader (vistas ya
-  resueltas por `pinned`), fast elide `ult` (`arrays.rs` vía
-  `Ctx::elide` + `fast_bounds`), slow intacto como fallback.
+  fast/slow): guarda `len ≥ maxidx+1` en preheader (vistas
+  resueltas por `prefill` de los objetos de la guarda, NO por
+  `pins`: el retain por pins filtraba el 100% de los planes y el
+  versionado jamás disparaba); fast elide `ult` (`arrays.rs`
+  vía `Ctx::elide` + `fast_bounds`), slow intacto como fallback;
+  si un objeto no está materializado en preheader se emite el
+  término original (sin versionar) en vez de petar.
   Elegibilidad en `ranges.rs` (solo innermost, sin calls/push/
   stores-globales, índices acotados ≥0, objetos invariantes,
   preheader único con Jump; sin OSR).

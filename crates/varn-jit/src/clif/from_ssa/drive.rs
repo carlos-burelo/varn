@@ -269,12 +269,7 @@ pub(in crate::clif) fn try_lower(
     let mut hoisted: std::collections::BTreeMap<(usize, u32), Value> =
         std::collections::BTreeMap::new();
 
-    let mut plans = version_plans;
-    plans.retain(|pl| {
-        pins.get(&pl.preheader).map_or(false, |objs| {
-            pl.guards.iter().all(|(o, _)| objs.contains(o))
-        })
-    });
+    let plans = version_plans;
     let mut plan_by_pre: std::collections::BTreeMap<usize, usize> =
         std::collections::BTreeMap::new();
     for (idx, pl) in plans.iter().enumerate() {
@@ -282,7 +277,12 @@ pub(in crate::clif) fn try_lower(
         ctx.fast_bounds.extend(pl.elide.iter().copied());
     }
     if super::super::trace() && (!plans.is_empty() || !hoist_at.is_empty()) {
-        eprintln!("clif: versions {} hoists {:?}", plans.len(), hoist_at);
+        eprintln!(
+            "clif: versions {} hoists {:?} fn={}",
+            plans.len(),
+            hoist_at,
+            proto.name.as_deref().unwrap_or("<module>")
+        );
     }
     let mut vmaps: Vec<VersionClones> = Vec::new();
     for pl in &plans {
@@ -348,6 +348,20 @@ pub(in crate::clif) fn try_lower(
                 n,
             )?;
             emitted[i] = true;
+            let gobjs: Vec<u32> = plans[pi].guards.iter().map(|(o, _)| *o).collect();
+            if !gobjs.iter().all(|o| values[*o as usize].is_some()) {
+                if super::super::trace() {
+                    eprintln!("clif: versions skip {}", plans[pi].header);
+                }
+                let blk = &ssa.blocks[i];
+                let polls = |target: u32| {
+                    rpo_pos[target as usize] <= rpo_pos[i]
+                        && cfg::loop_may_collect(ssa, &preds, target as usize, i)
+                };
+                term::emit_term(&mut b, &ctx, &blocks, &values, &blk.term, polls)?;
+                continue;
+            }
+            arrays::prefill(&mut b, &ctx, &values, &gobjs)?;
             emit_version_guard(&mut b, &ctx, &mut values, ssa, &plans[pi], &vmaps[pi])?;
             let fast_order: Vec<(usize, Block)> = vmaps[pi]
                 .fast
@@ -456,14 +470,6 @@ pub(in crate::clif) fn try_lower(
     b.seal_all_blocks();
     b.finalize(isa.frontend_config());
     super::super::debug::capture_ir(&mut debug, &func);
-    if std::env::var("VARN_DUMP_IR").is_ok() {
-        if let Err(e) = cranelift_codegen::verify_function(&func, &**isa) {
-            let _ = std::fs::write(
-                "C:\\Users\\x\\dev\\varn\\varn-lang\\target\\irfail.clif",
-                format!("{}\nVERIFY-FAIL: {}\n", func.display(), e),
-            );
-        }
-    }
     super::super::debug::capture_kinds_ssa(&mut debug, ssa);
     Ok(Lowered {
         piece: compile_piece(func, isa)?,
