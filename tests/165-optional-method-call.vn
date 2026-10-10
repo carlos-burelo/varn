@@ -1,0 +1,74 @@
+import { describe, it, expect } from "std:test";
+
+class Node {
+    child: Node? = null
+    depth(): int { return 1 }
+    echo(x: int): int { return x }
+}
+
+let sideEffects = 0
+function bump(): int {
+    sideEffects = sideEffects + 1
+    return 7
+}
+
+function depthOf(n: Node?): int { return n?.depth() ?? 0 }
+
+function sumDepths(n: int): int {
+    const present = new Node()
+    let total = 0
+    for (let i = 0; i < n; i = i + 1) {
+        let q: Node? = null
+        if (i % 2 == 0) { q = present }
+        total = total + depthOf(q)
+    }
+    return total
+}
+
+await describe("165 optional method call", async () => {
+    await it("a null receiver yields null instead of calling", () => {
+        const none: Node? = null
+        const some: Node? = new Node()
+        expect(none?.depth() ?? -1).toBe(-1)
+        expect(some?.depth() ?? -1).toBe(1)
+    })
+
+    await it("works on primitives and collections", () => {
+        const noInt: int? = null
+        const anInt: int? = 7
+        expect(noInt?.toString() ?? "none").toBe("none")
+        expect(anInt?.toString() ?? "none").toBe("7")
+        const noStr: str? = null
+        const aStr: str? = "ab"
+        expect(noStr?.toUpperCase() ?? "none").toBe("none")
+        expect(aStr?.toUpperCase() ?? "none").toBe("AB")
+        const noFloat: float? = null
+        expect(noFloat?.floor() ?? -1.0).toBe(-1.0)
+        const noList: int[]? = null
+        noList?.push(1)
+        expect(noList == null).toBe(true)
+        const list: int[]? = []
+        list?.push(1)
+        expect(list?.length ?? -1).toBe(1)
+    })
+
+    await it("does not evaluate the arguments when the receiver is null", () => {
+        const none: Node? = null
+        none?.echo(bump())
+        expect(sideEffects).toBe(0)
+        const some: Node? = new Node()
+        expect(some?.echo(bump()) ?? -1).toBe(7)
+        expect(sideEffects).toBe(1)
+    })
+
+    await it("chains through a nullable field", () => {
+        const root = new Node()
+        expect(root.child?.depth() ?? -1).toBe(-1)
+        root.child = new Node()
+        expect(root.child?.depth() ?? -1).toBe(1)
+    })
+
+    await it("holds in a hot loop", () => {
+        expect(sumDepths(5000)).toBe(2500)
+    })
+})

@@ -138,13 +138,13 @@ impl<'a> FnEmitter<'a> {
             };
         }
 
-        let (object, property) = match &self.ast_arena.expr(callee).kind {
+        let (object, property, optional) = match &self.ast_arena.expr(callee).kind {
             ExprKind::Member {
                 object,
                 property,
                 computed: false,
-                ..
-            } => (*object, *property),
+                optional,
+            } => (*object, *property, *optional),
             ExprKind::IntLiteral { .. }
             | ExprKind::FloatLiteral { .. }
             | ExprKind::BigIntLiteral { .. }
@@ -225,8 +225,37 @@ impl<'a> FnEmitter<'a> {
         }
 
         let recv = self.lower_expr(object);
+        if optional {
+            let recv = self.pin(recv);
+            let is_null = TirExpr {
+                kind: TirExprKind::Unary {
+                    op: TirUnOp::IsNull,
+                    operand: Box::new(recv.clone()),
+                },
+                ty: BackendTy::Bool,
+                res: Resolution::None,
+                span,
+            };
+            let present = TirExpr {
+                ty: recv.ty.non_nullable(self.tt),
+                ..recv
+            };
+            let targs = self.lower_call_args(call_id, args);
+            let call = self.member_call(present, name, targs, ty.non_nullable(self.tt), span);
+            return self.null_or(is_null, call, span);
+        }
         let targs = self.lower_call_args(call_id, args);
+        self.member_call(recv, name, targs, ty, span)
+    }
 
+    fn member_call(
+        &mut self,
+        recv: TirExpr,
+        name: Arc<str>,
+        targs: Vec<TirArg>,
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
         let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
 
         if all_positional {

@@ -62,6 +62,45 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    pub(super) fn null_or(&mut self, is_null: TirExpr, value: TirExpr, span: Span) -> TirExpr {
+        let result_ty = match value.ty {
+            BackendTy::Nullable(_) | BackendTy::Dynamic(_) | BackendTy::Void => value.ty,
+            member @ BackendTy::Int
+            | member @ BackendTy::Float
+            | member @ BackendTy::Bool
+            | member @ BackendTy::Char
+            | member @ BackendTy::Str
+            | member @ BackendTy::Bytes
+            | member @ BackendTy::Decimal
+            | member @ BackendTy::BigInt
+            | member @ BackendTy::Array(_)
+            | member @ BackendTy::Map(..)
+            | member @ BackendTy::Set(_)
+            | member @ BackendTy::Tuple(_)
+            | member @ BackendTy::Class(_)
+            | member @ BackendTy::Enum(_)
+            | member @ BackendTy::Fn(_)
+            | member @ BackendTy::Never => BackendTy::Nullable(self.tt.intern(member)),
+        };
+        let value = self.cast_to(value, result_ty);
+        let null_arm = TirExpr {
+            kind: TirExprKind::NullLit,
+            ty: result_ty,
+            res: Resolution::None,
+            span,
+        };
+        TirExpr {
+            kind: TirExprKind::Select {
+                cond: Box::new(is_null),
+                then_val: Box::new(null_arm),
+                else_val: Box::new(value),
+            },
+            ty: result_ty,
+            res: Resolution::None,
+            span,
+        }
+    }
+
     pub(super) fn lower_member(
         &mut self,
         object: ExprId,
@@ -86,43 +125,7 @@ impl<'a> FnEmitter<'a> {
                 span,
             };
             let access = self.field_access(recv, name, ty, span);
-            let result_ty = match access.ty {
-                BackendTy::Nullable(_) | BackendTy::Dynamic(_) => access.ty,
-                member @ BackendTy::Int
-                | member @ BackendTy::Float
-                | member @ BackendTy::Bool
-                | member @ BackendTy::Char
-                | member @ BackendTy::Str
-                | member @ BackendTy::Bytes
-                | member @ BackendTy::Decimal
-                | member @ BackendTy::BigInt
-                | member @ BackendTy::Array(_)
-                | member @ BackendTy::Map(..)
-                | member @ BackendTy::Set(_)
-                | member @ BackendTy::Tuple(_)
-                | member @ BackendTy::Class(_)
-                | member @ BackendTy::Enum(_)
-                | member @ BackendTy::Fn(_)
-                | member @ BackendTy::Void
-                | member @ BackendTy::Never => BackendTy::Nullable(self.tt.intern(member)),
-            };
-            let access = self.cast_to(access, result_ty);
-            let null_arm = TirExpr {
-                kind: TirExprKind::NullLit,
-                ty: result_ty,
-                res: Resolution::None,
-                span,
-            };
-            return TirExpr {
-                kind: TirExprKind::Select {
-                    cond: Box::new(is_null),
-                    then_val: Box::new(null_arm),
-                    else_val: Box::new(access),
-                },
-                ty: result_ty,
-                res: Resolution::None,
-                span,
-            };
+            return self.null_or(is_null, access, span);
         }
 
         let obj = self.lower_expr(object);

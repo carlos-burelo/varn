@@ -156,6 +156,7 @@ import "./161-string-length-chars.vn"
 import "./162-dynamic-boundary.vn"
 import "./163-implicit-constructor-chain.vn"
 import "./164-inline-callee-locals.vn"
+import "./165-optional-method-call.vn"
 
 summary()
 
