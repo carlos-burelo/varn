@@ -57,7 +57,22 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         let v = self.lower_expr(operand)?;
         match op {
-            TirUnOp::IsNull => Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool)),
+            TirUnOp::IsNull => match self.value_ty(v) {
+                HirType::Int | HirType::Float | HirType::Bool => {
+                    Ok(self.emit(InstKind::ConstBool(false), HirType::Bool))
+                }
+                HirType::Str
+                | HirType::Ref
+                | HirType::Dynamic
+                | HirType::Array(_)
+                | HirType::Map(..)
+                | HirType::Set(_)
+                | HirType::Tuple
+                | HirType::Class(_)
+                | HirType::Nullable(_) => {
+                    Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool))
+                }
+            },
             TirUnOp::ToStr => Ok(self.emit(
                 InstKind::Cast {
                     operand: v,
