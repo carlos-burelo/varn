@@ -171,15 +171,31 @@ pub(crate) fn op_get_super(
         .as_ref()
         .ok_or_else(|| RuntimeError::new("no superclass"))?
         .clone();
-    let method = super_cls
-        .find_method(name)
-        .ok_or_else(|| RuntimeError::new(format!("super: method '{}' not found", name)))?;
+    let method = match super_cls.find_method(name) {
+        Some(method) => method,
+        None if name == "constructor" => {
+            return Ok(heap.alloc_native_fn(default_constructor, "constructor"));
+        }
+        None => {
+            return Err(RuntimeError::new(format!(
+                "super: method '{}' not found",
+                name
+            )));
+        }
+    };
     Ok(bind_method_to_receiver(
         heap,
         receiver_nv,
         method,
         Some(super_cls.clone()),
     ))
+}
+
+fn default_constructor(
+    _ctx: &mut dyn varn_types::NativeCtx,
+    _args: &[VmValue],
+) -> varn_types::NativeFnResult {
+    Ok(VmValue::null())
 }
 
 fn get_class_arc(nv: VmValue, heap: &Heap) -> VmResult<Rc<ClassObj>> {
