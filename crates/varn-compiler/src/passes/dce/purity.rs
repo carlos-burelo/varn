@@ -5,9 +5,7 @@ pub(crate) fn dest_droppable(kind: &InstKind) -> bool {
     use InstKind::*;
     matches!(
         kind,
-        Call { .. }
-            | SelfCall { .. }
-            | MethodCall { .. }
+        SelfCall { .. }
             | SuperCall { .. }
             | SuperMethodCall { .. }
             | ExtensionCall { .. }
