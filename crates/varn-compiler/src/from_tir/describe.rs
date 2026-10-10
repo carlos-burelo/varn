@@ -100,8 +100,18 @@ impl<'m> Describer<'m> {
                 }
             }
             BackendTy::Dynamic(DynReason::Shape(id)) => {
-                if !self.tir.types.contains_shape(id) || self.open.contains(&id) {
+                if !self.tir.types.contains_shape(id) {
                     return TypeDesc::Any;
+                }
+                if let Some(at) = self.open.iter().rposition(|open| *open == id) {
+                    let name = match self.tir.types.shape_name(id) {
+                        Some(name) => name.to_string(),
+                        None => return TypeDesc::Any,
+                    };
+                    return TypeDesc::Enclosing {
+                        up: (self.open.len() - 1 - at) as u32,
+                        name,
+                    };
                 }
                 self.open.push(id);
                 let shape = self.tir.types.get_shape(id).to_vec();

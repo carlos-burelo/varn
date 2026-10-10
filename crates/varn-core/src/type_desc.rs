@@ -24,6 +24,7 @@ pub enum TypeDesc {
         rest: Option<Box<TypeDesc>>,
     },
     Object(Vec<FieldDesc>),
+    Enclosing { up: u32, name: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,6 +111,13 @@ impl TypeDesc {
                     None => out.push('.'),
                 }
             }
+            TypeDesc::Enclosing { up, name } => {
+                out.push('R');
+                out.push_str(&up.to_string());
+                out.push(':');
+                out.push_str(name);
+                out.push(';');
+            }
             TypeDesc::Object(fields) => {
                 out.push('O');
                 out.push_str(&fields.len().to_string());
@@ -194,6 +202,11 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
             };
             TypeDesc::Args { fixed, rest: tail }
         }
+        'R' => {
+            let up = take_until(rest, ':')?.parse().ok()?;
+            let name = take_until(rest, ';')?.to_string();
+            TypeDesc::Enclosing { up, name }
+        }
         'O' => {
             let count: usize = take_until(rest, ';')?.parse().ok()?;
             let mut fields = Vec::with_capacity(count);
@@ -265,6 +278,7 @@ impl fmt::Display for TypeDesc {
                 }
                 f.write_str(")")
             }
+            TypeDesc::Enclosing { name, .. } => f.write_str(name),
             TypeDesc::Object(fields) => {
                 f.write_str("{ ")?;
                 for (i, field) in fields.iter().enumerate() {

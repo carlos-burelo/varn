@@ -48,6 +48,29 @@ fn resolve_type_ref(
     }
 }
 
+fn lower_alias(
+    name: &str,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &dyn NameResolver,
+) -> BackendTy {
+    if let Some(id) = tt.named_shape(name) {
+        return BackendTy::Dynamic(DynReason::Shape(id));
+    }
+    let members = match names.alias(name).map(|target| table.get(target.0)) {
+        Some(TypeKind::Object(members)) => table.get_object_members(members),
+        Some(_) | None => return opaque(),
+    };
+    if members.is_empty() || !is_plain_shape(members) {
+        return opaque();
+    }
+    let id = tt.reserve_named_shape(std::sync::Arc::from(name));
+    let fields = shape_fields(members, table, interner, tt, names);
+    tt.fill_named_shape(id, fields);
+    BackendTy::Dynamic(DynReason::Shape(id))
+}
+
 fn lower_kind(
     kind: &varn_sem::types::InternedTypeKind,
     table: &CheckerTyTable,
@@ -133,7 +156,17 @@ fn lower_kind(
             BackendTy::Tuple(tt.intern_list(&lowered))
         }
 
-        TypeKind::Named(name, origin) => resolve_type_ref(name, origin, interner, names),
+        TypeKind::Named(name, origin) => {
+            let local = origin
+                .and_then(|o| interner.try_resolve(o))
+                .is_none_or(|o| names.is_local_origin(o));
+            match resolve_type_ref(name, origin, interner, names) {
+                BackendTy::Dynamic(_) if local => {
+                    lower_alias(interner.resolve(name), table, interner, tt, names)
+                }
+                resolved => resolved,
+            }
+        }
 
         TypeKind::Generic(name, _, origin) => resolve_type_ref(name, origin, interner, names),
 
@@ -172,21 +205,22 @@ fn lower_kind(
     }
 }
 
-fn lower_shape(
+fn is_plain_shape(members: &[varn_sem::types::ObjectTypeMember]) -> bool {
+    use varn_sem::types::ObjectTypeMember as Member;
+    members.iter().all(|m| match m {
+        Member::Property { .. } | Member::Method { .. } => true,
+        Member::Index { .. } | Member::Callable { .. } => false,
+    })
+}
+
+fn shape_fields(
     members: &[varn_sem::types::ObjectTypeMember],
     table: &CheckerTyTable,
     interner: &AtomInterner,
     tt: &mut TyTable,
     names: &dyn NameResolver,
-) -> BackendTy {
+) -> Vec<varn_tir::ShapeField> {
     use varn_sem::types::ObjectTypeMember as Member;
-    let plain = members.iter().all(|m| match m {
-        Member::Property { .. } | Member::Method { .. } => true,
-        Member::Index { .. } | Member::Callable { .. } => false,
-    });
-    if members.is_empty() || !plain || !tt.enter_shape() {
-        return BackendTy::Dynamic(DynReason::IndexSignature);
-    }
     let mut fields = Vec::with_capacity(members.len());
     for member in members {
         match member {
@@ -205,6 +239,20 @@ fn lower_shape(
             Member::Index { .. } | Member::Callable { .. } => {}
         }
     }
+    fields
+}
+
+fn lower_shape(
+    members: &[varn_sem::types::ObjectTypeMember],
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &dyn NameResolver,
+) -> BackendTy {
+    if members.is_empty() || !is_plain_shape(members) || !tt.enter_shape() {
+        return BackendTy::Dynamic(DynReason::IndexSignature);
+    }
+    let fields = shape_fields(members, table, interner, tt, names);
     BackendTy::Dynamic(DynReason::Shape(tt.leave_shape(fields)))
 }
 

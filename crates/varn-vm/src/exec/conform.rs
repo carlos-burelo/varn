@@ -1,6 +1,7 @@
 use crate::exec::advanced::{instanceof, typeof_val};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
+use std::cell::RefCell;
 use varn_core::{RuntimeErrorKind, RuntimeKind, TypeDesc};
 use varn_types::vm_value::ArrayRepr;
 use varn_types::{NativeCtx, NativeError, NativeFnResult, VmArray};
@@ -59,6 +60,28 @@ pub(crate) fn fit(
     desc: &TypeDesc,
     witnesses: &[VmValue],
 ) -> Option<Fit> {
+    let cx = Cx {
+        heap,
+        witnesses,
+        visiting: RefCell::new(Vec::new()),
+    };
+    fit_in(&cx, v, desc, None)
+}
+
+struct Cx<'a> {
+    heap: &'a Heap,
+    witnesses: &'a [VmValue],
+    visiting: RefCell<Vec<(u64, *const TypeDesc)>>,
+}
+
+struct Scope<'a> {
+    desc: &'a TypeDesc,
+    parent: Option<&'a Scope<'a>>,
+}
+
+fn fit_in(cx: &Cx, v: VmValue, desc: &TypeDesc, scope: Option<&Scope>) -> Option<Fit> {
+    let heap = cx.heap;
+    let witnesses = cx.witnesses;
     match desc {
         TypeDesc::Any => Some(Fit::Exact),
         TypeDesc::Int => exact(v.is_int()),
@@ -87,7 +110,7 @@ pub(crate) fn fit(
             let Some(HeapObj::Array(arr)) = heap.get(v.as_heap()) else {
                 return None;
             };
-            exact(fit_elements(heap, arr, el, witnesses))
+            exact(fit_elements(cx, arr, el, scope))
         }
         TypeDesc::Tuple(els) => {
             if !v.is_heap() {
@@ -100,7 +123,7 @@ pub(crate) fn fit(
                 return None;
             }
             for (i, el) in els.iter().enumerate() {
-                match fit(heap, arr.get_vm(i)?, el, witnesses)? {
+                match fit_in(cx, arr.get_vm(i)?, el, scope)? {
                     Fit::Exact => {}
                     Fit::Widened(widened) => {
                         arr.set_vm(i, widened);
@@ -122,7 +145,7 @@ pub(crate) fn fit(
                     let Some(x) = obj.field_at(slot) else {
                         continue;
                     };
-                    match fit(heap, x, val, witnesses)? {
+                    match fit_in(cx, x, val, scope)? {
                         Fit::Exact => {}
                         Fit::Widened(widened) => {
                             obj.set_field_at(slot, widened);
@@ -134,11 +157,11 @@ pub(crate) fn fit(
             let map = heap.map_of(v)?;
             let mut widened = Vec::new();
             for (k, x) in map.read().iter() {
-                match fit(heap, k.0, key, witnesses)? {
+                match fit_in(cx, k.0, key, scope)? {
                     Fit::Exact => {}
                     Fit::Widened(_) => return None,
                 }
-                match fit(heap, *x, val, witnesses)? {
+                match fit_in(cx, *x, val, scope)? {
                     Fit::Exact => {}
                     Fit::Widened(w) => widened.push((*k, w)),
                 }
@@ -151,7 +174,7 @@ pub(crate) fn fit(
         TypeDesc::Set(el) => {
             let set = heap.set_of(v)?;
             for k in set.read().iter() {
-                match fit(heap, k.0, el, witnesses)? {
+                match fit_in(cx, k.0, el, scope)? {
                     Fit::Exact => {}
                     Fit::Widened(_) => return None,
                 }
@@ -179,7 +202,7 @@ pub(crate) fn fit(
             if v.is_null() {
                 Some(Fit::Exact)
             } else {
-                fit(heap, v, inner, witnesses)
+                fit_in(cx, v, inner, scope)
             }
         }
         TypeDesc::Args { fixed, rest } => {
@@ -193,7 +216,7 @@ pub(crate) fn fit(
                 let Some(expected) = fixed.get(i).or(rest.as_deref()) else {
                     break;
                 };
-                match fit(heap, arr.get_vm(i)?, expected, witnesses)? {
+                match fit_in(cx, arr.get_vm(i)?, expected, scope)? {
                     Fit::Exact => {}
                     Fit::Widened(widened) => {
                         arr.set_vm(i, widened);
@@ -210,6 +233,11 @@ pub(crate) fn fit(
                 return None;
             };
             let obj = obj.borrow();
+            let inner = Scope {
+                desc,
+                parent: scope,
+            };
+            let scope = Some(&inner);
             let mut present = 0;
             for field in fields {
                 let value = obj.get_field(&field.name).filter(|x| !x.is_null());
@@ -223,17 +251,35 @@ pub(crate) fn fit(
                     return None;
                 };
                 present += 1;
-                match fit(heap, x, &field.ty, witnesses)? {
+                match fit_in(cx, x, &field.ty, scope)? {
                     Fit::Exact => {}
                     Fit::Widened(widened) => obj.set_field_str(&field.name, widened),
                 }
             }
             exact(present == obj.shape().property_names.len())
         }
+        TypeDesc::Enclosing { up, .. } => {
+            let mut target = scope?;
+            for _ in 0..*up {
+                target = target.parent?;
+            }
+            let key = (v.raw_payload(), target.desc as *const TypeDesc);
+            if v.is_heap() {
+                if cx.visiting.borrow().contains(&key) {
+                    return Some(Fit::Exact);
+                }
+                cx.visiting.borrow_mut().push(key);
+            }
+            let outcome = fit_in(cx, v, target.desc, target.parent);
+            if v.is_heap() {
+                cx.visiting.borrow_mut().pop();
+            }
+            outcome
+        }
     }
 }
 
-fn fit_elements(heap: &Heap, arr: &VmArray, el: &TypeDesc, witnesses: &[VmValue]) -> bool {
+fn fit_elements(cx: &Cx, arr: &VmArray, el: &TypeDesc, scope: Option<&Scope>) -> bool {
     let unboxed_fits = match arr.repr() {
         ArrayRepr::I64(_) => matches!(el, TypeDesc::Int),
         ArrayRepr::F64(_) => matches!(el, TypeDesc::Float),
@@ -246,7 +292,7 @@ fn fit_elements(heap: &Heap, arr: &VmArray, el: &TypeDesc, witnesses: &[VmValue]
         let Some(x) = arr.get_vm(i) else {
             return false;
         };
-        match fit(heap, x, el, witnesses) {
+        match fit_in(cx, x, el, scope) {
             Some(Fit::Exact) => {}
             Some(Fit::Widened(widened)) => {
                 arr.set_vm(i, widened);

@@ -1,0 +1,55 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+type Chain = { value: int, next: Chain? }
+type Folder = { label: str, kids: Folder[] }
+
+function outcome(f: () => void): str {
+    try {
+        f()
+        return "ok"
+    } catch (e) {
+        if (e instanceof TypeError) { return e.message }
+        return "other: " + e.message
+    }
+}
+
+function count(d: dynamic): int {
+    let node: Chain? = d
+    let total = 0
+    while (node != null) {
+        total = total + 1
+        node = node.next
+    }
+    return total
+}
+function folder(d: dynamic): Folder { return d }
+function head(d: dynamic): int {
+    const node: Chain = d
+    return node.value
+}
+
+await describe("178 dynamic boundary: recursive types", async () => {
+    await it("a recursive object type is checked at every level", () => {
+        expect(count(Json.parse("{\"value\":1,\"next\":{\"value\":2,\"next\":{\"value\":3,\"next\":null}}}"))).toBe(3)
+        const wanted = "type mismatch: expected '{ value: int, next: { value: int, next: Chain? }? }?', got 'object'"
+        expect(outcome(() => {
+            count(Json.parse("{\"value\":1,\"next\":{\"value\":2,\"next\":{\"value\":\"x\",\"next\":null}}}"))
+        })).toBe(wanted)
+        expect(outcome(() => { count(Json.parse("{\"value\":1,\"next\":{\"value\":2,\"next\":5}}")) })).toBe(wanted)
+    })
+
+    await it("recursion through an array", () => {
+        const good = "{\"label\":\"a\",\"kids\":[{\"label\":\"b\",\"kids\":[]},{\"label\":\"c\",\"kids\":[{\"label\":\"d\",\"kids\":[]}]}]}"
+        expect(folder(Json.parse(good)).kids.length).toBe(2)
+        expect(outcome(() => {
+            folder(Json.parse("{\"label\":\"a\",\"kids\":[{\"label\":\"b\",\"kids\":[{\"label\":7,\"kids\":[]}]}]}"))
+        })).toBe("type mismatch: expected '{ label: str, kids: { label: str, kids: Folder[] }[] }', got 'object'")
+    })
+
+    await it("cyclic data terminates", () => {
+        const loop: dynamic = { value: 1, next: null }
+        loop.next = loop
+        expect(head(loop)).toBe(1)
+    })
+})

@@ -154,6 +154,8 @@ pub struct TyTable {
     dedup: rustc_hash::FxHashMap<BackendTy, u32>,
     lists: Vec<Vec<BackendTy>>,
     shapes: Vec<Vec<ShapeField>>,
+    shape_names: Vec<Option<std::sync::Arc<str>>>,
+    named_shapes: rustc_hash::FxHashMap<std::sync::Arc<str>, u32>,
     open_shapes: u32,
 }
 
@@ -204,11 +206,37 @@ impl TyTable {
 
     pub fn leave_shape(&mut self, fields: Vec<ShapeField>) -> ShapeId {
         self.open_shapes -= 1;
-        if let Some(i) = self.shapes.iter().position(|known| *known == fields) {
+        let structural = self
+            .shapes
+            .iter()
+            .zip(&self.shape_names)
+            .position(|(known, name)| name.is_none() && *known == fields);
+        if let Some(i) = structural {
             return ShapeId(i as u32);
         }
         self.shapes.push(fields);
+        self.shape_names.push(None);
         ShapeId(self.shapes.len() as u32 - 1)
+    }
+
+    pub fn named_shape(&self, name: &str) -> Option<ShapeId> {
+        self.named_shapes.get(name).map(|&i| ShapeId(i))
+    }
+
+    pub fn reserve_named_shape(&mut self, name: std::sync::Arc<str>) -> ShapeId {
+        let id = self.shapes.len() as u32;
+        self.shapes.push(Vec::new());
+        self.shape_names.push(Some(name.clone()));
+        self.named_shapes.insert(name, id);
+        ShapeId(id)
+    }
+
+    pub fn fill_named_shape(&mut self, id: ShapeId, fields: Vec<ShapeField>) {
+        self.shapes[id.0 as usize] = fields;
+    }
+
+    pub fn shape_name(&self, id: ShapeId) -> Option<&std::sync::Arc<str>> {
+        self.shape_names.get(id.0 as usize)?.as_ref()
     }
 
     pub fn get_shape(&self, id: ShapeId) -> &[ShapeField] {

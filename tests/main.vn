@@ -169,6 +169,7 @@ import "./174-typed-register-guards.vn"
 import "./175-enum-instanceof.vn"
 import "./176-tuple-spread-arguments.vn"
 import "./177-recursive-type-alias.vn"
+import "./178-dynamic-boundary-recursive-types.vn"
 
 summary()
 

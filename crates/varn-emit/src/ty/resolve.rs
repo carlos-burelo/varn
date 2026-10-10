@@ -6,6 +6,7 @@ pub trait NameResolver {
     fn foreign_enum_id(&self, name: &str, origin: &str) -> Option<EnumId>;
     fn foreign_class_id(&self, name: &str, origin: &str) -> Option<ClassId>;
     fn is_local_origin(&self, origin: &str) -> bool;
+    fn alias(&self, name: &str) -> Option<varn_sem::types::Type>;
 }
 
 pub struct NoNames;
@@ -25,5 +26,8 @@ impl NameResolver for NoNames {
     }
     fn is_local_origin(&self, _: &str) -> bool {
         true
+    }
+    fn alias(&self, _: &str) -> Option<varn_sem::types::Type> {
+        None
     }
 }

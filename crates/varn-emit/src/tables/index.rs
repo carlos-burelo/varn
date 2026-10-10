@@ -15,6 +15,7 @@ pub struct NameIndex {
     enums: FxHashMap<Arc<str>, EnumId>,
     foreign_enums: FxHashMap<(Arc<str>, Arc<str>), EnumId>,
     foreign_classes: FxHashMap<(Arc<str>, Arc<str>), ClassId>,
+    aliases: FxHashMap<Arc<str>, varn_sem::types::Type>,
 }
 
 impl NameResolver for NameIndex {
@@ -36,6 +37,9 @@ impl NameResolver for NameIndex {
     }
     fn is_local_origin(&self, origin: &str) -> bool {
         origin == self.module.as_ref()
+    }
+    fn alias(&self, name: &str) -> Option<varn_sem::types::Type> {
+        self.aliases.get(name).copied()
     }
 }
 
@@ -110,6 +114,21 @@ pub fn build(
         module: Arc::from(bind.source_file.as_ref()),
         ..NameIndex::default()
     };
+    let global = bind.scopes.get(bind.global_scope);
+    for symbol in bind.arena.all() {
+        if symbol.kind != varn_sem::symbol::SymbolKind::TypeAlias || !symbol.type_params.is_empty() {
+            continue;
+        }
+        let declared = global
+            .resolve(symbol.name, &bind.scopes)
+            .map(|id| bind.arena.get(id))
+            .filter(|found| found.kind == varn_sem::symbol::SymbolKind::TypeAlias);
+        if let Some(target) = declared.and_then(|found| found.ty) {
+            names
+                .aliases
+                .insert(Arc::from(bind.interner.resolve(symbol.name)), target);
+        }
+    }
     for (i, f) in foreign.iter().enumerate() {
         names.foreign_enums.insert(
             (f.name.clone(), f.origin.clone()),
