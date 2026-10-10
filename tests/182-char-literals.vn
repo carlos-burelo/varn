@@ -1,0 +1,25 @@
+import { describe, it, expect } from "std:test";
+
+function same(c: char): char { return c }
+
+await describe("182 char literals", async () => {
+    await it("one character between single quotes is a char whatever its width", () => {
+        expect(typeof 'z').toBe("char")
+        expect(typeof 'ñ').toBe("char")
+        expect(typeof '€').toBe("char")
+        expect(same('ñ') == 'ñ').toBe(true)
+    })
+
+    await it("one escape between single quotes is a char", () => {
+        expect(typeof '\n').toBe("char")
+        expect(typeof '\t').toBe("char")
+        expect(typeof '\\').toBe("char")
+        expect(typeof '\u{1F600}').toBe("char")
+    })
+
+    await it("anything else between single quotes is a string", () => {
+        expect(typeof 'ab').toBe("str")
+        expect(typeof '').toBe("str")
+        expect(typeof 'ñu').toBe("str")
+    })
+})

@@ -173,6 +173,7 @@ import "./178-dynamic-boundary-recursive-types.vn"
 import "./179-dynamic-boundary-object-to-map.vn"
 import "./180-for-of-collections.vn"
 import "./181-narrowing-in-expressions.vn"
+import "./182-char-literals.vn"
 
 summary()
 

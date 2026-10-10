@@ -259,7 +259,7 @@ impl super::Scanner<'_> {
 
         let (el, ec) = self.location();
 
-        let kind = if quote == b'\'' && (content_end - content_start) == 1 {
+        let kind = if quote == b'\'' && is_single_char(&self.src[content_start..content_end]) {
             CHAR_TOK
         } else {
             STR
@@ -345,5 +345,23 @@ impl super::Scanner<'_> {
             start,
             self.pos,
         );
+    }
+}
+
+fn is_single_char(content: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(content) else {
+        return false;
+    };
+    let mut chars = text.chars();
+    match chars.next() {
+        Some('\\') => {
+            let escape = chars.as_str();
+            escape.chars().count() == 1
+                || (escape.starts_with("u{")
+                    && escape.ends_with('}')
+                    && escape.matches('}').count() == 1)
+        }
+        Some(_) => chars.next().is_none(),
+        None => false,
     }
 }
