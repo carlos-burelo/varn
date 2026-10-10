@@ -146,8 +146,8 @@ impl<'a> FnEmitter<'a> {
                 let args = self.verify_at_runtime(
                     vec![c.clone()],
                     args,
-                    varn_core::boundary_ops::VERIFY_CALL,
-                    varn_core::boundary_ops::VERIFY_SPREAD,
+                    varn_core::runtime_ops::VERIFY_CALL,
+                    varn_core::runtime_ops::VERIFY_SPREAD,
                     span,
                 );
                 (Callee::Value(c), args)
@@ -163,8 +163,8 @@ impl<'a> FnEmitter<'a> {
                 let args = self.verify_at_runtime(
                     vec![recv.clone(), label],
                     args,
-                    varn_core::boundary_ops::VERIFY_METHOD,
-                    varn_core::boundary_ops::VERIFY_METHOD_SPREAD,
+                    varn_core::runtime_ops::VERIFY_METHOD,
+                    varn_core::runtime_ops::VERIFY_METHOD_SPREAD,
                     span,
                 );
                 (Callee::Method { recv, name }, args)
@@ -180,8 +180,8 @@ impl<'a> FnEmitter<'a> {
                 let args = self.verify_at_runtime(
                     vec![class.clone(), label],
                     args,
-                    varn_core::boundary_ops::VERIFY_SUPER,
-                    varn_core::boundary_ops::VERIFY_SUPER_SPREAD,
+                    varn_core::runtime_ops::VERIFY_SUPER,
+                    varn_core::runtime_ops::VERIFY_SUPER_SPREAD,
                     span,
                 );
                 (Callee::Inherited { class, name }, args)
@@ -285,7 +285,7 @@ impl<'a> FnEmitter<'a> {
                 args: args.map(TirArg::Expr).collect(),
             },
             ty: BackendTy::Dynamic(DynReason::NotYetSupported),
-            res: Resolution::NativeOp(varn_core::boundary_ops::op_id(op)),
+            res: Resolution::NativeOp(varn_core::runtime_ops::op_id(op)),
             span,
         })
     }

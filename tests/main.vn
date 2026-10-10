@@ -175,6 +175,7 @@ import "./180-for-of-collections.vn"
 import "./181-narrowing-in-expressions.vn"
 import "./182-char-literals.vn"
 import "./183-tuple-index-typing.vn"
+import "./184-string-index.vn"
 
 summary()
 

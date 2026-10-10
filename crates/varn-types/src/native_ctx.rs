@@ -75,6 +75,10 @@ pub trait NativeCtx: crate::Buffers {
         None
     }
 
+    fn char_at(&self, _text: VmValue, _index: i64) -> VmValue {
+        VmValue::null()
+    }
+
     fn is_string(&self, v: VmValue) -> bool;
     fn is_array(&self, v: VmValue) -> bool;
 

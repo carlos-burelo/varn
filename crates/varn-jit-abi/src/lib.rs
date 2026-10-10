@@ -207,6 +207,7 @@ pub struct JitHelpers {
     pub store_upvalue: usize,
     pub str_ascii_bytes: usize,
     pub str_ascii_len: usize,
+    pub str_char_at: usize,
     pub str_char_code_at: usize,
     pub str_concat: usize,
     pub str_ends_with: usize,

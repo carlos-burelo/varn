@@ -96,7 +96,13 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         let obj = self.lower_expr(object)?;
         let idx = self.lower_expr(index)?;
-        let kind = if matches!(self.value_ty(obj), HirType::Array(_) | HirType::Tuple) {
+        let kind = if self.value_ty(obj) == HirType::Str && self.value_ty(idx) == HirType::Int {
+            InstKind::CallNativeOp {
+                object: obj,
+                args: vec![idx],
+                op_id: varn_core::op_id::str_index_op_id(),
+            }
+        } else if matches!(self.value_ty(obj), HirType::Array(_) | HirType::Tuple) {
             InstKind::ArrayGetIndex {
                 object: obj,
                 index: idx,

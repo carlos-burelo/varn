@@ -10,28 +10,36 @@ use varn_types::chunk::ContractWitness;
 use varn_types::value::BoundMethodTarget;
 use varn_types::{Boundary, ClassObj, NativeCtx, NativeError, NativeFn, NativeFnResult};
 
-const RUNTIME_OPS: [(&str, NativeFn); 7] = [
+const RUNTIME_OPS: [(&str, NativeFn); 8] = [
     (
-        varn_core::boundary_ops::CONFORM,
+        varn_core::runtime_ops::CONFORM,
         crate::exec::conform::conform_native,
     ),
-    (varn_core::boundary_ops::VERIFY_CALL, verify_call_native),
-    (varn_core::boundary_ops::VERIFY_SPREAD, verify_spread_native),
-    (varn_core::boundary_ops::VERIFY_METHOD, verify_method_native),
+    (varn_core::runtime_ops::VERIFY_CALL, verify_call_native),
+    (varn_core::runtime_ops::VERIFY_SPREAD, verify_spread_native),
+    (varn_core::runtime_ops::VERIFY_METHOD, verify_method_native),
     (
-        varn_core::boundary_ops::VERIFY_METHOD_SPREAD,
+        varn_core::runtime_ops::VERIFY_METHOD_SPREAD,
         verify_method_spread_native,
     ),
-    (varn_core::boundary_ops::VERIFY_SUPER, verify_super_native),
+    (varn_core::runtime_ops::VERIFY_SUPER, verify_super_native),
     (
-        varn_core::boundary_ops::VERIFY_SUPER_SPREAD,
+        varn_core::runtime_ops::VERIFY_SUPER_SPREAD,
         verify_super_spread_native,
     ),
+    (varn_core::runtime_ops::STR_INDEX, str_index_native),
 ];
 
+fn str_index_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
+    Ok(match args {
+        [text, index] => ctx.char_at(*text, ctx.as_int(*index)),
+        _ => VmValue::null(),
+    })
+}
+
 pub(crate) fn runtime_op(op_id: u64) -> Option<NativeFn> {
-    static IDS: std::sync::OnceLock<[u64; 7]> = std::sync::OnceLock::new();
-    let ids = IDS.get_or_init(|| RUNTIME_OPS.map(|(name, _)| varn_core::boundary_ops::op_id(name)));
+    static IDS: std::sync::OnceLock<[u64; 8]> = std::sync::OnceLock::new();
+    let ids = IDS.get_or_init(|| RUNTIME_OPS.map(|(name, _)| varn_core::runtime_ops::op_id(name)));
     ids.iter()
         .position(|id| *id == op_id)
         .map(|at| RUNTIME_OPS[at].1)

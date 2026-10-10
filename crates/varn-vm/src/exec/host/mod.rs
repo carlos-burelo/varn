@@ -87,6 +87,10 @@ impl NativeCtx for ExecCtx {
         Some(self)
     }
 
+    fn char_at(&self, text: VmValue, index: i64) -> VmValue {
+        self.heap.char_at(text, index)
+    }
+
     fn is_string(&self, v: VmValue) -> bool {
         v.is_sso() || (v.is_heap() && matches!(self.heap.get(v.as_heap()), Some(HeapObj::Str(_))))
     }

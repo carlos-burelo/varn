@@ -145,13 +145,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
         }
     }
     if obj.is_sso() {
-        let mut buf = [0u8; 5];
-        let s_str = obj.sso_as_str(&mut buf);
-        let idx = heap.as_int(key) as usize;
-        return match s_str.chars().nth(idx) {
-            Some(c) => Ok(heap.alloc_str(c.to_string())),
-            None => Ok(VmValue::null()),
-        };
+        return Ok(heap.char_at(obj, heap.as_int(key)));
     }
     if !obj.is_heap() {
         return Err(RuntimeError::new("OpGetIndex: not indexable"));
@@ -180,17 +174,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
                 Ok(o.borrow().get_field(&key_s).unwrap_or(VmValue::null()))
             }
         }
-        Some(HeapObj::Str(s)) => {
-            let idx = heap.as_int(key);
-            let c = s.chars().nth(idx as usize);
-            match c {
-                Some(ch) => {
-                    let s = ch.to_string();
-                    Ok(heap.alloc_str(s))
-                }
-                None => Ok(VmValue::null()),
-            }
-        }
+        Some(HeapObj::Str(_)) => Ok(heap.char_at(obj, heap.as_int(key))),
         Some(HeapObj::Range(r)) => {
             let r = r.clone();
             match r.nth(heap.as_int(key)) {

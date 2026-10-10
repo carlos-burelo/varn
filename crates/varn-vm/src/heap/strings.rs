@@ -262,3 +262,38 @@ impl HeapInner {
         "null".into()
     }
 }
+
+fn one_char(c: char) -> VmValue {
+    let mut buf = [0u8; 4];
+    VmValue::try_from_sso(c.encode_utf8(&mut buf)).unwrap_or_else(VmValue::null)
+}
+
+impl HeapInner {
+    pub(crate) fn char_at(&self, text: VmValue, index: i64) -> VmValue {
+        let Ok(at) = usize::try_from(index) else {
+            return VmValue::null();
+        };
+        if text.is_sso() {
+            let mut buf = [0u8; 5];
+            let short = text.sso_as_str(&mut buf);
+            let found = if short.is_ascii() {
+                short.as_bytes().get(at).map(|byte| *byte as char)
+            } else {
+                short.chars().nth(at)
+            };
+            return found.map_or_else(VmValue::null, one_char);
+        }
+        if !text.is_heap() {
+            return VmValue::null();
+        }
+        let Some(HeapObj::Str(long)) = self.get(text.as_heap()) else {
+            return VmValue::null();
+        };
+        let found = if long.is_ascii() {
+            long.as_str().as_bytes().get(at).map(|byte| *byte as char)
+        } else {
+            long.as_str().chars().nth(at)
+        };
+        found.map_or_else(VmValue::null, one_char)
+    }
+}

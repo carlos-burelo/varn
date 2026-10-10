@@ -87,6 +87,11 @@ pub fn str_code_point_at_op_id() -> u64 {
     *ID.get_or_init(|| core_method_op_id(crate::RuntimeKind::Str.name(), "codePointAt"))
 }
 
+pub fn str_index_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| crate::runtime_ops::op_id(crate::runtime_ops::STR_INDEX))
+}
+
 pub fn is_str_char_index_op_id(op_id: u64) -> bool {
     op_id == str_char_code_at_op_id() || op_id == str_code_point_at_op_id()
 }

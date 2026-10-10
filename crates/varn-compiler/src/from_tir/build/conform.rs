@@ -41,7 +41,7 @@ impl<'m> Builder<'m> {
             InstKind::CallNativeOp {
                 object: v,
                 args,
-                op_id: varn_core::boundary_ops::op_id(varn_core::boundary_ops::CONFORM),
+                op_id: varn_core::runtime_ops::op_id(varn_core::runtime_ops::CONFORM),
             },
             HirType::Dynamic,
         );

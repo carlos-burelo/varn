@@ -89,6 +89,10 @@ impl NativeCtx for Heap {
         self.deref_mut().alloc_class_vm(class)
     }
 
+    fn char_at(&self, text: VmValue, index: i64) -> VmValue {
+        self.deref().char_at(text, index)
+    }
+
     fn is_string(&self, v: VmValue) -> bool {
         self.deref().is_string(v)
     }

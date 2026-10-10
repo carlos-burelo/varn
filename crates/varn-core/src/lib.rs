@@ -1,5 +1,5 @@
 pub mod abi;
-pub mod boundary_ops;
+pub mod runtime_ops;
 pub mod ast;
 pub mod atom;
 pub mod capability;

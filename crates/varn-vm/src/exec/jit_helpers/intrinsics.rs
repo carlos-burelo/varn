@@ -94,6 +94,22 @@ pub(crate) extern "C" fn jit_str_char_code_at(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "str_char_at")]
+pub(crate) extern "C" fn jit_str_char_at(
+    ctx: *mut ExecCtx,
+    recv_tag: u64,
+    recv_payload: u64,
+    pos_tag: u64,
+    pos_payload: u64,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let text = VmValue::from_raw_parts(recv_tag, recv_payload);
+        let index = ctx_ref.heap.as_int(VmValue::from_raw_parts(pos_tag, pos_payload));
+        ctx_ref.jit_native_result = ctx_ref.heap.char_at(text, index);
+    }
+}
+
 #[varn_op_macros::jit_slow(field = "str_ascii_bytes")]
 pub(crate) extern "C" fn jit_str_ascii_bytes(
     ctx: *mut ExecCtx,

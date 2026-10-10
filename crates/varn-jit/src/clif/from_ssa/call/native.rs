@@ -32,6 +32,22 @@ pub(crate) fn emit_call_native_op(
         );
         return Ok(box_int(b, code));
     }
+    if args.len() == 1 && op_id == varn_core::op_id::str_index_op_id() {
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (pos_tag, pos_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
+        call_helper_void(
+            b,
+            ctx.cc,
+            ctx.helpers.str_char_at,
+            &[frame.exec_ctx, recv_tag, recv_payload, pos_tag, pos_payload],
+        );
+        return Ok(b.ins().load(
+            types::I128,
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            frame.exec_ctx,
+            ctx.helpers.jit_native_result_offset as i32,
+        ));
+    }
     if args.len() == 1 {
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
         let (arg_tag, arg_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
