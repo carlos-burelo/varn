@@ -180,7 +180,7 @@ pub(in crate::clif) fn try_lower(
         scratch,
         carried: match osr {
             Some(h) => osr::carried(&mut b, ssa, h, &reached),
-            None => Default::default(),
+            None => osr::versioned(&mut b, ssa, &version_plans, &preds, &rpo_pos, &reached),
         },
     };
 
