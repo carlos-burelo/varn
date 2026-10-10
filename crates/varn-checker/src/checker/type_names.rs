@@ -24,6 +24,49 @@ impl<'r> Checker<'r> {
                 }
                 known
             }
+            TypeKind::IndexedAccess { object, index } => {
+                let primitive = match &object.kind {
+                    TypeKind::Primitive(prim) => Some(prim.to_string()),
+                    TypeKind::Named(name, _) => {
+                        let text = self.resolve_bind_atom(bind, *name);
+                        TypeKind::<(), (), (), (), ()>::of_lang_name(&text)
+                            .is_some()
+                            .then(|| text.to_string())
+                    }
+                    TypeKind::Builtin(_)
+                    | TypeKind::Literal(_)
+                    | TypeKind::This
+                    | TypeKind::Array(_)
+                    | TypeKind::Union(_)
+                    | TypeKind::Intersection(_)
+                    | TypeKind::Tuple(_)
+                    | TypeKind::Generic(..)
+                    | TypeKind::TemplateLiteral(_)
+                    | TypeKind::Fn(_)
+                    | TypeKind::Object(_)
+                    | TypeKind::Typeof(_)
+                    | TypeKind::KeyOf(_)
+                    | TypeKind::IndexedAccess { .. }
+                    | TypeKind::Mapped { .. }
+                    | TypeKind::Conditional { .. }
+                    | TypeKind::Infer(_)
+                    | TypeKind::EnumVariant { .. }
+                    | TypeKind::TypePredicate { .. } => None,
+                };
+                if let Some(prim) = primitive {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::InvalidTypeOperator,
+                            format!(
+                                "'{prim}' cannot be indexed in a type: fixed-size arrays are not supported, use '{prim}[]'"
+                            ),
+                        )
+                        .with_range(node.range),
+                    );
+                    return false;
+                }
+                self.check_type_names(object, bind) & self.check_type_names(index, bind)
+            }
             TypeKind::Primitive(_)
             | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
@@ -33,7 +76,6 @@ impl<'r> Checker<'r> {
             | TypeKind::Object(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
-            | TypeKind::IndexedAccess { .. }
             | TypeKind::Mapped { .. }
             | TypeKind::Conditional { .. }
             | TypeKind::Infer(_)
