@@ -1,4 +1,3 @@
-// expect: error[VN3001]
-// `i8` no es un tipo (spec §11). Falta un diagnóstico propio de tipo
-// desconocido (roadmap Fase D); hoy se rechaza como mismatch.
+// expect: error[VN3002]
+// `i8` no es un tipo (spec §11).
 let b: i8 = 1

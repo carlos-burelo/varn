@@ -4993,7 +4993,7 @@
     "src/modules/core/types/range/range.vn": "a42090fbdcfe421e",
     "src/modules/core/types/set/set.vn": "ffef57063ef10859",
     "src/modules/core/types/str/str.vn": "5c2c55955a7b91a0",
-    "src/modules/runtime/buffer/buffer_runtime.vn": "5157b78fe04bdbc3",
+    "src/modules/runtime/buffer/buffer_runtime.vn": "9539df51956da58d",
     "src/modules/runtime/compress/compress_runtime.vn": "6554fc203fdbb972",
     "src/modules/runtime/crypto/crypto_runtime.vn": "2d5fde9b9aa8f739",
     "src/modules/runtime/csv/csv_runtime.vn": "b2b54bdac48c554c",

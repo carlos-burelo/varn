@@ -79,7 +79,13 @@ impl<'r> Checker<'r> {
                 is_async,
                 ..
             } => self.check_function_expr(rec, return_type, *body, *is_async, range, bind),
-            ExprKind::As { expression, .. } => self.check_expr(rec, *expression, bind),
+            ExprKind::As {
+                expression,
+                type_ann,
+            } => {
+                self.check_type_names(type_ann, bind);
+                self.check_expr(rec, *expression, bind)
+            }
             ExprKind::Is { expression, .. } => self.check_expr(rec, *expression, bind),
             ExprKind::Satisfies {
                 expression,

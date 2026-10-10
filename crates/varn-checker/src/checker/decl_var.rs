@@ -26,7 +26,10 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         for d in &v.declarators {
-            let ann = d.type_ann.as_ref();
+            let ann = d
+                .type_ann
+                .as_ref()
+                .filter(|node| self.check_type_names(node, bind));
             let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
 
             if let Some(init_expr) = d.init {

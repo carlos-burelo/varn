@@ -110,6 +110,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         self.check_expr(rec, expression, bind);
+        self.check_type_names(type_ann, bind);
         let declared_ty = self.resolve_type_node_cached(type_ann, bind);
         let inferred_ty = self.infer_type(rec, expression, bind);
         if !self.types_compatible_cached(&declared_ty, &inferred_ty, Some(bind)) {

@@ -1,0 +1,2 @@
+// expect: error[VN3002]
+let a: zzz = 1 as dynamic

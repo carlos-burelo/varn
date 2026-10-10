@@ -121,7 +121,7 @@ class WithCtx {
 }
 
 function shadowScope(): int {
-    function pure(fn: Function): Function {
+    function pure(fn: FunctionRef): FunctionRef {
         shadowLog.push("wrapped");
         return fn;
     }

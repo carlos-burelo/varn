@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { MetaKey, ClassRef } from "std:reflect";
+import { MetaKey, ClassRef, FunctionRef } from "std:reflect";
 
 let deco_log: str[] = [];
 function trackClass(cls: ClassRef): void {

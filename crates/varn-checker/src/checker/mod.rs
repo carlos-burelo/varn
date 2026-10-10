@@ -20,6 +20,7 @@ mod scope_records;
 mod setup;
 mod stages;
 mod stmts;
+mod type_names;
 mod type_queries;
 
 use rustc_hash::{FxHashMap, FxHashSet};

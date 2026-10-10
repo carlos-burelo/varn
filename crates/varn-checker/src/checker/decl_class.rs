@@ -39,6 +39,7 @@ impl<'r> Checker<'r> {
             parent = bind.class_parents.get(&p.name);
         }
 
+        self.check_class_type_names(c, bind);
         self.check_class_decorators(rec, c, bind);
         self.check_class_overrides(c, &superclass_members, bind);
         self.check_class_members(rec, c, bind);

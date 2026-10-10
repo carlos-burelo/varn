@@ -1,5 +1,6 @@
 // expect: error[VN4401]
-function oneArg(fn: Function): void {}
+import { FunctionRef } from "std:reflect";
+function oneArg(fn: FunctionRef): void {}
 
 class A {
     @oneArg

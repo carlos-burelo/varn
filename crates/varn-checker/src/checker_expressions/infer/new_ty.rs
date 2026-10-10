@@ -25,7 +25,10 @@ impl<'r> Checker<'r> {
                 if !type_args.is_empty() {
                     let args: Vec<Type> = type_args
                         .iter()
-                        .map(|a| self.resolve_type_node_cached(a, bind))
+                        .map(|a| {
+                                self.check_type_names(a, bind);
+                                self.resolve_type_node_cached(a, bind)
+                            })
                         .collect();
                     Type::generic_with_origin(
                         name_str,
@@ -88,7 +91,10 @@ impl<'r> Checker<'r> {
                     if !type_args.is_empty() {
                         let args: Vec<Type> = type_args
                             .iter()
-                            .map(|a| self.resolve_type_node_cached(a, bind))
+                            .map(|a| {
+                                self.check_type_names(a, bind);
+                                self.resolve_type_node_cached(a, bind)
+                            })
                             .collect();
                         Type::generic(
                             name_str,

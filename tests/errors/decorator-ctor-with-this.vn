@@ -1,5 +1,6 @@
 // expect: error[VN2013]
-function wrap(fn: Function, ctx: dynamic): Function {
+import { FunctionRef } from "std:reflect";
+function wrap(fn: FunctionRef, ctx: dynamic): FunctionRef {
     return fn;
 }
 class A {

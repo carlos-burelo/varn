@@ -11,6 +11,7 @@ impl<'r> Checker<'r> {
         f: &varn_core::ast::FunctionDecl,
         bind: &BindResult,
     ) {
+        self.check_signature_type_names(&f.type_params, &f.params, f.return_type.as_ref(), bind);
         let saved_expected = self.expected_return_type.take();
         self.expected_return_type = f.return_type.as_ref().map(|rt| {
             let ty = self.resolve_type_node_cached(rt, bind);
