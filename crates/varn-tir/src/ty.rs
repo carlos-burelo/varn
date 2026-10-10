@@ -5,6 +5,16 @@ pub struct TyId(pub u32);
 pub struct TyListId(pub u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ShapeId(pub u32);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShapeField {
+    pub name: std::sync::Arc<str>,
+    pub ty: BackendTy,
+    pub optional: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClassId(pub u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -37,6 +47,8 @@ pub enum DynReason {
     Awaitable(TyId),
 
     Yields(TyId),
+
+    Shape(ShapeId),
 
     NotYetSupported,
 }
@@ -141,6 +153,8 @@ pub struct TyTable {
     entries: Vec<BackendTy>,
     dedup: rustc_hash::FxHashMap<BackendTy, u32>,
     lists: Vec<Vec<BackendTy>>,
+    shapes: Vec<Vec<ShapeField>>,
+    open_shapes: u32,
 }
 
 impl TyTable {
@@ -177,5 +191,31 @@ impl TyTable {
 
     pub fn contains_list(&self, id: TyListId) -> bool {
         (id.0 as usize) < self.lists.len()
+    }
+
+    pub fn enter_shape(&mut self) -> bool {
+        const NESTING_LIMIT: u32 = 6;
+        if self.open_shapes >= NESTING_LIMIT {
+            return false;
+        }
+        self.open_shapes += 1;
+        true
+    }
+
+    pub fn leave_shape(&mut self, fields: Vec<ShapeField>) -> ShapeId {
+        self.open_shapes -= 1;
+        if let Some(i) = self.shapes.iter().position(|known| *known == fields) {
+            return ShapeId(i as u32);
+        }
+        self.shapes.push(fields);
+        ShapeId(self.shapes.len() as u32 - 1)
+    }
+
+    pub fn get_shape(&self, id: ShapeId) -> &[ShapeField] {
+        &self.shapes[id.0 as usize]
+    }
+
+    pub fn contains_shape(&self, id: ShapeId) -> bool {
+        (id.0 as usize) < self.shapes.len()
     }
 }

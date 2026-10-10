@@ -223,7 +223,9 @@ impl<'m> Builder<'m> {
             | varn_tir::BackendTy::Bytes
             | varn_tir::BackendTy::Decimal
             | varn_tir::BackendTy::BigInt
-            | varn_tir::BackendTy::Dynamic(varn_tir::DynReason::Callable) => {
+            | varn_tir::BackendTy::Dynamic(
+                varn_tir::DynReason::Callable | varn_tir::DynReason::Shape(_),
+            ) => {
                 return self.lower_conform(v, node_ty, ty);
             }
             varn_tir::BackendTy::Int

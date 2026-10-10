@@ -146,17 +146,15 @@ fn lower_kind(
 
         TypeKind::Object(members) => {
             let members = table.get_object_members(members);
-            if members.len() == 1 {
-                if let varn_sem::types::ObjectTypeMember::Index {
-                    key_ty, value_ty, ..
-                } = &members[0]
-                {
-                    let k = lower_type(&Type::resolved(*key_ty), table, interner, tt, names);
-                    let v = lower_type(&Type::resolved(*value_ty), table, interner, tt, names);
-                    return BackendTy::Map(tt.intern(k), tt.intern(v));
-                }
+            if let [varn_sem::types::ObjectTypeMember::Index {
+                key_ty, value_ty, ..
+            }] = members
+            {
+                let k = lower_type(&Type::resolved(*key_ty), table, interner, tt, names);
+                let v = lower_type(&Type::resolved(*value_ty), table, interner, tt, names);
+                return BackendTy::Map(tt.intern(k), tt.intern(v));
             }
-            BackendTy::Dynamic(DynReason::IndexSignature)
+            lower_shape(members, table, interner, tt, names)
         }
 
         TypeKind::Fn(_) => BackendTy::Dynamic(DynReason::Callable),
@@ -172,6 +170,42 @@ fn lower_kind(
         | TypeKind::Infer(_)
         | TypeKind::TypePredicate { .. } => opaque(),
     }
+}
+
+fn lower_shape(
+    members: &[varn_sem::types::ObjectTypeMember],
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &dyn NameResolver,
+) -> BackendTy {
+    use varn_sem::types::ObjectTypeMember as Member;
+    let plain = members.iter().all(|m| match m {
+        Member::Property { .. } | Member::Method { .. } => true,
+        Member::Index { .. } | Member::Callable { .. } => false,
+    });
+    if members.is_empty() || !plain || !tt.enter_shape() {
+        return BackendTy::Dynamic(DynReason::IndexSignature);
+    }
+    let mut fields = Vec::with_capacity(members.len());
+    for member in members {
+        match member {
+            Member::Property {
+                name, ty, optional, ..
+            } => fields.push(varn_tir::ShapeField {
+                name: name.clone(),
+                ty: lower_type(&Type::resolved(*ty), table, interner, tt, names),
+                optional: *optional,
+            }),
+            Member::Method { name, optional, .. } => fields.push(varn_tir::ShapeField {
+                name: name.clone(),
+                ty: BackendTy::Dynamic(DynReason::Callable),
+                optional: *optional,
+            }),
+            Member::Index { .. } | Member::Callable { .. } => {}
+        }
+    }
+    BackendTy::Dynamic(DynReason::Shape(tt.leave_shape(fields)))
 }
 
 fn lower_primitive(p: LangPrimitive) -> BackendTy {

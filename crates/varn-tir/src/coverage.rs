@@ -7,8 +7,8 @@ use crate::{TirFunction, TirModule};
 pub struct Coverage {
     pub nodes: u32,
 
-    dynamics: [u32; 8],
-    by_name: [u32; 8],
+    dynamics: [u32; 9],
+    by_name: [u32; 9],
     pub static_dispatch: u32,
     pub name_dispatch: u32,
 }
@@ -23,10 +23,11 @@ fn reason_index(r: DynReason) -> usize {
         DynReason::Callable => 5,
         DynReason::Awaitable(_) => 6,
         DynReason::Yields(_) => 7,
+        DynReason::Shape(_) => 8,
     }
 }
 
-const REASON_LABELS: [&str; 8] = [
+const REASON_LABELS: [&str; 9] = [
     "host boundary",
     "union",
     "index signature",
@@ -35,6 +36,7 @@ const REASON_LABELS: [&str; 8] = [
     "function type",
     "task",
     "generator",
+    "object type",
 ];
 
 impl Coverage {

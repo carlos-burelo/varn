@@ -222,7 +222,36 @@ impl<'a> FnEmitter<'a> {
                                 self.m.names,
                             )
                         })
-                        .filter(|t| !matches!(t, BackendTy::Dynamic(why) if *why != DynReason::Callable))
+                        .filter(|t| match t {
+                            BackendTy::Dynamic(DynReason::Callable | DynReason::Shape(_)) => true,
+                            BackendTy::Dynamic(
+                                DynReason::HostBoundary
+                                | DynReason::Union
+                                | DynReason::IndexSignature
+                                | DynReason::Declared
+                                | DynReason::Awaitable(_)
+                                | DynReason::Yields(_)
+                                | DynReason::NotYetSupported,
+                            ) => false,
+                            BackendTy::Int
+                            | BackendTy::Float
+                            | BackendTy::Bool
+                            | BackendTy::Char
+                            | BackendTy::Str
+                            | BackendTy::Bytes
+                            | BackendTy::Decimal
+                            | BackendTy::BigInt
+                            | BackendTy::Array(_)
+                            | BackendTy::Map(..)
+                            | BackendTy::Set(_)
+                            | BackendTy::Tuple(_)
+                            | BackendTy::Class(_)
+                            | BackendTy::Enum(_)
+                            | BackendTy::Fn(_)
+                            | BackendTy::Nullable(_)
+                            | BackendTy::Void
+                            | BackendTy::Never => true,
+                        })
                         .or_else(|| init.as_ref().map(|e| e.ty))
                         .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
                     let init = init.map(|e| self.guard_dynamic(e, ty));

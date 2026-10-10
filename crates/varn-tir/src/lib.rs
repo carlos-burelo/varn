@@ -1,6 +1,6 @@
 mod ty;
 
-pub use ty::{
+pub use ty::{ShapeField, ShapeId, 
     BackendTy, ClassId, DynReason, EnumId, FnId, LocalId, ModuleId, SigId, TyId, TyListId, TyTable,
 };
 

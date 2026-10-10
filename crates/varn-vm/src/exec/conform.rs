@@ -190,6 +190,34 @@ fn fit(heap: &Heap, v: VmValue, desc: &TypeDesc, witnesses: &[VmValue]) -> Optio
             }
             Some(Fit::Exact)
         }
+        TypeDesc::Object(fields) => {
+            if !v.is_heap() {
+                return None;
+            }
+            let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) = heap.get(v.as_heap()) else {
+                return None;
+            };
+            let obj = obj.borrow();
+            let mut present = 0;
+            for field in fields {
+                let value = obj.get_field(&field.name).filter(|x| !x.is_null());
+                let Some(x) = value else {
+                    if obj.get_field(&field.name).is_some() {
+                        present += 1;
+                    }
+                    if field.optional || matches!(field.ty, TypeDesc::Nullable(_) | TypeDesc::Any) {
+                        continue;
+                    }
+                    return None;
+                };
+                present += 1;
+                match fit(heap, x, &field.ty, witnesses)? {
+                    Fit::Exact => {}
+                    Fit::Widened(widened) => obj.set_field_str(&field.name, widened),
+                }
+            }
+            exact(present == obj.shape().property_names.len())
+        }
     }
 }
 

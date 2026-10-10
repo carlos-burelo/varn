@@ -162,6 +162,7 @@ import "./167-dynamic-boundary-collections.vn"
 import "./168-runtime-error-across-await.vn"
 import "./169-dynamic-boundary-coroutines.vn"
 import "./170-dynamic-boundary-arguments.vn"
+import "./171-dynamic-boundary-object-types.vn"
 
 summary()
 

@@ -23,6 +23,14 @@ pub enum TypeDesc {
         fixed: Vec<TypeDesc>,
         rest: Option<Box<TypeDesc>>,
     },
+    Object(Vec<FieldDesc>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FieldDesc {
+    pub name: String,
+    pub ty: TypeDesc,
+    pub optional: bool,
 }
 
 impl TypeDesc {
@@ -100,6 +108,18 @@ impl TypeDesc {
                     None => out.push('.'),
                 }
             }
+            TypeDesc::Object(fields) => {
+                out.push('O');
+                out.push_str(&fields.len().to_string());
+                out.push(';');
+                for field in fields {
+                    out.push_str(&field.name.len().to_string());
+                    out.push(':');
+                    out.push_str(&field.name);
+                    out.push(if field.optional { '~' } else { '!' });
+                    field.ty.encode_into(out);
+                }
+            }
         }
     }
 
@@ -168,6 +188,28 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
             };
             TypeDesc::Args { fixed, rest: tail }
         }
+        'O' => {
+            let count: usize = take_until(rest, ';')?.parse().ok()?;
+            let mut fields = Vec::with_capacity(count);
+            for _ in 0..count {
+                let len: usize = take_until(rest, ':')?.parse().ok()?;
+                let name = rest.get(..len)?.to_string();
+                *rest = &rest[len..];
+                let marker = rest.chars().next()?;
+                *rest = &rest[marker.len_utf8()..];
+                let optional = match marker {
+                    '~' => true,
+                    '!' => false,
+                    _ => return None,
+                };
+                fields.push(FieldDesc {
+                    name,
+                    ty: decode_one(rest)?,
+                    optional,
+                });
+            }
+            TypeDesc::Object(fields)
+        }
         _ => return None,
     })
 }
@@ -216,6 +258,17 @@ impl fmt::Display for TypeDesc {
                     write!(f, "...{el}")?;
                 }
                 f.write_str(")")
+            }
+            TypeDesc::Object(fields) => {
+                f.write_str("{ ")?;
+                for (i, field) in fields.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    let mark = if field.optional { "?" } else { "" };
+                    write!(f, "{}{mark}: {}", field.name, field.ty)?;
+                }
+                f.write_str(" }")
             }
         }
     }

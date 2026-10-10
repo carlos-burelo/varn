@@ -1,0 +1,76 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+type Account = { id: int, name: str }
+type Card = { owner: Account, tags: str[], score?: float }
+
+function outcome(f: () => void): str {
+    try {
+        f()
+        return "ok"
+    } catch (e) {
+        if (e instanceof TypeError) { return e.message }
+        return "other: " + e.message
+    }
+}
+
+function label(d: dynamic): str { const a: Account = d; return a.name + a.id }
+function inlineId(d: dynamic): int { const o: { id: int } = d; return o.id }
+function card(d: dynamic): Card { return d }
+function count(d: dynamic): int { const all: Account[] = d; return all.length }
+function missing(d: dynamic): bool { const a: Account? = d; return a == null }
+
+const expected = "type mismatch: expected '{ id: int, name: str }', got 'object'"
+
+await describe("171 dynamic boundary: object types", async () => {
+    await it("a parsed object must have every field with its type", () => {
+        expect(label(Json.parse("{\"id\": 1, \"name\": \"ana\"}"))).toBe("ana1")
+        expect(outcome(() => { label(Json.parse("{\"id\": \"x\", \"name\": \"ana\"}")) })).toBe(expected)
+        expect(outcome(() => { label(Json.parse("{\"id\": 1}")) })).toBe(expected)
+    })
+
+    await it("object types are exact: an extra field is rejected", () => {
+        expect(outcome(() => { label(Json.parse("{\"id\": 1, \"name\": \"ana\", \"extra\": true}")) }))
+            .toBe(expected)
+    })
+
+    await it("a non-object is rejected", () => {
+        expect(outcome(() => { label([1]) })).toBe("type mismatch: expected '{ id: int, name: str }', got 'Array'")
+        expect(outcome(() => { label(null) })).toBe("type mismatch: expected '{ id: int, name: str }', got 'null'")
+        expect(inlineId({ id: 7 })).toBe(7)
+        expect(outcome(() => { inlineId({ id: "7" }) })).toBe("type mismatch: expected '{ id: int }', got 'object'")
+    })
+
+    await it("nested fields, arrays and optional fields", () => {
+        const full = card(Json.parse("{\"owner\": {\"id\": 2, \"name\": \"bo\"}, \"tags\": [\"a\"], \"score\": 3}"))
+        expect(full.owner.name).toBe("bo")
+        expect(full.tags.length).toBe(1)
+        expect(full.score).toBe(3.0)
+        expect(card(Json.parse("{\"owner\": {\"id\": 2, \"name\": \"bo\"}, \"tags\": []}")).tags.length).toBe(0)
+        const wanted = "type mismatch: expected '{ owner: { id: int, name: str }, tags: str[], score?: float }', got 'object'"
+        expect(outcome(() => { card(Json.parse("{\"owner\": {\"id\": 2}, \"tags\": []}")) })).toBe(wanted)
+        expect(outcome(() => { card(Json.parse("{\"owner\": {\"id\": 2, \"name\": \"bo\"}, \"tags\": [1]}")) }))
+            .toBe(wanted)
+    })
+
+    await it("arrays of objects and nullable objects", () => {
+        expect(count(Json.parse("[{\"id\": 1, \"name\": \"a\"}]"))).toBe(1)
+        expect(outcome(() => { count(Json.parse("[{\"id\": 1}]")) }))
+            .toBe("type mismatch: expected '{ id: int, name: str }[]', got 'Array'")
+        expect(missing(null)).toBe(true)
+        expect(missing({ id: 1, name: "z" })).toBe(false)
+        expect(outcome(() => { missing(3) })).toBe("type mismatch: expected '{ id: int, name: str }?', got 'int'")
+    })
+
+    await it("a typed object passes through a dynamic parameter", () => {
+        const typed: Account = { id: 9, name: "t" }
+        expect(label(typed)).toBe("t9")
+    })
+
+    await it("holds in a hot loop", () => {
+        const hot: dynamic = Json.parse("{\"id\": 1, \"name\": \"ana\"}")
+        let n = 0
+        for (let i = 0; i < 5000; i = i + 1) { n = n + label(hot).length }
+        expect(n).toBe(20000)
+    })
+})

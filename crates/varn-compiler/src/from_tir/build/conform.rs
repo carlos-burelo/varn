@@ -20,19 +20,27 @@ pub(super) fn is_structural(ty: BackendTy) -> bool {
             | BackendTy::Bytes
             | BackendTy::Decimal
             | BackendTy::BigInt
-            | BackendTy::Dynamic(varn_tir::DynReason::Callable)
+            | BackendTy::Dynamic(varn_tir::DynReason::Callable | varn_tir::DynReason::Shape(_))
     )
 }
 
 impl<'m> Builder<'m> {
-    fn type_desc(&self, ty: BackendTy, witnesses: &mut Vec<Arc<str>>, depth: usize) -> TypeDesc {
+    fn type_desc(
+        &self,
+        ty: BackendTy,
+        witnesses: &mut Vec<Arc<str>>,
+        open: &mut Vec<varn_tir::ShapeId>,
+        depth: usize,
+    ) -> TypeDesc {
         if depth >= DEPTH_LIMIT {
             return TypeDesc::Any;
         }
         let types = &self.tir.types;
-        let of = |id: varn_tir::TyId, witnesses: &mut Vec<Arc<str>>| {
+        let of = |id: varn_tir::TyId,
+                  witnesses: &mut Vec<Arc<str>>,
+                  open: &mut Vec<varn_tir::ShapeId>| {
             if types.contains(id) {
-                self.type_desc(types.get(id), witnesses, depth + 1)
+                self.type_desc(types.get(id), witnesses, open, depth + 1)
             } else {
                 TypeDesc::Any
             }
@@ -46,13 +54,13 @@ impl<'m> Builder<'m> {
             BackendTy::Bytes => TypeDesc::Bytes,
             BackendTy::Decimal => TypeDesc::Decimal,
             BackendTy::BigInt => TypeDesc::BigInt,
-            BackendTy::Array(el) => TypeDesc::Array(Box::new(of(el, witnesses))),
+            BackendTy::Array(el) => TypeDesc::Array(Box::new(of(el, witnesses, open))),
             BackendTy::Map(k, v) => {
-                let key = of(k, witnesses);
-                let val = of(v, witnesses);
+                let key = of(k, witnesses, open);
+                let val = of(v, witnesses, open);
                 TypeDesc::Map(Box::new(key), Box::new(val))
             }
-            BackendTy::Set(el) => TypeDesc::Set(Box::new(of(el, witnesses))),
+            BackendTy::Set(el) => TypeDesc::Set(Box::new(of(el, witnesses, open))),
             BackendTy::Tuple(list) => {
                 if !types.contains_list(list) {
                     return TypeDesc::Any;
@@ -61,7 +69,7 @@ impl<'m> Builder<'m> {
                     types
                         .get_list(list)
                         .iter()
-                        .map(|el| self.type_desc(*el, witnesses, depth + 1))
+                        .map(|el| self.type_desc(*el, witnesses, open, depth + 1))
                         .collect(),
                 )
             }
@@ -89,12 +97,29 @@ impl<'m> Builder<'m> {
                 TypeDesc::Callable
             }
             BackendTy::Nullable(inner) => {
-                let inner = of(inner, witnesses);
+                let inner = of(inner, witnesses, open);
                 if inner.is_any() {
                     TypeDesc::Any
                 } else {
                     TypeDesc::Nullable(Box::new(inner))
                 }
+            }
+            BackendTy::Dynamic(varn_tir::DynReason::Shape(id)) => {
+                if !types.contains_shape(id) || open.contains(&id) {
+                    return TypeDesc::Any;
+                }
+                open.push(id);
+                let fields = types
+                    .get_shape(id)
+                    .iter()
+                    .map(|field| varn_core::type_desc::FieldDesc {
+                        name: field.name.to_string(),
+                        ty: self.type_desc(field.ty, witnesses, open, depth + 1),
+                        optional: field.optional,
+                    })
+                    .collect();
+                open.pop();
+                TypeDesc::Object(fields)
             }
             BackendTy::Void
             | BackendTy::Never
@@ -122,7 +147,7 @@ impl<'m> Builder<'m> {
                 .types
                 .get_list(shape.fixed)
                 .iter()
-                .map(|ty| self.type_desc(*ty, &mut witnesses, 0))
+                .map(|ty| self.type_desc(*ty, &mut witnesses, &mut Vec::new(), 0))
                 .collect()
         } else {
             Vec::new()
@@ -130,7 +155,7 @@ impl<'m> Builder<'m> {
         let rest = shape
             .rest
             .filter(|id| self.tir.types.contains(*id))
-            .map(|id| self.type_desc(self.tir.types.get(id), &mut witnesses, 0));
+            .map(|id| self.type_desc(self.tir.types.get(id), &mut witnesses, &mut Vec::new(), 0));
         if fixed.iter().all(TypeDesc::is_any) && rest.as_ref().is_none_or(TypeDesc::is_any) {
             return Ok(v);
         }
@@ -166,7 +191,7 @@ impl<'m> Builder<'m> {
         ty: HirType,
     ) -> Result<Value> {
         let mut witnesses = Vec::new();
-        let desc = self.type_desc(node_ty, &mut witnesses, 0);
+        let desc = self.type_desc(node_ty, &mut witnesses, &mut Vec::new(), 0);
         let checked = self.emit_conform(v, &desc, &witnesses)?;
         Ok(self.emit(InstKind::Cast { operand: checked, ty }, ty))
     }

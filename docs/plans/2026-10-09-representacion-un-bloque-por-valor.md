@@ -116,12 +116,12 @@ El orden lo decide la medición del paso 1 de cada fase, no este documento. Cada
 
 ### Fase E — Tipos objeto exactos como instancias
 
-- **Compuerta.** Depende de D. Hoy `{ id: int }` se baja a `BackendTy::Dynamic`: el backend no conoce sus campos y la frontera con `dynamic` no puede validar la forma.
-- **Ganancia.** Un valor de tipo objeto exacto se representa como una instancia de layout fijo (24 ms contra 45 en `instance3`/`objlit3` de la línea base) y la frontera valida campos y tipos.
-- **Verificación.** Fila nueva `typedobj3` en el probe; suite de frontera para la forma.
+- **Compuerta.** Depende de D. Hoy `{ id: int }` se baja a `BackendTy::Dynamic(DynReason::Shape)`: el backend conoce sus campos y la frontera con `dynamic` ya valida la forma (`tests/171-dynamic-boundary-object-types.vn`), pero el valor sigue siendo un objeto de shape dinámica con acceso por nombre.
+- **Ganancia.** Un valor de tipo objeto exacto se representa como una instancia de layout fijo (24 ms contra 45 en `instance3`/`objlit3` de la línea base).
+- **Verificación.** Fila nueva `typedobj3` en el probe.
 - **Se borra.** El acceso por nombre con caché de shape para valores cuyo tipo estático ya fija el layout.
-- **Contrato.** `BackendTy` gana una variante para tipo objeto con su lista de campos; `TypeDesc` gana la variante correspondiente. El único flujo que impide el layout fijo es «tipado → `dynamic` → agregar campo»: se decide en esta fase si ese flujo se prohíbe en el checker o si el objeto se desoptimiza a shape dinámica.
-- **Prueba.** Archivo nuevo en la suite: `Json.parse` hacia `{ id: int, name: str }` con campo faltante, campo de más, campo de tipo equivocado y campo opcional ausente.
+- **Contrato.** `DynReason::Shape` se gradúa a una variante propia de `BackendTy` con layout. El único flujo que impide el layout fijo es «tipado → `dynamic` → agregar campo»: se decide en esta fase si ese flujo se prohíbe en el checker o si el objeto se desoptimiza a shape dinámica.
+- **Prueba.** `tests/171-dynamic-boundary-object-types.vn` debe pasar sin cambios; se agrega lectura y escritura de campos en bucle caliente sobre el layout fijo.
 
 ---
 

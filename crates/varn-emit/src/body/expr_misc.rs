@@ -73,7 +73,9 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Bytes
             | BackendTy::Decimal
             | BackendTy::BigInt
-            | BackendTy::Dynamic(varn_tir::DynReason::Callable) => untyped,
+            | BackendTy::Dynamic(
+                varn_tir::DynReason::Callable | varn_tir::DynReason::Shape(_),
+            ) => untyped,
             BackendTy::Dynamic(
                 varn_tir::DynReason::HostBoundary
                 | varn_tir::DynReason::Union
@@ -209,6 +211,7 @@ fn untyped_reason(reason: varn_tir::DynReason) -> bool {
         | varn_tir::DynReason::Callable
         | varn_tir::DynReason::Awaitable(_)
         | varn_tir::DynReason::Yields(_)
+        | varn_tir::DynReason::Shape(_)
         | varn_tir::DynReason::NotYetSupported => false,
     }
 }
