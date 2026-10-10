@@ -6,7 +6,7 @@ use super::super::{heap, props, store, Ctx, Out};
 use super::direct::{entry_out_slot, run_entered_or};
 use super::invoke::boxed_window;
 use super::native_entry::{self, NativeCall};
-fn emit_is_str(
+pub(in crate::clif::from_ssa) fn emit_is_str(
     b: &mut FunctionBuilder,
     alay: &crate::JitArrayLayout,
     tag: Value,

@@ -84,6 +84,59 @@ pub(super) fn emit_convert(
     }
     let ectx = exec_ctx(ctx);
     let (tag, payload) = heap::boxed_parts(b, ctx, values, operand)?;
+    let Some(expected) = Expected::of(conv) else {
+        let conv_v = b.ins().iconst(types::I64, conv as i64);
+        call_helper_void(
+            b,
+            ctx.cc,
+            ctx.helpers.convert,
+            &[ectx, conv_v, tag, payload],
+        );
+        return Ok(Out::Boxed(native_result(b, ctx, ectx)));
+    };
+
+    let pass = b.create_block();
+    let slow = b.create_block();
+    let merge = b.create_block();
+    b.set_cold_block(slow);
+    b.append_block_param(merge, types::I128);
+    let kind = b
+        .ins()
+        .band_imm_u(tag, varn_types::vm_value::KIND_MASK as i64);
+    let after_null = if expected.nullable {
+        let is_null = b.ins().icmp_imm_u(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            kind,
+            varn_types::vm_value::KIND_NULL as i64,
+        );
+        let next = b.create_block();
+        b.ins().brif(is_null, pass, &[], next, &[]);
+        next
+    } else {
+        let next = b.create_block();
+        b.ins().jump(next, &[]);
+        next
+    };
+    b.switch_to_block(after_null);
+    match expected.kind {
+        ExpectedKind::Str => {
+            call::emit_is_str(b, &ctx.helpers.array_layout, tag, payload, pass, slow);
+        }
+        ExpectedKind::Tag(want) => {
+            let hit = b.ins().icmp_imm_u(
+                cranelift_codegen::ir::condcodes::IntCC::Equal,
+                kind,
+                want as i64,
+            );
+            b.ins().brif(hit, pass, &[], slow, &[]);
+        }
+    }
+
+    b.switch_to_block(pass);
+    let same = b.ins().iconcat(tag, payload);
+    b.ins().jump(merge, &[same.into()]);
+
+    b.switch_to_block(slow);
     let conv_v = b.ins().iconst(types::I64, conv as i64);
     call_helper_void(
         b,
@@ -91,5 +144,51 @@ pub(super) fn emit_convert(
         ctx.helpers.convert,
         &[ectx, conv_v, tag, payload],
     );
-    Ok(Out::Boxed(native_result(b, ctx, ectx)))
+    let converted = native_result(b, ctx, ectx);
+    b.ins().jump(merge, &[converted.into()]);
+
+    b.switch_to_block(merge);
+    Ok(Out::Boxed(b.block_params(merge)[0]))
+}
+
+enum ExpectedKind {
+    Str,
+    Tag(u64),
+}
+
+struct Expected {
+    kind: ExpectedKind,
+    nullable: bool,
+}
+
+impl Expected {
+    fn of(conv: ValueConv) -> Option<Self> {
+        use varn_types::vm_value::{KIND_BOOL, KIND_FLOAT, KIND_INT};
+        let (kind, nullable) = match conv {
+            ValueConv::ExpectStr => (ExpectedKind::Str, false),
+            ValueConv::ExpectStrOrNull => (ExpectedKind::Str, true),
+            ValueConv::ExpectBool => (ExpectedKind::Tag(KIND_BOOL), false),
+            ValueConv::ExpectBoolOrNull => (ExpectedKind::Tag(KIND_BOOL), true),
+            ValueConv::ExpectInt => (ExpectedKind::Tag(KIND_INT), false),
+            ValueConv::ExpectIntOrNull => (ExpectedKind::Tag(KIND_INT), true),
+            ValueConv::ExpectFloat => (ExpectedKind::Tag(KIND_FLOAT), false),
+            ValueConv::ExpectFloatOrNull => (ExpectedKind::Tag(KIND_FLOAT), true),
+            ValueConv::IntToFloat
+            | ValueConv::FloatToInt
+            | ValueConv::IntToBigInt
+            | ValueConv::BigIntToInt
+            | ValueConv::IntToDecimal
+            | ValueConv::DecimalToInt
+            | ValueConv::DynToInt
+            | ValueConv::DynToFloat
+            | ValueConv::BigIntToFloat
+            | ValueConv::FloatToBigInt
+            | ValueConv::DecimalToFloat
+            | ValueConv::FloatToDecimal
+            | ValueConv::BigIntToDecimal
+            | ValueConv::DecimalToBigInt
+            | ValueConv::AssertInstance => return None,
+        };
+        Some(Expected { kind, nullable })
+    }
 }
