@@ -22,8 +22,8 @@ impl<'r> Checker<'r> {
         self.diagnostics.extend(extra_diags);
         let has_named = !call_info.named_labels.is_empty();
 
-        let has_error = if has_named {
-            self.validate_named_call_arguments(
+        let (has_error, supplied) = if has_named {
+            let has_error = self.validate_named_call_arguments(
                 rec,
                 args,
                 params,
@@ -31,35 +31,35 @@ impl<'r> Checker<'r> {
                 range,
                 call_id,
                 bind,
-            )
+            );
+            (has_error, (!call_info.has_spread).then_some(args.len()))
         } else {
             self.validate_positional_call_arguments(rec, args, params, range, bind)
         };
 
-        if !has_error && !call_info.has_spread {
+        if let (false, Some(supplied)) = (has_error, supplied) {
             let required_count = params.iter().filter(|p| !p.optional && !p.is_rest).count();
             let has_rest = params.last().is_some_and(|p| p.is_rest);
 
-            if args.len() < required_count {
+            if supplied < required_count {
                 self.emit(
                     Diagnostic::error(
                         ErrorCode::TypeMismatch,
                         format!(
                             "expected at least {} arguments, but got {}",
-                            required_count,
-                            args.len()
+                            required_count, supplied
                         ),
                     )
                     .with_range(*range),
                 );
-            } else if args.len() > params.len() && !has_rest {
+            } else if supplied > params.len() && !has_rest {
                 self.emit(
                     Diagnostic::error(
                         ErrorCode::TypeMismatch,
                         format!(
                             "expected at most {} arguments, but got {}",
                             params.len(),
-                            args.len()
+                            supplied
                         ),
                     )
                     .with_range(*range),
@@ -92,13 +92,16 @@ impl<'r> Checker<'r> {
                 Arg::Spread(e) => {
                     let arg_ty = self.infer_type(rec, *e, bind);
                     if !arg_ty.is_dynamic()
-                        && !matches!(self.ty_table.get(arg_ty.0), TypeKind::Array(_))
+                        && !matches!(
+                            self.ty_table.get(arg_ty.0),
+                            TypeKind::Array(_) | TypeKind::Tuple(_)
+                        )
                     {
                         self.emit(
                             Diagnostic::error(
                                 ErrorCode::TypeMismatch,
                                 format!(
-                                    "spread argument must be an array, got '{}'",
+                                    "spread argument must be an array or a tuple, got '{}'",
                                     arg_ty.display(&self.ty_table, &bind.interner)
                                 ),
                             )
@@ -181,25 +184,41 @@ impl<'r> Checker<'r> {
         params: &[FunctionParam],
         range: &SourceRange,
         bind: &BindResult,
-    ) -> bool {
-        for (i, arg) in args.iter().enumerate() {
-            let (arg_ty, spread_inner) = match self.infer_arg_type(rec, arg, bind) {
-                Ok(value) => value,
+    ) -> (bool, Option<usize>) {
+        let mut supplied: Vec<(Type, Option<Type>, varn_core::ast::ExprId)> = Vec::new();
+        let mut known_count = true;
+        for arg in args {
+            let expr = match arg {
+                Arg::Positional(e) | Arg::Spread(e) => *e,
+                Arg::Named { value, .. } => *value,
+            };
+            match self.infer_arg_type(rec, arg, bind) {
+                Ok(Supplied::One(ty)) => supplied.push((ty, None, expr)),
+                Ok(Supplied::Each(types)) => {
+                    supplied.extend(types.into_iter().map(|ty| (ty, None, expr)));
+                }
+                Ok(Supplied::Some(ty, inner)) => {
+                    known_count = false;
+                    supplied.push((ty, inner, expr));
+                }
                 Err(arg_ty) => {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::TypeMismatch,
                             format!(
-                                "spread argument must be an array, got '{}'",
+                                "spread argument must be an array or a tuple, got '{}'",
                                 arg_ty.display(&self.ty_table, &bind.interner)
                             ),
                         )
                         .with_range(*range),
                     );
-                    return true;
+                    return (true, None);
                 }
-            };
+            }
+        }
+        let count = known_count.then_some(supplied.len());
 
+        for (i, (arg_ty, spread_inner, expr)) in supplied.into_iter().enumerate() {
             let param = if i < params.len() {
                 Some(&params[i])
             } else if params.last().is_some_and(|p| p.is_rest) {
@@ -219,22 +238,13 @@ impl<'r> Checker<'r> {
                         .get_list(list)
                         .iter()
                         .any(|m| matches!(self.ty_table.get(*m), TypeKind::Array(_))));
-                let arena = self.ast_arena;
                 let is_empty_array_arg = effective_arg_ty.is_dynamic()
                     && matches!(
-                        match arg {
-                            Arg::Positional(e) | Arg::Named { value: e, .. } | Arg::Spread(e) => {
-                                &arena.expr(*e).kind
-                            }
-                        },
+                        &self.ast_arena.expr(expr).kind,
                         ExprKind::Array { elements } if elements.is_empty()
                     )
                     && param_accepts_array;
 
-                let expr = match arg {
-                    Arg::Positional(e) | Arg::Spread(e) => *e,
-                    Arg::Named { value, .. } => *value,
-                };
                 if !is_empty_array_arg
                     && !self.value_assignable_to(
                         &param_ty,
@@ -252,12 +262,12 @@ impl<'r> Checker<'r> {
                         ))
                         .with_range(*range),
                     );
-                    return true;
+                    return (true, None);
                 }
             }
         }
 
-        false
+        (false, count)
     }
 
     fn infer_arg_type(
@@ -265,22 +275,30 @@ impl<'r> Checker<'r> {
         rec: &mut Recorder,
         arg: &Arg,
         bind: &BindResult,
-    ) -> Result<(Type, Option<Type>), Type> {
+    ) -> Result<Supplied, Type> {
         match arg {
             Arg::Positional(expr) | Arg::Named { value: expr, .. } => {
-                Ok((self.infer_type(rec, *expr, bind), None))
+                Ok(Supplied::One(self.infer_type(rec, *expr, bind)))
             }
             Arg::Spread(expr) => {
                 let arg_ty = self.infer_type(rec, *expr, bind);
                 let spread_inner = match self.ty_table.get(arg_ty.0) {
                     TypeKind::Array(inner) => Some(Type::resolved(inner)),
+                    TypeKind::Tuple(elements) => {
+                        return Ok(Supplied::Each(
+                            self.ty_table
+                                .get_list(elements)
+                                .iter()
+                                .map(|el| Type::resolved(*el))
+                                .collect(),
+                        ));
+                    }
                     TypeKind::Primitive(_)
                     | TypeKind::Builtin(_)
                     | TypeKind::Literal(_)
                     | TypeKind::This
                     | TypeKind::Union(_)
                     | TypeKind::Intersection(_)
-                    | TypeKind::Tuple(_)
                     | TypeKind::Named(..)
                     | TypeKind::Generic(..)
                     | TypeKind::TemplateLiteral(_)
@@ -296,13 +314,19 @@ impl<'r> Checker<'r> {
                     | TypeKind::TypePredicate { .. } => None,
                 };
                 match spread_inner {
-                    Some(inner) => Ok((arg_ty, Some(inner))),
-                    None if arg_ty.is_dynamic() => Ok((arg_ty, None)),
+                    Some(inner) => Ok(Supplied::Some(arg_ty, Some(inner))),
+                    None if arg_ty.is_dynamic() => Ok(Supplied::Some(arg_ty, None)),
                     None => Err(arg_ty),
                 }
             }
         }
     }
+}
+
+enum Supplied {
+    One(Type),
+    Each(Vec<Type>),
+    Some(Type, Option<Type>),
 }
 
 struct CallArgAnalysis<'a> {

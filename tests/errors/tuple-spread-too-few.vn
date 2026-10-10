@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+function pair(a: int, b: str): str { return b }
+pair(...#[1])
