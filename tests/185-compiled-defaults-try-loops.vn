@@ -16,6 +16,24 @@ function total(items: int[] = [1, 2, 3]): int {
     return sum
 }
 
+function maybeFormal(greeting: str, formal: bool | null = null): str {
+    if (formal == true) { return greeting + "," }
+    return greeting
+}
+function orZero(a: int, b: int?): int {
+    if (b == null) { return 0 }
+    return a * b
+}
+function fact(n: int, acc: int = 1): int {
+    if (n <= 1) { return acc }
+    return fact(n - 1, acc * n)
+}
+function countDown(n: int, tag: str? = null): int {
+    if (n == 0) { return tag == null ? 0 : 1 }
+    return countDown(n - 1)
+}
+function extras(a: int, ...more: int[]): int { return a + more.length }
+
 function fixedBound(): int {
     let items: int[] = []
     for (let i = 0; i < 1000; i = i + 1) { items.push(i) }
@@ -75,6 +93,21 @@ await describe("185 compiled defaults, try/catch and fixed-bound loops", async (
         expect(greet("ana")).toBe("hola ana")
         expect(total()).toBe(6)
         expect(total([10, 20])).toBe(30)
+    })
+
+    await it("calls reach a nullable or defaulted parameter in its declared shape", () => {
+        let acc = 0
+        for (let i = 0; i < 20000; i = i + 1) {
+            acc = acc + orZero(i, 2) + orZero(i, null) + stepInt(i) + extras(i) + extras(i, 1, 2)
+        }
+        expect(acc).toBe(19999 * 20000 / 2 * 5 + 20000 * 3)
+        expect(fact(10)).toBe(3628800)
+        expect(fact(5, 2)).toBe(240)
+        expect(countDown(50)).toBe(0)
+        expect(countDown(0, "x")).toBe(1)
+        expect(maybeFormal("hola")).toBe("hola")
+        expect(maybeFormal("hola", true)).toBe("hola,")
+        expect(maybeFormal("hola", null)).toBe("hola")
     })
 
     await it("a supplied value of the wrong type is rejected", () => {

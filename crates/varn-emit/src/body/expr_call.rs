@@ -91,6 +91,21 @@ impl<'a> FnEmitter<'a> {
                 (target.into_expr(), targs)
             };
             let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
+            let takes_rest = callee_sig
+                .and_then(|sig| self.signatures.get(sig.0 as usize))
+                .is_none_or(|sig| sig.has_rest);
+            let mut targs = targs;
+            if let Some(&(_, arity)) = self.m.fns.get(name).filter(|_| all_positional && !takes_rest)
+            {
+                while targs.len() < arity as usize {
+                    targs.push(TirArg::Expr(TirExpr {
+                        kind: TirExprKind::NullLit,
+                        ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                        res: Resolution::None,
+                        span: Span::EMPTY,
+                    }));
+                }
+            }
             let res = match self.m.fns.get(name) {
                 Some(&(fn_id, arity))
                     if all_positional
