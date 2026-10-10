@@ -7,8 +7,20 @@ function countB(text: str): int {
     }
     return n
 }
-function at(text: str, i: int): str? { return text[i] }
+function at(text: str, i: int): str { return text[i] }
 function viaDynamic(d: dynamic, i: int): dynamic { return d[i] }
+function failure(run: () => dynamic): str {
+    try { run(); return "no error" } catch (e) { return (e as Error).name + ": " + (e as Error).message }
+}
+function typedHot(text: str, i: int): str {
+    try { return text[i] } catch (e) { return "out" }
+}
+function arrayHot(xs: int[], i: int): int {
+    try { return xs[i] } catch (e) { return -1 }
+}
+function storeHot(xs: int[], i: int): int {
+    try { xs[i] = 7; return xs[i] } catch (e) { return -1 }
+}
 
 await describe("184 string index", async () => {
     await it("indexes by character, short and long strings", () => {
@@ -23,16 +35,52 @@ await describe("184 string index", async () => {
         expect(at("añoañoañoañoañoañoaño", 19)).toBe("ñ")
     })
 
-    await it("out of range and negative give null", () => {
-        expect(at("abc", 3)).toBe(null)
-        expect(at("abc", -1)).toBe(null)
-        expect(at("", 0)).toBe(null)
+    await it("out of range and negative throw RangeError", () => {
+        expect(failure(() => at("abc", 3))).toBe("RangeError: index 3 is out of range for length 3")
+        expect(failure(() => at("abc", -1))).toBe("RangeError: index -1 is out of range for length 3")
+        expect(failure(() => at("", 0))).toBe("RangeError: index 0 is out of range for length 0")
+        expect(failure(() => at("ñandú", 5))).toBe("RangeError: index 5 is out of range for length 5")
+    })
+
+    await it("at() is the access that may miss", () => {
+        expect("abc".at(3)).toBe(null)
+        expect("abc".at(1)).toBe("b")
+        expect([1, 2, 3].at(7)).toBe(null)
+        expect([1, 2, 3].at(-1)).toBe(3)
+    })
+
+    await it("arrays, bytes and ranges throw the same way", () => {
+        const xs = [1, 2, 3]
+        expect(failure(() => xs[3])).toBe("RangeError: index 3 is out of range for length 3")
+        expect(failure(() => xs[-1])).toBe("RangeError: index -1 is out of range for length 3")
+        expect(failure(() => { xs[3] = 4; return 0 })).toBe("RangeError: index 3 is out of range for length 3")
+        expect(failure(() => { xs[9] = 4; return 0 })).toBe("RangeError: index 9 is out of range for length 3")
+        expect(xs.length).toBe(3)
+        const empty: float[] = []
+        expect(failure(() => empty[0])).toBe("RangeError: index 0 is out of range for length 0")
+        expect(failure(() => (1..4)[3])).toBe("RangeError: index 3 is out of range for length 3")
+        expect((1..4)[2]).toBe(3)
+    })
+
+    await it("compiled code throws like the interpreter", () => {
+        const xs = [1, 2, 3]
+        let seen = 0
+        for (let r = 0; r < 300; r = r + 1) {
+            seen = seen + arrayHot(xs, r % 3) + storeHot(xs, r % 3)
+            typedHot("abc", r % 3)
+        }
+        expect(arrayHot(xs, 3)).toBe(-1)
+        expect(arrayHot(xs, -1)).toBe(-1)
+        expect(storeHot(xs, 3)).toBe(-1)
+        expect(typedHot("abc", 3)).toBe("out")
+        expect(typedHot("abc", -2)).toBe("out")
+        expect(xs.length).toBe(3)
     })
 
     await it("the untyped path agrees", () => {
         expect(viaDynamic("abc", 2)).toBe("c")
         expect(viaDynamic("ñandú", 4)).toBe("ú")
-        expect(viaDynamic("abc", 9)).toBe(null)
+        expect(failure(() => viaDynamic("abc", 9))).toBe("RangeError: index 9 is out of range for length 3")
     })
 
     await it("holds in a hot loop", () => {

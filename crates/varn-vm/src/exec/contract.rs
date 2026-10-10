@@ -31,10 +31,22 @@ const RUNTIME_OPS: [(&str, NativeFn); 8] = [
 ];
 
 fn str_index_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    Ok(match args {
-        [text, index] => ctx.char_at(*text, ctx.as_int(*index)),
-        _ => VmValue::null(),
-    })
+    let [text, index] = args else {
+        return Ok(VmValue::null());
+    };
+    let at = ctx.as_int(*index);
+    let found = ctx.char_at(*text, at);
+    if found.is_null() {
+        return Err(varn_types::NativeError::rethrow(
+            varn_core::RuntimeErrorKind::RangeError,
+            format!(
+                "index {at} is out of range for length {}",
+                ctx.str_repr(*text).chars().count()
+            ),
+            None,
+        ));
+    }
+    Ok(found)
 }
 
 pub(crate) fn runtime_op(op_id: u64) -> Option<NativeFn> {

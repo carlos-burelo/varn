@@ -33,6 +33,13 @@ impl RuntimeError {
         Self::of_kind(varn_core::RuntimeErrorKind::TypeError, message)
     }
 
+    pub(crate) fn out_of_range(index: i64, len: usize) -> Self {
+        Self::of_kind(
+            varn_core::RuntimeErrorKind::RangeError,
+            format!("index {index} is out of range for length {len}"),
+        )
+    }
+
     fn of_kind(kind: varn_core::RuntimeErrorKind, message: impl Into<String>) -> Self {
         Self {
             message: message.into(),

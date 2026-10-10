@@ -54,11 +54,14 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
         match ctx_ref.heap.get(heap_idx) {
             Some(crate::heap::HeapObj::Array(a)) => {
                 let idx = if key.is_int() {
-                    key.as_int() as usize
+                    key.as_int()
                 } else {
-                    key.to_i32() as usize
+                    i64::from(key.to_i32())
                 };
-                unsafe { (*ctx).jit_native_result = a.get_vm(idx).unwrap_or(VmValue::null()) };
+                match crate::exec::collections::element_at(a, idx) {
+                    Ok(v) => unsafe { (*ctx).jit_native_result = v },
+                    Err(e) => unsafe { super::construct::jit_propagate_error(&mut *ctx, e) },
+                }
                 return;
             }
             Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
@@ -168,20 +171,12 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
         let ctx_ref = unsafe { &mut *ctx };
         if let Some(crate::heap::HeapObj::Array(a)) = ctx_ref.heap.get_mut(heap_idx) {
             let idx = if key.is_int() {
-                key.as_int() as usize
+                key.as_int()
             } else {
-                key.to_i32() as usize
+                i64::from(key.to_i32())
             };
-            let len = a.len();
-            if idx < len {
-                a.set_vm(idx, val);
-            } else if idx == len {
-                a.push_vm(val);
-            } else {
-                while a.len() < idx {
-                    a.push_vm(VmValue::null());
-                }
-                a.push_vm(val);
+            if let Err(e) = crate::exec::collections::store_element(a, idx, val) {
+                unsafe { super::construct::jit_propagate_error(ctx_ref, e) };
             }
             ctx_ref.heap.write_barrier(heap_idx, val);
             return;

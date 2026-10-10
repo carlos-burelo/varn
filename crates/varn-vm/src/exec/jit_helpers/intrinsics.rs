@@ -106,7 +106,10 @@ pub(crate) extern "C" fn jit_str_char_at(
         let ctx_ref = &mut *ctx;
         let text = VmValue::from_raw_parts(recv_tag, recv_payload);
         let index = ctx_ref.heap.as_int(VmValue::from_raw_parts(pos_tag, pos_payload));
-        ctx_ref.jit_native_result = ctx_ref.heap.char_at(text, index);
+        match crate::exec::collections::char_index(&ctx_ref.heap, text, index) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        }
     }
 }
 
