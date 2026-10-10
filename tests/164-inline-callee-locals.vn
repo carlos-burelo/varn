@@ -1,0 +1,36 @@
+import { describe, it, expect } from "std:test";
+
+class Leaf {
+    v: int = 1
+}
+
+const leaf = new Leaf()
+
+function valueOr(q: Leaf?): int { return q?.v ?? 0 }
+
+let moduleTotal = 0
+for (let i = 0; i < 5; i = i + 1) { moduleTotal = moduleTotal + valueOr(leaf) }
+
+let moduleNulls = 0
+for (let i = 0; i < 5; i = i + 1) { moduleNulls = moduleNulls + valueOr(null) + 1 }
+
+function inFunction(n: int): int {
+    let total = 0
+    for (let i = 0; i < n; i = i + 1) {
+        let q: Leaf? = null
+        if (i % 2 == 0) { q = leaf }
+        total = total + valueOr(q)
+    }
+    return total
+}
+
+await describe("164 inline callee locals", async () => {
+    await it("a module-level loop keeps its counter when the callee uses a temporary", () => {
+        expect(moduleTotal).toBe(5)
+        expect(moduleNulls).toBe(5)
+    })
+
+    await it("the same callee inside a function loop", () => {
+        expect(inFunction(5000)).toBe(2500)
+    })
+})

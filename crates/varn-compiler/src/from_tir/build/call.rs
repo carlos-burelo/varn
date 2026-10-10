@@ -87,6 +87,14 @@ impl<'m> Builder<'m> {
             }
             return Ok(None);
         }
+        if !tf.locals.is_empty() {
+            if force {
+                return Err(crate::OptError::Unsupported(
+                    "`@inline` cannot apply to functions that declare locals",
+                ));
+            }
+            return Ok(None);
+        }
         if tf.body.len() != 1 {
             if force {
                 return Err(crate::OptError::Unsupported(
