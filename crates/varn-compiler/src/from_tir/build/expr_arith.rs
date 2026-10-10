@@ -287,6 +287,10 @@ impl<'m> Builder<'m> {
         Ok(self.emit(InstKind::Convert { operand: v, conv }, result_ty))
     }
 
+    fn compare(&mut self, op: crate::hir::HirBinOp, lhs: Value, rhs: Value, ty: HirType) -> Value {
+        self.emit(InstKind::Binary { op, lhs, rhs, ty }, HirType::Bool)
+    }
+
     pub(super) fn lower_cast(
         &mut self,
         operand: &TirExpr,
@@ -295,6 +299,16 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         use varn_core::NumericDomain as D;
         let v = self.lower_expr(operand)?;
+        if ty == HirType::Bool && self.value_ty(v) == HirType::Int {
+            let zero = self.emit(InstKind::ConstInt(0), HirType::Int);
+            return Ok(self.compare(crate::hir::HirBinOp::Ne, v, zero, HirType::Int));
+        }
+        if ty == HirType::Bool && self.value_ty(v) == HirType::Float {
+            let zero = self.emit(InstKind::ConstFloat(0.0), HirType::Float);
+            let nonzero = self.compare(crate::hir::HirBinOp::Ne, v, zero, HirType::Float);
+            let ordered = self.compare(crate::hir::HirBinOp::Eq, v, v, HirType::Float);
+            return Ok(self.compare(crate::hir::HirBinOp::Eq, nonzero, ordered, HirType::Bool));
+        }
         let from = match self.value_ty(v) {
             HirType::Int => Some(D::Int),
             HirType::Float => Some(D::Float),
