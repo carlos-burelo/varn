@@ -121,9 +121,49 @@ fn to_decimal(n: Numeric, heap: &mut Heap) -> VmResult<VmValue> {
     Ok(heap.alloc_decimal(d))
 }
 
+#[cold]
+#[inline(never)]
+fn not_a(expected: &str, v: VmValue, heap: &Heap) -> RuntimeError {
+    RuntimeError::new(format!(
+        "type mismatch: expected '{expected}', got '{}'",
+        crate::exec::advanced::typeof_val(v, heap)
+    ))
+}
+
 pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    match conv {
+        ValueConv::DynToStr => {
+            return if heap.is_string(v) {
+                Ok(v)
+            } else {
+                Err(not_a("str", v, heap))
+            };
+        }
+        ValueConv::DynToBool => {
+            return if v.is_bool() {
+                Ok(v)
+            } else {
+                Err(not_a("bool", v, heap))
+            };
+        }
+        ValueConv::IntToFloat
+        | ValueConv::FloatToInt
+        | ValueConv::IntToBigInt
+        | ValueConv::BigIntToInt
+        | ValueConv::IntToDecimal
+        | ValueConv::DecimalToInt
+        | ValueConv::DynToInt
+        | ValueConv::DynToFloat
+        | ValueConv::BigIntToFloat
+        | ValueConv::FloatToBigInt
+        | ValueConv::DecimalToFloat
+        | ValueConv::FloatToDecimal
+        | ValueConv::BigIntToDecimal
+        | ValueConv::DecimalToBigInt => {}
+    }
     let n = numeric_of(v, heap)?;
     match conv {
+        ValueConv::DynToStr | ValueConv::DynToBool => Ok(v),
         ValueConv::FloatToInt | ValueConv::BigIntToInt | ValueConv::DecimalToInt | ValueConv::DynToInt => {
             to_int(n)
         }
