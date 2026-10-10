@@ -1,0 +1,87 @@
+import { describe, it, expect } from "std:test";
+
+const ages = new Map<str, int>()
+ages.set("ana", 30)
+ages.set("bo", 4)
+const primes = new Set<int>()
+primes.add(2)
+primes.add(3)
+primes.add(5)
+
+function totalAges(): int {
+    let total = 0
+    for (const [name, age] of ages) { total = total + age + name.length }
+    return total
+}
+function sumPrimes(): int {
+    let total = 0
+    for (const p of primes) { total = total + p }
+    return total
+}
+function countA(text: str): int {
+    let n = 0
+    for (const c of text) {
+        if (c == 'a') { n = n + 1 }
+    }
+    return n
+}
+function countChars(text: str): int {
+    let n = 0
+    for (const c of text) { n = n + 1 }
+    return n
+}
+
+await describe("180 for-of over collections", async () => {
+    await it("a Map yields key/value tuples in insertion order", () => {
+        expect(totalAges()).toBe(39)
+        const seen: str[] = []
+        for (const entry of ages) { seen.push(typeof entry) }
+        expect(seen.length).toBe(2)
+        expect(seen[0]).toBe("Tuple")
+        const names: str[] = []
+        for (const [name, age] of ages) { names.push(name) }
+        expect(names[0]).toBe("ana")
+        expect(names[1]).toBe("bo")
+    })
+
+    await it("a Set yields its values", () => {
+        expect(sumPrimes()).toBe(10)
+    })
+
+    await it("a string yields its characters", () => {
+        expect(countA("banana")).toBe(3)
+        expect(countChars("ñandú")).toBe(5)
+    })
+
+    await it("a tuple yields its slots", () => {
+        const mixed = #[1, "x", true]
+        let slots = 0
+        for (const slot of mixed) { slots = slots + 1 }
+        expect(slots).toBe(3)
+    })
+
+    await it("an index signature iterates like the Map it is", () => {
+        const dict: { [k: str]: int } = { x: 1, y: 2 }
+        let total = 0
+        for (const [k, v] of dict) { total = total + v }
+        expect(total).toBe(3)
+    })
+
+    await it("mutating the collection inside the loop does not disturb it", () => {
+        const live = new Map<str, int>()
+        live.set("a", 1)
+        let rounds = 0
+        for (const [k, v] of live) {
+            live.set(k + "x", v)
+            rounds = rounds + 1
+        }
+        expect(rounds).toBe(1)
+        expect(live.size).toBe(2)
+    })
+
+    await it("holds in a hot loop", () => {
+        let acc = 0
+        for (let i = 0; i < 3000; i = i + 1) { acc = acc + totalAges() + sumPrimes() + countA("ab") }
+        expect(acc).toBe(150000)
+    })
+})

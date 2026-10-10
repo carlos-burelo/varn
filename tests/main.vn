@@ -171,6 +171,7 @@ import "./176-tuple-spread-arguments.vn"
 import "./177-recursive-type-alias.vn"
 import "./178-dynamic-boundary-recursive-types.vn"
 import "./179-dynamic-boundary-object-to-map.vn"
+import "./180-for-of-collections.vn"
 
 summary()
 

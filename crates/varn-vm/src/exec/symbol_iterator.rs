@@ -9,6 +9,16 @@ pub(crate) fn get_symbol_property(
     symbol: RuntimeSymbol,
     heap: &mut Heap,
 ) -> VmResult<VmValue> {
+    if symbol == RuntimeSymbol::Iterator {
+        if let Some(items) = snapshot(obj, heap) {
+            let frozen = heap.alloc_array_vm(items);
+            return Ok(heap.alloc_bound_native(
+                frozen,
+                array_symbol_iterator,
+                "[Symbol.iterator]",
+            ));
+        }
+    }
     let sym_str = symbol.to_string();
     let kind = obj
         .is_heap()
@@ -84,6 +94,32 @@ pub(crate) fn get_symbol_property(
         _ => VmValue::null(),
     };
     Ok(result)
+}
+
+fn snapshot(obj: VmValue, heap: &mut Heap) -> Option<Vec<VmValue>> {
+    if heap.is_string(obj) {
+        let text = heap.str_repr(obj);
+        return Some(text.chars().map(|c| heap.alloc_char(c)).collect());
+    }
+    if let Some(map) = heap.map_of(obj) {
+        let pairs: Vec<(VmValue, VmValue)> = map.read().iter().map(|(k, v)| (k.0, *v)).collect();
+        return Some(
+            pairs
+                .into_iter()
+                .map(|(k, v)| heap.alloc_tuple_vm(vec![k, v]))
+                .collect(),
+        );
+    }
+    if let Some(set) = heap.set_of(obj) {
+        return Some(set.read().iter().map(|k| k.0).collect());
+    }
+    if !obj.is_heap() {
+        return None;
+    }
+    if let Some(HeapObj::Tuple(items)) = heap.get(obj.as_heap()) {
+        return Some((0..items.len()).filter_map(|i| items.get_vm(i)).collect());
+    }
+    None
 }
 
 fn array_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
