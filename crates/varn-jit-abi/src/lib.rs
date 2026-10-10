@@ -134,6 +134,7 @@ pub struct JitHelpers {
     pub build_object_with_shape: usize,
     pub build_record_with_shape: usize,
     pub build_str: usize,
+    pub build_tuple_window: usize,
     pub bytes_length: usize,
     pub class_member_op: usize,
     pub close_upvalue: usize,

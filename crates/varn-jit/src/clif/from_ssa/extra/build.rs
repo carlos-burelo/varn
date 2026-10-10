@@ -18,7 +18,7 @@ pub(super) fn tuple(
         .iter()
         .map(|v| boxed_value(b, ctx, values, *v))
         .collect::<Result<_, _>>()?;
-    let r = window_result(b, ctx, h.build_array_window, &vals);
+    let r = window_result(b, ctx, h.build_tuple_window, &vals);
     Ok(Some(Some(Out::Boxed(r))))
 }
 

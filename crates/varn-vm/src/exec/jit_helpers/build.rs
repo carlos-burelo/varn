@@ -27,6 +27,19 @@ pub(crate) extern "C" fn jit_build_array_window(
     }
 }
 
+#[varn_op_macros::jit_slow(field = "build_tuple_window")]
+pub(crate) extern "C" fn jit_build_tuple_window(
+    ctx: *mut ExecCtx,
+    parts_ptr: *const VmValue,
+    count: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let parts = std::slice::from_raw_parts(parts_ptr, count);
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_tuple_vm(parts.to_vec());
+    }
+}
+
 #[varn_op_macros::jit_slow(field = "build_empty_object")]
 pub(crate) extern "C" fn jit_build_empty_object(ctx: *mut ExecCtx) {
     unsafe {
