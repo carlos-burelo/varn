@@ -32,16 +32,19 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         let mut describer = Describer::new(self.tir);
         let desc = describer.describe(node_ty);
-        let conform = varn_core::abi::native_global_index(varn_core::abi::CONFORM_GLOBAL).ok_or(
-            crate::OptError::Unsupported("from_tir: the conform runtime is not a native global"),
-        )?;
-        let callee = self.emit(InstKind::LoadNativeGlobalIdx(conform), HirType::Ref);
         let text = self.emit(InstKind::ConstStr(Arc::from(desc.encode())), HirType::Str);
-        let mut args = vec![v, text];
+        let mut args = vec![text];
         for name in &describer.witnesses {
             args.push(self.emit(self.global_load(name), HirType::Ref));
         }
-        let checked = self.emit(InstKind::Call { callee, args }, HirType::Dynamic);
+        let checked = self.emit(
+            InstKind::CallNativeOp {
+                object: v,
+                args,
+                op_id: varn_core::boundary_ops::op_id(varn_core::boundary_ops::CONFORM),
+            },
+            HirType::Dynamic,
+        );
         Ok(self.emit(InstKind::Cast { operand: checked, ty }, ty))
     }
 }

@@ -74,7 +74,7 @@ impl ExecCtx {
                         )))
                     }
                 };
-                let f = (varn_builtins::native_op_fn(op_id).ok_or_else(|| {
+                let f = (crate::exec::contract::native_op(op_id).ok_or_else(|| {
                     crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}"))
                 }))?;
                 if let Err(e) = varn_builtins::check_native_op_capability(op_id, &mut *self) {

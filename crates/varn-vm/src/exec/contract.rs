@@ -10,24 +10,36 @@ use varn_types::chunk::ContractWitness;
 use varn_types::value::BoundMethodTarget;
 use varn_types::{Boundary, ClassObj, NativeCtx, NativeError, NativeFn, NativeFnResult};
 
-pub(crate) const RUNTIME_GLOBALS: [(&str, NativeFn); 7] = [
+const RUNTIME_OPS: [(&str, NativeFn); 7] = [
     (
-        varn_core::abi::CONFORM_GLOBAL,
+        varn_core::boundary_ops::CONFORM,
         crate::exec::conform::conform_native,
     ),
-    (varn_core::abi::VERIFY_CALL_GLOBAL, verify_call_native),
-    (varn_core::abi::VERIFY_SPREAD_GLOBAL, verify_spread_native),
-    (varn_core::abi::VERIFY_METHOD_GLOBAL, verify_method_native),
+    (varn_core::boundary_ops::VERIFY_CALL, verify_call_native),
+    (varn_core::boundary_ops::VERIFY_SPREAD, verify_spread_native),
+    (varn_core::boundary_ops::VERIFY_METHOD, verify_method_native),
     (
-        varn_core::abi::VERIFY_METHOD_SPREAD_GLOBAL,
+        varn_core::boundary_ops::VERIFY_METHOD_SPREAD,
         verify_method_spread_native,
     ),
-    (varn_core::abi::VERIFY_SUPER_GLOBAL, verify_super_native),
+    (varn_core::boundary_ops::VERIFY_SUPER, verify_super_native),
     (
-        varn_core::abi::VERIFY_SUPER_SPREAD_GLOBAL,
+        varn_core::boundary_ops::VERIFY_SUPER_SPREAD,
         verify_super_spread_native,
     ),
 ];
+
+pub(crate) fn runtime_op(op_id: u64) -> Option<NativeFn> {
+    static IDS: std::sync::OnceLock<[u64; 7]> = std::sync::OnceLock::new();
+    let ids = IDS.get_or_init(|| RUNTIME_OPS.map(|(name, _)| varn_core::boundary_ops::op_id(name)));
+    ids.iter()
+        .position(|id| *id == op_id)
+        .map(|at| RUNTIME_OPS[at].1)
+}
+
+pub(crate) fn native_op(op_id: u64) -> Option<NativeFn> {
+    runtime_op(op_id).or_else(|| varn_builtins::native_op_fn(op_id))
+}
 
 fn spread_items(ctx: &dyn NativeCtx, flat: VmValue) -> Vec<VmValue> {
     (0..ctx.array_len(flat))

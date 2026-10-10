@@ -146,8 +146,8 @@ impl<'a> FnEmitter<'a> {
                 let args = self.verify_at_runtime(
                     vec![c.clone()],
                     args,
-                    varn_core::abi::VERIFY_CALL_GLOBAL,
-                    varn_core::abi::VERIFY_SPREAD_GLOBAL,
+                    varn_core::boundary_ops::VERIFY_CALL,
+                    varn_core::boundary_ops::VERIFY_SPREAD,
                     span,
                 );
                 (Callee::Value(c), args)
@@ -163,8 +163,8 @@ impl<'a> FnEmitter<'a> {
                 let args = self.verify_at_runtime(
                     vec![recv.clone(), label],
                     args,
-                    varn_core::abi::VERIFY_METHOD_GLOBAL,
-                    varn_core::abi::VERIFY_METHOD_SPREAD_GLOBAL,
+                    varn_core::boundary_ops::VERIFY_METHOD,
+                    varn_core::boundary_ops::VERIFY_METHOD_SPREAD,
                     span,
                 );
                 (Callee::Method { recv, name }, args)
@@ -180,8 +180,8 @@ impl<'a> FnEmitter<'a> {
                 let args = self.verify_at_runtime(
                     vec![class.clone(), label],
                     args,
-                    varn_core::abi::VERIFY_SUPER_GLOBAL,
-                    varn_core::abi::VERIFY_SUPER_SPREAD_GLOBAL,
+                    varn_core::boundary_ops::VERIFY_SUPER,
+                    varn_core::boundary_ops::VERIFY_SUPER_SPREAD,
                     span,
                 );
                 (Callee::Inherited { class, name }, args)
@@ -275,22 +275,17 @@ impl<'a> FnEmitter<'a> {
             .collect()
     }
 
-    fn call_runtime(&mut self, global: &str, args: Vec<TirExpr>, span: Span) -> Option<TirExpr> {
-        let index = varn_core::abi::native_global_index(global)?;
-        let opaque = BackendTy::Dynamic(DynReason::NotYetSupported);
-        let res = Resolution::NativeGlobal(index);
+    fn call_runtime(&mut self, op: &str, args: Vec<TirExpr>, span: Span) -> Option<TirExpr> {
+        let mut args = args.into_iter();
+        let subject = args.next()?;
         Some(TirExpr {
-            kind: TirExprKind::Call {
-                callee: Box::new(TirExpr {
-                    kind: TirExprKind::Var,
-                    ty: opaque,
-                    res: res.clone(),
-                    span,
-                }),
-                args: args.into_iter().map(TirArg::Expr).collect(),
+            kind: TirExprKind::MethodCall {
+                recv: Box::new(subject),
+                name: Arc::from(op),
+                args: args.map(TirArg::Expr).collect(),
             },
-            ty: opaque,
-            res,
+            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            res: Resolution::NativeOp(varn_core::boundary_ops::op_id(op)),
             span,
         })
     }

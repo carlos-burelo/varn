@@ -33,7 +33,7 @@ unsafe fn resolve_native(
     if fn_addr != 0 {
         return unsafe { std::mem::transmute::<usize, varn_types::NativeFn>(fn_addr) };
     }
-    match varn_builtins::native_op_fn(op_id) {
+    match crate::exec::contract::native_op(op_id) {
         Some(f) => f,
         None => unsafe {
             jit_propagate_error(

@@ -44,6 +44,12 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
 }
 
 fn resolve_native_op_target(op_id: u64) -> varn_types::NativeOpTarget {
+    if let Some(runtime) = crate::exec::contract::runtime_op(op_id) {
+        return varn_types::NativeOpTarget {
+            func_ptr: runtime as usize,
+            ..varn_types::NativeOpTarget::unknown()
+        };
+    }
     varn_builtins::find_native_op_entry(op_id).map_or(varn_types::NativeOpTarget::unknown(), |e| {
         varn_types::NativeOpTarget {
             func_ptr: e.func_ptr as usize,
