@@ -169,14 +169,14 @@ impl<'m> Builder<'m> {
             | varn_tir::BackendTy::Dynamic(_) => {}
         }
         let conv = match ty {
-            HirType::Str => varn_core::ValueConv::DynToStr,
-            HirType::Bool => varn_core::ValueConv::DynToBool,
+            HirType::Str => varn_core::ValueConv::ExpectStr,
+            HirType::Bool => varn_core::ValueConv::ExpectBool,
             HirType::Int => varn_core::ValueConv::DynToInt,
             HirType::Float => varn_core::ValueConv::DynToFloat,
             HirType::Nullable(inner) => {
                 let conv = match self.ssa_types.get(inner) {
-                    HirType::Str => varn_core::ValueConv::DynToStrOrNull,
-                    HirType::Bool => varn_core::ValueConv::DynToBoolOrNull,
+                    HirType::Str => varn_core::ValueConv::ExpectStrOrNull,
+                    HirType::Bool => varn_core::ValueConv::ExpectBoolOrNull,
                     HirType::Int
                     | HirType::Float
                     | HirType::Ref

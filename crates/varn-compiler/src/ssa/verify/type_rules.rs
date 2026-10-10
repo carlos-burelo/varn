@@ -254,9 +254,9 @@ pub(crate) fn convert_result_ty(conv: varn_core::ValueConv) -> HirType {
         FloatToInt | BigIntToInt | DecimalToInt | DynToInt => HirType::Int,
         IntToBigInt | IntToDecimal | FloatToBigInt | FloatToDecimal | BigIntToDecimal
         | DecimalToBigInt => HirType::Dynamic,
-        DynToStr => HirType::Str,
-        DynToBool | AssertInstance => HirType::Bool,
-        DynToStrOrNull | DynToBoolOrNull => HirType::Dynamic,
+        ExpectStr => HirType::Str,
+        ExpectBool | AssertInstance => HirType::Bool,
+        ExpectStrOrNull | ExpectBoolOrNull => HirType::Dynamic,
     }
 }
 
@@ -267,7 +267,7 @@ fn convert_operand_ty(conv: varn_core::ValueConv) -> Option<HirType> {
         AssertInstance => Some(HirType::Bool),
         FloatToInt | FloatToBigInt | FloatToDecimal => Some(HirType::Float),
         IntToBigInt | IntToDecimal | BigIntToInt | DecimalToInt | DynToInt | DynToFloat
-        | BigIntToFloat | DecimalToFloat | BigIntToDecimal | DecimalToBigInt | DynToStr
-        | DynToBool | DynToStrOrNull | DynToBoolOrNull => None,
+        | BigIntToFloat | DecimalToFloat | BigIntToDecimal | DecimalToBigInt | ExpectStr
+        | ExpectBool | ExpectStrOrNull | ExpectBoolOrNull => None,
     }
 }

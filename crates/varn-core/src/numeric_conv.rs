@@ -26,10 +26,10 @@ pub enum ValueConv {
     BigIntToDecimal = 12,
     DecimalToBigInt = 13,
 
-    DynToStr = 14,
-    DynToBool = 15,
-    DynToStrOrNull = 16,
-    DynToBoolOrNull = 17,
+    ExpectStr = 14,
+    ExpectBool = 15,
+    ExpectStrOrNull = 16,
+    ExpectBoolOrNull = 17,
     AssertInstance = 18,
 }
 
@@ -49,10 +49,10 @@ impl ValueConv {
         Self::FloatToDecimal,
         Self::BigIntToDecimal,
         Self::DecimalToBigInt,
-        Self::DynToStr,
-        Self::DynToBool,
-        Self::DynToStrOrNull,
-        Self::DynToBoolOrNull,
+        Self::ExpectStr,
+        Self::ExpectBool,
+        Self::ExpectStrOrNull,
+        Self::ExpectBoolOrNull,
         Self::AssertInstance,
     ];
 
@@ -91,10 +91,10 @@ impl ValueConv {
                 | Self::DecimalToInt
                 | Self::DynToInt
                 | Self::DynToFloat
-                | Self::DynToStr
-                | Self::DynToBool
-                | Self::DynToStrOrNull
-                | Self::DynToBoolOrNull
+                | Self::ExpectStr
+                | Self::ExpectBool
+                | Self::ExpectStrOrNull
+                | Self::ExpectBoolOrNull
                 | Self::AssertInstance
                 | Self::FloatToBigInt
                 | Self::FloatToDecimal

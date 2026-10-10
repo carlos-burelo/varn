@@ -132,16 +132,16 @@ fn not_a(expected: &str, v: VmValue, heap: &Heap) -> RuntimeError {
 
 pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     match conv {
-        ValueConv::DynToStr | ValueConv::DynToStrOrNull => {
-            let nullable = conv == ValueConv::DynToStrOrNull;
+        ValueConv::ExpectStr | ValueConv::ExpectStrOrNull => {
+            let nullable = conv == ValueConv::ExpectStrOrNull;
             return if heap.is_string(v) || (nullable && v.is_null()) {
                 Ok(v)
             } else {
                 Err(not_a(if nullable { "str?" } else { "str" }, v, heap))
             };
         }
-        ValueConv::DynToBool | ValueConv::DynToBoolOrNull => {
-            let nullable = conv == ValueConv::DynToBoolOrNull;
+        ValueConv::ExpectBool | ValueConv::ExpectBoolOrNull => {
+            let nullable = conv == ValueConv::ExpectBoolOrNull;
             return if v.is_bool() || (nullable && v.is_null()) {
                 Ok(v)
             } else {
@@ -174,10 +174,10 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
     }
     let n = numeric_of(v, heap)?;
     match conv {
-        ValueConv::DynToStr
-        | ValueConv::DynToBool
-        | ValueConv::DynToStrOrNull
-        | ValueConv::DynToBoolOrNull
+        ValueConv::ExpectStr
+        | ValueConv::ExpectBool
+        | ValueConv::ExpectStrOrNull
+        | ValueConv::ExpectBoolOrNull
         | ValueConv::AssertInstance => Ok(v),
         ValueConv::FloatToInt | ValueConv::BigIntToInt | ValueConv::DecimalToInt | ValueConv::DynToInt => {
             to_int(n)
