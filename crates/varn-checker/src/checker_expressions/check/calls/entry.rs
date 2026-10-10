@@ -20,6 +20,25 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         let arena = self.ast_arena;
+        if let ExprKind::Identifier { name } = &arena.expr(callee).kind {
+            let name = bind.interner.resolve(*name);
+            if varn_core::LangPrimitive::from_str(name).is_some() {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::NotCallable,
+                        format!(
+                            "'{name}' is a type, not a function: convert with 'value as {name}'"
+                        ),
+                    )
+                    .with_range(*range),
+                );
+                for arg in args {
+                    let (Arg::Positional(e) | Arg::Spread(e) | Arg::Named { value: e, .. }) = arg;
+                    self.check_expr(rec, *e, bind);
+                }
+                return;
+            }
+        }
         self.check_expr(rec, callee, bind);
         self.record_extension_call(rec, callee, range, bind);
 

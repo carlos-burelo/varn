@@ -1,0 +1,2 @@
+// expect: error[VN3003]
+const s = str(5)
