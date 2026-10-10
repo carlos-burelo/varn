@@ -1,0 +1,36 @@
+import { now } from "std:time";
+
+class P3 {
+    a: int; b: int; c: int;
+    constructor(a: int, b: int, c: int) { this.a = a; this.b = b; this.c = c; }
+}
+
+let N = 1000000;
+let checksum = 0;
+
+function row(name: str, f: () => int) {
+    let best = 1000000;
+    for (let r = 0; r < 5; r = r + 1) {
+        let t = now();
+        checksum = checksum + f();
+        let d = now() - t;
+        if (d < best) { best = d; }
+    }
+    print(name + " " + best);
+}
+
+row("loop_only", () => { let k: int[] = []; for (let i = 0; i < N; i = i + 1) { k.push(i); } return k.length; });
+row("instance3", () => { let k: P3[] = []; for (let i = 0; i < N; i = i + 1) { k.push(new P3(i, 2, 3)); } return k.length; });
+row("objlit3", () => { let k: { a: int, b: int, c: int }[] = []; for (let i = 0; i < N; i = i + 1) { k.push({ a: i, b: 2, c: 3 }); } return k.length; });
+row("arraylit3", () => { let k: int[][] = []; for (let i = 0; i < N; i = i + 1) { k.push([i, 2, 3]); } return k.length; });
+row("map3", () => { let k: { [key: str]: int }[] = []; for (let i = 0; i < N; i = i + 1) { k.push({ "a": i, "b": 2, "c": 3 }); } return k.length; });
+row("map_get_heapkey", () => {
+    let m: { [key: str]: str } = { "authorization": "Bearer x", "content-type": "json", "user-agent": "probe" };
+    let keys = ["authorization", "content-type", "user-agent"];
+    let total = 0;
+    for (let i = 0; i < N * 2; i = i + 1) { total = total + m[keys[i % 3]].length; }
+    return total;
+});
+row("strview", () => { let k: str[] = []; let base = "abcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < N; i = i + 1) { k.push(base.slice(i % 10, 20)); } return k.length; });
+row("split5", () => { let k: str[][] = []; for (let i = 0; i < N / 2; i = i + 1) { k.push("/api/v1/orders/history/details".split("/")); } return k.length; });
+print("checksum " + checksum);
