@@ -58,7 +58,13 @@ impl<'m> Builder<'m> {
         let v = self.lower_expr(operand)?;
         match op {
             TirUnOp::IsNull => Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool)),
-            TirUnOp::ToStr => Ok(self.emit(InstKind::ToString { operand: v }, HirType::Str)),
+            TirUnOp::ToStr => Ok(self.emit(
+                InstKind::Cast {
+                    operand: v,
+                    ty: HirType::Str,
+                },
+                HirType::Str,
+            )),
             TirUnOp::Neg | TirUnOp::Not | TirUnOp::BitNot | TirUnOp::Typeof => {
                 let result = self.emit(
                     InstKind::Unary {
