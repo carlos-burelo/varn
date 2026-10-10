@@ -8,7 +8,7 @@ struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
 }
 
-fn holds_map(desc: &TypeDesc, depth: usize) -> bool {
+fn reshapes(desc: &TypeDesc, depth: usize) -> bool {
     match desc {
         TypeDesc::Map(..) => true,
         TypeDesc::Any
@@ -27,22 +27,22 @@ fn holds_map(desc: &TypeDesc, depth: usize) -> bool {
         TypeDesc::Array(inner)
         | TypeDesc::Set(inner)
         | TypeDesc::Dict(inner)
-        | TypeDesc::Nullable(inner) => holds_map(inner, depth + 1),
-        TypeDesc::Tuple(items) => items.iter().any(|item| holds_map(item, depth + 1)),
-        TypeDesc::Object(fields) => fields.iter().any(|field| holds_map(&field.ty, depth + 1)),
+        | TypeDesc::Nullable(inner) => reshapes(inner, depth + 1),
+        TypeDesc::Tuple(_) => true,
+        TypeDesc::Object(fields) => fields.iter().any(|field| reshapes(&field.ty, depth + 1)),
         TypeDesc::Args { fixed, rest } => {
-            fixed.iter().any(|item| holds_map(item, depth + 1))
-                || rest.as_deref().is_some_and(|item| holds_map(item, depth + 1))
+            fixed.iter().any(|item| reshapes(item, depth + 1))
+                || rest.as_deref().is_some_and(|item| reshapes(item, depth + 1))
         }
     }
 }
 
 pub(crate) fn converts(desc: &TypeDesc) -> bool {
-    holds_map(desc, 0)
+    reshapes(desc, 0)
 }
 
 pub(crate) fn normalize(heap: &mut Heap, value: VmValue, desc: &TypeDesc) -> VmValue {
-    if !holds_map(desc, 0) {
+    if !reshapes(desc, 0) {
         return value;
     }
     let mut visiting = Vec::new();
@@ -184,13 +184,23 @@ fn walk(
             let Some(items) = elements(heap, v) else {
                 return v;
             };
+            let is_array = matches!(heap.get(v.as_heap()), Some(HeapObj::Array(_)));
+            if is_array && items.len() != slots.len() {
+                return v;
+            }
+            let mut converted = Vec::with_capacity(items.len());
             for (i, (item, slot)) in items.into_iter().zip(slots).enumerate() {
                 let replaced = walk(heap, item, slot, scope, visiting);
-                if replaced != item {
+                if replaced != item && !is_array {
                     store_element(heap, v, i, replaced);
                 }
+                converted.push(replaced);
             }
-            v
+            if is_array {
+                heap.alloc_tuple_vm(converted)
+            } else {
+                v
+            }
         }
         TypeDesc::Args { fixed, rest } => {
             let Some(items) = elements(heap, v) else {

@@ -201,6 +201,7 @@ fn resolve_witnesses(
 fn check_args(
     heap: &crate::heap::Heap,
     args: &[VmValue],
+    given: &[VmValue],
     fixed: &[TypeDesc],
     rest: Option<&TypeDesc>,
     witnesses: &[VmValue],
@@ -213,7 +214,7 @@ fn check_args(
             return Err(mismatch(format!(
                 "type mismatch: argument {} expected '{expected}', got '{}'",
                 i + 1,
-                typeof_val(*arg, heap)
+                typeof_val(given.get(i).copied().unwrap_or(*arg), heap)
             )));
         }
     }
@@ -243,7 +244,7 @@ fn convert_args(
         }
     }
     let actual = converted.as_deref().unwrap_or(args);
-    check_args(&ctx.heap, actual, fixed, rest.as_deref(), &witnesses)?;
+    check_args(&ctx.heap, actual, args, fixed, rest.as_deref(), &witnesses)?;
     Ok(converted)
 }
 
@@ -282,7 +283,7 @@ pub(crate) fn verify_call(
         return convert_args(ctx, &closure, args);
     }
     let witnesses = resolve_witnesses(ctx, closure, &contract.witnesses);
-    check_args(&ctx.heap, args, fixed, rest.as_deref(), &witnesses)?;
+    check_args(&ctx.heap, args, args, fixed, rest.as_deref(), &witnesses)?;
     Ok(None)
 }
 

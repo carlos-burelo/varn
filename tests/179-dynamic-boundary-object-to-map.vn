@@ -53,7 +53,7 @@ await describe("179 dynamic boundary: object to Map", async () => {
 
     await it("values are checked and nested objects are converted", () => {
         expect(outcome(() => { const m: Map<str, int> = Json.parse("{\"a\":\"x\"}") }))
-            .toBe("type mismatch: expected 'Map<str, int>', got 'Map'")
+            .toBe("type mismatch: expected 'Map<str, int>', got 'object'")
         const nested: Map<str, Map<str, int>> = Json.parse("{\"x\":{\"y\":1}}")
         expect(nested.get("x")?.get("y")).toBe(1)
         const cfg: Config = Json.parse("{\"name\":\"n\",\"limits\":{\"cpu\":4}}")
@@ -74,7 +74,7 @@ await describe("179 dynamic boundary: object to Map", async () => {
         expect(bag.count({ z: 1, y: 2 })).toBe(3)
         expect(bag.count(...[{ q: 1 }])).toBe(2)
         expect(outcome(() => { f({ k: "bad" }) }))
-            .toBe("type mismatch: argument 1 expected 'Map<str, int>', got 'Map'")
+            .toBe("type mismatch: argument 1 expected 'Map<str, int>', got 'object'")
     })
 
     await it("holds in a hot loop", () => {

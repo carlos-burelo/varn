@@ -36,9 +36,9 @@ pub(crate) fn conform(
 ) -> NativeFnResult {
     let desc = TypeDesc::decode(text)
         .ok_or_else(|| mismatch(format!("conform: malformed type descriptor '{text}'")))?;
-    let value = crate::exec::normalize::normalize(heap, value, &desc);
-    match fit(heap, value, &desc, witnesses) {
-        Some(Fit::Exact) => Ok(value),
+    let normal = crate::exec::normalize::normalize(heap, value, &desc);
+    match fit(heap, normal, &desc, witnesses) {
+        Some(Fit::Exact) => Ok(normal),
         Some(Fit::Widened(widened)) => Ok(widened),
         None => Err(mismatch(format!(
             "type mismatch: expected '{desc}', got '{}'",

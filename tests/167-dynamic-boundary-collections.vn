@@ -80,7 +80,10 @@ await describe("167 dynamic boundary: collections", async () => {
         expect(first(#[1, "a"])).toBe(1)
         expect(outcome(() => { first(#[1, 2]) })).toBe("type mismatch: expected '#[int, str]', got 'Tuple'")
         expect(outcome(() => { first(#[1]) })).toBe("type mismatch: expected '#[int, str]', got 'Tuple'")
-        expect(outcome(() => { first([1, "a"]) })).toBe("type mismatch: expected '#[int, str]', got 'Array'")
+        expect(first([1, "a"])).toBe(1)
+        expect(first(Json.parse("[7, \"z\"]"))).toBe(7)
+        expect(outcome(() => { first([1]) })).toBe("type mismatch: expected '#[int, str]', got 'Array'")
+        expect(outcome(() => { first(["x", "a"]) })).toBe("type mismatch: expected '#[int, str]', got 'Array'")
     })
 
     await it("an enum only accepts its own variants", () => {
