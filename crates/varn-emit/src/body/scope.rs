@@ -38,6 +38,7 @@ impl<'a> FnEmitter<'a> {
             outer_names: FxHashSet::default(),
             captures: Vec::new(),
             pending: Vec::new(),
+            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             disposables: Vec::new(),
         }
     }

@@ -105,7 +105,10 @@ impl<'a> FnEmitter<'a> {
                         return self.lower_match(subject, cases, MatchDest::Return);
                     }
                 }
-                let a = argument.map(|a| self.lower_expr(a));
+                let a = argument.map(|a| {
+                    let value = self.lower_expr(a);
+                    self.guard_dynamic(value, self.return_ty)
+                });
                 drained(self, one(TirStmt::Return(a)))
             }
             StmtKind::Throw { argument } => {

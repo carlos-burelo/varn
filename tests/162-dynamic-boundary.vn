@@ -42,6 +42,15 @@ function fieldBool(d: dynamic): bool {
     return h.on
 }
 
+function retStr(d: dynamic): str { return d }
+function retBool(d: dynamic): bool { return d }
+
+class Returner {
+    name(d: dynamic): str { return d }
+}
+
+const arrowStr = (d: dynamic): str => d
+
 function asStr(d: dynamic): str { return d as str }
 function asBool(d: dynamic): bool { return d as bool }
 
@@ -78,6 +87,17 @@ await describe("162 dynamic boundary", async () => {
         expect(failed(() => { assignStr(5) })).toBe(true)
         expect(failed(() => { fieldStr(5) })).toBe(true)
         expect(failed(() => { fieldBool("yes") })).toBe(true)
+    })
+
+    await it("a typed return checks what it hands back", () => {
+        expect(retStr("hola").length).toBe(4)
+        expect(retBool(false)).toBe(false)
+        expect(new Returner().name("ab").length).toBe(2)
+        expect(arrowStr("abc").length).toBe(3)
+        expect(failed(() => { retStr(5) })).toBe(true)
+        expect(failed(() => { retBool("no") })).toBe(true)
+        expect(failed(() => { new Returner().name(5) })).toBe(true)
+        expect(failed(() => { arrowStr(5) })).toBe(true)
     })
 
     await it("holds in a hot loop", () => {

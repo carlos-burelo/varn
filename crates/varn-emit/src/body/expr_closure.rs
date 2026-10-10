@@ -63,11 +63,15 @@ impl<'a> FnEmitter<'a> {
             param_names,
         );
         sub.outer_names = outer_names;
+        if !is_async && !is_generator {
+            sub.return_ty = return_ty;
+        }
         let mut stmts = sub.destructure_params(params);
         stmts.extend(match body {
             ClosureBody::Stmt(s) => sub.lower_stmt_as_block(s),
             ClosureBody::Expr(e) => {
                 let te = sub.lower_expr(e);
+                let te = sub.guard_dynamic(te, sub.return_ty);
                 let mut b = std::mem::take(&mut sub.pending);
                 b.push(TirStmt::Return(Some(te)));
                 b
