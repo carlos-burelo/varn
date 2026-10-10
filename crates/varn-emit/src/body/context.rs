@@ -67,6 +67,7 @@ pub(crate) struct FnEmitter<'a> {
 
     pub(super) pending: Vec<TirStmt>,
     pub return_ty: BackendTy,
+    pub yield_ty: BackendTy,
 
     pub(super) disposables: Vec<Vec<TirExpr>>,
 }

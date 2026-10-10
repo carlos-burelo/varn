@@ -78,6 +78,34 @@ fn lower_kind(
             );
             BackendTy::Set(tt.intern(el))
         }
+        TypeKind::Generic(name, args, _)
+            if interner.resolve(name) == BuiltinType::Task.name()
+                && table.get_list(args).len() == 1 =>
+        {
+            let result = lower_type(
+                &Type::resolved(table.get_list(args)[0]),
+                table,
+                interner,
+                tt,
+                names,
+            );
+            BackendTy::Dynamic(DynReason::Awaitable(tt.intern(result)))
+        }
+        TypeKind::Generic(name, args, _)
+            if matches!(
+                interner.resolve(name),
+                "Generator" | "AsyncGenerator"
+            ) && table.get_list(args).len() == 1 =>
+        {
+            let yielded = lower_type(
+                &Type::resolved(table.get_list(args)[0]),
+                table,
+                interner,
+                tt,
+                names,
+            );
+            BackendTy::Dynamic(DynReason::Yields(tt.intern(yielded)))
+        }
         TypeKind::Builtin(varn_core::BuiltinType::Map) => {
             let d = tt.intern(opaque());
             BackendTy::Map(d, d)

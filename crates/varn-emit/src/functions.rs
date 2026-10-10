@@ -44,9 +44,7 @@ pub(super) fn emit_member_fn(
             base,
             param_names,
         );
-        if !is_async && !is_generator {
-            em.return_ty = sig_snapshot.return_ty;
-        }
+        em.expect_results(sig_snapshot.return_ty, is_async, is_generator);
         if let Some(cid) = this_class {
             em = em.with_this(cid);
         }
@@ -277,9 +275,7 @@ pub(super) fn emit_function(
             closure_base,
             param_names,
         );
-        if !f.modifiers.is_async && !f.modifiers.is_generator {
-            em.return_ty = return_ty;
-        }
+        em.expect_results(return_ty, f.modifiers.is_async, f.modifiers.is_generator);
         let mut b = em.destructure_params(&f.params);
         b.extend(match &ast_arena.stmt(f.body).kind {
             StmtKind::Block { stmts } => em.lower_block(stmts),

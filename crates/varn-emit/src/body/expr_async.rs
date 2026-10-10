@@ -24,7 +24,14 @@ impl<'a> FnEmitter<'a> {
         delegate: bool,
         span: Span,
     ) -> TirExpr {
-        let value = argument.map(|a| Box::new(self.lower_expr(a)));
+        let value = argument.map(|a| {
+            let value = self.lower_expr(a);
+            Box::new(if delegate {
+                value
+            } else {
+                self.guard_dynamic(value, self.yield_ty)
+            })
+        });
         TirExpr {
             kind: TirExprKind::Yield { value, delegate },
 

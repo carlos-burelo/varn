@@ -7,8 +7,8 @@ use crate::{TirFunction, TirModule};
 pub struct Coverage {
     pub nodes: u32,
 
-    dynamics: [u32; 6],
-    by_name: [u32; 6],
+    dynamics: [u32; 8],
+    by_name: [u32; 8],
     pub static_dispatch: u32,
     pub name_dispatch: u32,
 }
@@ -21,16 +21,20 @@ fn reason_index(r: DynReason) -> usize {
         DynReason::Declared => 3,
         DynReason::NotYetSupported => 4,
         DynReason::Callable => 5,
+        DynReason::Awaitable(_) => 6,
+        DynReason::Yields(_) => 7,
     }
 }
 
-const REASONS: [(DynReason, &str); 6] = [
-    (DynReason::HostBoundary, "host boundary"),
-    (DynReason::Union, "union"),
-    (DynReason::IndexSignature, "index signature"),
-    (DynReason::Declared, "declared"),
-    (DynReason::NotYetSupported, "not yet supported"),
-    (DynReason::Callable, "function type"),
+const REASON_LABELS: [&str; 8] = [
+    "host boundary",
+    "union",
+    "index signature",
+    "declared",
+    "not yet supported",
+    "function type",
+    "task",
+    "generator",
 ];
 
 impl Coverage {
@@ -68,9 +72,9 @@ impl Coverage {
             self.name_dispatch,
             self.static_ratio() * 100.0
         ));
-        for (r, label) in REASONS {
-            let d = self.dynamic_by_reason(r);
-            let n = self.by_name_by_reason(r);
+        for (bucket, label) in REASON_LABELS.iter().enumerate() {
+            let d = self.dynamics[bucket];
+            let n = self.by_name[bucket];
             if d > 0 || n > 0 {
                 s.push_str(&format!("  {label:<18} dynamic {d:>5}   by name {n:>5}\n"));
             }

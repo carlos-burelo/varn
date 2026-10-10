@@ -61,6 +61,8 @@ impl<'a> FnEmitter<'a> {
             varn_tir::DynReason::Union
             | varn_tir::DynReason::IndexSignature
             | varn_tir::DynReason::Callable
+            | varn_tir::DynReason::Awaitable(_)
+            | varn_tir::DynReason::Yields(_)
             | varn_tir::DynReason::NotYetSupported => false,
         };
         match ty.non_nullable(self.tt) {
@@ -81,6 +83,8 @@ impl<'a> FnEmitter<'a> {
                 | varn_tir::DynReason::Union
                 | varn_tir::DynReason::IndexSignature
                 | varn_tir::DynReason::Declared
+                | varn_tir::DynReason::Awaitable(_)
+                | varn_tir::DynReason::Yields(_)
                 | varn_tir::DynReason::NotYetSupported,
             )
             | BackendTy::Char

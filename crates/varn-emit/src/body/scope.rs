@@ -39,7 +39,24 @@ impl<'a> FnEmitter<'a> {
             captures: Vec::new(),
             pending: Vec::new(),
             return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            yield_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             disposables: Vec::new(),
+        }
+    }
+
+    pub fn expect_results(&mut self, declared: BackendTy, is_async: bool, is_generator: bool) {
+        if is_generator {
+            self.yield_ty = match declared {
+                BackendTy::Dynamic(DynReason::Yields(yielded)) => self.tt.get(yielded),
+                other => other,
+            };
+        } else if is_async {
+            self.return_ty = match declared {
+                BackendTy::Dynamic(DynReason::Awaitable(result)) => self.tt.get(result),
+                other => other,
+            };
+        } else {
+            self.return_ty = declared;
         }
     }
 

@@ -34,6 +34,10 @@ pub enum DynReason {
 
     Callable,
 
+    Awaitable(TyId),
+
+    Yields(TyId),
+
     NotYetSupported,
 }
 

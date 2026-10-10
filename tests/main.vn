@@ -160,6 +160,7 @@ import "./165-optional-method-call.vn"
 import "./166-tuple-literal-in-compiled-code.vn"
 import "./167-dynamic-boundary-collections.vn"
 import "./168-runtime-error-across-await.vn"
+import "./169-dynamic-boundary-coroutines.vn"
 
 summary()
 

@@ -238,6 +238,8 @@ impl<'m> Builder<'m> {
                 | varn_tir::DynReason::Union
                 | varn_tir::DynReason::IndexSignature
                 | varn_tir::DynReason::Declared
+                | varn_tir::DynReason::Awaitable(_)
+                | varn_tir::DynReason::Yields(_)
                 | varn_tir::DynReason::NotYetSupported,
             ) => {}
         }

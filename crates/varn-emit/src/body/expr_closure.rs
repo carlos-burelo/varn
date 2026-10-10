@@ -23,8 +23,12 @@ impl<'a> FnEmitter<'a> {
         span: Span,
     ) -> TirExpr {
         let func_id = varn_tir::FnId(self.closure_base + self.out_closures.len() as u32);
-        let (sig, param_tys, return_ty) =
-            self.closure_signature(source, params.len(), is_async || is_generator);
+        let (sig, param_tys, declared) = self.closure_signature(source, params.len());
+        let return_ty = if is_async || is_generator {
+            BackendTy::Dynamic(DynReason::NotYetSupported)
+        } else {
+            declared
+        };
 
         self.out_closures.push(TirFunction {
             name: Arc::from("<closure>"),
@@ -63,9 +67,7 @@ impl<'a> FnEmitter<'a> {
             param_names,
         );
         sub.outer_names = outer_names;
-        if !is_async && !is_generator {
-            sub.return_ty = return_ty;
-        }
+        sub.expect_results(declared, is_async, is_generator);
         let mut stmts = sub.destructure_params(params);
         stmts.extend(match body {
             ClosureBody::Stmt(s) => sub.lower_stmt_as_block(s),
@@ -134,7 +136,6 @@ impl FnEmitter<'_> {
         &mut self,
         source: Option<ExprId>,
         arity: usize,
-        coroutine: bool,
     ) -> (SigId, Vec<BackendTy>, BackendTy) {
         let dynamic = BackendTy::Dynamic(DynReason::NotYetSupported);
         let fn_ty = source
@@ -158,10 +159,7 @@ impl FnEmitter<'_> {
                 .map(|s| (sig, s))
         });
         match checked {
-            Some((sig, s)) => {
-                let ret = if coroutine { dynamic } else { s.return_ty };
-                (sig, s.params.clone(), ret)
-            }
+            Some((sig, s)) => (sig, s.params.clone(), s.return_ty),
             None => (SigId(0), vec![dynamic; arity], dynamic),
         }
     }
