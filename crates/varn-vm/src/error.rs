@@ -29,6 +29,10 @@ impl RuntimeError {
         Self::of_kind(varn_core::RuntimeErrorKind::DivisionByZero, message)
     }
 
+    pub(crate) fn type_error(message: impl Into<String>) -> Self {
+        Self::of_kind(varn_core::RuntimeErrorKind::TypeError, message)
+    }
+
     fn of_kind(kind: varn_core::RuntimeErrorKind, message: impl Into<String>) -> Self {
         Self {
             message: message.into(),

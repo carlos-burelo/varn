@@ -79,6 +79,16 @@ function optArg(s: str?): int { return (s ?? "").length }
 function passOpt(d: dynamic): int { return optArg(d) }
 function retOpt(d: dynamic): str? { return d }
 
+function kindOf(f: () => void): str {
+    try {
+        f()
+        return "none"
+    } catch (e) {
+        if (e instanceof TypeError) { return "TypeError" }
+        return "Error"
+    }
+}
+
 function asStr(d: dynamic): str { return d as str }
 function asBool(d: dynamic): bool { return d as bool }
 
@@ -156,6 +166,13 @@ await describe("162 dynamic boundary", async () => {
         expect(failed(() => { optBool("x") })).toBe(true)
         expect(failed(() => { passOpt(5) })).toBe(true)
         expect(failed(() => { retOpt(5) })).toBe(true)
+    })
+
+    await it("the failure is a TypeError", () => {
+        expect(kindOf(() => { asStr(5) })).toBe("TypeError")
+        expect(kindOf(() => { declBool(1) })).toBe("TypeError")
+        expect(kindOf(() => { optStr(5) })).toBe("TypeError")
+        expect(kindOf(() => { asStr("ok") })).toBe("none")
     })
 
     await it("holds in a hot loop", () => {

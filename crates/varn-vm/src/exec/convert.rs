@@ -124,7 +124,7 @@ fn to_decimal(n: Numeric, heap: &mut Heap) -> VmResult<VmValue> {
 #[cold]
 #[inline(never)]
 fn not_a(expected: &str, v: VmValue, heap: &Heap) -> RuntimeError {
-    RuntimeError::new(format!(
+    RuntimeError::type_error(format!(
         "type mismatch: expected '{expected}', got '{}'",
         crate::exec::advanced::typeof_val(v, heap)
     ))

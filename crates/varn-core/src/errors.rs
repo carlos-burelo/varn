@@ -6,14 +6,16 @@ pub enum RuntimeErrorKind {
     DivisionByZero,
 
     MatchError,
+    TypeError,
 }
 
 impl RuntimeErrorKind {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Error,
         Self::IntegerOverflow,
         Self::DivisionByZero,
         Self::MatchError,
+        Self::TypeError,
     ];
 
     pub const fn class_name(self) -> &'static str {
@@ -22,6 +24,7 @@ impl RuntimeErrorKind {
             Self::IntegerOverflow => "IntegerOverflow",
             Self::DivisionByZero => "DivisionByZero",
             Self::MatchError => "MatchError",
+            Self::TypeError => "TypeError",
         }
     }
 }
