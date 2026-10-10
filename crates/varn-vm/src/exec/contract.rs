@@ -247,12 +247,18 @@ fn convert_args(
     Ok(converted)
 }
 
+#[inline]
+pub(crate) fn has_contract(ctx: &ExecCtx, callee: VmValue) -> bool {
+    target_closure(&ctx.heap, callee).is_some_and(|closure| closure.proto.checks_params)
+}
+
 pub(crate) fn verify_call(
     ctx: &mut ExecCtx,
     callee: VmValue,
     args: &[VmValue],
 ) -> Result<Option<Vec<VmValue>>, NativeError> {
-    let Some(closure) = target_closure(&ctx.heap, callee) else {
+    let Some(closure) = target_closure(&ctx.heap, callee).filter(|closure| closure.proto.checks_params)
+    else {
         return Ok(None);
     };
     let proto = &closure.proto;

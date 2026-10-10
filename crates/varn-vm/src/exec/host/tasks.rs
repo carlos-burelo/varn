@@ -6,6 +6,21 @@ impl ExecCtx {
         callee: VmValue,
         args: &[VmValue],
     ) -> Result<VmValue, varn_types::NativeError> {
+        if crate::exec::contract::has_contract(self, callee) {
+            return self.host_call_vm_checked(callee, args);
+        }
+        let mut window = Vec::with_capacity(args.len() + 1);
+        window.push(callee);
+        window.extend_from_slice(args);
+        Ok(self.invoke(callee, &window)?)
+    }
+
+    #[inline(never)]
+    fn host_call_vm_checked(
+        &mut self,
+        callee: VmValue,
+        args: &[VmValue],
+    ) -> Result<VmValue, varn_types::NativeError> {
         let converted = crate::exec::contract::verify_call(self, callee, args)?;
         let args = converted.as_deref().unwrap_or(args);
         let mut window = Vec::with_capacity(args.len() + 1);
@@ -13,6 +28,7 @@ impl ExecCtx {
         window.extend_from_slice(args);
         Ok(self.invoke(callee, &window)?)
     }
+
     pub(super) fn host_task_from_host(
         &mut self,
         promise: varn_types::HostPromise,

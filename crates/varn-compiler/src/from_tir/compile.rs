@@ -101,6 +101,7 @@ fn compile_one(
     proto.state_size = state_size;
     if !is_top_level {
         proto.param_contract = super::describe::param_contract(tir, f);
+        proto.checks_params = proto.param_contract.is_some();
     }
     if is_top_level {
         proto.global_count = tir.global_names.len() as u32;

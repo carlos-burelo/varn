@@ -16,6 +16,8 @@ pub struct FunctionProto {
 
     pub register_count: u16,
     pub has_rest: bool,
+    #[serde(default)]
+    pub checks_params: bool,
     pub is_async: bool,
     pub is_generator: bool,
     pub has_this: bool,

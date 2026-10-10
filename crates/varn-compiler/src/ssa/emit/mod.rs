@@ -182,6 +182,7 @@ pub(crate) fn emit_function_meta(
         export_names: Vec::new(),
         register_count,
         has_rest: f.has_rest,
+        checks_params: false,
         is_async: f.is_async,
         is_generator: f.is_generator,
         has_this: f.has_this,
