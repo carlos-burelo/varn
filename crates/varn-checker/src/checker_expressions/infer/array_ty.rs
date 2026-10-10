@@ -13,22 +13,39 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> Type {
         let mut elem_tys = Vec::new();
+        let mut holds_dynamic = false;
         for el in elements {
             match el {
                 varn_core::ast::ArrayEl::Expr(e) => {
                     let ty = self.infer_type(rec, *e, bind);
-                    if !ty.is_dynamic() {
+                    if ty.is_dynamic() {
+                        holds_dynamic = true;
+                    } else {
                         elem_tys.push(ty);
                     }
                 }
                 varn_core::ast::ArrayEl::Spread(e) => {
                     let ty = self.infer_type(rec, *e, bind);
-                    if let varn_core::TypeKind::Array(inner) = self.ty_table.get(ty.0) {
-                        elem_tys.push(Type::resolved(inner));
+                    let spread =
+                        if let varn_core::TypeKind::Array(inner) = self.ty_table.get(ty.0) {
+                            Type::resolved(inner)
+                        } else {
+                            Type::Dynamic
+                        };
+                    if spread.is_dynamic() {
+                        holds_dynamic = true;
+                    } else {
+                        elem_tys.push(spread);
                     }
                 }
                 varn_core::ast::ArrayEl::Hole => {}
             }
+        }
+        if holds_dynamic && !elem_tys.is_empty() {
+            return Type::array(
+                Type::Dynamic,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+            );
         }
         if elem_tys.is_empty() {
             if let Some(expected) = self.expected_type {
