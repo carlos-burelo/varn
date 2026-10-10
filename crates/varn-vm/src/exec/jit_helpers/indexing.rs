@@ -109,7 +109,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                 let found = ctx_ref
                     .heap
                     .lookup_map_key(key)
-                    .and_then(|k| m.borrow().get(&k).copied());
+                    .and_then(|k| m.read().get(&k).copied());
                 unsafe { (*ctx).jit_native_result = found.unwrap_or_else(VmValue::null) };
                 return;
             }
@@ -187,15 +187,9 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
             return;
         }
         if let Some(crate::heap::HeapObj::Map(m)) = ctx_ref.heap.get_mut(heap_idx) {
-            let m = if std::rc::Rc::strong_count(&m.0) > 1 {
-                let cloned = m.borrow().clone();
-                *m = varn_types::value::MapRef::new(cloned);
-                m.clone()
-            } else {
-                m.clone()
-            };
+            let m = *m;
             let k = ctx_ref.heap.canonical_map_key(key);
-            m.borrow_mut().insert(k, val);
+            m.write().insert(k, val);
             ctx_ref.heap.write_barrier(heap_idx, val);
             return;
         }

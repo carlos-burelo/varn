@@ -75,11 +75,45 @@ impl CellSpace {
         r
     }
 
+    #[inline]
+    pub(crate) fn alloc_map(
+        &mut self,
+        map: varn_types::value::ValueMap,
+        state: SlotState,
+    ) -> HeapRef {
+        let tail = std::mem::size_of::<HeapObj>();
+        let bytes = std::mem::size_of::<varn_types::value::ValueMap>();
+        let r = self.take_cell(tail + bytes, 0, state);
+        let m = unsafe {
+            varn_types::value::MapRef::init_at(body::<u8>(r).add(tail).cast(), map)
+        };
+        Self::place(r, HeapObj::Map(m));
+        r
+    }
+
+    #[inline]
+    pub(crate) fn alloc_set(
+        &mut self,
+        set: varn_types::value::ValueSet,
+        state: SlotState,
+    ) -> HeapRef {
+        let tail = std::mem::size_of::<HeapObj>();
+        let bytes = std::mem::size_of::<varn_types::value::ValueSet>();
+        let r = self.take_cell(tail + bytes, 0, state);
+        let s = unsafe {
+            varn_types::value::SetRef::init_at(body::<u8>(r).add(tail).cast(), set)
+        };
+        Self::place(r, HeapObj::Set(s));
+        r
+    }
+
     pub(super) unsafe fn drop_object(r: HeapRef) {
         let obj = body::<HeapObj>(r);
         match unsafe { &*obj } {
             HeapObj::Object(o) | HeapObj::Record(o) => unsafe { ObjData::drop_at(*o) },
             HeapObj::Array(a) | HeapObj::Tuple(a) => unsafe { a.drop_at() },
+            HeapObj::Map(m) => unsafe { m.drop_at() },
+            HeapObj::Set(t) => unsafe { t.drop_at() },
             HeapObj::Str(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
@@ -88,8 +122,6 @@ impl CellSpace {
             | HeapObj::Class(_)
             | HeapObj::NativeFn(..)
             | HeapObj::BoundMethod(_)
-            | HeapObj::Map(_)
-            | HeapObj::Set(_)
             | HeapObj::Task(_)
             | HeapObj::TaskHandle(_)
             | HeapObj::Range(_)

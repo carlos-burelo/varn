@@ -20,7 +20,7 @@ varn_contract! {
         fn add(ctx: &mut dyn NativeCtx, this: VmValue, value: VmValue) -> Result<(), NativeError> {
             if let Some(s) = get_set(ctx, this) {
                 let k = ctx.map_key(value)?;
-                s.borrow_mut().insert(k);
+                s.write().insert(k);
 
 
                 ctx.collection_write_barrier(this, k.0);
@@ -31,7 +31,7 @@ varn_contract! {
             match get_set(ctx, this) {
                 Some(s) => {
                     let k = ctx.map_key(value)?;
-                    Ok(s.borrow().contains(&k))
+                    Ok(s.read().contains(&k))
                 }
                 None => Ok(false),
             }
@@ -40,25 +40,25 @@ varn_contract! {
             match get_set(ctx, this) {
                 Some(s) => {
                     let k = ctx.map_key(value)?;
-                    Ok(s.borrow_mut().remove(&k))
+                    Ok(s.write().remove(&k))
                 }
                 None => Ok(false),
             }
         }
         fn clear(ctx: &mut dyn NativeCtx, this: VmValue) {
             if let Some(s) = get_set(ctx, this) {
-                s.borrow_mut().clear();
+                s.write().clear();
             }
         }
         fn values(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
             match get_set(ctx, this) {
-                Some(s) => s.borrow().iter().map(|k| k.0).collect(),
+                Some(s) => s.read().iter().map(|k| k.0).collect(),
                 None => Vec::new(),
             }
         }
         fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Result<(), NativeError> {
             if let Some(s) = get_set(ctx, this) {
-                let items: Vec<VmValue> = s.borrow().iter().map(|k| k.0).collect();
+                let items: Vec<VmValue> = s.read().iter().map(|k| k.0).collect();
                 for v in items {
                     ctx.call_vm(callback, &[v, v, this])?;
                 }
@@ -66,7 +66,7 @@ varn_contract! {
             Ok(())
         }
         fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
-            get_set(ctx, this).map(|s| s.borrow().len() as i64).unwrap_or(0)
+            get_set(ctx, this).map(|s| s.read().len() as i64).unwrap_or(0)
         }
     }
 }

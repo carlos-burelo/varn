@@ -30,7 +30,7 @@ impl ExecCtx {
     pub(super) fn host_map_for_each(&self, map: VmValue, f: &mut dyn FnMut(VmValue, VmValue)) {
         if map.is_heap() {
             if let Some(HeapObj::Map(m)) = self.heap.get(map.as_heap()) {
-                for (k, v) in m.0.borrow().iter() {
+                for (k, v) in m.read().iter() {
                     f(k.0, *v);
                 }
             }

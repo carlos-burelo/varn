@@ -45,7 +45,7 @@ pub(super) fn resolve_specialized_property(
         Some(HeapObj::Map(m)) => {
             let found = heap
                 .lookup_str_map_key(key)
-                .and_then(|k| m.0.borrow().get(&k).copied());
+                .and_then(|k| m.read().get(&k).copied());
             found.map(Ok)
         }
         Some(HeapObj::EnumVariant(ev)) => enum_variant_property(&ev, key, heap),

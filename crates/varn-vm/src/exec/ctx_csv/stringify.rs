@@ -79,7 +79,7 @@ pub(crate) fn stringify_csv(
                     }
                 }
                 Some(HeapObj::Map(first_map)) => {
-                    let map_b = first_map.borrow();
+                    let map_b = first_map.read();
                     let prop_names: Vec<(varn_types::value::MapKey, String)> = map_b
                         .keys()
                         .map(|k| {
@@ -87,7 +87,6 @@ pub(crate) fn stringify_csv(
                             (*k, name)
                         })
                         .collect();
-                    drop(map_b);
 
                     for (i, (_, name)) in prop_names.iter().enumerate() {
                         if i > 0 {
@@ -102,7 +101,7 @@ pub(crate) fn stringify_csv(
                             continue;
                         }
                         if let Some(HeapObj::Map(map)) = ctx.heap.get(item.as_heap()) {
-                            let m = map.borrow();
+                            let m = map.read();
                             for (slot, (k, _)) in prop_names.iter().enumerate() {
                                 if slot > 0 {
                                     out.push(delim_char);

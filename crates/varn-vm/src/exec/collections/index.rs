@@ -26,7 +26,7 @@ pub(crate) fn map_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmRe
         if let Some(HeapObj::Map(m)) = heap.get(heap_idx) {
             let found = heap
                 .lookup_map_key(key)
-                .and_then(|k| m.borrow().get(&k).copied());
+                .and_then(|k| m.read().get(&k).copied());
             return Ok(found.unwrap_or_else(VmValue::null));
         }
     }
@@ -43,13 +43,7 @@ pub(crate) fn map_set_index(
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
         let maybe_m = match heap.get_mut(heap_idx) {
-            Some(HeapObj::Map(mref)) => {
-                if std::rc::Rc::strong_count(&mref.0) > 1 {
-                    let cloned = mref.borrow().clone();
-                    *mref = varn_types::value::MapRef::new(cloned);
-                }
-                Some(mref.clone())
-            }
+            Some(HeapObj::Map(mref)) => Some(*mref),
             Some(
                 HeapObj::Str(_)
                 | HeapObj::Array(_)
@@ -79,7 +73,7 @@ pub(crate) fn map_set_index(
         };
         if let Some(m) = maybe_m {
             let k = heap.canonical_map_key(key);
-            m.borrow_mut().insert(k, val);
+            m.write().insert(k, val);
             heap.write_barrier(heap_idx, val);
             return Ok(());
         }
@@ -212,7 +206,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
         Some(HeapObj::Map(m)) => {
             let found = heap
                 .lookup_map_key(key)
-                .and_then(|k| m.borrow().get(&k).copied());
+                .and_then(|k| m.read().get(&k).copied());
             Ok(found.unwrap_or_else(VmValue::null))
         }
         Some(HeapObj::Class(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_)) => {
@@ -333,18 +327,9 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
             Ok(())
         }
         Some(HeapObj::Map(m)) => {
-            let m = m.clone();
+            let m = *m;
             let k = heap.canonical_map_key(key);
-            if std::rc::Rc::strong_count(&m.0) > 1 {
-                if let Some(HeapObj::Map(mref)) = heap.get_mut(heap_idx) {
-                    let cloned = mref.borrow().clone();
-                    *mref = varn_types::value::MapRef::new(cloned);
-                    mref.borrow_mut().insert(k, val);
-                    heap.write_barrier(heap_idx, val);
-                    return Ok(());
-                }
-            }
-            m.borrow_mut().insert(k, val);
+            m.write().insert(k, val);
             heap.write_barrier(heap_idx, val);
             Ok(())
         }

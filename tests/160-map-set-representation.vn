@@ -1,0 +1,95 @@
+import { describe, it, expect } from "std:test";
+
+function gcChurn(n: int): int {
+    let junk: str[] = [];
+    for (let i = 0; i < n; i = i + 1) { junk.push("churn-" + i); }
+    return junk.length;
+}
+
+function buildMaps(n: int): { [key: str]: int }[] {
+    let out: { [key: str]: int }[] = [];
+    for (let i = 0; i < n; i = i + 1) {
+        out.push({ "alpha": i, "beta": i * 2, "gamma": i * 3 });
+    }
+    return out;
+}
+
+function fillByIndex(n: int): int {
+    let m: { [key: str]: int } = {};
+    for (let i = 0; i < n; i = i + 1) { m["slot-" + (i % 40)] = i; }
+    let total = 0;
+    for (let i = 0; i < 40; i = i + 1) { total = total + (m["slot-" + i] as int); }
+    return total;
+}
+
+await describe("160 Map/Set representation", async () => {
+    await it("literal maps keep their values across GC", () => {
+        const maps = buildMaps(50000);
+        gcChurn(300000);
+        let sum = 0;
+        for (let i = 0; i < maps.length; i = i + 1) {
+            sum = sum + (maps[i]["gamma"] as int) - (maps[i]["alpha"] as int);
+        }
+        expect(sum).toBe(2499950000);
+    });
+
+    await it("growth past the linear index keeps insertion order", () => {
+        const m = new Map<str, int>();
+        for (let i = 0; i < 40; i = i + 1) { m.set("key-number-" + i, i); }
+        expect(m.size).toBe(40);
+        expect(m.get("key-number-0")).toBe(0);
+        expect(m.get("key-number-39")).toBe(39);
+        expect(m.keys()[4]).toBe("key-number-4");
+        m.delete("key-number-4");
+        m.set("key-number-4", 400);
+        expect(m.keys()[39]).toBe("key-number-4");
+        expect(m.get("key-number-4")).toBe(400);
+        expect(m.size).toBe(40);
+    });
+
+    await it("mutating the map inside forEach visits a snapshot", () => {
+        const m = new Map<str, int>();
+        m.set("a", 1);
+        m.set("b", 2);
+        m.set("c", 3);
+        let seen = 0;
+        m.forEach((v: int, k: str) => {
+            seen = seen + v;
+            m.set(k + "-copy", v);
+            m.delete("c");
+        });
+        expect(seen).toBe(6);
+        expect(m.size).toBe(5);
+        expect(m.has("c")).toBe(false);
+        expect(m.get("c-copy")).toBe(3);
+    });
+
+    await it("index writes overwrite and grow in a hot loop", () => {
+        expect(fillByIndex(20000)).toBe(799180);
+        expect(fillByIndex(20000)).toBe(799180);
+    });
+
+    await it("runtime-built keys find literal entries", () => {
+        let m: { [key: str]: str } = { "authorization": "Bearer t", "content-type": "json" };
+        let suffixes = ["type", "length"];
+        let hits = 0;
+        for (let i = 0; i < 20000; i = i + 1) {
+            if (m["content-" + suffixes[0]] == "json") { hits = hits + 1; }
+        }
+        expect(hits).toBe(20000);
+        expect(m["author" + "ization"]).toBe("Bearer t");
+    });
+
+    await it("sets dedupe, delete and mutate inside forEach", () => {
+        const s = new Set<str>();
+        for (let i = 0; i < 30; i = i + 1) { s.add("value-" + (i % 12)); }
+        expect(s.size).toBe(12);
+        expect(s.has("value-11")).toBeTruthy();
+        s.delete("value-0");
+        expect(s.has("value-0")).toBe(false);
+        let n = 0;
+        s.forEach((v: str) => { n = n + 1; s.add(v + "-x"); });
+        expect(n).toBe(11);
+        expect(s.size).toBe(22);
+    });
+});

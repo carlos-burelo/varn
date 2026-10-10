@@ -7,7 +7,7 @@ pub(super) fn value_estimate_capacity(ctx: &ExecCtx, val: VmValue) -> usize {
         if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = ctx.heap.get(val.as_heap()) {
             o.borrow().len() * 48 + 32
         } else if let Some(HeapObj::Map(m)) = ctx.heap.get(val.as_heap()) {
-            m.borrow().len() * 48 + 32
+            m.read().len() * 48 + 32
         } else {
             128
         }
@@ -113,7 +113,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
                 return;
             }
             Some(HeapObj::Map(m)) => {
-                let map = m.borrow();
+                let map = m.read();
                 out.push('{');
                 let mut first = true;
                 for (k, &v) in map.iter() {

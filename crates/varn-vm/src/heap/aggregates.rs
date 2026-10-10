@@ -1,4 +1,3 @@
-use super::obj::HeapObj;
 use super::structs::HeapInner;
 use crate::value::VmValue;
 use std::rc::Rc;
@@ -50,7 +49,12 @@ impl HeapInner {
     }
 
     pub(crate) fn alloc_map_vm(&mut self, map: varn_types::value::ValueMap) -> VmValue {
-        let mref = varn_types::value::MapRef::new(map);
-        VmValue::from_heap(self.alloc(HeapObj::Map(mref)))
+        if let Some(h) = &self.hotspot {
+            h.borrow_mut()
+                .record_alloc(varn_core::RuntimeKind::Map.name());
+        }
+        let r = self.cells.alloc_map(map, super::cells::SlotState::Young);
+        self.young.born.push(r);
+        VmValue::from_heap(r)
     }
 }

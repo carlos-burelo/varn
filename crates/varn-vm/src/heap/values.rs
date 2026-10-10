@@ -79,8 +79,13 @@ impl HeapInner {
     }
 
     pub(crate) fn alloc_set_vm(&mut self, set: varn_types::value::ValueSet) -> VmValue {
-        let sref = varn_types::value::SetRef::new(set);
-        VmValue::from_heap(self.alloc(HeapObj::Set(sref)))
+        if let Some(h) = &self.hotspot {
+            h.borrow_mut()
+                .record_alloc(varn_core::RuntimeKind::Set.name());
+        }
+        let r = self.cells.alloc_set(set, super::cells::SlotState::Young);
+        self.young.born.push(r);
+        VmValue::from_heap(r)
     }
 
     pub(crate) fn alloc_class_vm(&mut self, class: Rc<varn_types::ClassObj>) -> VmValue {

@@ -1,7 +1,7 @@
 use super::ordered::OrderedTable;
 use crate::vm_value::VmValue;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::cell::UnsafeCell;
+use std::ptr::NonNull;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct MapKey(pub VmValue);
@@ -54,47 +54,60 @@ impl ValueSet {
     }
 }
 
-#[derive(Clone)]
-pub struct MapRef(pub Rc<RefCell<ValueMap>>);
+pub struct CellTable<T>(NonNull<UnsafeCell<T>>);
 
-impl MapRef {
-    pub fn new(data: ValueMap) -> Self {
-        Self(Rc::new(RefCell::new(data)))
-    }
+pub type MapRef = CellTable<ValueMap>;
+pub type SetRef = CellTable<ValueSet>;
 
-    pub fn read(&self) -> std::cell::Ref<'_, ValueMap> {
-        self.0.borrow()
-    }
-
-    pub fn write(&self) -> std::cell::RefMut<'_, ValueMap> {
-        self.0.borrow_mut()
-    }
-
-    pub fn borrow(&self) -> std::cell::Ref<'_, ValueMap> {
-        self.0.borrow()
-    }
-
-    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, ValueMap> {
-        self.0.borrow_mut()
+impl<T> Clone for CellTable<T> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
 
-impl PartialEq for MapRef {
+impl<T> Copy for CellTable<T> {}
+
+impl<T> CellTable<T> {
+    #[inline(always)]
+    pub unsafe fn init_at(at: *mut T, table: T) -> Self {
+        unsafe {
+            std::ptr::write(at, table);
+            Self(NonNull::new_unchecked(at as *mut UnsafeCell<T>))
+        }
+    }
+
+    pub unsafe fn drop_at(self) {
+        unsafe { std::ptr::drop_in_place(self.0.as_ptr()) };
+    }
+
+    #[inline(always)]
+    pub fn read(&self) -> &T {
+        unsafe { &*(*self.0.as_ptr()).get() }
+    }
+
+    #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
+    pub fn write(&self) -> &mut T {
+        unsafe { &mut *(*self.0.as_ptr()).get() }
+    }
+}
+
+impl<T> PartialEq for CellTable<T> {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        self.0 == other.0
     }
 }
 
-impl Eq for MapRef {}
+impl<T> Eq for CellTable<T> {}
 
-impl std::hash::Hash for MapRef {
+impl<T> std::hash::Hash for CellTable<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
+        self.0.hash(state);
     }
 }
 
-impl std::fmt::Debug for MapRef {
+impl<T> std::fmt::Debug for CellTable<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MapRef({:p})", self.0)
+        write!(f, "CellTable({:p})", self.0)
     }
 }

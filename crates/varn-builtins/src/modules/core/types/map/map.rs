@@ -22,13 +22,13 @@ varn_contract! {
                 return Ok(None);
             };
             let k = ctx.map_key(key)?;
-            let found = m.borrow().get(&k).copied();
+            let found = m.read().get(&k).copied();
             Ok(found)
         }
         fn set(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue, value: VmValue) -> Result<(), NativeError> {
             if let Some(m) = get_map(ctx, this) {
                 let k = ctx.map_key(key)?;
-                m.borrow_mut().insert(k, value);
+                m.write().insert(k, value);
 
 
                 ctx.collection_write_barrier(this, k.0);
@@ -40,7 +40,7 @@ varn_contract! {
             match get_map(ctx, this) {
                 Some(m) => {
                     let k = ctx.map_key(key)?;
-                    Ok(m.borrow().contains_key(&k))
+                    Ok(m.read().contains_key(&k))
                 }
                 None => Ok(false),
             }
@@ -49,25 +49,25 @@ varn_contract! {
             match get_map(ctx, this) {
                 Some(m) => {
                     let k = ctx.map_key(key)?;
-                    Ok(m.borrow_mut().remove(&k).is_some())
+                    Ok(m.write().remove(&k).is_some())
                 }
                 None => Ok(false),
             }
         }
         fn clear(ctx: &mut dyn NativeCtx, this: VmValue) {
             if let Some(m) = get_map(ctx, this) {
-                m.borrow_mut().clear();
+                m.write().clear();
             }
         }
         fn keys(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
             match get_map(ctx, this) {
-                Some(m) => m.borrow().keys().map(|k| k.0).collect(),
+                Some(m) => m.read().keys().map(|k| k.0).collect(),
                 None => Vec::new(),
             }
         }
         fn values(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
             match get_map(ctx, this) {
-                Some(m) => m.borrow().values().copied().collect(),
+                Some(m) => m.read().values().copied().collect(),
                 None => Vec::new(),
             }
         }
@@ -75,7 +75,7 @@ varn_contract! {
             match get_map(ctx, this) {
                 Some(m) => {
                     let pairs: Vec<(VmValue, VmValue)> =
-                        m.borrow().iter().map(|(k, v)| (k.0, *v)).collect();
+                        m.read().iter().map(|(k, v)| (k.0, *v)).collect();
                     pairs
                         .into_iter()
                         .map(|(k, v)| ctx.alloc_array(vec![k, v]))
@@ -87,7 +87,7 @@ varn_contract! {
         fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Result<(), NativeError> {
             if let Some(m) = get_map(ctx, this) {
                 let pairs: Vec<(VmValue, VmValue)> =
-                    m.borrow().iter().map(|(k, v)| (k.0, *v)).collect();
+                    m.read().iter().map(|(k, v)| (k.0, *v)).collect();
                 for (k, v) in pairs {
                     ctx.call_vm(callback, &[v, k, this])?;
                 }
@@ -95,7 +95,7 @@ varn_contract! {
             Ok(())
         }
         fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
-            get_map(ctx, this).map(|m| m.borrow().len() as i64).unwrap_or(0)
+            get_map(ctx, this).map(|m| m.read().len() as i64).unwrap_or(0)
         }
     }
 }

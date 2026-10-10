@@ -90,12 +90,12 @@ fn for_each_heap_child(
             }
         }
         HeapObj::Map(map_ref) => {
-            for (k, v) in map_ref.0.borrow().iter() {
+            for (k, v) in map_ref.read().iter() {
                 value(k.0);
                 value(*v);
             }
         }
-        HeapObj::Set(set_ref) => set_ref.0.borrow().iter().for_each(|k| value(k.0)),
+        HeapObj::Set(set_ref) => set_ref.read().iter().for_each(|k| value(k.0)),
         HeapObj::BoundMethod(bm) => {
             value(bm.receiver);
             if let varn_types::value::BoundMethodTarget::Vm { closure, .. } = &bm.target {

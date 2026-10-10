@@ -69,7 +69,7 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
             | None => None,
         };
         if let Some(m) = maybe_map {
-            let keys: Vec<VmValue> = m.borrow().keys().map(|k| k.0).collect();
+            let keys: Vec<VmValue> = m.read().keys().map(|k| k.0).collect();
             return Ok(heap.alloc_array_vm(keys));
         }
     }
@@ -148,7 +148,7 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
         };
         if let Some(m) = maybe_map {
             let entries: Vec<(varn_types::value::MapKey, VmValue)> =
-                m.borrow().iter().map(|(k, v)| (*k, *v)).collect();
+                m.read().iter().map(|(k, v)| (*k, *v)).collect();
             let mut new_m = varn_types::value::ValueMap::default();
             for (k, v) in entries {
                 let s = heap.str_repr(k.0);
@@ -239,7 +239,7 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
         };
         if let Some(m) = maybe_map {
             let entries: Vec<(varn_types::value::MapKey, VmValue)> =
-                m.borrow().iter().map(|(k, v)| (*k, *v)).collect();
+                m.read().iter().map(|(k, v)| (*k, *v)).collect();
             for (k, nv) in entries {
                 let s = heap.str_repr(k.0);
                 target_obj.insert(Arc::from(s.as_str()), nv);
