@@ -47,13 +47,30 @@ impl<'r> Checker<'r> {
             TypeKind::Array(_) | TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
                 Some(Type::Int)
             }
+            TypeKind::Tuple(slots) => {
+                let arity = self.ty_table.get_list(slots).len();
+                if let ExprKind::IntLiteral { value, .. } = &self.ast_arena.expr(property).kind {
+                    if usize::try_from(*value).map_or(true, |at| at >= arity) {
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::TupleIndexOutOfBounds,
+                                format!(
+                                    "tuple index {value} is out of bounds: '{}' has {arity} elements",
+                                    check_ty.display(&self.ty_table, &bind.interner)
+                                ),
+                            )
+                            .with_range(property_range),
+                        );
+                    }
+                }
+                Some(Type::Int)
+            }
             TypeKind::Primitive(_)
             | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)
             | TypeKind::Intersection(_)
-            | TypeKind::Tuple(_)
             | TypeKind::Named(..)
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)

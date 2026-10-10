@@ -1,0 +1,3 @@
+// expect: error[VN3016]
+const p: #[int, str] = #[1, "a"]
+const x = p[2]

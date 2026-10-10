@@ -27,6 +27,30 @@ impl<'r> Checker<'r> {
         let obj_kind = self.ty_table.get(obj_ty.0);
         match obj_kind {
             TypeKind::Array(inner) if prop_ty.is_int() => Type::resolved(inner),
+            TypeKind::Tuple(slots) if prop_ty.is_int() => {
+                let slots: Vec<Type> = self
+                    .ty_table
+                    .get_list(slots)
+                    .iter()
+                    .map(|slot| Type::resolved(*slot))
+                    .collect();
+                if let varn_core::ast::ExprKind::IntLiteral { value, .. } =
+                    &arena.expr(property).kind
+                {
+                    return usize::try_from(*value)
+                        .ok()
+                        .and_then(|at| slots.get(at).copied())
+                        .unwrap_or(Type::Dynamic);
+                }
+                match slots.split_first() {
+                    Some((first, rest)) if rest.iter().all(|slot| slot == first) => *first,
+                    Some(_) => Type::union(
+                        slots,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    ),
+                    None => Type::Dynamic,
+                }
+            }
             TypeKind::Primitive(varn_core::LangPrimitive::Str) if prop_ty.is_int() => Type::Str,
             TypeKind::Builtin(varn_core::BuiltinType::Bytes) if prop_ty.is_int() => Type::Int,
             TypeKind::Named(name, _)
