@@ -235,7 +235,7 @@ impl ExecCtx {
                         let w1 = code[ip];
                         ip += 1;
                         let v = unsafe { (*ctx).stack.box_reg(base, hi(w1)) };
-                        let r = match varn_core::NumConv::from_u8(lo(w1) as u8) {
+                        let r = match varn_core::ValueConv::from_u8(lo(w1) as u8) {
                             Some(conv) => {
                                 crate::exec::convert::convert(conv, v, unsafe { &mut (*ctx).heap })
                             }

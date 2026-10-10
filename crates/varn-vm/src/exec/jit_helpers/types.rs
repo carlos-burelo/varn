@@ -100,7 +100,7 @@ pub(crate) extern "C" fn jit_convert(ctx: *mut ExecCtx, conv: u64, tag: u64, pay
     unsafe {
         let ctx_ref = &mut *ctx;
         let v = VmValue::from_raw_parts(tag, payload);
-        let r = match varn_core::NumConv::from_u8(conv as u8) {
+        let r = match varn_core::ValueConv::from_u8(conv as u8) {
             Some(conv) => crate::exec::convert::convert(conv, v, &mut ctx_ref.heap),
             None => Err(crate::error::RuntimeError::new("convert: bad operand")),
         };

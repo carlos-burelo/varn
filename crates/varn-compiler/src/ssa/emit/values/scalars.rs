@@ -118,7 +118,7 @@ pub(super) fn emit_convert(
     d: u8,
     operand: Value,
     reg: &[u8],
-    conv: varn_core::NumConv,
+    conv: varn_core::ValueConv,
     line: u32,
 ) {
     chunk.write(Chunk::pack_op(OpCode::Convert, d), line);

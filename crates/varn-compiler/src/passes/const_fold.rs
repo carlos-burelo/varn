@@ -266,8 +266,8 @@ fn fold_inst(kind: &InstKind, const_map: &FxHashMap<Value, InstKind>) -> Option<
     }
 }
 
-fn fold_convert(conv: varn_core::NumConv, operand: &InstKind) -> Option<InstKind> {
-    use varn_core::NumConv::*;
+fn fold_convert(conv: varn_core::ValueConv, operand: &InstKind) -> Option<InstKind> {
+    use varn_core::ValueConv::*;
     match (conv, operand) {
         (IntToFloat, InstKind::ConstInt(n)) => Some(InstKind::ConstFloat(*n as f64)),
         (FloatToInt, InstKind::ConstFloat(f)) => {

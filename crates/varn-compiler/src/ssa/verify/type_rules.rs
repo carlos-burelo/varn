@@ -247,8 +247,8 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
     Ok(())
 }
 
-pub(crate) fn convert_result_ty(conv: varn_core::NumConv) -> HirType {
-    use varn_core::NumConv::*;
+pub(crate) fn convert_result_ty(conv: varn_core::ValueConv) -> HirType {
+    use varn_core::ValueConv::*;
     match conv {
         IntToFloat | DynToFloat | BigIntToFloat | DecimalToFloat => HirType::Float,
         FloatToInt | BigIntToInt | DecimalToInt | DynToInt => HirType::Int,
@@ -257,8 +257,8 @@ pub(crate) fn convert_result_ty(conv: varn_core::NumConv) -> HirType {
     }
 }
 
-fn convert_operand_ty(conv: varn_core::NumConv) -> Option<HirType> {
-    use varn_core::NumConv::*;
+fn convert_operand_ty(conv: varn_core::ValueConv) -> Option<HirType> {
+    use varn_core::ValueConv::*;
     match conv {
         IntToFloat => Some(HirType::Int),
         FloatToInt | FloatToBigInt | FloatToDecimal => Some(HirType::Float),

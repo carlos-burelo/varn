@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_core::intrinsic_ops::math::MathOp;
-use varn_core::NumConv;
+use varn_core::ValueConv;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::SsaProto;
 
@@ -67,8 +67,8 @@ pub(super) fn emit_intrinsic(
     Ok(Out::Boxed(native_result(b, ctx, ectx)))
 }
 
-pub(super) fn is_inline_convert(ssa: &SsaProto, operand: u32, conv: NumConv) -> bool {
-    conv == NumConv::IntToFloat && ssa.value_ty(operand) == SlotKind::Int
+pub(super) fn is_inline_convert(ssa: &SsaProto, operand: u32, conv: ValueConv) -> bool {
+    conv == ValueConv::IntToFloat && ssa.value_ty(operand) == SlotKind::Int
 }
 
 pub(super) fn emit_convert(
@@ -76,7 +76,7 @@ pub(super) fn emit_convert(
     ctx: &Ctx<'_>,
     values: &[Option<Value>],
     operand: u32,
-    conv: NumConv,
+    conv: ValueConv,
 ) -> Result<Out, String> {
     if is_inline_convert(ctx.ssa, operand, conv) {
         let a = load_value(b, ctx, values, operand)?;

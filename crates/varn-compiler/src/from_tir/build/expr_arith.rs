@@ -97,9 +97,9 @@ impl<'m> Builder<'m> {
         let to = super::ops::numeric_domain(node_ty);
         let conv = match (from, to) {
             (Some(f), Some(t)) if f == t => return Ok(v),
-            (Some(f), Some(t)) => varn_core::NumConv::between(f, t),
-            (None, Some(D::Int)) => Some(varn_core::NumConv::DynToInt),
-            (None, Some(D::Float)) => Some(varn_core::NumConv::DynToFloat),
+            (Some(f), Some(t)) => varn_core::ValueConv::between(f, t),
+            (None, Some(D::Int)) => Some(varn_core::ValueConv::DynToInt),
+            (None, Some(D::Float)) => Some(varn_core::ValueConv::DynToFloat),
             _ => None,
         };
         if let Some(conv) = conv {

@@ -232,7 +232,7 @@ fn imm_text(at: At, kind: ImmKind, code: &[u16], offset: usize) -> Option<String
             Some(kind) => format!(":{}", kind.name()),
             None => ":dynamic".to_owned(),
         },
-        ImmKind::Conv => match varn_core::NumConv::from_u8(v as u8) {
+        ImmKind::Conv => match varn_core::ValueConv::from_u8(v as u8) {
             Some(conv) => format!("{conv:?}"),
             None => format!("conv{v}"),
         },

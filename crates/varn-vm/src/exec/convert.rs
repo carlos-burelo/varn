@@ -4,7 +4,7 @@ use crate::value::VmValue;
 use bigdecimal::{BigDecimal, RoundingMode};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
-use varn_core::NumConv;
+use varn_core::ValueConv;
 
 #[cold]
 #[inline(never)]
@@ -121,20 +121,20 @@ fn to_decimal(n: Numeric, heap: &mut Heap) -> VmResult<VmValue> {
     Ok(heap.alloc_decimal(d))
 }
 
-pub(crate) fn convert(conv: NumConv, v: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     let n = numeric_of(v, heap)?;
     match conv {
-        NumConv::FloatToInt | NumConv::BigIntToInt | NumConv::DecimalToInt | NumConv::DynToInt => {
+        ValueConv::FloatToInt | ValueConv::BigIntToInt | ValueConv::DecimalToInt | ValueConv::DynToInt => {
             to_int(n)
         }
-        NumConv::IntToFloat
-        | NumConv::DynToFloat
-        | NumConv::BigIntToFloat
-        | NumConv::DecimalToFloat => Ok(to_float(n)),
-        NumConv::IntToBigInt | NumConv::FloatToBigInt | NumConv::DecimalToBigInt => {
+        ValueConv::IntToFloat
+        | ValueConv::DynToFloat
+        | ValueConv::BigIntToFloat
+        | ValueConv::DecimalToFloat => Ok(to_float(n)),
+        ValueConv::IntToBigInt | ValueConv::FloatToBigInt | ValueConv::DecimalToBigInt => {
             to_bigint(n, heap)
         }
-        NumConv::IntToDecimal | NumConv::FloatToDecimal | NumConv::BigIntToDecimal => {
+        ValueConv::IntToDecimal | ValueConv::FloatToDecimal | ValueConv::BigIntToDecimal => {
             to_decimal(n, heap)
         }
     }

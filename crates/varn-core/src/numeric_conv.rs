@@ -8,7 +8,7 @@ pub enum NumericDomain {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
-pub enum NumConv {
+pub enum ValueConv {
     IntToFloat = 0,
     FloatToInt = 1,
     IntToBigInt = 2,
@@ -27,7 +27,7 @@ pub enum NumConv {
     DecimalToBigInt = 13,
 }
 
-impl NumConv {
+impl ValueConv {
     pub const ALL: [Self; 14] = [
         Self::IntToFloat,
         Self::FloatToInt,
@@ -111,9 +111,9 @@ mod tests {
 
     #[test]
     fn wire_roundtrip() {
-        for c in NumConv::ALL {
-            assert_eq!(NumConv::from_u8(c as u8), Some(c));
+        for c in ValueConv::ALL {
+            assert_eq!(ValueConv::from_u8(c as u8), Some(c));
         }
-        assert_eq!(NumConv::from_u8(NumConv::ALL.len() as u8), None);
+        assert_eq!(ValueConv::from_u8(ValueConv::ALL.len() as u8), None);
     }
 }

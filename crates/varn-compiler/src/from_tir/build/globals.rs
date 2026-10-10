@@ -40,8 +40,8 @@ impl<'m> Builder<'m> {
 
     pub(super) fn widen_exact(&mut self, v: Value, from: BackendTy, to: BackendTy) -> Value {
         let conv = match (from, to) {
-            (BackendTy::Int, BackendTy::BigInt) => varn_core::NumConv::IntToBigInt,
-            (BackendTy::Int, BackendTy::Decimal) => varn_core::NumConv::IntToDecimal,
+            (BackendTy::Int, BackendTy::BigInt) => varn_core::ValueConv::IntToBigInt,
+            (BackendTy::Int, BackendTy::Decimal) => varn_core::ValueConv::IntToDecimal,
             _ => return v,
         };
         self.emit(InstKind::Convert { operand: v, conv }, HirType::Dynamic)
@@ -55,7 +55,7 @@ impl<'m> Builder<'m> {
             self.emit(
                 InstKind::Convert {
                     operand: v,
-                    conv: varn_core::NumConv::IntToFloat,
+                    conv: varn_core::ValueConv::IntToFloat,
                 },
                 HirType::Float,
             )

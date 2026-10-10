@@ -152,7 +152,7 @@ pub enum InstKind {
 
     Convert {
         operand: Value,
-        conv: varn_core::NumConv,
+        conv: varn_core::ValueConv,
     },
 
     BuildArray {

@@ -115,7 +115,7 @@ pub enum SsaOp {
 
     Convert {
         operand: u32,
-        conv: varn_core::NumConv,
+        conv: varn_core::ValueConv,
     },
 
     IsNull {

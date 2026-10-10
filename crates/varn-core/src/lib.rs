@@ -47,7 +47,7 @@ pub use numeric::{
     add_int, binary_operand_kind, ceil_div_int, checked_int, div_int, floor_div_int, mod_int,
     mul_int, neg_int, pow_int, rem_int, sub_int, IntDivFault, NumericOperand, INT_MAX, INT_MIN,
 };
-pub use numeric_conv::{float_to_int, NumConv, NumericDomain};
+pub use numeric_conv::{float_to_int, ValueConv, NumericDomain};
 pub use runtime_kind::{FieldAccess, RuntimeKind};
 pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};
