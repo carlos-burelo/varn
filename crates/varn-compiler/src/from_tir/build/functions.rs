@@ -147,7 +147,22 @@ pub fn build_module(tir: &TirModule, lines: &[u32]) -> Result<Vec<SsaFunc>> {
 }
 
 impl<'m> Builder<'m> {
-    pub(super) fn restore_supplied_param(&mut self, cond: &TirExpr) -> Result<()> {
+    pub(super) fn filled_param_ty(&mut self, cond: &TirExpr) -> Result<Option<HirType>> {
+        let Some(i) = absent_param(cond) else {
+            return Ok(None);
+        };
+        if !self.is_open() || !matches!(self.defaulted.get(i as usize), Some(Some(_))) {
+            return Ok(None);
+        }
+        let filled = self.read_var(VarId::Param(i), self.current)?;
+        Ok(Some(self.value_ty(filled)))
+    }
+
+    pub(super) fn restore_supplied_param(
+        &mut self,
+        cond: &TirExpr,
+        filled: Option<HirType>,
+    ) -> Result<()> {
         let Some(i) = absent_param(cond) else {
             return Ok(());
         };
@@ -155,6 +170,9 @@ impl<'m> Builder<'m> {
             return Ok(());
         };
         let ty = self.ty(declared.non_nullable(&self.tir.types));
+        if filled != Some(ty) {
+            return Ok(());
+        }
         let var = VarId::Param(i);
         let supplied = self.read_var(var, self.current)?;
         let conv = match ty {

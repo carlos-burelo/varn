@@ -160,6 +160,7 @@ impl<'m> Builder<'m> {
 
                 self.current = then_blk;
                 self.lower_block(then_body)?;
+                let filled = self.filled_param_ty(cond)?;
                 if self.is_open() {
                     let cur = self.current;
                     self.set_term(Terminator::Jump {
@@ -170,7 +171,7 @@ impl<'m> Builder<'m> {
                 }
 
                 self.current = else_blk;
-                self.restore_supplied_param(cond)?;
+                self.restore_supplied_param(cond, filled)?;
                 self.lower_block(else_body)?;
                 if self.is_open() {
                     let cur = self.current;
