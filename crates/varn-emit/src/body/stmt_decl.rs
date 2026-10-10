@@ -225,6 +225,7 @@ impl<'a> FnEmitter<'a> {
                         .filter(|t| !matches!(t, BackendTy::Dynamic(_)))
                         .or_else(|| init.as_ref().map(|e| e.ty))
                         .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+                    let init = init.map(|e| self.guard_dynamic(e, ty));
                     out.extend(std::mem::take(&mut self.pending));
 
                     if self.top_level && prebound.is_none() {

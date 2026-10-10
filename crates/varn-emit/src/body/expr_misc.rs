@@ -44,10 +44,20 @@ impl<'a> FnEmitter<'a> {
     }
 
     pub(super) fn assert_type(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
-        let checkable = matches!(e.ty, BackendTy::Dynamic(_))
-            && matches!(ty, BackendTy::Str | BackendTy::Bool);
-        if !checkable {
-            return self.cast_to(e, ty);
+        if Self::crosses_dynamic_boundary(&e, ty) {
+            self.guard_dynamic(e, ty)
+        } else {
+            self.cast_to(e, ty)
+        }
+    }
+
+    fn crosses_dynamic_boundary(e: &TirExpr, ty: BackendTy) -> bool {
+        matches!(e.ty, BackendTy::Dynamic(_)) && matches!(ty, BackendTy::Str | BackendTy::Bool)
+    }
+
+    pub(super) fn guard_dynamic(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
+        if !Self::crosses_dynamic_boundary(&e, ty) {
+            return e;
         }
         let span = e.span;
         TirExpr {

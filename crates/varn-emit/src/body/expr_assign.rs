@@ -226,6 +226,7 @@ impl<'a> FnEmitter<'a> {
 
             Err(()) => self.lower_logical_assign(op, t.clone(), v, span),
         };
+        let rhs = self.guard_dynamic(rhs, t.ty);
         TirExpr {
             kind: TirExprKind::Assign {
                 target: Box::new(t),

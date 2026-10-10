@@ -9,6 +9,39 @@ function failed(f: () => void): bool {
     }
 }
 
+class Holder {
+    name: str = ""
+    on: bool = false
+}
+
+function declStr(d: dynamic): int {
+    let s: str = d
+    return s.length
+}
+
+function declBool(d: dynamic): bool {
+    let b: bool = d
+    return b
+}
+
+function assignStr(d: dynamic): int {
+    let s = "a"
+    s = d
+    return s.length
+}
+
+function fieldStr(d: dynamic): int {
+    const h = new Holder()
+    h.name = d
+    return h.name.length
+}
+
+function fieldBool(d: dynamic): bool {
+    const h = new Holder()
+    h.on = d
+    return h.on
+}
+
 function asStr(d: dynamic): str { return d as str }
 function asBool(d: dynamic): bool { return d as bool }
 
@@ -28,6 +61,23 @@ await describe("162 dynamic boundary", async () => {
         expect(failed(() => { asBool(1) })).toBe(true)
         expect(failed(() => { asBool("true") })).toBe(true)
         expect(failed(() => { asBool(null) })).toBe(true)
+    })
+
+    await it("a typed declaration checks what it receives from dynamic", () => {
+        expect(declStr("hola")).toBe(4)
+        expect(declBool(true)).toBe(true)
+        expect(failed(() => { declStr(5) })).toBe(true)
+        expect(failed(() => { declStr(null) })).toBe(true)
+        expect(failed(() => { declBool(1) })).toBe(true)
+    })
+
+    await it("assignments and field stores check too", () => {
+        expect(assignStr("hola")).toBe(4)
+        expect(fieldStr("hola")).toBe(4)
+        expect(fieldBool(true)).toBe(true)
+        expect(failed(() => { assignStr(5) })).toBe(true)
+        expect(failed(() => { fieldStr(5) })).toBe(true)
+        expect(failed(() => { fieldBool("yes") })).toBe(true)
     })
 
     await it("holds in a hot loop", () => {
