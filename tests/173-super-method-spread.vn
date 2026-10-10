@@ -1,0 +1,35 @@
+import { describe, it, expect } from "std:test";
+
+class Shape {
+    describe(kind: str, sides: int): str { return kind + ":" + sides }
+    total(...xs: int[]): int {
+        let t = 0
+        for (const x of xs) { t = t + x }
+        return t
+    }
+}
+
+class Square extends Shape {
+    override describe(kind: str, sides: int): str {
+        const parts: dynamic[] = [kind, sides]
+        return "[" + super.describe(...parts) + "]"
+    }
+    override total(...xs: int[]): int { return super.total(...xs, 10) }
+    mixed(xs: int[]): int { return super.total(1, ...xs) }
+}
+
+await describe("173 super method call with spread", async () => {
+    await it("a spread reaches the parent method", () => {
+        const s = new Square()
+        expect(s.describe("sq", 4)).toBe("[sq:4]")
+        expect(s.total(1, 2)).toBe(13)
+        expect(s.mixed([2, 3])).toBe(6)
+    })
+
+    await it("holds in a hot loop", () => {
+        const s = new Square()
+        let n = 0
+        for (let i = 0; i < 3000; i = i + 1) { n = n + s.total(1) }
+        expect(n).toBe(33000)
+    })
+})
