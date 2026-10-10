@@ -171,15 +171,15 @@ impl<'m> Builder<'m> {
         let conv = match ty {
             HirType::Str => varn_core::ValueConv::ExpectStr,
             HirType::Bool => varn_core::ValueConv::ExpectBool,
-            HirType::Int => varn_core::ValueConv::DynToInt,
-            HirType::Float => varn_core::ValueConv::DynToFloat,
+            HirType::Int => varn_core::ValueConv::ExpectInt,
+            HirType::Float => varn_core::ValueConv::ExpectFloat,
             HirType::Nullable(inner) => {
                 let conv = match self.ssa_types.get(inner) {
                     HirType::Str => varn_core::ValueConv::ExpectStrOrNull,
                     HirType::Bool => varn_core::ValueConv::ExpectBoolOrNull,
-                    HirType::Int
-                    | HirType::Float
-                    | HirType::Ref
+                    HirType::Int => varn_core::ValueConv::ExpectIntOrNull,
+                    HirType::Float => varn_core::ValueConv::ExpectFloatOrNull,
+                    HirType::Ref
                     | HirType::Dynamic
                     | HirType::Array(_)
                     | HirType::Map(..)

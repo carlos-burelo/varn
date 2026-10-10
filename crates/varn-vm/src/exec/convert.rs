@@ -148,6 +148,24 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
                 Err(not_a(if nullable { "bool?" } else { "bool" }, v, heap))
             };
         }
+        ValueConv::ExpectInt | ValueConv::ExpectIntOrNull => {
+            let nullable = conv == ValueConv::ExpectIntOrNull;
+            return if heap.is_int(v) || (nullable && v.is_null()) {
+                Ok(v)
+            } else {
+                Err(not_a(if nullable { "int?" } else { "int" }, v, heap))
+            };
+        }
+        ValueConv::ExpectFloat | ValueConv::ExpectFloatOrNull => {
+            let nullable = conv == ValueConv::ExpectFloatOrNull;
+            return if v.is_f64() || (nullable && v.is_null()) {
+                Ok(v)
+            } else if heap.is_int(v) {
+                Ok(VmValue::from_f64(heap.as_int(v) as f64))
+            } else {
+                Err(not_a(if nullable { "float?" } else { "float" }, v, heap))
+            };
+        }
         ValueConv::AssertInstance => {
             return if v.is_bool() && v.as_bool() {
                 Ok(v)
@@ -178,7 +196,11 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
         | ValueConv::ExpectBool
         | ValueConv::ExpectStrOrNull
         | ValueConv::ExpectBoolOrNull
-        | ValueConv::AssertInstance => Ok(v),
+        | ValueConv::AssertInstance
+        | ValueConv::ExpectInt
+        | ValueConv::ExpectFloat
+        | ValueConv::ExpectIntOrNull
+        | ValueConv::ExpectFloatOrNull => Ok(v),
         ValueConv::FloatToInt | ValueConv::BigIntToInt | ValueConv::DecimalToInt | ValueConv::DynToInt => {
             to_int(n)
         }

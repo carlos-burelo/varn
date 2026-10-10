@@ -44,7 +44,8 @@ impl<'a> FnEmitter<'a> {
     }
 
     pub(super) fn assert_type(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
-        if self.crosses_dynamic_boundary(&e, ty) {
+        let numeric = matches!(ty.non_nullable(self.tt), BackendTy::Int | BackendTy::Float);
+        if !numeric && self.crosses_dynamic_boundary(&e, ty) {
             self.guard_dynamic(e, ty)
         } else {
             self.cast_to(e, ty)
@@ -55,7 +56,11 @@ impl<'a> FnEmitter<'a> {
         matches!(e.ty, BackendTy::Dynamic(_))
             && matches!(
                 ty.non_nullable(self.tt),
-                BackendTy::Str | BackendTy::Bool | BackendTy::Class(_)
+                BackendTy::Str
+                    | BackendTy::Bool
+                    | BackendTy::Int
+                    | BackendTy::Float
+                    | BackendTy::Class(_)
             )
     }
 

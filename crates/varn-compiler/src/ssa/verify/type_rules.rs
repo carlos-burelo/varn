@@ -256,7 +256,11 @@ pub(crate) fn convert_result_ty(conv: varn_core::ValueConv) -> HirType {
         | DecimalToBigInt => HirType::Dynamic,
         ExpectStr => HirType::Str,
         ExpectBool | AssertInstance => HirType::Bool,
-        ExpectStrOrNull | ExpectBoolOrNull => HirType::Dynamic,
+        ExpectStrOrNull | ExpectBoolOrNull | ExpectIntOrNull | ExpectFloatOrNull => {
+            HirType::Dynamic
+        }
+        ExpectInt => HirType::Int,
+        ExpectFloat => HirType::Float,
     }
 }
 
@@ -268,6 +272,7 @@ fn convert_operand_ty(conv: varn_core::ValueConv) -> Option<HirType> {
         FloatToInt | FloatToBigInt | FloatToDecimal => Some(HirType::Float),
         IntToBigInt | IntToDecimal | BigIntToInt | DecimalToInt | DynToInt | DynToFloat
         | BigIntToFloat | DecimalToFloat | BigIntToDecimal | DecimalToBigInt | ExpectStr
-        | ExpectBool | ExpectStrOrNull | ExpectBoolOrNull => None,
+        | ExpectBool | ExpectStrOrNull | ExpectBoolOrNull | ExpectInt | ExpectFloat
+        | ExpectIntOrNull | ExpectFloatOrNull => None,
     }
 }

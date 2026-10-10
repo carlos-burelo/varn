@@ -113,6 +113,41 @@ function optAnimal(d: dynamic): bool {
     return a == null
 }
 
+class Reading {
+    count: int = 0
+    ratio: float = 0.0
+}
+
+function declInt(d: dynamic): int {
+    let n: int = d
+    return n + 1
+}
+function declFloat(d: dynamic): float {
+    let f: float = d
+    return f / 2.0
+}
+function optInt(d: dynamic): int {
+    let n: int? = d
+    return n ?? -1
+}
+function optFloat(d: dynamic): float {
+    let f: float? = d
+    return f ?? -1.0
+}
+function retInt(d: dynamic): int { return d }
+function double(f: float): float { return f * 2.0 }
+function passFloat(d: dynamic): float { return double(d) }
+function fieldInt(d: dynamic): int {
+    const r = new Reading()
+    r.count = d
+    return r.count
+}
+function fieldFloat(d: dynamic): float {
+    const r = new Reading()
+    r.ratio = d
+    return r.ratio
+}
+
 function asStr(d: dynamic): str { return d as str }
 function asBool(d: dynamic): bool { return d as bool }
 
@@ -205,6 +240,41 @@ await describe("162 dynamic boundary", async () => {
         expect(failed(() => { castAnimal(5) })).toBe(true)
         expect(failed(() => { optAnimal(new Rock()) })).toBe(true)
         expect(kindOf(() => { declAnimal(new Rock()) })).toBe("TypeError")
+    })
+
+    await it("int targets take ints only", () => {
+        expect(declInt(7)).toBe(8)
+        expect(retInt(9)).toBe(9)
+        expect(fieldInt(4)).toBe(4)
+        expect(optInt(null)).toBe(-1)
+        expect(optInt(5)).toBe(5)
+        expect(failed(() => { declInt(3.7) })).toBe(true)
+        expect(failed(() => { declInt("7") })).toBe(true)
+        expect(failed(() => { declInt(null) })).toBe(true)
+        expect(failed(() => { declInt(true) })).toBe(true)
+        expect(failed(() => { retInt("x") })).toBe(true)
+        expect(failed(() => { fieldInt("x") })).toBe(true)
+        expect(failed(() => { optInt("x") })).toBe(true)
+    })
+
+    await it("float targets take floats, widen ints and reject null", () => {
+        expect(declFloat(5.0)).toBe(2.5)
+        expect(declFloat(3)).toBe(1.5)
+        expect(passFloat(2)).toBe(4.0)
+        expect(fieldFloat(1.5)).toBe(1.5)
+        expect(optFloat(null)).toBe(-1.0)
+        expect(optFloat(2.5)).toBe(2.5)
+        expect(failed(() => { declFloat(null) })).toBe(true)
+        expect(failed(() => { declFloat("1.5") })).toBe(true)
+        expect(failed(() => { declFloat(true) })).toBe(true)
+        expect(failed(() => { passFloat(null) })).toBe(true)
+        expect(failed(() => { fieldFloat(null) })).toBe(true)
+        expect(failed(() => { optFloat("x") })).toBe(true)
+    })
+
+    await it("an explicit numeric cast still converts", () => {
+        const d: dynamic = 3.7
+        expect(d as int).toBe(3)
     })
 
     await it("the failure is a TypeError", () => {
