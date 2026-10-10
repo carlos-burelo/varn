@@ -241,8 +241,17 @@ pub(super) fn emit_class(
                 *body = new;
             }
             None => {
+                let forwards = class.super_class.is_some() && primary.is_empty();
                 let sig = fresh_sig(signatures, primary.len());
-                signatures[sig.0 as usize].params = primary_tys;
+                let rest_ty = BackendTy::Array(
+                    types.intern(BackendTy::Dynamic(DynReason::NotYetSupported)),
+                );
+                signatures[sig.0 as usize].params = if forwards {
+                    vec![rest_ty]
+                } else {
+                    primary_tys
+                };
+                signatures[sig.0 as usize].has_rest = forwards;
                 signatures[sig.0 as usize].return_ty = BackendTy::Void;
                 let id = emit_member_fn(
                     Arc::from(format!("{class_name}.constructor")),
@@ -262,7 +271,28 @@ pub(super) fn emit_class(
                 );
                 let body = &mut out[id.0 as usize].body;
                 body.extend(primary_assigns);
-                let mut new = field_defaults;
+                out[id.0 as usize].has_rest = forwards;
+                let body = &mut out[id.0 as usize].body;
+                let mut new = Vec::new();
+                if class.super_class.is_some() {
+                    let args = if forwards {
+                        vec![varn_tir::TirArg::Spread(varn_tir::TirExpr {
+                            kind: varn_tir::TirExprKind::Var,
+                            ty: rest_ty,
+                            res: varn_tir::Resolution::Param(0),
+                            span: varn_tir::Span::EMPTY,
+                        })]
+                    } else {
+                        vec![]
+                    };
+                    new.push(varn_tir::TirStmt::Expr(varn_tir::TirExpr {
+                        kind: varn_tir::TirExprKind::SuperCall { args },
+                        ty: BackendTy::Void,
+                        res: varn_tir::Resolution::None,
+                        span: varn_tir::Span::EMPTY,
+                    }));
+                }
+                new.extend(field_defaults);
                 new.extend(std::mem::take(body));
                 *body = new;
                 def.methods.push(varn_tir::TirClassMember {
