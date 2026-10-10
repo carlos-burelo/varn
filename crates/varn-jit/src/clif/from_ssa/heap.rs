@@ -204,13 +204,11 @@ pub(super) fn emit_build_object(
     let count_v = b.ins().iconst(types::I64, count as i64);
     let shape_v = b.ins().iconst(types::I64, shape_ptr as i64);
     let rec_v = b.ins().iconst(types::I64, is_record as i64);
-
-    let mhc_v = b.ins().iconst(types::I64, 1);
     call_helper_void(
         b,
         ctx.cc,
         ctx.helpers.build_object_window,
-        &[ectx, addr, count_v, shape_v, rec_v, mhc_v],
+        &[ectx, addr, count_v, shape_v, rec_v],
     );
     Ok(b.ins().load(
         types::I128,

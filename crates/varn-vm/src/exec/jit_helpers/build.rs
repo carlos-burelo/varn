@@ -63,13 +63,12 @@ pub(crate) extern "C" fn jit_build_object_with_shape(
     base: usize,
     start_reg: usize,
     shape: *const varn_types::Shape,
-    may_hold_closure: usize,
 ) {
     unsafe {
         use crate::alloc_profile as prof;
         let on = prof::enabled();
         let t_all = if on { prof::read() } else { 0 };
-        let out = build_shaped_from_ptr(ctx, base, start_reg, shape, may_hold_closure != 0, false);
+        let out = build_shaped_from_ptr(ctx, base, start_reg, shape, false);
         if on {
             prof::record(prof::Seg::HelperTotal, t_all, prof::read());
         }
@@ -83,10 +82,9 @@ pub(crate) extern "C" fn jit_build_record_with_shape(
     base: usize,
     start_reg: usize,
     shape: *const varn_types::Shape,
-    may_hold_closure: usize,
 ) {
     unsafe {
-        let out = build_shaped_from_ptr(ctx, base, start_reg, shape, may_hold_closure != 0, true);
+        let out = build_shaped_from_ptr(ctx, base, start_reg, shape, true);
         (*ctx).jit_native_result = out;
     }
 }
@@ -97,7 +95,6 @@ unsafe fn build_shaped_from_ptr(
     base: usize,
     start_reg: usize,
     shape: *const varn_types::Shape,
-    may_hold_closure: bool,
     is_record: bool,
 ) -> VmValue {
     let ctx_ref = unsafe { &mut *ctx };
@@ -108,7 +105,6 @@ unsafe fn build_shaped_from_ptr(
         start_reg,
         (*shape).clone(),
         &mut ctx_ref.heap,
-        may_hold_closure,
         is_record,
     )
 }
@@ -120,18 +116,15 @@ pub(crate) extern "C" fn jit_build_object_window(
     count: usize,
     shape: *const varn_types::Shape,
     is_record: usize,
-    may_hold_closure: usize,
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let vals = std::slice::from_raw_parts(vals_ptr, count);
         let shape = std::mem::ManuallyDrop::new(std::rc::Rc::from_raw(shape));
         let out = crate::exec::collections::build_with_shape_slice(
-            &ctx_ref.stack,
             (*shape).clone(),
             vals,
             &mut ctx_ref.heap,
-            may_hold_closure != 0,
             is_record != 0,
         );
         ctx_ref.jit_native_result = out;

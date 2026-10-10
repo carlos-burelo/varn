@@ -1,0 +1,61 @@
+import { describe, it, expect } from "std:test";
+
+function seesLaterWrite(i: int): int {
+    let x = i;
+    const o = { g: () => x };
+    x = x + 1000;
+    return o.g();
+}
+
+function makeCounter(i: int): { g: () => int, bump: () => void } {
+    let x = i;
+    const o = { g: () => x, bump: () => { x = x + 1; } };
+    x = x + 10;
+    return o;
+}
+
+function churn(n: int): int {
+    let a = n * 3;
+    let b = a + 7;
+    let c = [a, b, n];
+    return c[0] + c[1] + c[2];
+}
+
+function escapes(i: int): int {
+    const o = makeCounter(i);
+    let z = churn(i);
+    o.bump();
+    z = z + churn(i + 1);
+    o.bump();
+    return o.g() + z - z;
+}
+
+function nested(i: int): int {
+    let x = i;
+    const holder = { inner: { g: () => x } };
+    x = x * 2;
+    return holder.inner.g();
+}
+
+await describe("159 closure in object literal", async () => {
+    await it("sees writes made after the literal was built", () => {
+        let sum = 0;
+        for (let i = 0; i < 20000; i = i + 1) { sum = sum + seesLaterWrite(i); }
+        expect(sum).toBe(219990000);
+        expect(seesLaterWrite(1)).toBe(1001);
+    });
+
+    await it("keeps sharing the variable after the literal leaves its frame", () => {
+        let sum = 0;
+        for (let i = 0; i < 20000; i = i + 1) { sum = sum + escapes(i); }
+        expect(sum).toBe(200230000);
+        expect(escapes(5)).toBe(17);
+    });
+
+    await it("holds for a closure nested two literals deep", () => {
+        let sum = 0;
+        for (let i = 0; i < 20000; i = i + 1) { sum = sum + nested(i); }
+        expect(sum).toBe(399980000);
+        expect(nested(21)).toBe(42);
+    });
+});
