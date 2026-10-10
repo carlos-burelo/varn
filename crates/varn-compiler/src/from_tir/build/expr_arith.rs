@@ -215,6 +215,7 @@ impl<'m> Builder<'m> {
             }
             varn_tir::BackendTy::Array(_)
             | varn_tir::BackendTy::Map(..)
+            | varn_tir::BackendTy::Dict(_)
             | varn_tir::BackendTy::Set(_)
             | varn_tir::BackendTy::Tuple(_)
             | varn_tir::BackendTy::Enum(_)

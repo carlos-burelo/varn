@@ -183,9 +183,9 @@ fn lower_kind(
                 key_ty, value_ty, ..
             }] = members
             {
-                let k = lower_type(&Type::resolved(*key_ty), table, interner, tt, names);
+                let _ = key_ty;
                 let v = lower_type(&Type::resolved(*value_ty), table, interner, tt, names);
-                return BackendTy::Map(tt.intern(k), tt.intern(v));
+                return BackendTy::Dict(tt.intern(v));
             }
             lower_shape(members, table, interner, tt, names)
         }

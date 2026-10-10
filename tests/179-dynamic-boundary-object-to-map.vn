@@ -35,12 +35,20 @@ await describe("179 dynamic boundary: object to Map", async () => {
         expect(typeof parsed).toBe("object")
     })
 
-    await it("the same for an index signature", () => {
-        const dict: { [k: str]: int } = Json.parse("{\"a\":1,\"b\":2}")
-        expect(typeof dict).toBe("Map")
+    await it("an index signature takes the object as it is, without copying", () => {
+        const parsed: dynamic = Json.parse("{\"a\":1,\"b\":2}")
+        const dict: { [k: str]: int } = parsed
+        expect(typeof dict).toBe("object")
         expect(dict["a"]).toBe(1)
         dict["c"] = 3
         expect(dict["c"]).toBe(3)
+        expect(parsed.c).toBe(3)
+        let total = 0
+        for (const [k, v] of dict) { total = total + v }
+        expect(total).toBe(6)
+        let caught = ""
+        try { const bad: { [k: str]: int } = Json.parse("{\"a\":\"x\"}") } catch (e) { caught = e.message }
+        expect(caught).toBe("type mismatch: expected '{ [key: str]: int }', got 'object'")
     })
 
     await it("values are checked and nested objects are converted", () => {

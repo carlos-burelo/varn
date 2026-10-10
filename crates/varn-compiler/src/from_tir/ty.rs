@@ -16,6 +16,10 @@ pub fn lower(bt: BackendTy, tir: &TirModule, out: &mut SsaTyTable) -> HirType {
             HirType::Ref
         }
 
+        BackendTy::Dict(v) => {
+            let v_inner = resolve(v, tir, out);
+            HirType::Map(out.intern(HirType::Dynamic), out.intern(v_inner))
+        }
         BackendTy::Map(k, v) => {
             let k_inner = resolve(k, tir, out);
             let v_inner = resolve(v, tir, out);

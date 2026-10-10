@@ -24,9 +24,10 @@ fn holds_map(desc: &TypeDesc, depth: usize) -> bool {
         | TypeDesc::Class { .. }
         | TypeDesc::Enum { .. }
         | TypeDesc::Enclosing { .. } => false,
-        TypeDesc::Array(inner) | TypeDesc::Set(inner) | TypeDesc::Nullable(inner) => {
-            holds_map(inner, depth + 1)
-        }
+        TypeDesc::Array(inner)
+        | TypeDesc::Set(inner)
+        | TypeDesc::Dict(inner)
+        | TypeDesc::Nullable(inner) => holds_map(inner, depth + 1),
         TypeDesc::Tuple(items) => items.iter().any(|item| holds_map(item, depth + 1)),
         TypeDesc::Object(fields) => fields.iter().any(|field| holds_map(&field.ty, depth + 1)),
         TypeDesc::Args { fixed, rest } => {
@@ -48,7 +49,7 @@ pub(crate) fn normalize(heap: &mut Heap, value: VmValue, desc: &TypeDesc) -> VmV
     walk(heap, value, desc, None, &mut visiting)
 }
 
-fn object_entries(heap: &Heap, v: VmValue) -> Option<Vec<(String, VmValue)>> {
+pub(crate) fn object_entries(heap: &Heap, v: VmValue) -> Option<Vec<(String, VmValue)>> {
     if !v.is_heap() {
         return None;
     }
@@ -128,6 +129,32 @@ fn walk(
                     map.insert(key, x);
                 }
                 return heap.alloc_map_vm(map);
+            }
+            let Some(map) = heap.map_of(v) else {
+                return v;
+            };
+            let entries: Vec<_> = map.read().iter().map(|(k, x)| (*k, *x)).collect();
+            for (k, x) in entries {
+                let replaced = walk(heap, x, val, scope, visiting);
+                if replaced != x {
+                    map.write().insert(k, replaced);
+                }
+            }
+            v
+        }
+        TypeDesc::Dict(val) => {
+            if let Some(entries) = object_entries(heap, v) {
+                for (name, x) in entries {
+                    let replaced = walk(heap, x, val, scope, visiting);
+                    if replaced != x {
+                        if let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) =
+                            heap.get(v.as_heap())
+                        {
+                            obj.borrow().set_field_str(&name, replaced);
+                        }
+                    }
+                }
+                return v;
             }
             let Some(map) = heap.map_of(v) else {
                 return v;

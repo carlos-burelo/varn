@@ -41,6 +41,7 @@ pub(crate) fn intern_signature(
                         | BackendTy::BigInt
                         | BackendTy::Array(_)
                         | BackendTy::Map(..)
+                        | BackendTy::Dict(_)
                         | BackendTy::Set(_)
                         | BackendTy::Tuple(_)
                         | BackendTy::Class(_)

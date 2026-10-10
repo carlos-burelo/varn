@@ -10,6 +10,7 @@ pub(super) fn is_structural(ty: BackendTy) -> bool {
         ty,
         BackendTy::Array(_)
             | BackendTy::Map(..)
+            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Enum(_)

@@ -184,6 +184,7 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Decimal
             | BackendTy::BigInt
             | BackendTy::Map(..)
+            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Class(_)

@@ -18,7 +18,7 @@ impl<'a> FnEmitter<'a> {
         let index = self.lower_expr(property);
         let node_ty = match obj.ty.non_nullable(self.tt) {
             BackendTy::Array(el) => self.tt.get(el),
-            BackendTy::Map(_, val) => self.tt.get(val),
+            BackendTy::Map(_, val) | BackendTy::Dict(val) => self.tt.get(val),
             BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool

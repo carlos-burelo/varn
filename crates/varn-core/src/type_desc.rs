@@ -15,6 +15,7 @@ pub enum TypeDesc {
     Array(Box<TypeDesc>),
     Map(Box<TypeDesc>, Box<TypeDesc>),
     Set(Box<TypeDesc>),
+    Dict(Box<TypeDesc>),
     Tuple(Vec<TypeDesc>),
     Class { witness: u32, name: String },
     Enum { witness: u32, name: String },
@@ -68,6 +69,10 @@ impl TypeDesc {
             }
             TypeDesc::Set(el) => {
                 out.push('Z');
+                el.encode_into(out);
+            }
+            TypeDesc::Dict(el) => {
+                out.push('D');
                 el.encode_into(out);
             }
             TypeDesc::Tuple(els) => {
@@ -168,6 +173,7 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
             TypeDesc::Map(Box::new(k), Box::new(v))
         }
         'Z' => TypeDesc::Set(Box::new(decode_one(rest)?)),
+        'D' => TypeDesc::Dict(Box::new(decode_one(rest)?)),
         'T' => {
             let count: usize = take_until(rest, ';')?.parse().ok()?;
             let mut els = Vec::with_capacity(count);
@@ -249,6 +255,7 @@ impl fmt::Display for TypeDesc {
             TypeDesc::Array(el) => write!(f, "{el}[]"),
             TypeDesc::Map(k, v) => write!(f, "Map<{k}, {v}>"),
             TypeDesc::Set(el) => write!(f, "Set<{el}>"),
+            TypeDesc::Dict(el) => write!(f, "{{ [key: str]: {el} }}"),
             TypeDesc::Tuple(els) => {
                 f.write_str("#[")?;
                 for (i, el) in els.iter().enumerate() {

@@ -110,6 +110,7 @@ impl<'a> FnEmitter<'a> {
                     | BackendTy::Decimal
                     | BackendTy::BigInt
                     | BackendTy::Map(..)
+                    | BackendTy::Dict(_)
                     | BackendTy::Set(_)
                     | BackendTy::Tuple(_)
                     | BackendTy::Class(_)
@@ -205,6 +206,7 @@ impl<'a> FnEmitter<'a> {
             | t @ BackendTy::BigInt
             | t @ BackendTy::Array(_)
             | t @ BackendTy::Map(..)
+            | t @ BackendTy::Dict(_)
             | t @ BackendTy::Set(_)
             | t @ BackendTy::Tuple(_)
             | t @ BackendTy::Class(_)

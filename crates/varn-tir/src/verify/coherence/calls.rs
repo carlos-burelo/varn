@@ -125,6 +125,7 @@ fn check_args(
         | Some(BackendTy::BigInt)
         | Some(BackendTy::Array(_))
         | Some(BackendTy::Map(..))
+        | Some(BackendTy::Dict(_))
         | Some(BackendTy::Set(_))
         | Some(BackendTy::Tuple(_))
         | Some(BackendTy::Class(_))

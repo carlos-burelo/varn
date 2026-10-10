@@ -154,6 +154,41 @@ fn fit_in(cx: &Cx, v: VmValue, desc: &TypeDesc, scope: Option<&Scope>) -> Option
             }
             Some(Fit::Exact)
         }
+        TypeDesc::Dict(val) => {
+            if !v.is_heap() {
+                return None;
+            }
+            if let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) = heap.get(v.as_heap()) {
+                let obj = obj.borrow();
+                for slot in 0..obj.slot_count() {
+                    let Some(x) = obj.field_at(slot) else {
+                        continue;
+                    };
+                    match fit_in(cx, x, val, scope)? {
+                        Fit::Exact => {}
+                        Fit::Widened(widened) => {
+                            obj.set_field_at(slot, widened);
+                        }
+                    }
+                }
+                return Some(Fit::Exact);
+            }
+            let map = heap.map_of(v)?;
+            let mut widened = Vec::new();
+            for (k, x) in map.read().iter() {
+                if !heap.is_string(k.0) {
+                    return None;
+                }
+                match fit_in(cx, *x, val, scope)? {
+                    Fit::Exact => {}
+                    Fit::Widened(w) => widened.push((*k, w)),
+                }
+            }
+            for (k, w) in widened {
+                map.write().insert(k, w);
+            }
+            Some(Fit::Exact)
+        }
         TypeDesc::Set(el) => {
             let set = heap.set_of(v)?;
             for k in set.read().iter() {

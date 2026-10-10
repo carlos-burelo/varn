@@ -57,6 +57,7 @@ impl<'m> Describer<'m> {
             BackendTy::Decimal => TypeDesc::Decimal,
             BackendTy::BigInt => TypeDesc::BigInt,
             BackendTy::Array(el) => TypeDesc::Array(Box::new(self.of(el, depth))),
+            BackendTy::Dict(v) => TypeDesc::Dict(Box::new(self.of(v, depth))),
             BackendTy::Map(k, v) => {
                 let key = self.of(k, depth);
                 let val = self.of(v, depth);

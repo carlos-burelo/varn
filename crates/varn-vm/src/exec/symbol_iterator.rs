@@ -9,7 +9,8 @@ pub(crate) fn get_symbol_property(
     symbol: RuntimeSymbol,
     heap: &mut Heap,
 ) -> VmResult<VmValue> {
-    if symbol == RuntimeSymbol::Iterator {
+    let iterating = symbol == RuntimeSymbol::Iterator;
+    if iterating {
         if let Some(items) = snapshot(obj, heap) {
             let frozen = heap.alloc_array_vm(items);
             return Ok(heap.alloc_bound_native(
@@ -93,6 +94,23 @@ pub(crate) fn get_symbol_property(
         },
         _ => VmValue::null(),
     };
+    if result.is_null() && iterating {
+        if let Some(entries) = crate::exec::normalize::object_entries(heap, obj) {
+            let pairs: Vec<VmValue> = entries
+                .into_iter()
+                .map(|(name, value)| {
+                    let key = heap.alloc_str_interned(&name);
+                    heap.alloc_tuple_vm(vec![key, value])
+                })
+                .collect();
+            let frozen = heap.alloc_array_vm(pairs);
+            return Ok(heap.alloc_bound_native(
+                frozen,
+                array_symbol_iterator,
+                "[Symbol.iterator]",
+            ));
+        }
+    }
     Ok(result)
 }
 
