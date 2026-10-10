@@ -264,14 +264,14 @@ impl<'a> FnEmitter<'a> {
             BackendTy::Str => T::Str,
             BackendTy::Map(..) => T::Map,
             BackendTy::Set(_) => T::Set,
-            BackendTy::Int
-            | BackendTy::Float
-            | BackendTy::Bool
-            | BackendTy::Char
-            | BackendTy::Bytes
-            | BackendTy::Decimal
-            | BackendTy::BigInt
-            | BackendTy::Tuple(_)
+            BackendTy::Int => T::Int,
+            BackendTy::Float => T::Float,
+            BackendTy::Bool => T::Bool,
+            BackendTy::Char => T::Char,
+            BackendTy::Bytes => T::Bytes,
+            BackendTy::Decimal => T::Decimal,
+            BackendTy::BigInt => T::BigInt,
+            BackendTy::Tuple(_)
             | BackendTy::Class(_)
             | BackendTy::Enum(_)
             | BackendTy::Fn(_)
