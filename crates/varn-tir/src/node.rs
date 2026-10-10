@@ -174,6 +174,10 @@ pub enum TirExprKind {
         operand: Box<TirExpr>,
     },
 
+    Checked {
+        operand: Box<TirExpr>,
+    },
+
     Closure {
         func: FnId,
         upvalues: Vec<TirUpvalue>,

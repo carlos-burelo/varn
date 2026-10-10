@@ -14,14 +14,7 @@ impl<'a> FnEmitter<'a> {
         if matches!(inner.ty, BackendTy::Enum(_)) && matches!(ty, BackendTy::Int) {
             return self.field_access(inner, Arc::from("rawValue"), ty, span);
         }
-        TirExpr {
-            kind: TirExprKind::Cast {
-                operand: Box::new(inner),
-            },
-            ty,
-            res: Resolution::None,
-            span,
-        }
+        self.assert_type(inner, ty)
     }
 
     pub(super) fn lower_sequence(&mut self, expressions: &[ExprId], span: Span) -> TirExpr {

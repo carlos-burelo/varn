@@ -73,6 +73,27 @@ impl<'m> Builder<'m> {
         }
     }
 
+    pub(super) fn lower_checked(&mut self, operand: &TirExpr, ty: HirType) -> Result<Value> {
+        let v = self.lower_expr(operand)?;
+        let conv = match ty {
+            HirType::Str => varn_core::ValueConv::DynToStr,
+            HirType::Bool => varn_core::ValueConv::DynToBool,
+            HirType::Int => varn_core::ValueConv::DynToInt,
+            HirType::Float => varn_core::ValueConv::DynToFloat,
+            HirType::Ref
+            | HirType::Dynamic
+            | HirType::Array(_)
+            | HirType::Map(..)
+            | HirType::Set(_)
+            | HirType::Class(_)
+            | HirType::Nullable(_) => {
+                return Err(crate::OptError::Unsupported("from_tir: Checked to a non-scalar type"));
+            }
+        };
+        let result_ty = crate::ssa::verify::convert_result_ty(conv);
+        Ok(self.emit(InstKind::Convert { operand: v, conv }, result_ty))
+    }
+
     pub(super) fn lower_cast(
         &mut self,
         operand: &TirExpr,

@@ -92,6 +92,7 @@ impl<'a> FnEmitter<'a> {
             | TirExprKind::VariantPayload { .. }
             | TirExprKind::TypeTest { .. }
             | TirExprKind::Cast { .. }
+            | TirExprKind::Checked { .. }
             | TirExprKind::Closure { .. }
             | TirExprKind::New { .. }
             | TirExprKind::MakeVariant { .. }
@@ -147,6 +148,7 @@ impl<'a> FnEmitter<'a> {
             | other @ TirExprKind::VariantPayload { .. }
             | other @ TirExprKind::TypeTest { .. }
             | other @ TirExprKind::Cast { .. }
+            | other @ TirExprKind::Checked { .. }
             | other @ TirExprKind::Closure { .. }
             | other @ TirExprKind::New { .. }
             | other @ TirExprKind::MakeVariant { .. }

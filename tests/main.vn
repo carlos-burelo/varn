@@ -153,6 +153,7 @@ import "./158-expr-sequencing.vn"
 import "./159-closure-in-object-literal.vn"
 import "./160-map-set-representation.vn"
 import "./161-string-length-chars.vn"
+import "./162-dynamic-boundary.vn"
 
 summary()
 

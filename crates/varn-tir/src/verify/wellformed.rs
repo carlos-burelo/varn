@@ -165,7 +165,9 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
             check_expr(m, f, lhs, errors);
             check_expr(m, f, rhs, errors);
         }
-        TirExprKind::Unary { operand, .. } | TirExprKind::Cast { operand } => {
+        TirExprKind::Unary { operand, .. }
+        | TirExprKind::Cast { operand }
+        | TirExprKind::Checked { operand } => {
             check_expr(m, f, operand, errors)
         }
         TirExprKind::Field { object, .. } => check_expr(m, f, object, errors),

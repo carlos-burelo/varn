@@ -1,0 +1,53 @@
+import { describe, it, expect } from "std:test";
+
+function failed(f: () => void): bool {
+    try {
+        f()
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+function asStr(d: dynamic): str { return d as str }
+function asBool(d: dynamic): bool { return d as bool }
+
+await describe("162 dynamic boundary", async () => {
+    await it("as str accepts strings and rejects everything else", () => {
+        expect(asStr("hola").length).toBe(4)
+        expect(asStr("ñandú").length).toBe(5)
+        expect(failed(() => { asStr(5) })).toBe(true)
+        expect(failed(() => { asStr(true) })).toBe(true)
+        expect(failed(() => { asStr(null) })).toBe(true)
+        expect(failed(() => { asStr([1, 2]) })).toBe(true)
+    })
+
+    await it("as bool accepts booleans and rejects everything else", () => {
+        expect(asBool(true)).toBe(true)
+        expect(asBool(false)).toBe(false)
+        expect(failed(() => { asBool(1) })).toBe(true)
+        expect(failed(() => { asBool("true") })).toBe(true)
+        expect(failed(() => { asBool(null) })).toBe(true)
+    })
+
+    await it("holds in a hot loop", () => {
+        let total = 0
+        for (let i = 0; i < 5000; i = i + 1) { total = total + asStr("abc").length }
+        expect(total).toBe(15000)
+        let rejected = 0
+        for (let i = 0; i < 5000; i = i + 1) {
+            if (failed(() => { asStr(i) })) { rejected = rejected + 1 }
+        }
+        expect(rejected).toBe(5000)
+    })
+
+    await it("truthiness, interpolation and concatenation still take any value", () => {
+        const d: dynamic = { a: 1 }
+        let seen = false
+        if (d) { seen = true }
+        expect(seen).toBe(true)
+        const xs: dynamic[] = [1, "x", null]
+        expect(`${xs[0]}-${xs[1]}-${xs[2]}`).toBe("1-x-null")
+        expect("v=" + null).toBe("v=null")
+    })
+})

@@ -43,6 +43,23 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    pub(super) fn assert_type(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
+        let checkable = matches!(e.ty, BackendTy::Dynamic(_))
+            && matches!(ty, BackendTy::Str | BackendTy::Bool);
+        if !checkable {
+            return self.cast_to(e, ty);
+        }
+        let span = e.span;
+        TirExpr {
+            kind: TirExprKind::Checked {
+                operand: Box::new(e),
+            },
+            ty,
+            res: varn_tir::Resolution::None,
+            span,
+        }
+    }
+
     pub(super) fn cast_to(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
         if e.ty == ty {
             return e;

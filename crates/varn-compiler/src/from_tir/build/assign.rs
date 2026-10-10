@@ -127,6 +127,7 @@ impl<'m> Builder<'m> {
             | TirExprKind::VariantPayload { .. }
             | TirExprKind::TypeTest { .. }
             | TirExprKind::Cast { .. }
+            | TirExprKind::Checked { .. }
             | TirExprKind::Closure { .. }
             | TirExprKind::New { .. }
             | TirExprKind::MakeVariant { .. }
