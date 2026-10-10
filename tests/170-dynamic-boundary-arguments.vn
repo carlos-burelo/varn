@@ -32,12 +32,12 @@ const mixed: dynamic = [1, "two"]
 await describe("170 dynamic boundary: arguments", async () => {
     await it("a spread dynamic array is checked against the parameters it fills", () => {
         expect(pair(...good)).toBe("1:x")
-        expect(outcome(() => { pair(...bad) })).toBe("type mismatch: expected '(int, str)', got 'Array'")
+        expect(outcome(() => { pair(...bad) })).toBe("type mismatch: argument 1 expected 'int', got 'str'")
     })
 
     await it("arguments before a spread are still checked", () => {
         expect(outcome(() => { pair(five, ...bad) })).toBe("ok")
-        expect(outcome(() => { pair(word, ...good) })).toBe("type mismatch: expected 'int', got 'str'")
+        expect(outcome(() => { pair(word, ...good) })).toBe("type mismatch: argument 1 expected 'int', got 'str'")
     })
 
     await it("a rest parameter checks each argument against its element type", () => {
@@ -46,18 +46,18 @@ await describe("170 dynamic boundary: arguments", async () => {
         expect(outcome(() => { total("s", word) })).toBe("type mismatch: expected 'int', got 'str'")
         expect(outcome(() => { total("s", 1, word) })).toBe("type mismatch: expected 'int', got 'str'")
         expect(total("s", ...nums)).toBe(6)
-        expect(outcome(() => { total("s", ...mixed) })).toBe("type mismatch: expected '(...int)', got 'Array'")
-        expect(outcome(() => { total(...mixed) })).toBe("type mismatch: expected '(str, ...int)', got 'Array'")
+        expect(outcome(() => { total("s", ...mixed) })).toBe("type mismatch: argument 3 expected 'int', got 'str'")
+        expect(outcome(() => { total(...mixed) })).toBe("type mismatch: argument 1 expected 'str', got 'int'")
     })
 
     await it("constructors and methods check spreads too", () => {
         expect(new Point(...good).b).toBe("x")
-        expect(outcome(() => { new Point(...bad) })).toBe("type mismatch: expected '(int, str)', got 'Array'")
+        expect(outcome(() => { new Point(...bad) })).toBe("type mismatch: argument 1 expected 'int', got 'str'")
         const p = new Point(1, "a")
         const tail: dynamic = ["a", "b"]
         const badTail: dynamic = ["a", 2]
         expect(p.shift(1, ...tail)).toBe(3)
-        expect(outcome(() => { p.shift(1, ...badTail) })).toBe("type mismatch: expected '(...str)', got 'Array'")
+        expect(outcome(() => { p.shift(1, ...badTail) })).toBe("type mismatch: argument 3 expected 'str', got 'int'")
     })
 
     await it("a typed spread is not re-checked and still works", () => {

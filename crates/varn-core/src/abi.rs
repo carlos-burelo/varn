@@ -172,9 +172,21 @@ pub const NATIVE_GLOBALS: &[&str] = &[
     "isIsolate",
     "str",
     CONFORM_GLOBAL,
+    VERIFY_CALL_GLOBAL,
+    VERIFY_SPREAD_GLOBAL,
+    VERIFY_METHOD_GLOBAL,
+    VERIFY_METHOD_SPREAD_GLOBAL,
+    VERIFY_SUPER_GLOBAL,
+    VERIFY_SUPER_SPREAD_GLOBAL,
 ];
 
 pub const CONFORM_GLOBAL: &str = "<conform>";
+pub const VERIFY_CALL_GLOBAL: &str = "<verify-call>";
+pub const VERIFY_SPREAD_GLOBAL: &str = "<verify-spread>";
+pub const VERIFY_METHOD_GLOBAL: &str = "<verify-method>";
+pub const VERIFY_METHOD_SPREAD_GLOBAL: &str = "<verify-method-spread>";
+pub const VERIFY_SUPER_GLOBAL: &str = "<verify-super>";
+pub const VERIFY_SUPER_SPREAD_GLOBAL: &str = "<verify-super-spread>";
 
 pub fn native_global_index(name: &str) -> Option<u32> {
     NATIVE_GLOBALS

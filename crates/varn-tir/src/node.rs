@@ -1,5 +1,5 @@
 use crate::resolution::Resolution;
-use crate::ty::{BackendTy, ClassId, FnId, TyId, TyListId};
+use crate::ty::{BackendTy, ClassId, FnId};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -176,7 +176,6 @@ pub enum TirExprKind {
 
     Checked {
         operand: Box<TirExpr>,
-        spread: Option<SpreadShape>,
     },
 
     Closure {
@@ -273,12 +272,6 @@ pub enum TirStmt {
     },
 
     BuildClass(u32),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SpreadShape {
-    pub fixed: TyListId,
-    pub rest: Option<TyId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

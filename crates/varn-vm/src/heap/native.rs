@@ -99,15 +99,6 @@ impl NativeCtx for Heap {
         self.deref_mut().alloc_class_vm(class)
     }
 
-    fn conform(
-        &mut self,
-        value: VmValue,
-        desc: &str,
-        witnesses: &[VmValue],
-    ) -> varn_types::NativeFnResult {
-        crate::exec::conform::conform(self, value, desc, witnesses)
-    }
-
     fn is_string(&self, v: VmValue) -> bool {
         self.deref().is_string(v)
     }

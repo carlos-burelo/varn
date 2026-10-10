@@ -79,13 +79,8 @@ impl NativeCtx for ExecCtx {
         self.heap.str_is_ascii(v)
     }
 
-    fn conform(
-        &mut self,
-        value: VmValue,
-        desc: &str,
-        witnesses: &[VmValue],
-    ) -> varn_types::NativeFnResult {
-        crate::exec::conform::conform(&self.heap, value, desc, witnesses)
+    fn boundary(&self) -> Option<&dyn varn_types::Boundary> {
+        Some(self)
     }
 
     fn is_string(&self, v: VmValue) -> bool {

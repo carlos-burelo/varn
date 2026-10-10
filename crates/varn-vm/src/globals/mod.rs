@@ -22,13 +22,9 @@ impl GlobalStore {
 
     pub(crate) fn with_native_layout(heap: &mut Heap) -> Self {
         let mut native_map = varn_builtins::register_globals_vm(heap);
-        native_map.insert(
-            Arc::from(varn_core::abi::CONFORM_GLOBAL),
-            heap.alloc_native_fn(
-                crate::exec::conform::conform_native,
-                varn_core::abi::CONFORM_GLOBAL,
-            ),
-        );
+        for (name, native) in crate::exec::contract::RUNTIME_GLOBALS {
+            native_map.insert(Arc::from(name), heap.alloc_native_fn(native, name));
+        }
         let order = varn_core::abi::NATIVE_GLOBALS;
 
         let mut values = Vec::with_capacity(order.len());

@@ -1,3 +1,4 @@
+mod boundary;
 pub mod bytecode;
 pub mod capabilities;
 pub mod cell;
@@ -26,6 +27,7 @@ pub use module_graph::{ModuleGraphArtifact, PackageNode};
 pub use native::{
     call_static_with, ArgType, NativeFn, NativeOpEntry, NativeOpTarget, SignatureDescriptor,
 };
+pub use boundary::Boundary;
 pub use native_ctx::NativeCtx;
 pub use native_ctx::NativeFnResult;
 pub use native_error::NativeError;

@@ -2,6 +2,7 @@ use std::sync::Arc;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_tir::{BackendTy, DynReason, Resolution, TirExpr, TirExprKind};
 
+mod call_contract;
 mod context;
 mod expr_assign;
 mod expr_async;
@@ -11,6 +12,7 @@ mod expr_closure;
 mod expr_collection;
 mod expr_convert;
 mod expr_member;
+mod expr_method;
 mod expr_misc;
 mod expr_new;
 mod expr_special;

@@ -168,7 +168,7 @@ impl Coverage {
             }
             TirExprKind::Unary { operand, .. }
             | TirExprKind::Cast { operand }
-            | TirExprKind::Checked { operand, .. } => {
+            | TirExprKind::Checked { operand } => {
                 self.walk_expr(operand)
             }
             TirExprKind::Field { object, .. } => self.walk_expr(object),

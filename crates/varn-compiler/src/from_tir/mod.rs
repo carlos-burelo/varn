@@ -1,5 +1,6 @@
 pub mod build;
 pub mod compile;
+mod describe;
 mod pinning;
 mod tir_children;
 pub mod ty;

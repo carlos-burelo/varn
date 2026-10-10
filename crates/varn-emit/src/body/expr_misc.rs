@@ -91,86 +91,6 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn is_untyped(&self, ty: BackendTy) -> bool {
-        match ty {
-            BackendTy::Dynamic(reason) => untyped_reason(reason),
-            BackendTy::Array(el) => {
-                self.tt.contains(el)
-                    && matches!(self.tt.get(el), BackendTy::Dynamic(reason) if untyped_reason(reason))
-            }
-            BackendTy::Int
-            | BackendTy::Float
-            | BackendTy::Bool
-            | BackendTy::Char
-            | BackendTy::Str
-            | BackendTy::Bytes
-            | BackendTy::Decimal
-            | BackendTy::BigInt
-            | BackendTy::Map(..)
-            | BackendTy::Set(_)
-            | BackendTy::Tuple(_)
-            | BackendTy::Class(_)
-            | BackendTy::Enum(_)
-            | BackendTy::Fn(_)
-            | BackendTy::Nullable(_)
-            | BackendTy::Void
-            | BackendTy::Never => false,
-        }
-    }
-
-    pub(super) fn guard_args(
-        &mut self,
-        args: Vec<varn_tir::TirArg>,
-        sig: Option<varn_tir::SigId>,
-    ) -> Vec<varn_tir::TirArg> {
-        let Some(sig) = sig.and_then(|s| self.signatures.get(s.0 as usize)) else {
-            return args;
-        };
-        let (fixed, rest): (Vec<BackendTy>, Option<BackendTy>) = match sig.params.split_last() {
-            Some((BackendTy::Array(el), head)) if sig.has_rest && self.tt.contains(*el) => {
-                (head.to_vec(), Some(self.tt.get(*el)))
-            }
-            Some(_) | None => (sig.params.clone(), None),
-        };
-        let mut spread_seen = false;
-        let mut out = Vec::with_capacity(args.len());
-        for (i, arg) in args.into_iter().enumerate() {
-            if spread_seen {
-                out.push(arg);
-                continue;
-            }
-            out.push(match arg {
-                varn_tir::TirArg::Expr(e) => match fixed.get(i).copied().or(rest) {
-                    Some(ty) => varn_tir::TirArg::Expr(self.guard_dynamic(e, ty)),
-                    None => varn_tir::TirArg::Expr(e),
-                },
-                varn_tir::TirArg::Spread(e) => {
-                    spread_seen = true;
-                    if !self.is_untyped(e.ty) {
-                        varn_tir::TirArg::Spread(e)
-                    } else {
-                        let shape = varn_tir::SpreadShape {
-                            fixed: self.tt.intern_list(fixed.get(i..).unwrap_or(&[])),
-                            rest: rest.map(|ty| self.tt.intern(ty)),
-                        };
-                        let (ty, span) = (e.ty, e.span);
-                        varn_tir::TirArg::Spread(TirExpr {
-                            kind: TirExprKind::Checked {
-                                operand: Box::new(e),
-                                spread: Some(shape),
-                            },
-                            ty,
-                            res: varn_tir::Resolution::None,
-                            span,
-                        })
-                    }
-                }
-                named @ varn_tir::TirArg::Named { .. } => named,
-            });
-        }
-        out
-    }
-
     pub(super) fn guard_dynamic(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
         if !self.crosses_dynamic_boundary(&e, ty) {
             return e;
@@ -179,7 +99,6 @@ impl<'a> FnEmitter<'a> {
         TirExpr {
             kind: TirExprKind::Checked {
                 operand: Box::new(e),
-                spread: None,
             },
             ty,
             res: varn_tir::Resolution::None,
@@ -203,7 +122,7 @@ impl<'a> FnEmitter<'a> {
     }
 }
 
-fn untyped_reason(reason: varn_tir::DynReason) -> bool {
+pub(super) fn untyped_reason(reason: varn_tir::DynReason) -> bool {
     match reason {
         varn_tir::DynReason::Declared | varn_tir::DynReason::HostBoundary => true,
         varn_tir::DynReason::Union

@@ -69,15 +69,8 @@ pub trait NativeCtx {
     fn alloc_buffer(&mut self, size: usize) -> VmValue;
     fn alloc_buffer_from_bytes(&mut self, bytes: &[u8]) -> VmValue;
 
-    fn conform(
-        &mut self,
-        _value: VmValue,
-        _desc: &str,
-        _witnesses: &[VmValue],
-    ) -> NativeFnResult {
-        Err(crate::NativeError::from(
-            "conform: this context has no heap".to_string(),
-        ))
+    fn boundary(&self) -> Option<&dyn crate::Boundary> {
+        None
     }
 
     fn is_string(&self, v: VmValue) -> bool;

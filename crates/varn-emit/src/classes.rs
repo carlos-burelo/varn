@@ -246,12 +246,20 @@ pub(super) fn emit_class(
                 let rest_ty = BackendTy::Array(
                     types.intern(BackendTy::Dynamic(DynReason::NotYetSupported)),
                 );
+                let inherited = def
+                    .parent
+                    .and_then(|parent| crate::tables::inherited_constructor(ctx.classes, parent))
+                    .and_then(|parent_sig| signatures.get(parent_sig.0 as usize).cloned());
+                let (forward_tys, forward_rest) = match &inherited {
+                    Some(parent_sig) => (parent_sig.params.clone(), parent_sig.has_rest),
+                    None => (vec![rest_ty], true),
+                };
                 signatures[sig.0 as usize].params = if forwards {
-                    vec![rest_ty]
+                    forward_tys.clone()
                 } else {
                     primary_tys
                 };
-                signatures[sig.0 as usize].has_rest = forwards;
+                signatures[sig.0 as usize].has_rest = forwards && forward_rest;
                 signatures[sig.0 as usize].return_ty = BackendTy::Void;
                 let id = emit_member_fn(
                     Arc::from(format!("{class_name}.constructor")),
@@ -271,17 +279,29 @@ pub(super) fn emit_class(
                 );
                 let body = &mut out[id.0 as usize].body;
                 body.extend(primary_assigns);
-                out[id.0 as usize].has_rest = forwards;
+                out[id.0 as usize].has_rest = forwards && forward_rest;
                 let body = &mut out[id.0 as usize].body;
                 let mut new = Vec::new();
                 if class.super_class.is_some() {
                     let args = if forwards {
-                        vec![varn_tir::TirArg::Spread(varn_tir::TirExpr {
-                            kind: varn_tir::TirExprKind::Var,
-                            ty: rest_ty,
-                            res: varn_tir::Resolution::Param(0),
-                            span: varn_tir::Span::EMPTY,
-                        })]
+                        let last = forward_tys.len().saturating_sub(1);
+                        forward_tys
+                            .iter()
+                            .enumerate()
+                            .map(|(i, ty)| {
+                                let param = varn_tir::TirExpr {
+                                    kind: varn_tir::TirExprKind::Var,
+                                    ty: *ty,
+                                    res: varn_tir::Resolution::Param(i as u32),
+                                    span: varn_tir::Span::EMPTY,
+                                };
+                                if forward_rest && i == last {
+                                    varn_tir::TirArg::Spread(param)
+                                } else {
+                                    varn_tir::TirArg::Expr(param)
+                                }
+                            })
+                            .collect()
                     } else {
                         vec![]
                     };

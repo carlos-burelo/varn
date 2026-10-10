@@ -11,3 +11,15 @@ pub struct ExceptionRange {
     pub catch_ip: u32,
     pub err_reg: u8,
 }
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ContractWitness {
+    Slot(u32),
+    Name(String),
+}
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct ParamContract {
+    pub desc: String,
+    pub witnesses: Vec<ContractWitness>,
+}

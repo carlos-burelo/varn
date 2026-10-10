@@ -6,6 +6,7 @@ impl ExecCtx {
         callee: VmValue,
         args: &[VmValue],
     ) -> Result<VmValue, varn_types::NativeError> {
+        crate::exec::contract::verify_call(self, callee, args)?;
         let mut window = Vec::with_capacity(args.len() + 1);
         window.push(callee);
         window.extend_from_slice(args);

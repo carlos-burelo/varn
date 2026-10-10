@@ -1,3 +1,4 @@
+use super::call_contract::Callee;
 use super::context::FnEmitter;
 use crate::ty::NameResolver;
 use varn_core::ast::{Arg, AstId, ExprId, ExprKind};
@@ -69,10 +70,10 @@ impl<'a> FnEmitter<'a> {
             | ExprKind::MetaAccess { .. } => None,
         };
         let targs = self.lower_call_args(call_id, args);
-        let ctor_sig = class
-            .and_then(|c| self.m.classes.get(c.0 as usize))
-            .and_then(|ci| ci.constructor);
-        let targs = self.guard_args(targs, ctor_sig);
+        let ctor_sig =
+            class.and_then(|c| crate::tables::inherited_constructor(self.m.classes, c));
+        let c = self.lower_expr(callee);
+        let (target, targs) = self.settle_args(Callee::Value(c), targs, ctor_sig, span);
         match class {
             Some(class) => TirExpr {
                 kind: TirExprKind::New { class, args: targs },
@@ -80,19 +81,15 @@ impl<'a> FnEmitter<'a> {
                 res: Resolution::None,
                 span,
             },
-
-            None => {
-                let c = self.lower_expr(callee);
-                TirExpr {
-                    kind: TirExprKind::Call {
-                        callee: Box::new(c),
-                        args: targs,
-                    },
-                    ty,
-                    res: Resolution::None,
-                    span,
-                }
-            }
+            None => TirExpr {
+                kind: TirExprKind::Call {
+                    callee: Box::new(target.into_expr()),
+                    args: targs,
+                },
+                ty,
+                res: Resolution::None,
+                span,
+            },
         }
     }
 

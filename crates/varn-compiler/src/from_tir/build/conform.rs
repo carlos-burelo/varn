@@ -1,11 +1,9 @@
 use super::context::{Builder, Result};
+use crate::from_tir::describe::Describer;
 use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
-use varn_core::TypeDesc;
 use varn_tir::BackendTy;
-
-const DEPTH_LIMIT: usize = 32;
 
 pub(super) fn is_structural(ty: BackendTy) -> bool {
     matches!(
@@ -25,174 +23,24 @@ pub(super) fn is_structural(ty: BackendTy) -> bool {
 }
 
 impl<'m> Builder<'m> {
-    fn type_desc(
-        &self,
-        ty: BackendTy,
-        witnesses: &mut Vec<Arc<str>>,
-        open: &mut Vec<varn_tir::ShapeId>,
-        depth: usize,
-    ) -> TypeDesc {
-        if depth >= DEPTH_LIMIT {
-            return TypeDesc::Any;
-        }
-        let types = &self.tir.types;
-        let of = |id: varn_tir::TyId,
-                  witnesses: &mut Vec<Arc<str>>,
-                  open: &mut Vec<varn_tir::ShapeId>| {
-            if types.contains(id) {
-                self.type_desc(types.get(id), witnesses, open, depth + 1)
-            } else {
-                TypeDesc::Any
-            }
-        };
-        match ty {
-            BackendTy::Int => TypeDesc::Int,
-            BackendTy::Float => TypeDesc::Float,
-            BackendTy::Bool => TypeDesc::Bool,
-            BackendTy::Char => TypeDesc::Char,
-            BackendTy::Str => TypeDesc::Str,
-            BackendTy::Bytes => TypeDesc::Bytes,
-            BackendTy::Decimal => TypeDesc::Decimal,
-            BackendTy::BigInt => TypeDesc::BigInt,
-            BackendTy::Array(el) => TypeDesc::Array(Box::new(of(el, witnesses, open))),
-            BackendTy::Map(k, v) => {
-                let key = of(k, witnesses, open);
-                let val = of(v, witnesses, open);
-                TypeDesc::Map(Box::new(key), Box::new(val))
-            }
-            BackendTy::Set(el) => TypeDesc::Set(Box::new(of(el, witnesses, open))),
-            BackendTy::Tuple(list) => {
-                if !types.contains_list(list) {
-                    return TypeDesc::Any;
-                }
-                TypeDesc::Tuple(
-                    types
-                        .get_list(list)
-                        .iter()
-                        .map(|el| self.type_desc(*el, witnesses, open, depth + 1))
-                        .collect(),
-                )
-            }
-            BackendTy::Class(class) => match self.tir.class(class) {
-                Some(info) => {
-                    let witness = match witnesses.iter().position(|w| *w == info.name) {
-                        Some(at) => at,
-                        None => {
-                            witnesses.push(info.name.clone());
-                            witnesses.len() - 1
-                        }
-                    };
-                    TypeDesc::Class {
-                        witness: witness as u32,
-                        name: info.name.to_string(),
-                    }
-                }
-                None => TypeDesc::Any,
-            },
-            BackendTy::Enum(id) => match self.tir.enum_info(id) {
-                Some(info) => TypeDesc::Enum(info.name.to_string()),
-                None => TypeDesc::Any,
-            },
-            BackendTy::Fn(_) | BackendTy::Dynamic(varn_tir::DynReason::Callable) => {
-                TypeDesc::Callable
-            }
-            BackendTy::Nullable(inner) => {
-                let inner = of(inner, witnesses, open);
-                if inner.is_any() {
-                    TypeDesc::Any
-                } else {
-                    TypeDesc::Nullable(Box::new(inner))
-                }
-            }
-            BackendTy::Dynamic(varn_tir::DynReason::Shape(id)) => {
-                if !types.contains_shape(id) || open.contains(&id) {
-                    return TypeDesc::Any;
-                }
-                open.push(id);
-                let fields = types
-                    .get_shape(id)
-                    .iter()
-                    .map(|field| varn_core::type_desc::FieldDesc {
-                        name: field.name.to_string(),
-                        ty: self.type_desc(field.ty, witnesses, open, depth + 1),
-                        optional: field.optional,
-                    })
-                    .collect();
-                open.pop();
-                TypeDesc::Object(fields)
-            }
-            BackendTy::Void
-            | BackendTy::Never
-            | BackendTy::Dynamic(
-                varn_tir::DynReason::HostBoundary
-                | varn_tir::DynReason::Union
-                | varn_tir::DynReason::IndexSignature
-                | varn_tir::DynReason::Declared
-                | varn_tir::DynReason::Awaitable(_)
-                | varn_tir::DynReason::Yields(_)
-                | varn_tir::DynReason::NotYetSupported,
-            ) => TypeDesc::Any,
-        }
-    }
-
-    pub(super) fn lower_conform_spread(
-        &mut self,
-        operand: &varn_tir::TirExpr,
-        shape: varn_tir::SpreadShape,
-    ) -> Result<Value> {
-        let v = self.lower_expr(operand)?;
-        let mut witnesses = Vec::new();
-        let fixed: Vec<TypeDesc> = if self.tir.types.contains_list(shape.fixed) {
-            self.tir
-                .types
-                .get_list(shape.fixed)
-                .iter()
-                .map(|ty| self.type_desc(*ty, &mut witnesses, &mut Vec::new(), 0))
-                .collect()
-        } else {
-            Vec::new()
-        };
-        let rest = shape
-            .rest
-            .filter(|id| self.tir.types.contains(*id))
-            .map(|id| self.type_desc(self.tir.types.get(id), &mut witnesses, &mut Vec::new(), 0));
-        if fixed.iter().all(TypeDesc::is_any) && rest.as_ref().is_none_or(TypeDesc::is_any) {
-            return Ok(v);
-        }
-        let desc = TypeDesc::Args {
-            fixed,
-            rest: rest.map(Box::new),
-        };
-        self.emit_conform(v, &desc, &witnesses)
-    }
-
-    fn emit_conform(
-        &mut self,
-        v: Value,
-        desc: &TypeDesc,
-        witnesses: &[Arc<str>],
-    ) -> Result<Value> {
-        let conform = varn_core::abi::native_global_index(varn_core::abi::CONFORM_GLOBAL).ok_or(
-            crate::OptError::Unsupported("from_tir: the conform runtime is not a native global"),
-        )?;
-        let callee = self.emit(InstKind::LoadNativeGlobalIdx(conform), HirType::Ref);
-        let text = self.emit(InstKind::ConstStr(Arc::from(desc.encode())), HirType::Str);
-        let mut args = vec![v, text];
-        for name in witnesses {
-            args.push(self.emit(self.global_load(name), HirType::Ref));
-        }
-        Ok(self.emit(InstKind::Call { callee, args }, HirType::Dynamic))
-    }
-
     pub(super) fn lower_conform(
         &mut self,
         v: Value,
         node_ty: BackendTy,
         ty: HirType,
     ) -> Result<Value> {
-        let mut witnesses = Vec::new();
-        let desc = self.type_desc(node_ty, &mut witnesses, &mut Vec::new(), 0);
-        let checked = self.emit_conform(v, &desc, &witnesses)?;
+        let mut describer = Describer::new(self.tir);
+        let desc = describer.describe(node_ty);
+        let conform = varn_core::abi::native_global_index(varn_core::abi::CONFORM_GLOBAL).ok_or(
+            crate::OptError::Unsupported("from_tir: the conform runtime is not a native global"),
+        )?;
+        let callee = self.emit(InstKind::LoadNativeGlobalIdx(conform), HirType::Ref);
+        let text = self.emit(InstKind::ConstStr(Arc::from(desc.encode())), HirType::Str);
+        let mut args = vec![v, text];
+        for name in &describer.witnesses {
+            args.push(self.emit(self.global_load(name), HirType::Ref));
+        }
+        let checked = self.emit(InstKind::Call { callee, args }, HirType::Dynamic);
         Ok(self.emit(InstKind::Cast { operand: checked, ty }, ty))
     }
 }

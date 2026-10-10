@@ -99,6 +99,9 @@ fn compile_one(
     }
     let mut proto = emit_function_meta(ssa, &fn_meta(tir, f), source_file, scope)?;
     proto.state_size = state_size;
+    if !is_top_level {
+        proto.param_contract = super::describe::param_contract(tir, f);
+    }
     if is_top_level {
         proto.global_count = tir.global_names.len() as u32;
     }

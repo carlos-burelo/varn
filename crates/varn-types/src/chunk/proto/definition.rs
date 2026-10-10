@@ -126,6 +126,13 @@ pub struct FunctionProto {
 
     #[serde(default)]
     pub suspend_live: Vec<super::records::SuspendLive>,
+
+    #[serde(default)]
+    pub param_contract: Option<super::records::ParamContract>,
+
+    #[serde(skip)]
+    #[serde(default)]
+    pub param_types: std::cell::OnceCell<Option<varn_core::TypeDesc>>,
 }
 
 fn slot_kind_dynamic() -> crate::register_meta::SlotKind {

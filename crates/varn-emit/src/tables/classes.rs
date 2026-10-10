@@ -213,3 +213,18 @@ fn field_backend_ty(
         inner
     }
 }
+
+pub(crate) fn inherited_constructor(
+    classes: &[ClassInfo],
+    class: varn_tir::ClassId,
+) -> Option<varn_tir::SigId> {
+    let mut current = Some(class);
+    for _ in 0..=classes.len() {
+        let info = classes.get(current?.0 as usize)?;
+        if let Some(sig) = info.constructor {
+            return Some(sig);
+        }
+        current = info.parent;
+    }
+    None
+}

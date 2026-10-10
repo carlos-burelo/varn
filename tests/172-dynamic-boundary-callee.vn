@@ -1,0 +1,151 @@
+import { describe, it, expect } from "std:test";
+
+function outcome(f: () => void): str {
+    try {
+        f()
+        return "ok"
+    } catch (e) {
+        if (e instanceof TypeError) { return e.message }
+        return "other: " + e.message
+    }
+}
+
+class Creature { name: str = "a" }
+class Pebble {}
+function greet(who: str, times: int): str { return who + times }
+function pet(c: Creature): str { return c.name }
+function sum(label: str, ...xs: int[]): int {
+    let t = 0
+    for (const x of xs) { t = t + x }
+    return t
+}
+function withDefault(a: str, b: str = "d"): str { return a + b }
+
+class Crate {
+    constructor(public label: str) {}
+    rename(to: str): str {
+        this.label = to
+        return to
+    }
+    static make(label: str): Crate { return new Crate(label) }
+}
+
+class Base {
+    constructor(public a: int, public b: str = "dflt") {}
+    tag(prefix: str, n: int): str { return prefix + n }
+}
+class Mid extends Base { extra: int = 7 }
+class Leaf extends Mid {}
+class Child extends Base {
+    constructor(d: dynamic, rest: dynamic) { super(d, ...rest) }
+    override tag(prefix: str, n: int): str { return "c" + super.tag(prefix, n) }
+    viaDynamic(d: dynamic): str { return super.tag(d, 1) }
+    viaSpread(d: dynamic): str { return super.tag(...d) }
+}
+class Bag {
+    xs: int[] = []
+    constructor(...xs: int[]) { this.xs = xs }
+}
+class Sack extends Bag { tag: str = "w" }
+
+const bad: dynamic = "bad"
+
+await describe("172 dynamic boundary: callee without a known signature", async () => {
+    await it("a function called through dynamic checks its own parameters", () => {
+        const g: dynamic = greet
+        expect(g("hi", 2)).toBe("hi2")
+        expect(outcome(() => { g(1, 2) })).toBe("type mismatch: argument 1 expected 'str', got 'int'")
+        expect(outcome(() => { g("hi", "x") })).toBe("type mismatch: argument 2 expected 'int', got 'str'")
+        const p: dynamic = pet
+        expect(p(new Creature())).toBe("a")
+        expect(outcome(() => { p(new Pebble()) })).toBe("type mismatch: argument 1 expected 'Creature', got 'object'")
+    })
+
+    await it("rest and defaulted parameters", () => {
+        const s: dynamic = sum
+        expect(s("l", 1, 2)).toBe(3)
+        expect(outcome(() => { s("l", 1, "two") })).toBe("type mismatch: argument 3 expected 'int', got 'str'")
+        const o: dynamic = withDefault
+        expect(o("a")).toBe("ad")
+        expect(o("a", "b")).toBe("ab")
+        expect(outcome(() => { o("a", 3) })).toBe("type mismatch: argument 2 expected 'str?', got 'int'")
+    })
+
+    await it("methods, statics and constructors on a dynamic receiver", () => {
+        const b: dynamic = new Crate("x")
+        expect(b.rename("y")).toBe("y")
+        expect(outcome(() => { b.rename(7) })).toBe("type mismatch: argument 1 expected 'str', got 'int'")
+        const C: dynamic = Crate
+        expect(new C("z").label).toBe("z")
+        expect(outcome(() => { new C(9) })).toBe("type mismatch: argument 1 expected 'str', got 'int'")
+        expect(C.make("s").label).toBe("s")
+        expect(outcome(() => { C.make(1) })).toBe("type mismatch: argument 1 expected 'str', got 'int'")
+        const bound: dynamic = b.rename
+        expect(bound("w")).toBe("w")
+        expect(outcome(() => { bound(1) })).toBe("type mismatch: argument 1 expected 'str', got 'int'")
+    })
+
+    await it("functions stored in objects and arrays", () => {
+        const holder: dynamic = { run: greet }
+        expect(holder.run("k", 1)).toBe("k1")
+        expect(outcome(() => { holder.run(1, 1) })).toBe("type mismatch: argument 1 expected 'str', got 'int'")
+        const fns: dynamic = [greet]
+        expect(fns[0]("q", 3)).toBe("q3")
+        expect(outcome(() => { fns[0](3, 3) })).toBe("type mismatch: argument 1 expected 'str', got 'int'")
+    })
+
+    await it("arguments after a spread are checked", () => {
+        const nums: int[] = [1]
+        const after: dynamic = ["tail"]
+        expect(outcome(() => { sum("l", ...nums, 2) })).toBe("ok")
+        expect(outcome(() => { sum("l", ...nums, after[0]) }))
+            .toBe("type mismatch: argument 3 expected 'int', got 'str'")
+    })
+
+    await it("an inherited constructor keeps its contract", () => {
+        expect(new Mid(1).b).toBe("dflt")
+        expect(new Mid(2, "z").b).toBe("z")
+        expect(new Mid(3).extra).toBe(7)
+        expect(new Leaf(4).a).toBe(4)
+        expect(outcome(() => { new Mid(bad) })).toBe("type mismatch: expected 'int', got 'str'")
+        expect(outcome(() => { new Leaf(bad) })).toBe("type mismatch: expected 'int', got 'str'")
+        const M: dynamic = Mid
+        const L: dynamic = Leaf
+        expect(new M(5).a).toBe(5)
+        expect(outcome(() => { new M("x") })).toBe("type mismatch: argument 1 expected 'int', got 'str'")
+        expect(outcome(() => { new L("x") })).toBe("type mismatch: argument 1 expected 'int', got 'str'")
+        expect(new Sack(1, 2, 3).xs.length).toBe(3)
+        expect(new Sack().tag).toBe("w")
+        expect(outcome(() => { new Sack(1, bad) })).toBe("type mismatch: expected 'int', got 'str'")
+    })
+
+    await it("super calls check dynamic and spread arguments", () => {
+        expect(new Child(1, ["x"]).b).toBe("x")
+        expect(outcome(() => { new Child("no", ["x"]) })).toBe("type mismatch: argument 1 expected 'int', got 'str'")
+        expect(outcome(() => { new Child(1, [2]) })).toBe("type mismatch: argument 2 expected 'str?', got 'int'")
+        const c = new Child(1, ["x"])
+        expect(c.tag("p", 2)).toBe("cp2")
+        expect(c.viaDynamic("q")).toBe("q1")
+        expect(outcome(() => { c.viaDynamic(5) })).toBe("type mismatch: expected 'str', got 'int'")
+        expect(c.viaSpread(["s", 3])).toBe("s3")
+        expect(outcome(() => { c.viaSpread([3, 3]) })).toBe("type mismatch: argument 1 expected 'str', got 'int'")
+    })
+
+    await it("a typed callback invoked by a native checks what it receives", () => {
+        const mixed: dynamic = [1, "x"]
+        expect(outcome(() => { mixed.map((s: str) => s.length) }))
+            .toBe("type mismatch: argument 1 expected 'str', got 'int'")
+        expect(outcome(() => { mixed.forEach((c: Creature) => { c.name }) }))
+            .toBe("type mismatch: argument 1 expected 'Creature', got 'int'")
+        const words: str[] = ["ab", "c"]
+        expect(words.map((s: str) => s.length).length).toBe(2)
+    })
+
+    await it("holds in a hot loop", () => {
+        const g: dynamic = greet
+        const b: dynamic = new Crate("x")
+        let n = 0
+        for (let i = 0; i < 5000; i = i + 1) { n = n + g("hi", 2).length + b.rename("yy").length }
+        expect(n).toBe(25000)
+    })
+})

@@ -5,12 +5,12 @@ use varn_core::{RuntimeErrorKind, RuntimeKind, TypeDesc};
 use varn_types::vm_value::ArrayRepr;
 use varn_types::{NativeCtx, NativeError, NativeFnResult, VmArray};
 
-enum Fit {
+pub(crate) enum Fit {
     Exact,
     Widened(VmValue),
 }
 
-fn mismatch(message: String) -> NativeError {
+pub(crate) fn mismatch(message: String) -> NativeError {
     NativeError::rethrow(RuntimeErrorKind::TypeError, message, None)
 }
 
@@ -21,7 +21,10 @@ pub(crate) fn conform_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Nativ
     let text = ctx
         .str_owned(*desc)
         .ok_or_else(|| mismatch("conform: type descriptor is not a string".to_string()))?;
-    ctx.conform(*value, &text, witnesses)
+    match ctx.boundary() {
+        Some(boundary) => boundary.conform(*value, &text, witnesses),
+        None => Err(mismatch("conform: this context has no heap".to_string())),
+    }
 }
 
 pub(crate) fn conform(
@@ -50,7 +53,12 @@ fn kind_is(heap: &Heap, v: VmValue, kind: RuntimeKind) -> bool {
     typeof_val(v, heap) == kind.name()
 }
 
-fn fit(heap: &Heap, v: VmValue, desc: &TypeDesc, witnesses: &[VmValue]) -> Option<Fit> {
+pub(crate) fn fit(
+    heap: &Heap,
+    v: VmValue,
+    desc: &TypeDesc,
+    witnesses: &[VmValue],
+) -> Option<Fit> {
     match desc {
         TypeDesc::Any => Some(Fit::Exact),
         TypeDesc::Int => exact(v.is_int()),
@@ -152,7 +160,7 @@ fn fit(heap: &Heap, v: VmValue, desc: &TypeDesc, witnesses: &[VmValue]) -> Optio
         }
         TypeDesc::Class { witness, .. } => {
             let class = *witnesses.get(*witness as usize)?;
-            exact(instanceof(v, class, heap))
+            exact(class.is_null() || instanceof(v, class, heap))
         }
         TypeDesc::Enum(name) => {
             if !v.is_heap() {
