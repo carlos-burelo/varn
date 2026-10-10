@@ -83,6 +83,10 @@ impl NativeCtx for ExecCtx {
         Some(self)
     }
 
+    fn boundary_mut(&mut self) -> Option<&mut dyn varn_types::Boundary> {
+        Some(self)
+    }
+
     fn is_string(&self, v: VmValue) -> bool {
         v.is_sso() || (v.is_heap() && matches!(self.heap.get(v.as_heap()), Some(HeapObj::Str(_))))
     }

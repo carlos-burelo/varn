@@ -22,20 +22,21 @@ pub(crate) fn conform_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Nativ
     let text = ctx
         .str_owned(*desc)
         .ok_or_else(|| mismatch("conform: type descriptor is not a string".to_string()))?;
-    match ctx.boundary() {
+    match ctx.boundary_mut() {
         Some(boundary) => boundary.conform(*value, &text, witnesses),
         None => Err(mismatch("conform: this context has no heap".to_string())),
     }
 }
 
 pub(crate) fn conform(
-    heap: &Heap,
+    heap: &mut Heap,
     value: VmValue,
     text: &str,
     witnesses: &[VmValue],
 ) -> NativeFnResult {
     let desc = TypeDesc::decode(text)
         .ok_or_else(|| mismatch(format!("conform: malformed type descriptor '{text}'")))?;
+    let value = crate::exec::normalize::normalize(heap, value, &desc);
     match fit(heap, value, &desc, witnesses) {
         Some(Fit::Exact) => Ok(value),
         Some(Fit::Widened(widened)) => Ok(widened),
@@ -135,24 +136,6 @@ fn fit_in(cx: &Cx, v: VmValue, desc: &TypeDesc, scope: Option<&Scope>) -> Option
         TypeDesc::Map(key, val) => {
             if !v.is_heap() {
                 return None;
-            }
-            if let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) = heap.get(v.as_heap()) {
-                if !matches!(**key, TypeDesc::Str | TypeDesc::Any) {
-                    return None;
-                }
-                let obj = obj.borrow();
-                for slot in 0..obj.slot_count() {
-                    let Some(x) = obj.field_at(slot) else {
-                        continue;
-                    };
-                    match fit_in(cx, x, val, scope)? {
-                        Fit::Exact => {}
-                        Fit::Widened(widened) => {
-                            obj.set_field_at(slot, widened);
-                        }
-                    }
-                }
-                return Some(Fit::Exact);
             }
             let map = heap.map_of(v)?;
             let mut widened = Vec::new();

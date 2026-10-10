@@ -213,7 +213,9 @@ impl<'a> FnEmitter<'a> {
                 span,
             });
             lead.push(flat.clone());
-            self.call_runtime(spread, lead, span);
+            if let Some(check) = self.call_runtime(spread, lead, span) {
+                self.pending.push(TirStmt::Expr(check));
+            }
             return vec![TirArg::Spread(flat)];
         }
         let pinned: Vec<TirExpr> = args
@@ -223,17 +225,60 @@ impl<'a> FnEmitter<'a> {
             })
             .collect();
         lead.extend(pinned.iter().cloned());
-        self.call_runtime(positional, lead, span);
-        pinned.into_iter().map(TirArg::Expr).collect()
+        let Some(converted) = self.call_runtime(positional, lead, span) else {
+            return pinned.into_iter().map(TirArg::Expr).collect();
+        };
+        let converted = self.hoist(converted);
+        let unchanged = TirExpr {
+            kind: TirExprKind::Unary {
+                op: varn_tir::TirUnOp::IsNull,
+                operand: Box::new(converted.clone()),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span,
+        };
+        pinned
+            .into_iter()
+            .enumerate()
+            .map(|(i, arg)| {
+                if !matches!(arg.ty, BackendTy::Dynamic(_)) {
+                    return TirArg::Expr(arg);
+                }
+                let ty = arg.ty;
+                let replaced = TirExpr {
+                    kind: TirExprKind::Index {
+                        object: Box::new(converted.clone()),
+                        index: Box::new(TirExpr {
+                            kind: TirExprKind::IntLit(i as i64),
+                            ty: BackendTy::Int,
+                            res: Resolution::None,
+                            span,
+                        }),
+                    },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
+                TirArg::Expr(TirExpr {
+                    kind: TirExprKind::Select {
+                        cond: Box::new(unchanged.clone()),
+                        then_val: Box::new(arg),
+                        else_val: Box::new(replaced),
+                    },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                })
+            })
+            .collect()
     }
 
-    fn call_runtime(&mut self, global: &str, args: Vec<TirExpr>, span: Span) {
-        let Some(index) = varn_core::abi::native_global_index(global) else {
-            return;
-        };
+    fn call_runtime(&mut self, global: &str, args: Vec<TirExpr>, span: Span) -> Option<TirExpr> {
+        let index = varn_core::abi::native_global_index(global)?;
         let opaque = BackendTy::Dynamic(DynReason::NotYetSupported);
         let res = Resolution::NativeGlobal(index);
-        self.pending.push(TirStmt::Expr(TirExpr {
+        Some(TirExpr {
             kind: TirExprKind::Call {
                 callee: Box::new(TirExpr {
                     kind: TirExprKind::Var,
@@ -246,7 +291,7 @@ impl<'a> FnEmitter<'a> {
             ty: opaque,
             res,
             span,
-        }));
+        })
     }
 
     pub(super) fn guard_args(&mut self, args: Vec<TirArg>, sig: Option<SigId>) -> Vec<TirArg> {

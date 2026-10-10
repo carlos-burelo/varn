@@ -133,6 +133,10 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub param_types: std::cell::OnceCell<Option<varn_core::TypeDesc>>,
+
+    #[serde(skip)]
+    #[serde(default)]
+    pub param_converts: std::cell::OnceCell<bool>,
 }
 
 fn slot_kind_dynamic() -> crate::register_meta::SlotKind {

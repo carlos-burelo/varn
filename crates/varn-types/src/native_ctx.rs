@@ -71,6 +71,10 @@ pub trait NativeCtx: crate::Buffers {
         None
     }
 
+    fn boundary_mut(&mut self) -> Option<&mut dyn crate::Boundary> {
+        None
+    }
+
     fn is_string(&self, v: VmValue) -> bool;
     fn is_array(&self, v: VmValue) -> bool;
 

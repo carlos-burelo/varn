@@ -31,6 +31,7 @@ pub(crate) mod method_args;
 pub(crate) mod method_bind;
 pub(crate) mod module_freeze;
 pub(crate) mod modules;
+pub(crate) mod normalize;
 pub(crate) mod props;
 pub mod scheduler;
 pub(crate) mod strings;

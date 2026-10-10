@@ -1,0 +1,79 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+function outcome(f: () => void): str {
+    try {
+        f()
+        return "ok"
+    } catch (e) {
+        if (e instanceof TypeError) { return e.message }
+        return "other: " + e.message
+    }
+}
+
+function size(m: Map<str, int>): int { return m.size }
+function pick(a: int, m: Map<str, int>?, b: str): str {
+    if (m == null) { return a + b + "-" }
+    return a + b + m.get("k")
+}
+class Bag {
+    constructor(public items: Map<str, int>) {}
+    count(extra: Map<str, int>): int { return this.items.size + extra.size }
+}
+type Config = { name: str, limits: Map<str, int> }
+
+await describe("179 dynamic boundary: object to Map", async () => {
+    await it("a parsed object becomes a Map where a Map is declared", () => {
+        const parsed: dynamic = Json.parse("{\"a\":1,\"b\":2}")
+        const m: Map<str, int> = parsed
+        expect(typeof m).toBe("Map")
+        expect(m.get("a")).toBe(1)
+        expect(m.size).toBe(2)
+        expect(m.has("b")).toBe(true)
+        m.set("z", 9)
+        expect(m.get("z")).toBe(9)
+        expect(typeof parsed).toBe("object")
+    })
+
+    await it("the same for an index signature", () => {
+        const dict: { [k: str]: int } = Json.parse("{\"a\":1,\"b\":2}")
+        expect(typeof dict).toBe("Map")
+        expect(dict["a"]).toBe(1)
+        dict["c"] = 3
+        expect(dict["c"]).toBe(3)
+    })
+
+    await it("values are checked and nested objects are converted", () => {
+        expect(outcome(() => { const m: Map<str, int> = Json.parse("{\"a\":\"x\"}") }))
+            .toBe("type mismatch: expected 'Map<str, int>', got 'Map'")
+        const nested: Map<str, Map<str, int>> = Json.parse("{\"x\":{\"y\":1}}")
+        expect(nested.get("x")?.get("y")).toBe(1)
+        const cfg: Config = Json.parse("{\"name\":\"n\",\"limits\":{\"cpu\":4}}")
+        expect(cfg.limits.get("cpu")).toBe(4)
+        const many: Map<str, int>[] = Json.parse("[{\"a\":1},{\"b\":2}]")
+        expect(many[1].get("b")).toBe(2)
+    })
+
+    await it("arguments of an unproven call are converted too", () => {
+        const f: dynamic = size
+        const o: dynamic = { k: 1, j: 2 }
+        expect(f(o)).toBe(2)
+        const p: dynamic = pick
+        expect(p(1, { k: 7 }, "x")).toBe("1x7")
+        expect(p(2, null, "y")).toBe("2y-")
+        const B: dynamic = Bag
+        const bag: dynamic = new B({ a: 1 })
+        expect(bag.count({ z: 1, y: 2 })).toBe(3)
+        expect(bag.count(...[{ q: 1 }])).toBe(2)
+        expect(outcome(() => { f({ k: "bad" }) }))
+            .toBe("type mismatch: argument 1 expected 'Map<str, int>', got 'Map'")
+    })
+
+    await it("holds in a hot loop", () => {
+        const f: dynamic = size
+        const o: dynamic = { k: 1, j: 2 }
+        let n = 0
+        for (let i = 0; i < 5000; i = i + 1) { n = n + f(o) }
+        expect(n).toBe(10000)
+    })
+})

@@ -35,11 +35,32 @@ fn spread_items(ctx: &dyn NativeCtx, flat: VmValue) -> Vec<VmValue> {
         .collect()
 }
 
-fn verify(ctx: &dyn NativeCtx, callee: VmValue, args: &[VmValue]) -> Result<(), NativeError> {
-    match ctx.boundary() {
+fn verify(
+    ctx: &mut dyn NativeCtx,
+    callee: VmValue,
+    args: &[VmValue],
+) -> Result<Option<Vec<VmValue>>, NativeError> {
+    match ctx.boundary_mut() {
         Some(boundary) => boundary.verify_call(callee, args),
-        None => Ok(()),
+        None => Ok(None),
     }
+}
+
+fn verify_positional(ctx: &mut dyn NativeCtx, callee: VmValue, args: &[VmValue]) -> NativeFnResult {
+    Ok(match verify(ctx, callee, args)? {
+        Some(converted) => ctx.alloc_array(converted),
+        None => VmValue::null(),
+    })
+}
+
+fn verify_flat(ctx: &mut dyn NativeCtx, callee: VmValue, flat: VmValue) -> NativeFnResult {
+    let items = spread_items(ctx, flat);
+    if let Some(converted) = verify(ctx, callee, &items)? {
+        for (i, item) in converted.into_iter().enumerate() {
+            ctx.array_set(flat, i, item);
+        }
+    }
+    Ok(VmValue::null())
 }
 
 fn method_of(ctx: &dyn NativeCtx, recv: VmValue, name: VmValue) -> VmValue {
@@ -57,52 +78,57 @@ fn inherited_of(ctx: &dyn NativeCtx, class: VmValue, name: VmValue) -> VmValue {
 }
 
 fn verify_call_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    if let [callee, rest @ ..] = args {
-        verify(ctx, *callee, rest)?;
+    match args {
+        [callee, rest @ ..] => verify_positional(ctx, *callee, rest),
+        [] => Ok(VmValue::null()),
     }
-    Ok(VmValue::null())
 }
 
 fn verify_spread_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    if let [callee, flat] = args {
-        let items = spread_items(ctx, *flat);
-        verify(ctx, *callee, &items)?;
+    match args {
+        [callee, flat] => verify_flat(ctx, *callee, *flat),
+        _ => Ok(VmValue::null()),
     }
-    Ok(VmValue::null())
 }
 
 fn verify_method_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    if let [recv, name, rest @ ..] = args {
-        let callee = method_of(ctx, *recv, *name);
-        verify(ctx, callee, rest)?;
+    match args {
+        [recv, name, rest @ ..] => {
+            let callee = method_of(ctx, *recv, *name);
+            verify_positional(ctx, callee, rest)
+        }
+        _ => Ok(VmValue::null()),
     }
-    Ok(VmValue::null())
 }
 
 fn verify_method_spread_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    if let [recv, name, flat] = args {
-        let callee = method_of(ctx, *recv, *name);
-        let items = spread_items(ctx, *flat);
-        verify(ctx, callee, &items)?;
+    match args {
+        [recv, name, flat] => {
+            let callee = method_of(ctx, *recv, *name);
+            verify_flat(ctx, callee, *flat)
+        }
+        _ => Ok(VmValue::null()),
     }
-    Ok(VmValue::null())
 }
 
 fn verify_super_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    if let [class, name, rest @ ..] = args {
-        let callee = inherited_of(ctx, *class, *name);
-        verify(ctx, callee, rest)?;
+    match args {
+        [class, name, rest @ ..] => {
+            let callee = inherited_of(ctx, *class, *name);
+            verify_positional(ctx, callee, rest)
+        }
+        _ => Ok(VmValue::null()),
     }
-    Ok(VmValue::null())
 }
 
 fn verify_super_spread_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    if let [class, name, flat] = args {
-        let callee = inherited_of(ctx, *class, *name);
-        let items = spread_items(ctx, *flat);
-        verify(ctx, callee, &items)?;
+    match args {
+        [class, name, flat] => {
+            let callee = inherited_of(ctx, *class, *name);
+            verify_flat(ctx, callee, *flat)
+        }
+        _ => Ok(VmValue::null()),
     }
-    Ok(VmValue::null())
 }
 
 pub(crate) fn class_method(ctx: &ExecCtx, class: VmValue, name: &str) -> VmValue {
@@ -172,46 +198,98 @@ fn resolve_witnesses(
         .collect()
 }
 
-pub(crate) fn verify_call(
-    ctx: &ExecCtx,
-    callee: VmValue,
+fn check_args(
+    heap: &crate::heap::Heap,
     args: &[VmValue],
+    fixed: &[TypeDesc],
+    rest: Option<&TypeDesc>,
+    witnesses: &[VmValue],
 ) -> Result<(), NativeError> {
-    let Some(closure) = target_closure(&ctx.heap, callee) else {
-        return Ok(());
-    };
-    let proto = &closure.proto;
-    let Some(contract) = &proto.param_contract else {
-        return Ok(());
-    };
-    let Some(TypeDesc::Args { fixed, rest }) = proto
-        .param_types
-        .get_or_init(|| TypeDesc::decode(&contract.desc))
-    else {
-        return Ok(());
-    };
-    let witnesses = resolve_witnesses(ctx, closure, &contract.witnesses);
     for (i, arg) in args.iter().enumerate() {
-        let Some(expected) = fixed.get(i).or(rest.as_deref()) else {
+        let Some(expected) = fixed.get(i).or(rest) else {
             break;
         };
-        if fit(&ctx.heap, *arg, expected, &witnesses).is_none() {
+        if fit(heap, *arg, expected, witnesses).is_none() {
             return Err(mismatch(format!(
                 "type mismatch: argument {} expected '{expected}', got '{}'",
                 i + 1,
-                typeof_val(*arg, &ctx.heap)
+                typeof_val(*arg, heap)
             )));
         }
     }
     Ok(())
 }
 
+fn convert_args(
+    ctx: &mut ExecCtx,
+    closure: &VmClosure,
+    args: &[VmValue],
+) -> Result<Option<Vec<VmValue>>, NativeError> {
+    let Some(contract) = &closure.proto.param_contract else {
+        return Ok(None);
+    };
+    let Some(Some(TypeDesc::Args { fixed, rest })) = closure.proto.param_types.get() else {
+        return Ok(None);
+    };
+    let witnesses = resolve_witnesses(ctx, closure, &contract.witnesses);
+    let mut converted: Option<Vec<VmValue>> = None;
+    for (i, arg) in args.iter().enumerate() {
+        let Some(expected) = fixed.get(i).or(rest.as_deref()) else {
+            break;
+        };
+        let normal = crate::exec::normalize::normalize(&mut ctx.heap, *arg, expected);
+        if normal != *arg {
+            converted.get_or_insert_with(|| args.to_vec())[i] = normal;
+        }
+    }
+    let actual = converted.as_deref().unwrap_or(args);
+    check_args(&ctx.heap, actual, fixed, rest.as_deref(), &witnesses)?;
+    Ok(converted)
+}
+
+pub(crate) fn verify_call(
+    ctx: &mut ExecCtx,
+    callee: VmValue,
+    args: &[VmValue],
+) -> Result<Option<Vec<VmValue>>, NativeError> {
+    let Some(closure) = target_closure(&ctx.heap, callee) else {
+        return Ok(None);
+    };
+    let proto = &closure.proto;
+    let Some(contract) = &proto.param_contract else {
+        return Ok(None);
+    };
+    let Some(desc) = proto
+        .param_types
+        .get_or_init(|| TypeDesc::decode(&contract.desc))
+    else {
+        return Ok(None);
+    };
+    let TypeDesc::Args { fixed, rest } = desc else {
+        return Ok(None);
+    };
+    let converts = *proto
+        .param_converts
+        .get_or_init(|| crate::exec::normalize::converts(desc));
+    if converts {
+        let closure = Rc::clone(closure);
+        return convert_args(ctx, &closure, args);
+    }
+    let witnesses = resolve_witnesses(ctx, closure, &contract.witnesses);
+    check_args(&ctx.heap, args, fixed, rest.as_deref(), &witnesses)?;
+    Ok(None)
+}
+
 impl Boundary for ExecCtx {
-    fn conform(&self, value: VmValue, desc: &str, witnesses: &[VmValue]) -> NativeFnResult {
-        crate::exec::conform::conform(&self.heap, value, desc, witnesses)
+    fn conform(&mut self, value: VmValue, desc: &str, witnesses: &[VmValue]) -> NativeFnResult {
+        crate::exec::conform::conform(&mut self.heap, value, desc, witnesses)
     }
 
-    fn verify_call(&self, callee: VmValue, args: &[VmValue]) -> Result<(), NativeError> {
+    fn verify_call(
+        &mut self,
+        callee: VmValue,
+        args: &[VmValue],
+    ) -> Result<Option<Vec<VmValue>>, NativeError> {
         verify_call(self, callee, args)
     }
 
