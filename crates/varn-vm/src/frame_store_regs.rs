@@ -1,6 +1,5 @@
 use super::frame_store::{FrameStore, SlotAddr};
-use super::frame_store_convert::value_kind_name;
-use crate::error::{RuntimeError, VmResult};
+use crate::error::VmResult;
 use crate::value::VmValue;
 use varn_types::register_meta::SlotClass;
 
@@ -58,56 +57,11 @@ impl FrameStore {
 
     #[inline(always)]
     pub fn get_addr(&self, a: SlotAddr) -> VmValue {
-        let i = a.idx as usize;
-        match a.class {
-            SlotClass::Gpr => VmValue::from_int(self.gpr[i]),
-            SlotClass::Fpr => VmValue::from_f64(self.fpr[i]),
-            SlotClass::Ref => self.refs[i].map_or(VmValue::null(), VmValue::from_heap),
-            SlotClass::Dyn => self.dyn_[i],
-        }
+        self.box_slot(a.class, a.idx as usize)
     }
 
     #[inline(always)]
     pub fn set_addr(&mut self, a: SlotAddr, v: VmValue) -> VmResult<()> {
-        let i = a.idx as usize;
-        match a.class {
-            SlotClass::Gpr => {
-                if !v.is_int() {
-                    return Err(RuntimeError::new(format!(
-                        "type mismatch: cannot store '{}' in an int register",
-                        value_kind_name(v)
-                    )));
-                }
-                self.gpr[i] = v.as_int();
-            }
-            SlotClass::Fpr => {
-                if v.is_f64() {
-                    self.fpr[i] = v.as_f64();
-                } else if v.is_int() {
-                    self.fpr[i] = v.as_int() as f64;
-                } else if v.is_null() {
-                    self.fpr[i] = f64::NAN;
-                } else {
-                    return Err(RuntimeError::new(format!(
-                        "type mismatch: cannot store '{}' in a float register",
-                        value_kind_name(v)
-                    )));
-                }
-            }
-            SlotClass::Ref => {
-                if v.is_null() {
-                    self.refs[i] = None;
-                } else if v.is_heap() {
-                    self.refs[i] = Some(v.as_heap());
-                } else {
-                    return Err(RuntimeError::new(format!(
-                        "type mismatch: cannot store '{}' in a reference register",
-                        value_kind_name(v)
-                    )));
-                }
-            }
-            SlotClass::Dyn => self.dyn_[i] = v,
-        }
-        Ok(())
+        self.unbox_into(a.class, a.idx as usize, v)
     }
 }

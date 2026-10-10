@@ -164,6 +164,7 @@ import "./169-dynamic-boundary-coroutines.vn"
 import "./170-dynamic-boundary-arguments.vn"
 import "./171-dynamic-boundary-object-types.vn"
 import "./173-super-method-spread.vn"
+import "./174-typed-register-guards.vn"
 
 summary()
 

@@ -10,11 +10,20 @@ pub(crate) fn value_kind_name(v: VmValue) -> &'static str {
         KIND_BOOL => "bool",
         KIND_INT => "int",
         KIND_FLOAT => "float",
-        KIND_HEAP => "reference",
+        KIND_HEAP => "object",
         KIND_SSO => "str",
         KIND_SYMBOL => "symbol",
         _ => varn_core::LangPrimitive::Dynamic.name(),
     }
+}
+
+#[cold]
+#[inline(never)]
+fn rejected(expected: &str, v: VmValue) -> RuntimeError {
+    RuntimeError::type_error(format!(
+        "type mismatch: expected '{expected}', got '{}'",
+        value_kind_name(v)
+    ))
 }
 
 impl FrameStore {
@@ -71,7 +80,7 @@ impl FrameStore {
     }
 
     #[inline(always)]
-    fn box_slot(&self, class: SlotClass, i: usize) -> VmValue {
+    pub(crate) fn box_slot(&self, class: SlotClass, i: usize) -> VmValue {
         match class {
             SlotClass::Gpr => VmValue::from_int(self.gpr[i]),
             SlotClass::Fpr => VmValue::from_f64(self.fpr[i]),
@@ -81,14 +90,11 @@ impl FrameStore {
     }
 
     #[inline(always)]
-    fn unbox_into(&mut self, class: SlotClass, i: usize, v: VmValue) -> VmResult<()> {
+    pub(crate) fn unbox_into(&mut self, class: SlotClass, i: usize, v: VmValue) -> VmResult<()> {
         match class {
             SlotClass::Gpr => {
                 if !v.is_int() {
-                    return Err(RuntimeError::new(format!(
-                        "type mismatch: cannot store '{}' in an int register",
-                        value_kind_name(v)
-                    )));
+                    return Err(rejected("int", v));
                 }
                 self.gpr[i] = v.as_int();
             }
@@ -97,13 +103,8 @@ impl FrameStore {
                     self.fpr[i] = v.as_f64();
                 } else if v.is_int() {
                     self.fpr[i] = v.as_int() as f64;
-                } else if v.is_null() {
-                    self.fpr[i] = f64::NAN;
                 } else {
-                    return Err(RuntimeError::new(format!(
-                        "type mismatch: cannot store '{}' in a float register",
-                        value_kind_name(v)
-                    )));
+                    return Err(rejected("float", v));
                 }
             }
             SlotClass::Ref => {
@@ -112,10 +113,7 @@ impl FrameStore {
                 } else if v.is_heap() {
                     self.refs[i] = Some(v.as_heap());
                 } else {
-                    return Err(RuntimeError::new(format!(
-                        "type mismatch: cannot store '{}' in a reference register",
-                        value_kind_name(v)
-                    )));
+                    return Err(rejected("object", v));
                 }
             }
             SlotClass::Dyn => self.dyn_[i] = v,

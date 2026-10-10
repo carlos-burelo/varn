@@ -1,0 +1,35 @@
+import { describe, it, expect } from "std:test";
+
+function outcome(f: () => void): str {
+    try {
+        f()
+        return "ok"
+    } catch (e) {
+        if (e instanceof TypeError) { return e.message }
+        return "other: " + e.message
+    }
+}
+
+const mixed: dynamic = [1, "x"]
+const nulls: dynamic = [null]
+
+await describe("174 typed register guards", async () => {
+    await it("a value that does not fit a typed parameter is a TypeError naming the argument", () => {
+        expect(outcome(() => { mixed.map((n: int) => n + 1) }))
+            .toBe("type mismatch: argument 1 expected 'int', got 'str'")
+        expect(outcome(() => { mixed.map((f: float) => f + 1.0) }))
+            .toBe("type mismatch: argument 1 expected 'float', got 'str'")
+    })
+
+    await it("null does not become NaN in a float parameter", () => {
+        expect(outcome(() => { nulls.map((f: float) => f + 1.0) }))
+            .toBe("type mismatch: argument 1 expected 'float', got 'null'")
+        expect(outcome(() => { nulls.map((f: float?) => f) })).toBe("ok")
+    })
+
+    await it("an int still widens into a float parameter", () => {
+        const ints: dynamic = [1, 2]
+        const out: float[] = ints.map((f: float) => f + 0.5)
+        expect(out[0]).toBe(1.5)
+    })
+})

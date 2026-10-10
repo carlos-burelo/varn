@@ -60,13 +60,14 @@ pub(crate) fn materialize_frame(
     let nparams = nc.proto.arity.min(nc.proto.register_count as usize);
     for r in 0..nparams {
         let v = window.get(r).copied().unwrap_or_else(VmValue::null);
-        if store.unbox_into_reg(alloc, r, v).is_err() {
+        if let Err(mut rejected) = store.unbox_into_reg(alloc, r, v) {
             store.pop_frame();
-            return Err(RuntimeError::new(format!(
-                "type mismatch: argument {} does not fit parameter of '{}'",
-                r,
-                nc.proto.name.as_deref().unwrap_or("<anon>")
-            )));
+            rejected.message = rejected.message.replacen(
+                "type mismatch: ",
+                &format!("type mismatch: argument {r} "),
+                1,
+            );
+            return Err(rejected);
         }
     }
     Ok(CallFrame::new(nc, alloc))
