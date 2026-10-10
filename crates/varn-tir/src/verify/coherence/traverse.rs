@@ -94,7 +94,7 @@ fn walk_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Verif
                 ));
             }
         }
-        TirExprKind::Cast { operand } | TirExprKind::Checked { operand } => {
+        TirExprKind::Cast { operand } | TirExprKind::Checked { operand, .. } => {
             walk_expr(m, f, operand, errors)
         }
         TirExprKind::Call { callee, args } => {

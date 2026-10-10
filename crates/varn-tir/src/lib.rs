@@ -8,7 +8,7 @@ mod resolution;
 pub use resolution::Resolution;
 
 mod node;
-pub use node::{
+pub use node::{SpreadShape, 
     Span, TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirObjectEntry, TirStmt, TirUnOp,
     TirUpvalue,
 };

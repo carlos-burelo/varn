@@ -219,17 +219,17 @@ impl<'m> Builder<'m> {
             | varn_tir::BackendTy::Tuple(_)
             | varn_tir::BackendTy::Enum(_)
             | varn_tir::BackendTy::Fn(_)
+            | varn_tir::BackendTy::Char
+            | varn_tir::BackendTy::Bytes
+            | varn_tir::BackendTy::Decimal
+            | varn_tir::BackendTy::BigInt
             | varn_tir::BackendTy::Dynamic(varn_tir::DynReason::Callable) => {
                 return self.lower_conform(v, node_ty, ty);
             }
             varn_tir::BackendTy::Int
             | varn_tir::BackendTy::Float
             | varn_tir::BackendTy::Bool
-            | varn_tir::BackendTy::Char
             | varn_tir::BackendTy::Str
-            | varn_tir::BackendTy::Bytes
-            | varn_tir::BackendTy::Decimal
-            | varn_tir::BackendTy::BigInt
             | varn_tir::BackendTy::Nullable(_)
             | varn_tir::BackendTy::Void
             | varn_tir::BackendTy::Never

@@ -19,6 +19,10 @@ pub enum TypeDesc {
     Class { witness: u32, name: String },
     Enum(String),
     Nullable(Box<TypeDesc>),
+    Args {
+        fixed: Vec<TypeDesc>,
+        rest: Option<Box<TypeDesc>>,
+    },
 }
 
 impl TypeDesc {
@@ -81,6 +85,21 @@ impl TypeDesc {
                 out.push('?');
                 inner.encode_into(out);
             }
+            TypeDesc::Args { fixed, rest } => {
+                out.push('A');
+                out.push_str(&fixed.len().to_string());
+                out.push(';');
+                for el in fixed {
+                    el.encode_into(out);
+                }
+                match rest {
+                    Some(el) => {
+                        out.push('+');
+                        el.encode_into(out);
+                    }
+                    None => out.push('.'),
+                }
+            }
         }
     }
 
@@ -134,6 +153,21 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
         }
         'E' => TypeDesc::Enum(take_until(rest, ';')?.to_string()),
         '?' => TypeDesc::Nullable(Box::new(decode_one(rest)?)),
+        'A' => {
+            let count: usize = take_until(rest, ';')?.parse().ok()?;
+            let mut fixed = Vec::with_capacity(count);
+            for _ in 0..count {
+                fixed.push(decode_one(rest)?);
+            }
+            let marker = rest.chars().next()?;
+            *rest = &rest[marker.len_utf8()..];
+            let tail = match marker {
+                '+' => Some(Box::new(decode_one(rest)?)),
+                '.' => None,
+                _ => return None,
+            };
+            TypeDesc::Args { fixed, rest: tail }
+        }
         _ => return None,
     })
 }
@@ -167,6 +201,22 @@ impl fmt::Display for TypeDesc {
             TypeDesc::Class { name, .. } => f.write_str(name),
             TypeDesc::Enum(name) => f.write_str(name),
             TypeDesc::Nullable(inner) => write!(f, "{inner}?"),
+            TypeDesc::Args { fixed, rest } => {
+                f.write_str("(")?;
+                for (i, el) in fixed.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{el}")?;
+                }
+                if let Some(el) = rest {
+                    if !fixed.is_empty() {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "...{el}")?;
+                }
+                f.write_str(")")
+            }
         }
     }
 }

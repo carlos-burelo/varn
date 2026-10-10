@@ -1,0 +1,79 @@
+import { describe, it, expect } from "std:test";
+
+function outcome(f: () => void): str {
+    try {
+        f()
+        return "ok"
+    } catch (e) {
+        if (e instanceof TypeError) { return e.message }
+        return "other: " + e.message
+    }
+}
+
+function pair(a: int, b: str): str { return a + ":" + b }
+function total(label: str, ...xs: int[]): int {
+    let t = 0
+    for (const x of xs) { t = t + x }
+    return t
+}
+function letter(c: char): char { return c }
+class Point {
+    constructor(public a: int, public b: str) {}
+    shift(a: int, ...rest: str[]): int { return a + rest.length }
+}
+
+const good: dynamic = [1, "x"]
+const bad: dynamic = ["no", "x"]
+const five: dynamic = 5
+const word: dynamic = "w"
+const nums: dynamic = [1, 2, 3]
+const mixed: dynamic = [1, "two"]
+
+await describe("170 dynamic boundary: arguments", async () => {
+    await it("a spread dynamic array is checked against the parameters it fills", () => {
+        expect(pair(...good)).toBe("1:x")
+        expect(outcome(() => { pair(...bad) })).toBe("type mismatch: expected '(int, str)', got 'Array'")
+    })
+
+    await it("arguments before a spread are still checked", () => {
+        expect(outcome(() => { pair(five, ...bad) })).toBe("ok")
+        expect(outcome(() => { pair(word, ...good) })).toBe("type mismatch: expected 'int', got 'str'")
+    })
+
+    await it("a rest parameter checks each argument against its element type", () => {
+        expect(total("s", 1, 2)).toBe(3)
+        expect(total("s", five)).toBe(5)
+        expect(outcome(() => { total("s", word) })).toBe("type mismatch: expected 'int', got 'str'")
+        expect(outcome(() => { total("s", 1, word) })).toBe("type mismatch: expected 'int', got 'str'")
+        expect(total("s", ...nums)).toBe(6)
+        expect(outcome(() => { total("s", ...mixed) })).toBe("type mismatch: expected '(...int)', got 'Array'")
+        expect(outcome(() => { total(...mixed) })).toBe("type mismatch: expected '(str, ...int)', got 'Array'")
+    })
+
+    await it("constructors and methods check spreads too", () => {
+        expect(new Point(...good).b).toBe("x")
+        expect(outcome(() => { new Point(...bad) })).toBe("type mismatch: expected '(int, str)', got 'Array'")
+        const p = new Point(1, "a")
+        const tail: dynamic = ["a", "b"]
+        const badTail: dynamic = ["a", 2]
+        expect(p.shift(1, ...tail)).toBe(3)
+        expect(outcome(() => { p.shift(1, ...badTail) })).toBe("type mismatch: expected '(...str)', got 'Array'")
+    })
+
+    await it("a typed spread is not re-checked and still works", () => {
+        const typed: int[] = [4, 5]
+        expect(total("s", ...typed)).toBe(9)
+    })
+
+    await it("char is checked like the other scalars", () => {
+        const z: dynamic = 'z'
+        expect(letter(z)).toBe('z')
+        expect(outcome(() => { letter(five) })).toBe("type mismatch: expected 'char', got 'int'")
+    })
+
+    await it("holds in a hot loop", () => {
+        let n = 0
+        for (let i = 0; i < 5000; i = i + 1) { n = n + total("s", ...nums) }
+        expect(n).toBe(30000)
+    })
+})

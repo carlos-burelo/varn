@@ -170,6 +170,26 @@ fn fit(heap: &Heap, v: VmValue, desc: &TypeDesc, witnesses: &[VmValue]) -> Optio
                 fit(heap, v, inner, witnesses)
             }
         }
+        TypeDesc::Args { fixed, rest } => {
+            if !v.is_heap() {
+                return Some(Fit::Exact);
+            }
+            let Some(HeapObj::Array(arr) | HeapObj::Tuple(arr)) = heap.get(v.as_heap()) else {
+                return Some(Fit::Exact);
+            };
+            for i in 0..arr.len() {
+                let Some(expected) = fixed.get(i).or(rest.as_deref()) else {
+                    break;
+                };
+                match fit(heap, arr.get_vm(i)?, expected, witnesses)? {
+                    Fit::Exact => {}
+                    Fit::Widened(widened) => {
+                        arr.set_vm(i, widened);
+                    }
+                }
+            }
+            Some(Fit::Exact)
+        }
     }
 }
 

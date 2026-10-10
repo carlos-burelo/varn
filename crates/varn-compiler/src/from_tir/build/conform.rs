@@ -16,6 +16,10 @@ pub(super) fn is_structural(ty: BackendTy) -> bool {
             | BackendTy::Tuple(_)
             | BackendTy::Enum(_)
             | BackendTy::Fn(_)
+            | BackendTy::Char
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
             | BackendTy::Dynamic(varn_tir::DynReason::Callable)
     )
 }
@@ -106,6 +110,55 @@ impl<'m> Builder<'m> {
         }
     }
 
+    pub(super) fn lower_conform_spread(
+        &mut self,
+        operand: &varn_tir::TirExpr,
+        shape: varn_tir::SpreadShape,
+    ) -> Result<Value> {
+        let v = self.lower_expr(operand)?;
+        let mut witnesses = Vec::new();
+        let fixed: Vec<TypeDesc> = if self.tir.types.contains_list(shape.fixed) {
+            self.tir
+                .types
+                .get_list(shape.fixed)
+                .iter()
+                .map(|ty| self.type_desc(*ty, &mut witnesses, 0))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let rest = shape
+            .rest
+            .filter(|id| self.tir.types.contains(*id))
+            .map(|id| self.type_desc(self.tir.types.get(id), &mut witnesses, 0));
+        if fixed.iter().all(TypeDesc::is_any) && rest.as_ref().is_none_or(TypeDesc::is_any) {
+            return Ok(v);
+        }
+        let desc = TypeDesc::Args {
+            fixed,
+            rest: rest.map(Box::new),
+        };
+        self.emit_conform(v, &desc, &witnesses)
+    }
+
+    fn emit_conform(
+        &mut self,
+        v: Value,
+        desc: &TypeDesc,
+        witnesses: &[Arc<str>],
+    ) -> Result<Value> {
+        let conform = varn_core::abi::native_global_index(varn_core::abi::CONFORM_GLOBAL).ok_or(
+            crate::OptError::Unsupported("from_tir: the conform runtime is not a native global"),
+        )?;
+        let callee = self.emit(InstKind::LoadNativeGlobalIdx(conform), HirType::Ref);
+        let text = self.emit(InstKind::ConstStr(Arc::from(desc.encode())), HirType::Str);
+        let mut args = vec![v, text];
+        for name in witnesses {
+            args.push(self.emit(self.global_load(name), HirType::Ref));
+        }
+        Ok(self.emit(InstKind::Call { callee, args }, HirType::Dynamic))
+    }
+
     pub(super) fn lower_conform(
         &mut self,
         v: Value,
@@ -114,16 +167,7 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         let mut witnesses = Vec::new();
         let desc = self.type_desc(node_ty, &mut witnesses, 0);
-        let conform = varn_core::abi::native_global_index(varn_core::abi::CONFORM_GLOBAL).ok_or(
-            crate::OptError::Unsupported("from_tir: the conform runtime is not a native global"),
-        )?;
-        let callee = self.emit(InstKind::LoadNativeGlobalIdx(conform), HirType::Ref);
-        let text = self.emit(InstKind::ConstStr(Arc::from(desc.encode())), HirType::Str);
-        let mut args = vec![v, text];
-        for name in &witnesses {
-            args.push(self.emit(self.global_load(name), HirType::Ref));
-        }
-        let checked = self.emit(InstKind::Call { callee, args }, HirType::Dynamic);
+        let checked = self.emit_conform(v, &desc, &witnesses)?;
         Ok(self.emit(InstKind::Cast { operand: checked, ty }, ty))
     }
 }
