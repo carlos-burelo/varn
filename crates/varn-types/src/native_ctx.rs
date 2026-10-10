@@ -7,7 +7,7 @@ use crate::value::SendValue;
 use crate::vm_value::VmValue;
 use crate::ClassObj;
 
-pub trait NativeCtx {
+pub trait NativeCtx: crate::Buffers {
     fn null_val(&self) -> VmValue {
         VmValue::null()
     }
@@ -66,8 +66,6 @@ pub trait NativeCtx {
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue;
     fn alloc_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue;
     fn alloc_class(&mut self, class: Rc<ClassObj>) -> VmValue;
-    fn alloc_buffer(&mut self, size: usize) -> VmValue;
-    fn alloc_buffer_from_bytes(&mut self, bytes: &[u8]) -> VmValue;
 
     fn boundary(&self) -> Option<&dyn crate::Boundary> {
         None
@@ -75,28 +73,7 @@ pub trait NativeCtx {
 
     fn is_string(&self, v: VmValue) -> bool;
     fn is_array(&self, v: VmValue) -> bool;
-    fn is_buffer(&self, _v: VmValue) -> bool {
-        false
-    }
-    fn buffer_len(&self, _v: VmValue) -> usize {
-        0
-    }
-    fn buffer_get_byte(&self, _v: VmValue, _idx: usize) -> Option<u8> {
-        None
-    }
-    fn buffer_set_byte(&mut self, _v: VmValue, _idx: usize, _byte: u8) -> bool {
-        false
-    }
-    fn buffer_slice(&mut self, _v: VmValue, _start: usize, _end: usize) -> Option<VmValue> {
-        None
-    }
-    fn buffer_to_string(&self, _v: VmValue) -> Option<String> {
-        None
-    }
 
-    fn buffer_to_bytes(&self, _v: VmValue) -> Option<Vec<u8>> {
-        None
-    }
     fn is_object(&self, _v: VmValue) -> bool {
         false
     }

@@ -1,4 +1,5 @@
 mod boundary;
+mod buffers;
 pub mod bytecode;
 pub mod capabilities;
 pub mod cell;
@@ -28,6 +29,7 @@ pub use native::{
     call_static_with, ArgType, NativeFn, NativeOpEntry, NativeOpTarget, SignatureDescriptor,
 };
 pub use boundary::Boundary;
+pub use buffers::Buffers;
 pub use native_ctx::NativeCtx;
 pub use native_ctx::NativeFnResult;
 pub use native_error::NativeError;

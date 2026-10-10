@@ -61,16 +61,6 @@ impl NativeCtx for Heap {
         self.deref_mut().alloc_enum_variant_vm(data)
     }
 
-    fn alloc_buffer(&mut self, size: usize) -> VmValue {
-        self.deref_mut()
-            .alloc_vm_buffer(varn_types::VmBuffer::new(size))
-    }
-
-    fn alloc_buffer_from_bytes(&mut self, bytes: &[u8]) -> VmValue {
-        self.deref_mut()
-            .alloc_vm_buffer(varn_types::VmBuffer::from_bytes(bytes))
-    }
-
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue {
         self.alloc_array_vm(items)
     }
@@ -350,5 +340,17 @@ impl NativeCtx for Heap {
 
     fn register_class(&mut self, name: &str, cls: std::rc::Rc<ClassObj>) {
         self.set_intrinsic_class(name, cls);
+    }
+}
+
+impl varn_types::Buffers for Heap {
+    fn alloc_buffer(&mut self, size: usize) -> VmValue {
+        self.deref_mut()
+            .alloc_vm_buffer(varn_types::VmBuffer::new(size))
+    }
+
+    fn alloc_buffer_from_bytes(&mut self, bytes: &[u8]) -> VmValue {
+        self.deref_mut()
+            .alloc_vm_buffer(varn_types::VmBuffer::from_bytes(bytes))
     }
 }

@@ -75,3 +75,41 @@ impl ExecCtx {
         None
     }
 }
+
+impl varn_types::Buffers for ExecCtx {
+    fn alloc_buffer(&mut self, size: usize) -> VmValue {
+        self.host_alloc_buffer(size)
+    }
+
+    fn alloc_buffer_from_bytes(&mut self, bytes: &[u8]) -> VmValue {
+        self.host_alloc_buffer_from_bytes(bytes)
+    }
+
+    fn is_buffer(&self, v: VmValue) -> bool {
+        self.host_is_buffer(v)
+    }
+
+    fn buffer_len(&self, v: VmValue) -> usize {
+        self.host_buffer_len(v)
+    }
+
+    fn buffer_get_byte(&self, v: VmValue, idx: usize) -> Option<u8> {
+        self.host_buffer_get_byte(v, idx)
+    }
+
+    fn buffer_set_byte(&mut self, v: VmValue, idx: usize, byte: u8) -> bool {
+        self.host_buffer_set_byte(v, idx, byte)
+    }
+
+    fn buffer_slice(&mut self, v: VmValue, start: usize, end: usize) -> Option<VmValue> {
+        self.host_buffer_slice(v, start, end)
+    }
+
+    fn buffer_to_string(&self, v: VmValue) -> Option<String> {
+        self.host_buffer_to_string(v)
+    }
+
+    fn buffer_to_bytes(&self, v: VmValue) -> Option<Vec<u8>> {
+        self.host_buffer_to_bytes(v)
+    }
+}

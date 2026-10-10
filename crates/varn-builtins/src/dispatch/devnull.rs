@@ -29,12 +29,6 @@ impl varn_types::NativeCtx for DevNullModuleCtx {
     ) -> VmValue {
         VmValue::null()
     }
-    fn alloc_buffer(&mut self, _size: usize) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_buffer_from_bytes(&mut self, _bytes: &[u8]) -> VmValue {
-        VmValue::null()
-    }
     fn alloc_range_data(&mut self, _range: varn_types::value::RangeData) -> VmValue {
         VmValue::null()
     }
@@ -100,6 +94,16 @@ impl varn_types::NativeCtx for DevNullModuleCtx {
         panic!("DevNullModuleCtx::resources")
     }
     fn call_static(&mut self, _f: varn_types::NativeFn) -> VmValue {
+        VmValue::null()
+    }
+}
+
+impl varn_types::Buffers for DevNullModuleCtx {
+    fn alloc_buffer(&mut self, _size: usize) -> VmValue {
+        VmValue::null()
+    }
+
+    fn alloc_buffer_from_bytes(&mut self, _bytes: &[u8]) -> VmValue {
         VmValue::null()
     }
 }

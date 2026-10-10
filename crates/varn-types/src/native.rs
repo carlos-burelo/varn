@@ -162,12 +162,6 @@ impl NativeCtx for DummyCtx {
     ) -> VmValue {
         VmValue::null()
     }
-    fn alloc_buffer(&mut self, _size: usize) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_buffer_from_bytes(&mut self, _bytes: &[u8]) -> VmValue {
-        VmValue::null()
-    }
     fn alloc_range_data(&mut self, _range: crate::value::RangeData) -> VmValue {
         VmValue::null()
     }
@@ -241,6 +235,16 @@ impl NativeCtx for DummyCtx {
     }
 }
 
+impl crate::Buffers for DummyCtx {
+    fn alloc_buffer(&mut self, _size: usize) -> VmValue {
+        VmValue::null()
+    }
+
+    fn alloc_buffer_from_bytes(&mut self, _bytes: &[u8]) -> VmValue {
+        VmValue::null()
+    }
+}
+
 struct StaticInitCtx;
 
 impl NativeCtx for StaticInitCtx {
@@ -268,12 +272,6 @@ impl NativeCtx for StaticInitCtx {
         _func: NativeFn,
         _name: &'static str,
     ) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_buffer(&mut self, _size: usize) -> VmValue {
-        VmValue::null()
-    }
-    fn alloc_buffer_from_bytes(&mut self, _bytes: &[u8]) -> VmValue {
         VmValue::null()
     }
     fn alloc_range_data(&mut self, _range: crate::value::RangeData) -> VmValue {
@@ -346,6 +344,16 @@ impl NativeCtx for StaticInitCtx {
     }
     fn call_static(&mut self, f: NativeFn) -> VmValue {
         (f)(self as &mut dyn NativeCtx, &[]).unwrap_or(VmValue::null())
+    }
+}
+
+impl crate::Buffers for StaticInitCtx {
+    fn alloc_buffer(&mut self, _size: usize) -> VmValue {
+        VmValue::null()
+    }
+
+    fn alloc_buffer_from_bytes(&mut self, _bytes: &[u8]) -> VmValue {
+        VmValue::null()
     }
 }
 
