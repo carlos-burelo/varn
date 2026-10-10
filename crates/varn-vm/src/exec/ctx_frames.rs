@@ -41,7 +41,8 @@ impl ExecCtx {
                             if self.stage.is_empty() {
                                 self.stage.push(recv_nv);
                             } else {
-                                self.stage[0] = recv_nv;
+                                let start = self.stage.len().saturating_sub(arg_count);
+                                self.stage[start] = recv_nv;
                             }
                         }
                         PreparedCall::Constructor(..)
