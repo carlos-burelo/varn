@@ -203,7 +203,17 @@ pub fn drive_main(
                                 );
                             } else {
                                 let mut err = err;
-                                err.message = format!("awaited task failed: {}", err.message);
+                                let trace =
+                                    varn_types::NativeCtx::get_field(&machine.ctx, thrown, "stack")
+                                        .map(|stack| machine.ctx.heap.str_repr(stack))
+                                        .filter(|stack| !stack.is_empty());
+                                err.message = match trace {
+                                    Some(trace) => {
+                                        format!("awaited task failed: {}
+{trace}", err.message)
+                                    }
+                                    None => format!("awaited task failed: {}", err.message),
+                                };
                                 return DriveResult::Failed(err);
                             }
                         }

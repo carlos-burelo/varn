@@ -106,17 +106,7 @@ fn finish(queue: &TaskQueue, mut ctx: Box<ExecCtx>, output: &Rc<TaskCell>, res: 
 }
 
 fn failure_value(ctx: &mut ExecCtx, err: crate::error::RuntimeError) -> VmValue {
-    if let Some(thrown) = err.thrown {
-        return thrown;
-    }
-    let mut msg = err.message;
-    for frame in &err.frames {
-        msg.push_str(&format!(
-            "\n  at {} ({}:{})",
-            frame.fn_name, frame.file, frame.line
-        ));
-    }
-    ctx.heap.alloc_str(&msg)
+    crate::exec::exceptions::thrown_value_for(&err, &mut ctx.heap)
 }
 
 pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) {

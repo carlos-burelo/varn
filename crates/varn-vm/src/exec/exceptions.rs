@@ -114,11 +114,19 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         return msg;
     };
     let name = heap.alloc_str_dynamic(class_name);
+    let trace: Vec<String> = err
+        .frames
+        .iter()
+        .map(|frame| format!("  at {} ({}:{})", frame.fn_name, frame.file, frame.line))
+        .collect();
+    let stack = heap.alloc_str_dynamic(&trace.join("
+"));
     let (shape, n) = cls.instance_shape();
     let err_obj = heap.alloc_object_cell(false, shape, n, &[]);
     if let Some(HeapObj::Object(oref)) = heap.get(err_obj.as_heap()) {
         oref.set_field(std::sync::Arc::from("message"), msg);
         oref.set_field(std::sync::Arc::from("name"), name);
+        oref.set_field(std::sync::Arc::from("stack"), stack);
     }
     err_obj
 }
