@@ -223,6 +223,7 @@ impl<'r> Checker<'r> {
     pub(super) fn check_update(&mut self, rec: &mut Recorder, operand: ExprId, bind: &BindResult) {
         let arena = self.ast_arena;
         self.check_expr(rec, operand, bind);
+        self.require_number(rec, operand, "'++' and '--'", bind);
         if self.pure_scope.is_some() {
             let range = arena.expr(operand).range;
             match &arena.expr(operand).kind {

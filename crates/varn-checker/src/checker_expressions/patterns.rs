@@ -31,9 +31,42 @@ impl<'r> Checker<'r> {
                 }
             }
             Pattern::Array { elements, rest, .. } => {
+                let fixed: Option<Vec<Type>> =
+                    if let varn_core::TypeKind::Tuple(items) = self.ty_table.get(value_ty.0) {
+                        Some(
+                            self.ty_table
+                                .get_list(items)
+                                .iter()
+                                .map(|item| Type::resolved(*item))
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    };
                 let elem_ty = value_ty.get_array_element_type(&self.ty_table);
-                for el in elements.iter().flatten() {
-                    self.check_pattern(rec, &el.pattern, &elem_ty, bind);
+                for (at, el) in elements.iter().enumerate() {
+                    let Some(el) = el else { continue };
+                    let item_ty = match &fixed {
+                        Some(items) => match items.get(at) {
+                            Some(item) => *item,
+                            None => {
+                                self.emit(
+                                    varn_core::Diagnostic::error(
+                                        varn_core::ErrorCode::TupleIndexOutOfBounds,
+                                        format!(
+                                            "this pattern takes element {at}, but '{}' has {} elements",
+                                            value_ty.display(&self.ty_table, &bind.interner),
+                                            items.len()
+                                        ),
+                                    )
+                                    .with_range(*el.pattern.range()),
+                                );
+                                Type::Dynamic
+                            }
+                        },
+                        None => elem_ty,
+                    };
+                    self.check_pattern(rec, &el.pattern, &item_ty, bind);
                 }
                 if let Some(r) = rest {
                     self.check_pattern(rec, r, value_ty, bind);
@@ -43,8 +76,25 @@ impl<'r> Checker<'r> {
                 properties, rest, ..
             } => {
                 for prop in properties {
+                    let key = bind.interner.resolve(prop.key);
+                    let defaulted = matches!(prop.value, Pattern::Assignment { .. });
+                    if !defaulted
+                        && !value_ty.is_dynamic()
+                        && !self.member_exists_cached(value_ty, key, bind)
+                    {
+                        self.emit(
+                            varn_core::Diagnostic::error(
+                                varn_core::ErrorCode::MissingProperty,
+                                format!(
+                                    "property '{key}' does not exist on type '{}'",
+                                    value_ty.display(&self.ty_table, &bind.interner)
+                                ),
+                            )
+                            .with_range(*prop.value.range()),
+                        );
+                    }
                     let prop_ty = self
-                        .find_member_info(value_ty, bind.interner.resolve(prop.key), bind)
+                        .find_member_info(value_ty, key, bind)
                         .map(|(t, _)| t)
                         .unwrap_or(Type::Dynamic);
                     self.check_pattern(rec, &prop.value, &prop_ty, bind);

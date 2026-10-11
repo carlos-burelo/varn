@@ -129,13 +129,50 @@ impl Checker<'_> {
         op: varn_core::ast::operators::UnaryOp,
         operand: ExprId,
         bind: &BindResult,
-    ) {
+    ) -> bool {
         let Some(method) = varn_core::capability::unary_operator_method(op) else {
-            return;
+            return false;
         };
         let ty = self.infer_type(rec, operand, bind);
         if self.resolve_operator(&ty, method, bind).is_some() {
             rec.desugar.operator_calls.insert(expr.index());
+            return true;
         }
+        false
+    }
+
+    pub(super) fn require_number(
+        &mut self,
+        rec: &mut Recorder,
+        operand: ExprId,
+        what: &str,
+        bind: &BindResult,
+    ) {
+        let ty = self.infer_type(rec, operand, bind);
+        if ty.is_dynamic() {
+            return;
+        }
+        let numbers = varn_sem::types::Type::union(
+            vec![
+                varn_sem::types::Type::Int,
+                varn_sem::types::Type::Float,
+                varn_sem::types::Type::Decimal,
+                varn_sem::types::Type::BigInt,
+            ],
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        );
+        if self.types_compatible_cached(&numbers, &ty, Some(bind)) {
+            return;
+        }
+        self.emit(
+            varn_core::Diagnostic::error(
+                varn_core::ErrorCode::InvalidTypeOperator,
+                format!(
+                    "invalid operand: {what} needs a number, got '{}'",
+                    ty.display(&self.ty_table, &bind.interner)
+                ),
+            )
+            .with_range(self.ast_arena.expr(operand).range),
+        );
     }
 }

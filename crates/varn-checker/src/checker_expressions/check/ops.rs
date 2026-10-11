@@ -21,7 +21,13 @@ impl<'r> Checker<'r> {
         if op == UnaryOp::Not {
             self.require_condition(rec, operand, bind);
         }
-        self.check_unary_capability(rec, expr, op, operand, bind);
+        let overloaded = self.check_unary_capability(rec, expr, op, operand, bind);
+        match op {
+            UnaryOp::Minus | UnaryOp::Plus | UnaryOp::BitNot if !overloaded => {
+                self.require_number(rec, operand, "this operator", bind)
+            }
+            UnaryOp::Minus | UnaryOp::Plus | UnaryOp::BitNot | UnaryOp::Not | UnaryOp::Typeof => {}
+        }
         if overflows_int_literal(expr, arena) && !overflows_int_literal(operand, arena) {
             self.report_int_overflow(expr);
         }
