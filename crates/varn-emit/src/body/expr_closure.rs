@@ -67,6 +67,7 @@ impl<'a> FnEmitter<'a> {
             param_names,
         );
         sub.outer_names = outer_names;
+        sub.home_class = self.home_class;
         sub.expect_results(declared, is_async, is_generator);
         let mut stmts = sub.destructure_params(params);
         stmts.extend(match body {

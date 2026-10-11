@@ -122,6 +122,41 @@ impl<'r> Checker<'r> {
             Diagnostic::error(ErrorCode::StaticMemberOnInstance, message).with_range(*range),
         );
     }
+    pub(super) fn note_inherited_read(
+        &mut self,
+        rec: &mut crate::checker::recorder::Recorder,
+        property: ExprId,
+        bind: &BindResult,
+    ) {
+        let ExprKind::Identifier { name } = &self.ast_arena.expr(property).kind else {
+            return;
+        };
+        let member = bind.interner.resolve(*name);
+        let Some(parent) = self
+            .current_class
+            .as_ref()
+            .and_then(|class| bind.class_parents.get(class.as_ref()))
+        else {
+            return;
+        };
+        let Some(members) = varn_sem::bind::BindView::new(bind, self.resolver)
+            .get_class_members(&parent.name, parent.origin.as_deref())
+        else {
+            return;
+        };
+        let has = |kind: ClassMemberKind| {
+            members
+                .iter()
+                .any(|m| m.name.as_ref() == member && m.kind == kind && !m.is_static)
+        };
+        let at = self.ast_arena.expr(property).range.start.offset;
+        if has(ClassMemberKind::Getter) {
+            rec.desugar.inherited_getters.insert(at);
+        } else if has(ClassMemberKind::Property) || has(ClassMemberKind::Variable) {
+            rec.desugar.inherited_fields.insert(at);
+        }
+    }
+
     pub(super) fn check_accessor_side(
         &mut self,
         owner: &Type,

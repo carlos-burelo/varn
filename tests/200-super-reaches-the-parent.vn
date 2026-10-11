@@ -1,0 +1,51 @@
+import { describe, it, expect } from "std:test";
+
+class Base {
+    stock: int = 5
+    get size(): int { return 1 }
+    count(): int { return 10 }
+    label(suffix: str = "a"): str { return "B" + suffix }
+}
+class Mid extends Base {
+    override get size(): int { return super.size + 100 }
+    override count(): int {
+        const once = (): int => super.count() + 1
+        const mapped = (k: int): int => [1, 2].map((x) => x + super.count())[0] + k
+        return once() + mapped(1000)
+    }
+    held(): int { return super.stock + 1 }
+    named(): str { const f = (): str => super.label() + super.label("z"); return f() }
+    borrowed(): int { const count = super.count; return count() }
+}
+class Leaf extends Mid { }
+class Tip extends Leaf {
+    override count(): int { return super.count() + 100000 }
+}
+
+function many(x: Mid): int {
+    let total = 0
+    for (let i = 0; i < 300; i = i + 1) { total = total + x.count() + x.size }
+    return total
+}
+
+await describe("200 super reaches the parent", async () => {
+    await it("a getter, a field and a method value of the parent", () => {
+        const m = new Mid()
+        expect(m.size).toBe(101)
+        expect(m.held()).toBe(6)
+        expect(m.borrowed()).toBe(10)
+    })
+
+    await it("an arrow inside a method reaches the same parent", () => {
+        const m = new Mid()
+        expect(m.count()).toBe(1022)
+        expect(m.named()).toBe("BaBz")
+    })
+
+    await it("inherited further down, super still means the parent of where it is written", () => {
+        expect(new Leaf().count()).toBe(1022)
+        expect(new Tip().count()).toBe(101022)
+        expect(new Tip().size).toBe(101)
+        expect(many(new Leaf())).toBe(336900)
+    })
+})

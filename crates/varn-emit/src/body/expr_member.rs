@@ -149,6 +149,9 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
+        if let Some(read) = self.inherited_read(object, property, computed, ty, span) {
+            return read;
+        }
         if optional && !computed {
             let name = Self::member_name(self.ast_arena, property, self.m.interner)
                 .unwrap_or_else(|| Arc::from("<member>"));
@@ -282,6 +285,39 @@ impl<'a> FnEmitter<'a> {
         }
 
         self.field_access(obj, name, ty, span)
+    }
+
+    fn inherited_read(
+        &mut self,
+        object: ExprId,
+        property: ExprId,
+        computed: bool,
+        ty: BackendTy,
+        span: Span,
+    ) -> Option<TirExpr> {
+        if computed || !matches!(self.ast_arena.expr(object).kind, ExprKind::Super) {
+            return None;
+        }
+        let name = Self::member_name(self.ast_arena, property, self.m.interner)?;
+        let at = self.ast_arena.expr(property).range.start.offset;
+        if self.m.desugar.inherited_fields.contains(&at) {
+            let this = self.this_var(span);
+            return Some(self.field_access(this, name, ty, span));
+        }
+        let accessor = self.m.desugar.inherited_getters.contains(&at);
+        let member = self.inherited_member(&name, accessor, span)?;
+        if !accessor {
+            return Some(member);
+        }
+        Some(TirExpr {
+            kind: TirExprKind::Call {
+                callee: Box::new(member),
+                args: vec![],
+            },
+            ty,
+            res: Resolution::None,
+            span,
+        })
     }
 
     pub(super) fn field_access(

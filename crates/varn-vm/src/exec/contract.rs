@@ -10,7 +10,7 @@ use varn_types::chunk::ContractWitness;
 use varn_types::value::BoundMethodTarget;
 use varn_types::{Boundary, ClassObj, NativeCtx, NativeError, NativeFn, NativeFnResult};
 
-const RUNTIME_OPS: [(&str, NativeFn); 8] = [
+const RUNTIME_OPS: [(&str, NativeFn); 9] = [
     (
         varn_core::runtime_ops::CONFORM,
         crate::exec::conform::conform_native,
@@ -28,7 +28,20 @@ const RUNTIME_OPS: [(&str, NativeFn); 8] = [
         verify_super_spread_native,
     ),
     (varn_core::runtime_ops::STR_INDEX, str_index_native),
+    (varn_core::runtime_ops::INHERITED, inherited_native),
 ];
+
+fn inherited_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
+    let [home, receiver, name, accessor] = args else {
+        return Ok(VmValue::null());
+    };
+    let name = ctx.str_repr(*name);
+    let accessor = accessor.is_truthy();
+    match ctx.boundary_mut() {
+        Some(boundary) => boundary.inherited(*home, *receiver, &name, accessor),
+        None => Ok(VmValue::null()),
+    }
+}
 
 fn str_index_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
     let [text, index] = args else {
@@ -50,7 +63,7 @@ fn str_index_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult
 }
 
 pub(crate) fn runtime_op(op_id: u64) -> Option<NativeFn> {
-    static IDS: std::sync::OnceLock<[u64; 8]> = std::sync::OnceLock::new();
+    static IDS: std::sync::OnceLock<[u64; 9]> = std::sync::OnceLock::new();
     let ids = IDS.get_or_init(|| RUNTIME_OPS.map(|(name, _)| varn_core::runtime_ops::op_id(name)));
     ids.iter()
         .position(|id| *id == op_id)
@@ -338,5 +351,63 @@ impl Boundary for ExecCtx {
 
     fn class_method(&self, class: VmValue, name: &str) -> VmValue {
         class_method(self, class, name)
+    }
+
+    fn inherited(
+        &mut self,
+        home: VmValue,
+        receiver: VmValue,
+        name: &str,
+        accessor: bool,
+    ) -> NativeFnResult {
+        let parent = match self.heap.heap_ref(home).and_then(|at| self.heap.get(at)) {
+            Some(HeapObj::Class(class)) => class.superclass.borrow().clone(),
+            Some(
+                HeapObj::Str(_)
+                | HeapObj::Array(_)
+                | HeapObj::Tuple(_)
+                | HeapObj::Object(_)
+                | HeapObj::Record(_)
+                | HeapObj::Buffer(_)
+                | HeapObj::Module(_)
+                | HeapObj::FrozenModule(_)
+                | HeapObj::VmClosure(_)
+                | HeapObj::NativeFn(..)
+                | HeapObj::BoundMethod(_)
+                | HeapObj::Map(_)
+                | HeapObj::Set(_)
+                | HeapObj::Task(_)
+                | HeapObj::TaskHandle(_)
+                | HeapObj::Range(_)
+                | HeapObj::Symbol(_)
+                | HeapObj::Char(_)
+                | HeapObj::Generator(_)
+                | HeapObj::Spread(_)
+                | HeapObj::BigInt(_)
+                | HeapObj::Decimal(_)
+                | HeapObj::EnumVariant(_),
+            )
+            | None => None,
+        };
+        let found = parent.as_ref().and_then(|class| {
+            if accessor {
+                class.find_getter(name)
+            } else {
+                class.find_method(name)
+            }
+        });
+        match found {
+            Some(member) => Ok(crate::exec::props::bind_method_to_receiver(
+                &mut self.heap,
+                receiver,
+                member,
+                parent,
+            )),
+            None => Err(NativeError::rethrow(
+                varn_core::RuntimeErrorKind::TypeError,
+                format!("super: the parent class has no member '{name}'"),
+                None,
+            )),
+        }
     }
 }

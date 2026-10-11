@@ -65,9 +65,7 @@ impl<'r> Checker<'r> {
             ArrowBody::Block(stmt) if return_type.is_some() => Some(*stmt),
             ArrowBody::Block(_) | ArrowBody::Expr(_) => None,
         };
-        let outer_super = std::mem::replace(&mut self.super_reachable, false);
         self.in_function_body(is_async, |c| c.check_arrow_body(rec, body, range, bind));
-        self.super_reachable = outer_super;
         if let Some(block) = block {
             self.require_return(block, bind);
         }

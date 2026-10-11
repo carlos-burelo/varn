@@ -22,14 +22,8 @@ impl<'r> Checker<'r> {
         let arena = self.ast_arena;
         let property_range = arena.expr(property).range;
         let called = std::mem::replace(&mut self.callee_position, false);
-        if !called && matches!(arena.expr(object).kind, ExprKind::Super) {
-            self.emit(
-                Diagnostic::error(
-                    ErrorCode::InvalidSuperCall,
-                    "'super' can only call a method of the parent: write 'super.name(...)'",
-                )
-                .with_range(*range),
-            );
+        if !called && !computed && matches!(arena.expr(object).kind, ExprKind::Super) {
+            self.note_inherited_read(rec, property, bind);
         }
         self.check_expr(rec, object, bind);
         if computed {

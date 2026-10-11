@@ -1,5 +1,0 @@
-// VN4114
-class Base { size(): int { return 1 } }
-class Child extends Base {
-    override size(): int { const grow = (): int => super.size() + 1; return grow() }
-}

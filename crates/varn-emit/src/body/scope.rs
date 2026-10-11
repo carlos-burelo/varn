@@ -33,6 +33,7 @@ impl<'a> FnEmitter<'a> {
             params,
             this_class: None,
             this_enum: None,
+            home_class: None,
             top_level: false,
             saw_await: false,
             outer_names: FxHashSet::default(),
@@ -224,6 +225,7 @@ impl<'a> FnEmitter<'a> {
 
     pub fn with_this(mut self, class: ClassId) -> Self {
         self.this_class = Some(class);
+        self.home_class = Some(class);
         self
     }
 

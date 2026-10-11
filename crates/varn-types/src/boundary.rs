@@ -9,4 +9,11 @@ pub trait Boundary {
     ) -> Result<Option<Vec<VmValue>>, NativeError>;
     fn method_callee(&self, recv: VmValue, name: &str) -> VmValue;
     fn class_method(&self, class: VmValue, name: &str) -> VmValue;
+    fn inherited(
+        &mut self,
+        home: VmValue,
+        receiver: VmValue,
+        name: &str,
+        accessor: bool,
+    ) -> NativeFnResult;
 }

@@ -276,6 +276,37 @@ impl<'a> FnEmitter<'a> {
             .collect()
     }
 
+    pub(super) fn inherited_member(
+        &mut self,
+        name: &str,
+        accessor: bool,
+        span: Span,
+    ) -> Option<TirExpr> {
+        let home = self.home_class?;
+        let home_name = self.m.classes.get(home.0 as usize)?.name.clone();
+        let opaque = BackendTy::Dynamic(DynReason::NotYetSupported);
+        let home = TirExpr {
+            kind: TirExprKind::Var,
+            ty: opaque,
+            res: self.resolve_name(&home_name),
+            span,
+        };
+        let literal = |kind: TirExprKind, ty: BackendTy| TirExpr {
+            kind,
+            ty,
+            res: Resolution::None,
+            span,
+        };
+        let this = self.this_var(span);
+        let name = literal(TirExprKind::StrLit(Arc::from(name)), BackendTy::Str);
+        let accessor = literal(TirExprKind::BoolLit(accessor), BackendTy::Bool);
+        self.call_runtime(
+            varn_core::runtime_ops::INHERITED,
+            vec![home, this, name, accessor],
+            span,
+        )
+    }
+
     fn call_runtime(&mut self, op: &str, args: Vec<TirExpr>, span: Span) -> Option<TirExpr> {
         let mut args = args.into_iter();
         let subject = args.next()?;

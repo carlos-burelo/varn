@@ -57,6 +57,8 @@ pub(crate) struct FnEmitter<'a> {
 
     pub(super) this_enum: Option<EnumId>,
 
+    pub(super) home_class: Option<ClassId>,
+
     pub(super) top_level: bool,
 
     pub(super) saw_await: bool,

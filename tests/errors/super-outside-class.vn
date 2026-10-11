@@ -1,0 +1,2 @@
+// VN4114
+function outside(): int { return super.size() }

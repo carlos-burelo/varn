@@ -1,3 +1,0 @@
-// VN4109
-class Base { get size(): int { return 1 } }
-class Child extends Base { override get size(): int { return super.size + 1 } }

@@ -145,6 +145,21 @@ impl<'a> FnEmitter<'a> {
                 if let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner) {
                     let targs = self.lower_call_args(call_id, args);
                     let targs = self.settle_super_args(&name, targs, span);
+                    let reached = match self.this_class {
+                        Some(_) => None,
+                        None => self.inherited_member(&name, false, span),
+                    };
+                    if let Some(callee) = reached {
+                        return TirExpr {
+                            kind: TirExprKind::Call {
+                                callee: Box::new(callee),
+                                args: targs,
+                            },
+                            ty,
+                            res: Resolution::None,
+                            span,
+                        };
+                    }
                     return TirExpr {
                         kind: TirExprKind::SuperMethodCall { name, args: targs },
                         ty,

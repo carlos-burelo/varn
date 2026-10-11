@@ -69,6 +69,8 @@ pub struct Desugarings {
     pub operator_calls: FxHashSet<varn_core::ast::AstId>,
     pub foreign_enums: Vec<ForeignEnum>,
     pub call_params: FxHashMap<varn_core::ast::AstId, Vec<CheckedParam>>,
+    pub inherited_getters: FxHashSet<u32>,
+    pub inherited_fields: FxHashSet<u32>,
     pub foreign_classes: Vec<ForeignClass>,
     pub foreign_inherited_fields: std::collections::BTreeMap<Arc<str>, Vec<InheritedField>>,
     pub match_arm_subjects: FxHashMap<varn_core::ast::AstId, Vec<Type>>,

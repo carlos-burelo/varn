@@ -274,7 +274,7 @@ impl<'r> Checker<'r> {
                     self.emit(
                         varn_core::Diagnostic::error(
                             varn_core::ErrorCode::SuperOutsideMethod,
-                            "'super' can only be used directly in a method or constructor of a class, not inside a function or arrow nested in it",
+                            "'super' can only be used in a method or constructor of a class, or in an arrow written inside one",
                         )
                         .with_range(range),
                     );
