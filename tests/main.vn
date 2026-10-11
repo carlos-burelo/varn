@@ -188,6 +188,7 @@ import "./193-to-equal-compares-contents.vn"
 import "./194-generator-declared-yield.vn"
 import "./195-namespace-members.vn"
 import "./196-string-order.vn"
+import "./197-switch-cases.vn"
 
 summary()
 

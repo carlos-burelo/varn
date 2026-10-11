@@ -33,12 +33,14 @@ impl<'r> Checker<'r> {
                 self.check_return_stmt(rec, *argument, range, bind);
             }
 
-            StmtKind::Break { .. } => {
+            StmtKind::Break { label } => {
                 self.check_break_stmt(range);
+                self.reject_labeled_jump(label.is_some(), varn_core::ErrorCode::InvalidBreakTarget, range);
             }
 
-            StmtKind::Continue { .. } => {
+            StmtKind::Continue { label } => {
                 self.check_continue_stmt(range);
+                self.reject_labeled_jump(label.is_some(), varn_core::ErrorCode::InvalidContinueTarget, range);
             }
 
             StmtKind::If {

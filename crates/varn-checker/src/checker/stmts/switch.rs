@@ -1,6 +1,6 @@
 use super::super::Checker;
 use crate::checker::recorder::Recorder;
-use varn_core::ast::{AstArena, ExprId, SwitchCase};
+use varn_core::ast::{AstArena, ExprId, StmtId, StmtKind, SwitchCase};
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
 
@@ -15,7 +15,8 @@ impl<'r> Checker<'r> {
         self.check_expr(rec, discriminant, bind);
         self.switch_depth += 1;
         let mut seen_cases = rustc_hash::FxHashSet::default();
-        for case in &cases {
+        for (at, case) in cases.iter().enumerate() {
+            self.check_case_shape(case, at + 1 == cases.len());
             if let Some(t) = case.test {
                 self.check_expr(rec, t, bind);
                 if let Some(lit_val) = get_literal_value_key(t, self.ast_arena) {
@@ -33,6 +34,95 @@ impl<'r> Checker<'r> {
             self.check_stmts(rec, &case.body, bind);
         }
         self.switch_depth -= 1;
+    }
+}
+
+impl<'r> Checker<'r> {
+    fn check_case_shape(&mut self, case: &SwitchCase, is_last: bool) {
+        let arena = self.ast_arena;
+        let reject = |c: &mut Self, message: &str, range| {
+            c.emit(Diagnostic::error(ErrorCode::InvalidSwitchCase, message).with_range(range));
+        };
+        if case.test.is_none() && !is_last {
+            reject(self, "'default' must be the last case of a switch", case.range);
+        }
+        if case.body.is_empty() && !is_last {
+            reject(
+                self,
+                "an empty case does nothing: a case never falls through to the next one. Use 'match' with 'a | b' to share a body",
+                case.range,
+            );
+        }
+        let closing = case
+            .body
+            .last()
+            .copied()
+            .filter(|s| matches!(arena.stmt(*s).kind, StmtKind::Break { label: None }));
+        let mut stray = Vec::new();
+        for stmt in &case.body {
+            if Some(*stmt) != closing {
+                stray_breaks(*stmt, arena, &mut stray);
+            }
+        }
+        for stmt in stray {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::InvalidBreakTarget,
+                    "'break' can only close a switch case as its last statement: cases never fall through, so nothing else needs it",
+                )
+                .with_range(arena.stmt(stmt).range),
+            );
+        }
+    }
+}
+
+fn stray_breaks(stmt: StmtId, arena: &AstArena, out: &mut Vec<StmtId>) {
+    match &arena.stmt(stmt).kind {
+        StmtKind::Break { .. } => out.push(stmt),
+        StmtKind::Block { stmts } => {
+            for s in stmts {
+                stray_breaks(*s, arena, out);
+            }
+        }
+        StmtKind::If {
+            consequent,
+            alternate,
+            ..
+        } => {
+            stray_breaks(*consequent, arena, out);
+            if let Some(alt) = alternate {
+                stray_breaks(*alt, arena, out);
+            }
+        }
+        StmtKind::Try {
+            block,
+            catches,
+            finally,
+        } => {
+            stray_breaks(*block, arena, out);
+            for c in catches {
+                stray_breaks(c.body, arena, out);
+            }
+            if let Some(f) = finally {
+                stray_breaks(*f, arena, out);
+            }
+        }
+        StmtKind::Labeled { body, .. } => stray_breaks(*body, arena, out),
+        StmtKind::Empty
+        | StmtKind::Expr { .. }
+        | StmtKind::Decl(_)
+        | StmtKind::Error
+        | StmtKind::While { .. }
+        | StmtKind::DoWhile { .. }
+        | StmtKind::For { .. }
+        | StmtKind::ForIn { .. }
+        | StmtKind::ForOf { .. }
+        | StmtKind::Switch { .. }
+        | StmtKind::Return { .. }
+        | StmtKind::Continue { .. }
+        | StmtKind::Throw { .. }
+        | StmtKind::Using { .. }
+        | StmtKind::Debugger => {}
     }
 }
 

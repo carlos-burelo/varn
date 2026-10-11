@@ -87,6 +87,7 @@ pub enum ErrorCode {
     InvalidUsingTarget = 4016,
     UseBeforeAssignment = 4017,
     MissingReturn = 4018,
+    InvalidSwitchCase = 4019,
 
     MissingOverride = 4101,
     SpuriousOverride = 4102,
@@ -214,6 +215,7 @@ impl ErrorCode {
             ErrorCode::InvalidUsingTarget => "invalid-using-target",
             ErrorCode::UseBeforeAssignment => "use-before-assignment",
             ErrorCode::MissingReturn => "missing-return",
+            ErrorCode::InvalidSwitchCase => "invalid-switch-case",
             ErrorCode::IncompatibleOverride => "incompatible-override",
             ErrorCode::InterfaceNotSatisfied => "interface-not-satisfied",
 

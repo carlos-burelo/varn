@@ -67,6 +67,19 @@ impl<'r> Checker<'r> {
         }
     }
 
+    pub(super) fn reject_labeled_jump(&mut self, labeled: bool, code: ErrorCode, range: SourceRange) {
+        if !labeled {
+            return;
+        }
+        self.emit(
+            Diagnostic::error(
+                code,
+                "a jump to a label is not supported: 'break' and 'continue' act on the innermost loop",
+            )
+            .with_range(range),
+        );
+    }
+
     pub(super) fn check_continue_stmt(&mut self, range: SourceRange) {
         if self.loop_depth == 0 {
             self.emit(

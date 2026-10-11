@@ -1,0 +1,9 @@
+// VN4019
+function f(n: int): int {
+    switch (n) {
+        default:
+            return 0
+        case 1:
+            return 1
+    }
+}

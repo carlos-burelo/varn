@@ -1,0 +1,13 @@
+// VN4005
+function f(n: int): int {
+    let r = 0
+    switch (n) {
+        case 1:
+            if (n > 0) { break }
+            r = 1
+            break
+        default:
+            r = 2
+    }
+    return r
+}

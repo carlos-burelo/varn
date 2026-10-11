@@ -27,7 +27,14 @@ impl<'a> FnEmitter<'a> {
             return vec![];
         };
         self.scopes.push(FxHashMap::default());
-        let body: Vec<TirStmt> = case.body.iter().flat_map(|&s| self.lower_stmt(s)).collect();
+        let closes = case.body.last().is_some_and(|s| {
+            matches!(
+                self.ast_arena.stmt(*s).kind,
+                varn_core::ast::StmtKind::Break { label: None }
+            )
+        });
+        let run = &case.body[..case.body.len() - usize::from(closes)];
+        let body: Vec<TirStmt> = run.iter().flat_map(|&s| self.lower_stmt(s)).collect();
         self.scopes.pop();
         let rest = self.switch_cases(d, cases, i + 1);
         match case.test {
