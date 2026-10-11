@@ -6,6 +6,7 @@ use varn_core::ast::{Arg, ExprKind};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 use varn_sem::bind::BindResult;
+use super::param_types::compatible_param_type;
 use varn_sem::types::{FunctionParam, Type};
 
 impl<'r> Checker<'r> {
@@ -65,14 +66,6 @@ impl<'r> Checker<'r> {
                     .with_range(*range),
                 );
             }
-        }
-    }
-
-    fn accepted_param_type(&mut self, param: &FunctionParam, declared: Type) -> Type {
-        if param.optional && !param.is_rest && !declared.is_dynamic() {
-            Type::make_nullable(declared, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
-        } else {
-            declared
         }
     }
 
@@ -379,30 +372,4 @@ fn analyze_call_args<'a>(
         },
         extra_diags,
     )
-}
-
-fn compatible_param_type(
-    param: &FunctionParam,
-    spread_inner: Option<Type>,
-    table: &varn_sem::types::CheckerTyTable,
-) -> Type {
-    if let Some(inner) = spread_inner {
-        if param.is_rest {
-            if let TypeKind::Array(expected_inner) = table.get(param.ty) {
-                Type::resolved(expected_inner)
-            } else {
-                Type::resolved(param.ty)
-            }
-        } else {
-            inner
-        }
-    } else if param.is_rest {
-        if let TypeKind::Array(inner) = table.get(param.ty) {
-            Type::resolved(inner)
-        } else {
-            Type::resolved(param.ty)
-        }
-    } else {
-        Type::resolved(param.ty)
-    }
 }
