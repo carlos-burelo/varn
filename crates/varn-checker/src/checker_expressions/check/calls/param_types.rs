@@ -37,3 +37,13 @@ pub(super) fn compatible_param_type(
         Type::resolved(param.ty)
     }
 }
+
+pub(super) fn named_slot_problem(label: Option<&str>, slot: Option<usize>, taken: bool) -> Option<String> {
+    match (label, slot) {
+        (Some(label), None) => Some(format!("no parameter is named '{label}'")),
+        (Some(label), Some(_)) if taken => {
+            Some(format!("the parameter '{label}' is given more than once"))
+        }
+        (Some(_), Some(_)) | (None, _) => None,
+    }
+}

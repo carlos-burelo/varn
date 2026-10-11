@@ -156,6 +156,11 @@ impl<'r> Checker<'r> {
                 (ty, idx)
             };
 
+            let taken = param_idx.is_some_and(|idx| mapping[idx].is_some());
+            if let Some(problem) = super::param_types::named_slot_problem(label_opt, param_idx, taken) {
+                self.emit(Diagnostic::error(ErrorCode::TypeMismatch, problem).with_range(*range));
+                has_error = true;
+            }
             if let Some(idx) = param_idx {
                 let arg_idx = args.iter().position(|a| std::ptr::eq(a, arg)).unwrap();
                 mapping[idx] = Some(arg_idx);
