@@ -172,6 +172,28 @@ await describe("188 call shape and optional parameters", async () => {
         expect(typeof new Holder(2.5).held).toBe("float")
     })
 
+    await it("an assignment takes an integer literal the way an initialiser does", () => {
+        const box = new Box<float>(2.5)
+        const table = new Map<str, float>()
+        const values: float[] = [1.5]
+        let plain: float = 0.5
+        let maybe: float? = null
+        let filled: float? = null
+        box.value = 3
+        table["k"] = 1
+        values[0] = 2
+        plain = 4
+        maybe = 5
+        filled ??= 6
+        expect(typeof box.value).toBe("float")
+        expect(typeof table["k"]).toBe("float")
+        expect(typeof values[0]).toBe("float")
+        expect(typeof plain).toBe("float")
+        expect(typeof maybe).toBe("float")
+        expect(typeof filled).toBe("float")
+        expect(plain + values[0]).toBe(6.0)
+    })
+
     await it("an omitted argument and a null one are the same thing", () => {
         const absent: int? = null
         const missing: str? = null

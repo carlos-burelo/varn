@@ -147,6 +147,7 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Never
             | BackendTy::Dynamic(_) => v.ty,
         };
+        let v = self.as_assigned(op, v, node_ty);
         let read_ty = self.keyed_read_ty(obj.ty, node_ty);
         let index_node = |object: TirExpr, index: TirExpr, ty: BackendTy| TirExpr {
             kind: TirExprKind::Index {
@@ -210,6 +211,8 @@ impl<'a> FnEmitter<'a> {
             _ => self.pin_place(t),
         };
         let v = self.lower_expr(value);
+        let declared = self.expr_ty(target);
+        let v = self.as_assigned(op, v, declared);
         let rhs = match assign_bin_op(op) {
             Ok(None) => v,
             Ok(Some(bop)) => {
@@ -237,6 +240,13 @@ impl<'a> FnEmitter<'a> {
             ty,
             res: Resolution::None,
             span,
+        }
+    }
+
+    fn as_assigned(&self, op: AssignOp, value: TirExpr, place: BackendTy) -> TirExpr {
+        match assign_bin_op(op) {
+            Ok(Some(_)) => value,
+            Ok(None) | Err(()) => self.widened(value, place),
         }
     }
 

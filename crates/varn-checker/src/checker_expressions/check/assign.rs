@@ -145,7 +145,12 @@ impl<'r> Checker<'r> {
         let value_ty = self.infer_type(rec, value, bind);
         let is_empty_array_val = value_ty.is_dynamic()
             && matches!(&arena.expr(value).kind, varn_core::ast::ExprKind::Array { elements } if elements.is_empty());
-        if !is_empty_array_val && !self.types_compatible_cached(&target_ty, &value_ty, Some(bind)) {
+        let accepted = if reads_operand {
+            self.types_compatible_cached(&target_ty, &value_ty, Some(bind))
+        } else {
+            self.value_assignable_to(&target_ty, &value_ty, Some(value), Some(bind))
+        };
+        if !is_empty_array_val && !accepted {
             let value_ty_s = value_ty.display(&self.ty_table, &bind.interner);
             let target_ty_s = target_ty.display(&self.ty_table, &bind.interner);
             self.emit(

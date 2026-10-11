@@ -1,0 +1,4 @@
+// VN3001
+let ratio: float = 0.5
+const count = 3
+ratio = count
