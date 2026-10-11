@@ -1,0 +1,4 @@
+// VN2007
+class Meter {
+    function read(): int { return 1 }
+}

@@ -1,0 +1,4 @@
+// VN2007
+class Meter {
+    let unit: str = "m"
+}

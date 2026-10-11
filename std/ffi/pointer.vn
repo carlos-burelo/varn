@@ -10,7 +10,7 @@ import {
 } from "runtime:ffi";
 
 export class Pointer {
-    let address: int;
+    address: int;
 
     constructor(address: int) {
         this.address = address;

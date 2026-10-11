@@ -26,6 +26,17 @@ pub fn parse_class_member(
         });
     }
 
+    let stray = matches!(
+        s.peek_kind(0),
+        TokenKind::Let | TokenKind::Const | TokenKind::Var | TokenKind::Function
+    ) && s.peek_kind(1) == TokenKind::Identifier;
+    if stray {
+        return Err(
+            "a class member takes no 'let', 'const', 'var' or 'function': write 'name: Type' or 'name(...) { ... }'"
+                .to_owned(),
+        );
+    }
+
     if s.check(TokenKind::Constructor) {
         s.advance();
         let params = super::super::params::parse_params(s)?;

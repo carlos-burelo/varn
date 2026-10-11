@@ -43,7 +43,7 @@ export class FfiFunction {
 }
 
 export class DynamicLibrary {
-    let _handle: int;
+    _handle: int;
 
     constructor(handle: int) {
         this._handle = handle;
