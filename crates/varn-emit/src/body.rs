@@ -174,6 +174,16 @@ impl<'a> FnEmitter<'a> {
                 if inner.ty == nn {
                     return inner;
                 }
+                let inner = self.pin(inner);
+                self.pending.push(varn_tir::TirStmt::Expr(TirExpr {
+                    kind: TirExprKind::Unary {
+                        op: varn_tir::TirUnOp::Present,
+                        operand: Box::new(inner.clone()),
+                    },
+                    ty: inner.ty,
+                    res: Resolution::None,
+                    span,
+                }));
                 return TirExpr {
                     kind: TirExprKind::Cast {
                         operand: Box::new(inner),

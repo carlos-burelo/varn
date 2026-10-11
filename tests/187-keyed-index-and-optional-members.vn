@@ -38,6 +38,16 @@ function parenthesised(s: str?): int {
     return 0
 }
 
+class Held {
+    v: int = 4
+}
+function present(x: int?): int { return x! + 1 }
+function named(s: str?): int { return s!.length }
+function held(h: Held?): int { return h!.v }
+function claims(run: () => int): str {
+    try { return run().toString() } catch (e) { return (e as Error).message }
+}
+
 await describe("187 keyed index and optional members", async () => {
     await it("a missing key reads as null, in both tiers", () => {
         const seen = tally(["a", "b", "a"])
@@ -80,5 +90,16 @@ await describe("187 keyed index and optional members", async () => {
         expect(afterContinue({ a: "xx", b: ["y", "zzz"] })).toBe(6)
         expect(parenthesised("four")).toBe(4)
         expect(parenthesised(null)).toBe(0)
+    })
+
+    await it("the non-null assertion checks the value it vouches for", () => {
+        const refused = "the value is null: '!' claimed it was present"
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + present(i) + named("ab") + held(new Held()) }
+        expect(total).toBe(44850 + 300 + 600 + 1200)
+        expect(claims(() => present(null))).toBe(refused)
+        expect(claims(() => named(null))).toBe(refused)
+        expect(claims(() => held(null))).toBe(refused)
+        expect(claims(() => present(6))).toBe("7")
     })
 })

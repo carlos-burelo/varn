@@ -11,7 +11,8 @@ pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
 }
 
 #[varn_op_macros::jit_slow(field = "assert_not_null")]
-pub(crate) extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
+pub(crate) extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, tag: u64, payload: u64) {
+    let val = unsafe { VmValue::from_raw_parts(tag, payload) };
     if let Err(e) = crate::exec::advanced::assert_not_null(val) {
         unsafe {
             let ctx_ref = &mut *ctx;

@@ -56,6 +56,8 @@ pub enum TirUnOp {
 
     IsNull,
 
+    Present,
+
     ToStr,
 }
 

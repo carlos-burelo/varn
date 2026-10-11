@@ -182,7 +182,9 @@ pub(crate) fn is_array(val: VmValue, heap: &Heap) -> bool {
 
 pub(crate) fn assert_not_null(val: VmValue) -> VmResult<()> {
     if val.is_null() {
-        Err(RuntimeError::new("null assertion failed"))
+        Err(RuntimeError::new(
+            "the value is null: '!' claimed it was present",
+        ))
     } else {
         Ok(())
     }

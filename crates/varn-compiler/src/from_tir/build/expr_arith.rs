@@ -73,6 +73,10 @@ impl<'m> Builder<'m> {
                     Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool))
                 }
             },
+            TirUnOp::Present => {
+                self.emit_effect(InstKind::AssertNotNull { operand: v });
+                Ok(v)
+            }
             TirUnOp::ToStr => Ok(self.emit(
                 InstKind::Cast {
                     operand: v,

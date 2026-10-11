@@ -81,11 +81,7 @@ impl ExecCtx {
     }
 
     pub(in crate::exec::dispatch) fn exec_assert_not_null(&self, v: VmValue) -> VmResult<()> {
-        if v.is_null() {
-            Err(RuntimeError::new("assertion failed: value is null"))
-        } else {
-            Ok(())
-        }
+        crate::exec::advanced::assert_not_null(v)
     }
 
     pub(in crate::exec::dispatch) fn exec_get_index(
