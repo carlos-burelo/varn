@@ -16,6 +16,7 @@ pub(super) fn param_name(p: &Param, interner: &AtomInterner) -> Arc<str> {
 pub(super) struct FreeFunctions<'a> {
     pub(super) list: Vec<(&'a FunctionDecl, Option<Arc<str>>)>,
     pub(super) index: FxHashMap<Atom, (u32, u32)>,
+    pub(super) scoped: FxHashMap<Arc<str>, (u32, u32)>,
     pub(super) decorated: FxHashSet<Atom>,
 }
 
@@ -29,10 +30,11 @@ pub(super) fn collect_free_functions<'a>(
     use varn_core::ast::NamespaceDecl;
     fn ns_member_fns<'a>(
         ns: &'a NamespaceDecl,
+        outer: Option<&str>,
         interner: &AtomInterner,
         out: &mut Vec<(&'a FunctionDecl, Option<Arc<str>>)>,
     ) {
-        let ns_name: Arc<str> = Arc::from(interner.resolve(ns.id));
+        let ns_name = super::namespaces::scoped_name(outer, interner.resolve(ns.id));
         for m in &ns.body {
             let inner = match m {
                 varn_core::ast::Decl::Export(varn_core::ast::ExportDecl::Decl {
@@ -54,7 +56,9 @@ pub(super) fn collect_free_functions<'a>(
             };
             match inner {
                 varn_core::ast::Decl::Function(f) => out.push((f, Some(ns_name.clone()))),
-                varn_core::ast::Decl::Namespace(inner_ns) => ns_member_fns(inner_ns, interner, out),
+                varn_core::ast::Decl::Namespace(inner_ns) => {
+                    ns_member_fns(inner_ns, Some(&ns_name), interner, out)
+                }
                 varn_core::ast::Decl::Variable(_)
                 | varn_core::ast::Decl::Class(_)
                 | varn_core::ast::Decl::Interface(_)
@@ -99,14 +103,22 @@ pub(super) fn collect_free_functions<'a>(
             continue;
         };
         if let Some(ns) = namespace_decl(d) {
-            ns_member_fns(ns, interner, &mut free_fns);
+            ns_member_fns(ns, None, interner, &mut free_fns);
         }
     }
     let mut fn_index: FxHashMap<Atom, (u32, u32)> = FxHashMap::default();
-    for (i, (f, _)) in free_fns.iter().enumerate() {
-        fn_index
-            .entry(f.id)
-            .or_insert((i as u32, f.params.len() as u32));
+    let mut scoped: FxHashMap<Arc<str>, (u32, u32)> = FxHashMap::default();
+    for (i, (f, ns)) in free_fns.iter().enumerate() {
+        let entry = (i as u32, f.params.len() as u32);
+        match ns {
+            Some(ns) => {
+                let key = super::namespaces::scoped_name(Some(ns), interner.resolve(f.id));
+                scoped.entry(key).or_insert(entry);
+            }
+            None => {
+                fn_index.entry(f.id).or_insert(entry);
+            }
+        }
     }
     let decorated_fns: FxHashSet<Atom> = free_fns
         .iter()
@@ -126,6 +138,7 @@ pub(super) fn collect_free_functions<'a>(
     FreeFunctions {
         list: free_fns,
         index: fn_index,
+        scoped,
         decorated: decorated_fns,
     }
 }

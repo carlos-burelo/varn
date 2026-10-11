@@ -192,7 +192,9 @@ pub(super) fn emit_function(
         .find(|s| s.name == f.id)
         .and_then(|s| s.ty);
     let fn_ty: Option<varn_sem::types::Type> = match ns {
-        Some(ns) => bind.get_namespace_members_local(ns).and_then(|members| {
+        Some(ns) => bind
+            .get_namespace_members_local(ns.rsplit("::").next().unwrap_or(ns))
+            .and_then(|members| {
             members
                 .iter()
                 .filter(|m| {
@@ -276,6 +278,7 @@ pub(super) fn emit_function(
             closure_base,
             param_names,
         );
+        em.namespace = ns.map(Arc::from);
         em.expect_results(return_ty, f.modifiers.is_async, f.modifiers.is_generator);
         let mut b = em.destructure_params(&f.params);
         b.extend(match &ast_arena.stmt(f.body).kind {
@@ -304,7 +307,7 @@ pub(super) fn emit_function(
     };
 
     TirFunction {
-        name: Arc::from(fn_name_str),
+        name: crate::namespaces::scoped_name(ns, fn_name_str),
         sig,
         params: param_tys,
         return_ty,

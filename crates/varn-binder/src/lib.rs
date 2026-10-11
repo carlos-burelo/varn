@@ -71,8 +71,6 @@ pub struct Binder<'r> {
     pub(crate) evolved_array_types: FxHashMap<u32, Type>,
 
     pub(crate) type_decls: FxHashMap<Arc<str>, (varn_sem::scope::ScopeId, varn_core::SourceRange)>,
-    pub(crate) value_decls:
-        FxHashMap<varn_core::Atom, (varn_sem::scope::ScopeId, bool, varn_core::SourceRange)>,
 
     pub(crate) pending_decorator_roles: Vec<(
         varn_sem::symbol::SymbolId,

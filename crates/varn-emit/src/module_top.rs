@@ -8,13 +8,13 @@ use super::namespaces::{emit_namespace_object, ns_nested_types};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, Program, StmtKind};
-use varn_core::{Atom, AtomInterner};
+use varn_core::AtomInterner;
 use varn_tir::{BackendTy, Signature, TirFunction, TirStmt, TyTable};
 pub(super) fn lower_top_level(
     program: &Program,
     ast_arena: &AstArena,
     ctx: &MCtx,
-    fn_index: &FxHashMap<Atom, (u32, u32)>,
+    scoped_fns: &FxHashMap<Arc<str>, (u32, u32)>,
     global_slots: &FxHashMap<Arc<str>, u32>,
     interner: &AtomInterner,
     shadowed: &rustc_hash::FxHashSet<u32>,
@@ -51,7 +51,8 @@ pub(super) fn lower_top_level(
                 }
                 emit_namespace_object(
                     ns,
-                    fn_index,
+                    None,
+                    scoped_fns,
                     global_slots,
                     interner,
                     shadowed,

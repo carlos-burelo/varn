@@ -185,7 +185,7 @@ impl<'a> FnEmitter<'a> {
                 .and_then(|sig| self.signatures.get(sig.0 as usize))
                 .is_none_or(|sig| sig.has_rest);
             let mut targs = targs;
-            if let Some(&(_, arity)) = self.m.fns.get(name).filter(|_| all_positional && !takes_rest)
+            if let Some((_, arity)) = self.known_fn(*name).filter(|_| all_positional && !takes_rest)
             {
                 targs = self.fill_omitted(targs, callee_sig);
                 while targs.len() < arity as usize {
@@ -197,8 +197,8 @@ impl<'a> FnEmitter<'a> {
                     }));
                 }
             }
-            let res = match self.m.fns.get(name) {
-                Some(&(fn_id, arity))
+            let res = match self.known_fn(*name) {
+                Some((fn_id, arity))
                     if all_positional
                         && arity as usize == targs.len()
                         && !self.m.decorated_fns.contains(name) =>

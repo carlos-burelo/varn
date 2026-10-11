@@ -47,9 +47,11 @@ pub(super) fn upvalue_src(u: varn_tir::TirUpvalue) -> HirUpvalueSrc {
 }
 
 pub(super) fn is_free_fn_name(name: &str) -> bool {
-    let mut cs = name.chars();
-    matches!(cs.next(), Some(c) if c == '_' || c.is_ascii_alphabetic())
-        && cs.all(|c| c == '_' || c.is_ascii_alphanumeric())
+    name.split("::").all(|part| {
+        let mut cs = part.chars();
+        matches!(cs.next(), Some(c) if c == '_' || c.is_ascii_alphabetic())
+            && cs.all(|c| c == '_' || c.is_ascii_alphanumeric())
+    })
 }
 
 pub(super) fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> {

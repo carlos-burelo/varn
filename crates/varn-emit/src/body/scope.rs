@@ -34,6 +34,8 @@ impl<'a> FnEmitter<'a> {
             this_class: None,
             this_enum: None,
             home_class: None,
+            namespace: None,
+            not_yet_bound: FxHashSet::default(),
             top_level: false,
             saw_await: false,
             outer_names: FxHashSet::default(),
@@ -320,6 +322,38 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    fn scopes_outward(&self) -> Vec<&str> {
+        let Some(path) = self.namespace.as_deref() else {
+            return Vec::new();
+        };
+        let mut out = vec![path];
+        let mut rest = path;
+        while let Some((outer, _)) = rest.rsplit_once("::") {
+            out.push(outer);
+            rest = outer;
+        }
+        out
+    }
+
+    fn scoped_global(&self, name: &str) -> Option<u32> {
+        self.scopes_outward().into_iter().find_map(|scope| {
+            let key = crate::namespaces::scoped_name(Some(scope), name);
+            if self.not_yet_bound.contains(&key) {
+                return None;
+            }
+            self.m.globals.get(&key).copied()
+        })
+    }
+
+    pub(super) fn known_fn(&self, name: varn_core::Atom) -> Option<(u32, u32)> {
+        let bare = self.m.interner.resolve(name);
+        let scoped = self.scopes_outward().into_iter().find_map(|scope| {
+            let key = crate::namespaces::scoped_name(Some(scope), bare);
+            self.m.scoped_fns.get(&key).copied()
+        });
+        scoped.or_else(|| self.m.fns.get(&name).copied())
+    }
+
     pub(super) fn resolve_name(&mut self, name: &str) -> Resolution {
         for scope in self.scopes.iter().rev() {
             if let Some(id) = scope.get(name) {
@@ -338,6 +372,9 @@ impl<'a> FnEmitter<'a> {
                 }
             };
             return Resolution::Upvalue(idx as u32);
+        }
+        if let Some(slot) = self.scoped_global(name) {
+            return Resolution::GlobalSlot(slot);
         }
         if let Some(&slot) = self.m.globals.get(name) {
             return Resolution::GlobalSlot(slot);

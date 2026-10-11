@@ -13,6 +13,30 @@ namespace Labels {
     export function of(n: int): str { return prefix + n.toString() }
 }
 
+namespace Metric {
+    const unit = 1
+    export function size(): int { return unit }
+    export function doubled(): int { return size() + size() }
+    export namespace Fine {
+        const unit = 5
+        export function size(): int { return unit + 100 }
+        export function coarse(): int { return doubled() }
+    }
+}
+namespace Imperial {
+    const unit = 10
+    export const shown = unit + 1
+    export function size(): int { return unit }
+    export function mapped(): int { return [1, 2].map((n) => n + unit + size())[1] }
+}
+const unit = 100
+function size(): int { return unit }
+function sizes(n: int): int {
+    let acc = 0
+    for (let i = 0; i < n; i = i + 1) { acc = acc + Metric.size() + Imperial.size() + Metric.Fine.size() }
+    return acc
+}
+
 function sum(n: int): int {
     let acc = 0
     for (let i = 0; i < n; i = i + 1) { acc = acc + Rates.total() }
@@ -25,6 +49,16 @@ await describe("195 namespace members", async () => {
         expect(Rates.bonus).toBe(3)
         expect(Labels.of(5)).toBe("id-5")
         expect(sum(400)).toBe(2800)
+    })
+
+    await it("two namespaces and the module can use the same name", () => {
+        expect(Metric.size() + Imperial.size() + size()).toBe(111)
+        expect(Metric.doubled()).toBe(2)
+        expect(Metric.Fine.size()).toBe(105)
+        expect(Metric.Fine.coarse()).toBe(2)
+        expect(Imperial.shown).toBe(11)
+        expect(Imperial.mapped()).toBe(22)
+        expect(sizes(300)).toBe(34800)
     })
 
     await it("a namespace keeps its own state between calls", () => {

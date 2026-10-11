@@ -3,10 +3,17 @@ use super::decorators::apply_one_decorator;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 use varn_core::ast::{AstArena, Decl, ExportDecl, NamespaceDecl, Pattern};
-use varn_core::{Atom, AtomInterner};
+use varn_core::AtomInterner;
 use varn_tir::{
     BackendTy, DynReason, FnId, Resolution, Span, TirExpr, TirExprKind, TirObjectEntry, TirStmt,
 };
+
+pub(crate) fn scoped_name(outer: Option<&str>, name: &str) -> Arc<str> {
+    match outer {
+        Some(outer) => Arc::from(format!("{outer}::{name}")),
+        None => Arc::from(name),
+    }
+}
 
 pub(super) fn ns_nested_types(ns: &NamespaceDecl) -> Vec<&Decl> {
     let mut out = Vec::new();
@@ -45,13 +52,15 @@ pub(super) fn ns_nested_types(ns: &NamespaceDecl) -> Vec<&Decl> {
 
 pub(super) fn emit_namespace_object(
     ns: &NamespaceDecl,
-    fn_index: &FxHashMap<Atom, (u32, u32)>,
+    outer: Option<&str>,
+    scoped_fns: &FxHashMap<Arc<str>, (u32, u32)>,
     global_slots: &FxHashMap<Arc<str>, u32>,
     interner: &AtomInterner,
     shadowed: &rustc_hash::FxHashSet<u32>,
     top: &mut FnEmitter,
     top_body: &mut Vec<TirStmt>,
 ) {
+    let path = scoped_name(outer, interner.resolve(ns.id));
     let dyno = || BackendTy::Dynamic(DynReason::NotYetSupported);
     let global_ref = |slot: u32| TirExpr {
         kind: TirExprKind::Var,
@@ -79,7 +88,8 @@ pub(super) fn emit_namespace_object(
         if let Decl::Namespace(inner_ns) = inner {
             emit_namespace_object(
                 inner_ns,
-                fn_index,
+                Some(&path),
+                scoped_fns,
                 global_slots,
                 interner,
                 shadowed,
@@ -89,9 +99,29 @@ pub(super) fn emit_namespace_object(
         }
     }
 
-    let Some(&slot) = global_slots.get(interner.resolve(ns.id)) else {
+    let Some(&slot) = global_slots.get(&path) else {
         return;
     };
+    let outer_scope = top.namespace.replace(path.clone());
+    let mut pending: Vec<Arc<str>> = Vec::new();
+    for m in &ns.body {
+        let inner = if let Decl::Export(ExportDecl::Decl { declaration, .. }) = m {
+            declaration.as_ref()
+        } else {
+            m
+        };
+        if let Decl::Variable(v) = inner {
+            for decl in &v.declarators {
+                if let Pattern::Identifier { name, .. } = &decl.id {
+                    pending.push(scoped_name(Some(&path), interner.resolve(*name)));
+                }
+            }
+        }
+    }
+    let outer_pending = std::mem::replace(
+        &mut top.not_yet_bound,
+        pending.iter().cloned().collect(),
+    );
     for m in &ns.body {
         let inner = if let Decl::Export(ExportDecl::Decl { declaration, .. }) = m {
             declaration.as_ref()
@@ -103,7 +133,8 @@ pub(super) fn emit_namespace_object(
             let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, decl.init) else {
                 continue;
             };
-            let Some(&held) = global_slots.get(interner.resolve(*name)) else {
+            let Some(&held) = global_slots.get(&scoped_name(Some(&path), interner.resolve(*name)))
+            else {
                 continue;
             };
             let value = top.lower_expression(init);
@@ -117,6 +148,8 @@ pub(super) fn emit_namespace_object(
                 res: Resolution::None,
                 span: Span::EMPTY,
             }));
+            top.not_yet_bound
+                .remove(&scoped_name(Some(&path), interner.resolve(*name)));
         }
     }
     let mut entries: Vec<TirObjectEntry> = Vec::new();
@@ -139,7 +172,8 @@ pub(super) fn emit_namespace_object(
         };
         match inner {
             Decl::Function(f) => {
-                if let Some(&(fnid, _)) = fn_index.get(&f.id) {
+                let key = scoped_name(Some(&path), interner.resolve(f.id));
+                if let Some(&(fnid, _)) = scoped_fns.get(&key) {
                     let mut value = TirExpr {
                         kind: TirExprKind::Var,
                         ty: dyno(),
@@ -180,7 +214,22 @@ pub(super) fn emit_namespace_object(
                     | Decl::SumType(_) => None,
                 };
                 if let Some(mname) = mname {
-                    if let Some(&mslot) = global_slots.get(interner.resolve(mname)) {
+                    let bare = interner.resolve(mname);
+                    let key = match inner {
+                        Decl::Namespace(_) => scoped_name(Some(&path), bare),
+                        Decl::Class(_)
+                        | Decl::Enum(_)
+                        | Decl::Variable(_)
+                        | Decl::Function(_)
+                        | Decl::Interface(_)
+                        | Decl::TypeAlias(_)
+                        | Decl::Import(_)
+                        | Decl::Export(_)
+                        | Decl::Extension(_)
+                        | Decl::Struct(_)
+                        | Decl::SumType(_) => Arc::from(bare),
+                    };
+                    if let Some(&mslot) = global_slots.get(&key) {
                         entries.push(TirObjectEntry::Field {
                             name: Arc::from(interner.resolve(mname)),
                             value: global_ref(mslot),
@@ -191,7 +240,9 @@ pub(super) fn emit_namespace_object(
             Decl::Variable(v) => {
                 for decl in &v.declarators {
                     if let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, decl.init) {
-                        let value = match global_slots.get(interner.resolve(*name)) {
+                        let value = match global_slots
+                            .get(&scoped_name(Some(&path), interner.resolve(*name)))
+                        {
                             Some(&held) => global_ref(held),
                             None => top.lower_expression(init),
                         };
@@ -212,6 +263,8 @@ pub(super) fn emit_namespace_object(
         }
     }
 
+    top.namespace = outer_scope;
+    top.not_yet_bound = outer_pending;
     let obj = TirExpr {
         kind: TirExprKind::ObjectLit { entries },
         ty: dyno(),
@@ -235,37 +288,52 @@ pub(super) fn collect_decl_names(
     out: &mut FxHashSet<Arc<str>>,
     interner: &AtomInterner,
 ) {
+    collect_scoped_names(decl, None, ast_arena, out, interner)
+}
+
+fn collect_scoped_names(
+    decl: &Decl,
+    scope: Option<&str>,
+    ast_arena: &AstArena,
+    out: &mut FxHashSet<Arc<str>>,
+    interner: &AtomInterner,
+) {
     use varn_core::ast::{ImportSpecifier, Pattern as P};
-    fn pat_names(p: &P, out: &mut FxHashSet<Arc<str>>, interner: &AtomInterner) {
+    fn pat_names(
+        p: &P,
+        scope: Option<&str>,
+        out: &mut FxHashSet<Arc<str>>,
+        interner: &AtomInterner,
+    ) {
         match p {
             P::Identifier { name, .. } => {
-                out.insert(Arc::from(interner.resolve(*name)));
+                out.insert(scoped_name(scope, interner.resolve(*name)));
             }
             P::Array { elements, rest, .. } => {
                 for e in elements.iter().flatten() {
-                    pat_names(&e.pattern, out, interner);
+                    pat_names(&e.pattern, scope, out, interner);
                 }
                 if let Some(r) = rest {
-                    pat_names(r, out, interner);
+                    pat_names(r, scope, out, interner);
                 }
             }
             P::Object {
                 properties, rest, ..
             } => {
                 for prop in properties {
-                    pat_names(&prop.value, out, interner);
+                    pat_names(&prop.value, scope, out, interner);
                 }
                 if let Some(r) = rest {
-                    pat_names(r, out, interner);
+                    pat_names(r, scope, out, interner);
                 }
             }
-            P::Assignment { left, .. } => pat_names(left, out, interner),
-            P::Rest { argument, .. } => pat_names(argument, out, interner),
+            P::Assignment { left, .. } => pat_names(left, scope, out, interner),
+            P::Rest { argument, .. } => pat_names(argument, scope, out, interner),
         }
     }
     match decl {
         Decl::Function(f) => {
-            out.insert(Arc::from(interner.resolve(f.id)));
+            out.insert(scoped_name(scope, interner.resolve(f.id)));
         }
         Decl::Class(c) => {
             if let Some(id) = &c.id {
@@ -277,7 +345,7 @@ pub(super) fn collect_decl_names(
         }
         Decl::Variable(v) => {
             for d in &v.declarators {
-                pat_names(&d.id, out, interner);
+                pat_names(&d.id, scope, out, interner);
                 if d.init.is_some_and(|e| {
                     matches!(
                         ast_arena.expr(e).kind,
@@ -289,10 +357,11 @@ pub(super) fn collect_decl_names(
             }
         }
         Decl::Namespace(ns) => {
-            out.insert(Arc::from(interner.resolve(ns.id)));
+            let path = scoped_name(scope, interner.resolve(ns.id));
             for m in &ns.body {
-                collect_decl_names(m, ast_arena, out, interner);
+                collect_scoped_names(m, Some(&path), ast_arena, out, interner);
             }
+            out.insert(path);
         }
         Decl::Import(i) => {
             for spec in &i.specifiers {
@@ -303,7 +372,7 @@ pub(super) fn collect_decl_names(
             }
         }
         Decl::Export(ExportDecl::Decl { declaration, .. }) => {
-            collect_decl_names(declaration, ast_arena, out, interner)
+            collect_scoped_names(declaration, scope, ast_arena, out, interner)
         }
         Decl::Interface(_)
         | Decl::TypeAlias(_)

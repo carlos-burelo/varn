@@ -71,6 +71,7 @@ pub fn emit_module(
     let free_functions::FreeFunctions {
         list: free_fns,
         index: fn_index,
+        scoped: scoped_fns,
         decorated: decorated_fns,
     } = free_functions::collect_free_functions(program, ast_arena, interner, &bind.user_decorators);
 
@@ -80,6 +81,7 @@ pub fn emit_module(
         enums: &enums,
         globals: &global_slots,
         fns: &fn_index,
+        scoped_fns: &scoped_fns,
         decorated_fns: &decorated_fns,
         call_mappings,
         desugar,
@@ -117,7 +119,7 @@ pub fn emit_module(
         program,
         ast_arena,
         &ctx,
-        &fn_index,
+        &scoped_fns,
         &global_slots,
         interner,
         &bind.user_decorators,

@@ -19,6 +19,7 @@ pub(crate) struct ModuleCtx<'a> {
     pub globals: &'a FxHashMap<Arc<str>, u32>,
 
     pub fns: &'a FxHashMap<Atom, (u32, u32)>,
+    pub scoped_fns: &'a FxHashMap<Arc<str>, (u32, u32)>,
 
     pub decorated_fns: &'a FxHashSet<Atom>,
 
@@ -58,6 +59,10 @@ pub(crate) struct FnEmitter<'a> {
     pub(super) this_enum: Option<EnumId>,
 
     pub(super) home_class: Option<ClassId>,
+
+    pub namespace: Option<Arc<str>>,
+
+    pub not_yet_bound: FxHashSet<Arc<str>>,
 
     pub(super) top_level: bool,
 
