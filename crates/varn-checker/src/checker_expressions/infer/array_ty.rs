@@ -26,16 +26,40 @@ impl<'r> Checker<'r> {
                 }
                 varn_core::ast::ArrayEl::Spread(e) => {
                     let ty = self.infer_type(rec, *e, bind);
-                    let spread =
-                        if let varn_core::TypeKind::Array(inner) = self.ty_table.get(ty.0) {
-                            Type::resolved(inner)
+                    let spread: Vec<Type> = match self.ty_table.get(ty.0) {
+                        varn_core::TypeKind::Array(inner) => vec![Type::resolved(inner)],
+                        varn_core::TypeKind::Tuple(items) => self
+                            .ty_table
+                            .get_list(items)
+                            .iter()
+                            .map(|item| Type::resolved(*item))
+                            .collect(),
+                        varn_core::TypeKind::Primitive(_)
+                        | varn_core::TypeKind::Builtin(_)
+                        | varn_core::TypeKind::Literal(_)
+                        | varn_core::TypeKind::This
+                        | varn_core::TypeKind::Union(_)
+                        | varn_core::TypeKind::Intersection(_)
+                        | varn_core::TypeKind::Named(..)
+                        | varn_core::TypeKind::Generic(..)
+                        | varn_core::TypeKind::TemplateLiteral(_)
+                        | varn_core::TypeKind::Fn(_)
+                        | varn_core::TypeKind::Object(_)
+                        | varn_core::TypeKind::Typeof(_)
+                        | varn_core::TypeKind::KeyOf(_)
+                        | varn_core::TypeKind::IndexedAccess { .. }
+                        | varn_core::TypeKind::Mapped { .. }
+                        | varn_core::TypeKind::Conditional { .. }
+                        | varn_core::TypeKind::Infer(_)
+                        | varn_core::TypeKind::EnumVariant { .. }
+                        | varn_core::TypeKind::TypePredicate { .. } => vec![Type::Dynamic],
+                    };
+                    for item in spread {
+                        if item.is_dynamic() {
+                            holds_dynamic = true;
                         } else {
-                            Type::Dynamic
-                        };
-                    if spread.is_dynamic() {
-                        holds_dynamic = true;
-                    } else {
-                        elem_tys.push(spread);
+                            elem_tys.push(item);
+                        }
                     }
                 }
                 varn_core::ast::ArrayEl::Hole => {}

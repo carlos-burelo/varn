@@ -1,0 +1,3 @@
+// VN3001
+const pair = #["a", 2]
+const counts: int[] = [...pair]
