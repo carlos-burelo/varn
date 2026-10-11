@@ -1,0 +1,34 @@
+import { describe, it, expect } from "std:test";
+
+namespace Rates {
+    const base = 4
+    export const bonus = 3
+    let calls = 0
+    export function total(): int { return base + bonus }
+    export function count(): int { calls = calls + 1; return calls }
+}
+
+namespace Labels {
+    const prefix = "id-"
+    export function of(n: int): str { return prefix + n.toString() }
+}
+
+function sum(n: int): int {
+    let acc = 0
+    for (let i = 0; i < n; i = i + 1) { acc = acc + Rates.total() }
+    return acc
+}
+
+await describe("195 namespace members", async () => {
+    await it("a function in a namespace reads the names declared beside it", () => {
+        expect(Rates.total()).toBe(7)
+        expect(Rates.bonus).toBe(3)
+        expect(Labels.of(5)).toBe("id-5")
+        expect(sum(400)).toBe(2800)
+    })
+
+    await it("a namespace keeps its own state between calls", () => {
+        const first = Rates.count()
+        expect(Rates.count()).toBe(first + 1)
+    })
+})

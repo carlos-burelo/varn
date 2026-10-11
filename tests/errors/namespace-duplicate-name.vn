@@ -1,0 +1,3 @@
+// VN4002
+namespace A { export function make(): int { return 1 } }
+namespace B { export function make(): int { return 2 } }

@@ -92,6 +92,33 @@ pub(super) fn emit_namespace_object(
     let Some(&slot) = global_slots.get(interner.resolve(ns.id)) else {
         return;
     };
+    for m in &ns.body {
+        let inner = if let Decl::Export(ExportDecl::Decl { declaration, .. }) = m {
+            declaration.as_ref()
+        } else {
+            m
+        };
+        let Decl::Variable(v) = inner else { continue };
+        for decl in &v.declarators {
+            let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, decl.init) else {
+                continue;
+            };
+            let Some(&held) = global_slots.get(interner.resolve(*name)) else {
+                continue;
+            };
+            let value = top.lower_expression(init);
+            top_body.extend(top.take_pending());
+            top_body.push(TirStmt::Expr(TirExpr {
+                kind: TirExprKind::Assign {
+                    target: Box::new(global_ref(held)),
+                    value: Box::new(value),
+                },
+                ty: BackendTy::Void,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            }));
+        }
+    }
     let mut entries: Vec<TirObjectEntry> = Vec::new();
     for m in &ns.body {
         let Decl::Export(_) = m else { continue };
@@ -164,7 +191,10 @@ pub(super) fn emit_namespace_object(
             Decl::Variable(v) => {
                 for decl in &v.declarators {
                     if let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, decl.init) {
-                        let value = top.lower_expression(init);
+                        let value = match global_slots.get(interner.resolve(*name)) {
+                            Some(&held) => global_ref(held),
+                            None => top.lower_expression(init),
+                        };
                         entries.push(TirObjectEntry::Field {
                             name: Arc::from(interner.resolve(*name)),
                             value,

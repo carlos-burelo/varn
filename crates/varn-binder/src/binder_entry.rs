@@ -80,6 +80,7 @@ impl<'r> Binder<'r> {
             array_watch: Vec::new(),
             evolved_array_types: FxHashMap::default(),
             type_decls: FxHashMap::default(),
+            value_decls: FxHashMap::default(),
             pending_decorator_roles: Vec::new(),
             user_decorators: rustc_hash::FxHashSet::default(),
         };

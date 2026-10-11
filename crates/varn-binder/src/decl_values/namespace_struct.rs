@@ -28,7 +28,22 @@ impl<'r> super::super::Binder<'r> {
             self.bind_decl(d);
         }
 
-        let members = self.collect_namespace_members(&n.body);
+        let exported: Vec<varn_core::ast::Decl> = n
+            .body
+            .iter()
+            .filter_map(|d| {
+                if let varn_core::ast::Decl::Export(varn_core::ast::ExportDecl::Decl {
+                    declaration,
+                    ..
+                }) = d
+                {
+                    Some(declaration.as_ref().clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let members = self.collect_namespace_members(&exported);
         if !members.is_empty() {
             self.type_members.namespaces.insert(id_rc, members);
         }

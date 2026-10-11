@@ -28,6 +28,7 @@ impl<'r> super::Binder<'r> {
     }
 
     pub(super) fn define(&mut self, name: varn_core::Atom, sym: Symbol) -> SymbolId {
+        self.note_value_decl(name, &sym);
         let scope = self.scopes.get(self.current);
         if let Some(existing_id) = scope.lookup(name) {
             let existing_sym = self.arena.get(existing_id);

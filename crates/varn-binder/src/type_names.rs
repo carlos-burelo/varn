@@ -25,6 +25,47 @@ impl super::Binder<'_> {
         self.emit(diag);
     }
 
+    pub(crate) fn note_value_decl(&mut self, name: Atom, sym: &varn_sem::symbol::Symbol) {
+        let scope = self.current;
+        let in_namespace = match self.scopes.get(scope).kind {
+            ScopeKind::Namespace => true,
+            ScopeKind::Global | ScopeKind::Module => false,
+            ScopeKind::Function | ScopeKind::Block | ScopeKind::Class | ScopeKind::Interface => {
+                return
+            }
+        };
+        let is_value = matches!(
+            sym.kind,
+            SymbolKind::Function | SymbolKind::Var | SymbolKind::Let | SymbolKind::Const
+        );
+        let foreign =
+            sym.origin_module.is_some() || (sym.line == 0 && sym.full_range.start.line == 0);
+        if !is_value || foreign {
+            return;
+        }
+        let mut range = sym.full_range;
+        if range.start.line == 0 && range.end.line == 0 {
+            range.start.line = sym.line;
+            range.end.line = sym.line;
+        }
+        let Some(&(first_scope, first_in_namespace, first)) = self.value_decls.get(&name) else {
+            self.value_decls.insert(name, (scope, in_namespace, range));
+            return;
+        };
+        if first_scope == scope || !(in_namespace || first_in_namespace) {
+            return;
+        }
+        let msg = format!(
+            "duplicate declaration of '{}': a name declared inside a namespace is module-wide",
+            self.interner.resolve(name)
+        );
+        let diag = Diagnostic::error(ErrorCode::DuplicateDeclaration, msg)
+            .with_file(self.source_file.clone())
+            .with_range(range)
+            .with_related("original declaration here", self.source_file.clone(), first);
+        self.emit(diag);
+    }
+
     pub(crate) fn check_local_class_capture(&mut self, name: Atom, range: SourceRange) {
         let mut scope = self.current;
         let mut crossed_class = false;
