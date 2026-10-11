@@ -422,6 +422,31 @@ function speak(a: Animal): str {
 }
 ```
 
+### 10.1 Veracidad: solo `null` y `false` son falsos
+
+No hay tabla de valores falsos. `0`, `0.0`, `NaN`, `""` y `[]` son
+verdaderos (tests/186-truthiness-and-logical-values.vn).
+
+- Con `x: T?`, `if (x)` es exactamente `x != null`: la rama verdadera ve
+  `T` y la falsa ve `null`.
+- Un valor cuyo tipo no admite `null` ni `false` (`int`, `str`, un array,
+  una instancia) no puede ser condición: error `VN3027`. Se compara
+  explícitamente (`n != 0`, `s.length > 0`).
+- `a || b` devuelve `a` si no es `null`/`false`; `a && b` devuelve `b` solo
+  en ese caso. `count || 10` conserva un `0`.
+
+### 10.2 Índices y claves
+
+- `xs[i]`, `s[i]`, `bytes[i]` y `rango[i]` tienen tipo `T`: el índice
+  afirma que el elemento existe. Fuera de rango, o negativo, lanza
+  `RangeError`, también al escribir (tests/184-string-index.vn). Un array
+  crece con `push`; el acceso que puede fallar es `at(i)`, que devuelve `T?`.
+- `m[k]` sobre `Map<K, V>` o `{ [key: K]: V }` tiene tipo `V?`: que la
+  clave falte es un caso normal (tests/187-keyed-index-and-optional-members.vn).
+  La escritura `m[k] = v` pide `V`.
+- Un miembro o parámetro opcional (`tag?: str`) es `str?`: omitirlo y pasar
+  `null` son lo mismo (tests/188-call-shape-and-optional-parameters.vn).
+
 ---
 
 ## 11. Tipo `dynamic`

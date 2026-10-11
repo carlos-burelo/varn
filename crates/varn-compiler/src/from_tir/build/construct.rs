@@ -124,8 +124,7 @@ impl<'m> Builder<'m> {
                 TirArg::Expr(e) | TirArg::Named { value: e, .. } => e,
                 TirArg::Spread(_) => return Err(OptError::Unsupported("from_tir: spread in new")),
             };
-            let v = self.lower_expr(e)?;
-            argv.push(self.widen_exact(v, e.ty, pty));
+            argv.push(self.lower_inlined_arg(e, pty)?);
         }
         Ok(argv)
     }

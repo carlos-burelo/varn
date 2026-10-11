@@ -290,6 +290,82 @@ impl<'a> FnEmitter<'a> {
         })
     }
 
+    fn as_declared(&self, arg: TirExpr, param: BackendTy) -> TirExpr {
+        let boxed_already = matches!(arg.ty, BackendTy::Nullable(_) | BackendTy::Dynamic(_));
+        match param {
+            BackendTy::Nullable(_) | BackendTy::Dynamic(_) if boxed_already => arg,
+            BackendTy::Nullable(inner) => {
+                let present = if self.tt.contains(inner)
+                    && self.tt.get(inner) == BackendTy::Float
+                    && arg.ty == BackendTy::Int
+                {
+                    self.cast_to(arg, BackendTy::Float)
+                } else {
+                    arg
+                };
+                self.cast_to(present, param)
+            }
+            BackendTy::Dynamic(_) => self.cast_to(arg, param),
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Void
+            | BackendTy::Never => arg,
+        }
+    }
+
+    pub(super) fn fill_omitted(&self, mut args: Vec<TirArg>, sig: Option<SigId>) -> Vec<TirArg> {
+        let Some(sig) = sig.and_then(|s| self.signatures.get(s.0 as usize)) else {
+            return args;
+        };
+        if sig.has_rest || !args.iter().all(|a| matches!(a, TirArg::Expr(_))) {
+            return args;
+        }
+        for param in sig.params.iter().skip(args.len()) {
+            let ty = match param {
+                BackendTy::Nullable(_) | BackendTy::Dynamic(_) => *param,
+                BackendTy::Int
+                | BackendTy::Float
+                | BackendTy::Bool
+                | BackendTy::Char
+                | BackendTy::Str
+                | BackendTy::Bytes
+                | BackendTy::Decimal
+                | BackendTy::BigInt
+                | BackendTy::Array(_)
+                | BackendTy::Map(..)
+                | BackendTy::Dict(_)
+                | BackendTy::Set(_)
+                | BackendTy::Tuple(_)
+                | BackendTy::Class(_)
+                | BackendTy::Enum(_)
+                | BackendTy::Fn(_)
+                | BackendTy::Void
+                | BackendTy::Never => BackendTy::Dynamic(DynReason::NotYetSupported),
+            };
+            args.push(TirArg::Expr(TirExpr {
+                kind: TirExprKind::NullLit,
+                ty,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            }));
+        }
+        args
+    }
+
     pub(super) fn guard_args(&mut self, args: Vec<TirArg>, sig: Option<SigId>) -> Vec<TirArg> {
         let Some(sig) = sig.and_then(|s| self.signatures.get(s.0 as usize)) else {
             return args;
@@ -305,7 +381,10 @@ impl<'a> FnEmitter<'a> {
             .enumerate()
             .map(|(i, arg)| match arg {
                 TirArg::Expr(e) if !spread_seen => match fixed.get(i).copied().or(rest) {
-                    Some(ty) => TirArg::Expr(self.guard_dynamic(e, ty)),
+                    Some(ty) => {
+                        let guarded = self.guard_dynamic(e, ty);
+                        TirArg::Expr(self.as_declared(guarded, ty))
+                    }
                     None => TirArg::Expr(e),
                 },
                 TirArg::Spread(e) => {

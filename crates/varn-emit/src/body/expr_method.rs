@@ -56,6 +56,7 @@ impl<'a> FnEmitter<'a> {
         let (recv, targs) = if self.core_class_name(recv.ty).is_some() {
             (recv, self.guard_args(targs, method_sig))
         } else {
+            let targs = self.fill_omitted(targs, method_sig);
             let target = Callee::Method {
                 recv,
                 name: name.clone(),

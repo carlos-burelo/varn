@@ -147,8 +147,7 @@ impl<'m> Builder<'m> {
                 varn_tir::TirArg::Named { value, .. } => value,
                 varn_tir::TirArg::Spread(_) => return Ok(None),
             };
-            let v = self.lower_expr(e)?;
-            argv.push(self.widen_exact(v, e.ty, pty));
+            argv.push(self.lower_inlined_arg(e, pty)?);
         }
 
         self.inlining.push(InlineFrame {
@@ -162,6 +161,23 @@ impl<'m> Builder<'m> {
         let v = res?;
         let coerced = self.coerce(v, call_ty);
         Ok(Some(coerced))
+    }
+
+    pub(super) fn lower_inlined_arg(
+        &mut self,
+        arg: &varn_tir::TirExpr,
+        param: varn_tir::BackendTy,
+    ) -> Result<Value> {
+        let boxed = matches!(
+            arg.ty,
+            varn_tir::BackendTy::Nullable(_) | varn_tir::BackendTy::Dynamic(_)
+        );
+        let precise = match &arg.kind {
+            varn_tir::TirExprKind::Cast { operand } if boxed => operand.as_ref(),
+            _ => arg,
+        };
+        let v = self.lower_expr(precise)?;
+        Ok(self.widen_exact(v, precise.ty, param))
     }
 
     pub(super) fn lower_args_as_declared(

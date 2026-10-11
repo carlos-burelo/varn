@@ -1,0 +1,92 @@
+import { describe, it, expect } from "std:test";
+
+class Acc {
+    total: int
+    constructor(start: int?) { this.total = start ?? 0 }
+    exact(n: int): int { return this.total + n }
+    maybe(n: int?): int { return this.total + (n ?? 1) }
+    text(s: str, n: int?): int { return s.length + (n ?? 0) }
+    omit(n: int, k: int = 2): int { return n + k }
+    loose(v: dynamic): str { return typeof v }
+    half(x: float?): str { return typeof x }
+}
+class Wide extends Acc {
+    override maybe(n: int?): int { return (n ?? 100) * 2 }
+}
+class Pt {
+    x: int
+    y: int?
+    constructor(x: int, y: int? = null) { this.x = x; this.y = y }
+}
+class Box<T> {
+    value: T
+    constructor(value: T) { this.value = value }
+}
+
+function withDefault(k: int = 2): int { return k }
+function optional(s?: str): str { return s ?? "none" }
+function forward(s?: str): str { return optional(s) }
+function forwardDefault(k: int?): int { return withDefault(k) }
+function freeMaybe(n: int?): int { let k = n ?? 1; k = k + 1; return k }
+function freeFloat(x: float?): str { return typeof x }
+
+function callMethods(a: Acc, i: int): int {
+    return a.exact(i) + a.maybe(i) + a.text("abc", i) + a.omit(i)
+}
+function callValues(f: (n: int?) => int, i: int): int { return f(i) + f(null) }
+function build(i: int): int { return new Acc(i).total + new Pt(i).x + (new Pt(i, 3).y ?? 0) }
+
+await describe("188 call shape and optional parameters", async () => {
+    await it("methods take arguments in the shape they declare", () => {
+        const a = new Acc(1)
+        let total = 0
+        for (let i = 0; i < 400; i = i + 1) { total = total + callMethods(a, i) }
+        expect(callMethods(a, 5)).toBe(6 + 6 + 8 + 7)
+        expect(a.maybe(null)).toBe(2)
+        expect(a.text("ab", null)).toBe(2)
+        expect(a.omit(1, 10)).toBe(11)
+        expect(a.loose(5)).toBe("int")
+        expect(a.loose(null)).toBe("null")
+        expect(a.half(2.5)).toBe("float")
+        expect(a.half(3)).toBe("float")
+        expect(a.half(null)).toBe("null")
+        expect(total).toBe(322000)
+    })
+
+    await it("an override keeps the same call shape", () => {
+        const w: Acc = new Wide(1)
+        let total = 0
+        for (let i = 0; i < 400; i = i + 1) { total = total + w.maybe(i) }
+        expect(w.maybe(4)).toBe(8)
+        expect(w.maybe(null)).toBe(200)
+        expect(total).toBe(159600)
+    })
+
+    await it("constructors and function values follow the same rule", () => {
+        let total = 0
+        for (let i = 0; i < 400; i = i + 1) { total = total + build(i) + callValues(freeMaybe, i) }
+        expect(build(4)).toBe(4 + 4 + 3)
+        expect(callValues(freeMaybe, 4)).toBe(5 + 2)
+        expect(new Pt(1).y).toBe(null)
+        expect(new Box<int>(7).value).toBe(7)
+        expect(new Box<str>("s").value).toBe("s")
+        expect(freeFloat(1)).toBe("float")
+        expect(total).toBe(241800)
+    })
+
+    await it("an omitted argument and a null one are the same thing", () => {
+        const absent: int? = null
+        const missing: str? = null
+        for (let i = 0; i < 300; i = i + 1) { forwardDefault(i); forward("x") }
+        expect(withDefault()).toBe(2)
+        expect(withDefault(absent)).toBe(2)
+        expect(withDefault(9)).toBe(9)
+        expect(forwardDefault(null)).toBe(2)
+        expect(forwardDefault(7)).toBe(7)
+        expect(optional()).toBe("none")
+        expect(optional(missing)).toBe("none")
+        expect(optional("x")).toBe("x")
+        expect(forward()).toBe("none")
+        expect(forward("y")).toBe("y")
+    })
+})
