@@ -343,6 +343,11 @@ Contratos que se comprueban en la declaración:
 - Un miembro `static` se alcanza por la clase (`Counter.total`), nunca
   por una instancia ni por `this`; uno de instancia, nunca por la clase.
   Error `VN4106` en los dos sentidos.
+- El constructor de una subclase llama a `super(...)`: error `VN4108` si
+  falta. Sus argumentos se validan contra el constructor del padre.
+- `super` solo llama métodos del padre (`super.nombre(...)`), y solo
+  directamente en un método o constructor: `super.prop` es `VN4109` y
+  `super` dentro de una flecha o función anidada es `VN4114`.
 
 ---
 
@@ -505,7 +510,25 @@ Un estrechamiento vale mientras la variable no cambie
 - Una restricción `T extends X` se comprueba contra el argumento de tipo
   escrito y contra el que se deduce de la llamada (`VN3202`).
 
-### 10.5 Valores por defecto y spread
+### 10.5 Operadores, patrones y namespaces
+
+- `<`, `<=`, `>` y `>=` entre strings comparan sus puntos de código, en
+  orden (tests/196-string-order.vn). `==` entre arrays u objetos es
+  identidad.
+- `-`, `+` y `~` unarios, y `++`/`--`, exigen un número (o un tipo que
+  sobrecargue el operador). No hay conversión: `-"a"` es error.
+- Un patrón de `match` debe poder coincidir con el valor: un literal de
+  otro tipo, o una variante con más nombres que valores lleva, es
+  `VN4015`.
+- Desestructurar pide que el campo exista (`VN3004`), salvo que el patrón
+  traiga valor por defecto; una tupla da a cada nombre el tipo de su
+  posición y no admite más nombres que elementos (`VN3016`).
+- Un namespace expone solo lo que marca `export`; el resto es privado y
+  sus funciones lo leen (tests/195-namespace-members.vn). Los nombres
+  declarados en un namespace son del módulo: dos namespaces no pueden
+  declarar el mismo (`VN4002`).
+
+### 10.6 Valores por defecto y spread
 
 - El valor por defecto de un parámetro se comprueba contra su tipo, dentro
   del ámbito de la función (puede nombrar parámetros anteriores).

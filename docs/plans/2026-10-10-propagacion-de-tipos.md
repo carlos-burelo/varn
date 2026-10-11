@@ -160,6 +160,35 @@ Reglas que el checker no hacía cumplir, cada una con su error:
 Medidas todas con `vn check` sobre `std` y `tests` antes de fijarlas:
 en total rompían un sitio (`new Map()` en el test 66).
 
+### Quinta tanda (commits `94558cfa`..`0cbadb30`, tests 195 y 196)
+
+Siguió el barrido de sondas por `match`, namespaces, desestructuración,
+operadores y herencia. Tres fallos eran de ejecución, no del checker:
+
+- **`"a" < "b"` daba `false`** y `"b" <= "a"` daba `true`: el orden
+  entre strings no tenía caso en `lt_heap` y caía a comparar dos NaN.
+- **`super.m()` en un método heredado dos niveles más abajo se llamaba
+  a sí mismo**: `super` se resolvía desde la clase de la instancia. Ahora
+  sale de la clase dueña de la función que corre (`home_class`).
+- **Una función dentro de un namespace no veía las variables de al
+  lado** (`null`): el emisor les reservaba un global y nunca lo llenaba.
+- `super()` no rellenaba los argumentos omitidos.
+
+Reglas que el checker no hacía cumplir:
+
+- Un patrón de `match` de un tipo imposible, o con más nombres que
+  valores lleva la variante (`VN4015`; lo segundo rompía el emisor).
+- Solo lo exportado es miembro de un namespace (`VN3004`), y sus
+  nombres son del módulo: `A.f` y `B.f` chocaban en silencio (`VN4002`).
+- `-`, `+`, `~` unarios y `++`/`--` exigen un número: `-"a"` valía `0`
+  y `s++` sobre un `str` daba `"a1"`.
+- Desestructurar un campo que no existe (`VN3004`) o una tupla con más
+  nombres que elementos (`VN3016`); cada nombre toma el tipo de su
+  posición.
+- El constructor de una subclase llama a `super(...)` (`VN4108`) y sus
+  argumentos se validan. `super.prop` y `super` dentro de una flecha
+  son error (`VN4109`, `VN4114`): fallaban al ejecutar.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -275,10 +304,24 @@ anterior.
   función `never` al final de una rama no cuenta como salida.
 - Una interfaz acepta un objeto literal con campos de más; un tipo de
   objeto (`{ n: int }`) no. Es deliberado, pero no está escrito.
-- Las sondas de esta tanda cubrieron funciones, clases, genéricos y
-  generadores. No se barrieron: `match` con patrones anidados, tipos
-  condicionales y mapeados, `struct`, espacios de nombres, extensiones,
-  ni el paso de valores entre tareas.
+- Los nombres de un namespace no se cualifican al emitir: por eso dos
+  namespaces no pueden declarar el mismo nombre (`VN4002`). El arreglo
+  de fondo es que el emisor resuelva `x` dentro de `A` como `A.x`
+  (globales y `fn_index` por nombre cualificado).
+- `super.prop` y `super` dentro de una flecha están prohibidos, no
+  soportados: el getter del padre recursa y la flecha no tiene `this`.
+- No se comprueba que `this` no se use antes de `super(...)`, ni los
+  argumentos de `super(...)` cuando el padre es genérico.
+- `char < char` no lo acepta el checker, aunque el runtime ya ordena.
+- `[1] == [1]` es `false` (identidad) y compila sin aviso.
+- Un campo declarado sin inicializador ni asignación en el constructor
+  se lee como `T?`; no hay error de «campo sin inicializar».
+- El valor por defecto de un patrón (`{ a = "x" }` sobre un campo
+  `int`) no se comprueba contra el tipo del campo.
+- Barrido hecho: funciones, clases, herencia, genéricos, generadores,
+  `match`, namespaces, desestructuración, operadores. Sin barrer:
+  tipos condicionales y mapeados, `struct`, tipos suma, extensiones a
+  fondo, decoradores, y el paso de valores entre tareas.
 
 ## 3. Decisiones de lenguaje (tomadas 2026-10-10, delegadas por el dueño)
 
@@ -323,6 +366,17 @@ Tercera tanda:
 
 Las cuatro se midieron con `vn check` sobre todo `std` y `tests` antes
 de fijarlas: rompían, en total, un sitio.
+
+Quinta tanda:
+
+- **Los strings se ordenan por sus puntos de código** (`af267731`).
+- **`super(...)` es obligatorio y explícito en el constructor de una
+  subclase** (`0cbadb30`). Se descartó insertarlo solo cuando el padre
+  no pide argumentos: una llamada que no se ve es peor que una línea.
+  Rompió dos sitios (tests/12-classes.vn).
+- **Un namespace solo expone lo que exporta.**
+- **Los operadores numéricos unarios no convierten**: ni `-"a"` ni
+  `-true`.
 
 Cuarta tanda:
 
