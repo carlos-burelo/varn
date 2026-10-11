@@ -162,13 +162,24 @@ pub fn build(
             };
             fields.push((field.name.clone(), bt));
         }
-        foreign_parent_infos.push(ClassInfo::new_with_methods(
+        let mut info = ClassInfo::new_with_methods(
             f.name.clone(),
             varn_tir::Ancestry::Root,
             fields,
             Vec::new(),
             tt,
-        ));
+        );
+        info.constructor = f.constructor.map(|ctor| {
+            super::intern_signature(
+                &ctor,
+                &bind.ty_table,
+                &bind.interner,
+                tt,
+                &names,
+                &mut signatures,
+            )
+        });
+        foreign_parent_infos.push(info);
     }
     let mut classes = build_classes(
         bind,

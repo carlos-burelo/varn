@@ -50,6 +50,7 @@ pub struct ForeignClass {
     pub origin: Arc<str>,
     pub fields: Vec<InheritedField>,
     pub methods: Vec<Arc<str>>,
+    pub constructor: Option<Type>,
 }
 
 #[derive(Clone, Debug, Default)]

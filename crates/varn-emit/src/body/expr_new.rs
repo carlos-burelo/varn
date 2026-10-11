@@ -70,8 +70,30 @@ impl<'a> FnEmitter<'a> {
             | ExprKind::MetaAccess { .. } => None,
         };
         let targs = self.lower_call_args(call_id, args);
+        let built = match ty.non_nullable(self.tt) {
+            BackendTy::Class(foreign) => class.or(Some(foreign)),
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => class,
+        };
         let ctor_sig =
-            class.and_then(|c| crate::tables::inherited_constructor(self.m.classes, c));
+            built.and_then(|c| crate::tables::inherited_constructor(self.m.classes, c));
         let targs = self.fill_omitted(targs, ctor_sig);
         let c = self.lower_expr(callee);
         let (target, targs) = self.settle_args(Callee::Value(c), targs, ctor_sig, span);

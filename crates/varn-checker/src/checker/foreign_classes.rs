@@ -98,6 +98,7 @@ impl Checker<'_> {
                 }
                 let mut fields = Vec::new();
                 let mut methods = Vec::new();
+                let mut constructor = None;
                 for m in &entry.members {
                     if m.is_static {
                         continue;
@@ -118,7 +119,16 @@ impl Checker<'_> {
                                 methods.push(m.name.clone());
                             }
                         }
-                        _ => {}
+                        ClassMemberKind::Constructor => {
+                            constructor = Some(self.reintern_foreign_ty(owner, m.ty));
+                        }
+                        ClassMemberKind::Getter
+                        | ClassMemberKind::Setter
+                        | ClassMemberKind::Class
+                        | ClassMemberKind::Interface
+                        | ClassMemberKind::Namespace
+                        | ClassMemberKind::Enum
+                        | ClassMemberKind::Struct => {}
                     }
                 }
                 methods.sort();
@@ -129,6 +139,7 @@ impl Checker<'_> {
                         origin,
                         fields,
                         methods,
+                        constructor,
                     },
                 );
             }

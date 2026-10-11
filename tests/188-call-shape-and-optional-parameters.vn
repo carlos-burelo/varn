@@ -1,4 +1,5 @@
 import { describe, it, expect } from "std:test";
+import { Headers } from "std:http/headers";
 
 class Acc {
     total: int
@@ -34,6 +35,9 @@ function callMethods(a: Acc, i: int): int {
     return a.exact(i) + a.maybe(i) + a.text("abc", i) + a.omit(i)
 }
 function callValues(f: (n: int?) => int, i: int): int { return f(i) + f(null) }
+function imported(init: dynamic): str {
+    try { const h = new Headers(init); return h.get("a") ?? "absent" } catch (e) { return (e as Error).name }
+}
 function build(i: int): int { return new Acc(i).total + new Pt(i).x + (new Pt(i, 3).y ?? 0) }
 
 await describe("188 call shape and optional parameters", async () => {
@@ -72,6 +76,15 @@ await describe("188 call shape and optional parameters", async () => {
         expect(new Box<str>("s").value).toBe("s")
         expect(freeFloat(1)).toBe("float")
         expect(total).toBe(241800)
+    })
+
+    await it("an imported class brings its constructor signature", () => {
+        for (let i = 0; i < 300; i = i + 1) { imported({ a: "1" }) }
+        expect(imported({ a: "1" })).toBe("1")
+        expect(imported({})).toBe("absent")
+        expect(imported(null)).toBe("absent")
+        expect(imported(5)).toBe("TypeError")
+        expect(new Headers().get("a")).toBe(null)
     })
 
     await it("an omitted argument and a null one are the same thing", () => {
