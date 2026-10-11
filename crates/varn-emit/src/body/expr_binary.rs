@@ -210,7 +210,7 @@ impl<'a> FnEmitter<'a> {
         };
 
         let (then_val, else_val) =
-            if then_val.ty == else_val.ty || matches!(ty, BackendTy::Dynamic(_)) {
+            if then_val.ty == else_val.ty || ty == BackendTy::Dynamic(DynReason::Union) {
                 (then_val, else_val)
             } else {
                 (self.cast_to(then_val, ty), self.cast_to(else_val, ty))

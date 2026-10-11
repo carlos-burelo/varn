@@ -21,6 +21,8 @@ class Cell<T = int> {
     add(v: T): int { this.items.push(v); return this.items.length }
 }
 
+function orElse<T>(given: T?, fallback: T): T { return given ?? fallback }
+function either<T>(a: T?, b: T?): T? { return a || b }
 function sumBoxes(n: int): int {
     let total = 0
     for (let i = 0; i < n; i = i + 1) {
@@ -61,6 +63,14 @@ await describe("190 generic instantiation from new", async () => {
         expect(first).toBe(4)
         const imported = new ImportedAsyncBox()
         expect(imported.items.length).toBe(0)
+    })
+
+    await it("a nullable of a type parameter falls back inside a generic body", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + orElse(null, i) + orElse(1, i) }
+        expect(total).toBe(44850 + 300)
+        expect(orElse(null, "b") + orElse("a", "b")).toBe("ba")
+        expect(either(null, 3)).toBe(3)
     })
 
     await it("written type arguments and the expected type still win", () => {
