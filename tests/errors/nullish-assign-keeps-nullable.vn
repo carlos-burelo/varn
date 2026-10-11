@@ -1,0 +1,2 @@
+// VN3001
+function f(x: int?, y: int?): int { x ??= y; return x }

@@ -33,7 +33,7 @@ pub(super) fn pattern_names(p: &varn_core::ast::Pattern) -> Vec<Atom> {
     out
 }
 
-pub(super) fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(ExprId)) {
+pub(crate) fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(ExprId)) {
     use varn_core::ast::{Arg, ArrayEl, ExprKind, MatchBody, ObjectProp, TemplatePart};
     match &arena.expr(e).kind {
         ExprKind::Template { parts } => {

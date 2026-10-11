@@ -41,6 +41,13 @@ impl<'r> Checker<'r> {
             }
 
             self.check_stmt(rec, stmt_id, bind);
+            let filled = self.narrowing_after_assignment(rec, stmt_id, bind);
+            if !filled.is_empty() {
+                self.push_narrowings(&filled);
+                self.check_stmts_with_guards(rec, &stmts[i + 1..], bind);
+                self.pop_narrowings(&filled);
+                return;
+            }
             i += 1;
         }
     }

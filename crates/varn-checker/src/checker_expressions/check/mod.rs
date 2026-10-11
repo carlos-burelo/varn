@@ -127,7 +127,8 @@ impl<'r> Checker<'r> {
                 }
             }
             ExprKind::Assign { target, value, op } => {
-                self.check_assign(rec, *op, *target, *value, range, bind)
+                self.check_assign(rec, *op, *target, *value, range, bind);
+                self.forget_assigned_target(rec, *target, bind)
             }
             ExprKind::Call {
                 callee,

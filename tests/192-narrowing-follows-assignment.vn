@@ -1,0 +1,59 @@
+import { describe, it, expect } from "std:test";
+
+class Node {
+    value: int
+    next: Node?
+    constructor(value: int, next: Node? = null) { this.value = value; this.next = next }
+}
+
+function filled(x: int?): int { x ??= 5; return x }
+function named(x: str?): str { x ||= "none"; return x }
+function assigned(x: int?): int { x = 7; return x + 1 }
+function listed(m: Map<str, int[]>, k: str): int[] { let xs = m[k]; xs ??= []; return xs }
+function total(head: Node?): int {
+    let sum = 0
+    let at = head
+    while (at != null) {
+        sum = sum + at.value
+        at = at.next
+    }
+    return sum
+}
+function lastValue(head: Node): int {
+    let at: Node? = head
+    let seen = 0
+    while (at != null) {
+        seen = at.value
+        at = at.next
+    }
+    return seen
+}
+function reset(x: str?): int {
+    if (x == null) { return 0 }
+    const before = x.length
+    x = null
+    return before + (x?.length ?? 100)
+}
+
+await describe("192 narrowing follows assignment", async () => {
+    await it("filling a nullable variable makes it present", () => {
+        let sum = 0
+        for (let i = 0; i < 300; i = i + 1) { sum = sum + filled(null) + filled(i) + assigned(null) }
+        expect(sum).toBe(300 * 5 + 44850 + 300 * 8)
+        expect(named(null)).toBe("none")
+        expect(named("x")).toBe("x")
+        expect(listed(new Map<str, int[]>(), "k").length).toBe(0)
+    })
+
+    await it("a loop that advances a nullable cursor keeps its checks", () => {
+        const chain = new Node(1, new Node(2, new Node(3)))
+        expect(total(chain)).toBe(6)
+        expect(total(null)).toBe(0)
+        expect(lastValue(chain)).toBe(3)
+    })
+
+    await it("assigning null undoes an earlier check", () => {
+        expect(reset("abc")).toBe(103)
+        expect(reset(null)).toBe(0)
+    })
+})

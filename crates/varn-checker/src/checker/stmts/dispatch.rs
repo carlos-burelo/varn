@@ -50,6 +50,7 @@ impl<'r> Checker<'r> {
             }
 
             StmtKind::While { test, body } | StmtKind::DoWhile { test, body } => {
+                self.forget_loop_assignments(rec, stmt, bind);
                 self.check_while_stmt(rec, *test, *body, bind);
             }
 
@@ -59,18 +60,21 @@ impl<'r> Checker<'r> {
                 update,
                 body,
             } => {
+                self.forget_loop_assignments(rec, stmt, bind);
                 self.check_for_stmt(rec, init.clone(), *test, *update, *body, range, bind);
             }
 
             StmtKind::ForOf {
                 left, right, body, ..
             } => {
+                self.forget_loop_assignments(rec, stmt, bind);
                 self.check_for_of_stmt(rec, left.clone(), *right, *body, range, bind);
             }
 
             StmtKind::ForIn {
                 left, right, body, ..
             } => {
+                self.forget_loop_assignments(rec, stmt, bind);
                 self.check_for_in_stmt(rec, left.clone(), *right, *body, range, bind);
             }
 

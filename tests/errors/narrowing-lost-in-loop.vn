@@ -1,0 +1,7 @@
+// VN3301
+function f(x: str?): int {
+    if (x == null) { return 0 }
+    let n = 0
+    while (n < 2) { n = n + x.length; x = null }
+    return n
+}
