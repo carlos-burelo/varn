@@ -124,9 +124,17 @@ impl<'a> FnEmitter<'a> {
         let ExprKind::Identifier { name } = &self.ast_arena.expr(object).kind else {
             return None;
         };
-        let eid = self.m.names.enum_id(self.m.interner.resolve(*name))?;
-        let info = self.m.enums.get(eid.0 as usize)?;
-        let v = info.variants.iter().find(|v| v.name.as_ref() == variant)?;
-        Some((eid, v.tag))
+        let name = self.m.interner.resolve(*name);
+        let at = self.m.enums.iter().position(|info| {
+            info.binding.as_deref() == Some(name)
+                && info
+                    .variant_global(variant)
+                    .is_some_and(|global| self.m.globals.contains_key(&global))
+        })?;
+        let v = self.m.enums[at]
+            .variants
+            .iter()
+            .find(|v| v.name.as_ref() == variant)?;
+        Some((varn_tir::EnumId(at as u32), v.tag))
     }
 }

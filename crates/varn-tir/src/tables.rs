@@ -131,6 +131,7 @@ pub struct VariantInfo {
 #[derive(Debug, Clone)]
 pub struct EnumInfo {
     pub name: Arc<str>,
+    pub binding: Option<Arc<str>>,
     pub variants: Vec<VariantInfo>,
 }
 
@@ -139,8 +140,10 @@ impl EnumInfo {
         self.variants.iter().find(|v| v.tag == tag)
     }
 
-    pub fn variant_global(&self, variant: &str) -> Arc<str> {
-        Arc::from(format!("{}.{}", self.name, variant))
+    pub fn variant_global(&self, variant: &str) -> Option<Arc<str>> {
+        self.binding
+            .as_ref()
+            .map(|binding| Arc::from(format!("{binding}.{variant}")))
     }
 }
 

@@ -1,4 +1,6 @@
 import { describe, it, expect } from "std:test";
+import { Tone, Token as Tok } from "./helpers/enum-slots.vn";
+import { LogLevel } from "std:log/level";
 
 enum Color { Red, Green, Blue }
 enum Level { Low = 10, High = 20 }
@@ -32,6 +34,20 @@ function nested(i: int): int {
     const s = i % 2 == 0 ? Side.Left : Side.Right
     return s == Side.Left ? 1 : 2
 }
+function tone(i: int): Tone {
+    let t = Tone.Low
+    if (i % 3 == 1) { t = Tone.Mid }
+    if (i % 3 == 2) { t = Tone.High }
+    return t
+}
+function token(i: int): int {
+    const t = i % 2 == 0 ? Tok.Num(i) : Tok.End
+    return match (t) {
+        Num(v) => v,
+        Word(_) => -1,
+        End => 0
+    }
+}
 function build(i: int): float {
     const s = i % 2 == 0 ? Shape.Circle(1.0) : Shape.Rect(2.0, 3.0)
     return s.area()
@@ -61,6 +77,27 @@ await describe("189 enum variant slots", async () => {
         expect(total).toBe(200.0 * 3.0 + 200.0 * 6.0)
         expect(Shape.Dot.area()).toBe(0.0)
         expect(Shape.Circle(2.0).area()).toBe(12.0)
+    })
+
+    await it("an imported enum reads its variants the same way", () => {
+        let total = 0
+        for (let i = 0; i < 600; i = i + 1) { total = total + tone(i).weight() }
+        expect(total).toBe(200 * 111)
+        expect(tone(1) == Tone.Mid).toBe(true)
+        expect(tone(1) == Tone.High).toBe(false)
+        const byName: dynamic = Tone
+        expect(byName["High"] == Tone.High).toBe(true)
+        expect(LogLevel.Warn == LogLevel.Warn).toBe(true)
+        expect(LogLevel.Warn == LogLevel.Error).toBe(false)
+    })
+
+    await it("an imported enum under another name builds payload variants", () => {
+        let total = 0
+        for (let i = 0; i < 400; i = i + 1) { total = total + token(i) }
+        expect(total).toBe(39800)
+        expect(token(6)).toBe(6)
+        expect(token(7)).toBe(0)
+        expect(Tok.End == Tok.End).toBe(true)
     })
 
     await it("an enum declared inside a function has its own variants", () => {

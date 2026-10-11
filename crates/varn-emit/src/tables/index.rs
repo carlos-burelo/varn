@@ -210,6 +210,7 @@ pub fn build(
     enums.extend(foreign.iter().map(|f| {
         EnumInfo {
             name: f.name.clone(),
+            binding: f.binding.clone(),
             variants: f
                 .variants
                 .iter()

@@ -18,6 +18,7 @@ pub(super) fn build_enums(
         .iter()
         .map(|name| EnumInfo {
             name: name.clone(),
+            binding: Some(name.clone()),
             variants: bind
                 .enum_layout(name)
                 .unwrap_or_default()

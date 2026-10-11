@@ -36,7 +36,10 @@ impl<'m> Builder<'m> {
                 name: v.name.clone(),
                 value: variant_v,
             });
-            if let Some(slot) = enum_info.and_then(|ei| self.gslot(&ei.variant_global(&v.name))) {
+            if let Some(slot) = enum_info
+                .and_then(|ei| ei.variant_global(&v.name))
+                .and_then(|global| self.gslot(&global))
+            {
                 self.emit_effect(InstKind::StoreGlobalIdx {
                     slot,
                     value: variant_v,

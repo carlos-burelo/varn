@@ -148,8 +148,9 @@ impl<'m> Builder<'m> {
             .find(|v| v.tag == tag)
             .map(|v| v.name.clone())
             .ok_or(OptError::Unsupported("from_tir: variant out of range"))?;
-        let slot = self
-            .gslot(&ei.variant_global(&vname))
+        let slot = ei
+            .variant_global(&vname)
+            .and_then(|global| self.gslot(&global))
             .ok_or(OptError::Unsupported("from_tir: variant without a slot"))?;
         let variant = self.emit(InstKind::LoadGlobalIdx(slot), HirType::Ref);
         if args.is_empty() {

@@ -96,8 +96,60 @@ impl<'m> Builder<'m> {
                 };
                 let store = self.global_store(&spec.local, val);
                 self.emit_effect(store);
+                self.bind_imported_variants(&spec.local, val);
             }
         }
+    }
+
+    fn bind_imported_variants(&mut self, local: &Arc<str>, enum_v: Value) {
+        let slots: Vec<(Arc<str>, u32)> = self
+            .tir
+            .enums
+            .iter()
+            .filter(|info| info.binding.as_ref() == Some(local))
+            .flat_map(|info| {
+                info.variants.iter().filter_map(|v| {
+                    let slot = self.gslot(&info.variant_global(&v.name)?)?;
+                    Some((v.name.clone(), slot))
+                })
+            })
+            .collect();
+        if slots.is_empty() {
+            return;
+        }
+        let absent = self.emit(InstKind::IsNull { operand: enum_v }, HirType::Bool);
+        let bind_blk = self.new_block();
+        let join_blk = self.new_block();
+        let from = self.current;
+        self.set_term(Terminator::Branch {
+            cond: absent,
+            then_blk: join_blk,
+            then_args: vec![],
+            else_blk: bind_blk,
+            else_args: vec![],
+        });
+        self.add_pred(bind_blk, from);
+        self.seal_block(bind_blk);
+        self.current = bind_blk;
+        for (name, slot) in slots {
+            let value = self.emit(
+                InstKind::GetProperty {
+                    object: enum_v,
+                    name,
+                },
+                HirType::Ref,
+            );
+            self.emit_effect(InstKind::StoreGlobalIdx { slot, value });
+        }
+        let end = self.current;
+        self.set_term(Terminator::Jump {
+            target: join_blk,
+            args: vec![],
+        });
+        self.add_pred(join_blk, from);
+        self.add_pred(join_blk, end);
+        self.seal_block(join_blk);
+        self.current = join_blk;
     }
 
     fn emit_slot_guard(

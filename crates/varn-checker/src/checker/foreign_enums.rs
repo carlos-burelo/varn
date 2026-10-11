@@ -72,11 +72,21 @@ impl Checker<'_> {
                     .into_iter()
                     .map(|(v, fields)| (v, fields.len()))
                     .collect();
+                let binding = bind
+                    .global_symbols()
+                    .find(|s| {
+                        s.origin_module
+                            .is_some_and(|m| self.resolve_bind_atom(bind, m) == origin)
+                            && s.original_name
+                                .is_some_and(|n| self.resolve_bind_atom(bind, n) == name)
+                    })
+                    .map(|s| self.resolve_bind_atom(bind, s.name));
                 found.insert(
                     key,
                     ForeignEnum {
                         name,
                         origin,
+                        binding,
                         variants,
                     },
                 );

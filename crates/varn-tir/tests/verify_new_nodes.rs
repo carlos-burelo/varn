@@ -140,6 +140,7 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
         classes: vec![],
         enums: vec![EnumInfo {
             name: Arc::from("Shape"),
+            binding: Some(Arc::from("Shape")),
             variants: vec![VariantInfo {
                 name: Arc::from("Circle"),
                 tag: 0,

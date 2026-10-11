@@ -120,16 +120,23 @@ pub(super) fn assign_global_slots(
         global_slots.insert(name, slot);
     }
     for (id, info) in enums.iter().enumerate() {
-        if !global_slots.contains_key(&info.name) {
+        if !info
+            .binding
+            .as_ref()
+            .is_some_and(|binding| global_slots.contains_key(binding))
+        {
             continue;
         }
         for variant in &info.variants {
+            let Some(global) = info.variant_global(&variant.name) else {
+                continue;
+            };
             let held = if variant.payload.is_empty() {
                 BackendTy::Enum(EnumId(id as u32))
             } else {
                 BackendTy::Dynamic(DynReason::Callable)
             };
-            global_slots.insert(info.variant_global(&variant.name), globals.len() as u32);
+            global_slots.insert(global, globals.len() as u32);
             globals.push(held);
         }
     }

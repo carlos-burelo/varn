@@ -1,0 +1,19 @@
+export enum Tone {
+    Low,
+    Mid,
+    High;
+
+    weight(): int {
+        return match (this) {
+            Low => 1,
+            Mid => 10,
+            High => 100
+        }
+    }
+}
+
+export enum Token {
+    End,
+    Num(value: int),
+    Word(text: str)
+}
