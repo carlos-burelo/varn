@@ -89,6 +89,19 @@ impl<'r> Checker<'r> {
                 else {
                     return;
                 };
+                if let Some(extra) = bindings.get(fields.len()) {
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::MatchPatternTypeMismatch,
+                            format!(
+                                "variant '{variant_name_str}' carries {} value(s), but the pattern binds {}",
+                                fields.len(),
+                                bindings.len()
+                            ),
+                        )
+                        .with_range(extra.range),
+                    );
+                }
                 for (i, binding) in bindings.iter().enumerate() {
                     if bind.interner.resolve(binding.name) == "_" {
                         continue;
@@ -138,6 +151,23 @@ impl<'r> Checker<'r> {
             }
             MatchPattern::Literal(expr) => {
                 self.check_expr(rec, *expr, bind);
+                let given = self.infer_type(rec, *expr, bind);
+                if !value_ty.is_dynamic()
+                    && !given.is_dynamic()
+                    && !self.value_assignable_to(value_ty, &given, Some(*expr), Some(bind))
+                {
+                    let given_s = given.display(&self.ty_table, &bind.interner);
+                    let value_s = value_ty.display(&self.ty_table, &bind.interner);
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::MatchPatternTypeMismatch,
+                            format!(
+                                "this pattern is '{given_s}' and can never match a value of type '{value_s}'"
+                            ),
+                        )
+                        .with_range(self.ast_arena.expr(*expr).range),
+                    );
+                }
             }
             MatchPattern::Wildcard | MatchPattern::Type { .. } => {}
         }
