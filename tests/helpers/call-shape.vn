@@ -5,3 +5,21 @@ export class Tally {
     scale(by: float = 2): str { return typeof by }
     label(prefix: str, n: int?, suffix?: str): str { return prefix + (n ?? 0).toString() + (suffix ?? "") }
 }
+
+function marked(cls: dynamic): dynamic { cls.marked = true; return cls }
+
+@marked
+export class Marked {
+    n: int
+    constructor(n: int) { this.n = n }
+}
+
+export class Bare {
+    items: int[] = []
+    count: int = 3
+}
+
+export class Holder<T> {
+    held: T
+    constructor(held: T) { this.held = held }
+}

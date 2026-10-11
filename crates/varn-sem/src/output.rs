@@ -58,6 +58,7 @@ pub struct ForeignClass {
     pub fields: Vec<InheritedField>,
     pub methods: Vec<Arc<str>>,
     pub constructor: Option<Type>,
+    pub import_binding: Option<Arc<str>>,
 }
 
 #[derive(Clone, Debug, Default)]

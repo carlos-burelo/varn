@@ -1,6 +1,7 @@
 import { describe, it, expect } from "std:test";
 import { Headers } from "std:http/headers";
-import { Tally } from "./helpers/call-shape.vn";
+import { Tally, Marked, Bare, Holder } from "./helpers/call-shape.vn";
+import { Tally as Counter } from "./helpers/call-shape.vn";
 
 class Acc {
     total: int
@@ -40,6 +41,11 @@ function spans(i: int, end: int?): int {
 }
 function tally(t: Tally, i: int): int {
     return t.add(i) + t.add(null) + t.label("n", i).length + t.label("n", null, "!").length
+}
+function made(i: int): int {
+    const bare = new Bare()
+    return new Tally(i).total + new Tally().total + new Counter(i).add(null) + new Marked(i).n
+        + bare.count + bare.items.length + new Holder(i).held
 }
 function withDefault(k: int = 2): int { return k }
 function optional(s?: str): str { return s ?? "none" }
@@ -154,6 +160,16 @@ await describe("188 call shape and optional parameters", async () => {
         expect(t.scale(3)).toBe("float")
         expect(t.label("a", 2, "z")).toBe("a2z")
         expect(new Tally().add(4)).toBe(4)
+    })
+
+    await it("an imported class is built like a local one", () => {
+        let total = 0
+        for (let i = 0; i < 400; i = i + 1) { total = total + made(i) }
+        expect(made(2)).toBe(2 + 0 + 3 + 2 + 3 + 0 + 2)
+        expect(total).toBe(4 * 79800 + 400 * 4)
+        expect(new Tally(1) instanceof Tally).toBe(true)
+        expect(new Counter(1) instanceof Tally).toBe(true)
+        expect(typeof new Holder(2.5).held).toBe("float")
     })
 
     await it("an omitted argument and a null one are the same thing", () => {

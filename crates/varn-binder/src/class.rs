@@ -31,6 +31,7 @@ impl<'r> super::Binder<'r> {
             .iter()
             .map(|t| t.default.as_ref().map(|given| self.resolve_type(given)))
             .collect();
+        sym.decorated = !c.decorators.is_empty();
         let sym_id = self.define(name_atom, sym);
         crate::decorator_attrs::record_decorators(self, sym_id, &c.decorators);
         if c.id.is_some() {

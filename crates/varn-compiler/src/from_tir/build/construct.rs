@@ -19,6 +19,34 @@ impl<'m> Builder<'m> {
             .class(class)
             .map(|ci| (ci.name.clone(), ci.layout.payload_size))
             .ok_or(OptError::Unsupported("from_tir: New class out of range"))?;
+        let spreads = args.iter().any(|a| matches!(a, TirArg::Spread(_)));
+        let imported = self
+            .tir
+            .class(class)
+            .and_then(|ci| ci.import_binding.clone());
+        if let Some(binding) = imported {
+            let cv = self.emit(self.global_load(&binding), HirType::Ref);
+            if spreads {
+                return self.lower_call(cv, args, ty);
+            }
+            let argv = self.lower_args(args)?;
+            let inst = self.emit(
+                InstKind::AllocInstance {
+                    class: cv,
+                    payload_size,
+                },
+                ty,
+            );
+            self.emit(
+                InstKind::MethodCall {
+                    recv: inst,
+                    name: Arc::from(CONSTRUCTOR),
+                    args: argv,
+                },
+                HirType::Dynamic,
+            );
+            return Ok(inst);
+        }
         let cv = self.emit(self.global_load(&name), HirType::Ref);
         let static_def = self
             .class_def(class)

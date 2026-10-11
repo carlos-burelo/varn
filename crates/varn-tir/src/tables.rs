@@ -25,6 +25,8 @@ pub struct ClassInfo {
     pub layout: ClassLayout,
 
     pub constructor: Option<SigId>,
+
+    pub import_binding: Option<Arc<str>>,
 }
 
 pub enum Ancestry<'a> {
@@ -98,6 +100,7 @@ impl ClassInfo {
             vtable,
             layout,
             constructor: None,
+            import_binding: None,
         }
     }
 

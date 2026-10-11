@@ -179,6 +179,7 @@ pub fn build(
                 &mut signatures,
             )
         });
+        info.import_binding = f.import_binding.clone();
         foreign_parent_infos.push(info);
     }
     let mut classes = build_classes(

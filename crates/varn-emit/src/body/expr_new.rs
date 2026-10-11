@@ -95,6 +95,21 @@ impl<'a> FnEmitter<'a> {
         let ctor_sig =
             built.and_then(|c| crate::tables::inherited_constructor(self.m.classes, c));
         let targs = self.fill_omitted(targs, ctor_sig);
+        let reached_by = if let ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind {
+            let name = self.m.interner.resolve(*name);
+            matches!(self.resolve_name(name), Resolution::GlobalSlot(_)).then_some(name)
+        } else {
+            None
+        };
+        let imported = built.filter(|c| {
+            let binding = self
+                .m
+                .classes
+                .get(c.0 as usize)
+                .and_then(|info| info.import_binding.as_deref());
+            class.is_none() && ctor_sig.is_some() && binding.is_some() && binding == reached_by
+        });
+        let class = class.or(imported);
         let c = self.lower_expr(callee);
         let (target, targs) = self.settle_args(Callee::Value(c), targs, ctor_sig, span);
         match class {

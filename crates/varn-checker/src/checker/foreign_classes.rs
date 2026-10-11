@@ -132,6 +132,26 @@ impl Checker<'_> {
                     }
                 }
                 methods.sort();
+                let decorated = owner
+                    .interner
+                    .get(name.as_ref())
+                    .and_then(|atom| {
+                        owner
+                            .scopes
+                            .get(owner.global_scope)
+                            .resolve(atom, &owner.scopes)
+                    })
+                    .is_none_or(|sid| owner.arena.get(sid).decorated);
+                let import_binding = bind
+                    .global_symbols()
+                    .find(|s| {
+                        !decorated
+                            && s.origin_module
+                                .is_some_and(|m| self.resolve_bind_atom(bind, m) == origin)
+                            && s.original_name
+                                .is_some_and(|n| self.resolve_bind_atom(bind, n) == name)
+                    })
+                    .map(|s| self.resolve_bind_atom(bind, s.name));
                 found.insert(
                     key,
                     ForeignClass {
@@ -140,6 +160,7 @@ impl Checker<'_> {
                         fields,
                         methods,
                         constructor,
+                        import_binding,
                     },
                 );
             }
