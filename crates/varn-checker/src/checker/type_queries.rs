@@ -29,6 +29,9 @@ impl<'r> Checker<'r> {
         inferred: &Type,
         bind: Option<&BindResult>,
     ) -> bool {
+        if let Some(fits) = self.fits_open_parameter(declared, inferred, bind) {
+            return fits;
+        }
         let declared = &bind
             .and_then(|b| self.instantiate_interface(declared, inferred, b))
             .unwrap_or(*declared);
@@ -41,6 +44,45 @@ impl<'r> Checker<'r> {
             &mut self.compat_cache,
             &self.ty_table,
         )
+    }
+
+    fn fits_open_parameter(
+        &self,
+        declared: &Type,
+        inferred: &Type,
+        bind: Option<&BindResult>,
+    ) -> Option<bool> {
+        let varn_core::TypeKind::Named(name, _) = self.ty_table.get(declared.0) else {
+            return None;
+        };
+        let name = self.resolve_bind_atom(bind?, name);
+        if !self.active_type_params.contains(name.as_ref()) {
+            return None;
+        }
+        let same_parameter = match self.ty_table.get(inferred.0) {
+            varn_core::TypeKind::Named(given, _) => self.resolve_bind_atom(bind?, given) == name,
+            varn_core::TypeKind::Primitive(_)
+            | varn_core::TypeKind::Builtin(_)
+            | varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::This
+            | varn_core::TypeKind::Array(_)
+            | varn_core::TypeKind::Union(_)
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::Tuple(_)
+            | varn_core::TypeKind::Generic(..)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Fn(_)
+            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::EnumVariant { .. }
+            | varn_core::TypeKind::TypePredicate { .. } => false,
+        };
+        Some(same_parameter || inferred.is_dynamic() || *inferred == Type::Never)
     }
 
     fn instantiate_interface(
