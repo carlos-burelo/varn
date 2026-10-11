@@ -181,6 +181,7 @@ import "./186-truthiness-and-logical-values.vn"
 import "./187-keyed-index-and-optional-members.vn"
 import "./188-call-shape-and-optional-parameters.vn"
 import "./189-enum-variant-slots.vn"
+import "./190-generic-instantiation-from-new.vn"
 
 summary()
 

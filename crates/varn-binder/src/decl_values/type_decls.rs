@@ -41,6 +41,11 @@ impl<'r> super::super::Binder<'r> {
             .iter()
             .map(|t| t.constraint.as_ref().map(|con| self.resolve_type(con)))
             .collect();
+        sym.type_param_defaults = e
+            .type_params
+            .iter()
+            .map(|t| t.default.as_ref().map(|given| self.resolve_type(given)))
+            .collect();
         self.define(e.id, sym);
 
         self.sum_type_variants.insert(

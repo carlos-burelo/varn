@@ -1,0 +1,7 @@
+// VN3001
+class Pair<A, B> {
+    a: A
+    b: B
+    constructor(a: A, b: B, n: int) { this.a = a; this.b = b }
+}
+const p = new Pair(1, "x", "three")

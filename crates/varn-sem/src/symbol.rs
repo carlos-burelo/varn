@@ -60,6 +60,7 @@ pub struct Symbol {
     pub doc: Option<Atom>,
     pub type_params: Vec<Atom>,
     pub type_param_constraints: Vec<Option<Type>>,
+    pub type_param_defaults: Vec<Option<Type>>,
     pub offset: u32,
     #[serde(skip)]
     pub full_range: varn_core::SourceRange,
@@ -103,6 +104,7 @@ impl Symbol {
             doc: None,
             type_params: Vec::new(),
             type_param_constraints: Vec::new(),
+            type_param_defaults: Vec::new(),
             offset: 0,
             full_range: SourceRange::default(),
             origin_module: None,

@@ -57,8 +57,11 @@ impl<'r> Checker<'r> {
                 .map(|parent| self.parent_type(&parent))
                 .unwrap_or(Type::Dynamic),
             ExprKind::New {
-                callee, type_args, ..
-            } => self.infer_new_type(rec, *callee, type_args, bind),
+                callee,
+                type_args,
+                args,
+                ..
+            } => self.infer_new_type(rec, *callee, type_args, args, bind),
             ExprKind::Call { .. } => self.infer_call_type(rec, expr, bind),
             ExprKind::TaggedTemplate { tag, .. } => {
                 let tag_ty = self.infer_type(rec, *tag, bind);

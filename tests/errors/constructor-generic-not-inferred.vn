@@ -1,0 +1,5 @@
+// VN3201
+class Stack<T> {
+    items: T[] = []
+}
+const s = new Stack()

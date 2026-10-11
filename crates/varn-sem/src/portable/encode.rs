@@ -14,8 +14,13 @@ struct Roots {
 impl Roots {
     fn symbol(&mut self, s: &Symbol) {
         self.types.extend(s.ty.map(|t| t.0));
-        self.types
-            .extend(s.type_param_constraints.iter().flatten().map(|t| t.0));
+        self.types.extend(
+            s.type_param_constraints
+                .iter()
+                .chain(&s.type_param_defaults)
+                .flatten()
+                .map(|t| t.0),
+        );
         self.atoms.insert(s.name);
         self.atoms.extend(s.doc);
         self.atoms.extend(s.type_params.iter().copied());

@@ -139,6 +139,11 @@ impl<'r> super::super::Binder<'r> {
             .iter()
             .map(|t| t.constraint.as_ref().map(|c| self.resolve_type(c)))
             .collect();
+        sym.type_param_defaults = f
+            .type_params
+            .iter()
+            .map(|t| t.default.as_ref().map(|given| self.resolve_type(given)))
+            .collect();
         let sym_id = self.define(f.id, sym);
         crate::decorator_attrs::record_decorators(self, sym_id, &f.decorators);
 

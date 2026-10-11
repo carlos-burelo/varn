@@ -1,0 +1,73 @@
+import { describe, it, expect } from "std:test";
+import { ImportedAsyncBox } from "./75-async-shapes-lib.vn";
+
+class Box<T> {
+    value: T
+    constructor(value: T) { this.value = value }
+    swap(next: T): T { const old = this.value; this.value = next; return old }
+}
+class Pair<A, B> {
+    first: A
+    second: B
+    constructor(first: A, second: B) { this.first = first; this.second = second }
+}
+class Tagged<T, L = str> {
+    value: T
+    label: L?
+    constructor(value: T, label: L? = null) { this.value = value; this.label = label }
+}
+class Cell<T = int> {
+    items: T[] = []
+    add(v: T): int { this.items.push(v); return this.items.length }
+}
+
+function sumBoxes(n: int): int {
+    let total = 0
+    for (let i = 0; i < n; i = i + 1) {
+        const b = new Box(i)
+        total = total + b.swap(i + 1) + b.value
+    }
+    return total
+}
+
+await describe("190 generic instantiation from new", async () => {
+    await it("the arguments of new decide the type arguments", () => {
+        const b = new Box(1)
+        const n: int = b.value
+        const s: str = new Box("x").value
+        const p = new Pair(1, "one")
+        const first: int = p.first
+        const second: str = p.second
+        expect(n + first).toBe(2)
+        expect(s + second).toBe("xone")
+        expect(sumBoxes(300)).toBe(90000)
+    })
+
+    await it("a nullable parameter still names its type argument", () => {
+        const t = new Tagged(5, 7)
+        const label: int? = t.label
+        const none = new Tagged<int, int>(5)
+        expect(label).toBe(7)
+        expect(none.label).toBe(null)
+    })
+
+    await it("a type parameter left open takes its declared default", () => {
+        const t = new Tagged(5)
+        const label: str? = t.label
+        const c = new Cell()
+        expect(label).toBe(null)
+        expect(c.add(4)).toBe(1)
+        const first: int = c.items[0]
+        expect(first).toBe(4)
+        const imported = new ImportedAsyncBox()
+        expect(imported.items.length).toBe(0)
+    })
+
+    await it("written type arguments and the expected type still win", () => {
+        const wide = new Box<int?>(1)
+        wide.value = null
+        const typed: Box<float> = new Box(2)
+        expect(wide.value).toBe(null)
+        expect(typeof typed.value).toBe("float")
+    })
+})

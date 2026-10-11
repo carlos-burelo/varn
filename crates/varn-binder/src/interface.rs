@@ -28,6 +28,11 @@ impl<'r> super::Binder<'r> {
             .iter()
             .map(|t| t.constraint.as_ref().map(|con| self.resolve_type(con)))
             .collect();
+        sym.type_param_defaults = i
+            .type_params
+            .iter()
+            .map(|t| t.default.as_ref().map(|given| self.resolve_type(given)))
+            .collect();
         self.define(i.id, sym);
 
         let child = self

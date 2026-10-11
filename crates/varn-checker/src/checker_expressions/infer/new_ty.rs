@@ -11,6 +11,7 @@ impl<'r> Checker<'r> {
         rec: &mut Recorder,
         callee: ExprId,
         type_args: &[varn_core::ast::TypeNode],
+        ctor_args: &[varn_core::ast::Arg],
         bind: &BindResult,
     ) -> Type {
         let callee_ty = self.infer_type(rec, callee, bind);
@@ -42,6 +43,15 @@ impl<'r> Checker<'r> {
                     Type::generic_with_origin(
                         name_str,
                         vec![Type::Dynamic, Type::Dynamic],
+                        origin_str,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    )
+                } else if let Some(args) =
+                    self.instantiation_from_args(rec, callee, &name_str, origin_str.as_ref(), ctor_args, bind)
+                {
+                    Type::generic_with_origin(
+                        name_str,
+                        args,
                         origin_str,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     )
@@ -109,6 +119,14 @@ impl<'r> Checker<'r> {
                             vec![Type::Dynamic, Type::Dynamic],
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         )
+                    } else if let Some(args) =
+                        self.instantiation_from_args(rec, callee, &name_str, None, ctor_args, bind)
+                    {
+                        Type::generic(
+                            name_str,
+                            args,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        )
                     } else {
                         Type::named(name_str, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
                     }
@@ -117,6 +135,66 @@ impl<'r> Checker<'r> {
                 }
             }
         }
+    }
+
+    fn instantiation_from_args(
+        &mut self,
+        rec: &mut Recorder,
+        callee: ExprId,
+        class: &str,
+        origin: Option<&std::sync::Arc<str>>,
+        ctor_args: &[varn_core::ast::Arg],
+        bind: &BindResult,
+    ) -> Option<Vec<Type>> {
+        use crate::checker_expressions::members::member_util::class_type_params;
+        use varn_sem::bind::TypeContext;
+        let type_params = class_type_params(self.resolver, class, origin, bind);
+        if type_params.is_empty() {
+            return None;
+        }
+        let ctor = varn_sem::bind::BindView::new(bind, self.resolver)
+            .get_class_members(class, origin.map(|o| o.as_ref()))
+            .and_then(|members| {
+                members
+                    .iter()
+                    .find(|m| m.kind == varn_sem::types::ClassMemberKind::Constructor)
+                    .map(|m| m.ty)
+            });
+        let params = match ctor.map(|ty| self.ty_table.get(ty.0)) {
+            Some(TypeKind::Fn(fid)) => self.ty_table.get_function(fid).params.clone(),
+            Some(_) | None => Vec::new(),
+        };
+        let mapping = crate::checker_generics::infer_mapping_from_args(
+            &type_params,
+            &params,
+            ctor_args,
+            self,
+            rec,
+            bind,
+        );
+        let defaults = self.declared_type_defaults(callee, bind);
+        type_params
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                mapping
+                    .get(p)
+                    .copied()
+                    .or_else(|| defaults.get(i).copied().flatten())
+            })
+            .collect()
+    }
+
+    fn declared_type_defaults(&self, callee: ExprId, bind: &BindResult) -> Vec<Option<Type>> {
+        let varn_core::ast::ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind
+        else {
+            return Vec::new();
+        };
+        bind.scopes
+            .get(bind.global_scope)
+            .resolve(*name, &bind.scopes)
+            .map(|sid| bind.arena.get(sid).type_param_defaults.clone())
+            .unwrap_or_default()
     }
 
     fn expected_instantiation(&mut self, name: varn_core::Atom) -> Option<Type> {

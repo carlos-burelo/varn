@@ -193,6 +193,9 @@ impl<'r> Checker<'r> {
             })
         });
         let cls_name: Option<String> = cls_name.map(str::to_owned);
+        if let Some(class) = cls_name.as_deref() {
+            self.require_instantiation(rec, expr, class, range, bind);
+        }
         let instantiated = declared.and_then(|ctor| self.instantiated_constructor(rec, expr, ctor, cls_name.as_deref()?, bind));
         let context_ty = instantiated.or(declared);
         let ctor_params = match context_ty.map(|ty| self.ty_table.get(ty.0)) {
@@ -203,6 +206,34 @@ impl<'r> Checker<'r> {
         if instantiated.is_some() {
             self.validate_call_arguments(rec, args, &ctor_params, &range, expr.index(), bind);
         }
+    }
+
+    fn require_instantiation(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        class: &str,
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        use crate::checker_expressions::members::member_util::class_type_params;
+        let instance = self.infer_type(rec, expr, bind);
+        let varn_core::TypeKind::Named(_, origin) = self.ty_table.get(instance.0) else {
+            return;
+        };
+        let origin = origin.map(|o| self.resolve_bind_atom(bind, o));
+        if class_type_params(self.resolver, class, origin.as_ref(), bind).is_empty() {
+            return;
+        }
+        self.emit(
+            varn_core::Diagnostic::error(
+                varn_core::ErrorCode::TypeArgInferenceFailed,
+                format!(
+                    "cannot infer the type arguments of '{class}' from this call; write them: new {class}<...>(...)"
+                ),
+            )
+            .with_range(range),
+        );
     }
 
     fn instantiated_constructor(
