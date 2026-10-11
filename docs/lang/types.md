@@ -331,6 +331,19 @@ class Dog extends Animal {
 }
 ```
 
+Contratos que se comprueban en la declaración:
+
+- `override` debe poder ocupar el lugar de lo que redefine: mismo tipo
+  de retorno o uno más estrecho, parámetros iguales o más anchos. Si no,
+  error `VN4116`.
+- `implements I` exige que la clase satisfaga `I`: error `VN4117` si
+  falta un miembro o su tipo no encaja.
+- Una clase que no es `abstract` implementa todo miembro abstracto que
+  hereda: error `VN4107`.
+- Un miembro `static` se alcanza por la clase (`Counter.total`), nunca
+  por una instancia ni por `this`; uno de instancia, nunca por la clase.
+  Error `VN4106` en los dos sentidos.
+
 ---
 
 ## 8. Generics
@@ -375,6 +388,7 @@ const t = new Tagged(5, 7)        // label: L? con un int fija L = int
   (`class Cell<T = int>`; `new Cell()` es `Cell<int>`).
 - Si queda un parámetro de tipo abierto es error `VN3201`: se escribe
   (`new Stack<int>()`) o se da el tipo esperado (`const s: Stack<int> = new Stack()`).
+  `new Map()` y `new Set()` no son excepción.
 - El constructor se valida siempre contra los tipos ya instanciados.
 
 ---
@@ -479,12 +493,26 @@ Un estrechamiento vale mientras la variable no cambie
   la otra. No alcanza a miembros (`this.v ??= 3`) ni a asignaciones hechas
   dentro de un closure.
 
-### 10.4 Valores por defecto y spread
+### 10.4 Retorno
+
+- Una función, método, getter o flecha con tipo de retorno declarado
+  retorna por toda ruta: error `VN4018` si el cuerpo puede terminar sin
+  `return` ni `throw`. Vale también para `T?`: el `null` se escribe.
+- Una función `never` no puede llegar a su final.
+- La anotación de un generador nombra lo que produce. `function* g(): int`
+  y `function* g(): Generator<int>` son lo mismo, y cada `yield` se
+  comprueba contra ese tipo (tests/194-generator-declared-yield.vn).
+- Una restricción `T extends X` se comprueba contra el argumento de tipo
+  escrito y contra el que se deduce de la llamada (`VN3202`).
+
+### 10.5 Valores por defecto y spread
 
 - El valor por defecto de un parámetro se comprueba contra su tipo, dentro
-  del ámbito de la función (puede nombrar parámetros anteriores). Un literal
-  entero vale donde se declara `float`, `decimal` o `bigint` y llega
-  convertido: en `f(x: float = 1)`, `x` es siempre `float`.
+  del ámbito de la función (puede nombrar parámetros anteriores).
+- Un literal entero vale donde se declara `float`, `decimal` o `bigint`, en
+  un inicializador, un argumento, un valor por defecto, una asignación o un
+  `yield`, y llega convertido: en `f(x: float = 1)`, `x` es siempre `float`.
+  Una variable `int` no se convierte sola a `float`.
 - `[...xs]` y `f(...xs)` aceptan un array o una tupla. Un `Set`, un `Map`,
   un `str`, un generador o un valor que puede ser `null` son error de
   compilación (tests/191-spread-sources.vn).

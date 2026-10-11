@@ -129,20 +129,48 @@ Bugs previos que aparecieron, cada uno arreglado en su capa:
   `x = null; x.length` compilaba. Igual dentro de un `if` y en un bucle.
   Y al revés: ni `x = 5` quitaba el `null` de un `int?`.
 
+### Cuarta tanda (commits `136c0b38`..`207b9a24`, tests 193 y 194)
+
+Empezó por lo pendiente y siguió con un barrido de sondas: «¿se hace
+cumplir el tipo declarado?» en cada sitio donde se declara uno.
+
+- `new` de una clase importada aloca directo y llama al constructor por
+  método: 92 ns -> 12,6 ns (un `new` local sin inlinear: 14-15).
+- `toEqual` de `std:test` compara por contenido.
+
+Reglas que el checker no hacía cumplir, cada una con su error:
+
+- Una función con tipo de retorno debe retornar por toda ruta
+  (`VN4018`). Antes `function count(): int { }` devolvía `null` tipado
+  `int`, y `count() + 1` hacía paniquear a la VM.
+- `override` debe poder ocupar el lugar de lo que redefine (`VN4116`).
+- `implements` se comprueba en la declaración (`VN4117`).
+- Un miembro abstracto heredado debe implementarse (`VN4107`).
+- Estático desde una instancia, o de instancia desde la clase
+  (`VN4106`). `Counter.count` con `count` de instancia desbordaba la
+  pila.
+- La restricción `T extends X` vale para el tipo inferido (`VN3202`).
+- Un `yield` se comprueba contra el tipo que el generador declara.
+- Una asignación acepta un literal entero donde va `float`, como el
+  inicializador; antes `f = 2` era error y `let f: float = 2` no.
+- `new Map()` sin argumentos de tipo es `VN3201` como cualquier
+  genérico.
+- El spread de una tupla aporta sus tipos al literal de array.
+
+Medidas todas con `vn check` sobre `std` y `tests` antes de fijarlas:
+en total rompían un sitio (`new Map()` en el test 66).
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
 
 ### 2.1 Forma de llamada: lo que queda
 
-- `new` de una clase importada: 92 ns frente a 14 de un `new` local no
-  inlineado (0,2 inlineado). Va por llamada genérica al valor clase.
-  Para alocar directo y llamar al constructor por método hace falta que
-  `ForeignClass` diga si la clase está decorada (un decorador puede
-  devolver otra cosa que una clase). No fiar el tamaño de payload al
-  módulo que importa: el JIT lo escribe en la cabecera sin compararlo
-  con el layout real de la clase (`emit_alloc_instance`); para una clase
-  ajena hay que alocar por el helper, que usa el layout del dueño.
+- `new` de una clase importada: hecho cuando la clase declara
+  constructor y no está decorada. Una clase importada sin constructor
+  escrito (solo inicializadores de campo) sigue por la llamada genérica
+  (92 ns): desde fuera no se ve si se sintetizó un constructor. Y sigue
+  sin inlinearse: haría falta el cuerpo del constructor ajeno.
 - Slots de método para clases importadas: medido, no hace falta. Con
   tipos exactos la llamada por nombre con caché iguala al slot (6,8 ns
   las dos).
@@ -151,9 +179,6 @@ Cada item: qué falta, dónde, cómo se mide.
   usados para ensanchar y para clases sin tabla de métodos). El segundo
   es la fuente correcta; falta mover `guard_args` a él y borrar el caso
   `int` -> `float?` que quedó dentro de `as_declared`.
-- `new Map()` sigue siendo `Map<dynamic, dynamic>` sin avisar, cuando
-  `new Set()` y cualquier clase de usuario ya exigen los argumentos de
-  tipo (`VN3201`).
 - Un tipo genérico escrito sin argumentos en una anotación (`x: Cell`)
   no toma los valores por defecto de sus parámetros; solo `new` lo hace.
 - El estrechamiento por asignación no cubre miembros (`this.v ??= 3`),
@@ -234,17 +259,26 @@ anterior.
 
 ### 2.9 Encontrado y sin arreglar
 
-- `expect(a).toEqual(b)` de `std:test` no compara arrays ni objetos por
-  contenido: `isEq` solo mira identidad y strings. Ningún test lo usaba
-  con arrays.
+- `override` e `implements` no se comprueban cuando la clase o un
+  ancestro es genérico: comparar firmas pide sustituir los parámetros
+  de tipo del ancestro.
 - Un `int` variable no se acepta donde va un `float` (solo el literal),
-  pero sí donde va un `decimal` o un `bigint`. Y la asignación rechaza
-  hasta el literal (`a.value = 3` con `value: float`) cuando el
-  inicializador y el argumento lo aceptan. Falta una sola regla.
-- `function* gen(): Generator<int>` tiene tipo
-  `Generator<Generator<int>>` al llamarla.
-- Los elementos de un spread no se comprueban contra el tipo esperado
-  del array (`const xs: int[] = [...textos]`).
+  pero sí donde va un `decimal` o un `bigint`. Falta decidir si eso es
+  una regla o un accidente.
+- El `return` de un generador se compara contra el tipo de lo que
+  produce: `Generator<T>` tiene un solo parámetro y el valor final no
+  tiene dónde declararse (tests/76-generator-values.vn lo esquiva).
+- Con un operando `dynamic`, `variante == 1` compara el tag del enum
+  (`compare::eq`); el checker lo rechaza cuando los dos tipos se
+  conocen. `compare::eq` cierra además con `_ => return false`.
+- El análisis de «toda ruta retorna» es sintáctico: una llamada a una
+  función `never` al final de una rama no cuenta como salida.
+- Una interfaz acepta un objeto literal con campos de más; un tipo de
+  objeto (`{ n: int }`) no. Es deliberado, pero no está escrito.
+- Las sondas de esta tanda cubrieron funciones, clases, genéricos y
+  generadores. No se barrieron: `match` con patrones anidados, tipos
+  condicionales y mapeados, `struct`, espacios de nombres, extensiones,
+  ni el paso de valores entre tareas.
 
 ## 3. Decisiones de lenguaje (tomadas 2026-10-10, delegadas por el dueño)
 
@@ -289,6 +323,20 @@ Tercera tanda:
 
 Las cuatro se midieron con `vn check` sobre todo `std` y `tests` antes
 de fijarlas: rompían, en total, un sitio.
+
+Cuarta tanda:
+
+- **Toda ruta retorna, también en una función `T?`** (`0f1b3913`). Se
+  descartó el `null` implícito al caer del final: es el `undefined` de
+  otros lenguajes con otro nombre.
+- **Estático y de instancia no se cruzan** (`207b9a24`).
+- **`override` e `implements` son contratos que se comprueban al
+  declararlos**, no al usarlos (`544370a0`).
+- **La anotación de un generador nombra lo que produce**, escrita corta
+  (`: int`) o larga (`: Generator<int>`) (`201a8e62`).
+- **Un literal entero vale donde va `float`, `decimal` o `bigint`, en
+  cualquier posición** (inicializador, argumento, valor por defecto,
+  asignación, `yield`), y llega convertido (`fef41b27`).
 
 Medido antes de decidir: en todo `std` + suite solo 2 tests dependían
 del `null` fuera de rango, 9 sitios de la lectura por clave no nula y
