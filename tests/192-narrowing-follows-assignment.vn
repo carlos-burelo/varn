@@ -28,6 +28,18 @@ function lastValue(head: Node): int {
     }
     return seen
 }
+function size(x: int | str): int {
+    if (typeof x == "int") { return x }
+    return x.length
+}
+function name(x: int | str | bool): str {
+    if (typeof x == "str") { return x }
+    if (typeof x != "int") {
+        const flag: bool = x
+        return flag ? "yes" : "no"
+    }
+    return (x + 1).toString()
+}
 function reset(x: str?): int {
     if (x == null) { return 0 }
     const before = x.length
@@ -50,6 +62,13 @@ await describe("192 narrowing follows assignment", async () => {
         expect(total(chain)).toBe(6)
         expect(total(null)).toBe(0)
         expect(lastValue(chain)).toBe(3)
+    })
+
+    await it("ruling a type out with typeof leaves the others", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + size(i) + size("ab") }
+        expect(total).toBe(44850 + 600)
+        expect(name("s") + name(true) + name(false) + name(4)).toBe("syesno5")
     })
 
     await it("assigning null undoes an earlier check", () => {

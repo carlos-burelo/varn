@@ -38,21 +38,53 @@ impl<'r> Checker<'r> {
             _ => None,
         };
 
-        if let Some((typeof_op, value)) = typeof_check {
-            if (is_eq && is_true_branch) || (is_neq && !is_true_branch) {
-                if let ExprKind::Identifier { name } = &arena.expr(typeof_op).kind {
-                    let scope = bind.scopes.get(self.current_scope);
-                    if let Some(id) = scope.resolve(*name, &bind.scopes) {
-                        let view = varn_sem::bind::BindView::new(bind, self.resolver);
-                        let narrowed_ty = varn_binder::resolve_primitive(
-                            &value,
-                            Some(&view),
-                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        );
-                        out.push((id, narrowed_ty));
-                    }
-                }
-            }
+        let Some((typeof_op, value)) = typeof_check else {
+            return;
+        };
+        if !is_eq && !is_neq {
+            return;
         }
+        let ExprKind::Identifier { name } = &arena.expr(typeof_op).kind else {
+            return;
+        };
+        let Some(id) = bind
+            .scopes
+            .get(self.current_scope)
+            .resolve(*name, &bind.scopes)
+        else {
+            return;
+        };
+        let view = varn_sem::bind::BindView::new(bind, self.resolver);
+        let named = varn_binder::resolve_primitive(
+            &value,
+            Some(&view),
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        );
+        if is_eq == is_true_branch {
+            out.push((id, named));
+            return;
+        }
+        let Some(current) = self.narrowing_base(id, bind.arena.get(id).ty) else {
+            return;
+        };
+        let varn_core::TypeKind::Union(members) = self.ty_table.get(current.0) else {
+            return;
+        };
+        let members: Vec<Type> = self
+            .ty_table
+            .get_list(members)
+            .iter()
+            .map(|m| Type::resolved(*m))
+            .collect();
+        let rest: Vec<Type> = members
+            .iter()
+            .copied()
+            .filter(|m| !self.types_compatible_cached(&named, m, Some(bind)))
+            .collect();
+        if rest.is_empty() || rest.len() == members.len() {
+            return;
+        }
+        let narrowed = Type::union(rest, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        out.push((id, narrowed));
     }
 }
