@@ -30,6 +30,12 @@ pub struct ScopeSpan {
     pub scope: ScopeId,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct CheckedParam {
+    pub ty: Type,
+    pub optional: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct ForeignEnum {
     pub name: Arc<str>,
@@ -61,7 +67,7 @@ pub struct Desugarings {
     pub extension_set_members: FxHashMap<u32, Arc<str>>,
     pub operator_calls: FxHashSet<varn_core::ast::AstId>,
     pub foreign_enums: Vec<ForeignEnum>,
-    pub call_params: FxHashMap<varn_core::ast::AstId, Vec<Type>>,
+    pub call_params: FxHashMap<varn_core::ast::AstId, Vec<CheckedParam>>,
     pub foreign_classes: Vec<ForeignClass>,
     pub foreign_inherited_fields: std::collections::BTreeMap<Arc<str>, Vec<InheritedField>>,
     pub match_arm_subjects: FxHashMap<varn_core::ast::AstId, Vec<Type>>,

@@ -24,7 +24,10 @@ impl<'r> Checker<'r> {
             params
                 .iter()
                 .take_while(|p| !p.is_rest)
-                .map(|p| varn_sem::types::Type::resolved(p.ty))
+                .map(|p| varn_sem::output::CheckedParam {
+                    ty: varn_sem::types::Type::resolved(p.ty),
+                    optional: p.optional,
+                })
                 .collect(),
         );
         let (call_info, extra_diags) = analyze_call_args(args, range);

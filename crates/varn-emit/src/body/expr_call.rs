@@ -30,7 +30,7 @@ impl<'a> FnEmitter<'a> {
             .map(|(i, arg)| match arg {
                 TirArg::Expr(e) => match checked.get(i) {
                     Some(param) if !spread_seen => {
-                        let param = lower_type(param, table, interner, self.tt, names);
+                        let param = lower_type(&param.ty, table, interner, self.tt, names);
                         TirArg::Expr(self.widened(e, param))
                     }
                     Some(_) | None => TirArg::Expr(e),
@@ -42,6 +42,40 @@ impl<'a> FnEmitter<'a> {
                 named @ TirArg::Named { .. } => named,
             })
             .collect()
+    }
+
+    pub(super) fn checked_signature(
+        &mut self,
+        call_id: AstId,
+        return_ty: BackendTy,
+    ) -> Option<varn_tir::SigId> {
+        let checked = self.m.desugar.call_params.get(&call_id)?;
+        let (names, table, interner) = (self.m.names, self.m.checker_table, self.m.interner);
+        let params = checked
+            .iter()
+            .map(|param| {
+                let lowered = lower_type(&param.ty, table, interner, self.tt, names);
+                let boxed = matches!(lowered, BackendTy::Nullable(_) | BackendTy::Dynamic(_));
+                if param.optional && !boxed {
+                    BackendTy::Nullable(self.tt.intern(lowered))
+                } else {
+                    lowered
+                }
+            })
+            .collect();
+        let sig = varn_tir::Signature {
+            params,
+            return_ty,
+            has_rest: false,
+        };
+        let at = match self.signatures.iter().position(|known| *known == sig) {
+            Some(at) => at,
+            None => {
+                self.signatures.push(sig);
+                self.signatures.len() - 1
+            }
+        };
+        Some(varn_tir::SigId(at as u32))
     }
 
     pub(super) fn widened(&self, arg: TirExpr, param: BackendTy) -> TirExpr {
@@ -291,11 +325,14 @@ impl<'a> FnEmitter<'a> {
                 ..recv
             };
             let targs = self.lower_call_args(call_id, args);
-            let call = self.member_call(present, name, targs, ty.non_nullable(self.tt), span);
+            let ty = ty.non_nullable(self.tt);
+            let checked = self.checked_signature(call_id, ty);
+            let call = self.member_call(present, name, targs, ty, checked, span);
             return self.null_or(is_null, call, span);
         }
         let targs = self.lower_call_args(call_id, args);
-        self.member_call(recv, name, targs, ty, span)
+        let checked = self.checked_signature(call_id, ty);
+        self.member_call(recv, name, targs, ty, checked, span)
     }
 
     pub(super) fn lower_pipeline(

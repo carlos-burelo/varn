@@ -1,5 +1,6 @@
 import { describe, it, expect } from "std:test";
 import { Headers } from "std:http/headers";
+import { Tally } from "./helpers/call-shape.vn";
 
 class Acc {
     total: int
@@ -36,6 +37,9 @@ class Span {
 }
 function spans(i: int, end: int?): int {
     return new Span(i).to + new Span(i, 3).to + new Span(i, end).to + new Span(i, 1, "s").unit.length
+}
+function tally(t: Tally, i: int): int {
+    return t.add(i) + t.add(null) + t.label("n", i).length + t.label("n", null, "!").length
 }
 function withDefault(k: int = 2): int { return k }
 function optional(s?: str): str { return s ?? "none" }
@@ -138,6 +142,18 @@ await describe("188 call shape and optional parameters", async () => {
         expect(new Span(1).unit).toBe("ms")
         expect(new Span(1, null, "s").to).toBe(11)
         expect(total).toBe(169200 + 87400)
+    })
+
+    await it("a method of an imported class takes arguments in its declared shape", () => {
+        const t = new Tally(10)
+        let total = 0
+        for (let i = 0; i < 400; i = i + 1) { total = total + tally(t, i % 10) }
+        expect(tally(t, 5)).toBe(15 + 11 + 2 + 3)
+        expect(total).toBe(400 * (10 + 11 + 2 + 3) + 40 * 45)
+        expect(t.scale()).toBe("float")
+        expect(t.scale(3)).toBe("float")
+        expect(t.label("a", 2, "z")).toBe("a2z")
+        expect(new Tally().add(4)).toBe(4)
     })
 
     await it("an omitted argument and a null one are the same thing", () => {

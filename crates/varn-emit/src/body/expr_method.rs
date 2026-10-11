@@ -12,6 +12,7 @@ impl<'a> FnEmitter<'a> {
         name: Arc<str>,
         targs: Vec<TirArg>,
         ty: BackendTy,
+        checked: Option<varn_tir::SigId>,
         span: Span,
     ) -> TirExpr {
         let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
@@ -38,7 +39,7 @@ impl<'a> FnEmitter<'a> {
             }
         }
 
-        self.method_call(recv, name, targs, ty, span)
+        self.method_call(recv, name, targs, ty, checked, span)
     }
 
     pub(super) fn method_call(
@@ -47,12 +48,16 @@ impl<'a> FnEmitter<'a> {
         name: Arc<str>,
         targs: Vec<TirArg>,
         ty: BackendTy,
+        checked: Option<varn_tir::SigId>,
         span: Span,
     ) -> TirExpr {
-        let method_sig = self.class_of(recv.ty).and_then(|ci| {
-            let slot = ci.method_slot(&name)?;
-            Some(ci.method_at(slot)?.sig)
-        });
+        let class = self.class_of(recv.ty);
+        let method_sig = class
+            .and_then(|ci| {
+                let slot = ci.method_slot(&name)?;
+                Some(ci.method_at(slot)?.sig)
+            })
+            .or(checked.filter(|_| class.is_some()));
         let (recv, targs) = if self.core_class_name(recv.ty).is_some() {
             (recv, self.guard_args(targs, method_sig))
         } else {
@@ -106,10 +111,10 @@ impl<'a> FnEmitter<'a> {
             .unwrap_or_default();
         let name: Arc<str> = Arc::from(method.method);
         match method.shape {
-            OperatorShape::Value => self.method_call(recv, name, args, ty, span),
-            OperatorShape::Equals => self.method_call(recv, name, args, BackendTy::Bool, span),
+            OperatorShape::Value => self.method_call(recv, name, args, ty, None, span),
+            OperatorShape::Equals => self.method_call(recv, name, args, BackendTy::Bool, None, span),
             OperatorShape::NotEquals => {
-                let equals = self.method_call(recv, name, args, BackendTy::Bool, span);
+                let equals = self.method_call(recv, name, args, BackendTy::Bool, None, span);
                 TirExpr {
                     kind: TirExprKind::Unary {
                         op: TirUnOp::Not,
@@ -121,7 +126,7 @@ impl<'a> FnEmitter<'a> {
                 }
             }
             OperatorShape::CompareToZero(op) => {
-                let compared = self.method_call(recv, name, args, BackendTy::Int, span);
+                let compared = self.method_call(recv, name, args, BackendTy::Int, None, span);
                 TirExpr {
                     kind: TirExprKind::Binary {
                         op: bin_op(op).expect("comparison operators lower to a TirBinOp"),

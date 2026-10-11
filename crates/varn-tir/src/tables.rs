@@ -147,7 +147,7 @@ impl EnumInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Signature {
     pub params: Vec<BackendTy>,
     pub return_ty: BackendTy,

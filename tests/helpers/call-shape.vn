@@ -1,0 +1,7 @@
+export class Tally {
+    total: int
+    constructor(start: int? = null) { this.total = start ?? 0 }
+    add(n: int?): int { return this.total + (n ?? 1) }
+    scale(by: float = 2): str { return typeof by }
+    label(prefix: str, n: int?, suffix?: str): str { return prefix + (n ?? 0).toString() + (suffix ?? "") }
+}
