@@ -95,22 +95,70 @@ estado térmico antes → después):
 La máquina termaliza: las sondas se repiten alternando binarios; una
 sola pasada dio hasta 3× de diferencia en la misma medida.
 
+### Tercera tanda (commits `52fbbef6`..`75074dcc`, tests 189 a 192)
+
+- La variante de un enum es un slot global resuelto en compilación,
+  local o importado: `Color.Red` 28 ns -> 1,4 ns; `LogLevel.Warn`
+  importado 121 ns -> 1,2 ns (dos lecturas).
+- `new` deduce los argumentos de tipo y valida siempre el constructor.
+- Un constructor con valores por defecto se inlinea: 20,6 ns -> 0,4 ns
+  (igual que sin defecto). El mensaje de `46ce2cab` dice «~59 ns»: esa
+  cifra era de otra sonda; la medida con esta es 20,6.
+- Un método de clase importada recibe los argumentos con su forma:
+  `int` -> `int?` 44,6 ns -> 15,6 ns (el mismo método local: 14,8).
+- El estrechamiento sigue a la asignación.
+
+Bugs previos que aparecieron, cada uno arreglado en su capa:
+
+- `new Box(1)` era `Box` sin instanciar: `b.value` tenía tipo `T` y el
+  constructor no se validaba (`new Pair(1, "x", "tres")` compilaba).
+- El valor por defecto de un parámetro de tipo (`class Cell<T = int>`)
+  se parseaba y no se guardaba en ningún sitio.
+- La inferencia de genéricos emparejaba uniones por posición, `null`
+  incluido: un `int` dado a `label: L?` no fijaba `L`.
+- `new Box<float>(2)`, `Map<str, float>.set("a", 1)` y
+  `new Box<decimal>(1)` guardaban un int: la conversión se hacía contra
+  la firma del llamado, que en una clase genérica tiene `T` borrado.
+- El checker no visitaba el valor por defecto de un parámetro:
+  `function a(x: float = "s")` compilaba, un nombre inexistente también.
+  En `f(x: float = 1)` el compilador deducía del relleno que `x` era
+  int, y `f(2.5)` lanzaba «expected 'int', got 'float'».
+- `[...conjunto]`, `[..."ab"]`, `[...generador]` y `[...quizaNulo]`
+  compilaban y lanzaban al ejecutar; `[...tupla]` también lanzaba.
+- Asignar no tocaba el estrechamiento: tras `if (x == null) return`,
+  `x = null; x.length` compilaba. Igual dentro de un `if` y en un bucle.
+  Y al revés: ni `x = 5` quitaba el `null` de un `int?`.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
 
 ### 2.1 Forma de llamada: lo que queda
 
-- Un constructor con parámetro por defecto no se inlinea
-  (`inlinable_constructor` lo rechaza): 59 ns frente a 1,8 del
-  constructor sin defecto.
-- Métodos de clases importadas: el emisor no tiene sus firmas
-  (`ForeignClass.methods` son solo nombres), así que no hay forma ni
-  slot de vtable. No vale con añadir la firma: el slot lo decide el
-  módulo dueño. Hace falta exportar firma + slot juntos.
-- `new Box(1)` sin instanciar no valida los argumentos (no hay con qué
-  sustituir `T`); falta inferir la instanciación desde los argumentos.
-- Tras `x ||= v`, `x` no se estrecha a no nulo.
+- `new` de una clase importada: 92 ns frente a 14 de un `new` local no
+  inlineado (0,2 inlineado). Va por llamada genérica al valor clase.
+  Para alocar directo y llamar al constructor por método hace falta que
+  `ForeignClass` diga si la clase está decorada (un decorador puede
+  devolver otra cosa que una clase). No fiar el tamaño de payload al
+  módulo que importa: el JIT lo escribe en la cabecera sin compararlo
+  con el layout real de la clase (`emit_alloc_instance`); para una clase
+  ajena hay que alocar por el helper, que usa el layout del dueño.
+- Slots de método para clases importadas: medido, no hace falta. Con
+  tipos exactos la llamada por nombre con caché iguala al slot (6,8 ns
+  las dos).
+- La forma de un argumento sale de dos sitios: la firma del llamado
+  (`guard_args`) y los parámetros que validó el checker (`call_params`,
+  usados para ensanchar y para clases sin tabla de métodos). El segundo
+  es la fuente correcta; falta mover `guard_args` a él y borrar el caso
+  `int` -> `float?` que quedó dentro de `as_declared`.
+- `new Map()` sigue siendo `Map<dynamic, dynamic>` sin avisar, cuando
+  `new Set()` y cualquier clase de usuario ya exigen los argumentos de
+  tipo (`VN3201`).
+- Un tipo genérico escrito sin argumentos en una anotación (`x: Cell`)
+  no toma los valores por defecto de sus parámetros; solo `new` lo hace.
+- El estrechamiento por asignación no cubre miembros (`this.v ??= 3`),
+  ni asignaciones hechas desde un closure, y una asignación en una rama
+  de un `if` invalida también la otra.
 
 ### 2.2 Tipos que `HirType` no distingue
 
@@ -119,18 +167,22 @@ Tuple, Class, Nullable. Char, Bytes, Enum, Decimal, BigInt, Fn y los
 tipos de objeto caen en `Ref` (`from_tir/ty.rs`) y pierden su identidad
 antes de elegir opcode.
 
-- Medido en la segunda tanda: la igualdad entre enums no es lenta
-  (18 ns con la llamada, igual que int). El `Eq` genérico ya resuelve en
-  línea los bits idénticos y los dos SSO; solo va al helper cuando los
-  operandos difieren y son bool, enum o referencias. Lo caro del enum es
-  llegar a la variante: `Color.Red` es un `GetProperty` por nombre
-  (36–53 ns tras el arreglo, 84–90 antes). El arreglo de cimiento es
-  que la variante sin payload sea un slot resuelto en compilación:
-  `Resolution::StaticField` existe en el TIR y nadie lo produce.
-- Después, Enum y Char en `HirType`: son los que alimentan `Eq` genérico
-  cuando los operandos difieren.
-- `Eq` tipado para str, bool, enum y referencia (hoy 1,2 ns genérico
-  frente a 0,4 tipado; `eqStrLong` 12,6 ns).
+- Hecho en la tercera tanda: la variante es un slot global por módulo
+  (`EnumInfo::variant_global`). Quedan por nombre los estáticos de clase
+  (`Contador.total`): son mutables, así que un global aparte divergiría
+  de la lectura dinámica. Necesitan slots en el objeto clase
+  (`ClassObj.statics` es un `HashMap`) y es lo que produciría
+  `Resolution::StaticField`, que sigue sin productor.
+- `Eq` tipado, medido antes de hacerlo: la identidad de bits solo vale
+  para bool, instancias de clase y enums sin payload. `char` es un
+  objeto de heap que se compara por contenido y una variante con payload
+  se compara por estructura (`variant_eq`). El `Eq` genérico solo cae al
+  helper cuando los operandos difieren: unos 5 ns en ese caso (int 3,8,
+  bool 5,4, referencia 8,4, enum 10,6, char 9,0 ns con la llamada).
+  Pide un opcode nuevo o Enum/Char en `HirType`; no se hizo.
+- `compare::eq` cierra con `_ => return false` y deja que
+  `variante == int` compare el tag: revisar contra la Ley 7 y contra la
+  regla de no mezclar tipos en `==`.
 - Medida: recuento `EqInt`/`Eq` y `GetFixedField`/`GetProperty` en
   benchmarks, y A/B pareado. Un mejor recuento no es una mejora de
   tiempo: se confirma con el A/B.
@@ -158,7 +210,9 @@ genéricos que queda (340 `GetProperty` en benchmarks).
 
 Hecho para clases importadas raíz (`fd70b173`). Falta: clases
 importadas con padre (hoy `collect_foreign_classes` las salta) y clases
-nativas (`is_builtin_or_intrinsic`).
+nativas (`is_builtin_or_intrinsic`). Desde la tercera tanda la forma de
+los argumentos ya no depende de esto (`call_params`); lo que sigue
+dependiendo es poder alocar e inlinear.
 
 ### 2.6 Coste de entrar en un `try` compilado
 
@@ -177,6 +231,20 @@ async aprobado (memoria `varn-async-redesign-approved`).
 
 Hace doble búsqueda (unos 80 ns frente a 45). Pendiente de la sesión
 anterior.
+
+### 2.9 Encontrado y sin arreglar
+
+- `expect(a).toEqual(b)` de `std:test` no compara arrays ni objetos por
+  contenido: `isEq` solo mira identidad y strings. Ningún test lo usaba
+  con arrays.
+- Un `int` variable no se acepta donde va un `float` (solo el literal),
+  pero sí donde va un `decimal` o un `bigint`. Y la asignación rechaza
+  hasta el literal (`a.value = 3` con `value: float`) cuando el
+  inicializador y el argumento lo aceptan. Falta una sola regla.
+- `function* gen(): Generator<int>` tiene tipo
+  `Generator<Generator<int>>` al llamarla.
+- Los elementos de un spread no se comprueban contra el tipo esperado
+  del array (`const xs: int[] = [...textos]`).
 
 ## 3. Decisiones de lenguaje (tomadas 2026-10-10, delegadas por el dueño)
 
@@ -204,6 +272,23 @@ en su commit.
   miembro `tag?: T` es `T?`; un parámetro `p?: T` es `T?` en el cuerpo;
   quien llama puede pasar `T?` a cualquier parámetro opcional o con
   valor por defecto (el `null` toma el defecto).
+
+Tercera tanda:
+
+- **`new` deduce los argumentos de tipo; lo que no se deduce ni tiene
+  valor por defecto es error `VN3201`** (`e3c679cc`). Se descartó
+  rellenar con `dynamic`: es el `any` implícito de otros lenguajes.
+- **El valor por defecto de un parámetro se comprueba contra su tipo**
+  (`cbf7dad8`).
+- **Un spread toma un array o una tupla, en un literal igual que en una
+  llamada** (`dc287ea2`). Se descartó aceptar cualquier iterable: hoy
+  no hay protocolo de iteración que el literal pueda recorrer sin
+  ejecutar código (generadores), y aceptarlo a medias es peor.
+- **Asignar deshace el estrechamiento; llenar con un valor no nulo lo
+  crea** (`b2d9e3f7`).
+
+Las cuatro se midieron con `vn check` sobre todo `std` y `tests` antes
+de fijarlas: rompían, en total, un sitio.
 
 Medido antes de decidir: en todo `std` + suite solo 2 tests dependían
 del `null` fuera de rango, 9 sitios de la lectura por clave no nula y
@@ -235,3 +320,11 @@ del `null` fuera de rango, 9 sitios de la lectura por clave no nula y
   su primera línea el código que `vn check` debe emitir.
 - Un cuadrante `@embedded` falló una vez en el test 113 por un archivo
   temporal que dejó un `vn` matado; al repetir pasó.
+- Un test que no compila hace que `tests/main.vn` salga con código 1 y
+  sin línea `PASSED`. Mirar la salida antes de commitear: en la tercera
+  tanda se commiteó un test roto por encadenar la corrida y el commit.
+- El checker solo acepta un `int` donde va un `float` si es un literal.
+  Un test que pase una variable `int` a un parámetro `float` no compila.
+- `tests/errors/` y `/tmp/chk.sh` miden el impacto de una regla nueva,
+  pero `std` se compila dentro del build: si `std` rompe, es el build el
+  que falla, no la medición.

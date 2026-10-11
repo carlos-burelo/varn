@@ -360,6 +360,23 @@ interface Comparable<T> {
 }
 ```
 
+### 8.1 Argumentos de tipo de `new`
+
+`new` deduce los argumentos de tipo de los argumentos del constructor,
+igual que una llamada genérica (tests/190-generic-instantiation-from-new.vn):
+
+```varn
+const b = new Box(1)              // Box<int>
+const p = new Pair(1, "uno")      // Pair<int, str>
+const t = new Tagged(5, 7)        // label: L? con un int fija L = int
+```
+
+- Lo que no se deduce toma el valor por defecto declarado
+  (`class Cell<T = int>`; `new Cell()` es `Cell<int>`).
+- Si queda un parámetro de tipo abierto es error `VN3201`: se escribe
+  (`new Stack<int>()`) o se da el tipo esperado (`const s: Stack<int> = new Stack()`).
+- El constructor se valida siempre contra los tipos ya instanciados.
+
 ---
 
 ## 9. Conversiones numéricas
@@ -446,6 +463,31 @@ verdaderos (tests/186-truthiness-and-logical-values.vn).
   La escritura `m[k] = v` pide `V`.
 - Un miembro o parámetro opcional (`tag?: str`) es `str?`: omitirlo y pasar
   `null` son lo mismo (tests/188-call-shape-and-optional-parameters.vn).
+
+### 10.3 El estrechamiento sigue a la asignación
+
+Un estrechamiento vale mientras la variable no cambie
+(tests/192-narrowing-follows-assignment.vn):
+
+- Asignar a una variable deshace lo que se sabía de ella. Tras
+  `if (x == null) return`, hacer `x = null` devuelve `x` a `T?`.
+- Un bucle olvida, antes de empezar, lo que su cuerpo reasigna: lo
+  comprobado antes del bucle no vale para la segunda vuelta.
+- Tras `x = v`, `x ??= v` o `x ||= v` con `v` no nulo, `x` es `T` en el
+  resto del bloque.
+- Es conservador: una asignación en una rama de un `if` invalida también
+  la otra. No alcanza a miembros (`this.v ??= 3`) ni a asignaciones hechas
+  dentro de un closure.
+
+### 10.4 Valores por defecto y spread
+
+- El valor por defecto de un parámetro se comprueba contra su tipo, dentro
+  del ámbito de la función (puede nombrar parámetros anteriores). Un literal
+  entero vale donde se declara `float`, `decimal` o `bigint` y llega
+  convertido: en `f(x: float = 1)`, `x` es siempre `float`.
+- `[...xs]` y `f(...xs)` aceptan un array o una tupla. Un `Set`, un `Map`,
+  un `str`, un generador o un valor que puede ser `null` son error de
+  compilación (tests/191-spread-sources.vn).
 
 ---
 
