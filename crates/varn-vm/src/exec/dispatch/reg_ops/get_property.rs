@@ -57,10 +57,25 @@ impl ExecCtx {
         closure: &VmClosure,
     ) -> VmResult<PropRead> {
         let name_nv = closure.constants[name_idx];
-        let name = self
-            .heap
-            .str_val(name_nv)
-            .ok_or_else(|| RuntimeError::new("GetProperty: non-string const"))?;
+        let mut inline_name = [0u8; 5];
+        let shared_name;
+        let name: &str = if name_nv.is_sso() {
+            name_nv.sso_as_str(&mut inline_name)
+        } else {
+            shared_name = self
+                .heap
+                .str_val(name_nv)
+                .ok_or_else(|| RuntimeError::new("GetProperty: non-string const"))?;
+            shared_name.as_ref()
+        };
+
+        if obj.is_heap() {
+            if let Some(crate::heap::HeapObj::Class(class)) = self.heap.get(obj.as_heap()) {
+                if let Some(held) = class.get_static(name) {
+                    return Ok(PropRead::Value(held));
+                }
+            }
+        }
 
         let is_megamorphic = closure
             .feedback
@@ -168,7 +183,7 @@ impl ExecCtx {
             }
         }
 
-        if name.as_ref() == varn_core::MemberKey::Length.as_str() {
+        if name == varn_core::MemberKey::Length.as_str() {
             if let Some(v) = crate::exec::strings::fast_length(obj, &self.heap) {
                 if cs_idx < cache_len && !is_megamorphic {
                     let is_str = obj.is_sso()
@@ -196,10 +211,10 @@ impl ExecCtx {
             }
         }
 
-        if let Some(getter_val) = crate::exec::props::find_getter(obj, &name, &self.heap) {
+        if let Some(getter_val) = crate::exec::props::find_getter(obj, name, &self.heap) {
             if cs_idx < cache_len && !is_megamorphic {
                 if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                    if let Some(&slot) = cls.getter_map.borrow().get(name.as_ref()) {
+                    if let Some(&slot) = cls.getter_map.borrow().get(name) {
                         let entry = varn_types::chunk::CacheEntry {
                             id: cls.id,
                             slot: slot as u16,
@@ -215,7 +230,7 @@ impl ExecCtx {
             return Ok(PropRead::Getter(getter_val));
         }
 
-        let val = match crate::exec::props::get_property(obj, &name, &mut self.heap) {
+        let val = match crate::exec::props::get_property(obj, name, &mut self.heap) {
             Ok(val) => val,
             Err(e) => {
                 return Err(crate::error::RuntimeError::new(format!("{}", e)));
@@ -227,7 +242,7 @@ impl ExecCtx {
                 if let Some(inst) = self.heap.instance(obj.as_heap()) {
                     if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
                         let root = cls.root_shape.borrow();
-                        if let Some(&slot) = root.property_names.get(name.as_ref()) {
+                        if let Some(&slot) = root.property_names.get(name) {
                             let entry = varn_types::chunk::CacheEntry {
                                 id: inst.class_id,
                                 slot: slot as u16,
@@ -244,7 +259,7 @@ impl ExecCtx {
                 match self.heap.get(obj.as_heap()) {
                     Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
                         let guard = o.read();
-                        if let Some(&slot) = guard.shape().property_names.get(name.as_ref()) {
+                        if let Some(&slot) = guard.shape().property_names.get(name) {
                             if slot < guard.slot_count() {
                                 let shape_id = guard.shape().id;
                                 let entry = varn_types::chunk::CacheEntry {
@@ -288,7 +303,7 @@ impl ExecCtx {
                 }
             }
             if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                if let Some(&slot) = cls.method_map.borrow().get(name.as_ref()) {
+                if let Some(&slot) = cls.method_map.borrow().get(name) {
                     let entry = varn_types::chunk::CacheEntry {
                         id: cls.id,
                         slot: slot as u16,

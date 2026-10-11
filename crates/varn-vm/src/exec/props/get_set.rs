@@ -121,6 +121,11 @@ pub(crate) fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult
                 .and_then(|&s| m.get_slot(s))
                 .unwrap_or(VmValue::null()));
         }
+        if let Some(HeapObj::Class(cls)) = heap.get(obj.as_heap()) {
+            if let Some(held) = cls.get_static(key) {
+                return Ok(held);
+            }
+        }
     }
     if let Some(stripped) = key.strip_prefix("::") {
         return resolve_meta_property(obj, stripped, heap);
