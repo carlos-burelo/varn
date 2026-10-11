@@ -1,5 +1,6 @@
 use super::call_contract::Callee;
 use super::context::FnEmitter;
+use crate::ty::lower_type;
 use std::sync::Arc;
 use varn_core::ast::{Arg, AstId, ExprId, ExprKind};
 use varn_tir::{BackendTy, DynReason, Resolution, Span, TirArg, TirExpr, TirExprKind, TirUnOp};
@@ -17,6 +18,46 @@ impl<'a> FnEmitter<'a> {
     }
 
     pub(super) fn lower_call_args(&mut self, call_id: AstId, args: &[Arg]) -> Vec<TirArg> {
+        let lowered = self.lower_args_in_order(call_id, args);
+        let Some(checked) = self.m.desugar.call_params.get(&call_id) else {
+            return lowered;
+        };
+        let (names, table, interner) = (self.m.names, self.m.checker_table, self.m.interner);
+        let mut spread_seen = false;
+        lowered
+            .into_iter()
+            .enumerate()
+            .map(|(i, arg)| match arg {
+                TirArg::Expr(e) => match checked.get(i) {
+                    Some(param) if !spread_seen => {
+                        let param = lower_type(param, table, interner, self.tt, names);
+                        TirArg::Expr(self.widened(e, param))
+                    }
+                    Some(_) | None => TirArg::Expr(e),
+                },
+                spread @ TirArg::Spread(_) => {
+                    spread_seen = true;
+                    spread
+                }
+                named @ TirArg::Named { .. } => named,
+            })
+            .collect()
+    }
+
+    fn widened(&self, arg: TirExpr, param: BackendTy) -> TirExpr {
+        let target = param.non_nullable(self.tt);
+        let wider = matches!(
+            target,
+            BackendTy::Float | BackendTy::Decimal | BackendTy::BigInt
+        );
+        if arg.ty == BackendTy::Int && wider {
+            self.cast_to(arg, target)
+        } else {
+            arg
+        }
+    }
+
+    fn lower_args_in_order(&mut self, call_id: AstId, args: &[Arg]) -> Vec<TirArg> {
         match self.m.call_mappings.get(&call_id).cloned() {
             Some(mapping) => mapping
                 .iter()

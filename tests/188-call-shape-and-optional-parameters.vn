@@ -87,6 +87,21 @@ await describe("188 call shape and optional parameters", async () => {
         expect(new Headers().get("a")).toBe(null)
     })
 
+    await it("an int accepted where a float is declared arrives as a float", () => {
+        const count = 3
+        const box = new Box<float>(2)
+        const held = new Box<float?>(count)
+        const exact = new Box<decimal>(1)
+        const table = new Map<str, float>()
+        table.set("a", 1)
+        table.set("b", count)
+        expect(typeof box.value).toBe("float")
+        expect(typeof held.value).toBe("float")
+        expect(typeof exact.value).toBe("decimal")
+        expect(typeof table.get("a")).toBe("float")
+        expect(typeof table.get("b")).toBe("float")
+    })
+
     await it("an omitted argument and a null one are the same thing", () => {
         const absent: int? = null
         const missing: str? = null

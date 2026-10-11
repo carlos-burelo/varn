@@ -19,6 +19,14 @@ impl<'r> Checker<'r> {
         call_id: varn_core::ast::AstId,
         bind: &BindResult,
     ) {
+        rec.desugar.call_params.insert(
+            call_id,
+            params
+                .iter()
+                .take_while(|p| !p.is_rest)
+                .map(|p| varn_sem::types::Type::resolved(p.ty))
+                .collect(),
+        );
         let (call_info, extra_diags) = analyze_call_args(args, range);
         self.diagnostics.extend(extra_diags);
         let has_named = !call_info.named_labels.is_empty();
