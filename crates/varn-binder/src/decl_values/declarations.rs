@@ -157,7 +157,7 @@ impl<'r> super::super::Binder<'r> {
         self.bind_type_params(&f.type_params, line);
 
         for p in f.params.iter() {
-            let ty = self.param_type(p, crate::ParamSite::Declared);
+            let ty = self.param_binding_type(p, crate::ParamSite::Declared);
 
             self.bind_pattern(
                 &p.pattern,

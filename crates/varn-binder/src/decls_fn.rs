@@ -53,7 +53,7 @@ impl<'r> Binder<'r> {
         use varn_sem::symbol::SymbolKind;
 
         for p in params {
-            let ty = self.param_type(p, super::binding_types::ParamSite::Closure);
+            let ty = self.param_binding_type(p, super::binding_types::ParamSite::Closure);
 
             self.bind_pattern(
                 &p.pattern,

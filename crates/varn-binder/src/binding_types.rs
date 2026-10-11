@@ -30,6 +30,15 @@ impl<'r> Binder<'r> {
         }
     }
 
+    pub(crate) fn param_binding_type(&mut self, p: &Param, site: ParamSite) -> Type {
+        let declared = self.param_type(p, site);
+        if p.is_optional && p.default.is_none() && !p.is_rest && !declared.is_dynamic() {
+            Type::make_nullable(declared, &mut *Arc::make_mut(&mut self.ty_table))
+        } else {
+            declared
+        }
+    }
+
     pub(crate) fn function_param(&mut self, p: &Param, site: ParamSite) -> FunctionParam {
         let ty = self.param_type(p, site);
         FunctionParam {

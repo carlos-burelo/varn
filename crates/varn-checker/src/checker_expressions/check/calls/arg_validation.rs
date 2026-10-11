@@ -9,7 +9,7 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::{FunctionParam, Type};
 
 impl<'r> Checker<'r> {
-    pub(super) fn validate_call_arguments(
+    pub(in super::super) fn validate_call_arguments(
         &mut self,
         rec: &mut Recorder,
         args: &[Arg],
@@ -68,6 +68,14 @@ impl<'r> Checker<'r> {
         }
     }
 
+    fn accepted_param_type(&mut self, param: &FunctionParam, declared: Type) -> Type {
+        if param.optional && !param.is_rest && !declared.is_dynamic() {
+            Type::make_nullable(declared, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+        } else {
+            declared
+        }
+    }
+
     fn validate_named_call_arguments(
         &mut self,
         rec: &mut Recorder,
@@ -119,7 +127,7 @@ impl<'r> Checker<'r> {
                     .enumerate()
                     .find(|(_, p)| p.name.as_deref() == Some(lbl))
                 {
-                    (Some(Type::resolved(p.ty)), Some(i))
+                    (Some(self.accepted_param_type(p, Type::resolved(p.ty))), Some(i))
                 } else {
                     (None, None)
                 }
@@ -134,7 +142,7 @@ impl<'r> Checker<'r> {
                 }
                 let ty = params
                     .get(positional_param_idx)
-                    .map(|p| Type::resolved(p.ty));
+                    .map(|p| self.accepted_param_type(p, Type::resolved(p.ty)));
                 let idx = if ty.is_some() {
                     Some(positional_param_idx)
                 } else {
@@ -230,6 +238,7 @@ impl<'r> Checker<'r> {
             if let Some(param) = param {
                 let effective_arg_ty = spread_inner.unwrap_or(arg_ty);
                 let param_ty = compatible_param_type(param, spread_inner, &self.ty_table);
+                let param_ty = self.accepted_param_type(param, param_ty);
 
                 let param_kind = self.ty_table.get(param_ty.0);
                 let param_accepts_array = matches!(param_kind, TypeKind::Array(_))

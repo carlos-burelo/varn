@@ -213,7 +213,7 @@ impl<'r> super::super::Binder<'r> {
         self.define(this_atom, this_sym);
 
         for p in params {
-            let ty = self.param_type(p, crate::ParamSite::Declared);
+            let ty = self.param_binding_type(p, crate::ParamSite::Declared);
             self.bind_pattern(
                 &p.pattern,
                 SymbolKind::Parameter,
