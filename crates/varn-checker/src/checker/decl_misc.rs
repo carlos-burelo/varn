@@ -62,6 +62,7 @@ impl<'r> Checker<'r> {
                         self.current_scope = m_scope;
                         self.record_scope(rec, self.ast_arena.stmt(method.body).range.start.offset);
                     }
+                    self.check_param_defaults(rec, &method.params, bind);
                     self.in_function_body(method.modifiers.is_async, |c| {
                         c.check_stmt(rec, method.body, bind)
                     });

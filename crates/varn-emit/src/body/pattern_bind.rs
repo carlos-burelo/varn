@@ -28,6 +28,23 @@ impl<'a> FnEmitter<'a> {
                     span: Span::EMPTY,
                 };
                 let value = self.lower_expr(def);
+                let declared = p
+                    .type_ann
+                    .as_ref()
+                    .and_then(|ann| self.m.annotation_types.get(&ann.id))
+                    .map(|resolved| {
+                        crate::ty::lower_type(
+                            resolved,
+                            self.m.checker_table,
+                            self.m.interner,
+                            self.tt,
+                            self.m.names,
+                        )
+                    });
+                let value = match declared {
+                    Some(declared) => self.widened(value, declared),
+                    None => value,
+                };
                 let assign = TirExpr {
                     kind: TirExprKind::Assign {
                         target: Box::new(pvar()),

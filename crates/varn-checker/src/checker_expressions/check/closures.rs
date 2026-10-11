@@ -60,6 +60,7 @@ impl<'r> Checker<'r> {
             self.apply_contextual_arrow_params(rec, &params, &expected_fn, bind);
         }
 
+        self.check_param_defaults(rec, &params, bind);
         self.in_function_body(is_async, |c| c.check_arrow_body(rec, body, range, bind));
 
         self.current_scope = saved_scope;
@@ -72,6 +73,7 @@ impl<'r> Checker<'r> {
     pub(super) fn check_function_expr(
         &mut self,
         rec: &mut Recorder,
+        params: &[varn_core::ast::Param],
         return_type: &Option<varn_core::ast::TypeNode>,
         body: varn_core::ast::StmtId,
         is_async: bool,
@@ -95,6 +97,7 @@ impl<'r> Checker<'r> {
             self.record_scope_span(rec, range.start.offset, range.end.offset, fn_scope);
         }
 
+        self.check_param_defaults(rec, params, bind);
         self.in_function_body(is_async, |c| c.check_stmt(rec, body, bind));
 
         self.current_scope = saved_scope;

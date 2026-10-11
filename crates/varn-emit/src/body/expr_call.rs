@@ -44,7 +44,7 @@ impl<'a> FnEmitter<'a> {
             .collect()
     }
 
-    fn widened(&self, arg: TirExpr, param: BackendTy) -> TirExpr {
+    pub(super) fn widened(&self, arg: TirExpr, param: BackendTy) -> TirExpr {
         let target = param.non_nullable(self.tt);
         let wider = matches!(
             target,

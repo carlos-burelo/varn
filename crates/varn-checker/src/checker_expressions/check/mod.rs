@@ -74,11 +74,12 @@ impl<'r> Checker<'r> {
                 ..
             } => self.check_arrow(rec, params, return_type, body, *is_async, range, bind),
             ExprKind::Function {
+                params,
                 return_type,
                 body,
                 is_async,
                 ..
-            } => self.check_function_expr(rec, return_type, *body, *is_async, range, bind),
+            } => self.check_function_expr(rec, params, return_type, *body, *is_async, range, bind),
             ExprKind::As {
                 expression,
                 type_ann,

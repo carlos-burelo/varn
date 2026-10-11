@@ -240,6 +240,7 @@ impl<'r> Checker<'r> {
                     }
                 }
                 ObjectProp::Method {
+                    params,
                     return_type,
                     body,
                     is_async,
@@ -259,6 +260,7 @@ impl<'r> Checker<'r> {
                     if let Some(fn_scope) = self.next_child_scope(bind) {
                         self.current_scope = fn_scope;
                     }
+                    self.check_param_defaults(rec, params, bind);
                     self.in_function_body(*is_async, |c| c.check_stmt(rec, *body, bind));
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;

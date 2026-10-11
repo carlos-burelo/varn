@@ -1,0 +1,2 @@
+// VN3002
+function pick(x: int = missing): int { return x }

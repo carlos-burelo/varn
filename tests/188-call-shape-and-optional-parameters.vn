@@ -24,6 +24,10 @@ class Box<T> {
     constructor(value: T) { this.value = value }
 }
 
+class Scale {
+    by(factor: float = 2): str { return typeof factor }
+}
+function ratio(x: float = 1): str { return typeof x }
 function withDefault(k: int = 2): int { return k }
 function optional(s?: str): str { return s ?? "none" }
 function forward(s?: str): str { return optional(s) }
@@ -100,6 +104,21 @@ await describe("188 call shape and optional parameters", async () => {
         expect(typeof exact.value).toBe("decimal")
         expect(typeof counted.value).toBe("decimal")
         expect(typeof table.get("a")).toBe("float")
+    })
+
+    await it("a default value has the declared type of its parameter", () => {
+        const scaled = (x: float = 1): str => typeof x
+        const base = 4
+        const offset = (n: int, by: int = n + 1): int => by
+        for (let i = 0; i < 300; i = i + 1) { ratio(); ratio(2); ratio(2.5) }
+        expect(ratio()).toBe("float")
+        expect(ratio(2)).toBe("float")
+        expect(ratio(2.5)).toBe("float")
+        expect(scaled()).toBe("float")
+        expect(new Scale().by()).toBe("float")
+        expect(new Scale().by(3)).toBe("float")
+        expect(offset(base)).toBe(5)
+        expect(offset(base, 9)).toBe(9)
     })
 
     await it("an omitted argument and a null one are the same thing", () => {

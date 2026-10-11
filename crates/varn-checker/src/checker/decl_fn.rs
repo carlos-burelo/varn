@@ -54,6 +54,7 @@ impl<'r> Checker<'r> {
             self.pure_scope = next_scope.or(Some(self.current_scope));
         }
 
+        self.check_param_defaults(rec, &f.params, bind);
         self.in_function_body(f.modifiers.is_async, |c| c.check_stmt(rec, f.body, bind));
 
         self.pure_scope = saved_pure;

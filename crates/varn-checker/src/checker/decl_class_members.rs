@@ -54,7 +54,10 @@ impl<'r> Checker<'r> {
                     }
                 }
                 ClassMember::Constructor {
-                    body, decorators, ..
+                    params,
+                    body,
+                    decorators,
+                    ..
                 } => {
                     let body = *body;
                     let saved_scope = self.current_scope;
@@ -75,11 +78,13 @@ impl<'r> Checker<'r> {
                             self.ast_arena,
                             bind,
                         ));
+                    self.check_param_defaults(rec, params, bind);
                     self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
                     self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;
                 }
                 ClassMember::Method {
+                    params,
                     return_type,
                     body: Some(body),
                     modifiers,
@@ -121,6 +126,7 @@ impl<'r> Checker<'r> {
                         self.pure_scope = Some(self.current_scope);
                     }
 
+                    self.check_param_defaults(rec, params, bind);
                     self.in_function_body(modifiers.is_async, |c| c.check_stmt(rec, body, bind));
 
                     self.pure_scope = saved_pure;

@@ -128,6 +128,7 @@ impl<'r> Checker<'r> {
                             self.pure_scope = Some(self.current_scope);
                         }
 
+                        self.check_param_defaults(rec, params, bind);
                         self.in_function_body(modifiers.is_async, |c| {
                             c.check_stmt(rec, body_stmt, bind)
                         });
