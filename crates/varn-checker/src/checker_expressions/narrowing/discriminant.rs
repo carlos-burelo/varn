@@ -87,7 +87,7 @@ impl<'r> Checker<'r> {
                         let prop_name_str = bind.interner.resolve(prop_name);
                         let scope = bind.scopes.get(self.current_scope);
                         if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
-                            let original_ty = bind.arena.get(id).ty;
+                            let original_ty = self.narrowing_base(id, bind.arena.get(id).ty);
                             let union_list =
                                 original_ty.and_then(|t| match self.ty_table.get(t.0) {
                                     TypeKind::Union(list) => Some(list),
@@ -234,7 +234,7 @@ impl<'r> Checker<'r> {
                 let obj_name = *obj_name;
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
-                    if let Some(ty) = bind.arena.get(id).ty {
+                    if let Some(ty) = self.narrowing_base(id, bind.arena.get(id).ty) {
                         if let TypeKind::Union(list) = self.ty_table.get(ty.0) {
                             let members: Vec<Type> = self
                                 .ty_table

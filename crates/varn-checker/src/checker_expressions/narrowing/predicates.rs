@@ -11,6 +11,7 @@ impl<'r> Checker<'r> {
                 ..
             } | ExprKind::Logical { .. }
                 | ExprKind::Is { .. }
+                | ExprKind::Paren { .. }
                 | ExprKind::Call { .. }
                 | ExprKind::Identifier { .. }
                 | ExprKind::Unary {

@@ -30,7 +30,7 @@ impl<'r> Checker<'r> {
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         );
                         out.push((id, named));
-                    } else if let Some(ty) = bind.arena.get(id).ty {
+                    } else if let Some(ty) = self.narrowing_base(id, bind.arena.get(id).ty) {
                         let class_name_atom = varn_core::Atom::of(&class_name_str);
                         let narrowed = ty.minus_named(
                             class_name_atom,

@@ -27,7 +27,7 @@ impl<'r> Checker<'r> {
                     );
                     out.push((id, narrowed_ty));
                 } else {
-                    if let Some(original_ty) = bind.arena.get(id).ty {
+                    if let Some(original_ty) = self.narrowing_base(id, bind.arena.get(id).ty) {
                         let view = varn_sem::bind::BindView::new(bind, self.resolver);
                         let target_ty = varn_binder::resolve_type_node(
                             &type_ann,

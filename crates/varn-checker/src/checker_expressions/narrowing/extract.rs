@@ -31,6 +31,11 @@ impl<'r> Checker<'r> {
                 narrowings.extend(self.extract_narrowings(rec, operand, bind, !is_true_branch));
             }
 
+            ExprKind::Paren { expression } => {
+                let inner = *expression;
+                narrowings.extend(self.extract_narrowings(rec, inner, bind, is_true_branch));
+            }
+
             ExprKind::Identifier { name } => {
                 self.narrow_identifier(rec, *name, bind, is_true_branch, &mut narrowings);
             }
@@ -108,7 +113,6 @@ impl<'r> Checker<'r> {
             | ExprKind::Function { .. }
             | ExprKind::Arrow { .. }
             | ExprKind::Sequence { .. }
-            | ExprKind::Paren { .. }
             | ExprKind::Await { .. }
             | ExprKind::Spawn { .. }
             | ExprKind::Yield { .. }
