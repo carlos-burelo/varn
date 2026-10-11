@@ -44,7 +44,7 @@ pub(crate) fn array_pop(arr: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 
 pub(crate) fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<()> {
     if dst.is_heap() && src.is_heap() {
-        if let (Some(HeapObj::Array(da)), Some(HeapObj::Array(sa))) =
+        if let (Some(HeapObj::Array(da)), Some(HeapObj::Array(sa) | HeapObj::Tuple(sa))) =
             (heap.get(dst.as_heap()), heap.get(src.as_heap()))
         {
             let n = sa.len();

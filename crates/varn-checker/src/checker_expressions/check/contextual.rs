@@ -93,7 +93,22 @@ impl<'r> Checker<'r> {
                         }
                     }
                 }
-                ArrayEl::Spread(e) => self.check_expr(rec, *e, bind),
+                ArrayEl::Spread(e) => {
+                    self.check_expr(rec, *e, bind);
+                    let spread = varn_core::ast::Arg::Spread(*e);
+                    if let Err(given) = self.infer_arg_type(rec, &spread, bind) {
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::TypeMismatch,
+                                format!(
+                                    "spread element must be an array or a tuple, got '{}'",
+                                    given.display(&self.ty_table, &bind.interner)
+                                ),
+                            )
+                            .with_range(self.ast_arena.expr(*e).range),
+                        );
+                    }
+                }
                 ArrayEl::Hole => {}
             }
         }

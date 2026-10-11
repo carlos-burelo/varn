@@ -280,7 +280,7 @@ impl<'r> Checker<'r> {
         (false, count)
     }
 
-    fn infer_arg_type(
+    pub(in super::super) fn infer_arg_type(
         &mut self,
         rec: &mut Recorder,
         arg: &Arg,
@@ -333,7 +333,7 @@ impl<'r> Checker<'r> {
     }
 }
 
-enum Supplied {
+pub(in super::super) enum Supplied {
     One(Type),
     Each(Vec<Type>),
     Some(Type, Option<Type>),
