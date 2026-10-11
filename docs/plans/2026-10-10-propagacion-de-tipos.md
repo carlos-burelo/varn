@@ -202,6 +202,23 @@ Reglas que el checker no hacía cumplir:
 - Descartar un tipo con `typeof` deja los demás en la rama contraria y
   tras un `return`.
 
+### Séptima tanda (commits `49b7a3c7`..`c3051ec2`, test 198)
+
+- **Cada vuelta de un `for (let i ...)` tiene su variable** cuando una
+  closure la captura. Antes tres closures del bucle veían la misma `i`.
+  Sin captura el bucle conserva su forma (A/B de cuatro benchmarks con
+  bucles: 0,99 a 1,05).
+- **`x!` comprueba de verdad.** Era solo un cambio de tipo: con `null`,
+  `s!.length` daba `0`. El opcode `AssertNotNull` existía sin productor
+  y su helper del JIT tenía la ABI mal (segfault al usarlo por primera
+  vez).
+- Miembros repetidos en una clase (`VN4110`) y accesores a medias
+  (`VN3005`). La regla encontró dos casos en `std`: campos declarados
+  con `let` en `std/ffi/library.vn` y un campo y un método `values` en
+  `std/net/query.vn`.
+- Una variante de enum se convierte a texto con su nombre, no
+  `[object]`.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -317,23 +334,20 @@ anterior.
   función `never` al final de una rama no cuenta como salida.
 - Una interfaz acepta un objeto literal con campos de más; un tipo de
   objeto (`{ n: int }`) no. Es deliberado, pero no está escrito.
-- **La variable de un `for (let i ...)` es una sola para todas las
-  vueltas.** Tres closures creadas en el bucle ven la misma `i`
-  (`fs[0]() + fs[1]() + fs[2]()` da 9, no 3); `for-of` sí da una por
-  vuelta. Es el `var` de JS. Diseño del arreglo: cuando una closure del
-  cuerpo captura la variable (el emisor lo sabe al cerrar la closure),
-  bajar a `portadora = init; loop { let i = portadora; if (!primera)
-  update(i); test; cuerpo; portadora = i }`. El obstáculo es `continue`:
-  hoy salta al principio del bucle y se saltaría la copia de vuelta;
-  hay que envolver el cuerpo o reescribir sus `Continue`. Prohibir la
-  captura no vale: `xs.map((x) => x + i)` dentro del bucle es correcto
-  y muy común. Solo aplicar la forma nueva cuando hay captura: la forma
-  actual es la que reconocen la inducción y el versionado de bucles.
 - Etiquetas de bucle: implementarlas pide profundidad en
   `TirStmt::Break`/`Continue`, y que el emisor sepa a qué bucle del TIR
   corresponde cada bucle fuente (el `for` con `continue` y el `for-of`
   meten bucles propios) y qué `finally` cruza el salto
   (`finally_splice`).
+- Dentro de una clase, `let nombre: T;` se parsea como un campo llamado
+  `let` seguido del campo real: el parser acepta palabras reservadas
+  como nombre de miembro. Así estaba escrito `std/ffi/library.vn`.
+- `std` no se comprueba al compilar el binario: un error de tipos en
+  `std` solo aparece al pasar `vn check` por sus archivos.
+- `a ?? b` con `a` no nullable compila sin aviso (el `??` no hace nada);
+  una `Task` que nadie espera tampoco avisa.
+- Una variante con valores se imprime como `Shape.Circle(..)`, sin los
+  valores.
 - Los nombres de un namespace no se cualifican al emitir: por eso dos
   namespaces no pueden declarar el mismo nombre (`VN4002`). El arreglo
   de fondo es que el emisor resuelva `x` dentro de `A` como `A.x`
@@ -396,6 +410,14 @@ Tercera tanda:
 
 Las cuatro se midieron con `vn check` sobre todo `std` y `tests` antes
 de fijarlas: rompían, en total, un sitio.
+
+Séptima tanda:
+
+- **La variable de un `for` es de la vuelta, no del bucle**
+  (`49b7a3c7`), como en `for-of`. Lo que la vuelta escribe en ella lo
+  ve su closure y pasa a la vuelta siguiente.
+- **`!` es una afirmación que se comprueba**, no un permiso para
+  saltarse el tipo (`decff686`).
 
 Sexta tanda:
 

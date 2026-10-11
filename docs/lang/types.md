@@ -345,6 +345,10 @@ Contratos que se comprueban en la declaración:
   Error `VN4106` en los dos sentidos.
 - El constructor de una subclase llama a `super(...)`: error `VN4108` si
   falta. Sus argumentos se validan contra el constructor del padre.
+- Dos miembros de una clase no comparten nombre (`VN4110`), salvo el par
+  getter y setter. Estático e instancia son espacios distintos.
+- Una propiedad con getter y sin setter no se asigna, y una con setter y
+  sin getter no se lee (`VN3005`).
 - `super` solo llama métodos del padre (`super.nombre(...)`), y solo
   directamente en un método o constructor: `super.prop` es `VN4109` y
   `super` dentro de una flecha o función anidada es `VN4114`.
@@ -536,6 +540,11 @@ Un estrechamiento vale mientras la variable no cambie
   `a | b`.
 - `break` y `continue` actúan sobre el bucle más interno. Saltar a una
   etiqueta no está soportado y es error de compilación.
+- Cada vuelta de un `for (let i ...)` tiene su propia `i`, igual que en
+  `for-of`: una closure creada en la vuelta ve el valor de esa vuelta
+  (tests/198-loop-variable-per-iteration.vn).
+- `x!` afirma que `x` no es `null` y lo comprueba al ejecutar: si lo es,
+  lanza. No es una forma de saltarse el tipo.
 - Un argumento nombrado debe nombrar un parámetro, y una sola vez.
 - Descartar un tipo con `typeof` deja los demás: tras
   `if (typeof x == "int") { return x }`, un `x: int | str` es `str`.
