@@ -528,6 +528,18 @@ Un estrechamiento vale mientras la variable no cambie
   declarados en un namespace son del módulo: dos namespaces no pueden
   declarar el mismo (`VN4002`).
 
+- `switch`: cada caso corre solo, nunca cae al siguiente
+  (tests/197-switch-cases.vn). `break` puede cerrar un caso como último
+  enunciado y sale del `switch`, no del bucle que lo rodea; en otro punto
+  del caso es `VN4005`. Un caso vacío o un `default` que no es el último
+  son `VN4019`. Para compartir un cuerpo entre valores: `match` con
+  `a | b`.
+- `break` y `continue` actúan sobre el bucle más interno. Saltar a una
+  etiqueta no está soportado y es error de compilación.
+- Un argumento nombrado debe nombrar un parámetro, y una sola vez.
+- Descartar un tipo con `typeof` deja los demás: tras
+  `if (typeof x == "int") { return x }`, un `x: int | str` es `str`.
+
 ### 10.6 Valores por defecto y spread
 
 - El valor por defecto de un parámetro se comprueba contra su tipo, dentro

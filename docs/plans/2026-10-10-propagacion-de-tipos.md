@@ -189,6 +189,19 @@ Reglas que el checker no hacía cumplir:
   argumentos se validan. `super.prop` y `super` dentro de una flecha
   son error (`VN4109`, `VN4114`): fallaban al ejecutar.
 
+### Sexta tanda (commits `43a5accb`..`d0988e8b`, test 197)
+
+- **`break` dentro de un caso de `switch` salía del bucle de fuera.**
+  Un caso nunca cae al siguiente (el `switch` es una cadena de `if`);
+  `break` como último enunciado del caso se descarta, en otro punto es
+  `VN4005`. Caso vacío y `default` que no es el último: `VN4019`.
+- **`break etiqueta` y `continue etiqueta` ignoraban la etiqueta** y
+  actuaban sobre el bucle más interno. Son error hasta implementarlas.
+- Un argumento nombrado que no nombra ningún parámetro, o repetido,
+  dejaba el parámetro en `null`. Es `VN3001`.
+- Descartar un tipo con `typeof` deja los demás en la rama contraria y
+  tras un `return`.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -304,6 +317,23 @@ anterior.
   función `never` al final de una rama no cuenta como salida.
 - Una interfaz acepta un objeto literal con campos de más; un tipo de
   objeto (`{ n: int }`) no. Es deliberado, pero no está escrito.
+- **La variable de un `for (let i ...)` es una sola para todas las
+  vueltas.** Tres closures creadas en el bucle ven la misma `i`
+  (`fs[0]() + fs[1]() + fs[2]()` da 9, no 3); `for-of` sí da una por
+  vuelta. Es el `var` de JS. Diseño del arreglo: cuando una closure del
+  cuerpo captura la variable (el emisor lo sabe al cerrar la closure),
+  bajar a `portadora = init; loop { let i = portadora; if (!primera)
+  update(i); test; cuerpo; portadora = i }`. El obstáculo es `continue`:
+  hoy salta al principio del bucle y se saltaría la copia de vuelta;
+  hay que envolver el cuerpo o reescribir sus `Continue`. Prohibir la
+  captura no vale: `xs.map((x) => x + i)` dentro del bucle es correcto
+  y muy común. Solo aplicar la forma nueva cuando hay captura: la forma
+  actual es la que reconocen la inducción y el versionado de bucles.
+- Etiquetas de bucle: implementarlas pide profundidad en
+  `TirStmt::Break`/`Continue`, y que el emisor sepa a qué bucle del TIR
+  corresponde cada bucle fuente (el `for` con `continue` y el `for-of`
+  meten bucles propios) y qué `finally` cruza el salto
+  (`finally_splice`).
 - Los nombres de un namespace no se cualifican al emitir: por eso dos
   namespaces no pueden declarar el mismo nombre (`VN4002`). El arreglo
   de fondo es que el emisor resuelva `x` dentro de `A` como `A.x`
@@ -366,6 +396,14 @@ Tercera tanda:
 
 Las cuatro se midieron con `vn check` sobre todo `std` y `tests` antes
 de fijarlas: rompían, en total, un sitio.
+
+Sexta tanda:
+
+- **Un caso de `switch` nunca cae al siguiente**, y `break` solo lo
+  cierra (`cad4b450`). Agrupar valores es de `match` (`a | b`). Se
+  descartó la caída de C: es la fuente clásica de casos que se ejecutan
+  sin querer.
+- **Un argumento nombrado inexistente es error**, no se ignora.
 
 Quinta tanda:
 
