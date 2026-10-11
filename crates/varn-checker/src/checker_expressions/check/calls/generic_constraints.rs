@@ -16,6 +16,48 @@ impl<'r> Checker<'r> {
         if type_args.is_empty() {
             return;
         }
+        let resolved: Vec<Option<Type>> = type_args
+            .iter()
+            .map(|a| Some(self.resolve_type_node_cached(a, bind)))
+            .collect();
+        self.check_supplied_constraints(callee, &resolved, range, bind);
+    }
+
+    pub(super) fn check_inferred_constraints(
+        &mut self,
+        callee: ExprId,
+        mapping: &rustc_hash::FxHashMap<std::sync::Arc<str>, Type>,
+        range: &SourceRange,
+        bind: &BindResult,
+    ) {
+        let ExprKind::Identifier { name: fn_name } = &self.ast_arena.expr(callee).kind else {
+            return;
+        };
+        let Some(fn_sym) =
+            resolve_function_symbol(bind.interner.resolve(*fn_name), self.current_scope, bind)
+        else {
+            return;
+        };
+        let inferred: Vec<Option<Type>> = fn_sym
+            .type_params
+            .iter()
+            .map(|param| {
+                mapping
+                    .get(bind.interner.resolve(*param))
+                    .copied()
+                    .filter(|ty| !ty.is_dynamic())
+            })
+            .collect();
+        self.check_supplied_constraints(callee, &inferred, range, bind);
+    }
+
+    fn check_supplied_constraints(
+        &mut self,
+        callee: ExprId,
+        resolved: &[Option<Type>],
+        range: &SourceRange,
+        bind: &BindResult,
+    ) {
         let ExprKind::Identifier { name: fn_name } = &self.ast_arena.expr(callee).kind else {
             return;
         };
@@ -25,12 +67,8 @@ impl<'r> Checker<'r> {
             return;
         };
 
-        let resolved: Vec<Type> = type_args
-            .iter()
-            .map(|a| self.resolve_type_node_cached(a, bind))
-            .collect();
         for (i, constraint) in fn_sym.type_param_constraints.iter().enumerate() {
-            if let (Some(ct), Some(supplied)) = (constraint, resolved.get(i)) {
+            if let (Some(ct), Some(supplied)) = (constraint, resolved.get(i).copied().flatten().as_ref()) {
                 if !self.types_compatible_cached(ct, supplied, Some(bind)) {
                     self.emit(
                         Diagnostic::error(

@@ -144,6 +144,9 @@ impl<'r> Checker<'r> {
         let effective_callee_ty = if let TypeKind::Fn(fid) = callee_kind {
             let ft = self.ty_table.get_function(fid).clone();
             let mapping = build_call_mapping(callee, type_args, args, &ft, self, rec, bind);
+            if type_args.is_empty() {
+                self.check_inferred_constraints(callee, &mapping, range, bind);
+            }
             map_generics_cached(self, &callee_ty, &mapping)
         } else {
             callee_ty
