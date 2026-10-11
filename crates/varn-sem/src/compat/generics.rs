@@ -1,4 +1,3 @@
-use super::core::types_compatible_impl;
 use super::resolve::is_intrinsic;
 use super::scalar::t;
 use crate::bind::BindView;
@@ -24,7 +23,7 @@ pub(super) fn generic_arms(
                 && l1.len() == 1
                 && l2.len() == 1
             {
-                Some(types_compatible_impl(
+                Some(super::arrays::same_element(
                     &t(l1[0]),
                     &t(l2[0]),
                     bind,
@@ -33,10 +32,35 @@ pub(super) fn generic_arms(
                     table,
                 ))
             } else if n1 == n2 {
+                let only_read = [
+                    varn_core::BuiltinType::Task.name(),
+                    varn_core::BuiltinType::TaskHandle.name(),
+                    varn_core::BuiltinType::Generator.name(),
+                    "AsyncGenerator",
+                ]
+                .iter()
+                .any(|name| is_intrinsic(bind, n1, name));
                 Some(
                     l1.len() == l2.len()
                         && l1.to_vec().iter().zip(l2.to_vec().iter()).all(|(x, y)| {
-                            types_compatible_impl(&t(*x), &t(*y), bind, cache, in_progress, table)
+                            if only_read {
+                                return super::core::types_compatible_impl(
+                                    &t(*x),
+                                    &t(*y),
+                                    bind,
+                                    cache,
+                                    in_progress,
+                                    table,
+                                );
+                            }
+                            super::arrays::same_element(
+                                &t(*x),
+                                &t(*y),
+                                bind,
+                                cache,
+                                in_progress,
+                                table,
+                            )
                         }),
                 )
             } else {

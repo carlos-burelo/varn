@@ -203,7 +203,7 @@ impl<'r> Checker<'r> {
                     let is_empty_array = init_ty.is_dynamic()
                         && matches!(&self.ast_arena.expr(init_expr).kind, varn_core::ast::ExprKind::Array { elements } if elements.is_empty());
                     if !is_empty_array
-                        && !self.value_assignable_to(ann_ty, &init_ty, Some(init_expr), Some(bind))
+                        && !self.value_fits(rec, ann_ty, &init_ty, Some(init_expr), Some(bind))
                     {
                         let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
                         let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);

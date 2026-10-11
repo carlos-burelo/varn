@@ -192,7 +192,7 @@ impl<'r> Checker<'r> {
             self.with_expected(declared, |c| c.check_expr(rec, arg, bind));
             let given = self.infer_type(rec, arg, bind);
             if let Some(declared) = declared {
-                if !self.value_assignable_to(&declared, &given, Some(arg), Some(bind)) {
+                if !self.value_fits(rec, &declared, &given, Some(arg), Some(bind)) {
                     let declared_s = declared.display(&self.ty_table, &bind.interner);
                     let given_s = given.display(&self.ty_table, &bind.interner);
                     self.emit(

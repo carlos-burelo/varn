@@ -25,7 +25,7 @@ impl Checker<'_> {
                     return;
                 };
                 let given = checker.infer_type(rec, default, bind);
-                if checker.value_assignable_to(&declared, &given, Some(default), Some(bind)) {
+                if checker.value_fits(rec, &declared, &given, Some(default), Some(bind)) {
                     return;
                 }
                 let declared_s = declared.display(&checker.ty_table, &bind.interner);

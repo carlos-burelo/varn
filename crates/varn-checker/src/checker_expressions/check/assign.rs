@@ -148,7 +148,7 @@ impl<'r> Checker<'r> {
         let accepted = if reads_operand {
             self.types_compatible_cached(&target_ty, &value_ty, Some(bind))
         } else {
-            self.value_assignable_to(&target_ty, &value_ty, Some(value), Some(bind))
+            self.value_fits(rec, &target_ty, &value_ty, Some(value), Some(bind))
         };
         if !is_empty_array_val && !accepted {
             let value_ty_s = value_ty.display(&self.ty_table, &bind.interner);

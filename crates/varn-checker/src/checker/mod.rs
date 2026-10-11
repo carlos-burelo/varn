@@ -14,6 +14,7 @@ pub(crate) mod decorator_signature;
 mod definite_assignment;
 mod foreign_classes;
 mod foreign_enums;
+mod literal_fit;
 mod param_defaults;
 mod profile;
 pub(crate) mod recorder;

@@ -38,7 +38,7 @@ impl<'r> Checker<'r> {
                             self.with_expected(Some(prop_ty), |checker| {
                                 checker.check_expr(rec, init_expr, bind);
                                 let init_ty = checker.infer_type(rec, init_expr, bind);
-                                if !checker.value_assignable_to(&prop_ty, &init_ty, Some(init_expr), Some(bind)) {
+                                if !checker.value_fits(rec, &prop_ty, &init_ty, Some(init_expr), Some(bind)) {
                                     let prop_ty_s = prop_ty.display(&checker.ty_table, &bind.interner);
                                     let init_ty_s = init_ty.display(&checker.ty_table, &bind.interner);
                                     checker.emit(

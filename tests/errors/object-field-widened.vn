@@ -1,0 +1,4 @@
+// VN3001
+function relabel(o: { tag: int | str }): void { o.tag = "s" }
+const point: { tag: int } = { tag: 1 }
+relabel(point)

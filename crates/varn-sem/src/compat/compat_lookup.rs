@@ -92,6 +92,22 @@ pub(super) fn compatible_named(
     }
 }
 
+fn member_fits(
+    declared: &ClassMemberInfo,
+    given: &Type,
+    bind: &BindView,
+    cache: &mut FxHashMap<(Type, Type, usize), bool>,
+    in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
+) -> bool {
+    let written = declared.kind == ClassMemberKind::Property && !declared.is_readonly;
+    if written {
+        super::arrays::same_element(&declared.ty, given, Some(bind), cache, in_progress, table)
+    } else {
+        types_compatible_impl(&declared.ty, given, Some(bind), cache, in_progress, table)
+    }
+}
+
 fn class_members_compatible(
     decl_members: &[ClassMemberInfo],
     inf_members: &[ClassMemberInfo],
@@ -109,14 +125,7 @@ fn class_members_compatible(
                     .map(|m| m.ty);
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(
-                            &dm.ty,
-                            &inf_ty,
-                            Some(bind),
-                            cache,
-                            in_progress,
-                            table,
-                        ) {
+                        if !member_fits(dm, &inf_ty, bind, cache, in_progress, table) {
                             return false;
                         }
                     }
@@ -172,14 +181,7 @@ pub(super) fn class_members_match_object(
                 });
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(
-                            &dm.ty,
-                            &t(inf_ty),
-                            Some(bind),
-                            cache,
-                            in_progress,
-                            table,
-                        ) {
+                        if !member_fits(dm, &t(inf_ty), bind, cache, in_progress, table) {
                             return false;
                         }
                     }
@@ -244,19 +246,34 @@ pub(super) fn object_matches_class_members(
     for dm in decl_fields {
         match dm {
             ObjectTypeMember::Property {
-                name, ty, optional, ..
+                name,
+                ty,
+                optional,
+                readonly,
             } => {
                 let found = inf_members.iter().find(|im| &im.name == name).map(|m| m.ty);
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(
-                            &t(*ty),
-                            &inf_ty,
-                            Some(bind),
-                            cache,
-                            in_progress,
-                            table,
-                        ) {
+                        let fits = if *readonly {
+                            types_compatible_impl(
+                                &t(*ty),
+                                &inf_ty,
+                                Some(bind),
+                                cache,
+                                in_progress,
+                                table,
+                            )
+                        } else {
+                            super::arrays::same_element(
+                                &t(*ty),
+                                &inf_ty,
+                                Some(bind),
+                                cache,
+                                in_progress,
+                                table,
+                            )
+                        };
+                        if !fits {
                             return false;
                         }
                     }

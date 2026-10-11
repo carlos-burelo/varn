@@ -102,7 +102,7 @@ impl Checker<'_> {
             return false;
         };
         if let Some(param) = resolved.param {
-            if !self.value_assignable_to(&param, &r_ty, Some(right), Some(bind)) {
+            if !self.value_fits(rec, &param, &r_ty, Some(right), Some(bind)) {
                 let recv_s = l_ty.display(&self.ty_table, &bind.interner);
                 let param_s = param.display(&self.ty_table, &bind.interner);
                 let arg_s = r_ty.display(&self.ty_table, &bind.interner);

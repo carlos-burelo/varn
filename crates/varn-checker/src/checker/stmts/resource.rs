@@ -47,7 +47,7 @@ impl<'r> Checker<'r> {
             }
 
             if let Some(ann_ty) = &ann_ty_opt {
-                if !self.value_assignable_to(ann_ty, &init_ty, Some(init), Some(bind)) {
+                if !self.value_fits(rec, ann_ty, &init_ty, Some(init), Some(bind)) {
                     let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
                     let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
                     self.emit(

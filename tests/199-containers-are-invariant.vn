@@ -1,0 +1,57 @@
+import { describe, it, expect } from "std:test";
+
+type Json = int | str | null | Json[] | { [key: str]: Json }
+
+interface Labelled {
+    label: str?
+    weight: int | float
+}
+interface Sized {
+    readonly size: int | str
+}
+class Crate {
+    size: int = 3
+}
+
+function count(value: Json): int {
+    return 1
+}
+function widest(values: (int | str)[]): int {
+    return values.length
+}
+async function later(): int { return 4 }
+function* numbers(): int { yield 1; yield 2 }
+
+await describe("199 containers are invariant", async () => {
+    await it("a literal is checked piece by piece against the type it lands in", () => {
+        const mixed: (int | str)[] = [1, "two", 3]
+        const holes: int?[] = [1, null]
+        const ratios: float[] = [1, 2.5]
+        const grid: int?[][] = [[1, null], []]
+        const table: { [key: str]: int | str } = { a: 1, b: "x" }
+        const item: Labelled = { label: null, weight: 2 }
+        const more: (int | str)[] = [0, ...[1, 2], ...#[3, "four"]]
+        expect(mixed.length + holes.length + ratios.length + grid.length + more.length).toBe(14)
+        expect(table["a"]).toBe(1)
+        expect(item.weight).toBe(2)
+        expect(widest([1, 2, "three"])).toBe(3)
+    })
+
+    await it("a recursive shape accepts a literal built from typed parts", () => {
+        const name = "ada"
+        const tags: str[] = ["a", "b"]
+        expect(count([{ id: 1, name: name }])).toBe(1)
+        expect(count({ users: [...tags], depth: [1, [2, [3]]] })).toBe(1)
+    })
+
+    await it("what can only be read still widens", async () => {
+        const maybe: Task<int?> = later()
+        const loose: Generator<int | str> = numbers()
+        const view: Sized = new Crate()
+        let seen = 0
+        for (const value of loose) { seen = seen + 1 }
+        expect(await maybe).toBe(4)
+        expect(seen).toBe(2)
+        expect(view.size).toBe(3)
+    })
+})

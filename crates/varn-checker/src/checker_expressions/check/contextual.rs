@@ -80,7 +80,7 @@ impl<'r> Checker<'r> {
                         let actual = self.infer_type(rec, *e, bind);
 
                         if !actual.is_dynamic()
-                            && !self.value_assignable_to(expected, &actual, Some(*e), Some(bind))
+                            && !self.value_fits(rec, expected, &actual, Some(*e), Some(bind))
                         {
                             let actual_s = actual.display(&self.ty_table, &bind.interner);
                             let expected_s = expected.display(&self.ty_table, &bind.interner);
@@ -230,8 +230,7 @@ impl<'r> Checker<'r> {
                     if let Some(expected) = &prop_expected {
                         let actual = self.infer_type(rec, *value, bind);
                         if !actual.is_dynamic()
-                            && !self.value_assignable_to(
-                                expected,
+                            && !self.value_fits(rec, expected,
                                 &actual,
                                 Some(*value),
                                 Some(bind),

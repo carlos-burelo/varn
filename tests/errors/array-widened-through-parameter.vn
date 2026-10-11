@@ -1,0 +1,4 @@
+// VN3001
+function grow(values: (int | str)[]): void { values.push("s") }
+const counts: int[] = [1]
+grow(counts)

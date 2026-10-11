@@ -62,9 +62,11 @@ impl<'r> Checker<'r> {
             }
         }
         self.check_accessor_side(&obj_ty, prop_name, true, &target_range, bind);
-        if let Some(ObjectTypeMember::Property { readonly: true, .. }) =
-            self.find_member(&obj_ty, prop_name, bind)
-        {
+        let frozen = matches!(
+            self.find_member(&obj_ty, prop_name, bind),
+            Some(ObjectTypeMember::Property { readonly: true, .. })
+        ) || self.declared_readonly(&obj_ty, prop_name, bind);
+        if frozen {
             self.emit(
                 Diagnostic::error(
                     ErrorCode::NotAssignable,

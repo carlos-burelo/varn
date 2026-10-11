@@ -171,7 +171,7 @@ impl<'r> Checker<'r> {
                     Arg::Positional(e) | Arg::Spread(e) => *e,
                     Arg::Named { value, .. } => *value,
                 };
-                if !self.value_assignable_to(&param_ty, &arg_ty, Some(expr), Some(bind)) {
+                if !self.value_fits(rec, &param_ty, &arg_ty, Some(expr), Some(bind)) {
                     let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
                     let param_ty_s = param_ty.display(&self.ty_table, &bind.interner);
                     let msg = if let Some(lbl) = label_opt {
@@ -264,8 +264,7 @@ impl<'r> Checker<'r> {
                     && param_accepts_array;
 
                 if !is_empty_array_arg
-                    && !self.value_assignable_to(
-                        &param_ty,
+                    && !self.value_fits(rec, &param_ty,
                         &effective_arg_ty,
                         Some(expr),
                         Some(bind),

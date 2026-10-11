@@ -40,7 +40,7 @@ impl<'r> Checker<'r> {
                     let is_empty_array = init_ty.is_dynamic()
                         && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty());
                     let is_compatible =
-                        self.value_assignable_to(ann_ty, &init_ty, Some(init_expr), Some(bind));
+                        self.value_fits(rec, ann_ty, &init_ty, Some(init_expr), Some(bind));
                     if !is_empty_array && !is_compatible {
                         let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
                         let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);

@@ -19,7 +19,10 @@ pub(super) fn object_arm(
     'outer: for dm in &decl_fields {
         match dm {
             ObjectTypeMember::Property {
-                name, ty, optional, ..
+                name,
+                ty,
+                optional,
+                readonly,
             } => {
                 let found = inf_fields.iter().find_map(|im| match im {
                     ObjectTypeMember::Property {
@@ -34,14 +37,26 @@ pub(super) fn object_arm(
                 });
                 match found {
                     Some(inf_ty) => {
-                        if !types_compatible_impl(
-                            &t(*ty),
-                            &t(inf_ty),
-                            bind,
-                            cache,
-                            in_progress,
-                            table,
-                        ) {
+                        let fits = if *readonly {
+                            types_compatible_impl(
+                                &t(*ty),
+                                &t(inf_ty),
+                                bind,
+                                cache,
+                                in_progress,
+                                table,
+                            )
+                        } else {
+                            super::arrays::same_element(
+                                &t(*ty),
+                                &t(inf_ty),
+                                bind,
+                                cache,
+                                in_progress,
+                                table,
+                            )
+                        };
+                        if !fits {
                             ok = false;
                             break 'outer;
                         }
@@ -125,7 +140,7 @@ pub(super) fn object_arm(
                             cache,
                             in_progress,
                             table,
-                        ) && types_compatible_impl(
+                        ) && super::arrays::same_element(
                             &t(*value_ty),
                             &t(*ivalue),
                             bind,
@@ -143,7 +158,7 @@ pub(super) fn object_arm(
                 }
 
                 let explicit_members_compatible = inf_fields.iter().all(|im| match im {
-                    ObjectTypeMember::Property { ty, .. } => types_compatible_impl(
+                    ObjectTypeMember::Property { ty, .. } => super::arrays::same_element(
                         &t(*value_ty),
                         &t(*ty),
                         bind,

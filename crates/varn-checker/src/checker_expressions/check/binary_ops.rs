@@ -71,8 +71,8 @@ impl<'r> Checker<'r> {
                     } else {
                         l_ty == Type::Null
                             || r_ty == Type::Null
-                            || self.value_assignable_to(&l_ty, &r_ty, Some(right), Some(bind))
-                            || self.value_assignable_to(&r_ty, &l_ty, Some(left), Some(bind))
+                            || self.value_fits(rec, &l_ty, &r_ty, Some(right), Some(bind))
+                            || self.value_fits(rec, &r_ty, &l_ty, Some(left), Some(bind))
                     }
                 }
                 BinaryOp::Instanceof | BinaryOp::In => true,

@@ -80,6 +80,35 @@ pub(super) fn types_compatible_impl(
 
     let d = table.get(declared.0);
     let i = table.get(inferred.0);
+    let given_alias = match d {
+        TypeKind::Union(_) => super::nominal::expanded_alias(inferred, bind, table),
+        TypeKind::Primitive(_)
+        | TypeKind::Builtin(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Array(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Named(..)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => None,
+    };
+    if let Some(expanded) = given_alias {
+        let result = types_compatible_impl(declared, &expanded, bind, cache, in_progress, table);
+        in_progress.remove(&key);
+        cache.insert(key, result);
+        return result;
+    }
     let result = match (d, i) {
         (TypeKind::Primitive(varn_core::LangPrimitive::Dynamic), _)
         | (_, TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)) => true,

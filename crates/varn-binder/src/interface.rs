@@ -68,6 +68,7 @@ impl<'r> super::Binder<'r> {
                 key,
                 type_ann,
                 optional,
+                readonly,
                 range,
                 ..
             } => {
@@ -95,7 +96,7 @@ impl<'r> super::Binder<'r> {
                     members: Vec::new(),
                     visibility: None,
                     is_abstract: false,
-                    is_readonly: false,
+                    is_readonly: *readonly,
                     is_override: false,
                     symbol_id: Some(symbol_id),
                     ..Default::default()

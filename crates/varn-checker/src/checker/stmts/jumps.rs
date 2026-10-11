@@ -41,7 +41,7 @@ impl<'r> Checker<'r> {
             let check_expected_kind = self.ty_table.get(check_expected.0);
             let is_type_param = matches!(check_expected_kind, TypeKind::Named(n, _) if self.active_type_params.contains(bind.interner.resolve(n)));
             if !is_type_param
-                && !self.value_assignable_to(&check_expected, &actual, argument, Some(bind))
+                && !self.value_fits(rec, &check_expected, &actual, argument, Some(bind))
             {
                 let expected_s = expected.display(&self.ty_table, &bind.interner);
                 let actual_s = actual.display(&self.ty_table, &bind.interner);

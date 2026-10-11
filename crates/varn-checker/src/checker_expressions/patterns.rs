@@ -204,7 +204,7 @@ impl<'r> Checker<'r> {
                 let given = self.infer_type(rec, *expr, bind);
                 if !value_ty.is_dynamic()
                     && !given.is_dynamic()
-                    && !self.value_assignable_to(value_ty, &given, Some(*expr), Some(bind))
+                    && !self.value_fits(rec, value_ty, &given, Some(*expr), Some(bind))
                 {
                     let given_s = given.display(&self.ty_table, &bind.interner);
                     let value_s = value_ty.display(&self.ty_table, &bind.interner);
