@@ -231,23 +231,90 @@ Reglas que el checker no hacía cumplir:
   es `null`. Limpió 32 sitios de `std` y tests.
 - **`super` en flechas, getters y campos** (`13644dad`), **etiquetas de
   bucle** implementadas (`56b7d3ee`).
-- **Namespaces, rediseñados de raíz** a petición del dueño («defectuosa
-  por diseño»), en tres commits:
-  - `b470ffb6`: los nombres de un namespace son suyos (`N::nombre`).
-  - `f29c479b`: el namespace deja de ser un objeto de runtime. Antes
-    guardaba copias (`N.n` daba 0 tras dos `N.bump()`), cada acceso era
-    `GetProperty` por nombre y los anidados importados no existían para
-    el checker. Ahora `N.m` es un slot o una llamada directa; el
-    `ExportMap` lleva una clave por miembro, así que reexports,
-    renombres y `import * as` reenvían solos. Reglas: `VN4020`
-    (namespace no es un valor), `VN4021` (lo exportado es constante),
-    asignar `N.m` desde fuera es `VN3005`.
-  - `339fbc6c`: identidad de tipos cualificada (`A::Item`). Dos
-    namespaces ya pueden declarar la misma clase, enum, interfaz, alias
-    o anidado, y `A.Item` vale como anotación. El checker resolvía los
-    nombres de tipo solo en el ámbito global (`BindView::at`).
-  - Medido con `chk`: una línea usaba un namespace como valor y ninguna
-    exportaba un `let`.
+- **Namespaces, rediseñados de raíz**: ver el informe que sigue.
+
+#### Informe: rediseño de namespaces (2026-10-11)
+
+Pedido por el dueño («corrige mi implementación de namespaces que es
+defectuosa por diseño… de raíz», y después «no quiero namespaces
+parchados, sino corregidos de raíz»). Un namespace ya no existe en
+ejecución: es un ámbito estático. Validado en release: 3097/3097 en los
+cuatro cuadrantes, corpus 196/196, cero abandonos del JIT, `vn check`
+limpio sobre `std` y tests, tablas de contrato al día. Tres commits en
+`main`, sin push.
+
+**Qué estaba mal por diseño**
+
+- *Estado en copias.* Un namespace era un objeto literal con copias de
+  sus exportados: `N.n` daba 0 tras dos `N.bump()`, y `N.n = 50`
+  escribía la copia.
+- *Acceso lento.* Cada `N.miembro` era una carga de global más un
+  `GetProperty` por nombre, también en bucles calientes.
+- *Anidados invisibles entre módulos.* `Geo.Deep.twice` no compilaba
+  desde otro archivo, y el anidado filtraba lo no exportado.
+- *No delimitaba tipos.* Dos namespaces no podían declarar la misma
+  clase (`VN4002`); interfaces, alias y anidados homónimos se pisaban en
+  silencio; `A.Item` no existía como anotación de tipo.
+- *Checker ciego dentro del namespace.* Resolvía los nombres de tipo
+  solo en el ámbito global, así que `implements` de una clase dentro de
+  un namespace no se comprobaba.
+
+**Qué hay ahora**
+
+- `b470ffb6` — los nombres de un namespace son suyos (`N::nombre`), no
+  del módulo.
+- `f29c479b` — ámbito estático.
+  - Cada miembro es un global `N::miembro`; `N.m` se resuelve al
+    compilar a un slot o a una llamada directa
+    (`crates/varn-emit/src/body/namespace_access.rs`,
+    `crates/varn-emit/src/namespace_scope.rs`).
+  - El `ExportMap` del resolver, que ya fijaba los slots de módulo,
+    lleva una clave por miembro
+    (`crates/varn-resolver/src/namespace_exports.rs`). Reexports,
+    renombres (`export { Geo as Shapes } from`), `export *` e
+    `import * as L` llegan al mismo namespace y al mismo estado.
+  - El binder apunta qué namespaces importa cada módulo
+    (`BindResult.namespace_imports`); el emisor cambia el import del
+    namespace por uno por miembro.
+- `339fbc6c` — tipos del namespace.
+  - El nombre registrado es cualificado (`A::Item`): dos namespaces
+    pueden declarar la misma clase, enum, interfaz, alias o anidado. El
+    binder apunta el nombre de cada declaración
+    (`BindResult.declared_type_names`) y checker y emisor lo leen.
+  - `A.Item` y `Geo.Box` valen como tipo, también importados
+    (`crates/varn-binder/src/type_resolution/qualified.rs`), y
+    `class Crate extends Geo.Box` funciona.
+  - El checker resuelve un nombre de tipo en el ámbito donde está
+    escrito (`BindView::at`).
+- `26b8625c` — documentación (`docs/lang/types.md` §10.7 a §10.9).
+
+**Decisiones de lenguaje**
+
+- `VN4020`: un namespace no es un valor. `const g = N` o pasarlo como
+  argumento es error; un miembro sí es valor (`const f = N.area`).
+- `VN4021`: lo exportado es constante. `export let` es error en módulo
+  y en namespace, igual que `export { x }` de un `let`. La sonda mostró
+  que esto fallaba también a nivel de módulo: `import { counter }`
+  nunca veía los cambios. El estado compartido se exporta como
+  funciones.
+- Asignar `N.m` desde fuera es error (`VN3005`).
+
+**Coste medido de las reglas**: una sola línea en todo `std` y tests
+usaba un namespace como valor (`typeof Prompt` en tests/110, quitada) y
+ninguna exportaba un `let`.
+
+**Tests**: 202 (entre módulos: reexport, renombre, `import * as`) y 203
+(tipos homónimos, anotaciones con punto, herencia de una clase de
+namespace importado), con los helpers `tests/helpers/namespace-*.vn`, y
+diez casos nuevos en `tests/errors/`.
+
+**Sin hacer**
+
+- No hay medida antes/después de rendimiento: el binario base no
+  ejecutaba la sonda.
+- `expr_call.rs` (437 líneas) y `bind.rs` (436) siguen por encima de
+  400; ya lo estaban y no se partieron.
+- Lo que queda abierto en namespaces está en 2.9.
 
 ## 2. Pendiente, por orden
 
