@@ -56,7 +56,6 @@ function testHttpServerAndClientApis(): void {
         return json({ deleted: req.params["id"] });
     });
 
-        expect(app !== null).toBeTruthy();;
         expect(app.port).toBe(0);;
         expect(app.isListening).toBeFalsy();;
 

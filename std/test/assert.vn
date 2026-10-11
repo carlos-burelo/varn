@@ -201,7 +201,7 @@ export class Expectation<T> {
             fn();
         } catch (e) {
             threw = true;
-            if (e !== null && typeof e === "object") {
+            if (typeof e === "object") {
                 let dynE: dynamic = e;
                 if (dynE.message !== null) {
                     errMessage = "" + dynE.message;
@@ -387,7 +387,7 @@ export function assertThrows(fn: () => void, expectedErr: str = "", msg: str = "
         fn();
     } catch (e) {
         threw = true;
-        if (e !== null && typeof e === "object") {
+        if (typeof e === "object") {
             let dynE: dynamic = e;
             if (dynE.message !== null) {
                 errMessage = "" + dynE.message;

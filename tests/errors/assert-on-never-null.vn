@@ -1,0 +1,3 @@
+// VN3028
+const name: str = "a"
+const n = name!

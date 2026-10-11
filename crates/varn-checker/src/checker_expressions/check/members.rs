@@ -45,6 +45,9 @@ impl<'r> Checker<'r> {
         let prop_name = bind.interner.resolve(*prop_name);
 
         let obj_ty = self.infer_type(rec, object, bind);
+        if optional {
+            self.require_nullable(rec, object, "'?.'", bind);
+        }
         if !optional && obj_ty.is_nullable(&self.ty_table) {
             self.emit(
                 Diagnostic::error(

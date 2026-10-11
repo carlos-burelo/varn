@@ -50,7 +50,6 @@ async function runHttpVerification() {
 
     // 5. Test Server registration & routing configuration
     let app = serve();
-    expect(app !== null).toBeTruthy();
 
     app.get("/api/v1/users", (req: Request) => {
         return json({ users: ["alice", "bob"] });

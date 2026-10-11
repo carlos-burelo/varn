@@ -19,7 +19,7 @@ await describe("example std:ws", async () => {
         await client.send("hello-ws");
         let echo = await client.read();
         expect(echo !== null).toBe(true);
-        expect(echo!!.toString()).toBe("ECHO:hello-ws");
+        expect(echo!.toString()).toBe("ECHO:hello-ws");
         client.close();
         let status = proc.wait();
         expect(status.exitCode).toBe(0);

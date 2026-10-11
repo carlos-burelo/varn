@@ -1,0 +1,3 @@
+// VN3028
+const count: int = 5
+const n = count ?? 0

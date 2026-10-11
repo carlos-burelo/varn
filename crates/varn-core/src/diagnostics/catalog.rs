@@ -58,6 +58,7 @@ pub enum ErrorCode {
     DeprecatedUse = 3025,
     ImpureOperation = 3026,
     ConditionNeverFalse = 3027,
+    NeverNull = 3028,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -264,6 +265,7 @@ impl ErrorCode {
             ErrorCode::DeprecatedUse => "deprecated-use",
             ErrorCode::ImpureOperation => "impure-operation",
             ErrorCode::ConditionNeverFalse => "condition-never-false",
+            ErrorCode::NeverNull => "never-null",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }

@@ -27,7 +27,7 @@ async function wrapSettledOne<T>(task: Task<T>): Task<TaskSettledResult<T>> {
         let val = await task;
         return { status: "fulfilled", value: val };
     } catch (err) {
-        return { status: "rejected", reason: err.message ?? ("" + err) };
+        return { status: "rejected", reason: err.message };
     }
 }
 
@@ -36,7 +36,7 @@ async function raceOneHandle<T>(handle: TaskHandle<T>, ch: Channel<TaskSettledRe
         let res = await handle;
         await ch.tx.send({ status: "fulfilled", value: res });
     } catch (err) {
-        await ch.tx.send({ status: "rejected", reason: err.message ?? ("" + err) });
+        await ch.tx.send({ status: "rejected", reason: err.message });
     }
 }
 

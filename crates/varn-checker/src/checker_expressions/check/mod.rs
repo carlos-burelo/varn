@@ -125,7 +125,9 @@ impl<'r> Checker<'r> {
                     varn_core::ast::LogicalOp::And | varn_core::ast::LogicalOp::Or => {
                         self.require_condition(rec, left, bind)
                     }
-                    varn_core::ast::LogicalOp::Nullish => {}
+                    varn_core::ast::LogicalOp::Nullish => {
+                        self.require_nullable(rec, left, "'??'", bind)
+                    }
                 }
                 match op {
                     varn_core::ast::LogicalOp::And => {
@@ -184,7 +186,10 @@ impl<'r> Checker<'r> {
             }
 
             ExprKind::Paren { expression } => self.check_expr(rec, *expression, bind),
-            ExprKind::NonNull { expression } => self.check_expr(rec, *expression, bind),
+            ExprKind::NonNull { expression } => {
+                self.check_expr(rec, *expression, bind);
+                self.require_nullable(rec, *expression, "'!'", bind)
+            }
 
             ExprKind::Array { elements } => {
                 let elements = elements.clone();

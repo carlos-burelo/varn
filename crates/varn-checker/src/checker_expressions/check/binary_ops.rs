@@ -21,6 +21,19 @@ impl<'r> Checker<'r> {
     ) {
         let l_ty = self.infer_type(rec, left, bind);
         let r_ty = self.infer_type(rec, right, bind);
+        if matches!(
+            op,
+            BinaryOp::Eq | BinaryOp::NotEq
+        ) {
+            let is_null = |e: ExprId| {
+                matches!(self.ast_arena.expr(e).kind, varn_core::ast::ExprKind::NullLiteral)
+            };
+            match (is_null(left), is_null(right)) {
+                (false, true) => self.require_nullable(rec, left, "comparing it with null", bind),
+                (true, false) => self.require_nullable(rec, right, "comparing it with null", bind),
+                (true, true) | (false, false) => {}
+            }
+        }
 
         let l_base_raw = base_type(&l_ty);
         let r_base_raw = base_type(&r_ty);

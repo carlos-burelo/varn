@@ -147,13 +147,13 @@ export class HttpServer {
             await this._sendChunked(connId, responseObj, stream as AsyncReader);
             return;
         }
-        let hdrs = responseObj.headers !== null ? responseObj.headers.toObject() : {};
+        let hdrs = responseObj.headers.toObject();
         await sendHttpResponse$(connId, responseObj.status, responseObj.statusText, hdrs, responseObj.body, responseObj.cookies);
     }
 
     private async _sendChunked(connId: int, responseObj: Response, reader: AsyncReader): Task<void> {
         let head = "HTTP/1.1 " + responseObj.status.toString() + " " + responseObj.statusText + "\r\n";
-        let hdrs = responseObj.headers !== null ? responseObj.headers.toObject() : {};
+        let hdrs = responseObj.headers.toObject();
         for (let name in hdrs) {
             head = head + name + ": " + hdrs[name] + "\r\n";
         }

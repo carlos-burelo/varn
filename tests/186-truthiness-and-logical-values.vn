@@ -17,7 +17,7 @@ function elseIsNull(n: int?): int { if (n) { return n + 1 } else { return n ?? -
 
 function orMaybe(n: int?): int { return n || 7 }
 function andMaybe(n: int?, m: int): int? { return n && m }
-function orAssign(n: int?): int { let x = n; x ||= 9; return x! }
+function orAssign(n: int?): int { let x = n; x ||= 9; return x }
 function andAssign(n: int?): int? { let x = n; x &&= 9; return x }
 function orStr(s: str?): str { return s || "vacio" }
 function throughPoint(p: Point?): int { return (p && p.n) ?? -1 }

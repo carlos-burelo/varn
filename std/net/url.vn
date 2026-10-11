@@ -164,9 +164,6 @@ export function parseUrl(url: str): Url {
 }
 
 export function appendQuery(url: str, q: { [key: str]: str | str[] }): str {
-    if (q == null) {
-        return url;
-    }
     let hasKeys = false;
     for (const key in q) {
         if (q[key] != null) {

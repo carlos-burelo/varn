@@ -1,0 +1,4 @@
+// VN3028
+class Box { v: int = 1 }
+const b = new Box()
+print(b?.v)

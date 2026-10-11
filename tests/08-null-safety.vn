@@ -22,7 +22,6 @@ await describe("08 Null Safety", async () => {
     await it("nullish coalescing", () => {
         const p2: Profile? = { name: "Bob" };
         const p3: Profile? = null;
-        expect(42 ?? 0).toBe(42);
         expect(null ?? 99).toBe(99);
         expect(p3?.name ?? "anon").toBe("anon");
         expect(p2?.address?.city ?? "dynamic").toBe("dynamic");

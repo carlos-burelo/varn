@@ -95,7 +95,6 @@ await describe("31 stdlib migration test", async () => {
         expect(allHex).toBeTruthy()
         
         // ── std:http ──────────────────────────────────────────────────────
-        expect(fetch !== null).toBeTruthy()
         
     });
 });

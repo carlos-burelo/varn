@@ -23,6 +23,31 @@ impl<'r> Checker<'r> {
         );
     }
 
+    pub(crate) fn require_nullable(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        what: &str,
+        bind: &BindResult,
+    ) {
+        let ty = self.infer_type(rec, expr, bind);
+        let is_bool = matches!(
+            self.ty_table.get(ty.0),
+            TypeKind::Primitive(LangPrimitive::Bool) | TypeKind::Literal(TypeLiteral::Bool(_))
+        );
+        if !is_bool && !self.never_false(ty, bind) {
+            return;
+        }
+        let shown = ty.display(&self.ty_table, &bind.interner).to_string();
+        self.emit(
+            Diagnostic::error(
+                ErrorCode::NeverNull,
+                format!("'{shown}' is never null, so {what} does nothing here"),
+            )
+            .with_range(self.ast_arena.expr(expr).range),
+        );
+    }
+
     pub(crate) fn never_false(&self, ty: Type, bind: &BindResult) -> bool {
         match self.ty_table.get(ty.0) {
             TypeKind::Primitive(

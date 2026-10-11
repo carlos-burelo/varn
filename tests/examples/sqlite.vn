@@ -19,7 +19,7 @@ await describe("example std:sqlite", async () => {
         expect(rows.length).toBe(2);
         let row = db.get("SELECT * FROM t WHERE id = ?", 1);
         expect(row !== null).toBe(true);
-        expect(row!!["name"]).toBe("ana");
+        expect(row!["name"]).toBe("ana");
         expect(db.get("SELECT * FROM t WHERE id = ?", 999) === null).toBe(true);
         db.close();
     });

@@ -125,7 +125,6 @@ async function runComprehensiveTest(): Task<void> {
     expect(hasMetadata("my_key", list)).toBeTruthy();
 
     // 12. std:http
-    expect(fetch !== null).toBeTruthy();
     let clientTask = fetch("http://%/");
     let clientRes = await clientTask;
     expect(clientRes.status).toBe(200);
@@ -159,7 +158,6 @@ async function runComprehensiveTest(): Task<void> {
     let dispObj = new ResourceImpl();
     {
         using r = dispObj;
-        expect(r !== null).toBeTruthy();
         expect(dispObj.disposed).toBe(false);
     }
     expect(dispObj.disposed).toBe(true);

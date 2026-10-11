@@ -43,7 +43,6 @@ await describe("133 operator capabilities", async () => {
     await it("group 1 part 3", async () => {
         expect(a < b && !(b < a)).toBeTruthy();
         expect(a <= a && b >= a).toBeTruthy();
-        expect(!(a == null)).toBeTruthy();
         expect(maybe == null).toBeTruthy();
         expect(p == p && !(p == new Plain(1))).toBeTruthy();
     });

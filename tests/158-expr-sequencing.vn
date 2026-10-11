@@ -60,7 +60,7 @@ function orAssign(): int {
     x ||= counted()
     let y: int? = null
     y ||= counted()
-    return calls * 1000 + x! * 100 + y!
+    return calls * 1000 + x * 100 + y
 }
 
 function nullishAssign(): int {
@@ -69,7 +69,7 @@ function nullishAssign(): int {
     x ??= counted()
     let y: int? = null
     y ??= counted()
-    return calls * 1000 + (x ?? 0) * 100 + (y ?? 0)
+    return calls * 1000 + x * 100 + y
 }
 
 function tryInBranch(flag: bool, v: int?): int? {

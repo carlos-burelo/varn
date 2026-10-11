@@ -23,7 +23,7 @@ await describe("example std:net", async () => {
         cli.send("127.0.0.1", 19882, "ping-udp");
         let packet = await srv.recv();
         expect(packet !== null).toBe(true);
-        expect(packet!!.data.toString()).toBe("ping-udp");
+        expect(packet!.data.toString()).toBe("ping-udp");
         cli.close();
         srv.close();
     });
