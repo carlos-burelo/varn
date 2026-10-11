@@ -1,0 +1,2 @@
+// VN4018
+const pick = (n: int): str => { if (n > 0) { return "a" } }

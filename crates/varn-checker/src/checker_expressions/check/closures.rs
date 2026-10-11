@@ -61,7 +61,14 @@ impl<'r> Checker<'r> {
         }
 
         self.check_param_defaults(rec, &params, bind);
+        let block = match &body {
+            ArrowBody::Block(stmt) if return_type.is_some() => Some(*stmt),
+            ArrowBody::Block(_) | ArrowBody::Expr(_) => None,
+        };
         self.in_function_body(is_async, |c| c.check_arrow_body(rec, body, range, bind));
+        if let Some(block) = block {
+            self.require_return(block, bind);
+        }
 
         self.current_scope = saved_scope;
         self.expected_return_type = saved_expected;
@@ -77,6 +84,7 @@ impl<'r> Checker<'r> {
         return_type: &Option<varn_core::ast::TypeNode>,
         body: varn_core::ast::StmtId,
         is_async: bool,
+        is_generator: bool,
         range: varn_core::SourceRange,
         bind: &BindResult,
     ) {
@@ -99,6 +107,9 @@ impl<'r> Checker<'r> {
 
         self.check_param_defaults(rec, params, bind);
         self.in_function_body(is_async, |c| c.check_stmt(rec, body, bind));
+        if return_type.is_some() && !is_generator {
+            self.require_return(body, bind);
+        }
 
         self.current_scope = saved_scope;
         self.expected_return_type = saved_expected;

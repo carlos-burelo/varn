@@ -78,8 +78,18 @@ impl<'r> Checker<'r> {
                 return_type,
                 body,
                 is_async,
+                is_generator,
                 ..
-            } => self.check_function_expr(rec, params, return_type, *body, *is_async, range, bind),
+            } => self.check_function_expr(
+                rec,
+                params,
+                return_type,
+                *body,
+                *is_async,
+                *is_generator,
+                range,
+                bind,
+            ),
             ExprKind::As {
                 expression,
                 type_ann,

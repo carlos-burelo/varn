@@ -86,6 +86,7 @@ pub enum ErrorCode {
     MatchPatternTypeMismatch = 4015,
     InvalidUsingTarget = 4016,
     UseBeforeAssignment = 4017,
+    MissingReturn = 4018,
 
     MissingOverride = 4101,
     SpuriousOverride = 4102,
@@ -102,6 +103,8 @@ pub enum ErrorCode {
     InvalidExtensionReceiver = 4113,
     SuperOutsideMethod = 4114,
     ThisOutsideInstance = 4115,
+    IncompatibleOverride = 4116,
+    InterfaceNotSatisfied = 4117,
 
     InvalidIsolateTransfer = 4201,
     ChannelClosedError = 4202,
@@ -210,6 +213,9 @@ impl ErrorCode {
             ErrorCode::MatchPatternTypeMismatch => "match-pattern-type-mismatch",
             ErrorCode::InvalidUsingTarget => "invalid-using-target",
             ErrorCode::UseBeforeAssignment => "use-before-assignment",
+            ErrorCode::MissingReturn => "missing-return",
+            ErrorCode::IncompatibleOverride => "incompatible-override",
+            ErrorCode::InterfaceNotSatisfied => "interface-not-satisfied",
 
             ErrorCode::MissingOverride => "missing-override",
             ErrorCode::SpuriousOverride => "spurious-override",

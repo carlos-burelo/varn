@@ -135,6 +135,9 @@ impl<'r> Checker<'r> {
 
                     self.check_param_defaults(rec, params, bind);
                     self.in_function_body(modifiers.is_async, |c| c.check_stmt(rec, body, bind));
+                    if return_type.is_some() && !modifiers.is_generator {
+                        self.require_return(body, bind);
+                    }
 
                     self.pure_scope = saved_pure;
                     self.enclosing_caps = saved_caps;
@@ -178,6 +181,9 @@ impl<'r> Checker<'r> {
                     }
 
                     self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
+                    if return_type.is_some() {
+                        self.require_return(body, bind);
+                    }
 
                     self.pure_scope = saved_pure;
                     self.enclosing_caps = saved_caps;

@@ -1,3 +1,4 @@
+mod completion;
 mod control;
 mod dispatch;
 mod exception;

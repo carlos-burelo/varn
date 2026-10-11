@@ -61,6 +61,10 @@ impl<'r> Checker<'r> {
 
         self.check_param_defaults(rec, &f.params, bind);
         self.in_function_body(f.modifiers.is_async, |c| c.check_stmt(rec, f.body, bind));
+        let has_body = !f.modifiers.is_declare && !f.modifiers.is_native;
+        if f.return_type.is_some() && !is_gen && has_body {
+            self.require_return(f.body, bind);
+        }
 
         self.pure_scope = saved_pure;
         self.enclosing_caps = saved_caps;

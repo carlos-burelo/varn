@@ -1,0 +1,4 @@
+// VN4018
+function find(xs: int[]): int? {
+    for (const x of xs) { if (x > 0) { return x } }
+}
