@@ -48,17 +48,14 @@ impl<'m> Builder<'m> {
             return Ok(None);
         };
         let declared = self.tir.function(f).map_or(0, |tf| tf.params.len());
-        let argv = match self.lower_args_as_declared(f, args)? {
-            Some(argv) => argv,
-            None if args.len() == declared
-                && !args
-                    .iter()
-                    .any(|a| matches!(a, varn_tir::TirArg::Spread(_))) =>
-            {
-                self.lower_args(args)?
-            }
-            None => return Ok(None),
-        };
+        if args.len() != declared
+            || args
+                .iter()
+                .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))
+        {
+            return Ok(None);
+        }
+        let argv = self.lower_args(args)?;
         Ok(Some(self.emit(InstKind::SelfCall { args: argv }, ty)))
     }
 
@@ -178,50 +175,6 @@ impl<'m> Builder<'m> {
         };
         let v = self.lower_expr(precise)?;
         Ok(self.widen_exact(v, precise.ty, param))
-    }
-
-    pub(super) fn lower_args_as_declared(
-        &mut self,
-        f: varn_tir::FnId,
-        args: &[varn_tir::TirArg],
-    ) -> Result<Option<Vec<Value>>> {
-        let Some(declared) = self
-            .tir
-            .function(f)
-            .filter(|tf| !tf.has_rest && args.len() <= tf.params.len())
-            .map(|tf| tf.params.clone())
-        else {
-            return Ok(None);
-        };
-        if args
-            .iter()
-            .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))
-        {
-            return Ok(None);
-        }
-        let mut argv = self.lower_args(args)?;
-        for (i, param) in declared.into_iter().enumerate() {
-            let Some(supplied) = argv.get(i).copied() else {
-                argv.push(self.emit(InstKind::ConstNull, HirType::Dynamic));
-                continue;
-            };
-            match self.ty(param) {
-                boxed @ (HirType::Dynamic | HirType::Nullable(_)) => {
-                    argv[i] = self.coerce(supplied, boxed)
-                }
-                HirType::Int
-                | HirType::Float
-                | HirType::Bool
-                | HirType::Str
-                | HirType::Ref
-                | HirType::Array(_)
-                | HirType::Map(..)
-                | HirType::Set(_)
-                | HirType::Tuple
-                | HirType::Class(_) => {}
-            }
-        }
-        Ok(Some(argv))
     }
 
     pub(super) fn lower_args(&mut self, args: &[varn_tir::TirArg]) -> Result<Vec<Value>> {

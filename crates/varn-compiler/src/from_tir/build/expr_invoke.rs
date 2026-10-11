@@ -60,11 +60,6 @@ impl<'m> Builder<'m> {
             | Resolution::EnumVariant { .. }
             | Resolution::ByName { .. } => self.lower_expr(callee)?,
         };
-        if let Resolution::DirectFn(f) = res {
-            if let Some(argv) = self.lower_args_as_declared(*f, args)? {
-                return Ok(self.emit(InstKind::Call { callee: cv, args: argv }, ty));
-            }
-        }
         self.lower_call(cv, args, ty)
     }
 

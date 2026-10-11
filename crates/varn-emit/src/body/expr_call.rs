@@ -97,6 +97,7 @@ impl<'a> FnEmitter<'a> {
             let mut targs = targs;
             if let Some(&(_, arity)) = self.m.fns.get(name).filter(|_| all_positional && !takes_rest)
             {
+                targs = self.fill_omitted(targs, callee_sig);
                 while targs.len() < arity as usize {
                     targs.push(TirArg::Expr(TirExpr {
                         kind: TirExprKind::NullLit,
