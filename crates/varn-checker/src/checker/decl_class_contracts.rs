@@ -1,4 +1,5 @@
 use super::Checker;
+use varn_core::ast::ClassMember;
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
 use varn_sem::types::{ClassMemberInfo, ClassMemberKind};
@@ -41,6 +42,55 @@ impl<'r> Checker<'r> {
             )
             .with_range(range),
         );
+    }
+
+    pub(super) fn check_abstract_members(
+        &mut self,
+        c: &varn_core::ast::ClassDecl,
+        superclass_members: &[ClassMemberInfo],
+        bind: &BindResult,
+    ) {
+        let Some(id) = c.id else {
+            return;
+        };
+        if c.modifiers.is_abstract {
+            return;
+        }
+        let class = bind.interner.resolve(id);
+        let mut settled: Vec<std::sync::Arc<str>> = c
+            .body
+            .iter()
+            .filter_map(|member| match member {
+                ClassMember::Method { key, .. }
+                | ClassMember::Getter { key, .. }
+                | ClassMember::Setter { key, .. }
+                | ClassMember::Property { key, .. } => {
+                    Some(std::sync::Arc::from(bind.interner.resolve(*key)))
+                }
+                ClassMember::Constructor { .. }
+                | ClassMember::Destructor { .. }
+                | ClassMember::StaticBlock { .. } => None,
+            })
+            .collect();
+        for inherited in superclass_members {
+            if settled.contains(&inherited.name) {
+                continue;
+            }
+            settled.push(inherited.name.clone());
+            if !inherited.is_abstract {
+                continue;
+            }
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::AbstractMethodNotImplemented,
+                    format!(
+                        "class '{class}' does not implement the abstract member '{}'",
+                        inherited.name
+                    ),
+                )
+                .with_range(c.range),
+            );
+        }
     }
 
     pub(super) fn check_implements(&mut self, c: &varn_core::ast::ClassDecl, bind: &BindResult) {

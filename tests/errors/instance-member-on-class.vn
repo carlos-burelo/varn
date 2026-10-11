@@ -1,0 +1,3 @@
+// VN4106
+class Counter { count: int = 0 }
+print(Counter.count)

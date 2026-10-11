@@ -90,6 +90,8 @@ impl<'r> Checker<'r> {
             }
         }
 
+        self.check_member_side(object, &check_ty, prop_name, range, bind);
+
         if should_check && !self.member_exists_cached(&check_ty, prop_name, bind) {
             let candidates = self.collect_member_names(&check_ty, bind);
             let suggestion = closest_in_list(prop_name, &candidates)

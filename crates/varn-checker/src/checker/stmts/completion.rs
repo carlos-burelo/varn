@@ -9,23 +9,23 @@ impl<'r> Checker<'r> {
         let Some(declared) = self.expected_return_type else {
             return;
         };
-        if declared.is_dynamic() || declared == Type::Void || declared == Type::Never {
+        if declared.is_dynamic() || declared == Type::Void {
             return;
         }
         if !completes(body, self.ast_arena) {
             return;
         }
         let range = self.ast_arena.stmt(body).range;
-        self.emit(
-            Diagnostic::error(
-                ErrorCode::MissingReturn,
-                format!(
-                    "not every path returns a value: the function is declared to return '{}'",
-                    declared.display(&self.ty_table, &bind.interner)
-                ),
+        let message = if declared == Type::Never {
+            "a function declared to return 'never' cannot reach its end: it must throw or loop"
+                .to_owned()
+        } else {
+            format!(
+                "not every path returns a value: the function is declared to return '{}'",
+                declared.display(&self.ty_table, &bind.interner)
             )
-            .with_range(range),
-        );
+        };
+        self.emit(Diagnostic::error(ErrorCode::MissingReturn, message).with_range(range));
     }
 }
 

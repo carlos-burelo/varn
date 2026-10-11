@@ -43,6 +43,7 @@ impl<'r> Checker<'r> {
         self.check_class_decorators(rec, c, bind);
         self.check_class_overrides(c, &superclass_members, bind);
         self.check_implements(c, bind);
+        self.check_abstract_members(c, &superclass_members, bind);
         self.check_class_members(rec, c, bind);
 
         self.current_scope = saved_scope;

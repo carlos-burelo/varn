@@ -1,0 +1,4 @@
+// VN4106
+class Counter { static total: int = 0
+    read(): int { return this.total }
+}

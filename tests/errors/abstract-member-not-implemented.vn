@@ -1,0 +1,3 @@
+// VN4107
+abstract class Shape { abstract area(): float }
+class Square extends Shape { }

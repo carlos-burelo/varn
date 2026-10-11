@@ -8,6 +8,7 @@ mod control;
 mod exhaustiveness;
 mod match_arm;
 pub(crate) mod member_index;
+mod member_side;
 pub(crate) mod members;
 pub(crate) mod members_assign;
 mod misc;
