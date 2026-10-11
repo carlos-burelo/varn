@@ -231,9 +231,60 @@ pub(crate) fn neq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     !eq(a, b, heap)
 }
 
+fn text_bytes<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) -> Option<&'a [u8]> {
+    if v.is_sso() {
+        return Some(v.sso_as_str(buf).as_bytes());
+    }
+    if !v.is_heap() {
+        return None;
+    }
+    match heap.get(v.as_heap()) {
+        Some(HeapObj::Str(s)) => Some(s.as_str().as_bytes()),
+        Some(HeapObj::Char(c)) => {
+            let (head, _) = buf.split_at_mut(4);
+            Some(c.encode_utf8(head).as_bytes())
+        }
+        Some(
+            HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Record(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::EnumVariant(_),
+        )
+        | None => None,
+    }
+}
+
+fn text_order(a: VmValue, b: VmValue, heap: &Heap) -> Option<std::cmp::Ordering> {
+    let (mut left, mut right) = ([0u8; 5], [0u8; 5]);
+    let left = text_bytes(a, heap, &mut left)?;
+    let right = text_bytes(b, heap, &mut right)?;
+    Some(left.cmp(right))
+}
+
 pub(crate) fn lt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if heap.is_int(a) && heap.is_int(b) {
         return heap.as_int(a) < heap.as_int(b);
+    }
+    if let Some(order) = text_order(a, b, heap) {
+        return order == std::cmp::Ordering::Less;
     }
     if a.is_f64() && b.is_f64() {
         return a.as_f64() < b.as_f64();

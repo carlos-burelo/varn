@@ -1,0 +1,39 @@
+import { describe, it, expect } from "std:test";
+
+function before(a: str, b: str): bool { return a < b }
+function atMost(a: str, b: str): bool { return a <= b }
+function smallest(words: str[]): str {
+    let best = words[0]
+    for (const w of words) { if (w < best) { best = w } }
+    return best
+}
+
+await describe("196 string order", async () => {
+    await it("strings compare by their characters, in order", () => {
+        const long = "abcdefghijklmnopqrstuvwxyz0123456789"
+        const longer = long + "!"
+        expect("a" < "b").toBe(true)
+        expect("b" < "a").toBe(false)
+        expect("a" < "a").toBe(false)
+        expect("a" <= "a").toBe(true)
+        expect("b" <= "a").toBe(false)
+        expect("b" > "a").toBe(true)
+        expect("a" >= "b").toBe(false)
+        expect("" < "a").toBe(true)
+        expect("ab" < "abc").toBe(true)
+        expect("B" < "a").toBe(true)
+        expect(long < longer).toBe(true)
+        expect(longer > long).toBe(true)
+        expect("ñ" > "z").toBe(true)
+    })
+
+    await it("the comparison holds in compiled code", () => {
+        let hits = 0
+        for (let i = 0; i < 400; i = i + 1) {
+            if (before("apple", "banana")) { hits = hits + 1 }
+            if (atMost("pear", "peach")) { hits = hits + 10 }
+        }
+        expect(hits).toBe(400)
+        expect(smallest(["pear", "apple", "fig", "banana"])).toBe("apple")
+    })
+})
