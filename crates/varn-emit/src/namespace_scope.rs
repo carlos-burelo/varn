@@ -18,6 +18,11 @@ pub(super) fn declared_name(
     names.get(&ast_id).cloned().unwrap_or_else(|| Arc::from(bare))
 }
 
+pub(super) fn enclosing(class: Option<&varn_tir::ClassInfo>) -> Option<Arc<str>> {
+    let (outer, _) = class?.name.rsplit_once("::")?;
+    Some(Arc::from(outer))
+}
+
 pub(super) fn scoped_lookup<T>(
     scope: Option<&str>,
     written: &str,

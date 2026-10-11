@@ -527,10 +527,7 @@ Un estrechamiento vale mientras la variable no cambie
 - Desestructurar pide que el campo exista (`VN3004`), salvo que el patrón
   traiga valor por defecto; una tupla da a cada nombre el tipo de su
   posición y no admite más nombres que elementos (`VN3016`).
-- Un namespace expone solo lo que marca `export`; el resto es privado y
-  sus funciones lo leen (tests/195-namespace-members.vn). Los nombres
-  declarados en un namespace son del módulo: dos namespaces no pueden
-  declarar el mismo (`VN4002`).
+- Namespaces: ver §10.7.
 
 - `switch`: cada caso corre solo, nunca cae al siguiente
   (tests/197-switch-cases.vn). `break` puede cerrar un caso como último
@@ -538,8 +535,10 @@ Un estrechamiento vale mientras la variable no cambie
   del caso es `VN4005`. Un caso vacío o un `default` que no es el último
   son `VN4019`. Para compartir un cuerpo entre valores: `match` con
   `a | b`.
-- `break` y `continue` actúan sobre el bucle más interno. Saltar a una
-  etiqueta no está soportado y es error de compilación.
+- `break` y `continue` actúan sobre el bucle más interno, o sobre el
+  bucle que nombra su etiqueta (`fuera: for (...) { ... break fuera }`,
+  tests/201-loop-labels.vn). Una etiqueta que no nombra un bucle que
+  rodea al salto es error.
 - Cada vuelta de un `for (let i ...)` tiene su propia `i`, igual que en
   `for-of`: una closure creada en la vuelta ve el valor de esa vuelta
   (tests/198-loop-variable-per-iteration.vn).
@@ -548,6 +547,52 @@ Un estrechamiento vale mientras la variable no cambie
 - Un argumento nombrado debe nombrar un parámetro, y una sola vez.
 - Descartar un tipo con `typeof` deja los demás: tras
   `if (typeof x == "int") { return x }`, un `x: int | str` es `str`.
+
+### 10.7 Namespaces
+
+Un namespace es un ámbito con nombre. No existe al ejecutar: cada
+miembro es un global del módulo y `N.miembro` se resuelve al compilar
+(tests/195, 202 y 203).
+
+- Solo se ve desde fuera lo que marca `export`. Lo demás es privado y lo
+  leen las funciones y clases del propio namespace, por su nombre simple.
+- **Un namespace no es un valor** (`VN4020`): `const g = N` o pasarlo como
+  argumento es error. Sí lo es cada miembro: `const f = N.area`.
+- **Un miembro no se asigna desde fuera** (`VN3005`). El estado privado
+  de un namespace se cambia con sus funciones.
+- Los nombres son del namespace, no del módulo: dos namespaces pueden
+  declarar la misma función, variable, clase, enum, interfaz, alias o
+  namespace anidado, y son cosas distintas.
+- Un tipo se nombra por su namespace: `x: Geo.Box`, `Geo.Kind`,
+  `class Crate extends Geo.Box`. Dentro del namespace basta el nombre
+  simple.
+- Entre módulos se comporta igual: `import { Geo }`, un renombre
+  (`export { Geo as Shapes } from`), `export *` y `import * as L`
+  (`L.Geo.area`) llegan al mismo namespace, con el mismo estado.
+
+### 10.8 Lo exportado es constante
+
+`export let` es error (`VN4021`), en un módulo y en un namespace, igual
+que `export { x }` de un `let`. El módulo que importa recibe el valor,
+no la variable: una exportación mutable se leería desde fuera sin ver
+nunca sus cambios. El estado compartido se exporta como funciones que
+lo leen y lo cambian.
+
+### 10.9 Varianza, nulos y `super`
+
+- `T[]`, `Map<K, V>`, `Set<T>` y los campos mutables son invariantes: un
+  `Dog[]` no es un `Animal[]`, porque por la segunda vista se podría
+  guardar un `Cat` (tests/199-containers-are-invariant.vn). Un literal
+  sí se adapta al tipo que se le pide. `Task`, `Generator` y los campos
+  `readonly` son covariantes.
+- Dentro de una función genérica, `T` es opaco: no se le puede dar un
+  valor concreto ni devolver otra cosa donde se prometió `T`.
+- `??`, `?.` y `== null` sobre un valor que nunca es `null` son
+  error (`VN3028`): el código dice que algo puede faltar y el tipo dice
+  que no.
+- `super.m()` y `super.x` llegan al padre también desde una flecha, un
+  getter o el inicializador de un campo
+  (tests/200-super-reaches-the-parent.vn).
 
 ### 10.6 Valores por defecto y spread
 

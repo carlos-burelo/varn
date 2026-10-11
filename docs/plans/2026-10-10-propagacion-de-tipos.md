@@ -219,6 +219,36 @@ Reglas que el checker no hacía cumplir:
 - Una variante de enum se convierte a texto con su nombre, no
   `[object]`.
 
+### Octava tanda (commits `cd15bd0d`..`339fbc6c`, tests 199 a 203)
+
+- **Contenedores y campos mutables invariantes** (`cd15bd0d`): la
+  covarianza dejaba guardar un `Cat` en un `Dog[]`. Los literales se
+  adaptan al tipo pedido (`literal_fit.rs`).
+- **`T` opaco en su cuerpo** (`4a49beb0`), `??` sobre `T?` genérico
+  (`c2276b00`), `let`/`function` rechazados como miembro de clase
+  (`9524ce16`).
+- **`VN3028`** (`1b4f4e8a`): operador de nulos sobre un valor que nunca
+  es `null`. Limpió 32 sitios de `std` y tests.
+- **`super` en flechas, getters y campos** (`13644dad`), **etiquetas de
+  bucle** implementadas (`56b7d3ee`).
+- **Namespaces, rediseñados de raíz** a petición del dueño («defectuosa
+  por diseño»), en tres commits:
+  - `b470ffb6`: los nombres de un namespace son suyos (`N::nombre`).
+  - `f29c479b`: el namespace deja de ser un objeto de runtime. Antes
+    guardaba copias (`N.n` daba 0 tras dos `N.bump()`), cada acceso era
+    `GetProperty` por nombre y los anidados importados no existían para
+    el checker. Ahora `N.m` es un slot o una llamada directa; el
+    `ExportMap` lleva una clave por miembro, así que reexports,
+    renombres y `import * as` reenvían solos. Reglas: `VN4020`
+    (namespace no es un valor), `VN4021` (lo exportado es constante),
+    asignar `N.m` desde fuera es `VN3005`.
+  - `339fbc6c`: identidad de tipos cualificada (`A::Item`). Dos
+    namespaces ya pueden declarar la misma clase, enum, interfaz, alias
+    o anidado, y `A.Item` vale como anotación. El checker resolvía los
+    nombres de tipo solo en el ámbito global (`BindView::at`).
+  - Medido con `chk`: una línea usaba un namespace como valor y ninguna
+    exportaba un `let`.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -317,6 +347,18 @@ Hace doble búsqueda (unos 80 ns frente a 45). Pendiente de la sesión
 anterior.
 
 ### 2.9 Encontrado y sin arreglar
+
+- Namespaces: `import * as L` sigue siendo un objeto de módulo para lo
+  que no es namespace (`L.f`), y se puede pasar como valor: falta darle
+  el mismo trato estático. Los nombres de variante de un enum siguen
+  siendo del módulo (dos enums de namespaces distintos con una variante
+  homónima comparten `sum_variant_parent`). `struct` y tipo suma dentro
+  de un namespace no se exportan como valor. El nombre de una clase de
+  namespace se muestra como `A::Item`, no `A.Item`.
+- `BindResult.namespace_imports` y `declared_type_names` no se
+  serializan: valen porque el módulo que se emite siempre se acaba de
+  ligar; si algún día se emite desde un bind cacheado, hay que
+  guardarlos.
 
 - `override` e `implements` no se comprueban cuando la clase o un
   ancestro es genérico: comparar firmas pide sustituir los parámetros
