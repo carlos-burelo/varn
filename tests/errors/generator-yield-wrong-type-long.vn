@@ -1,0 +1,2 @@
+// VN3001
+function* numbers(): Generator<int> { yield "one" }

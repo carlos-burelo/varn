@@ -67,6 +67,7 @@ pub struct Checker<'r> {
 
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
     pub(crate) yielded_types: Option<Vec<Type>>,
+    pub(crate) declared_yield: Option<Type>,
     pub(crate) loop_depth: u32,
     pub(crate) switch_depth: u32,
     pub(crate) in_function: bool,

@@ -100,7 +100,7 @@ impl<'r> super::super::Binder<'r> {
         let declared_ret = f.return_type.as_ref().map(|ann| self.resolve_type(ann));
 
         let ret = if f.modifiers.is_generator {
-            varn_sem::types::generator_of(
+            varn_sem::types::declared_generator(
                 declared_ret.unwrap_or(Type::Dynamic),
                 f.modifiers.is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),

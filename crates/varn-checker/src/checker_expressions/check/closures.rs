@@ -172,9 +172,26 @@ impl<'r> Checker<'r> {
         if self.pure_scope.is_some() {
             self.forbid_pure("suspend on 'yield' (pure functions are synchronous)", range);
         }
+        let declared = self.declared_yield;
         let ty = if let Some(arg) = argument {
-            self.check_expr(rec, arg, bind);
-            self.infer_type(rec, arg, bind)
+            self.with_expected(declared, |c| c.check_expr(rec, arg, bind));
+            let given = self.infer_type(rec, arg, bind);
+            if let Some(declared) = declared {
+                if !self.value_assignable_to(&declared, &given, Some(arg), Some(bind)) {
+                    let declared_s = declared.display(&self.ty_table, &bind.interner);
+                    let given_s = given.display(&self.ty_table, &bind.interner);
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::TypeMismatch,
+                            format!(
+                                "type mismatch: the generator yields '{declared_s}', but this yields '{given_s}'"
+                            ),
+                        )
+                        .with_range(self.ast_arena.expr(arg).range),
+                    );
+                }
+            }
+            given
         } else {
             Type::Void
         };

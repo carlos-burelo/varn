@@ -301,7 +301,7 @@ impl<'r> Checker<'r> {
             .as_ref()
             .map(|rt| self.resolve_type_node_cached(rt, bind));
         let ret = if is_generator {
-            varn_sem::types::generator_of(
+            varn_sem::types::declared_generator(
                 declared.unwrap_or(Type::Dynamic),
                 is_async,
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),

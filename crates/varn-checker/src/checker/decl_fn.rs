@@ -36,6 +36,11 @@ impl<'r> Checker<'r> {
         }
 
         let is_gen = f.modifiers.is_generator;
+        let declared_yield = f.return_type.as_ref().filter(|_| is_gen).map(|ann| {
+            let declared = self.resolve_type_node_cached(ann, bind);
+            varn_sem::types::yielded_by(declared, &self.ty_table)
+        });
+        let old_declared_yield = std::mem::replace(&mut self.declared_yield, declared_yield);
         let old_yields = if is_gen {
             self.yielded_types.replace(Vec::new())
         } else {
@@ -95,6 +100,7 @@ impl<'r> Checker<'r> {
             self.yielded_types = old_yields;
         }
 
+        self.declared_yield = old_declared_yield;
         self.current_scope = saved_scope;
         self.expected_return_type = saved_expected;
         for tp in &injected_tps {

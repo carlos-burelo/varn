@@ -92,6 +92,13 @@ impl<'r> Checker<'r> {
                     ..
                 } => {
                     let body = *body;
+                    let declared_yield =
+                        return_type.as_ref().filter(|_| modifiers.is_generator).map(|ann| {
+                            let declared = self.resolve_type_node_cached(ann, bind);
+                            varn_sem::types::yielded_by(declared, &self.ty_table)
+                        });
+                    let old_declared_yield =
+                        std::mem::replace(&mut self.declared_yield, declared_yield);
                     let saved_expected = self.expected_return_type.take();
                     self.expected_return_type = return_type.as_ref().map(|rt| {
                         let ty = self.resolve_type_node_cached(rt, bind);
@@ -133,6 +140,7 @@ impl<'r> Checker<'r> {
                     self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;
+                    self.declared_yield = old_declared_yield;
                 }
                 ClassMember::Getter {
                     return_type,

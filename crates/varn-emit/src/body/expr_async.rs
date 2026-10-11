@@ -29,6 +29,7 @@ impl<'a> FnEmitter<'a> {
             Box::new(if delegate {
                 value
             } else {
+                let value = self.widened(value, self.yield_ty);
                 self.guard_dynamic(value, self.yield_ty)
             })
         });

@@ -37,6 +37,7 @@ impl<'r> Checker<'r> {
             expected_type: None,
             map_generics_cache: FxHashMap::default(),
             yielded_types: None,
+            declared_yield: None,
             loop_depth: 0,
             switch_depth: 0,
             in_function: false,
