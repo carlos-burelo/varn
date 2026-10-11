@@ -148,14 +148,10 @@ impl<'m> Builder<'m> {
             .find(|v| v.tag == tag)
             .map(|v| v.name.clone())
             .ok_or(OptError::Unsupported("from_tir: variant out of range"))?;
-        let enum_val = self.emit(self.global_load(&ei.name), HirType::Ref);
-        let variant = self.emit(
-            InstKind::GetProperty {
-                object: enum_val,
-                name: vname,
-            },
-            HirType::Ref,
-        );
+        let slot = self
+            .gslot(&ei.variant_global(&vname))
+            .ok_or(OptError::Unsupported("from_tir: variant without a slot"))?;
+        let variant = self.emit(InstKind::LoadGlobalIdx(slot), HirType::Ref);
         if args.is_empty() {
             Ok(variant)
         } else {

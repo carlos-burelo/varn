@@ -138,6 +138,10 @@ impl EnumInfo {
     pub fn variant_at(&self, tag: u16) -> Option<&VariantInfo> {
         self.variants.iter().find(|v| v.tag == tag)
     }
+
+    pub fn variant_global(&self, variant: &str) -> Arc<str> {
+        Arc::from(format!("{}.{}", self.name, variant))
+    }
 }
 
 #[derive(Debug, Clone)]

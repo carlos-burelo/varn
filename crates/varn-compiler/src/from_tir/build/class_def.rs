@@ -22,6 +22,7 @@ impl<'m> Builder<'m> {
             HirType::Ref,
         );
 
+        let enum_info = def.enum_id.and_then(|id| self.tir.enum_info(id));
         for v in &def.variants {
             let variant_v = self.emit(
                 InstKind::MakeEnumVariant {
@@ -35,6 +36,12 @@ impl<'m> Builder<'m> {
                 name: v.name.clone(),
                 value: variant_v,
             });
+            if let Some(slot) = enum_info.and_then(|ei| self.gslot(&ei.variant_global(&v.name))) {
+                self.emit_effect(InstKind::StoreGlobalIdx {
+                    slot,
+                    value: variant_v,
+                });
+            }
         }
 
         if let Some(ci) = def.class_id.and_then(|cid| self.tir.class(cid)) {

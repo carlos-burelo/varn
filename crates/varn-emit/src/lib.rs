@@ -62,7 +62,7 @@ pub fn emit_module(
         nested,
         first_nested_ordinal,
     } = module_globals::assign_global_slots(
-        program, ast_arena, bind, &mut types, &names, &declared,
+        program, ast_arena, bind, &mut types, &names, &declared, &enums,
     );
 
     let core_ops = module_globals::core_method_ops(bind);

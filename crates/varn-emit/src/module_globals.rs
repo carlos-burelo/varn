@@ -10,7 +10,7 @@ use std::sync::Arc;
 use varn_core::ast::{AstArena, Program, StmtKind};
 use varn_core::AtomInterner;
 use varn_sem::bind::BindResult;
-use varn_tir::{BackendTy, DynReason, TyTable};
+use varn_tir::{BackendTy, DynReason, EnumId, EnumInfo, TyTable};
 
 pub(super) fn core_method_ops(bind: &BindResult) -> FxHashSet<(Arc<str>, Arc<str>)> {
     let mut out = FxHashSet::default();
@@ -67,6 +67,7 @@ pub(super) fn assign_global_slots(
     types: &mut TyTable,
     names: &NameIndex,
     declared: &FxHashSet<Arc<str>>,
+    enums: &[EnumInfo],
 ) -> GlobalSlots {
     let interner = &bind.interner;
     let mut global_slots: FxHashMap<Arc<str>, u32> = FxHashMap::default();
@@ -117,6 +118,20 @@ pub(super) fn assign_global_slots(
         debug_assert_eq!(slot as usize, globals.len());
         globals.push(BackendTy::Dynamic(DynReason::NotYetSupported));
         global_slots.insert(name, slot);
+    }
+    for (id, info) in enums.iter().enumerate() {
+        if !global_slots.contains_key(&info.name) {
+            continue;
+        }
+        for variant in &info.variants {
+            let held = if variant.payload.is_empty() {
+                BackendTy::Enum(EnumId(id as u32))
+            } else {
+                BackendTy::Dynamic(DynReason::Callable)
+            };
+            global_slots.insert(info.variant_global(&variant.name), globals.len() as u32);
+            globals.push(held);
+        }
     }
     let mut global_names: Vec<Arc<str>> = vec![Arc::from(""); globals.len()];
     for (name, &slot) in &global_slots {

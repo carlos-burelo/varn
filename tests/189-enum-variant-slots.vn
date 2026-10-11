@@ -1,0 +1,71 @@
+import { describe, it, expect } from "std:test";
+
+enum Color { Red, Green, Blue }
+enum Level { Low = 10, High = 20 }
+enum Shape {
+    Dot,
+    Circle(r: float),
+    Rect(w: float, h: float);
+
+    area(): float {
+        return match (this) {
+            Dot => 0.0,
+            Circle(r) => r * r * 3.0,
+            Rect(w, h) => w * h
+        }
+    }
+}
+
+function pick(i: int): Color {
+    let c = Color.Red
+    if (i % 3 == 1) { c = Color.Green }
+    if (i % 3 == 2) { c = Color.Blue }
+    return c
+}
+function score(c: Color): int {
+    if (c == Color.Red) { return 1 }
+    if (c == Color.Green) { return 10 }
+    return 100
+}
+function nested(i: int): int {
+    enum Side { Left, Right }
+    const s = i % 2 == 0 ? Side.Left : Side.Right
+    return s == Side.Left ? 1 : 2
+}
+function build(i: int): float {
+    const s = i % 2 == 0 ? Shape.Circle(1.0) : Shape.Rect(2.0, 3.0)
+    return s.area()
+}
+
+await describe("189 enum variant slots", async () => {
+    await it("a variant read in a hot function is the declared variant", () => {
+        let total = 0
+        for (let i = 0; i < 600; i = i + 1) { total = total + score(pick(i)) }
+        expect(total).toBe(200 * 111)
+        expect(pick(0) == Color.Red).toBe(true)
+        expect(pick(1) == Color.Red).toBe(false)
+        expect(pick(2)).toBe(Color.Blue)
+    })
+
+    await it("a variant read by name and by slot is the same value", () => {
+        const byName: dynamic = Color
+        expect(byName["Green"] == Color.Green).toBe(true)
+        expect(byName.Blue == Color.Blue).toBe(true)
+        expect(Color.Red == Color.Red).toBe(true)
+        expect(Level.High == Level.Low).toBe(false)
+    })
+
+    await it("payload variants and methods keep working", () => {
+        let total = 0.0
+        for (let i = 0; i < 400; i = i + 1) { total = total + build(i) }
+        expect(total).toBe(200.0 * 3.0 + 200.0 * 6.0)
+        expect(Shape.Dot.area()).toBe(0.0)
+        expect(Shape.Circle(2.0).area()).toBe(12.0)
+    })
+
+    await it("an enum declared inside a function has its own variants", () => {
+        let total = 0
+        for (let i = 0; i < 400; i = i + 1) { total = total + nested(i) }
+        expect(total).toBe(600)
+    })
+})
