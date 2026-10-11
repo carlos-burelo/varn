@@ -241,6 +241,12 @@ impl HeapInner {
                 Some(HeapObj::Class(c)) => format!("[class {}]", c.name),
                 Some(HeapObj::BigInt(n)) => n.to_string(),
                 Some(HeapObj::Decimal(d)) => d.to_plain_string(),
+                Some(HeapObj::EnumVariant(v)) if v.fields.is_empty() => {
+                    format!("{}.{}", v.enum_name, v.variant_name)
+                }
+                Some(HeapObj::EnumVariant(v)) => {
+                    format!("{}.{}(..)", v.enum_name, v.variant_name)
+                }
                 Some(
                     HeapObj::Record(_)
                     | HeapObj::Buffer(_)
@@ -252,7 +258,6 @@ impl HeapInner {
                     | HeapObj::TaskHandle(_)
                     | HeapObj::Range(_)
                     | HeapObj::Symbol(_)
-                    | HeapObj::EnumVariant(_)
                     | HeapObj::Generator(_)
                     | HeapObj::Spread(_),
                 )

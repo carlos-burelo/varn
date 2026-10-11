@@ -100,6 +100,12 @@ await describe("189 enum variant slots", async () => {
         expect(Tok.End == Tok.End).toBe(true)
     })
 
+    await it("a variant reads as its name when turned into text", () => {
+        expect(`${Color.Green}`).toBe("Color.Green")
+        expect("is " + Level.High).toBe("is Level.High")
+        expect(`${Shape.Circle(1.0)}`).toBe("Shape.Circle(..)")
+    })
+
     await it("an enum declared inside a function has its own variants", () => {
         let total = 0
         for (let i = 0; i < 400; i = i + 1) { total = total + nested(i) }
