@@ -60,6 +60,8 @@ pub struct Checker<'r> {
     pub(crate) active_type_params: FxHashSet<Arc<str>>,
     pub(crate) abstract_classes: FxHashSet<Arc<str>>,
     pub(crate) is_assignment_target: bool,
+    pub(crate) super_reachable: bool,
+    pub(crate) callee_position: bool,
     pub(crate) in_pipeline_rhs: bool,
     pub(crate) pipeline_value_type: Option<Type>,
     pub(crate) member_exists_cache: FxHashMap<(Type, Arc<str>), bool>,

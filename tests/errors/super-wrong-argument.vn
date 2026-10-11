@@ -1,0 +1,3 @@
+// VN3001
+class Base { n: int; constructor(n: int) { this.n = n } }
+class Child extends Base { constructor() { super("one") } }

@@ -39,7 +39,12 @@ impl<'r> Checker<'r> {
                 return;
             }
         }
+        if matches!(arena.expr(callee).kind, ExprKind::Super) {
+            self.check_super_call(rec, args, range, call_id, bind);
+        }
+        self.callee_position = true;
         self.check_expr(rec, callee, bind);
+        self.callee_position = false;
         self.record_extension_call(rec, callee, range, bind);
 
         let callee_ty_raw = self.infer_type(rec, callee, bind);

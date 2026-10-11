@@ -79,6 +79,7 @@ impl<'r> Checker<'r> {
                             bind,
                         ));
                     self.check_param_defaults(rec, params, bind);
+                    self.require_super_call(body, bind);
                     self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
                     self.enclosing_caps = saved_caps;
                     self.current_scope = saved_scope;

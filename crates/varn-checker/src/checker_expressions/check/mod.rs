@@ -263,8 +263,18 @@ impl<'r> Checker<'r> {
             | ExprKind::BoolLiteral { .. }
             | ExprKind::RegexLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::Super
             | ExprKind::This => {}
+            ExprKind::Super => {
+                if !self.super_reachable {
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::SuperOutsideMethod,
+                            "'super' can only be used directly in a method or constructor of a class, not inside a function or arrow nested in it",
+                        )
+                        .with_range(range),
+                    );
+                }
+            }
         }
     }
 }

@@ -47,6 +47,22 @@ function made(i: int): int {
     return new Tally(i).total + new Tally().total + new Counter(i).add(null) + new Marked(i).n
         + bare.count + bare.items.length + new Holder(i).held
 }
+class Base {
+    n: int
+    constructor(n: int = 2) { this.n = n }
+    plus(k: int = 3): int { return this.n + k }
+}
+class Mid extends Base {
+    constructor() { super() }
+    override plus(k: int = 5): int { return super.plus() + k }
+}
+class Leaf extends Mid {
+    constructor() { super() }
+}
+class Twig extends Leaf {
+    constructor() { super() }
+    override plus(k: int = 7): int { return super.plus(1) + k }
+}
 function withDefault(k: int = 2): int { return k }
 function optional(s?: str): str { return s ?? "none" }
 function forward(s?: str): str { return optional(s) }
@@ -192,6 +208,17 @@ await describe("188 call shape and optional parameters", async () => {
         expect(typeof maybe).toBe("float")
         expect(typeof filled).toBe("float")
         expect(plain + values[0]).toBe(6.0)
+    })
+
+    await it("a call to super fills the arguments it leaves out", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + new Leaf().plus() }
+        expect(new Mid().n).toBe(2)
+        expect(new Leaf().n).toBe(2)
+        expect(new Leaf().plus()).toBe(2 + 3 + 5)
+        expect(new Leaf().plus(1)).toBe(2 + 3 + 1)
+        expect(new Twig().plus()).toBe(2 + 3 + 1 + 7)
+        expect(total).toBe(3000)
     })
 
     await it("an omitted argument and a null one are the same thing", () => {

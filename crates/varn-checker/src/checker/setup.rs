@@ -30,6 +30,8 @@ impl<'r> Checker<'r> {
             active_type_params: FxHashSet::default(),
             abstract_classes: FxHashSet::default(),
             is_assignment_target: false,
+            super_reachable: false,
+            callee_position: false,
             in_pipeline_rhs: false,
             pipeline_value_type: None,
             member_exists_cache: FxHashMap::default(),

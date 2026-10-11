@@ -44,7 +44,9 @@ impl<'r> Checker<'r> {
         self.check_class_overrides(c, &superclass_members, bind);
         self.check_implements(c, bind);
         self.check_abstract_members(c, &superclass_members, bind);
+        let outer_super = std::mem::replace(&mut self.super_reachable, true);
         self.check_class_members(rec, c, bind);
+        self.super_reachable = outer_super;
 
         self.current_scope = saved_scope;
         self.current_class = saved_class;
