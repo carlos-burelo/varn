@@ -78,7 +78,8 @@ impl<'r> Checker<'r> {
 
 fn stray_breaks(stmt: StmtId, arena: &AstArena, out: &mut Vec<StmtId>) {
     match &arena.stmt(stmt).kind {
-        StmtKind::Break { .. } => out.push(stmt),
+        StmtKind::Break { label: None } => out.push(stmt),
+        StmtKind::Break { label: Some(_) } => {}
         StmtKind::Block { stmts } => {
             for s in stmts {
                 stray_breaks(*s, arena, out);

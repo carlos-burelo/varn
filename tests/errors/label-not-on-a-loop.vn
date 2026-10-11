@@ -1,0 +1,6 @@
+// VN4005
+function f(): int {
+    let n = 0
+    block: { n = 1 }
+    return n
+}

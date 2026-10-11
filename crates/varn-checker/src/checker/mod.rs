@@ -74,6 +74,7 @@ pub struct Checker<'r> {
     pub(crate) declared_yield: Option<Type>,
     pub(crate) loop_depth: u32,
     pub(crate) switch_depth: u32,
+    pub(crate) loop_labels: Vec<varn_core::Atom>,
     pub(crate) in_function: bool,
     pub(crate) in_async: bool,
     pub(crate) expected_object_members_cache: FxHashMap<Type, Vec<ObjectTypeMember>>,

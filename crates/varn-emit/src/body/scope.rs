@@ -43,6 +43,8 @@ impl<'a> FnEmitter<'a> {
             return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             yield_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             disposables: Vec::new(),
+            loops: Vec::new(),
+            pending_label: None,
         }
     }
 

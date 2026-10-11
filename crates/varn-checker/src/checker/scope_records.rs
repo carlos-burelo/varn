@@ -87,6 +87,7 @@ impl<'r> Checker<'r> {
         self.in_async = is_async;
         let saved_loop_depth = self.loop_depth;
         let saved_switch_depth = self.switch_depth;
+        let saved_labels = std::mem::take(&mut self.loop_labels);
         self.in_function = true;
         self.loop_depth = 0;
         self.switch_depth = 0;
@@ -97,6 +98,7 @@ impl<'r> Checker<'r> {
         self.in_async = saved_in_async;
         self.loop_depth = saved_loop_depth;
         self.switch_depth = saved_switch_depth;
+        self.loop_labels = saved_labels;
         result
     }
 

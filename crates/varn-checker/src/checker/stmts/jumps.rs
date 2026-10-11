@@ -63,14 +63,26 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn reject_labeled_jump(&mut self, labeled: bool, code: ErrorCode, range: SourceRange) {
-        if !labeled {
+    pub(super) fn check_jump_label(
+        &mut self,
+        label: Option<varn_core::Atom>,
+        code: ErrorCode,
+        range: SourceRange,
+        bind: &BindResult,
+    ) {
+        let Some(label) = label else {
+            return;
+        };
+        if self.loop_labels.contains(&label) {
             return;
         }
         self.emit(
             Diagnostic::error(
                 code,
-                "a jump to a label is not supported: 'break' and 'continue' act on the innermost loop",
+                format!(
+                    "no enclosing loop is labelled '{}'",
+                    bind.interner.resolve(label)
+                ),
             )
             .with_range(range),
         );

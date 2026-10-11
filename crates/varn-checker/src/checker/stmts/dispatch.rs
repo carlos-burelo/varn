@@ -35,12 +35,12 @@ impl<'r> Checker<'r> {
 
             StmtKind::Break { label } => {
                 self.check_break_stmt(range);
-                self.reject_labeled_jump(label.is_some(), varn_core::ErrorCode::InvalidBreakTarget, range);
+                self.check_jump_label(*label, varn_core::ErrorCode::InvalidBreakTarget, range, bind);
             }
 
             StmtKind::Continue { label } => {
                 self.check_continue_stmt(range);
-                self.reject_labeled_jump(label.is_some(), varn_core::ErrorCode::InvalidContinueTarget, range);
+                self.check_jump_label(*label, varn_core::ErrorCode::InvalidContinueTarget, range, bind);
             }
 
             StmtKind::If {
@@ -99,9 +99,28 @@ impl<'r> Checker<'r> {
                 self.check_throw_stmt(rec, *argument, bind);
             }
 
-            StmtKind::Labeled { body, .. } => {
-                let body = *body;
+            StmtKind::Labeled { label, body } => {
+                let (label, body) = (*label, *body);
+                let on_loop = matches!(
+                    self.ast_arena.stmt(body).kind,
+                    StmtKind::While { .. }
+                        | StmtKind::DoWhile { .. }
+                        | StmtKind::For { .. }
+                        | StmtKind::ForIn { .. }
+                        | StmtKind::ForOf { .. }
+                );
+                if !on_loop {
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::InvalidBreakTarget,
+                            "a label names a loop: put it on a 'for', 'while' or 'do'",
+                        )
+                        .with_range(range),
+                    );
+                }
+                self.loop_labels.push(label);
                 self.check_stmt(rec, body, bind);
+                self.loop_labels.pop();
             }
 
             StmtKind::Using {

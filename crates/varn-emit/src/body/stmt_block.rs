@@ -62,7 +62,7 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    pub(super) fn lower_stmt(&mut self, s: StmtId) -> Vec<TirStmt> {
+    pub(super) fn lower_plain_stmt(&mut self, s: StmtId) -> Vec<TirStmt> {
         let one = |s: TirStmt| vec![s];
         let drained = |em: &mut Self, built: Vec<TirStmt>| {
             let mut out = std::mem::take(&mut em.pending);

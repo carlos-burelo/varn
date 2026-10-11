@@ -42,6 +42,7 @@ impl<'r> Checker<'r> {
             declared_yield: None,
             loop_depth: 0,
             switch_depth: 0,
+            loop_labels: Vec::new(),
             in_function: false,
             in_async: true,
             expected_object_members_cache: FxHashMap::default(),

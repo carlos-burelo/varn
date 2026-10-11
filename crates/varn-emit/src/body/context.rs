@@ -74,4 +74,8 @@ pub(crate) struct FnEmitter<'a> {
     pub yield_ty: BackendTy,
 
     pub(super) disposables: Vec<Vec<TirExpr>>,
+
+    pub(super) loops: Vec<super::loop_labels::LoopFrame>,
+
+    pub(super) pending_label: Option<varn_core::Atom>,
 }
