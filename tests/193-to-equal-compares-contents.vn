@@ -1,0 +1,37 @@
+import { describe, it, expect } from "std:test";
+import { deepEq } from "std:test/assert";
+
+class Point {
+    x: int = 1
+}
+
+await describe("193 toEqual compares contents", async () => {
+    await it("arrays, tuples, objects, maps and sets are equal by content", () => {
+        const left = new Map<str, int[]>()
+        const right = new Map<str, int[]>()
+        left.set("a", [1, 2])
+        right.set("a", [1, 2])
+        const seen = new Set<int>()
+        const same = new Set<int>()
+        seen.add(1)
+        same.add(1)
+        expect([1, 2, 3]).toEqual([1, 2, 3])
+        expect([[1], [2, 3]]).toEqual([[1], [2, 3]])
+        expect(#[1, "a"]).toEqual(#[1, "a"])
+        expect({ a: 1, b: [1, { c: null }] } as dynamic).toEqual({ a: 1, b: [1, { c: null }] })
+        expect(left).toEqual(right)
+        expect(seen).toEqual(same)
+    })
+
+    await it("a difference in content, size or identity of instances is reported", () => {
+        const one: dynamic = { a: 1 }
+        const two: dynamic = { a: 1, b: 2 }
+        expect(deepEq([1, 2], [1, 3])).toBe(false)
+        expect(deepEq([1, 2], [1, 2, 3])).toBe(false)
+        expect(deepEq(one, two)).toBe(false)
+        expect(deepEq(two, one)).toBe(false)
+        expect(deepEq(new Point(), new Point())).toBe(false)
+        expect(deepEq([1, 2], #[1, 2])).toBe(false)
+        expect(deepEq([1, 2], [1, 2])).toBe(true)
+    })
+})

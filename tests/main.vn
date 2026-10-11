@@ -184,6 +184,7 @@ import "./189-enum-variant-slots.vn"
 import "./190-generic-instantiation-from-new.vn"
 import "./191-spread-sources.vn"
 import "./192-narrowing-follows-assignment.vn"
+import "./193-to-equal-compares-contents.vn"
 
 summary()
 
