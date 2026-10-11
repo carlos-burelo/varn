@@ -56,6 +56,7 @@ impl<'r> Checker<'r> {
     pub(super) fn check_new(
         &mut self,
         rec: &mut Recorder,
+        expr: ExprId,
         callee: ExprId,
         args: &[varn_core::ast::Arg],
         range: varn_core::SourceRange,
@@ -183,20 +184,74 @@ impl<'r> Checker<'r> {
         }
         self.check_expr(rec, callee, bind);
         let view = varn_sem::bind::BindView::new(bind, self.resolver);
-        let ctor_params = cls_name
-            .and_then(|cn| {
-                view.get_class_members(cn, None).and_then(|members| {
-                    members.iter().find_map(|m| {
-                        if m.kind == varn_sem::types::ClassMemberKind::Constructor {
-                            if let varn_core::TypeKind::Fn(fid) = self.ty_table.get(m.ty.0) {
-                                return Some(self.ty_table.get_function(fid).params.clone());
-                            }
-                        }
-                        None
-                    })
-                })
+        let declared = cls_name.and_then(|cn| {
+            view.get_class_members(cn, None).and_then(|members| {
+                members
+                    .iter()
+                    .find(|m| m.kind == varn_sem::types::ClassMemberKind::Constructor)
+                    .map(|m| m.ty)
             })
-            .unwrap_or_default();
+        });
+        let cls_name: Option<String> = cls_name.map(str::to_owned);
+        let instantiated = declared.and_then(|ctor| self.instantiated_constructor(rec, expr, ctor, cls_name.as_deref()?, bind));
+        let context_ty = instantiated.or(declared);
+        let ctor_params = match context_ty.map(|ty| self.ty_table.get(ty.0)) {
+            Some(varn_core::TypeKind::Fn(fid)) => self.ty_table.get_function(fid).params.clone(),
+            Some(_) | None => Vec::new(),
+        };
         self.check_call_args_with_context(rec, args, &ctor_params, bind);
+        if instantiated.is_some() {
+            self.validate_call_arguments(rec, args, &ctor_params, &range, expr.index(), bind);
+        }
+    }
+
+    fn instantiated_constructor(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        ctor: varn_sem::types::Type,
+        class: &str,
+        bind: &BindResult,
+    ) -> Option<varn_sem::types::Type> {
+        use crate::checker_expressions::members::member_util::{class_type_params, generic_mapping};
+        let instance = self.infer_type(rec, expr, bind);
+        match self.ty_table.get(instance.0) {
+            varn_core::TypeKind::Generic(_, args, origin) => {
+                let origin = origin.map(|o| self.resolve_bind_atom(bind, o));
+                let args: Vec<varn_sem::types::Type> = self
+                    .ty_table
+                    .get_list(args)
+                    .iter()
+                    .map(|id| varn_sem::types::Type::resolved(*id))
+                    .collect();
+                let mapping = generic_mapping(self.resolver, class, &args, origin.as_ref(), bind);
+                Some(ctor.map_generics(&mapping, &mut *std::sync::Arc::make_mut(&mut self.ty_table)))
+            }
+            varn_core::TypeKind::Named(_, origin) => {
+                let origin = origin.map(|o| self.resolve_bind_atom(bind, o));
+                class_type_params(self.resolver, class, origin.as_ref(), bind)
+                    .is_empty()
+                    .then_some(ctor)
+            }
+            varn_core::TypeKind::Primitive(_)
+            | varn_core::TypeKind::Builtin(_)
+            | varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::This
+            | varn_core::TypeKind::Array(_)
+            | varn_core::TypeKind::Union(_)
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::Tuple(_)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Fn(_)
+            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::EnumVariant { .. }
+            | varn_core::TypeKind::TypePredicate { .. } => None,
+        }
     }
 }

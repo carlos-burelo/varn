@@ -1,0 +1,6 @@
+// expect: error[VN3001]
+class K {
+    n: int
+    constructor(n: int) { this.n = n }
+}
+const k = new K("x")

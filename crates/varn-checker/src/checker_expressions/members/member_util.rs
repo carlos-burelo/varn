@@ -4,7 +4,7 @@ use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
 use varn_sem::types::{CheckerTyTable, Type};
 
-pub(super) fn class_type_params(
+pub(crate) fn class_type_params(
     resolver: &dyn varn_sem::resolver::ImportResolver,
     name: &str,
     origin: Option<&Arc<str>>,

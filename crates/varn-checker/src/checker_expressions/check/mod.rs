@@ -138,7 +138,7 @@ impl<'r> Checker<'r> {
                 self.check_call_expr(rec, callee, &args, &type_args, &range, expr.index(), bind)
             }
             ExprKind::New { callee, args, .. } => {
-                self.check_new(rec, *callee, args, range, arena, bind)
+                self.check_new(rec, expr, *callee, args, range, arena, bind)
             }
 
             ExprKind::Conditional {
