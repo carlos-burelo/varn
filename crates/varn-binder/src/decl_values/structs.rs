@@ -7,7 +7,7 @@ use varn_sem::types::{ClassMemberInfo, ClassMemberKind};
 
 impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_struct(&mut self, s: &StructDecl) {
-        let id_rc: Arc<str> = Arc::from(self.interner.resolve(s.id));
+        let id_rc: Arc<str> = self.declared_type_name(s.id, s.ast_id);
         let struct_ty = Type::named_with_origin(
             id_rc.clone(),
             Some(Arc::from(self.source_file.as_ref())),

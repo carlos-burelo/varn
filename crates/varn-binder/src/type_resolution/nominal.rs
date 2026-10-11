@@ -23,6 +23,13 @@ pub(super) fn resolve_generic_type(
         .map(|m| resolve_type_node(m, ctx, table))
         .collect();
 
+    if let Some(member) = super::qualified::qualified_type(&name_str, ctx, table) {
+        if let TypeKind::Named(declared, origin) = table.get(member.0) {
+            return Type::generic_atom(declared, resolved_args, origin, table);
+        }
+        return member;
+    }
+
     if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(&name_str)) {
         if !params.is_empty() && params.len() == resolved_args.len() {
             let alias_ctx = AliasSubstitutionContext {
@@ -84,6 +91,9 @@ pub(super) fn resolve_named_type(
 ) -> Type {
     use super::aliases::resolve_primitive;
     let name_str = resolve_atom_name(name, ctx, interner);
+    if let Some(member) = super::qualified::qualified_type(&name_str, ctx, table) {
+        return member;
+    }
     let prim = resolve_primitive(&name_str, ctx, table);
     if !matches!(table.get(prim.0), TypeKind::Named(_, _)) {
         return prim;

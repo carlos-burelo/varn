@@ -1,7 +1,6 @@
 use super::context::FnEmitter;
 use super::finally_splice;
 use super::small_utils::bool_lit;
-use crate::ty::NameResolver;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::{Pattern, StmtId};
@@ -39,7 +38,7 @@ impl<'a> FnEmitter<'a> {
 
     pub(super) fn instance_of_name(&mut self, value: TirExpr, name: &str) -> TirExpr {
         let span = value.span;
-        if let Some(class) = self.m.names.class_id(name) {
+        if let Some(class) = self.class_named(name) {
             return TirExpr {
                 kind: TirExprKind::TypeTest {
                     value: Box::new(value),

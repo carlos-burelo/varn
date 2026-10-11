@@ -13,9 +13,8 @@ impl<'r> Checker<'r> {
         e: &varn_core::ast::EnumDecl,
         bind: &BindResult,
     ) {
-        let saved_class = self
-            .current_class
-            .replace(Arc::from(bind.interner.resolve(e.id)));
+        let declared = self.declared_type_name(bind, e.id, e.ast_id);
+        let saved_class = self.current_class.replace(declared);
         let saved_scope = self.current_scope;
         if let Some(enum_scope) = self.next_child_scope(bind) {
             self.current_scope = enum_scope;

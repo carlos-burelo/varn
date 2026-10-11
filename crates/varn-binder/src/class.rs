@@ -9,7 +9,7 @@ use varn_sem::types::{ClassMemberInfo, ClassMemberKind};
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_class(&mut self, c: &ClassDecl) {
         let name_atom: Atom = c.id.unwrap_or_else(|| self.intern_local("<anon>"));
-        let name: Arc<str> = Arc::from(self.interner.resolve(name_atom));
+        let name: Arc<str> = self.declared_type_name(name_atom, c.ast_id);
         let line = c.range.start.line;
         let cls_type = Type::named_with_origin(
             name.clone(),

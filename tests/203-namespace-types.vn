@@ -1,0 +1,71 @@
+import { describe, it, expect } from "std:test";
+import { Geo } from "./helpers/namespace-lib.vn"
+import { Shapes } from "./helpers/namespace-mid.vn"
+
+namespace Metric {
+    const base = 10
+    function helper(): int { return 100 }
+    export class Item { v: int = 1; total(): int { return this.v + base + helper() } }
+    export class Big extends Item { w: int = 2 }
+    export enum Unit { Meter, Mile }
+    export interface Shape { w: int }
+    export type Id = int
+    export function make(): Item { return new Item() }
+    export function shape(): Shape { return { w: 7 } }
+    export function isItem(x: dynamic): bool { return x instanceof Item }
+    export namespace Fine { export function grain(): int { return 1 } }
+}
+namespace Imperial {
+    export class Item { v: str = "inch" }
+    export enum Unit { Foot, Yard }
+    export interface Shape { h: str }
+    export type Id = str
+    export function make(): Item { return new Item() }
+    export function shape(): Shape { return { h: "tall" } }
+    export namespace Fine { export function grain(): str { return "fine" } }
+}
+
+class Crate extends Geo.Box { h: int = 9 }
+function width(box: Shapes.Box): int { return box.w }
+
+await describe("203 namespace types", async () => {
+    await it("two namespaces can declare a type with the same name", () => {
+        expect(Metric.make().v).toBe(1)
+        expect(Imperial.make().v).toBe("inch")
+        expect(Metric.shape().w).toBe(7)
+        expect(Imperial.shape().h).toBe("tall")
+        expect(Metric.Fine.grain()).toBe(1)
+        expect(Imperial.Fine.grain()).toBe("fine")
+        expect(Metric.Unit.Mile == Metric.Unit.Mile).toBe(true)
+    })
+
+    await it("a type is named through its namespace", () => {
+        const item: Metric.Item = new Metric.Item()
+        const other: Imperial.Item = new Imperial.Item()
+        const id: Metric.Id = 4
+        const label: Imperial.Id = "k"
+        const unit: Imperial.Unit = Imperial.Unit.Yard
+        expect(item.total()).toBe(111)
+        expect(other.v).toBe("inch")
+        expect(id + 1).toBe(5)
+        expect(label).toBe("k")
+        expect(unit == Imperial.Unit.Foot).toBe(false)
+    })
+
+    await it("a class in a namespace sees its neighbours and its parent", () => {
+        const big: Metric.Item = new Metric.Big()
+        expect(big.total()).toBe(111)
+        expect(Metric.isItem(big)).toBe(true)
+        expect(Metric.isItem(Imperial.make())).toBe(false)
+    })
+
+    await it("the types of an imported namespace work the same", () => {
+        const box: Geo.Box = new Geo.Box(4)
+        const kind: Geo.Kind = Geo.Kind.Deep
+        const crate = new Crate(2)
+        expect(width(box)).toBe(4)
+        expect(kind == Geo.Kind.Deep).toBe(true)
+        expect(crate.w + crate.h).toBe(11)
+        expect(crate instanceof Geo.Box).toBe(true)
+    })
+})

@@ -101,8 +101,12 @@ impl<'r> Checker<'r> {
         if scope.resolve(name, &bind.scopes).is_some() {
             return true;
         }
-        let view = BindView::new(bind, self.resolver);
+        let view = BindView::new(bind, self.resolver).at(self.current_scope);
         if view.resolve_symbol(&text).is_some() || view.get_alias_node(&text).is_some() {
+            return true;
+        }
+        let table = std::sync::Arc::make_mut(&mut self.ty_table);
+        if varn_binder::qualified_type(&text, Some(&view), table).is_some() {
             return true;
         }
         self.emit(

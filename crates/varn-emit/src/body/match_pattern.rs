@@ -56,7 +56,7 @@ impl<'a> FnEmitter<'a> {
                 (cond, vec![])
             }
             MatchPattern::Type { type_name, binding } => {
-                let Some(cid) = self.m.names.class_id(self.m.interner.resolve(*type_name)) else {
+                let Some(cid) = self.class_named(self.m.interner.resolve(*type_name)) else {
                     return (bool_lit(false), vec![]);
                 };
                 let cond = TirExpr {

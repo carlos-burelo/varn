@@ -171,7 +171,7 @@ impl<'r> super::super::Binder<'r> {
     }
 
     pub(crate) fn bind_sum_type(&mut self, t: &SumTypeDecl) {
-        let id_rc: Arc<str> = Arc::from(self.interner.resolve(t.id));
+        let id_rc: Arc<str> = self.declared_type_name(t.id, t.ast_id);
         let alias_ty = Type::named_with_origin(
             id_rc.clone(),
             Some(Arc::from(self.source_file.as_ref())),

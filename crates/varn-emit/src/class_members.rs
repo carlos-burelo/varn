@@ -270,6 +270,7 @@ pub(super) fn emit_class_members(
                             out,
                             out.len() as u32,
                             class_id,
+                            None,
                         );
                         def.prelude.extend(pre);
                         x

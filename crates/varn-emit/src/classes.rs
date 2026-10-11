@@ -99,7 +99,13 @@ pub(super) fn emit_class(
 ) -> varn_tir::TirClassDef {
     let class_name: Arc<str> = class
         .id
-        .map(|a| Arc::from(ctx.interner.resolve(a)))
+        .map(|a| {
+            crate::namespace_scope::declared_name(
+                ctx.type_names,
+                class.ast_id,
+                ctx.interner.resolve(a),
+            )
+        })
         .unwrap_or_else(|| Arc::from("<anon>"));
     let class_id = ctx.names.class_id(&class_name);
 
@@ -111,7 +117,11 @@ pub(super) fn emit_class(
 
     if let Some(sup) = class.super_class {
         if let varn_core::ast::ExprKind::Identifier { name } = &ast_arena.expr(sup).kind {
-            def.parent = ctx.names.class_id(ctx.interner.resolve(*name));
+            def.parent = crate::namespace_scope::scoped_lookup(
+                class_name.rsplit_once("::").map(|(outer, _)| outer),
+                ctx.interner.resolve(*name),
+                |key| ctx.names.class_id(key),
+            );
         }
         let (pre, x) = lower_outer(
             sup,
@@ -123,6 +133,7 @@ pub(super) fn emit_class(
             out,
             out.len() as u32,
             None,
+            class_name.rsplit_once("::").map(|(outer, _)| outer),
         );
         def.prelude.extend(pre);
         def.super_class = Some(x);
@@ -146,6 +157,7 @@ pub(super) fn emit_class(
             out,
             out.len() as u32,
             class_id,
+            None,
         );
         def.prelude.extend(pre);
         def.decorators.push(x);

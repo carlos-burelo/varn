@@ -6,6 +6,28 @@ use varn_sem::scope::{ScopeId, ScopeKind};
 use varn_sem::symbol::SymbolKind;
 
 impl super::Binder<'_> {
+    pub(crate) fn declared_type_name(
+        &mut self,
+        id: Atom,
+        ast_id: varn_core::ast::AstId,
+    ) -> Arc<str> {
+        let bare = self.interner.resolve(id);
+        let name: Arc<str> = match self.namespace_path.last() {
+            Some(outer) => Arc::from(format!("{outer}::{bare}")),
+            None => Arc::from(bare),
+        };
+        self.intern_local(&name);
+        self.declared_type_names.insert(ast_id, name.clone());
+        name
+    }
+
+    pub(crate) fn type_name_of(&self, id: Atom, ast_id: varn_core::ast::AstId) -> Arc<str> {
+        self.declared_type_names
+            .get(&ast_id)
+            .cloned()
+            .unwrap_or_else(|| Arc::from(self.interner.resolve(id)))
+    }
+
     pub(crate) fn note_type_decl(&mut self, name: &Arc<str>, scope: ScopeId, range: SourceRange) {
         let Some(&(first_scope, first)) = self.type_decls.get(name) else {
             self.type_decls.insert(name.clone(), (scope, range));

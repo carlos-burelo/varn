@@ -1,6 +1,5 @@
 use super::context::FnEmitter;
 use super::small_utils::{bin_op, bool_lit};
-use crate::ty::NameResolver;
 use varn_core::ast::operators::{BinaryOp, LogicalOp};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_tir::{BackendTy, DynReason, Resolution, Span, TirBinOp, TirExpr, TirExprKind, TirUnOp};
@@ -62,7 +61,7 @@ impl<'a> FnEmitter<'a> {
         let Some(top) = bin_op(op) else {
             if op == BinaryOp::Instanceof {
                 if let ExprKind::Identifier { name } = &self.ast_arena.expr(right).kind {
-                    if let Some(class) = self.m.names.class_id(self.m.interner.resolve(*name)) {
+                    if let Some(class) = self.class_named(self.m.interner.resolve(*name)) {
                         return TirExpr {
                             kind: TirExprKind::TypeTest {
                                 value: Box::new(lhs),

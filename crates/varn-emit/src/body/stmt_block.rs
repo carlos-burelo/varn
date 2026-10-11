@@ -84,11 +84,17 @@ impl<'a> FnEmitter<'a> {
 
             StmtKind::Decl(decl) => {
                 let nested = super::super::decl_classify::class_decl(decl)
-                    .and_then(|c| c.id)
-                    .or_else(|| super::super::decl_classify::enum_decl(decl).map(|e| e.id))
-                    .and_then(|id| {
-                        let name = self.m.interner.resolve(id);
-                        self.m.nested_types.declare(name, s)
+                    .and_then(|c| Some((c.id?, c.ast_id)))
+                    .or_else(|| {
+                        super::super::decl_classify::enum_decl(decl).map(|e| (e.id, e.ast_id))
+                    })
+                    .and_then(|(id, ast_id)| {
+                        let name = crate::namespace_scope::declared_name(
+                            self.m.type_names,
+                            ast_id,
+                            self.m.interner.resolve(id),
+                        );
+                        self.m.nested_types.declare(&name, s)
                     });
                 let built = match nested {
                     Some(stmt) => vec![stmt],

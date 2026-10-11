@@ -22,6 +22,7 @@ pub(super) struct MCtx<'a> {
     pub(super) interner: &'a AtomInterner,
     pub(super) checker_table: &'a varn_sem::types::CheckerTyTable,
     pub(super) annotation_types: &'a FxHashMap<AstId, varn_sem::types::Type>,
+    pub(super) type_names: &'a FxHashMap<AstId, Arc<str>>,
     pub(super) nested_types: &'a NestedTypes,
     pub(super) shadowed: &'a rustc_hash::FxHashSet<u32>,
 }
@@ -44,6 +45,7 @@ impl<'a> MCtx<'a> {
             interner: self.interner,
             checker_table: self.checker_table,
             annotation_types: self.annotation_types,
+            type_names: self.type_names,
             nested_types: self.nested_types,
             shadowed: self.shadowed,
         }

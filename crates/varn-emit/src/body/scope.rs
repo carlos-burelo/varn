@@ -230,11 +230,23 @@ impl<'a> FnEmitter<'a> {
     pub fn with_this(mut self, class: ClassId) -> Self {
         self.this_class = Some(class);
         self.home_class = Some(class);
+        self.namespace = self
+            .m
+            .classes
+            .get(class.0 as usize)
+            .and_then(|info| info.name.rsplit_once("::"))
+            .map(|(outer, _)| Arc::from(outer));
         self
     }
 
     pub fn with_this_enum(mut self, enum_id: EnumId) -> Self {
         self.this_enum = Some(enum_id);
+        self.namespace = self
+            .m
+            .enums
+            .get(enum_id.0 as usize)
+            .and_then(|info| info.name.rsplit_once("::"))
+            .map(|(outer, _)| Arc::from(outer));
         self
     }
 

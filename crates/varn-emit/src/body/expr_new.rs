@@ -14,7 +14,7 @@ impl<'a> FnEmitter<'a> {
         span: Span,
     ) -> TirExpr {
         let class = match &self.ast_arena.expr(callee).kind {
-            ExprKind::Identifier { name } => self.m.names.class_id(self.m.interner.resolve(*name)),
+            ExprKind::Identifier { name } => self.class_named(self.m.interner.resolve(*name)),
 
             ExprKind::Member {
                 property,

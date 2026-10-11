@@ -156,7 +156,7 @@ impl<'r> Checker<'r> {
         let class = bind.interner.resolve(id);
         let Some(instance) = bind
             .scopes
-            .get(bind.global_scope)
+            .get(self.current_scope)
             .resolve(id, &bind.scopes)
             .and_then(|sid| bind.arena.get(sid).ty)
         else {

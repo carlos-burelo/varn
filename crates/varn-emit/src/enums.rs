@@ -16,7 +16,11 @@ pub(super) fn emit_enum(
     out: &mut Vec<TirFunction>,
 ) -> varn_tir::TirClassDef {
     use varn_core::ast::ClassMember;
-    let name: Arc<str> = Arc::from(ctx.interner.resolve(en.id));
+    let name: Arc<str> = crate::namespace_scope::declared_name(
+        ctx.type_names,
+        en.ast_id,
+        ctx.interner.resolve(en.id),
+    );
     let enum_id = ctx.names.enum_id(&name);
     let mut def = varn_tir::TirClassDef {
         name: name.clone(),
@@ -56,6 +60,7 @@ pub(super) fn emit_enum(
                     out,
                     out.len() as u32,
                     None,
+                    name.rsplit_once("::").map(|(outer, _)| outer),
                 );
                 def.prelude.extend(pre);
                 const_args.push(x);
@@ -285,6 +290,7 @@ pub(super) fn emit_enum(
                             out,
                             out.len() as u32,
                             None,
+                            name.rsplit_once("::").map(|(outer, _)| outer),
                         );
                         def.prelude.extend(pre);
                         x

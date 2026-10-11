@@ -124,6 +124,7 @@ pub(super) fn lower_decorator_exprs(
                 out,
                 out.len() as u32,
                 class_id,
+                None,
             );
             prelude.extend(pre);
             x

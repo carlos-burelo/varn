@@ -8,7 +8,30 @@ use varn_tir::{TirImport, TirImportKind, TirImportSpec};
 
 pub(super) struct NamespaceScope {
     pub(super) paths: FxHashSet<Arc<str>>,
-    pub(super) types: FxHashMap<Arc<str>, Arc<str>>,
+}
+
+pub(super) fn declared_name(
+    names: &FxHashMap<varn_core::ast::AstId, Arc<str>>,
+    ast_id: varn_core::ast::AstId,
+    bare: &str,
+) -> Arc<str> {
+    names.get(&ast_id).cloned().unwrap_or_else(|| Arc::from(bare))
+}
+
+pub(super) fn scoped_lookup<T>(
+    scope: Option<&str>,
+    written: &str,
+    find: impl Fn(&str) -> Option<T>,
+) -> Option<T> {
+    let written = written.replace('.', "::");
+    let mut rest = scope;
+    while let Some(outer) = rest {
+        if let Some(found) = find(&format!("{outer}::{written}")) {
+            return Some(found);
+        }
+        rest = outer.rsplit_once("::").map(|(up, _)| up);
+    }
+    find(&written)
 }
 
 pub(super) struct Member {
@@ -46,38 +69,33 @@ fn walk(
     for m in &ns.body {
         let (inner, is_exported) = unwrapped(m);
         let visible = visible && is_exported;
-        let mut value = |bare: &str, qualified_global: bool| {
-            let qualified = scoped_name(Some(&path), bare);
-            let global = if qualified_global {
-                qualified.clone()
-            } else {
-                Arc::from(bare)
-            };
-            if !qualified_global {
-                scope.types.insert(qualified.clone(), global.clone());
-            }
+        let mut value = |bare: &str| {
             if visible {
-                exported.push(Member { qualified, global });
+                let qualified = scoped_name(Some(&path), bare);
+                exported.push(Member {
+                    global: qualified.clone(),
+                    qualified,
+                });
             }
         };
         match inner {
             Decl::Namespace(inner_ns) => {
                 walk(inner_ns, Some(&path), visible, interner, scope, exported)
             }
-            Decl::Function(f) => value(interner.resolve(f.id), true),
+            Decl::Function(f) => value(interner.resolve(f.id)),
             Decl::Variable(v) => {
                 for d in &v.declarators {
                     if let Pattern::Identifier { name, .. } = &d.id {
-                        value(interner.resolve(*name), true);
+                        value(interner.resolve(*name));
                     }
                 }
             }
             Decl::Class(c) => {
                 if let Some(id) = c.id {
-                    value(interner.resolve(id), false);
+                    value(interner.resolve(id));
                 }
             }
-            Decl::Enum(e) => value(interner.resolve(e.id), false),
+            Decl::Enum(e) => value(interner.resolve(e.id)),
             Decl::Interface(_)
             | Decl::TypeAlias(_)
             | Decl::Import(_)
@@ -97,7 +115,6 @@ pub(super) fn declared_scope(
 ) -> (NamespaceScope, FxHashMap<Arc<str>, Vec<Member>>) {
     let mut scope = NamespaceScope {
         paths: FxHashSet::default(),
-        types: FxHashMap::default(),
     };
     let mut exported = FxHashMap::default();
     for &stmt in &program.body {

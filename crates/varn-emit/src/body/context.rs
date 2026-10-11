@@ -37,6 +37,7 @@ pub(crate) struct ModuleCtx<'a> {
     pub checker_table: &'a varn_sem::types::CheckerTyTable,
 
     pub annotation_types: &'a FxHashMap<AstId, varn_sem::types::Type>,
+    pub type_names: &'a FxHashMap<AstId, Arc<str>>,
 
     pub nested_types: &'a NestedTypes,
 

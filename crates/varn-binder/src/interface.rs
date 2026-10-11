@@ -7,7 +7,7 @@ use varn_sem::types::{FunctionParam, FunctionType, Type};
 
 impl<'r> super::Binder<'r> {
     pub(super) fn bind_interface(&mut self, i: &InterfaceDecl) {
-        let id_rc: Arc<str> = Arc::from(self.interner.resolve(i.id));
+        let id_rc: Arc<str> = self.declared_type_name(i.id, i.ast_id);
         let origin_rc: Option<Arc<str>> = if self.source_file.is_empty() {
             None
         } else {

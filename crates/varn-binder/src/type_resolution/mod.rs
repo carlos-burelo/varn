@@ -8,6 +8,7 @@ mod keyed_access;
 mod mapped;
 mod names;
 mod nominal;
+mod qualified;
 mod objects;
 mod scalar;
 mod template;
@@ -22,6 +23,8 @@ use mapped::resolve_mapped_type;
 use template::resolve_template_literal_type;
 
 pub use aliases::resolve_primitive;
+
+pub use qualified::qualified_type;
 
 pub fn resolve_type_node(
     node: &TypeNode,

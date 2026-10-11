@@ -1,5 +1,4 @@
 use super::context::FnEmitter;
-use crate::ty::NameResolver;
 use std::sync::Arc;
 use varn_core::ast::ExprId;
 use varn_tir::{BackendTy, Resolution, Span, TirBinOp, TirExpr, TirExprKind, TirUnOp};
@@ -48,7 +47,7 @@ impl<'a> FnEmitter<'a> {
         let bool_ty = BackendTy::Bool;
 
         if let varn_core::TypeKind::Named(n, _) = &type_ann.kind {
-            if let Some(class) = self.m.names.class_id(self.m.interner.resolve(*n)) {
+            if let Some(class) = self.class_named(self.m.interner.resolve(*n)) {
                 return TirExpr {
                     kind: TirExprKind::TypeTest {
                         value: Box::new(v),

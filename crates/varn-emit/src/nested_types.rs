@@ -130,12 +130,15 @@ pub(super) fn top_level_types(
     program: &Program,
     arena: &AstArena,
     interner: &varn_core::AtomInterner,
+    type_names: &FxHashMap<varn_core::ast::AstId, Arc<str>>,
 ) -> FxHashSet<Arc<str>> {
     let type_name = |d: &Decl| {
         super::decl_classify::class_decl(d)
-            .and_then(|c| c.id)
-            .or_else(|| super::decl_classify::enum_decl(d).map(|e| e.id))
-            .or_else(|| super::decl_classify::anon_class_of(d, arena).and_then(|c| c.id))
+            .and_then(|c| Some((c.id?, c.ast_id)))
+            .or_else(|| super::decl_classify::enum_decl(d).map(|e| (e.id, e.ast_id)))
+            .or_else(|| {
+                super::decl_classify::anon_class_of(d, arena).and_then(|c| Some((c.id?, c.ast_id)))
+            })
     };
     let mut out = FxHashSet::default();
     for &stmt in &program.body {
@@ -146,8 +149,12 @@ pub(super) fn top_level_types(
         if let Some(ns) = super::decl_classify::namespace_decl(d) {
             decls.extend(super::namespaces::ns_nested_types(ns));
         }
-        for id in decls.into_iter().filter_map(type_name) {
-            out.insert(Arc::from(interner.resolve(id)));
+        for (id, ast_id) in decls.into_iter().filter_map(type_name) {
+            out.insert(super::namespace_scope::declared_name(
+                type_names,
+                ast_id,
+                interner.resolve(id),
+            ));
         }
     }
     out

@@ -159,6 +159,18 @@ impl<'r> Checker<'r> {
         )
     }
 
+    pub(crate) fn declared_type_name(
+        &self,
+        bind: &BindResult,
+        id: varn_core::Atom,
+        ast_id: varn_core::ast::AstId,
+    ) -> Arc<str> {
+        bind.declared_type_names
+            .get(&ast_id)
+            .cloned()
+            .unwrap_or_else(|| Arc::from(bind.interner.resolve(id)))
+    }
+
     pub(crate) fn resolve_bind_atom(&self, bind: &BindResult, atom: varn_core::Atom) -> Arc<str> {
         if let Some(s) = bind.interner.try_resolve(atom) {
             return Arc::from(s);
@@ -195,7 +207,7 @@ impl<'r> Checker<'r> {
         if let Some(cached) = self.type_node_cache.get(&key) {
             return *cached;
         }
-        let view = varn_sem::bind::BindView::new(bind, self.resolver);
+        let view = varn_sem::bind::BindView::new(bind, self.resolver).at(self.current_scope);
         let resolved = varn_binder::resolve_type_node(
             node,
             Some(&view),

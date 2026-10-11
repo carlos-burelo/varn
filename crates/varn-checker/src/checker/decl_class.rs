@@ -15,12 +15,12 @@ impl<'r> Checker<'r> {
     ) {
         if c.modifiers.is_abstract {
             if let Some(id) = &c.id {
-                self.abstract_classes
-                    .insert(Arc::from(bind.interner.resolve(*id)));
+                let declared = self.declared_type_name(bind, *id, c.ast_id);
+                self.abstract_classes.insert(declared);
             }
         }
         let name =
-            c.id.map(|id| Arc::from(bind.interner.resolve(id)))
+            c.id.map(|id| self.declared_type_name(bind, id, c.ast_id))
                 .unwrap_or_else(|| Arc::from("<anon>"));
         let saved_class = self.current_class.replace(name);
         let saved_scope = self.current_scope;

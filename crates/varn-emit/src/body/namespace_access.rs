@@ -1,5 +1,6 @@
 use super::call_contract::Callee;
 use super::context::FnEmitter;
+use crate::NameResolver;
 use std::sync::Arc;
 use varn_core::ast::{Arg, AstId, ExprId, ExprKind};
 use varn_tir::{BackendTy, DynReason, Resolution, Span, TirArg, TirExpr, TirExprKind};
@@ -40,8 +41,13 @@ impl FnEmitter<'_> {
         let path = self.namespace_path(object)?;
         let name = Self::member_name(self.ast_arena, property, self.m.interner)?;
         let key = crate::namespaces::scoped_name(Some(&path), &name);
-        let key = self.m.namespaces.types.get(&key).cloned().unwrap_or(key);
         self.m.globals.contains_key(&key).then_some(key)
+    }
+
+    pub(super) fn class_named(&self, written: &str) -> Option<varn_tir::ClassId> {
+        crate::namespace_scope::scoped_lookup(self.namespace.as_deref(), written, |key| {
+            self.m.names.class_id(key)
+        })
     }
 
     pub(super) fn lower_namespace_call(

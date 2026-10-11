@@ -261,11 +261,11 @@ fn collect_scoped_names(
         }
         Decl::Class(c) => {
             if let Some(id) = &c.id {
-                out.insert(Arc::from(interner.resolve(*id)));
+                out.insert(scoped_name(scope, interner.resolve(*id)));
             }
         }
         Decl::Enum(e) => {
-            out.insert(Arc::from(interner.resolve(e.id)));
+            out.insert(scoped_name(scope, interner.resolve(e.id)));
         }
         Decl::Variable(v) => {
             for d in &v.declarators {

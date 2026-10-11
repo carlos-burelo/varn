@@ -99,6 +99,8 @@ pub struct BindResult {
     pub user_decorators: FxHashSet<u32>,
     #[serde(skip, default)]
     pub namespace_imports: Vec<NamespaceImport>,
+    #[serde(skip, default)]
+    pub declared_type_names: FxHashMap<varn_core::ast::AstId, Arc<str>>,
 }
 
 #[derive(Clone, Debug)]
@@ -297,11 +299,21 @@ impl BindResult {
 pub struct BindView<'r> {
     pub bind: &'r BindResult,
     pub resolver: &'r dyn crate::resolver::ImportResolver,
+    pub scope: ScopeId,
 }
 
 impl<'r> BindView<'r> {
     pub fn new(bind: &'r BindResult, resolver: &'r dyn crate::resolver::ImportResolver) -> Self {
-        Self { bind, resolver }
+        Self {
+            bind,
+            resolver,
+            scope: bind.global_scope,
+        }
+    }
+
+    pub fn at(mut self, scope: ScopeId) -> Self {
+        self.scope = scope;
+        self
     }
 
     fn foreign(&self, origin: Option<&str>) -> Option<Arc<BindResult>> {
@@ -361,14 +373,14 @@ impl TypeContext for BindView<'_> {
     }
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
-        let scope = self.bind.scopes.get(self.bind.global_scope);
+        let scope = self.bind.scopes.get(self.scope);
         let atom = self.bind.interner.get(name)?;
         let id = scope.resolve(atom, &self.bind.scopes)?;
         self.bind.arena.get(id).ty
     }
 
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
-        let scope = self.bind.scopes.get(self.bind.global_scope);
+        let scope = self.bind.scopes.get(self.scope);
         let atom = self.bind.interner.get(name)?;
         let id = scope.resolve(atom, &self.bind.scopes)?;
         self.bind.arena.get(id).origin_module
@@ -379,7 +391,7 @@ impl TypeContext for BindView<'_> {
     }
 
     fn get_alias_node(&self, name: &str) -> Option<(Vec<String>, TypeNode)> {
-        let scope = self.bind.scopes.get(self.bind.global_scope);
+        let scope = self.bind.scopes.get(self.scope);
         let atom = self.bind.interner.get(name)?;
         let id = scope.resolve(atom, &self.bind.scopes)?;
         let sym = self.bind.arena.get(id);

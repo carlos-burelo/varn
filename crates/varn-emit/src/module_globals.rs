@@ -105,7 +105,12 @@ pub(super) fn assign_global_slots(
             global_slots.insert(name, slot);
         }
     }
-    let top_types = super::nested_types::top_level_types(program, ast_arena, interner);
+    let top_types = super::nested_types::top_level_types(
+        program,
+        ast_arena,
+        interner,
+        &bind.declared_type_names,
+    );
     let first_nested_ordinal = top_level_type_builds(program, ast_arena);
     let nested = NestedTypes::collect(
         bind,

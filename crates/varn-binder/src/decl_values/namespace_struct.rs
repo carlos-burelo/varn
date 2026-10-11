@@ -9,7 +9,7 @@ use varn_sem::types::{ClassMemberInfo, ClassMemberKind};
 
 impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_namespace(&mut self, n: &NamespaceDecl) {
-        let id_rc: Arc<str> = Arc::from(self.interner.resolve(n.id));
+        let id_rc: Arc<str> = self.declared_type_name(n.id, n.ast_id);
         let namespace_ty = Type::named_with_origin(
             id_rc.clone(),
             Some(Arc::from(self.source_file.as_ref())),
@@ -24,9 +24,11 @@ impl<'r> super::super::Binder<'r> {
         let saved = self.current;
         self.current = child;
 
+        self.namespace_path.push(id_rc.clone());
         for d in &n.body {
             self.bind_decl(d);
         }
+        self.namespace_path.pop();
 
         let members = self.collect_namespace_members(&exported_decls(&n.body));
         if !members.is_empty() {
@@ -96,16 +98,17 @@ impl<'r> super::super::Binder<'r> {
                     let name: Arc<str> =
                         c.id.map(|a| Arc::from(self.interner.resolve(a)))
                             .unwrap_or_else(|| Arc::from(""));
+                    let declared = c.id.map(|a| self.type_name_of(a, c.ast_id)).unwrap_or_default();
                     let class_members = self
                         .type_members
                         .classes
-                        .get(&name)
+                        .get(&declared)
                         .map(|e| e.members.clone())
                         .unwrap_or_default();
                     let scope = self.scopes.get(self.current);
                     let symbol_id = c.id.and_then(|a| scope.resolve(a, &self.scopes));
                     let class_ty = Type::named_with_origin(
-                        name.clone(),
+                        declared,
                         Some(Arc::from(self.source_file.as_ref())),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
@@ -175,7 +178,7 @@ impl<'r> super::super::Binder<'r> {
                     let symbol_id = scope.resolve(n.id, &self.scopes);
                     let n_id_rc: Arc<str> = Arc::from(self.interner.resolve(n.id));
                     let ns_ty = Type::named_with_origin(
-                        n_id_rc.clone(),
+                        self.type_name_of(n.id, n.ast_id),
                         Some(Arc::from(self.source_file.as_ref())),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
@@ -203,11 +206,15 @@ impl<'r> super::super::Binder<'r> {
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(t.id, &self.scopes);
                     let t_id_rc: Arc<str> = Arc::from(self.interner.resolve(t.id));
-                    let alias_ty = Type::named_with_origin(
-                        t_id_rc.clone(),
-                        Some(Arc::from(self.source_file.as_ref())),
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    );
+                    let alias_ty = if t.type_params.is_empty() {
+                        self.resolve_type(&t.alias)
+                    } else {
+                        Type::named_with_origin(
+                            t_id_rc.clone(),
+                            Some(Arc::from(self.source_file.as_ref())),
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        )
+                    };
                     members.push(ClassMemberInfo {
                         name: t_id_rc,
                         kind: ClassMemberKind::Property,
@@ -230,16 +237,17 @@ impl<'r> super::super::Binder<'r> {
                 }
                 Decl::Enum(e) => {
                     let e_id_rc: Arc<str> = Arc::from(self.interner.resolve(e.id));
+                    let declared = self.type_name_of(e.id, e.ast_id);
                     let variants = self
                         .type_members
                         .enums
-                        .get(&e_id_rc)
+                        .get(&declared)
                         .cloned()
                         .unwrap_or_default();
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(e.id, &self.scopes);
                     let enum_ty = Type::named_with_origin(
-                        e_id_rc.clone(),
+                        declared,
                         Some(Arc::from(self.source_file.as_ref())),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
@@ -273,8 +281,9 @@ impl<'r> super::super::Binder<'r> {
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(s.id, &self.scopes);
                     let s_id_rc: Arc<str> = Arc::from(self.interner.resolve(s.id));
-                    let struct_ty = Type::named(
-                        s_id_rc.clone(),
+                    let struct_ty = Type::named_with_origin(
+                        self.type_name_of(s.id, s.ast_id),
+                        Some(Arc::from(self.source_file.as_ref())),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
@@ -299,16 +308,18 @@ impl<'r> super::super::Binder<'r> {
                 }
                 Decl::Interface(i) => {
                     let i_id_rc: Arc<str> = Arc::from(self.interner.resolve(i.id));
+                    let declared = self.type_name_of(i.id, i.ast_id);
                     let interface_members = self
                         .type_members
                         .interfaces
-                        .get(&i_id_rc)
+                        .get(&declared)
                         .cloned()
                         .unwrap_or_default();
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(i.id, &self.scopes);
-                    let iface_ty = Type::named(
-                        i_id_rc.clone(),
+                    let iface_ty = Type::named_with_origin(
+                        declared,
+                        Some(Arc::from(self.source_file.as_ref())),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {

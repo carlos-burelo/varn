@@ -128,6 +128,7 @@ pub(super) fn lower_outer(
     closures: &mut Vec<TirFunction>,
     base: u32,
     this_class: Option<varn_tir::ClassId>,
+    namespace: Option<&str>,
 ) -> (Vec<TirStmt>, TirExpr) {
     let mut em = FnEmitter::new(
         ast_arena,
@@ -141,6 +142,9 @@ pub(super) fn lower_outer(
     );
     if let Some(cid) = this_class {
         em = em.with_this(cid);
+    }
+    if let Some(namespace) = namespace {
+        em.namespace = Some(Arc::from(namespace));
     }
     em.lower_outer_expr(e)
 }

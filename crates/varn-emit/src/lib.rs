@@ -99,6 +99,7 @@ pub fn emit_module(
         interner,
         checker_table: &bind.ty_table,
         annotation_types: &bind.annotation_types,
+        type_names: &bind.declared_type_names,
         nested_types: &nested,
         shadowed: &bind.user_decorators,
     };
