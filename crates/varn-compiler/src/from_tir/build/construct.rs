@@ -27,7 +27,7 @@ impl<'m> Builder<'m> {
         let Some(def) = static_def else {
             return self.lower_call(cv, args, ty);
         };
-        if let Some(func) = self.inlinable_constructor(def, args.len()) {
+        if let Some(func) = self.inlinable_constructor(def, args) {
             let argv = self.lower_ctor_args(func, args)?;
             let inst = self.emit(
                 InstKind::AllocInstance {
@@ -36,7 +36,7 @@ impl<'m> Builder<'m> {
                 },
                 ty,
             );
-            self.inline_constructor(func, argv, inst)?;
+            self.inline_constructor(func, args, argv, inst)?;
             return Ok(inst);
         }
         let argv = self.lower_args(args)?;
@@ -96,7 +96,7 @@ impl<'m> Builder<'m> {
         false
     }
 
-    fn inlinable_constructor(&self, def: &TirClassDef, argc: usize) -> Option<FnId> {
+    fn inlinable_constructor(&self, def: &TirClassDef, args: &[TirArg]) -> Option<FnId> {
         if def.parent.is_some() || self.inlining.len() >= 4 {
             return None;
         }
@@ -109,7 +109,13 @@ impl<'m> Builder<'m> {
         }
         let tf = self.tir.function(member.func)?;
         let plain = !tf.is_async && !tf.is_generator && !tf.has_rest && tf.locals.is_empty();
-        (plain && tf.params.len() == argc && tf.body.iter().all(is_field_store))
+        let settled = |stmt: &TirStmt| match default_fill(stmt) {
+            Some((param, _)) => args
+                .get(param as usize)
+                .is_some_and(|arg| supplied(arg).is_some()),
+            None => is_field_store(stmt),
+        };
+        (plain && tf.params.len() == args.len() && tf.body.iter().all(settled))
             .then_some(member.func)
     }
 
@@ -129,7 +135,13 @@ impl<'m> Builder<'m> {
         Ok(argv)
     }
 
-    fn inline_constructor(&mut self, func: FnId, params: Vec<Value>, this: Value) -> Result<()> {
+    fn inline_constructor(
+        &mut self,
+        func: FnId,
+        args: &[TirArg],
+        params: Vec<Value>,
+        this: Value,
+    ) -> Result<()> {
         let ctor = self
             .tir
             .function(func)
@@ -139,9 +151,101 @@ impl<'m> Builder<'m> {
             params,
             this: Some(this),
         });
-        let lowered = ctor.body.iter().try_for_each(|s| self.lower_stmt(s));
+        let lowered = ctor
+            .body
+            .iter()
+            .try_for_each(|s| self.lower_inlined_ctor_stmt(s, ctor, args));
         self.inlining.pop();
         lowered
+    }
+
+    fn lower_inlined_ctor_stmt(
+        &mut self,
+        stmt: &TirStmt,
+        ctor: &varn_tir::TirFunction,
+        args: &[TirArg],
+    ) -> Result<()> {
+        let Some((param, default)) = default_fill(stmt) else {
+            return self.lower_stmt(stmt);
+        };
+        let at = param as usize;
+        if args.get(at).and_then(supplied) != Some(false) {
+            return Ok(());
+        }
+        let declared = ctor
+            .params
+            .get(at)
+            .map(|ty| ty.non_nullable(&self.tir.types))
+            .ok_or(OptError::Unsupported("from_tir: default out of range"))?;
+        let filled = self.lower_inlined_arg(default, declared)?;
+        if let Some(slot) = self
+            .inlining
+            .last_mut()
+            .and_then(|frame| frame.params.get_mut(at))
+        {
+            *slot = filled;
+        }
+        Ok(())
+    }
+}
+
+fn default_fill(stmt: &TirStmt) -> Option<(u32, &TirExpr)> {
+    let TirStmt::If {
+        cond,
+        then_body,
+        else_body,
+    } = stmt
+    else {
+        return None;
+    };
+    let param = super::functions::absent_param(cond)?;
+    let [TirStmt::Expr(fill)] = then_body.as_slice() else {
+        return None;
+    };
+    let TirExprKind::Assign { target, value } = &fill.kind else {
+        return None;
+    };
+    let same = matches!(target.kind, TirExprKind::Var) && target.res == Resolution::Param(param);
+    (same && else_body.is_empty() && !needs_own_frame(value)).then_some((param, value.as_ref()))
+}
+
+fn supplied(arg: &TirArg) -> Option<bool> {
+    let TirArg::Expr(given) = arg else {
+        return None;
+    };
+    let shaped = matches!(
+        given.ty,
+        varn_tir::BackendTy::Nullable(_) | varn_tir::BackendTy::Dynamic(_)
+    );
+    let given = if let (TirExprKind::Cast { operand }, true) = (&given.kind, shaped) {
+        operand.as_ref()
+    } else {
+        given
+    };
+    if matches!(given.kind, TirExprKind::NullLit) {
+        return Some(false);
+    }
+    match given.ty {
+        varn_tir::BackendTy::Nullable(_)
+        | varn_tir::BackendTy::Dynamic(_)
+        | varn_tir::BackendTy::Void
+        | varn_tir::BackendTy::Never => None,
+        varn_tir::BackendTy::Int
+        | varn_tir::BackendTy::Float
+        | varn_tir::BackendTy::Bool
+        | varn_tir::BackendTy::Char
+        | varn_tir::BackendTy::Str
+        | varn_tir::BackendTy::Bytes
+        | varn_tir::BackendTy::Decimal
+        | varn_tir::BackendTy::BigInt
+        | varn_tir::BackendTy::Array(_)
+        | varn_tir::BackendTy::Map(..)
+        | varn_tir::BackendTy::Dict(_)
+        | varn_tir::BackendTy::Set(_)
+        | varn_tir::BackendTy::Tuple(_)
+        | varn_tir::BackendTy::Class(_)
+        | varn_tir::BackendTy::Enum(_)
+        | varn_tir::BackendTy::Fn(_) => Some(true),
     }
 }
 

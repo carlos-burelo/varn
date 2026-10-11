@@ -28,6 +28,15 @@ class Scale {
     by(factor: float = 2): str { return typeof factor }
 }
 function ratio(x: float = 1): str { return typeof x }
+class Span {
+    from: int
+    to: int
+    unit: str
+    constructor(from: int, to: int = from + 10, unit: str = "ms") { this.from = from; this.to = to; this.unit = unit }
+}
+function spans(i: int, end: int?): int {
+    return new Span(i).to + new Span(i, 3).to + new Span(i, end).to + new Span(i, 1, "s").unit.length
+}
 function withDefault(k: int = 2): int { return k }
 function optional(s?: str): str { return s ?? "none" }
 function forward(s?: str): str { return optional(s) }
@@ -119,6 +128,16 @@ await describe("188 call shape and optional parameters", async () => {
         expect(new Scale().by(3)).toBe("float")
         expect(offset(base)).toBe(5)
         expect(offset(base, 9)).toBe(9)
+    })
+
+    await it("a constructor fills its defaults whether or not it is inlined", () => {
+        let total = 0
+        for (let i = 0; i < 400; i = i + 1) { total = total + spans(i, null) + spans(i, 5) }
+        expect(spans(2, null)).toBe(12 + 3 + 12 + 1)
+        expect(spans(2, 5)).toBe(12 + 3 + 5 + 1)
+        expect(new Span(1).unit).toBe("ms")
+        expect(new Span(1, null, "s").to).toBe(11)
+        expect(total).toBe(169200 + 87400)
     })
 
     await it("an omitted argument and a null one are the same thing", () => {
