@@ -42,6 +42,7 @@ impl<'r> Checker<'r> {
         self.check_class_type_names(c, bind);
         self.check_class_decorators(rec, c, bind);
         self.check_class_overrides(c, &superclass_members, bind);
+        self.check_implements(c, bind);
         self.check_class_members(rec, c, bind);
 
         self.current_scope = saved_scope;
@@ -80,6 +81,17 @@ impl<'r> Checker<'r> {
                         m.name.as_ref() == key_str && m.kind != ClassMemberKind::Constructor
                     });
                     if exists_in_superclass {
+                        if let (true, ClassMember::Method { .. }, Some(class)) =
+                            (is_override, member, self.current_class.clone())
+                        {
+                            self.check_override_signature(
+                                &class,
+                                key_str,
+                                superclass_members,
+                                *range,
+                                bind,
+                            );
+                        }
                         if !is_override {
                             self.emit(
                                 Diagnostic::error(

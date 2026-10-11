@@ -1,5 +1,6 @@
 pub(crate) mod completion;
 mod decl_class;
+mod decl_class_contracts;
 mod decl_class_decorators;
 mod decl_class_members;
 mod decl_enum;

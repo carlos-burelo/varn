@@ -1,0 +1,96 @@
+use super::Checker;
+use varn_core::{Diagnostic, ErrorCode};
+use varn_sem::bind::BindResult;
+use varn_sem::types::{ClassMemberInfo, ClassMemberKind};
+
+impl<'r> Checker<'r> {
+    pub(super) fn check_override_signature(
+        &mut self,
+        class: &str,
+        member: &str,
+        superclass_members: &[ClassMemberInfo],
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        if self.lineage_is_generic(class, bind) {
+            return;
+        }
+        let is_method = |m: &&ClassMemberInfo| {
+            m.name.as_ref() == member && m.kind == ClassMemberKind::Method && !m.is_static
+        };
+        let Some(inherited) = superclass_members.iter().find(is_method).map(|m| m.ty) else {
+            return;
+        };
+        let Some(own) = bind
+            .get_class_entry(class)
+            .and_then(|entry| entry.members.iter().find(is_method).map(|m| m.ty))
+        else {
+            return;
+        };
+        if self.types_compatible_cached(&inherited, &own, Some(bind)) {
+            return;
+        }
+        let own_s = own.display(&self.ty_table, &bind.interner);
+        let inherited_s = inherited.display(&self.ty_table, &bind.interner);
+        self.emit(
+            Diagnostic::error(
+                ErrorCode::IncompatibleOverride,
+                format!(
+                    "member '{member}' is '{own_s}', which cannot stand in for the '{inherited_s}' it overrides"
+                ),
+            )
+            .with_range(range),
+        );
+    }
+
+    pub(super) fn check_implements(&mut self, c: &varn_core::ast::ClassDecl, bind: &BindResult) {
+        let Some(id) = c.id else {
+            return;
+        };
+        if c.implements.is_empty() || !c.type_params.is_empty() {
+            return;
+        }
+        let class = bind.interner.resolve(id);
+        let Some(instance) = bind
+            .scopes
+            .get(bind.global_scope)
+            .resolve(id, &bind.scopes)
+            .and_then(|sid| bind.arena.get(sid).ty)
+        else {
+            return;
+        };
+        for promised in &c.implements {
+            let contract = self.resolve_type_node_cached(promised, bind);
+            if contract.is_dynamic() || self.types_compatible_cached(&contract, &instance, Some(bind)) {
+                continue;
+            }
+            let contract_s = contract.display(&self.ty_table, &bind.interner);
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::InterfaceNotSatisfied,
+                    format!("class '{class}' declares that it implements '{contract_s}' but does not satisfy it"),
+                )
+                .with_range(*promised.range()),
+            );
+        }
+    }
+
+    fn lineage_is_generic(&self, class: &str, bind: &BindResult) -> bool {
+        use crate::checker_expressions::members::member_util::class_type_params;
+        let mut name = class.to_owned();
+        let mut origin = None;
+        for _ in 0..64 {
+            if !class_type_params(self.resolver, &name, origin.as_ref(), bind).is_empty() {
+                return true;
+            }
+            match bind.class_parents.get(name.as_str()) {
+                Some(parent) => {
+                    origin = parent.origin.clone();
+                    name = parent.name.to_string();
+                }
+                None => return false,
+            }
+        }
+        true
+    }
+}

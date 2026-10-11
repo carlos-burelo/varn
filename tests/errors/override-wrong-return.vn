@@ -1,0 +1,3 @@
+// VN4116
+class Base { size(): int { return 1 } }
+class Wide extends Base { override size(): str { return "big" } }
