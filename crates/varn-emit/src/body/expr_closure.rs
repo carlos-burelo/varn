@@ -100,7 +100,10 @@ impl<'a> FnEmitter<'a> {
         let upvalues: Vec<varn_tir::TirUpvalue> = captures
             .iter()
             .map(|name| match self.resolve_name(name) {
-                Resolution::Local(id) => varn_tir::TirUpvalue::ParentLocal(id.0),
+                Resolution::Local(id) => {
+                    self.captured_locals.insert(id.0);
+                    varn_tir::TirUpvalue::ParentLocal(id.0)
+                }
                 Resolution::Param(i) => varn_tir::TirUpvalue::ParentParam(i),
                 Resolution::Upvalue(i) => varn_tir::TirUpvalue::ParentUpvalue(i),
 

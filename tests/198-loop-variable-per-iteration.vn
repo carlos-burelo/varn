@@ -1,0 +1,60 @@
+import { describe, it, expect } from "std:test";
+
+function plain(): int {
+    const fs: (() => int)[] = []
+    for (let i = 0; i < 3; i = i + 1) { fs.push(() => i) }
+    return fs[0]() * 100 + fs[1]() * 10 + fs[2]()
+}
+function skipping(): int {
+    const fs: (() => int)[] = []
+    for (let i = 0; i < 6; i = i + 1) {
+        if (i % 2 == 1) { continue }
+        fs.push(() => i)
+    }
+    return fs[0]() * 100 + fs[1]() * 10 + fs[2]()
+}
+function mutated(): int {
+    const fs: (() => int)[] = []
+    for (let i = 0; i < 10; i = i + 1) {
+        fs.push(() => i)
+        i = i + 2
+    }
+    return fs.length * 1000 + fs[0]() * 100 + fs[1]() * 10 + fs[2]()
+}
+function nested(): int {
+    const fs: (() => int)[] = []
+    for (let i = 0; i < 2; i = i + 1) {
+        for (let j = 0; j < 2; j = j + 1) {
+            if (j == 1 && i == 0) { continue }
+            fs.push(() => i * 10 + j)
+        }
+    }
+    return fs[0]() * 10000 + fs[1]() * 100 + fs[2]()
+}
+function writer(): int {
+    const fs: (() => int)[] = []
+    for (let i = 0; i < 3; i = i + 1) { fs.push(() => { i = i + 100; return i }) }
+    return fs[0]() + fs[0]() + fs[1]()
+}
+function inside(): int {
+    let total = 0
+    for (let i = 0; i < 400; i = i + 1) { total = total + [1, 2].map((x) => x + i)[1] }
+    return total
+}
+
+await describe("198 loop variable per iteration", async () => {
+    await it("each turn of a for loop has its own variable", () => {
+        expect(plain()).toBe(12)
+        expect(skipping()).toBe(24)
+        expect(nested()).toBe(1011)
+    })
+
+    await it("a write inside the turn is seen by that turn's closure and carried on", () => {
+        expect(mutated()).toBe(4258)
+        expect(writer()).toBe(401)
+    })
+
+    await it("a closure used inside the turn still sees the counter", () => {
+        expect(inside()).toBe(80600)
+    })
+})

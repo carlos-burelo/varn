@@ -37,6 +37,7 @@ impl<'a> FnEmitter<'a> {
             saw_await: false,
             outer_names: FxHashSet::default(),
             captures: Vec::new(),
+            captured_locals: FxHashSet::default(),
             pending: Vec::new(),
             return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
             yield_ty: BackendTy::Dynamic(DynReason::NotYetSupported),

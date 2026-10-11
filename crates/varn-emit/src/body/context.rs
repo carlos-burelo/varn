@@ -65,6 +65,8 @@ pub(crate) struct FnEmitter<'a> {
 
     pub(super) captures: Vec<Arc<str>>,
 
+    pub(super) captured_locals: FxHashSet<u32>,
+
     pub(super) pending: Vec<TirStmt>,
     pub return_ty: BackendTy,
     pub yield_ty: BackendTy,
