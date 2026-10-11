@@ -18,6 +18,9 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         self.check_expr(rec, operand, bind);
+        if op == UnaryOp::Not {
+            self.require_condition(rec, operand, bind);
+        }
         self.check_unary_capability(rec, expr, op, operand, bind);
         if overflows_int_literal(expr, arena) && !overflows_int_literal(operand, arena) {
             self.report_int_overflow(expr);

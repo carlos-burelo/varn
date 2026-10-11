@@ -57,6 +57,7 @@ pub enum ErrorCode {
     InferOutsideConditional = 3024,
     DeprecatedUse = 3025,
     ImpureOperation = 3026,
+    ConditionNeverFalse = 3027,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -254,6 +255,7 @@ impl ErrorCode {
             ErrorCode::InferOutsideConditional => "infer-outside-conditional",
             ErrorCode::DeprecatedUse => "deprecated-use",
             ErrorCode::ImpureOperation => "impure-operation",
+            ErrorCode::ConditionNeverFalse => "condition-never-false",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }

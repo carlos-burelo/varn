@@ -28,7 +28,7 @@ impl<'r> Checker<'r> {
             varn_core::ast::LogicalOp::And => {
                 let present =
                     l_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                let always_truthy = self.is_class_instance(present, bind);
+                let always_truthy = self.never_false(present, bind);
                 let table = &mut *std::sync::Arc::make_mut(&mut self.ty_table);
                 if always_truthy && l_ty.is_nullable(table) {
                     Type::make_nullable(r_ty, table)
@@ -67,7 +67,7 @@ impl<'r> Checker<'r> {
         }
     }
 
-    fn is_class_instance(&self, ty: Type, bind: &BindResult) -> bool {
+    pub(crate) fn is_class_instance(&self, ty: Type, bind: &BindResult) -> bool {
         use varn_sem::types::TypeContext;
         let (TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin)) =
             self.ty_table.get(ty.0)

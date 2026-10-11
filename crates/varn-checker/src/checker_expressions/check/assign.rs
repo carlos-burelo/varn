@@ -38,6 +38,9 @@ impl<'r> Checker<'r> {
             | AssignOp::ShrAssign
             | AssignOp::UShrAssign => true,
         };
+        if matches!(op, AssignOp::AndAssign | AssignOp::OrAssign) {
+            self.require_condition(rec, target, bind);
+        }
         if reads_operand {
             let read_ty = self.infer_type(rec, target, bind);
             if !read_ty.is_dynamic() && read_ty.is_nullable(&self.ty_table) {

@@ -36,8 +36,8 @@ function dynNot(a: dynamic): bool {
     return r
 }
 
-// Also on a typed `int`: `!2` is `false`, not `2 ^ 1`.
-function intNot(a: int): bool {
+// Also on a typed `int?`: `!2` is `false`, not `2 ^ 1`; only `null` negates to `true`.
+function intNot(a: int?): bool {
     const r = !a
     return r
 }
@@ -103,8 +103,8 @@ await describe("142 jit dynamic operators", async () => {
         dCompare = dCompare + dynCompare(i % 3, 1)
         if (strEquals("key-" + (i % 2), "key-0")) { dStr = dStr + 1 }
         dBits = dBits + (dynBits(i % 8, 3) as int)
-        if (dynNot(i % 3)) { dNot = dNot + 1 }
-        if (intNot(i % 3)) { dIntNot = dIntNot + 1 }
+        if (dynNot(i % 3 == 0 ? null : i % 3)) { dNot = dNot + 1 }
+        if (intNot(i % 3 == 0 ? null : i % 3)) { dIntNot = dIntNot + 1 }
         dNeg = dNeg + (dynNegate(i) as int)
         dInv = dInv + (dynInvert(i) as int)
         dInt = dInt + dynAsInt(i)

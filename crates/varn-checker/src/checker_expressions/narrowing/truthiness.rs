@@ -38,7 +38,11 @@ impl<'r> Checker<'r> {
                         out.push((id, narrowed));
                     }
                 } else if ty.is_nullable(&self.ty_table) {
-                    out.push((id, Type::Null));
+                    let present =
+                        ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                    if self.never_false(present, bind) {
+                        out.push((id, Type::Null));
+                    }
                 }
             }
         }

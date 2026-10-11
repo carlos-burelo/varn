@@ -15,6 +15,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         self.check_expr(rec, test, bind);
+        self.require_condition(rec, test, bind);
         if self.can_extract_narrowings(test) {
             let narrow_true = self.extract_narrowings(rec, test, bind, true);
             self.with_narrowings(&narrow_true, |checker| {
@@ -41,6 +42,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         self.check_expr(rec, test, bind);
+        self.require_condition(rec, test, bind);
         self.loop_depth += 1;
         if self.can_extract_narrowings(test) {
             let narrow_true = self.extract_narrowings(rec, test, bind, true);
@@ -78,6 +80,7 @@ impl<'r> Checker<'r> {
                 }
                 if let Some(t) = test {
                     checker.check_expr(rec, t, bind);
+                    checker.require_condition(rec, t, bind);
                 }
                 if let Some(u) = update {
                     checker.check_expr(rec, u, bind);

@@ -302,8 +302,40 @@ impl<'m> Builder<'m> {
         Ok(self.emit(InstKind::Convert { operand: v, conv }, result_ty))
     }
 
-    fn compare(&mut self, op: crate::hir::HirBinOp, lhs: Value, rhs: Value, ty: HirType) -> Value {
-        self.emit(InstKind::Binary { op, lhs, rhs, ty }, HirType::Bool)
+    fn static_truthiness(&mut self, v: Value) -> Option<Value> {
+        match self.value_ty(v) {
+            HirType::Bool => Some(v),
+            HirType::Int
+            | HirType::Float
+            | HirType::Str
+            | HirType::Array(_)
+            | HirType::Map(..)
+            | HirType::Set(_)
+            | HirType::Tuple
+            | HirType::Class(_) => Some(self.emit(InstKind::ConstBool(true), HirType::Bool)),
+            HirType::Nullable(inner) => match self.ssa_types.get(inner) {
+                HirType::Int
+                | HirType::Float
+                | HirType::Str
+                | HirType::Array(_)
+                | HirType::Map(..)
+                | HirType::Set(_)
+                | HirType::Tuple
+                | HirType::Class(_) => {
+                    let absent = self.emit(InstKind::IsNull { operand: v }, HirType::Bool);
+                    Some(self.emit(
+                        InstKind::Unary {
+                            op: crate::hir::HirUnOp::Not,
+                            operand: absent,
+                            ty: HirType::Bool,
+                        },
+                        HirType::Bool,
+                    ))
+                }
+                HirType::Bool | HirType::Ref | HirType::Dynamic | HirType::Nullable(_) => None,
+            },
+            HirType::Ref | HirType::Dynamic => None,
+        }
     }
 
     pub(super) fn lower_cast(
@@ -314,15 +346,10 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         use varn_core::NumericDomain as D;
         let v = self.lower_expr(operand)?;
-        if ty == HirType::Bool && self.value_ty(v) == HirType::Int {
-            let zero = self.emit(InstKind::ConstInt(0), HirType::Int);
-            return Ok(self.compare(crate::hir::HirBinOp::Ne, v, zero, HirType::Int));
-        }
-        if ty == HirType::Bool && self.value_ty(v) == HirType::Float {
-            let zero = self.emit(InstKind::ConstFloat(0.0), HirType::Float);
-            let nonzero = self.compare(crate::hir::HirBinOp::Ne, v, zero, HirType::Float);
-            let ordered = self.compare(crate::hir::HirBinOp::Eq, v, v, HirType::Float);
-            return Ok(self.compare(crate::hir::HirBinOp::Eq, nonzero, ordered, HirType::Bool));
+        if ty == HirType::Bool {
+            if let Some(holds) = self.static_truthiness(v) {
+                return Ok(holds);
+            }
         }
         let from = match self.value_ty(v) {
             HirType::Int => Some(D::Int),

@@ -57,8 +57,9 @@ await describe("46 extreme nullable edgecases", async () => {
         expect(cast1).toBe(42)
         
         // b) Cast to non-nullable type followed by a ternary
-        // Under lookahead, 'val as int ? 100 : 200' must parse as (val as int) ? 100 : 200
-        const ternary1 = val as int ? 100 : 200
+        // Under lookahead, 'flag as bool ? 100 : 200' must parse as (flag as bool) ? 100 : 200
+        const flag: dynamic = true
+        const ternary1 = flag as bool ? 100 : 200
         expect(ternary1).toBe(100)
         
         // c) Cast to nullable type followed by a ternary

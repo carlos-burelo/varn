@@ -5,70 +5,100 @@ class Point {
     constructor(n: int) { this.n = n }
 }
 
-function ifInt(n: int): int { if (n) { return 1 } return 0 }
-function ifFloat(n: float): int { if (n) { return 1 } return 0 }
-function ifStr(s: str): int { if (s) { return 1 } return 0 }
 function ifMaybe(n: int?): int { if (n) { return 1 } return 0 }
-function whileInt(n: int): int { let c = 0; while (n) { n = n - 1; c = c + 1 } return c }
-function notInt(n: int): bool { return !n }
-function pickFloat(n: float): int { return n ? 5 : 6 }
+function ifMaybeFloat(n: float?): int { if (n) { return 1 } return 0 }
+function ifMaybeStr(s: str?): int { if (s) { return 1 } return 0 }
+function ifMaybeBool(b: bool?): int { if (b) { return 1 } return 0 }
+function ifDynamic(d: dynamic): int { if (d) { return 1 } return 0 }
+function whileMaybe(p: Point?): int { let c = 0; let at = p; while (at) { c = c + at.n; at = null } return c }
+function notMaybe(n: int?): bool { return !n }
+function pickMaybe(n: float?): int { return n ? 5 : 6 }
+function elseIsNull(n: int?): int { if (n) { return n + 1 } else { return n ?? -1 } }
 
-function orInt(n: int): int { return n || 7 }
-function andInt(n: int, m: int): int { return n && m }
-function orAssign(n: int): int { let x = n; x ||= 9; return x }
+function orMaybe(n: int?): int { return n || 7 }
+function andMaybe(n: int?, m: int): int? { return n && m }
+function orAssign(n: int?): int { let x = n; x ||= 9; return x! }
+function andAssign(n: int?): int? { let x = n; x &&= 9; return x }
 function orStr(s: str?): str { return s || "vacio" }
-function throughPoint(p: Point?): int { return (p && p.n) || -1 }
+function throughPoint(p: Point?): int { return (p && p.n) ?? -1 }
 function bools(a: bool, b: bool): bool { return a && b || !a }
-function mixed(n: int, s: str): dynamic { return n || s }
+function mixed(n: int?, s: str): dynamic { return n || s }
 
 let calls = 0
-function counted(v: int): int { calls = calls + 1; return v }
-function shortCircuit(): int { calls = 0; const r = counted(3) || counted(4); return r * 10 + calls }
-function bothSides(): int { calls = 0; const r = counted(0) || counted(4); return r * 10 + calls }
+function counted(v: int?): int? { calls = calls + 1; return v }
+function shortCircuit(): int { calls = 0; const r = counted(3) || counted(4); return (r ?? 0) * 10 + calls }
+function bothSides(): int { calls = 0; const r = counted(null) || counted(4); return (r ?? 0) * 10 + calls }
+function zeroDecides(): int { calls = 0; const r = counted(0) || counted(4); return (r ?? -1) * 10 + calls }
 
 await describe("186 truthiness and logical values", async () => {
-    await it("zero, 0.0 and NaN are false; every string is true", () => {
-        for (let r = 0; r < 300; r = r + 1) { ifInt(r); ifFloat(0.5); ifMaybe(r); whileInt(3); pickFloat(1.0) }
-        expect(ifInt(0)).toBe(0)
-        expect(ifInt(2)).toBe(1)
-        expect(ifInt(-1)).toBe(1)
-        expect(ifFloat(0.0)).toBe(0)
-        expect(ifFloat(0.5)).toBe(1)
-        expect(ifFloat(0.0 / 0.0)).toBe(0)
-        expect(ifStr("")).toBe(1)
-        expect(ifStr("a")).toBe(1)
+    await it("only null and false are false", () => {
+        for (let r = 0; r < 300; r = r + 1) {
+            ifMaybe(r); ifMaybeFloat(0.5); ifMaybeStr("a"); ifMaybeBool(true); ifDynamic(r)
+            whileMaybe(new Point(3)); pickMaybe(1.0); notMaybe(r); elseIsNull(r)
+        }
         expect(ifMaybe(null)).toBe(0)
-        expect(ifMaybe(0)).toBe(0)
+        expect(ifMaybe(0)).toBe(1)
         expect(ifMaybe(3)).toBe(1)
-        expect(whileInt(3)).toBe(3)
-        expect(notInt(0)).toBe(true)
-        expect(notInt(3)).toBe(false)
-        expect(pickFloat(0.0)).toBe(6)
-        expect(pickFloat(2.5)).toBe(5)
+        expect(ifMaybeFloat(null)).toBe(0)
+        expect(ifMaybeFloat(0.0)).toBe(1)
+        expect(ifMaybeFloat(0.0 / 0.0)).toBe(1)
+        expect(ifMaybeStr(null)).toBe(0)
+        expect(ifMaybeStr("")).toBe(1)
+        expect(ifMaybeStr("a")).toBe(1)
+        expect(ifMaybeBool(null)).toBe(0)
+        expect(ifMaybeBool(false)).toBe(0)
+        expect(ifMaybeBool(true)).toBe(1)
+        expect(whileMaybe(new Point(3))).toBe(3)
+        expect(whileMaybe(null)).toBe(0)
+        expect(notMaybe(null)).toBe(true)
+        expect(notMaybe(0)).toBe(false)
+        expect(notMaybe(3)).toBe(false)
+        expect(pickMaybe(null)).toBe(6)
+        expect(pickMaybe(0.0)).toBe(5)
+        expect(elseIsNull(null)).toBe(-1)
+        expect(elseIsNull(0)).toBe(1)
+    })
+
+    await it("a dynamic value follows the same rule", () => {
+        const falsy: dynamic[] = [null, false]
+        const truthy: dynamic[] = [0, 0.0, 0.0 / 0.0, "", "a", [], {}, true, 7]
+        for (const v of falsy) { expect(ifDynamic(v)).toBe(0) }
+        for (const v of truthy) { expect(ifDynamic(v)).toBe(1) }
     })
 
     await it("|| and && give back one of their operands", () => {
-        for (let r = 0; r < 300; r = r + 1) { orInt(r); andInt(r, 2); orAssign(r); orStr(null); throughPoint(null); bools(true, false) }
-        expect(orInt(0)).toBe(7)
-        expect(orInt(3)).toBe(3)
-        expect(andInt(0, 3)).toBe(0)
-        expect(andInt(2, 3)).toBe(3)
-        expect(orAssign(0)).toBe(9)
+        for (let r = 0; r < 300; r = r + 1) {
+            orMaybe(r); andMaybe(r, 2); orAssign(r); andAssign(r); orStr(null); throughPoint(null); bools(true, false)
+        }
+        expect(orMaybe(null)).toBe(7)
+        expect(orMaybe(0)).toBe(0)
+        expect(orMaybe(3)).toBe(3)
+        expect(andMaybe(null, 3)).toBe(null)
+        expect(andMaybe(0, 3)).toBe(3)
+        expect(andMaybe(2, 3)).toBe(3)
+        expect(orAssign(null)).toBe(9)
+        expect(orAssign(0)).toBe(0)
         expect(orAssign(4)).toBe(4)
+        expect(andAssign(null)).toBe(null)
+        expect(andAssign(4)).toBe(9)
         expect(orStr(null)).toBe("vacio")
+        expect(orStr("")).toBe("")
         expect(orStr("x")).toBe("x")
         expect(throughPoint(null)).toBe(-1)
         expect(throughPoint(new Point(5))).toBe(5)
+        expect(throughPoint(new Point(0))).toBe(0)
         expect(bools(true, true)).toBe(true)
         expect(bools(true, false)).toBe(false)
         expect(bools(false, false)).toBe(true)
-        expect(mixed(0, "s")).toBe("s")
+        expect(mixed(null, "s")).toBe("s")
+        expect(mixed(0, "s")).toBe(0)
         expect(mixed(4, "s")).toBe(4)
     })
 
     await it("the right side runs only when the left does not decide", () => {
-        for (let r = 0; r < 300; r = r + 1) { shortCircuit(); bothSides() }
+        for (let r = 0; r < 300; r = r + 1) { shortCircuit(); bothSides(); zeroDecides() }
         expect(shortCircuit()).toBe(31)
         expect(bothSides()).toBe(42)
+        expect(zeroDecides()).toBe(1)
     })
 })

@@ -1,0 +1,3 @@
+// expect: error[VN3027]
+class P { }
+function f(p: P): int { while (p) { return 1 } return 0 }

@@ -110,6 +110,12 @@ impl<'r> Checker<'r> {
                 let (left, right) = (*left, *right);
                 self.check_expr(rec, left, bind);
                 match op {
+                    varn_core::ast::LogicalOp::And | varn_core::ast::LogicalOp::Or => {
+                        self.require_condition(rec, left, bind)
+                    }
+                    varn_core::ast::LogicalOp::Nullish => {}
+                }
+                match op {
                     varn_core::ast::LogicalOp::And => {
                         self.in_branch(rec, left, bind, true, |c, rec| c.check_expr(rec, right, bind))
                     }
@@ -142,6 +148,7 @@ impl<'r> Checker<'r> {
             } => {
                 let (test, consequent, alternate) = (*test, *consequent, *alternate);
                 self.check_expr(rec, test, bind);
+                self.require_condition(rec, test, bind);
                 self.in_branch(rec, test, bind, true, |c, rec| {
                     c.check_expr(rec, consequent, bind)
                 });

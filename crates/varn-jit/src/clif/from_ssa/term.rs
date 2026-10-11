@@ -1,4 +1,3 @@
-use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::ir::{types, BlockArg, InstBuilder, TrapCode, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
@@ -38,11 +37,7 @@ fn truthy(
     let x = load_value(b, ctx, values, v)?;
     Ok(match ctx.ssa.value_ty(v) {
         SlotKind::Bool => x,
-        SlotKind::Int => b.ins().icmp_imm_u(IntCC::NotEqual, x, 0),
-        SlotKind::Float => {
-            let zero = b.ins().f64const(0.0);
-            b.ins().fcmp(FloatCC::OrderedNotEqual, x, zero)
-        }
+        SlotKind::Int | SlotKind::Float => b.ins().iconst(types::I8, 1),
         SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => {
             let (tag, payload) = b.ins().isplit(x);
             super::super::emit::call_helper(b, ctx.cc, ctx.helpers.truthy, &[tag, payload])

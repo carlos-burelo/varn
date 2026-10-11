@@ -1,0 +1,2 @@
+// expect: error[VN3027]
+function f(xs: int[]): int { return xs ? 1 : 0 }

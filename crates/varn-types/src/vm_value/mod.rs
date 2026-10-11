@@ -253,13 +253,6 @@ impl VmValue {
         if self.is_bool() {
             return self.as_bool();
         }
-        if self.is_int() {
-            return self.as_int() != 0;
-        }
-        if self.is_f64() {
-            let f = self.as_f64();
-            return f != 0.0 && !f.is_nan();
-        }
         true
     }
 

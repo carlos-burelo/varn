@@ -1,0 +1,2 @@
+// expect: error[VN3027]
+function f(n: int, m: int): int { return n || m }
