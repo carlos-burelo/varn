@@ -21,7 +21,12 @@ pub(super) fn resolve_object_type(
                 readonly,
                 ..
             } => {
-                let ty = resolve_type_node(type_ann, ctx, table);
+                let declared = resolve_type_node(type_ann, ctx, table);
+                let ty = if *optional {
+                    Type::make_nullable(declared, table)
+                } else {
+                    declared
+                };
                 ObjectTypeMember::Property {
                     name: resolve_atom_name(*key, ctx, interner),
                     ty: ty.0,

@@ -118,6 +118,11 @@ pub(super) fn resolve_mapped(
             } else {
                 false
             };
+            let value_ty = if member_optional {
+                Type::make_nullable(value_ty, table)
+            } else {
+                value_ty
+            };
             ObjectTypeMember::Property {
                 name: key,
                 ty: value_ty.0,

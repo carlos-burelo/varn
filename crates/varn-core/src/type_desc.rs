@@ -292,8 +292,12 @@ impl fmt::Display for TypeDesc {
                     if i > 0 {
                         f.write_str(", ")?;
                     }
-                    let mark = if field.optional { "?" } else { "" };
-                    write!(f, "{}{mark}: {}", field.name, field.ty)?;
+                    if let (true, TypeDesc::Nullable(present)) = (field.optional, &field.ty) {
+                        write!(f, "{}?: {present}", field.name)?;
+                    } else {
+                        let mark = if field.optional { "?" } else { "" };
+                        write!(f, "{}{mark}: {}", field.name, field.ty)?;
+                    }
                 }
                 f.write_str(" }")
             }

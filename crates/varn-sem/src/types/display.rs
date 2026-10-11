@@ -164,13 +164,13 @@ impl fmt::Display for TypeDisplay<'_> {
                             if *readonly {
                                 write!(f, "readonly ")?;
                             }
-                            write!(
-                                f,
-                                "{}{}: {}",
-                                name,
-                                if *optional { "?" } else { "" },
-                                self.child(*ty)
-                            )?;
+                            let shown = self.child(*ty).to_string();
+                            if *optional {
+                                let present = shown.strip_suffix('?').unwrap_or(&shown);
+                                write!(f, "{name}?: {present}")?;
+                            } else {
+                                write!(f, "{name}: {shown}")?;
+                            }
                         }
                         ObjectTypeMember::Method {
                             name,
