@@ -1,0 +1,2 @@
+// expect: error[VN3001]
+function f(m: Map<str, int>, k: str): void { m[k] = null }

@@ -8,16 +8,51 @@ impl<'r> Checker<'r> {
     pub(super) fn check_assign(
         &mut self,
         rec: &mut Recorder,
+        op: varn_core::ast::AssignOp,
         target: ExprId,
         value: ExprId,
         range: varn_core::SourceRange,
         bind: &BindResult,
     ) {
+        use varn_core::ast::AssignOp;
         let arena = self.ast_arena;
         let prev = self.is_assignment_target;
         self.is_assignment_target = true;
         self.check_expr(rec, target, bind);
         self.is_assignment_target = prev;
+
+        let reads_operand = match op {
+            AssignOp::Assign | AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign => {
+                false
+            }
+            AssignOp::AddAssign
+            | AssignOp::SubAssign
+            | AssignOp::MulAssign
+            | AssignOp::DivAssign
+            | AssignOp::ModAssign
+            | AssignOp::PowAssign
+            | AssignOp::BitAndAssign
+            | AssignOp::BitOrAssign
+            | AssignOp::BitXorAssign
+            | AssignOp::ShlAssign
+            | AssignOp::ShrAssign
+            | AssignOp::UShrAssign => true,
+        };
+        if reads_operand {
+            let read_ty = self.infer_type(rec, target, bind);
+            if !read_ty.is_dynamic() && read_ty.is_nullable(&self.ty_table) {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::InvalidTypeOperator,
+                        format!(
+                            "invalid compound assignment: the target is '{}' and may be null",
+                            read_ty.display(&self.ty_table, &bind.interner)
+                        ),
+                    )
+                    .with_range(arena.expr(target).range),
+                );
+            }
+        }
 
         let target_ty =
             if let varn_core::ast::ExprKind::Identifier { name } = &arena.expr(target).kind {
@@ -32,6 +67,14 @@ impl<'r> Checker<'r> {
                             .or_else(|| bind.arena.get(id).ty)
                     })
                     .unwrap_or_else(|| self.infer_type(rec, target, bind))
+            } else if let varn_core::ast::ExprKind::Member {
+                object,
+                property,
+                computed: true,
+                ..
+            } = &arena.expr(target).kind
+            {
+                self.computed_member_slot(rec, *object, *property, bind).0
             } else {
                 self.infer_type(rec, target, bind)
             };

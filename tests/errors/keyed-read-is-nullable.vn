@@ -1,0 +1,2 @@
+// expect: error[VN3010]
+function f(m: Map<str, int>, k: str): int { return m[k] + 1 }

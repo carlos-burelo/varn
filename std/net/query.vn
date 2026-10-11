@@ -98,7 +98,7 @@ export class Query {
         let newValues: { [key: str]: str[] } = {};
         for (const k in this.values) {
             if (k !== key) {
-                newValues[k] = this.values[k];
+                newValues[k] = this.values[k]!;
             }
         }
         this.values = newValues;

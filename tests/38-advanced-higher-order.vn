@@ -23,7 +23,8 @@ function memoize<A, B>(f: (A) => B): (A) => B {
     const cache: { [key: str]: B } = {}
     return (arg: A) => {
         const key = "" + arg
-        if (cache[key] !== null) return cache[key]
+        const hit = cache[key]
+        if (hit !== null) return hit
         const val = f(arg)
         cache[key] = val
         return val

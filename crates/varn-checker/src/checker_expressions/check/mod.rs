@@ -119,8 +119,8 @@ impl<'r> Checker<'r> {
                     varn_core::ast::LogicalOp::Nullish => self.check_expr(rec, right, bind),
                 }
             }
-            ExprKind::Assign { target, value, .. } => {
-                self.check_assign(rec, *target, *value, range, bind)
+            ExprKind::Assign { target, value, op } => {
+                self.check_assign(rec, *op, *target, *value, range, bind)
             }
             ExprKind::Call {
                 callee,

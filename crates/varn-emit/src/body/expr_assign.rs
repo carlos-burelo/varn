@@ -147,15 +147,17 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Never
             | BackendTy::Dynamic(_) => v.ty,
         };
-        let index_target = |object: TirExpr, index: TirExpr| TirExpr {
+        let read_ty = self.keyed_read_ty(obj.ty, node_ty);
+        let index_node = |object: TirExpr, index: TirExpr, ty: BackendTy| TirExpr {
             kind: TirExprKind::Index {
                 object: Box::new(object),
                 index: Box::new(index),
             },
-            ty: node_ty,
+            ty,
             res: Resolution::None,
             span,
         };
+        let index_target = |object: TirExpr, index: TirExpr| index_node(object, index, node_ty);
         let plain = matches!(assign_bin_op(op), Ok(None));
         let (obj_w, index_w) = if plain {
             (obj, index)
@@ -165,7 +167,7 @@ impl<'a> FnEmitter<'a> {
         let rhs = match assign_bin_op(op) {
             Ok(None) => v,
             Ok(Some(bop)) => {
-                let read = index_target(obj_w.clone(), index_w.clone());
+                let read = index_node(obj_w.clone(), index_w.clone(), read_ty);
                 let (lhs, rhs, nty) = self.coerce_binary_operands(bop, read, v, node_ty);
                 TirExpr {
                     kind: TirExprKind::Binary {
@@ -179,7 +181,7 @@ impl<'a> FnEmitter<'a> {
                 }
             }
             Err(()) => {
-                let read = index_target(obj_w.clone(), index_w.clone());
+                let read = index_node(obj_w.clone(), index_w.clone(), read_ty);
                 self.lower_logical_assign(op, read, v, span)
             }
         };

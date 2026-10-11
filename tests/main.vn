@@ -178,6 +178,7 @@ import "./183-tuple-index-typing.vn"
 import "./184-string-index.vn"
 import "./185-compiled-defaults-try-loops.vn"
 import "./186-truthiness-and-logical-values.vn"
+import "./187-keyed-index-and-optional-members.vn"
 
 summary()
 

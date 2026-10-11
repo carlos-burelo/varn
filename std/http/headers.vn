@@ -4,7 +4,7 @@ export class Headers {
     constructor(init: { [key: str]: str } = {}) {
         this._map = {};
         for (let k in init) {
-            this.set(k, init[k]);
+            this.set(k, init[k]!);
         }
     }
 
@@ -28,7 +28,7 @@ export class Headers {
         let newMap: { [key: str]: str } = {};
         for (let k in this._map) {
             if (k !== key) {
-                newMap[k] = this._map[k];
+                newMap[k] = this._map[k]!;
             }
         }
         this._map = newMap;

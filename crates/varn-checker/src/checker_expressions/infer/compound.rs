@@ -15,17 +15,61 @@ impl<'r> Checker<'r> {
         _expr: ExprId,
         bind: &BindResult,
     ) -> Type {
+        let (slot, keyed) = self.computed_member_slot(rec, object, property, bind);
+        if keyed && !slot.is_dynamic() {
+            Type::make_nullable(slot, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+        } else {
+            slot
+        }
+    }
+
+    pub(crate) fn computed_member_slot(
+        &mut self,
+        rec: &mut Recorder,
+        object: ExprId,
+        property: ExprId,
+        bind: &BindResult,
+    ) -> (Type, bool) {
         let arena = self.ast_arena;
         let obj_ty = self.infer_type(rec, object, bind);
         if matches!(
             arena.expr(property).kind,
             varn_core::ast::ExprKind::Range { .. }
         ) {
-            return obj_ty;
+            return (obj_ty, false);
         }
         let prop_ty = self.infer_type(rec, property, bind);
         let obj_kind = self.ty_table.get(obj_ty.0);
-        match obj_kind {
+        let keyed = match obj_kind {
+            TypeKind::Generic(name, _, _) => {
+                bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name)
+            }
+            TypeKind::Object(mid) => self
+                .ty_table
+                .get_object_members(mid)
+                .iter()
+                .any(|m| matches!(m, ObjectTypeMember::Index { .. })),
+            TypeKind::Primitive(_)
+            | TypeKind::Builtin(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::Named(..)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => false,
+        };
+        let slot = match obj_kind {
             TypeKind::Array(inner) if prop_ty.is_int() => Type::resolved(inner),
             TypeKind::Tuple(slots) if prop_ty.is_int() => {
                 let slots: Vec<Type> = self
@@ -37,10 +81,13 @@ impl<'r> Checker<'r> {
                 if let varn_core::ast::ExprKind::IntLiteral { value, .. } =
                     &arena.expr(property).kind
                 {
-                    return usize::try_from(*value)
-                        .ok()
-                        .and_then(|at| slots.get(at).copied())
-                        .unwrap_or(Type::Dynamic);
+                    return (
+                        usize::try_from(*value)
+                            .ok()
+                            .and_then(|at| slots.get(at).copied())
+                            .unwrap_or(Type::Dynamic),
+                        false,
+                    );
                 }
                 match slots.split_first() {
                     Some((first, rest)) if rest.iter().all(|slot| slot == first) => *first,
@@ -107,7 +154,8 @@ impl<'r> Checker<'r> {
             | TypeKind::Infer(_)
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => Type::Dynamic,
-        }
+        };
+        (slot, keyed)
     }
 
     pub(crate) fn infer_object_type(

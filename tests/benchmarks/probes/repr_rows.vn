@@ -28,7 +28,7 @@ row("map_get_heapkey", () => {
     let m: { [key: str]: str } = { "authorization": "Bearer x", "content-type": "json", "user-agent": "probe" };
     let keys = ["authorization", "content-type", "user-agent"];
     let total = 0;
-    for (let i = 0; i < N * 2; i = i + 1) { total = total + m[keys[i % 3]].length; }
+    for (let i = 0; i < N * 2; i = i + 1) { total = total + m[keys[i % 3]]!.length; }
     return total;
 });
 row("strview", () => { let k: str[] = []; let base = "abcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < N; i = i + 1) { k.push(base.slice(i % 10, 20)); } return k.length; });

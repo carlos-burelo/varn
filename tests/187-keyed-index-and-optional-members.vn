@@ -1,0 +1,84 @@
+import { describe, it, expect } from "std:test";
+
+type Part = { name: str, tag?: str }
+
+function tally(words: str[]): Map<str, int> {
+    const seen = new Map<str, int>()
+    for (const w of words) { seen[w] = (seen[w] ?? 0) + 1 }
+    return seen
+}
+function lookup(seen: Map<str, int>, key: str): int { return seen[key] ?? -1 }
+function ensure(seen: Map<str, int>, key: str): int { seen[key] ??= 10; return seen[key]! }
+function maybe(seen: Map<str, int>, key: str): int? { return seen[key] }
+function dictRead(d: { [key: str]: str }, key: str): str { return d[key] ?? "missing" }
+
+function makePart(tag: str?): Part { return { name: "p", tag: tag } }
+function tagOf(p: Part): str { return p.tag ?? "none" }
+
+function size(s: str): int { return s.length }
+function describeValue(value: str | str[] | null): int {
+    if (value == null) { return -1 }
+    if (Array.isArray(value)) { return value.length } else { return size(value) }
+}
+function afterContinue(q: { [key: str]: str | str[] }): int {
+    let n = 0
+    for (const key in q) {
+        const value = q[key]
+        if (value == null) { continue }
+        if (Array.isArray(value)) {
+            for (const item of value) { n = n + size(item) }
+        } else {
+            n = n + size(value)
+        }
+    }
+    return n
+}
+function parenthesised(s: str?): int {
+    if ((s != null)) { return size(s) }
+    return 0
+}
+
+await describe("187 keyed index and optional members", async () => {
+    await it("a missing key reads as null, in both tiers", () => {
+        const seen = tally(["a", "b", "a"])
+        let total = 0
+        for (let r = 0; r < 300; r = r + 1) { total = total + lookup(seen, "a") + lookup(seen, "zz") }
+        expect(total).toBe(300)
+        expect(lookup(seen, "a")).toBe(2)
+        expect(lookup(seen, "zz")).toBe(-1)
+        expect(maybe(seen, "zz")).toBe(null)
+        expect(maybe(seen, "b")).toBe(1)
+    })
+
+    await it("??= fills a missing key and keeps a present one", () => {
+        const seen = tally(["a", "a"])
+        for (let r = 0; r < 300; r = r + 1) { ensure(seen, "a") }
+        expect(ensure(seen, "fresh")).toBe(10)
+        expect(ensure(seen, "a")).toBe(2)
+        expect(seen.size).toBe(2)
+    })
+
+    await it("an index signature behaves like a map", () => {
+        const d: { [key: str]: str } = { x: "1" }
+        expect(dictRead(d, "x")).toBe("1")
+        expect(dictRead(d, "nope")).toBe("missing")
+    })
+
+    await it("an optional member accepts null and reads as nullable", () => {
+        expect(tagOf(makePart(null))).toBe("none")
+        expect(tagOf(makePart("t"))).toBe("t")
+        const bare: Part = { name: "q" }
+        const explicit: Part = { name: "q", tag: null }
+        expect(tagOf(bare)).toBe("none")
+        expect(tagOf(explicit)).toBe("none")
+    })
+
+    await it("a narrowing builds on the one before it", () => {
+        expect(describeValue(null)).toBe(-1)
+        expect(describeValue("abc")).toBe(3)
+        expect(describeValue(["a", "b"])).toBe(2)
+        expect(afterContinue({ a: "xx", b: ["y", "zzz"] })).toBe(6)
+        expect(parenthesised("four")).toBe(4)
+        expect(parenthesised(null)).toBe(0)
+    })
+})

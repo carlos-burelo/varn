@@ -37,6 +37,7 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Never
             | BackendTy::Dynamic(_) => ty,
         };
+        let read_ty = self.keyed_read_ty(obj.ty, node_ty);
         let obj_h = self.pin(obj);
         let index_h = self.pin(index);
         let read = TirExpr {
@@ -44,7 +45,7 @@ impl<'a> FnEmitter<'a> {
                 object: Box::new(obj_h.clone()),
                 index: Box::new(index_h.clone()),
             },
-            ty: node_ty,
+            ty: read_ty,
             res: Resolution::None,
             span,
         };

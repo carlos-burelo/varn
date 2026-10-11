@@ -62,9 +62,39 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    pub(super) fn keyed_read_ty(&mut self, container: BackendTy, slot: BackendTy) -> BackendTy {
+        match container.non_nullable(self.tt) {
+            BackendTy::Map(..) | BackendTy::Dict(_) => self.nullable_of(slot),
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Array(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => slot,
+        }
+    }
+
     pub(super) fn null_or(&mut self, is_null: TirExpr, value: TirExpr, span: Span) -> TirExpr {
-        let result_ty = match value.ty {
-            BackendTy::Nullable(_) | BackendTy::Dynamic(_) | BackendTy::Void => value.ty,
+        let result_ty = self.nullable_of(value.ty);
+        let value = self.cast_to(value, result_ty);
+        self.null_or_typed(is_null, value, result_ty, span)
+    }
+
+    pub(super) fn nullable_of(&mut self, ty: BackendTy) -> BackendTy {
+        match ty {
+            BackendTy::Nullable(_) | BackendTy::Dynamic(_) | BackendTy::Void => ty,
             member @ BackendTy::Int
             | member @ BackendTy::Float
             | member @ BackendTy::Bool
@@ -82,8 +112,16 @@ impl<'a> FnEmitter<'a> {
             | member @ BackendTy::Enum(_)
             | member @ BackendTy::Fn(_)
             | member @ BackendTy::Never => BackendTy::Nullable(self.tt.intern(member)),
-        };
-        let value = self.cast_to(value, result_ty);
+        }
+    }
+
+    fn null_or_typed(
+        &mut self,
+        is_null: TirExpr,
+        value: TirExpr,
+        result_ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
         let null_arm = TirExpr {
             kind: TirExprKind::NullLit,
             ty: result_ty,
@@ -200,6 +238,7 @@ impl<'a> FnEmitter<'a> {
                 | BackendTy::Never
                 | BackendTy::Dynamic(_) => ty,
             };
+            let node_ty = self.keyed_read_ty(obj.ty, node_ty);
             return TirExpr {
                 kind: TirExprKind::Index {
                     object: Box::new(obj),
