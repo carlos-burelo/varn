@@ -93,6 +93,59 @@ impl<'r> Checker<'r> {
         }
     }
 
+    pub(super) fn check_member_names(&mut self, c: &varn_core::ast::ClassDecl, bind: &BindResult) {
+        let mut seen: Vec<(varn_core::Atom, bool, u8)> = Vec::new();
+        for member in &c.body {
+            let (key, modifiers, range, role) = match member {
+                ClassMember::Method {
+                    key,
+                    modifiers,
+                    range,
+                    ..
+                }
+                | ClassMember::Property {
+                    key,
+                    modifiers,
+                    range,
+                    ..
+                } => (key, modifiers, range, 0u8),
+                ClassMember::Getter {
+                    key,
+                    modifiers,
+                    range,
+                    ..
+                } => (key, modifiers, range, 1u8),
+                ClassMember::Setter {
+                    key,
+                    modifiers,
+                    range,
+                    ..
+                } => (key, modifiers, range, 2u8),
+                ClassMember::Constructor { .. }
+                | ClassMember::Destructor { .. }
+                | ClassMember::StaticBlock { .. } => continue,
+            };
+            let clash = seen.iter().any(|(name, is_static, other)| {
+                name == key
+                    && *is_static == modifiers.is_static
+                    && (*other == role || *other == 0 || role == 0)
+            });
+            if clash {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::DuplicateMemberName,
+                        format!(
+                            "the class already declares a member named '{}'",
+                            bind.interner.resolve(*key)
+                        ),
+                    )
+                    .with_range(*range),
+                );
+            }
+            seen.push((*key, modifiers.is_static, role));
+        }
+    }
+
     pub(super) fn check_implements(&mut self, c: &varn_core::ast::ClassDecl, bind: &BindResult) {
         let Some(id) = c.id else {
             return;

@@ -1,0 +1,5 @@
+// VN4110
+class Meter {
+    read(): int { return 1 }
+    read(): int { return 2 }
+}

@@ -122,4 +122,43 @@ impl<'r> Checker<'r> {
             Diagnostic::error(ErrorCode::StaticMemberOnInstance, message).with_range(*range),
         );
     }
+    pub(super) fn check_accessor_side(
+        &mut self,
+        owner: &Type,
+        member: &str,
+        writing: bool,
+        range: &SourceRange,
+        bind: &BindResult,
+    ) {
+        let owner = owner.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        let (TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin)) =
+            self.ty_table.get(owner.0)
+        else {
+            return;
+        };
+        let name = self.resolve_bind_atom(bind, name);
+        let origin = origin.map(|o| self.resolve_bind_atom(bind, o));
+        let Some(members) = varn_sem::bind::BindView::new(bind, self.resolver)
+            .get_class_members(&name, origin.as_deref())
+        else {
+            return;
+        };
+        let has = |kind: ClassMemberKind| {
+            members
+                .iter()
+                .any(|m| m.name.as_ref() == member && m.kind == kind)
+        };
+        let (getter, setter) = (has(ClassMemberKind::Getter), has(ClassMemberKind::Setter));
+        let stored = has(ClassMemberKind::Property) || has(ClassMemberKind::Variable);
+        let message = match (writing, getter, setter, stored) {
+            (true, true, false, false) => {
+                format!("cannot assign to '{member}': it has a getter and no setter")
+            }
+            (false, false, true, false) => {
+                format!("cannot read '{member}': it has a setter and no getter")
+            }
+            (true, _, _, _) | (false, _, _, _) => return,
+        };
+        self.emit(Diagnostic::error(ErrorCode::NotAssignable, message).with_range(*range));
+    }
 }

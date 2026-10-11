@@ -1,0 +1,7 @@
+// VN3005
+class Meter {
+    private held: int = 1
+    get value(): int { return this.held }
+}
+const m = new Meter()
+m.value = 5

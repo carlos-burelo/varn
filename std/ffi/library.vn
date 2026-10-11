@@ -13,9 +13,9 @@ import { FfiType } from "std:ffi/types";
 import { Pointer } from "std:ffi/pointer";
 
 export class FfiFunction {
-    let fnPtr: int;
-    let returnType: FfiType;
-    let paramTypes: FfiType[];
+    fnPtr: int;
+    returnType: FfiType;
+    paramTypes: FfiType[];
 
     constructor(fnPtr: int, returnType: FfiType, paramTypes: FfiType[]) {
         this.fnPtr = fnPtr;

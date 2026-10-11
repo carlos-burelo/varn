@@ -11,10 +11,10 @@ function trimPrefixQ(s: str): str {
 }
 
 export class Query {
-    private values: { [key: str]: str[] } = {};
+    private buckets: { [key: str]: str[] } = {};
 
     constructor(init?: str | { [key: str]: str | str[] }) {
-        this.values = {};
+        this.buckets = {};
         if (init !== null) {
             if (typeof init === "str") {
                 this._parse(init as str);
@@ -62,7 +62,7 @@ export class Query {
     }
 
     get(key: str): str? {
-        const bucket = this.values[key];
+        const bucket = this.buckets[key];
         if (bucket == null || bucket.length == 0) {
             return null;
         }
@@ -70,7 +70,7 @@ export class Query {
     }
 
     getAll(key: str): str[] {
-        const bucket = this.values[key];
+        const bucket = this.buckets[key];
         if (bucket == null) {
             return [];
         }
@@ -78,35 +78,35 @@ export class Query {
     }
 
     set(key: str, value: str): void {
-        this.values[key] = [value];
+        this.buckets[key] = [value];
     }
 
     append(key: str, value: str): void {
-        const bucket = this.values[key];
+        const bucket = this.buckets[key];
         if (bucket == null) {
-            this.values[key] = [value];
+            this.buckets[key] = [value];
         } else {
             bucket.push(value);
         }
     }
 
     has(key: str): bool {
-        return this.values[key] !== null;
+        return this.buckets[key] !== null;
     }
 
     delete(key: str): void {
         let newValues: { [key: str]: str[] } = {};
-        for (const k in this.values) {
+        for (const k in this.buckets) {
             if (k !== key) {
-                newValues[k] = this.values[k]!;
+                newValues[k] = this.buckets[k]!;
             }
         }
-        this.values = newValues;
+        this.buckets = newValues;
     }
 
     keys(): str[] {
         let res: str[] = [];
-        for (const key in this.values) {
+        for (const key in this.buckets) {
             res.push(key);
         }
         return res;
@@ -114,8 +114,8 @@ export class Query {
 
     values(): str[] {
         let res: str[] = [];
-        for (const key in this.values) {
-            const bucket = this.values[key];
+        for (const key in this.buckets) {
+            const bucket = this.buckets[key];
             for (const val of bucket) {
                 res.push(val);
             }
@@ -125,8 +125,8 @@ export class Query {
 
     entries(): [str, str][] {
         let res: [str, str][] = [];
-        for (const key in this.values) {
-            const bucket = this.values[key];
+        for (const key in this.buckets) {
+            const bucket = this.buckets[key];
             for (const val of bucket) {
                 res.push(#[key, val]);
             }
@@ -135,14 +135,14 @@ export class Query {
     }
 
     toObject(): { [key: str]: str[] } {
-        return this.values;
+        return this.buckets;
     }
 
     toString(): str {
         const parts: str[] = [];
-        for (const key in this.values) {
+        for (const key in this.buckets) {
             const encodedKey = encodeURIComponent$(key);
-            const bucket = this.values[key];
+            const bucket = this.buckets[key];
             for (const value of bucket) {
                 parts.push(encodedKey + "=" + encodeURIComponent$(value));
             }

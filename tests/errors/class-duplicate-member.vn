@@ -1,0 +1,5 @@
+// VN4110
+class Meter {
+    unit: str = "m"
+    unit(): str { return "meters" }
+}

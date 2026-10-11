@@ -101,6 +101,9 @@ impl<'r> Checker<'r> {
         }
 
         self.check_member_side(object, &check_ty, prop_name, range, bind);
+        if !self.is_assignment_target {
+            self.check_accessor_side(&check_ty, prop_name, false, range, bind);
+        }
 
         if should_check && !self.member_exists_cached(&check_ty, prop_name, bind) {
             let candidates = self.collect_member_names(&check_ty, bind);
