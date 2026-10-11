@@ -74,6 +74,7 @@ pub struct Checker<'r> {
     pub(crate) declared_yield: Option<Type>,
     pub(crate) loop_depth: u32,
     pub(crate) switch_depth: u32,
+    pub(crate) namespace_bases: rustc_hash::FxHashSet<varn_core::ast::ExprId>,
     pub(crate) loop_labels: Vec<varn_core::Atom>,
     pub(crate) in_function: bool,
     pub(crate) in_async: bool,

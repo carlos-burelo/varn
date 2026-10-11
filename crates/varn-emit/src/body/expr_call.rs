@@ -237,6 +237,10 @@ impl<'a> FnEmitter<'a> {
             };
         }
 
+        if let Some(call) = self.lower_namespace_call(call_id, callee, args, ty, span) {
+            return call;
+        }
+
         let (object, property, optional) = match &self.ast_arena.expr(callee).kind {
             ExprKind::Member {
                 object,

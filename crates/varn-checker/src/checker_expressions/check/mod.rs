@@ -12,6 +12,7 @@ mod member_side;
 pub(crate) mod members;
 pub(crate) mod members_assign;
 mod misc;
+mod namespace_use;
 mod operator_capability;
 mod ops;
 
@@ -24,6 +25,7 @@ impl<'r> Checker<'r> {
     pub(crate) fn check_expr(&mut self, rec: &mut Recorder, expr: ExprId, bind: &BindResult) {
         let arena = self.ast_arena;
         self.check_expr_no_record(rec, expr, bind);
+        self.require_namespace_member_use(rec, expr, bind);
         let range = arena.expr(expr).range;
         let start = range.start.offset;
         let end = range.end.offset.saturating_sub(1);

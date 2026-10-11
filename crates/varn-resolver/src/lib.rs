@@ -1,6 +1,7 @@
 pub mod cache;
 pub mod exports;
 pub mod graph;
+mod namespace_exports;
 mod resolver_access;
 mod resolver_disk;
 mod resolver_embed;

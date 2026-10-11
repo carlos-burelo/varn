@@ -107,6 +107,7 @@ impl<'r> Checker<'r> {
         e: &varn_core::ast::ExportDecl,
         bind: &BindResult,
     ) {
+        self.reject_mutable_export(e, bind);
         match e {
             varn_core::ast::ExportDecl::Decl { declaration, .. } => {
                 self.check_decl(rec, declaration, bind);

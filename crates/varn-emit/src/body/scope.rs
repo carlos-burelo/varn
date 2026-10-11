@@ -322,7 +322,7 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn scopes_outward(&self) -> Vec<&str> {
+    pub(super) fn scopes_outward(&self) -> Vec<&str> {
         let Some(path) = self.namespace.as_deref() else {
             return Vec::new();
         };

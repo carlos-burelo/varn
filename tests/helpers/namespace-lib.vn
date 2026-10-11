@@ -1,0 +1,15 @@
+export namespace Geo {
+    export const unit = 2
+    let hits = 0
+    export function area(w: int, h: int): int { hits = hits + 1; return w * h * unit }
+    export function seen(): int { return hits }
+    export class Box { w: int; constructor(w: int) { this.w = w } }
+    export enum Kind { Flat, Deep }
+    export namespace Deep {
+        export function twice(x: int): int { return x * 2 }
+    }
+}
+namespace Local {
+    export function one(): int { return 1 }
+}
+export { Local as Renamed }

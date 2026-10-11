@@ -11,6 +11,7 @@ mod imports_exports;
 mod module_ctx;
 mod module_globals;
 mod module_top;
+mod namespace_scope;
 mod namespaces;
 mod nested_types;
 mod prelude;
@@ -55,6 +56,8 @@ pub fn emit_module(
         declared.extend(import.specs.iter().map(|spec| spec.local.clone()));
     }
 
+    declared.extend(namespace_scope::imported_globals(&bind.namespace_imports));
+
     let module_globals::GlobalSlots {
         slots: global_slots,
         globals,
@@ -72,8 +75,13 @@ pub fn emit_module(
         list: free_fns,
         index: fn_index,
         scoped: scoped_fns,
+        scoped_direct,
         decorated: decorated_fns,
     } = free_functions::collect_free_functions(program, ast_arena, interner, &bind.user_decorators);
+
+    let (mut namespace_scope, namespace_exports) =
+        namespace_scope::declared_scope(program, ast_arena, interner);
+    namespace_scope::add_imported_paths(&bind.namespace_imports, &mut namespace_scope);
 
     let ctx = MCtx {
         names: &names,
@@ -81,7 +89,8 @@ pub fn emit_module(
         enums: &enums,
         globals: &global_slots,
         fns: &fn_index,
-        scoped_fns: &scoped_fns,
+        scoped_fns: &scoped_direct,
+        namespaces: &namespace_scope,
         decorated_fns: &decorated_fns,
         call_mappings,
         desugar,
@@ -171,7 +180,8 @@ pub fn emit_module(
 
     let mut imports = prelude;
     imports.extend(collect_imports(program, ast_arena, interner));
-    let exports = collect_exports(program, ast_arena, interner);
+    namespace_scope::import_members(&mut imports, &bind.namespace_imports);
+    let exports = collect_exports(program, ast_arena, interner, &namespace_exports);
 
     TirModule {
         source_file: Arc::from(program.filename.as_ref()),

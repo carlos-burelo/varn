@@ -97,6 +97,16 @@ pub struct BindResult {
     pub evolved_array_types: FxHashMap<u32, Type>,
     #[serde(skip, default)]
     pub user_decorators: FxHashSet<u32>,
+    #[serde(skip, default)]
+    pub namespace_imports: Vec<NamespaceImport>,
+}
+
+#[derive(Clone, Debug)]
+pub struct NamespaceImport {
+    pub binding: Arc<str>,
+    pub hang: Arc<str>,
+    pub exported: Arc<str>,
+    pub members: Vec<Arc<str>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

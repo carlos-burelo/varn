@@ -126,6 +126,12 @@ impl<'r> super::Binder<'r> {
             let exports_ref: Option<&varn_sem::exports::ExportMap> =
                 relative_exports.as_deref().or(stdlib_exports.as_deref());
 
+            if let Some(exports) = exports_ref {
+                let hang: Arc<str> = Arc::from(self.interner.resolve(local));
+                let found = imported_namespaces(exports, &hang, &imported);
+                self.namespace_imports.extend(found);
+            }
+
             let sym = if let Some(exports) = exports_ref {
                 if imported == "*" {
                     let mut s = Symbol::new(SymbolKind::Namespace, local, line);
@@ -269,4 +275,37 @@ impl<'r> super::Binder<'r> {
             self.deps.push(Arc::from(dep));
         }
     }
+}
+
+fn imported_namespaces(
+    exports: &varn_sem::exports::ExportMap,
+    hang: &Arc<str>,
+    imported: &str,
+) -> Vec<varn_sem::bind::NamespaceImport> {
+    let mut keys: Vec<&String> = exports.keys().filter(|k| k.contains("::")).collect();
+    keys.sort();
+    let mut found: Vec<varn_sem::bind::NamespaceImport> = Vec::new();
+    for key in keys {
+        let Some((root, member)) = key.split_once("::") else {
+            continue;
+        };
+        if imported != "*" && imported != root {
+            continue;
+        }
+        let binding: Arc<str> = if imported == "*" {
+            Arc::from(format!("{hang}::{root}"))
+        } else {
+            hang.clone()
+        };
+        match found.iter_mut().find(|ns| ns.binding == binding) {
+            Some(ns) => ns.members.push(Arc::from(member)),
+            None => found.push(varn_sem::bind::NamespaceImport {
+                binding,
+                hang: hang.clone(),
+                exported: Arc::from(root),
+                members: vec![Arc::from(member)],
+            }),
+        }
+    }
+    found
 }

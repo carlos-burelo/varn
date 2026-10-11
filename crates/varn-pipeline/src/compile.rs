@@ -115,22 +115,26 @@ pub fn inject_star_reexports(
 ) {
     use std::collections::BTreeSet;
     let covered: BTreeSet<&str> = tir.exports.iter().map(|e| e.exported.as_ref()).collect();
-    let mut missing: Vec<(&String, Option<varn_core::Atom>)> = exports
-        .keys()
-        .filter(|k| !k.contains('.') && !covered.contains(k.as_str()))
-        .map(|k| {
-            let origin = exports.get(k).and_then(|s| s.origin_module);
-            (k, origin)
-        })
+    let mut missing: Vec<(&String, &varn_sem::symbol::Symbol)> = exports
+        .iter()
+        .filter(|(k, _)| !k.contains('.') && !covered.contains(k.as_str()))
         .collect();
     missing.sort_by(|a, b| a.0.cmp(b.0));
-    for (name, origin) in missing {
-        let Some(src) = origin.and_then(|a| exports.table.name(a).map(str::to_owned)) else {
+    for (name, sym) in missing {
+        let Some(src) = sym
+            .origin_module
+            .and_then(|a| exports.table.name(a).map(str::to_owned))
+        else {
             continue;
         };
+        let declared = sym
+            .original_name
+            .filter(|_| name.contains("::"))
+            .and_then(|a| exports.table.name(a))
+            .unwrap_or(name.as_str());
         tir.exports.push(varn_tir::TirExport {
             exported: std::sync::Arc::from(name.as_str()),
-            local: std::sync::Arc::from(name.as_str()),
+            local: std::sync::Arc::from(declared),
             reexport_from: Some(std::sync::Arc::from(src)),
             namespace: false,
         });

@@ -152,6 +152,16 @@ impl<'a> FnEmitter<'a> {
         if let Some(read) = self.inherited_read(object, property, computed, ty, span) {
             return read;
         }
+        if !computed && !optional {
+            if let Some(key) = self.namespace_member(object, property) {
+                return TirExpr {
+                    kind: TirExprKind::Var,
+                    ty,
+                    res: Resolution::GlobalSlot(self.m.globals[&key]),
+                    span,
+                };
+            }
+        }
         if optional && !computed {
             let name = Self::member_name(self.ast_arena, property, self.m.interner)
                 .unwrap_or_else(|| Arc::from("<member>"));

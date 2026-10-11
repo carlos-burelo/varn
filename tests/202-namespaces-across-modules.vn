@@ -1,0 +1,53 @@
+import { describe, it, expect } from "std:test";
+import { Shapes, Renamed } from "./helpers/namespace-mid.vn"
+import { Geo } from "./helpers/namespace-star.vn"
+import * as Lib from "./helpers/namespace-lib.vn"
+
+namespace Tally {
+    let n = 0
+    export const step = 2
+    export function bump(): int { n = n + step; return n }
+    export function read(): int { return n }
+}
+
+function hot(n: int): int {
+    let acc = 0
+    for (let i = 0; i < n; i = i + 1) { acc = acc + Geo.Deep.twice(i) + Tally.step }
+    return acc
+}
+
+await describe("202 namespaces across modules", async () => {
+    await it("an imported namespace reaches its members, nested ones too", () => {
+        expect(Geo.area(2, 3)).toBe(12)
+        expect(Geo.unit).toBe(2)
+        expect(Geo.Deep.twice(5)).toBe(10)
+        expect(new Geo.Box(5).w).toBe(5)
+        expect(Geo.Kind.Deep == Geo.Kind.Deep).toBe(true)
+        expect(Geo.Kind.Flat == Geo.Kind.Deep).toBe(false)
+    })
+
+    await it("a renamed or re-exported namespace is the same namespace", () => {
+        const before = Geo.seen()
+        expect(Shapes.area(1, 1)).toBe(2)
+        expect(Lib.Geo.area(1, 1)).toBe(2)
+        expect(Geo.seen()).toBe(before + 2)
+        expect(Shapes.Deep.twice(4)).toBe(8)
+        expect(Lib.Geo.Deep.twice(4)).toBe(8)
+        expect(Shapes.Kind.Flat == Geo.Kind.Flat).toBe(true)
+        expect(Renamed.one()).toBe(1)
+        expect(Lib.Renamed.one()).toBe(1)
+    })
+
+    await it("a member is a value even though the namespace is not", () => {
+        const area = Geo.area
+        expect(area(2, 2)).toBe(8)
+        expect([1, 2].map(Geo.Deep.twice)[1]).toBe(4)
+    })
+
+    await it("state inside a namespace is seen through its functions", () => {
+        Tally.bump()
+        Tally.bump()
+        expect(Tally.read()).toBe(4)
+        expect(hot(100)).toBe(10100)
+    })
+})

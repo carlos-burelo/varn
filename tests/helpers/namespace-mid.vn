@@ -1,0 +1,3 @@
+export { Geo as Shapes } from "./namespace-lib.vn"
+import { Renamed } from "./namespace-lib.vn"
+export { Renamed }

@@ -1,0 +1,4 @@
+// VN4020
+namespace N { export namespace Inner { export const n = 1 } }
+function take(x: dynamic): int { return 1 }
+take(N.Inner)

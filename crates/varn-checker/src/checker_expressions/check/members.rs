@@ -25,7 +25,21 @@ impl<'r> Checker<'r> {
         if !called && !computed && matches!(arena.expr(object).kind, ExprKind::Super) {
             self.note_inherited_read(rec, property, bind);
         }
+        if !computed {
+            self.namespace_bases.insert(object);
+            if self.is_assignment_target && self.denotes_namespace(rec, object, bind) {
+                self.emit(
+                    varn_core::Diagnostic::error(
+                        varn_core::ErrorCode::NotAssignable,
+                        "a namespace member cannot be assigned from outside: \
+                         its exports are constant",
+                    )
+                    .with_range(*range),
+                );
+            }
+        }
         self.check_expr(rec, object, bind);
+        self.namespace_bases.remove(&object);
         if computed {
             self.check_member_index(rec, object, property, property_range, bind);
             return;

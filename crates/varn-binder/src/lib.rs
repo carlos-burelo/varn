@@ -79,4 +79,5 @@ pub struct Binder<'r> {
     )>,
 
     pub(crate) user_decorators: rustc_hash::FxHashSet<u32>,
+    pub(crate) namespace_imports: Vec<varn_sem::bind::NamespaceImport>,
 }

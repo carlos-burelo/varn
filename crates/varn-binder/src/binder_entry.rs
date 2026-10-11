@@ -82,6 +82,7 @@ impl<'r> Binder<'r> {
             type_decls: FxHashMap::default(),
             pending_decorator_roles: Vec::new(),
             user_decorators: rustc_hash::FxHashSet::default(),
+            namespace_imports: Vec::new(),
         };
 
         let global = b.scopes.push(CheckerScope::new(ScopeKind::Global, None));
@@ -125,6 +126,7 @@ impl<'r> Binder<'r> {
             pending_enrich: b.pending_enrich,
             evolved_array_types: b.evolved_array_types,
             user_decorators: b.user_decorators,
+            namespace_imports: b.namespace_imports,
         }
     }
 }

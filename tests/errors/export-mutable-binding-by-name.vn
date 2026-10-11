@@ -1,0 +1,3 @@
+// VN4021
+let counter = 0
+export { counter }

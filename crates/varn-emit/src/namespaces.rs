@@ -5,7 +5,7 @@ use std::sync::Arc;
 use varn_core::ast::{AstArena, Decl, ExportDecl, NamespaceDecl, Pattern};
 use varn_core::AtomInterner;
 use varn_tir::{
-    BackendTy, DynReason, FnId, Resolution, Span, TirExpr, TirExprKind, TirObjectEntry, TirStmt,
+    BackendTy, DynReason, FnId, Resolution, Span, TirExpr, TirExprKind, TirStmt,
 };
 
 pub(crate) fn scoped_name(outer: Option<&str>, name: &str) -> Arc<str> {
@@ -99,9 +99,9 @@ pub(super) fn emit_namespace_object(
         }
     }
 
-    let Some(&slot) = global_slots.get(&path) else {
+    if !global_slots.contains_key(&path) {
         return;
-    };
+    }
     let outer_scope = top.namespace.replace(path.clone());
     let mut pending: Vec<Arc<str>> = Vec::new();
     for m in &ns.body {
@@ -152,134 +152,58 @@ pub(super) fn emit_namespace_object(
                 .remove(&scoped_name(Some(&path), interner.resolve(*name)));
         }
     }
-    let mut entries: Vec<TirObjectEntry> = Vec::new();
     for m in &ns.body {
-        let Decl::Export(_) = m else { continue };
-        let inner = match m {
-            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
-            Decl::Variable(_)
-            | Decl::Function(_)
-            | Decl::Class(_)
-            | Decl::Interface(_)
-            | Decl::TypeAlias(_)
-            | Decl::Enum(_)
-            | Decl::Namespace(_)
-            | Decl::Import(_)
-            | Decl::Export(_)
-            | Decl::Extension(_)
-            | Decl::Struct(_)
-            | Decl::SumType(_) => continue,
+        let inner = if let Decl::Export(ExportDecl::Decl { declaration, .. }) = m {
+            declaration.as_ref()
+        } else {
+            m
         };
-        match inner {
-            Decl::Function(f) => {
-                let key = scoped_name(Some(&path), interner.resolve(f.id));
-                if let Some(&(fnid, _)) = scoped_fns.get(&key) {
-                    let mut value = TirExpr {
-                        kind: TirExprKind::Var,
-                        ty: dyno(),
-                        res: Resolution::DirectFn(FnId(fnid)),
-                        span: Span::EMPTY,
-                    };
-                    for d in f.decorators.iter().rev().filter(|d| {
-                        !varn_core::ast::decorators::is_active_builtin(
-                            top.ast_arena,
-                            interner,
-                            |off| shadowed.contains(&off),
-                            d,
-                        )
-                    }) {
-                        let deco = top.lower_expression(d.expression);
-                        value = apply_one_decorator(top, value, deco);
-                        top_body.extend(top.take_pending());
-                    }
-                    entries.push(TirObjectEntry::Field {
-                        name: Arc::from(interner.resolve(f.id)),
-                        value,
-                    });
-                }
-            }
-            Decl::Class(_) | Decl::Enum(_) | Decl::Namespace(_) => {
-                let mname = match inner {
-                    Decl::Class(c) => c.id,
-                    Decl::Enum(e) => Some(e.id),
-                    Decl::Namespace(n) => Some(n.id),
-                    Decl::Variable(_)
-                    | Decl::Function(_)
-                    | Decl::Interface(_)
-                    | Decl::TypeAlias(_)
-                    | Decl::Import(_)
-                    | Decl::Export(_)
-                    | Decl::Extension(_)
-                    | Decl::Struct(_)
-                    | Decl::SumType(_) => None,
-                };
-                if let Some(mname) = mname {
-                    let bare = interner.resolve(mname);
-                    let key = match inner {
-                        Decl::Namespace(_) => scoped_name(Some(&path), bare),
-                        Decl::Class(_)
-                        | Decl::Enum(_)
-                        | Decl::Variable(_)
-                        | Decl::Function(_)
-                        | Decl::Interface(_)
-                        | Decl::TypeAlias(_)
-                        | Decl::Import(_)
-                        | Decl::Export(_)
-                        | Decl::Extension(_)
-                        | Decl::Struct(_)
-                        | Decl::SumType(_) => Arc::from(bare),
-                    };
-                    if let Some(&mslot) = global_slots.get(&key) {
-                        entries.push(TirObjectEntry::Field {
-                            name: Arc::from(interner.resolve(mname)),
-                            value: global_ref(mslot),
-                        });
-                    }
-                }
-            }
-            Decl::Variable(v) => {
-                for decl in &v.declarators {
-                    if let (Pattern::Identifier { name, .. }, Some(init)) = (&decl.id, decl.init) {
-                        let value = match global_slots
-                            .get(&scoped_name(Some(&path), interner.resolve(*name)))
-                        {
-                            Some(&held) => global_ref(held),
-                            None => top.lower_expression(init),
-                        };
-                        entries.push(TirObjectEntry::Field {
-                            name: Arc::from(interner.resolve(*name)),
-                            value,
-                        });
-                    }
-                }
-            }
-            Decl::Interface(_)
-            | Decl::TypeAlias(_)
-            | Decl::Import(_)
-            | Decl::Export(_)
-            | Decl::Extension(_)
-            | Decl::Struct(_)
-            | Decl::SumType(_) => {}
+        let Decl::Function(f) = inner else { continue };
+        let key = scoped_name(Some(&path), interner.resolve(f.id));
+        let (Some(&(fnid, _)), Some(&held)) = (scoped_fns.get(&key), global_slots.get(&key))
+        else {
+            continue;
+        };
+        let wrappers: Vec<_> = f
+            .decorators
+            .iter()
+            .rev()
+            .filter(|d| {
+                !varn_core::ast::decorators::is_active_builtin(
+                    top.ast_arena,
+                    interner,
+                    |off| shadowed.contains(&off),
+                    d,
+                )
+            })
+            .collect();
+        if wrappers.is_empty() {
+            continue;
         }
+        let mut value = TirExpr {
+            kind: TirExprKind::Var,
+            ty: dyno(),
+            res: Resolution::DirectFn(FnId(fnid)),
+            span: Span::EMPTY,
+        };
+        for d in wrappers {
+            let deco = top.lower_expression(d.expression);
+            value = apply_one_decorator(top, value, deco);
+            top_body.extend(top.take_pending());
+        }
+        top_body.push(TirStmt::Expr(TirExpr {
+            kind: TirExprKind::Assign {
+                target: Box::new(global_ref(held)),
+                value: Box::new(value),
+            },
+            ty: BackendTy::Void,
+            res: Resolution::None,
+            span: Span::EMPTY,
+        }));
     }
 
     top.namespace = outer_scope;
     top.not_yet_bound = outer_pending;
-    let obj = TirExpr {
-        kind: TirExprKind::ObjectLit { entries },
-        ty: dyno(),
-        res: Resolution::None,
-        span: Span::EMPTY,
-    };
-    top_body.push(TirStmt::Expr(TirExpr {
-        kind: TirExprKind::Assign {
-            target: Box::new(global_ref(slot)),
-            value: Box::new(obj),
-        },
-        ty: BackendTy::Void,
-        res: Resolution::None,
-        span: Span::EMPTY,
-    }));
 }
 
 pub(super) fn collect_decl_names(

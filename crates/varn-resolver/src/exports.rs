@@ -93,6 +93,10 @@ pub(super) fn collect_exports(
                         out.insert(name_str.to_string(), s);
                     }
                 }
+                if let Decl::Namespace(ns) = declaration.as_ref() {
+                    let name = bind.interner.resolve(ns.id);
+                    crate::namespace_exports::export_declared(bind, name, name, abs_path, out);
+                }
                 if let Decl::SumType(st) = declaration.as_ref() {
                     for variant in &st.variants {
                         let variant_name = bind.interner.resolve(variant.name);
@@ -126,11 +130,37 @@ pub(super) fn collect_exports(
                         let mut s = rehome_to_declaring_module(resolver, bind, visiting, sym, out)
                             .unwrap_or_else(|| sym.clone());
                         s.name = spec.exported;
+                        let declared_here = s.origin_module.is_none();
                         s.origin_module = s
                             .origin_module
                             .take()
                             .or_else(|| Some(intern_origin(out, abs_path)));
                         out.insert(exported_name.to_string(), s);
+                        if declared_here {
+                            crate::namespace_exports::export_declared(
+                                bind,
+                                local_name,
+                                exported_name,
+                                abs_path,
+                                out,
+                            );
+                        }
+                        let carried: Vec<(Arc<str>, Vec<Arc<str>>)> = bind
+                            .namespace_imports
+                            .iter()
+                            .filter(|ns| ns.binding.as_ref() == local_name)
+                            .map(|ns| (ns.exported.clone(), ns.members.clone()))
+                            .collect();
+                        for (root, members) in carried {
+                            crate::namespace_exports::carry_imported(
+                                bind,
+                                sym,
+                                &root,
+                                &members,
+                                exported_name,
+                                out,
+                            );
+                        }
                     }
                 }
             }
@@ -157,6 +187,12 @@ pub(super) fn collect_exports(
                         s.name = spec.exported;
                         s.re_export_path.push(intern_origin(out, abs_path));
                         out.insert(exported_name.to_string(), s);
+                        crate::namespace_exports::forward(
+                            &src_exports,
+                            local_name,
+                            exported_name,
+                            out,
+                        );
                     }
                 }
             }

@@ -1,0 +1,3 @@
+// VN3004
+namespace N { export namespace Inner { const hidden = 1; export const shown = 2 } }
+print(N.Inner.hidden)

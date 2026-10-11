@@ -20,6 +20,7 @@ pub(crate) struct ModuleCtx<'a> {
 
     pub fns: &'a FxHashMap<Atom, (u32, u32)>,
     pub scoped_fns: &'a FxHashMap<Arc<str>, (u32, u32)>,
+    pub namespaces: &'a crate::namespace_scope::NamespaceScope,
 
     pub decorated_fns: &'a FxHashSet<Atom>,
 

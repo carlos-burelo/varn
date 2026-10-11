@@ -17,6 +17,7 @@ pub(super) struct FreeFunctions<'a> {
     pub(super) list: Vec<(&'a FunctionDecl, Option<Arc<str>>)>,
     pub(super) index: FxHashMap<Atom, (u32, u32)>,
     pub(super) scoped: FxHashMap<Arc<str>, (u32, u32)>,
+    pub(super) scoped_direct: FxHashMap<Arc<str>, (u32, u32)>,
     pub(super) decorated: FxHashSet<Atom>,
 }
 
@@ -120,6 +121,24 @@ pub(super) fn collect_free_functions<'a>(
             }
         }
     }
+    let wrapped = |f: &FunctionDecl| {
+        f.decorators.iter().any(|d| {
+            !varn_core::ast::decorators::is_active_builtin(
+                ast_arena,
+                interner,
+                |off| shadowed.contains(&off),
+                d,
+            )
+        })
+    };
+    let scoped_direct: FxHashMap<Arc<str>, (u32, u32)> = free_fns
+        .iter()
+        .filter(|(f, _)| !wrapped(f))
+        .filter_map(|(f, ns)| {
+            let key = super::namespaces::scoped_name(Some(ns.as_deref()?), interner.resolve(f.id));
+            scoped.get(&key).map(|entry| (key, *entry))
+        })
+        .collect();
     let decorated_fns: FxHashSet<Atom> = free_fns
         .iter()
         .filter(|(f, ns)| {
@@ -139,6 +158,7 @@ pub(super) fn collect_free_functions<'a>(
         list: free_fns,
         index: fn_index,
         scoped,
+        scoped_direct,
         decorated: decorated_fns,
     }
 }

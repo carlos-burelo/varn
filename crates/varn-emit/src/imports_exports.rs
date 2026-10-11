@@ -8,6 +8,7 @@ pub(super) fn collect_exports(
     program: &Program,
     ast_arena: &AstArena,
     interner: &AtomInterner,
+    namespaces: &FxHashMap<Arc<str>, Vec<super::namespace_scope::Member>>,
 ) -> Vec<varn_tir::TirExport> {
     let mut out = Vec::new();
     let mut push = |exported: Arc<str>, local: Arc<str>, from: Option<Arc<str>>, ns: bool| {
@@ -24,6 +25,13 @@ pub(super) fn collect_exports(
         };
         match d.as_ref() {
             Decl::Export(ExportDecl::Decl { declaration, .. }) => {
+                if let Decl::Namespace(ns) = declaration.as_ref() {
+                    let name = interner.resolve(ns.id);
+                    for member in namespaces.get(name).into_iter().flatten() {
+                        push(member.qualified.clone(), member.global.clone(), None, false);
+                    }
+                    continue;
+                }
                 let mut names = FxHashSet::default();
                 collect_decl_names(declaration, ast_arena, &mut names, interner);
                 for n in names {
@@ -34,9 +42,23 @@ pub(super) fn collect_exports(
                 specifiers, source, ..
             }) => {
                 for sp in specifiers {
+                    let local = interner.resolve(sp.local);
+                    let exported = interner.resolve(sp.exported);
+                    if let (None, Some(members)) = (source, namespaces.get(local)) {
+                        for member in members {
+                            let rest = &member.qualified[local.len()..];
+                            push(
+                                Arc::from(format!("{exported}{rest}")),
+                                member.global.clone(),
+                                None,
+                                false,
+                            );
+                        }
+                        continue;
+                    }
                     push(
-                        Arc::from(interner.resolve(sp.exported)),
-                        Arc::from(interner.resolve(sp.local)),
+                        Arc::from(exported),
+                        Arc::from(local),
                         source.map(|s| Arc::from(interner.resolve(s))),
                         false,
                     );

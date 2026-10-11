@@ -193,6 +193,7 @@ import "./198-loop-variable-per-iteration.vn"
 import "./199-containers-are-invariant.vn"
 import "./200-super-reaches-the-parent.vn"
 import "./201-loop-labels.vn"
+import "./202-namespaces-across-modules.vn"
 
 summary()
 

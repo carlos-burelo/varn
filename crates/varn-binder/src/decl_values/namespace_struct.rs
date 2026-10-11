@@ -28,22 +28,7 @@ impl<'r> super::super::Binder<'r> {
             self.bind_decl(d);
         }
 
-        let exported: Vec<varn_core::ast::Decl> = n
-            .body
-            .iter()
-            .filter_map(|d| {
-                if let varn_core::ast::Decl::Export(varn_core::ast::ExportDecl::Decl {
-                    declaration,
-                    ..
-                }) = d
-                {
-                    Some(declaration.as_ref().clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
-        let members = self.collect_namespace_members(&exported);
+        let members = self.collect_namespace_members(&exported_decls(&n.body));
         if !members.is_empty() {
             self.type_members.namespaces.insert(id_rc, members);
         }
@@ -185,12 +170,13 @@ impl<'r> super::super::Binder<'r> {
                     }
                 }
                 Decl::Namespace(n) => {
-                    let inner_members = self.collect_namespace_members(&n.body);
+                    let inner_members = self.collect_namespace_members(&exported_decls(&n.body));
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(n.id, &self.scopes);
                     let n_id_rc: Arc<str> = Arc::from(self.interner.resolve(n.id));
-                    let ns_ty = Type::named(
+                    let ns_ty = Type::named_with_origin(
                         n_id_rc.clone(),
+                        Some(Arc::from(self.source_file.as_ref())),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
@@ -252,8 +238,9 @@ impl<'r> super::super::Binder<'r> {
                         .unwrap_or_default();
                     let scope = self.scopes.get(self.current);
                     let symbol_id = scope.resolve(e.id, &self.scopes);
-                    let enum_ty = Type::named(
+                    let enum_ty = Type::named_with_origin(
                         e_id_rc.clone(),
+                        Some(Arc::from(self.source_file.as_ref())),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     members.push(ClassMemberInfo {
@@ -357,4 +344,20 @@ impl<'r> super::super::Binder<'r> {
         }
         members
     }
+}
+
+fn exported_decls(body: &[varn_core::ast::Decl]) -> Vec<varn_core::ast::Decl> {
+    body.iter()
+        .filter_map(|d| {
+            if let varn_core::ast::Decl::Export(varn_core::ast::ExportDecl::Decl {
+                declaration,
+                ..
+            }) = d
+            {
+                Some(declaration.as_ref().clone())
+            } else {
+                None
+            }
+        })
+        .collect()
 }
