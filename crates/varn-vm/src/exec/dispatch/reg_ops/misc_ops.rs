@@ -57,10 +57,10 @@ impl ExecCtx {
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("GetSuper: non-string const"))?;
 
-        let cls = self.frames[frame_idx]
-            .current_class
-            .clone()
-            .or_else(|| crate::exec::props::get_class(this_val, &self.heap))
+        let receiver = crate::exec::props::get_class(this_val, &self.heap);
+        let cls = crate::exec::class::home_class(receiver.clone(), closure, &self.heap)
+            .or_else(|| self.frames[frame_idx].current_class.clone())
+            .or(receiver)
             .ok_or_else(|| RuntimeError::new("GetSuper: 'this' has no class"))?;
         crate::exec::class::op_get_super(cls, &name, this_val, &mut self.heap)
     }

@@ -71,6 +71,7 @@ impl<'a> FnEmitter<'a> {
             res: self.resolve_name(&info.name),
             span,
         };
+        let args = self.fill_omitted(args, sig);
         self.settle_args(Callee::Inherited { class, name }, args, sig, span)
             .1
     }

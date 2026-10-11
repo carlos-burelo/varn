@@ -159,6 +159,33 @@ pub(crate) fn op_define_static_setter(
     Ok(())
 }
 
+pub(crate) fn home_class(
+    receiver: Option<Rc<ClassObj>>,
+    running: &crate::closure::VmClosure,
+    heap: &Heap,
+) -> Option<Rc<ClassObj>> {
+    let runs = |held: &VmValue| {
+        heap.closure_of(*held)
+            .is_some_and(|k| Rc::ptr_eq(&k.proto, &running.proto))
+    };
+    let mut class = receiver;
+    while let Some(c) = class {
+        let tables = [
+            (&c.vtable, &c.vtable_owners),
+            (&c.getter_vtable, &c.getter_vtable_owners),
+            (&c.setter_vtable, &c.setter_vtable_owners),
+        ];
+        for (table, owners) in tables {
+            if let Some(at) = table.borrow().iter().position(runs) {
+                let owner = owners.borrow().get(at).cloned().flatten();
+                return owner.or(Some(c.clone()));
+            }
+        }
+        class = c.superclass.borrow().clone();
+    }
+    None
+}
+
 pub(crate) fn op_get_super(
     cls: Rc<ClassObj>,
     name: &str,

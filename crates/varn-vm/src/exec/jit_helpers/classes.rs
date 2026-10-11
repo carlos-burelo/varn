@@ -21,10 +21,10 @@ pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
 
-        let cls = ctx_ref.frames[frame_idx]
-            .current_class
-            .clone()
-            .or_else(|| crate::exec::props::get_class(this_val, &ctx_ref.heap))
+        let receiver = crate::exec::props::get_class(this_val, &ctx_ref.heap);
+        let cls = crate::exec::class::home_class(receiver.clone(), closure_ref, &ctx_ref.heap)
+            .or_else(|| ctx_ref.frames[frame_idx].current_class.clone())
+            .or(receiver)
             .expect("GetSuper: 'this' has no class");
         match crate::exec::class::op_get_super(cls, &name, this_val, &mut ctx_ref.heap) {
             Ok(v) => ctx_ref.jit_native_result = v,
