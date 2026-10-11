@@ -28,9 +28,9 @@ código (Ley 12).
    victorias en tres pasadas seguidas.
 5. Un commit atómico por arreglo, en `main`. Sin stash ni ramas.
 
-## 1. Estado al cerrar 2026-10-10
+## 1. Estado
 
-Hecho (commits `0c3a2add`..`f58fc56e`, tests 185 y 186):
+### Primera tanda (commits `0c3a2add`..`f58fc56e`, tests 185 y 186)
 
 - Cero abandonos reales del JIT en corpus y benchmarks.
 - `try/catch` compila (antes ninguna función con `try` lo hacía).
@@ -38,7 +38,6 @@ Hecho (commits `0c3a2add`..`f58fc56e`, tests 185 y 186):
 - Parámetro con valor por defecto recupera su tipo.
 - Llamada directa a función libre entrega los argumentos con la forma
   de la firma (`int` → `int?`, argumento omitido → `null`).
-- Veracidad de `int`/`float` es una comparación, no un `Cast`.
 - `||` y `&&` devuelven un operando; sus tipos se afinan.
 - Literal de array con un elemento `dynamic` es `dynamic[]`.
 - `e as Error` funciona sin imports.
@@ -46,31 +45,72 @@ Hecho (commits `0c3a2add`..`f58fc56e`, tests 185 y 186):
 Frontera de `dynamic` (sesión anterior): completa. Ver memoria
 `varn-dynamic-boundary`.
 
-Cobertura estática medida antes de esta tanda (funciones tipadas):
-benchmarks 58 %, corpus 66 %. Genéricos que quedaban en funciones de
-benchmarks: `GetProperty` 340, `Eq` 157, `CallMethod` 50, `GetIndex` 8.
-Re-medir al empezar (skill `varn-static-coverage`); estas cifras caducan.
+### Segunda tanda (commits `b9744f27`..`6fd7a992`, tests 187 y 188)
+
+Decisiones de lenguaje de la sección 3, y lo que destaparon:
+
+- Índice fuera de rango lanza; leer por clave da `V?`; solo `null` y
+  `false` son falsos; opcional y `null` son lo mismo.
+- 2.1 hecho: toda llamada con firma conocida (método, constructor,
+  valor función, `super`) entrega los argumentos con la forma
+  declarada, desde un único punto del emisor (`guard_args` +
+  `fill_omitted`). Se borró `lower_args_as_declared` del compilador.
+- 2.5 hecho para clases importadas raíz: `ForeignClass` lleva el tipo
+  del constructor.
+- Leer un estático de clase o una variante de enum: 84–90 → 36–53 ns.
+
+Bugs previos que aparecieron por el camino, cada uno arreglado en su
+capa:
+
+- El checker no validaba los argumentos de `new` (ni tipos ni aridad):
+  `new K("x")` con `constructor(n: int)` compilaba y rompía en runtime.
+- `m[k] ?? d` sobre `Map<str, int>` fallaba en runtime con «expected
+  'int', got 'null'»: el emisor re-derivaba el tipo del elemento en
+  tres sitios y decía `int`.
+- Un estrechamiento restaba al tipo declarado, no al ya estrechado:
+  tras `if (v == null) return`, el `else` de `Array.isArray(v)`
+  recuperaba el `null`. Seis estrechadores leían el tipo cada uno por
+  su cuenta.
+- `function f(s?: str)` veía `s` como `str` en el cuerpo.
+- Un miembro `tag?: T` no aceptaba `null` aunque se leía como `T?`.
+- Un `int` literal hacia `float?` llegaba como int dentro del `float?`
+  (`typeof` decía `int`).
+- La rama `else` de `if (n)` con `n: int?` estrechaba a `null` aunque
+  `n` fuera 0. Con la regla nueva es correcto por construcción.
+- Cada lectura de propiedad por camino lento alocaba un `Arc<str>` para
+  un nombre corto (SSO).
+
+Sonda de 2.1 (ns por llamada, perfil `quick`, mínimo de 7 × 5M, mismo
+estado térmico antes → después):
+
+| Llamada | antes | después |
+|---|---|---|
+| método, `int` → `int?` | 64 | 20 |
+| método, (`str`, `int` → `int?`) | 123 | 21 |
+| método con argumento omitido | 107 | 12 |
+| constructor con argumento omitido | 123 | 59 |
+| valor función, `int` → `int?` | 108 | 28 |
+| método con tipos exactos (referencia) | 10,6 | 10,6 |
+
+La máquina termaliza: las sondas se repiten alternando binarios; una
+sola pasada dio hasta 3× de diferencia en la misma medida.
 
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
 
-### 2.1 Forma de llamada en métodos y closures
+### 2.1 Forma de llamada: lo que queda
 
-La adaptación de argumentos a la firma solo cubre `Resolution::DirectFn`
-(`from_tir/build/call.rs::lower_args_as_declared`). El JIT deduce la
-forma nativa de los tipos de los argumentos
-(`clif/from_ssa/call/native_entry.rs`, `NativeShape::new`) y la compara
-con la del destino; si no casan, cada llamada va al camino genérico.
-
-- Falta: `lower_method_call` (`expr_invoke.rs`), `SuperCall`,
-  `SuperMethodCall`, constructores (`new C(...)`) y llamadas a través
-  de un valor con tipo función conocido.
-- Sonda: `scratchpad` no persiste; rehacer `df2.vn` (función con `int?`,
-  con `str`, con argumento omitido, llamadas 5M veces) en versión
-  método y constructor.
-- Medida: ns por llamada frente a la misma llamada con tipos exactos
-  (referencia: 7 ns directa, 55–100 ns genérica).
+- Un constructor con parámetro por defecto no se inlinea
+  (`inlinable_constructor` lo rechaza): 59 ns frente a 1,8 del
+  constructor sin defecto.
+- Métodos de clases importadas: el emisor no tiene sus firmas
+  (`ForeignClass.methods` son solo nombres), así que no hay forma ni
+  slot de vtable. No vale con añadir la firma: el slot lo decide el
+  módulo dueño. Hace falta exportar firma + slot juntos.
+- `new Box(1)` sin instanciar no valida los argumentos (no hay con qué
+  sustituir `T`); falta inferir la instanciación desde los argumentos.
+- Tras `x ||= v`, `x` no se estrecha a no nulo.
 
 ### 2.2 Tipos que `HirType` no distingue
 
@@ -79,7 +119,16 @@ Tuple, Class, Nullable. Char, Bytes, Enum, Decimal, BigInt, Fn y los
 tipos de objeto caen en `Ref` (`from_tir/ty.rs`) y pierden su identidad
 antes de elegir opcode.
 
-- Empezar por Enum y Char: son los que alimentan `Eq` genérico.
+- Medido en la segunda tanda: la igualdad entre enums no es lenta
+  (18 ns con la llamada, igual que int). El `Eq` genérico ya resuelve en
+  línea los bits idénticos y los dos SSO; solo va al helper cuando los
+  operandos difieren y son bool, enum o referencias. Lo caro del enum es
+  llegar a la variante: `Color.Red` es un `GetProperty` por nombre
+  (36–53 ns tras el arreglo, 84–90 antes). El arreglo de cimiento es
+  que la variante sin payload sea un slot resuelto en compilación:
+  `Resolution::StaticField` existe en el TIR y nadie lo produce.
+- Después, Enum y Char en `HirType`: son los que alimentan `Eq` genérico
+  cuando los operandos difieren.
 - `Eq` tipado para str, bool, enum y referencia (hoy 1,2 ns genérico
   frente a 0,4 tipado; `eqStrLong` 12,6 ns).
 - Medida: recuento `EqInt`/`Eq` y `GetFixedField`/`GetProperty` en
@@ -107,9 +156,9 @@ genéricos que queda (340 `GetProperty` en benchmarks).
 
 ### 2.5 Firmas de constructores de clases externas
 
-`new Headers({})` y similares van a verificación en runtime porque el
-emisor no conoce la firma del constructor de una clase importada o
-nativa. Hace falta exportar la firma del constructor junto a la clase.
+Hecho para clases importadas raíz (`fd70b173`). Falta: clases
+importadas con padre (hoy `collect_foreign_classes` las salta) y clases
+nativas (`is_builtin_or_intrinsic`).
 
 ### 2.6 Coste de entrar en un `try` compilado
 
@@ -129,20 +178,36 @@ async aprobado (memoria `varn-async-redesign-approved`).
 Hace doble búsqueda (unos 80 ns frente a 45). Pendiente de la sesión
 anterior.
 
-## 3. Decisiones de lenguaje sin tomar
+## 3. Decisiones de lenguaje (tomadas 2026-10-10, delegadas por el dueño)
 
-No se implementan sin que el dueño decida:
+Criterio: una regla que quepa en una frase, que el tipo no mienta, y
+ningún pecado heredado (tablas de falsos, `undefined`, huecos en
+arrays). Cada una declara qué se gana, cómo se verifica y qué se borra
+en su commit.
 
-- `xs[i]` y `s[i]` fuera de rango devuelven `null` con tipo `T`. O el
-  tipo del acceso pasa a ser `T?`, o el acceso lanza. Mientras siga
-  así, un `int` leído de un array puede ser `null` y no se puede plegar
-  `IsNull` sobre valores que vienen de un índice.
-- Un string vacío es verdadero (solo son falsos `null`, `false`, `0`,
-  `0.0` y `NaN`). Está cubierto por el test 186; confirmar que es lo
-  querido.
-- En `a && b`, solo se descarta el tipo de la izquierda cuando es una
-  instancia de clase. Arrays, tuplas y funciones también son siempre
-  verdaderos y podrían afinarse igual.
+- **Índice fuera de rango lanza `RangeError`** (`b9744f27`). `xs[i]`,
+  `s[i]`, `bytes[i]` y `rango[i]` tienen tipo `T` y ahora es verdad,
+  también al escribir (se borra el relleno con `null`). El acceso que
+  puede fallar es `at(i): T?`; crecer es `push`. Se descartó `T?`:
+  obliga a `!` en cada bucle y mete nullables en el camino caliente.
+- **Leer por clave da `V?`** (`e5ce9bc9`). En `Map<K, V>` y
+  `{ [key: K]: V }` la clave ausente es un caso normal, no un error.
+  La escritura pide `V`. Asignación compuesta aritmética sobre un
+  destino nullable es error.
+- **Solo `null` y `false` son falsos** (`f636c2ad`). `0`, `0.0`, `NaN`
+  y `""` son verdaderos. Condicionar sobre un tipo que nunca es falso
+  (int, str, array, instancia…) es error `VN3027`. Con `x: T?`,
+  `if (x)` es `x != null` exacto en las dos ramas y compila a `IsNull`.
+- **`&&` y `||` se afinan con la misma regla** para cualquier tipo
+  (`never_false`), no solo instancias de clase.
+- **Opcional y `null` son lo mismo** (`bac1cf33`, `2c1249fc`). Un
+  miembro `tag?: T` es `T?`; un parámetro `p?: T` es `T?` en el cuerpo;
+  quien llama puede pasar `T?` a cualquier parámetro opcional o con
+  valor por defecto (el `null` toma el defecto).
+
+Medido antes de decidir: en todo `std` + suite solo 2 tests dependían
+del `null` fuera de rango, 9 sitios de la lectura por clave no nula y
+17 condiciones de un tipo que nunca es falso (12 en el test 186).
 
 ## 4. Trampas conocidas
 
@@ -159,3 +224,14 @@ No se implementan sin que el dueño decida:
   `crates/varn-builtins/src/modules` desde el checkout principal.
 - Los scripts de edición deben conservar CRLF.
 - Tras cambiar el compilador, purgar `~/.varn/cache`.
+- Los tests 111 y 112 lanzan `target/debug/vn.exe` por ruta fija. Para
+  correr los cuadrantes `@embedded` con otro perfil hay que copiar ese
+  binario ahí, o el bundle se rechaza («compilado por otra version») y
+  el proceso se queda colgado.
+- `tests/main.vn` aborta en el primer error no capturado y solo enseña
+  ese. Para ver todo lo que rompe un cambio de lenguaje: `vn check`
+  sobre cada `.vn` de `std/` y `tests/`, y `vn run` de cada test suelto.
+- El corpus `tests/errors/` no tiene corredor: cada archivo declara en
+  su primera línea el código que `vn check` debe emitir.
+- Un cuadrante `@embedded` falló una vez en el test 113 por un archivo
+  temporal que dejó un `vn` matado; al repetir pasó.
