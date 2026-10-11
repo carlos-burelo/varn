@@ -24,7 +24,7 @@ function utf8Str(n: int): str { return "héllo-ñ" + n }
 
 // Used as a map key, which canonicalizes through the interner.
 function mapRoundTrip(n: int): bool {
-  const m = new Map()
+  const m = new Map<str, int>()
   m.set(isStr(n), n)
   return m.get("ab" + n) === n
 }

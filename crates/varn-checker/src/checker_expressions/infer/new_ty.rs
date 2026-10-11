@@ -39,13 +39,6 @@ impl<'r> Checker<'r> {
                     )
                 } else if let Some(contextual) = self.expected_instantiation(name) {
                     contextual
-                } else if name_str == varn_core::BuiltinType::Map.name() {
-                    Type::generic_with_origin(
-                        name_str,
-                        vec![Type::Dynamic, Type::Dynamic],
-                        origin_str,
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    )
                 } else if let Some(args) =
                     self.instantiation_from_args(rec, callee, &name_str, origin_str.as_ref(), ctor_args, bind)
                 {
@@ -113,12 +106,6 @@ impl<'r> Checker<'r> {
                         )
                     } else if let Some(contextual) = self.expected_instantiation(*name) {
                         contextual
-                    } else if name_str == varn_core::BuiltinType::Map.name() {
-                        Type::generic(
-                            name_str,
-                            vec![Type::Dynamic, Type::Dynamic],
-                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        )
                     } else if let Some(args) =
                         self.instantiation_from_args(rec, callee, &name_str, None, ctor_args, bind)
                     {
