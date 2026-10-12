@@ -37,6 +37,9 @@ pub(super) fn infer_member_type(
     };
 
     let prop_name_str = bind.interner.resolve(*prop_name);
+    if let Some(ty) = checker.narrowed_member_read(expr, bind) {
+        return ty;
+    }
     let obj_kind = checker.ty_table.get(obj_ty.0);
     match obj_kind {
         TypeKind::Array(_elem) => {

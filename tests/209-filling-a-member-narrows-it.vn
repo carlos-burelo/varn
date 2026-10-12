@@ -1,0 +1,48 @@
+import { describe, it, expect } from "std:test";
+
+class C {
+    v: int?
+    w: int?
+    constructor() {
+        this.v = null
+        this.w = null
+    }
+    fill(): int {
+        this.v ??= 3
+        return this.v
+    }
+    refills(): int {
+        this.v ??= 3
+        this.v = 7
+        return this.v
+    }
+}
+
+function ext(o: C): int {
+    o.v ??= 4
+    return o.v
+}
+
+function nested(o: C): int {
+    o.v ??= 4
+    const v = o.v
+    return v
+}
+
+await describe("209 filling a member narrows it", async () => {
+    await it("??= on this narrows until reassigned", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + new C().fill() + new C().refills() }
+        expect(new C().fill()).toBe(3)
+        expect(new C().refills()).toBe(7)
+        expect(total).toBe(300 * (3 + 7))
+    })
+
+    await it("??= on another object narrows its path", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + ext(new C()) + nested(new C()) }
+        expect(ext(new C())).toBe(4)
+        expect(nested(new C())).toBe(4)
+        expect(total).toBe(300 * (4 + 4))
+    })
+})

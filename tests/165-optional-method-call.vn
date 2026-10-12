@@ -65,7 +65,7 @@ await describe("165 optional method call", async () => {
         const root = new Node()
         expect(root.child?.depth() ?? -1).toBe(-1)
         root.child = new Node()
-        expect(root.child?.depth() ?? -1).toBe(1)
+        expect(root.child.depth()).toBe(1)
     })
 
     await it("holds in a hot loop", () => {

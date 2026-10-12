@@ -438,11 +438,37 @@ nuevos en `std` ni `tests`.
 Validación (perfil `quick`): cuadrante 1 `3137/3137`, corpus 202/202
 con caché nueva, cero abandonos reales del JIT.
 
+### Decimocuarta tanda (test 209)
+
+- **Llenar un miembro lo estrecha (`this.v ??= 3`).**
+  Faltaba el último hueco de 2.1. Claves por ruta (`MemberKey`, la
+  coincidencia exacta manda y la recursión hace el resto; `?.` o
+  computado no participan), creación y olvido como en variables:
+  asignar resetea, llamar e instanciar olvidan todo (como TS), los
+  closures aíslan por `in_function_body`. El emisor honra el tipo
+  estrechado en `field_access` y el verificador lo acepta
+  explícitamente; el test de coherencia existente sigue verde (`Str`
+  contra `Int` se rechaza igual).
+- 140 y 165 se adaptan a la paridad con variables: `?.` sobre algo
+  llenado es `VN3028`, y tras una llamada hay que releer.
+- Test 209. Sin A/B con ganancia: la base no compila el código
+  nuevo; control de no regresión con forma de llamada (3 bloques x 10:
+  medianas 27 y 28 ms).
+
+Validación (perfil `quick`): cuadrante 1 `3143/3143`, corpus 202/202
+con caché nueva, cero abandonos reales del JIT.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
 
 ### 2.1 Forma de llamada: lo que queda
+
+Hecho todo: `new` importado con y sin ctor (novena a undécima),
+genérico pelado en anotación (duodécima) y estrechamiento por
+asignación en variables, closures y miembros (tandas 6, 8, 13 y 14).
+Queda sin inlinear el constructor ajeno y, por diseño conservador, la
+rama que asigna invalida la otra y la llamada olvida miembros.
 
 - `new` de una clase importada: hecho cuando la clase declara
   constructor y no está decorada. Hecho en la undécima tanda para clases
@@ -460,7 +486,8 @@ Cada item: qué falta, dónde, cómo se mide.
   toma sus defaults (`TypeContext::generic_defaults`).
 - Hecho (decimotercera tanda, test 208): definir un closure no toca
   el estrechamiento exterior; llamarlo olvida solo lo que asigna.
-  Falta: miembros (`this.v ??= 3`). La rama que asigna invalida la
+- Hecho (decimocuarta tanda, test 209): llenar un miembro lo estrecha;
+  asignar lo resetea y llamar olvida. La rama que asigna invalida la
   otra por diseño conservador.
 
 ### 2.2 Tipos que `HirType` no distingue

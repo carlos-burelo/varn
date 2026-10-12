@@ -39,7 +39,7 @@ impl<'r> Checker<'r> {
                     &self.ast_arena.expr(init_expr).kind,
                     ExprKind::Function { .. } | ExprKind::Arrow { .. }
                 ) {
-                    if let Some(ids) = self.closure_def_effects(init_expr, bind) {
+                    if let Some(effects) = self.closure_def_effects(init_expr, bind) {
                         let mut bound = Vec::new();
                         Self::pattern_bound_atoms(&d.id, &mut bound);
                         for name in bound {
@@ -48,10 +48,13 @@ impl<'r> Checker<'r> {
                                 .get(self.current_scope)
                                 .resolve(name, &bind.scopes)
                             {
-                                self.closure_var_effects
-                                    .entry(id)
-                                    .or_default()
-                                    .extend(ids.iter().copied());
+                                let entry = self.closure_effects.entry(id).or_default();
+                                entry.vars.extend(effects.vars.iter().copied());
+                                entry.vars.sort();
+                                entry.vars.dedup();
+                                entry.members.extend(effects.members.iter().cloned());
+                                entry.members.sort();
+                                entry.members.dedup();
                             }
                         }
                     }

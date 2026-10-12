@@ -89,6 +89,7 @@ impl<'r> Checker<'r> {
         let saved_switch_depth = self.switch_depth;
         let saved_labels = std::mem::take(&mut self.loop_labels);
         let saved_narrowed = std::mem::take(&mut self.narrowed_types);
+        let saved_members = std::mem::take(&mut self.member_narrowed);
         self.in_function = true;
         self.loop_depth = 0;
         self.switch_depth = 0;
@@ -101,6 +102,7 @@ impl<'r> Checker<'r> {
         self.switch_depth = saved_switch_depth;
         self.loop_labels = saved_labels;
         self.narrowed_types = saved_narrowed;
+        self.member_narrowed = saved_members;
         self.mark_infer_env_dirty();
         result
     }

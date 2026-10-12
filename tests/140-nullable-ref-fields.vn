@@ -67,13 +67,17 @@ await describe("140 nullable ref fields", async () => {
 
     await it("group 1 part 2", async () => {
         expect(holder.label == null).toBeTruthy();
+        const counts = new Map<str, int>()
+        counts.set("a", 1)
         holder.node = new NrNode(5)
         holder.items = [1, 2, 3]
-        holder.counts = new Map<str, int>()
-        holder.counts?.set("a", 1)
-        expect(holder.node?.value).toBe(5);
-        expect(holder.items?.length).toBe(3);
-        expect(holder.counts?.get("a")).toBe(1);
+        holder.counts = counts
+        const node = holder.node
+        const items = holder.items
+        const filled = holder.counts
+        expect(node.value).toBe(5);
+        expect(items.length).toBe(3);
+        expect(filled.get("a")).toBe(1);
         holder.node = null
         holder.items = null
     });

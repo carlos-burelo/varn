@@ -78,6 +78,13 @@ impl<'r> Checker<'r> {
             } = &arena.expr(target).kind
             {
                 self.computed_member_slot(rec, *object, *property, bind).0
+            } else if matches!(
+                &arena.expr(target).kind,
+                varn_core::ast::ExprKind::Member { .. }
+            ) {
+                self.member_path_declared(rec, target, bind)
+                    .map(|(_, declared)| declared)
+                    .unwrap_or_else(|| self.infer_type(rec, target, bind))
             } else {
                 self.infer_type(rec, target, bind)
             };

@@ -70,10 +70,13 @@ impl<'r> Checker<'r> {
                 .get(self.current_scope)
                 .resolve(f.id, &bind.scopes)
             {
-                self.closure_var_effects
-                    .entry(id)
-                    .or_default()
-                    .extend(effects);
+                let entry = self.closure_effects.entry(id).or_default();
+                entry.vars.extend(effects.vars.iter().copied());
+                entry.vars.sort();
+                entry.vars.dedup();
+                entry.members.extend(effects.members.iter().cloned());
+                entry.members.sort();
+                entry.members.dedup();
             }
         }
         self.in_function_body(f.modifiers.is_async, |c| c.check_stmt(rec, f.body, bind));

@@ -86,7 +86,7 @@ pub(super) fn check_field(
         return;
     };
 
-    if e.ty != field.ty {
+    if e.ty != field.ty && e.ty != field.ty.non_nullable(&m.types) {
         errors.push(VerifyError::new(
             format!(
                 "field `{}` is declared {:?}, node says {:?}",

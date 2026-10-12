@@ -217,6 +217,7 @@ impl<'r> Checker<'r> {
             }
         }
         self.forget_closure_args(rec, args, bind);
+        self.forget_all_members();
     }
 
     fn require_instantiation(

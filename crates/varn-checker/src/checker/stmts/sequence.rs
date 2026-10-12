@@ -42,9 +42,12 @@ impl<'r> Checker<'r> {
 
             self.check_stmt(rec, stmt_id, bind);
             let filled = self.narrowing_after_assignment(rec, stmt_id, bind);
-            if !filled.is_empty() {
+            let filled_members = self.member_narrowing_after_assignment(rec, stmt_id, bind);
+            if !filled.is_empty() || !filled_members.is_empty() {
                 self.push_narrowings(&filled);
+                self.push_member_narrowings(&filled_members);
                 self.check_stmts_with_guards(rec, &stmts[i + 1..], bind);
+                self.pop_member_narrowings(&filled_members);
                 self.pop_narrowings(&filled);
                 return;
             }
@@ -140,6 +143,31 @@ impl<'r> Checker<'r> {
     fn push_narrowings(&mut self, narrowings: &[(varn_sem::symbol::SymbolId, Type)]) {
         for (id, ty) in narrowings {
             self.narrowed_types.entry(*id).or_default().push(*ty);
+        }
+        self.mark_infer_env_dirty();
+    }
+
+    fn push_member_narrowings(
+        &mut self,
+        narrowings: &[(super::reassignment::MemberKey, Type)],
+    ) {
+        for (key, ty) in narrowings {
+            self.member_narrowed
+                .entry(key.clone())
+                .or_default()
+                .push(*ty);
+        }
+        self.mark_infer_env_dirty();
+    }
+
+    fn pop_member_narrowings(
+        &mut self,
+        narrowings: &[(super::reassignment::MemberKey, Type)],
+    ) {
+        for (key, _) in narrowings {
+            if let Some(stack) = self.member_narrowed.get_mut(key) {
+                stack.pop();
+            }
         }
         self.mark_infer_env_dirty();
     }

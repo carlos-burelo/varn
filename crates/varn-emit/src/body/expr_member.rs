@@ -341,15 +341,22 @@ impl<'a> FnEmitter<'a> {
             .class_of(obj.ty)
             .and_then(|ci| ci.field(&name).cloned())
         {
-            Some(field) => TirExpr {
-                kind: TirExprKind::Field {
-                    object: Box::new(obj),
-                    name,
-                },
-                ty: field.ty,
-                res: Resolution::FieldSlot(field.slot),
-                span,
-            },
+            Some(field) => {
+                let ty = if ty != field.ty && ty == field.ty.non_nullable(self.tt) {
+                    ty
+                } else {
+                    field.ty
+                };
+                TirExpr {
+                    kind: TirExprKind::Field {
+                        object: Box::new(obj),
+                        name,
+                    },
+                    ty,
+                    res: Resolution::FieldSlot(field.slot),
+                    span,
+                }
+            }
             None => TirExpr {
                 kind: TirExprKind::Field {
                     object: Box::new(obj),
