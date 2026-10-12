@@ -22,15 +22,16 @@ impl<'a> FnEmitter<'a> {
         let Some(checked) = self.m.desugar.call_params.get(&call_id) else {
             return lowered;
         };
+        let checked = checked.clone();
         let (names, table, interner) = (self.m.names, self.m.checker_table, self.m.interner);
         let mut spread_seen = false;
         lowered
             .into_iter()
             .enumerate()
             .map(|(i, arg)| match arg {
-                TirArg::Expr(e) => match checked.get(i) {
-                    Some(param) if !spread_seen => {
-                        let param = lower_type(&param.ty, table, interner, self.tt, names);
+                TirArg::Expr(e) => match checked_widen_ty(&checked, i, table) {
+                    Some(ty) if !spread_seen => {
+                        let param = lower_type(&ty, table, interner, self.tt, names);
                         TirArg::Expr(self.widened(e, param))
                     }
                     Some(_) | None => TirArg::Expr(e),
@@ -49,24 +50,11 @@ impl<'a> FnEmitter<'a> {
         call_id: AstId,
         return_ty: BackendTy,
     ) -> Option<varn_tir::SigId> {
-        let checked = self.m.desugar.call_params.get(&call_id)?;
-        let (names, table, interner) = (self.m.names, self.m.checker_table, self.m.interner);
-        let params = checked
-            .iter()
-            .map(|param| {
-                let lowered = lower_type(&param.ty, table, interner, self.tt, names);
-                let boxed = matches!(lowered, BackendTy::Nullable(_) | BackendTy::Dynamic(_));
-                if param.optional && !boxed {
-                    BackendTy::Nullable(self.tt.intern(lowered))
-                } else {
-                    lowered
-                }
-            })
-            .collect();
+        let (params, has_rest) = self.checked_shape(call_id)?;
         let sig = varn_tir::Signature {
             params,
             return_ty,
-            has_rest: false,
+            has_rest,
         };
         let at = match self.signatures.iter().position(|known| *known == sig) {
             Some(at) => at,
@@ -89,6 +77,28 @@ impl<'a> FnEmitter<'a> {
         } else {
             arg
         }
+    }
+
+    pub(super) fn checked_shape(
+        &mut self,
+        call_id: varn_core::ast::AstId,
+    ) -> Option<(Vec<BackendTy>, bool)> {
+        let checked = self.m.desugar.call_params.get(&call_id)?.clone();
+        let (names, table, interner) = (self.m.names, self.m.checker_table, self.m.interner);
+        let params = checked
+            .iter()
+            .map(|param| {
+                let lowered = lower_type(&param.ty, table, interner, self.tt, names);
+                let boxed = matches!(lowered, BackendTy::Nullable(_) | BackendTy::Dynamic(_));
+                if param.optional && !param.is_rest && !boxed {
+                    BackendTy::Nullable(self.tt.intern(lowered))
+                } else {
+                    lowered
+                }
+            })
+            .collect();
+        let has_rest = checked.last().is_some_and(|param| param.is_rest);
+        Some((params, has_rest))
     }
 
     fn lower_args_in_order(&mut self, call_id: AstId, args: &[Arg]) -> Vec<TirArg> {
@@ -124,7 +134,7 @@ impl<'a> FnEmitter<'a> {
     ) -> TirExpr {
         if matches!(self.ast_arena.expr(callee).kind, ExprKind::Super) {
             let targs = self.lower_call_args(call_id, args);
-            let targs = self.settle_super_args("constructor", targs, span);
+            let targs = self.settle_super_args(call_id, "constructor", targs, span);
             return TirExpr {
                 kind: TirExprKind::SuperCall { args: targs },
                 ty,
@@ -144,7 +154,7 @@ impl<'a> FnEmitter<'a> {
             if matches!(self.ast_arena.expr(object).kind, ExprKind::Super) {
                 if let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner) {
                     let targs = self.lower_call_args(call_id, args);
-                    let targs = self.settle_super_args(&name, targs, span);
+                    let targs = self.settle_super_args(call_id, &name, targs, span);
                     let reached = match self.this_class {
                         Some(_) => None,
                         None => self.inherited_member(&name, false, span),
@@ -175,9 +185,10 @@ impl<'a> FnEmitter<'a> {
             let targs = self.lower_call_args(call_id, args);
             let callee_sig = self.callee_signature(callee);
             let (c, targs) = if matches!(c.res, Resolution::NativeGlobal(_)) {
-                (c, self.guard_args(targs, callee_sig))
+                (c, self.guard_args(Some(call_id), targs, callee_sig))
             } else {
-                let (target, targs) = self.settle_args(Callee::Value(c), targs, callee_sig, span);
+                let (target, targs) =
+                    self.settle_args(Some(call_id), Callee::Value(c), targs, callee_sig, span);
                 (target.into_expr(), targs)
             };
             let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
@@ -187,7 +198,7 @@ impl<'a> FnEmitter<'a> {
             let mut targs = targs;
             if let Some((_, arity)) = self.known_fn(*name).filter(|_| all_positional && !takes_rest)
             {
-                targs = self.fill_omitted(targs, callee_sig);
+                targs = self.fill_omitted(targs, Some(call_id), callee_sig);
                 while targs.len() < arity as usize {
                     targs.push(TirArg::Expr(TirExpr {
                         kind: TirExprKind::NullLit,
@@ -422,7 +433,8 @@ impl<'a> FnEmitter<'a> {
         let c = self.lower_expr(callee);
         let targs = self.lower_call_args(call_id, args);
         let callee_sig = self.callee_signature(callee);
-        let (target, targs) = self.settle_args(Callee::Value(c), targs, callee_sig, span);
+        let (target, targs) =
+            self.settle_args(Some(call_id), Callee::Value(c), targs, callee_sig, span);
         let c = target.into_expr();
         TirExpr {
             kind: TirExprKind::Call {
@@ -434,4 +446,25 @@ impl<'a> FnEmitter<'a> {
             span,
         }
     }
+}
+
+fn checked_widen_ty(
+    checked: &[varn_sem::output::CheckedParam],
+    at: usize,
+    table: &varn_sem::types::CheckerTyTable,
+) -> Option<varn_sem::types::Type> {
+    let rest_inner = |param: &varn_sem::output::CheckedParam| match table.get(param.ty.0) {
+        varn_core::TypeKind::Array(inner) => Some(varn_sem::types::Type::resolved(inner)),
+        _ => Some(param.ty),
+    };
+    if let Some(param) = checked.get(at) {
+        if param.is_rest {
+            return rest_inner(param);
+        }
+        return Some(param.ty);
+    }
+    checked
+        .last()
+        .filter(|param| param.is_rest)
+        .and_then(rest_inner)
 }

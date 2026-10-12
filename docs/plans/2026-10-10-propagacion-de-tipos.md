@@ -316,6 +316,34 @@ diez casos nuevos en `tests/errors/`.
   400; ya lo estaban y no se partieron.
 - Lo que queda abierto en namespaces está en 2.9.
 
+### Novena tanda (test 204)
+
+- **La forma de un argumento sale de un solo sitio: `call_params`.**
+  `guard_args`, `fill_omitted` y el ensanchado `int` -> `float`/`decimal`/
+  `bigint` leían dos fuentes: la firma del llamado (`SigId` de la tabla
+  de métodos, del constructor o del callee) y los parámetros que validó
+  el checker (`Desugarings.call_params`, ya instanciados). En una clase
+  genérica la primera tiene `T` borrado y la segunda el tipo real, así
+  que la guarda y el relleno veían un tipo distinto del que validó el
+  checker. Ahora `shape_of` resuelve primero `call_params` (vía
+  `checked_shape`) y deja la firma como respaldo cuando no hay llamada
+  validada; `settle_args`, `settle_super_args`, `guard_args` y
+  `fill_omitted` reciben el `call_id`. Un método prefiere la firma
+  validada a la tabla (`checked` antes que `table_sig`).
+- **Se borró el caso `int` -> `float?` de `as_declared`.** Era anterior
+  al ensanchado por `call_params`: hoy el argumento ya llega como
+  `float` y solo se encaja en el `float?`.
+- **`call_params` conserva el `rest`.** Antes lo cortaba (`take_while !
+  is_rest`) y `checked_signature` mentía `has_rest: false`; ahora
+  `CheckedParam` lleva `is_rest`, el ensanchado desenvuelve el interior
+  del `Array` para cada argumento extra y la firma reconstruida lleva su
+  `has_rest`.
+
+Validación (perfil `quick`): cuadrante 1 `3114/3114`, corpus 200/200 con
+caché nueva, cero abandonos reales del JIT, A/B pareado de forma de
+llamada (3 bloques x 10, alternos): mediana 32 ms los dos binarios.
+Test 204 (genérico `T`/`T?` con `int`, `rest` con `float`, omitido).
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -330,11 +358,9 @@ Cada item: qué falta, dónde, cómo se mide.
 - Slots de método para clases importadas: medido, no hace falta. Con
   tipos exactos la llamada por nombre con caché iguala al slot (6,8 ns
   las dos).
-- La forma de un argumento sale de dos sitios: la firma del llamado
-  (`guard_args`) y los parámetros que validó el checker (`call_params`,
-  usados para ensanchar y para clases sin tabla de métodos). El segundo
-  es la fuente correcta; falta mover `guard_args` a él y borrar el caso
-  `int` -> `float?` que quedó dentro de `as_declared`.
+- Hecho (novena tanda, test 204): la forma sale de `call_params`
+  (`shape_of` + `checked_shape`); la firma del llamado queda como
+  respaldo y se borró el caso `int` -> `float?` de `as_declared`.
 - Un tipo genérico escrito sin argumentos en una anotación (`x: Cell`)
   no toma los valores por defecto de sus parámetros; solo `new` lo hace.
 - El estrechamiento por asignación no cubre miembros (`this.v ??= 3`),

@@ -45,6 +45,7 @@ impl<'a> FnEmitter<'a> {
 
     pub(super) fn settle_super_args(
         &mut self,
+        call_id: varn_core::ast::AstId,
         method: &str,
         args: Vec<TirArg>,
         span: Span,
@@ -71,8 +72,14 @@ impl<'a> FnEmitter<'a> {
             res: self.resolve_name(&info.name),
             span,
         };
-        let args = self.fill_omitted(args, sig);
-        self.settle_args(Callee::Inherited { class, name }, args, sig, span)
+        let args = self.fill_omitted(args, Some(call_id), sig);
+        self.settle_args(
+            Some(call_id),
+            Callee::Inherited { class, name },
+            args,
+            sig,
+            span,
+        )
             .1
     }
 
@@ -105,7 +112,13 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn unproven(&self, callee: &Callee, args: &[TirArg], sig: Option<SigId>) -> bool {
+    fn unproven(
+        &self,
+        call_id: Option<varn_core::ast::AstId>,
+        callee: &Callee,
+        args: &[TirArg],
+        fallback: Option<SigId>,
+    ) -> bool {
         if args.iter().any(|a| matches!(a, TirArg::Named { .. })) {
             return false;
         }
@@ -119,7 +132,10 @@ impl<'a> FnEmitter<'a> {
                 return true;
             }
         }
-        if sig.is_some() {
+        if fallback.is_some() {
+            return false;
+        }
+        if call_id.is_some_and(|id| self.m.desugar.call_params.contains_key(&id)) {
             return false;
         }
         let untyped_callee = match callee {
@@ -132,13 +148,14 @@ impl<'a> FnEmitter<'a> {
 
     pub(super) fn settle_args(
         &mut self,
+        call_id: Option<varn_core::ast::AstId>,
         callee: Callee,
         args: Vec<TirArg>,
-        sig: Option<SigId>,
+        fallback: Option<SigId>,
         span: Span,
     ) -> (Callee, Vec<TirArg>) {
-        if !self.unproven(&callee, &args, sig) {
-            let args = self.guard_args(args, sig);
+        if !self.unproven(call_id, &callee, &args, fallback) {
+            let args = self.guard_args(call_id, args, fallback);
             return (callee, args);
         }
         match callee {
@@ -326,17 +343,7 @@ impl<'a> FnEmitter<'a> {
         let boxed_already = matches!(arg.ty, BackendTy::Nullable(_) | BackendTy::Dynamic(_));
         match param {
             BackendTy::Nullable(_) | BackendTy::Dynamic(_) if boxed_already => arg,
-            BackendTy::Nullable(inner) => {
-                let present = if self.tt.contains(inner)
-                    && self.tt.get(inner) == BackendTy::Float
-                    && arg.ty == BackendTy::Int
-                {
-                    self.cast_to(arg, BackendTy::Float)
-                } else {
-                    arg
-                };
-                self.cast_to(present, param)
-            }
+            BackendTy::Nullable(_) => self.cast_to(arg, param),
             BackendTy::Dynamic(_) => self.cast_to(arg, param),
             BackendTy::Int
             | BackendTy::Float
@@ -359,14 +366,34 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    pub(super) fn fill_omitted(&self, mut args: Vec<TirArg>, sig: Option<SigId>) -> Vec<TirArg> {
-        let Some(sig) = sig.and_then(|s| self.signatures.get(s.0 as usize)) else {
+    fn shape_of(
+        &mut self,
+        call_id: Option<varn_core::ast::AstId>,
+        fallback: Option<SigId>,
+    ) -> Option<(Vec<BackendTy>, bool)> {
+        if let Some(call_id) = call_id {
+            if let Some(shape) = self.checked_shape(call_id) {
+                return Some(shape);
+            }
+        }
+        let sig = fallback.and_then(|s| self.signatures.get(s.0 as usize))?;
+        Some((sig.params.clone(), sig.has_rest))
+    }
+
+    pub(super) fn fill_omitted(
+        &mut self,
+        args: Vec<TirArg>,
+        call_id: Option<varn_core::ast::AstId>,
+        fallback: Option<SigId>,
+    ) -> Vec<TirArg> {
+        let Some((params, has_rest)) = self.shape_of(call_id, fallback) else {
             return args;
         };
-        if sig.has_rest || !args.iter().all(|a| matches!(a, TirArg::Expr(_))) {
+        if has_rest || !args.iter().all(|a| matches!(a, TirArg::Expr(_))) {
             return args;
         }
-        for param in sig.params.iter().skip(args.len()) {
+        let mut args = args;
+        for param in params.iter().skip(args.len()) {
             let ty = match param {
                 BackendTy::Nullable(_) | BackendTy::Dynamic(_) => *param,
                 BackendTy::Int
@@ -398,15 +425,20 @@ impl<'a> FnEmitter<'a> {
         args
     }
 
-    pub(super) fn guard_args(&mut self, args: Vec<TirArg>, sig: Option<SigId>) -> Vec<TirArg> {
-        let Some(sig) = sig.and_then(|s| self.signatures.get(s.0 as usize)) else {
+    pub(super) fn guard_args(
+        &mut self,
+        call_id: Option<varn_core::ast::AstId>,
+        args: Vec<TirArg>,
+        fallback: Option<SigId>,
+    ) -> Vec<TirArg> {
+        let Some((params, has_rest)) = self.shape_of(call_id, fallback) else {
             return args;
         };
-        let (fixed, rest): (Vec<BackendTy>, Option<BackendTy>) = match sig.params.split_last() {
-            Some((BackendTy::Array(el), head)) if sig.has_rest && self.tt.contains(*el) => {
+        let (fixed, rest): (Vec<BackendTy>, Option<BackendTy>) = match params.split_last() {
+            Some((BackendTy::Array(el), head)) if has_rest && self.tt.contains(*el) => {
                 (head.to_vec(), Some(self.tt.get(*el)))
             }
-            Some(_) | None => (sig.params.clone(), None),
+            Some(_) | None => (params, None),
         };
         let mut spread_seen = false;
         args.into_iter()

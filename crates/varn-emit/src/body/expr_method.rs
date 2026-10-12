@@ -52,21 +52,20 @@ impl<'a> FnEmitter<'a> {
         span: Span,
     ) -> TirExpr {
         let class = self.class_of(recv.ty);
-        let method_sig = class
-            .and_then(|ci| {
-                let slot = ci.method_slot(&name)?;
-                Some(ci.method_at(slot)?.sig)
-            })
-            .or(checked.filter(|_| class.is_some()));
+        let table_sig = class.and_then(|ci| {
+            let slot = ci.method_slot(&name)?;
+            Some(ci.method_at(slot)?.sig)
+        });
+        let method_sig = checked.filter(|_| class.is_some()).or(table_sig);
         let (recv, targs) = if self.core_class_name(recv.ty).is_some() {
-            (recv, self.guard_args(targs, method_sig))
+            (recv, self.guard_args(None, targs, method_sig))
         } else {
-            let targs = self.fill_omitted(targs, method_sig);
+            let targs = self.fill_omitted(targs, None, method_sig);
             let target = Callee::Method {
                 recv,
                 name: name.clone(),
             };
-            let (target, targs) = self.settle_args(target, targs, method_sig, span);
+            let (target, targs) = self.settle_args(None, target, targs, method_sig, span);
             (target.into_expr(), targs)
         };
         let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));

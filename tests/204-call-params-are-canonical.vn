@@ -1,0 +1,57 @@
+import { describe, it, expect } from "std:test";
+
+class Wrap<T> {
+    value: T
+    constructor(value: T) { this.value = value }
+    set(v: T): str { this.value = v; return typeof this.value }
+    setOpt(v: T?): str { return typeof v }
+}
+
+function takeFloat(x: float): str { return typeof x }
+function takeOpt(x: float?): str { return typeof x }
+function restFloat(...xs: float[]): str {
+    if (xs.length == 0) { return "empty" }
+    return typeof xs[0]
+}
+function restInt(...xs: int[]): int { return xs.length }
+function greet(name: str, punct: str = "!"): str { return name + punct }
+
+await describe("204 call params are canonical", async () => {
+    await it("a generic method takes an int where its instantiation declares a float", () => {
+        const w = new Wrap<float>(2.5)
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + w.set(1).length + w.setOpt(2).length }
+        expect(w.set(1)).toBe("float")
+        expect(typeof w.value).toBe("float")
+        expect(w.setOpt(1)).toBe("float")
+        expect(w.setOpt(null)).toBe("null")
+        expect(total).toBe(300 * (5 + 5))
+    })
+
+    await it("an int accepted where a float is declared arrives as a float", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + takeFloat(1).length + takeOpt(2).length }
+        expect(takeFloat(1)).toBe("float")
+        expect(takeOpt(1)).toBe("float")
+        expect(takeOpt(null)).toBe("null")
+        expect(total).toBe(300 * (5 + 5))
+    })
+
+    await it("a rest parameter widens each extra argument", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + restInt(i, i + 1) }
+        expect(restFloat(1, 2)).toBe("float")
+        expect(restFloat()).toBe("empty")
+        expect(restInt(1, 2, 3)).toBe(3)
+        expect(total).toBe(300 * 2)
+    })
+
+    await it("an omitted argument still takes the default", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + greet("hi").length + greet("hi", "?").length }
+        expect(greet("hi")).toBe("hi!")
+        expect(greet("hi", "?")).toBe("hi?")
+        expect(greet("hi", null)).toBe("hi!")
+        expect(total).toBe(300 * (3 + 3))
+    })
+})

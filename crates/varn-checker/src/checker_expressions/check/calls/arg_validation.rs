@@ -23,10 +23,10 @@ impl<'r> Checker<'r> {
             call_id,
             params
                 .iter()
-                .take_while(|p| !p.is_rest)
                 .map(|p| varn_sem::output::CheckedParam {
                     ty: varn_sem::types::Type::resolved(p.ty),
                     optional: p.optional,
+                    is_rest: p.is_rest,
                 })
                 .collect(),
         );

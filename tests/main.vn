@@ -195,6 +195,7 @@ import "./200-super-reaches-the-parent.vn"
 import "./201-loop-labels.vn"
 import "./202-namespaces-across-modules.vn"
 import "./203-namespace-types.vn"
+import "./204-call-params-are-canonical.vn"
 
 summary()
 

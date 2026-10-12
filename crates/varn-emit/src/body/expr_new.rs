@@ -94,7 +94,7 @@ impl<'a> FnEmitter<'a> {
         };
         let ctor_sig =
             built.and_then(|c| crate::tables::inherited_constructor(self.m.classes, c));
-        let targs = self.fill_omitted(targs, ctor_sig);
+        let targs = self.fill_omitted(targs, Some(call_id), ctor_sig);
         let reached_by = if let ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind {
             let name = self.m.interner.resolve(*name);
             matches!(self.resolve_name(name), Resolution::GlobalSlot(_)).then_some(name)
@@ -111,7 +111,8 @@ impl<'a> FnEmitter<'a> {
         });
         let class = class.or(imported);
         let c = self.lower_expr(callee);
-        let (target, targs) = self.settle_args(Callee::Value(c), targs, ctor_sig, span);
+        let (target, targs) =
+            self.settle_args(Some(call_id), Callee::Value(c), targs, ctor_sig, span);
         match class {
             Some(class) => TirExpr {
                 kind: TirExprKind::New { class, args: targs },

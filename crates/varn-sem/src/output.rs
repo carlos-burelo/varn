@@ -34,6 +34,7 @@ pub struct ScopeSpan {
 pub struct CheckedParam {
     pub ty: Type,
     pub optional: bool,
+    pub is_rest: bool,
 }
 
 #[derive(Clone, Debug)]

@@ -72,7 +72,8 @@ impl FnEmitter<'_> {
         let c = self.lower_expr(callee);
         let targs = self.lower_call_args(call_id, args);
         let callee_sig = self.callee_signature(callee);
-        let (target, targs) = self.settle_args(Callee::Value(c), targs, callee_sig, span);
+        let (target, targs) =
+            self.settle_args(Some(call_id), Callee::Value(c), targs, callee_sig, span);
         let c = target.into_expr();
         let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
         let takes_rest = callee_sig
@@ -81,7 +82,7 @@ impl FnEmitter<'_> {
         let known = self.m.scoped_fns.get(&key).copied();
         let mut targs = targs;
         if let Some((_, arity)) = known.filter(|_| all_positional && !takes_rest) {
-            targs = self.fill_omitted(targs, callee_sig);
+            targs = self.fill_omitted(targs, Some(call_id), callee_sig);
             while targs.len() < arity as usize {
                 targs.push(TirArg::Expr(TirExpr {
                     kind: TirExprKind::NullLit,
