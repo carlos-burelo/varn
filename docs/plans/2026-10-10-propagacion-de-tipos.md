@@ -559,8 +559,14 @@ async aprobado (memoria `varn-async-redesign-approved`).
 
 ### 2.8 Llamada a método dinámico
 
-Hace doble búsqueda (unos 80 ns frente a 45). Pendiente de la sesión
-anterior.
+Medido en `quick` (5M llamadas, 3 bloques, binarios alternos): estático
+12 ns, dinámico 95 ns, dinámico sin verificar 60 ns (quitando el verify
+en scratch, sin validez). La doble búsqueda existe (el verify resuelve
+y el despacho vuelve a resolver), pero el despacho acierta el IC en
+caliente: reencaminar a resolver-una-vez + llamada directa dio ~2x
+PEOR (llamada sin IC + alloc del ligado). Veredicto: sin cambio. El
+camino real es fusión verify/despacho en el JIT o memo del verify con
+almacenamiento visible al GC; queda abierto con este análisis.
 
 ### 2.9 Encontrado y sin arreglar
 
