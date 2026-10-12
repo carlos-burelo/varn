@@ -23,6 +23,10 @@ pub trait TypeContext {
     /// `reintern_member_type` (binder) y `reintern_foreign_ty` (checker).
     fn resolve_symbol(&self, name: &str) -> Option<Type>;
 
+    fn generic_defaults(&self, _name: &str) -> Option<Vec<Option<Type>>> {
+        None
+    }
+
     fn symbol_origin(&self, _name: &str) -> Option<varn_core::Atom> {
         None
     }

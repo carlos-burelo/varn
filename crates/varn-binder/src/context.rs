@@ -97,6 +97,19 @@ impl TypeContext for Binder<'_> {
         self.arena.get(id).ty
     }
 
+    fn generic_defaults(&self, name: &str) -> Option<Vec<Option<Type>>> {
+        let scope = self.scopes.get(self.current);
+        let atom = self.interner.get(name)?;
+        let id = scope.resolve(atom, &self.scopes)?;
+        let sym = self.arena.get(id);
+        match sym.kind {
+            varn_sem::symbol::SymbolKind::Class
+            | varn_sem::symbol::SymbolKind::Interface => (!sym.type_params.is_empty())
+                .then(|| sym.type_param_defaults.clone()),
+            _ => None,
+        }
+    }
+
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
         let scope = self.scopes.get(self.current);
         let atom = self.interner.get(name)?;

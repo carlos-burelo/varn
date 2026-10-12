@@ -158,12 +158,35 @@ impl<'r> Checker<'r> {
                             .or_else(|| view.get_enum_members(&name, origin.as_deref()))
                             .unwrap_or_default();
 
+                        let mapping = match self.ty_table.get(ty.0) {
+                            TypeKind::Generic(_, args, _) if origin.as_deref()
+                                .is_none_or(|o| o == bind.source_file.as_ref()) =>
+                            {
+                                let args: Vec<Type> = self
+                                    .ty_table
+                                    .get_list(args)
+                                    .iter()
+                                    .map(|id| Type::resolved(*id))
+                                    .collect();
+                                crate::checker_expressions::members::member_util::generic_mapping(
+                                    self.resolver,
+                                    &name,
+                                    &args,
+                                    None,
+                                    bind,
+                                )
+                            }
+                            _ => rustc_hash::FxHashMap::default(),
+                        };
+                        let table = &mut *std::sync::Arc::make_mut(&mut self.ty_table);
+
                         members
                             .into_iter()
                             .map(|m| {
-                                let m_kind = self.ty_table.get(m.ty.0);
+                                let ty = m.ty.map_generics(&mapping, table);
+                                let m_kind = table.get(ty.0);
                                 if let TypeKind::Fn(fid) = m_kind {
-                                    let ft = self.ty_table.get_function(fid).clone();
+                                    let ft = table.get_function(fid).clone();
                                     ObjectTypeMember::Method {
                                         name: m.name,
                                         params: ft.params.clone(),
@@ -174,7 +197,7 @@ impl<'r> Checker<'r> {
                                 } else {
                                     ObjectTypeMember::Property {
                                         name: m.name,
-                                        ty: m.ty.0,
+                                        ty: ty.0,
                                         optional: m.is_optional,
                                         readonly: m.is_readonly,
                                     }

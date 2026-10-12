@@ -372,9 +372,10 @@ caché nueva, cero abandonos reales del JIT.
   `super(1, 2)` y hasta `new Tally(1, 2, 3)` importado compilaban y
   soltaban los argumentos. Ahora hay un solo origen
   (`effective_ctor_ty`: el constructor más cercano en la cadena, o uno
-  vacío sintetizado) que usan los tres sitios: `new` (`ops.rs`),
-  `super(...)` (`super_call.rs`) y `ForeignClass`. Pasar de más o de
-  menos es `VN3001`, local e importado.
+  vacío sintetizado, con sustitución de genéricos del instanciado) que
+  usan los tres sitios: `new` (`ops.rs`), `super(...)`
+  (`super_call.rs`) y `ForeignClass`. Pasar de más o de menos es
+  `VN3001`, local e importado.
 - Medido (`new` importado sin ctor, 500k, `quick`, 3 bloques x 10
   alternos): 107 ms -> 49 ms (-54%; el genérico citado en 2.1).
 - Sin rotura: `vn check` sobre `std` y `tests` no añade ningún error
@@ -384,6 +385,26 @@ caché nueva, cero abandonos reales del JIT.
 
 Validación (perfil `quick`): cuadrante 1 `3129/3129`, corpus 202/202
 con caché nueva, cero abandonos reales del JIT.
+
+### Duodécima tanda (test 207)
+
+- **Un genérico pelado en anotación toma sus defaults.**
+  `const c: Cell = new Cell(5)` dejaba `Cell<T>` crudo y `c.v` era
+  `T`. Ahora hay un solo origen (`TypeContext::generic_defaults`, con
+  delegación en los contextos envoltura): `resolve_named_type` rellena
+  con los defaults cuando existen para todos. Sin defaults para lo que
+  falta no cambia nada (sigue crudo y los errores de después lo cazan).
+- **Literal de objeto contra interfaz genérica sustituye.**
+  Apareció por el camino: ni `Box<str>` explícito pasaba
+  (`'item' is 'str', expected 'I'`). `check_object_with_context`
+  usaba los miembros crudos; ahora sustituye con `generic_mapping`
+  cuando el origen es local. Foráneo queda crudo como antes.
+- Sin A/B: solo checker, sin cambio de código generado para código
+  válido. Test 207.
+
+Validación (perfil `quick`): cuadrante 1 `3133/3133`, corpus 202/202
+con caché nueva, cero abandonos reales del JIT, `vn check` sin errores
+nuevos en `std` ni `tests`.
 
 ## 2. Pendiente, por orden
 
@@ -403,8 +424,8 @@ Cada item: qué falta, dónde, cómo se mide.
 - Hecho (novena tanda, test 204): la forma sale de `call_params`
   (`shape_of` + `checked_shape`); la firma del llamado queda como
   respaldo y se borró el caso `int` -> `float?` de `as_declared`.
-- Un tipo genérico escrito sin argumentos en una anotación (`x: Cell`)
-  no toma los valores por defecto de sus parámetros; solo `new` lo hace.
+- Hecho (duodécima tanda, test 207): un genérico pelado en anotación
+  toma sus defaults (`TypeContext::generic_defaults`).
 - El estrechamiento por asignación no cubre miembros (`this.v ??= 3`),
   ni asignaciones hechas desde un closure, y una asignación en una rama
   de un `if` invalida también la otra.
@@ -494,6 +515,8 @@ anterior.
   serializan: valen porque el módulo que se emite siempre se acaba de
   ligar; si algún día se emite desde un bind cacheado, hay que
   guardarlos.
+- Literal de objeto contra interfaz/clase genérica foránea: los
+  miembros llegan crudos (la sustitución solo cubre origen local).
 
 - `override` e `implements` no se comprueban cuando la clase o un
   ancestro es genérico: comparar firmas pide sustituir los parámetros

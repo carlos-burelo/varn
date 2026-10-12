@@ -32,6 +32,10 @@ impl TypeContext for InferBindingContext<'_> {
         self.inner.and_then(|c| c.resolve_symbol(name))
     }
 
+    fn generic_defaults(&self, name: &str) -> Option<Vec<Option<Type>>> {
+        self.inner.and_then(|c| c.generic_defaults(name))
+    }
+
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
         self.inner.and_then(|c| c.symbol_origin(name))
     }
@@ -152,6 +156,10 @@ impl TypeContext for MappedContext<'_> {
         self.inner.and_then(|c| c.resolve_symbol(name))
     }
 
+    fn generic_defaults(&self, name: &str) -> Option<Vec<Option<Type>>> {
+        self.inner.and_then(|c| c.generic_defaults(name))
+    }
+
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
         self.inner.and_then(|c| c.symbol_origin(name))
     }
@@ -215,6 +223,10 @@ impl TypeContext for AliasSubstitutionContext<'_> {
             return Some(self.args[pos]);
         }
         self.inner.and_then(|c| c.resolve_symbol(name))
+    }
+
+    fn generic_defaults(&self, name: &str) -> Option<Vec<Option<Type>>> {
+        self.inner.and_then(|c| c.generic_defaults(name))
     }
 
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {

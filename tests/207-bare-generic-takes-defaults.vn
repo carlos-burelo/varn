@@ -1,0 +1,36 @@
+import { describe, it, expect } from "std:test";
+
+class Cell<T = int> {
+    v: T
+    constructor(v: T) { this.v = v }
+}
+
+interface Box<I = str> {
+    item: I
+}
+
+function cell(n: int): int {
+    const c: Cell = new Cell(n)
+    return c.v
+}
+
+function box(s: str): str {
+    const b: Box = { item: s }
+    return b.item
+}
+
+await describe("207 a bare generic takes its defaults", async () => {
+    await it("a bare class annotation instantiates with defaults", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + cell(i) }
+        expect(cell(5)).toBe(5)
+        expect(total).toBe(44850)
+    })
+
+    await it("a bare interface annotation checks literals with defaults", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + box("x").length }
+        expect(box("hey")).toBe("hey")
+        expect(total).toBe(300)
+    })
+})

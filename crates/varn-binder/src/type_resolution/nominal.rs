@@ -112,6 +112,14 @@ pub(super) fn resolve_named_type(
         ) {
             return resolved.with_origin(origin, table);
         }
+        if let TypeKind::Named(n, o) = table.get(resolved.0) {
+            if let Some(defaults) = ctx.and_then(|c| c.generic_defaults(&name_str)) {
+                if !defaults.is_empty() && defaults.iter().all(|d| d.is_some()) {
+                    let args = defaults.into_iter().map(|d| d.unwrap()).collect();
+                    return Type::generic_atom(n, args, o, table);
+                }
+            }
+        }
         return resolved;
     }
 

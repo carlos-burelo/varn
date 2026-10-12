@@ -379,6 +379,19 @@ impl TypeContext for BindView<'_> {
         self.bind.arena.get(id).ty
     }
 
+    fn generic_defaults(&self, name: &str) -> Option<Vec<Option<Type>>> {
+        let scope = self.bind.scopes.get(self.scope);
+        let atom = self.bind.interner.get(name)?;
+        let id = scope.resolve(atom, &self.bind.scopes)?;
+        let sym = self.bind.arena.get(id);
+        match sym.kind {
+            crate::symbol::SymbolKind::Class | crate::symbol::SymbolKind::Interface => {
+                (!sym.type_params.is_empty()).then(|| sym.type_param_defaults.clone())
+            }
+            _ => None,
+        }
+    }
+
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
         let scope = self.bind.scopes.get(self.scope);
         let atom = self.bind.interner.get(name)?;
