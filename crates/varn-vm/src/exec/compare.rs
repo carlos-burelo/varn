@@ -112,9 +112,9 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 let rhs = bigdecimal::BigDecimal::from(heap.as_int(b));
                 return **da == rhs;
             }
-            Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(b),
             Some(
-                HeapObj::Str(_)
+                HeapObj::EnumVariant(_)
+                | HeapObj::Str(_)
                 | HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
@@ -149,7 +149,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 let lhs = bigdecimal::BigDecimal::from(heap.as_int(a));
                 return lhs == **db;
             }
-            Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(a),
+            Some(HeapObj::EnumVariant(_)) => return false,
             Some(
                 HeapObj::Str(_)
                 | HeapObj::Array(_)
