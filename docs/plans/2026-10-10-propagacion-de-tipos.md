@@ -539,6 +539,18 @@ Validación (perfil `quick`): cuadrante 1 `3178/3178`, abandonos
 Validación (perfil `quick`): cuadrante 1 `3183/3183`, corpus sin
 errores nuevos (+3 ficheros), matriz release 4/4 `3183/3183`.
 
+### Decimonovena tanda (test 213, `never` termina la rama)
+
+- **`completes` consulta la tabla de tipos**: la sentencia-expresión
+  cuya llamada tipa `never` no completa (antes todo `Expr`
+  completaba). Un solo punto (vale para `if`/`else`, `switch`,
+  `try`, estáticos, miembros y closures); lo demás (`break`,
+  bucles, `Decl`) intacto. La cola no-`never` sigue dando
+  `VN4018` (corpus +1).
+
+Validación (perfil `quick`): cuadrante 1 pendiente, corpus sin
+errores nuevos (+1 fichero), matriz release pendiente.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -735,8 +747,12 @@ almacenamiento visible al GC; queda abierto con este análisis.
 - Con un operando `dynamic`, `variante == 1` compara el tag del enum
   (`compare::eq`); el checker lo rechaza cuando los dos tipos se
   conocen. `compare::eq` cierra además con `_ => return false`.
-- El análisis de «toda ruta retorna» es sintáctico: una llamada a una
-  función `never` al final de una rama no cuenta como salida.
+- Hecho (tanda 19, test 213): la llamada que tipa `never` termina
+  la rama (`completes` consulta `expr_table`; vale en `if`/`else`,
+  `switch`, `try`, estáticos, miembros y closures). Sigue dando
+  `VN4018` la cola no-`never` (corpus +1). Nota de niveles: esas
+  funciones hacen bail (`value-less return of a scalar`, van a
+  intérprete); son colas frías de error, sin relevancia.
 - Una interfaz acepta un objeto literal con campos de más; un tipo de
   objeto (`{ n: int }`) no. Es deliberado, pero no está escrito.
 - Etiquetas de bucle: implementarlas pide profundidad en

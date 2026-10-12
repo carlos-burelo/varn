@@ -1,18 +1,20 @@
 use super::super::Checker;
-use varn_core::ast::{AstArena, ExprKind, StmtId, StmtKind};
+use crate::checker::recorder::Recorder;
+use varn_core::ast::{AstArena, AstId, ExprKind, StmtId, StmtKind};
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
+use varn_sem::output::TypeEntry;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn require_return(&mut self, body: StmtId, bind: &BindResult) {
+    pub(crate) fn require_return(&mut self, rec: &Recorder, body: StmtId, bind: &BindResult) {
         let Some(declared) = self.expected_return_type else {
             return;
         };
         if declared.is_dynamic() || declared == Type::Void {
             return;
         }
-        if !completes(body, self.ast_arena) {
+        if !completes(body, self.ast_arena, &rec.expr_table) {
             return;
         }
         let range = self.ast_arena.stmt(body).range;
@@ -29,20 +31,27 @@ impl<'r> Checker<'r> {
     }
 }
 
-fn completes(stmt: StmtId, arena: &AstArena) -> bool {
+fn completes(
+    stmt: StmtId,
+    arena: &AstArena,
+    table: &rustc_hash::FxHashMap<AstId, TypeEntry>,
+) -> bool {
     match &arena.stmt(stmt).kind {
         StmtKind::Return { .. } | StmtKind::Throw { .. } => false,
-        StmtKind::Block { stmts } => stmts.iter().all(|s| completes(*s, arena)),
+        StmtKind::Block { stmts } => stmts.iter().all(|s| completes(*s, arena, table)),
         StmtKind::If {
             consequent,
             alternate,
             ..
         } => match alternate {
-            Some(alt) => completes(*consequent, arena) || completes(*alt, arena),
+            Some(alt) => completes(*consequent, arena, table) || completes(*alt, arena, table),
             None => true,
         },
         StmtKind::While { test, body } | StmtKind::DoWhile { body, test } => {
-            let forever = matches!(arena.expr(*test).kind, ExprKind::BoolLiteral { value: true });
+            let forever = matches!(
+                arena.expr(*test).kind,
+                ExprKind::BoolLiteral { value: true }
+            );
             !forever || breaks(*body, arena)
         }
         StmtKind::For { test, body, .. } => test.is_some() || breaks(*body, arena),
@@ -53,7 +62,7 @@ fn completes(stmt: StmtId, arena: &AstArena) -> bool {
                 .any(|c| c.body.iter().any(|s| breaks(*s, arena)));
             let falls_out = cases
                 .last()
-                .is_none_or(|c| c.body.iter().all(|s| completes(*s, arena)));
+                .is_none_or(|c| c.body.iter().all(|s| completes(*s, arena, table)));
             !has_default || escapes || falls_out
         }
         StmtKind::Try {
@@ -61,13 +70,14 @@ fn completes(stmt: StmtId, arena: &AstArena) -> bool {
             catches,
             finally,
         } => {
-            let ends = finally.is_none_or(|f| completes(f, arena));
-            let reaches = completes(*block, arena) || catches.iter().any(|c| completes(c.body, arena));
+            let ends = finally.is_none_or(|f| completes(f, arena, table));
+            let reaches = completes(*block, arena, table)
+                || catches.iter().any(|c| completes(c.body, arena, table));
             ends && reaches
         }
-        StmtKind::Labeled { body, .. } => completes(*body, arena),
+        StmtKind::Labeled { body, .. } => completes(*body, arena, table),
+        StmtKind::Expr { expression } => !diverges(*expression, arena, table),
         StmtKind::Empty
-        | StmtKind::Expr { .. }
         | StmtKind::Decl(_)
         | StmtKind::Error
         | StmtKind::ForIn { .. }
@@ -77,6 +87,19 @@ fn completes(stmt: StmtId, arena: &AstArena) -> bool {
         | StmtKind::Using { .. }
         | StmtKind::Debugger => true,
     }
+}
+
+fn diverges(
+    expr: varn_core::ast::ExprId,
+    arena: &AstArena,
+    table: &rustc_hash::FxHashMap<AstId, TypeEntry>,
+) -> bool {
+    let ExprKind::Call { .. } = &arena.expr(expr).kind else {
+        return false;
+    };
+    table
+        .get(&expr.index())
+        .is_some_and(|entry| entry.ty.is_never())
 }
 
 fn breaks(stmt: StmtId, arena: &AstArena) -> bool {

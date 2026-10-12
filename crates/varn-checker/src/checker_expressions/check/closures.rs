@@ -67,7 +67,7 @@ impl<'r> Checker<'r> {
         };
         self.in_function_body(is_async, |c| c.check_arrow_body(rec, body, range, bind));
         if let Some(block) = block {
-            self.require_return(block, bind);
+            self.require_return(rec, block, bind);
         }
 
         self.current_scope = saved_scope;
@@ -110,7 +110,7 @@ impl<'r> Checker<'r> {
         self.in_function_body(is_async, |c| c.check_stmt(rec, body, bind));
         self.super_reachable = outer_super;
         if return_type.is_some() && !is_generator {
-            self.require_return(body, bind);
+            self.require_return(rec, body, bind);
         }
 
         self.current_scope = saved_scope;

@@ -1,0 +1,55 @@
+import { describe, it, expect } from "std:test";
+
+function halt(msg: str): never {
+    throw new Error(msg)
+}
+
+function pick(c: bool): int {
+    if (c) {
+        return 1
+    }
+    halt("nope")
+}
+
+function pickElse(c: bool): int {
+    if (c) {
+        return 1
+    } else {
+        halt("nope")
+    }
+}
+
+class Guard {
+    static need(c: bool): int {
+        if (c) {
+            return 2
+        }
+        halt("static")
+    }
+    check(c: bool): int {
+        if (c) {
+            return 3
+        }
+        halt("member")
+    }
+}
+
+const run = (c: bool): int => {
+    if (c) {
+        return 4
+    }
+    halt("closure")
+}
+
+await describe("213 calls to never end the branch", async () => {
+    await it("a trailing never call satisfies the return", () => {
+        expect(pick(true)).toBe(1)
+        expect(pickElse(true)).toBe(1)
+    })
+
+    await it("works in static, member and closure bodies", () => {
+        expect(Guard.need(true)).toBe(2)
+        expect(new Guard().check(true)).toBe(3)
+        expect(run(true)).toBe(4)
+    })
+})

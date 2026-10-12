@@ -82,7 +82,7 @@ impl<'r> Checker<'r> {
         self.in_function_body(f.modifiers.is_async, |c| c.check_stmt(rec, f.body, bind));
         let has_body = !f.modifiers.is_declare && !f.modifiers.is_native;
         if f.return_type.is_some() && !is_gen && has_body {
-            self.require_return(f.body, bind);
+            self.require_return(rec, f.body, bind);
         }
 
         self.pure_scope = saved_pure;

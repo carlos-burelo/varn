@@ -204,6 +204,7 @@ import "./209-filling-a-member-narrows-it.vn"
 import "./210-static-field-slots.vn"
 import "./211-static-method-dispatch.vn"
 import "./212-generic-ancestor-contracts.vn"
+import "./213-never-call-ends-branch.vn"
 
 summary()
 

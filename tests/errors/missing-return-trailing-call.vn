@@ -1,0 +1,11 @@
+// VN4018
+function log(msg: str): int {
+    print(msg)
+    return 0
+}
+function f(c: bool): int {
+    if (c) {
+        return 1
+    }
+    log("falls through")
+}
