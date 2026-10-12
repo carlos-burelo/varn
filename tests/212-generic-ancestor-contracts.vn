@@ -1,0 +1,65 @@
+import { describe, it, expect } from "std:test";
+
+class Box<T> {
+    v: T
+    constructor(v: T) {
+        this.v = v
+    }
+    get(): T {
+        return this.v
+    }
+}
+
+class IntBox extends Box<int> {
+    override get(): int {
+        return 20
+    }
+}
+
+class Mid extends Box<int> {
+}
+
+class Leaf extends Mid {
+    override get(): int {
+        return 21
+    }
+}
+
+class Wrap<T> extends Box<T> {
+    override get(): T {
+        return this.v
+    }
+}
+
+interface Getter<T> {
+    get(): T
+}
+
+class UsesBox implements Box<int> {
+    v: int = 1
+    get(): int {
+        return this.v
+    }
+}
+
+class UsesGetter implements Getter<int> {
+    get(): int {
+        return 2
+    }
+}
+
+function dynArg(): dynamic {
+    return 1
+}
+
+await describe("212 override and implements with generic ancestors", async () => {
+    await it("substituted overrides dispatch", () => {
+        expect(new IntBox(dynArg()).get()).toBe(20)
+        expect(new Leaf(dynArg()).get()).toBe(21)
+    })
+
+    await it("implements against a generic class holds", () => {
+        expect(new UsesBox().get()).toBe(1)
+        expect(new UsesGetter().get()).toBe(2)
+    })
+})

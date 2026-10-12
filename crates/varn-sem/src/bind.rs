@@ -62,6 +62,8 @@ pub struct Extensions {
 pub struct ClassParent {
     pub name: Arc<str>,
     pub origin: Option<Arc<str>>,
+    #[serde(skip, default)]
+    pub args: Vec<Type>,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]

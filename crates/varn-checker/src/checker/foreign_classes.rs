@@ -348,6 +348,7 @@ impl Checker<'_> {
             .map(|p| ClassParent {
                 name: p.name.clone(),
                 origin: p.origin.clone().or_else(|| class.origin.clone()),
+                args: Vec::new(),
             });
         if let Some(parent) = parent {
             self.ancestor_fields(parent, bind, out, visited);

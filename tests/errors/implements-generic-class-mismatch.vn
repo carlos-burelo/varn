@@ -1,0 +1,16 @@
+// VN4117
+class Box<T> {
+    v: T
+    constructor(v: T) {
+        this.v = v
+    }
+    get(): T {
+        return this.v
+    }
+}
+class BadUsesBox implements Box<int> {
+    v: int = 1
+    get(): str {
+        return "bad"
+    }
+}

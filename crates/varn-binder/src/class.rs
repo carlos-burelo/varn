@@ -60,9 +60,14 @@ impl<'r> super::Binder<'r> {
 
         let extends = c.super_class.as_ref().and_then(|e| {
             let super_ty = self.infer_expr_type_self(*e);
+            let args: Vec<Type> = c
+                .super_type_args
+                .iter()
+                .map(|node| self.resolve_type(node))
+                .collect();
             match self.ty_table.get(super_ty.0) {
-                TypeKind::Named(n, o) => Some((n, o)),
-                TypeKind::Generic(n, _, o) => Some((n, o)),
+                TypeKind::Named(n, o) => Some((n, o, args)),
+                TypeKind::Generic(n, _, o) => Some((n, o, args)),
                 TypeKind::Primitive(_)
                 | TypeKind::Builtin(_)
                 | TypeKind::Literal(_)
@@ -84,10 +89,11 @@ impl<'r> super::Binder<'r> {
                 | TypeKind::TypePredicate { .. } => None,
             }
         });
-        let extends = extends.map(|(n, o)| (self.name_text(n), o.map(|o| self.name_text(o))));
+        let extends =
+            extends.map(|(n, o, args)| (self.name_text(n), o.map(|o| self.name_text(o)), args));
 
         let mut final_members = members.clone();
-        if let Some((parent_name, parent_origin)) = extends {
+        if let Some((parent_name, parent_origin, parent_args)) = extends {
             let parent_is_local = parent_origin
                 .as_deref()
                 .is_none_or(|o| o == self.source_file.as_ref());
@@ -99,6 +105,7 @@ impl<'r> super::Binder<'r> {
                         .as_deref()
                         .filter(|_| !parent_is_local)
                         .map(Arc::from),
+                    args: parent_args,
                 },
             );
             if let Some(parent_members) = parent_is_local

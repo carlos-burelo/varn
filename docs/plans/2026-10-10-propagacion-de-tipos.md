@@ -523,6 +523,23 @@ errores nuevos, cero abandonos reales del JIT, matriz release 4/4
 Validación (perfil `quick`): cuadrante 1 `3178/3178`, abandonos
 «fase B» 0, matriz release 4/4 `3178/3178`.
 
+### Decimoctava tanda (test 212, contratos con ancestro genérico)
+
+- **`override` sustituye los args del `extends`.** Nadie leía
+  `super_type_args`: ahora viajan en `ClassParent.args` y el chequeo
+  compone `generic_mapping` + `map_generics` por niveles. Cadenas
+  foráneas y `extends` pelado siguen el camino viejo; un `override`
+  mal en `Box<int>` (directo o vía `Mid`) da `VN4116` con el tipo
+  ya sustituido; el correcto pasa, incluido en subclase genérica.
+- **`implements` contra clase genérica** instancia sus miembros
+  igual: se acabó el falso `VN4117` en código correcto; el que no
+  cumple sigue fallando.
+- Sin regresión posible por construcción: solo se activa donde el
+  camino viejo saltaba (`lineage_is_generic`).
+
+Validación (perfil `quick`): cuadrante 1 `3182/3182`, corpus sin
+errores nuevos (+3 ficheros), matriz release 4/4 `3182/3182`.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -700,9 +717,15 @@ almacenamiento visible al GC; queda abierto con este análisis.
 - Literal de objeto contra interfaz/clase genérica foránea: los
   miembros llegan crudos (la sustitución solo cubre origen local).
 
-- `override` e `implements` no se comprueban cuando la clase o un
-  ancestro es genérico: comparar firmas pide sustituir los parámetros
-  de tipo del ancestro.
+- Hecho (tanda 18, test 212): `override` contra ancestro genérico
+  sustituye los args del `extends` (`ClassParent.args`, antes nadie
+  leía `super_type_args`) con `generic_mapping` + `map_generics`,
+  compuesto por niveles; `implements` contra clase genérica
+  instancia sus miembros igual (antes falso positivo `VN4117` en
+  código correcto). Cadenas foráneas y `extends` pelado siguen el
+  camino viejo (sin regresión posible: solo se activa donde antes
+  se saltaba). Sigue sin sustitución el cuerpo (`this.v` se ve
+  como `T`).
 - Un `int` variable no se acepta donde va un `float` (solo el literal),
   pero sí donde va un `decimal` o un `bigint`. Falta decidir si eso es
   una regla o un accidente.

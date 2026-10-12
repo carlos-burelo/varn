@@ -13,6 +13,39 @@ impl<'r> Checker<'r> {
         range: varn_core::SourceRange,
         bind: &BindResult,
     ) {
+        if let Some(inherited) = self.substituted_inherited(class, member, bind) {
+            let Some(own) = bind
+                .get_class_entry(class)
+                .and_then(|entry| {
+                    entry
+                        .members
+                        .iter()
+                        .find(|m| {
+                            m.name.as_ref() == member
+                                && m.kind == ClassMemberKind::Method
+                                && !m.is_static
+                        })
+                        .map(|m| m.ty)
+                })
+            else {
+                return;
+            };
+            if self.types_compatible_cached(&inherited, &own, Some(bind)) {
+                return;
+            }
+            let own_s = own.display(&self.ty_table, &bind.interner);
+            let inherited_s = inherited.display(&self.ty_table, &bind.interner);
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::IncompatibleOverride,
+                    format!(
+                        "member '{member}' is '{own_s}', which cannot stand in for the '{inherited_s}' it overrides"
+                    ),
+                )
+                .with_range(range),
+            );
+            return;
+        }
         if self.lineage_is_generic(class, bind) {
             return;
         }
@@ -42,6 +75,63 @@ impl<'r> Checker<'r> {
             )
             .with_range(range),
         );
+    }
+
+    fn substituted_inherited(
+        &mut self,
+        class: &str,
+        member: &str,
+        bind: &BindResult,
+    ) -> Option<varn_sem::types::Type> {
+        use crate::checker_expressions::members::member_util::generic_mapping;
+        let is_method = |m: &ClassMemberInfo| {
+            m.name.as_ref() == member && m.kind == ClassMemberKind::Method && !m.is_static
+        };
+        let mut chain: Vec<varn_sem::bind::ClassParent> = Vec::new();
+        let mut level = class.to_owned();
+        for _ in 0..64 {
+            let Some(parent) = bind.class_parents.get(level.as_str()) else {
+                break;
+            };
+            if parent.origin.is_some() {
+                return None;
+            }
+            chain.push(parent.clone());
+            level = parent.name.to_string();
+        }
+        let mut current = None;
+        let mut at = class.to_owned();
+        for _ in 0..64 {
+            let Some(next) = bind.class_parents.get(at.as_str()) else {
+                break;
+            };
+            if let Some(ty) = bind
+                .get_class_entry(&next.name)
+                .and_then(|e| e.members.iter().find(|m| is_method(m)).map(|m| m.ty))
+            {
+                current = Some(ty);
+                break;
+            }
+            at = next.name.to_string();
+        }
+        let mut current = current?;
+        let mut engaged = false;
+        for parent in chain.iter().rev() {
+            let mapping = generic_mapping(
+                self.resolver,
+                &parent.name,
+                &parent.args,
+                parent.origin.as_ref(),
+                bind,
+            );
+            if mapping.is_empty() {
+                continue;
+            }
+            engaged = true;
+            let table = std::sync::Arc::make_mut(&mut self.ty_table);
+            current = current.map_generics(&mapping, table);
+        }
+        engaged.then_some(current)
     }
 
     pub(super) fn check_abstract_members(
@@ -164,7 +254,10 @@ impl<'r> Checker<'r> {
         };
         for promised in &c.implements {
             let contract = self.resolve_type_node_cached(promised, bind);
-            if contract.is_dynamic() || self.types_compatible_cached(&contract, &instance, Some(bind)) {
+            if contract.is_dynamic()
+                || self.class_contract_satisfied(&contract, &instance, bind)
+                || self.types_compatible_cached(&contract, &instance, Some(bind))
+            {
                 continue;
             }
             let contract_s = contract.display(&self.ty_table, &bind.interner);
@@ -178,8 +271,64 @@ impl<'r> Checker<'r> {
         }
     }
 
-    fn lineage_is_generic(&self, class: &str, bind: &BindResult) -> bool {
-        use crate::checker_expressions::members::member_util::class_type_params;
+    fn class_contract_satisfied(
+        &mut self,
+        contract: &varn_sem::types::Type,
+        instance: &varn_sem::types::Type,
+        bind: &BindResult,
+    ) -> bool {
+        use crate::checker_expressions::members::member_util::generic_mapping;
+        use varn_sem::bind::BindView;
+        use varn_sem::types::TypeContext;
+        let varn_core::TypeKind::Generic(name_atom, args_list, origin_atom) =
+            self.ty_table.get(contract.0)
+        else {
+            return false;
+        };
+        let name = self.resolve_bind_atom(bind, name_atom);
+        let origin = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
+        if origin.as_deref().is_some_and(|o| o != bind.source_file.as_ref()) {
+            return false;
+        }
+        let view = BindView::new(bind, self.resolver);
+        let Some(members) = view.get_class_members(&name, origin.as_deref()) else {
+            return false;
+        };
+        let args: Vec<varn_sem::types::Type> = self
+            .ty_table
+            .get_list(args_list)
+            .iter()
+            .map(|id| varn_sem::types::Type::resolved(*id))
+            .collect();
+        let mapping = generic_mapping(self.resolver, &name, &args, origin.as_ref(), bind);
+        if mapping.is_empty() {
+            return false;
+        }
+        let table = std::sync::Arc::make_mut(&mut self.ty_table);
+        let object_members: Vec<_> = members
+            .iter()
+            .filter(|cm| {
+                !cm.is_static
+                    && matches!(
+                        cm.kind,
+                        ClassMemberKind::Method
+                            | ClassMemberKind::Function
+                            | ClassMemberKind::Property
+                            | ClassMemberKind::Variable
+                            | ClassMemberKind::Getter
+                            | ClassMemberKind::Setter
+                    )
+            })
+            .map(|cm| {
+                cm.as_object_member(table)
+                    .map_generics(&mapping, table)
+            })
+            .collect();
+        let object = varn_sem::types::Type::object(object_members, table);
+        self.types_compatible_cached(&object, instance, Some(bind))
+    }
+
+    fn lineage_is_generic(&self, class: &str, bind: &BindResult) -> bool {        use crate::checker_expressions::members::member_util::class_type_params;
         let mut name = class.to_owned();
         let mut origin = None;
         for _ in 0..64 {

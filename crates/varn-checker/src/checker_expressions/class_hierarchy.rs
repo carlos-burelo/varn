@@ -12,6 +12,7 @@ impl<'r> Checker<'r> {
         let mut current = varn_sem::bind::ClassParent {
             name: std::sync::Arc::from(candidate),
             origin: None,
+            args: Vec::new(),
         };
         loop {
             if current.name.as_ref() == target {
@@ -42,6 +43,7 @@ impl<'r> Checker<'r> {
             return Some(varn_sem::bind::ClassParent {
                 name: parent.name.clone(),
                 origin: parent.origin.clone().or_else(|| class.origin.clone()),
+                args: Vec::new(),
             });
         }
         if let Some(parent) = bind.get_class_parent(&class.name) {
@@ -58,6 +60,7 @@ impl<'r> Checker<'r> {
                         .origin
                         .clone()
                         .or_else(|| Some(rb.source_file.clone())),
+                    args: Vec::new(),
                 });
             }
         }

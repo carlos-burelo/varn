@@ -1,0 +1,17 @@
+// VN4116
+class Box<T> {
+    v: T
+    constructor(v: T) {
+        this.v = v
+    }
+    get(): T {
+        return this.v
+    }
+}
+class Mid extends Box<int> {
+}
+class Leaf extends Mid {
+    override get(): str {
+        return "bad"
+    }
+}
