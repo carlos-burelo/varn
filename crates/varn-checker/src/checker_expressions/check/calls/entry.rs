@@ -290,5 +290,6 @@ impl<'r> Checker<'r> {
         }
 
         self.check_type_arg_constraints(callee, type_args, range, bind);
+        self.forget_called_closure(rec, callee, callee_sid, args, bind);
     }
 }

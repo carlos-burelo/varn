@@ -48,6 +48,7 @@ pub struct Checker<'r> {
     pub(crate) current_scope: varn_sem::scope::ScopeId,
     pub(crate) expected_return_type: Option<Type>,
     pub(crate) narrowed_types: FxHashMap<SymbolId, Vec<Type>>,
+    pub(crate) closure_var_effects: FxHashMap<SymbolId, Vec<SymbolId>>,
     pub(crate) narrowings_cache:
         FxHashMap<(u32, bool, varn_sem::scope::ScopeId), Vec<(SymbolId, Type)>>,
     pub(crate) child_indices: FxHashMap<ScopeId, usize>,

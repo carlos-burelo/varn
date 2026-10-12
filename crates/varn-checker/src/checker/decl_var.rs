@@ -35,6 +35,28 @@ impl<'r> Checker<'r> {
             if let Some(init_expr) = d.init {
                 self.with_expected(ann_ty_opt, |c| c.check_expr(rec, init_expr, bind));
 
+                if matches!(
+                    &self.ast_arena.expr(init_expr).kind,
+                    ExprKind::Function { .. } | ExprKind::Arrow { .. }
+                ) {
+                    if let Some(ids) = self.closure_def_effects(init_expr, bind) {
+                        let mut bound = Vec::new();
+                        Self::pattern_bound_atoms(&d.id, &mut bound);
+                        for name in bound {
+                            if let Some(id) = bind
+                                .scopes
+                                .get(self.current_scope)
+                                .resolve(name, &bind.scopes)
+                            {
+                                self.closure_var_effects
+                                    .entry(id)
+                                    .or_default()
+                                    .extend(ids.iter().copied());
+                            }
+                        }
+                    }
+                }
+
                 if let Some(ann_ty) = &ann_ty_opt {
                     let init_ty = self.infer_type(rec, init_expr, bind);
                     let is_empty_array = init_ty.is_dynamic()

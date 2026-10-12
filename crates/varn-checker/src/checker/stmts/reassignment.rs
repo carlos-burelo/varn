@@ -2,21 +2,19 @@ use super::super::Checker;
 use crate::checker::definite_assignment::walk_expr_children;
 use crate::checker::recorder::Recorder;
 use rustc_hash::FxHashSet;
-use varn_core::ast::{AssignOp, AstArena, Decl, ExprId, ExprKind, ForInit, StmtId, StmtKind};
+use varn_core::ast::{ArrowBody, AssignOp, AstArena, Decl, ExprId, ExprKind, ForInit, Pattern, StmtId, StmtKind};
 use varn_core::Atom;
 use varn_sem::bind::BindResult;
 use varn_sem::symbol::SymbolId;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn forget_narrowing(&mut self, rec: &Recorder, name: Atom, bind: &BindResult) {
-        let Some(id) = bind
-            .scopes
-            .get(self.current_scope)
-            .resolve(name, &bind.scopes)
-        else {
-            return;
-        };
+    pub(crate) fn forget_symbol(
+        &mut self,
+        rec: &Recorder,
+        id: SymbolId,
+        bind: &BindResult,
+    ) {
         let declared = rec
             .symbol_types
             .get(&id)
@@ -30,6 +28,17 @@ impl<'r> Checker<'r> {
             *held = declared;
         }
         self.mark_infer_env_dirty();
+    }
+
+    pub(crate) fn forget_narrowing(&mut self, rec: &Recorder, name: Atom, bind: &BindResult) {
+        let Some(id) = bind
+            .scopes
+            .get(self.current_scope)
+            .resolve(name, &bind.scopes)
+        else {
+            return;
+        };
+        self.forget_symbol(rec, id, bind);
     }
 
     pub(crate) fn forget_assigned_target(
@@ -55,7 +64,122 @@ impl<'r> Checker<'r> {
             self.forget_narrowing(rec, name, bind);
         }
     }
+}
 
+pub(crate) enum ClosureBodyRef {
+    Stmt(StmtId),
+    Expr(ExprId),
+}
+
+impl<'r> Checker<'r> {
+    pub(crate) fn closure_assigned_symbols(
+        &mut self,
+        body: ClosureBodyRef,
+        bind: &BindResult,
+    ) -> Vec<SymbolId> {
+        let mut names = FxHashSet::default();
+        match body {
+            ClosureBodyRef::Stmt(stmt) => assigned_in_stmt(stmt, self.ast_arena, &mut names),
+            ClosureBodyRef::Expr(expr) => assigned_in_expr(expr, self.ast_arena, &mut names),
+        }
+        let mut ids: Vec<SymbolId> = names
+            .into_iter()
+            .filter_map(|name| {
+                bind.scopes
+                    .get(self.current_scope)
+                    .resolve(name, &bind.scopes)
+            })
+            .collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+
+    pub(crate) fn closure_def_effects(
+        &mut self,
+        expr: ExprId,
+        bind: &BindResult,
+    ) -> Option<Vec<SymbolId>> {
+        let body = match &self.ast_arena.expr(expr).kind {
+            ExprKind::Function { body, .. } => ClosureBodyRef::Stmt(*body),
+            ExprKind::Arrow { body, .. } => match body.as_ref() {
+                ArrowBody::Block(stmt) => ClosureBodyRef::Stmt(*stmt),
+                ArrowBody::Expr(value) => ClosureBodyRef::Expr(*value),
+            },
+            _ => return None,
+        };
+        Some(self.closure_assigned_symbols(body, bind))
+    }
+
+    pub(crate) fn forget_closure_args(
+        &mut self,
+        rec: &Recorder,
+        args: &[varn_core::ast::Arg],
+        bind: &BindResult,
+    ) {
+        for arg in args {
+            let value = match arg {
+                varn_core::ast::Arg::Positional(value)
+                | varn_core::ast::Arg::Named { value, .. } => *value,
+                varn_core::ast::Arg::Spread(_) => continue,
+            };
+            if let Some(ids) = self.closure_def_effects(value, bind) {
+                for id in &ids {
+                    self.forget_symbol(rec, *id, bind);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn forget_called_closure(
+        &mut self,
+        rec: &Recorder,
+        callee: ExprId,
+        callee_sid: Option<SymbolId>,
+        args: &[varn_core::ast::Arg],
+        bind: &BindResult,
+    ) {
+        if let Some(sid) = callee_sid {
+            if let Some(ids) = self.closure_var_effects.get(&sid).cloned() {
+                for id in ids {
+                    self.forget_symbol(rec, id, bind);
+                }
+            }
+        } else if let Some(ids) = self.closure_def_effects(callee, bind) {
+            for id in &ids {
+                self.forget_symbol(rec, *id, bind);
+            }
+        }
+        self.forget_closure_args(rec, args, bind);
+    }
+
+    pub(crate) fn pattern_bound_atoms(pattern: &Pattern, out: &mut Vec<Atom>) {
+        match pattern {
+            Pattern::Identifier { name, .. } => out.push(*name),
+            Pattern::Array {
+                elements, rest, ..
+            } => {
+                for el in elements.iter().flatten() {
+                    Self::pattern_bound_atoms(&el.pattern, out);
+                }
+                if let Some(rest) = rest {
+                    Self::pattern_bound_atoms(rest, out);
+                }
+            }
+            Pattern::Object {
+                properties, rest, ..
+            } => {
+                for prop in properties {
+                    Self::pattern_bound_atoms(&prop.value, out);
+                }
+                if let Some(rest) = rest {
+                    Self::pattern_bound_atoms(rest, out);
+                }
+            }
+            Pattern::Assignment { left, .. } => Self::pattern_bound_atoms(left, out),
+            Pattern::Rest { argument, .. } => Self::pattern_bound_atoms(argument, out),
+        }
+    }
     pub(crate) fn narrowing_after_assignment(
         &mut self,
         rec: &mut Recorder,
@@ -117,7 +241,11 @@ impl<'r> Checker<'r> {
     }
 }
 
-fn assigned_in_stmt(stmt: StmtId, arena: &AstArena, out: &mut FxHashSet<Atom>) {
+pub(crate) fn assigned_in_stmt(
+    stmt: StmtId,
+    arena: &AstArena,
+    out: &mut FxHashSet<Atom>,
+) {
     match &arena.stmt(stmt).kind {
         StmtKind::Block { stmts } => {
             for s in stmts {
@@ -235,7 +363,7 @@ fn assigned_in_stmt(stmt: StmtId, arena: &AstArena, out: &mut FxHashSet<Atom>) {
     }
 }
 
-fn assigned_in_expr(expr: ExprId, arena: &AstArena, out: &mut FxHashSet<Atom>) {
+pub(crate) fn assigned_in_expr(expr: ExprId, arena: &AstArena, out: &mut FxHashSet<Atom>) {
     if let ExprKind::Assign { target, .. } = &arena.expr(expr).kind {
         if let ExprKind::Identifier { name } = &arena.expr(*target).kind {
             out.insert(*name);

@@ -1,0 +1,41 @@
+import { describe, it, expect } from "std:test";
+
+function definedNotCalled(): int {
+    let x: int? = null
+    x = 5
+    const f = () => { x = null }
+    return x
+}
+
+function unrelated(): int {
+    let x: int? = null
+    let y: int? = null
+    x = 5
+    const f = () => { y = null }
+    f()
+    return x
+}
+
+function counts(): int {
+    let total = 0
+    const bump = (n: int): int => n + 1
+    for (let i = 0; i < 300; i = i + 1) { total = total + bump(i) }
+    return total
+}
+
+await describe("208 narrowing survives a closure that never runs", async () => {
+    await it("defining a closure does not undo narrowing", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + definedNotCalled() }
+        expect(definedNotCalled()).toBe(5)
+        expect(total).toBe(1500)
+    })
+
+    await it("calling one keeps what it does not assign", () => {
+        expect(unrelated()).toBe(5)
+    })
+
+    await it("a read-only closure changes nothing", () => {
+        expect(counts()).toBe(45150)
+    })
+})

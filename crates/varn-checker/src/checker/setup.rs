@@ -19,6 +19,7 @@ impl<'r> Checker<'r> {
             source_file,
             expected_return_type: None,
             narrowed_types: FxHashMap::default(),
+            closure_var_effects: FxHashMap::default(),
             narrowings_cache: FxHashMap::default(),
             child_indices: FxHashMap::default(),
             infer_cache: FxHashMap::default(),

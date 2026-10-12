@@ -216,6 +216,7 @@ impl<'r> Checker<'r> {
                 self.validate_call_arguments(rec, args, &params, &range, expr.index(), bind);
             }
         }
+        self.forget_closure_args(rec, args, bind);
     }
 
     fn require_instantiation(

@@ -389,6 +389,22 @@ con caché nueva, cero abandonos reales del JIT.
 ### Duodécima tanda (test 207)
 
 - **Un genérico pelado en anotación toma sus defaults.**
+
+- **Un closure ya no deshace el estrechamiento al definirse.**
+  Cualquier asignación dentro del cuerpo olvidaba el estrechamiento
+  exterior (`const f = () => { x = null }` bastaba, aunque `f` no se
+  llamara). Ahora `in_function_body` aísla el estado: lo de dentro no
+  sale. A cambio, llamar un closure conocido olvida lo que ese closure
+  asigna (efectos sintácticos por símbolo, también para `function`
+  anidadas, IIFEs y closures en argumentos). Llamar lo que no asigna no
+  toca nada.
+- Sin A/B con ganancia esperada: es precisión del checker; control de
+  forma de llamada para confirmar no regresión. Test 208.
+
+Validación (perfil `quick`): cuadrante 1 `3137/3137`, corpus 202/202
+con caché nueva, cero abandonos reales del JIT.
+
+- **Un genérico pelado en anotación toma sus defaults.**
   `const c: Cell = new Cell(5)` dejaba `Cell<T>` crudo y `c.v` era
   `T`. Ahora hay un solo origen (`TypeContext::generic_defaults`, con
   delegación en los contextos envoltura): `resolve_named_type` rellena
@@ -405,6 +421,22 @@ con caché nueva, cero abandonos reales del JIT.
 Validación (perfil `quick`): cuadrante 1 `3133/3133`, corpus 202/202
 con caché nueva, cero abandonos reales del JIT, `vn check` sin errores
 nuevos en `std` ni `tests`.
+
+### Decimotercera tanda (test 208)
+
+- **Un closure ya no deshace el estrechamiento al definirse.**
+  Cualquier asignación dentro del cuerpo olvidaba el estrechamiento
+  exterior (`const f = () => { x = null }` bastaba, aunque `f` no se
+  llamara). Ahora `in_function_body` aísla el estado: lo de dentro no
+  sale. A cambio, llamar un closure conocido olvida lo que ese closure
+  asigna (efectos sintácticos por símbolo, también para `function`
+  anidadas, IIFEs y closures en argumentos). Llamar lo que no asigna no
+  toca nada.
+- A/B de control contra el padre: forma de llamada, medianas iguales
+  (sin regresión). Test 208.
+
+Validación (perfil `quick`): cuadrante 1 `3137/3137`, corpus 202/202
+con caché nueva, cero abandonos reales del JIT.
 
 ## 2. Pendiente, por orden
 
@@ -426,9 +458,10 @@ Cada item: qué falta, dónde, cómo se mide.
   respaldo y se borró el caso `int` -> `float?` de `as_declared`.
 - Hecho (duodécima tanda, test 207): un genérico pelado en anotación
   toma sus defaults (`TypeContext::generic_defaults`).
-- El estrechamiento por asignación no cubre miembros (`this.v ??= 3`),
-  ni asignaciones hechas desde un closure, y una asignación en una rama
-  de un `if` invalida también la otra.
+- Hecho (decimotercera tanda, test 208): definir un closure no toca
+  el estrechamiento exterior; llamarlo olvida solo lo que asigna.
+  Falta: miembros (`this.v ??= 3`). La rama que asigna invalida la
+  otra por diseño conservador.
 
 ### 2.2 Tipos que `HirType` no distingue
 

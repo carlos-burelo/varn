@@ -60,6 +60,22 @@ impl<'r> Checker<'r> {
         }
 
         self.check_param_defaults(rec, &f.params, bind);
+        if !f.modifiers.is_declare && !f.modifiers.is_native {
+            let effects = self.closure_assigned_symbols(
+                super::stmts::reassignment::ClosureBodyRef::Stmt(f.body),
+                bind,
+            );
+            if let Some(id) = bind
+                .scopes
+                .get(self.current_scope)
+                .resolve(f.id, &bind.scopes)
+            {
+                self.closure_var_effects
+                    .entry(id)
+                    .or_default()
+                    .extend(effects);
+            }
+        }
         self.in_function_body(f.modifiers.is_async, |c| c.check_stmt(rec, f.body, bind));
         let has_body = !f.modifiers.is_declare && !f.modifiers.is_native;
         if f.return_type.is_some() && !is_gen && has_body {
