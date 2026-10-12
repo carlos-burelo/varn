@@ -1,7 +1,8 @@
 
   [35mtir check[0m [2m──────────────────────────────────────── <fixtures>/closure.vn[0m
-nodes 46   static 19   by name 0   static 100%
-  not yet supported  dynamic    12   by name     0
+nodes 50   static 19   by name 0   static 100%
+  declared           dynamic     1   by name     0
+  function type      dynamic    12   by name     0
   info from_tir(ssa): OK (5 ssa fn(s))
   info from_tir(proto): OK
   [2m── end: tir check ──[0m

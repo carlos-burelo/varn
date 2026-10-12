@@ -7,13 +7,25 @@ TirModule {
     types: TyTable {
         entries: [
             Never,
+            Str,
             Int,
+            Dynamic(
+                Declared,
+            ),
         ],
         dedup: {
-            Int: 1,
+            Int: 2,
             Never: 0,
+            Dynamic(
+                Declared,
+            ): 3,
+            Str: 1,
         },
         lists: [],
+        shapes: [],
+        shape_names: [],
+        named_shapes: {},
+        open_shapes: 0,
     },
     classes: [
         ClassInfo {
@@ -36,6 +48,7 @@ TirModule {
                     slot: 2,
                 },
             ],
+            statics: [],
             vtable: [],
             layout: ClassLayout {
                 payload_size: 48,
@@ -95,7 +108,12 @@ TirModule {
                     ],
                 },
             },
-            constructor: None,
+            constructor: Some(
+                SigId(
+                    1,
+                ),
+            ),
+            import_binding: None,
         },
     ],
     class_origins: [
@@ -112,9 +130,20 @@ TirModule {
         },
         Signature {
             params: [
-                Array(
+                Nullable(
                     TyId(
                         1,
+                    ),
+                ),
+            ],
+            return_ty: Void,
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Array(
+                    TyId(
+                        2,
                     ),
                 ),
             ],
@@ -125,7 +154,7 @@ TirModule {
             params: [
                 Array(
                     TyId(
-                        1,
+                        2,
                     ),
                 ),
                 Int,
@@ -133,17 +162,51 @@ TirModule {
             return_ty: Int,
             has_rest: false,
         },
+        Signature {
+            params: [
+                Array(
+                    TyId(
+                        2,
+                    ),
+                ),
+            ],
+            return_ty: Int,
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Array(
+                    TyId(
+                        2,
+                    ),
+                ),
+                Int,
+            ],
+            return_ty: Int,
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Array(
+                    TyId(
+                        3,
+                    ),
+                ),
+            ],
+            return_ty: Void,
+            has_rest: true,
+        },
     ],
     functions: [
         TirFunction {
             name: "sum",
             sig: SigId(
-                1,
+                2,
             ),
             params: [
                 Array(
                     TyId(
-                        1,
+                        2,
                     ),
                 ),
             ],
@@ -152,7 +215,7 @@ TirModule {
                 Int,
                 Array(
                     TyId(
-                        1,
+                        2,
                     ),
                 ),
                 Int,
@@ -184,7 +247,7 @@ TirModule {
                     ),
                     ty: Array(
                         TyId(
-                            1,
+                            2,
                         ),
                     ),
                     init: Some(
@@ -192,7 +255,7 @@ TirModule {
                             kind: Var,
                             ty: Array(
                                 TyId(
-                                    1,
+                                    2,
                                 ),
                             ),
                             res: Param(
@@ -320,7 +383,7 @@ TirModule {
                                                 kind: Var,
                                                 ty: Array(
                                                     TyId(
-                                                        1,
+                                                        2,
                                                     ),
                                                 ),
                                                 res: Local(
@@ -370,7 +433,7 @@ TirModule {
                                             kind: Var,
                                             ty: Array(
                                                 TyId(
-                                                    1,
+                                                    2,
                                                 ),
                                             ),
                                             res: Local(
@@ -498,12 +561,12 @@ TirModule {
         TirFunction {
             name: "firstAbove",
             sig: SigId(
-                2,
+                3,
             ),
             params: [
                 Array(
                     TyId(
-                        1,
+                        2,
                     ),
                 ),
                 Int,
@@ -586,7 +649,7 @@ TirModule {
                                         kind: Var,
                                         ty: Array(
                                             TyId(
-                                                1,
+                                                2,
                                             ),
                                         ),
                                         res: Param(
@@ -628,7 +691,7 @@ TirModule {
                                                 kind: Var,
                                                 ty: Array(
                                                     TyId(
-                                                        1,
+                                                        2,
                                                     ),
                                                 ),
                                                 res: Param(
@@ -702,7 +765,7 @@ TirModule {
                                                         kind: Var,
                                                         ty: Array(
                                                             TyId(
-                                                                1,
+                                                                2,
                                                             ),
                                                         ),
                                                         res: Param(
@@ -837,14 +900,14 @@ TirModule {
     ],
     globals: [
         Dynamic(
-            NotYetSupported,
+            Callable,
         ),
         Dynamic(
-            NotYetSupported,
+            Callable,
         ),
         Array(
             TyId(
-                1,
+                2,
             ),
         ),
     ],
@@ -870,7 +933,7 @@ TirModule {
                             kind: Var,
                             ty: Array(
                                 TyId(
-                                    1,
+                                    2,
                                 ),
                             ),
                             res: GlobalSlot(
@@ -953,7 +1016,7 @@ TirModule {
                             ),
                             ty: Array(
                                 TyId(
-                                    1,
+                                    2,
                                 ),
                             ),
                             res: None,
@@ -980,7 +1043,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        NotYetSupported,
+                                        Callable,
                                     ),
                                     res: GlobalSlot(
                                         0,
@@ -996,7 +1059,7 @@ TirModule {
                                             kind: Var,
                                             ty: Array(
                                                 TyId(
-                                                    1,
+                                                    2,
                                                 ),
                                             ),
                                             res: GlobalSlot(
@@ -1062,10 +1125,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "loop sum",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "loop sum",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 451,
+                                                        end: 461,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 451,
@@ -1099,7 +1176,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        NotYetSupported,
+                                        Callable,
                                     ),
                                     res: GlobalSlot(
                                         1,
@@ -1115,7 +1192,7 @@ TirModule {
                                             kind: Var,
                                             ty: Array(
                                                 TyId(
-                                                    1,
+                                                    2,
                                                 ),
                                             ),
                                             res: GlobalSlot(
@@ -1194,10 +1271,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "loop firstAbove",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "loop firstAbove",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 510,
+                                                        end: 527,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 510,
@@ -1228,7 +1319,7 @@ TirModule {
                         callee: TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: NativeGlobal(
                                 0,
@@ -1241,10 +1332,22 @@ TirModule {
                         args: [
                             Expr(
                                 TirExpr {
-                                    kind: StrLit(
-                                        "loop ok",
+                                    kind: Cast {
+                                        operand: TirExpr {
+                                            kind: StrLit(
+                                                "loop ok",
+                                            ),
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 535,
+                                                end: 544,
+                                            },
+                                        },
+                                    },
+                                    ty: Dynamic(
+                                        Declared,
                                     ),
-                                    ty: Str,
                                     res: None,
                                     span: Span {
                                         start: 535,

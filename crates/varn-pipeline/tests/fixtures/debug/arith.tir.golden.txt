@@ -7,11 +7,23 @@ TirModule {
     types: TyTable {
         entries: [
             Never,
+            Str,
+            Dynamic(
+                Declared,
+            ),
         ],
         dedup: {
+            Str: 1,
             Never: 0,
+            Dynamic(
+                Declared,
+            ): 2,
         },
         lists: [],
+        shapes: [],
+        shape_names: [],
+        named_shapes: {},
+        open_shapes: 0,
     },
     classes: [
         ClassInfo {
@@ -34,6 +46,7 @@ TirModule {
                     slot: 2,
                 },
             ],
+            statics: [],
             vtable: [],
             layout: ClassLayout {
                 payload_size: 48,
@@ -93,7 +106,12 @@ TirModule {
                     ],
                 },
             },
-            constructor: None,
+            constructor: Some(
+                SigId(
+                    1,
+                ),
+            ),
+            import_binding: None,
         },
     ],
     class_origins: [
@@ -105,6 +123,17 @@ TirModule {
     signatures: [
         Signature {
             params: [],
+            return_ty: Void,
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Nullable(
+                    TyId(
+                        1,
+                    ),
+                ),
+            ],
             return_ty: Void,
             has_rest: false,
         },
@@ -123,12 +152,38 @@ TirModule {
             return_ty: Int,
             has_rest: false,
         },
+        Signature {
+            params: [
+                Int,
+                Int,
+            ],
+            return_ty: Int,
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Int,
+            ],
+            return_ty: Int,
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Array(
+                    TyId(
+                        2,
+                    ),
+                ),
+            ],
+            return_ty: Void,
+            has_rest: true,
+        },
     ],
     functions: [
         TirFunction {
             name: "add",
             sig: SigId(
-                1,
+                2,
             ),
             params: [
                 Int,
@@ -185,7 +240,7 @@ TirModule {
         TirFunction {
             name: "scale",
             sig: SigId(
-                2,
+                3,
             ),
             params: [
                 Int,
@@ -263,10 +318,10 @@ TirModule {
     ],
     globals: [
         Dynamic(
-            NotYetSupported,
+            Callable,
         ),
         Dynamic(
-            NotYetSupported,
+            Callable,
         ),
         Int,
     ],
@@ -304,7 +359,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        NotYetSupported,
+                                        Callable,
                                     ),
                                     res: GlobalSlot(
                                         0,
@@ -419,10 +474,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "arith add",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "arith add",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 159,
+                                                        end: 170,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 159,
@@ -456,7 +525,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        NotYetSupported,
+                                        Callable,
                                     ),
                                     res: GlobalSlot(
                                         1,
@@ -534,10 +603,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "arith scale",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "arith scale",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 210,
+                                                        end: 223,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 210,
@@ -568,7 +651,7 @@ TirModule {
                         callee: TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: NativeGlobal(
                                 0,
@@ -581,10 +664,22 @@ TirModule {
                         args: [
                             Expr(
                                 TirExpr {
-                                    kind: StrLit(
-                                        "arith ok",
+                                    kind: Cast {
+                                        operand: TirExpr {
+                                            kind: StrLit(
+                                                "arith ok",
+                                            ),
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 231,
+                                                end: 241,
+                                            },
+                                        },
+                                    },
+                                    ty: Dynamic(
+                                        Declared,
                                     ),
-                                    ty: Str,
                                     res: None,
                                     span: Span {
                                         start: 231,

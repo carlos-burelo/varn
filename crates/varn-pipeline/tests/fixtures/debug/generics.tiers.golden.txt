@@ -2,7 +2,7 @@
   [1mtiers[0m [2m──────────────────────────────────────────── <module> · 6/6 ruteadas[0m
   [2mfunción        [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                      [0m
   ────────────────┼───────┼──────┼────────────────────────────
-  <module>        │   119 │ clif │  (native: alloc+boxed)     
+  <module>        │   125 │ clif │  (native: alloc+boxed)     
   identity        │     5 │ clif │  (native: boxed)           
   Box.constructor │    12 │ clif │  (native: this+boxed)      
   Box.get         │    11 │ clif │  (native: this+boxed)      

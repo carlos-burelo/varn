@@ -7,11 +7,23 @@ TirModule {
     types: TyTable {
         entries: [
             Never,
+            Str,
+            Dynamic(
+                Declared,
+            ),
         ],
         dedup: {
+            Str: 1,
             Never: 0,
+            Dynamic(
+                Declared,
+            ): 2,
         },
         lists: [],
+        shapes: [],
+        shape_names: [],
+        named_shapes: {},
+        open_shapes: 0,
     },
     classes: [
         ClassInfo {
@@ -34,6 +46,7 @@ TirModule {
                     slot: 2,
                 },
             ],
+            statics: [],
             vtable: [],
             layout: ClassLayout {
                 payload_size: 48,
@@ -93,7 +106,12 @@ TirModule {
                     ],
                 },
             },
-            constructor: None,
+            constructor: Some(
+                SigId(
+                    1,
+                ),
+            ),
+            import_binding: None,
         },
     ],
     class_origins: [
@@ -110,10 +128,21 @@ TirModule {
         },
         Signature {
             params: [
+                Nullable(
+                    TyId(
+                        1,
+                    ),
+                ),
+            ],
+            return_ty: Void,
+            has_rest: false,
+        },
+        Signature {
+            params: [
                 Int,
             ],
             return_ty: Dynamic(
-                NotYetSupported,
+                Callable,
             ),
             has_rest: false,
         },
@@ -127,7 +156,7 @@ TirModule {
         Signature {
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Callable,
             ),
             has_rest: false,
         },
@@ -135,19 +164,63 @@ TirModule {
             params: [],
             return_ty: Int,
             has_rest: false,
+        },
+        Signature {
+            params: [
+                Int,
+            ],
+            return_ty: Dynamic(
+                Callable,
+            ),
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Int,
+            ],
+            return_ty: Int,
+            has_rest: false,
+        },
+        Signature {
+            params: [],
+            return_ty: Dynamic(
+                Callable,
+            ),
+            has_rest: false,
+        },
+        Signature {
+            params: [],
+            return_ty: Int,
+            has_rest: false,
+        },
+        Signature {
+            params: [],
+            return_ty: Int,
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Array(
+                    TyId(
+                        2,
+                    ),
+                ),
+            ],
+            return_ty: Void,
+            has_rest: true,
         },
     ],
     functions: [
         TirFunction {
             name: "makeAdder",
             sig: SigId(
-                1,
+                2,
             ),
             params: [
                 Int,
             ],
             return_ty: Dynamic(
-                NotYetSupported,
+                Callable,
             ),
             locals: [],
             body: [
@@ -165,7 +238,7 @@ TirModule {
                                 ],
                             },
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: None,
                             span: Span {
@@ -186,11 +259,11 @@ TirModule {
         TirFunction {
             name: "makeCounter",
             sig: SigId(
-                3,
+                4,
             ),
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Callable,
             ),
             locals: [
                 Int,
@@ -229,7 +302,7 @@ TirModule {
                                 ],
                             },
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: None,
                             span: Span {
@@ -250,7 +323,7 @@ TirModule {
         TirFunction {
             name: "<closure>",
             sig: SigId(
-                2,
+                3,
             ),
             params: [
                 Int,
@@ -306,7 +379,7 @@ TirModule {
         TirFunction {
             name: "<closure>",
             sig: SigId(
-                4,
+                5,
             ),
             params: [],
             return_ty: Int,
@@ -394,16 +467,16 @@ TirModule {
     ],
     globals: [
         Dynamic(
-            NotYetSupported,
+            Callable,
         ),
         Dynamic(
-            NotYetSupported,
+            Callable,
         ),
         Dynamic(
-            NotYetSupported,
+            Callable,
         ),
         Dynamic(
-            NotYetSupported,
+            Callable,
         ),
     ],
     global_names: [
@@ -428,7 +501,7 @@ TirModule {
                         target: TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: GlobalSlot(
                                 2,
@@ -443,7 +516,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        NotYetSupported,
+                                        Callable,
                                     ),
                                     res: GlobalSlot(
                                         0,
@@ -470,7 +543,7 @@ TirModule {
                                 ],
                             },
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: DirectFn(
                                 FnId(
@@ -500,7 +573,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        NotYetSupported,
+                                        Callable,
                                     ),
                                     res: GlobalSlot(
                                         2,
@@ -574,10 +647,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "closure add5",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "closure add5",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 252,
+                                                        end: 266,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 252,
@@ -608,7 +695,7 @@ TirModule {
                         target: TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: GlobalSlot(
                                 3,
@@ -623,7 +710,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        NotYetSupported,
+                                        Callable,
                                     ),
                                     res: GlobalSlot(
                                         1,
@@ -636,7 +723,7 @@ TirModule {
                                 args: [],
                             },
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: DirectFn(
                                 FnId(
@@ -666,7 +753,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        NotYetSupported,
+                                        Callable,
                                     ),
                                     res: GlobalSlot(
                                         3,
@@ -726,10 +813,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "closure counter 1",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "closure counter 1",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 335,
+                                                        end: 354,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 335,
@@ -763,7 +864,7 @@ TirModule {
                                 callee: TirExpr {
                                     kind: Var,
                                     ty: Dynamic(
-                                        NotYetSupported,
+                                        Callable,
                                     ),
                                     res: GlobalSlot(
                                         3,
@@ -823,10 +924,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "closure counter 2",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "closure counter 2",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 393,
+                                                        end: 412,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 393,
@@ -857,7 +972,7 @@ TirModule {
                         callee: TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: NativeGlobal(
                                 0,
@@ -870,10 +985,22 @@ TirModule {
                         args: [
                             Expr(
                                 TirExpr {
-                                    kind: StrLit(
-                                        "closure ok",
+                                    kind: Cast {
+                                        operand: TirExpr {
+                                            kind: StrLit(
+                                                "closure ok",
+                                            ),
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 420,
+                                                end: 432,
+                                            },
+                                        },
+                                    },
+                                    ty: Dynamic(
+                                        Declared,
                                     ),
-                                    ty: Str,
                                     res: None,
                                     span: Span {
                                         start: 420,

@@ -1,14 +1,14 @@
 
   [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
   [1m<module>[0m[2m (native)[0m
-    [2mkinds (16 regs):[0m
+    [2mkinds (18 regs):[0m
   [2mblock  [0m │ [2mkinds                                                                                             [0m
   ────────┼───────────────────────────────────────────────────────────────────────────────────────────────────
   block@0 │ v0:Ref, v1:Ref, v2:Int, v3:Int, v4:Int, v6:Int, v7:Ref, v8:Ref, v9:Ref, v10:Int, v11:Int, v12:Bool
-  block@1 │ v13:Ref, v14:Str, v15:Ref                                                                         
-  block@2 │ v16:Ref, v17:Ref, v18:Int, v19:Int, v20:Int, v21:Bool                                             
-  block@3 │ v22:Ref, v23:Str, v24:Ref                                                                         
-  block@4 │ v25:Ref, v26:Str                                                                                  
+  block@1 │ v13:Ref, v14:Str, v15:Dynamic, v16:Ref                                                            
+  block@2 │ v17:Ref, v18:Ref, v19:Int, v20:Int, v21:Int, v22:Bool                                             
+  block@3 │ v23:Ref, v24:Str, v25:Dynamic, v26:Ref                                                            
+  block@4 │ v27:Ref, v28:Str, v29:Dynamic, v30:Dynamic                                                        
   [1msum[0m[2m (native)[0m
     [2mkinds (8 regs):[0m
   [2mblock  [0m │ [2mkinds                                           [0m

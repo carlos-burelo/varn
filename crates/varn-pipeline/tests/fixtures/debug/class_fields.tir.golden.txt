@@ -7,11 +7,23 @@ TirModule {
     types: TyTable {
         entries: [
             Never,
+            Str,
+            Dynamic(
+                Declared,
+            ),
         ],
         dedup: {
+            Str: 1,
             Never: 0,
+            Dynamic(
+                Declared,
+            ): 2,
         },
         lists: [],
+        shapes: [],
+        shape_names: [],
+        named_shapes: {},
+        open_shapes: 0,
     },
     classes: [
         ClassInfo {
@@ -24,23 +36,24 @@ TirModule {
                     slot: 0,
                 },
             ],
+            statics: [],
             vtable: [
                 VtableEntry {
                     name: "get celsius",
-                    sig: SigId(
-                        2,
-                    ),
-                },
-                VtableEntry {
-                    name: "set celsius",
                     sig: SigId(
                         3,
                     ),
                 },
                 VtableEntry {
-                    name: "get fahrenheit",
+                    name: "set celsius",
                     sig: SigId(
                         4,
+                    ),
+                },
+                VtableEntry {
+                    name: "get fahrenheit",
+                    sig: SigId(
+                        5,
                     ),
                 },
             ],
@@ -67,9 +80,10 @@ TirModule {
             },
             constructor: Some(
                 SigId(
-                    1,
+                    2,
                 ),
             ),
+            import_binding: None,
         },
         ClassInfo {
             name: "Error",
@@ -91,6 +105,7 @@ TirModule {
                     slot: 2,
                 },
             ],
+            statics: [],
             vtable: [],
             layout: ClassLayout {
                 payload_size: 48,
@@ -150,7 +165,12 @@ TirModule {
                     ],
                 },
             },
-            constructor: None,
+            constructor: Some(
+                SigId(
+                    1,
+                ),
+            ),
+            import_binding: None,
         },
     ],
     class_origins: [
@@ -163,6 +183,17 @@ TirModule {
     signatures: [
         Signature {
             params: [],
+            return_ty: Void,
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Nullable(
+                    TyId(
+                        1,
+                    ),
+                ),
+            ],
             return_ty: Void,
             has_rest: false,
         },
@@ -195,6 +226,17 @@ TirModule {
             has_rest: false,
         },
         Signature {
+            params: [
+                Array(
+                    TyId(
+                        2,
+                    ),
+                ),
+            ],
+            return_ty: Void,
+            has_rest: true,
+        },
+        Signature {
             params: [],
             return_ty: Dynamic(
                 NotYetSupported,
@@ -224,7 +266,7 @@ TirModule {
         TirFunction {
             name: "Temperature.constructor",
             sig: SigId(
-                1,
+                2,
             ),
             params: [
                 Float,
@@ -296,7 +338,7 @@ TirModule {
         TirFunction {
             name: "Temperature.get celsius",
             sig: SigId(
-                5,
+                7,
             ),
             params: [],
             return_ty: Dynamic(
@@ -349,7 +391,7 @@ TirModule {
         TirFunction {
             name: "Temperature.set celsius",
             sig: SigId(
-                6,
+                8,
             ),
             params: [
                 Dynamic(
@@ -425,7 +467,7 @@ TirModule {
         TirFunction {
             name: "Temperature.get fahrenheit",
             sig: SigId(
-                7,
+                9,
             ),
             params: [],
             return_ty: Dynamic(
@@ -740,10 +782,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "class getter",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "class getter",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 389,
+                                                        end: 403,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 389,
@@ -842,10 +898,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "class derived",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "class derived",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 449,
+                                                        end: 464,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 449,
@@ -996,10 +1066,24 @@ TirModule {
                                 args: [
                                     Expr(
                                         TirExpr {
-                                            kind: StrLit(
-                                                "class setter",
+                                            kind: Cast {
+                                                operand: TirExpr {
+                                                    kind: StrLit(
+                                                        "class setter",
+                                                    ),
+                                                    ty: Str,
+                                                    res: None,
+                                                    span: Span {
+                                                        start: 525,
+                                                        end: 539,
+                                                    },
+                                                },
+                                            },
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
                                             ),
-                                            ty: Str,
                                             res: None,
                                             span: Span {
                                                 start: 525,
@@ -1030,7 +1114,7 @@ TirModule {
                         callee: TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                NotYetSupported,
+                                Callable,
                             ),
                             res: NativeGlobal(
                                 0,
@@ -1043,10 +1127,22 @@ TirModule {
                         args: [
                             Expr(
                                 TirExpr {
-                                    kind: StrLit(
-                                        "class ok",
+                                    kind: Cast {
+                                        operand: TirExpr {
+                                            kind: StrLit(
+                                                "class ok",
+                                            ),
+                                            ty: Str,
+                                            res: None,
+                                            span: Span {
+                                                start: 547,
+                                                end: 557,
+                                            },
+                                        },
+                                    },
+                                    ty: Dynamic(
+                                        Declared,
                                     ),
-                                    ty: Str,
                                     res: None,
                                     span: Span {
                                         start: 547,
