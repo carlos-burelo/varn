@@ -514,6 +514,11 @@ errores nuevos, cero abandonos reales del JIT, matriz release 4/4
   sigue valiendo para ejecutar tareas.
 - Sin test nuevo: el 154 existente lo cubre (fallaba, ahora pasa).
   Batería B0: checksums JIT/NO_JIT idénticos.
+- Veredicto B1 (reanudar en nativo): sin cambio en esta tanda.
+  Pide tabla `resume_ip`→bloque en el SSA portable, params en los
+  bloques de continuación y entrada con valores desde home: cirugía
+  con riesgo propio, varios días. El modelo actual (primer segmento
+  en nativo, resto en intérprete) es seguro por construcción.
 
 Validación (perfil `quick`): cuadrante 1 `3178/3178`, abandonos
 «fase B» 0, matriz release 4/4 `3178/3178`.
@@ -643,10 +648,13 @@ cuerpo en vez de crear la tarea: lo cazó el test 154 con `churn`
 devolviendo su `acc` dentro del lote). Es seguro por construcción:
 el intérprete solo entra a JIT con `ip == 0`; reanudar va siempre a
 intérprete; el OSR de suspendibles sigue vetado.
-Medido en `quick`: generadores `pingpong` 47→23 ms (2x), `mapfilter`
-43→27 ms (1,6x), checksums idénticos; abandonos «fase B» en suite:
-0 (eran 860). Queda para B1 de verdad: re-entrar a nativo en
-`resume_ip`.
+Medido en `quick` (A/B pareado, 3×10 y 2×10, binarios alternos):
+async sin suspensión (`churn` 400k) 43→23 ms (1,9x, corre entero
+en nativo); `pingpong` 100k 62→52 ms (16%); cadena `await`
+dominada por maquinaria: sin ganancia (245 vs 230 ms). Batería B0:
+checksums JIT/NO_JIT idénticos; abandonos «fase B» en suite: 0
+(eran 860). Queda para B1 de verdad: re-entrar a nativo en
+`resume_ip` (veredicto abajo).
 
 ### 2.8 Llamada a método dinámico
 
