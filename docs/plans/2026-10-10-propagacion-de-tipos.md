@@ -548,8 +548,8 @@ errores nuevos (+3 ficheros), matriz release 4/4 `3183/3183`.
   bucles, `Decl`) intacto. La cola no-`never` sigue dando
   `VN4018` (corpus +1).
 
-Validación (perfil `quick`): cuadrante 1 pendiente, corpus sin
-errores nuevos (+1 fichero), matriz release pendiente.
+Validación (perfil `quick`): cuadrante 1 `3188/3188`, corpus sin
+errores nuevos (+1 fichero), matriz release 4/4 `3188/3188`.
 
 ## 2. Pendiente, por orden
 
