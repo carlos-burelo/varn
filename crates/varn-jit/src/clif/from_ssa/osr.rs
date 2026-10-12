@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use cranelift_codegen::ir::{Block, BlockArg, InstBuilder, Value};
+use cranelift_codegen::ir::{types, Block, BlockArg, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::ssa::{SsaProto, SsaSecondaryEntry};
 
@@ -69,13 +69,18 @@ pub(super) fn emit_entry(
     values: &mut [Option<Value>],
     header: &SsaSecondaryEntry,
     header_blk: Block,
-    throwing: Option<u32>,
+    throwing: bool,
 ) -> Result<(), String> {
     let ssa = ctx.ssa;
-    if let Some(r) = throwing {
-        let x = load_home_value(b, ctx, ssa.reg(r), ssa.value_ty(r))?;
-        define(b, ctx, values, r, x);
-        return super::exceptions::emit_throw(b, ctx, values, r);
+    if throwing {
+        let boxed = b.ins().load(
+            types::I128,
+            MemFlagsData::trusted(),
+            ctx.exec_ctx,
+            ctx.helpers.jit_native_result_offset as i32,
+        );
+        b.declare_value_needs_stack_map(boxed);
+        return super::exceptions::emit_throw_boxed(b, ctx, ctx.exec_ctx, boxed);
     }
     for &v in &header.live {
         let x = load_home_value(b, ctx, ssa.reg(v), ssa.value_ty(v))?;

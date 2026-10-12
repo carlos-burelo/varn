@@ -58,15 +58,31 @@ impl ExecCtx {
             let is_first_entry = unsafe { (*ctx).frames[frame_idx].ip == 0 };
 
             let osr_fn = match unsafe { (*ctx).osr_request.take() } {
-                Some(osr_ip)
-                    if unsafe { !(*ctx).settings.no_jit }
-                        && unsafe { osr_ip == (*ctx).frames[frame_idx].ip } =>
-                {
-                    closure.osr_jit_fn(varn_types::ssa::OsrRequest {
-                        ip: osr_ip,
-                        throwing: false,
-                        dest_reg: 0,
-                    })
+                Some(req) if unsafe { req.ip == (*ctx).frames[frame_idx].ip } => {
+                    let jit_on = unsafe { !(*ctx).settings.no_jit };
+                    let f = jit_on
+                        .then(|| closure.osr_jit_fn(req))
+                        .flatten();
+                    match (f, req.throwing) {
+                        (Some(f), _) => Some(f),
+                        (None, true) => unsafe {
+                            let ctxm = &mut *ctx;
+                            let thrown = ctxm.jit_native_result;
+                            match ctxm.reject_awaited(thrown) {
+                                crate::exec::ctx_tasks::Rejection::Caught => None,
+                                crate::exec::ctx_tasks::Rejection::Unhandled(thrown) => {
+                                    let err =
+                                        crate::exec::exceptions::build_thrown_error(
+                                            thrown,
+                                            &ctxm.heap,
+                                            &ctxm.frames,
+                                        );
+                                    return Err(err);
+                                }
+                            }
+                        },
+                        (None, false) => None,
+                    }
                 }
                 Some(_) | None => None,
             };

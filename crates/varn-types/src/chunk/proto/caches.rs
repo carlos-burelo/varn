@@ -6,6 +6,44 @@ use super::super::pool::PoolEntry;
 use super::definition::FunctionProto;
 
 impl FunctionProto {
+    pub fn osr_lookup(&self, ip: usize, throwing: bool, epoch: u64) -> Option<Option<usize>> {
+        self.jit_osr_entries.borrow().iter().find_map(|e| {
+            (e.ip == ip && e.throwing == throwing && e.epoch == epoch).then_some(e.entry)
+        })
+    }
+
+    pub fn osr_failed(&self, ip: usize, throwing: bool, epoch: u64) -> bool {
+        matches!(self.osr_lookup(ip, throwing, epoch), Some(None))
+    }
+
+    pub fn osr_remember(
+        &self,
+        ip: usize,
+        throwing: bool,
+        epoch: u64,
+        entry: Option<(usize, Rc<dyn std::any::Any>)>,
+    ) {
+        let mut entries = self.jit_osr_entries.borrow_mut();
+        entries.retain(|e| !(e.ip == ip && e.throwing == throwing));
+        let (ptr, code) = match entry {
+            Some((ptr, code)) => (Some(ptr), Some(code)),
+            None => (None, None),
+        };
+        entries.push(super::definition::OsrCacheEntry {
+            ip,
+            throwing,
+            epoch,
+            entry: ptr,
+            code,
+        });
+    }
+
+    pub fn osr_invalidate(&self, epoch: u64) {
+        self.jit_osr_entries
+            .borrow_mut()
+            .retain(|e| e.epoch != epoch);
+    }
+
     pub fn frame_layout(&self) -> Rc<crate::register_meta::FrameLayout> {
         Rc::clone(
             self.frame_layout

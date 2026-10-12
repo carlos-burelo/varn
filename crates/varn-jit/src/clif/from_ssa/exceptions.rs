@@ -45,12 +45,27 @@ pub(super) fn emit_throw(
 ) -> Result<(), String> {
     let frame = frame(ctx)?;
     let (tag, payload) = heap::boxed_parts(b, ctx, values, value)?;
-    call_helper_void(
-        b,
-        ctx.cc,
-        ctx.helpers.throw,
-        &[frame.exec_ctx, tag, payload],
-    );
+    throw_parts(b, ctx, frame.exec_ctx, tag, payload)
+}
+
+pub(super) fn emit_throw_boxed(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    ectx: Value,
+    boxed: Value,
+) -> Result<(), String> {
+    let (tag, payload) = b.ins().isplit(boxed);
+    throw_parts(b, ctx, ectx, tag, payload)
+}
+
+fn throw_parts(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    ectx: Value,
+    tag: Value,
+    payload: Value,
+) -> Result<(), String> {
+    call_helper_void(b, ctx.cc, ctx.helpers.throw, &[ectx, tag, payload]);
     b.ins().trap(TrapCode::user(1).expect("non-zero trap code"));
     Ok(())
 }

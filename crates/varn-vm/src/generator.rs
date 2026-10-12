@@ -83,11 +83,7 @@ impl GeneratorDriver for NanGenDriver {
                     }
                 }
             }
-            if let Some(frame) = inner.ctx.frames.last() {
-                if frame.ip != 0 {
-                    inner.ctx.osr_request = Some(frame.ip);
-                }
-            }
+            crate::exec::scheduler::request_osr(&mut inner.ctx, false);
         }
         inner.started = true;
 
@@ -106,25 +102,12 @@ impl GeneratorDriver for NanGenDriver {
                     match inner.ctx.settle_awaited(value) {
                         Ok(resolved) => {
                             inner.ctx.resume_with_awaited(dest_reg, resolved);
-                            if let Some(frame) = inner.ctx.frames.last() {
-                                if frame.ip != 0 {
-                                    inner.ctx.osr_request = Some(frame.ip);
-                                }
-                            }
+                            crate::exec::scheduler::request_osr(&mut inner.ctx, false);
                         }
-                        Err(thrown) => match inner.ctx.reject_awaited(thrown) {
-                            crate::exec::ctx_tasks::Rejection::Caught => {
-                                if let Some(frame) = inner.ctx.frames.last() {
-                                    if frame.ip != 0 {
-                                        inner.ctx.osr_request = Some(frame.ip);
-                                    }
-                                }
-                            }
-                            crate::exec::ctx_tasks::Rejection::Unhandled(thrown) => {
-                                inner.done = true;
-                                return Err(format!("{thrown}"));
-                            }
-                        },
+                        Err(thrown) => {
+                            inner.ctx.jit_native_result = thrown;
+                            crate::exec::scheduler::request_osr(&mut inner.ctx, true);
+                        }
                     }
                 }
                 Some(VmSuspend::Await { .. }) => {

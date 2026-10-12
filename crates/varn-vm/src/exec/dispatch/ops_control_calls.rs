@@ -35,7 +35,11 @@ impl ExecCtx {
     #[cold]
     #[inline(never)]
     fn request_osr(&mut self, header_ip: usize, frame_idx: usize, closure: &VmClosure) -> bool {
-        if closure.proto.jit_osr_failed.get() {
+        if closure.proto.osr_failed(
+            header_ip,
+            false,
+            crate::clif_link::current_epoch(),
+        ) {
             return false;
         }
 
@@ -49,7 +53,10 @@ impl ExecCtx {
 
         debug_assert_eq!(frame_idx, self.frames.len() - 1);
         self.frames[frame_idx].ip = header_ip;
-        self.osr_request = Some(header_ip);
+        self.osr_request = Some(varn_types::ssa::OsrRequest {
+            ip: header_ip,
+            throwing: false,
+        });
         true
     }
 

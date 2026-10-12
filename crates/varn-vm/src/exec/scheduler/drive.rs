@@ -6,7 +6,6 @@ use super::pumps::{drain_hosts, host_generation, host_wait, queue_for, PumpGuard
 use super::queue::{Delivery, ReadyTask, Start, TaskQueue};
 use super::suspend::{freeze, thaw};
 use crate::exec::ctx::ExecCtx;
-use crate::exec::ctx_tasks::Rejection;
 use crate::exec::VmSuspend;
 use crate::heap::HeapObj;
 use crate::task::{settle, Outcome, Status, TaskCell};
@@ -109,6 +108,17 @@ fn failure_value(ctx: &mut ExecCtx, err: crate::error::RuntimeError) -> VmValue 
     crate::exec::exceptions::thrown_value_for(&err, &mut ctx.heap)
 }
 
+pub(crate) fn request_osr(ctx: &mut ExecCtx, throwing: bool) {
+    if let Some(frame) = ctx.frames.last() {
+        if frame.ip != 0 {
+            ctx.osr_request = Some(varn_types::ssa::OsrRequest {
+                ip: frame.ip,
+                throwing,
+            });
+        }
+    }
+}
+
 pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) {
     let ReadyTask { start, output } = ready;
     if !output.is_pending() {
@@ -131,21 +141,15 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
         }
     };
     if let Delivery::Settled(cell) = delivery {
-        match cell.status() {
-            Status::Resolved => ctx.resume_with_awaited(dest_reg, cell.value()),
-            Status::Rejected | Status::Pending => {
-                if let Rejection::Unhandled(thrown) = ctx.reject_awaited(cell.value()) {
-                    return finish(queue, ctx, &output, Err(thrown));
-                }
-            }
+        if matches!(cell.status(), Status::Resolved) {
+            ctx.resume_with_awaited(dest_reg, cell.value());
+            request_osr(&mut ctx, false);
+        } else {
+            ctx.jit_native_result = cell.value();
+            request_osr(&mut ctx, true);
         }
-    }
-    if resumed {
-        if let Some(frame) = ctx.frames.last() {
-            if frame.ip != 0 {
-                ctx.osr_request = Some(frame.ip);
-            }
-        }
+    } else if resumed {
+        request_osr(&mut ctx, false);
     }
     loop {
         let result = match ctx.run() {
@@ -164,21 +168,11 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
         match settle_for_park(&mut ctx, value) {
             ParkAction::ResumeOk(resolved) => {
                 ctx.resume_with_awaited(dest_reg, resolved);
-                if let Some(frame) = ctx.frames.last() {
-                    if frame.ip != 0 {
-                        ctx.osr_request = Some(frame.ip);
-                    }
-                }
+                request_osr(&mut ctx, false);
             }
             ParkAction::ResumeErr(thrown) => {
-                if let Rejection::Unhandled(thrown) = ctx.reject_awaited(thrown) {
-                    return finish(queue, ctx, &output, Err(thrown));
-                }
-                if let Some(frame) = ctx.frames.last() {
-                    if frame.ip != 0 {
-                        ctx.osr_request = Some(frame.ip);
-                    }
-                }
+                ctx.jit_native_result = thrown;
+                request_osr(&mut ctx, true);
             }
             ParkAction::Park(handle) => {
                 let stats = &crate::profile::TASK_STATS;

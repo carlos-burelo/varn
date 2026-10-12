@@ -123,29 +123,22 @@ impl VmClosure {
         if FRAME_LAYOUT_V2_JIT_BAIL {
             return None;
         }
-        let osr_ip = req.ip;
         let proto = &self.proto;
-        if proto.jit_osr_failed.get() {
-            return None;
-        }
         let epoch = crate::clif_link::current_epoch();
         if epoch == 0 {
             return None;
         }
-        if proto.jit_osr_epoch.get() == epoch {
-            if let Some(entry) = proto.jit_osr_entry.get() {
-                if proto.jit_osr_ip.get() == osr_ip {
-                    return Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry) });
-                }
-            }
+        if let Some(hit) = proto.osr_lookup(req.ip, req.throwing, epoch) {
+            return hit.map(|entry| unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry) });
         }
 
         if proto.is_generator || proto.is_async {
-            let is_resume = proto
+            if !proto
                 .ssa
                 .get()
-                .is_some_and(|ssa| ssa.is_resume_entry(osr_ip));
-            if !is_resume {
+                .is_some_and(|ssa| ssa.is_resume_entry(req.ip))
+            {
+                proto.osr_remember(req.ip, req.throwing, epoch, None);
                 return None;
             }
         }
@@ -155,23 +148,22 @@ impl VmClosure {
         match varn_jit::compile(proto, &self.constants, helpers, &linker, Some(req)) {
             Ok(compiled) => {
                 let entry_usize: usize = compiled.entry as usize;
-                proto.jit_osr_epoch.set(epoch);
-                proto.jit_osr_ip.set(osr_ip);
-                proto.jit_osr_entry.set(Some(entry_usize));
-                *proto.jit_osr_code.borrow_mut() = Some(compiled.code);
-
                 debug_assert_eq!(
                     compiled.native, 0,
                     "osr lowering must not publish a native entry"
+                );
+                proto.osr_remember(
+                    req.ip,
+                    req.throwing,
+                    epoch,
+                    Some((entry_usize, compiled.code)),
                 );
 
                 crate::clif_link::register_compiled(proto, None);
                 Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry_usize) })
             }
             Err(_) => {
-                proto.jit_osr_failed.set(true);
-                proto.jit_osr_entry.set(None);
-                proto.jit_osr_epoch.set(0);
+                proto.osr_remember(req.ip, req.throwing, epoch, None);
                 None
             }
         }

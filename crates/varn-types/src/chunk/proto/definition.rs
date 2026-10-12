@@ -105,23 +105,7 @@ pub struct FunctionProto {
 
     #[serde(skip)]
     #[serde(default)]
-    pub jit_osr_entry: std::cell::Cell<Option<usize>>,
-
-    #[serde(skip)]
-    #[serde(default)]
-    pub jit_osr_epoch: std::cell::Cell<u64>,
-
-    #[serde(skip)]
-    #[serde(default)]
-    pub jit_osr_ip: std::cell::Cell<usize>,
-
-    #[serde(skip)]
-    #[serde(default)]
-    pub jit_osr_code: std::cell::RefCell<Option<Rc<dyn std::any::Any>>>,
-
-    #[serde(skip)]
-    #[serde(default)]
-    pub jit_osr_failed: std::cell::Cell<bool>,
+    pub jit_osr_entries: std::cell::RefCell<Vec<OsrCacheEntry>>,
 
     #[serde(default)]
     pub ssa: crate::ssa::PortableSsa,
@@ -143,6 +127,15 @@ pub struct FunctionProto {
 
 fn slot_kind_dynamic() -> crate::register_meta::SlotKind {
     crate::register_meta::SlotKind::Dynamic
+}
+
+#[derive(Clone, Debug)]
+pub struct OsrCacheEntry {
+    pub ip: usize,
+    pub throwing: bool,
+    pub epoch: u64,
+    pub entry: Option<usize>,
+    pub code: Option<Rc<dyn std::any::Any>>,
 }
 
 fn proto_ic_default() -> Rc<RefCell<Vec<PolyICSlot>>> {

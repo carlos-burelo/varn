@@ -59,7 +59,7 @@ pub struct ExecCtx {
     pub jit_exit: varn_jit::stack_roots::JitExit,
     pub jit_exits_saved: Vec<varn_jit::stack_roots::JitExit>,
 
-    pub osr_request: Option<usize>,
+    pub osr_request: Option<varn_types::ssa::OsrRequest>,
 
     pub resources: Rc<std::cell::UnsafeCell<varn_types::ResourceStore>>,
 

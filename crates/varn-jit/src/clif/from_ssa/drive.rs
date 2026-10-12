@@ -16,7 +16,7 @@ use cranelift_codegen::ir::{
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use varn_types::register_meta::SlotKind;
-use varn_types::ssa::{OsrRequest, SsaProto, SsaTerm};
+use varn_types::ssa::{OsrRequest, SsaEntryKind, SsaProto, SsaTerm};
 use varn_types::{FunctionProto, VmValue};
 pub(in crate::clif) fn try_lower(
     proto: &FunctionProto,
@@ -37,11 +37,13 @@ pub(in crate::clif) fn try_lower(
         ),
     };
     let throwing = match (osr_req, osr) {
-        (Some(req), Some(e)) if req.throwing => Some(
-            e.result
-                .ok_or_else(|| format!("from_ssa: throw without result at ip {}", req.ip))?,
-        ),
-        _ => None,
+        (Some(req), Some(e)) if req.throwing => {
+            if e.kind != SsaEntryKind::Resume {
+                return Err(format!("from_ssa: throw at loop entry {}", req.ip));
+            }
+            true
+        }
+        _ => false,
     };
     if (osr.is_some() || proto.resumes_in_interpreter()) && activation == Activation::Native {
         return Err(NEEDS_ACTIVATION.into());
