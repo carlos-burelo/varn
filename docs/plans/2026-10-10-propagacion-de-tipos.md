@@ -523,22 +523,21 @@ errores nuevos, cero abandonos reales del JIT, matriz release 4/4
 Validación (perfil `quick`): cuadrante 1 `3178/3178`, abandonos
 «fase B» 0, matriz release 4/4 `3178/3178`.
 
-### Decimoctava tanda (test 212, contratos con ancestro genérico)
+### Decimoctava tanda (test 212, sustitución de ancestro genérico)
 
-- **`override` sustituye los args del `extends`.** Nadie leía
-  `super_type_args`: ahora viajan en `ClassParent.args` y el chequeo
-  compone `generic_mapping` + `map_generics` por niveles. Cadenas
-  foráneas y `extends` pelado siguen el camino viejo; un `override`
-  mal en `Box<int>` (directo o vía `Mid`) da `VN4116` con el tipo
-  ya sustituido; el correcto pasa, incluido en subclase genérica.
-- **`implements` contra clase genérica** instancia sus miembros
-  igual: se acabó el falso `VN4117` en código correcto; el que no
-  cumple sigue fallando.
-- Sin regresión posible por construcción: solo se activa donde el
-  camino viejo saltaba (`lineage_is_generic`).
+- **Un solo sitio: al aplanar en el binder.** Los miembros
+  heredados ya viajan sustituidos (`super_type_args` por fin se
+  lee); con eso `this.v` es `int`, `new IntBox(1)` valida y el
+  `override` compara directo. `parent_type` construye el genérico
+  para el cruce (local y foráneo con re-intern).
+- **`override`** caza el `str` donde va `int` (`VN4116` directo e
+  indirecto); **`implements`** contra clase genérica instancia
+  sus miembros (se acabó el falso `VN4117`).
+- Foráneo y `extends` pelado: camino viejo (solo se activa donde
+  antes se saltaba; sin regresión posible).
 
-Validación (perfil `quick`): cuadrante 1 `3182/3182`, corpus sin
-errores nuevos (+3 ficheros), matriz release 4/4 `3182/3182`.
+Validación (perfil `quick`): cuadrante 1 `3183/3183`, corpus sin
+errores nuevos (+3 ficheros), matriz release 4/4 `3183/3183`.
 
 ## 2. Pendiente, por orden
 
