@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 use cranelift_codegen::ir::{types, Block, BlockArg, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
-use varn_types::ssa::{SsaProto, SsaSecondaryEntry};
+use varn_types::ssa::{SsaOp, SsaProto, SsaSecondaryEntry};
 
 use super::store::{clif_ty, define, is_heap, load_home_value};
 use super::Ctx;
@@ -61,6 +61,59 @@ pub(super) fn versioned(
         }
     }
     carried
+}
+
+pub(super) fn emit_catch_entry(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &mut [Option<Value>],
+    header: &SsaSecondaryEntry,
+    header_blk: Block,
+) -> Result<(), String> {
+    let ssa = ctx.ssa;
+    let blk = ssa
+        .blocks
+        .get(header.block as usize)
+        .ok_or_else(|| format!("from_ssa: catch block {} out of range", header.block))?;
+    if !blk.params.is_empty() {
+        return Err(format!(
+            "from_ssa: catch block {} takes params",
+            header.block
+        ));
+    }
+    let mut caught: Vec<u32> = Vec::new();
+    for inst in &blk.insts {
+        if let SsaOp::CatchParam { try_val } = &inst.op {
+            if !caught.contains(try_val) {
+                caught.push(*try_val);
+            }
+        }
+    }
+    if caught.is_empty() {
+        return Err(format!(
+            "from_ssa: catch block {} without CatchParam",
+            header.block
+        ));
+    }
+    let mut staged: Option<Value> = None;
+    for v in caught {
+        let boxed = match staged {
+            Some(x) => x,
+            None => {
+                let x = b.ins().load(
+                    types::I128,
+                    MemFlagsData::trusted(),
+                    ctx.exec_ctx,
+                    ctx.helpers.jit_native_result_offset as i32,
+                );
+                b.declare_value_needs_stack_map(x);
+                staged = Some(x);
+                x
+            }
+        };
+        define(b, ctx, values, v, boxed);
+    }
+    emit_entry(b, ctx, values, header, header_blk, false)
 }
 
 pub(super) fn emit_entry(

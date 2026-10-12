@@ -117,6 +117,23 @@ pub(super) unsafe fn run_compiled_frame(
                 let err_obj = unsafe { (*ctx).jit_panic_exception_err_obj.take() };
 
                 if let Some(handler) = handler {
+                    if let Some(catch_fn) = unsafe {
+                        catch_entry_fn(ctx, closure, frame_idx, &handler)
+                    } {
+                        unsafe { (*ctx).jit_native_result = error };
+                        return unsafe {
+                            run_compiled_frame(
+                                ctx,
+                                catch_fn,
+                                closure_ptr,
+                                closure,
+                                frame_idx,
+                                depth,
+                                false,
+                                true,
+                            )
+                        };
+                    }
                     if let Err(e) = unwind_to_handler(unsafe { &mut *ctx }, handler, error) {
                         return JitFrameOutcome::Failed(e);
                     }
@@ -136,6 +153,38 @@ pub(super) unsafe fn run_compiled_frame(
         }
     };
 
+    unsafe { finish_compiled_frame(ctx, depth, res) }
+}
+
+#[allow(dangerous_implicit_autorefs)]
+unsafe fn catch_entry_fn(
+    ctx: *mut ExecCtx,
+    closure: &VmClosure,
+    frame_idx: usize,
+    handler: &crate::frame::TryHandler,
+) -> Option<varn_jit::JitFn> {
+    let ctxm = &mut *ctx;
+    if ctxm.settings.no_jit {
+        return None;
+    }
+    if ctxm.frames.len() != frame_idx + 1 || handler.frame_depth != ctxm.frames.len() {
+        return None;
+    }
+    let ssa = closure.proto.ssa.get()?;
+    ssa.catch_at(handler.catch_ip)?;
+    let req = varn_types::ssa::OsrRequest {
+        ip: handler.catch_ip,
+        mode: varn_types::ssa::OsrMode::Catch,
+    };
+    closure.osr_jit_fn(req)
+}
+
+#[allow(dangerous_implicit_autorefs)]
+unsafe fn finish_compiled_frame(
+    ctx: *mut ExecCtx,
+    depth: usize,
+    res: VmValue,
+) -> JitFrameOutcome {
     let returning_frame_idx = unsafe { (*ctx).frames.len() }.saturating_sub(1);
     let frame = unsafe { (*ctx).frames.pop() }.unwrap();
     unsafe { (*ctx).drop_frame_storage(frame.base) };

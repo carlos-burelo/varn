@@ -51,6 +51,8 @@ pub(super) struct Ctx<'a> {
 
     pub carried: FxHashMap<u32, cranelift_frontend::Variable>,
 
+    pub try_live: FxHashSet<u32>,
+
     pub home_addrs: std::cell::RefCell<FxHashMap<u32, Value>>,
 
     pub scratch: Option<call::ScratchWin>,

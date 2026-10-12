@@ -132,15 +132,25 @@ impl VmClosure {
             return hit.map(|entry| unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry) });
         }
 
-        if proto.is_generator || proto.is_async {
-            if !proto
+        let allowed = match req.mode {
+            varn_types::ssa::OsrMode::Resume | varn_types::ssa::OsrMode::Throw => {
+                if proto.is_generator || proto.is_async {
+                    proto
+                        .ssa
+                        .get()
+                        .is_some_and(|ssa| ssa.is_resume_entry(req.ip))
+                } else {
+                    true
+                }
+            }
+            varn_types::ssa::OsrMode::Catch => proto
                 .ssa
                 .get()
-                .is_some_and(|ssa| ssa.is_resume_entry(req.ip))
-            {
-                proto.osr_remember(req.ip, req.mode, epoch, None);
-                return None;
-            }
+                .is_some_and(|ssa| ssa.catch_at(req.ip).is_some()),
+        };
+        if !allowed {
+            proto.osr_remember(req.ip, req.mode, epoch, None);
+            return None;
         }
 
         let helpers = super::table_build::build_jit_helpers();

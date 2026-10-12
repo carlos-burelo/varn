@@ -31,10 +31,14 @@ pub(in crate::clif) fn try_lower(
 ) -> Result<Lowered, String> {
     let osr = match osr_req {
         None => None,
-        Some(req) => Some(
-            ssa.secondary_at(req.ip)
+        Some(req) => Some(match req.mode {
+            OsrMode::Resume | OsrMode::Throw => ssa
+                .secondary_at(req.ip)
                 .ok_or_else(|| format!("from_ssa: no secondary entry at ip {}", req.ip))?,
-        ),
+            OsrMode::Catch => ssa
+                .catch_at(req.ip)
+                .ok_or_else(|| format!("from_ssa: no catch entry at ip {}", req.ip))?,
+        }),
     };
     let throwing = match (osr_req, osr) {
         (Some(req), Some(e)) if req.mode == OsrMode::Throw => {
@@ -45,6 +49,10 @@ pub(in crate::clif) fn try_lower(
         }
         _ => false,
     };
+    let catching = matches!(
+        (osr_req, osr),
+        (Some(req), Some(_)) if req.mode == OsrMode::Catch
+    );
     if (osr.is_some() || proto.resumes_in_interpreter()) && activation == Activation::Native {
         return Err(NEEDS_ACTIVATION.into());
     }
@@ -189,6 +197,7 @@ pub(in crate::clif) fn try_lower(
             Some(h) => osr::carried(&mut b, ssa, h, &reached),
             None => osr::versioned(&mut b, ssa, &version_plans, &preds, &rpo_pos, &reached),
         },
+        try_live: try_live_set(ssa),
     };
 
     if let Some(frame) = &ctx.frame {
@@ -197,7 +206,11 @@ pub(in crate::clif) fn try_lower(
     let mut values: Vec<Option<Value>> = vec![None; ssa.values.len()];
     if let Some(h) = osr {
         let header = blocks[h.block as usize].expect("block created");
-        osr::emit_entry(&mut b, &ctx, &mut values, h, header, throwing)?;
+        if catching {
+            osr::emit_catch_entry(&mut b, &ctx, &mut values, h, header)?;
+        } else {
+            osr::emit_entry(&mut b, &ctx, &mut values, h, header, throwing)?;
+        }
     }
     let pins = match osr {
         Some(_) => std::collections::BTreeMap::new(),
@@ -606,6 +619,13 @@ fn lower_block(
             }
             None => {}
         }
+        if let Some(d) = inst.dest {
+            if ctx.try_live.contains(&d) {
+                debug_assert!(ctx.frame.is_some());
+                let boxed = heap::boxed_value(b, ctx, values, d)?;
+                store::home_store(b, ctx, ctx.ssa.reg(d), boxed)?;
+            }
+        }
         match &inst.op {
             varn_types::ssa::SsaOp::GetFixedField { object, slot, .. } => {
                 if let Some(d) = inst.dest {
@@ -678,6 +698,18 @@ struct VersionClones {
     slow: std::collections::BTreeMap<usize, Block>,
     fast_view: Vec<Option<Block>>,
     slow_view: Vec<Option<Block>>,
+}
+
+fn try_live_set(ssa: &SsaProto) -> rustc_hash::FxHashSet<u32> {
+    let mut set = rustc_hash::FxHashSet::default();
+    for blk in &ssa.blocks {
+        for inst in &blk.insts {
+            if let varn_types::ssa::SsaOp::Try { live, .. } = &inst.op {
+                set.extend(live.iter().copied());
+            }
+        }
+    }
+    set
 }
 
 fn entry_param(
