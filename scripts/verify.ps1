@@ -156,6 +156,15 @@ if (-not $Quick) {
     }
 }
 
+# Los tests con procesos hijo (111) espawnean target/debug/vn.exe: si es
+# rancio, su huella no coincide con el bundle recién compilado y los
+# cuadrantes @embedded caen con "compilado por otra version".
+$debugBin = Join-Path $RootDir "target\debug\vn.exe"
+if (Test-Path $debugBin) {
+    Copy-Item $vnBin $debugBin -Force
+    Write-Success "Binario hijo sincronizado (target/debug/vn.exe)."
+}
+
 # Helper para ejecutar un cuadrante
 function Run-Quadrant($name, $envVars, $argsList) {
     Write-Host "`n--- Ejecutando Cuadrante: $name ---" -ForegroundColor Yellow
