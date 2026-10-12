@@ -20,7 +20,11 @@ pub struct ClifArtifact {
 
 impl ClifArtifact {
     pub fn native_entry(&self, proto: &FunctionProto) -> (usize, u64) {
-        if self.activation != Activation::Native || proto.has_rest {
+        if self.activation != Activation::Native
+            || proto.has_rest
+            || proto.is_async
+            || proto.is_generator
+        {
             return (0, 0);
         }
         let Some(id) = super::native_abi::NativeShape::of_proto(proto).id() else {
@@ -137,10 +141,6 @@ pub fn try_compile(
             proto.name,
             proto.chunk.code.len()
         );
-    }
-
-    if proto.is_generator || proto.is_async {
-        return Err("clif: generator/async not JIT-able in fase B".into());
     }
 
     if let Some(why) = proto.ssa.unavailable() {

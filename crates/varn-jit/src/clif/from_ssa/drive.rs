@@ -41,9 +41,7 @@ pub(in crate::clif) fn try_lower(
     }
     let nparams = proto.arity.saturating_sub(1);
     cfg::check_block_args(ssa)?;
-    if proto.is_generator
-        || proto.is_async
-        || ssa.blocks.is_empty()
+    if ssa.blocks.is_empty()
         || ssa.entry as usize >= ssa.blocks.len()
         || ssa.blocks[ssa.entry as usize].params.len() != nparams
         || proto.param_kinds.len() != nparams

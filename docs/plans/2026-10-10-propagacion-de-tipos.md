@@ -19,7 +19,8 @@ código (Ley 12).
    (`VARN_CACHE_DIR`) en cada corrida. No se corre `cargo test`.
 2. Barrido de abandonos: `vn debug -p bails` sobre `tests/*.vn` y
    `tests/benchmarks/vn/*.vn` (ojo: `vn/`, no `tests/benchmarks/*.vn`).
-   Debe quedar solo «generator/async not JIT-able in fase B».
+   Cero «fase B» (la puerta ya no existe): async/generadores compilan
+   y aparcan por ayudante.
 3. Todo test nuevo se mira con `vn debug -p tiers`: una función que
    abandona pasa la suite igual, interpretada.
 4. Rendimiento: A/B pareado contra el binario anterior (dos binarios,
@@ -500,6 +501,23 @@ Validación (perfil `quick`): cuadrante 1 `3178/3178`, corpus sin
 errores nuevos, cero abandonos reales del JIT, matriz release 4/4
 `3178/3178`.
 
+### Decimoséptima tanda (2.7 primera fase: async/generadores compilan)
+
+- **Fuera las dos puertas de fase B** (`lower.rs:142`,
+  `drive.rs:44`): la bajada `suspend` ya sabía aparcar
+  (`spill` + ayudante + `longjmp` exterior).
+- **Destino de `await`/`yield` desde home**: el ayudante nunca
+  retorna; el verificador CLIF exige definir el valor igual.
+- **Sin entrada nativa para async/generadores**: la llamada directa
+  ejecutaba el cuerpo en vez de crear la tarea (test 154:
+  `batch[200]` era el `acc` de `churn`). La entrada enmarcada
+  sigue valiendo para ejecutar tareas.
+- Sin test nuevo: el 154 existente lo cubre (fallaba, ahora pasa).
+  Batería B0: checksums JIT/NO_JIT idénticos.
+
+Validación (perfil `quick`): cuadrante 1 `3178/3178`, abandonos
+«fase B» 0, matriz release 4/4 `3178/3178`.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -614,9 +632,21 @@ propagación de tipos; queda anotado con esta medida.
 
 ### 2.7 Funciones async sin JIT
 
-Por diseño hoy («fase B»). Es la mayor masa de código interpretado:
-todo `it(...)` de la suite y buena parte de `std`. Depende del rediseño
-async aprobado (memoria `varn-async-redesign-approved`).
+Hecho en la decimoséptima tanda (primera fase: compilan; reanudar
+sigue en intérprete). La bajada `suspend` ya existía entera
+(`await_`/`yield_` derraman a home y aparcan por `longjmp` exterior);
+solo la frenaban dos puertas (`lower.rs`, `drive.rs`). Al quitarlas
+hicieron falta dos arreglos: el destino del `await`/`yield` se define
+desde home (el ayudante nunca retorna) y la entrada nativa no se
+publica para async/generadores (una llamada directa ejecutaba el
+cuerpo en vez de crear la tarea: lo cazó el test 154 con `churn`
+devolviendo su `acc` dentro del lote). Es seguro por construcción:
+el intérprete solo entra a JIT con `ip == 0`; reanudar va siempre a
+intérprete; el OSR de suspendibles sigue vetado.
+Medido en `quick`: generadores `pingpong` 47→23 ms (2x), `mapfilter`
+43→27 ms (1,6x), checksums idénticos; abandonos «fase B» en suite:
+0 (eran 860). Queda para B1 de verdad: re-entrar a nativo en
+`resume_ip`.
 
 ### 2.8 Llamada a método dinámico
 

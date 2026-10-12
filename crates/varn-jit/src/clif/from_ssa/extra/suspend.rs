@@ -1,7 +1,7 @@
 use super::super::super::emit::{call_helper, call_helper_void};
 use super::super::heap::{boxed_value, exec_ctx};
 use super::super::load_value;
-use super::super::store::{home_store, Out};
+use super::super::store::{home_load, home_store, Out};
 use super::super::Ctx;
 use super::extra_shared::{frame, native};
 use cranelift_codegen::ir::{types, InstBuilder, Value};
@@ -26,7 +26,7 @@ pub(super) fn await_(
     let rv = b.ins().iconst(types::I64, i64::from(resume_ip));
 
     call_helper_void(b, ctx.cc, h.await_helper, &[ectx, t, p, dv, rv]);
-    Ok(Some(None))
+    Ok(Some(Some(Out::Boxed(home_load(b, ctx, ctx.ssa.reg(d))?))))
 }
 
 pub(super) fn spawn(
@@ -62,7 +62,7 @@ pub(super) fn yield_(
     let rv = b.ins().iconst(types::I64, i64::from(resume_ip));
 
     call_helper_void(b, ctx.cc, h.yield_helper, &[ectx, t, p, dv, rv]);
-    Ok(Some(None))
+    Ok(Some(Some(Out::Boxed(home_load(b, ctx, ctx.ssa.reg(d))?))))
 }
 
 pub(super) fn dispose(
