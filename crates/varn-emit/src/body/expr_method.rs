@@ -51,6 +51,35 @@ impl<'a> FnEmitter<'a> {
         checked: Option<varn_tir::SigId>,
         span: Span,
     ) -> TirExpr {
+        if let Some(ci) = self.class_of(recv.ty) {
+            if Self::is_class_ref(&recv, &ci.name, self.m.globals) {
+                if let Some(slot) = ci.static_slot(&name) {
+                    let sig = checked.or(ci.static_at(slot).and_then(|s| s.sig));
+                    let declared = ci.static_at(slot).map(|s| s.ty).unwrap_or(ty);
+                    let callee = TirExpr {
+                        kind: TirExprKind::Field {
+                            object: Box::new(recv),
+                            name: name.clone(),
+                        },
+                        ty: declared,
+                        res: Resolution::StaticField(slot),
+                        span,
+                    };
+                    let targs = self.fill_omitted(targs, None, sig);
+                    let (target, targs) =
+                        self.settle_args(None, Callee::Value(callee), targs, sig, span);
+                    return TirExpr {
+                        kind: TirExprKind::Call {
+                            callee: Box::new(target.into_expr()),
+                            args: targs,
+                        },
+                        ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+            }
+        }
         let class = self.class_of(recv.ty);
         let table_sig = class.and_then(|ci| {
             let slot = ci.method_slot(&name)?;

@@ -481,6 +481,25 @@ con caché nueva, cero abandonos reales del JIT.
 Validación: cuadrante 1 `3163/3163`, corpus sin errores nuevos,
 cero abandonos reales del JIT, matriz release 4/4 `3163/3163`.
 
+### Decimosexta tanda (test 211, despacho estático directo)
+
+- **Llamar un método estático ya no pasa por `MethodCall`.**
+  `ClassInfo.statics` lleva también los métodos (`sig` incluida) en
+  orden de emisión: campos y luego métodos, como el runtime. Si el
+  receptor es la clase, `method_call` resuelve el closure por
+  `StaticField` y emite `Call` con la firma para dar forma a los
+  argumentos (sin `verify` cuando hay firma). `this`/`super` en un
+  estático lo impide el checker (`VN4115`), así que el reencamine es
+  exacto; el receptor dinámico y lo foráneo siguen por nombre.
+  Medido en `quick` (5M llamadas, binarios alternos): 466 ms →
+  88 ms (~89 ns → ~13 ns por llamada, como la de instancia).
+  Test 211 (orden de slots, defaults, dinámicos, método como valor,
+  `override static`, bucle caliente).
+
+Validación (perfil `quick`): cuadrante 1 `3178/3178`, corpus sin
+errores nuevos, cero abandonos reales del JIT, matriz release 4/4
+`3178/3178`.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.

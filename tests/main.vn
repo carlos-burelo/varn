@@ -202,6 +202,7 @@ import "./207-bare-generic-takes-defaults.vn"
 import "./208-closure-narrowing-isolation.vn"
 import "./209-filling-a-member-narrows-it.vn"
 import "./210-static-field-slots.vn"
+import "./211-static-method-dispatch.vn"
 
 summary()
 

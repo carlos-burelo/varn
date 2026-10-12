@@ -15,6 +15,8 @@ pub struct StaticInfo {
     pub name: Arc<str>,
     pub ty: BackendTy,
 
+    pub sig: Option<crate::ty::SigId>,
+
     pub slot: u16,
 }
 
@@ -59,7 +61,7 @@ impl ClassInfo {
         parent: Ancestry<'_>,
         fields: Vec<(Arc<str>, BackendTy)>,
         methods: Vec<(Arc<str>, SigId)>,
-        statics: Vec<(Arc<str>, BackendTy)>,
+        statics: Vec<(Arc<str>, BackendTy, Option<SigId>)>,
         types: &TyTable,
     ) -> Self {
         let (parent_id, parent_info, foreign) = match parent {
@@ -110,9 +112,10 @@ impl ClassInfo {
             statics: statics
                 .into_iter()
                 .enumerate()
-                .map(|(slot, (name, ty))| StaticInfo {
+                .map(|(slot, (name, ty, sig))| StaticInfo {
                     name,
                     ty,
+                    sig,
                     slot: slot as u16,
                 })
                 .collect(),

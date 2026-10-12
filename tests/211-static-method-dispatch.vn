@@ -1,0 +1,68 @@
+import { describe, it, expect } from "std:test";
+
+class Calc {
+    static step: int = 1
+    static one(): int { return 1 }
+    static two(): int { return 2 }
+    static three(): int { return 3 }
+    static add(a: int, b: int): int { return a + b }
+    static greet(name: str = "world"): str { return "hi " + name }
+    static bump(): int {
+        Calc.step = Calc.step + 1
+        return Calc.step
+    }
+}
+
+class Base {
+    static who(): str { return "base" }
+}
+
+class Kid extends Base {
+    static override who(): str { return "kid" }
+}
+
+function callDyn(f: dynamic, x: int, y: int): int { return f(x, y) }
+
+await describe("211 static methods dispatch direct", async () => {
+    await it("each static resolves to its own slot", () => {
+        expect(Calc.one()).toBe(1)
+        expect(Calc.two()).toBe(2)
+        expect(Calc.three()).toBe(3)
+        expect(Calc.add(20, 22)).toBe(42)
+    })
+
+    await it("defaults are filled", () => {
+        expect(Calc.greet()).toBe("hi world")
+        expect(Calc.greet("mars")).toBe("hi mars")
+    })
+
+    await it("dynamic args are shaped", () => {
+        const d: dynamic = 21
+        expect(Calc.add(d, 21)).toBe(42)
+        expect(callDyn(Calc.add, 21, 21)).toBe(42)
+    })
+
+    await it("method as value calls the same closure", () => {
+        const f = Calc.add
+        expect(f(3, 4)).toBe(7)
+    })
+
+    await it("state flows through statics", () => {
+        Calc.step = 1
+        expect(Calc.bump()).toBe(2)
+        expect(Calc.bump()).toBe(3)
+    })
+
+    await it("override from the subclass wins", () => {
+        expect(Kid.who()).toBe("kid")
+        expect(Base.who()).toBe("base")
+    })
+
+    await it("hot static calls stay exact", () => {
+        Calc.step = 0
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + Calc.bump() }
+        expect(Calc.step).toBe(300)
+        expect(total).toBe(300 * 301 / 2)
+    })
+})

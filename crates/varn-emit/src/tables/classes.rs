@@ -6,7 +6,7 @@ use std::sync::Arc;
 use varn_core::AtomInterner;
 use varn_sem::bind::BindResult;
 use varn_sem::types::{CheckerTyTable, ClassMemberKind};
-use varn_tir::{Ancestry, BackendTy, ClassInfo, Signature, TyTable};
+use varn_tir::{Ancestry, BackendTy, ClassInfo, DynReason, Signature, TyTable};
 
 type ForeignFields = std::collections::BTreeMap<Arc<str>, Vec<varn_sem::output::InheritedField>>;
 pub(super) fn build_classes(
@@ -133,22 +133,50 @@ fn build_one_class(
         .map(|e| e.members.as_slice())
         .unwrap_or(&[]);
 
-    let mut statics: Vec<(Arc<str>, BackendTy)> = Vec::new();
+    let mut statics: Vec<(Arc<str>, BackendTy, Option<varn_tir::SigId>)> = Vec::new();
     for m in members {
         if !m.is_static {
             continue;
         }
         match m.kind {
             ClassMemberKind::Property | ClassMemberKind::Variable => {
-                if statics.iter().any(|(n, _)| n == &m.name) {
+                if statics.iter().any(|(n, _, _)| n == &m.name) {
                     continue;
                 }
                 let static_bt =
                     field_backend_ty(m.ty, m.is_optional, table, interner, tt, names);
-                statics.push((m.name.clone(), static_bt));
+                statics.push((m.name.clone(), static_bt, None));
             }
             ClassMemberKind::Method
             | ClassMemberKind::Function
+            | ClassMemberKind::Constructor
+            | ClassMemberKind::Getter
+            | ClassMemberKind::Setter
+            | ClassMemberKind::Class
+            | ClassMemberKind::Interface
+            | ClassMemberKind::Namespace
+            | ClassMemberKind::Enum
+            | ClassMemberKind::Struct => {}
+        }
+    }
+    for m in members {
+        if !m.is_static {
+            continue;
+        }
+        match m.kind {
+            ClassMemberKind::Method | ClassMemberKind::Function => {
+                if statics.iter().any(|(n, _, _)| n == &m.name) {
+                    continue;
+                }
+                let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
+                statics.push((
+                    m.name.clone(),
+                    BackendTy::Dynamic(DynReason::Declared),
+                    Some(sig),
+                ));
+            }
+            ClassMemberKind::Property
+            | ClassMemberKind::Variable
             | ClassMemberKind::Constructor
             | ClassMemberKind::Getter
             | ClassMemberKind::Setter

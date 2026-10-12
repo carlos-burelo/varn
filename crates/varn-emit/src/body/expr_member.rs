@@ -400,7 +400,7 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn is_class_ref(
+    pub(super) fn is_class_ref(
         obj: &TirExpr,
         class_name: &Arc<str>,
         globals: &rustc_hash::FxHashMap<Arc<str>, u32>,
