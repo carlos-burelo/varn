@@ -188,7 +188,12 @@ pub fn try_compile(
         Ok((lowered, activation)) if !super::emit::disabled_helper_hit() => {
             if super::trace() {
                 let osr_tag = osr_req.map_or(String::new(), |req| {
-                    format!(" osr@{}{}", req.ip, if req.throwing { "!" } else { "" })
+                    let mark = match req.mode {
+                        varn_types::ssa::OsrMode::Resume => String::new(),
+                        varn_types::ssa::OsrMode::Throw => "!".to_owned(),
+                        varn_types::ssa::OsrMode::Catch => "?".to_owned(),
+                    };
+                    format!(" osr@{}{}", req.ip, mark)
                 });
                 eprintln!(
                     "clif: from_ssa {}{} ({activation:?}{})",

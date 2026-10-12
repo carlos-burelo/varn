@@ -83,7 +83,7 @@ impl GeneratorDriver for NanGenDriver {
                     }
                 }
             }
-            crate::exec::scheduler::request_osr(&mut inner.ctx, false);
+            crate::exec::scheduler::request_osr(&mut inner.ctx, varn_types::ssa::OsrMode::Resume);
         }
         inner.started = true;
 
@@ -102,11 +102,14 @@ impl GeneratorDriver for NanGenDriver {
                     match inner.ctx.settle_awaited(value) {
                         Ok(resolved) => {
                             inner.ctx.resume_with_awaited(dest_reg, resolved);
-                            crate::exec::scheduler::request_osr(&mut inner.ctx, false);
+                            crate::exec::scheduler::request_osr(&mut inner.ctx, varn_types::ssa::OsrMode::Resume);
                         }
                         Err(thrown) => {
                             inner.ctx.jit_native_result = thrown;
-                            crate::exec::scheduler::request_osr(&mut inner.ctx, true);
+                            crate::exec::scheduler::request_osr(
+                                &mut inner.ctx,
+                                varn_types::ssa::OsrMode::Throw,
+                            );
                         }
                     }
                 }

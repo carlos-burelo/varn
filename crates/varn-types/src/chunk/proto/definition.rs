@@ -132,7 +132,7 @@ fn slot_kind_dynamic() -> crate::register_meta::SlotKind {
 #[derive(Clone, Debug)]
 pub struct OsrCacheEntry {
     pub ip: usize,
-    pub throwing: bool,
+    pub mode: crate::ssa::OsrMode,
     pub epoch: u64,
     pub entry: Option<usize>,
     pub code: Option<Rc<dyn std::any::Any>>,

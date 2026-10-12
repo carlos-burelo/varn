@@ -63,9 +63,9 @@ impl ExecCtx {
                     let f = jit_on
                         .then(|| closure.osr_jit_fn(req))
                         .flatten();
-                    match (f, req.throwing) {
+                    match (f, req.mode) {
                         (Some(f), _) => Some(f),
-                        (None, true) => unsafe {
+                        (None, varn_types::ssa::OsrMode::Throw) => unsafe {
                             let ctxm = &mut *ctx;
                             let thrown = ctxm.jit_native_result;
                             match ctxm.reject_awaited(thrown) {
@@ -81,7 +81,8 @@ impl ExecCtx {
                                 }
                             }
                         },
-                        (None, false) => None,
+                        (None, varn_types::ssa::OsrMode::Resume)
+                        | (None, varn_types::ssa::OsrMode::Catch) => None,
                     }
                 }
                 Some(_) | None => None,

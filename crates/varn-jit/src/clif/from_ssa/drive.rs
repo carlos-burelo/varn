@@ -16,7 +16,7 @@ use cranelift_codegen::ir::{
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use varn_types::register_meta::SlotKind;
-use varn_types::ssa::{OsrRequest, SsaEntryKind, SsaProto, SsaTerm};
+use varn_types::ssa::{OsrMode, OsrRequest, SsaEntryKind, SsaProto, SsaTerm};
 use varn_types::{FunctionProto, VmValue};
 pub(in crate::clif) fn try_lower(
     proto: &FunctionProto,
@@ -37,7 +37,7 @@ pub(in crate::clif) fn try_lower(
         ),
     };
     let throwing = match (osr_req, osr) {
-        (Some(req), Some(e)) if req.throwing => {
+        (Some(req), Some(e)) if req.mode == OsrMode::Throw => {
             if e.kind != SsaEntryKind::Resume {
                 return Err(format!("from_ssa: throw at loop entry {}", req.ip));
             }

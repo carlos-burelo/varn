@@ -128,7 +128,7 @@ impl VmClosure {
         if epoch == 0 {
             return None;
         }
-        if let Some(hit) = proto.osr_lookup(req.ip, req.throwing, epoch) {
+        if let Some(hit) = proto.osr_lookup(req.ip, req.mode, epoch) {
             return hit.map(|entry| unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry) });
         }
 
@@ -138,7 +138,7 @@ impl VmClosure {
                 .get()
                 .is_some_and(|ssa| ssa.is_resume_entry(req.ip))
             {
-                proto.osr_remember(req.ip, req.throwing, epoch, None);
+                proto.osr_remember(req.ip, req.mode, epoch, None);
                 return None;
             }
         }
@@ -154,7 +154,7 @@ impl VmClosure {
                 );
                 proto.osr_remember(
                     req.ip,
-                    req.throwing,
+                    req.mode,
                     epoch,
                     Some((entry_usize, compiled.code)),
                 );
@@ -163,9 +163,10 @@ impl VmClosure {
                 Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry_usize) })
             }
             Err(_) => {
-                proto.osr_remember(req.ip, req.throwing, epoch, None);
+                proto.osr_remember(req.ip, req.mode, epoch, None);
                 None
             }
         }
     }
 }
+

@@ -108,12 +108,12 @@ fn failure_value(ctx: &mut ExecCtx, err: crate::error::RuntimeError) -> VmValue 
     crate::exec::exceptions::thrown_value_for(&err, &mut ctx.heap)
 }
 
-pub(crate) fn request_osr(ctx: &mut ExecCtx, throwing: bool) {
+pub(crate) fn request_osr(ctx: &mut ExecCtx, mode: varn_types::ssa::OsrMode) {
     if let Some(frame) = ctx.frames.last() {
         if frame.ip != 0 {
             ctx.osr_request = Some(varn_types::ssa::OsrRequest {
                 ip: frame.ip,
-                throwing,
+                mode,
             });
         }
     }
@@ -143,13 +143,13 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
     if let Delivery::Settled(cell) = delivery {
         if matches!(cell.status(), Status::Resolved) {
             ctx.resume_with_awaited(dest_reg, cell.value());
-            request_osr(&mut ctx, false);
+            request_osr(&mut ctx, varn_types::ssa::OsrMode::Resume);
         } else {
             ctx.jit_native_result = cell.value();
-            request_osr(&mut ctx, true);
+            request_osr(&mut ctx, varn_types::ssa::OsrMode::Throw);
         }
     } else if resumed {
-        request_osr(&mut ctx, false);
+        request_osr(&mut ctx, varn_types::ssa::OsrMode::Resume);
     }
     loop {
         let result = match ctx.run() {
@@ -168,11 +168,11 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
         match settle_for_park(&mut ctx, value) {
             ParkAction::ResumeOk(resolved) => {
                 ctx.resume_with_awaited(dest_reg, resolved);
-                request_osr(&mut ctx, false);
+                request_osr(&mut ctx, varn_types::ssa::OsrMode::Resume);
             }
             ParkAction::ResumeErr(thrown) => {
                 ctx.jit_native_result = thrown;
-                request_osr(&mut ctx, true);
+                request_osr(&mut ctx, varn_types::ssa::OsrMode::Throw);
             }
             ParkAction::Park(handle) => {
                 let stats = &crate::profile::TASK_STATS;

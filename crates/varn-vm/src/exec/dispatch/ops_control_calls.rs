@@ -37,7 +37,7 @@ impl ExecCtx {
     fn request_osr(&mut self, header_ip: usize, frame_idx: usize, closure: &VmClosure) -> bool {
         if closure.proto.osr_failed(
             header_ip,
-            false,
+            varn_types::ssa::OsrMode::Resume,
             crate::clif_link::current_epoch(),
         ) {
             return false;
@@ -55,7 +55,7 @@ impl ExecCtx {
         self.frames[frame_idx].ip = header_ip;
         self.osr_request = Some(varn_types::ssa::OsrRequest {
             ip: header_ip,
-            throwing: false,
+            mode: varn_types::ssa::OsrMode::Resume,
         });
         true
     }

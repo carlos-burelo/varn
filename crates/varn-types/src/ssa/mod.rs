@@ -88,9 +88,16 @@ pub struct SsaSecondaryEntry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OsrMode {
+    Resume,
+    Throw,
+    Catch,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OsrRequest {
     pub ip: usize,
-    pub throwing: bool,
+    pub mode: OsrMode,
 }
 
 impl SsaProto {
