@@ -344,6 +344,25 @@ caché nueva, cero abandonos reales del JIT, A/B pareado de forma de
 llamada (3 bloques x 10, alternos): mediana 32 ms los dos binarios.
 Test 204 (genérico `T`/`T?` con `int`, `rest` con `float`, omitido).
 
+### Décima tanda (test 205)
+
+- **`new` de clase importada con padre y de clase nativa: directo.**
+  `collect_foreign_classes` saltaba ambas (`get_class_parent` y
+  `is_builtin_or_intrinsic`): su `new` iba por llamada genérica y su
+  tipo se opacaba a `Dynamic`. Ahora camina la cadena (`foreign_chain`,
+  con visita para cortar ciclos): los campos se aplanan de raíz a hoja
+  (el primero gana, igual que `ancestor_fields`), los métodos se unen,
+  el constructor es el más cercano a la hoja. El emisor no cambia: la
+  `ForeignClass` aplanada entra al mismo `New` directo (`AllocInstance`
+  + `constructor` por nombre) que las raíces.
+- Medido (sonda 1M `new` de subclase importada, `quick`, 3 bloques x 10
+  alternos): 432 ns -> 324 ns por `new` (-25%). `throw new
+  TypeError`/`catch`/`instanceof` intactos.
+- Test 205 + helper `tests/helpers/foreign-child.vn`.
+
+Validación (perfil `quick`): cuadrante 1 `3124/3124`, corpus 200/200 con
+caché nueva, cero abandonos reales del JIT.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -415,11 +434,11 @@ genéricos que queda (340 `GetProperty` en benchmarks).
 
 ### 2.5 Firmas de constructores de clases externas
 
-Hecho para clases importadas raíz (`fd70b173`). Falta: clases
-importadas con padre (hoy `collect_foreign_classes` las salta) y clases
-nativas (`is_builtin_or_intrinsic`). Desde la tercera tanda la forma de
-los argumentos ya no depende de esto (`call_params`); lo que sigue
-dependiendo es poder alocar e inlinear.
+Hecho para clases importadas raíz (`fd70b173`) y en la décima tanda
+(test 205) para importadas con padre y nativas: `ForeignClass` aplana
+la cadena (`foreign_chain`) y el `new` aloca directo (432 ns -> 324 ns).
+Lo que sigue sin hacerse es inlinear el constructor ajeno: haría falta
+su cuerpo.
 
 ### 2.6 Coste de entrar en un `try` compilado
 

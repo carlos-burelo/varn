@@ -6,6 +6,11 @@ use varn_sem::bind::{BindResult, ClassParent};
 use varn_sem::output::{ForeignClass, InheritedField};
 use varn_sem::types::{ClassMemberKind, Type};
 
+struct ForeignLevel {
+    name: Arc<str>,
+    owner: std::sync::Arc<BindResult>,
+}
+
 impl Checker<'_> {
     pub(super) fn collect_foreign_inherited_fields(
         &mut self,
@@ -80,55 +85,68 @@ impl Checker<'_> {
                     .resolver
                     .module_bind(&origin)
                     .or_else(|| self.resolver.stdlib_bind(&origin));
-                let Some(owner) = owner.as_deref() else {
+                let Some(owner) = owner else {
                     continue;
                 };
                 use varn_sem::bind::DeclKind;
-                if !matches!(owner.classify_decl(name.as_ref()), Some(DeclKind::Class)) {
+                if !matches!(
+                    owner.classify_decl(name.as_ref()),
+                    Some(DeclKind::Class)
+                ) {
                     continue;
                 }
-                if owner.get_class_parent(name.as_ref()).is_some() {
-                    continue;
-                }
-                let Some(entry) = owner.get_class_entry(&name) else {
-                    continue;
-                };
-                if entry.is_builtin_or_intrinsic {
-                    continue;
-                }
+                let chain = self.foreign_chain(name.as_ref(), &owner);
                 let mut fields = Vec::new();
                 let mut methods = Vec::new();
                 let mut constructor = None;
-                for m in &entry.members {
-                    if m.is_static {
+                for level in chain.iter().rev() {
+                    let Some(entry) = level.owner.get_class_entry(&level.name) else {
                         continue;
+                    };
+                    for m in &entry.members {
+                        if m.is_static {
+                            continue;
+                        }
+                        match m.kind {
+                            ClassMemberKind::Property | ClassMemberKind::Variable => {
+                                if fields.iter().any(|f: &InheritedField| f.name == m.name) {
+                                    continue;
+                                }
+                                fields.push(InheritedField {
+                                    name: m.name.clone(),
+                                    ty: self.reintern_foreign_ty(&level.owner, m.ty),
+                                    optional: m.is_optional,
+                                });
+                            }
+                            ClassMemberKind::Method | ClassMemberKind::Function => {
+                                if !methods.contains(&m.name) {
+                                    methods.push(m.name.clone());
+                                }
+                            }
+                            ClassMemberKind::Constructor => {}
+                            ClassMemberKind::Getter
+                            | ClassMemberKind::Setter
+                            | ClassMemberKind::Class
+                            | ClassMemberKind::Interface
+                            | ClassMemberKind::Namespace
+                            | ClassMemberKind::Enum
+                            | ClassMemberKind::Struct => {}
+                        }
                     }
-                    match m.kind {
-                        ClassMemberKind::Property | ClassMemberKind::Variable => {
-                            if fields.iter().any(|f: &InheritedField| f.name == m.name) {
-                                continue;
-                            }
-                            fields.push(InheritedField {
-                                name: m.name.clone(),
-                                ty: self.reintern_foreign_ty(owner, m.ty),
-                                optional: m.is_optional,
-                            });
-                        }
-                        ClassMemberKind::Method | ClassMemberKind::Function => {
-                            if !methods.contains(&m.name) {
-                                methods.push(m.name.clone());
-                            }
-                        }
-                        ClassMemberKind::Constructor => {
-                            constructor = Some(self.reintern_foreign_ty(owner, m.ty));
-                        }
-                        ClassMemberKind::Getter
-                        | ClassMemberKind::Setter
-                        | ClassMemberKind::Class
-                        | ClassMemberKind::Interface
-                        | ClassMemberKind::Namespace
-                        | ClassMemberKind::Enum
-                        | ClassMemberKind::Struct => {}
+                }
+                for level in chain.iter() {
+                    let ctor = level
+                        .owner
+                        .get_class_entry(&level.name)
+                        .and_then(|entry| {
+                            entry.members.iter().find(|m| {
+                                !m.is_static && m.kind == ClassMemberKind::Constructor
+                            })
+                        })
+                        .map(|m| self.reintern_foreign_ty(&level.owner, m.ty));
+                    if ctor.is_some() {
+                        constructor = ctor;
+                        break;
                     }
                 }
                 methods.sort();
@@ -166,6 +184,40 @@ impl Checker<'_> {
             }
         }
         found.into_values().collect()
+    }
+
+    fn foreign_chain(
+        &self,
+        name: &str,
+        owner: &std::sync::Arc<BindResult>,
+    ) -> Vec<ForeignLevel> {
+        let mut chain = vec![ForeignLevel {
+            name: Arc::from(name),
+            owner: owner.clone(),
+        }];
+        let mut visited: Vec<(Arc<str>, Option<Arc<str>>)> =
+            vec![(Arc::from(name), Some(owner.source_file.clone()))];
+        while let Some(level) = chain.last() {
+            let parent = level.owner.get_class_parent(&level.name).cloned();
+            let Some(parent) = parent else {
+                break;
+            };
+            if visited.contains(&(parent.name.clone(), parent.origin.clone())) {
+                break;
+            }
+            visited.push((parent.name.clone(), parent.origin.clone()));
+            let next = parent.origin.as_deref().and_then(|o| {
+                self.resolver
+                    .module_bind(o)
+                    .or_else(|| self.resolver.stdlib_bind(o))
+            });
+            let owner = next.unwrap_or_else(|| level.owner.clone());
+            chain.push(ForeignLevel {
+                name: parent.name.clone(),
+                owner,
+            });
+        }
+        chain
     }
 
     fn ancestor_fields(

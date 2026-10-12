@@ -1,0 +1,42 @@
+import { describe, it, expect } from "std:test";
+import { Shape, Polygon, Dot } from "./helpers/foreign-child.vn";
+
+function poly(n: int): str {
+    const p = new Polygon(n)
+    return p.describe() + (p.filled ? "!" : "?") + p.label
+}
+
+function dot(): str {
+    const d = new Dot()
+    return d.describe() + d.label
+}
+
+function thrown(msg: str): str {
+    try { throw new TypeError(msg) } catch (e) { return (e as Error).name + ":" + (e as Error).message }
+}
+
+function ranged(msg: str): bool {
+    try { throw new RangeError(msg) } catch (e) { return (e as Error) instanceof RangeError }
+}
+
+await describe("205 foreign subclass and native new", async () => {
+    await it("a new of an imported subclass allocates direct", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + poly(i % 7).length + dot().length }
+        expect(poly(4)).toBe("poly4!s")
+        expect(poly(0)).toBe("poly0!s")
+        expect(dot()).toBe("dot0dot")
+        expect(new Polygon(3) instanceof Polygon).toBe(true)
+        expect(new Polygon(3) instanceof Shape).toBe(true)
+        expect(new Dot() instanceof Shape).toBe(true)
+        expect(total).toBe(300 * (7 + 7))
+    })
+
+    await it("a new of a native error builds and catches", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + thrown("boom").length }
+        expect(thrown("boom")).toBe("TypeError:boom")
+        expect(ranged("r")).toBe(true)
+        expect(total).toBe(300 * 14)
+    })
+})

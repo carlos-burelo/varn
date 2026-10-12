@@ -1,0 +1,16 @@
+export class Shape {
+    sides: int
+    label: str
+    constructor(sides: int, label: str = "s") { this.sides = sides; this.label = label }
+    describe(): str { return this.label + this.sides.toString() }
+}
+
+export class Polygon extends Shape {
+    filled: bool
+    constructor(sides: int, filled: bool = true) { super(sides); this.filled = filled }
+    override describe(): str { return "poly" + this.sides.toString() }
+}
+
+export class Dot extends Shape {
+    constructor() { super(0, "dot") }
+}
