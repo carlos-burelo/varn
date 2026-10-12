@@ -620,8 +620,15 @@ genéricos que queda (340 `GetProperty` en benchmarks).
 Hecho para clases importadas raíz (`fd70b173`) y en la décima tanda
 (test 205) para importadas con padre y nativas: `ForeignClass` aplana
 la cadena (`foreign_chain`) y el `new` aloca directo (432 ns -> 324 ns).
-Lo que sigue sin hacerse es inlinear el constructor ajeno: haría falta
-su cuerpo.
+Medido en `quick` (2M `new`, binarios alternos): foráneo 62 ms,
+local 23 ms (~19 ns por `new` de hueco: el local inlinea el ctor,
+el foráneo lo llama).
+Veredicto: sin inlinear. El cuerpo ajeno no viaja en la interfaz
+(`ForeignClass` lleva solo el tipo) y traerlo es compilación
+cruzada (re-mapear globales y constantes del otro módulo). La
+dirección dueña es el registro global (AUDIT F3/F4: borrar
+`ForeignClass`); cuando los defs foráneos sean locales, el inline
+sale solo. No se extiende `ForeignClass`.
 
 ### 2.6 Coste de entrar en un `try` compilado
 
