@@ -458,6 +458,29 @@ con caché nueva, cero abandonos reales del JIT.
 Validación (perfil `quick`): cuadrante 1 `3143/3143`, corpus 202/202
 con caché nueva, cero abandonos reales del JIT.
 
+### Decimoquinta tanda (tests 210, 2.2 completo)
+
+- **`compare::eq` ya no mezcla variante con int.** Las dos
+  direcciones (`variante == int`, `int == variante`) devuelven
+  `false`, como `1 == "a"` dinámico; el estático lo rechaza
+  (`VN3010`). El `_ => return false` que queda es la decisión total
+  explícita, no un caso escondido.
+- **Estáticos de clase por slot (`Counter.total`).**
+  `ClassInfo.statics` con tipos, productor `Resolution::StaticField`
+  (la referencia a la clase es `Var` + `GlobalSlot` de su propio
+  global; el alias lo impide el checker con `VN4106`) y bajada a
+  `GetFixedField` / `SetFixedField` por slot con coherencia que lo
+  comprueba. Solo campos planos: métodos y accesores siguen por
+  nombre y el receptor dinámico ve el mismo almacén. Medido en
+  `quick` (5M iters, bloques alternos): 614 ms → 183 ms (3,3x;
+  instancia 39 ms). Test 210.
+- `Eq` tipado descartado con medida: el genérico del JIT ya inlinea
+  la identidad de bits y solo cae al helper en distinto (~5 ns); un
+  opcode nuevo no paga el cruce.
+
+Validación: cuadrante 1 `3163/3163`, corpus sin errores nuevos,
+cero abandonos reales del JIT, matriz release 4/4 `3163/3163`.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -560,10 +583,15 @@ su cuerpo.
 
 ### 2.6 Coste de entrar en un `try` compilado
 
-65 ns por entrada (2M llamadas: 130 ms compilado, 190 ms interpretado).
-Viene del helper `try_push` y de exigir activación con marco
-(`proto.resumes_in_interpreter()` ⇒ `Activation::Framed`). No es
-propagación de tipos; se anota porque `try` es ubicuo en `std`.
+Medido en `quick` (2M llamadas, binarios alternos): con `try` 165 ms,
+sin `try` 24 ms, ~70 ns por entrada. La función compila (`clif`) pero
+con activación con marco (`framed: alloc+resume`): `Try` en el chunk
+fuerza `resumes_in_interpreter()` y con ello `Activation::Framed`
+para toda la función, más el `push_try`/`pop_try` por entrada.
+Veredicto: sin cambio. Quitarlo pide unwinding en marcos nativos
+(personality + landing pads), que es el mismo proyecto que el
+rediseño async (2.7): rehacerlo aquí duplicaría ese trabajo. No es
+propagación de tipos; queda anotado con esta medida.
 
 ### 2.7 Funciones async sin JIT
 
