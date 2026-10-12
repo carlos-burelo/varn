@@ -62,7 +62,11 @@ impl ExecCtx {
                     if unsafe { !(*ctx).settings.no_jit }
                         && unsafe { osr_ip == (*ctx).frames[frame_idx].ip } =>
                 {
-                    closure.osr_jit_fn(osr_ip)
+                    closure.osr_jit_fn(varn_types::ssa::OsrRequest {
+                        ip: osr_ip,
+                        throwing: false,
+                        dest_reg: 0,
+                    })
                 }
                 Some(_) | None => None,
             };

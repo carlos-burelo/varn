@@ -69,8 +69,14 @@ pub(super) fn emit_entry(
     values: &mut [Option<Value>],
     header: &SsaSecondaryEntry,
     header_blk: Block,
+    throwing: Option<u32>,
 ) -> Result<(), String> {
     let ssa = ctx.ssa;
+    if let Some(r) = throwing {
+        let x = load_home_value(b, ctx, ssa.reg(r), ssa.value_ty(r))?;
+        define(b, ctx, values, r, x);
+        return super::exceptions::emit_throw(b, ctx, values, r);
+    }
     for &v in &header.live {
         let x = load_home_value(b, ctx, ssa.reg(v), ssa.value_ty(v))?;
         define(b, ctx, values, v, x);

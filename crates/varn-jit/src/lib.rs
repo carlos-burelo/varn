@@ -184,14 +184,14 @@ pub fn compile(
     constants: &[VmValue],
     helpers: JitHelpers,
     linker: &dyn clif::lower::ClifLinker,
-    osr_ip: Option<usize>,
+    osr_req: Option<varn_types::ssa::OsrRequest>,
 ) -> Result<Compiled, String> {
     #[cfg(feature = "clif")]
     if clif::enabled() {
         if let Ok(isa) = clif::shared_isa() {
             let start = std::time::Instant::now();
             let res =
-                clif::lower::try_compile(proto, constants, &helpers, isa, linker, osr_ip, None);
+                clif::lower::try_compile(proto, constants, &helpers, isa, linker, osr_req, None);
             let elapsed = start.elapsed().as_nanos() as u64;
             let words = proto.chunk.code.len();
             match res {

@@ -111,7 +111,7 @@ pub fn try_compile(
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
-    osr_ip: Option<usize>,
+    osr_req: Option<varn_types::ssa::OsrRequest>,
     mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<ClifArtifact, String> {
     if crate::PAIR_MIGRATION_PENDING {
@@ -162,7 +162,7 @@ pub fn try_compile(
         helpers,
         isa,
         linker,
-        osr_ip,
+        osr_req,
         Activation::Native,
         debug.as_deref_mut(),
     ) {
@@ -176,7 +176,7 @@ pub fn try_compile(
                 helpers,
                 isa,
                 linker,
-                osr_ip,
+                osr_req,
                 Activation::Framed,
                 debug.as_deref_mut(),
             )
@@ -187,14 +187,17 @@ pub fn try_compile(
     match lowered {
         Ok((lowered, activation)) if !super::emit::disabled_helper_hit() => {
             if super::trace() {
+                let osr_tag = osr_req.map_or(String::new(), |req| {
+                    format!(" osr@{}{}", req.ip, if req.throwing { "!" } else { "" })
+                });
                 eprintln!(
                     "clif: from_ssa {}{} ({activation:?}{})",
                     proto.name.as_deref().unwrap_or("<module>"),
-                    osr_ip.map_or(String::new(), |ip| format!(" osr@{ip}")),
+                    osr_tag,
                     if lowered.frameless { ", frameless" } else { "" }
                 );
             }
-            let wrapper = build_wrapper(proto, helpers, isa, activation, osr_ip.is_some())?;
+            let wrapper = build_wrapper(proto, helpers, isa, activation, osr_req.is_some())?;
             finish_artifact(lowered, wrapper, activation, debug)
         }
         Ok(_) => Err("clif: uses a helper disabled in fase B".into()),

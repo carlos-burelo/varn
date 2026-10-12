@@ -119,11 +119,11 @@ impl VmClosure {
         }
     }
 
-    pub(crate) fn osr_jit_fn(&self, _osr_ip: usize) -> Option<varn_jit::JitFn> {
+    pub(crate) fn osr_jit_fn(&self, req: varn_types::ssa::OsrRequest) -> Option<varn_jit::JitFn> {
         if FRAME_LAYOUT_V2_JIT_BAIL {
             return None;
         }
-        let osr_ip = _osr_ip;
+        let osr_ip = req.ip;
         let proto = &self.proto;
         if proto.jit_osr_failed.get() {
             return None;
@@ -152,7 +152,7 @@ impl VmClosure {
 
         let helpers = super::table_build::build_jit_helpers();
         let linker = crate::clif_link::CtxLinker;
-        match varn_jit::compile(proto, &self.constants, helpers, &linker, Some(osr_ip)) {
+        match varn_jit::compile(proto, &self.constants, helpers, &linker, Some(req)) {
             Ok(compiled) => {
                 let entry_usize: usize = compiled.entry as usize;
                 proto.jit_osr_epoch.set(epoch);

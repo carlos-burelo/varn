@@ -16,7 +16,7 @@ use cranelift_codegen::ir::{
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use varn_types::register_meta::SlotKind;
-use varn_types::ssa::{SsaProto, SsaTerm};
+use varn_types::ssa::{OsrRequest, SsaProto, SsaTerm};
 use varn_types::{FunctionProto, VmValue};
 pub(in crate::clif) fn try_lower(
     proto: &FunctionProto,
@@ -25,16 +25,23 @@ pub(in crate::clif) fn try_lower(
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
-    osr_ip: Option<usize>,
+    osr_req: Option<OsrRequest>,
     activation: Activation,
     mut debug: Option<&mut super::super::debug::ClifDebugSink>,
 ) -> Result<Lowered, String> {
-    let osr = match osr_ip {
+    let osr = match osr_req {
         None => None,
-        Some(ip) => Some(
-            ssa.secondary_at(ip)
-                .ok_or_else(|| format!("from_ssa: no secondary entry at ip {ip}"))?,
+        Some(req) => Some(
+            ssa.secondary_at(req.ip)
+                .ok_or_else(|| format!("from_ssa: no secondary entry at ip {}", req.ip))?,
         ),
+    };
+    let throwing = match (osr_req, osr) {
+        (Some(req), Some(e)) if req.throwing => Some(
+            e.result
+                .ok_or_else(|| format!("from_ssa: throw without result at ip {}", req.ip))?,
+        ),
+        _ => None,
     };
     if (osr.is_some() || proto.resumes_in_interpreter()) && activation == Activation::Native {
         return Err(NEEDS_ACTIVATION.into());
@@ -188,7 +195,7 @@ pub(in crate::clif) fn try_lower(
     let mut values: Vec<Option<Value>> = vec![None; ssa.values.len()];
     if let Some(h) = osr {
         let header = blocks[h.block as usize].expect("block created");
-        osr::emit_entry(&mut b, &ctx, &mut values, h, header)?;
+        osr::emit_entry(&mut b, &ctx, &mut values, h, header, throwing)?;
     }
     let pins = match osr {
         Some(_) => std::collections::BTreeMap::new(),
