@@ -121,6 +121,9 @@ pub(super) unsafe fn run_compiled_frame(
                         catch_entry_fn(ctx, closure, frame_idx, &handler)
                     } {
                         unsafe { (*ctx).jit_native_result = error };
+                        varn_jit::JIT_STATS
+                            .catch_entries
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         return unsafe {
                             run_compiled_frame(
                                 ctx,

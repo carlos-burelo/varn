@@ -49,6 +49,8 @@ pub struct JitStatsSnapshot {
     pub interp_runs: u64,
 
     pub osr_entries: u64,
+
+    pub catch_entries: u64,
 }
 
 impl JitStatsSnapshot {
@@ -111,6 +113,7 @@ pub struct JitStats {
     pub jit_cached: AtomicU64,
     pub interp_runs: AtomicU64,
     pub osr_entries: AtomicU64,
+    pub catch_entries: AtomicU64,
 }
 
 impl JitStats {
@@ -126,6 +129,7 @@ impl JitStats {
             jit_cached: AtomicU64::new(0),
             interp_runs: AtomicU64::new(0),
             osr_entries: AtomicU64::new(0),
+            catch_entries: AtomicU64::new(0),
         }
     }
 
@@ -140,6 +144,7 @@ impl JitStats {
         self.jit_cached.store(0, Ordering::Relaxed);
         self.interp_runs.store(0, Ordering::Relaxed);
         self.osr_entries.store(0, Ordering::Relaxed);
+        self.catch_entries.store(0, Ordering::Relaxed);
     }
 
     pub fn snapshot(&self) -> JitStatsSnapshot {
@@ -154,6 +159,7 @@ impl JitStats {
             jit_cached: self.jit_cached.load(Ordering::Relaxed),
             interp_runs: self.interp_runs.load(Ordering::Relaxed),
             osr_entries: self.osr_entries.load(Ordering::Relaxed),
+            catch_entries: self.catch_entries.load(Ordering::Relaxed),
         }
     }
 }

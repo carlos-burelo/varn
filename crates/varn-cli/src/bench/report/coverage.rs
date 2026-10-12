@@ -122,6 +122,13 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
             chalk("← empezaron interpretados, terminaron compilados").dim()
         ));
     }
+    if jit.catch_entries > 0 {
+        terminal::log(format!(
+            "{}  {}",
+            row("  catch en nativo", fmt_num(jit.catch_entries)),
+            chalk("← excepciones mismo-marco sin salir a intérprete").dim()
+        ));
+    }
     let never_line = format!(
         "{}  {}",
         row("  nunca compilados", fmt_num(never_compiled)),
