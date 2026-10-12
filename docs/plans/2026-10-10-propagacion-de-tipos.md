@@ -635,9 +635,19 @@ almacenamiento visible al GC; queda abierto con este análisis.
   que no es namespace (`L.f`), y se puede pasar como valor: falta darle
   el mismo trato estático. Los nombres de variante de un enum siguen
   siendo del módulo (dos enums de namespaces distintos con una variante
-  homónima comparten `sum_variant_parent`). `struct` y tipo suma dentro
-  de un namespace no se exportan como valor. El nombre de una clase de
-  namespace se muestra como `A::Item`, no `A.Item`.
+  homónima comparten `sum_variant_parent`, veredicto abajo). `struct`
+  y tipo suma dentro de un namespace no se exportan como valor. El
+  nombre de una clase de namespace se muestra como `A::Item`, no
+  `A.Item`.
+  Veredicto variante homónima (sondas, sin cambio): con `Red` en
+  `A.Color` y `B.Mode` el `match` resuelve bien en ambos órdenes y la
+  no-exhaustividad señala al que falta (`Green`, `Red`). La rama viva
+  de exhaustividad indexa por tipo (`sum_type_variants[nombre]`), no
+  por variante; el mapa compartido solo alimenta la rama secundaria
+  (`get_enum_members_local` sin entrada en el primero), inalcanzable
+  con lo que el binder produce. Endurecer la clave rompería lo que
+  hoy funciona (el lector no siempre conoce al padre: es para lo que
+  está el mapa).
 - `BindResult.namespace_imports` y `declared_type_names` no se
   serializan: valen porque el módulo que se emite siempre se acaba de
   ligar; si algún día se emite desde un bind cacheado, hay que
