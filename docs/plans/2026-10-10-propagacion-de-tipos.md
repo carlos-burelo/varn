@@ -724,8 +724,10 @@ almacenamiento visible al GC; queda abierto con este análisis.
   instancia sus miembros igual (antes falso positivo `VN4117` en
   código correcto). Cadenas foráneas y `extends` pelado siguen el
   camino viejo (sin regresión posible: solo se activa donde antes
-  se saltaba). Sigue sin sustitución el cuerpo (`this.v` se ve
-  como `T`).
+  se saltaba). Refactor final en un solo flujo (sin vía legacy
+  paralela): buscar, sustituir si engancha, si no saltar si el
+  linaje es genérico. Sigue sin sustitución el cuerpo (`this.v` se
+  ve como `T`).
 - Un `int` variable no se acepta donde va un `float` (solo el literal),
   pero sí donde va un `decimal` o un `bigint`. Falta decidir si eso es
   una regla o un accidente.
