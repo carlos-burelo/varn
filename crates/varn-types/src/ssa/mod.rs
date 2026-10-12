@@ -84,6 +84,15 @@ pub struct SsaSecondaryEntry {
     pub live: Vec<u32>,
 
     pub kind: SsaEntryKind,
+
+    pub result: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OsrRequest {
+    pub ip: usize,
+    pub throwing: bool,
+    pub dest_reg: u16,
 }
 
 impl SsaProto {

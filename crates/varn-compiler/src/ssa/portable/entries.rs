@@ -40,6 +40,7 @@ fn loop_entries(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaSecondaryEntry> 
                 ip,
                 live,
                 kind: SsaEntryKind::Loop,
+                result: None,
             })
         })
         .collect()
@@ -83,6 +84,7 @@ fn resume_entries(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaSecondaryEntry
                 ip,
                 live,
                 kind: SsaEntryKind::Resume,
+                result: inst.dest.map(|v| v.0),
             });
         }
     }
