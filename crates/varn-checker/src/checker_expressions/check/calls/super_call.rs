@@ -36,6 +36,25 @@ impl<'r> Checker<'r> {
                     .map(|m| m.ty)
             });
         let Some(TypeKind::Fn(fid)) = constructor.map(|ty| self.ty_table.get(ty.0)) else {
+            let owner = match parent.origin.as_deref() {
+                Some(origin) => {
+                    let Some(found) = self
+                        .resolver
+                        .module_bind(origin)
+                        .or_else(|| self.resolver.stdlib_bind(origin))
+                    else {
+                        return;
+                    };
+                    crate::checker::foreign_classes::OwnerRef::Foreign(found)
+                }
+                None => crate::checker::foreign_classes::OwnerRef::Current(bind),
+            };
+            let ty = self.effective_ctor_ty(&parent.name, owner);
+            let params = match self.ty_table.get(ty.0) {
+                TypeKind::Fn(fid) => self.ty_table.get_function(fid).params.clone(),
+                _ => Vec::new(),
+            };
+            self.validate_call_arguments(rec, args, &params, range, call_id, bind);
             return;
         };
         let params = self.ty_table.get_function(fid).params.clone();

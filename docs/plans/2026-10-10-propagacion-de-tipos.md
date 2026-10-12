@@ -363,6 +363,28 @@ Test 204 (genérico `T`/`T?` con `int`, `rest` con `float`, omitido).
 Validación (perfil `quick`): cuadrante 1 `3124/3124`, corpus 200/200 con
 caché nueva, cero abandonos reales del JIT.
 
+### Undécima tanda (tests 206 y errores)
+
+- **El constructor efectivo se ve desde fuera y se valida.**
+  Una clase sin constructor escrito ni primario igual tiene constructor:
+  el emisor lo sintetiza (reenvía al padre o cero parámetros) pero el
+  checker no lo veía: `new Bare(1, 2)`, `new Box2<int>(7)`,
+  `super(1, 2)` y hasta `new Tally(1, 2, 3)` importado compilaban y
+  soltaban los argumentos. Ahora hay un solo origen
+  (`effective_ctor_ty`: el constructor más cercano en la cadena, o uno
+  vacío sintetizado) que usan los tres sitios: `new` (`ops.rs`),
+  `super(...)` (`super_call.rs`) y `ForeignClass`. Pasar de más o de
+  menos es `VN3001`, local e importado.
+- Medido (`new` importado sin ctor, 500k, `quick`, 3 bloques x 10
+  alternos): 107 ms -> 49 ms (-54%; el genérico citado en 2.1).
+- Sin rotura: `vn check` sobre `std` y `tests` no añade ningún error
+  nuevo frente a la base.
+- Tests 206 (construir sin ctor: campos, `super()` y genérico vacío)
+  y dos casos en `tests/errors/`.
+
+Validación (perfil `quick`): cuadrante 1 `3129/3129`, corpus 202/202
+con caché nueva, cero abandonos reales del JIT.
+
 ## 2. Pendiente, por orden
 
 Cada item: qué falta, dónde, cómo se mide.
@@ -370,10 +392,11 @@ Cada item: qué falta, dónde, cómo se mide.
 ### 2.1 Forma de llamada: lo que queda
 
 - `new` de una clase importada: hecho cuando la clase declara
-  constructor y no está decorada. Una clase importada sin constructor
-  escrito (solo inicializadores de campo) sigue por la llamada genérica
-  (92 ns): desde fuera no se ve si se sintetizó un constructor. Y sigue
-  sin inlinearse: haría falta el cuerpo del constructor ajeno.
+  constructor y no está decorada. Hecho en la undécima tanda para clases
+  sin constructor escrito: el constructor efectivo (reenvío al padre o
+  vacío) se valida (`VN3001`) y viaja en `ForeignClass`, así que el
+  `new` va directo. Sigue sin inlinearse: haría falta el cuerpo del
+  constructor ajeno.
 - Slots de método para clases importadas: medido, no hace falta. Con
   tipos exactos la llamada por nombre con caché iguala al slot (6,8 ns
   las dos).

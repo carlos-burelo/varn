@@ -1,14 +1,30 @@
 use super::Checker;
+use crate::checker::recorder::Recorder;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use varn_core::ast::ExprId;
 use varn_core::TypeKind;
 use varn_sem::bind::{BindResult, ClassParent};
 use varn_sem::output::{ForeignClass, InheritedField};
-use varn_sem::types::{ClassMemberKind, Type};
+use varn_sem::types::{ClassMemberKind, FunctionParam, FunctionType, Type};
 
-struct ForeignLevel {
+pub(crate) struct ForeignLevel<'a> {
     name: Arc<str>,
-    owner: std::sync::Arc<BindResult>,
+    owner: OwnerRef<'a>,
+}
+
+pub(crate) enum OwnerRef<'a> {
+    Current(&'a BindResult),
+    Foreign(std::sync::Arc<BindResult>),
+}
+
+impl<'a> OwnerRef<'a> {
+    fn get(&self) -> &BindResult {
+        match self {
+            OwnerRef::Current(bind) => bind,
+            OwnerRef::Foreign(bind) => bind,
+        }
+    }
 }
 
 impl Checker<'_> {
@@ -95,12 +111,12 @@ impl Checker<'_> {
                 ) {
                     continue;
                 }
-                let chain = self.foreign_chain(name.as_ref(), &owner);
+                let chain = self.foreign_chain(name.as_ref(), OwnerRef::Foreign(owner.clone()));
                 let mut fields = Vec::new();
                 let mut methods = Vec::new();
-                let mut constructor = None;
+                let constructor;
                 for level in chain.iter().rev() {
-                    let Some(entry) = level.owner.get_class_entry(&level.name) else {
+                    let Some(entry) = level.owner.get().get_class_entry(&level.name) else {
                         continue;
                     };
                     for m in &entry.members {
@@ -114,7 +130,7 @@ impl Checker<'_> {
                                 }
                                 fields.push(InheritedField {
                                     name: m.name.clone(),
-                                    ty: self.reintern_foreign_ty(&level.owner, m.ty),
+                                    ty: self.reintern_foreign_ty(level.owner.get(), m.ty),
                                     optional: m.is_optional,
                                 });
                             }
@@ -134,21 +150,9 @@ impl Checker<'_> {
                         }
                     }
                 }
-                for level in chain.iter() {
-                    let ctor = level
-                        .owner
-                        .get_class_entry(&level.name)
-                        .and_then(|entry| {
-                            entry.members.iter().find(|m| {
-                                !m.is_static && m.kind == ClassMemberKind::Constructor
-                            })
-                        })
-                        .map(|m| self.reintern_foreign_ty(&level.owner, m.ty));
-                    if ctor.is_some() {
-                        constructor = ctor;
-                        break;
-                    }
-                }
+                constructor = Some(
+                    self.effective_ctor_ty(name.as_ref(), OwnerRef::Foreign(owner.clone())),
+                );
                 methods.sort();
                 let decorated = owner
                     .interner
@@ -186,19 +190,111 @@ impl Checker<'_> {
         found.into_values().collect()
     }
 
-    fn foreign_chain(
+    pub(crate) fn effective_ctor_ty(
+        &mut self,
+        name: &str,
+        owner: OwnerRef<'_>,
+    ) -> Type {
+        for level in self.foreign_chain(name, owner) {
+            let found = level
+                .owner
+                .get()
+                .get_class_entry(&level.name)
+                .and_then(|entry| {
+                    entry.members.iter().find(|m| {
+                        !m.is_static && m.kind == ClassMemberKind::Constructor
+                    })
+                })
+                .map(|m| self.reintern_foreign_ty(level.owner.get(), m.ty));
+            if let Some(ty) = found {
+                return ty;
+            }
+        }
+        Type::fn_(
+            FunctionType {
+                params: Vec::new(),
+                return_type: Type::Void.0,
+                is_arrow: false,
+                type_params: Vec::new(),
+            },
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        )
+    }
+
+    pub(crate) fn synthesized_ctor_params(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        bind: &BindResult,
+    ) -> Option<Vec<FunctionParam>> {
+        let instance = self.infer_type(rec, expr, bind);
+        let (name, origin) = match self.ty_table.get(instance.0) {
+            varn_core::TypeKind::Generic(name, _, origin)
+            | varn_core::TypeKind::Named(name, origin) => (
+                self.resolve_bind_atom(bind, name),
+                origin.map(|o| self.resolve_bind_atom(bind, o)),
+            ),
+            _ => return None,
+        };
+        let owner = match origin {
+            Some(origin) if origin.as_ref() != bind.source_file.as_ref() => {
+                OwnerRef::Foreign(self.resolver.module_bind(&origin).or_else(|| {
+                    self.resolver.stdlib_bind(&origin)
+                })?)
+            }
+            Some(_) | None => OwnerRef::Current(bind),
+        };
+        if owner.get().get_class_entry(&name).is_none() {
+            return None;
+        }
+        let ty = self.effective_ctor_ty(&name, owner);
+        let ty = match self.ty_table.get(instance.0) {
+            varn_core::TypeKind::Generic(_, args, origin) => {
+                let args: Vec<Type> = self
+                    .ty_table
+                    .get_list(args)
+                    .iter()
+                    .map(|id| Type::resolved(*id))
+                    .collect();
+                let origin = origin.map(|o| self.resolve_bind_atom(bind, o));
+                let mapping = crate::checker_expressions::members::member_util::generic_mapping(
+                    self.resolver,
+                    &name,
+                    &args,
+                    origin.as_ref(),
+                    bind,
+                );
+                ty.map_generics(
+                    &mapping,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                )
+            }
+            _ => ty,
+        };
+        Some(match self.ty_table.get(ty.0) {
+            varn_core::TypeKind::Fn(fid) => self.ty_table.get_function(fid).params.clone(),
+            _ => Vec::new(),
+        })
+    }
+
+    fn foreign_chain<'a>(
         &self,
         name: &str,
-        owner: &std::sync::Arc<BindResult>,
-    ) -> Vec<ForeignLevel> {
+        owner: OwnerRef<'a>,
+    ) -> Vec<ForeignLevel<'a>> {
         let mut chain = vec![ForeignLevel {
             name: Arc::from(name),
-            owner: owner.clone(),
+            owner,
         }];
-        let mut visited: Vec<(Arc<str>, Option<Arc<str>>)> =
-            vec![(Arc::from(name), Some(owner.source_file.clone()))];
+        let mut visited: Vec<(Arc<str>, Option<Arc<str>>)> = vec![(
+            Arc::from(name),
+            chain
+                .first()
+                .and_then(|level| level.owner.get().get_class_parent(name))
+                .and_then(|p| p.origin.clone()),
+        )];
         while let Some(level) = chain.last() {
-            let parent = level.owner.get_class_parent(&level.name).cloned();
+            let parent = level.owner.get().get_class_parent(&level.name).cloned();
             let Some(parent) = parent else {
                 break;
             };
@@ -211,7 +307,13 @@ impl Checker<'_> {
                     .module_bind(o)
                     .or_else(|| self.resolver.stdlib_bind(o))
             });
-            let owner = next.unwrap_or_else(|| level.owner.clone());
+            let owner = match next {
+                Some(bind) => OwnerRef::Foreign(bind),
+                None => match &level.owner {
+                    OwnerRef::Current(bind) => OwnerRef::Current(bind),
+                    OwnerRef::Foreign(bind) => OwnerRef::Foreign(bind.clone()),
+                },
+            };
             chain.push(ForeignLevel {
                 name: parent.name.clone(),
                 owner,

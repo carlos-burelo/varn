@@ -211,6 +211,10 @@ impl<'r> Checker<'r> {
         self.check_call_args_with_context(rec, args, &ctor_params, bind);
         if instantiated.is_some() {
             self.validate_call_arguments(rec, args, &ctor_params, &range, expr.index(), bind);
+        } else if declared.is_none() {
+            if let Some(params) = self.synthesized_ctor_params(rec, expr, bind) {
+                self.validate_call_arguments(rec, args, &params, &range, expr.index(), bind);
+            }
         }
     }
 

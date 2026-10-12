@@ -1,0 +1,7 @@
+// VN3001
+class Root {
+    items: int[] = []
+}
+class Kid extends Root {
+    constructor() { super(1, 2) }
+}

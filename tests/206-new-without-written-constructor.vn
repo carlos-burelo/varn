@@ -1,0 +1,37 @@
+import { describe, it, expect } from "std:test";
+
+class Bare {
+    items: int[] = []
+    count: int = 3
+}
+
+class Root {
+    items: int[] = []
+}
+
+class Kid extends Root {
+    tag: str = "t"
+    constructor() { super() }
+}
+
+class Box2<T> {
+    v: T
+}
+
+await describe("206 new without a written constructor", async () => {
+    await it("a class with only field initialisers builds empty", () => {
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) { total = total + new Bare().count + new Kid().tag.length }
+        const bare = new Bare()
+        expect(bare.items.length).toBe(0)
+        expect(bare.count).toBe(3)
+        expect(new Kid().items.length).toBe(0)
+        expect(total).toBe(300 * (3 + 1))
+    })
+
+    await it("a generic without constructor takes no arguments", () => {
+        const box = new Box2<int>()
+        box.v = 7
+        expect(box.v).toBe(7)
+    })
+})

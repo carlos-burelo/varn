@@ -1,0 +1,5 @@
+// VN3001
+class Bare {
+    items: int[] = []
+}
+const b = new Bare(1, 2)

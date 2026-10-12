@@ -197,6 +197,7 @@ import "./202-namespaces-across-modules.vn"
 import "./203-namespace-types.vn"
 import "./204-call-params-are-canonical.vn"
 import "./205-foreign-subclass-and-native-new.vn"
+import "./206-new-without-written-constructor.vn"
 
 summary()
 
