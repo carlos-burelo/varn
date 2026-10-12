@@ -74,6 +74,7 @@ pub struct SsaProto {
 pub enum SsaEntryKind {
     Loop,
     Resume,
+    Catch,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -112,7 +113,17 @@ impl SsaProto {
         self.secondary_entries
             .iter()
             .find(|e| e.ip as usize == ip && e.kind == SsaEntryKind::Resume)
-            .or_else(|| self.secondary_entries.iter().find(|e| e.ip as usize == ip))
+            .or_else(|| {
+                self.secondary_entries.iter().find(|e| {
+                    e.ip as usize == ip && e.kind != SsaEntryKind::Catch
+                })
+            })
+    }
+
+    pub fn catch_at(&self, ip: usize) -> Option<&SsaSecondaryEntry> {
+        self.secondary_entries
+            .iter()
+            .find(|e| e.ip as usize == ip && e.kind == SsaEntryKind::Catch)
     }
 
     pub fn is_resume_entry(&self, ip: usize) -> bool {

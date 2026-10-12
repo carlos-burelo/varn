@@ -190,8 +190,9 @@ pub(super) fn emit_inst(
             return Ok(None);
         }
 
-        SsaOp::CatchParam { .. } => {
-            return Err("from_ssa: a landing pad reached compiled code".into())
+        SsaOp::CatchParam { try_val } => {
+            let boxed = heap::boxed_value(b, ctx, values, *try_val)?;
+            return Ok(Some(Out::Boxed(boxed)));
         }
         SsaOp::StoreGlobalIdx { slot, value } => {
             let boxed = heap::boxed_value(b, ctx, values, *value)?;

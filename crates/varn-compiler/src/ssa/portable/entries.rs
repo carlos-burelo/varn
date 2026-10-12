@@ -6,8 +6,17 @@ use super::Emitted;
 pub(super) fn secondary_entries(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaSecondaryEntry> {
     let mut out = loop_entries(ssa, emitted);
     out.extend(resume_entries(ssa, emitted));
+    out.extend(catch_entries(ssa, emitted));
     out.sort_by_key(|e| (e.ip, e.block));
     out
+}
+
+fn block_ip(emitted: &Emitted<'_>, b: usize) -> Option<u32> {
+    let off = emitted.block_offset.get(b).copied().unwrap_or(usize::MAX);
+    if off == usize::MAX {
+        return None;
+    }
+    u32::try_from(off).ok()
 }
 
 fn loop_entries(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaSecondaryEntry> {
@@ -83,6 +92,38 @@ fn resume_entries(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaSecondaryEntry
                 ip,
                 live,
                 kind: SsaEntryKind::Resume,
+            });
+        }
+    }
+    out
+}
+
+fn catch_entries(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaSecondaryEntry> {
+    let mut out = Vec::new();
+    for block in &ssa.blocks {
+        for inst in &block.insts {
+            let InstKind::Try { handler } = &inst.kind else {
+                continue;
+            };
+            let h = handler.0 as usize;
+            if h >= ssa.blocks.len() {
+                continue;
+            }
+            let Some(ip) = block_ip(emitted, h) else {
+                continue;
+            };
+            let dest = inst.dest.map(|v| v.0);
+            let mut live: Vec<u32> = emitted.liveness.live_in[h]
+                .iter()
+                .copied()
+                .filter(|v| Some(*v) != dest)
+                .collect();
+            live.sort_unstable();
+            out.push(SsaSecondaryEntry {
+                block: h as u32,
+                ip,
+                live,
+                kind: SsaEntryKind::Catch,
             });
         }
     }
