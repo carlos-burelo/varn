@@ -7,11 +7,21 @@ impl Checker<'_> {
         &mut self,
         parent: &varn_sem::bind::ClassParent,
     ) -> varn_sem::types::Type {
-        varn_sem::types::Type::named_with_origin(
-            parent.name.clone(),
-            parent.origin.clone(),
-            std::sync::Arc::make_mut(&mut self.ty_table),
-        )
+        let table = std::sync::Arc::make_mut(&mut self.ty_table);
+        if parent.args.is_empty() {
+            varn_sem::types::Type::named_with_origin(
+                parent.name.clone(),
+                parent.origin.clone(),
+                table,
+            )
+        } else {
+            varn_sem::types::Type::generic_with_origin(
+                parent.name.clone(),
+                parent.args.clone(),
+                parent.origin.clone(),
+                table,
+            )
+        }
     }
 
     pub(super) fn foreign_owner(

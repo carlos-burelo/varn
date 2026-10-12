@@ -717,17 +717,16 @@ almacenamiento visible al GC; queda abierto con este análisis.
 - Literal de objeto contra interfaz/clase genérica foránea: los
   miembros llegan crudos (la sustitución solo cubre origen local).
 
-- Hecho (tanda 18, test 212): `override` contra ancestro genérico
-  sustituye los args del `extends` (`ClassParent.args`, antes nadie
-  leía `super_type_args`) con `generic_mapping` + `map_generics`,
-  compuesto por niveles; `implements` contra clase genérica
+- Hecho (tanda 18, test 212): sustitución del ancestro genérico
+  en UN solo sitio: al aplanar en el binder (los miembros
+  heredados ya viajan sustituidos; `super_type_args` nadie los
+  leía). Con eso `this.v` es `int`, `new IntBox(1)` valida y el
+  `override` compara directo; `parent_type` construye el genérico
+  para el cruce foráneo. `implements` contra clase genérica
   instancia sus miembros igual (antes falso positivo `VN4117` en
   código correcto). Cadenas foráneas y `extends` pelado siguen el
   camino viejo (sin regresión posible: solo se activa donde antes
-  se saltaba). Refactor final en un solo flujo (sin vía legacy
-  paralela): buscar, sustituir si engancha, si no saltar si el
-  linaje es genérico. Sigue sin sustitución el cuerpo (`this.v` se
-  ve como `T`).
+  se saltaba).
 - Un `int` variable no se acepta donde va un `float` (solo el literal),
   pero sí donde va un `decimal` o un `bigint`. Falta decidir si eso es
   una regla o un accidente.

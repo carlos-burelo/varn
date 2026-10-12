@@ -97,6 +97,12 @@ impl<'r> super::Binder<'r> {
             let parent_is_local = parent_origin
                 .as_deref()
                 .is_none_or(|o| o == self.source_file.as_ref());
+            let owned_members: Vec<ClassMemberInfo> = parent_is_local
+                .then(|| self.local_class_members(parent_name.as_ref()))
+                .flatten()
+                .map(|v| v.clone())
+                .unwrap_or_default();
+            let mapping = self.parent_param_mapping(&parent_name, &parent_args);
             self.class_parents.insert(
                 name.clone(),
                 varn_sem::bind::ClassParent {
@@ -108,15 +114,18 @@ impl<'r> super::Binder<'r> {
                     args: parent_args,
                 },
             );
-            if let Some(parent_members) = parent_is_local
-                .then(|| self.local_class_members(parent_name.as_ref()))
-                .flatten()
-            {
-                for pm in parent_members {
-                    if !members.iter().any(|m| m.name == pm.name) {
-                        final_members.push(pm.clone());
-                    }
+            for pm in &owned_members {
+                if members.iter().any(|m| m.name == pm.name) {
+                    continue;
                 }
+                if mapping.is_empty() {
+                    final_members.push(pm.clone());
+                    continue;
+                }
+                let mut substituted = pm.clone();
+                let table = std::sync::Arc::make_mut(&mut self.ty_table);
+                substituted.ty = pm.ty.map_generics(&mapping, table);
+                final_members.push(substituted);
             }
         }
 
@@ -146,6 +155,33 @@ impl<'r> super::Binder<'r> {
 
     pub(crate) fn local_class_members(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {
         self.type_members.classes.get(name).map(|e| &e.members)
+    }
+
+    fn parent_param_mapping(
+        &self,
+        parent_name: &str,
+        parent_args: &[Type],
+    ) -> FxHashMap<Atom, Type> {
+        if parent_args.is_empty() {
+            return FxHashMap::default();
+        }
+        let Some(atom) = self.interner.get(parent_name) else {
+            return FxHashMap::default();
+        };
+        let mut scope = self.current;
+        while let Some(parent) = self.scopes.get(scope).parent {
+            scope = parent;
+        }
+        let Some(sid) = self.scopes.get(scope).resolve(atom, &self.scopes) else {
+            return FxHashMap::default();
+        };
+        self.arena
+            .get(sid)
+            .type_params
+            .iter()
+            .map(|p| Atom::of(&self.interner.resolve(*p)))
+            .zip(parent_args.iter().cloned())
+            .collect()
     }
 
     pub(crate) fn local_interface_members(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {

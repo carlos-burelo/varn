@@ -12,7 +12,7 @@ class Box<T> {
 
 class IntBox extends Box<int> {
     override get(): int {
-        return 20
+        return this.v + 1
     }
 }
 
@@ -21,7 +21,7 @@ class Mid extends Box<int> {
 
 class Leaf extends Mid {
     override get(): int {
-        return 21
+        return this.v + 2
     }
 }
 
@@ -48,14 +48,11 @@ class UsesGetter implements Getter<int> {
     }
 }
 
-function dynArg(): dynamic {
-    return 1
-}
-
 await describe("212 override and implements with generic ancestors", async () => {
-    await it("substituted overrides dispatch", () => {
-        expect(new IntBox(dynArg()).get()).toBe(20)
-        expect(new Leaf(dynArg()).get()).toBe(21)
+    await it("substituted members read and dispatch", () => {
+        expect(new IntBox(20).get()).toBe(21)
+        expect(new Leaf(21).get()).toBe(23)
+        expect(new Wrap<int>(22).get()).toBe(22)
     })
 
     await it("implements against a generic class holds", () => {
