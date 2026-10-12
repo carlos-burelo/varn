@@ -118,6 +118,7 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
         .take_spare()
         .unwrap_or_else(|| Box::new(template.fork_for_task()));
     let mut dest_reg = 0;
+    let resumed = matches!(start, Start::Resume(_, _));
     let delivery = match start {
         Start::Fresh(lazy) => {
             mount(&mut ctx, &lazy);
@@ -139,6 +140,13 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
             }
         }
     }
+    if resumed {
+        if let Some(frame) = ctx.frames.last() {
+            if frame.ip != 0 {
+                ctx.osr_request = Some(frame.ip);
+            }
+        }
+    }
     loop {
         let result = match ctx.run() {
             Ok(result) => result,
@@ -154,10 +162,22 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
             }
         };
         match settle_for_park(&mut ctx, value) {
-            ParkAction::ResumeOk(resolved) => ctx.resume_with_awaited(dest_reg, resolved),
+            ParkAction::ResumeOk(resolved) => {
+                ctx.resume_with_awaited(dest_reg, resolved);
+                if let Some(frame) = ctx.frames.last() {
+                    if frame.ip != 0 {
+                        ctx.osr_request = Some(frame.ip);
+                    }
+                }
+            }
             ParkAction::ResumeErr(thrown) => {
                 if let Rejection::Unhandled(thrown) = ctx.reject_awaited(thrown) {
                     return finish(queue, ctx, &output, Err(thrown));
+                }
+                if let Some(frame) = ctx.frames.last() {
+                    if frame.ip != 0 {
+                        ctx.osr_request = Some(frame.ip);
+                    }
                 }
             }
             ParkAction::Park(handle) => {

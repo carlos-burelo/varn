@@ -83,6 +83,11 @@ impl GeneratorDriver for NanGenDriver {
                     }
                 }
             }
+            if let Some(frame) = inner.ctx.frames.last() {
+                if frame.ip != 0 {
+                    inner.ctx.osr_request = Some(frame.ip);
+                }
+            }
         }
         inner.started = true;
 
@@ -99,9 +104,22 @@ impl GeneratorDriver for NanGenDriver {
                 }
                 Some(VmSuspend::Await { value, dest_reg }) if self.is_async => {
                     match inner.ctx.settle_awaited(value) {
-                        Ok(resolved) => inner.ctx.resume_with_awaited(dest_reg, resolved),
+                        Ok(resolved) => {
+                            inner.ctx.resume_with_awaited(dest_reg, resolved);
+                            if let Some(frame) = inner.ctx.frames.last() {
+                                if frame.ip != 0 {
+                                    inner.ctx.osr_request = Some(frame.ip);
+                                }
+                            }
+                        }
                         Err(thrown) => match inner.ctx.reject_awaited(thrown) {
-                            crate::exec::ctx_tasks::Rejection::Caught => {}
+                            crate::exec::ctx_tasks::Rejection::Caught => {
+                                if let Some(frame) = inner.ctx.frames.last() {
+                                    if frame.ip != 0 {
+                                        inner.ctx.osr_request = Some(frame.ip);
+                                    }
+                                }
+                            }
                             crate::exec::ctx_tasks::Rejection::Unhandled(thrown) => {
                                 inner.done = true;
                                 return Err(format!("{thrown}"));

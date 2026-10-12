@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 use cranelift_codegen::ir::{Block, BlockArg, InstBuilder, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
-use varn_types::ssa::{SsaLoopHeader, SsaProto};
+use varn_types::ssa::{SsaProto, SsaSecondaryEntry};
 
 use super::store::{clif_ty, define, is_heap, load_home_value};
 use super::Ctx;
@@ -10,7 +10,7 @@ use super::Ctx;
 pub(super) fn carried(
     b: &mut FunctionBuilder,
     ssa: &SsaProto,
-    header: &SsaLoopHeader,
+    header: &SsaSecondaryEntry,
     reached: &[bool],
 ) -> FxHashMap<u32, Variable> {
     let def = super::cfg::def_blocks(ssa);
@@ -67,7 +67,7 @@ pub(super) fn emit_entry(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     values: &mut [Option<Value>],
-    header: &SsaLoopHeader,
+    header: &SsaSecondaryEntry,
     header_blk: Block,
 ) -> Result<(), String> {
     let ssa = ctx.ssa;

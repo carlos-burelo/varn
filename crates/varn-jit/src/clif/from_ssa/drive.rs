@@ -32,8 +32,8 @@ pub(in crate::clif) fn try_lower(
     let osr = match osr_ip {
         None => None,
         Some(ip) => Some(
-            ssa.loop_header_at(ip)
-                .ok_or_else(|| format!("from_ssa: no loop header at ip {ip}"))?,
+            ssa.secondary_at(ip)
+                .ok_or_else(|| format!("from_ssa: no secondary entry at ip {ip}"))?,
         ),
     };
     if (osr.is_some() || proto.resumes_in_interpreter()) && activation == Activation::Native {

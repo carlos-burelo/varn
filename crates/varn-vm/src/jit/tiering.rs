@@ -134,16 +134,20 @@ impl VmClosure {
         }
         if proto.jit_osr_epoch.get() == epoch {
             if let Some(entry) = proto.jit_osr_entry.get() {
-                if proto.jit_osr_ip.get() != osr_ip {
-                    return None;
+                if proto.jit_osr_ip.get() == osr_ip {
+                    return Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry) });
                 }
-                return Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry) });
             }
         }
 
         if proto.is_generator || proto.is_async {
-            proto.jit_osr_failed.set(true);
-            return None;
+            let is_resume = proto
+                .ssa
+                .get()
+                .is_some_and(|ssa| ssa.is_resume_entry(osr_ip));
+            if !is_resume {
+                return None;
+            }
         }
 
         let helpers = super::table_build::build_jit_helpers();

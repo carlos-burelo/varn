@@ -67,15 +67,23 @@ pub struct SsaProto {
 
     pub captured: Vec<u32>,
 
-    pub loop_headers: Vec<SsaLoopHeader>,
+    pub secondary_entries: Vec<SsaSecondaryEntry>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SsaEntryKind {
+    Loop,
+    Resume,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct SsaLoopHeader {
+pub struct SsaSecondaryEntry {
     pub block: u32,
     pub ip: u32,
 
     pub live: Vec<u32>,
+
+    pub kind: SsaEntryKind,
 }
 
 impl SsaProto {
@@ -94,8 +102,17 @@ impl SsaProto {
         self.regs.get(v as usize).copied().unwrap_or(0)
     }
 
-    pub fn loop_header_at(&self, ip: usize) -> Option<&SsaLoopHeader> {
-        self.loop_headers.iter().find(|h| h.ip as usize == ip)
+    pub fn secondary_at(&self, ip: usize) -> Option<&SsaSecondaryEntry> {
+        self.secondary_entries
+            .iter()
+            .find(|e| e.ip as usize == ip && e.kind == SsaEntryKind::Resume)
+            .or_else(|| self.secondary_entries.iter().find(|e| e.ip as usize == ip))
+    }
+
+    pub fn is_resume_entry(&self, ip: usize) -> bool {
+        self.secondary_entries
+            .iter()
+            .any(|e| e.ip as usize == ip && e.kind == SsaEntryKind::Resume)
     }
 
     #[inline]
@@ -248,7 +265,7 @@ mod tests {
             register_count: 13,
             has_this: false,
             captured: Vec::new(),
-            loop_headers: Vec::new(),
+            secondary_entries: Vec::new(),
         }
     }
 

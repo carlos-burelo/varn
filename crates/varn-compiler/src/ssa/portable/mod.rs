@@ -4,8 +4,9 @@ use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, SsaFunc, Terminator, VarId};
 use crate::ssa::liveness::Liveness;
 use rustc_hash::FxHashSet;
-use varn_types::ssa::{SsaBlock, SsaLoopHeader, SsaProto, SsaTerm, SsaValue};
+use varn_types::ssa::{SsaBlock, SsaProto, SsaTerm, SsaValue};
 
+mod entries;
 mod inst;
 mod ops;
 
@@ -312,42 +313,8 @@ pub(crate) fn project(
         register_count: emitted.register_count,
         has_this,
         captured: captured.regs(),
-        loop_headers: loop_headers(ssa, emitted),
+        secondary_entries: entries::secondary_entries(ssa, &emitted),
     })
-}
-
-fn loop_headers(ssa: &SsaFunc, emitted: &Emitted<'_>) -> Vec<SsaLoopHeader> {
-    let off = |b: usize| emitted.block_offset.get(b).copied().unwrap_or(usize::MAX);
-    let mut is_header = vec![false; ssa.blocks.len()];
-    for (b, block) in ssa.blocks.iter().enumerate() {
-        let targets = match &block.term {
-            Terminator::Jump { target, .. } => vec![target.0 as usize],
-            Terminator::Branch {
-                then_blk, else_blk, ..
-            } => vec![then_blk.0 as usize, else_blk.0 as usize],
-            Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
-        };
-        for t in targets {
-            if off(b) != usize::MAX && off(t) <= off(b) {
-                is_header[t] = true;
-            }
-        }
-    }
-    is_header
-        .iter()
-        .enumerate()
-        .filter(|(_, h)| **h)
-        .filter_map(|(b, _)| {
-            let ip = u32::try_from(off(b)).ok()?;
-            let mut live: Vec<u32> = emitted.liveness.live_in[b].iter().copied().collect();
-            live.sort_unstable();
-            Some(SsaLoopHeader {
-                block: b as u32,
-                ip,
-                live,
-            })
-        })
-        .collect()
 }
 
 struct Site<'a> {
