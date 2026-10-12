@@ -1,0 +1,83 @@
+import { describe, it, expect } from "std:test";
+
+class Counter {
+    static total: int = 0
+    static step: int = 1
+    static label: str = "c"
+    static maybe: int? = null
+    static bump(): int {
+        Counter.total = Counter.total + Counter.step
+        return Counter.total
+    }
+}
+
+class WithInstance {
+    static total: int = 100
+    total: int = 7
+}
+
+await describe("210 static fields use slots", async () => {
+    await it("reads and writes each static in order", () => {
+        Counter.total = 0
+        Counter.step = 1
+        Counter.label = "c"
+        Counter.maybe = null
+        expect(Counter.total).toBe(0)
+        expect(Counter.step).toBe(1)
+        expect(Counter.label).toBe("c")
+        expect(Counter.maybe).toBe(null)
+        Counter.total = 41
+        Counter.step = 2
+        Counter.label = "d"
+        Counter.maybe = 5
+        expect(Counter.total).toBe(41)
+        expect(Counter.step).toBe(2)
+        expect(Counter.label).toBe("d")
+        expect(Counter.maybe).toBe(5)
+    })
+
+    await it("compound assign and update go through the slot", () => {
+        Counter.total = 10
+        Counter.total += 5
+        expect(Counter.total).toBe(15)
+        Counter.total++
+        expect(Counter.total).toBe(16)
+    })
+
+    await it("static methods still dispatch", () => {
+        Counter.total = 0
+        Counter.step = 3
+        expect(Counter.bump()).toBe(3)
+        expect(Counter.bump()).toBe(6)
+    })
+
+    await it("dynamic receivers still read the same storage", () => {
+        Counter.total = 9
+        const dyn: dynamic = Counter
+        expect(dyn.total).toBe(9)
+        dyn.total = 11
+        expect(Counter.total).toBe(11)
+    })
+
+    await it("instance fields keep their own slots", () => {
+        const w = new WithInstance()
+        expect(w.total).toBe(7)
+        expect(WithInstance.total).toBe(100)
+        w.total = 8
+        WithInstance.total = 101
+        expect(w.total).toBe(8)
+        expect(WithInstance.total).toBe(101)
+    })
+
+    await it("hot static loop stays exact", () => {
+        Counter.total = 0
+        Counter.step = 1
+        let total = 0
+        for (let i = 0; i < 300; i = i + 1) {
+            Counter.total = Counter.total + Counter.step
+            total = total + Counter.total
+        }
+        expect(Counter.total).toBe(300)
+        expect(total).toBe(300 * 301 / 2)
+    })
+})

@@ -25,6 +25,12 @@ impl<'m> Builder<'m> {
                     name: name.clone(),
                 },
             },
+            Resolution::StaticField(slot) => InstKind::GetFixedField {
+                object: obj,
+                slot: *slot,
+                offset: 0,
+                tag: varn_core::FieldAccess::Slot,
+            },
             _ if name.as_ref() == varn_core::MemberKey::Length.as_str() => {
                 if matches!(
                     object.ty.non_nullable(&self.tir.types),
@@ -74,7 +80,6 @@ impl<'m> Builder<'m> {
             | Resolution::GlobalSlot(_)
             | Resolution::NativeGlobal(_)
             | Resolution::ModuleSlot { .. }
-            | Resolution::StaticField(_)
             | Resolution::VtableSlot(_)
             | Resolution::DirectFn(_)
             | Resolution::Intrinsic(_)

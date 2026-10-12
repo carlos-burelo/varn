@@ -167,6 +167,7 @@ pub fn build(
             varn_tir::Ancestry::Root,
             fields,
             Vec::new(),
+            Vec::new(),
             tt,
         );
         info.constructor = f.constructor.map(|ctor| {

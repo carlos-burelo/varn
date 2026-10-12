@@ -65,6 +65,7 @@ fn override_reuses_the_parent_slot() {
         varn_tir::Ancestry::Root,
         vec![],
         vec![("speak".into(), SigId(0)), ("name".into(), SigId(1))],
+        vec![],
         &varn_tir::TyTable::default(),
     );
     let derived = ClassInfo::new_with_methods(
@@ -72,6 +73,7 @@ fn override_reuses_the_parent_slot() {
         varn_tir::Ancestry::Local(ClassId(0), &base),
         vec![],
         vec![("speak".into(), SigId(2)), ("fetch".into(), SigId(3))],
+        vec![],
         &varn_tir::TyTable::default(),
     );
 

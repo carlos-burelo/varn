@@ -133,6 +133,33 @@ fn build_one_class(
         .map(|e| e.members.as_slice())
         .unwrap_or(&[]);
 
+    let mut statics: Vec<(Arc<str>, BackendTy)> = Vec::new();
+    for m in members {
+        if !m.is_static {
+            continue;
+        }
+        match m.kind {
+            ClassMemberKind::Property | ClassMemberKind::Variable => {
+                if statics.iter().any(|(n, _)| n == &m.name) {
+                    continue;
+                }
+                let static_bt =
+                    field_backend_ty(m.ty, m.is_optional, table, interner, tt, names);
+                statics.push((m.name.clone(), static_bt));
+            }
+            ClassMemberKind::Method
+            | ClassMemberKind::Function
+            | ClassMemberKind::Constructor
+            | ClassMemberKind::Getter
+            | ClassMemberKind::Setter
+            | ClassMemberKind::Class
+            | ClassMemberKind::Interface
+            | ClassMemberKind::Namespace
+            | ClassMemberKind::Enum
+            | ClassMemberKind::Struct => {}
+        }
+    }
+
     let mut seen_field: FxHashMap<Arc<str>, ()> = FxHashMap::default();
     let mut method_names: Vec<Arc<str>> = Vec::new();
     let mut method_sig: FxHashMap<Arc<str>, varn_tir::SigId> = FxHashMap::default();
@@ -193,7 +220,7 @@ fn build_one_class(
         None if !foreign_prefix.is_empty() => Ancestry::Foreign(foreign_prefix),
         None => Ancestry::Root,
     };
-    let mut info = ClassInfo::new_with_methods(name.clone(), ancestry, fields, methods, tt);
+    let mut info = ClassInfo::new_with_methods(name.clone(), ancestry, fields, methods, statics, tt);
     info.constructor = constructor;
     info
 }

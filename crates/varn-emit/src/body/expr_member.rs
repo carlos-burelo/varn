@@ -337,17 +337,45 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        match self
-            .class_of(obj.ty)
-            .and_then(|ci| ci.field(&name).cloned())
-        {
-            Some(field) => {
+        if let Some(ci) = self.class_of(obj.ty) {
+            if Self::is_class_ref(&obj, &ci.name, self.m.globals) {
+                if let Some(slot) = ci.static_slot(&name) {
+                    let declared = ci.static_at(slot).map(|s| s.ty).unwrap_or(ty);
+                    let ty = if ty != declared && ty == declared.non_nullable(self.tt) {
+                        ty
+                    } else {
+                        declared
+                    };
+                    return TirExpr {
+                        kind: TirExprKind::Field {
+                            object: Box::new(obj),
+                            name,
+                        },
+                        ty,
+                        res: Resolution::StaticField(slot),
+                        span,
+                    };
+                }
+                return TirExpr {
+                    kind: TirExprKind::Field {
+                        object: Box::new(obj),
+                        name: name.clone(),
+                    },
+                    ty,
+                    res: Resolution::ByName {
+                        name,
+                        why: DynReason::NotYetSupported,
+                    },
+                    span,
+                };
+            }
+            if let Some(field) = ci.field(&name).cloned() {
                 let ty = if ty != field.ty && ty == field.ty.non_nullable(self.tt) {
                     ty
                 } else {
                     field.ty
                 };
-                TirExpr {
+                return TirExpr {
                     kind: TirExprKind::Field {
                         object: Box::new(obj),
                         name,
@@ -355,20 +383,34 @@ impl<'a> FnEmitter<'a> {
                     ty,
                     res: Resolution::FieldSlot(field.slot),
                     span,
-                }
+                };
             }
-            None => TirExpr {
-                kind: TirExprKind::Field {
-                    object: Box::new(obj),
-                    name: name.clone(),
-                },
-                ty,
-                res: Resolution::ByName {
-                    name,
-                    why: DynReason::NotYetSupported,
-                },
-                span,
-            },
         }
+        TirExpr {
+            kind: TirExprKind::Field {
+                object: Box::new(obj),
+                name: name.clone(),
+            },
+            ty,
+            res: Resolution::ByName {
+                name,
+                why: DynReason::NotYetSupported,
+            },
+            span,
+        }
+    }
+
+    fn is_class_ref(
+        obj: &TirExpr,
+        class_name: &Arc<str>,
+        globals: &rustc_hash::FxHashMap<Arc<str>, u32>,
+    ) -> bool {
+        if !matches!(obj.kind, varn_tir::TirExprKind::Var) {
+            return false;
+        }
+        let varn_tir::Resolution::GlobalSlot(slot) = obj.res else {
+            return false;
+        };
+        globals.get(class_name).is_some_and(|s| *s == slot)
     }
 }

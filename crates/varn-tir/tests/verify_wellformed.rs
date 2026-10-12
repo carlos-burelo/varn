@@ -358,6 +358,7 @@ fn a_dangling_vtable_sig_is_rejected() {
         varn_tir::Ancestry::Root,
         vec![("x".into(), BackendTy::Int)],
         vec![("m".into(), SigId(99))],
+        vec![],
         &varn_tir::TyTable::default(),
     )];
     let errs = verify_module(&m).unwrap_err();

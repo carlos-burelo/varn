@@ -498,24 +498,38 @@ tipos de objeto caen en `Ref` (`from_tir/ty.rs`) y pierden su identidad
 antes de elegir opcode.
 
 - Hecho en la tercera tanda: la variante es un slot global por módulo
-  (`EnumInfo::variant_global`). Quedan por nombre los estáticos de clase
-  (`Contador.total`): son mutables, así que un global aparte divergiría
-  de la lectura dinámica. Necesitan slots en el objeto clase
-  (`ClassObj.statics` es un `HashMap`) y es lo que produciría
-  `Resolution::StaticField`, que sigue sin productor.
-- `Eq` tipado, medido antes de hacerlo: la identidad de bits solo vale
-  para bool, instancias de clase y enums sin payload. `char` es un
-  objeto de heap que se compara por contenido y una variante con payload
-  se compara por estructura (`variant_eq`). El `Eq` genérico solo cae al
-  helper cuando los operandos difieren: unos 5 ns en ese caso (int 3,8,
-  bool 5,4, referencia 8,4, enum 10,6, char 9,0 ns con la llamada).
-  Pide un opcode nuevo o Enum/Char en `HirType`; no se hizo.
-- `compare::eq` cierra con `_ => return false` y deja que
-  `variante == int` compare el tag: revisar contra la Ley 7 y contra la
-  regla de no mezclar tipos en `==`.
-- Medida: recuento `EqInt`/`Eq` y `GetFixedField`/`GetProperty` en
-  benchmarks, y A/B pareado. Un mejor recuento no es una mejora de
-  tiempo: se confirma con el A/B.
+  (`EnumInfo::variant_global`). Hecho en la decimoquinta tanda (test
+  210): los estáticos de clase son slots en el objeto clase
+  (`ClassInfo.statics`, `Resolution::StaticField` → `GetFixedField` /
+  `SetFixedField` por slot). Solo campos planos: métodos y accesores
+  siguen por nombre, y las variantes de enum ya iban por global. Son
+  mutables, así que no valía un global aparte (divergiría de la
+  lectura dinámica). Medido en `quick` (5M iters, bloques alternos):
+  campo estático 123 ns → 37 ns por iter (3 lecturas + 1 escritura),
+  3,3x; la llamada a método estático sigue lenta (100 ns extra) y
+  queda fuera de este item. Regla: la referencia a la clase es
+  `Var` + `GlobalSlot` de su propio global (un alias lo rechaza el
+  checker con `VN4106`); el receptor dinámico sigue por nombre y ve
+  el mismo almacén.
+- `Eq` tipado, medido y descartado: el `Eq` genérico del JIT ya
+  inlinea la identidad de bits (`boxed_compare`: mismos bits no
+  float, o ambos SSO, sin helper) y solo cae al helper cuando los
+  operandos difieren (~5 ns). Un opcode nuevo (`EqChar`/`EqEnum`)
+  ahorraría solo la llamada en el caso distinto, con contenido
+  (`char`) o estructura (`variant_eq`) iguales de caros. No paga el
+  cruce (OpCode, SsaBinOp, VM, JIT, AOT, verificador). La caída de
+  Char/Enum a `Ref` en `HirType` queda como imprecisión correcta
+  (el fallback genérico decide bien).
+- Hecho: `compare::eq` ya no mezcla variante con int (las dos
+  direcciones devuelven `false`, como `1 == "a"` dinámico). El
+  checker estático lo rechaza (`VN3010`); el `_ => return false`
+  restante es la decisión total explícita (tipos distintos no son
+  iguales), no un caso escondido: los `match` que sí deben romperse
+  ante variantes nuevas (`text_bytes`, pares iguales) listan cada
+  variante sin `_`.
+- Medida: benchmarks con `Eq` 503 / `EqInt` 242 y `GetFixedField`
+  841 / `GetProperty` 1878; el A/B decide (test 210: estático
+  614 ms → 183 ms frente a instancia 39 ms).
 
 ### 2.3 `DynReason` que deberían ser tipos
 

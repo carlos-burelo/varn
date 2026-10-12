@@ -76,24 +76,64 @@ pub(super) fn check_field(
     object: &TirExpr,
     errors: &mut Vec<VerifyError>,
 ) {
-    let Resolution::FieldSlot(slot) = &e.res else {
-        return;
-    };
-    let BackendTy::Class(c) = object.ty.non_nullable(&m.types) else {
-        return;
-    };
-    let Some(field) = m.class(c).and_then(|ci| ci.field_at(*slot)) else {
-        return;
-    };
+    match &e.res {
+        Resolution::FieldSlot(slot) => {
+            let BackendTy::Class(c) = object.ty.non_nullable(&m.types) else {
+                return;
+            };
+            let Some(field) = m.class(c).and_then(|ci| ci.field_at(*slot)) else {
+                return;
+            };
 
-    if e.ty != field.ty && e.ty != field.ty.non_nullable(&m.types) {
-        errors.push(VerifyError::new(
-            format!(
-                "field `{}` is declared {:?}, node says {:?}",
-                field.name, field.ty, e.ty
-            ),
-            e.span,
-        ));
+            if e.ty != field.ty && e.ty != field.ty.non_nullable(&m.types) {
+                errors.push(VerifyError::new(
+                    format!(
+                        "field `{}` is declared {:?}, node says {:?}",
+                        field.name, field.ty, e.ty
+                    ),
+                    e.span,
+                ));
+            }
+        }
+        Resolution::StaticField(slot) => {
+            let BackendTy::Class(c) = object.ty.non_nullable(&m.types) else {
+                errors.push(VerifyError::new(
+                    format!("static field slot {slot} on non-class receiver"),
+                    e.span,
+                ));
+                return;
+            };
+            let Some(info) = m.class(c).and_then(|ci| ci.static_at(*slot)) else {
+                errors.push(VerifyError::new(
+                    format!("static field slot {slot} is out of range"),
+                    e.span,
+                ));
+                return;
+            };
+
+            if e.ty != info.ty && e.ty != info.ty.non_nullable(&m.types) {
+                errors.push(VerifyError::new(
+                    format!(
+                        "static `{}` is declared {:?}, node says {:?}",
+                        info.name, info.ty, e.ty
+                    ),
+                    e.span,
+                ));
+            }
+        }
+        Resolution::None
+        | Resolution::Local(_)
+        | Resolution::Param(_)
+        | Resolution::Upvalue(_)
+        | Resolution::GlobalSlot(_)
+        | Resolution::NativeGlobal(_)
+        | Resolution::ModuleSlot { .. }
+        | Resolution::VtableSlot(_)
+        | Resolution::DirectFn(_)
+        | Resolution::Intrinsic(_)
+        | Resolution::NativeOp(_)
+        | Resolution::EnumVariant { .. }
+        | Resolution::ByName { .. } => {}
     }
 }
 

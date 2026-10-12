@@ -61,6 +61,13 @@ impl<'m> Builder<'m> {
                             value,
                         },
                     },
+                    Resolution::StaticField(slot) => InstKind::SetFixedField {
+                        object: obj,
+                        value,
+                        slot: *slot,
+                        offset: 0,
+                        tag: None,
+                    },
                     Resolution::None
                     | Resolution::Local(_)
                     | Resolution::Param(_)
@@ -68,7 +75,6 @@ impl<'m> Builder<'m> {
                     | Resolution::GlobalSlot(_)
                     | Resolution::NativeGlobal(_)
                     | Resolution::ModuleSlot { .. }
-                    | Resolution::StaticField(_)
                     | Resolution::VtableSlot(_)
                     | Resolution::DirectFn(_)
                     | Resolution::Intrinsic(_)

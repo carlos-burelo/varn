@@ -11,6 +11,14 @@ pub struct FieldInfo {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct StaticInfo {
+    pub name: Arc<str>,
+    pub ty: BackendTy,
+
+    pub slot: u16,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct VtableEntry {
     pub name: Arc<str>,
     pub sig: SigId,
@@ -21,6 +29,7 @@ pub struct ClassInfo {
     pub name: Arc<str>,
     pub parent: Option<ClassId>,
     pub fields: Vec<FieldInfo>,
+    pub statics: Vec<StaticInfo>,
     pub vtable: Vec<VtableEntry>,
     pub layout: ClassLayout,
 
@@ -42,7 +51,7 @@ impl ClassInfo {
         fields: Vec<(Arc<str>, BackendTy)>,
         types: &TyTable,
     ) -> Self {
-        Self::new_with_methods(name, parent, fields, Vec::new(), types)
+        Self::new_with_methods(name, parent, fields, Vec::new(), Vec::new(), types)
     }
 
     pub fn new_with_methods(
@@ -50,6 +59,7 @@ impl ClassInfo {
         parent: Ancestry<'_>,
         fields: Vec<(Arc<str>, BackendTy)>,
         methods: Vec<(Arc<str>, SigId)>,
+        statics: Vec<(Arc<str>, BackendTy)>,
         types: &TyTable,
     ) -> Self {
         let (parent_id, parent_info, foreign) = match parent {
@@ -97,6 +107,15 @@ impl ClassInfo {
             name,
             parent: parent_id,
             fields: out,
+            statics: statics
+                .into_iter()
+                .enumerate()
+                .map(|(slot, (name, ty))| StaticInfo {
+                    name,
+                    ty,
+                    slot: slot as u16,
+                })
+                .collect(),
             vtable,
             layout,
             constructor: None,
@@ -110,6 +129,17 @@ impl ClassInfo {
 
     pub fn field_at(&self, slot: u16) -> Option<&FieldInfo> {
         self.fields.get(slot as usize)
+    }
+
+    pub fn static_slot(&self, name: &str) -> Option<u16> {
+        self.statics
+            .iter()
+            .position(|s| s.name.as_ref() == name)
+            .map(|i| i as u16)
+    }
+
+    pub fn static_at(&self, slot: u16) -> Option<&StaticInfo> {
+        self.statics.get(slot as usize)
     }
 
     pub fn method_slot(&self, name: &str) -> Option<u16> {
