@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `CORE_PREFIX` (`crates/varn-modules/src/spec.rs:1`), `Layer`+`check_import` (`layer.rs:62-66`), `RUNTIME_NET/CRYPTO` (`ids.rs:30-32`), `core:types/*` (`lang_type.rs:56-62`).
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0018: Capas de módulos y prefijos
 
 ## Estado
@@ -66,3 +70,4 @@ texto: un `Result` declarado por el usuario no es el del núcleo.
    texto.
 
 Los cuatro pasos están hechos.
+

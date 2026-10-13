@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: PARCIAL — base compartida `Arc<CheckerTyBase>` (`crates/varn-sem/src/types/interned/table.rs:19`) + nombres `Arc<str>` vigentes; tabla completa no es `Arc` único; ids migrados a content-hash (ADR-0013).
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR-0012: Single-owner, immutable `CheckerTyTable` (Arc + interned names)
 
 ## Status
@@ -87,3 +91,4 @@ Steps 4–5 (the `absorb`/`reintern` dataflow) were **superseded by ADR-0013**,
 which makes `CheckerTyId` content-addressed so `absorb` is a plain union and
 `reintern` is deleted. Still pending: a work-stealing scheduler over the module
 DAG and the parallel checking test.
+

@@ -1,3 +1,8 @@
+> Estado verificado 2026-10-13: PARCIAL como snapshot 2026-10-08 — "26 manifiestos" y tamaños `target/` son de sesión (hoy 27 members en `Cargo.toml`); no re-medir desde aquí.
+> Validación: `.\scripts\verify.ps1 -Fast`. Cifras = sesión indicada, no cita.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # Auditoría de crates y tiempos de compilación — 2026-10-08
 
 Metodología (Ley 12): solo código + ejecución. Ningún `.md` previo como evidencia.
@@ -149,3 +154,4 @@ Cada paso: un commit (Ley 9), declara ganancia + verificación + qué borra (Ley
 - Features: `varn-vm/clif`, `varn-debug/clif` reenvían a `varn-jit/clif`. `varn-cli` default `["lsp","clif"]`, `clif` los habilita. Conducta default idéntica (JIT activo). `--no-default-features` salta Tokio+LSP+Cranelift.
 - Verificado: `check -p varn-jit` (light, 7 warnings dead-code), `--features clif`, `-p varn-cli` default/`embed-std`/`--no-default-features` verdes. `quick --no-default-features` en 1m17s. Light: `doctor` ok, `run 01-arithmetic` ok en intérprete, `debug --phase tiers` vacío sin error.
 - Queda: versionar `dist/std.vnb` en CI dist + job `--check` bundle fresco; resto pecados (globals, `DefaultHasher`, `contract`, `jit optional`, `lsp default`, split `checker`) pendientes fase 2.
+

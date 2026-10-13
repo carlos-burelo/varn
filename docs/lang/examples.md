@@ -1,6 +1,8 @@
+> Verificado contra tests/*.vn citados. Código manda.
+
 # Varn Language — Ejemplos Integrados
 
-Colección de ejemplos completos extraídos directamente de los archivos de prueba `tests/*.vn`. Cada sección corresponde a un tema del lenguaje y muestra el código real que pasa en la suite de 89 test suites.
+Colección de ejemplos completos extraídos directamente de los archivos de prueba `tests/*.vn` (208 ficheros, 206 importados por `tests/main.vn`).
 
 ---
 
@@ -354,7 +356,7 @@ async function runAsync(): void {
     const all = await parallel([asyncSquare(2), asyncSquare(3), asyncSquare(4)])
     assert("parallel[0]", all[0] === 4)
 
-    using group = TaskGroup<int>()
+    using group = new TaskGroup<int>()
     const g1 = group.spawn(asyncAdd(7, 8))
     const joined = await group.join()
     assert("group joined[0]", joined[0] === 15)
@@ -576,3 +578,4 @@ assertEqual(prodConfig.host, "localhost")
 assertEqual(prodConfig.port, 8080)
 assertEqual(baseConfig.port, 3000)   // original intacto
 ```
+

@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: PARCIAL — nominalidad vigente (`crates/varn-checker/src/checker_expressions/class_hierarchy.rs:5` `is_subclass_or_same`); §2 narrowing reemplazada por ADR-0015 (el propio ADR lo declara).
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0004: Reforma del Sistema de Tipos — Nominalidad Estricta de Clases, Prohibición de Narrowing Implícito y Consolidación de ADTs
 
 ## Estado
@@ -30,3 +34,4 @@ Durante la auditoría integral del sistema de tipos de Varn, se detectaron rezag
 - **Seguridad de Tipos:** Se erradica la posibilidad de desbordamiento silencioso en asignaciones entre variables enteras.
 - **Optimización:** El JIT y el SSA pueden asumir con certeza la identidad de tipo de las clases sin falsas equivalencias estructurales.
 - **Simplificación del Código:** Se eliminaron ~200 líneas de código muerto y redundante a lo largo de 9 módulos del compilador.
+

@@ -1,3 +1,5 @@
+> Precisión parcial. Verificado contra tests/... Código manda.
+
 # Varn Language — Sentencias y Control de Flujo
 
 > Fuentes: `tests/09-control-flow.vn`, `tests/10-match.vn`, `tests/11-errors.vn`, `tests/18-ranges.vn`, `tests/34-char-type.vn`, `tests/47-isolates-multithread.vn`, `tests/54-channels.vn`, `tests/78-try-early-exit.vn`, `tests/79-control-flow-narrowing.vn`.
@@ -75,7 +77,7 @@ function describeNum(n: int): str {
 }
 ```
 
-Match sobre enum con payload:
+Match sobre enum con payload (`tests/41-advanced-enums.vn`):
 
 ```varn
 let v = match x {
@@ -84,7 +86,7 @@ let v = match x {
 }
 ```
 
-Match anidado en `this`:
+Match anidado en `this` (`tests/41-advanced-enums.vn:48`, `tests/189-enum-variant-slots.vn:13`):
 
 ```varn
 area(): float {
@@ -339,15 +341,23 @@ throw e    // re-lanzar una excepción capturada
 Gestión de recursos con disposición automática al salir del bloque:
 
 ```varn
-using group = TaskGroup<int>()       // tests/21-async.vn:57
+using group = new TaskGroup<int>()   // tests/21-async.vn:43
 const g1 = group.spawn(asyncAdd(7, 8))
 const joined = await group.join()
 
 // Bloque explícito con using
 {
-    using tx = ch.tx               // tests/54-channels.vn:45
+    using tx = ch.tx               // tests/54-channels.vn:47
     await tx.send(5)
 }   // tx.dispose() se llama aquí automáticamente
+
+// using con destructuring
+{
+    using { res1, res2 } = resource;   // tests/50-opt-unsupported-phase3.vn:55
+}   // resource.dispose() corre al salir
+
+// using con ficheros
+using file = File.open("temp_simple.txt", "w");   // tests/45-simple-file-test.vn:8
 ```
 
 ---
@@ -387,3 +397,4 @@ assert("mensaje", condición_booleana)
 assert("int add", 1 + 2 === 3)
 assert("trim",    s.trim() === "Hello, World!")
 ```
+

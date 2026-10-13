@@ -1,3 +1,5 @@
+> Precisión parcial. Verificado contra tests/... Código manda.
+
 # Varn Language — Identificadores y Palabras Reservadas
 
 > Fuentes: todos los archivos `tests/*.vn`.
@@ -16,6 +18,8 @@
 
 ## 2. Convenciones de Nomenclatura
 
+> NO-VERIFICADO como regla: solo estilo observado en `tests/*.vn`.
+
 | Ámbito | Convención | Ejemplo |
 |--------|-----------|---------|
 | Variables y funciones | `camelCase` | `makeCounter`, `forOfSum` |
@@ -28,30 +32,26 @@
 
 ## 3. Palabras Reservadas
 
-Las siguientes palabras son reservadas y **no pueden** usarse como identificadores:
+Lista exacta del lexer (`crates/varn-lexer/src/keywords.rs:12-78`;
+tokens en `crates/varn-core/src/token/kind.rs:85-155`):
 
-### Declaraciones
 ```
-let  const  var  function  async  class  interface  enum
-extension  type  abstract  record  export  import  from
-```
-
-### Control de Flujo
-```
-if  else  match  switch  for  while  do  break  continue
-return  throw  try  catch  finally  using
-```
-
-### Operadores y Expresiones
-```
-new  this  super  null  true  false
-instanceof  typeof  is  in  of  with  override  static
+let  const  var  function  class  struct  interface  type  enum
+namespace  module  extension  on
+if  else  switch  case  default  while  for  do  break  continue
+return  throw  try  catch  finally  using  with
+import  export  from  as
+async  await  yield
+new  this  super  delete  typeof  instanceof  in  of  void  is
+true  false  null
+public  private  protected  static  abstract  override  readonly
+declare  native  extends  implements  get  set  constructor  destructor
+match
 ```
 
-### Concurrencia y Runtime
-```
-await  yield  isIsolate  dynamic
-```
+`_` es token `Placeholder`, no identificador. NO son keywords:
+`record`, `spawn`, `parallel` (imports de `std:task`), `dynamic` (nombre
+de tipo contextual), `isIsolate` (global del runtime, `tests/47-isolates-multithread.vn`).
 
 ---
 
@@ -100,20 +100,10 @@ assert("pipe multi _",     4 |> addN(_, _) === 8)
 
 ## 6. Nombres de Tipos en `typeof`
 
-El operador `typeof` devuelve uno de estos strings canónicos:
+Verificado en tests: `"str"`, `"int"`, `"float"`, `"class"`
+(`tests/79-control-flow-narrowing.vn:32-34`,
+`tests/122-numeric-conversions.vn:47`, `tests/111-network-apis-overhaul.vn:77`).
+Nombres canónicos: `"str"` nunca `"string"`, `"int"` nunca `"integer"`.
+Otros valores (`"bool"`, `"char"`, `"null"`, `"object"`, `"array"`,
+`"function"`): NO-VERIFICADOS.
 
-```varn
-typeof "abc"          // "str"
-typeof 42             // "int"
-typeof 3.14           // "float"
-typeof true           // "bool"
-typeof 'a'            // "char"
-typeof null           // "null"
-typeof MyClass        // "class"
-typeof someObject     // "object"
-typeof someArray      // "array"
-typeof someFunction   // "function"
-```
-
-> [!IMPORTANT]
-> Los nombres de tipo retornados por `typeof` usan los nombres canónicos de Varn: `"str"` nunca `"string"`, `"int"` nunca `"integer"`, `"bool"` nunca `"boolean"`.

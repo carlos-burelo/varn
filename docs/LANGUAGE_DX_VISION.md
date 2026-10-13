@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: PARCIAL — visión DX, no spec; cada propuesta debe verificarse contra código antes de implementarse (AGENTS.md checklist).
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # Visión de Sintaxis y Experiencia de Desarrollo (DX)
 
 Este documento esboza la visión estratégica de evolución sintáctica y ergonometría del lenguaje **Varn**, enfocada en maximizar la productividad del desarrollador (DX) manteniendo el rendimiento en tiempo de ejecución.
@@ -60,3 +64,4 @@ const datos = await "https://api.ejemplo.com/data"
       return v instanceof str
   }
   ```
+

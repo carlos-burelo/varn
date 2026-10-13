@@ -1,3 +1,5 @@
+> Estado verificado 2026-10-13: VIGENTE.
+
 # Política de Seguridad
 
 ## Versiones con soporte

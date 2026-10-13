@@ -1,3 +1,5 @@
+> Precisión parcial. Verificado contra tests/... Código manda.
+
 # Varn Language — Glosario
 
 Este glosario define los términos clave del lenguaje Varn. Las entradas están ordenadas alfabéticamente.
@@ -18,8 +20,9 @@ Operador de cast explícito (narrowing). Ejemplo: `(obj as dynamic).field`.
 **`assert(label, condition)`**  
 Función de testing. Lanza un error si `condition` es `false`.
 
-**`async`**  
-Modificador de función. Convierte la función en asíncrona; el valor de retorno se envuelve en una `Future`. Permite usar `await` dentro del cuerpo.
+**`async`**
+Modificador de función. La función devuelve un valor awaitable; permite
+`await` dentro del cuerpo (`tests/21-async.vn:4-11`).
 
 **`await`**  
 Operador que pausa la ejecución de la función asíncrona actual hasta que la `Future` se resuelva. También válido a nivel de módulo (top-level await).
@@ -95,8 +98,10 @@ Declara métodos adicionales en un tipo existente sin modificar su definición o
 **`finally`**  
 Bloque que se ejecuta siempre después de `try/catch`, independientemente de si hubo error o `return`.
 
-**`float`**  
-Tipo primitivo de número flotante de 64 bits (IEEE 754 doble precisión). Resultado de división `int/int`.
+**`float`**
+Tipo primitivo de número flotante de 64 bits (IEEE 754 doble precisión).
+`int / int` es `int`; la división flotante usa operandos `float`
+(`tests/120-int-division.vn:13,16-28`).
 
 **`for`**  
 Bucle de tres partes estilo C: `for (init; condition; step) { }`.
@@ -149,8 +154,10 @@ Operador usado en `for...in` para iterar claves de objeto.
 **`instanceof`**  
 Operador de verificación de tipo en tiempo de ejecución. Devuelve `bool`. También estrecha el tipo en bloques condicionales.
 
-**`int`**  
-Tipo primitivo de entero de 48 bits con signo, rango `-140737488355328 ..= 140737488355327`. La aritmética que sale de ese rango lanza `integer overflow`; no envuelve.
+**`int`**
+Tipo primitivo de entero de 64 bits con signo (`-2^63 .. 2^63-1`).
+La aritmética fuera de rango lanza `IntegerOverflow`; no envuelve
+(`tests/120-int-division.vn:25`, `tests/102-int-overflow.vn`).
 
 **`interface`**  
 Contrato estructural sin implementación. Los campos opcionales se marcan con `?`. Varn usa tipado estructural.
@@ -228,8 +235,9 @@ Sintaxis compacta de constructor declarada en la firma de la clase: `class User(
 **`raw string` (`"""…"""`)**  
 Literal de cadena delimitado por triple comilla. No procesa secuencias de escape.
 
-**Record (`#{…}`)**  
-Tipo compuesto nominal profundamente inmutable con igualdad estructural (`==`). Par nominal de `Tuple` (`#[…]`). No confundir con `Map<K, V>`.
+**Record (`#{…}`)**
+Producto estructural inmutable con igualdad profunda (`==`); par de
+`Tuple` (`#[…]`) (`tests/69-tuples-records.vn:22`).
 
 **`return`**  
 Devuelve un valor desde una función y termina su ejecución.
@@ -288,8 +296,10 @@ Parámetros de constructor con `public`/`private` que se convierten automáticam
 **Union Type**  
 Tipo que puede ser uno de varios tipos posibles. Ejemplo: `str | int`, `T | null`.
 
-**`using`**  
-Declaración de recurso con disposición automática al salir del bloque o función. Equivalente a `using` de C# 8.
+**`using`**
+Declaración de recurso con disposición automática (`dispose()`) al salir del
+bloque (`tests/21-async.vn:43`, `tests/54-channels.vn:47`,
+`tests/50-opt-unsupported-phase3.vn:55`).
 
 ---
 
@@ -305,8 +315,11 @@ Tipo de retorno de funciones que no devuelven ningún valor significativo.
 
 ## W
 
-**Widening**  
-Coerción implícita de un tipo numérico a otro más amplio: `int → float`, `int → decimal`, `int → bigint`. No requiere cast.
+**Widening**
+Conversión implícita exacta: `int → bigint`, `int → decimal`. Un **literal**
+entero adopta `float`/`decimal`/`bigint` del contexto si es representable.
+`int → float` de variable NO es implícito: se escribe con `as`
+(`tests/122-numeric-conversions.vn:3-4`).
 
 **`with` Expression**  
 Expresión que clona un objeto o instancia sobreescribiendo solo los campos especificados, manteniendo el original inmutable. Ejemplo: `u1 with { name: "Bob" }`.
@@ -320,3 +333,4 @@ Bucle que repite mientras la condición sea `true`.
 
 **`yield`**  
 Sentencia dentro de un generador que produce un valor y suspende la ejecución hasta el próximo `.next()`.
+

@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `ExprKind::Try` (`crates/varn-core/src/ast/expr.rs:155`), `infer_try`/`check_try` en checker, `tests/109-try-operator.vn`.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0005: Operador Prefijo de Propagación de Errores (`try <expr>`)
 
 ## Estado
@@ -42,3 +46,4 @@ El operador `try <expr>` soporta de forma canónica tres familias de tipos:
 - **Cero Ambigüedad Sintáctica**: El operador ternario, encadenamiento opcional y null coalescing permanecen limpios y sin ambigüedades.
 - **Ergonomía de Manejo de Errores**: Se elimina el código repetitivo de `match` para propagar errores en cascada.
 - **Rendimiento**: Ejecuta a nivel de bytecode y JIT con operaciones nativas de discriminante y desempaquetado directo de campo.
+

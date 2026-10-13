@@ -1,3 +1,5 @@
+> Precisión parcial. Verificado contra tests/... Código manda.
+
 # Varn Language — Generadores
 
 > Fuentes: `tests/20-generators.vn`, `tests/76-generator-values.vn`, `tests/77-async-generators.vn`.
@@ -254,3 +256,4 @@ assert("async gen awaits sleep", awaitsSleep().next().value === 7)
 | `.next().done` | `bool` | `true` cuando la función generadora ha terminado. |
 
 Para **async generators**: `.next()` puede ser llamado normalmente; `await gen.next()` también es válido.
+

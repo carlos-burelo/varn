@@ -1,12 +1,20 @@
 # Roadmap — Varn
 
+> Estado parcial. Código manda (AGENTS.md Ley 12). Última sync: 2026-10-13 desde código.
+
 Trabajo futuro verificado, no intenciones. Cada entrada cita su evidencia y
 su puerta de validación. Nada aquí se implementa sin pasar por `AGENTS.md`
 (checklist de diseño + matriz de validación).
 
 ## LSP: paralelismo real del análisis (futuro)
 
-**Estado actual.** El análisis vive en un solo hilo (`varn-lsp/src/analysis`):
+**Hipótesis 2026-10 (verificar en código antes de usar).** Contenido abajo
+es hipótesis histórica, no estado. Rutas citadas sin verificar en árbol
+actual: `varn-lsp/src/analysis` existe, pero `varn-lsp/src/workspace/resolver.rs`
+no existe (`workspace/` = `mod.rs`, `revision.rs`, `std_sources.rs`);
+`crates/varn-lsp/tests/design_audit_test.rs` existe (casos h1-h10).
+Nada usar sin re-verificar.
+Hipótesis: el análisis vive en un solo hilo (`varn-lsp/src/analysis`):
 el index bulk es secuencial (~1.1s en este repo tras la serie de
 optimizaciones de memoria/throughput) y cada archivo paga el checker
 completo (30–600ms). El index IO ya es concurrente; el cómputo no.
@@ -43,5 +51,6 @@ internos entre corridas; las respuestas a nivel texto son idénticas y la
 ruta CLI single-thread queda intacta.
 
 **Puerta.** Test de equivalencia paralelo-vs-serial (mismos
-exports/definiciones), suite `varn-lsp`, `memoryStats`, timing real.
+exports/definiciones), suite `varn-lsp`, puerta canónica `tests/main.vn` +
+`.\scripts\verify.ps1 -Fast`. Sin `memoryStats` suelto como puerta.
 Evidencia base: `crates/varn-lsp/tests/design_audit_test.rs` (H1–H10).

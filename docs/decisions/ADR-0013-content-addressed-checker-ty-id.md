@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — ids `u128` (`crates/varn-sem/src/types/interned/ids.rs:6`), `CONTENT_FLAG` (`hash.rs:6`), asserts de colisión en `interning.rs:20`.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR-0013: Content-addressed `CheckerTyId` (Merkle hashing)
 
 ## Status
@@ -73,3 +77,4 @@ pub type InternedTypeKind = TypeKind<CheckerTyId, Atom, TyListId, FunctionTypeId
 - Parallel module-checking scheduler over the module DAG + a parallel checking
   test — designed and **deferred** in ADR-0014 (Option A, phase-parallel).
 - Optionally: content-addressed `Atom` for cross-process id stability.
+

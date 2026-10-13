@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `std/` sin `buffer`/`json`/`csv` huérfanos (27 dirs, `encoding` canónico en `std/encoding/mod.vn`); sin `WebSocketClient`/`HttpRequest`/`Buffer` alias.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0009: Erradicación Total de Alias y Wrappers Redundantes en la Stdlib
 
 ## Estado
@@ -36,3 +40,4 @@ Varn es un lenguaje de diseño moderno sin bases de código heredadas en producc
 - Cero deuda técnica ni nombres duplicados en la superficie pública.
 - Una única forma canónica de hacer cada tarea en la biblioteca estándar.
 - Las 112 suites de pruebas (2408+ tests) se ejecutan y pasan al 100% en verde con `target/debug/vn.exe test` y `cargo test`.
+

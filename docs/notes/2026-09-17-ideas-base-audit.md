@@ -1,6 +1,9 @@
-# Auditoría: Varn vs IDEAS_BASE.md (2026-09-17)
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
 
-Mapeo punto por punto de los 50 puntos de `IDEAS_BASE.md` contra el estado real del código (no memoria, no docs previos). Cuatro sub-auditorías paralelas, evidencia con `file:línea`.
+# Auditoría: Varn vs IDEAS_BASE.md (2026-09-17) [corregido 2026-10-13: `IDEAS_BASE.md` inexistente en repo; tablas abajo = snapshot autocontenido]
+
+Mapeo punto por punto de los 50 puntos de `IDEAS_BASE.md` [corregido 2026-10-13: fichero inexistente] contra el estado real del código (no memoria, no docs previos). Cuatro sub-auditorías paralelas, evidencia con `file:línea`.
 
 Leyenda: ✅ ya-implementado · 🟡 parcial/compromiso distinto · ❌ ausente.
 
@@ -87,3 +90,4 @@ Leyenda: ✅ ya-implementado · 🟡 parcial/compromiso distinto · ❌ ausente.
 ## Nota sobre memoria previa
 
 La memoria `native-inheritance-kills-fixed-fields.md` ("herencia nativa mata campos fijos, GetFixedField roto") **no se confirmó** con la evidencia actual — el diseño de campos aplanados con `skip(inherited)` es deliberado y funciona; solo hay un workaround puntual hardcodeado para clases nativas tipo `Error`. Recomendado: revisar y actualizar/retirar esa memoria.
+

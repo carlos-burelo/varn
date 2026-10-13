@@ -1,170 +1,45 @@
-# Arquitectura de la Biblioteca Estándar (`std:*` & `.vnb`)
+# Arquitectura stdlib
 
-Este documento especifica la estructura, el sistema de resolución, el mecanismo de empaquetado y la especificación de módulos de la biblioteca estándar de **Varn**.
+Medido desde `std/` real. Código manda.
 
----
+## Tamaño
 
-## Tabla de Contenidos
+- 27 dirs raíz: cli, collections, compress, crypto, db, encoding, env, error, ffi, fs, http, io, log, markdown, math, net, path, pm, process, reflect, regex, sqlite, sys, task, test, time, ws.
+- 112 `.vn` recursivos (`Get-ChildItem std -Filter *.vn -Recurse`).
 
-- [1. Visión General de la Stdlib](#1-visión-general-de-la-stdlib)
-- [2. Módulos de la Biblioteca Estándar](#2-módulos-de-la-biblioteca-estándar)
-- [3. Arquitectura del Bundle `.vnb`](#3-arquitectura-del-bundle-vnb)
-- [4. Jerarquía de Resolución y Procedencia](#4-jerarquía-de-resolución-y-procedencia)
-- [5. Estado de la Matriz de Validación de Procedencia](#5-estado-de-la-matriz-de-validación-de-procedencia)
-- [6. Especificación del Módulo HTTP (`std:http`)](#6-especificación-del-módulo-http-stdhttp)
-  - [6.1 Protocolo Estándar Web (`Request`, `Response`, `Headers`)](#61-protocolo-estándar-web-request-response-headers)
-  - [6.2 Servidor HTTP Declarativo y Fluido](#62-servidor-http-declarativo-y-fluido)
-  - [6.3 Tabla Comparativa de Diseño de API](#63-tabla-comparativa-de-diseño-de-api)
-- [7. Integración con Bindings Nativos LBI](#7-integración-con-bindings-nativos-lbi)
+## Submódulos detallados
 
----
+### encoding (9 ficheros: `mod.vn` + 8 submódulos)
 
-## 1. Visión General de la Stdlib
+`mod.vn`, `base32.vn`, `base64.vn`, `csv.vn`, `hex.vn`, `html.vn`, `json.vn`, `msgpack.vn`, `toml.vn`.
 
-La biblioteca estándar de Varn está escrita principalmente en el propio lenguaje Varn (`std/*.vn`) e integrada directamente en el binario ejecutable mediante un bundle empaquetado `.vnb`. Para operaciones del sistema de bajo nivel (I/O, sockets, criptografía), los módulos se comunican con implementaciones nativas en Rust a través de la Interfaz Ligada al Linker (LBI).
+### cli (`mod.vn` + 4)
 
-```mermaid
-flowchart TD
-    A["Código de Usuario (import { readFile } from 'std:fs')"] --> B["varn-modules (Resolución de Nombre)"]
-    B --> C{"¿Módulo std:*?"}
-    C -- Sí --> D["Cargar desde Bundle .vnb (std/fs.vn)"]
-    D --> E["Invocaciones a opcodes nativos host_fn"]
-    E --> F["varn-builtins (Ejecución Nativa en Rust)"]
-```
+`mod.vn`, `args.vn`, `color.vn`, `prompt.vn`, `table.vn`.
 
----
+### task (`mod.vn` + 5)
 
-## 2. Módulos de la Biblioteca Estándar
+`mod.vn`, `channel.vn`, `group.vn`, `sync.vn`, `cron.vn`, `combinators.vn`.
 
-| Módulo | Descripción | Dependencias Nativas (Rust) |
-|---|---|---|
-| `std:http` | Cliente (`fetch`) y Servidor HTTP declarativo (`Request`, `Response`, `Headers`), y streaming chunked (`HttpResponse.stream`). | `varn-builtins::net` |
-| `std:fs` | Sistema de archivos (`File`, `FileStream` con `AsyncReader`/`AsyncWriter`, `readBytes`, `writeBytes`, `appendBytes`). | `varn-builtins::fs` |
-| `std:io` | Entrada/Salida estándar (`stdin`, `stdout`, `stderr`), contratos `Reader`, `Writer`, `AsyncReader`, `AsyncWriter` y `Stream.pipe`. | `varn-builtins::io` |
-| `std:net` | Redes y transporte: TCP (`TcpListener`, `TcpStream`), UDP (`UdpSocket`, `UdpPacket`), `Url`, `URLSearchParams`. | `varn-builtins::net` |
-| `std:compress` | Compresión binaria en memoria (`gzip`, `gunzip`, `deflate`, `inflate`) sobre `Bytes` y archivadores (`tar`, `zip`). | `varn-builtins::compress` |
-| `std:task` | Concurrencia, `TaskGroup`, `parallel`, `spawnIsolate`, sincronización (`Mutex`, `Semaphore`, `Barrier`). | `varn-runtime` |
-| `std:crypto` | Hashing (SHA256, MD5, HMAC), cifrado (AES-GCM), KDF (`pbkdf2`, `hashPassword`, `verifyPassword`), `timingSafeEqual`, `randomBytes: Bytes`. | `varn-builtins::crypto` |
-| `std:time` | Medición de tiempo, temporizadores y formateo de fechas. | `varn-builtins::time` |
-| `std:encoding` | Serialización unificada: JSON (`JSON.parse`, `JSON.stringify`), CSV (`CSV.parse`, `CSV.stringify`), MessagePack (`MsgPack.encode`, `MsgPack.decode`), Base64, Hex. | `varn-builtins::json`, `varn-builtins::crypto` |
-| `std:reflect` | Introspección de clases, decoradores y metadatos (`MetaKey`). | `varn-builtins::reflect` |
-| `std:sys` | Información del entorno de ejecución, OS, CPU y memoria. | `varn-builtins::sys` |
-| `std:math` | Operaciones matemáticas y funciones trigonométricas. | `varn-core::numeric` |
-| `std:test` | Framework de pruebas unitarias y aserciones ricas. | `varn-builtins::testing` |
-| `std:collections` | Estructuras de datos avanzadas (`List`, `Stack`, `Queue`, `PriorityQueue`, `LRUCache`). | — |
-| `std:cli` | Parser de argumentos CLI, formateo de tablas y colores ANSI terminal (`Color`, `Table`). | — |
-| `std:log` | Logger estructurado configurable con niveles (Debug, Info, Warn, Error). | — |
-| `std:markdown` | Parser de Markdown CommonMark/GFM a AST, renderizado a HTML y utilidades de extracción. | — |
+### net (`mod.vn` + 6)
 
----
+`mod.vn`, `url.vn`, `ip.vn`, `socket.vn`, `udp.vn`, `query.vn`, `encoding.vn`.
 
-## 3. Arquitectura del Bundle `.vnb` (Build-Time Zero-Runtime Discovery)
+### http (12 ficheros)
 
-Para distribuir el lenguaje en un **único ejecutable autónomo sin dependencias de archivos externos**, el compilador elimina la necesidad de un archivo de manifiesto estático como `std.json`. En su lugar, el script de compilación `crates/varn-cli/build.rs` y el cargador de la stdlib descubren dinámicamente y de forma recursiva todos los módulos de `std/` **en tiempo de compilación**, indexándolos en el bundle binario `.vnb`:
+`mod.vn`, `auth.vn`, `client.vn`, `core.vn`, `headers.vn`, `mime.vn`, `multipart.vn`, `request.vn`, `response.vn`, `route.vn`, `server.vn`, `status.vn`.
 
-- `std/<module>/mod.vn` se mapea canónicamente a `std:<module>`.
-- `std/<module>/<submodule>.vn` se mapea a `std:<module>/<submodule>`.
-- Cero sobrecarga o I/O en tiempo de ejecución.
+### ws (`mod.vn` + 2)
 
-```mermaid
-flowchart LR
-    A["Fuentes std/*.vn"] --> B["build.rs\n(Parsing & Precompilación)"]
-    B --> C["std.vnb\n(Bundle Precompilado)"]
-    C --> D["varn-cli\n(include_bytes! en ejecutable final)"]
-```
+`mod.vn`, `server.vn`, `client.vn`.
 
----
+## Nativos (`crates/varn-builtins/src/modules/mod.rs`)
 
-## 4. Jerarquía de Resolución y Procedencia
+23 `pub mod` (mod.rs:1-47): buffer, compress, crypto, csv, errors, ffi, fs, globals, io, json, math, net, path, process, reflect, regex, sqlite, sys, task, testing, time, types, ws.
 
-Al importar un módulo `std:*`, `varn-modules` determina la fuente del código según el siguiente orden de prioridad:
+`build_module` / `has_native_builder` delegan en `crate::dispatch` (mod.rs:51-57).
 
-```mermaid
-flowchart TD
-    A["Importación std:*"] --> B{"VARN_STD especificada?"}
-    B -- VARN_STD=@embedded --> C["Usar Bundle Embebido en Ejecutable (.vnb)"]
-    B -- VARN_STD=/ruta/custom --> D["Usar Ruta Personalizada"]
-    B -- No especificada --> E{"¿Existe directorio std/ local?\n(dev-checkout)"}
-    E -- Sí --> F["Usar Fuentes de std/ (Modo Desarrollo)"]
-    E -- No --> C
-```
+## Macros
 
----
-
-## 5. Estado de la Matriz de Validación de Procedencia
-
-**Estado: 100% Verde (1094 / 0 PASSED en todas las combinaciones).**
-
-| Procedencia | Modo de Ejecución | Estado | Aserciones |
-|---|---|---|---|
-| **Árbol local (`std/`)** | JIT (x86_64 Cranelift) | **PASSED** | 1094 / 0 |
-| **Árbol local (`std/`)** | Intérprete (`VARN_NO_JIT=1`) | **PASSED** | 1094 / 0 |
-| **Bundle Embebido (`@embedded`)** | JIT (x86_64 Cranelift) | **PASSED** | 1094 / 0 |
-| **Bundle Embebido (`@embedded`)** | Intérprete (`VARN_NO_JIT=1`) | **PASSED** | 1094 / 0 |
-
----
-
-## 6. Especificación del Módulo HTTP (`std:http`)
-
-El módulo `std:http` unifica el protocolo de comunicación cliente/servidor bajo el estándar web moderno (WinterCG / Fetch API / Bun) combinándolo con un router declarativo y fluido.
-
-### 6.1 Protocolo Estándar Web (`Request`, `Response`, `Headers`)
-
-- **`Headers`**:
-  - Búsqueda case-insensitive (`.get("content-type")`, `.set(k, v)`, `.has(k)`, `.delete(k)`, `.append(k, v)`).
-  - Serialización a objeto plano mediante `.toObject()`.
-- **`Request`**:
-  - `url: str`, `method: str`, `headers: Headers`, `body: str`, `path: str`, `query: { [k: str]: str }`, `params: { [k: str]: str }`.
-  - Métodos asíncronos/síncronos de extracción tipada: `.text(): str`, `.json(): Json`.
-  - Soporte de constructor polimórfico `new Request(url, init?: { method, headers, body })` o `new Request(url, method, headers, body)`.
-- **`Response`**:
-  - `status: int`, `statusText: str`, `ok: bool`, `headers: Headers`, `body: str`.
-  - `.text(): str`, `.json(): Json`.
-  - Helpers declarativos de respuesta:
-    - `json(data, status = 200, headers = {}): Response`
-    - `redirect(url, status = 302): Response`
-    - `error(status = 500, message = ""): Response`
-
-### 6.2 Servidor HTTP Declarativo y Fluido
-
-```typescript
-import { server, json, redirect, error, Request, Response, Headers } from "std:http"
-
-let app = server();
-
-// Rutas declarativas que retornan instancias de Response o usan helpers
-app.get("/api/v1/users/:id", (req: Request) => {
-    let id = req.params["id"];
-    return json({ user_id: id, active: true });
-});
-
-app.post("/api/v1/users", async (req: Request) => {
-    let data = req.json();
-    return json({ created: true, payload: data }, 201);
-});
-
-app.get("/old-docs", (req: Request) => redirect("/docs"));
-
-app.listen(8080);
-```
-
-### 6.3 Tabla Comparativa de Diseño de API
-
-| Característica | Node.js (`http` / Express) | Bun (`Bun.serve`) | **Varn (`std:http`)** |
-| :--- | :--- | :--- | :--- |
-| **Protocolo de Petición** | `IncomingMessage` (Streams heredados) | `Request` estándar web | **`Request` estándar web** |
-| **Protocolo de Respuesta** | `ServerResponse` mutativo (`res.write()`) | `Response` inmutable | **`Response` estándar web + Helpers (`json`, `redirect`)** |
-| **Sintaxis de Servidor** | Callbacks anidados (`(req, res) => ...`) | Objeto `fetch(req): Response` | **Router declarativo (`app.get(...) => Response`) + `serve()`** |
-| **Búsqueda de Headers** | Case-sensitive o mapeo manual en minúsculas | `Headers` case-insensitive | **`Headers` case-insensitive nativo** |
-| **Interoperabilidad Cliente-Servidor** | Disjunta (`node-fetch` vs `http.Server`) | Unificada | **100% Unificada (mismo `Request`/`Response` en `fetch` y `server`)** |
-
----
-
-## 7. Integración con Bindings Nativos LBI
-
-Los archivos de la stdlib exponen una API limpia con tipos estáticos mientras delegan el trabajo pesado a funciones nativas mediante anotaciones especiales y opcodes de enlace:
-
-```typescript
-// std/http.vn
-import { tcpListen$, tcpAccept$, tcpRead$, tcpWrite$, tcpClose$ } from "builtin:net"
-```
+- `varn_contract!` vive en `crates/varn-contract/src/lib.rs:8` (`#[proc_macro] pub fn varn_contract`).
+- `varn-op-macros` solo expone dos proc-macros (`crates/varn-op-macros/src/lib.rs:1-14`): `#[jit_slow]` (attribute) y `jit_helper_table` (function-like). Módulos: `jit_helper_table.rs`, `jit_slow.rs`.

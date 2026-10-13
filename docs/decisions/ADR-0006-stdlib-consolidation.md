@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `std/encoding/mod.vn:1-8` re-exporta Json/Csv/Base64/Hex/Toml/MsgPack; `tests/110-stdlib-consolidation.vn`.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0006: Consolidación y Pulido de la Stdlib en 5 Dominios Cohesivos
 
 ## Estado
@@ -55,3 +59,4 @@ Para maximizar la cohesión y simplificar la experiencia de desarrollo, se aprob
 - **API Cohesiva y Limpia**: Los desarrolladores tienen un mapa mental claro de 5 dominios principales para datos, terminal, concurrencia, logging y colecciones.
 - **Cero Dependencias Huérfanas**: No se introdujeron paquetes sueltos como `std:ansi`, `std:sync`, `std:toml` o `std:heap`.
 - **Compatibilidad Garantizada**: Se mantuvieron todos los puntos de entrada existentes, pasando el 100% de la suite de pruebas (110 suites, 2408+ pruebas).
+

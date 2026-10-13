@@ -1,3 +1,5 @@
+> Precisión parcial. Verificado contra tests/... Código manda.
+
 # Varn Language — Funciones y Métodos
 
 > Fuentes: `tests/07-closures.vn`, `tests/09-control-flow.vn`, `tests/14-generics.vn`, `tests/19-pipeline.vn`, `tests/22-recursion.vn`, `tests/36-advanced-generics.vn`, `tests/37-complex-closures.vn`, `tests/38-advanced-higher-order.vn`, `tests/40-named-arguments.vn`, `tests/86-tagged-templates.vn`.
@@ -304,3 +306,4 @@ const add5: (a: int) => int = makeAdder(5)
 // Rest parameters
 function rolesDeco(...r: str[]) { /* r es str[] */ }
 ```
+

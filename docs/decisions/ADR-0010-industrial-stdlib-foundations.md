@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `readBytes`+`FileStream` (`std/fs/file.vn`), `UdpSocket` (`std/net/udp.vn`), `timingSafeEqual` (`std/crypto/password.vn`), `MsgPack` (`std/encoding/msgpack.vn`); `tests/113,114,115-*.vn`.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR-0010: Industrial Standard Library Foundations (Binary I/O, Compression, UDP, HTTP Streaming, KDF & MessagePack)
 
 ## Context
@@ -34,3 +38,4 @@ Specifically:
 - Zero dynamic typing in public signatures: all contracts use explicit canonical types (`Bytes`, `int`, `str`, `Task<T>`, `AsyncReader`, `AsyncWriter`).
 - Full end-to-end binary fidelity across filesystem, network, cryptography, and serialization.
 - High efficiency and zero copy where possible through `Bytes` buffers.
+

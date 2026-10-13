@@ -1,3 +1,5 @@
+> Estado verificado 2026-10-13: VIGENTE.
+
 # Código de Conducta
 
 Este proyecto sigue un estándar profesional simple:

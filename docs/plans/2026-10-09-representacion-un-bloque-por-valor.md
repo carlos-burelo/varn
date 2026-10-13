@@ -1,4 +1,6 @@
 # Representación de valores: un bloque por valor
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
 
 Plan de implementación. Estado al 2026-10-09.
 

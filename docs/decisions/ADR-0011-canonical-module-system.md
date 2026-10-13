@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: PARCIAL — loader único con `Provenance` (`crates/varn-modules/src/loader.rs:9`) + `Layer` (`layer.rs`) vigentes; persisten rutas por crate (`varn-resolver/src/graph.rs`, `varn-pipeline/src/stdlib_loader.rs:135`, `ImportResolver` en checker).
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR-0011: One Canonical Module System (single loader, single resolution, single source of truth)
 
 ## Status
@@ -126,3 +130,4 @@ branching key.
   `varn-modules` already owns ids/providers/artifacts and everyone depends on it.
 - **Have the VM keep returning compiled protos from `load`**: couples loading to
   compiling and forces a second loader for the checker. Separation is the point.
+

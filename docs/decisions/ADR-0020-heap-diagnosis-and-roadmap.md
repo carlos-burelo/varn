@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: PARCIAL — diagnóstico cerrado y correcciones H1-H3 vigentes (el propio texto); etapas H3-H5 propuestas, no implementadas.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0020: Diagnóstico medido del heap y hoja de ruta
 
 ## Estado
@@ -119,3 +123,4 @@ con cambios que se pueden validar uno a uno contra `tests/main.vn`.
   volver a romperse en silencio.
 - `clean_prefix` es un invariante de `VmArray`: cualquier mutador nuevo debe
   bajarlo. Hoy están todos en `vm_value.rs`.
+

@@ -1,4 +1,6 @@
 # Plan unificado de rendimiento JIT (living, 2026-10-09)
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
 
 Sustituye a `2026-10-09-plan-beat-bun.md`, `2026-10-09-plan-async-fase-b.md`
 y `2026-10-08-plan-jit-machine-code.md` (eliminados; su contenido vive

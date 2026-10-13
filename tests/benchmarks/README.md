@@ -1,3 +1,5 @@
+> Estado verificado 2026-10-13: VIGENTE — metodología (checksum antes que tiempo, `cargo xtask compare`, re-medir siempre). Sin tabla de ratios históricos que borrar: no hay.
+>
 # Benchmarks
 
 Micro-benchmarks `.vn` con su contraparte TypeScript (`.ts`) para comparación

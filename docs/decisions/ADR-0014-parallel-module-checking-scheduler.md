@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: OBSOLETO — el propio ADR se declara deferred/archived; scheduler sin implementar, checking single-thread; solo prereqs (`Send+Sync` en `crates/varn-resolver/src/graph.rs:140-141`).
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR-0014: Parallel module checking — phase-parallel scheduler (Option A)
 
 ## Status
@@ -74,3 +78,4 @@ continuous work stealing.
 ## Trigger to implement
 - Compile-time wall clock on multi-module projects becomes a bottleneck, or the
   editor/LSP needs to analyse many modules concurrently.
+

@@ -1,11 +1,16 @@
-# Varn — Respuesta de Auditoría Arquitectónica (contra `EXPECTED_AUDIT.md`)
+> Estado verificado 2026-10-13: PARCIAL — snapshot 2026-09-20 + actualización post-auditoría; balas JIT/SSA resueltas siguen vigentes (SSA portable, `tests/main.vn` verde); rutas `EXPECTED_AUDIT.md` y `2026-09-20-PLAN-PENDIENTE.md` inexistentes [corregido 2026-10-13].
+> Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
+# Varn — Respuesta de Auditoría Arquitectónica (contra `EXPECTED_AUDIT.md` [corregido 2026-10-13: fichero inexistente en repo; contexto = auditoría 2026-09-20])
 
 Idioma: español. Salida: `docs/` (acordado). Prioridad de verdad aplicada: `1. implementación, 2. tests, 3. comportamiento, 4. documentación, 5. README, 6. supuestos`.
 Cada conclusión importante cita `Archivo | Símbolo | Comportamiento | Conclusión`. Lo no verificable se marca `Unverified`.
 
 > **Actualización (2026-09-20, post-auditoría).** Este documento describe el
 > estado al momento de la auditoría. **El plan vivo es único:
-> `docs/plans/2026-09-20-PLAN-PENDIENTE.md`** (absorbió los planes de JIT
+> `docs/plans/2026-09-20-PLAN-PENDIENTE.md`** [corregido 2026-10-13: plan inexistente; plan vivo actual `docs/plans/2026-10-09-plan-unificado.md`] (absorbió los planes de JIT
 > anteriores). Cambios posteriores que invalidan varias balas del resumen:
 > - **JIT activo y con par de valor único (C1).** `Ref`+`Dyn` bajan como par
 >   tag+payload; el gate `VARN_JIT_ALLOW_REF` se eliminó. `tests/main.vn`
@@ -66,7 +71,7 @@ Contraste de §I (borrados) y §K (11 pasos) con el código actual.
 
 ### Pendiente real
 
-> El plan vivo y su estado por fases es `docs/plans/2026-09-20-PLAN-PENDIENTE.md`
+> El plan vivo y su estado por fases es `docs/plans/2026-09-20-PLAN-PENDIENTE.md` [corregido 2026-10-13: plan inexistente; ver `docs/plans/2026-10-09-plan-unificado.md`]
 > (documento único). Resumen:
 
 - **JIT desde SSA/TIR** (paso 9 / §I-2) — **F1–F4 hechos** (escalar, heap,
@@ -455,3 +460,4 @@ este documento).**
 - `cargo build --workspace`: limpio. Cada `match` exhaustivo roto por el nuevo campo `narrow_elem` (`ssa/dump.rs`, `ssa/emit/regs.rs`, `ssa/uses.rs` x2) y por las 7 variantes de `ArrayRepr` se resolvió explícitamente — sin `_ =>` nuevo escondiendo un caso sin decidir. Un sitio no enumerado por el plan (`varn-lsp/src/features/compiler_inspect.rs`) apareció durante el build y se corrigió igual.
 - Stress test dedicado (no permanente): `Array<i8>` de 5 elementos declarado antes de 200 000 asignaciones de basura (fuerza colecciones menores repetidas), íntegro tras 8 `minor gc` (`VARN_GC_TRACE=1`); valores en los extremos del rango (`-128`, `127`) sobreviven exactos.
 - `clif/arrays.rs`: doc de módulo actualizado — confirma que el módulo (hoy muerto, `FRAME_LAYOUT_V2_JIT_BAIL = true`) sigue siendo correcto para las 7 variantes nuevas sin cambio de código: el bloque `slow` ya despacha por los accesores totales de `VmArray`, no por un `match` de 3 vías fijo.
+

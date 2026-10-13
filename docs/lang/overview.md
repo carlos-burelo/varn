@@ -1,31 +1,26 @@
-# Varn Language Specification – Overview
+# Varn — Overview (desde tests)
 
-Este documento sirve como punto de partida para la especificación completa del lenguaje Varn. Cada sección posterior refuerza los conceptos descritos aquí con ejemplos extraídos de la suite de pruebas ubicada en `tests/*.vn`.
+Fuente única: `tests/*.vn`. Código manda.
 
-## Contenido de la especificación
+## Suite
 
-| Archivo | Tema | Descripción breve |
-|---|---|---|
-| [`overview.md`](overview.md) | Visión general | Filosofía del lenguaje, modelo mental y organización de la documentación. |
-| [`lexical.md`](lexical.md) | Sintaxis Léxica | Identificadores, literales (numéricos, `str`, `int`, `float`, `bool`, `char`, **Raw Strings**), comentarios y operadores. |
-| [`identifiers.md`](identifiers.md) | Identificadores y Keywords | Reglas de nombres, palabras reservadas y convenciones de estilo. |
-| [`types.md`](types.md) | Sistema de tipos | Tipos primitivos, estructuras, clases, enums, genéricos, uniones, tipos nulos, operador `??=` y tipos intrínsecos. |
-| [`expressions.md`](expressions.md) | Expresiones | Literales, variables, llamadas, objetos, arrays, tuplas, rangos, spreads, **`with`**, destructuring, null‑coalescing, `match`/`switch`, plantillas etiquetadas, etc. |
-| [`statements.md`](statements.md) | Sentencias y control de flujo | `if/else`, `switch`, bucles (`while`, `for`, `do‑while`), `break`, `continue`, `return`, `throw`, manejo de excepciones, `try/catch/finally`, `async/await`, generadores y async‑generadores. |
-| [`functions_methods.md`](functions_methods.md) | Funciones y métodos | Declaración, parámetros nombrados, valores por defecto, sobrecarga, `async`, generadores, constructores y destructores. |
-| [`classes_objects.md`](classes_objects.md) | Clases y objetos | Definición de clases, visibilidad, campos, métodos, herencia, `record`‑like semantics y expresión `with`. |
-| [`modules_packages.md`](modules_packages.md) | Módulos y paquetes | Sistema de importación/exportación, organización de código y stdlib. |
-| [`async_concurrency.md`](async_concurrency.md) | Concurrencia asíncrona | Isolates, canales, `Future`, `Task`, `await`. |
-| [`generators.md`](generators.md) | Generadores | `yield`, iteradores y uso en bucles. |
-| [`error_handling.md`](error_handling.md) | Manejo de errores | Tipos de excepción, propagación y bloques `try/catch/finally`. |
-| [`standard_library.md`](standard_library.md) | Biblioteca estándar | Funcionalidades usadas en los tests (`print`, `assert`, `std:csv`, `std:process`, `std:math`, etc.). |
-| [`runtime_behavior.md`](runtime_behavior.md) | Comportamiento en tiempo de ejecución | Modelo de memoria, GC generacional, JIT vs intérprete. |
-| [`examples.md`](examples.md) | Ejemplos integrados | Fragmentos de código tomados directamente de los archivos de prueba, organizados por tema. |
-| [`glossary.md`](glossary.md) | Glosario | Definiciones de palabras clave y conceptos relevantes. |
+- 208 ficheros `tests/*.vn`. `tests/main.vn` importa 206 (`main.vn:1-145,147-208`).
+- No importado directo: `75-async-shapes-lib.vn` (lib auxiliar de `75-async-shapes.vn`), más `main.vn` mismo.
+- Cierre: `import { summary } from "std:test"` (`main.vn:146`), `summary()` (`main.vn:209`).
+- Huecos de numeración que no existen: 39, 81, 91, 104–108.
 
-## Organización de los archivos
-Los archivos se encuentran bajo `docs/lang/` en la raíz del proyecto y están enlazados desde `docs/lang/README.md` para una navegación sencilla.
+## Rasgos probados (cita mínima)
 
----
+- `try/catch/finally`: `tests/11-errors.vn:5-26` (safeDivide, withFinally), `44-48` (catch TypeError, `e.name`).
+- `try` prefijo (early-return sobre Result/Option/nullable): `tests/109-try-operator.vn:18-19` (Result), `:35` (Option), `:44` (nullable `str?`).
+- Multi-catch tipado + unión: `tests/90-multi-catch.vn:23-30` (handler `catch (e: TypeError)`, `RangeError`, network, database).
+- `match`: `tests/10-match.vn:4-9` (literal, `|`, `_`).
+- Clases: `tests/12-classes.vn:3-40` (static, getter/setter, herencia, `super`, `override`, abstract).
+- Async: `tests/21-async.vn:4-38` (`async/await`, `spawn`, `parallel`).
+- Generadores: `tests/20-generators.vn:3-34` (`function*`, `yield`, `.next()` `{value,done}`).
+- Async-generadores: `tests/77-async-generators.vn:22-26` (`async function*`, `yield await`).
+- Isolates + canales: `tests/47-isolates-multithread.vn:2` (imports `spawnIsolate,channel,Sender,Receiver,ChannelClosed`), `:10-39` (workers), más `tests/54-channels.vn` (close, `ChannelClosed` en send/receive).
 
-*Esta especificación se genera sin utilizar comandos Git, en cumplimiento con la normativa del proyecto.*
+## Regla
+
+Sin sintaxis no probada: lo no citado arriba y en `docs/lang/*.md` con cita `tests/*.vn:L-L` no es contrato.

@@ -1,3 +1,6 @@
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
+
 # Auditoría de `Value` y `VmValue`
 
 Fecha: 2026-10-02. Auditoría original; resuelta por ADR-0021 (`Value` eliminado, los tres fallos de corrupción corregidos y cubiertos por `tests/157-task-value-handles.vn`).
@@ -113,3 +116,4 @@ isolates, no en el camino general.
 Recomendación: B para cerrar F1/F2 y la clase entera de fallos con un cambio
 acotado, y C después, por piezas (primero `LazyTask` y el estado de tareas,
 que además eliminan conversiones).
+

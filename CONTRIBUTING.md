@@ -19,7 +19,7 @@ Gracias por tu interés en contribuir al desarrollo del lenguaje de programació
 
 1. **Simplicidad sobre Complejidad**: Preferir soluciones pequeñas, locales y cohesionadas. Aplicar DRY y KISS.
 2. **Sin Deuda Técnica Ni Compatibilidad Legada Innecesaria**: Si un subsistema tiene defectos fundamentales, no extenderlo; reemplazarlo.
-3. **Frontend / Backend Boundary**: Mantener límites estrictos entre frontend (`varn-lexer`, `varn-parser`, `varn-checker`), compilador (`varn-compiler`), backend (`varn-regalloc`), VM (`varn-vm`) y runtime (`varn-runtime`).
+3. **Frontend / Backend Boundary**: Mantener límites estrictos entre frontend (`varn-lexer`, `varn-parser`, `varn-checker`), compilador (`varn-compiler`), backend (`varn-compiler::regalloc`), VM (`varn-vm`) y runtime (`varn-runtime`).
 
 ---
 
@@ -32,7 +32,7 @@ Para evitar la creación de *God Files*, el proyecto aplica reglas estrictas sob
 | `< 300` | **Ideal** | Tamaño óptimo y enfocado. |
 | `300 - 400` | **Advertencia** | Monitorear responsabilidad del módulo. |
 | `400 - 1000` | **Refactor Requerido (AGENTS §6)** | Partir por dominio antes de agregar nada. Puerta CI avisa; `verify.ps1`/`verify.sh`/`ci.yml` advierten >400. |
-| `> 1000` | **Refactor Obligatorio** | **Prohibido** añadir nuevas funciones sin dividir el archivo. Puerta CI falla. |
+| `> 1000` | **Prohibido salvo exención legacy** | **Prohibido** añadir nuevas funciones sin dividir el archivo, salvo exenciones legacy listadas en `LEGACY_EXEMPTIONS` (`.github/workflows/ci.yml:41`). CI falla si un archivo no exento supera 1000 líneas. |
 
 ---
 
@@ -64,10 +64,13 @@ Ninguna tarea o Pull Request se considera completada sin pasar la matriz de 4 cu
 
 | Procedencia Std | Modo JIT / Intérprete | Comando de Validación |
 |---|---|---|
-| `dev-checkout` | **JIT Activado** | `./target/release/vn.exe run ./tests/main.vn` |
-| `dev-checkout` | **Intérprete Pure (`VARN_NO_JIT=1`)** | `VARN_NO_JIT=1 ./target/release/vn.exe run ./tests/main.vn` |
-| `@embedded` | **JIT Activado** | `VARN_STD=@embedded ./target/release/vn.exe run ./tests/main.vn` |
-| `@embedded` | **Intérprete Pure (`VARN_NO_JIT=1`)** | `VARN_STD=@embedded VARN_NO_JIT=1 ./target/release/vn.exe run ./tests/main.vn` |
+| `dev-checkout` | **JIT Activado** | `./target/release/vn run ./tests/main.vn` |
+| `dev-checkout` | **Intérprete Pure (`VARN_NO_JIT=1`)** | `VARN_NO_JIT=1 ./target/release/vn run ./tests/main.vn` |
+| `@embedded` | **JIT Activado** | `VARN_STD=@embedded ./target/release/vn run ./tests/main.vn` |
+| `@embedded` | **Intérprete Pure (`VARN_NO_JIT=1`)** | `VARN_STD=@embedded VARN_NO_JIT=1 ./target/release/vn run ./tests/main.vn` |
+
+> [!NOTE]
+> En Windows el binario es `./target/release/vn.exe`. En Linux/macOS es `./target/release/vn` (ver matriz multi-SO en `.github/workflows/ci.yml`).
 
 > [!IMPORTANT]
 > `cargo test` no ejercita la suite de integración completa del compilador. La prueba canónica del sistema es la ejecución de `tests/main.vn`.
@@ -78,15 +81,23 @@ Para simplificar la validación y asegurar cero roturas antes de hacer commit/pu
 
 - **Windows (PowerShell)**:
   ```powershell
-  .\scripts\verify.ps1          # Ejecución completa (fmt + clippy + audit + release + 4 cuadrantes + bench)
-  .\scripts\verify.ps1 -Fast    # Iteración rápida (sin benchmark)
+  .\scripts\verify.ps1              # Ejecución completa (fmt + clippy + audit + release + 4 cuadrantes + bench)
+  .\scripts\verify.ps1 -Fast        # Release sin benchmark (matriz completa de 4 cuadrantes)
+  .\scripts\verify.ps1 -Quick       # Iteración: perfil `quick` (sin LTO) + solo cuadrante 1, sin lint ni bench
+  .\scripts\verify.ps1 -SkipLint    # Omite cargo fmt y cargo clippy
+  .\scripts\verify.ps1 -CleanCache  # Limpia la caché de Varn antes de cada cuadrante
   ```
 
 - **Linux / macOS (Bash)**:
   ```bash
-  ./scripts/verify.sh           # Ejecución completa
-  ./scripts/verify.sh --fast    # Iteración rápida
+  ./scripts/verify.sh               # Ejecución completa
+  ./scripts/verify.sh --fast        # Iteración rápida (sin benchmark)
+  ./scripts/verify.sh --skip-lint   # Omite cargo fmt y cargo clippy
+  ./scripts/verify.sh --clean-cache # Limpia la caché de Varn antes de cada cuadrante
   ```
+
+> [!NOTE]
+> Los flags son distintos por shell: `verify.ps1` usa mayúscula inicial (`-Fast`, `-Quick`, `-SkipLint`, `-CleanCache`); `verify.sh` usa minúsculas (`--fast`, `--skip-lint`, `--clean-cache`) y no tiene equivalente de `-Quick`.
 
 ---
 
@@ -95,7 +106,7 @@ Para simplificar la validación y asegurar cero roturas antes de hacer commit/pu
 El repositorio cuenta con dos flujos automatizados en `.github/workflows/`:
 
 1. **`ci.yml`**: Se ejecuta en cada Push y Pull Request sobre ramas principales. Valida formato (`rustfmt`), linter (`clippy`), límites de tamaño de archivo (regla anti-god files) y ejecuta la matriz multi-SO en Linux, Windows y macOS.
-2. **`release.yml`**: Se dispara con tags de versión (`v*`) o manualmente (`workflow_dispatch`). Compila binarios optimizados de producción para todas las arquitecturas (`x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`), genera sumas de verificación criptográficas `SHA256SUMS.txt` y publica los artefactos automáticamente en GitHub Releases.
+2. **`release.yml`**: Se dispara con tags de versión (`v*`) o manualmente (`workflow_dispatch`). Compila binarios optimizados de producción para todas las arquitecturas (`x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`), genera sumas de verificación criptográficas `SHA256SUMS.txt` y publica los artefactos automáticamente en GitHub Releases. Fuente de targets: `.github/workflows/ci.yml` (job `release`); no existe `release.yml` separado.
 
 ---
 

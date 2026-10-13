@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: PARCIAL — `for-of` especializado vigente (`lower_for_of` en `crates/varn-emit/src/body/stmt_for_of.rs:8`, `tests/180-for-of-collections.vn`); `interface Iterable/Iterator` sin evidencia en `std/` ni crates.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0017: Protocolo de iteración estático (`iter()` + `next(): Option<T>`)
 
 ## Estado
@@ -38,3 +42,4 @@ después de ese paso.
 - `hasNext()` + `next(): T`: dos llamadas por elemento y lookahead obligado en
   generadores.
 - `next(): T?` con `null` como fin: ambiguo para `Iterator<int?>`.
+

@@ -1,93 +1,128 @@
-# Manual de Referencia de la CLI (`vn`)
+# CLI Reference (`vn`)
 
-Este documento constituye la guía oficial de referencia para el ejecutable CLI unificado **`vn`** del lenguaje Varn.
+Fuente: `crates/varn-cli/src/cli.rs:16-299`. Código manda.
 
----
+## Comandos (`Commands`, cli.rs:16-55)
 
-## Tabla de Contenidos
+Run / Check / Eval / Repl / Bench / Debug / Build / Test / Fmt / Pkg / Init / Doctor / Cache / Lsp / Completions / Dap / StdBundle / GenContractTables.
 
-- [1. Visión General](#1-visión-general)
-- [2. Lista Global de Subcomandos](#2-lista-global-de-subcomandos)
-- [3. Detalle de Comandos](#3-detalle-de-comandos)
-  - [`vn run`](#vn-run)
-  - [`vn check`](#vn-check)
-  - [`vn build`](#vn-build)
-  - [`vn bench`](#vn-bench)
-  - [`vn debug`](#vn-debug)
-  - [`vn eval`](#vn-eval)
-  - [`vn repl`](#vn-repl)
-  - [`vn pkg`](#vn-pkg)
-  - [`vn init`](#vn-init)
-  - [`vn doctor`](#vn-doctor)
-  - [`vn cache`](#vn-cache)
-  - [`vn lsp`](#vn-lsp)
-  - [`vn completions`](#vn-completions)
-- [4. Variables de Entorno](#4-variables-de-entorno)
+## Flags reales
 
----
+### Run (`RunArgs`, cli.rs:58-96)
 
-## 1. Visión General
+`vn run [file] [-e CODE] [-- ARGS] [-v] [--trace] [--allow-*] [--sandbox] [--compare-tiers]`
 
-El ejecutable `vn` es la herramienta unificada que gestiona la compilación, comprobación de tipos, ejecución, pruebas de rendimiento y servidor de lenguaje LSP para proyectos escritos en Varn.
+- `file: Option<String>` (posicional)
+- `-e, --eval CODE`
+- `script_args` tras `--`
+- `-v, --verbose`
+- `--trace`
+- `-A, --allow-all`
+- `--allow-read [PATHS]` (=`*` si sin valor)
+- `--allow-write [PATHS]` (idem)
+- `--allow-net [HOSTS]` (idem)
+- `--allow-env [VARS]` (idem)
+- `--allow-ffi`
+- `--sandbox`
+- `--compare-tiers`
 
-Sintaxis general:
-```bash
-vn [SUBCOMANDO] [OPCIONES] [ARCHIVOS...]
-```
+### Check (`CheckArgs`, cli.rs:116-121)
 
----
+`vn check <file> [-v]` — `file: String`, `-v/--verbose`.
 
-## 2. Lista Global de Subcomandos
+### Eval (`EvalArgs`, cli.rs:124-129)
 
-| Subcomando | Descripción |
-|---|---|
-| `run` | Compila (si es necesario) y ejecuta un archivo `.vn` o paquete `.vnc`. |
-| `check` | Ejecuta el comprobador semántico y de tipos sin generar bytecode ni ejecutar. |
-| `build` | Compila un script `.vn` a un artefacto binario de bytecode portable `.vnc`. |
-| `bench` | Ejecuta un programa reportando métricas de compilación, parsing, GC y ejecución VM. |
-| `debug` | Inspecciona las representaciones intermedias (`ast`, `check`, `hir`, `ssa`, `bytecode`). |
-| `eval` | Evalúa una cadena de código Varn directamente desde la línea de comandos. |
-| `repl` | Inicia una sesión de lectura, evaluación e impresión interactiva (REPL). |
-| `pkg` | Gestiona las dependencias del proyecto (`add`, `remove`, `install`, `update`). |
-| `init` | Inicializa un nuevo proyecto estructurado con `varn.json`. |
-| `doctor` | Realiza un diagnóstico del entorno, binarios y procedencia de la stdlib. |
-| `cache` | Gestiona y limpia la caché local de bytecode en `.vn/cache/`. |
-| `lsp` | Inicia el servidor de lenguaje Language Server Protocol (stdio). |
-| `completions` | Genera scripts de autocompletado para Bash, Zsh, PowerShell y Fish. |
+`vn eval <code> [-v]` — `code: String`, `-v/--verbose`.
 
----
+### Repl (`ReplArgs`, cli.rs:132-135)
 
-## 3. Detalle de Comandos
+`vn repl [--debug-bytecode]`.
 
-### `vn run`
-Sintaxis: `vn run <archivo.vn | archivo.vnc> [-- arg1 arg2...]`
-- Ejecuta el programa. Si se le pasa un `.vn`, ejecuta todo el pipeline. Si se le pasa un `.vnc`, omitirá parsing y type-checking.
+### Bench (`BenchArgs`, cli.rs:138-158)
 
-### `vn check`
-Sintaxis: `vn check <archivo.vn> [-v]`
-- Valida la corrección de tipos y llena la SemanticDB. Flag `-v` muestra advertencias detalladas.
+`vn bench [file] [-e CODE] [--runs N] [--show-output] [-v] [--all-rows] [--min-clif-coverage PCT]`
 
-### `vn build`
-Sintaxis: `vn build <archivo.vn> [-o salida.vnc]`
-- Empaqueta el programa en un artefacto compilado `.vnc`.
+- `file` opcional, `-e/--eval CODE`
+- `--runs N` default `10`
+- `--show-output`, `-v/--verbose`, `--all-rows`
+- `--min-clif-coverage PCT: Option<f64>`
 
-### `vn bench`
-Sintaxis: `vn bench <archivo.vn> [--runs N] [-v]`
-- Perfila la ejecución reportando desglose de tiempos de parser, checker, VM, GC y JIT.
+### Debug (`DebugArgs`, cli.rs:99-113)
 
-### `vn debug`
-Sintaxis: `vn debug -p <fase> <archivo.vn>`
-- Permite volcar las fases internas. Ver [CLI_INSPECT.md](CLI_INSPECT.md).
+`vn debug [file] [-e CODE] [-p PHASE] [--fn NAME] [--list-phases]`
 
-### `vn pkg`
-- `vn pkg add <alias> <origen>`: Añade una dependencia.
-- `vn pkg install`: Instala las dependencias del `varn.json`.
+- `file` opcional, `-e/--eval CODE`
+- `-p, --phase PHASE` default `all`
+- `--fn NAME` (`fn_filter`)
+- `--list-phases`
 
----
+### Build (`BuildArgs`, cli.rs:192-206)
 
-## 4. Variables de Entorno
+`vn build <file> [-o PATH] [-t TARGET] [--native] [-v]`
 
-| Variable | Descripción |
-|---|---|
-| `VARN_STD` | Controla la procedencia de la stdlib (`dev-checkout` o `@embedded`). |
-| `VARN_NO_JIT` | Fuerza la ejecución exclusiva en modo intérprete ignorando Cranelift JIT. |
+- `file: String`
+- `-o, --output PATH`
+- `-t, --target TARGET` default `bytecode`
+- `--native`, `-v/--verbose`
+
+### Test (`TestArgs`, cli.rs:253-267)
+
+`vn test [path] [--filter X] [-j N] [--fail-fast] [-v]`
+
+- `path: Option<String>`
+- `-f/--filter`, `-j/--jobs: Option<usize>`, `--fail-fast`, `-v/--verbose`
+
+### Fmt (`FmtArgs`, cli.rs:270-278)
+
+`vn fmt [path] [--check] [-v]` — `path` opcional, `--check`, `-v/--verbose`.
+
+### Pkg (`PkgCommands`, cli.rs:221-235; `AddArgs` 209-213, `RemoveArgs` 216-218)
+
+- `pkg add <alias> <origin>`
+- `pkg remove <alias>`
+- `pkg install` / `update` / `tree` / `doctor` / `clean`
+
+### Init (`InitArgs`, cli.rs:161-166)
+
+`vn init [dir] [--name X]` — `dir: Option<String>`, `--name: Option<String>`.
+
+### Doctor (cli.rs:41)
+
+`vn doctor`. Sin args.
+
+### Cache (`CacheCommands`, cli.rs:238-240)
+
+- `cache clean`. Único subcomando.
+
+### Lsp (`LspArgs`, cli.rs:174-189)
+
+`vn lsp [-p PORT] [--tcp HOST:PORT] [--stdio]`
+
+- `-p/--port: Option<u16>`, `--tcp: Option<String>`, `--stdio: bool`
+
+### Completions (`CompletionsArgs` + `Shell`, cli.rs:169-171,242-250)
+
+`vn completions <shell>` — `Bash | Zsh | Fish | PowerShell | Elvish`.
+
+### Dap (cli.rs:50)
+
+`vn dap`. Sin args.
+
+### StdBundle (`StdBundleArgs`, cli.rs:281-287)
+
+`vn std-bundle [--std-dir D] [--out F]` — defaults `std` / `dist/std.vnb`.
+
+### GenContractTables (`GenContractTablesArgs`, cli.rs:290-299)
+
+`vn gen-contract-tables [--crate-dir D] [--out F] [--check]` — defaults `""` / `""`, `--check: bool`.
+
+## Verificación
+
+`scripts/verify.ps1` (params verify.ps1:34-39):
+
+- `-Quick`: perfil `quick`, omite lint+bench, solo cuadrante 1 (dev-checkout+JIT). No sustituye matriz completa.
+- `-Fast`: omite benchmark.
+- `-SkipLint`: omite `cargo fmt --check` + `clippy`.
+- `-CleanCache`: `vn cache clean` antes de cada cuadrante.
+
+`scripts/verify.sh` (verify.sh:14-29): `--fast|-f`, `--skip-lint`, `--clean-cache`. Sin modo `-Quick`.

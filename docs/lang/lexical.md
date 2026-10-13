@@ -1,3 +1,5 @@
+> Precisión parcial. Verificado contra tests/... Código manda.
+
 # Varn Language — Lexical Syntax
 
 > Fuentes: `tests/01-arithmetic.vn`, `tests/02-boolean.vn`, `tests/03-strings.vn`, `tests/04-templates.vn`, `tests/34-char-type.vn`, `tests/35-decimal-bigint.vn`, `tests/89-raw-strings-and-with-expressions.vn`.
@@ -22,16 +24,20 @@ const [head, _] = [1, 2]
 
 ## 2. Palabras Reservadas
 
+Lista exacta del lexer (`crates/varn-lexer/src/keywords.rs:12-78`):
+
 ```
-let  const  var  function  async  await  yield
-class  interface  enum  extension  record  type  abstract  override
-if  else  match  switch  for  while  do  break  continue  return
-try  catch  finally  throw  new  this  super  instanceof  typeof  is  in  of
-true  false  null
-import  export  from
-using  isIsolate  dynamic
-with
+let  const  var  function  class  struct  interface  type  enum
+namespace  module  extension  on  if  else  switch  case  default
+while  for  do  break  continue  return  throw  try  catch  finally
+using  with  import  export  from  as  async  await  yield
+new  this  super  delete  typeof  instanceof  in  of  void  is
+true  false  null  public  private  protected  static  abstract
+override  readonly  declare  native  extends  implements
+get  set  constructor  destructor  match
 ```
+
+NO son keywords: `record`, `spawn`, `parallel`, `dynamic`, `isIsolate`.
 
 ---
 
@@ -66,7 +72,9 @@ assert("float add",  0.1 + 0.2 > 0.29 && 0.1 + 0.2 < 0.31)  // tests/01-arithmet
 assert("float div",  1.0 / 3.0 > 0.333 && 1.0 / 3.0 < 0.334)  // tests/01-arithmetic.vn:9
 ```
 
-Require punto decimal. La división `int / int` produce `float`.
+Requiere punto decimal. `int / int` es `int` truncado
+(`tests/120-int-division.vn:16`); la división `float` usa operandos `float`
+(`tests/120-int-division.vn:13`).
 
 ### 4.3 Literales `decimal`
 
@@ -171,7 +179,7 @@ assert("triple neq null", null !== 0)
 | `+` | Suma / concatenación de strings |
 | `-` | Resta / negación unaria |
 | `*` | Multiplicación |
-| `/` | División (produce `float` cuando operandos son `int`) |
+| `/` | División: `int / int` es `int` truncado hacia cero (`tests/120-int-division.vn:16`); `float / float` es `float` |
 | `%` | Módulo |
 | `**` | Potencia |
 
@@ -235,9 +243,10 @@ const ext    = { ...base, z: 3 }               // tests/06-destructuring.vn:33
 
 ### 5.11 Instanceof y typeof
 ```varn
-assert("instanceof PoliceDog", pd instanceof PoliceDog)  // tests/12-classes.vn:55
-assert("processTypeof string", typeof "abc" === "str")   // tests/79-control-flow-narrowing.vn:47
+assert("instanceof PoliceDog", pd instanceof PoliceDog)  // tests/12-classes.vn
+assert("processTypeof string", typeof "abc" === "str")   // tests/79-control-flow-narrowing.vn
 ```
+// `typeof` verificado: `"str"`, `"int"`, `"float"`, `"class"` (ver `identifiers.md` §6).
 
 ### 5.12 Type Assertion (`is`)
 ```varn
@@ -251,6 +260,8 @@ function describeChar(c: char): str {
 
 ## 6. Secuencias de Escape en cadenas `str`
 
+> NO-VERIFICADO como tabla: ningún test fija el conjunto exacto.
+
 | Secuencia | Carácter |
 |-----------|---------|
 | `\n` | Nueva línea |
@@ -261,3 +272,4 @@ function describeChar(c: char): str {
 | `\'` | Comilla simple |
 
 En **Raw Strings** (`"""…"""`), ninguna de estas secuencias se procesa; el texto es literal.
+

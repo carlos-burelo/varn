@@ -1,3 +1,8 @@
+> Estado verificado 2026-10-13: VIGENTE como snapshot 2026-10-09 (método Ley 12, structs citadas verificables en `crates/varn-sem`, `varn-modules`, `varn-resolver`).
+> Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # AUDIT MÓDULOS VARN — exports, imports, capas, capabilities, host, runtime, ABI, typechecking, resolvers, binders
 
 Fecha: 2026-10-09. Método: solo código + ejecución (Ley 12). Ningún `.md` es evidencia.
@@ -528,3 +533,4 @@ Fases (cada una verde + commit):
 - F5: `ModuleSlot`: emitir `LoadModuleSlot/StoreModuleSlot` verificados contra `ExportMap` + `interface_hash` en caché; borrar `LoadModule+GetProperty Dynamic` para estáticos y `loader.load` fallback sin hash.
 
 Verificación F4/F5: t4 `true` con `TypeTest` estático, suite 4 cuadrantes, bench campo/método cross-module == local, caché limpio `VARN_CACHE_DIR=<tmp>`.
+

@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `TcpListener`/`TcpStream` en `std/net/socket.vn:134`, `runtime:net` en `crates/varn-builtins/src/modules/runtime/net/`; `tests/111-network-apis-overhaul.vn`.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0007: Modernización y Perfeccionamiento de las APIs de Red (`std:net`, `std:http`, `std:ws`)
 
 ## Estado
@@ -41,3 +45,4 @@ Además, en el modelo de ejecución de Varn, las operaciones asíncronas sobre `
 - **APIs de Grado de Producción**: La superficie de red de Varn ahora cubre desde transporte de bajo nivel (`TcpStream`) hasta capas de aplicación modernas (`http`, `HttpServer`, `WebSocket`).
 - **Seguridad de Tipos Estática**: Integración completa con el sistema de tipos estático y sin aliases.
 - **Suite de Pruebas Robusta**: Se añadió la suite `tests/111-network-apis-overhaul.vn`, alcanzando 111 suites pasando al 100% (2408+ pruebas).
+

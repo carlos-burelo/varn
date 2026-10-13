@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `BackendTy::Bytes` en `crates/varn-tir/src/ty.rs:90`, `TypeDesc::Bytes`, `RuntimeKind::Bytes`; `tests/112-canonical-bytes-and-streams.vn`.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0008: Tipo Canónico de Primera Clase `Bytes` y Streaming I/O
 
 ## Estado
@@ -57,3 +61,4 @@ Bajo las reglas arquitectónicas del lenguaje (Regla 1: Prohibición absoluta de
 - **Rendimiento**: Cero conversiones innecesarias de cadenas en el transporte de paquetes.
 - **Coherencia Arquitectónica**: Varn evita por completo los 15 tipos redundantes de JS (`Buffer`, `ArrayBuffer`, `SharedArrayBuffer`, `DataView`, `Uint8Array`, etc.); `Bytes` es la única abstracción canónica.
 - **Compatibilidad y Verificación**: 112 suites de pruebas (2408+ tests) pasando al 100% en verde con `vn test` y `cargo test`.
+

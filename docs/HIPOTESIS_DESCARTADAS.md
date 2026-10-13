@@ -1,3 +1,8 @@
+> Estado verificado 2026-10-13: VIGENTE como registro — cada entrada murió por medición; reabrir solo con dato nuevo (regla del propio doc).
+> Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # Hipótesis descartadas
 
 Cada entrada murió por una **medición**, no por un razonamiento. Están aquí para
@@ -305,3 +310,4 @@ cero o un `JSON.parse` inválido terminaban el proceso. Sobrevivió porque
 `tests/11-errors.vn` **evitaba** dividir por cero y lanzaba a mano.
 
 Verifica ejecutando, no leyendo.
+

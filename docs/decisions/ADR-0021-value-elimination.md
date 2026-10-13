@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `crates/varn-vm/src/value.rs:1` re-exporta solo `VmValue`; `SendValue` en `varn-types`; `tests/157-task-value-handles.vn` regresión verde.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0021: Eliminación de `Value`
 
 ## Estado
@@ -58,3 +62,4 @@ Accesores tipados que sustituyen a `extract`: `as_char`, `as_bigint`,
   resolvía al valor por defecto del trait (`null`) en vez del método real. La
   implementación de `Heap` reenvía ahora. Deuda abierta: `Heap` como
   `NativeCtx` a medias es la causa raíz de esa trampa.
+

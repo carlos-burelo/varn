@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `num_bigint::BigInt` + `bigdecimal::BigDecimal` en `crates/varn-core/src/numeric_big.rs:2-3`, división 34 dígitos half-even; `tests/35-decimal-bigint.vn`, `tests/124-bigint-arbitrary.vn`.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0016: `bigint` y `decimal` de precisión arbitraria
 
 ## Estado
@@ -32,3 +36,4 @@ como dominios de precisión arbitraria. Hoy `bigint` es `i128` (un literal de
   representación por dominio.
 - Coste: `bigint`/`decimal` siempre en heap (ya lo eran). `int` no se ve
   afectado: sigue siendo i64 en registro.
+

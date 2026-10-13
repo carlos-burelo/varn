@@ -1,3 +1,6 @@
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
+
 # Varn Runtime Performance Investigation
 
 Investigation of eight reported performance/correctness anomalies. All numbers
@@ -750,3 +753,4 @@ tests/main.vn 670/670.
 6. **Decide 48-bit int semantics** (trap on overflow or widen) — correctness.
 7. **Benchmark with profiling off; isolate variables; defeat DCE; stay in int
    range** — so future numbers mean something. (Inv8)
+

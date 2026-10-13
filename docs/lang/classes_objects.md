@@ -1,3 +1,5 @@
+> Precisión parcial. Verificado contra tests/... Código manda.
+
 # Varn Language — Clases y Objetos
 
 > Fuentes: `tests/11-errors.vn`, `tests/12-classes.vn`, `tests/13-interfaces.vn`, `tests/23-objects.vn`, `tests/24-record.vn`, `tests/25-extensions.vn`, `tests/27-decorators.vn`, `tests/28-extensions-comprehensive.vn`, `tests/36-advanced-generics.vn`, `tests/87-primary-constructors-nullish-assign.vn`, `tests/89-raw-strings-and-with-expressions.vn`.
@@ -194,7 +196,7 @@ assert("str shout", "hello".shout() === "hello!")
 assert("str times", "ab".times(3) === "ababab")
 ```
 
-Extensiones con `get`/`set`:
+Extensiones con `get`/`set` (NO-VERIFICADO: sin cita en `tests/*.vn`):
 
 ```varn
 extension SlotAccessor on Slot {
@@ -431,3 +433,4 @@ class Builder {                       // tests/23-objects.vn:2
 const result = new Builder().add("hello").add("from").add("builder").build()
 assert("builder pattern", result === "hello from builder")
 ```
+

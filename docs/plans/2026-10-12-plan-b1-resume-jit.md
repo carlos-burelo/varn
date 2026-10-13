@@ -1,4 +1,6 @@
 # Plan B1: reanudar async/generadores en JIT (2026-10-12)
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
 
 Sesión limpia dedicada. Al terminar se regresa a
 `2026-10-10-propagacion-de-tipos.md` (2.7 queda en primera fase).

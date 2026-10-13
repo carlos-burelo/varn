@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `Frozen`/`FrozenFrame` (`crates/varn-vm/src/exec/scheduler/suspend.rs:11-23`), `suspend_live` (`:62`), `TaskCell` (`task.rs:127`); `tests/154,157-*.vn`.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0019: Tareas como objetos de estado compactos (diseño objetivo)
 
 ## Estado
@@ -101,3 +105,4 @@ ante cualquier inconsistencia, retención completa (fallback seguro).
   El GC traza el stash con forwarding en menor y mayor.
 - Sin número (bench 100k sleeps, GC vs parqueadas) la ganancia cuantitativa
   sigue pendiente de medición.
+

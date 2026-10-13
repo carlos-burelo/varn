@@ -1,3 +1,7 @@
+> Estado verificado 2026-10-13: VIGENTE — `NumConv` en `crates/varn-core/src/numeric_conv.rs:5`, `numeric_big.rs`, `literal_fits_type`; `tests/119,120,121,122,123-*.vn`.
+>
+> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+
 # ADR 0015: Núcleo semántico de NEW_SPEC — números, conversiones y errores
 
 ## Estado
@@ -33,3 +37,4 @@ crashes y errores silenciosos (ver `docs/plans/2026-09-23-new-spec-roadmap.md` �
   migran en el mismo commit que cambia la regla.
 - Ganancia (Ley 10): corrección (crashes y silencios eliminados), una sola
   representación por tipo y menos código de backend.
+

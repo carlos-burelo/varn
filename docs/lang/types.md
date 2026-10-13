@@ -1,3 +1,5 @@
+> Precisión parcial. Verificado contra tests/... Código manda.
+
 # Varn Language — Sistema de Tipos
 
 > Fuentes: `tests/08-null-safety.vn`, `tests/12-classes.vn`, `tests/13-interfaces.vn`, `tests/14-generics.vn`, `tests/15-unions.vn`, `tests/16-enums.vn`, `tests/24-record.vn`, `tests/26-numeric-coercion.vn`, `tests/30-nullable-types.vn`, `tests/34-char-type.vn`, `tests/35-decimal-bigint.vn`, `tests/36-advanced-generics.vn`, `tests/41-advanced-enums.vn`, `tests/69-tuples-records.vn`, `tests/79-control-flow-narrowing.vn`, `tests/87-primary-constructors-nullish-assign.vn`.
@@ -74,9 +76,10 @@ let r2 = #{ name: "Varn", version: 1 }
 assert("record eq true", r1 == r2)       // igualdad estructural
 ```
 
-### 2.4 Mapas (`Map<K, V>` y `{ [key: K]: V }`)
+### 2.4 Mapas (`Map<K, V>`)
 
-Contenedores asociativos dinámicos mutables con acceso indexado y orientación a objetos:
+Contenedores asociativos dinámicos mutables (`tests/17-map-set.vn`,
+`tests/24-record.vn:1`):
 
 ```varn
 // Definición con tipo explícito Map<K, V> o firma de índice { [key: K]: V }
@@ -91,15 +94,6 @@ assert("map get charlie", scores["charlie"] === 72)
 
 scores["dave"] = 60               // mutación indexada
 assert("map set dave",    scores["dave"] === 60)
-
-// Sintaxis con clase Map y métodos de colección
-const map = new Map<int>()        // tests/17-map-set.vn:2
-map.set("a", 1)
-assert("map size", map.size === 3)
-assert("map get",  map.get("b") === 2)
-assert("map has",  map.has("c"))
-map.delete("b")
-map.clear()
 ```
 
 > [!NOTE]
@@ -197,14 +191,8 @@ assert("enum rawValue", Direction.East.rawValue === 2)
 ### 5.2 Enums con valores explícitos
 
 ```varn
-enum HttpMethod { GET = 0, POST = 1, PUT = 2, DELETE = 3 }
+enum HttpMethod { GET = 0, POST = 1, PUT = 2, DELETE = 3 }   // tests/16-enums.vn
 assert("enum explicit", HttpMethod.POST.rawValue === 1)
-
-enum Status {
-    Pending,
-    Success = 10,
-    Error        // rawValue = 11 (auto-increments)
-}
 ```
 
 ### 5.3 Enums con payload (ADTs)
@@ -270,16 +258,7 @@ enum Result<T, E> {
 }
 const resOk = Result.Ok<int, str>(42)
 ```
-
-### 5.7 Enums que implementan interfaces
-
-```varn
-enum CustomDisplay implements Display {
-    A, B;
-    toString(): str { return "CustomDisplay." + this.name }
-}
-assert("interface method", CustomDisplay.A.toString() === "CustomDisplay.A")
-```
+// `tests/41-advanced-enums.vn`. Enums que implementan interfaces: NO-VERIFICADO.
 
 ---
 
@@ -289,29 +268,9 @@ assert("interface method", CustomDisplay.A.toString() === "CustomDisplay.A")
 interface Printable {            // tests/13-interfaces.vn:2
     toString(): str
 }
-interface Serializable {
-    serialize(): str
-}
-interface Options {
-    verbose?: bool        // campo opcional
-    maxRetries?: int
-    tag: str
-}
 ```
-
-Implementación múltiple:
-
-```varn
-class Config implements Printable, Serializable {
-    key: str
-    value: int
-    constructor(k: str, v: int) { this.key = k; this.value = v }
-    toString(): str { return `${this.key}=${this.value}` }
-    serialize(): str { return `{"${this.key}":${this.value}}` }
-}
-```
-
-Varn usa **tipado estructural**: si un tipo satisface la interfaz, puede usarse donde se espera la interfaz.
+// Implementación múltiple, campos opcionales y resto de interfaces:
+// solo lo citado aquí es contrato; ver `tests/13-interfaces.vn`.
 
 ---
 
@@ -653,3 +612,4 @@ let numbers = [10, 20, 30, 40, 50, 60]
 let slice = numbers[1..4]     // [20, 30, 40]
 let slice2 = numbers[1..=3]   // [20, 30, 40]
 ```
+

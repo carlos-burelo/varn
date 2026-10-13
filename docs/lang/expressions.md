@@ -1,3 +1,5 @@
+> Precisión parcial. Verificado contra tests/... Código manda.
+
 # Varn Language — Expresiones
 
 > Fuentes: `tests/01-arithmetic.vn`, `tests/04-templates.vn`, `tests/05-arrays.vn`, `tests/06-destructuring.vn`, `tests/07-closures.vn`, `tests/08-null-safety.vn`, `tests/10-match.vn`, `tests/14-generics.vn`, `tests/18-ranges.vn`, `tests/19-pipeline.vn`, `tests/29-option-destructuring.vn`, `tests/37-complex-closures.vn`, `tests/38-advanced-higher-order.vn`, `tests/41-advanced-enums.vn`, `tests/69-tuples-records.vn`, `tests/86-tagged-templates.vn`, `tests/87-primary-constructors-nullish-assign.vn`, `tests/88-range-indexing.vn`, `tests/89-raw-strings-and-with-expressions.vn`.
@@ -37,7 +39,8 @@ const explicit: str = "world"
 
 ## 3. Operadores y Precedencia
 
-De mayor a menor precedencia:
+> NO-VERIFICADO: la tabla completa no está fijada por ningún test. Solo esto:
+> `2 + 3 * 4 === 14`, `(2 + 3) * 4 === 20` (`tests/01-arithmetic.vn:12`).
 
 | Nivel | Operadores |
 |-------|-----------|
@@ -208,13 +211,13 @@ assert("match 2",     describeNum(2) === "two or three")
 assert("match other", describeNum(99) === "other")
 ```
 
-Match sobre enums con payload:
+Match sobre enums con payload (`tests/41-advanced-enums.vn`):
 
 ```varn
 enum R { A(int), B(str) }
 
 let x = R.A(42)
-let v = match x {               // tests/29-option-destructuring.vn:5
+let v = match x {
     A(n) => n,
     B(_) => -1,
 }
@@ -312,11 +315,8 @@ let version = 1
 let output = customTag`Language: ${name}, Version: ${version}!`
 assert("tagged template", output === "Language: [Varn], Version: [1]!")   // tests/86-tagged-templates.vn:37
 
-// Tagged template con método de clase
-let formatted = fmt.format`Player ${user} scored ${score} points`
-
-// SQL seguro con tagged templates
-let rows = db.sql`SELECT * FROM users WHERE role = ${targetRole} AND active = ${isActive}`
+// SQL parametrizado con tagged templates
+let rows = db.sql`SELECT * FROM users WHERE role = ${targetRole} AND active = ${isActive}`   // tests/86-tagged-templates.vn:56
 ```
 
 ---
@@ -325,13 +325,10 @@ let rows = db.sql`SELECT * FROM users WHERE role = ${targetRole} AND active = ${
 
 ```varn
 assert("instanceof Dog",  pd instanceof Dog)           // tests/12-classes.vn:56
-assert("instanceof Error", ve instanceof Error)
+assert("instanceof Error", ve instanceof Error)        // tests/11-errors.vn:85
 
-// typeof devuelve el nombre canónico del tipo como str
-assert("typeof str",  typeof "abc" === "str")          // tests/79-control-flow-narrowing.vn:39
-assert("typeof int",  typeof 42 === "int")
-assert("typeof bool", typeof true === "bool")
-assert("typeof class", typeof WebSocketClient === "class")
+// typeof verificado: "str", "int" (tests/79-control-flow-narrowing.vn:32-34),
+// "float" (tests/122-numeric-conversions.vn:47), "class" (tests/111-network-apis-overhaul.vn:77)
 ```
 
 ---
@@ -340,12 +337,11 @@ assert("typeof class", typeof WebSocketClient === "class")
 
 ```varn
 function describeChar(c: char): str {
-    if (c is char) return "yes"   // tests/34-char-type.vn:38
+    if (c is char) return "yes"   // tests/34-char-type.vn:7
     return "no"
 }
-function isDecimalType(v: decimal): bool { return v is decimal }
-function isBigInt(v: bigint): bool { return v is bigint }
 ```
+// Otros usos de `is`: NO-VERIFICADOS.
 
 ---
 
@@ -362,11 +358,11 @@ assertEqual(status, 200)
 ## 19. `new` — Creación de Instancias
 
 ```varn
-const t = new Temperature(100.0)
-const stk = new GenericStack<int>()
-const list = new LinkedList<int>()
-const either = Either.left<str, int>("error")
-const db = new Database(":memory:")
+const map = new Map<int>()              // tests/17-map-set.vn
+const intBox = new Box<int>(10)         // tests/14-generics.vn
+const b = new Box(1)                    // deduce Box<int> (tests/190-generic-instantiation-from-new.vn)
+const u1 = new User(1, "Alice", "admin")   // tests/87-primary-constructors-nullish-assign.vn
+const db = new Database(":memory:")     // tests/85-stdlib-sqlite-ws-archive.vn
 ```
 
 ---
@@ -386,3 +382,4 @@ const spread = [...[1, 2], ...[3, 4]]          // array spread
 const ext    = { ...base, z: 3 }               // object spread
 function rolesDeco(...r: str[]) { /* rest params */ }   // rest parameters
 ```
+

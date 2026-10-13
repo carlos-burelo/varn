@@ -1,149 +1,79 @@
-# Guía de Instalación y Configuración de Varn
+# Instalación Varn
 
-Este documento proporciona las instrucciones completas para instalar binarios oficiales precompilados o compilar y configurar **Varn** en Windows, Linux y macOS.
+Código manda. Fuentes: `Cargo.toml:112-166`, `rust-toolchain.toml:9`, `crates/varn-cli/src/cli.rs`, `.github/workflows/ci.yml:90-110,194-196`.
 
----
+## Requisitos
 
-## Tabla de Contenidos
-
-- [Instalación Rápida con Binarios Oficiales](#instalación-rápida-con-binarios-oficiales)
-- [Compilación desde el Código Fuente](#compilación-desde-el-código-fuente)
-  - [Requisitos del Sistema](#requisitos-del-sistema)
-  - [Build de Producción (`release`)](#build-de-producción-release)
-  - [Build de Desarrollo (`dev`)](#build-de-desarrollo-dev)
-- [Configuración de Variables de Entorno (`PATH`)](#configuración-de-variables-de-entorno-path)
-  - [Windows (PowerShell)](#windows-powershell)
-  - [Linux / macOS (Bash / Zsh)](#linux--macos-bash--zsh)
-- [Verificación de la Instalación](#verificación-de-la-instalación)
-- [Variables de Entorno del Runtime](#variables-de-entorno-del-runtime)
-
----
-
-## Instalación Rápida con Binarios Oficiales
-
-Descarga el paquete correspondiente a tu arquitectura y sistema operativo desde la [sección de Releases](https://github.com/carlos-burelo/varn/releases/latest):
-
-| Plataforma / Arquitectura | Target Triple | Enlace de Descarga (v0.1.0) |
-|---|---|---|
-| **Linux x86_64** (glibc) | `x86_64-unknown-linux-gnu` | [`vn-v0.1.0-x86_64-unknown-linux-gnu.tar.gz`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-unknown-linux-gnu.tar.gz) |
-| **Linux ARM64** (glibc) | `aarch64-unknown-linux-gnu` | [`vn-v0.1.0-aarch64-unknown-linux-gnu.tar.gz`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-aarch64-unknown-linux-gnu.tar.gz) |
-| **macOS Apple Silicon** | `aarch64-apple-darwin` | [`vn-v0.1.0-aarch64-apple-darwin.tar.gz`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-aarch64-apple-darwin.tar.gz) |
-| **macOS Intel** | `x86_64-apple-darwin` | [`vn-v0.1.0-x86_64-apple-darwin.tar.gz`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-apple-darwin.tar.gz) |
-| **Windows x86_64** | `x86_64-pc-windows-msvc` | [`vn-v0.1.0-x86_64-pc-windows-msvc.zip`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-pc-windows-msvc.zip) |
-
-Checksums criptográficos: [`SHA256SUMS.txt`](https://github.com/carlos-burelo/varn/releases/download/v0.1.0/SHA256SUMS.txt)
-
-### Linux & macOS
+- Toolchain pineada: `channel = "1.97.1"` (`rust-toolchain.toml:9`). Usar rustup, pin se aplica solo.
+- Edición 2024 (`Cargo.toml:61`).
+- Linker: `cc`/`gcc`/`clang` en Unix; MSVC o `rust-lld` en Windows.
 
 ```bash
-curl -LO https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
-tar -xzf vn-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
-sudo mv vn /usr/local/bin/
-vn --version
-```
-
-### Windows (PowerShell)
-
-```powershell
-Invoke-WebRequest -Uri "https://github.com/carlos-burelo/varn/releases/download/v0.1.0/vn-v0.1.0-x86_64-pc-windows-msvc.zip" -OutFile "vn.zip"
-Expand-Archive -Path "vn.zip" -DestinationPath "$HOME\bin"
-$env:Path += ";$HOME\bin"
-vn --version
-```
-
----
-
-## Compilación desde el Código Fuente
-
-### Requisitos del Sistema
-
-- **Sistema Operativo**: Windows 10/11 (x86_64), Linux (x86_64 / AArch64), macOS (Apple Silicon / x86_64).
-- **Toolchain de Rust**: Rust Stable (1.75 o superior) instalado a través de [`rustup`](https://rustup.rs).
-- **Linker**: `cc` / `gcc` / `clang` en Unix; `MSVC` o `rust-lld.exe` en Windows.
-
-```bash
-git clone https://github.com/carlos-burelo/varn.git
+git clone <repo-url>
 cd varn-lang
 ```
 
-### Build de Producción (`release`)
+## Perfiles (`Cargo.toml:112-166`)
 
-Para compilar el binario `vn` optimizado con ThinLTO y Cranelift:
+| Perfil | Flags | Uso |
+|---|---|---|
+| `quick` | hereda release, `opt-level=3`, `lto=false`, `codegen-units=16` (`Cargo.toml:136-141`) | Iteración diaria (Ley 13 AGENTS.md) |
+| `release` | `opt-level=3`, `lto="thin"`, `codegen-units=1`, `panic="abort"` (`Cargo.toml:112-116`) | Puerta validación, CI test-matrix (`ci.yml:91`) |
+| `dev-it` | hereda quick, `opt-level=0` (`Cargo.toml:150-152`) | Edición LSP/DAP, nunca matriz ni bench |
+| `dist` | hereda release, `lto="fat"`, `strip="symbols"` (`Cargo.toml:157-163`) | Solo CI release (`ci.yml:196`) |
+
+## Build
+
+Iteración:
+
+```bash
+cargo build --profile quick --bin vn
+```
+
+Puerta / CI:
 
 ```bash
 cargo build --release --bin vn
 ```
 
-El ejecutable resultante se ubicará en `target/release/vn` (o `target/release/vn.exe` en Windows).
-
-### Build de Desarrollo (`dev`)
-
-Para iteraciones rápidas durante el desarrollo del compilador o la VM:
+Dist (solo CI, no local salvo empaquetar):
 
 ```bash
-cargo build --bin vn
+cargo build --profile dist --bin vn --target <triple>
 ```
 
----
+Binario: `target/<perfil>/vn` (+`.exe` Windows). CI cubre 5 targets (`ci.yml:135-156`): `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`.
 
-## Configuración de Variables de Entorno (`PATH`)
+## Binarios oficiales
 
-### Windows (PowerShell)
+Release CI (`ci.yml:126-295`): push a main → build dist por target → smoke (`--version` + `run ./tests/main.vn`) → asset `vn-v$VERSION-$target.{tar.gz,zip}` + `SHA256SUMS.txt` → tag `v$VERSION` (versión de `Cargo.toml:60`, hoy `0.1.0`).
 
-Copia el ejecutable a la carpeta de binarios de Cargo (que usualmente ya está en el PATH):
+Estado local verificado: tag `v0.1.0` existe en git local; `dist/std.vnb` existe (bundle stdlib build, no asset release). URLs `github.com/.../releases/download/...` no verificadas localmente — componer desde tag publicado, no copiar de memoria.
+
+## PATH
 
 ```powershell
-Copy-Item target\release\vn.exe "$env:USERPROFILE\.cargo\bin\vn.exe" -Force
+Copy-Item target\quick\vn.exe "$env:USERPROFILE\.cargo\bin\vn.exe" -Force
 ```
-
-### Linux / macOS (Bash / Zsh)
-
-Copia el ejecutable a tu directorio de binarios local:
 
 ```bash
-sudo cp target/release/vn /usr/local/bin/vn
+sudo cp target/quick/vn /usr/local/bin/vn
 ```
 
-O añade el directorio target directamente a tu `~/.bashrc` o `~/.zshrc`:
-
-```bash
-export PATH="$HOME/varn-lang/target/release:$PATH"
-```
-
----
-
-## Verificación de la Instalación
-
-Ejecuta la herramienta de diagnóstico integrada:
+## Verificación
 
 ```bash
 vn doctor
-```
-
-Salida esperada:
-```
-[OK] Varn CLI Binary Version: 0.1.0
-[OK] System OS: linux (x86_64)
-[OK] StdLib Provider: @embedded
-[OK] Environment status: Healthy
-```
-
-Verifica la estabilidad ejecutando la suite de integración:
-
-```bash
 vn run tests/main.vn
 ```
 
----
+Matriz puerta = 4 cuadrantes (`ci.yml:93-110`): std `dev-checkout`/`@embedded` × JIT/`VARN_NO_JIT=1`. Falla 1 = falla todo.
 
-## Variables de Entorno del Runtime
+## Env runtime
 
-Varn admite variables de entorno para controlar el comportamiento del runtime y la VM:
-
-| Variable | Valores Posibles | Descripción |
-|---|---|---|
-| `VARN_STD` | `@embedded`, `dev-checkout`, `/path/to/vnb` | Define la procedencia de la biblioteca estándar. Por defecto usa `dev-checkout` si existe el árbol `std/`, o `@embedded` si se ejecuta el binario empaquetado. |
-| `VARN_NO_JIT` | `1`, `0` | Desactiva el compilador JIT Cranelift y fuerza a la VM a interpretar todo el bytecode. |
-| `VARN_CLIF_OPT` | `none`, `speed`, `speed_and_size` | Nivel de optimización del backend Cranelift (por defecto: `speed`). |
-| `RUST_LOG` | `info`, `debug`, `trace` | Controla el nivel de logs detallados del pipeline de compilación. |
-| `RUST_BACKTRACE` | `1`, `full` | Muestra el stack trace completo de Rust en caso de pánico interno. |
+| Variable | Efecto (código) |
+|---|---|
+| `VARN_STD=@embedded\|dev-checkout\|<path>` | Origen stdlib |
+| `VARN_NO_JIT=1` | Fuerza intérprete |
+| `VARN_GC_TRACE=1` | Línea por colección menor (`varn-debug/src/flags/phases.rs:67`) |
+| `RUST_BACKTRACE=1\|full` | Stack trace pánico Rust |

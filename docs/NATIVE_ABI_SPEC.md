@@ -1,70 +1,36 @@
-# Especificación de la ABI Nativa (`NATIVE_ABI_SPEC.md`)
+# Especificación de la ABI JIT/Nativa
 
-Este documento define la **Interfaz Binaria de Aplicación (ABI)** nativa de **Varn**, detallando las convenciones de llamada a nivel de ensamblador, la distribución de registros y la compatibilidad FFI.
+Contrato vigente entre código generado (`varn-jit`, Cranelift) y VM (`varn-vm`).
+Detalle completo en `docs/JIT_ABI_V2_SPEC.md`; aquí el resumen normativo.
 
----
+## 1. Versión
 
-## Tabla de Contenidos
+`JIT_HELPERS_VERSION = 3` (`crates/varn-jit-abi/src/lib.rs:3`). `JitHelpers`
+(`lib.rs:118-246`): direcciones de helpers + layouts + offsets al `ExecCtx`
+(`jit_native_result_offset`, `jit_error_flag_offset`, `jit_exit_offset`,
+`globals_offset`, `young_len_offset/threshold`, `frame_layout`, `call_layout`).
 
-- [1. Convención de Llamada Nativa](#1-convención-de-llamada-nativa)
-- [2. Distribución de Registros en la VM](#2-distribución-de-registros-en-la-vm)
-- [3. Representación de Memoria FFI](#3-representación-de-memoria-ffi)
-- [4. Interoperabilidad con C/Rust](#4-interoperabilidad-con-crust)
+## 2. Convención de llamada JIT
 
----
+Dos activaciones (`varn-jit/src/clif/abi.rs:16-19`): `Native` (firma
+`NativeShape`, `CallConv::Tail`, `Int|Bool→i64`, `Float→f64`, resto boxed
+`i64×2`; `NATIVE_FRAMELESS = 1<<63`) y `Framed` (`raw_signature`, `sret` en
+Windows). Se intenta `Native` y se cae a `Framed` con `NEEDS_ACTIVATION`
+(`clif/lower.rs:158-186`). Gate: 8192 words (`SIZE_GATE_WORDS`); tiering
+1 / 128 recto / OSR 1000 (`varn-vm/src/jit/tiering.rs:7-11`).
 
-## 1. Convención de Llamada Nativa
+## 3. Valores y registros FFI
 
-Para minimizar la sobrecarga al invocar funciones nativas de Rust desde el intérprete o el JIT x86-64, Varn sigue la convención C estándar de 64 bits de la plataforma host (`x86_64-pc-windows-msvc` en Windows o `System V AMD64 ABI` en Linux/macOS).
+`VmValue` = 16 B (`tag: u64, payload: u64`); kinds 0..6
+(NULL/BOOL/INT/FLOAT/HEAP/SSO/SYMBOL), SSO hasta 5 B. Los frames separan
+registros por clase: GPR `i64`, FPR `f64`, Refs `HeapRef`, Dyn `VmValue`
+(`docs/VM_ARCHITECTURE.md` §1-2). Las nativas Rust usan
+`fn(ctx, &[VmValue]) -> VmResult<VmValue>`; structs `#[repr(C)]`.
 
-```mermaid
-flowchart LR
-    subgraph Host Call Frame
-        A["Context Pointer (RCX / rdi)"] --> B["Arg 0 Pointer (RDX / rsi)"]
-        B --> C["Arg Count (R8 / rdx)"]
-        C --> D["Return Value in RAX"]
-    end
-```
+## 4. Errores y plataforma
 
----
-
-## 2. Distribución de Registros en la VM
-
-Las funciones nativas reciben una vista del array de registros del frame actual:
-
-```rust
-pub type NativeFn = fn(ctx: &mut CallContext, args: &[VmValue]) -> VmResult<VmValue>;
-```
-
-- `ctx`: Puntero al contexto de ejecución (acceso al heap, internador de cadenas y registrador de raíces del GC).
-- `args`: Slice plano contiguo de estructuras `VmValue` (128 bits cada una: tag + payload de 64 bits con soporte de SSO hasta 5B).
-
----
-
-## 3. Representación de Memoria FFI
-
-Cualquier struct exportada a la ABI nativa debe mantener un layout binario compatible con C (`#[repr(C)]`):
-
-```rust
-#[repr(C)]
-pub struct NativeStringHeader {
-    pub length: u32,
-    pub capacity: u32,
-    pub hash: u32,
-    pub data: *const u8,
-}
-```
-
----
-
-## 4. Interoperabilidad con C/Rust
-
-Las bibliotecas nativas de terceros pueden compilarse como DLL / Dynamic Libraries (`.dll`, `.so`, `.dylib`) e integrarse dinámicamente con Varn exponiendo el símbolo de entrada:
-
-```c
-// extern "C" C-ABI Plugin Entry
-__declspec(dllexport) uint64_t varn_plugin_init(void* vm_context) {
-    // Registrar opcodes nativos dinámicos
-    return 0; // Success
-}
-```
+Try nativo sin `longjmp`/`personality` en `varn-jit`: flag
+`jit_error_flag` + boxed en `jit_native_result` (`from_ssa/exceptions.rs`).
+El `setjmp`/`longjmp` vive solo en `varn-vm/src/arch/` para la frontera
+JIT↔intérprete. Plataformas: host `x86_64`/`aarch64` vía `cranelift_native`;
+no existe backend RISC-V.
