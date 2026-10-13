@@ -6,7 +6,12 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn require_condition(&mut self, rec: &mut Recorder, expr: ExprId, bind: &BindResult) {
+    pub(crate) fn require_condition(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        bind: &BindResult,
+    ) {
         let ty = self.infer_type(rec, expr, bind);
         if !self.never_false(ty, bind) {
             return;

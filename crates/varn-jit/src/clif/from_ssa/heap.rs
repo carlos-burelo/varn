@@ -3,9 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use super::{load_value, Ctx};
 
-use super::super::emit::{
-    box_bool, box_f64, box_int, call_helper, call_helper_void, unbox_f64_coerce, unbox_int,
-};
+use super::super::emit::{box_bool, box_f64, box_int, call_helper, unbox_f64_coerce, unbox_int};
 
 pub(super) fn exec_ctx(ctx: &Ctx<'_>) -> Value {
     ctx.exec_ctx
@@ -85,7 +83,7 @@ pub(super) fn emit_unary_boxed(
 ) -> Result<Value, String> {
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
     let ectx = exec_ctx(ctx);
-    call_helper_void(b, ctx.cc, helper, &[ectx, tag, payload]);
+    super::exceptions::call_checked(b, ctx, helper, &[ectx, tag, payload])?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -104,7 +102,7 @@ pub(super) fn emit_str_concat(
     let (at, ap) = boxed_parts(b, ctx, values, lhs)?;
     let (bt, bp) = boxed_parts(b, ctx, values, rhs)?;
     let ectx = exec_ctx(ctx);
-    call_helper_void(b, ctx.cc, ctx.helpers.str_concat, &[ectx, at, ap, bt, bp]);
+    super::exceptions::call_checked(b, ctx, ctx.helpers.str_concat, &[ectx, at, ap, bt, bp])?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -204,12 +202,12 @@ pub(super) fn emit_build_object(
     let count_v = b.ins().iconst(types::I64, count as i64);
     let shape_v = b.ins().iconst(types::I64, shape_ptr as i64);
     let rec_v = b.ins().iconst(types::I64, is_record as i64);
-    call_helper_void(
+    super::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.build_object_window,
         &[ectx, addr, count_v, shape_v, rec_v],
-    );
+    )?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -236,7 +234,7 @@ fn emit_window_boxed(
         );
     }
     let count_v = b.ins().iconst(types::I64, count as i64);
-    call_helper_void(b, ctx.cc, helper, &[ectx, addr, count_v]);
+    super::exceptions::call_checked(b, ctx, helper, &[ectx, addr, count_v])?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),

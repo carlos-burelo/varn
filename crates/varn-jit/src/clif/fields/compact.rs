@@ -11,6 +11,54 @@ pub(crate) struct FieldIo<'a> {
     pub helpers: &'a JitHelpers,
     pub cc: CallConv,
     pub exec_ctx: Value,
+    pub landing: Option<Block>,
+    pub err_ret: Option<Block>,
+}
+
+fn call_checked_void(b: &mut FunctionBuilder, io: &FieldIo, helper: usize, args: &[Value]) {
+    use cranelift_codegen::ir::MemFlagsData;
+    let zero = b.ins().iconst(types::I64, 0);
+    b.ins().store(
+        MemFlagsData::trusted(),
+        zero,
+        io.exec_ctx,
+        io.helpers.jit_error_flag_offset as i32,
+    );
+    call_helper_void(b, io.cc, helper, args);
+    let flag = b.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        io.exec_ctx,
+        io.helpers.jit_error_flag_offset as i32,
+    );
+    let cont = b.create_block();
+    match (io.landing, io.err_ret) {
+        (Some(t), _) => {
+            let err_blk = b.create_block();
+            b.ins().brif(flag, err_blk, &[], cont, &[]);
+            b.switch_to_block(err_blk);
+            let boxed = b.ins().load(
+                types::I128,
+                MemFlagsData::trusted(),
+                io.exec_ctx,
+                io.helpers.jit_native_result_offset as i32,
+            );
+            b.declare_value_needs_stack_map(boxed);
+            b.ins().store(
+                MemFlagsData::trusted(),
+                zero,
+                io.exec_ctx,
+                io.helpers.jit_error_flag_offset as i32,
+            );
+            b.ins().jump(t, &[boxed.into()]);
+            b.switch_to_block(cont);
+        }
+        (None, Some(e)) => {
+            b.ins().brif(flag, e, &[], cont, &[]);
+            b.switch_to_block(cont);
+        }
+        (None, None) => {}
+    }
 }
 
 pub(crate) fn cached_base(
@@ -86,9 +134,9 @@ pub(crate) fn load_compact(
     b.switch_to_block(slow);
     let (obj_tag, obj_payload) = b.ins().isplit(obj);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
-    call_helper_void(
+    call_checked_void(
         b,
-        io.cc,
+        io,
         io.helpers.get_fixed_field,
         &[io.exec_ctx, obj_tag, obj_payload, slot_v],
     );
@@ -157,9 +205,9 @@ pub(crate) fn store_compact_native(
                 let boxed = emit::box_int(b, native);
                 b.ins().isplit(boxed)
             };
-            call_helper_void(
+            call_checked_void(
                 b,
-                io.cc,
+                io,
                 io.helpers.set_fixed_field,
                 &[io.exec_ctx, obj_tag, obj_payload, slot_v, vt, vp],
             );
@@ -179,9 +227,9 @@ pub(crate) fn store_compact_native(
         let boxed = emit::box_int(b, native);
         b.ins().isplit(boxed)
     };
-    call_helper_void(
+    call_checked_void(
         b,
-        io.cc,
+        io,
         io.helpers.set_fixed_field,
         &[io.exec_ctx, obj_tag, obj_payload, slot_v, vt, vp],
     );
@@ -244,9 +292,9 @@ pub(crate) fn store_compact(
 
     b.switch_to_block(slow);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
-    call_helper_void(
+    call_checked_void(
         b,
-        io.cc,
+        io,
         io.helpers.set_fixed_field,
         &[
             io.exec_ctx,

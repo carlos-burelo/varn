@@ -1,4 +1,3 @@
-use super::super::super::emit::call_helper_void;
 use super::super::heap::{boxed_value, exec_ctx};
 use super::super::store::Out;
 use super::super::Ctx;
@@ -16,7 +15,12 @@ pub(super) fn load_global(
     let f = frame(ctx)?;
     let ni = super::super::props::str_idx(ctx, name)? as i64;
     let niv = b.ins().iconst(types::I64, ni);
-    call_helper_void(b, ctx.cc, h.load_global_by_name, &[ectx, f.closure, niv]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.load_global_by_name,
+        &[ectx, f.closure, niv],
+    )?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
 
@@ -35,12 +39,12 @@ pub(super) fn store_global(
     let niv = b
         .ins()
         .iconst(types::I64, super::super::props::str_idx(ctx, name)? as i64);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         h.store_global_by_name,
         &[ectx, f.closure, niv, t, p],
-    );
+    )?;
     Ok(Some(None))
 }
 
@@ -59,7 +63,12 @@ pub(super) fn load_module(
     let idx = super::super::props::str_idx(ctx, source)? as i64;
     let siv = b.ins().iconst(types::I64, idx);
     let oiv = b.ins().iconst(types::I64, i64::from(own_ip));
-    call_helper_void(b, ctx.cc, h.load_module, &[ectx, f.closure, siv, oiv]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.load_module,
+        &[ectx, f.closure, siv, oiv],
+    )?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
 
@@ -75,7 +84,12 @@ pub(super) fn module_slot(
     let o = boxed_value(b, ctx, values, object)?;
     let (ot, op_) = b.ins().isplit(o);
     let siv = b.ins().iconst(types::I64, i64::from(slot));
-    call_helper_void(b, ctx.cc, h.load_module_slot, &[ectx, ot, op_, siv]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.load_module_slot,
+        &[ectx, ot, op_, siv],
+    )?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
 
@@ -91,6 +105,11 @@ pub(super) fn store_module_slot(
     let v = boxed_value(b, ctx, values, value)?;
     let (t, p) = b.ins().isplit(v);
     let siv = b.ins().iconst(types::I64, i64::from(slot));
-    call_helper_void(b, ctx.cc, h.store_module_slot, &[ectx, siv, t, p]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.store_module_slot,
+        &[ectx, siv, t, p],
+    )?;
     Ok(Some(None))
 }

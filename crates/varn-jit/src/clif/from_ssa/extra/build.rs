@@ -1,4 +1,3 @@
-use super::super::super::emit::call_helper_void;
 use super::super::heap::{boxed_value, exec_ctx};
 use super::super::store::Out;
 use super::super::Ctx;
@@ -18,7 +17,7 @@ pub(super) fn tuple(
         .iter()
         .map(|v| boxed_value(b, ctx, values, *v))
         .collect::<Result<_, _>>()?;
-    let r = window_result(b, ctx, h.build_tuple_window, &vals);
+    let r = window_result(b, ctx, h.build_tuple_window, &vals)?;
     Ok(Some(Some(Out::Boxed(r))))
 }
 
@@ -58,7 +57,12 @@ pub(super) fn object_merge(
     let c = boxed_value(b, ctx, values, source)?;
     let (at, ap) = b.ins().isplit(a);
     let (ct, cp) = b.ins().isplit(c);
-    call_helper_void(b, ctx.cc, h.object_merge, &[ectx, at, ap, ct, cp]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.object_merge,
+        &[ectx, at, ap, ct, cp],
+    )?;
     Ok(Some(None))
 }
 
@@ -83,20 +87,30 @@ pub(super) fn object_rest(
         )?);
     }
     let (addr, n) = stage(b, ctx, &keys);
-    call_helper_void(b, ctx.cc, h.object_rest_window, &[ectx, ot, op_, addr, n]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.object_rest_window,
+        &[ectx, ot, op_, addr, n],
+    )?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
 
-fn window_result(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize, vals: &[Value]) -> Value {
+fn window_result(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    helper: usize,
+    vals: &[Value],
+) -> Result<Value, String> {
     let ectx = exec_ctx(ctx);
     let (addr, n) = stage(b, ctx, vals);
-    call_helper_void(b, ctx.cc, helper, &[ectx, addr, n]);
-    b.ins().load(
+    crate::clif::from_ssa::exceptions::call_checked(b, ctx, helper, &[ectx, addr, n])?;
+    Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
-    )
+    ))
 }
 
 fn emit_array_spread(
@@ -114,7 +128,12 @@ fn emit_array_spread(
     ));
     let addr = b.ins().stack_addr(types::I64, slot, 0);
     let zero = b.ins().iconst(types::I64, 0);
-    call_helper_void(b, ctx.cc, h.build_array_window, &[ectx, addr, zero]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.build_array_window,
+        &[ectx, addr, zero],
+    )?;
     let fresh = |b: &mut FunctionBuilder| {
         b.ins().load(
             types::I128,
@@ -129,9 +148,19 @@ fn emit_array_spread(
         let v = boxed_value(b, ctx, values, s.value)?;
         let (vt, vp) = b.ins().isplit(v);
         if s.spread {
-            call_helper_void(b, ctx.cc, h.array_extend, &[ectx, at, ap, vt, vp]);
+            crate::clif::from_ssa::exceptions::call_checked(
+                b,
+                ctx,
+                h.array_extend,
+                &[ectx, at, ap, vt, vp],
+            )?;
         } else {
-            call_helper_void(b, ctx.cc, h.array_push, &[ectx, at, ap, vt, vp]);
+            crate::clif::from_ssa::exceptions::call_checked(
+                b,
+                ctx,
+                h.array_push,
+                &[ectx, at, ap, vt, vp],
+            )?;
         }
     }
     Ok(fresh(b))
@@ -150,7 +179,7 @@ fn emit_object_spread(
         .frame
         .as_ref()
         .ok_or("from_ssa: spread without a frame")?;
-    call_helper_void(b, ctx.cc, h.build_empty_object, &[ectx]);
+    crate::clif::from_ssa::exceptions::call_checked(b, ctx, h.build_empty_object, &[ectx])?;
     let fresh = |b: &mut FunctionBuilder| {
         b.ins().load(
             types::I128,
@@ -174,12 +203,12 @@ fn emit_object_spread(
                     .ins()
                     .iconst(types::I64, i64::from(cs_base) + i64::from(keyed));
                 let ipv = b.ins().iconst(types::I64, 0);
-                call_helper_void(
+                crate::clif::from_ssa::exceptions::call_checked(
                     b,
-                    ctx.cc,
+                    ctx,
                     h.set_property_flat,
                     &[ectx, frame.closure, ot, op_, vt, vp, niv, csv, ipv],
-                );
+                )?;
 
                 super::super::store::drop_home_addrs(ctx);
                 keyed += 1;
@@ -189,7 +218,12 @@ fn emit_object_spread(
                 let (ot, op_) = b.ins().isplit(obj);
                 let v = boxed_value(b, ctx, values, p.value)?;
                 let (vt, vp) = b.ins().isplit(v);
-                call_helper_void(b, ctx.cc, h.object_merge, &[ectx, ot, op_, vt, vp]);
+                crate::clif::from_ssa::exceptions::call_checked(
+                    b,
+                    ctx,
+                    h.object_merge,
+                    &[ectx, ot, op_, vt, vp],
+                )?;
             }
         }
     }

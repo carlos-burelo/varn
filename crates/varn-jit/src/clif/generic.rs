@@ -1,5 +1,5 @@
 use super::emit::{call_helper, call_helper_void};
-use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
+use cranelift_codegen::ir::{condcodes::IntCC, types, Block, InstBuilder, MemFlagsData, Value};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::FunctionBuilder;
 
@@ -7,15 +7,51 @@ pub(crate) fn boxed_binop(
     b: &mut FunctionBuilder,
     cc: CallConv,
     helper: usize,
-    exec_ctx: cranelift_codegen::ir::Value,
+    exec_ctx: Value,
     native_result_offset: i32,
-    a: (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value),
-    c: (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value),
-) -> cranelift_codegen::ir::Value {
+    error_flag_offset: i32,
+    landing: Option<Block>,
+    err_ret: Option<Block>,
+    a: (Value, Value),
+    c: (Value, Value),
+) -> Value {
+    let zero = b.ins().iconst(types::I64, 0);
+    b.ins()
+        .store(MemFlagsData::trusted(), zero, exec_ctx, error_flag_offset);
     call_helper_void(b, cc, helper, &[exec_ctx, a.0, a.1, c.0, c.1]);
+    let flag = b.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        exec_ctx,
+        error_flag_offset,
+    );
+    let cont = b.create_block();
+    match (landing, err_ret) {
+        (Some(t), _) => {
+            let err_blk = b.create_block();
+            b.ins().brif(flag, err_blk, &[], cont, &[]);
+            b.switch_to_block(err_blk);
+            let boxed = b.ins().load(
+                types::I128,
+                MemFlagsData::trusted(),
+                exec_ctx,
+                native_result_offset,
+            );
+            b.declare_value_needs_stack_map(boxed);
+            b.ins()
+                .store(MemFlagsData::trusted(), zero, exec_ctx, error_flag_offset);
+            b.ins().jump(t, &[boxed.into()]);
+            b.switch_to_block(cont);
+        }
+        (None, Some(e)) => {
+            b.ins().brif(flag, e, &[], cont, &[]);
+            b.switch_to_block(cont);
+        }
+        (None, None) => {}
+    }
     b.ins().load(
         types::I128,
-        cranelift_codegen::ir::MemFlagsData::trusted(),
+        MemFlagsData::trusted(),
         exec_ctx,
         native_result_offset,
     )

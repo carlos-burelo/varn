@@ -105,7 +105,9 @@ pub(crate) extern "C" fn jit_str_char_at(
     unsafe {
         let ctx_ref = &mut *ctx;
         let text = VmValue::from_raw_parts(recv_tag, recv_payload);
-        let index = ctx_ref.heap.as_int(VmValue::from_raw_parts(pos_tag, pos_payload));
+        let index = ctx_ref
+            .heap
+            .as_int(VmValue::from_raw_parts(pos_tag, pos_payload));
         match crate::exec::collections::char_index(&ctx_ref.heap, text, index) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
@@ -240,7 +242,8 @@ pub(crate) extern "C" fn jit_str_starts_with(
         jit_propagate_error(
             &mut *ctx,
             crate::error::RuntimeError::new("startsWith: receiver and argument must be strings"),
-        )
+        );
+        0
     }
 }
 
@@ -321,7 +324,8 @@ pub(crate) extern "C" fn jit_str_ends_with(
         jit_propagate_error(
             &mut *ctx,
             crate::error::RuntimeError::new("endsWith: receiver and argument must be strings"),
-        )
+        );
+        0
     }
 }
 
@@ -355,7 +359,8 @@ pub(crate) extern "C" fn jit_str_index_of(
         jit_propagate_error(
             &mut *ctx,
             crate::error::RuntimeError::new("indexOf: receiver and argument must be strings"),
-        )
+        );
+        -1
     }
 }
 
@@ -383,7 +388,8 @@ pub(crate) extern "C" fn jit_str_includes(
         jit_propagate_error(
             &mut *ctx,
             crate::error::RuntimeError::new("includes: receiver and argument must be strings"),
-        )
+        );
+        0
     }
 }
 #[varn_op_macros::jit_slow(field = "str_split")]
@@ -404,6 +410,7 @@ pub(crate) extern "C" fn jit_str_split(
                 ctx_ref,
                 crate::error::RuntimeError::new("split: receiver must be a string"),
             );
+            return;
         };
 
         let sep: Option<String> = if argc == 0 {
@@ -413,10 +420,13 @@ pub(crate) extern "C" fn jit_str_split(
             let mut sbuf = [0u8; 5];
             match borrow_str_fast(sep_val, &ctx_ref.heap, &mut sbuf) {
                 Some(sep) => Some(sep.to_owned()),
-                None => jit_propagate_error(
-                    ctx_ref,
-                    crate::error::RuntimeError::new("split: separator must be a string"),
-                ),
+                None => {
+                    jit_propagate_error(
+                        ctx_ref,
+                        crate::error::RuntimeError::new("split: separator must be a string"),
+                    );
+                    return;
+                }
             }
         };
         let mut out = Vec::new();
@@ -472,22 +482,27 @@ pub(crate) extern "C" fn jit_str_slice_range(
         } else if s_val.is_heap() {
             match ctx_ref.heap.get(s_val.as_heap()) {
                 Some(crate::heap::HeapObj::Str(h)) => (h.as_str(), h.is_ascii()),
-                _ => jit_propagate_error(
-                    ctx_ref,
-                    crate::error::RuntimeError::new("slice: receiver must be a string"),
-                ),
+                _ => {
+                    jit_propagate_error(
+                        ctx_ref,
+                        crate::error::RuntimeError::new("slice: receiver must be a string"),
+                    );
+                    return;
+                }
             }
         } else {
             jit_propagate_error(
                 ctx_ref,
                 crate::error::RuntimeError::new("slice: receiver must be a string"),
-            )
+            );
+            return;
         };
         let Some(start) = start_val.is_int().then(|| start_val.as_int()) else {
             jit_propagate_error(
                 ctx_ref,
                 crate::error::RuntimeError::new("slice: bounds must be ints"),
             );
+            return;
         };
         let end: Option<i64> = if has_end == 0 {
             None
@@ -498,6 +513,7 @@ pub(crate) extern "C" fn jit_str_slice_range(
                 ctx_ref,
                 crate::error::RuntimeError::new("slice: bounds must be ints"),
             );
+            return;
         };
         let (bs, be) = if ascii {
             let len = text.len() as i64;

@@ -32,7 +32,9 @@ fn reshapes(desc: &TypeDesc, depth: usize) -> bool {
         TypeDesc::Object(fields) => fields.iter().any(|field| reshapes(&field.ty, depth + 1)),
         TypeDesc::Args { fixed, rest } => {
             fixed.iter().any(|item| reshapes(item, depth + 1))
-                || rest.as_deref().is_some_and(|item| reshapes(item, depth + 1))
+                || rest
+                    .as_deref()
+                    .is_some_and(|item| reshapes(item, depth + 1))
         }
     }
 }
@@ -231,8 +233,7 @@ fn walk(
                 };
                 let replaced = walk(heap, x, &field.ty, Some(&inner), visiting);
                 if replaced != x {
-                    if let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) =
-                        heap.get(v.as_heap())
+                    if let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) = heap.get(v.as_heap())
                     {
                         obj.borrow().set_field_str(&name, replaced);
                     }

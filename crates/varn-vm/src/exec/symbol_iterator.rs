@@ -13,11 +13,7 @@ pub(crate) fn get_symbol_property(
     if iterating {
         if let Some(items) = snapshot(obj, heap) {
             let frozen = heap.alloc_array_vm(items);
-            return Ok(heap.alloc_bound_native(
-                frozen,
-                array_symbol_iterator,
-                "[Symbol.iterator]",
-            ));
+            return Ok(heap.alloc_bound_native(frozen, array_symbol_iterator, "[Symbol.iterator]"));
         }
     }
     let sym_str = symbol.to_string();
@@ -104,11 +100,7 @@ pub(crate) fn get_symbol_property(
                 })
                 .collect();
             let frozen = heap.alloc_array_vm(pairs);
-            return Ok(heap.alloc_bound_native(
-                frozen,
-                array_symbol_iterator,
-                "[Symbol.iterator]",
-            ));
+            return Ok(heap.alloc_bound_native(frozen, array_symbol_iterator, "[Symbol.iterator]"));
         }
     }
     Ok(result)

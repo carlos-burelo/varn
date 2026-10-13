@@ -26,5 +26,25 @@ pub(super) fn emit(
         let divisor = b.ins().select(trapping, one, c);
         (b.ins().srem(a, divisor), zero, ctx.helpers.modulo)
     };
-    guard_overflow(b, ctx.cc, ctx.exec_ctx, helper, r, fault, a, c)
+    let err_off = ctx.helpers.jit_error_flag_offset as i32;
+    let res_off = ctx.helpers.jit_native_result_offset as i32;
+    let (landing, err_ret) = {
+        let st = ctx.pure_try.borrow();
+        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
+        (landing, st.err_ret)
+    };
+    guard_overflow(
+        b,
+        ctx.cc,
+        ctx.exec_ctx,
+        helper,
+        r,
+        fault,
+        a,
+        c,
+        err_off,
+        res_off,
+        landing,
+        err_ret,
+    )
 }

@@ -209,8 +209,11 @@ pub fn drive_main(
                                         .filter(|stack| !stack.is_empty());
                                 err.message = match trace {
                                     Some(trace) => {
-                                        format!("awaited task failed: {}
-{trace}", err.message)
+                                        format!(
+                                            "awaited task failed: {}
+{trace}",
+                                            err.message
+                                        )
                                     }
                                     None => format!("awaited task failed: {}", err.message),
                                 };

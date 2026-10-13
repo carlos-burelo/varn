@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{call_helper_void, is_young, HEAP_KIND, KIND_MASK};
+use super::super::super::emit::{is_young, HEAP_KIND, KIND_MASK};
 use super::super::heap::{boxed_parts, boxed_value};
 use super::super::store::drop_home_addrs;
 use super::super::Ctx;
@@ -119,12 +119,12 @@ pub(crate) fn emit_set_property(
     let name_v = b.ins().iconst(types::I64, name_idx as i64);
     let cs_v = b.ins().iconst(types::I64, cs as i64);
     let ip_v = b.ins().iconst(types::I64, 0);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.set_property_flat,
         &[ectx, frame.closure, ot, op, vt, vp, name_v, cs_v, ip_v],
-    );
+    )?;
     drop_home_addrs(ctx);
     b.ins().jump(cont, &[]);
 

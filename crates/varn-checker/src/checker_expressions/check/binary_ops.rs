@@ -21,12 +21,12 @@ impl<'r> Checker<'r> {
     ) {
         let l_ty = self.infer_type(rec, left, bind);
         let r_ty = self.infer_type(rec, right, bind);
-        if matches!(
-            op,
-            BinaryOp::Eq | BinaryOp::NotEq
-        ) {
+        if matches!(op, BinaryOp::Eq | BinaryOp::NotEq) {
             let is_null = |e: ExprId| {
-                matches!(self.ast_arena.expr(e).kind, varn_core::ast::ExprKind::NullLiteral)
+                matches!(
+                    self.ast_arena.expr(e).kind,
+                    varn_core::ast::ExprKind::NullLiteral
+                )
             };
             match (is_null(left), is_null(right)) {
                 (false, true) => self.require_nullable(rec, left, "comparing it with null", bind),

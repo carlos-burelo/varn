@@ -191,7 +191,7 @@ pub(super) fn emit_inst(
         }
 
         SsaOp::CatchParam { try_val } => {
-            let boxed = heap::boxed_value(b, ctx, values, *try_val)?;
+            let boxed = exceptions::emit_catch_param(values, *try_val)?;
             return Ok(Some(Out::Boxed(boxed)));
         }
         SsaOp::StoreGlobalIdx { slot, value } => {
@@ -378,7 +378,27 @@ fn checked_int(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaBinOp, a: Value, c
         }
     };
 
-    guard_overflow(b, ctx.cc, ctx.exec_ctx, helper, r, ovf, a, c)
+    let err_off = helpers.jit_error_flag_offset as i32;
+    let res_off = helpers.jit_native_result_offset as i32;
+    let (landing, err_ret) = {
+        let st = ctx.pure_try.borrow();
+        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
+        (landing, st.err_ret)
+    };
+    guard_overflow(
+        b,
+        ctx.cc,
+        ctx.exec_ctx,
+        helper,
+        r,
+        ovf,
+        a,
+        c,
+        err_off,
+        res_off,
+        landing,
+        err_ret,
+    )
 }
 
 fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Result<Value, String> {
@@ -387,6 +407,13 @@ fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Res
         SsaUnOp::NegInt => {
             let cc = ctx.cc;
             let helpers = ctx.helpers;
+            let err_off = helpers.jit_error_flag_offset as i32;
+            let res_off = helpers.jit_native_result_offset as i32;
+            let (landing, err_ret) = {
+                let st = ctx.pure_try.borrow();
+                let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
+                (landing, st.err_ret)
+            };
             let neg = b.ins().ineg(a);
             let fits = b.ins().icmp_imm_u(IntCC::NotEqual, a, i64::MIN);
             let raise = b.create_block();
@@ -395,8 +422,47 @@ fn emit_un(b: &mut FunctionBuilder, ctx: &Ctx<'_>, op: SsaUnOp, a: Value) -> Res
             b.switch_to_block(raise);
             let boxed = box_int(b, a);
             let (tag, payload) = b.ins().isplit(boxed);
+            let zero = b.ins().iconst(types::I64, 0);
+            b.ins().store(
+                cranelift_codegen::ir::MemFlagsData::trusted(),
+                zero,
+                ctx.exec_ctx,
+                err_off,
+            );
             call_helper_void(b, cc, helpers.negate, &[ctx.exec_ctx, tag, payload]);
-            b.ins().jump(cont, &[]);
+            let flag = b.ins().load(
+                types::I64,
+                cranelift_codegen::ir::MemFlagsData::trusted(),
+                ctx.exec_ctx,
+                err_off,
+            );
+            match (landing, err_ret) {
+                (Some(t), _) => {
+                    let err_blk = b.create_block();
+                    b.ins().brif(flag, err_blk, &[], cont, &[]);
+                    b.switch_to_block(err_blk);
+                    let eboxed = b.ins().load(
+                        types::I128,
+                        cranelift_codegen::ir::MemFlagsData::trusted(),
+                        ctx.exec_ctx,
+                        res_off,
+                    );
+                    b.declare_value_needs_stack_map(eboxed);
+                    b.ins().store(
+                        cranelift_codegen::ir::MemFlagsData::trusted(),
+                        zero,
+                        ctx.exec_ctx,
+                        err_off,
+                    );
+                    b.ins().jump(t, &[eboxed.into()]);
+                }
+                (None, Some(e)) => {
+                    b.ins().brif(flag, e, &[], cont, &[]);
+                }
+                (None, None) => {
+                    b.ins().jump(cont, &[]);
+                }
+            }
             b.switch_to_block(cont);
             neg
         }

@@ -17,7 +17,9 @@ impl<'r> Checker<'r> {
                 known
             }
             TypeKind::Array(inner) => self.check_type_names(inner, bind),
-            TypeKind::Union(members) | TypeKind::Intersection(members) | TypeKind::Tuple(members) => {
+            TypeKind::Union(members)
+            | TypeKind::Intersection(members)
+            | TypeKind::Tuple(members) => {
                 let mut known = true;
                 for member in members {
                     known &= self.check_type_names(member, bind);

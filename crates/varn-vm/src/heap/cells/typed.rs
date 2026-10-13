@@ -84,9 +84,7 @@ impl CellSpace {
         let tail = std::mem::size_of::<HeapObj>();
         let bytes = std::mem::size_of::<varn_types::value::ValueMap>();
         let r = self.take_cell(tail + bytes, 0, state);
-        let m = unsafe {
-            varn_types::value::MapRef::init_at(body::<u8>(r).add(tail).cast(), map)
-        };
+        let m = unsafe { varn_types::value::MapRef::init_at(body::<u8>(r).add(tail).cast(), map) };
         Self::place(r, HeapObj::Map(m));
         r
     }
@@ -100,9 +98,7 @@ impl CellSpace {
         let tail = std::mem::size_of::<HeapObj>();
         let bytes = std::mem::size_of::<varn_types::value::ValueSet>();
         let r = self.take_cell(tail + bytes, 0, state);
-        let s = unsafe {
-            varn_types::value::SetRef::init_at(body::<u8>(r).add(tail).cast(), set)
-        };
+        let s = unsafe { varn_types::value::SetRef::init_at(body::<u8>(r).add(tail).cast(), set) };
         Self::place(r, HeapObj::Set(s));
         r
     }

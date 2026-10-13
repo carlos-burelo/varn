@@ -59,7 +59,12 @@ pub(crate) fn invalidate_epoch(epoch: u64) {
     let entry = COMPILED.with(|m| m.borrow_mut().remove(&epoch));
     let Some(entry) = entry else { return };
     for proto in &entry.protos {
-        if proto.jit_osr_entries.borrow().iter().any(|e| e.epoch == epoch) {
+        if proto
+            .jit_osr_entries
+            .borrow()
+            .iter()
+            .any(|e| e.epoch == epoch)
+        {
             proto.osr_invalidate(epoch);
             proto.backedge_count.set(0);
         }

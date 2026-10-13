@@ -45,6 +45,12 @@ impl<'m> Builder<'m> {
             },
             HirType::Dynamic,
         );
-        Ok(self.emit(InstKind::Cast { operand: checked, ty }, ty))
+        Ok(self.emit(
+            InstKind::Cast {
+                operand: checked,
+                ty,
+            },
+            ty,
+        ))
     }
 }

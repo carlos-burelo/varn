@@ -27,6 +27,8 @@ pub(crate) struct Frozen {
     pub(crate) dest_reg: u16,
     try_handlers: Vec<TryHandler>,
     open_upvalues: Vec<(SlotAddr, VmUpvalue)>,
+    jit_error_flag: u64,
+    jit_native_result: VmValue,
 }
 
 impl Frozen {
@@ -174,6 +176,8 @@ pub(crate) fn freeze(ctx: &mut ExecCtx, dest_reg: u16) -> Result<Box<Frozen>, &'
     }
     let try_handlers = std::mem::take(&mut ctx.try_handlers);
     let open_upvalues = std::mem::take(&mut ctx.open_upvalues);
+    let jit_error_flag = std::mem::replace(&mut ctx.jit_error_flag, 0);
+    let jit_native_result = std::mem::replace(&mut ctx.jit_native_result, VmValue::null());
     for (_, uv) in &open_upvalues {
         uv.close(&ctx.stack);
     }
@@ -191,6 +195,8 @@ pub(crate) fn freeze(ctx: &mut ExecCtx, dest_reg: u16) -> Result<Box<Frozen>, &'
         dest_reg,
         try_handlers,
         open_upvalues,
+        jit_error_flag,
+        jit_native_result,
     }))
 }
 
@@ -200,6 +206,8 @@ pub(crate) fn thaw(ctx: &mut ExecCtx, frozen: Frozen) {
         rest,
         try_handlers,
         open_upvalues,
+        jit_error_flag,
+        jit_native_result,
         ..
     } = frozen;
     let reopen = ctx.stack.allocs.is_empty();
@@ -276,6 +284,8 @@ pub(crate) fn thaw(ctx: &mut ExecCtx, frozen: Frozen) {
         ctx.frames.push(frame);
     }
     ctx.try_handlers = try_handlers;
+    ctx.jit_error_flag = jit_error_flag;
+    ctx.jit_native_result = jit_native_result;
     if reopen {
         for (slot, uv) in &open_upvalues {
             uv.inner.borrow_mut().stack_slot = Some(*slot);

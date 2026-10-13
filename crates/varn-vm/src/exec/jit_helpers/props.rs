@@ -198,7 +198,10 @@ pub(crate) extern "C" fn jit_bind_method(
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
         let method = match crate::exec::props::get_property(obj, &key, &mut ctx_ref.heap) {
             Ok(m) => m,
-            Err(e) => jit_propagate_error(ctx_ref, e),
+            Err(e) => {
+                jit_propagate_error(ctx_ref, e);
+                return;
+            }
         };
         match crate::exec::method_bind::bind_method(obj, method, &mut ctx_ref.heap) {
             Ok(v) => ctx_ref.jit_native_result = v,

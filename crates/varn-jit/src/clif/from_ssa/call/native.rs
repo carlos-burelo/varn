@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{box_bool, box_int, call_helper, call_helper_void};
+use super::super::super::emit::{box_bool, box_int};
 use super::super::{heap, Ctx};
 use super::invoke::boxed_window;
 
@@ -24,23 +24,23 @@ pub(crate) fn emit_call_native_op(
     if args.len() == 1 && varn_core::op_id::is_str_char_index_op_id(op_id) {
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
         let (pos_tag, pos_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
-        let code = call_helper(
+        let code = crate::clif::from_ssa::exceptions::call_checked_value(
             b,
-            ctx.cc,
+            ctx,
             ctx.helpers.str_char_code_at,
             &[frame.exec_ctx, recv_tag, recv_payload, pos_tag, pos_payload],
-        );
+        )?;
         return Ok(box_int(b, code));
     }
     if args.len() == 1 && op_id == varn_core::op_id::str_index_op_id() {
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
         let (pos_tag, pos_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
-        call_helper_void(
+        crate::clif::from_ssa::exceptions::call_checked(
             b,
-            ctx.cc,
+            ctx,
             ctx.helpers.str_char_at,
             &[frame.exec_ctx, recv_tag, recv_payload, pos_tag, pos_payload],
-        );
+        )?;
         return Ok(b.ins().load(
             types::I128,
             cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -52,39 +52,39 @@ pub(crate) fn emit_call_native_op(
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
         let (arg_tag, arg_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
         if op_id == varn_core::op_id::str_starts_with_op_id() {
-            let r = call_helper(
+            let r = crate::clif::from_ssa::exceptions::call_checked_value(
                 b,
-                ctx.cc,
+                ctx,
                 ctx.helpers.str_starts_with,
                 &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
-            );
+            )?;
             return Ok(box_bool(b, r));
         }
         if op_id == varn_core::op_id::str_ends_with_op_id() {
-            let r = call_helper(
+            let r = crate::clif::from_ssa::exceptions::call_checked_value(
                 b,
-                ctx.cc,
+                ctx,
                 ctx.helpers.str_ends_with,
                 &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
-            );
+            )?;
             return Ok(box_bool(b, r));
         }
         if op_id == varn_core::op_id::str_index_of_op_id() {
-            let r = call_helper(
+            let r = crate::clif::from_ssa::exceptions::call_checked_value(
                 b,
-                ctx.cc,
+                ctx,
                 ctx.helpers.str_index_of,
                 &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
-            );
+            )?;
             return Ok(box_int(b, r));
         }
         if op_id == varn_core::op_id::str_includes_op_id() {
-            let r = call_helper(
+            let r = crate::clif::from_ssa::exceptions::call_checked_value(
                 b,
-                ctx.cc,
+                ctx,
                 ctx.helpers.str_includes,
                 &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
-            );
+            )?;
             return Ok(box_bool(b, r));
         }
     }
@@ -96,9 +96,9 @@ pub(crate) fn emit_call_native_op(
         } else {
             (b.ins().iconst(types::I64, 0), b.ins().iconst(types::I64, 0))
         };
-        call_helper_void(
+        crate::clif::from_ssa::exceptions::call_checked(
             b,
-            ctx.cc,
+            ctx,
             ctx.helpers.str_split,
             &[
                 frame.exec_ctx,
@@ -108,7 +108,7 @@ pub(crate) fn emit_call_native_op(
                 sep_tag,
                 sep_payload,
             ],
-        );
+        )?;
         return Ok(b.ins().load(
             types::I128,
             cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -125,9 +125,9 @@ pub(crate) fn emit_call_native_op(
         } else {
             (b.ins().iconst(types::I64, 0), b.ins().iconst(types::I64, 0))
         };
-        call_helper_void(
+        crate::clif::from_ssa::exceptions::call_checked(
             b,
-            ctx.cc,
+            ctx,
             ctx.helpers.str_substring,
             &[
                 frame.exec_ctx,
@@ -139,7 +139,7 @@ pub(crate) fn emit_call_native_op(
                 end_tag,
                 end_payload,
             ],
-        );
+        )?;
         return Ok(b.ins().load(
             types::I128,
             cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -156,9 +156,9 @@ pub(crate) fn emit_call_native_op(
         } else {
             (b.ins().iconst(types::I64, 0), b.ins().iconst(types::I64, 0))
         };
-        call_helper_void(
+        crate::clif::from_ssa::exceptions::call_checked(
             b,
-            ctx.cc,
+            ctx,
             ctx.helpers.str_slice_range,
             &[
                 frame.exec_ctx,
@@ -170,7 +170,7 @@ pub(crate) fn emit_call_native_op(
                 end_tag,
                 end_payload,
             ],
-        );
+        )?;
         return Ok(b.ins().load(
             types::I128,
             cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -183,12 +183,12 @@ pub(crate) fn emit_call_native_op(
     let fn_v = b.ins().iconst(types::I64, target.func_ptr as i64);
     let op_v = b.ins().iconst(types::I64, op_id as i64);
     let total = b.ins().iconst(types::I64, (args.len() + 1) as i64);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.jit_call_native_window,
         &[frame.exec_ctx, fn_v, op_v, window, total],
-    );
+    )?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),

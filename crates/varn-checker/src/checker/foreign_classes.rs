@@ -105,10 +105,7 @@ impl Checker<'_> {
                     continue;
                 };
                 use varn_sem::bind::DeclKind;
-                if !matches!(
-                    owner.classify_decl(name.as_ref()),
-                    Some(DeclKind::Class)
-                ) {
+                if !matches!(owner.classify_decl(name.as_ref()), Some(DeclKind::Class)) {
                     continue;
                 }
                 let chain = self.foreign_chain(name.as_ref(), OwnerRef::Foreign(owner.clone()));
@@ -150,9 +147,8 @@ impl Checker<'_> {
                         }
                     }
                 }
-                constructor = Some(
-                    self.effective_ctor_ty(name.as_ref(), OwnerRef::Foreign(owner.clone())),
-                );
+                constructor =
+                    Some(self.effective_ctor_ty(name.as_ref(), OwnerRef::Foreign(owner.clone())));
                 methods.sort();
                 let decorated = owner
                     .interner
@@ -190,20 +186,17 @@ impl Checker<'_> {
         found.into_values().collect()
     }
 
-    pub(crate) fn effective_ctor_ty(
-        &mut self,
-        name: &str,
-        owner: OwnerRef<'_>,
-    ) -> Type {
+    pub(crate) fn effective_ctor_ty(&mut self, name: &str, owner: OwnerRef<'_>) -> Type {
         for level in self.foreign_chain(name, owner) {
             let found = level
                 .owner
                 .get()
                 .get_class_entry(&level.name)
                 .and_then(|entry| {
-                    entry.members.iter().find(|m| {
-                        !m.is_static && m.kind == ClassMemberKind::Constructor
-                    })
+                    entry
+                        .members
+                        .iter()
+                        .find(|m| !m.is_static && m.kind == ClassMemberKind::Constructor)
                 })
                 .map(|m| self.reintern_foreign_ty(level.owner.get(), m.ty));
             if let Some(ty) = found {
@@ -237,11 +230,11 @@ impl Checker<'_> {
             _ => return None,
         };
         let owner = match origin {
-            Some(origin) if origin.as_ref() != bind.source_file.as_ref() => {
-                OwnerRef::Foreign(self.resolver.module_bind(&origin).or_else(|| {
-                    self.resolver.stdlib_bind(&origin)
-                })?)
-            }
+            Some(origin) if origin.as_ref() != bind.source_file.as_ref() => OwnerRef::Foreign(
+                self.resolver
+                    .module_bind(&origin)
+                    .or_else(|| self.resolver.stdlib_bind(&origin))?,
+            ),
             Some(_) | None => OwnerRef::Current(bind),
         };
         if owner.get().get_class_entry(&name).is_none() {
@@ -264,10 +257,7 @@ impl Checker<'_> {
                     origin.as_ref(),
                     bind,
                 );
-                ty.map_generics(
-                    &mapping,
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                )
+                ty.map_generics(&mapping, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
             }
             _ => ty,
         };
@@ -277,11 +267,7 @@ impl Checker<'_> {
         })
     }
 
-    fn foreign_chain<'a>(
-        &self,
-        name: &str,
-        owner: OwnerRef<'a>,
-    ) -> Vec<ForeignLevel<'a>> {
+    fn foreign_chain<'a>(&self, name: &str, owner: OwnerRef<'a>) -> Vec<ForeignLevel<'a>> {
         let mut chain = vec![ForeignLevel {
             name: Arc::from(name),
             owner,

@@ -76,11 +76,13 @@ pub(crate) extern "C" fn jit_str_substring(
                 _ => {
                     let msg = format!("expected str, got {s_val:?}");
                     jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg));
+                    return;
                 }
             }
         } else {
             let msg = format!("expected str, got {s_val:?}");
             jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg));
+            return;
         };
         let int_arg = |v: VmValue| {
             if v.is_int() {
@@ -92,6 +94,7 @@ pub(crate) extern "C" fn jit_str_substring(
         let Some(start) = int_arg(start_val) else {
             let msg = format!("expected int, got {start_val:?}");
             jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg));
+            return;
         };
         let end_opt: Option<i64> = if has_end == 0 || end_val.is_null() {
             None
@@ -100,6 +103,7 @@ pub(crate) extern "C" fn jit_str_substring(
         } else {
             let msg = format!("expected int, got {end_val:?}");
             jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg));
+            return;
         };
         let total = if ascii {
             text.len()

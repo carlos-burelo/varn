@@ -103,9 +103,9 @@ impl TypeContext for Binder<'_> {
         let id = scope.resolve(atom, &self.scopes)?;
         let sym = self.arena.get(id);
         match sym.kind {
-            varn_sem::symbol::SymbolKind::Class
-            | varn_sem::symbol::SymbolKind::Interface => (!sym.type_params.is_empty())
-                .then(|| sym.type_param_defaults.clone()),
+            varn_sem::symbol::SymbolKind::Class | varn_sem::symbol::SymbolKind::Interface => {
+                (!sym.type_params.is_empty()).then(|| sym.type_param_defaults.clone())
+            }
             _ => None,
         }
     }

@@ -202,7 +202,9 @@ impl<'r> Checker<'r> {
         if let Some(class) = cls_name.as_deref() {
             self.require_instantiation(rec, expr, class, range, bind);
         }
-        let instantiated = declared.and_then(|ctor| self.instantiated_constructor(rec, expr, ctor, cls_name.as_deref()?, bind));
+        let instantiated = declared.and_then(|ctor| {
+            self.instantiated_constructor(rec, expr, ctor, cls_name.as_deref()?, bind)
+        });
         let context_ty = instantiated.or(declared);
         let ctor_params = match context_ty.map(|ty| self.ty_table.get(ty.0)) {
             Some(varn_core::TypeKind::Fn(fid)) => self.ty_table.get_function(fid).params.clone(),
@@ -256,7 +258,9 @@ impl<'r> Checker<'r> {
         class: &str,
         bind: &BindResult,
     ) -> Option<varn_sem::types::Type> {
-        use crate::checker_expressions::members::member_util::{class_type_params, generic_mapping};
+        use crate::checker_expressions::members::member_util::{
+            class_type_params, generic_mapping,
+        };
         let instance = self.infer_type(rec, expr, bind);
         match self.ty_table.get(instance.0) {
             varn_core::TypeKind::Generic(_, args, origin) => {
@@ -268,7 +272,9 @@ impl<'r> Checker<'r> {
                     .map(|id| varn_sem::types::Type::resolved(*id))
                     .collect();
                 let mapping = generic_mapping(self.resolver, class, &args, origin.as_ref(), bind);
-                Some(ctor.map_generics(&mapping, &mut *std::sync::Arc::make_mut(&mut self.ty_table)))
+                Some(
+                    ctor.map_generics(&mapping, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
+                )
             }
             varn_core::TypeKind::Named(_, origin) => {
                 let origin = origin.map(|o| self.resolve_bind_atom(bind, o));

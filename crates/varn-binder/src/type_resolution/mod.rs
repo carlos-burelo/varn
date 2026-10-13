@@ -8,8 +8,8 @@ mod keyed_access;
 mod mapped;
 mod names;
 mod nominal;
-mod qualified;
 mod objects;
+mod qualified;
 mod scalar;
 mod template;
 

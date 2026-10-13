@@ -207,7 +207,11 @@ fn named_alias(bind: &BindView, name: &str, origin: Option<&str>) -> Option<Type
     bind.resolve_type_alias(name, origin)
 }
 
-pub(super) fn expanded_alias(ty: &Type, bind: Option<&BindView>, table: &CheckerTyTable) -> Option<Type> {
+pub(super) fn expanded_alias(
+    ty: &Type,
+    bind: Option<&BindView>,
+    table: &CheckerTyTable,
+) -> Option<Type> {
     use crate::types::TypeContext;
     let TypeKind::Named(name, origin) = table.get(ty.0) else {
         return None;

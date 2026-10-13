@@ -3,7 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{DynBinOp, DynUnOp};
 
-use super::super::emit::{box_bool, box_int, call_helper, call_helper_void};
+use super::super::emit::{box_bool, box_int, call_helper};
 use super::super::generic::{boxed_binop, boxed_compare};
 use super::heap::boxed_parts;
 use super::{Ctx, Out};
@@ -34,8 +34,16 @@ pub(super) fn emit_bin(
     let c = boxed_parts(b, ctx, values, rhs)?;
     let ectx = ctx.exec_ctx;
     let result_off = h.jit_native_result_offset as i32;
+    let err_off = h.jit_error_flag_offset as i32;
+    let (landing, err_ret) = {
+        let st = ctx.pure_try.borrow();
+        let landing = st.stack.last().and_then(|hh| st.clif_map.get(hh).copied());
+        (landing, st.err_ret)
+    };
     let arith = |b: &mut FunctionBuilder, helper| {
-        Out::Boxed(boxed_binop(b, ctx.cc, helper, ectx, result_off, a, c))
+        Out::Boxed(boxed_binop(
+            b, ctx.cc, helper, ectx, result_off, err_off, landing, err_ret, a, c,
+        ))
     };
     let compare = |b: &mut FunctionBuilder, helper, equality| {
         let cond = boxed_compare(b, ctx.cc, helper, ectx, equality, a, c);
@@ -77,9 +85,15 @@ pub(super) fn emit_un(
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
     let ectx = ctx.exec_ctx;
     let result_off = h.jit_native_result_offset as i32;
+    let err_off = h.jit_error_flag_offset as i32;
+    let (landing, err_ret) = {
+        let st = ctx.pure_try.borrow();
+        let landing = st.stack.last().and_then(|hh| st.clif_map.get(hh).copied());
+        (landing, st.err_ret)
+    };
     Ok(match op {
         DynUnOp::Neg => {
-            call_helper_void(b, ctx.cc, h.negate, &[ectx, tag, payload]);
+            super::exceptions::call_checked(b, ctx, h.negate, &[ectx, tag, payload])?;
             Out::Boxed(b.ins().load(
                 types::I128,
                 cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -102,6 +116,9 @@ pub(super) fn emit_un(
                 h.bit_xor,
                 ectx,
                 result_off,
+                err_off,
+                landing,
+                err_ret,
                 (tag, payload),
                 m1,
             ))

@@ -119,8 +119,10 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         .iter()
         .map(|frame| format!("  at {} ({}:{})", frame.fn_name, frame.file, frame.line))
         .collect();
-    let stack = heap.alloc_str_dynamic(&trace.join("
-"));
+    let stack = heap.alloc_str_dynamic(&trace.join(
+        "
+",
+    ));
     let (shape, n) = cls.instance_shape();
     let err_obj = heap.alloc_object_cell(false, shape, n, &[]);
     if let Some(HeapObj::Object(oref)) = heap.get(err_obj.as_heap()) {

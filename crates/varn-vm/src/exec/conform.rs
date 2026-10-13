@@ -55,12 +55,7 @@ fn kind_is(heap: &Heap, v: VmValue, kind: RuntimeKind) -> bool {
     typeof_val(v, heap) == kind.name()
 }
 
-pub(crate) fn fit(
-    heap: &Heap,
-    v: VmValue,
-    desc: &TypeDesc,
-    witnesses: &[VmValue],
-) -> Option<Fit> {
+pub(crate) fn fit(heap: &Heap, v: VmValue, desc: &TypeDesc, witnesses: &[VmValue]) -> Option<Fit> {
     let cx = Cx {
         heap,
         witnesses,
@@ -101,9 +96,9 @@ fn fit_in(cx: &Cx, v: VmValue, desc: &TypeDesc, scope: Option<&Scope>) -> Option
         TypeDesc::Bytes => exact(kind_is(heap, v, RuntimeKind::Bytes)),
         TypeDesc::Decimal => exact(kind_is(heap, v, RuntimeKind::Decimal)),
         TypeDesc::BigInt => exact(kind_is(heap, v, RuntimeKind::BigInt)),
-        TypeDesc::Callable => exact(
-            kind_is(heap, v, RuntimeKind::Function) || kind_is(heap, v, RuntimeKind::Class),
-        ),
+        TypeDesc::Callable => {
+            exact(kind_is(heap, v, RuntimeKind::Function) || kind_is(heap, v, RuntimeKind::Class))
+        }
         TypeDesc::Array(el) => {
             if !v.is_heap() {
                 return None;

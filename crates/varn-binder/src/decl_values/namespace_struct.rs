@@ -98,7 +98,9 @@ impl<'r> super::super::Binder<'r> {
                     let name: Arc<str> =
                         c.id.map(|a| Arc::from(self.interner.resolve(a)))
                             .unwrap_or_else(|| Arc::from(""));
-                    let declared = c.id.map(|a| self.type_name_of(a, c.ast_id)).unwrap_or_default();
+                    let declared =
+                        c.id.map(|a| self.type_name_of(a, c.ast_id))
+                            .unwrap_or_default();
                     let class_members = self
                         .type_members
                         .classes

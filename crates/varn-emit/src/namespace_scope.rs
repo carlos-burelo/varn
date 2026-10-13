@@ -15,7 +15,10 @@ pub(super) fn declared_name(
     ast_id: varn_core::ast::AstId,
     bare: &str,
 ) -> Arc<str> {
-    names.get(&ast_id).cloned().unwrap_or_else(|| Arc::from(bare))
+    names
+        .get(&ast_id)
+        .cloned()
+        .unwrap_or_else(|| Arc::from(bare))
 }
 
 pub(super) fn enclosing(class: Option<&varn_tir::ClassInfo>) -> Option<Arc<str>> {

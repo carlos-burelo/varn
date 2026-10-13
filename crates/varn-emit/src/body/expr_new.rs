@@ -92,8 +92,7 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Never
             | BackendTy::Dynamic(_) => class,
         };
-        let ctor_sig =
-            built.and_then(|c| crate::tables::inherited_constructor(self.m.classes, c));
+        let ctor_sig = built.and_then(|c| crate::tables::inherited_constructor(self.m.classes, c));
         let targs = self.fill_omitted(targs, Some(call_id), ctor_sig);
         let reached_by = if let ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind {
             let name = self.m.interner.resolve(*name);

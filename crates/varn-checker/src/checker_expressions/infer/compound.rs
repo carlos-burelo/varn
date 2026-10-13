@@ -91,10 +91,9 @@ impl<'r> Checker<'r> {
                 }
                 match slots.split_first() {
                     Some((first, rest)) if rest.iter().all(|slot| slot == first) => *first,
-                    Some(_) => Type::union(
-                        slots,
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    ),
+                    Some(_) => {
+                        Type::union(slots, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                    }
                     None => Type::Dynamic,
                 }
             }

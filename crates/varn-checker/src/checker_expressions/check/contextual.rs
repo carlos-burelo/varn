@@ -159,8 +159,10 @@ impl<'r> Checker<'r> {
                             .unwrap_or_default();
 
                         let mapping = match self.ty_table.get(ty.0) {
-                            TypeKind::Generic(_, args, _) if origin.as_deref()
-                                .is_none_or(|o| o == bind.source_file.as_ref()) =>
+                            TypeKind::Generic(_, args, _)
+                                if origin
+                                    .as_deref()
+                                    .is_none_or(|o| o == bind.source_file.as_ref()) =>
                             {
                                 let args: Vec<Type> = self
                                     .ty_table
@@ -253,11 +255,7 @@ impl<'r> Checker<'r> {
                     if let Some(expected) = &prop_expected {
                         let actual = self.infer_type(rec, *value, bind);
                         if !actual.is_dynamic()
-                            && !self.value_fits(rec, expected,
-                                &actual,
-                                Some(*value),
-                                Some(bind),
-                            )
+                            && !self.value_fits(rec, expected, &actual, Some(*value), Some(bind))
                         {
                             let actual_s = actual.display(&self.ty_table, &bind.interner);
                             let expected_s = expected.display(&self.ty_table, &bind.interner);

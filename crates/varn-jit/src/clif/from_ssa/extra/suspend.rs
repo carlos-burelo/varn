@@ -94,7 +94,7 @@ pub(super) fn dispose(
         ctx.helpers.jit_call_method_window,
         &[ectx, niv, csv, w, total, out],
     );
-    super::super::call::run_entered_or(b, ctx, entry, out);
+    super::super::call::run_entered_or(b, ctx, entry, out)?;
     Ok(Some(None))
 }
 

@@ -87,13 +87,12 @@ fn recycle(ctx: &mut ExecCtx) {
     ctx.module_exports.clear();
     ctx.stage.clear();
     ctx.vm_suspend = None;
-    ctx.jit_jmp_buf = std::ptr::null_mut();
     ctx.jit_suspend_buf = std::ptr::null_mut();
-    ctx.jit_panic_exception_handler = None;
     ctx.jit_panic_exception_error = None;
     ctx.jit_panic_exception_err_obj = None;
     ctx.jit_panic_suspend_resume_ip = None;
     ctx.jit_native_result = VmValue::null();
+    ctx.jit_error_flag = 0;
     ctx.osr_request = None;
     ctx.gc_inhibited = false;
 }
@@ -111,10 +110,7 @@ fn failure_value(ctx: &mut ExecCtx, err: crate::error::RuntimeError) -> VmValue 
 pub(crate) fn request_osr(ctx: &mut ExecCtx, mode: varn_types::ssa::OsrMode) {
     if let Some(frame) = ctx.frames.last() {
         if frame.ip != 0 {
-            ctx.osr_request = Some(varn_types::ssa::OsrRequest {
-                ip: frame.ip,
-                mode,
-            });
+            ctx.osr_request = Some(varn_types::ssa::OsrRequest { ip: frame.ip, mode });
         }
     }
 }
@@ -146,7 +142,8 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
             request_osr(&mut ctx, varn_types::ssa::OsrMode::Resume);
         } else {
             ctx.jit_native_result = cell.value();
-            request_osr(&mut ctx, varn_types::ssa::OsrMode::Throw);
+            ctx.jit_error_flag = 1;
+            request_osr(&mut ctx, varn_types::ssa::OsrMode::Resume);
         }
     } else if resumed {
         request_osr(&mut ctx, varn_types::ssa::OsrMode::Resume);
@@ -172,7 +169,8 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
             }
             ParkAction::ResumeErr(thrown) => {
                 ctx.jit_native_result = thrown;
-                request_osr(&mut ctx, varn_types::ssa::OsrMode::Throw);
+                ctx.jit_error_flag = 1;
+                request_osr(&mut ctx, varn_types::ssa::OsrMode::Resume);
             }
             ParkAction::Park(handle) => {
                 let stats = &crate::profile::TASK_STATS;

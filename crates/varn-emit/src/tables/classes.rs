@@ -143,8 +143,7 @@ fn build_one_class(
                 if statics.iter().any(|(n, _, _)| n == &m.name) {
                     continue;
                 }
-                let static_bt =
-                    field_backend_ty(m.ty, m.is_optional, table, interner, tt, names);
+                let static_bt = field_backend_ty(m.ty, m.is_optional, table, interner, tt, names);
                 statics.push((m.name.clone(), static_bt, None));
             }
             ClassMemberKind::Method
@@ -248,7 +247,8 @@ fn build_one_class(
         None if !foreign_prefix.is_empty() => Ancestry::Foreign(foreign_prefix),
         None => Ancestry::Root,
     };
-    let mut info = ClassInfo::new_with_methods(name.clone(), ancestry, fields, methods, statics, tt);
+    let mut info =
+        ClassInfo::new_with_methods(name.clone(), ancestry, fields, methods, statics, tt);
     info.constructor = constructor;
     info
 }

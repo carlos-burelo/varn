@@ -237,7 +237,9 @@ impl<'a> FnEmitter<'a> {
     pub fn with_this_enum(mut self, enum_id: EnumId) -> Self {
         self.this_enum = Some(enum_id);
         let owner = self.m.enums.get(enum_id.0 as usize).map(|info| &info.name);
-        self.namespace = owner.and_then(|name| name.rsplit_once("::")).map(|(outer, _)| Arc::from(outer));
+        self.namespace = owner
+            .and_then(|name| name.rsplit_once("::"))
+            .map(|(outer, _)| Arc::from(outer));
         self
     }
 

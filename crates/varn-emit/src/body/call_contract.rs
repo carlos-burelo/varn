@@ -80,7 +80,7 @@ impl<'a> FnEmitter<'a> {
             sig,
             span,
         )
-            .1
+        .1
     }
 
     fn is_untyped(&self, ty: BackendTy) -> bool {

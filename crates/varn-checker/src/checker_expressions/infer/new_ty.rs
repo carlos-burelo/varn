@@ -27,9 +27,9 @@ impl<'r> Checker<'r> {
                     let args: Vec<Type> = type_args
                         .iter()
                         .map(|a| {
-                                self.check_type_names(a, bind);
-                                self.resolve_type_node_cached(a, bind)
-                            })
+                            self.check_type_names(a, bind);
+                            self.resolve_type_node_cached(a, bind)
+                        })
                         .collect();
                     Type::generic_with_origin(
                         name_str,
@@ -39,9 +39,14 @@ impl<'r> Checker<'r> {
                     )
                 } else if let Some(contextual) = self.expected_instantiation(name) {
                     contextual
-                } else if let Some(args) =
-                    self.instantiation_from_args(rec, callee, &name_str, origin_str.as_ref(), ctor_args, bind)
-                {
+                } else if let Some(args) = self.instantiation_from_args(
+                    rec,
+                    callee,
+                    &name_str,
+                    origin_str.as_ref(),
+                    ctor_args,
+                    bind,
+                ) {
                     Type::generic_with_origin(
                         name_str,
                         args,

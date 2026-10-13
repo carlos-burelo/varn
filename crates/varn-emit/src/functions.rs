@@ -199,14 +199,16 @@ pub(super) fn emit_function(
         Some(ns) => bind
             .get_namespace_members_local(ns.rsplit("::").next().unwrap_or(ns))
             .and_then(|members| {
-            members
-                .iter()
-                .filter(|m| {
-                    m.kind == varn_sem::types::ClassMemberKind::Function
-                        && m.name.as_ref() == fn_name_str
-                })
-                .find_map(|m| matches!(m.ty.kind(ctx.checker_table), TypeKind::Fn(_)).then(|| m.ty))
-        }),
+                members
+                    .iter()
+                    .filter(|m| {
+                        m.kind == varn_sem::types::ClassMemberKind::Function
+                            && m.name.as_ref() == fn_name_str
+                    })
+                    .find_map(|m| {
+                        matches!(m.ty.kind(ctx.checker_table), TypeKind::Fn(_)).then(|| m.ty)
+                    })
+            }),
         None => sym_ty.filter(|t| matches!(t.kind(ctx.checker_table), TypeKind::Fn(_))),
     };
 

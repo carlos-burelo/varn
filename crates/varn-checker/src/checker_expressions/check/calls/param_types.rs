@@ -38,7 +38,11 @@ pub(super) fn compatible_param_type(
     }
 }
 
-pub(super) fn named_slot_problem(label: Option<&str>, slot: Option<usize>, taken: bool) -> Option<String> {
+pub(super) fn named_slot_problem(
+    label: Option<&str>,
+    slot: Option<usize>,
+    taken: bool,
+) -> Option<String> {
     match (label, slot) {
         (Some(label), None) => Some(format!("no parameter is named '{label}'")),
         (Some(label), Some(_)) if taken => {

@@ -105,11 +105,13 @@ impl<'m> Builder<'m> {
         nullable: bool,
         ty: HirType,
     ) -> Result<Value> {
-        let name = self
-            .tir
-            .class(class)
-            .map(|ci| ci.name.clone())
-            .ok_or(crate::OptError::Unsupported("from_tir: Checked to an unknown class"))?;
+        let name =
+            self.tir
+                .class(class)
+                .map(|ci| ci.name.clone())
+                .ok_or(crate::OptError::Unsupported(
+                    "from_tir: Checked to an unknown class",
+                ))?;
         let cls = self.emit(self.global_load(&name), HirType::Ref);
         let is_instance = self.emit(
             InstKind::Binary {
@@ -142,17 +144,16 @@ impl<'m> Builder<'m> {
         } else {
             is_instance
         };
-        let expected = if nullable { format!("{name}?") } else { name.to_string() };
+        let expected = if nullable {
+            format!("{name}?")
+        } else {
+            name.to_string()
+        };
         self.throw_type_mismatch_unless(holds, v, &expected)?;
         Ok(self.emit(InstKind::Cast { operand: v, ty }, ty))
     }
 
-    fn throw_type_mismatch_unless(
-        &mut self,
-        holds: Value,
-        v: Value,
-        expected: &str,
-    ) -> Result<()> {
+    fn throw_type_mismatch_unless(&mut self, holds: Value, v: Value, expected: &str) -> Result<()> {
         let throw_blk = self.new_block();
         let join_blk = self.new_block();
         let from = self.current;
@@ -290,7 +291,13 @@ impl<'m> Builder<'m> {
                     }
                 };
                 let checked = self.emit(InstKind::Convert { operand: v, conv }, HirType::Dynamic);
-                return Ok(self.emit(InstKind::Cast { operand: checked, ty }, ty));
+                return Ok(self.emit(
+                    InstKind::Cast {
+                        operand: checked,
+                        ty,
+                    },
+                    ty,
+                ));
             }
             HirType::Ref
             | HirType::Dynamic
@@ -299,7 +306,9 @@ impl<'m> Builder<'m> {
             | HirType::Set(_)
             | HirType::Tuple
             | HirType::Class(_) => {
-                return Err(crate::OptError::Unsupported("from_tir: Checked to a non-scalar type"));
+                return Err(crate::OptError::Unsupported(
+                    "from_tir: Checked to a non-scalar type",
+                ));
             }
         };
         let result_ty = crate::ssa::verify::convert_result_ty(conv);

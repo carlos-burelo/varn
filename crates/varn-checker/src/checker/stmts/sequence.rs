@@ -147,10 +147,7 @@ impl<'r> Checker<'r> {
         self.mark_infer_env_dirty();
     }
 
-    fn push_member_narrowings(
-        &mut self,
-        narrowings: &[(super::reassignment::MemberKey, Type)],
-    ) {
+    fn push_member_narrowings(&mut self, narrowings: &[(super::reassignment::MemberKey, Type)]) {
         for (key, ty) in narrowings {
             self.member_narrowed
                 .entry(key.clone())
@@ -160,10 +157,7 @@ impl<'r> Checker<'r> {
         self.mark_infer_env_dirty();
     }
 
-    fn pop_member_narrowings(
-        &mut self,
-        narrowings: &[(super::reassignment::MemberKey, Type)],
-    ) {
+    fn pop_member_narrowings(&mut self, narrowings: &[(super::reassignment::MemberKey, Type)]) {
         for (key, _) in narrowings {
             if let Some(stack) = self.member_narrowed.get_mut(key) {
                 stack.pop();

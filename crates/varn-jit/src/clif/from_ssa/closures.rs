@@ -2,7 +2,6 @@ use cranelift_codegen::ir::{types, InstBuilder, StackSlotData, StackSlotKind, Va
 use cranelift_frontend::FunctionBuilder;
 use varn_types::ssa::{SsaUpvalue, UPVALUE_LOCAL};
 
-use super::super::emit::call_helper_void;
 use super::{heap, home_load, home_store, Ctx, FrameIo};
 
 fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
@@ -69,12 +68,12 @@ pub(super) fn emit_make_closure(
     };
     let proto_v = b.ins().iconst(types::I64, i64::from(proto));
     let count = b.ins().iconst(types::I64, words.len() as i64);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.make_closure_window,
         &[frame.exec_ctx, frame.closure, base, proto_v, descs, count],
-    );
+    )?;
     Ok(native_result(b, ctx, frame.exec_ctx))
 }
 
@@ -104,12 +103,12 @@ pub(super) fn emit_load_upvalue(
 ) -> Result<Value, String> {
     let frame = frame(ctx)?;
     let idx = b.ins().iconst(types::I64, i64::from(index));
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.load_upvalue,
         &[frame.exec_ctx, frame.closure, idx],
-    );
+    )?;
     Ok(native_result(b, ctx, frame.exec_ctx))
 }
 
@@ -123,12 +122,12 @@ pub(super) fn emit_store_upvalue(
     let frame = frame(ctx)?;
     let (tag, payload) = heap::boxed_parts(b, ctx, values, value)?;
     let idx = b.ins().iconst(types::I64, i64::from(index));
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.store_upvalue,
         &[frame.exec_ctx, frame.closure, idx, tag, payload],
-    );
+    )?;
     Ok(())
 }
 
@@ -146,11 +145,11 @@ pub(super) fn emit_close_upvalues(
         .min()
         .ok_or("from_ssa: closing no upvalues")?;
     let lowest = b.ins().iconst(types::I64, i64::from(lowest));
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.close_upvalue,
         &[frame.exec_ctx, lowest],
-    );
+    )?;
     Ok(())
 }

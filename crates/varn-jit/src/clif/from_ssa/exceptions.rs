@@ -1,13 +1,33 @@
-use cranelift_codegen::ir::{types, InstBuilder, TrapCode, Value};
-use cranelift_frontend::FunctionBuilder;
-
-use super::super::emit::call_helper_void;
 use super::{heap, home_store, Ctx, FrameIo};
+use cranelift_codegen::ir::{types, Block, InstBuilder, MemFlagsData, Value};
+use cranelift_frontend::FunctionBuilder;
 
 fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
     ctx.frame
         .as_ref()
         .ok_or_else(|| "from_ssa: try/throw without a frame".into())
+}
+
+fn current_landing(ctx: &Ctx<'_>) -> Option<(usize, Block)> {
+    let st = ctx.pure_try.borrow();
+    let h = *st.stack.last()?;
+    let blk = *st.clif_map.get(&h)?;
+    Some((h, blk))
+}
+
+fn err_ret(ctx: &Ctx<'_>) -> Option<Block> {
+    ctx.pure_try.borrow().err_ret
+}
+
+pub(super) fn set_block_stack(ctx: &Ctx<'_>, ssa_idx: usize) {
+    let entry = ctx
+        .pure_try
+        .borrow()
+        .entry_stacks
+        .get(ssa_idx)
+        .cloned()
+        .unwrap_or_default();
+    ctx.pure_try.borrow_mut().stack = entry;
 }
 
 pub(super) fn emit_try(
@@ -18,22 +38,37 @@ pub(super) fn emit_try(
     catch_value: u32,
     live: &[u32],
 ) -> Result<(), String> {
-    let frame = frame(ctx)?;
+    let fr = frame(ctx)?;
+    let _ = fr;
     for &v in live {
         let boxed = heap::boxed_value(b, ctx, values, v)?;
         home_store(b, ctx, ctx.ssa.reg(v), boxed)?;
     }
-    let ip = b.ins().iconst(types::I64, i64::from(catch_ip));
-    let reg = b
-        .ins()
-        .iconst(types::I64, i64::from(ctx.ssa.reg(catch_value)));
-    call_helper_void(b, ctx.cc, ctx.helpers.try_push, &[frame.exec_ctx, ip, reg]);
+    let e = ctx
+        .ssa
+        .catch_at(catch_ip as usize)
+        .ok_or_else(|| format!("from_ssa: no catch entry at ip {catch_ip}"))?;
+    let h = e.block as usize;
+    {
+        let mut st = ctx.pure_try.borrow_mut();
+        if let Some(prev) = st.landing_error.get(&h) {
+            if *prev != catch_value {
+                return Err("from_ssa: handler shared by two try values".into());
+            }
+        } else {
+            st.landing_error.insert(h, catch_value);
+        }
+        st.stack.push(h);
+    }
     Ok(())
 }
 
 pub(super) fn emit_pop_try(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<(), String> {
-    let frame = frame(ctx)?;
-    call_helper_void(b, ctx.cc, ctx.helpers.try_pop, &[frame.exec_ctx]);
+    let _ = b;
+    let mut st = ctx.pure_try.borrow_mut();
+    st.stack
+        .pop()
+        .ok_or_else(|| "from_ssa: poptry without try".to_owned())?;
     Ok(())
 }
 
@@ -43,29 +78,130 @@ pub(super) fn emit_throw(
     values: &[Option<Value>],
     value: u32,
 ) -> Result<(), String> {
-    let frame = frame(ctx)?;
-    let (tag, payload) = heap::boxed_parts(b, ctx, values, value)?;
-    throw_parts(b, ctx, frame.exec_ctx, tag, payload)
+    let boxed = heap::boxed_value(b, ctx, values, value)?;
+    emit_throw_boxed(b, ctx, boxed)
 }
 
 pub(super) fn emit_throw_boxed(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
-    ectx: Value,
     boxed: Value,
 ) -> Result<(), String> {
-    let (tag, payload) = b.ins().isplit(boxed);
-    throw_parts(b, ctx, ectx, tag, payload)
+    if let Some((_, landing)) = current_landing(ctx) {
+        b.ins().jump(landing, &[boxed.into()]);
+        Ok(())
+    } else {
+        let fr = frame(ctx)?;
+        let ectx = fr.exec_ctx;
+        b.ins().store(
+            MemFlagsData::trusted(),
+            boxed,
+            ectx,
+            ctx.helpers.jit_native_result_offset as i32,
+        );
+        let one = b.ins().iconst(types::I64, 1);
+        b.ins().store(
+            MemFlagsData::trusted(),
+            one,
+            ectx,
+            ctx.helpers.jit_error_flag_offset as i32,
+        );
+        let err =
+            err_ret(ctx).ok_or_else(|| "from_ssa: throw without handler nor err_ret".to_owned())?;
+        b.ins().jump(err, &[]);
+        Ok(())
+    }
 }
 
-fn throw_parts(
+pub(super) fn emit_catch_param(values: &[Option<Value>], try_val: u32) -> Result<Value, String> {
+    values
+        .get(try_val as usize)
+        .copied()
+        .flatten()
+        .ok_or_else(|| format!("from_ssa: catch value {try_val} not defined at landing"))
+}
+
+pub(super) fn clear_error_flag(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<(), String> {
+    let Some(fr) = ctx.frame.as_ref() else {
+        return Ok(());
+    };
+    let zero = b.ins().iconst(types::I64, 0);
+    b.ins().store(
+        MemFlagsData::trusted(),
+        zero,
+        fr.exec_ctx,
+        ctx.helpers.jit_error_flag_offset as i32,
+    );
+    Ok(())
+}
+
+pub(super) fn check_error_branch(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<(), String> {
+    let Some(fr) = ctx.frame.as_ref() else {
+        return Ok(());
+    };
+    let ectx = fr.exec_ctx;
+    let flag = b.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        ectx,
+        ctx.helpers.jit_error_flag_offset as i32,
+    );
+    let (landing, err) = {
+        let st = ctx.pure_try.borrow();
+        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
+        (landing, st.err_ret)
+    };
+    let cont = b.create_block();
+    match (landing, err) {
+        (Some(t), _) => {
+            let err_blk = b.create_block();
+            b.ins().brif(flag, err_blk, &[], cont, &[]);
+            b.switch_to_block(err_blk);
+            let boxed = b.ins().load(
+                types::I128,
+                MemFlagsData::trusted(),
+                ectx,
+                ctx.helpers.jit_native_result_offset as i32,
+            );
+            b.declare_value_needs_stack_map(boxed);
+            let zero = b.ins().iconst(types::I64, 0);
+            b.ins().store(
+                MemFlagsData::trusted(),
+                zero,
+                ectx,
+                ctx.helpers.jit_error_flag_offset as i32,
+            );
+            b.ins().jump(t, &[boxed.into()]);
+            b.switch_to_block(cont);
+        }
+        (None, Some(e)) => {
+            b.ins().brif(flag, e, &[], cont, &[]);
+            b.switch_to_block(cont);
+        }
+        (None, None) => {}
+    }
+    Ok(())
+}
+
+pub(super) fn call_checked(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
-    ectx: Value,
-    tag: Value,
-    payload: Value,
+    helper: usize,
+    args: &[Value],
 ) -> Result<(), String> {
-    call_helper_void(b, ctx.cc, ctx.helpers.throw, &[ectx, tag, payload]);
-    b.ins().trap(TrapCode::user(1).expect("non-zero trap code"));
-    Ok(())
+    clear_error_flag(b, ctx)?;
+    super::super::emit::call_helper_void(b, ctx.cc, helper, args);
+    check_error_branch(b, ctx)
+}
+
+pub(super) fn call_checked_value(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    helper: usize,
+    args: &[Value],
+) -> Result<Value, String> {
+    clear_error_flag(b, ctx)?;
+    let v = super::super::emit::call_helper(b, ctx.cc, helper, args);
+    check_error_branch(b, ctx)?;
+    Ok(v)
 }

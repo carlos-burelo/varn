@@ -2,9 +2,7 @@ use super::context::FnEmitter;
 use std::collections::BTreeSet;
 use varn_core::ast::{StmtId, StmtKind};
 use varn_core::Atom;
-use varn_tir::{
-    BackendTy, LocalId, Resolution, Span, TirBinOp, TirExpr, TirExprKind, TirStmt,
-};
+use varn_tir::{BackendTy, LocalId, Resolution, Span, TirBinOp, TirExpr, TirExprKind, TirStmt};
 
 const LEAVE: i64 = 1;
 const AGAIN: i64 = 2;

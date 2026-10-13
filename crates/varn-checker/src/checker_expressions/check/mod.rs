@@ -133,10 +133,14 @@ impl<'r> Checker<'r> {
                 }
                 match op {
                     varn_core::ast::LogicalOp::And => {
-                        self.in_branch(rec, left, bind, true, |c, rec| c.check_expr(rec, right, bind))
+                        self.in_branch(rec, left, bind, true, |c, rec| {
+                            c.check_expr(rec, right, bind)
+                        })
                     }
                     varn_core::ast::LogicalOp::Or => {
-                        self.in_branch(rec, left, bind, false, |c, rec| c.check_expr(rec, right, bind))
+                        self.in_branch(rec, left, bind, false, |c, rec| {
+                            c.check_expr(rec, right, bind)
+                        })
                     }
                     varn_core::ast::LogicalOp::Nullish => self.check_expr(rec, right, bind),
                 }

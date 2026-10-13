@@ -14,6 +14,7 @@ macro_rules! fill_tail {
             young_len_offset: crate::heap::Heap::young_len_byte_offset_from_rcbox(),
             young_threshold: crate::heap::young::YOUNG_THRESHOLD,
             jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
+            jit_error_flag_offset: std::mem::offset_of!(ctx::ExecCtx, jit_error_flag),
             jit_exit_offset: std::mem::offset_of!(ctx::ExecCtx, jit_exit),
             globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals),
             globals_store_offset: 2 * std::mem::size_of::<usize>()
@@ -37,7 +38,7 @@ macro_rules! fill_tail {
 pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     assert_eq!(
         varn_jit::JIT_HELPERS_VERSION,
-        1,
+        3,
         "JitHelpers ABI version mismatch: review offset_of layout after varn-jit-abi change"
     );
     jit_helper_table!(fill, "src/exec/jit_helpers")

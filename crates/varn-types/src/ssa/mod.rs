@@ -90,8 +90,6 @@ pub struct SsaSecondaryEntry {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OsrMode {
     Resume,
-    Throw,
-    Catch,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -120,11 +118,6 @@ impl SsaProto {
         self.secondary_entries
             .iter()
             .find(|e| e.ip as usize == ip && e.kind == SsaEntryKind::Resume)
-            .or_else(|| {
-                self.secondary_entries.iter().find(|e| {
-                    e.ip as usize == ip && e.kind != SsaEntryKind::Catch
-                })
-            })
     }
 
     pub fn catch_at(&self, ip: usize) -> Option<&SsaSecondaryEntry> {

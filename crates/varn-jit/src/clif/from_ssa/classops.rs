@@ -9,7 +9,7 @@ use super::heap::boxed_parts;
 use super::props::str_idx;
 use super::Ctx;
 
-use super::super::emit::{box_null, call_helper_void};
+use super::super::emit::box_null;
 
 pub(super) fn emit_make_class(
     b: &mut FunctionBuilder,
@@ -32,12 +32,12 @@ pub(super) fn emit_make_class(
     };
     let ectx = frame.exec_ctx;
     let name_v = b.ins().iconst(types::I64, name_idx as i64);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.make_class,
         &[ectx, frame.closure, st, sp, name_v],
-    );
+    )?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -266,7 +266,12 @@ fn emit_alloc_instance_slow(
         .ok_or("from_ssa: AllocInstance without a frame")?;
     let (ct, cp) = boxed_parts(b, ctx, values, class)?;
     let ectx = frame.exec_ctx;
-    call_helper_void(b, ctx.cc, ctx.helpers.alloc_instance, &[ectx, ct, cp]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        ctx.helpers.alloc_instance,
+        &[ectx, ct, cp],
+    )?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -296,12 +301,12 @@ pub(super) fn emit_declare_layout(
         .ok_or("from_ssa: class layout not in pool")?;
     let ectx = frame.exec_ctx;
     let idx_v = b.ins().iconst(types::I64, layout_idx as i64);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.declare_layout,
         &[ectx, frame.closure, ct, cp, idx_v],
-    );
+    )?;
     Ok(())
 }
 
@@ -338,12 +343,12 @@ pub(super) fn emit_define_member(
     b.ins().stack_store(types::I64, kind_v, slot, 40);
     let args = b.ins().stack_addr(types::I64, slot, 0);
 
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.class_member_op,
         &[ectx, frame.closure, args],
-    );
+    )?;
     Ok(())
 }
 
@@ -360,7 +365,12 @@ pub(super) fn emit_get_super(
     let name_idx = str_idx(ctx, name)?;
     let ectx = frame.exec_ctx;
     let name_v = b.ins().iconst(types::I64, name_idx as i64);
-    call_helper_void(b, ctx.cc, ctx.helpers.get_super, &[ectx, name_v]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        ctx.helpers.get_super,
+        &[ectx, name_v],
+    )?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -381,12 +391,12 @@ pub(super) fn emit_make_enum_variant(
         .ok_or("from_ssa: MakeEnumVariant without a frame")?;
     let meta_v = b.ins().iconst(types::I64, str_idx(ctx, meta)? as i64);
     let tag_v = b.ins().iconst(types::I64, tag);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.make_enum_variant_const,
         &[frame.exec_ctx, frame.closure, tag_v, meta_v],
-    );
+    )?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),

@@ -115,10 +115,8 @@ fn lower_kind(
             BackendTy::Dynamic(DynReason::Awaitable(tt.intern(result)))
         }
         TypeKind::Generic(name, args, _)
-            if matches!(
-                interner.resolve(name),
-                "Generator" | "AsyncGenerator"
-            ) && table.get_list(args).len() == 1 =>
+            if matches!(interner.resolve(name), "Generator" | "AsyncGenerator")
+                && table.get_list(args).len() == 1 =>
         {
             let yielded = lower_type(
                 &Type::resolved(table.get_list(args)[0]),

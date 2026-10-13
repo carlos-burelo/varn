@@ -60,29 +60,29 @@ impl ExecCtx {
             let osr_fn = match unsafe { (*ctx).osr_request.take() } {
                 Some(req) if unsafe { req.ip == (*ctx).frames[frame_idx].ip } => {
                     let jit_on = unsafe { !(*ctx).settings.no_jit };
-                    let f = jit_on
-                        .then(|| closure.osr_jit_fn(req))
-                        .flatten();
+                    let f = jit_on.then(|| closure.osr_jit_fn(req)).flatten();
                     match (f, req.mode) {
                         (Some(f), _) => Some(f),
-                        (None, varn_types::ssa::OsrMode::Throw) => unsafe {
+                        (None, varn_types::ssa::OsrMode::Resume) => unsafe {
                             let ctxm = &mut *ctx;
-                            let thrown = ctxm.jit_native_result;
-                            match ctxm.reject_awaited(thrown) {
-                                crate::exec::ctx_tasks::Rejection::Caught => None,
-                                crate::exec::ctx_tasks::Rejection::Unhandled(thrown) => {
-                                    let err =
-                                        crate::exec::exceptions::build_thrown_error(
+                            if ctxm.jit_error_flag != 0 {
+                                ctxm.jit_error_flag = 0;
+                                let thrown = ctxm.jit_native_result;
+                                match ctxm.reject_awaited(thrown) {
+                                    crate::exec::ctx_tasks::Rejection::Caught => None,
+                                    crate::exec::ctx_tasks::Rejection::Unhandled(thrown) => {
+                                        let err = crate::exec::exceptions::build_thrown_error(
                                             thrown,
                                             &ctxm.heap,
                                             &ctxm.frames,
                                         );
-                                    return Err(err);
+                                        return Err(err);
+                                    }
                                 }
+                            } else {
+                                None
                             }
                         },
-                        (None, varn_types::ssa::OsrMode::Resume)
-                        | (None, varn_types::ssa::OsrMode::Catch) => None,
                     }
                 }
                 Some(_) | None => None,

@@ -303,7 +303,8 @@ pub(crate) fn verify_call(
     callee: VmValue,
     args: &[VmValue],
 ) -> Result<Option<Vec<VmValue>>, NativeError> {
-    let Some(closure) = target_closure(&ctx.heap, callee).filter(|closure| closure.proto.checks_params)
+    let Some(closure) =
+        target_closure(&ctx.heap, callee).filter(|closure| closure.proto.checks_params)
     else {
         return Ok(None);
     };

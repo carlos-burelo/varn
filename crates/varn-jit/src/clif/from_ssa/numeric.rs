@@ -5,7 +5,7 @@ use varn_core::ValueConv;
 use varn_types::register_meta::SlotKind;
 use varn_types::ssa::SsaProto;
 
-use super::super::emit::{box_f64, call_helper_void};
+use super::super::emit::box_f64;
 use super::{call, heap, load_value, Ctx, Out};
 
 fn exec_ctx(ctx: &Ctx<'_>) -> Value {
@@ -58,12 +58,12 @@ pub(super) fn emit_intrinsic(
     let window = call::boxed_window(b, ctx, values, receiver, args)?;
     let wire_v = b.ins().iconst(types::I64, i64::from(wire));
     let count = b.ins().iconst(types::I64, (args.len() + 1) as i64);
-    call_helper_void(
+    super::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.intrinsic_window,
         &[ectx, wire_v, window, count],
-    );
+    )?;
     Ok(Out::Boxed(native_result(b, ctx, ectx)))
 }
 
@@ -86,12 +86,12 @@ pub(super) fn emit_convert(
     let (tag, payload) = heap::boxed_parts(b, ctx, values, operand)?;
     let Some(expected) = Expected::of(conv) else {
         let conv_v = b.ins().iconst(types::I64, conv as i64);
-        call_helper_void(
+        super::exceptions::call_checked(
             b,
-            ctx.cc,
+            ctx,
             ctx.helpers.convert,
             &[ectx, conv_v, tag, payload],
-        );
+        )?;
         return Ok(Out::Boxed(native_result(b, ctx, ectx)));
     };
 
@@ -138,12 +138,7 @@ pub(super) fn emit_convert(
 
     b.switch_to_block(slow);
     let conv_v = b.ins().iconst(types::I64, conv as i64);
-    call_helper_void(
-        b,
-        ctx.cc,
-        ctx.helpers.convert,
-        &[ectx, conv_v, tag, payload],
-    );
+    super::exceptions::call_checked(b, ctx, ctx.helpers.convert, &[ectx, conv_v, tag, payload])?;
     let converted = native_result(b, ctx, ectx);
     b.ins().jump(merge, &[converted.into()]);
 

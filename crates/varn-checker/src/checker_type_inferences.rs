@@ -75,12 +75,13 @@ pub(crate) fn collect_type_inferences(
             }
         }
         TypeKind::Union(e_members) => {
-            let present = |ids: &[varn_sem::types::CheckerTyId]| -> Vec<varn_sem::types::CheckerTyId> {
-                ids.iter()
-                    .copied()
-                    .filter(|id| *id != Type::Null.0)
-                    .collect()
-            };
+            let present =
+                |ids: &[varn_sem::types::CheckerTyId]| -> Vec<varn_sem::types::CheckerTyId> {
+                    ids.iter()
+                        .copied()
+                        .filter(|id| *id != Type::Null.0)
+                        .collect()
+                };
             let e_ids = present(table.get_list(e_members));
             let a_ids = if let TypeKind::Union(a_members) = table.get(actual.0) {
                 present(table.get_list(a_members))

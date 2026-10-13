@@ -9,7 +9,10 @@ pub(crate) extern "C" fn jit_get_index(ctx: *mut ExecCtx, args: *const varn_jit:
         let args = &*args;
         let key = match ctx_ref.hashable_key(args.key) {
             Ok(key) => key,
-            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+            Err(e) => {
+                super::construct::jit_propagate_error(ctx_ref, e);
+                return;
+            }
         };
         match crate::exec::collections::get_index(args.obj, key, &mut ctx_ref.heap) {
             Ok(v) => ctx_ref.jit_native_result = v,
@@ -25,7 +28,10 @@ pub(crate) extern "C" fn jit_set_index(ctx: *mut ExecCtx, args: *const varn_jit:
         let args = &*args;
         let key = match ctx_ref.hashable_key(args.key) {
             Ok(key) => key,
-            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+            Err(e) => {
+                super::construct::jit_propagate_error(ctx_ref, e);
+                return;
+            }
         };
         match crate::exec::collections::set_index(args.obj, key, args.val, &mut ctx_ref.heap) {
             Ok(()) => {}
@@ -45,7 +51,10 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
     let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
     let key = match unsafe { (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload)) } {
         Ok(key) => key,
-        Err(e) => unsafe { super::construct::jit_propagate_error(&mut *ctx, e) },
+        Err(e) => {
+            unsafe { super::construct::jit_propagate_error(&mut *ctx, e) };
+            return;
+        }
     };
 
     if obj.is_heap() {
@@ -60,7 +69,10 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                 };
                 match crate::exec::collections::element_at(a, idx) {
                     Ok(v) => unsafe { (*ctx).jit_native_result = v },
-                    Err(e) => unsafe { super::construct::jit_propagate_error(&mut *ctx, e) },
+                    Err(e) => unsafe {
+                        super::construct::jit_propagate_error(&mut *ctx, e);
+                        return;
+                    },
                 }
                 return;
             }
@@ -162,7 +174,10 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
     let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
     let key = match unsafe { (*ctx).hashable_key(VmValue::from_raw_parts(key_tag, key_payload)) } {
         Ok(key) => key,
-        Err(e) => unsafe { super::construct::jit_propagate_error(&mut *ctx, e) },
+        Err(e) => {
+            unsafe { super::construct::jit_propagate_error(&mut *ctx, e) };
+            return;
+        }
     };
     let val = VmValue::from_raw_parts(val_tag, val_payload);
 

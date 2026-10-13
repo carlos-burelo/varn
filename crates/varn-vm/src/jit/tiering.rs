@@ -129,11 +129,12 @@ impl VmClosure {
             return None;
         }
         if let Some(hit) = proto.osr_lookup(req.ip, req.mode, epoch) {
-            return hit.map(|entry| unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry) });
+            return hit
+                .map(|entry| unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry) });
         }
 
         let allowed = match req.mode {
-            varn_types::ssa::OsrMode::Resume | varn_types::ssa::OsrMode::Throw => {
+            varn_types::ssa::OsrMode::Resume => {
                 if proto.is_generator || proto.is_async {
                     proto
                         .ssa
@@ -143,10 +144,6 @@ impl VmClosure {
                     true
                 }
             }
-            varn_types::ssa::OsrMode::Catch => proto
-                .ssa
-                .get()
-                .is_some_and(|ssa| ssa.catch_at(req.ip).is_some()),
         };
         if !allowed {
             proto.osr_remember(req.ip, req.mode, epoch, None);
@@ -162,12 +159,7 @@ impl VmClosure {
                     compiled.native, 0,
                     "osr lowering must not publish a native entry"
                 );
-                proto.osr_remember(
-                    req.ip,
-                    req.mode,
-                    epoch,
-                    Some((entry_usize, compiled.code)),
-                );
+                proto.osr_remember(req.ip, req.mode, epoch, Some((entry_usize, compiled.code)));
 
                 crate::clif_link::register_compiled(proto, None);
                 Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry_usize) })
@@ -179,4 +171,3 @@ impl VmClosure {
         }
     }
 }
-

@@ -12,9 +12,10 @@ impl FunctionProto {
         mode: crate::ssa::OsrMode,
         epoch: u64,
     ) -> Option<Option<usize>> {
-        self.jit_osr_entries.borrow().iter().find_map(|e| {
-            (e.ip == ip && e.mode == mode && e.epoch == epoch).then_some(e.entry)
-        })
+        self.jit_osr_entries
+            .borrow()
+            .iter()
+            .find_map(|e| (e.ip == ip && e.mode == mode && e.epoch == epoch).then_some(e.entry))
     }
 
     pub fn osr_failed(&self, ip: usize, mode: crate::ssa::OsrMode, epoch: u64) -> bool {

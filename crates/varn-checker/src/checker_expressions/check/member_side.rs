@@ -118,9 +118,7 @@ impl<'r> Checker<'r> {
         } else {
             format!("'{member}' belongs to an instance of '{name}', not to the class itself")
         };
-        self.emit(
-            Diagnostic::error(ErrorCode::StaticMemberOnInstance, message).with_range(*range),
-        );
+        self.emit(Diagnostic::error(ErrorCode::StaticMemberOnInstance, message).with_range(*range));
     }
     pub(super) fn note_inherited_read(
         &mut self,
@@ -196,7 +194,12 @@ impl<'r> Checker<'r> {
         };
         self.emit(Diagnostic::error(ErrorCode::NotAssignable, message).with_range(*range));
     }
-    pub(super) fn declared_readonly(&mut self, owner: &Type, member: &str, bind: &BindResult) -> bool {
+    pub(super) fn declared_readonly(
+        &mut self,
+        owner: &Type,
+        member: &str,
+        bind: &BindResult,
+    ) -> bool {
         let owner = owner.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let (TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin)) =
             self.ty_table.get(owner.0)

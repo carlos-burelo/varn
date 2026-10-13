@@ -93,8 +93,10 @@ impl<'r> Checker<'r> {
                     ..
                 } => {
                     let body = *body;
-                    let declared_yield =
-                        return_type.as_ref().filter(|_| modifiers.is_generator).map(|ann| {
+                    let declared_yield = return_type
+                        .as_ref()
+                        .filter(|_| modifiers.is_generator)
+                        .map(|ann| {
                             let declared = self.resolve_type_node_cached(ann, bind);
                             varn_sem::types::yielded_by(declared, &self.ty_table)
                         });

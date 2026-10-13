@@ -98,7 +98,12 @@ pub(crate) fn emit_method_call(
         } else {
             ctx.helpers.str_index_of
         };
-        let r = call_helper(b, ctx.cc, helper, &[ectx, rt0, rp0, at, ap]);
+        let r = crate::clif::from_ssa::exceptions::call_checked_value(
+            b,
+            ctx,
+            helper,
+            &[ectx, rt0, rp0, at, ap],
+        )?;
         let boxed = if name == "indexOf" {
             box_int(b, r)
         } else {
@@ -207,7 +212,7 @@ pub(crate) fn emit_method_call(
     b.switch_to_block(resolved);
     let p = b.block_params(resolved).to_vec();
     let (class, id, slot16, kc, ver8) = (p[0], p[1], p[2], p[3], p[4]);
-    let cached = |b: &mut FunctionBuilder| -> Value {
+    let cached = |b: &mut FunctionBuilder| -> Result<Value, String> {
         let entry = call_helper(
             b,
             ctx.cc,
@@ -217,7 +222,7 @@ pub(crate) fn emit_method_call(
             ],
         );
         store::drop_home_addrs(ctx);
-        run_entered_or(b, ctx, entry, out)
+        Ok(run_entered_or(b, ctx, entry, out)?)
     };
     let lay = &ctx.helpers.call_layout;
     let is_vm = b.ins().icmp_imm_u(
@@ -252,7 +257,7 @@ pub(crate) fn emit_method_call(
         args,
         dest,
     };
-    let landed = native_entry::emit(b, ctx, values, call, |b| Ok(cached(b)))?;
+    let landed = native_entry::emit(b, ctx, values, call, |b| cached(b))?;
     let dest_kind = dest
         .map(|d| ctx.ssa.value_ty(d))
         .unwrap_or(varn_types::register_meta::SlotKind::Dynamic);
@@ -263,7 +268,7 @@ pub(crate) fn emit_method_call(
     b.ins().jump(merge, &[boxed.into()]);
 
     b.switch_to_block(cached_blk);
-    let boxed = cached(b);
+    let boxed = cached(b)?;
     b.ins().jump(merge, &[boxed.into()]);
 
     b.switch_to_block(slow);
@@ -274,7 +279,7 @@ pub(crate) fn emit_method_call(
         &[frame.exec_ctx, name_v, cs_v, window, total, out],
     );
     store::drop_home_addrs(ctx);
-    let res = run_entered_or(b, ctx, entry, out);
+    let res = run_entered_or(b, ctx, entry, out)?;
     b.ins().jump(merge, &[res.into()]);
 
     b.switch_to_block(merge);

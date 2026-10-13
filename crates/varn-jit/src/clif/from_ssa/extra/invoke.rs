@@ -1,4 +1,3 @@
-use super::super::super::emit::call_helper_void;
 use super::super::heap::{boxed_value, exec_ctx};
 use super::super::load_value;
 use super::super::store::Out;
@@ -18,7 +17,7 @@ pub(super) fn iter_call(
     let c = load_value(b, ctx, values, callee)?;
     let (ct, cp) = b.ins().isplit(c);
     let w = super::super::call::boxed_window(b, ctx, values, c, &[recv])?;
-    let r = super::super::call::emit_invoke(b, ctx, w, (ct, cp), 2);
+    let r = super::super::call::emit_invoke(b, ctx, w, (ct, cp), 2)?;
     Ok(Some(Some(Out::Boxed(r))))
 }
 
@@ -49,7 +48,7 @@ pub(super) fn super_method_call(
     }
     let w = stage_value(b, ctx, m, &vals);
     let (mt, mp) = b.ins().isplit(m);
-    let r = super::super::call::emit_invoke(b, ctx, w, (mt, mp), vals.len() + 1);
+    let r = super::super::call::emit_invoke(b, ctx, w, (mt, mp), vals.len() + 1)?;
     Ok(Some(Some(Out::Boxed(r))))
 }
 
@@ -73,7 +72,12 @@ pub(super) fn extension_call(
             let niv = b
                 .ins()
                 .iconst(types::I64, super::super::props::str_idx(ctx, func)? as i64);
-            call_helper_void(b, ctx.cc, h.load_global_by_name, &[ectx, f.closure, niv]);
+            crate::clif::from_ssa::exceptions::call_checked(
+                b,
+                ctx,
+                h.load_global_by_name,
+                &[ectx, f.closure, niv],
+            )?;
             native(b, ectx, h)
         }
     };
@@ -82,7 +86,7 @@ pub(super) fn extension_call(
     full.extend_from_slice(args);
     let w = super::super::call::boxed_window(b, ctx, values, callee, &full)?;
     let (ct, cp) = b.ins().isplit(callee);
-    let r = super::super::call::emit_invoke(b, ctx, w, (ct, cp), full.len() + 1);
+    let r = super::super::call::emit_invoke(b, ctx, w, (ct, cp), full.len() + 1)?;
     Ok(Some(Some(Out::Boxed(r))))
 }
 
@@ -102,7 +106,7 @@ pub(super) fn call_spread(
         let v = boxed_value(b, ctx, values, s.value)?;
         if s.spread {
             let (t, p) = b.ins().isplit(v);
-            call_helper_void(b, ctx.cc, h.wrap_spread, &[ectx, t, p]);
+            crate::clif::from_ssa::exceptions::call_checked(b, ctx, h.wrap_spread, &[ectx, t, p])?;
             vals.push(native(b, ectx, h));
         } else {
             vals.push(v);
@@ -110,12 +114,12 @@ pub(super) fn call_spread(
     }
     let (addr, _) = stage(b, ctx, &vals);
     let argc = b.ins().iconst(types::I64, vals.len() as i64);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         h.jit_call_spread_window,
         &[ectx, ct, cp, addr, argc],
-    );
+    )?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
 
@@ -142,13 +146,7 @@ fn emit_super_call(
         );
     }
     let (ct, cp) = b.ins().isplit(ctor);
-    Ok(super::super::call::emit_invoke(
-        b,
-        ctx,
-        addr,
-        (ct, cp),
-        vals.len(),
-    ))
+    super::super::call::emit_invoke(b, ctx, addr, (ct, cp), vals.len())
 }
 
 fn stage_value(b: &mut FunctionBuilder, ctx: &Ctx<'_>, callee: Value, args: &[Value]) -> Value {

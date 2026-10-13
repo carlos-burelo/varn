@@ -46,6 +46,10 @@ fn text(atom: varn_core::Atom, ctx: &dyn TypeContext, table: &CheckerTyTable) ->
     table
         .name(atom)
         .map(Arc::from)
-        .or_else(|| ctx.interner().and_then(|i| i.try_resolve(atom)).map(Arc::from))
+        .or_else(|| {
+            ctx.interner()
+                .and_then(|i| i.try_resolve(atom))
+                .map(Arc::from)
+        })
         .or_else(|| ctx.atom_text(atom).map(Arc::from))
 }

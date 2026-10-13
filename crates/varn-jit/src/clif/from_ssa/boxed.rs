@@ -4,7 +4,7 @@ use varn_types::ssa::SsaBinOp;
 
 use super::Ctx;
 
-use super::super::emit::{box_f64, box_int, call_helper_void, unbox_f64_coerce, unbox_int};
+use super::super::emit::{box_f64, box_int, unbox_f64_coerce, unbox_int};
 
 pub(super) fn emit_bin(
     b: &mut FunctionBuilder,
@@ -16,7 +16,6 @@ pub(super) fn emit_bin(
 ) -> Result<Value, String> {
     use SsaBinOp::*;
     let helpers = ctx.helpers;
-    let cc = ctx.cc;
     let (helper, operand_float) = match op {
         IntPow => (helpers.pow, false),
         FloatMod => (helpers.modulo, true),
@@ -30,7 +29,7 @@ pub(super) fn emit_bin(
     let (a_tag, a_payload) = box_native(b, a, operand_float);
     let (b_tag, b_payload) = box_native(b, c, operand_float);
     let live = ctx.exec_ctx;
-    call_helper_void(b, cc, helper, &[live, a_tag, a_payload, b_tag, b_payload]);
+    super::exceptions::call_checked(b, ctx, helper, &[live, a_tag, a_payload, b_tag, b_payload])?;
     let boxed = b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),

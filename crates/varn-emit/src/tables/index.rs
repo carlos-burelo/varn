@@ -116,7 +116,8 @@ pub fn build(
     };
     let global = bind.scopes.get(bind.global_scope);
     for symbol in bind.arena.all() {
-        if symbol.kind != varn_sem::symbol::SymbolKind::TypeAlias || !symbol.type_params.is_empty() {
+        if symbol.kind != varn_sem::symbol::SymbolKind::TypeAlias || !symbol.type_params.is_empty()
+        {
             continue;
         }
         let declared = global

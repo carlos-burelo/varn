@@ -28,13 +28,7 @@ pub(crate) fn emit_call(
     native_entry::emit(b, ctx, values, call, |b| {
         let window = boxed_window(b, ctx, values, callee_v, args)?;
         let (ctag, cpayload) = b.ins().isplit(callee_v);
-        Ok(emit_invoke(
-            b,
-            ctx,
-            window,
-            (ctag, cpayload),
-            args.len() + 1,
-        ))
+        emit_invoke(b, ctx, window, (ctag, cpayload), args.len() + 1)
     })
 }
 
@@ -61,5 +55,5 @@ pub(crate) fn emit_self_call_framed(
         ctx.helpers.jit_call_self_window,
         &[frame.exec_ctx, window, argc, out],
     );
-    Ok(run_entered_or(b, ctx, entry, out))
+    Ok(run_entered_or(b, ctx, entry, out)?)
 }

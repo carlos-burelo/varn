@@ -53,12 +53,23 @@ pub(super) struct Ctx<'a> {
 
     pub try_live: FxHashSet<u32>,
 
+    pub pure_try: std::cell::RefCell<PureTryState>,
+
     pub home_addrs: std::cell::RefCell<FxHashMap<u32, Value>>,
 
     pub scratch: Option<call::ScratchWin>,
 }
 
 pub(in crate::clif) const NEEDS_ACTIVATION: &str = "from_ssa: body needs a FrameStore activation";
+
+#[derive(Default)]
+pub(super) struct PureTryState {
+    pub err_ret: Option<cranelift_codegen::ir::Block>,
+    pub entry_stacks: Vec<Vec<usize>>,
+    pub landing_error: std::collections::BTreeMap<usize, u32>,
+    pub clif_map: std::collections::BTreeMap<usize, cranelift_codegen::ir::Block>,
+    pub stack: Vec<usize>,
+}
 
 pub(in crate::clif) struct Lowered {
     pub piece: CompiledPiece,

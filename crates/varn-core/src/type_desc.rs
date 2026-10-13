@@ -17,15 +17,24 @@ pub enum TypeDesc {
     Set(Box<TypeDesc>),
     Dict(Box<TypeDesc>),
     Tuple(Vec<TypeDesc>),
-    Class { witness: u32, name: String },
-    Enum { witness: u32, name: String },
+    Class {
+        witness: u32,
+        name: String,
+    },
+    Enum {
+        witness: u32,
+        name: String,
+    },
     Nullable(Box<TypeDesc>),
     Args {
         fixed: Vec<TypeDesc>,
         rest: Option<Box<TypeDesc>>,
     },
     Object(Vec<FieldDesc>),
-    Enclosing { up: u32, name: String },
+    Enclosing {
+        up: u32,
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -27,7 +27,10 @@ pub(crate) extern "C" fn jit_load_module(
         let loaded =
             match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
                 Ok(v) => v,
-                Err(e) => jit_propagate_error(ctx_ref, e),
+                Err(e) => {
+                    jit_propagate_error(ctx_ref, e);
+                    return;
+                }
             };
         if ctx_ref.vm_suspend.is_some() {
             jit_suspend_at(ctx_ref, self_idx, own_ip);

@@ -17,7 +17,7 @@ pub(crate) fn run_entered_or(
     ctx: &Ctx<'_>,
     entry: Value,
     out: Value,
-) -> Value {
+) -> Result<Value, String> {
     let entered = b.create_block();
     let declined = b.create_block();
     let merge = b.create_block();
@@ -26,11 +26,12 @@ pub(crate) fn run_entered_or(
     b.ins().brif(taken, entered, &[], declined, &[]);
 
     b.switch_to_block(entered);
-    let direct = run_entered(b, ctx, entry, out);
+    let direct = run_entered(b, ctx, entry, out)?;
     store::drop_home_addrs(ctx);
     b.ins().jump(merge, &[direct.into()]);
 
     b.switch_to_block(declined);
+    crate::clif::from_ssa::exceptions::check_error_branch(b, ctx)?;
     let fallback = b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -41,15 +42,21 @@ pub(crate) fn run_entered_or(
     b.ins().jump(merge, &[fallback.into()]);
 
     b.switch_to_block(merge);
-    b.block_params(merge)[0]
+    Ok(b.block_params(merge)[0])
 }
 
-fn run_entered(b: &mut FunctionBuilder, ctx: &Ctx<'_>, entry: Value, out: Value) -> Value {
+fn run_entered(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    entry: Value,
+    out: Value,
+) -> Result<Value, String> {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let closure = b.ins().load(types::I64, m, out, 0);
     let base = b.ins().load(types::I64, m, out, 8);
     let null = b.ins().iconst(types::I64, 0);
     let sig = b.import_signature(wrapper_signature(ctx.cc));
+    crate::clif::from_ssa::exceptions::clear_error_flag(b, ctx)?;
     let result = if wrapper_returns_via_sret(ctx.cc) {
         let slot =
             b.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 4));
@@ -66,5 +73,6 @@ fn run_entered(b: &mut FunctionBuilder, ctx: &Ctx<'_>, entry: Value, out: Value)
     };
     super::super::stack_exit::publish(b, ctx.helpers, ctx.exec_ctx);
     call_helper_void(b, ctx.cc, ctx.helpers.jit_call_leave, &[ctx.exec_ctx, base]);
-    result
+    crate::clif::from_ssa::exceptions::check_error_branch(b, ctx)?;
+    Ok(result)
 }

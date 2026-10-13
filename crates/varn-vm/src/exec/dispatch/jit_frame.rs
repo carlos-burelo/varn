@@ -1,7 +1,7 @@
 use super::ExecCtx;
 use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
-use crate::exec::frame_ctrl::{resolve_constructor_return, unwind_to_handler};
+use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::value::VmValue;
 
 pub(super) enum JitFrameOutcome {
@@ -30,8 +30,6 @@ unsafe fn execute_jit_frame(
     closure_ptr: *const VmClosure,
     base: usize,
 ) -> Result<VmValue, i32> {
-    let saved = unsafe { (*ctx).jit_jmp_buf };
-    let is_outer = saved.is_null();
     let exits_len = unsafe { (*ctx).jit_exits_saved.len() };
     unsafe { (*ctx).jit_exits_saved.push((*ctx).jit_exit) };
     unsafe { (*ctx).jit_exit = varn_jit::stack_roots::JitExit::default() };
@@ -39,9 +37,10 @@ unsafe fn execute_jit_frame(
     let jmp_res = std::hint::black_box(unsafe { crate::exec::ctx::my_setjmp(&mut jmp_buf) });
 
     if jmp_res == 0 {
-        unsafe { (*ctx).jit_jmp_buf = &mut jmp_buf as *mut crate::exec::ctx::JmpBuf };
+        let saved_suspend = unsafe { (*ctx).jit_suspend_buf };
+        let is_outer = saved_suspend.is_null();
         if is_outer {
-            unsafe { (*ctx).jit_suspend_buf = (*ctx).jit_jmp_buf };
+            unsafe { (*ctx).jit_suspend_buf = &mut jmp_buf as *mut crate::exec::ctx::JmpBuf };
         }
         let val = unsafe {
             (jit_fn)(
@@ -53,17 +52,13 @@ unsafe fn execute_jit_frame(
         };
         std::hint::black_box(ctx);
         unsafe { restore_exit(ctx, exits_len) };
-        unsafe { (*ctx).jit_jmp_buf = saved };
         if is_outer {
-            unsafe { (*ctx).jit_suspend_buf = std::ptr::null_mut() };
+            unsafe { (*ctx).jit_suspend_buf = saved_suspend };
         }
         Ok(val)
     } else {
         unsafe { restore_exit(ctx, exits_len) };
-        unsafe { (*ctx).jit_jmp_buf = saved };
-        if is_outer {
-            unsafe { (*ctx).jit_suspend_buf = std::ptr::null_mut() };
-        }
+        unsafe { (*ctx).jit_suspend_buf = std::ptr::null_mut() };
         Err(jmp_res)
     }
 }
@@ -104,47 +99,50 @@ pub(super) unsafe fn run_compiled_frame(
     let res = unsafe { execute_jit_frame(ctx, jit_fn, closure_ptr, base) };
 
     let res = match res {
-        Ok(val) => val,
-        Err(code) => {
-            if code == 1 {
-                let handler = unsafe { (*ctx).try_handlers.pop_if(|h| h.frame_depth > depth) };
-                let error = unsafe {
+        Ok(val) => {
+            if unsafe { (*ctx).jit_error_flag } != 0 {
+                unsafe { (*ctx).jit_error_flag = 0 };
+                let err_obj = unsafe { (*ctx).jit_panic_exception_err_obj.take() };
+                let error_val = unsafe {
                     (*ctx)
                         .jit_panic_exception_error
                         .take()
-                        .unwrap_or(VmValue::null())
+                        .unwrap_or((*ctx).jit_native_result)
                 };
-                let err_obj = unsafe { (*ctx).jit_panic_exception_err_obj.take() };
-
-                if let Some(handler) = handler {
-                    if let Some(catch_fn) = unsafe {
-                        catch_entry_fn(ctx, closure, frame_idx, &handler)
-                    } {
-                        unsafe { (*ctx).jit_native_result = error };
-                        varn_jit::JIT_STATS
-                            .catch_entries
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        return unsafe {
-                            run_compiled_frame(
-                                ctx,
-                                catch_fn,
-                                closure_ptr,
-                                closure,
-                                frame_idx,
-                                depth,
-                                false,
-                                true,
-                            )
-                        };
+                if unsafe { (*ctx).frames.len() } > depth {
+                    let frame = unsafe { (*ctx).frames.pop() }.unwrap();
+                    unsafe { (*ctx).drop_frame_storage(frame.base) };
+                    unsafe {
+                        (*ctx)
+                            .try_handlers
+                            .retain(|h| h.frame_depth <= (*ctx).frames.len());
                     }
-                    if let Err(e) = unwind_to_handler(unsafe { &mut *ctx }, handler, error) {
+                }
+                let handler = unsafe { (*ctx).try_handlers.pop_if(|h| h.frame_depth > depth) };
+                if let Some(handler) = handler {
+                    use crate::exec::frame_ctrl::unwind_to_handler;
+                    if let Err(e) = unwind_to_handler(unsafe { &mut *ctx }, handler, error_val) {
                         return JitFrameOutcome::Failed(e);
                     }
                     return JitFrameOutcome::Continue;
-                } else {
-                    return JitFrameOutcome::Failed(err_obj.unwrap());
                 }
-            } else if code == 2 {
+                if let Some(e) = err_obj {
+                    return JitFrameOutcome::Failed(e);
+                }
+                let e = unsafe {
+                    crate::exec::exceptions::build_thrown_error(
+                        error_val,
+                        &(*ctx).heap,
+                        &(*ctx).frames,
+                    )
+                };
+                return JitFrameOutcome::Failed(e);
+            }
+            val
+        }
+        Err(code) => {
+            if code == 2 {
+                unsafe { (*ctx).jit_error_flag = 0 };
                 if let Some(resume_ip) = unsafe { (*ctx).jit_panic_suspend_resume_ip.take() } {
                     let frame_idx2 = unsafe { (*ctx).frames.len() } - 1;
                     unsafe { (*ctx).frames[frame_idx2].ip = resume_ip };
@@ -160,34 +158,7 @@ pub(super) unsafe fn run_compiled_frame(
 }
 
 #[allow(dangerous_implicit_autorefs)]
-unsafe fn catch_entry_fn(
-    ctx: *mut ExecCtx,
-    closure: &VmClosure,
-    frame_idx: usize,
-    handler: &crate::frame::TryHandler,
-) -> Option<varn_jit::JitFn> {
-    let ctxm = &mut *ctx;
-    if ctxm.settings.no_jit {
-        return None;
-    }
-    if ctxm.frames.len() != frame_idx + 1 || handler.frame_depth != ctxm.frames.len() {
-        return None;
-    }
-    let ssa = closure.proto.ssa.get()?;
-    ssa.catch_at(handler.catch_ip)?;
-    let req = varn_types::ssa::OsrRequest {
-        ip: handler.catch_ip,
-        mode: varn_types::ssa::OsrMode::Catch,
-    };
-    closure.osr_jit_fn(req)
-}
-
-#[allow(dangerous_implicit_autorefs)]
-unsafe fn finish_compiled_frame(
-    ctx: *mut ExecCtx,
-    depth: usize,
-    res: VmValue,
-) -> JitFrameOutcome {
+unsafe fn finish_compiled_frame(ctx: *mut ExecCtx, depth: usize, res: VmValue) -> JitFrameOutcome {
     let returning_frame_idx = unsafe { (*ctx).frames.len() }.saturating_sub(1);
     let frame = unsafe { (*ctx).frames.pop() }.unwrap();
     unsafe { (*ctx).drop_frame_storage(frame.base) };

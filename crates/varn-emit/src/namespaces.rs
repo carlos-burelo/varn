@@ -4,9 +4,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 use varn_core::ast::{AstArena, Decl, ExportDecl, NamespaceDecl, Pattern};
 use varn_core::AtomInterner;
-use varn_tir::{
-    BackendTy, DynReason, FnId, Resolution, Span, TirExpr, TirExprKind, TirStmt,
-};
+use varn_tir::{BackendTy, DynReason, FnId, Resolution, Span, TirExpr, TirExprKind, TirStmt};
 
 pub(crate) fn scoped_name(outer: Option<&str>, name: &str) -> Arc<str> {
     match outer {
@@ -118,10 +116,8 @@ pub(super) fn emit_namespace_object(
             }
         }
     }
-    let outer_pending = std::mem::replace(
-        &mut top.not_yet_bound,
-        pending.iter().cloned().collect(),
-    );
+    let outer_pending =
+        std::mem::replace(&mut top.not_yet_bound, pending.iter().cloned().collect());
     for m in &ns.body {
         let inner = if let Decl::Export(ExportDecl::Decl { declaration, .. }) = m {
             declaration.as_ref()
@@ -160,8 +156,7 @@ pub(super) fn emit_namespace_object(
         };
         let Decl::Function(f) = inner else { continue };
         let key = scoped_name(Some(&path), interner.resolve(f.id));
-        let (Some(&(fnid, _)), Some(&held)) = (scoped_fns.get(&key), global_slots.get(&key))
-        else {
+        let (Some(&(fnid, _)), Some(&held)) = (scoped_fns.get(&key), global_slots.get(&key)) else {
             continue;
         };
         let wrappers: Vec<_> = f

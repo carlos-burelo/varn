@@ -140,7 +140,9 @@ impl<'a> FnEmitter<'a> {
         let name: Arc<str> = Arc::from(method.method);
         match method.shape {
             OperatorShape::Value => self.method_call(recv, name, args, ty, None, span),
-            OperatorShape::Equals => self.method_call(recv, name, args, BackendTy::Bool, None, span),
+            OperatorShape::Equals => {
+                self.method_call(recv, name, args, BackendTy::Bool, None, span)
+            }
             OperatorShape::NotEquals => {
                 let equals = self.method_call(recv, name, args, BackendTy::Bool, None, span);
                 TirExpr {

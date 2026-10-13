@@ -17,6 +17,16 @@ pub(super) fn predecessors(ssa: &SsaProto) -> Vec<Vec<usize>> {
         for s in succs {
             preds[*s as usize].push(b);
         }
+        for inst in &blk.insts {
+            if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op {
+                if let Some(e) = ssa.catch_at(*catch_ip as usize) {
+                    let h = e.block as usize;
+                    if h < preds.len() && !preds[h].contains(&b) {
+                        preds[h].push(b);
+                    }
+                }
+            }
+        }
     }
     preds
 }
@@ -54,13 +64,23 @@ pub(super) fn order(ssa: &SsaProto, entry: usize) -> Vec<usize> {
     visited[entry] = true;
     while let Some(&(b, stage)) = stack.last() {
         stack.last_mut().unwrap().1 += 1;
-        let succs: Vec<usize> = match &ssa.blocks[b].term {
+        let mut succs: Vec<usize> = match &ssa.blocks[b].term {
             SsaTerm::Jump { target, .. } => vec![*target as usize],
             SsaTerm::Branch {
                 then_blk, else_blk, ..
             } => vec![*else_blk as usize, *then_blk as usize],
             SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => Vec::new(),
         };
+        for inst in &ssa.blocks[b].insts {
+            if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op {
+                if let Some(e) = ssa.catch_at(*catch_ip as usize) {
+                    let h = e.block as usize;
+                    if h < n && !succs.contains(&h) {
+                        succs.insert(0, h);
+                    }
+                }
+            }
+        }
         match succs.get(stage as usize) {
             Some(&s) => {
                 if !visited[s] {
@@ -163,4 +183,127 @@ pub(super) fn def_blocks(ssa: &SsaProto) -> Vec<Option<usize>> {
         }
     }
     def
+}
+
+fn normal_succs(ssa: &SsaProto, b: usize) -> Vec<usize> {
+    match &ssa.blocks[b].term {
+        SsaTerm::Jump { target, .. } => vec![*target as usize],
+        SsaTerm::Branch {
+            then_blk, else_blk, ..
+        } => vec![*then_blk as usize, *else_blk as usize],
+        SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => Vec::new(),
+    }
+}
+
+fn block_exit(ssa: &SsaProto, entry: &[usize], b: usize) -> Option<Vec<usize>> {
+    let mut stack = entry.to_vec();
+    for inst in &ssa.blocks[b].insts {
+        match &inst.op {
+            varn_types::ssa::SsaOp::Try { catch_ip, .. } => {
+                let e = ssa.catch_at(*catch_ip as usize)?;
+                stack.push(e.block as usize);
+            }
+            varn_types::ssa::SsaOp::PopTry => {
+                stack.pop()?;
+            }
+            _ => {}
+        }
+    }
+    Some(stack)
+}
+
+fn stack_before_try(
+    ssa: &SsaProto,
+    entry: &[usize],
+    b: usize,
+    try_idx: usize,
+) -> Option<Vec<usize>> {
+    let mut stack = entry.to_vec();
+    for (i, inst) in ssa.blocks[b].insts.iter().enumerate() {
+        if i == try_idx {
+            return Some(stack);
+        }
+        match &inst.op {
+            varn_types::ssa::SsaOp::Try { catch_ip, .. } => {
+                let e = ssa.catch_at(*catch_ip as usize)?;
+                stack.push(e.block as usize);
+            }
+            varn_types::ssa::SsaOp::PopTry => {
+                stack.pop()?;
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+pub(super) fn try_entry_stacks(
+    ssa: &SsaProto,
+    rpo: &[usize],
+    reached: &[bool],
+) -> Option<Vec<Vec<usize>>> {
+    let n = ssa.blocks.len();
+    let mut entry: Vec<Option<Vec<usize>>> = vec![None; n];
+    entry[ssa.entry as usize] = Some(Vec::new());
+    for _ in 0..n + 2 {
+        let mut changed = false;
+        for &b in rpo {
+            if !reached[b] {
+                continue;
+            }
+            let Some(cur) = entry[b].clone() else {
+                continue;
+            };
+            for (ti, inst) in ssa.blocks[b].insts.iter().enumerate() {
+                if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op {
+                    let Some(e) = ssa.catch_at(*catch_ip as usize) else {
+                        return None;
+                    };
+                    let h = e.block as usize;
+                    if h >= n {
+                        return None;
+                    }
+                    let Some(outer) = stack_before_try(ssa, &cur, b, ti) else {
+                        return None;
+                    };
+                    match &entry[h] {
+                        None => {
+                            entry[h] = Some(outer);
+                            changed = true;
+                        }
+                        Some(prev) if *prev != outer => return None,
+                        _ => {}
+                    }
+                }
+            }
+            let Some(exit) = block_exit(ssa, &cur, b) else {
+                return None;
+            };
+            for s in normal_succs(ssa, b) {
+                if s >= n || !reached[s] {
+                    continue;
+                }
+                match &entry[s] {
+                    None => {
+                        entry[s] = Some(exit.clone());
+                        changed = true;
+                    }
+                    Some(prev) if *prev != exit => return None,
+                    _ => {}
+                }
+            }
+        }
+        if !changed {
+            let mut out = Vec::with_capacity(n);
+            for (i, e) in entry.into_iter().enumerate() {
+                if reached[i] {
+                    out.push(e?);
+                } else {
+                    out.push(Vec::new());
+                }
+            }
+            return Some(out);
+        }
+    }
+    None
 }

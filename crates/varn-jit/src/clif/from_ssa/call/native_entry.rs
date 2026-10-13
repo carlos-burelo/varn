@@ -102,7 +102,7 @@ pub(crate) fn emit(
     b.ins().brif(frameless, invoke, &[], push, &[]);
 
     b.switch_to_block(push);
-    push_frame(b, ctx, ectx, closure);
+    push_frame(b, ctx, ectx, closure)?;
     b.ins().jump(invoke, &[]);
 
     b.switch_to_block(invoke);
@@ -120,6 +120,7 @@ pub(crate) fn emit(
         }
     }
     let sig_ref = b.import_signature(shape.signature());
+    crate::clif::from_ssa::exceptions::clear_error_flag(b, ctx)?;
     let inst = b.ins().call_indirect(sig_ref, entry, &argv);
     let res = b.inst_results(inst).to_vec();
     let pop = b.create_block();
@@ -132,6 +133,7 @@ pub(crate) fn emit(
 
     b.switch_to_block(after);
     stack_exit::publish(b, ctx.helpers, ectx);
+    crate::clif::from_ssa::exceptions::check_error_branch(b, ctx)?;
     let direct = match shape.ret {
         NativeClass::Word | NativeClass::Float => res[0],
         NativeClass::Boxed => b.ins().iconcat(res[0], res[1]),
@@ -153,7 +155,12 @@ pub(crate) fn emit(
     Ok(Out::Native(b.block_params(merge)[0]))
 }
 
-fn push_frame(b: &mut FunctionBuilder, ctx: &Ctx<'_>, ectx: Value, closure: Value) {
+fn push_frame(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    ectx: Value,
+    closure: Value,
+) -> Result<(), String> {
     let lay = &ctx.helpers.call_layout;
     let m = MemFlagsData::trusted();
     let len = b.ins().load(types::I64, m, ectx, lay.frames_len_off as i32);
@@ -172,12 +179,12 @@ fn push_frame(b: &mut FunctionBuilder, ctx: &Ctx<'_>, ectx: Value, closure: Valu
     b.ins().brif(out_of_line, grow, &[], inline, &[]);
 
     b.switch_to_block(grow);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.jit_push_native_frame,
         &[ectx, closure],
-    );
+    )?;
     b.ins().jump(done, &[]);
 
     b.switch_to_block(inline);
@@ -207,6 +214,7 @@ fn push_frame(b: &mut FunctionBuilder, ctx: &Ctx<'_>, ectx: Value, closure: Valu
     b.ins().jump(done, &[]);
 
     b.switch_to_block(done);
+    Ok(())
 }
 
 fn pop_frame(b: &mut FunctionBuilder, ctx: &Ctx<'_>, ectx: Value) {

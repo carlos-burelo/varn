@@ -37,7 +37,11 @@ impl FnEmitter<'_> {
         self.m.namespaces.paths.contains(&path).then_some(path)
     }
 
-    pub(super) fn namespace_member(&mut self, object: ExprId, property: ExprId) -> Option<Arc<str>> {
+    pub(super) fn namespace_member(
+        &mut self,
+        object: ExprId,
+        property: ExprId,
+    ) -> Option<Arc<str>> {
         let path = self.namespace_path(object)?;
         let name = Self::member_name(self.ast_arena, property, self.m.interner)?;
         let key = crate::namespaces::scoped_name(Some(&path), &name);

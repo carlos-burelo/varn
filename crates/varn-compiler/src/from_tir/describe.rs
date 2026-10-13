@@ -145,11 +145,7 @@ impl<'m> Describer<'m> {
 fn global_name(tir: &TirModule, bare: &str) -> ContractWitness {
     match tir.global_names.iter().position(|n| n.as_ref() == bare) {
         Some(slot) => ContractWitness::Slot(slot as u32),
-        None => ContractWitness::Name(format!(
-            "{}::{}",
-            tir.source_file.replace('\\', "/"),
-            bare
-        )),
+        None => ContractWitness::Name(format!("{}::{}", tir.source_file.replace('\\', "/"), bare)),
     }
 }
 

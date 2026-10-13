@@ -191,9 +191,10 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
         | ValueConv::ExpectFloat
         | ValueConv::ExpectIntOrNull
         | ValueConv::ExpectFloatOrNull => Ok(v),
-        ValueConv::FloatToInt | ValueConv::BigIntToInt | ValueConv::DecimalToInt | ValueConv::DynToInt => {
-            to_int(n)
-        }
+        ValueConv::FloatToInt
+        | ValueConv::BigIntToInt
+        | ValueConv::DecimalToInt
+        | ValueConv::DynToInt => to_int(n),
         ValueConv::IntToFloat
         | ValueConv::DynToFloat
         | ValueConv::BigIntToFloat

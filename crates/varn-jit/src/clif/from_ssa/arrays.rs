@@ -3,7 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
 use super::super::emit::{
-    array_disc, box_f64, box_int, call_helper_void, emit_array_payload, unbox_f64_coerce, unbox_int,
+    array_disc, box_f64, box_int, emit_array_payload, unbox_f64_coerce, unbox_int,
 };
 use super::{heap, load_value, Ctx, Out};
 
@@ -189,12 +189,12 @@ pub(super) fn emit_get(
     let (ot, op) = b.ins().isplit(obj);
     let boxed_key = box_int(b, key);
     let (kt, kp) = b.ins().isplit(boxed_key);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.jit_array_get_fast,
         &[exec_ctx, ot, op, kt, kp],
-    );
+    )?;
     let r = b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -274,12 +274,12 @@ pub(super) fn emit_set(
     let boxed_key = box_int(b, key);
     let (kt, kp) = b.ins().isplit(boxed_key);
     let (vt, vp) = heap::boxed_parts(b, ctx, values, value)?;
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.jit_array_set_fast,
         &[exec_ctx, ot, op, kt, kp, vt, vp],
-    );
+    )?;
 
     ctx.views.clear(b);
 

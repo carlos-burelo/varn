@@ -39,7 +39,10 @@ pub(super) unsafe fn settle(ctx: &mut ExecCtx, handoff: Handoff) -> usize {
             ctx.jit_native_result = v;
             0
         }
-        Handoff::Ran(Err(e)) => unsafe { jit_propagate_error(ctx, e) },
+        Handoff::Ran(Err(e)) => {
+            unsafe { jit_propagate_error(ctx, e) };
+            0
+        }
     }
 }
 
@@ -78,6 +81,7 @@ pub(crate) extern "C" fn jit_call_self_window(
             if let Err(e) = ctx_ref.stack.set_addr(addr, *v) {
                 ctx_ref.stack.pop_frame();
                 jit_propagate_error(ctx_ref, e);
+                return 0;
             }
         }
         ctx_ref
@@ -97,6 +101,7 @@ pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *cons
                 ctx_ref,
                 crate::error::RuntimeError::new("stack overflow: call depth exceeded 10000"),
             );
+            return;
         }
         std::rc::Rc::increment_strong_count(closure);
         let owned = std::rc::Rc::from_raw(closure);

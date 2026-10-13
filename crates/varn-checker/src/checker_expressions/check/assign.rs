@@ -22,9 +22,10 @@ impl<'r> Checker<'r> {
         self.is_assignment_target = prev;
 
         let reads_operand = match op {
-            AssignOp::Assign | AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign => {
-                false
-            }
+            AssignOp::Assign
+            | AssignOp::AndAssign
+            | AssignOp::OrAssign
+            | AssignOp::NullishAssign => false,
             AssignOp::AddAssign
             | AssignOp::SubAssign
             | AssignOp::MulAssign

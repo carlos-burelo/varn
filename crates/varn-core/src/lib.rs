@@ -1,5 +1,4 @@
 pub mod abi;
-pub mod runtime_ops;
 pub mod ast;
 pub mod atom;
 pub mod capability;
@@ -17,16 +16,17 @@ pub mod module_id;
 pub mod numeric;
 pub mod numeric_big;
 pub mod numeric_conv;
-pub mod type_desc;
 pub mod op_id;
 pub mod op_meta;
 pub mod opcode;
 pub mod paths;
 pub mod runtime_kind;
+pub mod runtime_ops;
 pub mod source;
 pub mod term;
 pub mod token;
 pub mod trivia;
+pub mod type_desc;
 pub mod well_known;
 
 pub use ast::AstId;
@@ -49,12 +49,12 @@ pub use numeric::{
     add_int, binary_operand_kind, ceil_div_int, checked_int, div_int, floor_div_int, mod_int,
     mul_int, neg_int, pow_int, rem_int, sub_int, IntDivFault, NumericOperand, INT_MAX, INT_MIN,
 };
-pub use numeric_conv::{float_to_int, ValueConv, NumericDomain};
-pub use type_desc::TypeDesc;
+pub use numeric_conv::{float_to_int, NumericDomain, ValueConv};
 pub use runtime_kind::{FieldAccess, RuntimeKind};
 pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use trivia::{Trivia, TriviaKind};
+pub use type_desc::TypeDesc;
 
 pub const HOST_API_VERSION: u32 = 3;
 

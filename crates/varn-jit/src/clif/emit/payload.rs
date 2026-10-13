@@ -132,6 +132,10 @@ pub(in crate::clif) fn guard_overflow(
     overflow: cranelift_codegen::ir::Value,
     lhs: cranelift_codegen::ir::Value,
     rhs: cranelift_codegen::ir::Value,
+    error_flag_offset: i32,
+    native_result_offset: i32,
+    landing: Option<cranelift_codegen::ir::Block>,
+    err_ret: Option<cranelift_codegen::ir::Block>,
 ) -> cranelift_codegen::ir::Value {
     let raise = b.create_block();
     let cont = b.create_block();
@@ -142,13 +146,52 @@ pub(in crate::clif) fn guard_overflow(
     let bb = box_int(b, rhs);
     let (a_tag, a_payload) = b.ins().isplit(ba);
     let (b_tag, b_payload) = b.ins().isplit(bb);
+    let zero = b.ins().iconst(types::I64, 0);
+    b.ins().store(
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        zero,
+        exec_ctx,
+        error_flag_offset,
+    );
     call_helper_void(
         b,
         cc,
         helper,
         &[exec_ctx, a_tag, a_payload, b_tag, b_payload],
     );
-    b.ins().jump(cont, &[]);
+    let flag = b.ins().load(
+        types::I64,
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        exec_ctx,
+        error_flag_offset,
+    );
+    match (landing, err_ret) {
+        (Some(t), _) => {
+            let err_blk = b.create_block();
+            b.ins().brif(flag, err_blk, &[], cont, &[]);
+            b.switch_to_block(err_blk);
+            let boxed = b.ins().load(
+                types::I128,
+                cranelift_codegen::ir::MemFlagsData::trusted(),
+                exec_ctx,
+                native_result_offset,
+            );
+            b.declare_value_needs_stack_map(boxed);
+            b.ins().store(
+                cranelift_codegen::ir::MemFlagsData::trusted(),
+                zero,
+                exec_ctx,
+                error_flag_offset,
+            );
+            b.ins().jump(t, &[boxed.into()]);
+        }
+        (None, Some(e)) => {
+            b.ins().brif(flag, e, &[], cont, &[]);
+        }
+        (None, None) => {
+            b.ins().jump(cont, &[]);
+        }
+    }
 
     b.switch_to_block(cont);
     r

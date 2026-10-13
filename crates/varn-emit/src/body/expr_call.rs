@@ -196,7 +196,9 @@ impl<'a> FnEmitter<'a> {
                 .and_then(|sig| self.signatures.get(sig.0 as usize))
                 .is_none_or(|sig| sig.has_rest);
             let mut targs = targs;
-            if let Some((_, arity)) = self.known_fn(*name).filter(|_| all_positional && !takes_rest)
+            if let Some((_, arity)) = self
+                .known_fn(*name)
+                .filter(|_| all_positional && !takes_rest)
             {
                 targs = self.fill_omitted(targs, Some(call_id), callee_sig);
                 while targs.len() < arity as usize {

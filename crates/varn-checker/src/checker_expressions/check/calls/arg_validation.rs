@@ -1,12 +1,12 @@
 use rustc_hash::FxHashSet;
 
+use super::param_types::compatible_param_type;
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::{Arg, ExprKind};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 use varn_sem::bind::BindResult;
-use super::param_types::compatible_param_type;
 use varn_sem::types::{FunctionParam, Type};
 
 impl<'r> Checker<'r> {
@@ -131,7 +131,10 @@ impl<'r> Checker<'r> {
                     .enumerate()
                     .find(|(_, p)| p.name.as_deref() == Some(lbl))
                 {
-                    (Some(self.accepted_param_type(p, Type::resolved(p.ty))), Some(i))
+                    (
+                        Some(self.accepted_param_type(p, Type::resolved(p.ty))),
+                        Some(i),
+                    )
                 } else {
                     (None, None)
                 }
@@ -157,7 +160,9 @@ impl<'r> Checker<'r> {
             };
 
             let taken = param_idx.is_some_and(|idx| mapping[idx].is_some());
-            if let Some(problem) = super::param_types::named_slot_problem(label_opt, param_idx, taken) {
+            if let Some(problem) =
+                super::param_types::named_slot_problem(label_opt, param_idx, taken)
+            {
                 self.emit(Diagnostic::error(ErrorCode::TypeMismatch, problem).with_range(*range));
                 has_error = true;
             }
@@ -264,11 +269,7 @@ impl<'r> Checker<'r> {
                     && param_accepts_array;
 
                 if !is_empty_array_arg
-                    && !self.value_fits(rec, &param_ty,
-                        &effective_arg_ty,
-                        Some(expr),
-                        Some(bind),
-                    )
+                    && !self.value_fits(rec, &param_ty, &effective_arg_ty, Some(expr), Some(bind))
                 {
                     let effective_arg_ty_s =
                         effective_arg_ty.display(&self.ty_table, &bind.interner);

@@ -44,7 +44,11 @@ impl<'r> Checker<'r> {
             c.emit(Diagnostic::error(ErrorCode::InvalidSwitchCase, message).with_range(range));
         };
         if case.test.is_none() && !is_last {
-            reject(self, "'default' must be the last case of a switch", case.range);
+            reject(
+                self,
+                "'default' must be the last case of a switch",
+                case.range,
+            );
         }
         if case.body.is_empty() && !is_last {
             reject(

@@ -159,7 +159,9 @@ impl<'m> Builder<'m> {
             }
 
             TirExprKind::SuperCall { args }
-                if args.iter().any(|a| matches!(a, varn_tir::TirArg::Spread(_))) =>
+                if args
+                    .iter()
+                    .any(|a| matches!(a, varn_tir::TirArg::Spread(_))) =>
             {
                 let ctor = self.emit(
                     InstKind::GetSuper {
@@ -174,7 +176,9 @@ impl<'m> Builder<'m> {
                 Ok(self.emit(InstKind::SuperCall { args: argv }, ty))
             }
             TirExprKind::SuperMethodCall { name, args }
-                if args.iter().any(|a| matches!(a, varn_tir::TirArg::Spread(_))) =>
+                if args
+                    .iter()
+                    .any(|a| matches!(a, varn_tir::TirArg::Spread(_))) =>
             {
                 let method = self.emit(InstKind::GetSuper { name: name.clone() }, HirType::Ref);
                 self.lower_call(method, args, ty)

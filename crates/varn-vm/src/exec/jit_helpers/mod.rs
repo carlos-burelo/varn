@@ -6,7 +6,6 @@ pub(crate) mod calls_new;
 pub(crate) mod calls_static;
 pub(crate) mod classes;
 pub(crate) mod construct;
-pub(crate) mod exceptions;
 pub(crate) mod frames;
 pub(crate) mod indexing;
 pub(crate) mod intrinsics;

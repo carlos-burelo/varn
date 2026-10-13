@@ -16,7 +16,7 @@ use cranelift_codegen::ir::{
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use varn_types::register_meta::SlotKind;
-use varn_types::ssa::{OsrMode, OsrRequest, SsaEntryKind, SsaProto, SsaTerm};
+use varn_types::ssa::{OsrRequest, SsaEntryKind, SsaProto, SsaTerm};
 use varn_types::{FunctionProto, VmValue};
 pub(in crate::clif) fn try_lower(
     proto: &FunctionProto,
@@ -31,28 +31,11 @@ pub(in crate::clif) fn try_lower(
 ) -> Result<Lowered, String> {
     let osr = match osr_req {
         None => None,
-        Some(req) => Some(match req.mode {
-            OsrMode::Resume | OsrMode::Throw => ssa
-                .secondary_at(req.ip)
+        Some(req) => Some(
+            ssa.secondary_at(req.ip)
                 .ok_or_else(|| format!("from_ssa: no secondary entry at ip {}", req.ip))?,
-            OsrMode::Catch => ssa
-                .catch_at(req.ip)
-                .ok_or_else(|| format!("from_ssa: no catch entry at ip {}", req.ip))?,
-        }),
+        ),
     };
-    let throwing = match (osr_req, osr) {
-        (Some(req), Some(e)) if req.mode == OsrMode::Throw => {
-            if e.kind != SsaEntryKind::Resume {
-                return Err(format!("from_ssa: throw at loop entry {}", req.ip));
-            }
-            true
-        }
-        _ => false,
-    };
-    let catching = matches!(
-        (osr_req, osr),
-        (Some(req), Some(_)) if req.mode == OsrMode::Catch
-    );
     if (osr.is_some() || proto.resumes_in_interpreter()) && activation == Activation::Native {
         return Err(NEEDS_ACTIVATION.into());
     }
@@ -100,6 +83,34 @@ pub(in crate::clif) fn try_lower(
     let entry = ssa.entry as usize;
     let call_entry = osr.is_none().then_some(entry);
     let start = osr.map_or(entry, |h| h.block as usize);
+    let mut landing_live: std::collections::BTreeMap<usize, Vec<u32>> = Default::default();
+    let mut landing_error: std::collections::BTreeMap<usize, u32> = Default::default();
+    for e in &ssa.secondary_entries {
+        if e.kind == SsaEntryKind::Catch {
+            landing_live.insert(e.block as usize, e.live.clone());
+        }
+    }
+    for blk in &ssa.blocks {
+        for inst in &blk.insts {
+            if let varn_types::ssa::SsaOp::Try {
+                catch_ip,
+                catch_value,
+                ..
+            } = &inst.op
+            {
+                if let Some(e) = ssa.catch_at(*catch_ip as usize) {
+                    let h = e.block as usize;
+                    if let Some(prev) = landing_error.get(&h) {
+                        if *prev != *catch_value {
+                            return Err("from_ssa: handler shared by two try values".into());
+                        }
+                    } else {
+                        landing_error.insert(h, *catch_value);
+                    }
+                }
+            }
+        }
+    }
     let mut blocks: Vec<Option<cranelift_codegen::ir::Block>> = vec![None; ssa.blocks.len()];
     let entry_blk = b.create_block();
     b.append_block_params_for_function_params(entry_blk);
@@ -115,16 +126,77 @@ pub(in crate::clif) fn try_lower(
             let ty = clif_ty(ssa.value_ty(p)).ok_or("from_ssa: unsupported block param")?;
             b.append_block_param(cb, ty);
         }
+        if landing_live.contains_key(&i) {
+            if !blk.params.is_empty() {
+                return Err("from_ssa: catch block with params".into());
+            }
+            b.append_block_param(cb, types::I128);
+        }
         blocks[i] = Some(cb);
     }
 
-    let rpo = cfg::order(ssa, start);
+    let mut rpo = cfg::order(ssa, start);
     let preds = cfg::predecessors(ssa);
     let mut rpo_pos = vec![0usize; ssa.blocks.len()];
     let mut reached = vec![false; ssa.blocks.len()];
     for (pos, &blk) in rpo.iter().enumerate() {
         rpo_pos[blk] = pos;
         reached[blk] = true;
+    }
+    let full_rpo = if osr.is_some() {
+        cfg::order(ssa, entry)
+    } else {
+        rpo.clone()
+    };
+    let mut full_reached = vec![false; ssa.blocks.len()];
+    for &blk in &full_rpo {
+        full_reached[blk] = true;
+    }
+    let full_entry_stacks = cfg::try_entry_stacks(ssa, &full_rpo, &full_reached)
+        .ok_or_else(|| "from_ssa: inconsistent try stacks".to_owned())?;
+    if osr.is_some() {
+        let resume_blk = start;
+        let enclosing = full_entry_stacks
+            .get(resume_blk)
+            .cloned()
+            .unwrap_or_default();
+        let mut stack: Vec<usize> = enclosing;
+        while let Some(b) = stack.pop() {
+            if b >= reached.len() || reached[b] {
+                continue;
+            }
+            reached[b] = true;
+            rpo_pos[b] = rpo.len();
+            rpo.push(b);
+            match &ssa.blocks[b].term {
+                SsaTerm::Jump { target, .. } => {
+                    let s = *target as usize;
+                    if s < reached.len() && !reached[s] {
+                        stack.push(s);
+                    }
+                }
+                SsaTerm::Branch {
+                    then_blk, else_blk, ..
+                } => {
+                    for s in [*then_blk as usize, *else_blk as usize] {
+                        if s < reached.len() && !reached[s] {
+                            stack.push(s);
+                        }
+                    }
+                }
+                SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => {}
+            }
+            for inst in &ssa.blocks[b].insts {
+                if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op {
+                    if let Some(e) = ssa.catch_at(*catch_ip as usize) {
+                        let h = e.block as usize;
+                        if h < reached.len() && !reached[h] {
+                            stack.push(h);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     b.switch_to_block(entry_blk);
@@ -174,6 +246,18 @@ pub(in crate::clif) fn try_lower(
     } else {
         ranges::analyze(ssa, &preds, &rpo_pos, &reached)
     };
+    let entry_stacks = full_entry_stacks;
+    let mut clif_map: std::collections::BTreeMap<usize, Block> = Default::default();
+    for h in landing_live.keys() {
+        if let Some(cb) = blocks[*h] {
+            clif_map.insert(*h, cb);
+        }
+    }
+    let err_ret = if frame_aware {
+        Some(b.create_block())
+    } else {
+        None
+    };
     let mut ctx = Ctx {
         cc,
         helpers,
@@ -198,19 +282,35 @@ pub(in crate::clif) fn try_lower(
             None => osr::versioned(&mut b, ssa, &version_plans, &preds, &rpo_pos, &reached),
         },
         try_live: try_live_set(ssa),
+        pure_try: Default::default(),
     };
+    {
+        let mut st = ctx.pure_try.borrow_mut();
+        st.entry_stacks = entry_stacks;
+        st.landing_error = landing_error;
+        st.clif_map = clif_map;
+        st.err_ret = err_ret;
+        st.stack = Vec::new();
+    }
 
     if let Some(frame) = &ctx.frame {
         stack_exit::publish(&mut b, helpers, frame.exec_ctx);
     }
+    if osr.is_none() {
+        if let Some(frame) = &ctx.frame {
+            let zero = b.ins().iconst(types::I64, 0);
+            b.ins().store(
+                cranelift_codegen::ir::MemFlagsData::trusted(),
+                zero,
+                frame.exec_ctx,
+                helpers.jit_error_flag_offset as i32,
+            );
+        }
+    }
     let mut values: Vec<Option<Value>> = vec![None; ssa.values.len()];
     if let Some(h) = osr {
         let header = blocks[h.block as usize].expect("block created");
-        if catching {
-            osr::emit_catch_entry(&mut b, &ctx, &mut values, h, header)?;
-        } else {
-            osr::emit_entry(&mut b, &ctx, &mut values, h, header, throwing)?;
-        }
+        osr::emit_entry(&mut b, &ctx, &mut values, h, header)?;
     }
     let pins = match osr {
         Some(_) => std::collections::BTreeMap::new(),
@@ -358,6 +458,7 @@ pub(in crate::clif) fn try_lower(
                 &mut hoisted,
                 &hoist_at,
                 &loop_bodies,
+                &landing_live,
                 i,
                 cb,
                 is_call_entry,
@@ -405,6 +506,7 @@ pub(in crate::clif) fn try_lower(
                     &mut hoisted,
                     &hoist_at,
                     &loop_bodies,
+                    &landing_live,
                     ssa_b,
                     fast_blk,
                     false,
@@ -438,6 +540,7 @@ pub(in crate::clif) fn try_lower(
                     &mut hoisted,
                     &hoist_at,
                     &loop_bodies,
+                    &landing_live,
                     ssa_b,
                     slow_blk,
                     false,
@@ -467,6 +570,7 @@ pub(in crate::clif) fn try_lower(
             &mut hoisted,
             &hoist_at,
             &loop_bodies,
+            &landing_live,
             i,
             cb,
             is_call_entry,
@@ -487,6 +591,10 @@ pub(in crate::clif) fn try_lower(
         }
     }
 
+    if ctx.frame.is_some() {
+        emit_pure_err_ret(&mut b, &ctx)?;
+    }
+
     b.seal_all_blocks();
     b.finalize(isa.frontend_config());
     super::super::debug::capture_ir(&mut debug, &func);
@@ -495,6 +603,51 @@ pub(in crate::clif) fn try_lower(
         piece: compile_piece(func, isa)?,
         frameless,
     })
+}
+
+fn emit_pure_err_ret(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<(), String> {
+    let st = ctx.pure_try.borrow();
+    let Some(err_ret) = st.err_ret else {
+        return Ok(());
+    };
+    drop(st);
+    b.switch_to_block(err_ret);
+    match ctx.activation {
+        Activation::Framed => match ctx.proto.return_kind {
+            SlotKind::Int | SlotKind::Bool => {
+                let z = b.ins().iconst(types::I64, 0);
+                b.ins().return_(&[z]);
+            }
+            SlotKind::Float => {
+                let z = b.ins().f64const(0.0);
+                b.ins().return_(&[z]);
+            }
+            SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => {
+                b.ins().return_(&[]);
+            }
+        },
+        Activation::Native => {
+            let shape = NativeShape::of_proto(ctx.proto);
+            match shape.ret {
+                NativeClass::Word => {
+                    let z = b.ins().iconst(types::I64, 0);
+                    b.ins().return_(&[z]);
+                }
+                NativeClass::Float => {
+                    let z = b.ins().f64const(0.0);
+                    b.ins().return_(&[z]);
+                }
+                NativeClass::Boxed => {
+                    let tag = b
+                        .ins()
+                        .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+                    let pay = b.ins().iconst(types::I64, 0);
+                    b.ins().return_(&[tag, pay]);
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn emit_version_guard(
@@ -548,6 +701,7 @@ fn lower_block(
     hoisted: &mut std::collections::BTreeMap<(usize, u32), Value>,
     hoist_at: &std::collections::BTreeMap<usize, Vec<(usize, u32)>>,
     loop_bodies: &rustc_hash::FxHashMap<usize, rustc_hash::FxHashSet<usize>>,
+    landing_live: &std::collections::BTreeMap<usize, Vec<u32>>,
     ssa_idx: usize,
     clif_blk: Block,
     is_call_entry: bool,
@@ -558,8 +712,32 @@ fn lower_block(
     rpo_n: usize,
 ) -> Result<(), String> {
     let blk = &ssa.blocks[ssa_idx];
+    super::exceptions::set_block_stack(ctx, ssa_idx);
+    let saved = if landing_live.contains_key(&ssa_idx) {
+        Some(values.to_vec())
+    } else {
+        None
+    };
     if !(rpo_n == 0 && is_call_entry) {
         b.switch_to_block(clif_blk);
+    }
+
+    if let Some(live) = landing_live.get(&ssa_idx) {
+        if ctx.frame.is_some() {
+            for &v in live {
+                let x = store::load_home_value(b, ctx, ctx.ssa.reg(v), ctx.ssa.value_ty(v))?;
+                store::define(b, ctx, values, v, x);
+            }
+            if let Some(frame) = &ctx.frame {
+                let zero = b.ins().iconst(types::I64, 0);
+                b.ins().store(
+                    cranelift_codegen::ir::MemFlagsData::trusted(),
+                    zero,
+                    frame.exec_ctx,
+                    ctx.helpers.jit_error_flag_offset as i32,
+                );
+            }
+        }
     }
 
     drop_home_addrs(ctx);
@@ -574,6 +752,21 @@ fn lower_block(
             params[k]
         };
         store::define(b, ctx, values, p, pv);
+    }
+    if landing_live.contains_key(&ssa_idx) {
+        let err_val = ctx
+            .pure_try
+            .borrow()
+            .landing_error
+            .get(&ssa_idx)
+            .copied()
+            .ok_or_else(|| format!("from_ssa: landing {ssa_idx} without error value"))?;
+        let err_param = params
+            .get(blk.params.len())
+            .copied()
+            .ok_or_else(|| format!("from_ssa: landing {ssa_idx} without error param"))?;
+        b.declare_value_needs_stack_map(err_param);
+        store::define(b, ctx, values, err_val, err_param);
     }
 
     let old_elide = ctx.elide.replace(elide_flag);
@@ -689,6 +882,9 @@ fn lower_block(
     }
     if !skip_term {
         term::emit_term(b, ctx, view, values, &blk.term, polls)?;
+    }
+    if let Some(saved) = saved {
+        values.copy_from_slice(&saved);
     }
     Ok(())
 }

@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{call_helper_void, unbox_int};
+use super::super::super::emit::unbox_int;
 use super::super::arrays;
 use super::super::heap::{boxed_parts, boxed_value, exec_ctx};
 use super::super::{Ctx, Out};
@@ -24,7 +24,12 @@ pub(crate) fn emit_array_length(
     let obj = boxed_value(b, ctx, values, operand)?;
     let (tag, payload) = b.ins().isplit(obj);
     let ectx = exec_ctx(ctx);
-    call_helper_void(b, ctx.cc, ctx.helpers.array_length, &[ectx, tag, payload]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        ctx.helpers.array_length,
+        &[ectx, tag, payload],
+    )?;
     let boxed = b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -46,12 +51,20 @@ pub(crate) fn emit_str_length(
 ) -> Result<Value, String> {
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
     let ectx = exec_ctx(ctx);
+    let (landing, err_ret) = {
+        let st = ctx.pure_try.borrow();
+        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
+        (landing, st.err_ret)
+    };
     Ok(super::super::super::strings::str_length_boxed(
         b,
         ctx.cc,
         ctx.helpers.str_length,
         ectx,
         ctx.helpers.jit_native_result_offset as i32,
+        ctx.helpers.jit_error_flag_offset as i32,
+        landing,
+        err_ret,
         tag,
         payload,
     ))
@@ -65,7 +78,12 @@ pub(crate) fn emit_bytes_length(
 ) -> Result<Value, String> {
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
     let ectx = exec_ctx(ctx);
-    call_helper_void(b, ctx.cc, ctx.helpers.bytes_length, &[ectx, tag, payload]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        ctx.helpers.bytes_length,
+        &[ectx, tag, payload],
+    )?;
     Ok(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),

@@ -1,4 +1,3 @@
-use super::super::super::emit::call_helper_void;
 use super::super::heap::{boxed_value, exec_ctx};
 use super::super::store::Out;
 use super::super::Ctx;
@@ -20,7 +19,12 @@ pub(super) fn property_maybe(
     let niv = b
         .ins()
         .iconst(types::I64, super::super::props::str_idx(ctx, name)? as i64);
-    call_helper_void(b, ctx.cc, h.get_property_maybe, &[ectx, ot, op_, niv]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.get_property_maybe,
+        &[ectx, ot, op_, niv],
+    )?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
 
@@ -34,7 +38,7 @@ pub(super) fn assert_not_null(
     let h = ctx.helpers;
     let v = boxed_value(b, ctx, values, operand)?;
     let (t, p) = b.ins().isplit(v);
-    call_helper_void(b, ctx.cc, h.assert_not_null, &[ectx, t, p]);
+    crate::clif::from_ssa::exceptions::call_checked(b, ctx, h.assert_not_null, &[ectx, t, p])?;
     Ok(Some(None))
 }
 
@@ -52,7 +56,7 @@ pub(super) fn bind_method(
     let niv = b
         .ins()
         .iconst(types::I64, super::super::props::str_idx(ctx, name)? as i64);
-    call_helper_void(b, ctx.cc, h.bind_method, &[ectx, ot, op_, niv]);
+    crate::clif::from_ssa::exceptions::call_checked(b, ctx, h.bind_method, &[ectx, ot, op_, niv])?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
 
@@ -69,7 +73,12 @@ pub(super) fn array_extend(
     let s = boxed_value(b, ctx, values, source)?;
     let (at, ap) = b.ins().isplit(a);
     let (st, sp) = b.ins().isplit(s);
-    call_helper_void(b, ctx.cc, h.array_extend, &[ectx, at, ap, st, sp]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.array_extend,
+        &[ectx, at, ap, st, sp],
+    )?;
     Ok(Some(None))
 }
 
@@ -83,7 +92,7 @@ pub(super) fn wrap_spread(
     let h = ctx.helpers;
     let v = boxed_value(b, ctx, values, operand)?;
     let (t, p) = b.ins().isplit(v);
-    call_helper_void(b, ctx.cc, h.wrap_spread, &[ectx, t, p]);
+    crate::clif::from_ssa::exceptions::call_checked(b, ctx, h.wrap_spread, &[ectx, t, p])?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
 
@@ -102,7 +111,7 @@ pub(super) fn range(
     let (at, ap) = b.ins().isplit(a);
     let (ct, cp) = b.ins().isplit(c);
     let f = b.ins().iconst(types::I64, i64::from(inclusive));
-    call_helper_void(b, ctx.cc, h.range, &[ectx, at, ap, ct, cp, f]);
+    crate::clif::from_ssa::exceptions::call_checked(b, ctx, h.range, &[ectx, at, ap, ct, cp, f])?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
 
@@ -132,6 +141,6 @@ pub(super) fn get_symbol(
         })
         .ok_or("from_ssa: iterator symbol not in pool")? as i64;
     let siv = b.ins().iconst(types::I64, idx);
-    call_helper_void(b, ctx.cc, h.get_symbol, &[ectx, ot, op_, siv]);
+    crate::clif::from_ssa::exceptions::call_checked(b, ctx, h.get_symbol, &[ectx, ot, op_, siv])?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }

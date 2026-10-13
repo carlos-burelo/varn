@@ -38,7 +38,7 @@ pub(crate) fn emit_invoke(
     window: Value,
     callee: (Value, Value),
     argc: usize,
-) -> Value {
+) -> Result<Value, String> {
     let frame = ctx.frame.as_ref().expect("a call has a frame");
     let (ctag, cpayload) = callee;
     let argc_v = b.ins().iconst(types::I64, argc as i64);

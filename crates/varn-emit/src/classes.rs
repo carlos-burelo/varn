@@ -255,9 +255,8 @@ pub(super) fn emit_class(
             None => {
                 let forwards = class.super_class.is_some() && primary.is_empty();
                 let sig = fresh_sig(signatures, primary.len());
-                let rest_ty = BackendTy::Array(
-                    types.intern(BackendTy::Dynamic(DynReason::NotYetSupported)),
-                );
+                let rest_ty =
+                    BackendTy::Array(types.intern(BackendTy::Dynamic(DynReason::NotYetSupported)));
                 let inherited = def
                     .parent
                     .and_then(|parent| crate::tables::inherited_constructor(ctx.classes, parent))

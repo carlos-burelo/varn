@@ -3,19 +3,16 @@ use crate::checker::definite_assignment::walk_expr_children;
 use crate::checker::recorder::Recorder;
 use rustc_hash::FxHashSet;
 use std::sync::Arc;
-use varn_core::ast::{ArrowBody, AssignOp, AstArena, Decl, ExprId, ExprKind, ForInit, Pattern, StmtId, StmtKind};
+use varn_core::ast::{
+    ArrowBody, AssignOp, AstArena, Decl, ExprId, ExprKind, ForInit, Pattern, StmtId, StmtKind,
+};
 use varn_core::Atom;
 use varn_sem::bind::BindResult;
 use varn_sem::symbol::SymbolId;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn forget_symbol(
-        &mut self,
-        rec: &Recorder,
-        id: SymbolId,
-        bind: &BindResult,
-    ) {
+    pub(crate) fn forget_symbol(&mut self, rec: &Recorder, id: SymbolId, bind: &BindResult) {
         let declared = rec
             .symbol_types
             .get(&id)
@@ -66,17 +63,15 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(crate) fn member_path_key(
-        &self,
-        expr: ExprId,
-        bind: &BindResult,
-    ) -> Option<MemberKey> {
+    pub(crate) fn member_path_key(&self, expr: ExprId, bind: &BindResult) -> Option<MemberKey> {
         let (root, path) = static_path_atoms(expr, self.ast_arena)?;
         let root = match root {
             MemberRoot::This(_) => None,
-            MemberRoot::Name(_, name) => {
-                Some(bind.scopes.get(self.current_scope).resolve(name, &bind.scopes)?)
-            }
+            MemberRoot::Name(_, name) => Some(
+                bind.scopes
+                    .get(self.current_scope)
+                    .resolve(name, &bind.scopes)?,
+            ),
         };
         let path = path
             .into_iter()
@@ -85,20 +80,21 @@ impl<'r> Checker<'r> {
         Some((root, path))
     }
 
-    pub(crate) fn narrowed_member_read(
-        &mut self,
-        expr: ExprId,
-        bind: &BindResult,
-    ) -> Option<Type> {
+    pub(crate) fn narrowed_member_read(&mut self, expr: ExprId, bind: &BindResult) -> Option<Type> {
         let (root, path) = static_path_atoms(expr, self.ast_arena)?;
         let root = match root {
             MemberRoot::This(_) => None,
-            MemberRoot::Name(_, name) => {
-                Some(bind.scopes.get(self.current_scope).resolve(name, &bind.scopes)?)
-            }
+            MemberRoot::Name(_, name) => Some(
+                bind.scopes
+                    .get(self.current_scope)
+                    .resolve(name, &bind.scopes)?,
+            ),
         };
         let key: MemberKey = (root, Self::atoms_to_path(&path, bind));
-        self.member_narrowed.get(&key).and_then(|stack| stack.last()).copied()
+        self.member_narrowed
+            .get(&key)
+            .and_then(|stack| stack.last())
+            .copied()
     }
 
     pub(crate) fn member_path_declared(
@@ -223,10 +219,7 @@ impl<'r> Checker<'r> {
         }
         members.sort();
         members.dedup();
-        ClosureEffects {
-            vars: ids,
-            members,
-        }
+        ClosureEffects { vars: ids, members }
     }
 
     pub(crate) fn closure_def_effects(
@@ -295,9 +288,7 @@ impl<'r> Checker<'r> {
     pub(crate) fn pattern_bound_atoms(pattern: &Pattern, out: &mut Vec<Atom>) {
         match pattern {
             Pattern::Identifier { name, .. } => out.push(*name),
-            Pattern::Array {
-                elements, rest, ..
-            } => {
+            Pattern::Array { elements, rest, .. } => {
                 for el in elements.iter().flatten() {
                     Self::pattern_bound_atoms(&el.pattern, out);
                 }
@@ -571,7 +562,9 @@ pub(crate) fn assigned_in_expr(expr: ExprId, arena: &AstArena, out: &mut Assigne
             out.members.push((root, path));
         }
     }
-    walk_expr_children(expr, arena, &mut |child| assigned_in_expr(child, arena, out));
+    walk_expr_children(expr, arena, &mut |child| {
+        assigned_in_expr(child, arena, out)
+    });
 }
 
 pub(crate) fn static_path_atoms(expr: ExprId, arena: &AstArena) -> Option<(MemberRoot, Vec<Atom>)> {

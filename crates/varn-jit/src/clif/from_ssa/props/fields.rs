@@ -1,7 +1,6 @@
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::call_helper_void;
 use super::super::super::fields::{
     cached_base, load_compact, store_compact, store_compact_native, FieldIo,
 };
@@ -10,10 +9,17 @@ use super::super::store::{load_value, Out};
 use super::super::Ctx;
 
 fn field_io<'a>(ctx: &'a Ctx<'_>) -> Result<FieldIo<'a>, String> {
+    let (landing, err_ret) = {
+        let st = ctx.pure_try.borrow();
+        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
+        (landing, st.err_ret)
+    };
     Ok(FieldIo {
         helpers: ctx.helpers,
         cc: ctx.cc,
         exec_ctx: exec_ctx(ctx),
+        landing,
+        err_ret,
     })
 }
 pub(crate) fn emit_get_fixed_field(
@@ -65,12 +71,12 @@ pub(crate) fn emit_get_fixed_field(
     let (ot, op) = b.ins().isplit(obj);
     let ectx = exec_ctx(ctx);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
-    call_helper_void(
+    crate::clif::from_ssa::exceptions::call_checked(
         b,
-        ctx.cc,
+        ctx,
         ctx.helpers.get_fixed_field,
         &[ectx, ot, op, slot_v],
-    );
+    )?;
     Ok(Out::Boxed(b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
@@ -122,7 +128,12 @@ fn emit_get_fixed_field_native(
     b.switch_to_block(slow);
     let (ot, op) = b.ins().isplit(obj);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
-    call_helper_void(b, ctx.cc, h.get_fixed_field, &[ectx, ot, op, slot_v]);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        h.get_fixed_field,
+        &[ectx, ot, op, slot_v],
+    )?;
     let boxed = b.ins().load(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),

@@ -24,7 +24,12 @@ impl<'r> Checker<'r> {
         );
     }
 
-    pub(super) fn denotes_namespace(&mut self, rec: &mut Recorder, expr: ExprId, bind: &BindResult) -> bool {
+    pub(super) fn denotes_namespace(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        bind: &BindResult,
+    ) -> bool {
         use varn_sem::types::TypeContext;
         if let ExprKind::Identifier { name } = &self.ast_arena.expr(expr).kind {
             let scope = bind.scopes.get(self.current_scope);
@@ -51,7 +56,8 @@ impl<'r> Checker<'r> {
         let name = self.resolve_bind_atom(bind, name);
         let origin = origin.map(|o| self.resolve_bind_atom(bind, o));
         let view = varn_sem::bind::BindView::new(bind, self.resolver);
-        view.get_namespace_members(&name, origin.as_deref()).is_some()
+        view.get_namespace_members(&name, origin.as_deref())
+            .is_some()
             && view.get_class_members(&name, origin.as_deref()).is_none()
             && view.get_enum_members(&name, origin.as_deref()).is_none()
     }
@@ -88,7 +94,9 @@ impl<'r> Checker<'r> {
                     .map(|spec| spec.range)
                     .collect();
                 for range in mutable {
-                    self.emit(Diagnostic::error(ErrorCode::MutableExport, message).with_range(range));
+                    self.emit(
+                        Diagnostic::error(ErrorCode::MutableExport, message).with_range(range),
+                    );
                 }
             }
             ExportDecl::Named { .. } | ExportDecl::All { .. } | ExportDecl::Default { .. } => {}
