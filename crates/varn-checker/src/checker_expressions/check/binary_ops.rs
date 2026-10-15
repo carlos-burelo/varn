@@ -76,7 +76,9 @@ impl<'r> Checker<'r> {
                 | BinaryOp::Shr
                 | BinaryOp::UShr => l_base == Type::Int && r_base == Type::Int,
                 BinaryOp::Lt | BinaryOp::Gt | BinaryOp::LtEq | BinaryOp::GtEq => {
-                    same_numeric || (l_base == Type::Str && r_base == Type::Str)
+                    same_numeric
+                        || (l_base == Type::Str && r_base == Type::Str)
+                        || (l_base == Type::Char && r_base == Type::Char)
                 }
                 BinaryOp::Eq | BinaryOp::NotEq => {
                     if both_numeric {
