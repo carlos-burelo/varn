@@ -42,10 +42,29 @@ impl<'m> Builder<'m> {
     }
 
     pub(super) fn widen_exact(&mut self, v: Value, from: BackendTy, to: BackendTy) -> Value {
-        let conv = match (from, to) {
-            (BackendTy::Int, BackendTy::BigInt) => varn_core::ValueConv::IntToBigInt,
-            (BackendTy::Int, BackendTy::Decimal) => varn_core::ValueConv::IntToDecimal,
-            _ => return v,
+        let conv = match to {
+            BackendTy::BigInt if from == BackendTy::Int => varn_core::ValueConv::IntToBigInt,
+            BackendTy::Decimal if from == BackendTy::Int => varn_core::ValueConv::IntToDecimal,
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::BigInt
+            | BackendTy::Decimal
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => return v,
         };
         self.emit(InstKind::Convert { operand: v, conv }, HirType::Dynamic)
     }

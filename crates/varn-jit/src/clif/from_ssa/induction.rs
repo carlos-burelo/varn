@@ -102,12 +102,45 @@ pub(super) fn in_range_steps(
                 let (Some(d), SsaOp::Binary { op, lhs, rhs }) = (inst.dest, &inst.op) else {
                     continue;
                 };
-                let proven = match (op, bound) {
-                    (SsaBinOp::IntAdd, Bound::Below) => {
+                let proven = match op {
+                    SsaBinOp::IntAdd if bound == Bound::Below => {
                         (*lhs == k && is_one(*rhs)) || (*rhs == k && is_one(*lhs))
                     }
-                    (SsaBinOp::IntSub, Bound::Above) => *lhs == k && is_one(*rhs),
-                    _ => false,
+                    SsaBinOp::IntSub if bound == Bound::Above => *lhs == k && is_one(*rhs),
+                    SsaBinOp::IntAdd
+                    | SsaBinOp::IntSub
+                    | SsaBinOp::IntMul
+                    | SsaBinOp::IntDiv
+                    | SsaBinOp::IntMod
+                    | SsaBinOp::IntPow
+                    | SsaBinOp::IntEq
+                    | SsaBinOp::IntNe
+                    | SsaBinOp::IntLt
+                    | SsaBinOp::IntLe
+                    | SsaBinOp::IntGt
+                    | SsaBinOp::IntGe
+                    | SsaBinOp::IntAnd
+                    | SsaBinOp::IntOr
+                    | SsaBinOp::IntXor
+                    | SsaBinOp::IntShl
+                    | SsaBinOp::IntShr
+                    | SsaBinOp::IntUshr
+                    | SsaBinOp::FloatAdd
+                    | SsaBinOp::FloatSub
+                    | SsaBinOp::FloatMul
+                    | SsaBinOp::FloatDiv
+                    | SsaBinOp::FloatMod
+                    | SsaBinOp::FloatPow
+                    | SsaBinOp::FloatEq
+                    | SsaBinOp::FloatNe
+                    | SsaBinOp::FloatLt
+                    | SsaBinOp::FloatLe
+                    | SsaBinOp::FloatGt
+                    | SsaBinOp::FloatGe
+                    | SsaBinOp::StrConcat
+                    | SsaBinOp::StrEq
+                    | SsaBinOp::StrNe
+                    | SsaBinOp::Dyn(_) => false,
                 };
                 if proven {
                     steps.insert(d);

@@ -228,7 +228,6 @@ impl<'a> FnEmitter<'a> {
                                 DynReason::HostBoundary
                                 | DynReason::Union
                                 | DynReason::IndexSignature
-                                | DynReason::Declared
                                 | DynReason::Awaitable(_)
                                 | DynReason::Yields(_)
                                 | DynReason::NotYetSupported,

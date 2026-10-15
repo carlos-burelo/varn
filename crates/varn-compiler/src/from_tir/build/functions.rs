@@ -86,11 +86,30 @@ fn build_inner(
         };
         let v = b.new_value(t);
         b.block_mut(entry).params.push(v);
-        let v = match (*pty, defaulted[i]) {
-            (BackendTy::BigInt | BackendTy::Decimal, false) => {
+        let v = match *pty {
+            BackendTy::BigInt | BackendTy::Decimal if !defaulted[i] => {
                 b.widen_exact(v, BackendTy::Int, *pty)
             }
-            _ => v,
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::BigInt
+            | BackendTy::Decimal
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => v,
         };
         b.write_var(VarId::Param(i as u32), entry, v);
     }
