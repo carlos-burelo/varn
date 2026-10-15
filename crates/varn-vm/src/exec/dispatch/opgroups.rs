@@ -57,6 +57,8 @@ macro_rules! math_cmp_ops {
             | OpCode::GteFloat
             | OpCode::EqFloat
             | OpCode::NeqFloat
+            | OpCode::EqStr
+            | OpCode::NeqStr
             | OpCode::Eq
             | OpCode::Neq
             | OpCode::Lt

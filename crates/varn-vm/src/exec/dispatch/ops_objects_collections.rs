@@ -345,6 +345,8 @@ impl ExecCtx {
             | OpCode::GteFloat
             | OpCode::EqFloat
             | OpCode::NeqFloat
+            | OpCode::EqStr
+            | OpCode::NeqStr
             | OpCode::ModInt
             | OpCode::PowInt
             | OpCode::Intrinsic

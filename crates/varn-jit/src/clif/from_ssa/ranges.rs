@@ -164,6 +164,8 @@ fn header_check(
         | SsaBinOp::FloatGt
         | SsaBinOp::FloatGe
         | SsaBinOp::StrConcat
+        | SsaBinOp::StrEq
+        | SsaBinOp::StrNe
         | SsaBinOp::Dyn(_) => None,
     }
 }
@@ -413,6 +415,8 @@ pub(super) fn analyze(
                     | SsaBinOp::FloatGt
                     | SsaBinOp::FloatGe
                     | SsaBinOp::StrConcat
+                    | SsaBinOp::StrEq
+                    | SsaBinOp::StrNe
                     | SsaBinOp::Dyn(_) => None,
                 };
                 if let Some(r) = r
@@ -593,6 +597,8 @@ fn version_plans(
                         | SsaBinOp::FloatGt
                         | SsaBinOp::FloatGe
                         | SsaBinOp::StrConcat
+                        | SsaBinOp::StrEq
+                        | SsaBinOp::StrNe
                         | SsaBinOp::Dyn(_) => mul_range(a, c),
                     };
                     if let Some(r) = r

@@ -36,6 +36,9 @@ pub enum SsaBinOp {
 
     StrConcat,
 
+    StrEq,
+    StrNe,
+
     Dyn(DynBinOp),
 }
 

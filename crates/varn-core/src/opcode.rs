@@ -173,6 +173,9 @@ pub enum OpCode {
     EqFloat,
     NeqFloat,
 
+    EqStr,
+    NeqStr,
+
     ModInt,
     PowInt,
 

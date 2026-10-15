@@ -92,6 +92,8 @@ pub fn is_alloc_free_op(op: OpCode) -> bool {
             | OpCode::GteFloat
             | OpCode::EqFloat
             | OpCode::NeqFloat
+            | OpCode::EqStr
+            | OpCode::NeqStr
             | OpCode::IsNull
             | OpCode::Jump
             | OpCode::JumpIfFalse

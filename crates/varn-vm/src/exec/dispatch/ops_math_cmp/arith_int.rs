@@ -202,6 +202,8 @@ impl ExecCtx {
             | OpCode::GteFloat
             | OpCode::EqFloat
             | OpCode::NeqFloat
+            | OpCode::EqStr
+            | OpCode::NeqStr
             | OpCode::ModInt
             | OpCode::PowInt
             | OpCode::Intrinsic
@@ -526,6 +528,8 @@ impl ExecCtx {
             | OpCode::GteFloat
             | OpCode::EqFloat
             | OpCode::NeqFloat
+            | OpCode::EqStr
+            | OpCode::NeqStr
             | OpCode::Intrinsic
             | OpCode::LoadStaticFn
             | OpCode::CallSelf

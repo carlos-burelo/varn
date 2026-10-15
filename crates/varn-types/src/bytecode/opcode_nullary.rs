@@ -130,6 +130,8 @@ pub(super) fn implied(op: OpCode) -> Option<&'static str> {
         | OpCode::GteFloat
         | OpCode::EqFloat
         | OpCode::NeqFloat
+        | OpCode::EqStr
+        | OpCode::NeqStr
         | OpCode::ModInt
         | OpCode::PowInt
         | OpCode::Intrinsic

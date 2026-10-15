@@ -37,6 +37,8 @@ pub(super) fn project_bin(
         OpCode::PowFloat => SsaBinOp::FloatPow,
         OpCode::EqFloat => SsaBinOp::FloatEq,
         OpCode::NeqFloat => SsaBinOp::FloatNe,
+        OpCode::EqStr => SsaBinOp::StrEq,
+        OpCode::NeqStr => SsaBinOp::StrNe,
         OpCode::LtFloat => SsaBinOp::FloatLt,
         OpCode::LteFloat => SsaBinOp::FloatLe,
         OpCode::GtFloat => SsaBinOp::FloatGt,

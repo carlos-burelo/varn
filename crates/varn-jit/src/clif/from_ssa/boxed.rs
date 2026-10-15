@@ -23,7 +23,7 @@ pub(super) fn emit_bin(
         IntAdd | IntSub | IntMul | IntDiv | IntMod | IntEq | IntNe | IntLt | IntLe | IntGt
         | IntGe | IntAnd | IntOr | IntXor | IntShl | IntShr | IntUshr | FloatAdd | FloatSub
         | FloatMul | FloatDiv | FloatEq | FloatNe | FloatLt | FloatLe | FloatGt | FloatGe
-        | StrConcat | Dyn(_) => return Err("from_ssa: not a boxed op".into()),
+        | StrConcat | StrEq | StrNe | Dyn(_) => return Err("from_ssa: not a boxed op".into()),
     };
 
     let (a_tag, a_payload) = box_native(b, a, operand_float);

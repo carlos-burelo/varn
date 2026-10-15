@@ -92,7 +92,14 @@ impl ExecCtx {
                 self.exec_float_cmp(op, code, ip, base, first_reg)?;
             }
 
-            OpCode::Eq | OpCode::Neq | OpCode::Lt | OpCode::Lte | OpCode::Gt | OpCode::Gte => {
+            OpCode::Eq
+            | OpCode::Neq
+            | OpCode::EqStr
+            | OpCode::NeqStr
+            | OpCode::Lt
+            | OpCode::Lte
+            | OpCode::Gt
+            | OpCode::Gte => {
                 self.exec_generic_cmp(op, code, ip, base, first_reg)?;
             }
             OpCode::ToString

@@ -74,6 +74,8 @@ pub(super) fn in_range_steps(
             | SsaBinOp::FloatGt
             | SsaBinOp::FloatGe
             | SsaBinOp::StrConcat
+            | SsaBinOp::StrEq
+            | SsaBinOp::StrNe
             | SsaBinOp::Dyn(_) => continue,
         };
         let (k, bound) = if blk.params.contains(&k) {

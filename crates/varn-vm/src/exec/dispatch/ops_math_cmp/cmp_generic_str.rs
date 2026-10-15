@@ -19,8 +19,12 @@ impl ExecCtx {
         let a = self.stack.box_reg(base, hi(w1));
         let b = self.stack.box_reg(base, lo(w1));
         let r = match op {
-            OpCode::Eq => VmValue::from_bool(crate::exec::compare::eq(a, b, &self.heap)),
-            OpCode::Neq => VmValue::from_bool(crate::exec::compare::neq(a, b, &self.heap)),
+            OpCode::Eq | OpCode::EqStr => {
+                VmValue::from_bool(crate::exec::compare::eq(a, b, &self.heap))
+            }
+            OpCode::Neq | OpCode::NeqStr => {
+                VmValue::from_bool(crate::exec::compare::neq(a, b, &self.heap))
+            }
             OpCode::Lt => VmValue::from_bool(crate::exec::compare::lt_heap(a, b, &self.heap)),
             OpCode::Lte => VmValue::from_bool(crate::exec::compare::lte_heap(a, b, &self.heap)),
             OpCode::Gt => VmValue::from_bool(crate::exec::compare::gt_heap(a, b, &self.heap)),
@@ -342,6 +346,8 @@ impl ExecCtx {
             | OpCode::GteFloat
             | OpCode::EqFloat
             | OpCode::NeqFloat
+            | OpCode::EqStr
+            | OpCode::NeqStr
             | OpCode::ModInt
             | OpCode::PowInt
             | OpCode::Intrinsic

@@ -64,8 +64,29 @@ fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
             Instanceof => OpCode::Instanceof,
             In => OpCode::In,
         },
+        HirType::Str => match op {
+            Eq => OpCode::EqStr,
+            Ne => OpCode::NeqStr,
+            Add => OpCode::Add,
+            Sub => OpCode::Sub,
+            Mul => OpCode::Mul,
+            Div => OpCode::Div,
+            Mod => OpCode::Mod,
+            Pow => OpCode::Pow,
+            Lt => OpCode::Lt,
+            Le => OpCode::Lte,
+            Gt => OpCode::Gt,
+            Ge => OpCode::Gte,
+            BitAnd => OpCode::BitAnd,
+            BitOr => OpCode::BitOr,
+            BitXor => OpCode::BitXor,
+            Shl => OpCode::Shl,
+            Shr => OpCode::Shr,
+            Ushr => OpCode::Ushr,
+            Instanceof => OpCode::Instanceof,
+            In => OpCode::In,
+        },
         HirType::Bool
-        | HirType::Str
         | HirType::Ref
         | HirType::Dynamic
         | HirType::Array(_)

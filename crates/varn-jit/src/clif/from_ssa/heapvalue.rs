@@ -196,6 +196,42 @@ pub(super) fn emit(
             let boxed = heap::emit_str_concat(b, ctx, values, *lhs, *rhs)?;
             Out::Boxed(boxed)
         }
+        SsaOp::Binary {
+            op: varn_types::ssa::SsaBinOp::StrEq,
+            lhs,
+            rhs,
+        } => {
+            let a = heap::boxed_parts(b, ctx, values, *lhs)?;
+            let c = heap::boxed_parts(b, ctx, values, *rhs)?;
+            let cond = super::super::generic::boxed_compare(
+                b,
+                ctx.cc,
+                ctx.helpers.eq,
+                ctx.exec_ctx,
+                Some(true),
+                a,
+                c,
+            );
+            Out::Native(cond)
+        }
+        SsaOp::Binary {
+            op: varn_types::ssa::SsaBinOp::StrNe,
+            lhs,
+            rhs,
+        } => {
+            let a = heap::boxed_parts(b, ctx, values, *lhs)?;
+            let c = heap::boxed_parts(b, ctx, values, *rhs)?;
+            let cond = super::super::generic::boxed_compare(
+                b,
+                ctx.cc,
+                ctx.helpers.neq,
+                ctx.exec_ctx,
+                Some(false),
+                a,
+                c,
+            );
+            Out::Native(cond)
+        }
         SsaOp::BuildStr { parts } => {
             let boxed = heap::emit_build_str(b, ctx, values, parts)?;
             Out::Boxed(boxed)

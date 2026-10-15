@@ -17,6 +17,9 @@ const PAIRS: &[(OpCode, OpCode)] = &[
     (OpCode::SubInt, OpCode::Sub),
     (OpCode::MulInt, OpCode::Mul),
     (OpCode::EqInt, OpCode::Eq),
+    (OpCode::NeqInt, OpCode::Neq),
+    (OpCode::EqStr, OpCode::Eq),
+    (OpCode::NeqStr, OpCode::Neq),
     (OpCode::LtInt, OpCode::Lt),
     (OpCode::GtInt, OpCode::Gt),
     (OpCode::GetFixedField, OpCode::GetProperty),
@@ -149,16 +152,21 @@ fn count_one(proto: &FunctionProto) -> Counts {
                 c.members.push(name);
             }
         }
-        for (typed, gen_op) in PAIRS {
+        for (typed, _) in PAIRS {
             if op == *typed {
                 c.typed += 1;
-            } else if op == *gen_op {
+                break;
+            }
+        }
+        for (_, gen_op) in PAIRS {
+            if op == *gen_op {
                 c.generic += 1;
                 let label = format!("{op:?}");
                 match generic.iter_mut().find(|(n, _)| *n == label) {
                     Some((_, n)) => *n += 1,
                     None => generic.push((label, 1)),
                 }
+                break;
             }
         }
         ip += layout.len;
