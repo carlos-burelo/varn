@@ -222,7 +222,8 @@ impl<'a> FnEmitter<'a> {
                             )
                         })
                         .filter(|t| match t {
-                            BackendTy::Dynamic(DynReason::Callable | DynReason::Shape(_)) => true,
+                            BackendTy::Dynamic(DynReason::Callable | DynReason::Shape(_))
+                            | BackendTy::Dynamic(DynReason::Declared) => true,
                             BackendTy::Dynamic(
                                 DynReason::HostBoundary
                                 | DynReason::Union
