@@ -116,6 +116,12 @@ impl<'a> FnEmitter<'a> {
                 }
             }
             Pattern::Array { elements, rest, .. } => {
+                let tuple_elems = match src.ty.non_nullable(self.tt) {
+                    BackendTy::Tuple(slots) if self.tt.contains_list(slots) => {
+                        Some(self.tt.get_list(slots).to_vec())
+                    }
+                    _ => None,
+                };
                 let elem_ty = match src.ty.non_nullable(self.tt) {
                     BackendTy::Array(e) => self.tt.get(e),
                     BackendTy::Int
@@ -141,12 +147,16 @@ impl<'a> FnEmitter<'a> {
                 for (i, slot) in elements.iter().enumerate() {
                     let Some(el) = slot else { continue };
 
+                    let ty = tuple_elems
+                        .as_ref()
+                        .and_then(|els| els.get(i).copied())
+                        .unwrap_or(elem_ty);
                     let idx = TirExpr {
                         kind: TirExprKind::Index {
                             object: Box::new(src.clone()),
                             index: Box::new(int_lit(i as i64)),
                         },
-                        ty: elem_ty,
+                        ty,
                         res: Resolution::None,
                         span: src.span,
                     };
