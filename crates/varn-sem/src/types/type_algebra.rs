@@ -260,12 +260,20 @@ impl Type {
                     .collect();
                 Type::object(new_members, table)
             }
+            TypeKind::Tuple(els) => {
+                let ids = table.get_list(els).to_vec();
+                let new_els: Vec<CheckerTyId> = ids
+                    .into_iter()
+                    .map(|id| Type::resolved(id).map_generics(mapping, table).0)
+                    .collect();
+                let new_list = table.intern_list(&new_els);
+                Type(table.intern(TypeKind::Tuple(new_list)), self.1)
+            }
             TypeKind::Primitive(_)
             | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Intersection(_)
-            | TypeKind::Tuple(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)

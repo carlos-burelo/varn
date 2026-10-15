@@ -56,6 +56,14 @@ function nested<T>(items: T[], wrap: (v: T) => T[]): T[][] {
     return out;
 }
 
+function pairOf<A, B>(a: A, b: B): [A, B] {
+    return #[a, b];
+}
+
+function boxPair<A, B>(a: A, b: B): Box<[A, B]> {
+    return new Box<[A, B]>(#[a, b]);
+}
+
 namespace tools {
     export function eachLocal<T>(items: T[], key: (v: T) => dynamic, render: (v: T) => str): str[] {
         const out: str[] = [];
@@ -198,6 +206,16 @@ await describe("221 generics named edges", async () => {
 
     await it("nested generic named", () => {
         expect(nested(items: [1, 2], wrap: x => [x])).toEqual([[1], [2]]);
+    });
+
+    await it("generic tuple return substitutes through index", () => {
+        const t = pairOf(7, "seven");
+        expect(t[0] + 1).toBe(8);
+        expect(t[1] + "!").toBe("seven!");
+        expect(pairOf<int, str>(1, "a")[0]).toBe(1);
+        const bp = boxPair(7, "seven");
+        expect(bp.get()[0] + 1).toBe(8);
+        expect(bp.get()[1] + "!").toBe("seven!");
     });
 
     await it("shadowed global name generic", () => {
