@@ -371,7 +371,11 @@ impl<'a> FnEmitter<'a> {
                 };
             }
             if let Some(field) = ci.field(&name).cloned() {
-                let ty = if ty != field.ty && ty == field.ty.non_nullable(self.tt) {
+                let ty = if ty == field.ty || ty == field.ty.non_nullable(self.tt) {
+                    ty
+                } else if matches!(field.ty, BackendTy::Dynamic(_))
+                    && !matches!(ty, BackendTy::Dynamic(_))
+                {
                     ty
                 } else {
                     field.ty
