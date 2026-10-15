@@ -47,13 +47,13 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         }
 
         if tok.kind == TokenKind::This {
-            if let Some((_, ty)) = state.db.resolve_at("this", tok.offset) {
-                if !state.db.is_dynamic(&ty) {
-                    return Some(make_lang_hover(
-                        format!("this: {}", state.ty_text(&ty)),
-                        token_range,
-                    ));
-                }
+            if let Some((_, ty)) = state.db.resolve_at("this", tok.offset)
+                && !state.db.is_dynamic(&ty)
+            {
+                return Some(make_lang_hover(
+                    format!("this: {}", state.ty_text(&ty)),
+                    token_range,
+                ));
             }
             return Some(make_lang_hover("this".to_owned(), token_range));
         }
@@ -63,10 +63,8 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             .and_then(|j| state.tokens.get(j))
             .map(|t| t.kind == TokenKind::At)
             .unwrap_or(false);
-        if prev_is_at {
-            if let Some(h) = decorator_hover(state.lexeme(tok)) {
-                return Some(with_range(h, token_range));
-            }
+        if prev_is_at && let Some(h) = decorator_hover(state.lexeme(tok)) {
+            return Some(with_range(h, token_range));
         }
 
         if let Some(mem_res) = state.db.member_resolutions.get(&tok.offset) {
@@ -78,12 +76,11 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     if let Some(res) = query::resolve_chain(state, line, col) {
         match res {
             ChainResult::Symbol(sym) => {
-                if sym.is_from_stdlib() {
-                    if let Some((_, tok)) = tok_any {
-                        if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
-                            return Some(with_range(h, token_range));
-                        }
-                    }
+                if sym.is_from_stdlib()
+                    && let Some((_, tok)) = tok_any
+                    && let Some(h) = intrinsic_or_keyword_hover(state, tok)
+                {
+                    return Some(with_range(h, token_range));
                 }
                 return Some(with_range(symbol_hover(state, sym), token_range));
             }
@@ -103,12 +100,11 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     }
 
     if let Some(sym) = query::symbol_at(state, line, col) {
-        if sym.is_from_stdlib() {
-            if let Some((_, tok)) = tok_any {
-                if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
-                    return Some(with_range(h, token_range));
-                }
-            }
+        if sym.is_from_stdlib()
+            && let Some((_, tok)) = tok_any
+            && let Some(h) = intrinsic_or_keyword_hover(state, tok)
+        {
+            return Some(with_range(h, token_range));
         }
         return Some(with_range(symbol_hover(state, sym), token_range));
     }
@@ -133,10 +129,10 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         return Some(make_lang_hover(sig, token_range));
     }
 
-    if let Some((_, tok)) = tok_any {
-        if let Some(h) = intrinsic_or_keyword_hover(state, tok) {
-            return Some(with_range(h, token_range));
-        }
+    if let Some((_, tok)) = tok_any
+        && let Some(h) = intrinsic_or_keyword_hover(state, tok)
+    {
+        return Some(with_range(h, token_range));
     }
 
     None

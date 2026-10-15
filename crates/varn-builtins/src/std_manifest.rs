@@ -68,11 +68,11 @@ fn collect_vn_files(base: &Path, dir: &Path, out: &mut Vec<String>) {
         let p = entry.path();
         if p.is_dir() {
             collect_vn_files(base, &p, out);
-        } else if p.extension().is_some_and(|ext| ext == "vn") {
-            if let Ok(rel) = p.strip_prefix(base) {
-                let normalized = rel.to_string_lossy().replace('\\', "/");
-                out.push(normalized);
-            }
+        } else if p.extension().is_some_and(|ext| ext == "vn")
+            && let Ok(rel) = p.strip_prefix(base)
+        {
+            let normalized = rel.to_string_lossy().replace('\\', "/");
+            out.push(normalized);
         }
     }
 }

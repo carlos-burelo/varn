@@ -19,16 +19,16 @@ impl<'r> Checker<'r> {
             self.check_case_shape(case, at + 1 == cases.len());
             if let Some(t) = case.test {
                 self.check_expr(rec, t, bind);
-                if let Some(lit_val) = get_literal_value_key(t, self.ast_arena) {
-                    if !seen_cases.insert(lit_val.clone()) {
-                        self.emit(
-                            Diagnostic::error(
-                                ErrorCode::DuplicateCaseLabel,
-                                format!("duplicate case label '{}'", lit_val),
-                            )
-                            .with_range(self.ast_arena.expr(t).range),
-                        );
-                    }
+                if let Some(lit_val) = get_literal_value_key(t, self.ast_arena)
+                    && !seen_cases.insert(lit_val.clone())
+                {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::DuplicateCaseLabel,
+                            format!("duplicate case label '{}'", lit_val),
+                        )
+                        .with_range(self.ast_arena.expr(t).range),
+                    );
                 }
             }
             self.check_stmts(rec, &case.body, bind);

@@ -69,10 +69,10 @@ impl ExecCtx {
         };
         let proto_ptr = Rc::as_ptr(&proto) as usize;
         let is_static = upvalues.len() == 0;
-        if is_static {
-            if let Some(&(_, cached)) = unsafe { &*self.static_closures.get() }.get(&proto_ptr) {
-                return Ok(cached);
-            }
+        if is_static
+            && let Some(&(_, cached)) = unsafe { &*self.static_closures.get() }.get(&proto_ptr)
+        {
+            return Ok(cached);
         }
         let captured = upvalues
             .map(|src| match src {

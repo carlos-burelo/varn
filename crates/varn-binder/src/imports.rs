@@ -31,18 +31,15 @@ impl<'r> super::Binder<'r> {
             None
         };
 
-        if is_relative {
-            if let Some(abs) = &resolved_target {
-                let base_path = std::path::Path::new(self.source_file.as_ref())
-                    .parent()
-                    .unwrap_or(std::path::Path::new("."));
-                if let Err(message) = varn_modules::contain::check_within_root(base_path, abs) {
-                    self.emit(
-                        Diagnostic::error(ErrorCode::InvalidImportPath, message)
-                            .with_range(i.range),
-                    );
-                    return;
-                }
+        if is_relative && let Some(abs) = &resolved_target {
+            let base_path = std::path::Path::new(self.source_file.as_ref())
+                .parent()
+                .unwrap_or(std::path::Path::new("."));
+            if let Err(message) = varn_modules::contain::check_within_root(base_path, abs) {
+                self.emit(
+                    Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(i.range),
+                );
+                return;
             }
         }
 
@@ -220,10 +217,10 @@ impl<'r> super::Binder<'r> {
                 for s in specifiers {
                     self.escape_array_candidate(s.local);
                 }
-                if let Some(source) = source {
-                    if self.check_reexport_layer(*source, e.range()) {
-                        self.record_reexport_dep(*source);
-                    }
+                if let Some(source) = source
+                    && self.check_reexport_layer(*source, e.range())
+                {
+                    self.record_reexport_dep(*source);
                 }
             }
             ExportDecl::All { source, .. } => {

@@ -24,12 +24,11 @@ impl<'a> FnEmitter<'a> {
             MatchPattern::Wildcard => (bool_lit(true), vec![]),
             MatchPattern::Identifier(name) => {
                 let name_str = self.m.interner.resolve(*name);
-                if let BackendTy::Enum(eid) = s.ty.non_nullable(self.tt) {
-                    if let Some(info) = self.m.enums.get(eid.0 as usize) {
-                        if info.variants.iter().any(|v| v.name.as_ref() == name_str) {
-                            return self.match_enum_variant(s, name_str, name_str, &[]);
-                        }
-                    }
+                if let BackendTy::Enum(eid) = s.ty.non_nullable(self.tt)
+                    && let Some(info) = self.m.enums.get(eid.0 as usize)
+                    && info.variants.iter().any(|v| v.name.as_ref() == name_str)
+                {
+                    return self.match_enum_variant(s, name_str, name_str, &[]);
                 }
                 let local = self.bind_local(Arc::from(name_str), s.ty);
                 (

@@ -96,16 +96,14 @@ impl DocumentState {
             })
             .unwrap_or(false);
 
-        if after_dot {
-            if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
-                return Some(ChainResult::Member {
-                    member: summary_from_resolution(res),
-                    parent_name: self
-                        .db
-                        .decl_name(&res.receiver_ty)
-                        .unwrap_or_else(|| DYNAMIC.to_string()),
-                });
-            }
+        if after_dot && let Some(res) = self.db.member_resolutions.get(&tok.offset) {
+            return Some(ChainResult::Member {
+                member: summary_from_resolution(res),
+                parent_name: self
+                    .db
+                    .decl_name(&res.receiver_ty)
+                    .unwrap_or_else(|| DYNAMIC.to_string()),
+            });
         }
 
         if let Some(entry) = self.expr_entry_at_offset(tok.offset) {
@@ -195,10 +193,10 @@ impl DocumentState {
             } else if after_dot {
                 let parent_name = self.resolve_receiver_type_name_at(tok);
 
-                if let Some(sid) = self.checker_symbol_id_at_token(tok) {
-                    if let Some(s) = self.symbols().find(|s| s.id == sid) {
-                        return Some(ChainResult::Symbol(s));
-                    }
+                if let Some(sid) = self.checker_symbol_id_at_token(tok)
+                    && let Some(s) = self.symbols().find(|s| s.id == sid)
+                {
+                    return Some(ChainResult::Symbol(s));
                 }
                 return Some(ChainResult::Member {
                     member: summary_of(
@@ -217,20 +215,20 @@ impl DocumentState {
             }
         }
 
-        if let Some(sid) = self.checker_symbol_id_at_token(tok) {
-            if let Some(s) = self.symbols().find(|s| s.id == sid) {
-                return Some(ChainResult::Symbol(s));
-            }
+        if let Some(sid) = self.checker_symbol_id_at_token(tok)
+            && let Some(s) = self.symbols().find(|s| s.id == sid)
+        {
+            return Some(ChainResult::Symbol(s));
         }
 
         None
     }
 
     pub fn resolve_receiver_type_name_at(&self, tok: &TokenRecord) -> String {
-        if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
-            if let Some(name) = self.db.decl_name(&res.receiver_ty) {
-                return name;
-            }
+        if let Some(res) = self.db.member_resolutions.get(&tok.offset)
+            && let Some(name) = self.db.decl_name(&res.receiver_ty)
+        {
+            return name;
         }
 
         let tok_idx_opt = self.tokens.iter().position(|t| t.offset == tok.offset);

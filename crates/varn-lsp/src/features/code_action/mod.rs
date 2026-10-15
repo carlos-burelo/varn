@@ -24,76 +24,76 @@ pub fn build_code_action(
     let cursor_col = params.range.start.character;
 
     for diag in &params.context.diagnostics {
-        if let Some(data) = &diag.data {
-            if let Some(suggestions) = data.get("suggestions").and_then(|s| s.as_array()) {
-                for sug in suggestions {
-                    let msg = sug
-                        .get("message")
-                        .and_then(|m| m.as_str())
-                        .unwrap_or("Fix issue");
-                    let mut action = CodeAction {
-                        title: msg.to_string(),
-                        kind: Some(CodeActionKind::QuickFix),
-                        diagnostics: Some(vec![diag.clone()]),
-                        edit: None,
-                        command: None,
-                        is_preferred: Some(true),
-                        disabled: None,
-                        tags: None,
-                        data: None,
+        if let Some(data) = &diag.data
+            && let Some(suggestions) = data.get("suggestions").and_then(|s| s.as_array())
+        {
+            for sug in suggestions {
+                let msg = sug
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Fix issue");
+                let mut action = CodeAction {
+                    title: msg.to_string(),
+                    kind: Some(CodeActionKind::QuickFix),
+                    diagnostics: Some(vec![diag.clone()]),
+                    edit: None,
+                    command: None,
+                    is_preferred: Some(true),
+                    disabled: None,
+                    tags: None,
+                    data: None,
+                };
+
+                if let Some(repl) = sug.get("replacement").and_then(|r| r.as_str()) {
+                    let mut edits = Vec::new();
+
+                    let range = if let Some(r) = sug.get("range") {
+                        let start_line = r
+                            .get("start")
+                            .and_then(|s| s.get("line"))
+                            .and_then(|l| l.as_u64())
+                            .unwrap_or(0) as u32;
+                        let start_col = r
+                            .get("start")
+                            .and_then(|s| s.get("character"))
+                            .and_then(|l| l.as_u64())
+                            .unwrap_or(0) as u32;
+                        let end_line = r
+                            .get("end")
+                            .and_then(|s| s.get("line"))
+                            .and_then(|l| l.as_u64())
+                            .unwrap_or(0) as u32;
+                        let end_col = r
+                            .get("end")
+                            .and_then(|s| s.get("character"))
+                            .and_then(|l| l.as_u64())
+                            .unwrap_or(0) as u32;
+
+                        Range {
+                            start: Position {
+                                line: start_line.saturating_sub(1),
+                                character: start_col,
+                            },
+                            end: Position {
+                                line: end_line.saturating_sub(1),
+                                character: end_col,
+                            },
+                        }
+                    } else {
+                        diag.range
                     };
 
-                    if let Some(repl) = sug.get("replacement").and_then(|r| r.as_str()) {
-                        let mut edits = Vec::new();
+                    edits.push(TextEdit {
+                        range,
+                        new_text: repl.to_string(),
+                    });
 
-                        let range = if let Some(r) = sug.get("range") {
-                            let start_line = r
-                                .get("start")
-                                .and_then(|s| s.get("line"))
-                                .and_then(|l| l.as_u64())
-                                .unwrap_or(0) as u32;
-                            let start_col = r
-                                .get("start")
-                                .and_then(|s| s.get("character"))
-                                .and_then(|l| l.as_u64())
-                                .unwrap_or(0) as u32;
-                            let end_line = r
-                                .get("end")
-                                .and_then(|s| s.get("line"))
-                                .and_then(|l| l.as_u64())
-                                .unwrap_or(0) as u32;
-                            let end_col = r
-                                .get("end")
-                                .and_then(|s| s.get("character"))
-                                .and_then(|l| l.as_u64())
-                                .unwrap_or(0) as u32;
+                    let doc_edits = vec![(uri.clone(), edits)];
 
-                            Range {
-                                start: Position {
-                                    line: start_line.saturating_sub(1),
-                                    character: start_col,
-                                },
-                                end: Position {
-                                    line: end_line.saturating_sub(1),
-                                    character: end_col,
-                                },
-                            }
-                        } else {
-                            diag.range
-                        };
-
-                        edits.push(TextEdit {
-                            range,
-                            new_text: repl.to_string(),
-                        });
-
-                        let doc_edits = vec![(uri.clone(), edits)];
-
-                        action.edit = Some(crate::features::workspace_edit::doc_edits(doc_edits));
-                    }
-
-                    actions.push(CodeActionResponse::CodeAction(action));
+                    action.edit = Some(crate::features::workspace_edit::doc_edits(doc_edits));
                 }
+
+                actions.push(CodeActionResponse::CodeAction(action));
             }
         }
 

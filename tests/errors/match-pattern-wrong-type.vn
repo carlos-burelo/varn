@@ -1,2 +1,2 @@
-// VN4015
+// expect: error[VN4015]
 function label(n: int): str { return match (n) { 0 => "zero", "one" => "one", _ => "many" } }

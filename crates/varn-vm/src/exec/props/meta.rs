@@ -177,10 +177,11 @@ pub(crate) fn resolve_meta_property(
             Ok(target.unwrap_or(VmValue::null()))
         }
         MemberKey::Fields => {
-            if let Some(c) = &cls {
-                if obj.is_heap() && heap.instance(obj.as_heap()).is_some() {
-                    return Ok(str_array(heap, class_field_names(c).into_iter()));
-                }
+            if let Some(c) = &cls
+                && obj.is_heap()
+                && heap.instance(obj.as_heap()).is_some()
+            {
+                return Ok(str_array(heap, class_field_names(c).into_iter()));
             }
             let names = match (
                 &cls,

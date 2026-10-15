@@ -59,31 +59,31 @@ impl<'a> FnEmitter<'a> {
         }
 
         let Some(top) = bin_op(op) else {
-            if op == BinaryOp::Instanceof {
-                if let ExprKind::Identifier { name } = &self.ast_arena.expr(right).kind {
-                    if let Some(class) = self.class_named(self.m.interner.resolve(*name)) {
-                        return TirExpr {
-                            kind: TirExprKind::TypeTest {
-                                value: Box::new(lhs),
-                                class,
-                            },
-                            ty: BackendTy::Bool,
-                            res: Resolution::None,
-                            span,
-                        };
-                    }
-
+            if op == BinaryOp::Instanceof
+                && let ExprKind::Identifier { name } = &self.ast_arena.expr(right).kind
+            {
+                if let Some(class) = self.class_named(self.m.interner.resolve(*name)) {
                     return TirExpr {
-                        kind: TirExprKind::Binary {
-                            op: TirBinOp::Instanceof,
-                            lhs: Box::new(lhs),
-                            rhs: Box::new(rhs),
+                        kind: TirExprKind::TypeTest {
+                            value: Box::new(lhs),
+                            class,
                         },
                         ty: BackendTy::Bool,
                         res: Resolution::None,
                         span,
                     };
                 }
+
+                return TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: TirBinOp::Instanceof,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    },
+                    ty: BackendTy::Bool,
+                    res: Resolution::None,
+                    span,
+                };
             }
             if op == BinaryOp::In {
                 return TirExpr {

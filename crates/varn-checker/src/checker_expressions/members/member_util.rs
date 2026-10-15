@@ -25,10 +25,10 @@ pub(crate) fn class_type_params(
     if let Some(b) = resolver.find_bind_for_type(name, &origins) {
         return params_in(name, &b);
     }
-    if origin.is_none() {
-        if let Some(found) = resolver.find_stdlib_bind(&mut |b| !params_in(name, b).is_empty()) {
-            return params_in(name, &found);
-        }
+    if origin.is_none()
+        && let Some(found) = resolver.find_stdlib_bind(&mut |b| !params_in(name, b).is_empty())
+    {
+        return params_in(name, &found);
     }
     Vec::new()
 }

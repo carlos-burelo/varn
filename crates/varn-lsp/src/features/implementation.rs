@@ -81,33 +81,31 @@ fn find_class_subtypes(
     locations: &mut Vec<Location>,
 ) {
     for c in top_level_classes(file) {
-        if let Some(super_expr) = c.super_class {
-            if let varn_core::ast::ExprKind::Identifier { name } =
+        if let Some(super_expr) = c.super_class
+            && let varn_core::ast::ExprKind::Identifier { name } =
                 &file.ast_arena.expr(super_expr).kind
-            {
-                if file.name(*name) == class_or_method_name {
-                    locations.push(class_location(file, c, uri));
-                }
-            }
+            && file.name(*name) == class_or_method_name
+        {
+            locations.push(class_location(file, c, uri));
         }
 
         for member in &c.body {
-            if let ClassMember::Method { key, range, .. } = member {
-                if file.name(*key) == class_or_method_name {
-                    locations.push(Location::new(
-                        uri.clone(),
-                        Range {
-                            start: Position {
-                                line: range.start.line.saturating_sub(1),
-                                character: range.start.column,
-                            },
-                            end: Position {
-                                line: range.end.line.saturating_sub(1),
-                                character: range.end.column,
-                            },
+            if let ClassMember::Method { key, range, .. } = member
+                && file.name(*key) == class_or_method_name
+            {
+                locations.push(Location::new(
+                    uri.clone(),
+                    Range {
+                        start: Position {
+                            line: range.start.line.saturating_sub(1),
+                            character: range.start.column,
                         },
-                    ));
-                }
+                        end: Position {
+                            line: range.end.line.saturating_sub(1),
+                            character: range.end.column,
+                        },
+                    },
+                ));
             }
         }
     }

@@ -22,20 +22,6 @@ pub unsafe extern "C" fn varn_rt_print(ptr: *const u8, len: usize) {
     let _ = std::io::stdout().flush();
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn varn_rt_print_int(val: i64) {
-    println!("{val}");
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn varn_rt_print_bool(val: i64) {
-    if val != 0 {
-        println!("true");
-    } else {
-        println!("false");
-    }
-}
-
 #[repr(C)]
 pub struct StrResult {
     pub ptr: *const u8,

@@ -156,10 +156,9 @@ impl Type {
                     }
                     if let (TypeKind::Array(_), TypeKind::Array(_)) =
                         (table.get(id), table.get(other.0))
+                        && (other.0 == dynamic_array || id == other.0)
                     {
-                        if other.0 == dynamic_array || id == other.0 {
-                            continue;
-                        }
+                        continue;
                     }
                     kept.push(id);
                 }

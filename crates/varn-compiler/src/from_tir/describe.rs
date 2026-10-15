@@ -160,8 +160,48 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Option<ParamCo
             let desc = describer.describe(*ty);
             match desc {
                 TypeDesc::Any | TypeDesc::Nullable(_) => desc,
-                required if *defaulted => TypeDesc::Nullable(Box::new(required)),
-                required => required,
+                required @ TypeDesc::Int
+                | required @ TypeDesc::Float
+                | required @ TypeDesc::Bool
+                | required @ TypeDesc::Char
+                | required @ TypeDesc::Str
+                | required @ TypeDesc::Bytes
+                | required @ TypeDesc::Decimal
+                | required @ TypeDesc::BigInt
+                | required @ TypeDesc::Callable
+                | required @ TypeDesc::Array(_)
+                | required @ TypeDesc::Map(_, _)
+                | required @ TypeDesc::Set(_)
+                | required @ TypeDesc::Dict(_)
+                | required @ TypeDesc::Tuple(_)
+                | required @ TypeDesc::Class { .. }
+                | required @ TypeDesc::Enum { .. }
+                | required @ TypeDesc::Args { .. }
+                | required @ TypeDesc::Object(_)
+                | required @ TypeDesc::Enclosing { .. }
+                    if *defaulted =>
+                {
+                    TypeDesc::Nullable(Box::new(required))
+                }
+                required @ TypeDesc::Int
+                | required @ TypeDesc::Float
+                | required @ TypeDesc::Bool
+                | required @ TypeDesc::Char
+                | required @ TypeDesc::Str
+                | required @ TypeDesc::Bytes
+                | required @ TypeDesc::Decimal
+                | required @ TypeDesc::BigInt
+                | required @ TypeDesc::Callable
+                | required @ TypeDesc::Array(_)
+                | required @ TypeDesc::Map(_, _)
+                | required @ TypeDesc::Set(_)
+                | required @ TypeDesc::Dict(_)
+                | required @ TypeDesc::Tuple(_)
+                | required @ TypeDesc::Class { .. }
+                | required @ TypeDesc::Enum { .. }
+                | required @ TypeDesc::Args { .. }
+                | required @ TypeDesc::Object(_)
+                | required @ TypeDesc::Enclosing { .. } => required,
             }
         })
         .collect();

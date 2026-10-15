@@ -19,90 +19,146 @@ impl<'r> Checker<'r> {
         let arena = self.ast_arena;
         let is_eq = op == BinaryOp::Eq;
         let is_neq = op == BinaryOp::NotEq;
-        if is_eq || is_neq {
-            if let ExprKind::Member {
+        if (is_eq || is_neq)
+            && let ExprKind::Member {
                 object,
                 property,
                 computed: false,
                 ..
             } = &arena.expr(left).kind
+        {
+            let (object, property) = (*object, *property);
+            if let (
+                ExprKind::Identifier { name: obj_name },
+                ExprKind::Identifier { name: prop_name },
+            ) = (&arena.expr(object).kind, &arena.expr(property).kind)
             {
-                let (object, property) = (*object, *property);
-                if let (
-                    ExprKind::Identifier { name: obj_name },
-                    ExprKind::Identifier { name: prop_name },
-                ) = (&arena.expr(object).kind, &arena.expr(property).kind)
-                {
-                    let (obj_name, prop_name) = (*obj_name, *prop_name);
-                    let disc_ty: Option<Type> = match &arena.expr(right).kind {
-                        ExprKind::StrLiteral { .. } => Some(Type::Str),
-                        ExprKind::IntLiteral { .. } => Some(Type::Int),
-                        ExprKind::FloatLiteral { .. }
-                        | ExprKind::BigIntLiteral { .. }
-                        | ExprKind::DecimalLiteral { .. }
-                        | ExprKind::CharLiteral { .. }
-                        | ExprKind::BoolLiteral { .. }
-                        | ExprKind::NullLiteral
-                        | ExprKind::RegexLiteral { .. }
-                        | ExprKind::Template { .. }
-                        | ExprKind::TaggedTemplate { .. }
-                        | ExprKind::Identifier { .. }
-                        | ExprKind::Missing
-                        | ExprKind::This
-                        | ExprKind::Super
-                        | ExprKind::Array { .. }
-                        | ExprKind::Object { .. }
-                        | ExprKind::Tuple { .. }
-                        | ExprKind::Record { .. }
-                        | ExprKind::Unary { .. }
-                        | ExprKind::Update { .. }
-                        | ExprKind::Binary { .. }
-                        | ExprKind::Logical { .. }
-                        | ExprKind::Assign { .. }
-                        | ExprKind::Conditional { .. }
-                        | ExprKind::Member { .. }
-                        | ExprKind::Call { .. }
-                        | ExprKind::New { .. }
-                        | ExprKind::Function { .. }
-                        | ExprKind::Arrow { .. }
-                        | ExprKind::Sequence { .. }
-                        | ExprKind::Paren { .. }
-                        | ExprKind::Await { .. }
-                        | ExprKind::Spawn { .. }
-                        | ExprKind::Yield { .. }
-                        | ExprKind::Spread { .. }
-                        | ExprKind::Pipeline { .. }
-                        | ExprKind::Range { .. }
-                        | ExprKind::NonNull { .. }
-                        | ExprKind::Try { .. }
-                        | ExprKind::As { .. }
-                        | ExprKind::Satisfies { .. }
-                        | ExprKind::ClassExpr { .. }
-                        | ExprKind::Match { .. }
-                        | ExprKind::Is { .. }
-                        | ExprKind::With { .. }
-                        | ExprKind::MetaAccess { .. } => None,
-                    };
-                    if let Some(disc_ty) = disc_ty {
-                        let prop_name_str = bind.interner.resolve(prop_name);
-                        let scope = bind.scopes.get(self.current_scope);
-                        if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
-                            let original_ty = self.narrowing_base(id, bind.arena.get(id).ty);
-                            let union_list =
-                                original_ty.and_then(|t| match self.ty_table.get(t.0) {
-                                    TypeKind::Union(list) => Some(list),
+                let (obj_name, prop_name) = (*obj_name, *prop_name);
+                let disc_ty: Option<Type> = match &arena.expr(right).kind {
+                    ExprKind::StrLiteral { .. } => Some(Type::Str),
+                    ExprKind::IntLiteral { .. } => Some(Type::Int),
+                    ExprKind::FloatLiteral { .. }
+                    | ExprKind::BigIntLiteral { .. }
+                    | ExprKind::DecimalLiteral { .. }
+                    | ExprKind::CharLiteral { .. }
+                    | ExprKind::BoolLiteral { .. }
+                    | ExprKind::NullLiteral
+                    | ExprKind::RegexLiteral { .. }
+                    | ExprKind::Template { .. }
+                    | ExprKind::TaggedTemplate { .. }
+                    | ExprKind::Identifier { .. }
+                    | ExprKind::Missing
+                    | ExprKind::This
+                    | ExprKind::Super
+                    | ExprKind::Array { .. }
+                    | ExprKind::Object { .. }
+                    | ExprKind::Tuple { .. }
+                    | ExprKind::Record { .. }
+                    | ExprKind::Unary { .. }
+                    | ExprKind::Update { .. }
+                    | ExprKind::Binary { .. }
+                    | ExprKind::Logical { .. }
+                    | ExprKind::Assign { .. }
+                    | ExprKind::Conditional { .. }
+                    | ExprKind::Member { .. }
+                    | ExprKind::Call { .. }
+                    | ExprKind::New { .. }
+                    | ExprKind::Function { .. }
+                    | ExprKind::Arrow { .. }
+                    | ExprKind::Sequence { .. }
+                    | ExprKind::Paren { .. }
+                    | ExprKind::Await { .. }
+                    | ExprKind::Spawn { .. }
+                    | ExprKind::Yield { .. }
+                    | ExprKind::Spread { .. }
+                    | ExprKind::Pipeline { .. }
+                    | ExprKind::Range { .. }
+                    | ExprKind::NonNull { .. }
+                    | ExprKind::Try { .. }
+                    | ExprKind::As { .. }
+                    | ExprKind::Satisfies { .. }
+                    | ExprKind::ClassExpr { .. }
+                    | ExprKind::Match { .. }
+                    | ExprKind::Is { .. }
+                    | ExprKind::With { .. }
+                    | ExprKind::MetaAccess { .. } => None,
+                };
+                if let Some(disc_ty) = disc_ty {
+                    let prop_name_str = bind.interner.resolve(prop_name);
+                    let scope = bind.scopes.get(self.current_scope);
+                    if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
+                        let original_ty = self.narrowing_base(id, bind.arena.get(id).ty);
+                        let union_list = original_ty.and_then(|t| match self.ty_table.get(t.0) {
+                            TypeKind::Union(list) => Some(list),
+                            TypeKind::Primitive(_)
+                            | TypeKind::Builtin(_)
+                            | TypeKind::Literal(_)
+                            | TypeKind::This
+                            | TypeKind::Array(_)
+                            | TypeKind::Intersection(_)
+                            | TypeKind::Tuple(_)
+                            | TypeKind::Named(..)
+                            | TypeKind::Generic(..)
+                            | TypeKind::TemplateLiteral(_)
+                            | TypeKind::Fn(_)
+                            | TypeKind::Object(_)
+                            | TypeKind::Typeof(_)
+                            | TypeKind::KeyOf(_)
+                            | TypeKind::IndexedAccess { .. }
+                            | TypeKind::Mapped { .. }
+                            | TypeKind::Conditional { .. }
+                            | TypeKind::Infer(_)
+                            | TypeKind::EnumVariant { .. }
+                            | TypeKind::TypePredicate { .. } => None,
+                        });
+                        if let Some(list) = union_list {
+                            let members: Vec<Type> = self
+                                .ty_table
+                                .get_list(list)
+                                .iter()
+                                .map(|id| Type::resolved(*id))
+                                .collect();
+                            let mut matched: Vec<Type> = Vec::new();
+                            let mut unmatched: Vec<Type> = Vec::new();
+                            for m in members.iter() {
+                                let m_kind = self.ty_table.get(m.0);
+                                let hits = match m_kind {
+                                    TypeKind::Object(mid) => self
+                                        .ty_table
+                                        .get_object_members(mid)
+                                        .iter()
+                                        .any(|f| match f {
+                                            ObjectTypeMember::Property { name, ty, .. } => {
+                                                name.as_ref() == prop_name_str && *ty == disc_ty.0
+                                            }
+                                            ObjectTypeMember::Method { .. }
+                                            | ObjectTypeMember::Index { .. }
+                                            | ObjectTypeMember::Callable { .. } => false,
+                                        }),
+                                    TypeKind::Named(cn, _) => {
+                                        let cn_str = bind.interner.resolve(cn).to_string();
+                                        bind.get_interface_members_local(&cn_str)
+                                            .or_else(|| {
+                                                bind.get_class_entry(&cn_str).map(|e| &e.members)
+                                            })
+                                            .is_some_and(|ms| {
+                                                ms.iter().any(|cm| {
+                                                    cm.name.as_ref() == prop_name_str
+                                                        && cm.ty == disc_ty
+                                                })
+                                            })
+                                    }
                                     TypeKind::Primitive(_)
                                     | TypeKind::Builtin(_)
                                     | TypeKind::Literal(_)
                                     | TypeKind::This
                                     | TypeKind::Array(_)
+                                    | TypeKind::Union(_)
                                     | TypeKind::Intersection(_)
                                     | TypeKind::Tuple(_)
-                                    | TypeKind::Named(..)
                                     | TypeKind::Generic(..)
                                     | TypeKind::TemplateLiteral(_)
                                     | TypeKind::Fn(_)
-                                    | TypeKind::Object(_)
                                     | TypeKind::Typeof(_)
                                     | TypeKind::KeyOf(_)
                                     | TypeKind::IndexedAccess { .. }
@@ -110,100 +166,39 @@ impl<'r> Checker<'r> {
                                     | TypeKind::Conditional { .. }
                                     | TypeKind::Infer(_)
                                     | TypeKind::EnumVariant { .. }
-                                    | TypeKind::TypePredicate { .. } => None,
-                                });
-                            if let Some(list) = union_list {
-                                let members: Vec<Type> = self
-                                    .ty_table
-                                    .get_list(list)
-                                    .iter()
-                                    .map(|id| Type::resolved(*id))
-                                    .collect();
-                                let mut matched: Vec<Type> = Vec::new();
-                                let mut unmatched: Vec<Type> = Vec::new();
-                                for m in members.iter() {
-                                    let m_kind = self.ty_table.get(m.0);
-                                    let hits = match m_kind {
-                                        TypeKind::Object(mid) => self
-                                            .ty_table
-                                            .get_object_members(mid)
-                                            .iter()
-                                            .any(|f| match f {
-                                                ObjectTypeMember::Property { name, ty, .. } => {
-                                                    name.as_ref() == prop_name_str
-                                                        && *ty == disc_ty.0
-                                                }
-                                                ObjectTypeMember::Method { .. }
-                                                | ObjectTypeMember::Index { .. }
-                                                | ObjectTypeMember::Callable { .. } => false,
-                                            }),
-                                        TypeKind::Named(cn, _) => {
-                                            let cn_str = bind.interner.resolve(cn).to_string();
-                                            bind.get_interface_members_local(&cn_str)
-                                                .or_else(|| {
-                                                    bind.get_class_entry(&cn_str)
-                                                        .map(|e| &e.members)
-                                                })
-                                                .is_some_and(|ms| {
-                                                    ms.iter().any(|cm| {
-                                                        cm.name.as_ref() == prop_name_str
-                                                            && cm.ty == disc_ty
-                                                    })
-                                                })
-                                        }
-                                        TypeKind::Primitive(_)
-                                        | TypeKind::Builtin(_)
-                                        | TypeKind::Literal(_)
-                                        | TypeKind::This
-                                        | TypeKind::Array(_)
-                                        | TypeKind::Union(_)
-                                        | TypeKind::Intersection(_)
-                                        | TypeKind::Tuple(_)
-                                        | TypeKind::Generic(..)
-                                        | TypeKind::TemplateLiteral(_)
-                                        | TypeKind::Fn(_)
-                                        | TypeKind::Typeof(_)
-                                        | TypeKind::KeyOf(_)
-                                        | TypeKind::IndexedAccess { .. }
-                                        | TypeKind::Mapped { .. }
-                                        | TypeKind::Conditional { .. }
-                                        | TypeKind::Infer(_)
-                                        | TypeKind::EnumVariant { .. }
-                                        | TypeKind::TypePredicate { .. } => false,
-                                    };
-                                    if hits {
-                                        matched.push(*m);
-                                    } else {
-                                        unmatched.push(*m);
-                                    }
+                                    | TypeKind::TypePredicate { .. } => false,
+                                };
+                                if hits {
+                                    matched.push(*m);
+                                } else {
+                                    unmatched.push(*m);
                                 }
-                                let make_ty =
-                                    |v: Vec<Type>, table: &mut varn_sem::types::CheckerTyTable| {
-                                        match v.len() {
-                                            0 => None,
-                                            1 => Some(v.into_iter().next().unwrap()),
-                                            _ => Some(Type::union(v, table)),
-                                        }
-                                    };
-                                if (is_eq && is_true_branch) || (is_neq && !is_true_branch) {
-                                    if !matched.is_empty() {
-                                        if let Some(t) = make_ty(
-                                            matched,
-                                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                        ) {
-                                            out.push((id, t));
-                                        }
-                                    }
-                                } else if ((is_neq && is_true_branch) || (is_eq && !is_true_branch))
-                                    && !matched.is_empty()
+                            }
+                            let make_ty =
+                                |v: Vec<Type>, table: &mut varn_sem::types::CheckerTyTable| match v
+                                    .len()
                                 {
-                                    if let Some(t) = make_ty(
-                                        unmatched,
+                                    0 => None,
+                                    1 => Some(v.into_iter().next().unwrap()),
+                                    _ => Some(Type::union(v, table)),
+                                };
+                            if (is_eq && is_true_branch) || (is_neq && !is_true_branch) {
+                                if !matched.is_empty()
+                                    && let Some(t) = make_ty(
+                                        matched,
                                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                    ) {
-                                        out.push((id, t));
-                                    }
+                                    )
+                                {
+                                    out.push((id, t));
                                 }
+                            } else if ((is_neq && is_true_branch) || (is_eq && !is_true_branch))
+                                && !matched.is_empty()
+                                && let Some(t) = make_ty(
+                                    unmatched,
+                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                                )
+                            {
+                                out.push((id, t));
                             }
                         }
                     }
@@ -233,18 +228,17 @@ impl<'r> Checker<'r> {
             {
                 let obj_name = *obj_name;
                 let scope = bind.scopes.get(self.current_scope);
-                if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
-                    if let Some(ty) = self.narrowing_base(id, bind.arena.get(id).ty) {
-                        if let TypeKind::Union(list) = self.ty_table.get(ty.0) {
-                            let members: Vec<Type> = self
-                                .ty_table
-                                .get_list(list)
-                                .iter()
-                                .map(|id| Type::resolved(*id))
-                                .collect();
-                            return Some((id, members));
-                        }
-                    }
+                if let Some(id) = scope.resolve(obj_name, &bind.scopes)
+                    && let Some(ty) = self.narrowing_base(id, bind.arena.get(id).ty)
+                    && let TypeKind::Union(list) = self.ty_table.get(ty.0)
+                {
+                    let members: Vec<Type> = self
+                        .ty_table
+                        .get_list(list)
+                        .iter()
+                        .map(|id| Type::resolved(*id))
+                        .collect();
+                    return Some((id, members));
                 }
             }
         }

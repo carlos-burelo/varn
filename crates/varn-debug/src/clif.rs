@@ -87,53 +87,53 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
         }
     }
 
-    if flags.clif_kinds {
-        if let Some(k) = &insp.kinds {
-            terminal::log(format!(
-                "    {}",
-                chalk(format!("kinds ({} regs):", k.nregs)).dim()
-            ));
-            let mut table = terminal::Table::new(["block", "kinds"]);
-            for (start, ks) in &k.blocks {
-                table.row([format!("block@{start}"), ks.join(", ")]);
-            }
-            table.print();
+    if flags.clif_kinds
+        && let Some(k) = &insp.kinds
+    {
+        terminal::log(format!(
+            "    {}",
+            chalk(format!("kinds ({} regs):", k.nregs)).dim()
+        ));
+        let mut table = terminal::Table::new(["block", "kinds"]);
+        for (start, ks) in &k.blocks {
+            table.row([format!("block@{start}"), ks.join(", ")]);
+        }
+        table.print();
+    }
+
+    if flags.clif_ir
+        && let Some(ir) = &insp.clif_ir
+    {
+        terminal::log(format!("    {}", chalk("clif ir:").dim()));
+        for line in ir.lines() {
+            terminal::log(format!("      {line}"));
         }
     }
 
-    if flags.clif_ir {
-        if let Some(ir) = &insp.clif_ir {
-            terminal::log(format!("    {}", chalk("clif ir:").dim()));
-            for line in ir.lines() {
-                terminal::log(format!("      {line}"));
-            }
+    if flags.clif_asm
+        && let Some(code) = &insp.code
+    {
+        let n = code.bytes.len();
+        let raw_end = (code.raw_off + code.raw_len).min(n);
+        let entry = code.entry_off.min(n);
+        terminal::log(format!(
+            "    {}",
+            chalk(format!("machine code raw@{}:", code.raw_off)).dim()
+        ));
+        for line in disasm(
+            &code.bytes[code.raw_off.min(n)..raw_end],
+            code.raw_off as u64,
+        )
+        .lines()
+        {
+            terminal::log(line.to_string());
         }
-    }
-
-    if flags.clif_asm {
-        if let Some(code) = &insp.code {
-            let n = code.bytes.len();
-            let raw_end = (code.raw_off + code.raw_len).min(n);
-            let entry = code.entry_off.min(n);
-            terminal::log(format!(
-                "    {}",
-                chalk(format!("machine code raw@{}:", code.raw_off)).dim()
-            ));
-            for line in disasm(
-                &code.bytes[code.raw_off.min(n)..raw_end],
-                code.raw_off as u64,
-            )
-            .lines()
-            {
-                terminal::log(line.to_string());
-            }
-            terminal::log(format!(
-                "    {}",
-                chalk(format!("machine code wrapper@{}:", code.entry_off)).dim()
-            ));
-            for line in disasm(&code.bytes[entry..], entry as u64).lines() {
-                terminal::log(line.to_string());
-            }
+        terminal::log(format!(
+            "    {}",
+            chalk(format!("machine code wrapper@{}:", code.entry_off)).dim()
+        ));
+        for line in disasm(&code.bytes[entry..], entry as u64).lines() {
+            terminal::log(line.to_string());
         }
     }
 }

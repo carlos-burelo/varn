@@ -23,12 +23,12 @@ impl ExecCtx {
             unsafe { &mut *self.modules.get() }.insert(module_id, cached);
         }
 
-        if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {
-            if let Some(caller) = self.frames.last() {
-                let caller_base = caller.base;
-                self.stack
-                    .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)?;
-            }
+        if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG
+            && let Some(caller) = self.frames.last()
+        {
+            let caller_base = caller.base;
+            self.stack
+                .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)?;
         }
         Ok(final_val)
     }

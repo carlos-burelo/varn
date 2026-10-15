@@ -30,10 +30,10 @@ pub(super) fn emit_enum(
 
     let mut tag = 0i64;
     for m in &en.members {
-        if let Some(init) = m.init {
-            if let varn_core::ast::ExprKind::IntLiteral { value, .. } = &ast_arena.expr(init).kind {
-                tag = *value;
-            }
+        if let Some(init) = m.init
+            && let varn_core::ast::ExprKind::IntLiteral { value, .. } = &ast_arena.expr(init).kind
+        {
+            tag = *value;
         }
         let member_name = ctx.interner.resolve(m.id);
         let fields_str = m

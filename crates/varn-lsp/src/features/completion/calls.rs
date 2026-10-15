@@ -74,24 +74,23 @@ pub fn build_call_argument_completions(
         } else if let TypeKind::Named(name, _) = state.db.ty_kind(&info.ty) {
             push_constructor_params(state, state.name(name), &mut fn_params);
         }
-    } else if callee_tok.kind == TokenKind::Identifier || callee_tok.kind.can_be_identifier() {
-        if let Some((sid, _)) = state
+    } else if (callee_tok.kind == TokenKind::Identifier || callee_tok.kind.can_be_identifier())
+        && let Some((sid, _)) = state
             .db
             .resolve_at(state.lexeme(callee_tok), callee_tok.offset)
-        {
-            if sid >= state.db.bind.arena.len() {
-                return None;
-            }
-            let sym = state.symbol(sid);
-            if let Some(f) = state.db.fn_shape(sym.ty()) {
-                fn_params.extend(
-                    f.params
-                        .iter()
-                        .filter_map(|p| p.name.as_deref().map(str::to_owned)),
-                );
-            } else if matches!(sym.kind(), varn_sem::symbol::SymbolKind::Class) {
-                push_constructor_params(state, state.lexeme(callee_tok), &mut fn_params);
-            }
+    {
+        if sid >= state.db.bind.arena.len() {
+            return None;
+        }
+        let sym = state.symbol(sid);
+        if let Some(f) = state.db.fn_shape(sym.ty()) {
+            fn_params.extend(
+                f.params
+                    .iter()
+                    .filter_map(|p| p.name.as_deref().map(str::to_owned)),
+            );
+        } else if matches!(sym.kind(), varn_sem::symbol::SymbolKind::Class) {
+            push_constructor_params(state, state.lexeme(callee_tok), &mut fn_params);
         }
     }
 

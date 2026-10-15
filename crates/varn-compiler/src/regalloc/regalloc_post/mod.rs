@@ -92,12 +92,12 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     let mut offset = 0;
     while offset < proto.chunk.code.len() {
         if let Some(info) = decode(&proto.chunk.code, offset, &proto.chunk.constants) {
-            if OpCode::from_u16(proto.chunk.code[offset]) == Some(OpCode::Move) {
-                if let (Some(dest), Some(&src)) = (info.def, info.uses.first()) {
-                    if dest >= base && src >= base {
-                        copies.push((dest, src));
-                    }
-                }
+            if OpCode::from_u16(proto.chunk.code[offset]) == Some(OpCode::Move)
+                && let (Some(dest), Some(&src)) = (info.def, info.uses.first())
+                && dest >= base
+                && src >= base
+            {
+                copies.push((dest, src));
             }
             offset += info.len;
         } else {

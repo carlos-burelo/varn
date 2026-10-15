@@ -13,11 +13,11 @@ impl<'r> Checker<'r> {
         c: &varn_core::ast::ClassDecl,
         bind: &BindResult,
     ) {
-        if c.modifiers.is_abstract {
-            if let Some(id) = &c.id {
-                let declared = self.declared_type_name(bind, *id, c.ast_id);
-                self.abstract_classes.insert(declared);
-            }
+        if c.modifiers.is_abstract
+            && let Some(id) = &c.id
+        {
+            let declared = self.declared_type_name(bind, *id, c.ast_id);
+            self.abstract_classes.insert(declared);
         }
         let name =
             c.id.map(|id| self.declared_type_name(bind, id, c.ast_id))

@@ -1,2 +1,2 @@
-// VN4021
+// expect: error[VN4021]
 export let counter = 0

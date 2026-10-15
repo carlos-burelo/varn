@@ -1,0 +1,54 @@
+import { describe, it, expect } from "std:test";
+import { Request } from "std:http";
+
+extension StringUtils on str {
+    shout(): str { return this + "!"; }
+}
+
+function hotShout(s: str, n: int): str {
+    let r = "";
+    for (let i = 0; i < n; i = i + 1) {
+        r = s.shout();
+    }
+    return r;
+}
+
+function hotCookies(n: int): int {
+    let total = 0;
+    for (let i = 0; i < n; i = i + 1) {
+        const req = new Request("http://localhost:3000/api", "GET", {
+            "cookie": "session_id=xyz789; theme=dark"
+        });
+        total = total + (req.cookies["session_id"] ?? "").length + (req.cookies["theme"] ?? "").length;
+    }
+    return total;
+}
+
+function hotIntReturn(n: int): float {
+    let acc = 0.0;
+    for (let i = 0; i < n; i = i + 1) {
+        acc = acc + pickFloat(i);
+    }
+    return acc;
+}
+
+function pickFloat(i: int): float {
+    if (i % 2 == 0) {
+        return -1;
+    }
+    return (i as float) * 1.5;
+}
+
+await describe("222 native lowering edges", async () => {
+    await it("extension calls lower the receiver in hot loops", () => {
+        expect(hotShout("hello", 2000)).toBe("hello!");
+    });
+
+    await it("imported class field offsets agree in hot loops", () => {
+        expect(hotCookies(300)).toBe(300 * (6 + 4));
+    });
+
+    await it("int literals coerce to float returns in hot loops", () => {
+        expect(hotIntReturn(10)).toBe(32.5);
+    });
+});

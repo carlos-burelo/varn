@@ -24,31 +24,27 @@ impl TypeContext for Binder<'_> {
         name: &str,
         origin: Option<&str>,
     ) -> Option<Vec<ClassMemberInfo>> {
-        if let Some(origin) = origin {
-            if origin != self.source_file.as_ref() {
-                if let Some(rb) = self
-                    .resolver
-                    .module_bind(origin)
-                    .or_else(|| self.resolver.stdlib_bind(origin))
-                {
-                    return rb.type_members.interfaces.get(name).cloned();
-                }
-            }
+        if let Some(origin) = origin
+            && origin != self.source_file.as_ref()
+            && let Some(rb) = self
+                .resolver
+                .module_bind(origin)
+                .or_else(|| self.resolver.stdlib_bind(origin))
+        {
+            return rb.type_members.interfaces.get(name).cloned();
         }
         self.type_members.interfaces.get(name).cloned()
     }
 
     fn get_class_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
-        if let Some(origin) = origin {
-            if origin != self.source_file.as_ref() {
-                if let Some(rb) = self
-                    .resolver
-                    .module_bind(origin)
-                    .or_else(|| self.resolver.stdlib_bind(origin))
-                {
-                    return rb.type_members.classes.get(name).map(|e| e.members.clone());
-                }
-            }
+        if let Some(origin) = origin
+            && origin != self.source_file.as_ref()
+            && let Some(rb) = self
+                .resolver
+                .module_bind(origin)
+                .or_else(|| self.resolver.stdlib_bind(origin))
+        {
+            return rb.type_members.classes.get(name).map(|e| e.members.clone());
         }
         self.type_members
             .classes
@@ -61,31 +57,27 @@ impl TypeContext for Binder<'_> {
         name: &str,
         origin: Option<&str>,
     ) -> Option<Vec<ClassMemberInfo>> {
-        if let Some(origin) = origin {
-            if origin != self.source_file.as_ref() {
-                if let Some(rb) = self
-                    .resolver
-                    .module_bind(origin)
-                    .or_else(|| self.resolver.stdlib_bind(origin))
-                {
-                    return rb.type_members.namespaces.get(name).cloned();
-                }
-            }
+        if let Some(origin) = origin
+            && origin != self.source_file.as_ref()
+            && let Some(rb) = self
+                .resolver
+                .module_bind(origin)
+                .or_else(|| self.resolver.stdlib_bind(origin))
+        {
+            return rb.type_members.namespaces.get(name).cloned();
         }
         self.type_members.namespaces.get(name).cloned()
     }
 
     fn get_enum_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
-        if let Some(origin) = origin {
-            if origin != self.source_file.as_ref() {
-                if let Some(rb) = self
-                    .resolver
-                    .module_bind(origin)
-                    .or_else(|| self.resolver.stdlib_bind(origin))
-                {
-                    return rb.type_members.enums.get(name).cloned();
-                }
-            }
+        if let Some(origin) = origin
+            && origin != self.source_file.as_ref()
+            && let Some(rb) = self
+                .resolver
+                .module_bind(origin)
+                .or_else(|| self.resolver.stdlib_bind(origin))
+        {
+            return rb.type_members.enums.get(name).cloned();
         }
         self.type_members.enums.get(name).cloned()
     }
@@ -106,7 +98,20 @@ impl TypeContext for Binder<'_> {
             varn_sem::symbol::SymbolKind::Class | varn_sem::symbol::SymbolKind::Interface => {
                 (!sym.type_params.is_empty()).then(|| sym.type_param_defaults.clone())
             }
-            _ => None,
+            varn_sem::symbol::SymbolKind::Var
+            | varn_sem::symbol::SymbolKind::Let
+            | varn_sem::symbol::SymbolKind::Const
+            | varn_sem::symbol::SymbolKind::Function
+            | varn_sem::symbol::SymbolKind::TypeAlias
+            | varn_sem::symbol::SymbolKind::Enum
+            | varn_sem::symbol::SymbolKind::Parameter
+            | varn_sem::symbol::SymbolKind::Property
+            | varn_sem::symbol::SymbolKind::Method
+            | varn_sem::symbol::SymbolKind::TypeParameter
+            | varn_sem::symbol::SymbolKind::Namespace
+            | varn_sem::symbol::SymbolKind::Struct
+            | varn_sem::symbol::SymbolKind::Extension
+            | varn_sem::symbol::SymbolKind::EnumMember => None,
         }
     }
 

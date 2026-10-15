@@ -224,6 +224,7 @@ pub(crate) fn infer_object(
                         return_type: ft.return_type,
                         optional: false,
                         is_arrow: ft.is_arrow,
+                        type_params: ft.type_params.clone(),
                     });
                 } else {
                     members.push(ObjectTypeMember::Property {
@@ -255,6 +256,7 @@ pub(crate) fn infer_object(
                     return_type: ret.0,
                     optional: false,
                     is_arrow: false,
+                    type_params: Vec::new(),
                 });
             }
             ObjectProp::Spread { argument, .. } => {

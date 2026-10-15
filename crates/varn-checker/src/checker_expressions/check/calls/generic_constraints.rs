@@ -70,20 +70,19 @@ impl<'r> Checker<'r> {
         for (i, constraint) in fn_sym.type_param_constraints.iter().enumerate() {
             if let (Some(ct), Some(supplied)) =
                 (constraint, resolved.get(i).copied().flatten().as_ref())
+                && !self.types_compatible_cached(ct, supplied, Some(bind))
             {
-                if !self.types_compatible_cached(ct, supplied, Some(bind)) {
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::ConstraintViolation,
-                            format!(
-                                "type '{}' does not satisfy constraint '{}'",
-                                supplied.display(&self.ty_table, &bind.interner),
-                                ct.display(&self.ty_table, &bind.interner)
-                            ),
-                        )
-                        .with_range(*range),
-                    );
-                }
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::ConstraintViolation,
+                        format!(
+                            "type '{}' does not satisfy constraint '{}'",
+                            supplied.display(&self.ty_table, &bind.interner),
+                            ct.display(&self.ty_table, &bind.interner)
+                        ),
+                    )
+                    .with_range(*range),
+                );
             }
         }
     }

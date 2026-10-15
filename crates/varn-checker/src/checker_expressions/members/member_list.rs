@@ -87,6 +87,7 @@ pub fn get_members_of_type(
                         params,
                         return_type,
                         is_arrow,
+                        type_params,
                         ..
                     } => {
                         let fn_ty = Type::fn_(
@@ -94,7 +95,7 @@ pub fn get_members_of_type(
                                 params: params.clone(),
                                 return_type,
                                 is_arrow,
-                                type_params: vec![],
+                                type_params: type_params.clone(),
                             },
                             table,
                         );
@@ -219,13 +220,13 @@ pub fn get_members_of_type(
             }
 
             let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-            if let Some(ext_bind) = resolver.find_bind_for_type(&cn, &origin_modules) {
-                if let Some(entry) = ext_bind.type_members.classes.get(&cn) {
-                    for m in &entry.members {
-                        let kind = super::member_kind::map_class_member_kind(m.kind);
-                        let mapped = map_ty(&m.ty, table);
-                        add_declared(&mut results, &mut seen, m, mapped, kind);
-                    }
+            if let Some(ext_bind) = resolver.find_bind_for_type(&cn, &origin_modules)
+                && let Some(entry) = ext_bind.type_members.classes.get(&cn)
+            {
+                for m in &entry.members {
+                    let kind = super::member_kind::map_class_member_kind(m.kind);
+                    let mapped = map_ty(&m.ty, table);
+                    add_declared(&mut results, &mut seen, m, mapped, kind);
                 }
             }
         }

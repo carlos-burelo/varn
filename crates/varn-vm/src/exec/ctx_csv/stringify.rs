@@ -235,10 +235,10 @@ fn write_vm_value_csv(out: &mut String, ctx: &ExecCtx, val: VmValue, delimiter: 
         write_csv_cell(out, s, delimiter);
         return;
     }
-    if val.is_heap() {
-        if let Some(HeapObj::Str(h)) = ctx.heap.get(val.as_heap()) {
-            write_csv_cell(out, h.as_str(), delimiter);
-        }
+    if val.is_heap()
+        && let Some(HeapObj::Str(h)) = ctx.heap.get(val.as_heap())
+    {
+        write_csv_cell(out, h.as_str(), delimiter);
     }
 }
 

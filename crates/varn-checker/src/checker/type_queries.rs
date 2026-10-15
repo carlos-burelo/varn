@@ -103,10 +103,10 @@ impl<'r> Checker<'r> {
         ) {
             return None;
         }
-        if let varn_core::TypeKind::Named(inferred_name, _) = self.ty_table.get(inferred.0) {
-            if inferred_name == name_atom {
-                return None;
-            }
+        if let varn_core::TypeKind::Named(inferred_name, _) = self.ty_table.get(inferred.0)
+            && inferred_name == name_atom
+        {
+            return None;
         }
         let name = self.resolve_bind_atom(bind, name_atom);
         let origin = origin_atom.map(|o| self.resolve_bind_atom(bind, o));

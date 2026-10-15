@@ -26,3 +26,6 @@ export interface TaskHandle<T = dynamic> {
     await(): T;
     cancel(): void;
 }
+
+export interface Task<T> {
+}

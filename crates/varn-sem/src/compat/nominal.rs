@@ -48,20 +48,19 @@ pub(super) fn nominal_arms(
             };
             let origin_d_s = origin_d.and_then(|o| resolve_atom(Some(bind), o));
             let _ = ft;
-            if let Some(members) = named_members(bind, &dn_s, origin_d_s.as_deref()) {
-                if let Some(callable) = members
+            if let Some(members) = named_members(bind, &dn_s, origin_d_s.as_deref())
+                && let Some(callable) = members
                     .iter()
                     .find(|m| m.name.as_ref() == MemberKey::Callable.as_str())
-                {
-                    return Some(types_compatible_impl(
-                        &m_ty(callable),
-                        inferred,
-                        Some(bind),
-                        cache,
-                        in_progress,
-                        table,
-                    ));
-                }
+            {
+                return Some(types_compatible_impl(
+                    &m_ty(callable),
+                    inferred,
+                    Some(bind),
+                    cache,
+                    in_progress,
+                    table,
+                ));
             }
             Some(true)
         }

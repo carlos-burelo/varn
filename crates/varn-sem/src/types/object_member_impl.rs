@@ -24,6 +24,7 @@ impl ObjectTypeMember {
                 return_type,
                 optional,
                 is_arrow,
+                type_params,
             } => ObjectTypeMember::Method {
                 name: name.clone(),
                 params: params
@@ -38,6 +39,7 @@ impl ObjectTypeMember {
                 return_type: Type::resolved(*return_type).map_generics(mapping, table).0,
                 optional: *optional,
                 is_arrow: *is_arrow,
+                type_params: type_params.clone(),
             },
             ObjectTypeMember::Index {
                 param_name,

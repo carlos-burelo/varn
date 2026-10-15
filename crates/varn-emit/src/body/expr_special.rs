@@ -46,18 +46,18 @@ impl<'a> FnEmitter<'a> {
         let v = self.lower_expr(expression);
         let bool_ty = BackendTy::Bool;
 
-        if let varn_core::TypeKind::Named(n, _) = &type_ann.kind {
-            if let Some(class) = self.class_named(self.m.interner.resolve(*n)) {
-                return TirExpr {
-                    kind: TirExprKind::TypeTest {
-                        value: Box::new(v),
-                        class,
-                    },
-                    ty: bool_ty,
-                    res: Resolution::None,
-                    span,
-                };
-            }
+        if let varn_core::TypeKind::Named(n, _) = &type_ann.kind
+            && let Some(class) = self.class_named(self.m.interner.resolve(*n))
+        {
+            return TirExpr {
+                kind: TirExprKind::TypeTest {
+                    value: Box::new(v),
+                    class,
+                },
+                ty: bool_ty,
+                res: Resolution::None,
+                span,
+            };
         }
 
         let tag_name: Option<&'static str> = match &type_ann.kind {

@@ -26,30 +26,28 @@ impl<'r> Checker<'r> {
             _ => (None, false),
         };
 
-        if is_null_check {
-            if let Some(name) = ident_name {
-                let scope = bind.scopes.get(self.current_scope);
-                if let Some(id) = scope.resolve(name, &bind.scopes) {
-                    if (is_neq && is_true_branch) || (is_eq && !is_true_branch) {
-                        let original_ty = self.narrowing_base(
-                            id,
-                            rec.symbol_types
-                                .get(&id)
-                                .cloned()
-                                .or_else(|| bind.arena.get(id).ty),
-                        );
-                        if let Some(ty) = original_ty {
-                            let narrowed = ty
-                                .non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                            if !narrowed.is_dynamic() {
-                                out.push((id, narrowed));
-                            }
+        if is_null_check && let Some(name) = ident_name {
+            let scope = bind.scopes.get(self.current_scope);
+            if let Some(id) = scope.resolve(name, &bind.scopes) {
+                if (is_neq && is_true_branch) || (is_eq && !is_true_branch) {
+                    let original_ty = self.narrowing_base(
+                        id,
+                        rec.symbol_types
+                            .get(&id)
+                            .cloned()
+                            .or_else(|| bind.arena.get(id).ty),
+                    );
+                    if let Some(ty) = original_ty {
+                        let narrowed =
+                            ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                        if !narrowed.is_dynamic() {
+                            out.push((id, narrowed));
                         }
-                    } else {
-                        let name_str = bind.interner.resolve(name);
-                        if name_str != "_" && name_str != "__variant__" {
-                            out.push((id, Type::Null));
-                        }
+                    }
+                } else {
+                    let name_str = bind.interner.resolve(name);
+                    if name_str != "_" && name_str != "__variant__" {
+                        out.push((id, Type::Null));
                     }
                 }
             }

@@ -1,3 +1,3 @@
-// VN3002
+// expect: error[VN3002]
 namespace A { export class Item { v: int = 1 } }
 const x: A.Missing = 1

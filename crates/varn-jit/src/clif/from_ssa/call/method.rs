@@ -222,7 +222,7 @@ pub(crate) fn emit_method_call(
             ],
         );
         store::drop_home_addrs(ctx);
-        Ok(run_entered_or(b, ctx, entry, out)?)
+        run_entered_or(b, ctx, entry, out)
     };
     let lay = &ctx.helpers.call_layout;
     let is_vm = b.ins().icmp_imm_u(

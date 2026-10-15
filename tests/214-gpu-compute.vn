@@ -1,0 +1,104 @@
+import { describe, it, expect } from "std:test";
+import { backend, deviceCount, adapterName, engine, isAvailable, getInfo, GpuBuffer } from "std:gpu";
+
+await describe("214 gpu compute", async () => {
+    await it("device probe is structural", () => {
+        const b = backend();
+        const n = deviceCount();
+        expect(isAvailable()).toBe(true);
+        expect(n >= 0).toBe(true);
+        expect((b == "cpu-graph") == (n == 0)).toBe(true);
+        const info = getInfo();
+        expect(info.deviceCount).toBe(n);
+        expect(info.accelerated).toBe(b != "cpu-graph");
+        if (n > 0) {
+            expect(adapterName(0).length > 0).toBe(true);
+        }
+    });
+
+    await it("adapter out of range throws", () => {
+        let failed = false;
+        try {
+            adapterName(deviceCount());
+        } catch (e) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+    });
+
+    await it("lazy chain single submit", () => {
+        using a = GpuBuffer.upload([1.0, 2.0, 3.0]);
+        using b = GpuBuffer.upload([4.0, 5.0, 6.0]);
+        using c = a.add(b);
+        using d = c.scale(2.0);
+        expect(d.download()).toEqual([10.0, 14.0, 18.0]);
+        expect(a.mul(b).download()).toEqual([4.0, 10.0, 18.0]);
+    });
+
+    await it("engine routing follows cost model", () => {
+        using tiny = GpuBuffer.upload([1.0, 2.0]);
+        using t2 = tiny.add(tiny);
+        t2.download();
+        expect(engine()).toBe("cpu");
+        const big: float[] = [];
+        for (let i = 0; i < 64 * 64; i = i + 1) {
+            big.push(1.0);
+        }
+        using m1 = GpuBuffer.upload(big);
+        m1.reshape([64, 64]);
+        using m2 = m1.matmul(m1);
+        m2.download();
+        if (deviceCount() > 0) {
+            expect(engine()).toBe("gpu");
+        } else {
+            expect(engine()).toBe("cpu");
+        }
+    });
+    await it("shape mismatch throws", () => {
+        using a = GpuBuffer.upload([1.0, 2.0]);
+        using b = GpuBuffer.upload([1.0]);
+        let failed = false;
+        try {
+            a.add(b);
+        } catch (e) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+    });
+
+    await it("dot and matmul infer shape", () => {
+        using a = GpuBuffer.upload([1.0, 2.0, 3.0]);
+        using b = GpuBuffer.upload([4.0, 5.0, 6.0]);
+        expect(a.dot(b)).toBe(32.0);
+        using m1 = GpuBuffer.upload([1.0, 2.0, 3.0, 4.0]);
+        m1.reshape([2, 2]);
+        using m2 = GpuBuffer.upload([5.0, 6.0, 7.0, 8.0]);
+        m2.reshape([2, 2]);
+        using m3 = m1.matmul(m2);
+        expect(m3.shape()).toEqual([2, 2]);
+        expect(m3.download()).toEqual([19.0, 22.0, 43.0, 50.0]);
+    });
+
+    await it("reshape bad product throws", () => {
+        using a = GpuBuffer.upload([1.0, 2.0, 3.0]);
+        let failed = false;
+        try {
+            a.reshape([2, 2]);
+        } catch (e) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+    });
+
+    await it("stale handle throws", () => {
+        const tmp = GpuBuffer.upload([1.0]);
+        tmp.dispose();
+        let failed = false;
+        try {
+            tmp.download();
+        } catch (e) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+    });
+});

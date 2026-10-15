@@ -58,12 +58,13 @@ pub(super) fn probe(
             if let Some((f, _)) = method.and_then(|m| heap.native_of(*m)) {
                 return Some(IcHit::Native(f));
             }
-        } else if entry.is_class == ICKind::VM_VTABLE_METHOD {
-            if let Some(nc) = method.and_then(|m| heap.closure_of(*m)) {
-                if !nc.proto.is_generator && !nc.proto.is_async && arg_count <= nc.proto.arity {
-                    return Some(IcHit::Vm(nc.clone(), cls.clone()));
-                }
-            }
+        } else if entry.is_class == ICKind::VM_VTABLE_METHOD
+            && let Some(nc) = method.and_then(|m| heap.closure_of(*m))
+            && !nc.proto.is_generator
+            && !nc.proto.is_async
+            && arg_count <= nc.proto.arity
+        {
+            return Some(IcHit::Vm(nc.clone(), cls.clone()));
         }
     }
     None

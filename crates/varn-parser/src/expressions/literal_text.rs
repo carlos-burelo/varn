@@ -37,24 +37,23 @@ pub(crate) fn unescape_string(raw: &str) -> String {
                     if chars.peek() == Some(&'{') {
                         chars.next();
                         let hex: String = chars.by_ref().take_while(|&c| c != '}').collect();
-                        if let Ok(n) = u32::from_str_radix(&hex, 16) {
-                            if let Some(ch) = char::from_u32(n) {
-                                result.push(ch);
-                                continue;
-                            }
+                        if let Ok(n) = u32::from_str_radix(&hex, 16)
+                            && let Some(ch) = char::from_u32(n)
+                        {
+                            result.push(ch);
+                            continue;
                         }
                         result.push_str("\\u{");
                         result.push_str(&hex);
                         result.push('}');
                     } else {
                         let hex: String = chars.by_ref().take(4).collect();
-                        if hex.len() == 4 {
-                            if let Ok(n) = u32::from_str_radix(&hex, 16) {
-                                if let Some(ch) = char::from_u32(n) {
-                                    result.push(ch);
-                                    continue;
-                                }
-                            }
+                        if hex.len() == 4
+                            && let Ok(n) = u32::from_str_radix(&hex, 16)
+                            && let Some(ch) = char::from_u32(n)
+                        {
+                            result.push(ch);
+                            continue;
                         }
                         result.push_str("\\u");
                         result.push_str(&hex);
@@ -62,11 +61,11 @@ pub(crate) fn unescape_string(raw: &str) -> String {
                 }
                 Some('x') => {
                     let hex: String = chars.by_ref().take(2).collect();
-                    if hex.len() == 2 {
-                        if let Ok(n) = u8::from_str_radix(&hex, 16) {
-                            result.push(n as char);
-                            continue;
-                        }
+                    if hex.len() == 2
+                        && let Ok(n) = u8::from_str_radix(&hex, 16)
+                    {
+                        result.push(n as char);
+                        continue;
                     }
                     result.push_str("\\x");
                     result.push_str(&hex);
@@ -85,10 +84,10 @@ pub(crate) fn unescape_string(raw: &str) -> String {
 }
 
 pub(super) fn split_regex(raw: &str) -> (String, String) {
-    if let Some(stripped) = raw.strip_prefix('/') {
-        if let Some(end) = stripped.rfind('/') {
-            return (stripped[..end].to_owned(), stripped[end + 1..].to_owned());
-        }
+    if let Some(stripped) = raw.strip_prefix('/')
+        && let Some(end) = stripped.rfind('/')
+    {
+        return (stripped[..end].to_owned(), stripped[end + 1..].to_owned());
     }
     (raw.to_owned(), String::new())
 }

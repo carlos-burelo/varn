@@ -171,7 +171,45 @@ impl<'m> Builder<'m> {
         );
         let precise = match &arg.kind {
             varn_tir::TirExprKind::Cast { operand } if boxed => operand.as_ref(),
-            _ => arg,
+            varn_tir::TirExprKind::IntLit(_)
+            | varn_tir::TirExprKind::FloatLit(_)
+            | varn_tir::TirExprKind::BoolLit(_)
+            | varn_tir::TirExprKind::StrLit(_)
+            | varn_tir::TirExprKind::CharLit(_)
+            | varn_tir::TirExprKind::NullLit
+            | varn_tir::TirExprKind::Var
+            | varn_tir::TirExprKind::Binary { .. }
+            | varn_tir::TirExprKind::Unary { .. }
+            | varn_tir::TirExprKind::Field { .. }
+            | varn_tir::TirExprKind::Index { .. }
+            | varn_tir::TirExprKind::Call { .. }
+            | varn_tir::TirExprKind::MethodCall { .. }
+            | varn_tir::TirExprKind::Assign { .. }
+            | varn_tir::TirExprKind::ArrayLit(_)
+            | varn_tir::TirExprKind::TupleLit(_)
+            | varn_tir::TirExprKind::ObjectLit { .. }
+            | varn_tir::TirExprKind::RecordLit { .. }
+            | varn_tir::TirExprKind::Await { .. }
+            | varn_tir::TirExprKind::Yield { .. }
+            | varn_tir::TirExprKind::Discriminant { .. }
+            | varn_tir::TirExprKind::VariantPayload { .. }
+            | varn_tir::TirExprKind::TypeTest { .. }
+            | varn_tir::TirExprKind::Cast { .. }
+            | varn_tir::TirExprKind::Checked { .. }
+            | varn_tir::TirExprKind::Closure { .. }
+            | varn_tir::TirExprKind::New { .. }
+            | varn_tir::TirExprKind::MakeVariant { .. }
+            | varn_tir::TirExprKind::Select { .. }
+            | varn_tir::TirExprKind::Seq { .. }
+            | varn_tir::TirExprKind::ObjectKeys { .. }
+            | varn_tir::TirExprKind::IterInit { .. }
+            | varn_tir::TirExprKind::SuperCall { .. }
+            | varn_tir::TirExprKind::SuperMethodCall { .. }
+            | varn_tir::TirExprKind::DecimalLit(_)
+            | varn_tir::TirExprKind::BigIntLit(_)
+            | varn_tir::TirExprKind::RangeLit { .. }
+            | varn_tir::TirExprKind::ObjectRest { .. }
+            | varn_tir::TirExprKind::ExtensionCall { .. } => arg,
         };
         let v = self.lower_expr(precise)?;
         Ok(self.widen_exact(v, precise.ty, param))

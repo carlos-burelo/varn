@@ -126,10 +126,10 @@ pub fn run(func: &mut SsaFunc) -> bool {
 
     for block in &func.blocks {
         for inst in &block.insts {
-            if let InstKind::GetProperty { object, .. } = &inst.kind {
-                if obj_literals.contains_key(&object.0) {
-                    continue;
-                }
+            if let InstKind::GetProperty { object, .. } = &inst.kind
+                && obj_literals.contains_key(&object.0)
+            {
+                continue;
             }
             if let InstKind::GetIndex { object, index }
             | InstKind::ArrayGetIndex { object, index } = &inst.kind
@@ -137,10 +137,11 @@ pub fn run(func: &mut SsaFunc) -> bool {
                 let elems = tuple_literals
                     .get(&object.0)
                     .or_else(|| array_literals.get(&object.0));
-                if let (Some(elems), Some(&idx)) = (elems, const_ints.get(&index.0)) {
-                    if idx >= 0 && (idx as usize) < elems.len() {
-                        continue;
-                    }
+                if let (Some(elems), Some(&idx)) = (elems, const_ints.get(&index.0))
+                    && idx >= 0
+                    && (idx as usize) < elems.len()
+                {
+                    continue;
                 }
             }
 
@@ -190,35 +191,34 @@ pub fn run(func: &mut SsaFunc) -> bool {
     let mut dead_reads: FxHashSet<Value> = FxHashSet::default();
     for block in &func.blocks {
         for inst in &block.insts {
-            if let (Some(dest), InstKind::GetProperty { object, name }) = (inst.dest, &inst.kind) {
-                if let Some(pairs) = obj_literals.get(&object.0) {
-                    if let Some((_, v)) = pairs.iter().find(|(k, _)| k == name) {
-                        forwards.push((dest, *v));
-                        dead_reads.insert(dest);
-                    }
-                }
+            if let (Some(dest), InstKind::GetProperty { object, name }) = (inst.dest, &inst.kind)
+                && let Some(pairs) = obj_literals.get(&object.0)
+                && let Some((_, v)) = pairs.iter().find(|(k, _)| k == name)
+            {
+                forwards.push((dest, *v));
+                dead_reads.insert(dest);
             }
             if let (
                 Some(dest),
                 InstKind::GetIndex { object, index } | InstKind::ArrayGetIndex { object, index },
             ) = (inst.dest, &inst.kind)
             {
-                if let Some(elems) = tuple_literals.get(&object.0) {
-                    if let Some(&idx) = const_ints.get(&index.0) {
-                        if idx >= 0 && (idx as usize) < elems.len() {
-                            forwards.push((dest, elems[idx as usize]));
-                        }
-                    }
+                if let Some(elems) = tuple_literals.get(&object.0)
+                    && let Some(&idx) = const_ints.get(&index.0)
+                    && idx >= 0
+                    && (idx as usize) < elems.len()
+                {
+                    forwards.push((dest, elems[idx as usize]));
                 }
-                if let Some(elems) = array_literals.get(&object.0) {
-                    if let Some(&idx) = const_ints.get(&index.0) {
-                        if idx >= 0 && (idx as usize) < elems.len() {
-                            let elem = elems[idx as usize];
-                            if func.value_ty(elem) == func.value_ty(dest) {
-                                forwards.push((dest, elem));
-                                dead_reads.insert(dest);
-                            }
-                        }
+                if let Some(elems) = array_literals.get(&object.0)
+                    && let Some(&idx) = const_ints.get(&index.0)
+                    && idx >= 0
+                    && (idx as usize) < elems.len()
+                {
+                    let elem = elems[idx as usize];
+                    if func.value_ty(elem) == func.value_ty(dest) {
+                        forwards.push((dest, elem));
+                        dead_reads.insert(dest);
                     }
                 }
             }

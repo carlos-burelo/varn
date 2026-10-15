@@ -152,13 +152,13 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
                 }
             }
             let oty = func.value_ty(*operand);
-            if let Some(want) = convert_operand_ty(*conv) {
-                if oty != want {
-                    return Err(format!(
-                        "Convert {conv:?} reads v{}: {oty:?}, expected {want:?}",
-                        operand.0
-                    ));
-                }
+            if let Some(want) = convert_operand_ty(*conv)
+                && oty != want
+            {
+                return Err(format!(
+                    "Convert {conv:?} reads v{}: {oty:?}, expected {want:?}",
+                    operand.0
+                ));
             }
         }
         InstKind::ArrayGetIndex { index, .. } | InstKind::ArraySetIndex { index, .. } => {

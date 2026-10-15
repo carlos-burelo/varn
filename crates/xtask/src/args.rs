@@ -35,19 +35,20 @@ pub(super) fn parse_args() -> Result<Opts, String> {
     let mut opts = Opts::default();
     let mut args = std::env::args().skip(1);
 
-    if let Some(first) = args.next() {
-        if first != "compare" && first != "bench" {
-            if first == "--help" || first == "-h" {
-                print_help();
-                std::process::exit(0);
-            }
-            if first.starts_with('-') {
-                parse_option(&mut opts, &first, &mut args)?;
-            } else {
-                return Err(format!(
-                    "Unknown command: '{first}'. Usage: cargo xtask compare [options]"
-                ));
-            }
+    if let Some(first) = args.next()
+        && first != "compare"
+        && first != "bench"
+    {
+        if first == "--help" || first == "-h" {
+            print_help();
+            std::process::exit(0);
+        }
+        if first.starts_with('-') {
+            parse_option(&mut opts, &first, &mut args)?;
+        } else {
+            return Err(format!(
+                "Unknown command: '{first}'. Usage: cargo xtask compare [options]"
+            ));
         }
     }
 

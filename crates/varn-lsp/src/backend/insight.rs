@@ -185,8 +185,8 @@ pub(crate) async fn workspace_diagnostic(
                     continue;
                 };
                 let diags = convert_diagnostics(entry.value());
-                if let Some(prev) = previous.get(&uri_str) {
-                    if prev == "empty" && diags.is_empty() {
+                if let Some(prev) = previous.get(&uri_str)
+                    && prev == "empty" && diags.is_empty() {
                         out.push(
                             WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
                                 WorkspaceUnchangedDocumentDiagnosticReport {
@@ -201,7 +201,6 @@ pub(crate) async fn workspace_diagnostic(
                         );
                         continue;
                     }
-                }
                 let result_id = if diags.is_empty() {
                     "empty".to_string()
                 } else {

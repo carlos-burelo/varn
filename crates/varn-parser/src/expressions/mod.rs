@@ -51,10 +51,10 @@ pub(super) fn parse_assign_expr(s: &mut TokenStream) -> Result<ExprId, String> {
         return parse_yield_expr(s);
     }
 
-    if could_be_arrow(s) {
-        if let Some(arrow) = try_parse_arrow(s)? {
-            return Ok(arrow);
-        }
+    if could_be_arrow(s)
+        && let Some(arrow) = try_parse_arrow(s)?
+    {
+        return Ok(arrow);
     }
 
     let left = parse_conditional_expr(s)?;

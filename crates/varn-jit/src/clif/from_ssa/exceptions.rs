@@ -1,6 +1,9 @@
+use super::super::abi::Activation;
+use super::super::native_abi::{NativeClass, NativeShape};
 use super::{heap, home_store, Ctx, FrameIo};
 use cranelift_codegen::ir::{types, Block, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::FunctionBuilder;
+use varn_types::register_meta::SlotKind;
 
 fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
     ctx.frame
@@ -204,4 +207,61 @@ pub(super) fn call_checked_value(
     let v = super::super::emit::call_helper(b, ctx.cc, helper, args);
     check_error_branch(b, ctx)?;
     Ok(v)
+}
+
+pub(super) fn try_live_set(ssa: &varn_types::ssa::SsaProto) -> rustc_hash::FxHashSet<u32> {
+    let mut set = rustc_hash::FxHashSet::default();
+    for blk in &ssa.blocks {
+        for inst in &blk.insts {
+            if let varn_types::ssa::SsaOp::Try { live, .. } = &inst.op {
+                set.extend(live.iter().copied());
+            }
+        }
+    }
+    set
+}
+
+pub(super) fn emit_pure_err_ret(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<(), String> {
+    let st = ctx.pure_try.borrow();
+    let Some(err_ret) = st.err_ret else {
+        return Ok(());
+    };
+    drop(st);
+    b.switch_to_block(err_ret);
+    match ctx.activation {
+        Activation::Framed => match ctx.proto.return_kind {
+            SlotKind::Int | SlotKind::Bool => {
+                let z = b.ins().iconst(types::I64, 0);
+                b.ins().return_(&[z]);
+            }
+            SlotKind::Float => {
+                let z = b.ins().f64const(0.0);
+                b.ins().return_(&[z]);
+            }
+            SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => {
+                b.ins().return_(&[]);
+            }
+        },
+        Activation::Native => {
+            let shape = NativeShape::of_proto(ctx.proto);
+            match shape.ret {
+                NativeClass::Word => {
+                    let z = b.ins().iconst(types::I64, 0);
+                    b.ins().return_(&[z]);
+                }
+                NativeClass::Float => {
+                    let z = b.ins().f64const(0.0);
+                    b.ins().return_(&[z]);
+                }
+                NativeClass::Boxed => {
+                    let tag = b
+                        .ins()
+                        .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64);
+                    let pay = b.ins().iconst(types::I64, 0);
+                    b.ins().return_(&[tag, pay]);
+                }
+            }
+        }
+    }
+    Ok(())
 }

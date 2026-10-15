@@ -65,10 +65,11 @@
   [2m1:0     [0m │ class           │ [2m[core][0m [1mMap                 [0m │ [33mMap[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1mErr                 [0m │ [33m(error: E) => Result<T, E>[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mstr                 [0m │ [33mstr[0m
-  [2m1:0     [0m │ class           │ [2m[core][0m [1mRange               [0m │ [33mRange[0m
+  [2m1:0     [0m │ interface       │ [2m[core][0m [1mTask                [0m │ [33mTask[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mNeg                 [0m │ [33mNeg[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mExclude             [0m │ [33mdynamic[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mDisplay             [0m │ [33mDisplay[0m
+  [2m1:0     [0m │ class           │ [2m[core][0m [1mRange               [0m │ [33mRange[0m
   [2m1:0     [0m │ const           │ [2m[core][0m [1mInfinity            [0m │ [33mfloat[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mAsyncGenerator      [0m │ [33mAsyncGenerator[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mGenerator           [0m │ [33mGenerator[0m

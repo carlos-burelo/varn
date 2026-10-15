@@ -1,0 +1,11 @@
+// expect: error[VN3203]
+function identity<T>(v: T): T {
+    return v;
+}
+class Box<T> {
+    value: T;
+    constructor(v: T) {
+        this.value = v;
+    }
+}
+print(identity<int, str>(42));

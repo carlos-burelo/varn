@@ -96,6 +96,10 @@ pub(super) unsafe fn run_compiled_frame(
     }
 
     let base = unsafe { (*ctx).frames[frame_idx].base };
+    if unsafe { (*ctx).jit_error_flag } == 0 {
+        unsafe { (*ctx).jit_panic_exception_error = None };
+        unsafe { (*ctx).jit_panic_exception_err_obj = None };
+    }
     let res = unsafe { execute_jit_frame(ctx, jit_fn, closure_ptr, base) };
 
     let res = match res {
@@ -175,16 +179,16 @@ unsafe fn finish_compiled_frame(ctx: *mut ExecCtx, depth: usize, res: VmValue) -
         unsafe { &mut *(*ctx).modules.get() }.insert(module_id, cached);
     }
 
-    if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG {
-        if let Some(caller) = unsafe { (*ctx).frames.last() } {
-            let caller_base = caller.base;
-            if let Err(e) = unsafe {
-                (*ctx)
-                    .stack
-                    .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)
-            } {
-                return JitFrameOutcome::Failed(e);
-            }
+    if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG
+        && let Some(caller) = unsafe { (*ctx).frames.last() }
+    {
+        let caller_base = caller.base;
+        if let Err(e) = unsafe {
+            (*ctx)
+                .stack
+                .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)
+        } {
+            return JitFrameOutcome::Failed(e);
         }
     }
 

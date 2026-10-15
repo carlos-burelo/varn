@@ -202,13 +202,13 @@ pub(super) fn measure_benchmarks(
         let mut best_rival_work: Option<f64> = None;
 
         for rt in &present_rts {
-            if rt.name != "varn" && rt.name != "varn-base" {
-                if let Some(w) = work_stats.get(&rt.name) {
-                    if best_rival_work.is_none() || w.median < best_rival_work.unwrap() {
-                        best_rival = Some(rt.name.clone());
-                        best_rival_work = Some(w.median);
-                    }
-                }
+            if rt.name != "varn"
+                && rt.name != "varn-base"
+                && let Some(w) = work_stats.get(&rt.name)
+                && (best_rival_work.is_none() || w.median < best_rival_work.unwrap())
+            {
+                best_rival = Some(rt.name.clone());
+                best_rival_work = Some(w.median);
             }
         }
 

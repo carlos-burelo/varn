@@ -253,10 +253,10 @@ fn emit_inst(
     closure_const: &mut Option<u16>,
     scope: &crate::from_tir::compile::ModuleScope,
 ) -> Result<()> {
-    if let (Some(d), InstKind::ConstInt(_)) = (inst.dest, &inst.kind) {
-        if imms.is_elided(d) {
-            return Ok(());
-        }
+    if let (Some(d), InstKind::ConstInt(_)) = (inst.dest, &inst.kind)
+        && imms.is_elided(d)
+    {
+        return Ok(());
     }
     if let Some((_, other, value)) = immediates::immediate_operand(&inst.kind, &imms.imm) {
         let dest = reg[inst.dest.expect("binary defines a value").0 as usize];

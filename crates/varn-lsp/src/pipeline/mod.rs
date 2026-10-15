@@ -246,10 +246,10 @@ fn collect_import_paths(
 ) -> Vec<String> {
     let mut paths = Vec::new();
     for &stmt in stmts {
-        if let StmtKind::Decl(decl) = &arena.stmt(stmt).kind {
-            if let Decl::Import(i) = decl.as_ref() {
-                paths.push(interner.resolve(i.source).to_owned());
-            }
+        if let StmtKind::Decl(decl) = &arena.stmt(stmt).kind
+            && let Decl::Import(i) = decl.as_ref()
+        {
+            paths.push(interner.resolve(i.source).to_owned());
         }
     }
     paths

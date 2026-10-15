@@ -169,11 +169,10 @@ pub(super) fn anon_class_of<'a>(
 ) -> Option<&'a varn_core::ast::ClassDecl> {
     let v = variable_decl(decl)?;
     for d in &v.declarators {
-        if let Some(init) = d.init {
-            if let varn_core::ast::ExprKind::ClassExpr { declaration } = &ast_arena.expr(init).kind
-            {
-                return Some(declaration);
-            }
+        if let Some(init) = d.init
+            && let varn_core::ast::ExprKind::ClassExpr { declaration } = &ast_arena.expr(init).kind
+        {
+            return Some(declaration);
         }
     }
     None

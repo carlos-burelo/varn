@@ -3,7 +3,7 @@ use crate::exec::ctx::ExecCtx;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow(field = "dispatch_intrinsic")]
+#[varn_macros::jit_slow(field = "dispatch_intrinsic")]
 pub(crate) extern "C" fn jit_dispatch_intrinsic(
     ctx: *mut ExecCtx,
     wire_byte: usize,
@@ -32,7 +32,7 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "intrinsic_window")]
+#[varn_macros::jit_slow(field = "intrinsic_window")]
 pub(crate) extern "C" fn jit_intrinsic_window(
     ctx: *mut ExecCtx,
     wire_byte: usize,
@@ -49,7 +49,7 @@ pub(crate) extern "C" fn jit_intrinsic_window(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "str_char_code_at")]
+#[varn_macros::jit_slow(field = "str_char_code_at")]
 pub(crate) extern "C" fn jit_str_char_code_at(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -70,31 +70,34 @@ pub(crate) extern "C" fn jit_str_char_code_at(
 
         if receiver.is_sso() {
             let mut buf = [0u8; 5];
-            let len = receiver.sso_copy_bytes(&mut buf);
-            return if idx < len { buf[idx] as i64 } else { -1 };
+            let s = receiver.sso_as_str(&mut buf);
+            if s.is_ascii() {
+                return s.as_bytes().get(idx).map(|&b| b as i64).unwrap_or(-1);
+            }
+            return s.chars().nth(idx).map(|c| c as i64).unwrap_or(-1);
         }
 
-        if receiver.is_heap() {
-            if let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap()) {
-                let s = h.as_str();
-                let code = if h.is_ascii_cached() {
+        if receiver.is_heap()
+            && let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap())
+        {
+            let s = h.as_str();
+            let code = if h.is_ascii_cached() {
+                s.as_bytes().get(idx).map(|&b| b as i64)
+            } else {
+                h.is_ascii();
+                if h.is_ascii_cached() {
                     s.as_bytes().get(idx).map(|&b| b as i64)
                 } else {
-                    h.is_ascii();
-                    if h.is_ascii_cached() {
-                        s.as_bytes().get(idx).map(|&b| b as i64)
-                    } else {
-                        s.chars().nth(idx).map(|c| c as i64)
-                    }
-                };
-                return code.unwrap_or(-1);
-            }
+                    s.chars().nth(idx).map(|c| c as i64)
+                }
+            };
+            return code.unwrap_or(-1);
         }
         -1
     }
 }
 
-#[varn_op_macros::jit_slow(field = "str_char_at")]
+#[varn_macros::jit_slow(field = "str_char_at")]
 pub(crate) extern "C" fn jit_str_char_at(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -115,7 +118,7 @@ pub(crate) extern "C" fn jit_str_char_at(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "str_ascii_bytes")]
+#[varn_macros::jit_slow(field = "str_ascii_bytes")]
 pub(crate) extern "C" fn jit_str_ascii_bytes(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -130,7 +133,7 @@ pub(crate) extern "C" fn jit_str_ascii_bytes(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "str_ascii_len")]
+#[varn_macros::jit_slow(field = "str_ascii_len")]
 pub(crate) extern "C" fn jit_str_ascii_len(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -159,15 +162,15 @@ unsafe fn borrow_str_fast<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) 
     if v.is_sso() {
         return Some(v.sso_as_str(buf));
     }
-    if v.is_heap() {
-        if let Some(HeapObj::Str(h)) = heap.get(v.as_heap()) {
-            return Some(h.as_str());
-        }
+    if v.is_heap()
+        && let Some(HeapObj::Str(h)) = heap.get(v.as_heap())
+    {
+        return Some(h.as_str());
     }
     None
 }
 
-#[varn_op_macros::jit_slow(field = "str_starts_with")]
+#[varn_macros::jit_slow(field = "str_starts_with")]
 pub(crate) extern "C" fn jit_str_starts_with(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -200,32 +203,33 @@ pub(crate) extern "C" fn jit_str_starts_with(
                 0
             };
         }
-        if receiver.is_heap() && search.is_sso() {
-            if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap()) {
-                let n_len = search.sso_len();
-                let s_bytes = h.as_str().as_bytes();
-                if s_bytes.len() >= n_len {
-                    let mut b2 = [0u8; 5];
-                    search.sso_copy_bytes(&mut b2);
-                    return if s_bytes[..n_len] == b2[..n_len] {
-                        1
-                    } else {
-                        0
-                    };
-                }
-                return 0;
-            }
-        }
-        if receiver.is_heap() && search.is_heap() {
-            if let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) =
-                (heap.get(receiver.as_heap()), heap.get(search.as_heap()))
-            {
-                return if h1.as_str().as_bytes().starts_with(h2.as_str().as_bytes()) {
+        if receiver.is_heap()
+            && search.is_sso()
+            && let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap())
+        {
+            let n_len = search.sso_len();
+            let s_bytes = h.as_str().as_bytes();
+            if s_bytes.len() >= n_len {
+                let mut b2 = [0u8; 5];
+                search.sso_copy_bytes(&mut b2);
+                return if s_bytes[..n_len] == b2[..n_len] {
                     1
                 } else {
                     0
                 };
             }
+            return 0;
+        }
+        if receiver.is_heap()
+            && search.is_heap()
+            && let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) =
+                (heap.get(receiver.as_heap()), heap.get(search.as_heap()))
+        {
+            return if h1.as_str().as_bytes().starts_with(h2.as_str().as_bytes()) {
+                1
+            } else {
+                0
+            };
         }
         let mut b1 = [0u8; 5];
         let mut b2 = [0u8; 5];
@@ -247,7 +251,7 @@ pub(crate) extern "C" fn jit_str_starts_with(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "str_ends_with")]
+#[varn_macros::jit_slow(field = "str_ends_with")]
 pub(crate) extern "C" fn jit_str_ends_with(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -282,32 +286,33 @@ pub(crate) extern "C" fn jit_str_ends_with(
                 0
             };
         }
-        if receiver.is_heap() && search.is_sso() {
-            if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap()) {
-                let n_len = search.sso_len();
-                let s_bytes = h.as_str().as_bytes();
-                if s_bytes.len() >= n_len {
-                    let mut b2 = [0u8; 5];
-                    search.sso_copy_bytes(&mut b2);
-                    return if s_bytes[s_bytes.len() - n_len..] == b2[..n_len] {
-                        1
-                    } else {
-                        0
-                    };
-                }
-                return 0;
-            }
-        }
-        if receiver.is_heap() && search.is_heap() {
-            if let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) =
-                (heap.get(receiver.as_heap()), heap.get(search.as_heap()))
-            {
-                return if h1.as_str().as_bytes().ends_with(h2.as_str().as_bytes()) {
+        if receiver.is_heap()
+            && search.is_sso()
+            && let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap())
+        {
+            let n_len = search.sso_len();
+            let s_bytes = h.as_str().as_bytes();
+            if s_bytes.len() >= n_len {
+                let mut b2 = [0u8; 5];
+                search.sso_copy_bytes(&mut b2);
+                return if s_bytes[s_bytes.len() - n_len..] == b2[..n_len] {
                     1
                 } else {
                     0
                 };
             }
+            return 0;
+        }
+        if receiver.is_heap()
+            && search.is_heap()
+            && let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) =
+                (heap.get(receiver.as_heap()), heap.get(search.as_heap()))
+        {
+            return if h1.as_str().as_bytes().ends_with(h2.as_str().as_bytes()) {
+                1
+            } else {
+                0
+            };
         }
         let mut b1 = [0u8; 5];
         let mut b2 = [0u8; 5];
@@ -329,7 +334,7 @@ pub(crate) extern "C" fn jit_str_ends_with(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "str_index_of")]
+#[varn_macros::jit_slow(field = "str_index_of")]
 pub(crate) extern "C" fn jit_str_index_of(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -364,7 +369,7 @@ pub(crate) extern "C" fn jit_str_index_of(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "str_includes")]
+#[varn_macros::jit_slow(field = "str_includes")]
 pub(crate) extern "C" fn jit_str_includes(
     ctx: *mut ExecCtx,
     recv_tag: u64,
@@ -392,7 +397,7 @@ pub(crate) extern "C" fn jit_str_includes(
         0
     }
 }
-#[varn_op_macros::jit_slow(field = "str_split")]
+#[varn_macros::jit_slow(field = "str_split")]
 pub(crate) extern "C" fn jit_str_split(
     ctx: *mut ExecCtx,
     s_tag: u64,
@@ -458,7 +463,7 @@ pub(crate) extern "C" fn jit_str_split(
             .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(vals));
     }
 }
-#[varn_op_macros::jit_slow(field = "str_slice_range")]
+#[varn_macros::jit_slow(field = "str_slice_range")]
 pub(crate) extern "C" fn jit_str_slice_range(
     ctx: *mut ExecCtx,
     s_tag: u64,

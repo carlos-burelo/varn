@@ -35,6 +35,7 @@ mod type_infer_ops;
 pub mod type_inference;
 mod type_names;
 mod type_resolution;
+mod variance;
 
 pub(crate) use binding_types::ParamSite;
 pub use inference_utils::build_fn_type;

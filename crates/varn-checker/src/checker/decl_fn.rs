@@ -97,27 +97,25 @@ impl<'r> Checker<'r> {
                     Type::union(yields, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
                 };
                 let scope = bind.scopes.get(saved_scope);
-                if let Some(sym_id) = scope.resolve(f.id, &bind.scopes) {
-                    if let Some(fn_ty) = rec
+                if let Some(sym_id) = scope.resolve(f.id, &bind.scopes)
+                    && let Some(fn_ty) = rec
                         .symbol_types
                         .get(&sym_id)
                         .cloned()
                         .or_else(|| bind.arena.get(sym_id).ty)
-                    {
-                        if let varn_core::TypeKind::Fn(fid) = self.ty_table.get(fn_ty.0) {
-                            let new_ret = varn_sem::types::generator_of(
-                                inferred_yield,
-                                f.modifiers.is_async,
-                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                            );
-                            let mut ft = self.ty_table.get_function(fid).clone();
-                            ft.return_type = new_ret.0;
-                            let new_fn_ty =
-                                Type::fn_(ft, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                            rec.symbol_types.insert(sym_id, new_fn_ty);
-                            self.record_type_with_symbol(rec, f.id_offset, new_fn_ty, sym_id);
-                        }
-                    }
+                    && let varn_core::TypeKind::Fn(fid) = self.ty_table.get(fn_ty.0)
+                {
+                    let new_ret = varn_sem::types::generator_of(
+                        inferred_yield,
+                        f.modifiers.is_async,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    let mut ft = self.ty_table.get_function(fid).clone();
+                    ft.return_type = new_ret.0;
+                    let new_fn_ty =
+                        Type::fn_(ft, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                    rec.symbol_types.insert(sym_id, new_fn_ty);
+                    self.record_type_with_symbol(rec, f.id_offset, new_fn_ty, sym_id);
                 }
             }
             self.yielded_types = old_yields;

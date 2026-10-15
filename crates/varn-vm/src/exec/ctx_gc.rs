@@ -22,6 +22,9 @@ impl ExecCtx {
         f: varn_types::NativeFn,
         args: &[crate::value::VmValue],
     ) -> varn_types::NativeFnResult {
+        if let Err(e) = varn_builtins::check_native_fn_capability(f, &*self) {
+            return Err(varn_types::NativeError::from(e));
+        }
         let scope = self.heap.cells.enter_native();
         let result = self.timed_native(f, args);
         self.heap.cells.exit_native(scope);

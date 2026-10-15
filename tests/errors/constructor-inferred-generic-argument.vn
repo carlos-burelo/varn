@@ -1,4 +1,4 @@
-// VN3001
+// expect: error[VN3001]
 class Pair<A, B> {
     a: A
     b: B

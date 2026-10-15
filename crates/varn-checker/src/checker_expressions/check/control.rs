@@ -58,20 +58,19 @@ impl<'r> Checker<'r> {
         let enclosing = expected_ret.core_sum(&self.ty_table, resolve);
         match (operand, enclosing) {
             (Some((sum, args)), Some((ret_sum, ret_args))) if sum == ret_sum => {
-                if sum == varn_core::CoreSum::Result {
-                    if let (Some(err_e), Some(err_r)) = (args.get(1), ret_args.get(1)) {
-                        if !self.types_compatible_cached(err_r, err_e, Some(bind)) {
-                            let err_e_s = err_e.display(&self.ty_table, &bind.interner);
-                            let err_r_s = err_r.display(&self.ty_table, &bind.interner);
-                            self.emit(
+                if sum == varn_core::CoreSum::Result
+                    && let (Some(err_e), Some(err_r)) = (args.get(1), ret_args.get(1))
+                    && !self.types_compatible_cached(err_r, err_e, Some(bind))
+                {
+                    let err_e_s = err_e.display(&self.ty_table, &bind.interner);
+                    let err_r_s = err_r.display(&self.ty_table, &bind.interner);
+                    self.emit(
                                 Diagnostic::error(
                                     ErrorCode::TypeMismatch,
                                     format!("cannot propagate error type '{err_e_s}' into return type '{err_r_s}'"),
                                 )
                                 .with_range(range),
                             );
-                        }
-                    }
                 }
             }
             (Some((sum, _)), _) => {

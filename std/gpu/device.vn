@@ -1,0 +1,37 @@
+import {
+    backend$,
+    deviceCount$,
+    adapterName$,
+    engine$
+} from "runtime:gpu";
+
+export function backend(): str {
+    return backend$();
+}
+
+export function deviceCount(): int {
+    return deviceCount$();
+}
+
+export function adapterName(i: int): str {
+    return adapterName$(i);
+}
+
+export function engine(): str {
+    return engine$();
+}
+
+export function isAvailable(): bool {
+    return true;
+}
+
+export type GpuInfo = { backend: str, deviceCount: int, accelerated: bool };
+
+export function getInfo(): GpuInfo {
+    const b = backend$();
+    return #{
+        backend: b,
+        deviceCount: deviceCount$(),
+        accelerated: b != "cpu-graph"
+    };
+}

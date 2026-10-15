@@ -1,0 +1,108 @@
+import { UiWindow } from "std:ui/window";
+import { hit, MOUSE_LEFT } from "std:ui/keys";
+
+export class UiFrame {
+    mouseX: int;
+    mouseY: int;
+    left: bool;
+    leftPressed: bool;
+    leftReleased: bool;
+    downX: int;
+    downY: int;
+    keys: int[];
+    pressed: int[];
+    repeated: int[];
+    closed: bool;
+    resized: bool;
+    w: int;
+    h: int;
+
+    constructor(w: int, h: int) {
+        this.mouseX = 0;
+        this.mouseY = 0;
+        this.left = false;
+        this.leftPressed = false;
+        this.leftReleased = false;
+        this.downX = -1;
+        this.downY = -1;
+        this.keys = [];
+        this.pressed = [];
+        this.repeated = [];
+        this.closed = false;
+        this.resized = false;
+        this.w = w;
+        this.h = h;
+    }
+
+    update(win: UiWindow): void {
+        this.leftPressed = false;
+        this.leftReleased = false;
+        this.pressed = [];
+        this.repeated = [];
+        this.resized = false;
+        const evs = win.poll();
+        for (let i = 0; i < evs.length; i = i + 1) {
+            const e = evs[i];
+            if (e.kind == "mouse") {
+                this.mouseX = e.x;
+                this.mouseY = e.y;
+                if (e.button == MOUSE_LEFT) {
+                    if (e.pressed && !this.left) {
+                        this.left = true;
+                        this.leftPressed = true;
+                        this.downX = e.x;
+                        this.downY = e.y;
+                    } else if (!e.pressed && this.left) {
+                        this.left = false;
+                        this.leftReleased = true;
+                    }
+                }
+            } else if (e.kind == "key") {
+                if (e.pressed) {
+                    if (!UiFrame.contains(this.keys, e.key)) {
+                        this.keys.push(e.key);
+                        this.pressed.push(e.key);
+                    } else {
+                        this.repeated.push(e.key);
+                    }
+                } else {
+                    UiFrame.drop(this.keys, e.key);
+                }
+            } else if (e.kind == "resize") {
+                this.resized = true;
+                this.w = e.w;
+                this.h = e.h;
+            } else if (e.kind == "close") {
+                this.closed = true;
+            }
+        }
+    }
+
+    held(key: int): bool {
+        return UiFrame.contains(this.keys, key);
+    }
+
+    clicked(rx: float, ry: float, rw: float, rh: float): bool {
+        return this.leftReleased
+            && hit(this.mouseX as float, this.mouseY as float, rx, ry, rw, rh)
+            && hit(this.downX as float, this.downY as float, rx, ry, rw, rh);
+    }
+
+    static contains(xs: int[], v: int): bool {
+        for (let i = 0; i < xs.length; i = i + 1) {
+            if (xs[i] == v) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static drop(xs: int[], v: int): void {
+        for (let i = 0; i < xs.length; i = i + 1) {
+            if (xs[i] == v) {
+                xs.splice(i, 1);
+                return;
+            }
+        }
+    }
+}

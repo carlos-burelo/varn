@@ -1,4 +1,5 @@
 mod arrays;
+mod block;
 mod boxed;
 mod call;
 mod cfg;
@@ -13,6 +14,7 @@ mod frame_policy;
 mod globals;
 mod heap;
 mod heapvalue;
+mod hoist;
 mod induction;
 mod int_div;
 mod numeric;
@@ -22,9 +24,11 @@ mod pool;
 mod props;
 mod ranges;
 mod scalar;
+mod setup;
 mod stack_exit;
 mod store;
 mod term;
+mod versions;
 mod views;
 
 use super::abi::Activation;

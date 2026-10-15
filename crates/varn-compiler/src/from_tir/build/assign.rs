@@ -177,10 +177,10 @@ impl<'m> Builder<'m> {
         match res {
             Resolution::Local(id) => self.load_var(VarId::Local(LocalId(id.0)), ty),
             Resolution::Param(i) => {
-                if let Some(frame) = self.inlining.last() {
-                    if let Some(&arg_v) = frame.params.get(*i as usize) {
-                        return Ok(arg_v);
-                    }
+                if let Some(frame) = self.inlining.last()
+                    && let Some(&arg_v) = frame.params.get(*i as usize)
+                {
+                    return Ok(arg_v);
                 }
                 self.load_var(VarId::Param(*i), ty)
             }

@@ -83,12 +83,12 @@ pub fn all_native_ops() -> &'static [&'static NativeOpEntry] {
         for entry in iter_native_ops() {
             push(entry, &mut list);
         }
-        if let Some(mutex) = FALLBACK_ENTRIES.get() {
-            if let Ok(guard) = mutex.lock() {
-                for slice in guard.iter() {
-                    for &entry in *slice {
-                        push(entry, &mut list);
-                    }
+        if let Some(mutex) = FALLBACK_ENTRIES.get()
+            && let Ok(guard) = mutex.lock()
+        {
+            for slice in guard.iter() {
+                for &entry in *slice {
+                    push(entry, &mut list);
                 }
             }
         }
@@ -118,12 +118,34 @@ fn build_entry_index() -> FxHashMap<u64, &'static NativeOpEntry> {
 }
 
 static TABLE: OnceLock<FxHashMap<u64, DispatchEntry>> = OnceLock::new();
+static FN_TABLE: OnceLock<FxHashMap<usize, DispatchEntry>> = OnceLock::new();
+
+fn fn_table() -> &'static FxHashMap<usize, DispatchEntry> {
+    FN_TABLE.get_or_init(|| {
+        let mut table = FxHashMap::default();
+        for &entry in all_native_ops() {
+            table.entry(entry.func() as usize).or_insert(DispatchEntry {
+                id: entry_op_id(entry),
+                module_id: entry.module_id(),
+                name: entry.symbol_name(),
+                func: entry.func(),
+                capability: capability_for_op(
+                    entry.module_id(),
+                    entry.namespace_path(),
+                    entry.symbol_name(),
+                ),
+            });
+        }
+        table
+    })
+}
 
 pub fn capability_for_op(module_id: &str, namespace: &str, symbol: &str) -> Option<&'static str> {
     let _ = namespace;
     let sym = symbol.trim_end_matches('$');
     match (module_id, sym) {
         ("runtime:ffi", _) => Some("sys.ffi"),
+        ("runtime:ui", _) => Some("ui"),
         ("runtime:sys", "env" | "setEnv") => Some("sys.env"),
         ("runtime:process", "exec" | "spawnProcess") => Some("sys.exec"),
         _ => None,
@@ -204,19 +226,33 @@ pub fn check_native_op_capability(id: u64, ctx: &dyn NativeCtx) -> Result<(), St
     let table = TABLE.get_or_init(build_table);
     match table.get(&id) {
         None => Ok(()),
-        Some(entry) => match entry.capability {
-            None => Ok(()),
-            Some(capability) => {
-                if ctx.has_capability(capability) {
-                    Ok(())
-                } else {
-                    Err(format!(
-                        "E_HOST_PERMISSION_DENIED:id={}:{}:capability={capability}",
-                        entry.module_id, entry.name
-                    ))
-                }
+        Some(entry) => check_entry(entry, ctx),
+    }
+}
+
+pub fn check_native_fn_capability(
+    f: varn_types::NativeFn,
+    ctx: &dyn NativeCtx,
+) -> Result<(), String> {
+    match fn_table().get(&(f as usize)) {
+        None => Ok(()),
+        Some(entry) => check_entry(entry, ctx),
+    }
+}
+
+fn check_entry(entry: &DispatchEntry, ctx: &dyn NativeCtx) -> Result<(), String> {
+    match entry.capability {
+        None => Ok(()),
+        Some(capability) => {
+            if ctx.has_capability(capability) {
+                Ok(())
+            } else {
+                Err(format!(
+                    "E_HOST_PERMISSION_DENIED:id={}:{}:capability={capability}",
+                    entry.module_id, entry.name
+                ))
             }
-        },
+        }
     }
 }
 
@@ -232,12 +268,12 @@ pub fn dispatch_runtime_op(
 ) -> Result<VmValue, String> {
     let table = TABLE.get_or_init(build_table);
     if let Some(entry) = table.get(&id) {
-        if let Some(capability) = entry.capability {
-            if !ctx.has_capability(capability) {
-                return Err(format!(
-                    "E_RUNTIME_PERMISSION_DENIED:id={id}:capability={capability}"
-                ));
-            }
+        if let Some(capability) = entry.capability
+            && !ctx.has_capability(capability)
+        {
+            return Err(format!(
+                "E_RUNTIME_PERMISSION_DENIED:id={id}:capability={capability}"
+            ));
         }
         return (entry.func)(ctx, args).map_err(|err| format!("E_RUNTIME_FAILURE:id={id}:{err}"));
     }

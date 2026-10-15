@@ -2,7 +2,7 @@ use crate::exec::closures::UpvalueSrc;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow(field = "load_const")]
+#[varn_macros::jit_slow(field = "load_const")]
 pub(crate) extern "C" fn jit_load_const(
     closure: *const crate::closure::VmClosure,
     idx: usize,
@@ -13,7 +13,7 @@ pub(crate) extern "C" fn jit_load_const(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "eq")]
+#[varn_macros::jit_slow(field = "eq")]
 pub(crate) extern "C" fn jit_eq(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -33,7 +33,7 @@ pub(crate) extern "C" fn jit_eq(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "neq")]
+#[varn_macros::jit_slow(field = "neq")]
 pub(crate) extern "C" fn jit_neq(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -53,7 +53,7 @@ pub(crate) extern "C" fn jit_neq(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "lt")]
+#[varn_macros::jit_slow(field = "lt")]
 pub(crate) extern "C" fn jit_lt(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -73,7 +73,7 @@ pub(crate) extern "C" fn jit_lt(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "lte")]
+#[varn_macros::jit_slow(field = "lte")]
 pub(crate) extern "C" fn jit_lte(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -93,7 +93,7 @@ pub(crate) extern "C" fn jit_lte(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "gt")]
+#[varn_macros::jit_slow(field = "gt")]
 pub(crate) extern "C" fn jit_gt(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -113,7 +113,7 @@ pub(crate) extern "C" fn jit_gt(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "gte")]
+#[varn_macros::jit_slow(field = "gte")]
 pub(crate) extern "C" fn jit_gte(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -133,7 +133,7 @@ pub(crate) extern "C" fn jit_gte(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "add")]
+#[varn_macros::jit_slow(field = "add")]
 pub(crate) extern "C" fn jit_add(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -152,7 +152,7 @@ pub(crate) extern "C" fn jit_add(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "sub")]
+#[varn_macros::jit_slow(field = "sub")]
 pub(crate) extern "C" fn jit_sub(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -171,7 +171,7 @@ pub(crate) extern "C" fn jit_sub(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "mul")]
+#[varn_macros::jit_slow(field = "mul")]
 pub(crate) extern "C" fn jit_mul(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -190,7 +190,7 @@ pub(crate) extern "C" fn jit_mul(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "to_string")]
+#[varn_macros::jit_slow(field = "to_string")]
 pub(crate) extern "C" fn jit_to_string(ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -199,7 +199,7 @@ pub(crate) extern "C" fn jit_to_string(ctx: *mut ExecCtx, v_tag: u64, v_payload:
     }
 }
 
-#[varn_op_macros::jit_slow(field = "load_upvalue")]
+#[varn_macros::jit_slow(field = "load_upvalue")]
 pub(crate) extern "C" fn jit_load_upvalue(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -212,7 +212,7 @@ pub(crate) extern "C" fn jit_load_upvalue(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "store_upvalue")]
+#[varn_macros::jit_slow(field = "store_upvalue")]
 pub(crate) extern "C" fn jit_store_upvalue(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -230,7 +230,7 @@ pub(crate) extern "C" fn jit_store_upvalue(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "make_closure")]
+#[varn_macros::jit_slow(field = "make_closure")]
 pub(crate) extern "C" fn jit_make_closure(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -252,7 +252,7 @@ pub(crate) extern "C" fn jit_make_closure(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "make_closure_window")]
+#[varn_macros::jit_slow(field = "make_closure_window")]
 pub(crate) extern "C" fn jit_make_closure_window(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -277,7 +277,7 @@ pub(crate) extern "C" fn jit_make_closure_window(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "load_global_by_name")]
+#[varn_macros::jit_slow(field = "load_global_by_name")]
 pub(crate) extern "C" fn jit_load_global_by_name(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -299,7 +299,7 @@ pub(crate) extern "C" fn jit_load_global_by_name(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "store_global_by_name")]
+#[varn_macros::jit_slow(field = "store_global_by_name")]
 pub(crate) extern "C" fn jit_store_global_by_name(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,

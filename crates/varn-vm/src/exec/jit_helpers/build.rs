@@ -1,20 +1,17 @@
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow(field = "build_str")]
+#[varn_macros::jit_slow(field = "build_str")]
 pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmValue, count: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let parts = std::slice::from_raw_parts(parts_ptr, count);
-        let mut out = crate::strbuf::StrBuf::new();
-        for &v in parts {
-            ctx_ref.heap.str_repr_into(v, &mut out);
-        }
-        ctx_ref.jit_native_result = ctx_ref.heap.alloc_str_dynamic(out.as_str());
+        ctx_ref.jit_native_result =
+            crate::exec::strings::str_concat_parts(parts, &mut ctx_ref.heap);
     }
 }
 
-#[varn_op_macros::jit_slow(field = "build_array_window")]
+#[varn_macros::jit_slow(field = "build_array_window")]
 pub(crate) extern "C" fn jit_build_array_window(
     ctx: *mut ExecCtx,
     parts_ptr: *const VmValue,
@@ -27,7 +24,7 @@ pub(crate) extern "C" fn jit_build_array_window(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "build_tuple_window")]
+#[varn_macros::jit_slow(field = "build_tuple_window")]
 pub(crate) extern "C" fn jit_build_tuple_window(
     ctx: *mut ExecCtx,
     parts_ptr: *const VmValue,
@@ -40,7 +37,7 @@ pub(crate) extern "C" fn jit_build_tuple_window(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "build_empty_object")]
+#[varn_macros::jit_slow(field = "build_empty_object")]
 pub(crate) extern "C" fn jit_build_empty_object(ctx: *mut ExecCtx) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -48,7 +45,7 @@ pub(crate) extern "C" fn jit_build_empty_object(ctx: *mut ExecCtx) {
     }
 }
 
-#[varn_op_macros::jit_slow(field = "build_map_window")]
+#[varn_macros::jit_slow(field = "build_map_window")]
 pub(crate) extern "C" fn jit_build_map_window(
     ctx: *mut ExecCtx,
     pairs_ptr: *const VmValue,
@@ -70,7 +67,7 @@ pub(crate) extern "C" fn jit_build_map_window(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "build_object_with_shape")]
+#[varn_macros::jit_slow(field = "build_object_with_shape")]
 pub(crate) extern "C" fn jit_build_object_with_shape(
     ctx: *mut ExecCtx,
     base: usize,
@@ -89,7 +86,7 @@ pub(crate) extern "C" fn jit_build_object_with_shape(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "build_record_with_shape")]
+#[varn_macros::jit_slow(field = "build_record_with_shape")]
 pub(crate) extern "C" fn jit_build_record_with_shape(
     ctx: *mut ExecCtx,
     base: usize,
@@ -122,7 +119,7 @@ unsafe fn build_shaped_from_ptr(
     )
 }
 
-#[varn_op_macros::jit_slow(field = "build_object_window")]
+#[varn_macros::jit_slow(field = "build_object_window")]
 pub(crate) extern "C" fn jit_build_object_window(
     ctx: *mut ExecCtx,
     vals_ptr: *const VmValue,
@@ -144,7 +141,7 @@ pub(crate) extern "C" fn jit_build_object_window(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "range")]
+#[varn_macros::jit_slow(field = "range")]
 pub(crate) extern "C" fn jit_range(
     ctx: *mut ExecCtx,
     start_tag: u64,
@@ -170,7 +167,7 @@ pub(crate) extern "C" fn jit_range(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "wrap_spread")]
+#[varn_macros::jit_slow(field = "wrap_spread")]
 pub(crate) extern "C" fn jit_wrap_spread(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;

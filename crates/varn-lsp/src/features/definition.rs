@@ -11,33 +11,33 @@ pub fn build_goto_definition(
 ) -> Option<Definition> {
     let token = state.identifier_token_at(line, col)?;
     if let Some(mem_res) = state.db.member_resolutions.get(&token.offset) {
-        if let Some(def_range) = mem_res.def_range {
-            if let Ok(uri) = Uri::parse(&state.uri) {
-                return Some(Definition::Location(Location::new(
-                    uri,
-                    Range {
-                        start: Position {
-                            line: def_range.start.line,
-                            character: def_range.start.column,
-                        },
-                        end: Position {
-                            line: def_range.end.line,
-                            character: def_range.end.column,
-                        },
+        if let Some(def_range) = mem_res.def_range
+            && let Ok(uri) = Uri::parse(&state.uri)
+        {
+            return Some(Definition::Location(Location::new(
+                uri,
+                Range {
+                    start: Position {
+                        line: def_range.start.line,
+                        character: def_range.start.column,
                     },
-                )));
-            }
+                    end: Position {
+                        line: def_range.end.line,
+                        character: def_range.end.column,
+                    },
+                },
+            )));
         }
-        if let Some(origin_mod) = &mem_res.origin_module {
-            if let Some(loc) = resolve_member_location(index, origin_mod, &mem_res.member_name) {
-                return Some(Definition::Location(loc));
-            }
-        }
-    }
-    if let Some(sid) = state.checker_symbol_id_at_token(token) {
-        if let Some(loc) = resolve_symbol_location(state, sid) {
+        if let Some(origin_mod) = &mem_res.origin_module
+            && let Some(loc) = resolve_member_location(index, origin_mod, &mem_res.member_name)
+        {
             return Some(Definition::Location(loc));
         }
+    }
+    if let Some(sid) = state.checker_symbol_id_at_token(token)
+        && let Some(loc) = resolve_symbol_location(state, sid)
+    {
+        return Some(Definition::Location(loc));
     }
     if let Some(chain) = state.resolve_chain_at(line, col) {
         match chain {

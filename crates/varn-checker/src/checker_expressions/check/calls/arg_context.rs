@@ -56,7 +56,13 @@ impl<'r> Checker<'r> {
                     let e = *e;
                     self.with_expected(expected, |c| c.check_expr(rec, e, bind));
                 }
-                Arg::Named { value, .. } => self.check_expr(rec, *value, bind),
+                Arg::Named { label, value } => {
+                    let expected = params
+                        .iter()
+                        .find(|p| p.name.as_deref() == Some(label.as_str()))
+                        .map(|p| Type::resolved(p.ty));
+                    self.with_expected(expected, |c| c.check_expr(rec, *value, bind));
+                }
             }
         }
     }

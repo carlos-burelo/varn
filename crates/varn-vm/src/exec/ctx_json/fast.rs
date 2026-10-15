@@ -303,12 +303,12 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             &spilled
         };
 
-        if hot && matched == n {
-            if let Some((keys, shape)) = &self.cached_shape {
-                if keys.len() == n {
-                    return Some(self.ctx.heap.alloc_object_with_shape_slice(shape, values));
-                }
-            }
+        if hot
+            && matched == n
+            && let Some((keys, shape)) = &self.cached_shape
+            && keys.len() == n
+        {
+            return Some(self.ctx.heap.alloc_object_with_shape_slice(shape, values));
         }
 
         if hot {

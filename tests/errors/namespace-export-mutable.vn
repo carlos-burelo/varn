@@ -1,2 +1,2 @@
-// VN4021
+// expect: error[VN4021]
 namespace N { export let n = 0 }

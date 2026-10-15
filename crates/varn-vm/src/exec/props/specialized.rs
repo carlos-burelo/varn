@@ -82,16 +82,17 @@ fn enum_variant_property(
     if let Some(f) = payload.as_ref().and_then(|o| o.get(key)) {
         return Some(Ok(f));
     }
-    if key.starts_with("value") && key.len() > 5 {
-        if let Ok(idx) = key[5..].parse::<usize>() {
-            if !ev.fields.is_empty() {
-                if idx < ev.fields.len() {
-                    let field = payload.as_ref().and_then(|o| o.get(&ev.fields[idx]));
-                    return Some(Ok(field.unwrap_or(VmValue::null())));
-                }
-            } else if idx == 0 {
-                return Some(Ok(ev.payload));
+    if key.starts_with("value")
+        && key.len() > 5
+        && let Ok(idx) = key[5..].parse::<usize>()
+    {
+        if !ev.fields.is_empty() {
+            if idx < ev.fields.len() {
+                let field = payload.as_ref().and_then(|o| o.get(&ev.fields[idx]));
+                return Some(Ok(field.unwrap_or(VmValue::null())));
             }
+        } else if idx == 0 {
+            return Some(Ok(ev.payload));
         }
     }
     match MemberKey::from_str(key) {

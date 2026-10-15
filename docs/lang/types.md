@@ -359,6 +359,28 @@ const t = new Tagged(5, 7)        // label: L? con un int fija L = int
   `new Map()` y `new Set()` no son excepción.
 - El constructor se valida siempre contra los tipos ya instanciados.
 
+### 8.2 Varianza automática
+
+Sin anotaciones: el compilador mide dónde aparece cada parámetro dentro de
+los miembros y decide (tests/199-containers-are-invariant.vn,
+tests/errors/generator-narrowing-rejected.vn):
+
+- solo salidas (`get(): T`, getters, campos `readonly`) → covariante:
+  `Task<int>` entra donde `Task<int?>`
+- solo entradas (parámetros) → contravariante
+- ambas o campo mutable → invariante: `Box<int>` no entra donde `Box<str>`,
+  `Generator<int>` no entra donde `Generator<int | str>` (su `return(v?: T)`
+  acepta `T`: ensancharlo rompería el cuerpo)
+- sin usos (phantom) → covariante
+- arrays y genéricos anidados cuentan como ambas posiciones (invariantes);
+  uniones, tuplas y objetos `readonly` son transparentes
+- `dynamic` escapa en ambas direcciones (explícito)
+
+Si una asignación falla por invarianza, el culpable es siempre un miembro
+concreto que usa `T` en mala posición. Válvula de escape: el cast `as`
+existente. La medición es determinista y viaja con el símbolo (igual al
+importar que al declarar).
+
 ---
 
 ## 9. Conversiones numéricas

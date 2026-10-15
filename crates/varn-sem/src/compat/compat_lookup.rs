@@ -287,6 +287,7 @@ pub(super) fn object_matches_class_members(
                 return_type,
                 optional,
                 is_arrow,
+                ..
             } => {
                 if *optional {
                     continue;

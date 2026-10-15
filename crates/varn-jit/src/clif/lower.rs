@@ -167,7 +167,7 @@ pub fn try_compile(
         debug.as_deref_mut(),
     ) {
         Ok(lowered) => Ok((lowered, Activation::Native)),
-        Err(reason) if reason == super::from_ssa::NEEDS_ACTIVATION => {
+        Err(reason) if reason.starts_with(super::from_ssa::NEEDS_ACTIVATION) => {
             super::emit::reset_disabled_helper_hit();
             super::from_ssa::try_lower(
                 proto,

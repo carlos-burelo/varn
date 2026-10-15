@@ -8,7 +8,7 @@ Run / Check / Eval / Repl / Bench / Debug / Build / Test / Fmt / Pkg / Init / Do
 
 ## Flags reales
 
-### Run (`RunArgs`, cli.rs:58-96)
+### Run (`RunArgs`, cli.rs:58-99)
 
 `vn run [file] [-e CODE] [-- ARGS] [-v] [--trace] [--allow-*] [--sandbox] [--compare-tiers]`
 
@@ -23,6 +23,7 @@ Run / Check / Eval / Repl / Bench / Debug / Build / Test / Fmt / Pkg / Init / Do
 - `--allow-net [HOSTS]` (idem)
 - `--allow-env [VARS]` (idem)
 - `--allow-ffi`
+- `--allow-ui`
 - `--sandbox`
 - `--compare-tiers`
 

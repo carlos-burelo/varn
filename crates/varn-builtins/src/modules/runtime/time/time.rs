@@ -1,4 +1,4 @@
-use varn_contract::varn_contract;
+use varn_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct TimeRuntime;
@@ -11,16 +11,16 @@ fn parse_iso_duration(s: &str) -> i64 {
     if let Some(t_pos) = rest.find('T') {
         let date_part = &rest[..t_pos];
         rest = &rest[t_pos + 1..];
-        if let Some(d_pos) = date_part.find('D') {
-            if let Ok(d) = date_part[..d_pos].parse::<i64>() {
-                ms += d * 86400 * 1000;
-            }
+        if let Some(d_pos) = date_part.find('D')
+            && let Ok(d) = date_part[..d_pos].parse::<i64>()
+        {
+            ms += d * 86400 * 1000;
         }
     } else {
-        if let Some(d_pos) = rest.find('D') {
-            if let Ok(d) = rest[..d_pos].parse::<i64>() {
-                ms += d * 86400 * 1000;
-            }
+        if let Some(d_pos) = rest.find('D')
+            && let Ok(d) = rest[..d_pos].parse::<i64>()
+        {
+            ms += d * 86400 * 1000;
         }
         return ms;
     }

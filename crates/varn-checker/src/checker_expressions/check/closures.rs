@@ -189,11 +189,12 @@ impl<'r> Checker<'r> {
         let ty = if let Some(arg) = argument {
             self.with_expected(declared, |c| c.check_expr(rec, arg, bind));
             let given = self.infer_type(rec, arg, bind);
-            if let Some(declared) = declared {
-                if !self.value_fits(rec, &declared, &given, Some(arg), Some(bind)) {
-                    let declared_s = declared.display(&self.ty_table, &bind.interner);
-                    let given_s = given.display(&self.ty_table, &bind.interner);
-                    self.emit(
+            if let Some(declared) = declared
+                && !self.value_fits(rec, &declared, &given, Some(arg), Some(bind))
+            {
+                let declared_s = declared.display(&self.ty_table, &bind.interner);
+                let given_s = given.display(&self.ty_table, &bind.interner);
+                self.emit(
                         varn_core::Diagnostic::error(
                             varn_core::ErrorCode::TypeMismatch,
                             format!(
@@ -202,7 +203,6 @@ impl<'r> Checker<'r> {
                         )
                         .with_range(self.ast_arena.expr(arg).range),
                     );
-                }
             }
             given
         } else {

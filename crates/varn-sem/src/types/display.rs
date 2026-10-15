@@ -178,6 +178,7 @@ impl fmt::Display for TypeDisplay<'_> {
                             return_type,
                             optional,
                             is_arrow: _,
+                            ..
                         } => {
                             write!(f, "{}{}(", name, if *optional { "?" } else { "" })?;
                             for (j, p) in params.iter().enumerate() {

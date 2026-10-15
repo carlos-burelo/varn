@@ -88,17 +88,17 @@ pub fn dot_receiver(
         .skip(dot_pos + 1)
         .filter(|t| t.offset < cursor_offset)
         .collect();
-    if after.len() == 1 {
-        if let Some(res) = state.db.member_resolutions.get(&after[0].offset) {
-            let before = &state.tokens[dot_pos - 1];
-            return hit(
-                state,
-                "partial",
-                before,
-                res.receiver_ty,
-                !receiver_is_type_name(state, before),
-            );
-        }
+    if after.len() == 1
+        && let Some(res) = state.db.member_resolutions.get(&after[0].offset)
+    {
+        let before = &state.tokens[dot_pos - 1];
+        return hit(
+            state,
+            "partial",
+            before,
+            res.receiver_ty,
+            !receiver_is_type_name(state, before),
+        );
     }
 
     let before = &state.tokens[dot_pos - 1];
@@ -168,17 +168,16 @@ pub fn dot_receiver(
 }
 
 fn receiver_is_type_name(state: &DocumentState, tok: &TokenRecord) -> bool {
-    if let Some(info) = state.expr_info_at_token(tok) {
-        if let Some(sid) = info.symbol_id {
-            if sid < state.db.bind.arena.len() {
-                return names_a_type(state.db.bind.arena.get(sid).kind);
-            }
-        }
+    if let Some(info) = state.expr_info_at_token(tok)
+        && let Some(sid) = info.symbol_id
+        && sid < state.db.bind.arena.len()
+    {
+        return names_a_type(state.db.bind.arena.get(sid).kind);
     }
-    if let Some((sid, _)) = state.db.resolve_at(state.lexeme(tok), tok.offset) {
-        if sid < state.db.bind.arena.len() {
-            return names_a_type(state.db.bind.arena.get(sid).kind);
-        }
+    if let Some((sid, _)) = state.db.resolve_at(state.lexeme(tok), tok.offset)
+        && sid < state.db.bind.arena.len()
+    {
+        return names_a_type(state.db.bind.arena.get(sid).kind);
     }
     false
 }
@@ -211,14 +210,13 @@ fn dot_receiver_source_fallback(
         if let Some((sid, ty)) = state
             .db
             .resolve_at(state.lexeme(receiver_tok), receiver_tok.offset)
+            && sid < state.db.bind.arena.len()
         {
-            if sid < state.db.bind.arena.len() {
-                let is_instance = !names_a_type(state.db.bind.arena.get(sid).kind);
-                return Some(ReceiverInfo {
-                    ty: state.db.non_null(&ty),
-                    is_instance,
-                });
-            }
+            let is_instance = !names_a_type(state.db.bind.arena.get(sid).kind);
+            return Some(ReceiverInfo {
+                ty: state.db.non_null(&ty),
+                is_instance,
+            });
         }
         let ty = state.db.named_type(state.lexeme(receiver_tok));
         if !state.members_of_type(&ty).is_empty() {

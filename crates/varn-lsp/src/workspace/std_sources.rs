@@ -37,10 +37,10 @@ pub fn materialize() {
         if std::fs::read_to_string(&path).is_ok_and(|existing| existing == source) {
             continue;
         }
-        if let Some(parent) = path.parent() {
-            if std::fs::create_dir_all(parent).is_err() {
-                continue;
-            }
+        if let Some(parent) = path.parent()
+            && std::fs::create_dir_all(parent).is_err()
+        {
+            continue;
         }
         let _ = std::fs::write(&path, source);
     }
@@ -61,16 +61,14 @@ pub fn specifier_from_path(path: &str) -> Option<String> {
 
     if let (varn_modules::std_root::StdSource::SourceTree(tree), _) =
         varn_modules::std_root::resolve()
+        && let Some(rest) = strip_root(&normalized, &tree)
+        && !rest.contains('/')
     {
-        if let Some(rest) = strip_root(&normalized, &tree) {
-            if !rest.contains('/') {
-                return Some(format!(
-                    "{}{}",
-                    varn_modules::spec::STD_PREFIX,
-                    rest.strip_suffix(".vn")?
-                ));
-            }
-        }
+        return Some(format!(
+            "{}{}",
+            varn_modules::spec::STD_PREFIX,
+            rest.strip_suffix(".vn")?
+        ));
     }
 
     None

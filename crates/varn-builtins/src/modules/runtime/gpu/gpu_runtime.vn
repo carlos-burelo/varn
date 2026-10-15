@@ -1,0 +1,19 @@
+// runtime:gpu — device-owned buffers + lazy graph. Single path.
+// Host float[] only at upload/download border. Compute stays device-side.
+
+export declare function backend$(): str;
+export declare function deviceCount$(): int;
+export declare function adapterName$(i: int): str;
+export declare function engine$(): str;
+export declare function create$(len: int): int;
+export declare function destroy$(id: int): void;
+export declare function len$(id: int): int;
+export declare function dims$(id: int): int[];
+export declare function reshape$(id: int, dims: int[]): void;
+export declare function upload$(data: float[]): int;
+export declare function download$(id: int): float[];
+export declare function add$(a: int, b: int): int;
+export declare function mul$(a: int, b: int): int;
+export declare function scale$(a: int, s: float): int;
+export declare function dot$(a: int, b: int): float;
+export declare function matMul$(a: int, b: int): int;

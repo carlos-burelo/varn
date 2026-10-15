@@ -67,13 +67,12 @@ impl<'r> Checker<'r> {
                        and change shared state through a function";
         match export {
             ExportDecl::Decl { declaration, .. } => {
-                if let Decl::Variable(v) = declaration.as_ref() {
-                    if v.kind == VarKind::Let {
-                        self.emit(
-                            Diagnostic::error(ErrorCode::MutableExport, message)
-                                .with_range(v.range),
-                        );
-                    }
+                if let Decl::Variable(v) = declaration.as_ref()
+                    && v.kind == VarKind::Let
+                {
+                    self.emit(
+                        Diagnostic::error(ErrorCode::MutableExport, message).with_range(v.range),
+                    );
                 }
             }
             ExportDecl::Named {

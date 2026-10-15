@@ -1,2 +1,2 @@
-// VN3001
+// expect: error[VN3001]
 function scale(x: float = "one"): float { return x }

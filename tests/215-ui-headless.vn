@@ -1,0 +1,426 @@
+import { describe, it, expect } from "std:test";
+import {
+    UiWindow,
+    UiFrame,
+    Focus,
+    TextEdit,
+    pad, row, col, textX, textY, ellipsize,
+    KEY_BACKSPACE, KEY_TAB, KEY_ENTER, KEY_ESCAPE, KEY_SPACE, KEY_DELETE,
+    KEY_ARROW_LEFT, KEY_ARROW_UP, KEY_ARROW_RIGHT, KEY_ARROW_DOWN,
+    MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE,
+    keyCode, isNamedKey, hit
+} from "std:ui";
+import { measure, ascent, descent } from "std:text";
+
+function tapKey(win: UiWindow, fr: UiFrame, focus: Focus, ed: TextEdit, code: int): void {
+    win.inject("key", code, 1, 0);
+    fr.update(win);
+    ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+    win.inject("key", code, 0, 0);
+    fr.update(win);
+    ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+}
+
+function holdKey(win: UiWindow, fr: UiFrame, focus: Focus, ed: TextEdit, code: int, times: int): void {
+    for (let i = 0; i < times; i = i + 1) {
+        win.inject("key", code, 1, 0);
+        fr.update(win);
+        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+    }
+    win.inject("key", code, 0, 0);
+    fr.update(win);
+    ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+}
+
+await describe("215 ui headless", async () => {    await it("open reports size", () => {
+        using win = UiWindow.open("t", 800, 600);
+        expect(win.size()).toEqual([800, 600]);
+        expect(win.shouldClose()).toBe(false);
+    });
+
+    await it("bad size throws", () => {
+        let failed = false;
+        try {
+            UiWindow.open("t", 0, 600);
+        } catch (e) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+    });
+
+    await it("events round trip", () => {
+        using win = UiWindow.open("t", 800, 600);
+        win.inject("key", 65, 1, 0);
+        win.inject("mouse", 10, 20, 1);
+        win.inject("resize", 1024, 768, 0);
+        const evs = win.poll();
+        expect(evs.length).toBe(3);
+        expect(evs[0].kind).toBe("key");
+        expect(evs[0].key).toBe(65);
+        expect(evs[0].pressed).toBe(true);
+        expect(evs[1].kind).toBe("mouse");
+        expect(evs[1].x).toBe(10);
+        expect(evs[1].button).toBe(1);
+        expect(evs[2].kind).toBe("resize");
+        expect(win.size()).toEqual([1024, 768]);
+        expect(win.poll().length).toBe(0);
+    });
+
+    await it("unknown inject kind throws", () => {
+        using win = UiWindow.open("t", 800, 600);
+        let failed = false;
+        try {
+            win.inject("nope", 0, 0, 0);
+        } catch (e) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+    });
+
+    await it("draw log and present drains", () => {
+        using win = UiWindow.open("t", 800, 600);
+        win.clear(0);
+        win.rect(10.0, 20.0, 100.0, 50.0, 4278190335);
+        win.text(10.0, 80.0, "hola", 16.0, 4294967295);
+        const cmds = win.commands();
+        expect(cmds.length).toBe(3);
+        expect(cmds[0]).toBe("clear 0");
+        expect(cmds[2]).toBe("text 10 80 16 4294967295 hola");
+        expect(win.present()).toBe(3);
+        expect(win.commands().length).toBe(0);
+    });
+
+    await it("close event and destroyed handle", () => {
+        const win = UiWindow.open("t", 800, 600);
+        win.inject("close", 0, 0, 0);
+        expect(win.shouldClose()).toBe(true);
+        expect(win.poll()[0].kind).toBe("close");
+        win.dispose();
+        let failed = false;
+        try {
+            win.size();
+        } catch (e) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+    });
+
+    await it("key table matches native and ascii", () => {
+        expect(keyCode("escape")).toBe(KEY_ESCAPE);
+        expect(keyCode("enter")).toBe(KEY_ENTER);
+        expect(keyCode("tab")).toBe(KEY_TAB);
+        expect(keyCode("backspace")).toBe(KEY_BACKSPACE);
+        expect(keyCode("delete")).toBe(KEY_DELETE);
+        expect(keyCode("space")).toBe(KEY_SPACE);
+        expect(keyCode("left")).toBe(KEY_ARROW_LEFT);
+        expect(keyCode("up")).toBe(KEY_ARROW_UP);
+        expect(keyCode("right")).toBe(KEY_ARROW_RIGHT);
+        expect(keyCode("down")).toBe(KEY_ARROW_DOWN);
+        expect(KEY_ESCAPE).toBe(27);
+        expect(KEY_ENTER).toBe(13);
+        expect(KEY_SPACE).toBe(32);
+        expect(KEY_ARROW_LEFT).toBe(8592);
+        expect(KEY_ARROW_DOWN).toBe(8595);
+        expect(MOUSE_LEFT).toBe(0);
+        expect(MOUSE_RIGHT).toBe(1);
+        expect(MOUSE_MIDDLE).toBe(2);
+        let failed = false;
+        try {
+            keyCode("nope");
+        } catch (e) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+    });
+
+    await it("key events carry codes end to end", () => {
+        using win = UiWindow.open("t", 800, 600);
+        win.inject("key", keyCode("escape"), 1, 0);
+        win.inject("key", keyCode("left"), 1, 0);
+        const evs = win.poll();
+        expect(evs.length).toBe(2);
+        expect(evs[0].key).toBe(KEY_ESCAPE);
+        expect(evs[0].pressed).toBe(true);
+        expect(evs[1].key).toBe(KEY_ARROW_LEFT);
+    });
+
+    await it("hit tests rect edges", () => {
+        expect(hit(10.0, 10.0, 10.0, 10.0, 100.0, 50.0)).toBe(true);
+        expect(hit(109.9, 59.9, 10.0, 10.0, 100.0, 50.0)).toBe(true);
+        expect(hit(110.0, 10.0, 10.0, 10.0, 100.0, 50.0)).toBe(false);
+        expect(hit(10.0, 60.0, 10.0, 10.0, 100.0, 50.0)).toBe(false);
+        expect(hit(9.9, 10.0, 10.0, 10.0, 100.0, 50.0)).toBe(false);
+        expect(hit(10.0, 9.9, 10.0, 10.0, 100.0, 50.0)).toBe(false);
+    });
+
+    await it("frame aggregates key edges", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        win.inject("key", KEY_ESCAPE, 1, 0);
+        fr.update(win);
+        expect(fr.held(KEY_ESCAPE)).toBe(true);
+        expect(fr.pressed).toEqual([KEY_ESCAPE]);
+        fr.update(win);
+        expect(fr.held(KEY_ESCAPE)).toBe(true);
+        expect(fr.pressed).toEqual([]);
+        win.inject("key", KEY_ESCAPE, 1, 0);
+        fr.update(win);
+        expect(fr.pressed).toEqual([]);
+        win.inject("key", KEY_ESCAPE, 0, 0);
+        fr.update(win);
+        expect(fr.held(KEY_ESCAPE)).toBe(false);
+    });
+
+    await it("frame clicks need down and up inside", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        win.inject("mouse", 30, 40, -1);
+        fr.update(win);
+        expect(fr.mouseX).toBe(30);
+        expect(fr.mouseY).toBe(40);
+        expect(fr.leftPressed).toBe(false);
+        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        expect(fr.left).toBe(true);
+        expect(fr.leftPressed).toBe(true);
+        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
+        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        expect(fr.left).toBe(false);
+        expect(fr.leftReleased).toBe(true);
+        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(true);
+        fr.update(win);
+        expect(fr.leftReleased).toBe(false);
+        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
+    });
+
+    await it("frame rejects partial clicks", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        win.inject("mouseUp", 500, 500, MOUSE_LEFT);
+        fr.update(win);
+        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
+        win.inject("mouseDown", 500, 500, MOUSE_LEFT);
+        fr.update(win);
+        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
+    });
+
+    await it("frame tracks resize and close", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        win.inject("resize", 1024, 768, 0);
+        fr.update(win);
+        expect(fr.resized).toBe(true);
+        expect(fr.w).toBe(1024);
+        expect(fr.h).toBe(768);
+        fr.update(win);
+        expect(fr.resized).toBe(false);
+        win.inject("close", 0, 0, 0);
+        fr.update(win);
+        expect(fr.closed).toBe(true);
+        expect(win.shouldClose()).toBe(true);
+    });
+
+    await it("focus claims and cycles", () => {
+        const f = new Focus();
+        expect(f.current()).toBe(-1);
+        expect(f.size).toBe(0);
+        f.claim(7);
+        f.claim(9);
+        expect(f.current()).toBe(9);
+        expect(f.has(7)).toBe(true);
+        expect(f.has(8)).toBe(false);
+        expect(f.size).toBe(2);
+        f.claim(7);
+        expect(f.size).toBe(2);
+        expect(f.current()).toBe(7);
+        f.next();
+        expect(f.current()).toBe(9);
+        f.next();
+        expect(f.current()).toBe(7);
+        f.prev();
+        expect(f.current()).toBe(9);
+        f.clear();
+        expect(f.current()).toBe(-1);
+        expect(f.size).toBe(0);
+        f.next();
+        expect(f.current()).toBe(-1);
+    });
+
+    await it("layout distributes rects", () => {        expect(pad(10.0, 20.0, 100.0, 50.0, 5.0)).toEqual([15.0, 25.0, 90.0, 40.0]);
+        expect(row(0.0, 0.0, 200.0, 50.0, [1.0, 1.0], 10.0)).toEqual([
+            [0.0, 0.0, 95.0, 50.0],
+            [105.0, 0.0, 95.0, 50.0]
+        ]);
+        expect(row(0.0, 0.0, 200.0, 50.0, [1.0, 3.0], 0.0)).toEqual([
+            [0.0, 0.0, 50.0, 50.0],
+            [50.0, 0.0, 150.0, 50.0]
+        ]);
+        expect(row(20.0, 0.0, 760.0, 30.0, [-36.0, 1.0, -36.0], 8.0)).toEqual([
+            [20.0, 0.0, 36.0, 30.0],
+            [64.0, 0.0, 672.0, 30.0],
+            [744.0, 0.0, 36.0, 30.0]
+        ]);
+        expect(col(0.0, 0.0, 100.0, 120.0, [1.0, 1.0], 20.0)).toEqual([
+            [0.0, 0.0, 100.0, 50.0],
+            [0.0, 70.0, 100.0, 50.0]
+        ]);
+        expect(row(0.0, 0.0, 200.0, 50.0, [], 10.0)).toEqual([]);
+        expect(col(0.0, 0.0, 100.0, 120.0, [], 10.0)).toEqual([]);
+    });
+
+    await it("text placement centers in boxes", () => {
+        const w = measure("Añadir", 22.0);
+        expect(textX(660.0, 120.0, "Añadir", 22.0)).toBe(660.0 + (120.0 - w) / 2.0);
+        const a = ascent(22.0);
+        const d = descent(22.0);
+        expect(textY(96.0, 44.0, 22.0)).toBe(96.0 + (44.0 - a - d) / 2.0);
+        const ty = textY(96.0, 44.0, 22.0);
+        expect(ty >= 96.0).toBe(true);
+        expect(ty + a + d <= 96.0 + 44.0).toBe(true);
+    });
+
+    await it("ellipsize shortens only on overflow", () => {
+        expect(ellipsize("hola", 20.0, 1000.0)).toBe("hola");
+        const narrow = ellipsize("hola mundo", 20.0, 1.0);
+        expect(narrow == "" || narrow == "…").toBe(true);
+        const mid = ellipsize("hola mundo varn", 20.0, measure("hola", 20.0) + measure("…", 20.0));
+        expect(mid.endsWith("…") || mid == "hola").toBe(true);
+        expect(measure(mid, 20.0) <= measure("hola", 20.0) + measure("…", 20.0) + 1.0).toBe(true);
+    });
+
+    await it("named keys are classified", () => {
+        expect(isNamedKey(KEY_ESCAPE)).toBe(true);
+        expect(isNamedKey(KEY_SPACE)).toBe(true);
+        expect(isNamedKey(KEY_ARROW_UP)).toBe(true);
+        expect(isNamedKey(65)).toBe(false);
+        expect(isNamedKey(32)).toBe(true);
+        expect(isNamedKey(0)).toBe(false);
+    });
+
+    await it("frame separates press edge from repeat", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        win.inject("key", 65, 1, 0);
+        fr.update(win);
+        expect(fr.pressed).toEqual([65]);
+        expect(fr.repeated).toEqual([]);
+        win.inject("key", 65, 1, 0);
+        fr.update(win);
+        expect(fr.pressed).toEqual([]);
+        expect(fr.repeated).toEqual([65]);
+        expect(fr.held(65)).toBe(true);
+        win.inject("key", 65, 0, 0);
+        fr.update(win);
+        expect(fr.held(65)).toBe(false);
+        expect(fr.repeated).toEqual([]);
+    });
+
+    await it("edit repeats held keys", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        const focus = new Focus();
+        const ed = new TextEdit();
+        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        holdKey(win, fr, focus, ed, 97, 3);
+        expect(ed.text).toBe("aaa");
+        holdKey(win, fr, focus, ed, KEY_BACKSPACE, 2);
+        expect(ed.text).toBe("a");
+    });
+
+    await it("edit enter splits lines", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        const focus = new Focus();
+        const ed = new TextEdit();
+        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        tapKey(win, fr, focus, ed, 97);
+        tapKey(win, fr, focus, ed, KEY_ENTER);
+        tapKey(win, fr, focus, ed, 98);
+        expect(ed.text).toBe("a\nb");
+        expect(ed.cursor).toBe(3);
+        expect(ed.lines()).toEqual(["a", "b"]);
+        expect(ed.caretLine()).toBe(1);
+        expect(ed.caretCol()).toBe(1);
+        tapKey(win, fr, focus, ed, KEY_ARROW_LEFT);
+        expect(ed.cursor).toBe(2);
+        tapKey(win, fr, focus, ed, KEY_BACKSPACE);
+        expect(ed.text).toBe("ab");
+        expect(ed.cursor).toBe(1);
+        expect(ed.caretLine()).toBe(0);
+        expect(ed.caretCol()).toBe(1);
+    });
+
+    await it("edit types moves and erases", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        const focus = new Focus();
+        const ed = new TextEdit();
+        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        expect(ed.focused).toBe(true);
+        expect(focus.current()).toBe(1);
+        tapKey(win, fr, focus, ed, 72);
+        tapKey(win, fr, focus, ed, 105);
+        expect(ed.text).toBe("Hi");
+        expect(ed.cursor).toBe(2);
+        tapKey(win, fr, focus, ed, KEY_ARROW_LEFT);
+        expect(ed.cursor).toBe(1);
+        tapKey(win, fr, focus, ed, 33);
+        expect(ed.text).toBe("H!i");
+        expect(ed.cursor).toBe(2);
+        tapKey(win, fr, focus, ed, KEY_BACKSPACE);
+        expect(ed.text).toBe("Hi");
+        expect(ed.cursor).toBe(1);
+        tapKey(win, fr, focus, ed, KEY_ARROW_LEFT);
+        tapKey(win, fr, focus, ed, KEY_ARROW_LEFT);
+        expect(ed.cursor).toBe(0);
+        tapKey(win, fr, focus, ed, KEY_BACKSPACE);
+        expect(ed.text).toBe("Hi");
+        tapKey(win, fr, focus, ed, KEY_DELETE);
+        expect(ed.text).toBe("i");
+        expect(ed.cursor).toBe(0);
+    });
+
+    await it("edit ignores keys without focus and blurs outside", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        const focus = new Focus();
+        const ed = new TextEdit();
+        win.inject("key", 65, 1, 0);
+        fr.update(win);
+        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        expect(ed.text).toBe("");
+        expect(ed.focused).toBe(false);
+        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        fr.update(win);
+        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        expect(ed.focused).toBe(true);
+        win.inject("mouseDown", 500, 500, MOUSE_LEFT);
+        fr.update(win);
+        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        expect(ed.focused).toBe(false);
+        expect(focus.current()).toBe(-1);
+        win.inject("key", 66, 1, 0);
+        fr.update(win);
+        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        expect(ed.text).toBe("");
+    });
+});

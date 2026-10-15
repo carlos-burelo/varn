@@ -30,19 +30,19 @@ fn execute_tree() -> Result<(), CliError> {
     ));
 
     let lock_path = varn_pm::lockfile::lock_path(project_root);
-    if lock_path.exists() {
-        if let Ok(lock) = varn_pm::PmLockfile::load(&lock_path) {
-            let total = lock.packages.len();
-            for (idx, pkg) in lock.packages.iter().enumerate() {
-                let is_last = idx + 1 == total;
-                let branch = if is_last { "└── " } else { "├── " };
-                terminal::log(format!(
-                    "{branch}{}@{} ({})",
-                    pkg.name, pkg.version, pkg.origin
-                ));
-            }
-            return Ok(());
+    if lock_path.exists()
+        && let Ok(lock) = varn_pm::PmLockfile::load(&lock_path)
+    {
+        let total = lock.packages.len();
+        for (idx, pkg) in lock.packages.iter().enumerate() {
+            let is_last = idx + 1 == total;
+            let branch = if is_last { "└── " } else { "├── " };
+            terminal::log(format!(
+                "{branch}{}@{} ({})",
+                pkg.name, pkg.version, pkg.origin
+            ));
         }
+        return Ok(());
     }
 
     let deps = manifest.parsed_deps().map_err(CliError::fatal)?;

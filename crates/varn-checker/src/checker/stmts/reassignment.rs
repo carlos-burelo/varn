@@ -49,10 +49,10 @@ impl<'r> Checker<'r> {
             self.forget_narrowing(rec, *name, bind);
             return;
         }
-        if let Some(key) = self.member_path_key(target, bind) {
-            if self.member_narrowed.remove(&key).is_some() {
-                self.mark_infer_env_dirty();
-            }
+        if let Some(key) = self.member_path_key(target, bind)
+            && self.member_narrowed.remove(&key).is_some()
+        {
+            self.mark_infer_env_dirty();
         }
     }
 
@@ -233,7 +233,51 @@ impl<'r> Checker<'r> {
                 ArrowBody::Block(stmt) => ClosureBodyRef::Stmt(*stmt),
                 ArrowBody::Expr(value) => ClosureBodyRef::Expr(*value),
             },
-            _ => return None,
+            ExprKind::IntLiteral { .. }
+            | ExprKind::FloatLiteral { .. }
+            | ExprKind::BigIntLiteral { .. }
+            | ExprKind::DecimalLiteral { .. }
+            | ExprKind::StrLiteral { .. }
+            | ExprKind::CharLiteral { .. }
+            | ExprKind::BoolLiteral { .. }
+            | ExprKind::NullLiteral
+            | ExprKind::RegexLiteral { .. }
+            | ExprKind::Template { .. }
+            | ExprKind::TaggedTemplate { .. }
+            | ExprKind::Identifier { .. }
+            | ExprKind::Missing
+            | ExprKind::This
+            | ExprKind::Super
+            | ExprKind::Array { .. }
+            | ExprKind::Object { .. }
+            | ExprKind::Tuple { .. }
+            | ExprKind::Record { .. }
+            | ExprKind::Unary { .. }
+            | ExprKind::Update { .. }
+            | ExprKind::Binary { .. }
+            | ExprKind::Logical { .. }
+            | ExprKind::Assign { .. }
+            | ExprKind::Conditional { .. }
+            | ExprKind::Member { .. }
+            | ExprKind::Call { .. }
+            | ExprKind::New { .. }
+            | ExprKind::Sequence { .. }
+            | ExprKind::Paren { .. }
+            | ExprKind::Await { .. }
+            | ExprKind::Spawn { .. }
+            | ExprKind::Yield { .. }
+            | ExprKind::Spread { .. }
+            | ExprKind::Pipeline { .. }
+            | ExprKind::Range { .. }
+            | ExprKind::NonNull { .. }
+            | ExprKind::Try { .. }
+            | ExprKind::As { .. }
+            | ExprKind::Satisfies { .. }
+            | ExprKind::ClassExpr { .. }
+            | ExprKind::Match { .. }
+            | ExprKind::Is { .. }
+            | ExprKind::With { .. }
+            | ExprKind::MetaAccess { .. } => return None,
         };
         Some(self.closure_assigned_symbols(body, bind))
     }
@@ -589,7 +633,51 @@ pub(crate) fn static_path_atoms(expr: ExprId, arena: &AstArena) -> Option<(Membe
                 break MemberRoot::Name(node, *name);
             }
             ExprKind::This => break MemberRoot::This(node),
-            _ => return None,
+            ExprKind::IntLiteral { .. }
+            | ExprKind::FloatLiteral { .. }
+            | ExprKind::BigIntLiteral { .. }
+            | ExprKind::DecimalLiteral { .. }
+            | ExprKind::StrLiteral { .. }
+            | ExprKind::CharLiteral { .. }
+            | ExprKind::BoolLiteral { .. }
+            | ExprKind::NullLiteral
+            | ExprKind::RegexLiteral { .. }
+            | ExprKind::Template { .. }
+            | ExprKind::TaggedTemplate { .. }
+            | ExprKind::Missing
+            | ExprKind::Super
+            | ExprKind::Array { .. }
+            | ExprKind::Object { .. }
+            | ExprKind::Tuple { .. }
+            | ExprKind::Record { .. }
+            | ExprKind::Unary { .. }
+            | ExprKind::Update { .. }
+            | ExprKind::Binary { .. }
+            | ExprKind::Logical { .. }
+            | ExprKind::Assign { .. }
+            | ExprKind::Conditional { .. }
+            | ExprKind::Member { .. }
+            | ExprKind::Call { .. }
+            | ExprKind::New { .. }
+            | ExprKind::Function { .. }
+            | ExprKind::Arrow { .. }
+            | ExprKind::Sequence { .. }
+            | ExprKind::Paren { .. }
+            | ExprKind::Await { .. }
+            | ExprKind::Spawn { .. }
+            | ExprKind::Yield { .. }
+            | ExprKind::Spread { .. }
+            | ExprKind::Pipeline { .. }
+            | ExprKind::Range { .. }
+            | ExprKind::NonNull { .. }
+            | ExprKind::Try { .. }
+            | ExprKind::As { .. }
+            | ExprKind::Satisfies { .. }
+            | ExprKind::ClassExpr { .. }
+            | ExprKind::Match { .. }
+            | ExprKind::Is { .. }
+            | ExprKind::With { .. }
+            | ExprKind::MetaAccess { .. } => return None,
         }
     };
     names.reverse();

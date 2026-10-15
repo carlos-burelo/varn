@@ -8,7 +8,7 @@ struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
 }
 
-fn reshapes(desc: &TypeDesc, depth: usize) -> bool {
+fn reshapes(desc: &TypeDesc) -> bool {
     match desc {
         TypeDesc::Map(..) => true,
         TypeDesc::Any
@@ -27,24 +27,21 @@ fn reshapes(desc: &TypeDesc, depth: usize) -> bool {
         TypeDesc::Array(inner)
         | TypeDesc::Set(inner)
         | TypeDesc::Dict(inner)
-        | TypeDesc::Nullable(inner) => reshapes(inner, depth + 1),
+        | TypeDesc::Nullable(inner) => reshapes(inner),
         TypeDesc::Tuple(_) => true,
-        TypeDesc::Object(fields) => fields.iter().any(|field| reshapes(&field.ty, depth + 1)),
+        TypeDesc::Object(fields) => fields.iter().any(|field| reshapes(&field.ty)),
         TypeDesc::Args { fixed, rest } => {
-            fixed.iter().any(|item| reshapes(item, depth + 1))
-                || rest
-                    .as_deref()
-                    .is_some_and(|item| reshapes(item, depth + 1))
+            fixed.iter().any(reshapes) || rest.as_deref().is_some_and(reshapes)
         }
     }
 }
 
 pub(crate) fn converts(desc: &TypeDesc) -> bool {
-    reshapes(desc, 0)
+    reshapes(desc)
 }
 
 pub(crate) fn normalize(heap: &mut Heap, value: VmValue, desc: &TypeDesc) -> VmValue {
-    if !reshapes(desc, 0) {
+    if !reshapes(desc) {
         return value;
     }
     let mut visiting = Vec::new();
@@ -148,12 +145,11 @@ fn walk(
             if let Some(entries) = object_entries(heap, v) {
                 for (name, x) in entries {
                     let replaced = walk(heap, x, val, scope, visiting);
-                    if replaced != x {
-                        if let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) =
+                    if replaced != x
+                        && let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) =
                             heap.get(v.as_heap())
-                        {
-                            obj.borrow().set_field_str(&name, replaced);
-                        }
+                    {
+                        obj.borrow().set_field_str(&name, replaced);
                     }
                 }
                 return v;
@@ -232,11 +228,10 @@ fn walk(
                     continue;
                 };
                 let replaced = walk(heap, x, &field.ty, Some(&inner), visiting);
-                if replaced != x {
-                    if let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) = heap.get(v.as_heap())
-                    {
-                        obj.borrow().set_field_str(&name, replaced);
-                    }
+                if replaced != x
+                    && let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) = heap.get(v.as_heap())
+                {
+                    obj.borrow().set_field_str(&name, replaced);
                 }
             }
             v

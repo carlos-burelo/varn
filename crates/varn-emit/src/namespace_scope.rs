@@ -126,12 +126,12 @@ pub(super) fn declared_scope(
     };
     let mut exported = FxHashMap::default();
     for &stmt in &program.body {
-        if let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind {
-            if let Some(ns) = super::decl_classify::namespace_decl(d) {
-                let mut members = Vec::new();
-                walk(ns, None, true, interner, &mut scope, &mut members);
-                exported.insert(Arc::from(interner.resolve(ns.id)), members);
-            }
+        if let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind
+            && let Some(ns) = super::decl_classify::namespace_decl(d)
+        {
+            let mut members = Vec::new();
+            walk(ns, None, true, interner, &mut scope, &mut members);
+            exported.insert(Arc::from(interner.resolve(ns.id)), members);
         }
     }
     (scope, exported)

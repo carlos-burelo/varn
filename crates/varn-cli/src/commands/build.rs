@@ -124,34 +124,34 @@ fn link_native_executable(obj_path: &Path, out_exe: &Path) -> Result<(), CliErro
 }
 
 fn find_lld_link() -> Option<PathBuf> {
-    if let Ok(output) = Command::new("lld-link").arg("--version").output() {
-        if output.status.success() {
-            return Some(PathBuf::from("lld-link"));
-        }
+    if let Ok(output) = Command::new("lld-link").arg("--version").output()
+        && output.status.success()
+    {
+        return Some(PathBuf::from("lld-link"));
     }
 
-    if let Ok(output) = Command::new("rustc").arg("--print").arg("sysroot").output() {
-        if output.status.success() {
-            let sysroot = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            let p1 = Path::new(&sysroot)
-                .join("lib")
-                .join("rustlib")
-                .join("x86_64-pc-windows-msvc")
-                .join("bin")
-                .join("gcc-ld")
-                .join("lld-link.exe");
-            if p1.exists() {
-                return Some(p1);
-            }
-            let p2 = Path::new(&sysroot)
-                .join("lib")
-                .join("rustlib")
-                .join("x86_64-pc-windows-msvc")
-                .join("bin")
-                .join("rust-lld.exe");
-            if p2.exists() {
-                return Some(p2);
-            }
+    if let Ok(output) = Command::new("rustc").arg("--print").arg("sysroot").output()
+        && output.status.success()
+    {
+        let sysroot = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let p1 = Path::new(&sysroot)
+            .join("lib")
+            .join("rustlib")
+            .join("x86_64-pc-windows-msvc")
+            .join("bin")
+            .join("gcc-ld")
+            .join("lld-link.exe");
+        if p1.exists() {
+            return Some(p1);
+        }
+        let p2 = Path::new(&sysroot)
+            .join("lib")
+            .join("rustlib")
+            .join("x86_64-pc-windows-msvc")
+            .join("bin")
+            .join("rust-lld.exe");
+        if p2.exists() {
+            return Some(p2);
         }
     }
 
@@ -172,12 +172,12 @@ fn find_varn_rt_lib() -> Result<PathBuf, CliError> {
         }
     }
 
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let lib_candidate = dir.join("varn_rt.lib");
-            if lib_candidate.exists() {
-                return Ok(lib_candidate);
-            }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        let lib_candidate = dir.join("varn_rt.lib");
+        if lib_candidate.exists() {
+            return Ok(lib_candidate);
         }
     }
 
@@ -206,26 +206,26 @@ fn add_system_lib_paths(cmd: &mut Command) {
     }
 
     let vs_base = Path::new(r"C:\Program Files\Microsoft Visual Studio");
-    if vs_base.exists() {
-        if let Ok(entries) = std::fs::read_dir(vs_base) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                for edition in &[
-                    "Insiders",
-                    "Community",
-                    "Professional",
-                    "Enterprise",
-                    "BuildTools",
-                ] {
-                    let msvc_dir = p.join(edition).join("VC").join("Tools").join("MSVC");
-                    if msvc_dir.exists() {
-                        if let Ok(versions) = std::fs::read_dir(&msvc_dir) {
-                            for ver in versions.flatten() {
-                                let x64_lib = ver.path().join("lib").join("x64");
-                                if x64_lib.exists() {
-                                    cmd.arg(format!("/libpath:{}", x64_lib.display()));
-                                }
-                            }
+    if vs_base.exists()
+        && let Ok(entries) = std::fs::read_dir(vs_base)
+    {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            for edition in &[
+                "Insiders",
+                "Community",
+                "Professional",
+                "Enterprise",
+                "BuildTools",
+            ] {
+                let msvc_dir = p.join(edition).join("VC").join("Tools").join("MSVC");
+                if msvc_dir.exists()
+                    && let Ok(versions) = std::fs::read_dir(&msvc_dir)
+                {
+                    for ver in versions.flatten() {
+                        let x64_lib = ver.path().join("lib").join("x64");
+                        if x64_lib.exists() {
+                            cmd.arg(format!("/libpath:{}", x64_lib.display()));
                         }
                     }
                 }

@@ -1,4 +1,4 @@
-// VN3202
+// expect: error[VN3202]
 class Animal { name: str = "a" }
 function pet<T extends Animal>(x: T): T { return x }
 pet(5)

@@ -22,20 +22,18 @@ pub(super) fn try_print(
             ..
         } => {
             let (object, property, computed) = (*object, *property, *computed);
-            if !computed {
-                if let ExprKind::Identifier { name } = &arena.expr(property).kind {
-                    terminal::log(format!(
-                        "{indent}{marker}{} {}",
-                        chalk("Member").bold(),
-                        chalk(format!(
-                            "{}.{}",
-                            format_expr_short(object, arena, interner),
-                            interner.resolve(*name)
-                        ))
-                        .cyan()
-                    ));
-                    return true;
-                }
+            if !computed && let ExprKind::Identifier { name } = &arena.expr(property).kind {
+                terminal::log(format!(
+                    "{indent}{marker}{} {}",
+                    chalk("Member").bold(),
+                    chalk(format!(
+                        "{}.{}",
+                        format_expr_short(object, arena, interner),
+                        interner.resolve(*name)
+                    ))
+                    .cyan()
+                ));
+                return true;
             }
             terminal::log(format!(
                 "{indent}{marker}{} (computed)",
@@ -45,12 +43,23 @@ pub(super) fn try_print(
             print_expr(property, arena, child_indent, true, interner);
             true
         }
-        ExprKind::Call { callee, args, .. } => {
+        ExprKind::Call {
+            callee,
+            type_args,
+            args,
+            ..
+        } => {
             let callee = *callee;
+            let targs = if type_args.is_empty() {
+                String::new()
+            } else {
+                format!("{}", chalk(format!("<{}>", type_args.len())).dim())
+            };
             terminal::log(format!(
-                "{indent}{marker}{} {}",
+                "{indent}{marker}{} {}{}",
                 chalk("Call").bold(),
-                chalk(format_expr_short(callee, arena, interner)).blue()
+                chalk(format_expr_short(callee, arena, interner)).blue(),
+                targs
             ));
             for (i, a) in args.iter().enumerate() {
                 let e = match a {
@@ -61,12 +70,23 @@ pub(super) fn try_print(
             }
             true
         }
-        ExprKind::New { callee, args, .. } => {
+        ExprKind::New {
+            callee,
+            type_args,
+            args,
+            ..
+        } => {
             let callee = *callee;
+            let targs = if type_args.is_empty() {
+                String::new()
+            } else {
+                format!("{}", chalk(format!("<{}>", type_args.len())).dim())
+            };
             terminal::log(format!(
-                "{indent}{marker}{} {}",
+                "{indent}{marker}{} {}{}",
                 chalk("New").bold(),
-                chalk(format_expr_short(callee, arena, interner)).blue()
+                chalk(format_expr_short(callee, arena, interner)).blue(),
+                targs
             ));
             for (i, a) in args.iter().enumerate() {
                 let e = match a {

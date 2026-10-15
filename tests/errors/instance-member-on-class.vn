@@ -1,3 +1,3 @@
-// VN4106
+// expect: error[VN4106]
 class Counter { count: int = 0 }
 print(Counter.count)

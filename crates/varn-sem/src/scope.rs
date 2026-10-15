@@ -35,7 +35,9 @@ impl CheckerScope {
     }
 
     pub fn define(&mut self, name: Atom, id: SymbolId) {
-        self.bindings.insert(name, id);
+        if let Some(old) = self.bindings.insert(name, id) {
+            self.ordered.retain(|&x| x != old);
+        }
         self.ordered.push(id);
     }
 

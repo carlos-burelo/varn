@@ -105,15 +105,15 @@ pub fn resolve_token(
         return Some(TT_PROPERTY);
     }
 
-    if let Some((sid, ty)) = state.db.resolve_at(state.lexeme(tok), tok.offset) {
-        if sid < state.db.bind.arena.len() {
-            return Some(tt_from_symbol(
-                state,
-                state.db.bind.arena.get(sid).kind,
-                &ty,
-                prev_is_dot,
-            ));
-        }
+    if let Some((sid, ty)) = state.db.resolve_at(state.lexeme(tok), tok.offset)
+        && sid < state.db.bind.arena.len()
+    {
+        return Some(tt_from_symbol(
+            state,
+            state.db.bind.arena.get(sid).kind,
+            &ty,
+            prev_is_dot,
+        ));
     }
 
     if is_lang_type_name(state.lexeme(tok)) {

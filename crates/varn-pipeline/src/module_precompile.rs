@@ -64,11 +64,11 @@ pub fn build_module_graph(
         }
         enqueued.insert(module_path.clone());
 
-        if let Some(provider) = varn_modules::provider::get() {
-            if provider.bytecode_blob(&module_path).is_some() {
-                graph.insert(module_path.clone(), Vec::new());
-                continue;
-            }
+        if let Some(provider) = varn_modules::provider::get()
+            && provider.bytecode_blob(&module_path).is_some()
+        {
+            graph.insert(module_path.clone(), Vec::new());
+            continue;
         }
 
         let source = read_module_source(&module_path)

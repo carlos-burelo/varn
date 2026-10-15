@@ -45,7 +45,88 @@ impl Views {
                             .or_insert_with(|| b.declare_var(types::I64));
                     }
                 }
-                _ => {}
+                SsaOp::ConstInt(_)
+                | SsaOp::ConstFloat(_)
+                | SsaOp::ConstBool(_)
+                | SsaOp::ConstNull
+                | SsaOp::ConstStr(_)
+                | SsaOp::Binary { .. }
+                | SsaOp::Unary { .. }
+                | SsaOp::SelfCall { .. }
+                | SsaOp::Call { .. }
+                | SsaOp::AllocInstance { .. }
+                | SsaOp::LoadGlobalIdx(_)
+                | SsaOp::ArrayGetIndex { .. }
+                | SsaOp::ArraySetIndex { .. }
+                | SsaOp::ConstChar(_)
+                | SsaOp::ConstBigInt(_)
+                | SsaOp::ConstDecimal(_)
+                | SsaOp::MakeEnumVariant { .. }
+                | SsaOp::IntrinsicCall { .. }
+                | SsaOp::LoadNativeGlobalIdx(_)
+                | SsaOp::Try { .. }
+                | SsaOp::PopTry
+                | SsaOp::CatchParam { .. }
+                | SsaOp::StoreGlobalIdx { .. }
+                | SsaOp::MakeClosure { .. }
+                | SsaOp::LoadCaptured { .. }
+                | SsaOp::StoreCaptured { .. }
+                | SsaOp::LoadUpvalue(_)
+                | SsaOp::StoreUpvalue { .. }
+                | SsaOp::CloseUpvalues { .. }
+                | SsaOp::Cast { .. }
+                | SsaOp::Convert { .. }
+                | SsaOp::IsNull { .. }
+                | SsaOp::Typeof { .. }
+                | SsaOp::ToString { .. }
+                | SsaOp::IsArray { .. }
+                | SsaOp::GetEnumTag { .. }
+                | SsaOp::ObjectKeys { .. }
+                | SsaOp::BuildStr { .. }
+                | SsaOp::BuildArray { .. }
+                | SsaOp::BuildMap { .. }
+                | SsaOp::BuildObject { .. }
+                | SsaOp::GetProperty { .. }
+                | SsaOp::SetProperty { .. }
+                | SsaOp::GetIndex { .. }
+                | SsaOp::SetIndex { .. }
+                | SsaOp::ArrayLength { .. }
+                | SsaOp::StrLength { .. }
+                | SsaOp::BytesLength { .. }
+                | SsaOp::MethodCall { .. }
+                | SsaOp::CallNativeOp { .. }
+                | SsaOp::ArrayPush { .. }
+                | SsaOp::This
+                | SsaOp::MakeClass { .. }
+                | SsaOp::DeclareLayout { .. }
+                | SsaOp::DefineMethod { .. }
+                | SsaOp::GetSuper { .. }
+                | SsaOp::LoadGlobal(_)
+                | SsaOp::StoreGlobal { .. }
+                | SsaOp::BuildTuple { .. }
+                | SsaOp::BuildArraySpread { .. }
+                | SsaOp::BuildObjectSpread { .. }
+                | SsaOp::ObjectMerge { .. }
+                | SsaOp::ObjectRest { .. }
+                | SsaOp::GetPropertyMaybe { .. }
+                | SsaOp::AssertNotNull { .. }
+                | SsaOp::BindMethod { .. }
+                | SsaOp::ArrayExtend { .. }
+                | SsaOp::WrapSpread { .. }
+                | SsaOp::Range { .. }
+                | SsaOp::GetSymbol { .. }
+                | SsaOp::IterCall { .. }
+                | SsaOp::SuperCall { .. }
+                | SsaOp::SuperMethodCall { .. }
+                | SsaOp::ExtensionCall { .. }
+                | SsaOp::CallSpread { .. }
+                | SsaOp::LoadModule { .. }
+                | SsaOp::ModuleSlot { .. }
+                | SsaOp::StoreModuleSlot { .. }
+                | SsaOp::Await { .. }
+                | SsaOp::Spawn { .. }
+                | SsaOp::Yield { .. }
+                | SsaOp::Dispose { .. } => {}
             }
         }
         for inst in ssa.blocks.iter().flat_map(|blk| &blk.insts) {

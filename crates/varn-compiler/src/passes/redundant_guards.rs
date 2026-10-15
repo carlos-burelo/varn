@@ -290,17 +290,17 @@ pub fn run(func: &mut SsaFunc) -> bool {
     for (b_id, facts) in &block_facts {
         let block = &mut func.blocks[b_id.0 as usize];
         for inst in &mut block.insts {
-            if let InstKind::IsNull { operand } = &inst.kind {
-                if let Some(fact) = facts.get(operand) {
-                    match fact {
-                        NullFact::Null => {
-                            inst.kind = InstKind::ConstBool(true);
-                            changed = true;
-                        }
-                        NullFact::NonNull => {
-                            inst.kind = InstKind::ConstBool(false);
-                            changed = true;
-                        }
+            if let InstKind::IsNull { operand } = &inst.kind
+                && let Some(fact) = facts.get(operand)
+            {
+                match fact {
+                    NullFact::Null => {
+                        inst.kind = InstKind::ConstBool(true);
+                        changed = true;
+                    }
+                    NullFact::NonNull => {
+                        inst.kind = InstKind::ConstBool(false);
+                        changed = true;
                     }
                 }
             }

@@ -54,12 +54,50 @@ impl<'a> FnEmitter<'a> {
         if is_generator {
             self.yield_ty = match declared {
                 BackendTy::Dynamic(DynReason::Yields(yielded)) => self.tt.get(yielded),
-                other => other,
+                other @ BackendTy::Int
+                | other @ BackendTy::Float
+                | other @ BackendTy::Bool
+                | other @ BackendTy::Char
+                | other @ BackendTy::Str
+                | other @ BackendTy::Bytes
+                | other @ BackendTy::Decimal
+                | other @ BackendTy::BigInt
+                | other @ BackendTy::Array(_)
+                | other @ BackendTy::Map(..)
+                | other @ BackendTy::Dict(_)
+                | other @ BackendTy::Set(_)
+                | other @ BackendTy::Tuple(_)
+                | other @ BackendTy::Class(_)
+                | other @ BackendTy::Enum(_)
+                | other @ BackendTy::Fn(_)
+                | other @ BackendTy::Nullable(_)
+                | other @ BackendTy::Void
+                | other @ BackendTy::Never
+                | other @ BackendTy::Dynamic(_) => other,
             };
         } else if is_async {
             self.return_ty = match declared {
                 BackendTy::Dynamic(DynReason::Awaitable(result)) => self.tt.get(result),
-                other => other,
+                other @ BackendTy::Int
+                | other @ BackendTy::Float
+                | other @ BackendTy::Bool
+                | other @ BackendTy::Char
+                | other @ BackendTy::Str
+                | other @ BackendTy::Bytes
+                | other @ BackendTy::Decimal
+                | other @ BackendTy::BigInt
+                | other @ BackendTy::Array(_)
+                | other @ BackendTy::Map(..)
+                | other @ BackendTy::Dict(_)
+                | other @ BackendTy::Set(_)
+                | other @ BackendTy::Tuple(_)
+                | other @ BackendTy::Class(_)
+                | other @ BackendTy::Enum(_)
+                | other @ BackendTy::Fn(_)
+                | other @ BackendTy::Nullable(_)
+                | other @ BackendTy::Void
+                | other @ BackendTy::Never
+                | other @ BackendTy::Dynamic(_) => other,
             };
         } else {
             self.return_ty = declared;

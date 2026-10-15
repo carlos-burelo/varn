@@ -77,15 +77,15 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
         .map(|p| p.to_path_buf());
 
     for specifier in &state.import_paths {
-        if is_stable_specifier(specifier) {
-            if let Some(cached) = index.module_cache.get(specifier) {
-                index
-                    .reverse_deps
-                    .entry(cached.clone())
-                    .or_default()
-                    .insert(uri.to_owned());
-                continue;
-            }
+        if is_stable_specifier(specifier)
+            && let Some(cached) = index.module_cache.get(specifier)
+        {
+            index
+                .reverse_deps
+                .entry(cached.clone())
+                .or_default()
+                .insert(uri.to_owned());
+            continue;
         }
         let resolved_uri = resolve_specifier_to_uri(specifier, doc_dir.as_deref());
         if let Some(target_uri) = resolved_uri {

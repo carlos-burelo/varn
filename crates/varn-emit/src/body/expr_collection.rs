@@ -135,13 +135,13 @@ impl<'a> FnEmitter<'a> {
     ) -> TirExpr {
         let mut entries = vec![TirObjectEntry::Spread(self.lower_expr(object))];
         for p in properties {
-            if let ObjectProp::Property { key, value, .. } = p {
-                if let Some(name) = prop_key_name(key) {
-                    entries.push(TirObjectEntry::Field {
-                        name,
-                        value: self.lower_expr(*value),
-                    });
-                }
+            if let ObjectProp::Property { key, value, .. } = p
+                && let Some(name) = prop_key_name(key)
+            {
+                entries.push(TirObjectEntry::Field {
+                    name,
+                    value: self.lower_expr(*value),
+                });
             }
         }
         TirExpr {

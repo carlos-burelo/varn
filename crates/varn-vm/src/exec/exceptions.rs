@@ -51,19 +51,19 @@ pub(crate) fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
 
 fn extract_error_message(val: VmValue, heap: &Heap) -> String {
     if val.is_heap() {
-        if let Some(inst) = heap.instance(val.as_heap()) {
-            if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
-                let layout = cls.layout();
-                let message = layout
-                    .get_field("message")
-                    .and_then(|f| inst.read_field(f))
-                    .map(|nv| heap.str_repr(nv));
-                return match message {
-                    Some(msg) if &*cls.name == varn_core::well_known::ERROR => msg,
-                    Some(msg) => format!("{}: {}", cls.name, msg),
-                    None => format!("[{}]", cls.name),
-                };
-            }
+        if let Some(inst) = heap.instance(val.as_heap())
+            && let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id)
+        {
+            let layout = cls.layout();
+            let message = layout
+                .get_field("message")
+                .and_then(|f| inst.read_field(f))
+                .map(|nv| heap.str_repr(nv));
+            return match message {
+                Some(msg) if &*cls.name == varn_core::well_known::ERROR => msg,
+                Some(msg) => format!("{}: {}", cls.name, msg),
+                None => format!("[{}]", cls.name),
+            };
         }
         if let Some(HeapObj::Object(obj_ref)) = heap.get(val.as_heap()) {
             let obj = obj_ref.borrow();
@@ -119,7 +119,7 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         .iter()
         .map(|frame| format!("  at {} ({}:{})", frame.fn_name, frame.file, frame.line))
         .collect();
-    let stack = heap.alloc_str_dynamic(&trace.join(
+    let stack = heap.alloc_str_dynamic(trace.join(
         "
 ",
     ));
@@ -140,38 +140,34 @@ pub(crate) unsafe fn dispatch_to_handler(
     depth: usize,
 ) -> bool {
     let ctx = unsafe { &mut *ctx };
-    if let Some(handler) = (*ctx).try_handlers.pop_if(|h| h.frame_depth > depth) {
+    if let Some(handler) = ctx.try_handlers.pop_if(|h| h.frame_depth > depth) {
         if crate::exec::frame_ctrl::unwind_to_handler(&mut *ctx, handler, thrown_val).is_err() {
             return false;
         }
         return true;
     }
 
-    while (*ctx).frames.len() > depth {
-        let cur_ip = (*ctx).frames.last().unwrap().ip as u32;
-        let proto = &(*ctx).frames.last().unwrap().closure().proto;
+    while ctx.frames.len() > depth {
+        let cur_ip = ctx.frames.last().unwrap().ip as u32;
+        let proto = &ctx.frames.last().unwrap().closure().proto;
         let hit = proto
             .exception_table
             .iter()
             .find(|r| cur_ip >= r.try_start_ip && cur_ip <= r.try_end_ip)
             .map(|r| (r.catch_ip as usize, r.err_reg as usize));
         let Some((catch_ip, err_reg)) = hit else {
-            let popped = (*ctx).frames.pop().unwrap();
+            let popped = ctx.frames.pop().unwrap();
             (*ctx).drop_frame_storage(popped.base);
             continue;
         };
-        let f2 = (*ctx).frames.len() - 1;
-        let b2 = (*ctx).frames[f2].base;
-        let nregs = (*ctx).frames[f2].closure().proto.register_count as usize;
-        (*ctx).stack.ensure_frame_size(b2, nregs);
-        if (*ctx)
-            .stack
-            .unbox_into_reg(b2, err_reg, thrown_val)
-            .is_err()
-        {
+        let f2 = ctx.frames.len() - 1;
+        let b2 = ctx.frames[f2].base;
+        let nregs = ctx.frames[f2].closure().proto.register_count as usize;
+        ctx.stack.ensure_frame_size(b2, nregs);
+        if ctx.stack.unbox_into_reg(b2, err_reg, thrown_val).is_err() {
             return false;
         }
-        (*ctx).frames[f2].ip = catch_ip;
+        ctx.frames[f2].ip = catch_ip;
         return true;
     }
     false

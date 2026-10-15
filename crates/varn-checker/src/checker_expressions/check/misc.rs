@@ -127,10 +127,10 @@ impl<'r> Checker<'r> {
                     )
                     .with_range(range),
                 );
-            } else if self.in_pipeline_rhs {
-                if let Some(ty) = self.pipeline_value_type {
-                    self.record_type(rec, range.start.offset, ty);
-                }
+            } else if self.in_pipeline_rhs
+                && let Some(ty) = self.pipeline_value_type
+            {
+                self.record_type(rec, range.start.offset, ty);
             }
             return;
         }

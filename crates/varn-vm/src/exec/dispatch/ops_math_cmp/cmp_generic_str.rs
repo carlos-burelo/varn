@@ -195,14 +195,13 @@ impl ExecCtx {
             OpCode::BuildStr => {
                 let count = hi(code[*ip]);
                 *ip += 1;
-                let mut out = crate::strbuf::StrBuf::new();
+                let mut parts = Vec::with_capacity(count);
                 for i in 0..count {
                     let reg_idx = hi(code[*ip + i]);
-                    self.heap
-                        .str_repr_into(self.stack.box_reg(base, reg_idx), &mut out);
+                    parts.push(self.stack.box_reg(base, reg_idx));
                 }
                 *ip += count;
-                let r = self.heap.alloc_str_dynamic(out.as_str());
+                let r = crate::exec::strings::str_concat_parts(&parts, &mut self.heap);
                 self.stack.unbox_into_reg(base, first_reg, r)?;
             }
             OpCode::StrLength => {

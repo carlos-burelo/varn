@@ -32,7 +32,10 @@ runtime = [
 varn-core      = { path = "../varn-core" }
 varn-types     = { path = "../varn-types" }
 varn-modules   = { path = "../varn-modules" }
-varn-contract  = { path = "../varn-contract" }
+varn-macros      = { path = "../varn-macros" }
+varn-gpu       = { path = "../varn-gpu" }
+varn-text      = { path = "../varn-text" }
+varn-ui        = { path = "../varn-ui" }
 
 bigdecimal   = { workspace = true, optional = true }
 num-bigint   = { workspace = true, optional = true }

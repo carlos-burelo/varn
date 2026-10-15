@@ -125,13 +125,13 @@ impl ExecCtx {
         }
 
         if let Some(&cached) = unsafe { &*self.modules.get() }.get(&resolved) {
-            if cached.is_heap() {
-                if let Some(HeapObj::FrozenModule(frozen)) = self.heap.get(cached.as_heap()) {
-                    let frozen = frozen.clone();
-                    let thawed = super::module_freeze::thaw_module(&frozen, &mut self.heap);
-                    self.linker.set_done(resolved, thawed);
-                    return Ok(thawed);
-                }
+            if cached.is_heap()
+                && let Some(HeapObj::FrozenModule(frozen)) = self.heap.get(cached.as_heap())
+            {
+                let frozen = frozen.clone();
+                let thawed = super::module_freeze::thaw_module(&frozen, &mut self.heap);
+                self.linker.set_done(resolved, thawed);
+                return Ok(thawed);
             }
             return Ok(cached);
         }
@@ -181,14 +181,14 @@ impl ExecCtx {
         }
 
         let loader = self.loader.clone();
-        if let Some(loader) = loader {
-            if let Ok(Some(proto)) = loader.load(&resolved) {
-                let result = self.eval_module_proto(resolved.clone(), proto);
-                if is_pure {
-                    varn_builtins::build_module(&spec_str, &mut self.heap);
-                }
-                return result;
+        if let Some(loader) = loader
+            && let Ok(Some(proto)) = loader.load(&resolved)
+        {
+            let result = self.eval_module_proto(resolved.clone(), proto);
+            if is_pure {
+                varn_builtins::build_module(&spec_str, &mut self.heap);
             }
+            return result;
         }
 
         Err(RuntimeError::new(format!("module not found: {specifier}")))
@@ -199,16 +199,15 @@ impl ExecCtx {
         resolved: ModuleId,
         proto: std::rc::Rc<varn_types::FunctionProto>,
     ) -> VmResult<VmValue> {
-        if let Some(fs_path) = module_fs_path(&resolved) {
-            if !self
+        if let Some(fs_path) = module_fs_path(&resolved)
+            && !self
                 .capabilities
                 .check_fs_read(std::path::Path::new(fs_path.as_ref()))
-            {
-                return Err(crate::error::RuntimeError::new(format!(
+        {
+            return Err(crate::error::RuntimeError::new(format!(
                     "E_PERMISSION_DENIED: loading module '{}' requires fs.read access (allow with --allow-read)",
                     resolved.as_str()
                 )));
-            }
         }
         let module_base = self.globals_mut().reserve_region(proto.global_count);
 

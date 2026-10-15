@@ -18,12 +18,12 @@ pub(super) fn predecessors(ssa: &SsaProto) -> Vec<Vec<usize>> {
             preds[*s as usize].push(b);
         }
         for inst in &blk.insts {
-            if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op {
-                if let Some(e) = ssa.catch_at(*catch_ip as usize) {
-                    let h = e.block as usize;
-                    if h < preds.len() && !preds[h].contains(&b) {
-                        preds[h].push(b);
-                    }
+            if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op
+                && let Some(e) = ssa.catch_at(*catch_ip as usize)
+            {
+                let h = e.block as usize;
+                if h < preds.len() && !preds[h].contains(&b) {
+                    preds[h].push(b);
                 }
             }
         }
@@ -72,12 +72,12 @@ pub(super) fn order(ssa: &SsaProto, entry: usize) -> Vec<usize> {
             SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => Vec::new(),
         };
         for inst in &ssa.blocks[b].insts {
-            if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op {
-                if let Some(e) = ssa.catch_at(*catch_ip as usize) {
-                    let h = e.block as usize;
-                    if h < n && !succs.contains(&h) {
-                        succs.insert(0, h);
-                    }
+            if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op
+                && let Some(e) = ssa.catch_at(*catch_ip as usize)
+            {
+                let h = e.block as usize;
+                if h < n && !succs.contains(&h) {
+                    succs.insert(0, h);
                 }
             }
         }
@@ -206,7 +206,88 @@ fn block_exit(ssa: &SsaProto, entry: &[usize], b: usize) -> Option<Vec<usize>> {
             varn_types::ssa::SsaOp::PopTry => {
                 stack.pop()?;
             }
-            _ => {}
+            varn_types::ssa::SsaOp::ConstInt(_)
+            | varn_types::ssa::SsaOp::ConstFloat(_)
+            | varn_types::ssa::SsaOp::ConstBool(_)
+            | varn_types::ssa::SsaOp::ConstNull
+            | varn_types::ssa::SsaOp::ConstStr(_)
+            | varn_types::ssa::SsaOp::Binary { .. }
+            | varn_types::ssa::SsaOp::Unary { .. }
+            | varn_types::ssa::SsaOp::SelfCall { .. }
+            | varn_types::ssa::SsaOp::Call { .. }
+            | varn_types::ssa::SsaOp::AllocInstance { .. }
+            | varn_types::ssa::SsaOp::LoadGlobalIdx(_)
+            | varn_types::ssa::SsaOp::ArrayGetIndex { .. }
+            | varn_types::ssa::SsaOp::ArraySetIndex { .. }
+            | varn_types::ssa::SsaOp::ConstChar(_)
+            | varn_types::ssa::SsaOp::ConstBigInt(_)
+            | varn_types::ssa::SsaOp::ConstDecimal(_)
+            | varn_types::ssa::SsaOp::MakeEnumVariant { .. }
+            | varn_types::ssa::SsaOp::IntrinsicCall { .. }
+            | varn_types::ssa::SsaOp::LoadNativeGlobalIdx(_)
+            | varn_types::ssa::SsaOp::CatchParam { .. }
+            | varn_types::ssa::SsaOp::StoreGlobalIdx { .. }
+            | varn_types::ssa::SsaOp::MakeClosure { .. }
+            | varn_types::ssa::SsaOp::LoadCaptured { .. }
+            | varn_types::ssa::SsaOp::StoreCaptured { .. }
+            | varn_types::ssa::SsaOp::LoadUpvalue(_)
+            | varn_types::ssa::SsaOp::StoreUpvalue { .. }
+            | varn_types::ssa::SsaOp::CloseUpvalues { .. }
+            | varn_types::ssa::SsaOp::Cast { .. }
+            | varn_types::ssa::SsaOp::Convert { .. }
+            | varn_types::ssa::SsaOp::IsNull { .. }
+            | varn_types::ssa::SsaOp::Typeof { .. }
+            | varn_types::ssa::SsaOp::ToString { .. }
+            | varn_types::ssa::SsaOp::IsArray { .. }
+            | varn_types::ssa::SsaOp::GetEnumTag { .. }
+            | varn_types::ssa::SsaOp::ObjectKeys { .. }
+            | varn_types::ssa::SsaOp::BuildStr { .. }
+            | varn_types::ssa::SsaOp::BuildArray { .. }
+            | varn_types::ssa::SsaOp::BuildMap { .. }
+            | varn_types::ssa::SsaOp::BuildObject { .. }
+            | varn_types::ssa::SsaOp::GetProperty { .. }
+            | varn_types::ssa::SsaOp::SetProperty { .. }
+            | varn_types::ssa::SsaOp::GetIndex { .. }
+            | varn_types::ssa::SsaOp::SetIndex { .. }
+            | varn_types::ssa::SsaOp::ArrayLength { .. }
+            | varn_types::ssa::SsaOp::StrLength { .. }
+            | varn_types::ssa::SsaOp::BytesLength { .. }
+            | varn_types::ssa::SsaOp::MethodCall { .. }
+            | varn_types::ssa::SsaOp::CallNativeOp { .. }
+            | varn_types::ssa::SsaOp::ArrayPush { .. }
+            | varn_types::ssa::SsaOp::This
+            | varn_types::ssa::SsaOp::GetFixedField { .. }
+            | varn_types::ssa::SsaOp::SetFixedField { .. }
+            | varn_types::ssa::SsaOp::MakeClass { .. }
+            | varn_types::ssa::SsaOp::DeclareLayout { .. }
+            | varn_types::ssa::SsaOp::DefineMethod { .. }
+            | varn_types::ssa::SsaOp::GetSuper { .. }
+            | varn_types::ssa::SsaOp::LoadGlobal(_)
+            | varn_types::ssa::SsaOp::StoreGlobal { .. }
+            | varn_types::ssa::SsaOp::BuildTuple { .. }
+            | varn_types::ssa::SsaOp::BuildArraySpread { .. }
+            | varn_types::ssa::SsaOp::BuildObjectSpread { .. }
+            | varn_types::ssa::SsaOp::ObjectMerge { .. }
+            | varn_types::ssa::SsaOp::ObjectRest { .. }
+            | varn_types::ssa::SsaOp::GetPropertyMaybe { .. }
+            | varn_types::ssa::SsaOp::AssertNotNull { .. }
+            | varn_types::ssa::SsaOp::BindMethod { .. }
+            | varn_types::ssa::SsaOp::ArrayExtend { .. }
+            | varn_types::ssa::SsaOp::WrapSpread { .. }
+            | varn_types::ssa::SsaOp::Range { .. }
+            | varn_types::ssa::SsaOp::GetSymbol { .. }
+            | varn_types::ssa::SsaOp::IterCall { .. }
+            | varn_types::ssa::SsaOp::SuperCall { .. }
+            | varn_types::ssa::SsaOp::SuperMethodCall { .. }
+            | varn_types::ssa::SsaOp::ExtensionCall { .. }
+            | varn_types::ssa::SsaOp::CallSpread { .. }
+            | varn_types::ssa::SsaOp::LoadModule { .. }
+            | varn_types::ssa::SsaOp::ModuleSlot { .. }
+            | varn_types::ssa::SsaOp::StoreModuleSlot { .. }
+            | varn_types::ssa::SsaOp::Await { .. }
+            | varn_types::ssa::SsaOp::Spawn { .. }
+            | varn_types::ssa::SsaOp::Yield { .. }
+            | varn_types::ssa::SsaOp::Dispose { .. } => {}
         }
     }
     Some(stack)
@@ -231,7 +312,88 @@ fn stack_before_try(
             varn_types::ssa::SsaOp::PopTry => {
                 stack.pop()?;
             }
-            _ => {}
+            varn_types::ssa::SsaOp::ConstInt(_)
+            | varn_types::ssa::SsaOp::ConstFloat(_)
+            | varn_types::ssa::SsaOp::ConstBool(_)
+            | varn_types::ssa::SsaOp::ConstNull
+            | varn_types::ssa::SsaOp::ConstStr(_)
+            | varn_types::ssa::SsaOp::Binary { .. }
+            | varn_types::ssa::SsaOp::Unary { .. }
+            | varn_types::ssa::SsaOp::SelfCall { .. }
+            | varn_types::ssa::SsaOp::Call { .. }
+            | varn_types::ssa::SsaOp::AllocInstance { .. }
+            | varn_types::ssa::SsaOp::LoadGlobalIdx(_)
+            | varn_types::ssa::SsaOp::ArrayGetIndex { .. }
+            | varn_types::ssa::SsaOp::ArraySetIndex { .. }
+            | varn_types::ssa::SsaOp::ConstChar(_)
+            | varn_types::ssa::SsaOp::ConstBigInt(_)
+            | varn_types::ssa::SsaOp::ConstDecimal(_)
+            | varn_types::ssa::SsaOp::MakeEnumVariant { .. }
+            | varn_types::ssa::SsaOp::IntrinsicCall { .. }
+            | varn_types::ssa::SsaOp::LoadNativeGlobalIdx(_)
+            | varn_types::ssa::SsaOp::CatchParam { .. }
+            | varn_types::ssa::SsaOp::StoreGlobalIdx { .. }
+            | varn_types::ssa::SsaOp::MakeClosure { .. }
+            | varn_types::ssa::SsaOp::LoadCaptured { .. }
+            | varn_types::ssa::SsaOp::StoreCaptured { .. }
+            | varn_types::ssa::SsaOp::LoadUpvalue(_)
+            | varn_types::ssa::SsaOp::StoreUpvalue { .. }
+            | varn_types::ssa::SsaOp::CloseUpvalues { .. }
+            | varn_types::ssa::SsaOp::Cast { .. }
+            | varn_types::ssa::SsaOp::Convert { .. }
+            | varn_types::ssa::SsaOp::IsNull { .. }
+            | varn_types::ssa::SsaOp::Typeof { .. }
+            | varn_types::ssa::SsaOp::ToString { .. }
+            | varn_types::ssa::SsaOp::IsArray { .. }
+            | varn_types::ssa::SsaOp::GetEnumTag { .. }
+            | varn_types::ssa::SsaOp::ObjectKeys { .. }
+            | varn_types::ssa::SsaOp::BuildStr { .. }
+            | varn_types::ssa::SsaOp::BuildArray { .. }
+            | varn_types::ssa::SsaOp::BuildMap { .. }
+            | varn_types::ssa::SsaOp::BuildObject { .. }
+            | varn_types::ssa::SsaOp::GetProperty { .. }
+            | varn_types::ssa::SsaOp::SetProperty { .. }
+            | varn_types::ssa::SsaOp::GetIndex { .. }
+            | varn_types::ssa::SsaOp::SetIndex { .. }
+            | varn_types::ssa::SsaOp::ArrayLength { .. }
+            | varn_types::ssa::SsaOp::StrLength { .. }
+            | varn_types::ssa::SsaOp::BytesLength { .. }
+            | varn_types::ssa::SsaOp::MethodCall { .. }
+            | varn_types::ssa::SsaOp::CallNativeOp { .. }
+            | varn_types::ssa::SsaOp::ArrayPush { .. }
+            | varn_types::ssa::SsaOp::This
+            | varn_types::ssa::SsaOp::GetFixedField { .. }
+            | varn_types::ssa::SsaOp::SetFixedField { .. }
+            | varn_types::ssa::SsaOp::MakeClass { .. }
+            | varn_types::ssa::SsaOp::DeclareLayout { .. }
+            | varn_types::ssa::SsaOp::DefineMethod { .. }
+            | varn_types::ssa::SsaOp::GetSuper { .. }
+            | varn_types::ssa::SsaOp::LoadGlobal(_)
+            | varn_types::ssa::SsaOp::StoreGlobal { .. }
+            | varn_types::ssa::SsaOp::BuildTuple { .. }
+            | varn_types::ssa::SsaOp::BuildArraySpread { .. }
+            | varn_types::ssa::SsaOp::BuildObjectSpread { .. }
+            | varn_types::ssa::SsaOp::ObjectMerge { .. }
+            | varn_types::ssa::SsaOp::ObjectRest { .. }
+            | varn_types::ssa::SsaOp::GetPropertyMaybe { .. }
+            | varn_types::ssa::SsaOp::AssertNotNull { .. }
+            | varn_types::ssa::SsaOp::BindMethod { .. }
+            | varn_types::ssa::SsaOp::ArrayExtend { .. }
+            | varn_types::ssa::SsaOp::WrapSpread { .. }
+            | varn_types::ssa::SsaOp::Range { .. }
+            | varn_types::ssa::SsaOp::GetSymbol { .. }
+            | varn_types::ssa::SsaOp::IterCall { .. }
+            | varn_types::ssa::SsaOp::SuperCall { .. }
+            | varn_types::ssa::SsaOp::SuperMethodCall { .. }
+            | varn_types::ssa::SsaOp::ExtensionCall { .. }
+            | varn_types::ssa::SsaOp::CallSpread { .. }
+            | varn_types::ssa::SsaOp::LoadModule { .. }
+            | varn_types::ssa::SsaOp::ModuleSlot { .. }
+            | varn_types::ssa::SsaOp::StoreModuleSlot { .. }
+            | varn_types::ssa::SsaOp::Await { .. }
+            | varn_types::ssa::SsaOp::Spawn { .. }
+            | varn_types::ssa::SsaOp::Yield { .. }
+            | varn_types::ssa::SsaOp::Dispose { .. } => {}
         }
     }
     None
@@ -256,16 +418,12 @@ pub(super) fn try_entry_stacks(
             };
             for (ti, inst) in ssa.blocks[b].insts.iter().enumerate() {
                 if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op {
-                    let Some(e) = ssa.catch_at(*catch_ip as usize) else {
-                        return None;
-                    };
+                    let e = ssa.catch_at(*catch_ip as usize)?;
                     let h = e.block as usize;
                     if h >= n {
                         return None;
                     }
-                    let Some(outer) = stack_before_try(ssa, &cur, b, ti) else {
-                        return None;
-                    };
+                    let outer = stack_before_try(ssa, &cur, b, ti)?;
                     match &entry[h] {
                         None => {
                             entry[h] = Some(outer);
@@ -276,9 +434,7 @@ pub(super) fn try_entry_stacks(
                     }
                 }
             }
-            let Some(exit) = block_exit(ssa, &cur, b) else {
-                return None;
-            };
+            let exit = block_exit(ssa, &cur, b)?;
             for s in normal_succs(ssa, b) {
                 if s >= n || !reached[s] {
                     continue;

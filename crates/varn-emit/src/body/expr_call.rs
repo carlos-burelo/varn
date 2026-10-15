@@ -103,23 +103,29 @@ impl<'a> FnEmitter<'a> {
 
     fn lower_args_in_order(&mut self, call_id: AstId, args: &[Arg]) -> Vec<TirArg> {
         match self.m.call_mappings.get(&call_id).cloned() {
-            Some(mapping) => mapping
-                .iter()
-                .map(|opt| match opt {
-                    Some(i) => match &args[*i] {
-                        Arg::Positional(e) | Arg::Named { value: e, .. } => {
-                            TirArg::Expr(self.lower_expr(*e))
-                        }
-                        Arg::Spread(e) => TirArg::Spread(self.lower_expr(*e)),
-                    },
-                    None => TirArg::Expr(TirExpr {
-                        kind: TirExprKind::NullLit,
-                        ty: BackendTy::Dynamic(DynReason::NotYetSupported),
-                        res: Resolution::None,
-                        span: Span::EMPTY,
-                    }),
-                })
-                .collect(),
+            Some(mapping) => {
+                let mut end = mapping.len();
+                while end > 0 && mapping[end - 1].is_none() {
+                    end -= 1;
+                }
+                mapping[..end]
+                    .iter()
+                    .map(|opt| match opt {
+                        Some(i) => match &args[*i] {
+                            Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                                TirArg::Expr(self.lower_expr(*e))
+                            }
+                            Arg::Spread(e) => TirArg::Spread(self.lower_expr(*e)),
+                        },
+                        None => TirArg::Expr(TirExpr {
+                            kind: TirExprKind::NullLit,
+                            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                            res: Resolution::None,
+                            span: Span::EMPTY,
+                        }),
+                    })
+                    .collect()
+            }
             None => args.iter().map(|a| self.lower_arg(a)).collect(),
         }
     }
@@ -151,32 +157,32 @@ impl<'a> FnEmitter<'a> {
         } = &self.ast_arena.expr(callee).kind
         {
             let (object, property) = (*object, *property);
-            if matches!(self.ast_arena.expr(object).kind, ExprKind::Super) {
-                if let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner) {
-                    let targs = self.lower_call_args(call_id, args);
-                    let targs = self.settle_super_args(call_id, &name, targs, span);
-                    let reached = match self.this_class {
-                        Some(_) => None,
-                        None => self.inherited_member(&name, false, span),
-                    };
-                    if let Some(callee) = reached {
-                        return TirExpr {
-                            kind: TirExprKind::Call {
-                                callee: Box::new(callee),
-                                args: targs,
-                            },
-                            ty,
-                            res: Resolution::None,
-                            span,
-                        };
-                    }
+            if matches!(self.ast_arena.expr(object).kind, ExprKind::Super)
+                && let Some(name) = Self::member_name(self.ast_arena, property, self.m.interner)
+            {
+                let targs = self.lower_call_args(call_id, args);
+                let targs = self.settle_super_args(call_id, &name, targs, span);
+                let reached = match self.this_class {
+                    Some(_) => None,
+                    None => self.inherited_member(&name, false, span),
+                };
+                if let Some(callee) = reached {
                     return TirExpr {
-                        kind: TirExprKind::SuperMethodCall { name, args: targs },
+                        kind: TirExprKind::Call {
+                            callee: Box::new(callee),
+                            args: targs,
+                        },
                         ty,
                         res: Resolution::None,
                         span,
                     };
                 }
+                return TirExpr {
+                    kind: TirExprKind::SuperMethodCall { name, args: targs },
+                    ty,
+                    res: Resolution::None,
+                    span,
+                };
             }
         }
 
@@ -457,7 +463,26 @@ fn checked_widen_ty(
 ) -> Option<varn_sem::types::Type> {
     let rest_inner = |param: &varn_sem::output::CheckedParam| match table.get(param.ty.0) {
         varn_core::TypeKind::Array(inner) => Some(varn_sem::types::Type::resolved(inner)),
-        _ => Some(param.ty),
+        varn_core::TypeKind::Primitive(_)
+        | varn_core::TypeKind::Builtin(_)
+        | varn_core::TypeKind::Literal(_)
+        | varn_core::TypeKind::This
+        | varn_core::TypeKind::Union(_)
+        | varn_core::TypeKind::Intersection(_)
+        | varn_core::TypeKind::Tuple(_)
+        | varn_core::TypeKind::Named(..)
+        | varn_core::TypeKind::Generic(..)
+        | varn_core::TypeKind::TemplateLiteral(_)
+        | varn_core::TypeKind::Fn(_)
+        | varn_core::TypeKind::Object(_)
+        | varn_core::TypeKind::Typeof(_)
+        | varn_core::TypeKind::KeyOf(_)
+        | varn_core::TypeKind::IndexedAccess { .. }
+        | varn_core::TypeKind::Mapped { .. }
+        | varn_core::TypeKind::Conditional { .. }
+        | varn_core::TypeKind::Infer(_)
+        | varn_core::TypeKind::EnumVariant { .. }
+        | varn_core::TypeKind::TypePredicate { .. } => Some(param.ty),
     };
     if let Some(param) = checked.get(at) {
         if param.is_rest {

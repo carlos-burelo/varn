@@ -131,10 +131,9 @@ fn walk_expr(e: ExprId, arena: &AstArena, interner: &AtomInterner, out: &mut FxH
         target,
         ..
     } = &arena.expr(e).kind
+        && let Some(name) = this_field_target(*target, arena, interner)
     {
-        if let Some(name) = this_field_target(*target, arena, interner) {
-            out.insert(name);
-        }
+        out.insert(name);
     }
 }
 

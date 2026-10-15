@@ -79,10 +79,10 @@ pub(crate) fn color_with_base(
             let child = reg + offset;
             if let Some(child_range) = ranges_by_vreg.get(&child) {
                 for &n in &child_range.interference {
-                    if let Some(&c) = coloring.get(&(n as u8)) {
-                        if c >= offset {
-                            neighbor_colors.insert(c - offset);
-                        }
+                    if let Some(&c) = coloring.get(&(n as u8))
+                        && c >= offset
+                    {
+                        neighbor_colors.insert(c - offset);
                     }
                 }
             }
@@ -97,13 +97,11 @@ pub(crate) fn color_with_base(
                         .uses
                         .get(&child)
                         .is_some_and(|us| us.iter().any(|&u| u > call_idx));
-                if is_live_across {
-                    if let Some(&c) = coloring.get(&arg_start) {
-                        if c > offset {
-                            max_allowed_color = max_allowed_color.min(c - 1 - offset);
-                        } else {
-                            max_allowed_color = 0;
-                        }
+                if is_live_across && let Some(&c) = coloring.get(&arg_start) {
+                    if c > offset {
+                        max_allowed_color = max_allowed_color.min(c - 1 - offset);
+                    } else {
+                        max_allowed_color = 0;
                     }
                 }
             }

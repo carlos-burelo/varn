@@ -46,10 +46,10 @@ await describe("199 containers are invariant", async () => {
 
     await it("what can only be read still widens", async () => {
         const maybe: Task<int?> = later()
-        const loose: Generator<int | str> = numbers()
+        const tight: Generator<int> = numbers()
         const view: Sized = new Crate()
         let seen = 0
-        for (const value of loose) { seen = seen + 1 }
+        for (const value of tight) { seen = seen + 1 }
         expect(await maybe).toBe(4)
         expect(seen).toBe(2)
         expect(view.size).toBe(3)

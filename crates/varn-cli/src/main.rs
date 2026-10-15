@@ -81,12 +81,12 @@ fn run_cli() {
 
     let cli = Cli::parse_from(effective);
 
-    if !matches!(cli.command, Commands::Lsp(_) | Commands::Doctor) {
-        if let Some(reason) = varn_builtins::std_load_error() {
-            let e = error::CliError::fatal(reason);
-            terminal::error(&e);
-            process::exit(e.exit_code);
-        }
+    if !matches!(cli.command, Commands::Lsp(_) | Commands::Doctor)
+        && let Some(reason) = varn_builtins::std_load_error()
+    {
+        let e = error::CliError::fatal(reason);
+        terminal::error(&e);
+        process::exit(e.exit_code);
     }
 
     varn_vm::alloc_profile::init();
@@ -189,10 +189,11 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
         "--version",
         "-V",
     ];
-    if let Some(first) = args.get(1) {
-        if !SUBCOMMANDS.contains(&first.as_str()) && !first.starts_with('-') {
-            args.insert(1, "run".to_owned());
-        }
+    if let Some(first) = args.get(1)
+        && !SUBCOMMANDS.contains(&first.as_str())
+        && !first.starts_with('-')
+    {
+        args.insert(1, "run".to_owned());
     }
     args
 }

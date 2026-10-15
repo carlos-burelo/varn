@@ -1,4 +1,4 @@
-// VN2007
+// expect: error[VN2007]
 class Meter {
     let unit: str = "m"
 }

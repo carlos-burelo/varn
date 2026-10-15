@@ -1,4 +1,4 @@
-// VN3001
+// expect: error[VN3001]
 interface Tagged { tag: int | str }
 class Point { tag: int = 1 }
 const t: Tagged = new Point()

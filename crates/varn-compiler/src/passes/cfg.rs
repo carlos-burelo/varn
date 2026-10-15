@@ -26,11 +26,11 @@ fn get_reachable(func: &SsaFunc) -> Vec<BlockId> {
         reachable.push(curr);
         let block = func.block(curr);
         for inst in &block.insts {
-            if let InstKind::Try { handler } = &inst.kind {
-                if !visited[handler.0 as usize] {
-                    visited[handler.0 as usize] = true;
-                    queue.push_back(*handler);
-                }
+            if let InstKind::Try { handler } = &inst.kind
+                && !visited[handler.0 as usize]
+            {
+                visited[handler.0 as usize] = true;
+                queue.push_back(*handler);
             }
         }
         for succ in succs(&block.term) {
@@ -65,19 +65,19 @@ fn fold_redundant_branches(func: &mut SsaFunc) -> bool {
             else_blk,
             else_args,
         } = term
+            && then_blk == else_blk
+            && then_args == else_args
         {
-            if then_blk == else_blk && then_args == else_args {
-                func.blocks[b_id.0 as usize].term = Terminator::Jump {
-                    target: then_blk,
-                    args: then_args,
-                };
+            func.blocks[b_id.0 as usize].term = Terminator::Jump {
+                target: then_blk,
+                args: then_args,
+            };
 
-                let preds = &mut func.blocks[then_blk.0 as usize].preds;
-                if let Some(pos) = preds.iter().position(|p| *p == b_id) {
-                    preds.remove(pos);
-                }
-                changed = true;
+            let preds = &mut func.blocks[then_blk.0 as usize].preds;
+            if let Some(pos) = preds.iter().position(|p| *p == b_id) {
+                preds.remove(pos);
             }
+            changed = true;
         }
     }
     changed
@@ -88,82 +88,82 @@ fn jump_forwarding(func: &mut SsaFunc) -> bool {
     let n = func.blocks.len();
     for b_idx in 0..n {
         let b_id = BlockId(b_idx as u32);
-        if func.block(b_id).params.is_empty() && func.block(b_id).insts.is_empty() {
-            if let Terminator::Jump { target: c_id, args } = func.block(b_id).term.clone() {
-                if c_id != b_id {
-                    let b_preds = func.block(b_id).preds.clone();
-                    if b_preds.is_empty() {
-                        continue;
-                    }
+        if func.block(b_id).params.is_empty()
+            && func.block(b_id).insts.is_empty()
+            && let Terminator::Jump { target: c_id, args } = func.block(b_id).term.clone()
+            && c_id != b_id
+        {
+            let b_preds = func.block(b_id).preds.clone();
+            if b_preds.is_empty() {
+                continue;
+            }
 
-                    let mut updates = Vec::new();
-                    for a_id in b_preds {
-                        let a_term = &func.blocks[a_id.0 as usize].term;
-                        match a_term {
-                            Terminator::Jump { target, .. } if *target == b_id => {
-                                updates.push((
-                                    a_id,
-                                    Terminator::Jump {
-                                        target: c_id,
-                                        args: args.clone(),
-                                    },
-                                ));
-                            }
-                            Terminator::Branch {
-                                cond,
-                                then_blk,
-                                then_args,
-                                else_blk,
-                                else_args,
-                            } => {
-                                if *then_blk == b_id || *else_blk == b_id {
-                                    let new_then = if *then_blk == b_id { c_id } else { *then_blk };
-                                    let new_then_args = if *then_blk == b_id {
-                                        args.clone()
-                                    } else {
-                                        then_args.clone()
-                                    };
-                                    let new_else = if *else_blk == b_id { c_id } else { *else_blk };
-                                    let new_else_args = if *else_blk == b_id {
-                                        args.clone()
-                                    } else {
-                                        else_args.clone()
-                                    };
-                                    updates.push((
-                                        a_id,
-                                        Terminator::Branch {
-                                            cond: *cond,
-                                            then_blk: new_then,
-                                            then_args: new_then_args,
-                                            else_blk: new_else,
-                                            else_args: new_else_args,
-                                        },
-                                    ));
-                                }
-                            }
-                            Terminator::Return(_)
-                            | Terminator::Throw(_)
-                            | Terminator::Jump { .. }
-                            | Terminator::Unreachable => {}
+            let mut updates = Vec::new();
+            for a_id in b_preds {
+                let a_term = &func.blocks[a_id.0 as usize].term;
+                match a_term {
+                    Terminator::Jump { target, .. } if *target == b_id => {
+                        updates.push((
+                            a_id,
+                            Terminator::Jump {
+                                target: c_id,
+                                args: args.clone(),
+                            },
+                        ));
+                    }
+                    Terminator::Branch {
+                        cond,
+                        then_blk,
+                        then_args,
+                        else_blk,
+                        else_args,
+                    } => {
+                        if *then_blk == b_id || *else_blk == b_id {
+                            let new_then = if *then_blk == b_id { c_id } else { *then_blk };
+                            let new_then_args = if *then_blk == b_id {
+                                args.clone()
+                            } else {
+                                then_args.clone()
+                            };
+                            let new_else = if *else_blk == b_id { c_id } else { *else_blk };
+                            let new_else_args = if *else_blk == b_id {
+                                args.clone()
+                            } else {
+                                else_args.clone()
+                            };
+                            updates.push((
+                                a_id,
+                                Terminator::Branch {
+                                    cond: *cond,
+                                    then_blk: new_then,
+                                    then_args: new_then_args,
+                                    else_blk: new_else,
+                                    else_args: new_else_args,
+                                },
+                            ));
                         }
                     }
+                    Terminator::Return(_)
+                    | Terminator::Throw(_)
+                    | Terminator::Jump { .. }
+                    | Terminator::Unreachable => {}
+                }
+            }
 
-                    for (a_id, new_term) in &updates {
-                        func.blocks[a_id.0 as usize].term = new_term.clone();
-                        func.blocks[c_id.0 as usize].preds.push(*a_id);
-                        changed = true;
-                    }
+            for (a_id, new_term) in &updates {
+                func.blocks[a_id.0 as usize].term = new_term.clone();
+                func.blocks[c_id.0 as usize].preds.push(*a_id);
+                changed = true;
+            }
 
-                    func.blocks[b_id.0 as usize]
-                        .preds
-                        .retain(|p| !updates.iter().any(|(a_id, _)| a_id == p));
+            func.blocks[b_id.0 as usize]
+                .preds
+                .retain(|p| !updates.iter().any(|(a_id, _)| a_id == p));
 
-                    if func.blocks[b_id.0 as usize].preds.is_empty() {
-                        let c_preds = &mut func.blocks[c_id.0 as usize].preds;
-                        if let Some(pos) = c_preds.iter().position(|p| *p == b_id) {
-                            c_preds.remove(pos);
-                        }
-                    }
+            if func.blocks[b_id.0 as usize].preds.is_empty() {
+                let c_preds = &mut func.blocks[c_id.0 as usize].preds;
+                if let Some(pos) = c_preds.iter().position(|p| *p == b_id) {
+                    c_preds.remove(pos);
                 }
             }
         }
@@ -177,135 +177,135 @@ fn merge_blocks(func: &mut SsaFunc) -> bool {
     for a_idx in 0..n {
         let a_id = BlockId(a_idx as u32);
         let term = func.block(a_id).term.clone();
-        if let Terminator::Jump { target: b_id, args } = term {
-            if b_id != a_id {
-                let b_preds = &func.block(b_id).preds;
-                if b_preds == &[a_id] {
-                    let b_params = func.block(b_id).params.clone();
-                    for (&param, &arg) in b_params.iter().zip(args.iter()) {
-                        func.replace_all_uses(param, arg);
-                    }
-
-                    let b_insts = std::mem::take(&mut func.blocks[b_id.0 as usize].insts);
-                    let b_term = std::mem::replace(
-                        &mut func.blocks[b_id.0 as usize].term,
-                        Terminator::Unreachable,
-                    );
-
-                    let handlers: Vec<BlockId> = b_insts
-                        .iter()
-                        .filter_map(|i| match &i.kind {
-                            InstKind::Try { handler } => Some(*handler),
-                            InstKind::ConstInt(_)
-                            | InstKind::ConstFloat(_)
-                            | InstKind::ConstBool(_)
-                            | InstKind::ConstStr(_)
-                            | InstKind::ConstChar(_)
-                            | InstKind::ConstDecimal(_)
-                            | InstKind::ConstBigInt(_)
-                            | InstKind::ConstNull
-                            | InstKind::Binary { .. }
-                            | InstKind::Unary { .. }
-                            | InstKind::LoadGlobal(_)
-                            | InstKind::LoadGlobalIdx(_)
-                            | InstKind::LoadNativeGlobalIdx(_)
-                            | InstKind::LoadUpvalue(_)
-                            | InstKind::StoreGlobal { .. }
-                            | InstKind::StoreGlobalIdx { .. }
-                            | InstKind::StoreUpvalue { .. }
-                            | InstKind::Call { .. }
-                            | InstKind::AllocInstance { .. }
-                            | InstKind::SelfCall { .. }
-                            | InstKind::GetProperty { .. }
-                            | InstKind::GetFixedField { .. }
-                            | InstKind::GetIndex { .. }
-                            | InstKind::ArrayGetIndex { .. }
-                            | InstKind::MapGetIndex { .. }
-                            | InstKind::SetProperty { .. }
-                            | InstKind::SetFixedField { .. }
-                            | InstKind::SetIndex { .. }
-                            | InstKind::ArraySetIndex { .. }
-                            | InstKind::MapSetIndex { .. }
-                            | InstKind::ArrayPush { .. }
-                            | InstKind::ObjectMerge { .. }
-                            | InstKind::MethodCall { .. }
-                            | InstKind::IsNull { .. }
-                            | InstKind::Cast { .. }
-                            | InstKind::Convert { .. }
-                            | InstKind::BuildArray { .. }
-                            | InstKind::BuildTuple { .. }
-                            | InstKind::BuildObject { .. }
-                            | InstKind::BuildRecord { .. }
-                            | InstKind::BuildMap { .. }
-                            | InstKind::ObjectRest { .. }
-                            | InstKind::ToString { .. }
-                            | InstKind::BuildStr { .. }
-                            | InstKind::MakeClosure { .. }
-                            | InstKind::LoadCaptured { .. }
-                            | InstKind::StoreCaptured { .. }
-                            | InstKind::MakeClass { .. }
-                            | InstKind::DeclareLayout { .. }
-                            | InstKind::DefineStatic { .. }
-                            | InstKind::DefineMethod { .. }
-                            | InstKind::DefineAccessor { .. }
-                            | InstKind::MakeEnumVariant { .. }
-                            | InstKind::PopTry
-                            | InstKind::CatchParam { .. }
-                            | InstKind::CloseUpvalues { .. }
-                            | InstKind::Dispose { .. }
-                            | InstKind::LoadModule { .. }
-                            | InstKind::StoreModuleSlot { .. }
-                            | InstKind::Await { .. }
-                            | InstKind::Spawn { .. }
-                            | InstKind::Yield { .. }
-                            | InstKind::IntrinsicCall { .. }
-                            | InstKind::CallNativeOp { .. }
-                            | InstKind::AssertNotNull { .. }
-                            | InstKind::GetPropertyMaybe { .. }
-                            | InstKind::ModuleSlot { .. }
-                            | InstKind::GetEnumTag { .. }
-                            | InstKind::IsArray { .. }
-                            | InstKind::StrLength { .. }
-                            | InstKind::ArrayLength { .. }
-                            | InstKind::BytesLength { .. }
-                            | InstKind::This
-                            | InstKind::Range { .. }
-                            | InstKind::ObjectKeys { .. }
-                            | InstKind::GetSymbol { .. }
-                            | InstKind::IterCall { .. }
-                            | InstKind::GetSuper { .. }
-                            | InstKind::SuperCall { .. }
-                            | InstKind::SuperMethodCall { .. }
-                            | InstKind::ExtensionCall { .. }
-                            | InstKind::CallSpread { .. }
-                            | InstKind::BuildArraySpread { .. }
-                            | InstKind::BuildObjectSpread { .. } => None,
-                        })
-                        .collect();
-                    func.blocks[a_id.0 as usize].insts.extend(b_insts);
-                    for h in handlers {
-                        for p in &mut func.blocks[h.0 as usize].preds {
-                            if *p == b_id {
-                                *p = a_id;
-                            }
-                        }
-                    }
-
-                    let succs = succs(&b_term);
-                    for s in succs {
-                        let preds = &mut func.blocks[s.0 as usize].preds;
-                        for p in preds {
-                            if *p == b_id {
-                                *p = a_id;
-                            }
-                        }
-                    }
-
-                    func.blocks[b_id.0 as usize].preds.clear();
-
-                    func.blocks[a_id.0 as usize].term = b_term;
-                    changed = true;
+        if let Terminator::Jump { target: b_id, args } = term
+            && b_id != a_id
+        {
+            let b_preds = &func.block(b_id).preds;
+            if b_preds == &[a_id] {
+                let b_params = func.block(b_id).params.clone();
+                for (&param, &arg) in b_params.iter().zip(args.iter()) {
+                    func.replace_all_uses(param, arg);
                 }
+
+                let b_insts = std::mem::take(&mut func.blocks[b_id.0 as usize].insts);
+                let b_term = std::mem::replace(
+                    &mut func.blocks[b_id.0 as usize].term,
+                    Terminator::Unreachable,
+                );
+
+                let handlers: Vec<BlockId> = b_insts
+                    .iter()
+                    .filter_map(|i| match &i.kind {
+                        InstKind::Try { handler } => Some(*handler),
+                        InstKind::ConstInt(_)
+                        | InstKind::ConstFloat(_)
+                        | InstKind::ConstBool(_)
+                        | InstKind::ConstStr(_)
+                        | InstKind::ConstChar(_)
+                        | InstKind::ConstDecimal(_)
+                        | InstKind::ConstBigInt(_)
+                        | InstKind::ConstNull
+                        | InstKind::Binary { .. }
+                        | InstKind::Unary { .. }
+                        | InstKind::LoadGlobal(_)
+                        | InstKind::LoadGlobalIdx(_)
+                        | InstKind::LoadNativeGlobalIdx(_)
+                        | InstKind::LoadUpvalue(_)
+                        | InstKind::StoreGlobal { .. }
+                        | InstKind::StoreGlobalIdx { .. }
+                        | InstKind::StoreUpvalue { .. }
+                        | InstKind::Call { .. }
+                        | InstKind::AllocInstance { .. }
+                        | InstKind::SelfCall { .. }
+                        | InstKind::GetProperty { .. }
+                        | InstKind::GetFixedField { .. }
+                        | InstKind::GetIndex { .. }
+                        | InstKind::ArrayGetIndex { .. }
+                        | InstKind::MapGetIndex { .. }
+                        | InstKind::SetProperty { .. }
+                        | InstKind::SetFixedField { .. }
+                        | InstKind::SetIndex { .. }
+                        | InstKind::ArraySetIndex { .. }
+                        | InstKind::MapSetIndex { .. }
+                        | InstKind::ArrayPush { .. }
+                        | InstKind::ObjectMerge { .. }
+                        | InstKind::MethodCall { .. }
+                        | InstKind::IsNull { .. }
+                        | InstKind::Cast { .. }
+                        | InstKind::Convert { .. }
+                        | InstKind::BuildArray { .. }
+                        | InstKind::BuildTuple { .. }
+                        | InstKind::BuildObject { .. }
+                        | InstKind::BuildRecord { .. }
+                        | InstKind::BuildMap { .. }
+                        | InstKind::ObjectRest { .. }
+                        | InstKind::ToString { .. }
+                        | InstKind::BuildStr { .. }
+                        | InstKind::MakeClosure { .. }
+                        | InstKind::LoadCaptured { .. }
+                        | InstKind::StoreCaptured { .. }
+                        | InstKind::MakeClass { .. }
+                        | InstKind::DeclareLayout { .. }
+                        | InstKind::DefineStatic { .. }
+                        | InstKind::DefineMethod { .. }
+                        | InstKind::DefineAccessor { .. }
+                        | InstKind::MakeEnumVariant { .. }
+                        | InstKind::PopTry
+                        | InstKind::CatchParam { .. }
+                        | InstKind::CloseUpvalues { .. }
+                        | InstKind::Dispose { .. }
+                        | InstKind::LoadModule { .. }
+                        | InstKind::StoreModuleSlot { .. }
+                        | InstKind::Await { .. }
+                        | InstKind::Spawn { .. }
+                        | InstKind::Yield { .. }
+                        | InstKind::IntrinsicCall { .. }
+                        | InstKind::CallNativeOp { .. }
+                        | InstKind::AssertNotNull { .. }
+                        | InstKind::GetPropertyMaybe { .. }
+                        | InstKind::ModuleSlot { .. }
+                        | InstKind::GetEnumTag { .. }
+                        | InstKind::IsArray { .. }
+                        | InstKind::StrLength { .. }
+                        | InstKind::ArrayLength { .. }
+                        | InstKind::BytesLength { .. }
+                        | InstKind::This
+                        | InstKind::Range { .. }
+                        | InstKind::ObjectKeys { .. }
+                        | InstKind::GetSymbol { .. }
+                        | InstKind::IterCall { .. }
+                        | InstKind::GetSuper { .. }
+                        | InstKind::SuperCall { .. }
+                        | InstKind::SuperMethodCall { .. }
+                        | InstKind::ExtensionCall { .. }
+                        | InstKind::CallSpread { .. }
+                        | InstKind::BuildArraySpread { .. }
+                        | InstKind::BuildObjectSpread { .. } => None,
+                    })
+                    .collect();
+                func.blocks[a_id.0 as usize].insts.extend(b_insts);
+                for h in handlers {
+                    for p in &mut func.blocks[h.0 as usize].preds {
+                        if *p == b_id {
+                            *p = a_id;
+                        }
+                    }
+                }
+
+                let succs = succs(&b_term);
+                for s in succs {
+                    let preds = &mut func.blocks[s.0 as usize].preds;
+                    for p in preds {
+                        if *p == b_id {
+                            *p = a_id;
+                        }
+                    }
+                }
+
+                func.blocks[b_id.0 as usize].preds.clear();
+
+                func.blocks[a_id.0 as usize].term = b_term;
+                changed = true;
             }
         }
     }

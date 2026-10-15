@@ -138,10 +138,10 @@ impl<'r> Binder<'r> {
                 None => FxHashSet::default(),
             };
             for field in &candidate_fields {
-                if !guaranteed.contains(field) {
-                    if let Some(m) = members.iter_mut().find(|m| &m.name == field) {
-                        m.is_optional = true;
-                    }
+                if !guaranteed.contains(field)
+                    && let Some(m) = members.iter_mut().find(|m| &m.name == field)
+                {
+                    m.is_optional = true;
                 }
             }
         }

@@ -1,4 +1,4 @@
-// VN4005
+// expect: error[VN4005]
 function f(n: int): int {
     let r = 0
     switch (n) {

@@ -98,19 +98,20 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
                 file_start.elapsed()
             })
             .await;
-        if let Some(elapsed) = elapsed {
-            if super::state::verbose() && elapsed.as_millis() >= SLOW_REQUEST_MS {
-                client
-                    .log_message(
-                        MessageType::Warning,
-                        format!(
-                            "[perf] slow index {} ({}ms)",
-                            abs_path.display(),
-                            elapsed.as_millis()
-                        ),
-                    )
-                    .await;
-            }
+        if let Some(elapsed) = elapsed
+            && super::state::verbose()
+            && elapsed.as_millis() >= SLOW_REQUEST_MS
+        {
+            client
+                .log_message(
+                    MessageType::Warning,
+                    format!(
+                        "[perf] slow index {} ({}ms)",
+                        abs_path.display(),
+                        elapsed.as_millis()
+                    ),
+                )
+                .await;
         }
 
         let done = skipped.len() + idx + 1;
@@ -158,8 +159,8 @@ fn walk_dir(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
                 let path = entry.path();
                 if ft.is_dir() {
                     let name = path.file_name().and_then(|n| n.to_str());
-                    if let Some(n) = name {
-                        if n == ".git"
+                    if let Some(n) = name
+                        && (n == ".git"
                             || n == "target"
                             || n == ".vn"
                             || n == "node_modules"
@@ -167,10 +168,9 @@ fn walk_dir(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
                             || n == ".claude"
                             || n == ".gemini"
                             || n == "dist"
-                            || n == "build"
-                        {
-                            continue;
-                        }
+                            || n == "build")
+                    {
+                        continue;
                     }
                     walk_dir(&path, files);
                 } else if ft.is_file() && path.extension().and_then(|e| e.to_str()) == Some("vn") {

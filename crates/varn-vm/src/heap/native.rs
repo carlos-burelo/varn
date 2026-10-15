@@ -118,10 +118,10 @@ impl NativeCtx for Heap {
             let mut buf = [0u8; 5];
             return Some(std::sync::Arc::from(v.sso_as_str(&mut buf)));
         }
-        if v.is_heap() {
-            if let Some(HeapObj::Str(s)) = self.get(v.as_heap()) {
-                return Some(s.to_shared());
-            }
+        if v.is_heap()
+            && let Some(HeapObj::Str(s)) = self.get(v.as_heap())
+        {
+            return Some(s.to_shared());
         }
         None
     }
@@ -152,10 +152,10 @@ impl NativeCtx for Heap {
             let mut buf = [0u8; 5];
             return v.sso_as_str(&mut buf).is_ascii();
         }
-        if v.is_heap() {
-            if let Some(HeapObj::Str(s)) = self.get(v.as_heap()) {
-                return s.is_ascii();
-            }
+        if v.is_heap()
+            && let Some(HeapObj::Str(s)) = self.get(v.as_heap())
+        {
+            return s.is_ascii();
         }
         false
     }
@@ -193,21 +193,21 @@ impl NativeCtx for Heap {
     }
 
     fn object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
-        if obj.is_heap() {
-            if let Some(HeapObj::Object(o)) = self.get(obj.as_heap()) {
-                let g = o.borrow();
-                for (k, v) in g.iter() {
-                    f(k.as_ref(), v);
-                }
+        if obj.is_heap()
+            && let Some(HeapObj::Object(o)) = self.get(obj.as_heap())
+        {
+            let g = o.borrow();
+            for (k, v) in g.iter() {
+                f(k.as_ref(), v);
             }
         }
     }
 
     fn get_object_shape(&self, obj: VmValue) -> Option<std::rc::Rc<varn_types::Shape>> {
-        if obj.is_heap() {
-            if let Some(HeapObj::Object(o)) = self.get(obj.as_heap()) {
-                return Some(Rc::clone(o.borrow().shape()));
-            }
+        if obj.is_heap()
+            && let Some(HeapObj::Object(o)) = self.get(obj.as_heap())
+        {
+            return Some(Rc::clone(o.borrow().shape()));
         }
         None
     }

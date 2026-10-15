@@ -143,30 +143,29 @@ pub fn build_code_lenses(
         if matches!(
             sym.kind(),
             SymbolKind::Function | SymbolKind::Class | SymbolKind::Interface
-        ) {
-            if let Some(ws) = workspace {
-                let ref_count = count_references(analysis, ws, sym.line(), sym.col());
-                if ref_count > 0 {
-                    let title = if ref_count == 1 {
-                        "1 reference".to_string()
-                    } else {
-                        format!("{} references", ref_count)
-                    };
-                    lenses.push(CodeLens {
-                        range: sym_range,
-                        command: Some(Command {
-                            title,
-                            tooltip: None,
-                            command: "varn.findReferences".to_string(),
-                            arguments: Some(vec![
-                                uri_arg(),
-                                serde_json::Value::from(sym.line()),
-                                serde_json::Value::from(sym.col()),
-                            ]),
-                        }),
-                        data: None,
-                    });
-                }
+        ) && let Some(ws) = workspace
+        {
+            let ref_count = count_references(analysis, ws, sym.line(), sym.col());
+            if ref_count > 0 {
+                let title = if ref_count == 1 {
+                    "1 reference".to_string()
+                } else {
+                    format!("{} references", ref_count)
+                };
+                lenses.push(CodeLens {
+                    range: sym_range,
+                    command: Some(Command {
+                        title,
+                        tooltip: None,
+                        command: "varn.findReferences".to_string(),
+                        arguments: Some(vec![
+                            uri_arg(),
+                            serde_json::Value::from(sym.line()),
+                            serde_json::Value::from(sym.col()),
+                        ]),
+                    }),
+                    data: None,
+                });
             }
         }
     }

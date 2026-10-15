@@ -1,0 +1,41 @@
+import { describe, it, expect } from "std:test";
+
+class LoopProbe {
+    n: int;
+    closed: bool;
+    constructor() {
+        this.n = 0;
+        this.closed = false;
+    }
+    dispose(): void {
+    }
+}
+
+let andFrames = 0;
+let andGo = true;
+using andProbe = new LoopProbe();
+while (andGo && andFrames < 5) {
+    if (andFrames > 2) {
+        break;
+    }
+    andFrames = andFrames + 1;
+}
+
+let fieldFrames = 0;
+using fieldProbe = new LoopProbe();
+while (!fieldProbe.closed && fieldFrames < 5) {
+    if (fieldFrames > 2) {
+        break;
+    }
+    fieldFrames = fieldFrames + 1;
+}
+
+await describe("218 using top-level loops", async () => {
+    await it("and-cond loop with break runs to break", () => {
+        expect(andFrames).toBe(3);
+    });
+
+    await it("field-cond loop with break runs to break", () => {
+        expect(fieldFrames).toBe(3);
+    });
+});

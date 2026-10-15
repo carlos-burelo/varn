@@ -193,13 +193,10 @@ fn compile_source_cached(
     }
 
     let compiled = compile_source(source, path, verbose, &DebugFlags::default(), session, sink)?;
-    if let Err(e) = cache::store_cached_graph(&cache_path, &compiled.graph_artifact) {
-        if verbose {
-            varn_core::term::terminal::tagged(
-                "Varn",
-                format_args!("compile cache write skipped: {e}"),
-            );
-        }
+    if let Err(e) = cache::store_cached_graph(&cache_path, &compiled.graph_artifact)
+        && verbose
+    {
+        varn_core::term::terminal::tagged("Varn", format_args!("compile cache write skipped: {e}"));
     }
     Ok(compiled)
 }

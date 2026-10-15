@@ -39,14 +39,13 @@ impl<'r> super::super::Binder<'r> {
                 !has_explicit_ann && (ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()));
             self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty, has_explicit_ann);
 
-            if let Pattern::Identifier { name, .. } = &d.id {
-                if let Some(init) = d.init {
-                    if let ExprKind::Object { properties } = &self.ast_arena.expr(init).kind {
-                        let fields = self.collect_object_members(properties);
-                        if !fields.is_empty() {
-                            self.type_members.objects.insert(*name, fields);
-                        }
-                    }
+            if let Pattern::Identifier { name, .. } = &d.id
+                && let Some(init) = d.init
+                && let ExprKind::Object { properties } = &self.ast_arena.expr(init).kind
+            {
+                let fields = self.collect_object_members(properties);
+                if !fields.is_empty() {
+                    self.type_members.objects.insert(*name, fields);
                 }
             }
 
@@ -76,12 +75,11 @@ impl<'r> super::super::Binder<'r> {
                     }
                 } else if !has_explicit_ann
                     && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty())
+                    && let Pattern::Identifier { name, .. } = &d.id
                 {
-                    if let Pattern::Identifier { name, .. } = &d.id {
-                        let scope = self.scopes.get(self.current);
-                        if let Some(sym_id) = scope.lookup(*name) {
-                            self.register_array_candidate(sym_id, *name);
-                        }
+                    let scope = self.scopes.get(self.current);
+                    if let Some(sym_id) = scope.lookup(*name) {
+                        self.register_array_candidate(sym_id, *name);
                     }
                 }
                 self.bind_expr(init_expr);

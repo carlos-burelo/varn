@@ -83,13 +83,14 @@ impl<'r> super::super::Binder<'r> {
                                     params,
                                     return_type,
                                     is_arrow,
+                                    type_params,
                                     ..
                                 } if name.as_ref() == key_str => Some(varn_sem::types::Type::fn_(
                                     varn_sem::types::FunctionType {
                                         params: params.clone(),
                                         return_type: *return_type,
                                         is_arrow: *is_arrow,
-                                        type_params: vec![],
+                                        type_params: type_params.clone(),
                                     },
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 )),

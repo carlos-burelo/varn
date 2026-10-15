@@ -177,19 +177,49 @@ impl<'r> Checker<'r> {
             | ExprKind::With { .. }
             | ExprKind::MetaAccess { .. } => None,
         };
-        if let Some(name) = cls_name {
-            if self.abstract_classes.contains(name) {
+        if let Some(name) = cls_name
+            && self.abstract_classes.contains(name)
+        {
+            self.emit(
+                varn_core::Diagnostic::error(
+                    varn_core::ErrorCode::AbstractMethodNotImplemented,
+                    format!("cannot instantiate abstract class '{name}'"),
+                )
+                .with_range(range),
+            );
+        }
+        self.check_expr(rec, callee, bind);
+        let view = varn_sem::bind::BindView::new(bind, self.resolver);
+        if let ExprKind::New { type_args, .. } = &arena.expr(expr).kind
+            && !type_args.is_empty()
+            && let Some(class) = cls_name.as_deref()
+        {
+            let expected = crate::checker_expressions::members::member_util::class_type_params(
+                self.resolver,
+                class,
+                None,
+                bind,
+            );
+            let known = !expected.is_empty()
+                || view.get_class_members(class, None).is_some()
+                || bind
+                    .core
+                    .as_ref()
+                    .is_some_and(|b| b.class_type_params.contains_key(class));
+            if known && expected.len() != type_args.len() {
                 self.emit(
                     varn_core::Diagnostic::error(
-                        varn_core::ErrorCode::AbstractMethodNotImplemented,
-                        format!("cannot instantiate abstract class '{name}'"),
+                        varn_core::ErrorCode::WrongTypeArgCount,
+                        format!(
+                            "wrong number of type arguments: expected {} but got {}",
+                            expected.len(),
+                            type_args.len()
+                        ),
                     )
                     .with_range(range),
                 );
             }
         }
-        self.check_expr(rec, callee, bind);
-        let view = varn_sem::bind::BindView::new(bind, self.resolver);
         let declared = cls_name.and_then(|cn| {
             view.get_class_members(cn, None).and_then(|members| {
                 members
@@ -213,10 +243,10 @@ impl<'r> Checker<'r> {
         self.check_call_args_with_context(rec, args, &ctor_params, bind);
         if instantiated.is_some() {
             self.validate_call_arguments(rec, args, &ctor_params, &range, expr.index(), bind);
-        } else if declared.is_none() {
-            if let Some(params) = self.synthesized_ctor_params(rec, expr, bind) {
-                self.validate_call_arguments(rec, args, &params, &range, expr.index(), bind);
-            }
+        } else if declared.is_none()
+            && let Some(params) = self.synthesized_ctor_params(rec, expr, bind)
+        {
+            self.validate_call_arguments(rec, args, &params, &range, expr.index(), bind);
         }
         self.forget_closure_args(rec, args, bind);
         self.forget_all_members();

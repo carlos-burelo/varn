@@ -31,11 +31,12 @@ impl<'r> Checker<'r> {
                             bind,
                         );
                     }
-                    if let Some(init_expr) = *init {
-                        if let Some(ann) = type_ann {
-                            let prop_ty = self.resolve_type_node_cached(ann, bind);
-                            let key_str = bind.interner.resolve(*key);
-                            self.with_expected(Some(prop_ty), |checker| {
+                    if let Some(init_expr) = *init
+                        && let Some(ann) = type_ann
+                    {
+                        let prop_ty = self.resolve_type_node_cached(ann, bind);
+                        let key_str = bind.interner.resolve(*key);
+                        self.with_expected(Some(prop_ty), |checker| {
                                 checker.check_expr(rec, init_expr, bind);
                                 let init_ty = checker.infer_type(rec, init_expr, bind);
                                 if !checker.value_fits(rec, &prop_ty, &init_ty, Some(init_expr), Some(bind)) {
@@ -50,7 +51,6 @@ impl<'r> Checker<'r> {
                                     );
                                 }
                             });
-                        }
                     }
                 }
                 ClassMember::Constructor {

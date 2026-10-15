@@ -172,45 +172,42 @@ impl<'r> Checker<'r> {
                     | varn_core::ast::ObjectProp::Setter { .. }
             )
         });
-        if !has_methods {
-            if let Some(expected) = self.expected_type {
-                let exp =
-                    expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                let exp_kind = self.ty_table.get(exp.0);
-                let is_index_signature = match exp_kind {
-                    TypeKind::Object(mid) => {
-                        let members = self.ty_table.get_object_members(mid);
-                        members.len() == 1 && matches!(&members[0], ObjectTypeMember::Index { .. })
-                    }
-                    TypeKind::Primitive(_)
-                    | TypeKind::Builtin(_)
-                    | TypeKind::Literal(_)
-                    | TypeKind::This
-                    | TypeKind::Array(_)
-                    | TypeKind::Union(_)
-                    | TypeKind::Intersection(_)
-                    | TypeKind::Tuple(_)
-                    | TypeKind::Named(..)
-                    | TypeKind::Generic(..)
-                    | TypeKind::TemplateLiteral(_)
-                    | TypeKind::Fn(_)
-                    | TypeKind::Typeof(_)
-                    | TypeKind::KeyOf(_)
-                    | TypeKind::IndexedAccess { .. }
-                    | TypeKind::Mapped { .. }
-                    | TypeKind::Conditional { .. }
-                    | TypeKind::Infer(_)
-                    | TypeKind::EnumVariant { .. }
-                    | TypeKind::TypePredicate { .. } => false,
-                };
-                if is_index_signature {
-                    for prop in properties {
-                        if let varn_core::ast::ObjectProp::Property { value, .. } = prop {
-                            self.infer_type(rec, *value, bind);
-                        }
-                    }
-                    return exp;
+        if !has_methods && let Some(expected) = self.expected_type {
+            let exp = expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+            let exp_kind = self.ty_table.get(exp.0);
+            let is_index_signature = match exp_kind {
+                TypeKind::Object(mid) => {
+                    let members = self.ty_table.get_object_members(mid);
+                    members.len() == 1 && matches!(&members[0], ObjectTypeMember::Index { .. })
                 }
+                TypeKind::Primitive(_)
+                | TypeKind::Builtin(_)
+                | TypeKind::Literal(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Union(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Tuple(_)
+                | TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Fn(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Conditional { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => false,
+            };
+            if is_index_signature {
+                for prop in properties {
+                    if let varn_core::ast::ObjectProp::Property { value, .. } = prop {
+                        self.infer_type(rec, *value, bind);
+                    }
+                }
+                return exp;
             }
         }
         let mut members = Vec::new();
@@ -253,6 +250,7 @@ impl<'r> Checker<'r> {
                         return_type: ret.0,
                         optional: false,
                         is_arrow: false,
+                        type_params: Vec::new(),
                     });
                 }
                 varn_core::ast::ObjectProp::Getter { .. }

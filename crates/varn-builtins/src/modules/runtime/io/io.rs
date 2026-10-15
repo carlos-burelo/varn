@@ -1,5 +1,5 @@
 use std::io::Write as IoWrite;
-use varn_contract::varn_contract;
+use varn_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct IoRuntime;
@@ -35,12 +35,11 @@ varn_contract! {
         }
 
         fn readLine(ctx: &mut dyn NativeCtx, prompt: Option<&str>) -> Result<String, String> {
-            if let Some(p) = prompt {
-                if !ctx.print_silent() {
+            if let Some(p) = prompt
+                && !ctx.print_silent() {
                     print!("{p}");
                     let _ = std::io::stdout().flush();
                 }
-            }
             let mut line = String::new();
             std::io::stdin()
                 .read_line(&mut line)
@@ -51,11 +50,12 @@ varn_contract! {
 }
 
 pub fn read_line(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-    if let Some(&p) = args.first() {
-        if !p.is_null() && !ctx.print_silent() {
-            print!("{}", ctx.str_repr_borrowed(p));
-            let _ = std::io::stdout().flush();
-        }
+    if let Some(&p) = args.first()
+        && !p.is_null()
+        && !ctx.print_silent()
+    {
+        print!("{}", ctx.str_repr_borrowed(p));
+        let _ = std::io::stdout().flush();
     }
     let mut line = String::new();
     std::io::stdin()

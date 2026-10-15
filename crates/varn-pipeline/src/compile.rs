@@ -98,12 +98,11 @@ pub fn resolve_import_slots(
                 varn_tir::TirImportKind::Default => std::sync::Arc::from("default"),
                 varn_tir::TirImportKind::Namespace => continue,
             };
-            if let Some(sym) = exports.get(name.as_ref()) {
-                if let Some(slot) = sym.slot_idx {
-                    if slot <= u16::MAX as usize {
-                        spec.slot = Some(slot as u16);
-                    }
-                }
+            if let Some(sym) = exports.get(name.as_ref())
+                && let Some(slot) = sym.slot_idx
+                && slot <= u16::MAX as usize
+            {
+                spec.slot = Some(slot as u16);
             }
         }
     }

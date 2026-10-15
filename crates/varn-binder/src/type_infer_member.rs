@@ -181,12 +181,12 @@ pub(crate) fn infer_member(
                     for v in &variants {
                         let vty =
                             reintern_member_type(Some(ctx), origin_str.as_deref(), v.ty, table);
-                        if let TypeKind::Fn(fid) = table.get(vty.0) {
-                            if let Some(p) = table.get_function(fid).params.iter().find(|p| {
+                        if let TypeKind::Fn(fid) = table.get(vty.0)
+                            && let Some(p) = table.get_function(fid).params.iter().find(|p| {
                                 p.name.as_ref().is_some_and(|pn| pn.as_ref() == prop_name)
-                            }) {
-                                found_tys.push(Type::resolved(p.ty));
-                            }
+                            })
+                        {
+                            found_tys.push(Type::resolved(p.ty));
                         }
                     }
                     if !found_tys.is_empty() {
@@ -198,10 +198,9 @@ pub(crate) fn infer_member(
                     .or_else(|| ctx.get_interface_members(&name_str, origin_str.as_deref()))
                     .or_else(|| ctx.get_namespace_members(&name_str, origin_str.as_deref()))
                     .or_else(|| ctx.get_enum_members(&name_str, origin_str.as_deref()))
+                    && let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name)
                 {
-                    if let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name) {
-                        return reintern_member_type(Some(ctx), origin_str.as_deref(), m.ty, table);
-                    }
+                    return reintern_member_type(Some(ctx), origin_str.as_deref(), m.ty, table);
                 }
             }
             TypeKind::Object(mid) => {

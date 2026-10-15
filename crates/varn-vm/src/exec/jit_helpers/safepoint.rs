@@ -2,7 +2,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow(field = "gc_safepoint")]
+#[varn_macros::jit_slow(field = "gc_safepoint")]
 pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -10,9 +10,9 @@ pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
     }
 }
 
-#[varn_op_macros::jit_slow(field = "assert_not_null")]
+#[varn_macros::jit_slow(field = "assert_not_null")]
 pub(crate) extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, tag: u64, payload: u64) {
-    let val = unsafe { VmValue::from_raw_parts(tag, payload) };
+    let val = VmValue::from_raw_parts(tag, payload);
     if let Err(e) = crate::exec::advanced::assert_not_null(val) {
         unsafe {
             let ctx_ref = &mut *ctx;
@@ -21,7 +21,7 @@ pub(crate) extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, tag: u64, payloa
     }
 }
 
-#[varn_op_macros::jit_slow(field = "close_upvalue")]
+#[varn_macros::jit_slow(field = "close_upvalue")]
 pub(crate) extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;

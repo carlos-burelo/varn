@@ -1,0 +1,9 @@
+import { FunctionRef } from "std:reflect";
+
+export function component(fn: FunctionRef): FunctionRef {
+    return fn;
+}
+
+export function memo(fn: FunctionRef): FunctionRef {
+    return fn;
+}

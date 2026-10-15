@@ -27,10 +27,10 @@ impl<'r> Checker<'r> {
         if let ExprKind::Identifier { name } = &arena.expr(expr).kind {
             let scope = bind.scopes.get(self.current_scope);
             if let Some(id) = scope.resolve(*name, &bind.scopes) {
-                if let Some(stack) = self.narrowed_types.get(&id) {
-                    if let Some(ty) = stack.last() {
-                        return *ty;
-                    }
+                if let Some(stack) = self.narrowed_types.get(&id)
+                    && let Some(ty) = stack.last()
+                {
+                    return *ty;
                 }
                 if let Some(ty) = rec.symbol_types.get(&id).cloned() {
                     return ty;

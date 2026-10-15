@@ -11,6 +11,48 @@ use varn_sem::bind::BindResult;
 use varn_sem::symbol::SymbolKind;
 use varn_sem::types::{FunctionParam, FunctionType, Type};
 
+pub(crate) fn fn_type_param_names(
+    callee: ExprId,
+    ft: &FunctionType,
+    checker: &mut Checker,
+    bind: &BindResult,
+) -> Vec<Arc<str>> {
+    if !ft.type_params.is_empty() {
+        ft.type_params.clone()
+    } else if let ExprKind::Identifier { name } = &checker.ast_arena.expr(callee).kind {
+        checker.symbol_type_params(bind.interner.resolve(*name), SymbolKind::Function, bind)
+    } else {
+        Vec::new()
+    }
+}
+
+pub(crate) fn check_call_type_arg_arity(
+    callee: ExprId,
+    type_args: &[TypeNode],
+    ft: &FunctionType,
+    checker: &mut Checker,
+    range: &varn_core::source::SourceRange,
+    bind: &BindResult,
+) {
+    if type_args.is_empty() {
+        return;
+    }
+    let expected = fn_type_param_names(callee, ft, checker, bind);
+    if expected.len() != type_args.len() {
+        checker.emit(
+            varn_core::Diagnostic::error(
+                varn_core::ErrorCode::WrongTypeArgCount,
+                format!(
+                    "wrong number of type arguments: expected {} but got {}",
+                    expected.len(),
+                    type_args.len()
+                ),
+            )
+            .with_range(*range),
+        );
+    }
+}
+
 pub(crate) fn build_call_mapping(
     callee: ExprId,
     type_args: &[TypeNode],
@@ -20,13 +62,7 @@ pub(crate) fn build_call_mapping(
     rec: &mut Recorder,
     bind: &BindResult,
 ) -> FxHashMap<Arc<str>, Type> {
-    let fn_type_params: Vec<Arc<str>> = if !ft.type_params.is_empty() {
-        ft.type_params.clone()
-    } else if let ExprKind::Identifier { name } = &checker.ast_arena.expr(callee).kind {
-        checker.symbol_type_params(bind.interner.resolve(*name), SymbolKind::Function, bind)
-    } else {
-        Vec::new()
-    };
+    let fn_type_params = fn_type_param_names(callee, ft, checker, bind);
 
     if fn_type_params.is_empty() {
         return FxHashMap::default();
@@ -50,7 +86,10 @@ pub(crate) fn build_call_mapping(
         }
         mapping
     } else {
-        FxHashMap::default()
+        fn_type_params
+            .iter()
+            .map(|k| (k.clone(), Type::Dynamic))
+            .collect()
     }
 }
 
@@ -64,7 +103,42 @@ pub(crate) fn infer_mapping_from_args(
 ) -> FxHashMap<Arc<str>, Type> {
     let mut mapping = FxHashMap::default();
 
-    for (param, arg) in param_types.iter().zip(args.iter()) {
+    let mut taken = vec![false; param_types.len()];
+    for arg in args.iter() {
+        if let Arg::Named { label, .. } = arg
+            && let Some(idx) = param_types
+                .iter()
+                .position(|p| p.name.as_deref() == Some(label.as_str()))
+        {
+            taken[idx] = true;
+        }
+    }
+    let mut aligned: Vec<(&FunctionParam, &Arg)> = Vec::new();
+    let mut positional_idx = 0usize;
+    for arg in args.iter() {
+        match arg {
+            Arg::Named { label, .. } => {
+                if let Some(idx) = param_types
+                    .iter()
+                    .position(|p| p.name.as_deref() == Some(label.as_str()))
+                {
+                    aligned.push((&param_types[idx], arg));
+                }
+            }
+            Arg::Positional(_) => {
+                while positional_idx < param_types.len() && taken[positional_idx] {
+                    positional_idx += 1;
+                }
+                if let Some(param) = param_types.get(positional_idx) {
+                    aligned.push((param, arg));
+                }
+                positional_idx += 1;
+            }
+            Arg::Spread(_) => {}
+        }
+    }
+
+    for (param, arg) in aligned.iter().copied() {
         let is_arrow = match arg {
             Arg::Positional(e) => matches!(checker.ast_arena.expr(*e).kind, ExprKind::Arrow { .. }),
             Arg::Named { value, .. } => {
@@ -90,7 +164,7 @@ pub(crate) fn infer_mapping_from_args(
         );
     }
 
-    for (param, arg) in param_types.iter().zip(args.iter()) {
+    for (param, arg) in aligned.iter().copied() {
         let is_arrow = match arg {
             Arg::Positional(e) => matches!(checker.ast_arena.expr(*e).kind, ExprKind::Arrow { .. }),
             Arg::Named { value, .. } => {
@@ -104,7 +178,7 @@ pub(crate) fn infer_mapping_from_args(
 
         let mapped_param_ty = map_generics_cached(checker, &Type::resolved(param.ty), &mapping);
         let arg_ty = match arg {
-            Arg::Positional(e) => {
+            Arg::Positional(e) | Arg::Named { value: e, .. } => {
                 let mapped_kind = checker.ty_table.get(mapped_param_ty.0);
                 if let TypeKind::Fn(fid) = mapped_kind {
                     let expected_fn = checker.ty_table.get_function(fid).clone();
@@ -124,7 +198,6 @@ pub(crate) fn infer_mapping_from_args(
                 }
                 checker.infer_type(rec, *e, bind)
             }
-            Arg::Named { value, .. } => checker.infer_type(rec, *value, bind),
             Arg::Spread(_) => continue,
         };
         collect_type_inferences(

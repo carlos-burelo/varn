@@ -4,7 +4,26 @@ use crate::types::{CheckerTyTable, Type};
 pub fn canonicalize_lang_named(ty: Type, table: &mut CheckerTyTable) -> Type {
     let (name_atom, origin_atom) = match table.get(ty.0) {
         varn_core::TypeKind::Named(n, o) => (n, o),
-        _ => return ty,
+        varn_core::TypeKind::Primitive(_)
+        | varn_core::TypeKind::Builtin(_)
+        | varn_core::TypeKind::Literal(_)
+        | varn_core::TypeKind::This
+        | varn_core::TypeKind::Array(_)
+        | varn_core::TypeKind::Union(_)
+        | varn_core::TypeKind::Intersection(_)
+        | varn_core::TypeKind::Tuple(_)
+        | varn_core::TypeKind::Generic(..)
+        | varn_core::TypeKind::TemplateLiteral(_)
+        | varn_core::TypeKind::Fn(_)
+        | varn_core::TypeKind::Object(_)
+        | varn_core::TypeKind::Typeof(_)
+        | varn_core::TypeKind::KeyOf(_)
+        | varn_core::TypeKind::IndexedAccess { .. }
+        | varn_core::TypeKind::Mapped { .. }
+        | varn_core::TypeKind::Conditional { .. }
+        | varn_core::TypeKind::Infer(_)
+        | varn_core::TypeKind::EnumVariant { .. }
+        | varn_core::TypeKind::TypePredicate { .. } => return ty,
     };
     let Some(origin) = origin_atom else {
         return ty;
@@ -13,15 +32,15 @@ pub fn canonicalize_lang_named(ty: Type, table: &mut CheckerTyTable) -> Type {
         return ty;
     };
     let (name_s, origin_s) = (name_s.to_string(), origin_s.to_string());
-    if let Some(b) = varn_core::BuiltinType::from_str(&name_s) {
-        if origin_s == b.core_module() {
-            return Type::builtin(b, table);
-        }
+    if let Some(b) = varn_core::BuiltinType::from_str(&name_s)
+        && origin_s == b.core_module()
+    {
+        return Type::builtin(b, table);
     }
-    if let Some(p) = varn_core::LangPrimitive::from_str(&name_s) {
-        if Some(origin_s.as_str()) == p.core_module() {
-            return Type::primitive(p, table);
-        }
+    if let Some(p) = varn_core::LangPrimitive::from_str(&name_s)
+        && Some(origin_s.as_str()) == p.core_module()
+    {
+        return Type::primitive(p, table);
     }
     ty
 }

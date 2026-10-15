@@ -37,6 +37,7 @@ pub(super) fn lower_top_level(
     )
     .into_top_level();
     let mut class_ord: u32 = 0;
+    top.push_dispose_frame();
     for &stmt in &program.body {
         match &ast_arena.stmt(stmt).kind {
             StmtKind::Decl(d) if class_decl(d).is_some() || enum_decl(d).is_some() => {
@@ -111,5 +112,6 @@ pub(super) fn lower_top_level(
             | StmtKind::Debugger => top_body.extend(top.lower_stmt_as_block(stmt)),
         }
     }
+    top_body.extend(top.drain_dispose_frame());
     (std::mem::take(&mut top.locals), top.saw_await(), top_body)
 }

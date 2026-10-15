@@ -26,10 +26,10 @@ pub fn expr_satisfies_target_type(
             interner,
         );
     }
-    if let Some(value) = const_int_value(arena, expr) {
-        if int_literal_adopts(target_ty, value, table) {
-            return true;
-        }
+    if let Some(value) = const_int_value(arena, expr)
+        && int_literal_adopts(target_ty, value, table)
+    {
+        return true;
     }
     if literal_expr_admitted(target_ty, arena, expr, table, interner) {
         return true;

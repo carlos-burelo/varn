@@ -3,7 +3,7 @@ use super::suspend::jit_suspend_at;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow(field = "load_module")]
+#[varn_macros::jit_slow(field = "load_module")]
 pub(crate) extern "C" fn jit_load_module(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -39,7 +39,7 @@ pub(crate) extern "C" fn jit_load_module(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "load_module_slot")]
+#[varn_macros::jit_slow(field = "load_module_slot")]
 pub(crate) extern "C" fn jit_load_module_slot(
     ctx: *mut ExecCtx,
     mod_tag: u64,
@@ -61,7 +61,7 @@ pub(crate) extern "C" fn jit_load_module_slot(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "store_module_slot")]
+#[varn_macros::jit_slow(field = "store_module_slot")]
 pub(crate) extern "C" fn jit_store_module_slot(
     ctx: *mut ExecCtx,
     slot_idx: usize,

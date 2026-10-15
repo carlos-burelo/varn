@@ -79,7 +79,6 @@ fn is_one(def: &[Option<&SsaOp>], ranges: &FxHashMap<u32, (i128, i128)>, v: u32)
 }
 
 struct Check {
-    param: u32,
     bound: i128,
     below: bool,
     le: bool,
@@ -107,14 +106,12 @@ fn header_check(
         SsaBinOp::IntLt | SsaBinOp::IntLe => {
             if *lhs == param {
                 Some(Check {
-                    param,
                     bound: as_const(ranges, *rhs)?,
                     below: true,
                     le,
                 })
             } else if *rhs == param {
                 Some(Check {
-                    param,
                     bound: as_const(ranges, *lhs)?,
                     below: false,
                     le,
@@ -126,14 +123,12 @@ fn header_check(
         SsaBinOp::IntGt | SsaBinOp::IntGe => {
             if *lhs == param {
                 Some(Check {
-                    param,
                     bound: as_const(ranges, *rhs)?,
                     below: false,
                     le,
                 })
             } else if *rhs == param {
                 Some(Check {
-                    param,
                     bound: as_const(ranges, *lhs)?,
                     below: true,
                     le,
@@ -142,7 +137,34 @@ fn header_check(
                 None
             }
         }
-        _ => None,
+        SsaBinOp::IntAdd
+        | SsaBinOp::IntSub
+        | SsaBinOp::IntMul
+        | SsaBinOp::IntDiv
+        | SsaBinOp::IntMod
+        | SsaBinOp::IntPow
+        | SsaBinOp::IntEq
+        | SsaBinOp::IntNe
+        | SsaBinOp::IntAnd
+        | SsaBinOp::IntOr
+        | SsaBinOp::IntXor
+        | SsaBinOp::IntShl
+        | SsaBinOp::IntShr
+        | SsaBinOp::IntUshr
+        | SsaBinOp::FloatAdd
+        | SsaBinOp::FloatSub
+        | SsaBinOp::FloatMul
+        | SsaBinOp::FloatDiv
+        | SsaBinOp::FloatMod
+        | SsaBinOp::FloatPow
+        | SsaBinOp::FloatEq
+        | SsaBinOp::FloatNe
+        | SsaBinOp::FloatLt
+        | SsaBinOp::FloatLe
+        | SsaBinOp::FloatGt
+        | SsaBinOp::FloatGe
+        | SsaBinOp::StrConcat
+        | SsaBinOp::Dyn(_) => None,
     }
 }
 
@@ -239,10 +261,10 @@ pub(super) fn analyze(
 
     let mut ranges: FxHashMap<u32, (i128, i128)> = FxHashMap::default();
     for (v, op) in def.iter().enumerate() {
-        if let Some(SsaOp::ConstInt(c)) = op {
-            if ssa.value_ty(v as u32) == SlotKind::Int {
-                ranges.insert(v as u32, (*c as i128, *c as i128));
-            }
+        if let Some(SsaOp::ConstInt(c)) = op
+            && ssa.value_ty(v as u32) == SlotKind::Int
+        {
+            ranges.insert(v as u32, (*c as i128, *c as i128));
         }
     }
 
@@ -268,12 +290,12 @@ pub(super) fn analyze(
                 if ssa.value_ty(p) != SlotKind::Int {
                     continue;
                 }
-                let latched = bodies.get(&b).is_some();
+                let latched = bodies.contains_key(&b);
                 let mut elo: Option<i128> = None;
                 let mut ehi: Option<i128> = None;
                 let mut ok = true;
                 for pred in preds[b].iter().filter(|p| reached[**p]) {
-                    let pred_in_body = bodies.get(&b).map_or(false, |bd| bd.contains(pred));
+                    let pred_in_body = bodies.get(&b).is_some_and(|bd| bd.contains(pred));
                     if latched && pred_in_body {
                         continue;
                     }
@@ -304,7 +326,7 @@ pub(super) fn analyze(
                 let entry = (l, h);
                 if latched {
                     for pred in preds[b].iter().filter(|p| reached[**p]) {
-                        let pred_in_body = bodies.get(&b).map_or(false, |bd| bd.contains(pred));
+                        let pred_in_body = bodies.get(&b).is_some_and(|bd| bd.contains(pred));
                         if !pred_in_body {
                             continue;
                         }
@@ -363,13 +385,41 @@ pub(super) fn analyze(
                     SsaBinOp::IntAdd => add_range(a, c),
                     SsaBinOp::IntSub => sub_range(a, c),
                     SsaBinOp::IntMul => mul_range(a, c),
-                    _ => None,
+                    SsaBinOp::IntDiv
+                    | SsaBinOp::IntMod
+                    | SsaBinOp::IntPow
+                    | SsaBinOp::IntEq
+                    | SsaBinOp::IntNe
+                    | SsaBinOp::IntLt
+                    | SsaBinOp::IntLe
+                    | SsaBinOp::IntGt
+                    | SsaBinOp::IntGe
+                    | SsaBinOp::IntAnd
+                    | SsaBinOp::IntOr
+                    | SsaBinOp::IntXor
+                    | SsaBinOp::IntShl
+                    | SsaBinOp::IntShr
+                    | SsaBinOp::IntUshr
+                    | SsaBinOp::FloatAdd
+                    | SsaBinOp::FloatSub
+                    | SsaBinOp::FloatMul
+                    | SsaBinOp::FloatDiv
+                    | SsaBinOp::FloatMod
+                    | SsaBinOp::FloatPow
+                    | SsaBinOp::FloatEq
+                    | SsaBinOp::FloatNe
+                    | SsaBinOp::FloatLt
+                    | SsaBinOp::FloatLe
+                    | SsaBinOp::FloatGt
+                    | SsaBinOp::FloatGe
+                    | SsaBinOp::StrConcat
+                    | SsaBinOp::Dyn(_) => None,
                 };
-                if let Some(r) = r {
-                    if ranges.get(&d) != Some(&r) {
-                        ranges.insert(d, r);
-                        changed = true;
-                    }
+                if let Some(r) = r
+                    && ranges.get(&d) != Some(&r)
+                {
+                    ranges.insert(d, r);
+                    changed = true;
                 }
             }
         }
@@ -411,7 +461,7 @@ pub(super) fn analyze(
 }
 
 fn step_contrib(
-    ssa: &SsaProto,
+    _ssa: &SsaProto,
     def: &[Option<&SsaOp>],
     ranges: &FxHashMap<u32, (i128, i128)>,
     checks: &FxHashMap<(usize, u32), Check>,
@@ -514,16 +564,45 @@ fn version_plans(
                     let r = match op {
                         SsaBinOp::IntAdd => add_range(a, c),
                         SsaBinOp::IntSub => sub_range(a, c),
-                        _ => mul_range(a, c),
+                        SsaBinOp::IntMul
+                        | SsaBinOp::IntDiv
+                        | SsaBinOp::IntMod
+                        | SsaBinOp::IntPow
+                        | SsaBinOp::IntEq
+                        | SsaBinOp::IntNe
+                        | SsaBinOp::IntLt
+                        | SsaBinOp::IntLe
+                        | SsaBinOp::IntGt
+                        | SsaBinOp::IntGe
+                        | SsaBinOp::IntAnd
+                        | SsaBinOp::IntOr
+                        | SsaBinOp::IntXor
+                        | SsaBinOp::IntShl
+                        | SsaBinOp::IntShr
+                        | SsaBinOp::IntUshr
+                        | SsaBinOp::FloatAdd
+                        | SsaBinOp::FloatSub
+                        | SsaBinOp::FloatMul
+                        | SsaBinOp::FloatDiv
+                        | SsaBinOp::FloatMod
+                        | SsaBinOp::FloatPow
+                        | SsaBinOp::FloatEq
+                        | SsaBinOp::FloatNe
+                        | SsaBinOp::FloatLt
+                        | SsaBinOp::FloatLe
+                        | SsaBinOp::FloatGt
+                        | SsaBinOp::FloatGe
+                        | SsaBinOp::StrConcat
+                        | SsaBinOp::Dyn(_) => mul_range(a, c),
                     };
-                    if let Some(r) = r {
-                        if narrowed.get(&d) != Some(&r) {
-                            if r.0 > r.1 {
-                                return Vec::new();
-                            }
-                            narrowed.insert(d, r);
-                            changed = true;
+                    if let Some(r) = r
+                        && narrowed.get(&d) != Some(&r)
+                    {
+                        if r.0 > r.1 {
+                            return Vec::new();
                         }
+                        narrowed.insert(d, r);
+                        changed = true;
                     }
                 }
             }
@@ -599,7 +678,7 @@ fn version_plans(
                             ok = false;
                             break;
                         }
-                        if dblk[*object as usize].map_or(true, |db| body.contains(&db)) {
+                        if dblk[*object as usize].is_none_or(|db| body.contains(&db)) {
                             ok = false;
                             break;
                         }
@@ -609,7 +688,88 @@ fn version_plans(
                             .and_modify(|m| *m = (*m).max(hi + 1))
                             .or_insert(hi + 1);
                     }
-                    _ => {}
+                    SsaOp::ConstInt(_)
+                    | SsaOp::ConstFloat(_)
+                    | SsaOp::ConstBool(_)
+                    | SsaOp::ConstNull
+                    | SsaOp::ConstStr(_)
+                    | SsaOp::Binary { .. }
+                    | SsaOp::Unary { .. }
+                    | SsaOp::SelfCall { .. }
+                    | SsaOp::Call { .. }
+                    | SsaOp::AllocInstance { .. }
+                    | SsaOp::LoadGlobalIdx(_)
+                    | SsaOp::ConstChar(_)
+                    | SsaOp::ConstBigInt(_)
+                    | SsaOp::ConstDecimal(_)
+                    | SsaOp::MakeEnumVariant { .. }
+                    | SsaOp::IntrinsicCall { .. }
+                    | SsaOp::LoadNativeGlobalIdx(_)
+                    | SsaOp::Try { .. }
+                    | SsaOp::PopTry
+                    | SsaOp::CatchParam { .. }
+                    | SsaOp::StoreGlobalIdx { .. }
+                    | SsaOp::MakeClosure { .. }
+                    | SsaOp::LoadCaptured { .. }
+                    | SsaOp::StoreCaptured { .. }
+                    | SsaOp::LoadUpvalue(_)
+                    | SsaOp::StoreUpvalue { .. }
+                    | SsaOp::CloseUpvalues { .. }
+                    | SsaOp::Cast { .. }
+                    | SsaOp::Convert { .. }
+                    | SsaOp::IsNull { .. }
+                    | SsaOp::Typeof { .. }
+                    | SsaOp::ToString { .. }
+                    | SsaOp::IsArray { .. }
+                    | SsaOp::GetEnumTag { .. }
+                    | SsaOp::ObjectKeys { .. }
+                    | SsaOp::BuildStr { .. }
+                    | SsaOp::BuildArray { .. }
+                    | SsaOp::BuildMap { .. }
+                    | SsaOp::BuildObject { .. }
+                    | SsaOp::GetProperty { .. }
+                    | SsaOp::SetProperty { .. }
+                    | SsaOp::GetIndex { .. }
+                    | SsaOp::SetIndex { .. }
+                    | SsaOp::ArrayLength { .. }
+                    | SsaOp::StrLength { .. }
+                    | SsaOp::BytesLength { .. }
+                    | SsaOp::MethodCall { .. }
+                    | SsaOp::CallNativeOp { .. }
+                    | SsaOp::ArrayPush { .. }
+                    | SsaOp::This
+                    | SsaOp::GetFixedField { .. }
+                    | SsaOp::SetFixedField { .. }
+                    | SsaOp::MakeClass { .. }
+                    | SsaOp::DeclareLayout { .. }
+                    | SsaOp::DefineMethod { .. }
+                    | SsaOp::GetSuper { .. }
+                    | SsaOp::LoadGlobal(_)
+                    | SsaOp::StoreGlobal { .. }
+                    | SsaOp::BuildTuple { .. }
+                    | SsaOp::BuildArraySpread { .. }
+                    | SsaOp::BuildObjectSpread { .. }
+                    | SsaOp::ObjectMerge { .. }
+                    | SsaOp::ObjectRest { .. }
+                    | SsaOp::GetPropertyMaybe { .. }
+                    | SsaOp::AssertNotNull { .. }
+                    | SsaOp::BindMethod { .. }
+                    | SsaOp::ArrayExtend { .. }
+                    | SsaOp::WrapSpread { .. }
+                    | SsaOp::Range { .. }
+                    | SsaOp::GetSymbol { .. }
+                    | SsaOp::IterCall { .. }
+                    | SsaOp::SuperCall { .. }
+                    | SsaOp::SuperMethodCall { .. }
+                    | SsaOp::ExtensionCall { .. }
+                    | SsaOp::CallSpread { .. }
+                    | SsaOp::LoadModule { .. }
+                    | SsaOp::ModuleSlot { .. }
+                    | SsaOp::StoreModuleSlot { .. }
+                    | SsaOp::Await { .. }
+                    | SsaOp::Spawn { .. }
+                    | SsaOp::Yield { .. }
+                    | SsaOp::Dispose { .. } => {}
                 }
             }
             if !ok {

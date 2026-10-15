@@ -16,29 +16,28 @@ impl<'r> Checker<'r> {
         out: &mut Vec<(SymbolId, Type)>,
     ) {
         let arena = self.ast_arena;
-        if op == BinaryOp::Instanceof {
-            if let (ExprKind::Identifier { name }, ExprKind::Identifier { name: class_name }) =
+        if op == BinaryOp::Instanceof
+            && let (ExprKind::Identifier { name }, ExprKind::Identifier { name: class_name }) =
                 (&arena.expr(left).kind, &arena.expr(right).kind)
-            {
-                let (name, class_name) = (*name, *class_name);
-                let scope = bind.scopes.get(self.current_scope);
-                if let Some(id) = scope.resolve(name, &bind.scopes) {
-                    let class_name_str = bind.interner.resolve(class_name).to_string();
-                    if is_true_branch {
-                        let named = Type::named(
-                            class_name_str,
-                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        );
-                        out.push((id, named));
-                    } else if let Some(ty) = self.narrowing_base(id, bind.arena.get(id).ty) {
-                        let class_name_atom = varn_core::Atom::of(&class_name_str);
-                        let narrowed = ty.minus_named(
-                            class_name_atom,
-                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                        );
-                        if bind.interner.get("_") == Some(name) {
-                            out.push((id, narrowed));
-                        }
+        {
+            let (name, class_name) = (*name, *class_name);
+            let scope = bind.scopes.get(self.current_scope);
+            if let Some(id) = scope.resolve(name, &bind.scopes) {
+                let class_name_str = bind.interner.resolve(class_name).to_string();
+                if is_true_branch {
+                    let named = Type::named(
+                        class_name_str,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    out.push((id, named));
+                } else if let Some(ty) = self.narrowing_base(id, bind.arena.get(id).ty) {
+                    let class_name_atom = varn_core::Atom::of(&class_name_str);
+                    let narrowed = ty.minus_named(
+                        class_name_atom,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    if bind.interner.get("_") == Some(name) {
+                        out.push((id, narrowed));
                     }
                 }
             }

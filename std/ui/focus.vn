@@ -1,0 +1,60 @@
+export class Focus {
+    private _ids: int[];
+    private _idx: int;
+
+    constructor() {
+        this._ids = [];
+        this._idx = -1;
+    }
+
+    claim(id: int): void {
+        let at = -1;
+        for (let i = 0; i < this._ids.length; i = i + 1) {
+            if (this._ids[i] == id) {
+                at = i;
+            }
+        }
+        if (at < 0) {
+            this._ids.push(id);
+            at = this._ids.length - 1;
+        }
+        this._idx = at;
+    }
+
+    has(id: int): bool {
+        for (let i = 0; i < this._ids.length; i = i + 1) {
+            if (this._ids[i] == id) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    current(): int {
+        if (this._idx < 0 || this._idx >= this._ids.length) {
+            return -1;
+        }
+        return this._ids[this._idx];
+    }
+
+    next(): void {
+        if (this._ids.length > 0) {
+            this._idx = (this._idx + 1) % this._ids.length;
+        }
+    }
+
+    prev(): void {
+        if (this._ids.length > 0) {
+            this._idx = (this._idx - 1 + this._ids.length) % this._ids.length;
+        }
+    }
+
+    clear(): void {
+        this._ids = [];
+        this._idx = -1;
+    }
+
+    get size(): int {
+        return this._ids.length;
+    }
+}

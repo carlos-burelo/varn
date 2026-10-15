@@ -8,6 +8,17 @@ use varn_core::AtomInterner;
 use super::expr::{format_pattern, print_expr};
 use super::print_stmt;
 
+fn type_params_suffix(params: &[varn_core::ast::TypeParam], interner: &AtomInterner) -> String {
+    if params.is_empty() {
+        return String::new();
+    }
+    let names: Vec<String> = params
+        .iter()
+        .map(|p| interner.resolve(p.name).to_owned())
+        .collect();
+    format!("{}", chalk(format!("<{}>", names.join(", "))).dim())
+}
+
 pub(super) fn print_decl(
     decl: &Decl,
     arena: &AstArena,
@@ -49,27 +60,32 @@ pub(super) fn print_decl(
         }
         Decl::Function(f) => {
             terminal::log(format!(
-                "{indent}{marker}{} {}",
+                "{indent}{marker}{} {}{}",
                 chalk("FunctionDecl").bold(),
-                chalk(interner.resolve(f.id)).blue()
+                chalk(interner.resolve(f.id)).blue(),
+                type_params_suffix(&f.type_params, interner)
             ));
             print_stmt(f.body, arena, &child_indent, true, interner);
         }
         Decl::Class(c) => {
             let name = c.id.map(|a| interner.resolve(a)).unwrap_or("<anonymous>");
             terminal::log(format!(
-                "{indent}{marker}{} {}",
+                "{indent}{marker}{} {}{}",
                 chalk("ClassDecl").bold(),
-                chalk(name).blue()
+                chalk(name).blue(),
+                type_params_suffix(&c.type_params, interner)
             ));
             for (i, m) in c.body.iter().enumerate() {
                 let is_l = i == c.body.len() - 1;
                 let mk = if is_l { "└── " } else { "├── " };
                 match m {
-                    ClassMember::Method { key, .. } => terminal::log(format!(
-                        "{child_indent}{mk}{} {}",
+                    ClassMember::Method {
+                        key, type_params, ..
+                    } => terminal::log(format!(
+                        "{child_indent}{mk}{} {}{}",
                         chalk("Method").bold(),
-                        chalk(interner.resolve(*key)).blue()
+                        chalk(interner.resolve(*key)).blue(),
+                        type_params_suffix(type_params, interner)
                     )),
                     ClassMember::Property { key, .. } => terminal::log(format!(
                         "{child_indent}{mk}{} {}",
@@ -91,9 +107,10 @@ pub(super) fn print_decl(
         }
         Decl::Interface(i_node) => {
             terminal::log(format!(
-                "{indent}{marker}{} {}",
+                "{indent}{marker}{} {}{}",
                 chalk("InterfaceDecl").bold(),
-                chalk(interner.resolve(i_node.id)).blue()
+                chalk(interner.resolve(i_node.id)).blue(),
+                type_params_suffix(&i_node.type_params, interner)
             ));
             for (idx, m) in i_node.body.iter().enumerate() {
                 let is_l = idx == i_node.body.len() - 1;
@@ -120,9 +137,10 @@ pub(super) fn print_decl(
         }
         Decl::Enum(e) => {
             terminal::log(format!(
-                "{indent}{marker}{} {}",
+                "{indent}{marker}{} {}{}",
                 chalk("EnumDecl").bold(),
-                chalk(interner.resolve(e.id)).blue()
+                chalk(interner.resolve(e.id)).blue(),
+                type_params_suffix(&e.type_params, interner)
             ));
             for (idx, m) in e.members.iter().enumerate() {
                 let is_l = idx == e.members.len() - 1;
@@ -145,9 +163,10 @@ pub(super) fn print_decl(
         }
         Decl::TypeAlias(t) => {
             terminal::log(format!(
-                "{indent}{marker}{} {}",
+                "{indent}{marker}{} {}{}",
                 chalk("TypeAlias").bold(),
-                chalk(interner.resolve(t.id)).blue()
+                chalk(interner.resolve(t.id)).blue(),
+                type_params_suffix(&t.type_params, interner)
             ));
         }
         Decl::Import(i) => {
@@ -229,9 +248,10 @@ pub(super) fn print_decl(
         }
         Decl::SumType(s) => {
             terminal::log(format!(
-                "{indent}{marker}{} {}",
+                "{indent}{marker}{} {}{}",
                 chalk("SumTypeDecl").bold(),
-                chalk(interner.resolve(s.id)).blue()
+                chalk(interner.resolve(s.id)).blue(),
+                type_params_suffix(&s.type_params, interner)
             ));
             for (idx, v) in s.variants.iter().enumerate() {
                 let mk = if idx == s.variants.len() - 1 {

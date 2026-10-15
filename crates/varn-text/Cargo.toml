@@ -1,0 +1,13 @@
+[package]
+name = "varn-text"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+parking_lot = { workspace = true }
+rustc-hash = { workspace = true }
+fontdb = "0.24"
+swash = "0.2"
+
+[lints]
+workspace = true

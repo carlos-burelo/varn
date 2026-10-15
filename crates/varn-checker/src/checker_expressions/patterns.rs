@@ -271,46 +271,44 @@ impl<'r> Checker<'r> {
 
         let mut fields = bind.sum_variant_fields.get(variant).cloned();
         let mut def_bind: Option<std::sync::Arc<BindResult>> = None;
-        if fields.is_none() {
-            if let Some(o) = &origin {
-                let mb = self
-                    .resolver
-                    .module_bind(o.as_ref())
-                    .or_else(|| self.resolver.stdlib_bind(o.as_ref()));
-                if let Some(mb) = mb {
-                    fields = mb.sum_variant_fields.get(variant).cloned();
-                    def_bind = Some(mb);
-                }
+        if fields.is_none()
+            && let Some(o) = &origin
+        {
+            let mb = self
+                .resolver
+                .module_bind(o.as_ref())
+                .or_else(|| self.resolver.stdlib_bind(o.as_ref()));
+            if let Some(mb) = mb {
+                fields = mb.sum_variant_fields.get(variant).cloned();
+                def_bind = Some(mb);
             }
         }
         let fields = fields?;
 
         let mut mapping = rustc_hash::FxHashMap::default();
-        if !args.is_empty() {
-            if let Some(p) = &parent {
-                let mut params = self.symbol_type_params_any(p.as_ref(), bind);
-                if params.is_empty() {
-                    if let Some(db) = &def_bind {
-                        params = db
-                            .interner
-                            .get(p.as_ref())
-                            .and_then(|atom| {
-                                db.scopes.get(db.global_scope).resolve(atom, &db.scopes)
-                            })
-                            .map(|sid| {
-                                db.arena
-                                    .get(sid)
-                                    .type_params
-                                    .iter()
-                                    .map(|a| std::sync::Arc::from(db.interner.resolve(*a)))
-                                    .collect()
-                            })
-                            .unwrap_or_default();
-                    }
-                }
-                for (name, arg) in params.iter().zip(args.iter()) {
-                    mapping.insert(name.clone(), *arg);
-                }
+        if !args.is_empty()
+            && let Some(p) = &parent
+        {
+            let mut params = self.symbol_type_params_any(p.as_ref(), bind);
+            if params.is_empty()
+                && let Some(db) = &def_bind
+            {
+                params = db
+                    .interner
+                    .get(p.as_ref())
+                    .and_then(|atom| db.scopes.get(db.global_scope).resolve(atom, &db.scopes))
+                    .map(|sid| {
+                        db.arena
+                            .get(sid)
+                            .type_params
+                            .iter()
+                            .map(|a| std::sync::Arc::from(db.interner.resolve(*a)))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+            }
+            for (name, arg) in params.iter().zip(args.iter()) {
+                mapping.insert(name.clone(), *arg);
             }
         }
         Some((fields, mapping))

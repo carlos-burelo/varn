@@ -54,10 +54,10 @@ pub fn generate_auto_imports_action(
     }
 
     for &(exp, module) in STDLIB_COMMON_EXPORTS {
-        if exp == sym_name {
-            if let Some(action) = create_import_action(uri, diag, sym_name, module) {
-                actions.push(action);
-            }
+        if exp == sym_name
+            && let Some(action) = create_import_action(uri, diag, sym_name, module)
+        {
+            actions.push(action);
         }
     }
 
@@ -75,12 +75,12 @@ pub fn generate_auto_imports_action(
 
     if actions.is_empty() {
         for s in state.symbols() {
-            if s.is_from_stdlib() && s.name() == sym_name {
-                if let Some(origin) = &s.origin() {
-                    if let Some(action) = create_import_action(uri, diag, sym_name, origin) {
-                        actions.push(action);
-                    }
-                }
+            if s.is_from_stdlib()
+                && s.name() == sym_name
+                && let Some(origin) = &s.origin()
+                && let Some(action) = create_import_action(uri, diag, sym_name, origin)
+            {
+                actions.push(action);
             }
         }
     }
@@ -151,10 +151,10 @@ fn compute_relative_import_path(from_uri: &str, to_uri: &str) -> String {
     let from_p = std::path::Path::new(&from_path);
     let to_p = std::path::Path::new(&to_path);
 
-    if let (Some(from_dir), Some(to_file)) = (from_p.parent(), to_p.file_name()) {
-        if from_dir == to_p.parent().unwrap_or(from_dir) {
-            return format!("./{}", to_file.to_string_lossy());
-        }
+    if let (Some(from_dir), Some(to_file)) = (from_p.parent(), to_p.file_name())
+        && from_dir == to_p.parent().unwrap_or(from_dir)
+    {
+        return format!("./{}", to_file.to_string_lossy());
     }
 
     to_uri.to_string()

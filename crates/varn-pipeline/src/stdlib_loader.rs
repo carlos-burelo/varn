@@ -40,13 +40,13 @@ impl PipelineLoader {
     }
 
     fn store_proto(&self, key: &str, fingerprint: u64, proto: &Rc<FunctionProto>) {
-        if let Ok(bytes) = postcard::to_allocvec(proto.as_ref()) {
-            if let Ok(mut guard) = self.protos.lock() {
-                guard.insert(
-                    key.to_owned(),
-                    (fingerprint, Arc::from(bytes.into_boxed_slice())),
-                );
-            }
+        if let Ok(bytes) = postcard::to_allocvec(proto.as_ref())
+            && let Ok(mut guard) = self.protos.lock()
+        {
+            guard.insert(
+                key.to_owned(),
+                (fingerprint, Arc::from(bytes.into_boxed_slice())),
+            );
         }
     }
 }
@@ -192,10 +192,10 @@ pub fn compile_stdlib_bundle(
                         let p = entry.path();
                         if p.is_dir() {
                             collect_vn(base, &p, out);
-                        } else if p.extension().is_some_and(|e| e == "vn") {
-                            if let Ok(rel) = p.strip_prefix(base) {
-                                out.push(rel.to_string_lossy().replace('\\', "/"));
-                            }
+                        } else if p.extension().is_some_and(|e| e == "vn")
+                            && let Ok(rel) = p.strip_prefix(base)
+                        {
+                            out.push(rel.to_string_lossy().replace('\\', "/"));
                         }
                     }
                 }

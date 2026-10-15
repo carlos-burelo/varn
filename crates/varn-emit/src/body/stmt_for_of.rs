@@ -65,8 +65,9 @@ impl<'a> FnEmitter<'a> {
             | ExprKind::With { .. }
             | ExprKind::MetaAccess { .. } => false,
         };
-        if !is_await && int_range {
-            if let (
+        if !is_await
+            && int_range
+            && let (
                 ExprKind::Range {
                     start,
                     end,
@@ -74,92 +75,91 @@ impl<'a> FnEmitter<'a> {
                 },
                 Pattern::Identifier { name, .. },
             ) = (&self.ast_arena.expr(right).kind, left)
-            {
-                let (start, end, inclusive) = (*start, *end, *inclusive);
-                let name: Arc<str> = Arc::from(self.m.interner.resolve(*name));
-                let lo = self.lower_expr(start);
-                let mut hi = self.lower_expr(end);
-                if inclusive {
-                    hi = TirExpr {
-                        kind: TirExprKind::Binary {
-                            op: TirBinOp::Add,
-                            lhs: Box::new(hi),
-                            rhs: Box::new(int_lit(1)),
-                        },
-                        ty: BackendTy::Int,
-                        res: Resolution::None,
-                        span: Span::EMPTY,
-                    };
-                }
-                let mut out = std::mem::take(&mut self.pending);
-                let hi = self.hoist(hi);
-                out.extend(std::mem::take(&mut self.pending));
-                let i = self.bind_local(name, BackendTy::Int);
-                let ivar = || TirExpr {
-                    kind: TirExprKind::Var,
-                    ty: BackendTy::Int,
-                    res: Resolution::Local(i),
-                    span: Span::EMPTY,
-                };
-
-                let start = TirExpr {
+        {
+            let (start, end, inclusive) = (*start, *end, *inclusive);
+            let name: Arc<str> = Arc::from(self.m.interner.resolve(*name));
+            let lo = self.lower_expr(start);
+            let mut hi = self.lower_expr(end);
+            if inclusive {
+                hi = TirExpr {
                     kind: TirExprKind::Binary {
-                        op: TirBinOp::Sub,
-                        lhs: Box::new(lo),
+                        op: TirBinOp::Add,
+                        lhs: Box::new(hi),
                         rhs: Box::new(int_lit(1)),
                     },
                     ty: BackendTy::Int,
                     res: Resolution::None,
                     span: Span::EMPTY,
                 };
-                out.push(TirStmt::Let {
-                    local: i,
-                    ty: BackendTy::Int,
-                    init: Some(start),
-                });
-                let cond = TirExpr {
-                    kind: TirExprKind::Binary {
-                        op: TirBinOp::Lt,
-                        lhs: Box::new(ivar()),
-                        rhs: Box::new(hi),
-                    },
-                    ty: BackendTy::Bool,
-                    res: Resolution::None,
-                    span: Span::EMPTY,
-                };
-                let step = TirStmt::Expr(TirExpr {
-                    kind: TirExprKind::Assign {
-                        target: Box::new(ivar()),
-                        value: Box::new(TirExpr {
-                            kind: TirExprKind::Binary {
-                                op: TirBinOp::Add,
-                                lhs: Box::new(ivar()),
-                                rhs: Box::new(int_lit(1)),
-                            },
-                            ty: BackendTy::Int,
-                            res: Resolution::None,
-                            span: Span::EMPTY,
-                        }),
-                    },
-                    ty: BackendTy::Void,
-                    res: Resolution::None,
-                    span: Span::EMPTY,
-                });
-                let mut loop_body = vec![
-                    step,
-                    TirStmt::If {
-                        cond,
-                        then_body: vec![],
-                        else_body: vec![TirStmt::Break],
-                    },
-                ];
-                loop_body.extend(self.lower_stmt_as_block(body));
-                out.push(TirStmt::Loop {
-                    cond: bool_lit(true),
-                    body: loop_body,
-                });
-                return out;
             }
+            let mut out = std::mem::take(&mut self.pending);
+            let hi = self.hoist(hi);
+            out.extend(std::mem::take(&mut self.pending));
+            let i = self.bind_local(name, BackendTy::Int);
+            let ivar = || TirExpr {
+                kind: TirExprKind::Var,
+                ty: BackendTy::Int,
+                res: Resolution::Local(i),
+                span: Span::EMPTY,
+            };
+
+            let start = TirExpr {
+                kind: TirExprKind::Binary {
+                    op: TirBinOp::Sub,
+                    lhs: Box::new(lo),
+                    rhs: Box::new(int_lit(1)),
+                },
+                ty: BackendTy::Int,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+            out.push(TirStmt::Let {
+                local: i,
+                ty: BackendTy::Int,
+                init: Some(start),
+            });
+            let cond = TirExpr {
+                kind: TirExprKind::Binary {
+                    op: TirBinOp::Lt,
+                    lhs: Box::new(ivar()),
+                    rhs: Box::new(hi),
+                },
+                ty: BackendTy::Bool,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            };
+            let step = TirStmt::Expr(TirExpr {
+                kind: TirExprKind::Assign {
+                    target: Box::new(ivar()),
+                    value: Box::new(TirExpr {
+                        kind: TirExprKind::Binary {
+                            op: TirBinOp::Add,
+                            lhs: Box::new(ivar()),
+                            rhs: Box::new(int_lit(1)),
+                        },
+                        ty: BackendTy::Int,
+                        res: Resolution::None,
+                        span: Span::EMPTY,
+                    }),
+                },
+                ty: BackendTy::Void,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            });
+            let mut loop_body = vec![
+                step,
+                TirStmt::If {
+                    cond,
+                    then_body: vec![],
+                    else_body: vec![TirStmt::Break],
+                },
+            ];
+            loop_body.extend(self.lower_stmt_as_block(body));
+            out.push(TirStmt::Loop {
+                cond: bool_lit(true),
+                body: loop_body,
+            });
+            return out;
         }
 
         let iter = self.lower_expr(right);

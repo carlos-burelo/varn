@@ -13,9 +13,9 @@ Orquesta `varn-pipeline`. CLI `vn`. Sin `varn-runtime`: no existe como crate.
 
 Try/catch nativo en JIT mismo-marco + cross-frame vía `jit_error_flag` existe en primera versión (`d4768f2a`). `await`/`yield` dentro de `try` en JIT sigue en revisión.
 
-## Crates (27)
+## Crates (28)
 
-`varn-binder, varn-builtins, varn-checker, varn-cli, varn-compiler, varn-contract, varn-core, varn-dap, varn-debug, varn-emit, varn-jit, varn-jit-abi, varn-lexer, varn-lsp, varn-modules, varn-op-macros, varn-parser, varn-pipeline, varn-pm, varn-resolver, varn-rt, varn-sem, varn-shadow, varn-tir, varn-types, varn-vm` + `xtask`.
+`varn-binder, varn-builtins, varn-checker, varn-cli, varn-compiler, varn-core, varn-dap, varn-debug, varn-emit, varn-gpu, varn-jit, varn-jit-abi, varn-lexer, varn-lsp, varn-macros, varn-modules, varn-parser, varn-pipeline, varn-pm, varn-resolver, varn-rt, varn-sem, varn-shadow, varn-text, varn-tir, varn-types, varn-vm` + `xtask`.
 
 Fuente: `Cargo.toml` workspace. `default-members` excluye `rt, shadow, xtask`.
 

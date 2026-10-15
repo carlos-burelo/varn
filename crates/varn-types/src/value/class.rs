@@ -318,10 +318,10 @@ impl ClassObj {
 
     pub fn constructor(&self) -> Option<VmValue> {
         let ver = self.vtable_version.load(Ordering::Relaxed);
-        if let Some((cached_ver, ctor)) = self.ctor_cache.borrow().as_ref() {
-            if *cached_ver == ver {
-                return *ctor;
-            }
+        if let Some((cached_ver, ctor)) = self.ctor_cache.borrow().as_ref()
+            && *cached_ver == ver
+        {
+            return *ctor;
         }
         let ctor = self.find_method("constructor");
         *self.ctor_cache.borrow_mut() = Some((ver, ctor));

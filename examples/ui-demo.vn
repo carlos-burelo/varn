@@ -1,0 +1,96 @@
+import { now } from "std:time";
+import {
+    UiWindow, UiFrame, Focus, TextEdit,
+    KEY_ESCAPE,
+    row
+} from "std:ui";
+import { wrap as wrapText, measure } from "std:text";
+
+const W = 800;
+const H = 600;
+const BG = 4278190080;
+const RED = 4294901760;
+const GREEN = 4278255360;
+const WHITE = 4294967295;
+const GRAY = 4287137928;
+
+using win = UiWindow.open("varn ui demo", W, H);
+print(`real window: ${win.real() ? "yes" : "no (headless, set VARN_UI_REAL=1)"}`);
+
+const fr = new UiFrame(W, H);
+const focus = new Focus();
+const ed = new TextEdit();
+let bx = 100.0;
+let by = 120.0;
+let dx = 4.0;
+let dy = 3.0;
+let boxColor = RED;
+let frames = 0;
+const t0 = now();
+const budgetMs = 25000;
+while (!fr.closed) {
+    fr.update(win);
+    if (fr.held(KEY_ESCAPE)) {
+        break;
+    }
+    bx = bx + dx;
+    by = by + dy;
+    if (bx < 0.0 || bx + 120.0 > (W as float)) {
+        dx = 0.0 - dx;
+    }
+    if (by < 0.0 || by + 80.0 > (H as float)) {
+        dy = 0.0 - dy;
+    }
+    if (fr.clicked(bx, by, 120.0, 80.0)) {
+        boxColor = boxColor == RED ? GREEN : RED;
+    }
+
+    win.clear(BG);
+    win.rect(bx, by, 120.0, 80.0, boxColor);
+    win.rect(fr.mouseX as float - 5.0, fr.mouseY as float - 5.0, 10.0, 10.0, WHITE);
+
+    const cells = row(20.0, 480.0, 760.0, 90.0, [1.0, 1.0, 1.0], 12.0);
+    win.rect(cells[0][0], cells[0][1], cells[0][2], cells[0][3], GRAY);
+    win.rect(cells[1][0], cells[1][1], cells[1][2], cells[1][3], GRAY);
+    win.rect(cells[2][0], cells[2][1], cells[2][2], cells[2][3], GRAY);
+
+    const elapsed = (now() - t0) as float;
+    const fps = frames > 10 ? (frames as float) * 1000.0 / elapsed : 0.0;
+    win.text(24.0, 60.0, "varn native ui — click the box, move the mouse, Esc closes", 22.0, WHITE);
+    win.text(24.0, 100.0, `frame ${frames}  fps ${fps}`, 22.0, WHITE);
+    const lines = wrapText("marquee: immediate-mode draw list, one submit per present", 18.0, 240.0);
+    for (let i = 0; i < lines.length; i = i + 1) {
+        win.text(cells[0][0] + 8.0, cells[0][1] + 28.0 + (i as float) * 22.0, lines[i], 18.0, WHITE);
+    }
+    win.text(cells[1][0] + 8.0, cells[1][1] + 28.0, `box ${bx},${by}`, 18.0, WHITE);
+    win.text(cells[2][0] + 8.0, cells[2][1] + 28.0, `mouse ${fr.mouseX},${fr.mouseY}`, 18.0, WHITE);
+
+    ed.update(fr, focus, 2, 20.0, 356.0, 760.0, 104.0);
+    win.rect(20.0, 356.0, 760.0, 104.0, ed.focused ? WHITE : GRAY);
+    win.rect(22.0, 358.0, 756.0, 100.0, BG);
+    const ls = ed.lines();
+    const show = ls.length;
+    const rows = show < 3 ? show : 3;
+    for (let i = 0; i < rows; i = i + 1) {
+        let line = ls[i];
+        let shade = WHITE;
+        if (line == "" && !ed.focused && i == 0) {
+            line = "click here and type, Enter splits lines";
+            shade = GRAY;
+        }
+        win.text(30.0, 388.0 + (i as float) * 30.0, line, 22.0, shade);
+    }
+    const cline = ed.caretLine();
+    if (ed.focused && cline < 3 && ((now() / 500) % 2 == 0)) {
+        const prefix = ls[cline].slice(0, ed.caretCol());
+        const caretX = 30.0 + measure(prefix, 22.0);
+        win.rect(caretX, 366.0 + (cline as float) * 30.0, 2.0, 26.0, WHITE);
+    }
+
+    win.present();
+    frames = frames + 1;
+    if (frames >= 1500 || (now() - t0) > budgetMs) {
+        break;
+    }
+}
+print(`demo done: ${frames} frames`);

@@ -102,12 +102,12 @@ impl<'r> Checker<'r> {
                         .extension_members
                         .insert(property_range.start.offset, mangled.clone());
                 }
-            } else if let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) {
-                if let Some(mangled) = method_map.get(prop_name) {
-                    rec.desugar
-                        .extension_members
-                        .insert(property_range.start.offset, mangled.clone());
-                }
+            } else if let Some(method_map) = bind.extensions.methods.get(tn.as_ref())
+                && let Some(mangled) = method_map.get(prop_name)
+            {
+                rec.desugar
+                    .extension_members
+                    .insert(property_range.start.offset, mangled.clone());
             }
         }
 

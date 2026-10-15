@@ -1,3 +1,3 @@
-// VN3001
+// expect: error[VN3001]
 const counts: int[] = [1]
 const holes: int?[] = counts

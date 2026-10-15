@@ -1,4 +1,4 @@
-use varn_contract::varn_contract;
+use varn_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct Globals;
@@ -41,12 +41,11 @@ varn_contract! {
 
         fn input(ctx: &mut dyn NativeCtx, prompt: Option<&str>) -> Result<String, String> {
             use std::io::Write;
-            if let Some(p) = prompt {
-                if !ctx.print_silent() {
+            if let Some(p) = prompt
+                && !ctx.print_silent() {
                     print!("{p}");
                     let _ = std::io::stdout().flush();
                 }
-            }
             let mut line = String::new();
             std::io::stdin()
                 .read_line(&mut line)

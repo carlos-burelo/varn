@@ -24,14 +24,14 @@ pub(super) fn build_enrich_context(
         if let Some(ty) = &sym.ty {
             sym_map.insert(name_rc.clone(), *ty);
 
-            if sym.kind == SymbolKind::Function {
-                if let TypeKind::Fn(fid) = bind.ty_table.get(ty.0) {
-                    let FunctionType { return_type, .. } = bind.ty_table.get_function(fid);
+            if sym.kind == SymbolKind::Function
+                && let TypeKind::Fn(fid) = bind.ty_table.get(ty.0)
+            {
+                let FunctionType { return_type, .. } = bind.ty_table.get_function(fid);
 
-                    let raw = Type::resolved(*return_type);
-                    if !raw.is_dynamic() {
-                        fn_map.insert(name_rc.clone(), raw);
-                    }
+                let raw = Type::resolved(*return_type);
+                if !raw.is_dynamic() {
+                    fn_map.insert(name_rc.clone(), raw);
                 }
             }
         }

@@ -26,10 +26,10 @@ pub fn producer_fingerprint() -> u32 {
                 eat(exe.to_string_lossy().as_bytes());
                 if let Ok(meta) = std::fs::metadata(&exe) {
                     eat(&meta.len().to_le_bytes());
-                    if let Ok(modified) = meta.modified() {
-                        if let Ok(since) = modified.duration_since(std::time::UNIX_EPOCH) {
-                            eat(&since.as_nanos().to_le_bytes());
-                        }
+                    if let Ok(modified) = meta.modified()
+                        && let Ok(since) = modified.duration_since(std::time::UNIX_EPOCH)
+                    {
+                        eat(&since.as_nanos().to_le_bytes());
                     }
                 }
             }
@@ -382,10 +382,10 @@ pub fn write_artifact_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     }
     match std::fs::rename(&tmp, path) {
         Ok(()) => {
-            if let Some(dir) = path.parent() {
-                if let Ok(dir_f) = std::fs::File::open(dir) {
-                    let _ = dir_f.sync_all();
-                }
+            if let Some(dir) = path.parent()
+                && let Ok(dir_f) = std::fs::File::open(dir)
+            {
+                let _ = dir_f.sync_all();
             }
             Ok(())
         }

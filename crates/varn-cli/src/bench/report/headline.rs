@@ -114,10 +114,10 @@ impl Headline<'_> {
                     0.0
                 };
                 let mut name = phase.name.to_owned();
-                if phase.name == "execute (warm)" {
-                    if let Some(s) = &self.split {
-                        name = format!("{} (compile {})", name, fmt_dur(s.compile));
-                    }
+                if phase.name == "execute (warm)"
+                    && let Some(s) = &self.split
+                {
+                    name = format!("{} (compile {})", name, fmt_dur(s.compile));
                 }
                 t.row([
                     (phase.color_fn)(chalk(name.as_str())).bold().to_string(),
@@ -181,14 +181,15 @@ impl Headline<'_> {
             if spread_warn {
                 terminal::warn(format!("spread {}", fmt_pct(e2e.spread())));
             }
-            if let Some(cf) = &self.cpu {
-                if cf.max_mhz > 0 && cf.cur_mhz as f64 / (cf.max_mhz as f64) < 0.90 {
-                    terminal::warn(format!(
-                        "throttle CPU {}MHz ({})",
-                        cf.cur_mhz,
-                        fmt_pct(cf.cur_mhz as f64 / (cf.max_mhz as f64))
-                    ));
-                }
+            if let Some(cf) = &self.cpu
+                && cf.max_mhz > 0
+                && cf.cur_mhz as f64 / (cf.max_mhz as f64) < 0.90
+            {
+                terminal::warn(format!(
+                    "throttle CPU {}MHz ({})",
+                    cf.cur_mhz,
+                    fmt_pct(cf.cur_mhz as f64 / (cf.max_mhz as f64))
+                ));
             }
         }
     }

@@ -45,16 +45,16 @@ pub(super) fn discover_runtimes(opts: &Opts, target_vn: &Path) -> Vec<RuntimeInf
         });
     }
 
-    if !opts.skip_python {
-        if let Some(py_path) = find_binary("python").or_else(|| find_binary("python3")) {
-            runtimes.push(RuntimeInfo {
-                name: "python".to_string(),
-                bin: py_path,
-                args_prefix: vec![],
-                empty_ext: ".py",
-                empty_body: "print(1)",
-            });
-        }
+    if !opts.skip_python
+        && let Some(py_path) = find_binary("python").or_else(|| find_binary("python3"))
+    {
+        runtimes.push(RuntimeInfo {
+            name: "python".to_string(),
+            bin: py_path,
+            args_prefix: vec![],
+            empty_ext: ".py",
+            empty_body: "print(1)",
+        });
     }
 
     runtimes

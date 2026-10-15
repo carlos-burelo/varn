@@ -200,48 +200,47 @@ impl ExecCtx {
             varn_core::RuntimeErrorKind::MatchError.class_name(),
         ];
         for name in names {
-            if let Some(nv) = self.globals_ref().get_by_name(name) {
-                if let Some(obj) = self.heap.get(nv.as_heap()) {
-                    match obj {
-                        crate::heap::HeapObj::Class(cls) => {
+            if let Some(nv) = self.globals_ref().get_by_name(name)
+                && let Some(obj) = self.heap.get(nv.as_heap())
+            {
+                match obj {
+                    crate::heap::HeapObj::Class(cls) => {
+                        let cls = cls.clone();
+                        self.heap.set_intrinsic_class(name, cls);
+                    }
+                    crate::heap::HeapObj::NativeFn(f, _) => {
+                        let f = *f;
+                        if let Ok(class_nv) = self.invoke_native(f, &[])
+                            && let Some(crate::heap::HeapObj::Class(cls)) =
+                                self.heap.get(class_nv.as_heap())
+                        {
                             let cls = cls.clone();
                             self.heap.set_intrinsic_class(name, cls);
+                            self.globals_mut().set_by_name(name, class_nv);
                         }
-                        crate::heap::HeapObj::NativeFn(f, _) => {
-                            let f = *f;
-                            if let Ok(class_nv) = self.invoke_native(f, &[]) {
-                                if let Some(crate::heap::HeapObj::Class(cls)) =
-                                    self.heap.get(class_nv.as_heap())
-                                {
-                                    let cls = cls.clone();
-                                    self.heap.set_intrinsic_class(name, cls);
-                                    self.globals_mut().set_by_name(name, class_nv);
-                                }
-                            }
-                        }
-                        crate::heap::HeapObj::Str(_)
-                        | crate::heap::HeapObj::Array(_)
-                        | crate::heap::HeapObj::Tuple(_)
-                        | crate::heap::HeapObj::Object(_)
-                        | crate::heap::HeapObj::Record(_)
-                        | crate::heap::HeapObj::Buffer(_)
-                        | crate::heap::HeapObj::Module(_)
-                        | crate::heap::HeapObj::FrozenModule(_)
-                        | crate::heap::HeapObj::VmClosure(_)
-                        | crate::heap::HeapObj::BoundMethod(_)
-                        | crate::heap::HeapObj::Map(_)
-                        | crate::heap::HeapObj::Set(_)
-                        | crate::heap::HeapObj::Task(_)
-                        | crate::heap::HeapObj::TaskHandle(_)
-                        | crate::heap::HeapObj::Range(_)
-                        | crate::heap::HeapObj::Symbol(_)
-                        | crate::heap::HeapObj::EnumVariant(_)
-                        | crate::heap::HeapObj::BigInt(_)
-                        | crate::heap::HeapObj::Decimal(_)
-                        | crate::heap::HeapObj::Char(_)
-                        | crate::heap::HeapObj::Generator(_)
-                        | crate::heap::HeapObj::Spread(_) => {}
                     }
+                    crate::heap::HeapObj::Str(_)
+                    | crate::heap::HeapObj::Array(_)
+                    | crate::heap::HeapObj::Tuple(_)
+                    | crate::heap::HeapObj::Object(_)
+                    | crate::heap::HeapObj::Record(_)
+                    | crate::heap::HeapObj::Buffer(_)
+                    | crate::heap::HeapObj::Module(_)
+                    | crate::heap::HeapObj::FrozenModule(_)
+                    | crate::heap::HeapObj::VmClosure(_)
+                    | crate::heap::HeapObj::BoundMethod(_)
+                    | crate::heap::HeapObj::Map(_)
+                    | crate::heap::HeapObj::Set(_)
+                    | crate::heap::HeapObj::Task(_)
+                    | crate::heap::HeapObj::TaskHandle(_)
+                    | crate::heap::HeapObj::Range(_)
+                    | crate::heap::HeapObj::Symbol(_)
+                    | crate::heap::HeapObj::EnumVariant(_)
+                    | crate::heap::HeapObj::BigInt(_)
+                    | crate::heap::HeapObj::Decimal(_)
+                    | crate::heap::HeapObj::Char(_)
+                    | crate::heap::HeapObj::Generator(_)
+                    | crate::heap::HeapObj::Spread(_) => {}
                 }
             }
         }

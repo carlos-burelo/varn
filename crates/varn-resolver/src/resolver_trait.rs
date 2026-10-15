@@ -22,10 +22,10 @@ impl ImportResolver for DiskResolver {
 
         let canonical = varn_modules::canonical_or_original(Path::new(abs_path));
 
-        if canonical != abs_path {
-            if let Some(cached) = self.cached_bind(&canonical) {
-                return Some(cached);
-            }
+        if canonical != abs_path
+            && let Some(cached) = self.cached_bind(&canonical)
+        {
+            return Some(cached);
         }
 
         let source = self.load_source(&ModuleId::local_str(&canonical))?;
@@ -69,10 +69,10 @@ impl ImportResolver for DiskResolver {
         }
 
         let canonical = varn_modules::canonical_or_original(Path::new(abs_path));
-        if canonical != abs_path {
-            if let Some(cached) = self.cached_exports(&canonical) {
-                return cached;
-            }
+        if canonical != abs_path
+            && let Some(cached) = self.cached_exports(&canonical)
+        {
+            return cached;
         }
 
         if visiting.iter().any(|v| v == &canonical) {

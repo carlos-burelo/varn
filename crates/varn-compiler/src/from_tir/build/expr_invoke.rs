@@ -25,10 +25,10 @@ impl<'m> Builder<'m> {
             ));
         }
         if let Resolution::DirectFn(f) = res {
-            if Some(*f) == self.self_fn {
-                if let Some(v) = self.try_lower_self_call(args, ty)? {
-                    return Ok(v);
-                }
+            if Some(*f) == self.self_fn
+                && let Some(v) = self.try_lower_self_call(args, ty)?
+            {
+                return Ok(v);
             }
             if let Some(v) = self.try_inline_direct_call(*f, args, ty)? {
                 return Ok(v);

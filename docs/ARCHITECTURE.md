@@ -26,12 +26,13 @@ Fases, en orden:
    (`crates/varn-vm/src/jit/tiering.rs` compila vía `varn_jit::compile` al calentarse);
    no hay fase JIT separada en el pipeline.
 
-## Crates (27 members en `Cargo.toml:2-30`)
+## Crates (28 members en `Cargo.toml:2-30`)
 
 varn-core, varn-lexer, varn-parser, varn-checker, varn-emit, varn-types, varn-tir,
-varn-sem, varn-binder, varn-resolver, varn-op-macros, varn-contract, varn-modules,
+varn-sem, varn-binder, varn-resolver, varn-macros, varn-modules,
 varn-builtins, varn-cli, varn-lsp, varn-vm, varn-debug, varn-pm, varn-jit,
-varn-jit-abi, varn-pipeline, varn-compiler, varn-rt, varn-shadow, varn-dap, xtask.
+varn-jit-abi, varn-pipeline, varn-compiler, varn-gpu, varn-text, varn-rt,
+varn-shadow, varn-dap, xtask.
 
 `default-members` (`Cargo.toml:32-57`) excluye `varn-rt`, `varn-shadow` y `xtask`.
 No existe `varn-runtime` ni `varn-regalloc` como crates: regalloc es un módulo

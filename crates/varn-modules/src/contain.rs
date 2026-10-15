@@ -24,10 +24,10 @@ fn root_cache() -> &'static std::sync::Mutex<std::collections::HashMap<PathBuf, 
 
 pub fn project_root_cached(base_dir: &Path) -> (PathBuf, bool) {
     let base_canon = canonicalize(base_dir);
-    if let Ok(cache) = root_cache().lock() {
-        if let Some(hit) = cache.get(&base_canon) {
-            return hit.clone();
-        }
+    if let Ok(cache) = root_cache().lock()
+        && let Some(hit) = cache.get(&base_canon)
+    {
+        return hit.clone();
     }
     let found = find_root_from(&base_canon);
     if let Ok(mut cache) = root_cache().lock() {

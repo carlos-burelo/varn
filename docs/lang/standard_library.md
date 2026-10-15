@@ -2,7 +2,7 @@
 
 > Precisión parcial. Verificado contra tests/... Código manda.
 
-Mapa completo de paquetes: `../STDLIB_ARCHITECTURE.md` (27 dirs en `std/`).
+Mapa completo de paquetes: `../STDLIB_ARCHITECTURE.md` (30 dirs en `std/`, incl. `gpu`, `ui`, `text`).
 Este archivo no duplica esa lista; solo ancla lo ejercitado por la suite.
 
 ## Núcleo async y tareas (`std:task`)

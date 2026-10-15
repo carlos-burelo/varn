@@ -3,14 +3,13 @@ use crate::checker::recorder::Recorder;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use varn_core::ast::ExprId;
-use varn_core::TypeKind;
 use varn_sem::bind::{BindResult, ClassParent};
-use varn_sem::output::{ForeignClass, InheritedField};
+use varn_sem::output::InheritedField;
 use varn_sem::types::{ClassMemberKind, FunctionParam, FunctionType, Type};
 
 pub(crate) struct ForeignLevel<'a> {
-    name: Arc<str>,
-    owner: OwnerRef<'a>,
+    pub(crate) name: Arc<str>,
+    pub(crate) owner: OwnerRef<'a>,
 }
 
 pub(crate) enum OwnerRef<'a> {
@@ -19,7 +18,7 @@ pub(crate) enum OwnerRef<'a> {
 }
 
 impl<'a> OwnerRef<'a> {
-    fn get(&self) -> &BindResult {
+    pub(crate) fn get(&self) -> &BindResult {
         match self {
             OwnerRef::Current(bind) => bind,
             OwnerRef::Foreign(bind) => bind,
@@ -47,143 +46,6 @@ impl Checker<'_> {
             out.insert(class, fields);
         }
         out
-    }
-
-    pub(super) fn collect_foreign_classes<'t>(
-        &mut self,
-        bind: &BindResult,
-        types: impl Iterator<Item = &'t Type>,
-    ) -> Vec<ForeignClass> {
-        let mut found: BTreeMap<(Arc<str>, Arc<str>), ForeignClass> = BTreeMap::new();
-        for ty in types {
-            let members = match self.ty_table.get(ty.0) {
-                TypeKind::Union(list) => self.ty_table.get_list(list).to_vec(),
-                TypeKind::Primitive(_)
-                | TypeKind::Builtin(_)
-                | TypeKind::Literal(_)
-                | TypeKind::This
-                | TypeKind::Array(_)
-                | TypeKind::Intersection(_)
-                | TypeKind::Tuple(_)
-                | TypeKind::Named(..)
-                | TypeKind::Generic(..)
-                | TypeKind::TemplateLiteral(_)
-                | TypeKind::Fn(_)
-                | TypeKind::Object(_)
-                | TypeKind::Typeof(_)
-                | TypeKind::KeyOf(_)
-                | TypeKind::IndexedAccess { .. }
-                | TypeKind::Mapped { .. }
-                | TypeKind::Conditional { .. }
-                | TypeKind::Infer(_)
-                | TypeKind::EnumVariant { .. }
-                | TypeKind::TypePredicate { .. } => vec![ty.0],
-            };
-            for id in members {
-                let (TypeKind::Named(name, Some(origin))
-                | TypeKind::Generic(name, _, Some(origin))) = self.ty_table.get(id)
-                else {
-                    continue;
-                };
-                let origin = self.resolve_bind_atom(bind, origin);
-                if origin.as_ref() == bind.source_file.as_ref() {
-                    continue;
-                }
-                let name = self.resolve_bind_atom(bind, name);
-                if varn_core::is_lang_type_name(name.as_ref()) {
-                    continue;
-                }
-                let key = (name.clone(), origin.clone());
-                if found.contains_key(&key) {
-                    continue;
-                }
-                let owner = self
-                    .resolver
-                    .module_bind(&origin)
-                    .or_else(|| self.resolver.stdlib_bind(&origin));
-                let Some(owner) = owner else {
-                    continue;
-                };
-                use varn_sem::bind::DeclKind;
-                if !matches!(owner.classify_decl(name.as_ref()), Some(DeclKind::Class)) {
-                    continue;
-                }
-                let chain = self.foreign_chain(name.as_ref(), OwnerRef::Foreign(owner.clone()));
-                let mut fields = Vec::new();
-                let mut methods = Vec::new();
-                let constructor;
-                for level in chain.iter().rev() {
-                    let Some(entry) = level.owner.get().get_class_entry(&level.name) else {
-                        continue;
-                    };
-                    for m in &entry.members {
-                        if m.is_static {
-                            continue;
-                        }
-                        match m.kind {
-                            ClassMemberKind::Property | ClassMemberKind::Variable => {
-                                if fields.iter().any(|f: &InheritedField| f.name == m.name) {
-                                    continue;
-                                }
-                                fields.push(InheritedField {
-                                    name: m.name.clone(),
-                                    ty: self.reintern_foreign_ty(level.owner.get(), m.ty),
-                                    optional: m.is_optional,
-                                });
-                            }
-                            ClassMemberKind::Method | ClassMemberKind::Function => {
-                                if !methods.contains(&m.name) {
-                                    methods.push(m.name.clone());
-                                }
-                            }
-                            ClassMemberKind::Constructor => {}
-                            ClassMemberKind::Getter
-                            | ClassMemberKind::Setter
-                            | ClassMemberKind::Class
-                            | ClassMemberKind::Interface
-                            | ClassMemberKind::Namespace
-                            | ClassMemberKind::Enum
-                            | ClassMemberKind::Struct => {}
-                        }
-                    }
-                }
-                constructor =
-                    Some(self.effective_ctor_ty(name.as_ref(), OwnerRef::Foreign(owner.clone())));
-                methods.sort();
-                let decorated = owner
-                    .interner
-                    .get(name.as_ref())
-                    .and_then(|atom| {
-                        owner
-                            .scopes
-                            .get(owner.global_scope)
-                            .resolve(atom, &owner.scopes)
-                    })
-                    .is_none_or(|sid| owner.arena.get(sid).decorated);
-                let import_binding = bind
-                    .global_symbols()
-                    .find(|s| {
-                        !decorated
-                            && s.origin_module
-                                .is_some_and(|m| self.resolve_bind_atom(bind, m) == origin)
-                            && s.original_name
-                                .is_some_and(|n| self.resolve_bind_atom(bind, n) == name)
-                    })
-                    .map(|s| self.resolve_bind_atom(bind, s.name));
-                found.insert(
-                    key,
-                    ForeignClass {
-                        name,
-                        origin,
-                        fields,
-                        methods,
-                        constructor,
-                        import_binding,
-                    },
-                );
-            }
-        }
-        found.into_values().collect()
     }
 
     pub(crate) fn effective_ctor_ty(&mut self, name: &str, owner: OwnerRef<'_>) -> Type {
@@ -227,7 +89,25 @@ impl Checker<'_> {
                 self.resolve_bind_atom(bind, name),
                 origin.map(|o| self.resolve_bind_atom(bind, o)),
             ),
-            _ => return None,
+            varn_core::TypeKind::Primitive(_)
+            | varn_core::TypeKind::Builtin(_)
+            | varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::This
+            | varn_core::TypeKind::Array(_)
+            | varn_core::TypeKind::Union(_)
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::Tuple(_)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Fn(_)
+            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::EnumVariant { .. }
+            | varn_core::TypeKind::TypePredicate { .. } => return None,
         };
         let owner = match origin {
             Some(origin) if origin.as_ref() != bind.source_file.as_ref() => OwnerRef::Foreign(
@@ -237,9 +117,7 @@ impl Checker<'_> {
             ),
             Some(_) | None => OwnerRef::Current(bind),
         };
-        if owner.get().get_class_entry(&name).is_none() {
-            return None;
-        }
+        owner.get().get_class_entry(&name)?;
         let ty = self.effective_ctor_ty(&name, owner);
         let ty = match self.ty_table.get(instance.0) {
             varn_core::TypeKind::Generic(_, args, origin) => {
@@ -259,15 +137,57 @@ impl Checker<'_> {
                 );
                 ty.map_generics(&mapping, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
             }
-            _ => ty,
+            varn_core::TypeKind::Primitive(_)
+            | varn_core::TypeKind::Builtin(_)
+            | varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::This
+            | varn_core::TypeKind::Array(_)
+            | varn_core::TypeKind::Union(_)
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::Tuple(_)
+            | varn_core::TypeKind::Named(..)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Fn(_)
+            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::EnumVariant { .. }
+            | varn_core::TypeKind::TypePredicate { .. } => ty,
         };
         Some(match self.ty_table.get(ty.0) {
             varn_core::TypeKind::Fn(fid) => self.ty_table.get_function(fid).params.clone(),
-            _ => Vec::new(),
+            varn_core::TypeKind::Primitive(_)
+            | varn_core::TypeKind::Builtin(_)
+            | varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::This
+            | varn_core::TypeKind::Array(_)
+            | varn_core::TypeKind::Union(_)
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::Tuple(_)
+            | varn_core::TypeKind::Named(..)
+            | varn_core::TypeKind::Generic(..)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::EnumVariant { .. }
+            | varn_core::TypeKind::TypePredicate { .. } => Vec::new(),
         })
     }
 
-    fn foreign_chain<'a>(&self, name: &str, owner: OwnerRef<'a>) -> Vec<ForeignLevel<'a>> {
+    pub(crate) fn foreign_chain<'a>(
+        &self,
+        name: &str,
+        owner: OwnerRef<'a>,
+    ) -> Vec<ForeignLevel<'a>> {
         let mut chain = vec![ForeignLevel {
             name: Arc::from(name),
             owner,

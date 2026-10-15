@@ -70,6 +70,7 @@ impl<'r> Checker<'r> {
                     return_type,
                     is_arrow,
                     optional: true,
+                    type_params,
                     ..
                 } => Type::make_nullable(
                     Type::fn_(
@@ -77,7 +78,7 @@ impl<'r> Checker<'r> {
                             params: params.clone(),
                             return_type: *return_type,
                             is_arrow: *is_arrow,
-                            type_params: vec![],
+                            type_params: type_params.clone(),
                         },
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     ),
@@ -87,13 +88,14 @@ impl<'r> Checker<'r> {
                     params,
                     return_type,
                     is_arrow,
+                    type_params,
                     ..
                 } => Type::fn_(
                     varn_sem::types::FunctionType {
                         params: params.clone(),
                         return_type: *return_type,
                         is_arrow: *is_arrow,
-                        type_params: vec![],
+                        type_params: type_params.clone(),
                     },
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 ),

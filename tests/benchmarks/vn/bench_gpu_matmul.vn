@@ -1,0 +1,85 @@
+import { now } from "std:time";
+import { GpuBuffer, engine } from "std:gpu";
+
+function fill(n: int): float[] {
+    const out: float[] = [];
+    for (let i = 0; i < n * n; i = i + 1) {
+        out.push(((i * 7) % 13) as float + 0.5);
+    }
+    return out;
+}
+
+function cpuMatMul(a: float[], b: float[], n: int): float[] {
+    const c: float[] = [];
+    for (let i = 0; i < n * n; i = i + 1) {
+        c.push(0.0);
+    }
+    for (let row = 0; row < n; row = row + 1) {
+        for (let col = 0; col < n; col = col + 1) {
+            let sum = 0.0;
+            for (let k = 0; k < n; k = k + 1) {
+                sum = sum + a[row * n + k] * b[k * n + col];
+            }
+            c[row * n + col] = sum;
+        }
+    }
+    return c;
+}
+
+function sum(a: float[]): float {
+    let s = 0.0;
+    for (let i = 0; i < a.length; i = i + 1) {
+        s = s + a[i];
+    }
+    return s;
+}
+
+function bench(n: int, reps: int): void {
+    const a = fill(n);
+    const b = fill(n);
+
+    const t0 = now();
+    const cCpu = cpuMatMul(a, b, n);
+    const tCpu = now() - t0;
+
+    using wa = GpuBuffer.upload(a);
+    wa.reshape([n, n]);
+    using wb = GpuBuffer.upload(b);
+    wb.reshape([n, n]);
+    using ww = wa.matmul(wb);
+    ww.download();
+
+    using ga = GpuBuffer.upload(a);
+    ga.reshape([n, n]);
+    using gb = GpuBuffer.upload(b);
+    gb.reshape([n, n]);
+    using gc0 = ga.matmul(gb);
+    const t1 = now();
+    for (let r = 0; r < reps; r = r + 1) {
+        using gc = ga.matmul(gb);
+        const cGpu = gc.download();
+    }
+    const tGpu = ((now() - t1) as float) / (reps as float);
+    const cGpu = gc0.download();
+    print(`engine=${engine()}`);
+
+    const sCpu = sum(cCpu);
+    const sGpu = sum(cGpu);
+    let diff = sCpu - sGpu;
+    if (diff < 0.0) {
+        diff = 0.0 - diff;
+    }
+    const tol = sCpu / 100000.0 + 0.01;
+    if (diff > tol) {
+        throw new Error(`gpu checksum mismatch n=${n}: cpu=${sCpu} gpu=${sGpu}`);
+    }
+
+    print(`n=${n} checksum=${sGpu} cpu_ms=${tCpu} gpu_ms=${tGpu} speedup=${(tCpu as float) / tGpu}`);
+}
+
+function run(): void {
+    bench(64, 20);
+    bench(128, 5);
+}
+
+run();

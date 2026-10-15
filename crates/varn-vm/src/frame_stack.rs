@@ -37,10 +37,10 @@ impl FrameStack {
     #[inline(always)]
     pub fn pop(&mut self) -> Option<CallFrame> {
         let popped = self.frames.pop();
-        if popped.is_some() {
-            if let Some(ref c) = self.counters {
-                c.frame_pops.fetch_add(1, Ordering::Relaxed);
-            }
+        if popped.is_some()
+            && let Some(ref c) = self.counters
+        {
+            c.frame_pops.fetch_add(1, Ordering::Relaxed);
         }
         popped
     }

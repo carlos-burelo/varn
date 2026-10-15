@@ -98,7 +98,14 @@ impl<'r> Checker<'r> {
         for arg in args {
             let (label_opt, arg_ty) = match arg {
                 Arg::Named { label, value } => {
-                    (Some(label.as_str()), self.infer_type(rec, *value, bind))
+                    let expected = params
+                        .iter()
+                        .find(|p| p.name.as_deref() == Some(label.as_str()))
+                        .map(|p| Type::resolved(p.ty));
+                    (
+                        Some(label.as_str()),
+                        self.with_expected(expected, |c| c.infer_type(rec, *value, bind)),
+                    )
                 }
                 Arg::Positional(e) => (None, self.infer_type(rec, *e, bind)),
                 Arg::Spread(e) => {
@@ -120,6 +127,13 @@ impl<'r> Checker<'r> {
                             .with_range(*range),
                         );
                         has_error = true;
+                    }
+                    if params.last().is_some_and(|p| p.is_rest)
+                        && let Some(idx) = params.len().checked_sub(1)
+                        && mapping[idx].is_none()
+                    {
+                        let arg_idx = args.iter().position(|a| std::ptr::eq(a, arg)).unwrap();
+                        mapping[idx] = Some(arg_idx);
                     }
                     continue;
                 }

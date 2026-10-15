@@ -116,22 +116,21 @@ pub(super) fn assemble(
             });
         }
     }
-    if !final_diagnostics.has_errors() {
-        if let Some(&id) = expr_table
+    if !final_diagnostics.has_errors()
+        && let Some(&id) = expr_table
             .iter()
             .filter(|(_, entry)| entry.ty.is_error())
             .map(|(id, _)| id)
             .min()
-        {
-            let mut diag = varn_core::Diagnostic::error(
-                varn_core::ErrorCode::CompilationInternalError,
-                "type resolution failed here without reporting why",
-            );
-            if let Some(node) = ast_arena.exprs().nth(id as usize) {
-                diag = diag.with_range(node.range);
-            }
-            final_diagnostics.emit(diag);
+    {
+        let mut diag = varn_core::Diagnostic::error(
+            varn_core::ErrorCode::CompilationInternalError,
+            "type resolution failed here without reporting why",
+        );
+        if let Some(node) = ast_arena.exprs().nth(id as usize) {
+            diag = diag.with_range(node.range);
         }
+        final_diagnostics.emit(diag);
     }
     profile.collect_annotations = std::time::Duration::ZERO;
     let flattened = std::mem::take(&mut bind.type_members.flattened);

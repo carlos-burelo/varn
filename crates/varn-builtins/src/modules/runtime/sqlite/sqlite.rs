@@ -1,7 +1,7 @@
 use parking_lot::Mutex;
 use rusqlite::types::ValueRef;
 use rusqlite::Connection;
-use varn_contract::varn_contract;
+use varn_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue, VnArray};
 
 static DB_POOL: Mutex<Vec<Option<Connection>>> = Mutex::new(Vec::new());
@@ -59,12 +59,11 @@ varn_contract! {
                 return Ok(false);
             }
             let mut pool = DB_POOL.lock();
-            if let Some(slot) = pool.get_mut(db_id as usize) {
-                if let Some(conn) = slot.take() {
+            if let Some(slot) = pool.get_mut(db_id as usize)
+                && let Some(conn) = slot.take() {
                     let _ = conn.close();
                     return Ok(true);
                 }
-            }
             Ok(false)
         }
 

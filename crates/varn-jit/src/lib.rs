@@ -187,56 +187,55 @@ pub fn compile(
     osr_req: Option<varn_types::ssa::OsrRequest>,
 ) -> Result<Compiled, String> {
     #[cfg(feature = "clif")]
-    if clif::enabled() {
-        if let Ok(isa) = clif::shared_isa() {
-            let start = std::time::Instant::now();
-            let res =
-                clif::lower::try_compile(proto, constants, &helpers, isa, linker, osr_req, None);
-            let elapsed = start.elapsed().as_nanos() as u64;
-            let words = proto.chunk.code.len();
-            match res {
-                Ok(art) => {
-                    if clif::trace() {
-                        eprintln!("CLIF ROUTE {:?}", proto.name);
-                    }
-                    JIT_STATS.compile_success.fetch_add(1, Ordering::Relaxed);
-                    JIT_STATS
-                        .total_compile_time_ns
-                        .fetch_add(elapsed, Ordering::Relaxed);
-                    JIT_STATS
-                        .total_code_size_bytes
-                        .fetch_add(art.buffer.size() as u64, Ordering::Relaxed);
-                    record(|| CompileRecord {
-                        name: fn_name(proto),
-                        words,
-                        outcome: CompileOutcome::Routed,
-                        compile_ns: elapsed,
-                    });
-                    let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
-                    let (native, native_sig) = art.native_entry(proto);
-                    return Ok(Compiled {
-                        entry: jit_fn,
-                        native,
-                        native_sig,
-                        code: Rc::new(art) as Rc<dyn Any>,
-                    });
+    if clif::enabled()
+        && let Ok(isa) = clif::shared_isa()
+    {
+        let start = std::time::Instant::now();
+        let res = clif::lower::try_compile(proto, constants, &helpers, isa, linker, osr_req, None);
+        let elapsed = start.elapsed().as_nanos() as u64;
+        let words = proto.chunk.code.len();
+        match res {
+            Ok(art) => {
+                if clif::trace() {
+                    eprintln!("CLIF ROUTE {:?}", proto.name);
                 }
-                Err(e) => {
-                    if clif::trace() {
-                        eprintln!("CLIF BAIL  {:?}: {e}", proto.name);
-                    }
-                    JIT_STATS.compile_fail.fetch_add(1, Ordering::Relaxed);
-                    JIT_STATS
-                        .total_compile_time_ns
-                        .fetch_add(elapsed, Ordering::Relaxed);
-                    record(|| CompileRecord {
-                        name: fn_name(proto),
-                        words,
-                        outcome: CompileOutcome::Bailed(e.clone()),
-                        compile_ns: elapsed,
-                    });
-                    return Err(e);
+                JIT_STATS.compile_success.fetch_add(1, Ordering::Relaxed);
+                JIT_STATS
+                    .total_compile_time_ns
+                    .fetch_add(elapsed, Ordering::Relaxed);
+                JIT_STATS
+                    .total_code_size_bytes
+                    .fetch_add(art.buffer.size() as u64, Ordering::Relaxed);
+                record(|| CompileRecord {
+                    name: fn_name(proto),
+                    words,
+                    outcome: CompileOutcome::Routed,
+                    compile_ns: elapsed,
+                });
+                let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
+                let (native, native_sig) = art.native_entry(proto);
+                return Ok(Compiled {
+                    entry: jit_fn,
+                    native,
+                    native_sig,
+                    code: Rc::new(art) as Rc<dyn Any>,
+                });
+            }
+            Err(e) => {
+                if clif::trace() {
+                    eprintln!("CLIF BAIL  {:?}: {e}", proto.name);
                 }
+                JIT_STATS.compile_fail.fetch_add(1, Ordering::Relaxed);
+                JIT_STATS
+                    .total_compile_time_ns
+                    .fetch_add(elapsed, Ordering::Relaxed);
+                record(|| CompileRecord {
+                    name: fn_name(proto),
+                    words,
+                    outcome: CompileOutcome::Bailed(e.clone()),
+                    compile_ns: elapsed,
+                });
+                return Err(e);
             }
         }
     }

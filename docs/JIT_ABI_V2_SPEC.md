@@ -27,7 +27,7 @@ verificadas contra fuentes.
   es Float) (`clif/abi.rs:21-41`); en Windows la envoltura retorna por `sret`
   (`wrapper_returns_via_sret`).
 
-Heurística frameless (`clif/from_ssa/drive.rs:52-62`): sin valores heap, params y
+Heurística frameless (`clif/from_ssa/setup.rs::prepare`): sin valores heap, params y
 retorno escalares (`Int|Float|Bool`), sin `this`, sin upvalues, sin bloque que
 necesite frame ni `SsaTerm::Throw`. `frame_aware = Framed || !frameless`.
 `NATIVE_FRAMELESS: u64 = 1 << 63` marca el bit 63 del id de firma nativa
@@ -61,9 +61,9 @@ vía `cranelift_native`: `x86_64`/`aarch64` en `mem/buffer.rs`, `clif/mod.rs:50-
   bifurca a salida de error. `call_checked`/`call_checked_value` (`:186-207`)
   = limpiar flag + llamar helper + chequear.
 
-Bails reales de try en `drive.rs`: handler compartido por dos valores
-(`:105`, también `exceptions.rs:54-57`), catch block con params (`:131`),
-try-stacks inconsistentes (`:156`).
+Bails reales de try en `setup.rs`: handler compartido por dos valores
+(`landing_maps`, también `exceptions.rs:54-57`), catch block con params
+(`create_blocks`), try-stacks inconsistentes (`reachability`).
 
 ## 5. AOT stub (`varn-jit/src/aot/mod.rs`)
 

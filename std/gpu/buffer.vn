@@ -1,0 +1,74 @@
+import {
+    create$,
+    destroy$,
+    len$,
+    dims$,
+    reshape$,
+    upload$,
+    download$,
+    add$,
+    mul$,
+    scale$,
+    dot$,
+    matMul$
+} from "runtime:gpu";
+
+export class GpuBuffer {
+    id: int;
+
+    constructor(id: int) {
+        this.id = id;
+    }
+
+    static create(len: int): GpuBuffer {
+        return new GpuBuffer(create$(len));
+    }
+
+    static zeros(len: int): GpuBuffer {
+        return new GpuBuffer(create$(len));
+    }
+
+    static upload(data: float[]): GpuBuffer {
+        return new GpuBuffer(upload$(data));
+    }
+
+    len(): int {
+        return len$(this.id);
+    }
+
+    shape(): int[] {
+        return dims$(this.id);
+    }
+
+    reshape(dims: int[]): void {
+        reshape$(this.id, dims);
+    }
+
+    download(): float[] {
+        return download$(this.id);
+    }
+
+    add(b: GpuBuffer): GpuBuffer {
+        return new GpuBuffer(add$(this.id, b.id));
+    }
+
+    mul(b: GpuBuffer): GpuBuffer {
+        return new GpuBuffer(mul$(this.id, b.id));
+    }
+
+    scale(s: float): GpuBuffer {
+        return new GpuBuffer(scale$(this.id, s));
+    }
+
+    dot(b: GpuBuffer): float {
+        return dot$(this.id, b.id);
+    }
+
+    matmul(b: GpuBuffer): GpuBuffer {
+        return new GpuBuffer(matMul$(this.id, b.id));
+    }
+
+    dispose(): void {
+        destroy$(this.id);
+    }
+}

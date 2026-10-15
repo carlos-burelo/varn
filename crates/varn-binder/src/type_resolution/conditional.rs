@@ -15,47 +15,41 @@ pub(super) fn resolve_conditional(
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
-    if let TypeKind::Union(list) = table.get(check.0) {
-        if matches!(&check_node.kind, TypeKind::Named(_, None)) {
-            if let TypeKind::Named(var_name, None) = &check_node.kind {
-                let var_name_str = ctx
-                    .and_then(|c| c.interner())
-                    .and_then(|i| i.try_resolve(*var_name))
-                    .unwrap_or("")
-                    .to_owned();
-                let members = table.get_list(list).to_vec();
-                let results: Vec<Type> = members
-                    .into_iter()
-                    .map(|m_id| {
-                        let m = Type::resolved(m_id);
-                        let dist_ctx = AliasSubstitutionContext {
-                            inner: ctx,
-                            params: vec![var_name_str.clone()],
-                            args: vec![m],
-                        };
-                        let mut infer_bindings = FxHashMap::default();
-                        let extends_ty = resolve_extends_with_infer(
-                            extends,
-                            Some(&dist_ctx),
-                            &mut infer_bindings,
-                            &m,
-                            table,
-                        );
-                        if type_satisfies_extends(&m, &extends_ty, table) {
-                            resolve_with_infer_ctx(
-                                true_type,
-                                Some(&dist_ctx),
-                                infer_bindings,
-                                table,
-                            )
-                        } else {
-                            resolve_type_node(false_type, Some(&dist_ctx), table)
-                        }
-                    })
-                    .collect();
-                return collapse_union_never(results, table);
-            }
-        }
+    if let TypeKind::Union(list) = table.get(check.0)
+        && matches!(&check_node.kind, TypeKind::Named(_, None))
+        && let TypeKind::Named(var_name, None) = &check_node.kind
+    {
+        let var_name_str = ctx
+            .and_then(|c| c.interner())
+            .and_then(|i| i.try_resolve(*var_name))
+            .unwrap_or("")
+            .to_owned();
+        let members = table.get_list(list).to_vec();
+        let results: Vec<Type> = members
+            .into_iter()
+            .map(|m_id| {
+                let m = Type::resolved(m_id);
+                let dist_ctx = AliasSubstitutionContext {
+                    inner: ctx,
+                    params: vec![var_name_str.clone()],
+                    args: vec![m],
+                };
+                let mut infer_bindings = FxHashMap::default();
+                let extends_ty = resolve_extends_with_infer(
+                    extends,
+                    Some(&dist_ctx),
+                    &mut infer_bindings,
+                    &m,
+                    table,
+                );
+                if type_satisfies_extends(&m, &extends_ty, table) {
+                    resolve_with_infer_ctx(true_type, Some(&dist_ctx), infer_bindings, table)
+                } else {
+                    resolve_type_node(false_type, Some(&dist_ctx), table)
+                }
+            })
+            .collect();
+        return collapse_union_never(results, table);
     }
 
     let mut infer_bindings = FxHashMap::default();

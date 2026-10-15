@@ -108,10 +108,10 @@ fn failure_value(ctx: &mut ExecCtx, err: crate::error::RuntimeError) -> VmValue 
 }
 
 pub(crate) fn request_osr(ctx: &mut ExecCtx, mode: varn_types::ssa::OsrMode) {
-    if let Some(frame) = ctx.frames.last() {
-        if frame.ip != 0 {
-            ctx.osr_request = Some(varn_types::ssa::OsrRequest { ip: frame.ip, mode });
-        }
+    if let Some(frame) = ctx.frames.last()
+        && frame.ip != 0
+    {
+        ctx.osr_request = Some(varn_types::ssa::OsrRequest { ip: frame.ip, mode });
     }
 }
 

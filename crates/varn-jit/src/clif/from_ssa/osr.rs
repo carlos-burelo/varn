@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 use cranelift_codegen::ir::{types, Block, BlockArg, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
-use varn_types::ssa::{SsaProto, SsaSecondaryEntry};
+use varn_types::ssa::{SsaProto, SsaSecondaryEntry, SsaTerm};
 
 use super::store::{clif_ty, define, is_heap, load_home_value};
 use super::Ctx;
@@ -18,14 +18,12 @@ pub(super) fn carried(
     for &v in &header.live {
         let kind = ssa.value_ty(v);
         let redefined = def[v as usize].is_some_and(|blk| reached[blk]);
-        if redefined {
-            if let Some(ty) = clif_ty(kind) {
-                let var = b.declare_var(ty);
-                if is_heap(kind) {
-                    b.declare_var_needs_stack_map(var);
-                }
-                carried.insert(v, var);
+        if redefined && let Some(ty) = clif_ty(kind) {
+            let var = b.declare_var(ty);
+            if is_heap(kind) {
+                b.declare_var_needs_stack_map(var);
             }
+            carried.insert(v, var);
         }
     }
     carried
@@ -129,4 +127,52 @@ pub(super) fn emit_entry(
     }
     b.ins().jump(header_blk, &args);
     Ok(())
+}
+
+pub(super) fn expand_resume(
+    ssa: &SsaProto,
+    entry_stacks: &[Vec<usize>],
+    resume_blk: usize,
+    rpo: &mut Vec<usize>,
+    rpo_pos: &mut [usize],
+    reached: &mut [bool],
+) {
+    let enclosing = entry_stacks.get(resume_blk).cloned().unwrap_or_default();
+    let mut stack: Vec<usize> = enclosing;
+    while let Some(b) = stack.pop() {
+        if b >= reached.len() || reached[b] {
+            continue;
+        }
+        reached[b] = true;
+        rpo_pos[b] = rpo.len();
+        rpo.push(b);
+        match &ssa.blocks[b].term {
+            SsaTerm::Jump { target, .. } => {
+                let s = *target as usize;
+                if s < reached.len() && !reached[s] {
+                    stack.push(s);
+                }
+            }
+            SsaTerm::Branch {
+                then_blk, else_blk, ..
+            } => {
+                for s in [*then_blk as usize, *else_blk as usize] {
+                    if s < reached.len() && !reached[s] {
+                        stack.push(s);
+                    }
+                }
+            }
+            SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => {}
+        }
+        for inst in &ssa.blocks[b].insts {
+            if let varn_types::ssa::SsaOp::Try { catch_ip, .. } = &inst.op
+                && let Some(e) = ssa.catch_at(*catch_ip as usize)
+            {
+                let h = e.block as usize;
+                if h < reached.len() && !reached[h] {
+                    stack.push(h);
+                }
+            }
+        }
+    }
 }

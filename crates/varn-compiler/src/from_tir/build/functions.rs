@@ -28,10 +28,10 @@ pub(super) fn absent_param(cond: &TirExpr) -> Option<u32> {
 pub(crate) fn defaulted_param_mask(body: &[TirStmt], nparams: usize) -> Vec<bool> {
     let mut mask = vec![false; nparams];
     for stmt in body {
-        if let TirStmt::If { cond, .. } = stmt {
-            if let Some(i) = absent_param(cond).filter(|i| (*i as usize) < nparams) {
-                mask[i as usize] = true;
-            }
+        if let TirStmt::If { cond, .. } = stmt
+            && let Some(i) = absent_param(cond).filter(|i| (*i as usize) < nparams)
+        {
+            mask[i as usize] = true;
         }
     }
     mask

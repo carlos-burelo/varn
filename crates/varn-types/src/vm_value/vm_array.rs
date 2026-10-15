@@ -98,23 +98,6 @@ impl VmArray {
             b.clean_prefix = b.items.len() as u32;
         }
     }
-
-    #[inline(always)]
-    pub fn borrow(&self) -> &Vec<VmValue> {
-        match self.repr() {
-            ArrayRepr::Boxed(v) => &v.items,
-            ArrayRepr::I64(_) | ArrayRepr::F64(_) => unreachable_typed("borrow"),
-        }
-    }
-}
-
-#[cold]
-#[inline(never)]
-fn unreachable_typed(op: &str) -> ! {
-    panic!(
-        "VmArray::{op} called on a non-Boxed repr — typed arrays are not \
-         constructed before Task A.4; this projection is Boxed-only"
-    )
 }
 
 impl PartialEq for VmArray {

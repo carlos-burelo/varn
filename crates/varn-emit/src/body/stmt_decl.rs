@@ -163,30 +163,29 @@ impl<'a> FnEmitter<'a> {
             match &d.id {
                 Pattern::Identifier { name, .. } => {
                     let name_str = self.m.interner.resolve(*name);
-                    if let Some(init) = d.init {
-                        if let ExprKind::Match { subject, cases } = &self.ast_arena.expr(init).kind
-                        {
-                            let (subject, cases) = (*subject, cases);
-                            let ty = self
-                                .expr_table
-                                .get(&init.index())
-                                .map(|e| {
-                                    let names = self.m.names;
-                                    let table = self.m.checker_table;
-                                    let interner = self.m.interner;
-                                    lower_type(&e.ty, table, interner, self.tt, names)
-                                })
-                                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
-                            let local = self.bind_local(Arc::from(name_str), ty);
-                            out.push(TirStmt::Let {
-                                local,
-                                ty,
-                                init: None,
-                            });
-                            out.extend(std::mem::take(&mut self.pending));
-                            out.extend(self.lower_match(subject, cases, MatchDest::Assign(local)));
-                            continue;
-                        }
+                    if let Some(init) = d.init
+                        && let ExprKind::Match { subject, cases } = &self.ast_arena.expr(init).kind
+                    {
+                        let (subject, cases) = (*subject, cases);
+                        let ty = self
+                            .expr_table
+                            .get(&init.index())
+                            .map(|e| {
+                                let names = self.m.names;
+                                let table = self.m.checker_table;
+                                let interner = self.m.interner;
+                                lower_type(&e.ty, table, interner, self.tt, names)
+                            })
+                            .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+                        let local = self.bind_local(Arc::from(name_str), ty);
+                        out.push(TirStmt::Let {
+                            local,
+                            ty,
+                            init: None,
+                        });
+                        out.extend(std::mem::take(&mut self.pending));
+                        out.extend(self.lower_match(subject, cases, MatchDest::Assign(local)));
+                        continue;
                     }
 
                     let prebound = {
@@ -258,31 +257,32 @@ impl<'a> FnEmitter<'a> {
                     let init = init.map(|e| self.guard_dynamic(e, ty));
                     out.extend(std::mem::take(&mut self.pending));
 
-                    if self.top_level && prebound.is_none() {
-                        if let Some(&slot) = self.m.globals.get(name_str) {
-                            let value = init.unwrap_or(TirExpr {
-                                kind: TirExprKind::NullLit,
-                                ty,
-                                res: Resolution::None,
-                                span: Span::EMPTY,
-                            });
-                            let target = TirExpr {
-                                kind: TirExprKind::Var,
-                                ty,
-                                res: Resolution::GlobalSlot(slot),
-                                span: Span::EMPTY,
-                            };
-                            out.push(TirStmt::Expr(TirExpr {
-                                kind: TirExprKind::Assign {
-                                    target: Box::new(target),
-                                    value: Box::new(value),
-                                },
-                                ty: BackendTy::Void,
-                                res: Resolution::None,
-                                span: Span::EMPTY,
-                            }));
-                            continue;
-                        }
+                    if self.top_level
+                        && prebound.is_none()
+                        && let Some(&slot) = self.m.globals.get(name_str)
+                    {
+                        let value = init.unwrap_or(TirExpr {
+                            kind: TirExprKind::NullLit,
+                            ty,
+                            res: Resolution::None,
+                            span: Span::EMPTY,
+                        });
+                        let target = TirExpr {
+                            kind: TirExprKind::Var,
+                            ty,
+                            res: Resolution::GlobalSlot(slot),
+                            span: Span::EMPTY,
+                        };
+                        out.push(TirStmt::Expr(TirExpr {
+                            kind: TirExprKind::Assign {
+                                target: Box::new(target),
+                                value: Box::new(value),
+                            },
+                            ty: BackendTy::Void,
+                            res: Resolution::None,
+                            span: Span::EMPTY,
+                        }));
+                        continue;
                     }
 
                     let local =

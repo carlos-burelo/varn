@@ -40,17 +40,17 @@ pub(super) fn emit_intrinsic(
     wire: u8,
     dest: Option<u32>,
 ) -> Result<Out, String> {
-    if let [arg] = args {
-        if ctx.ssa.value_ty(*arg) == SlotKind::Float {
-            let x = load_value(b, ctx, values, *arg)?;
-            if let Some(r) = float_instruction(b, ctx, wire, x) {
-                let float_dest = dest.is_some_and(|d| ctx.ssa.value_ty(d) == SlotKind::Float);
-                return Ok(if float_dest {
-                    Out::Native(r)
-                } else {
-                    Out::Boxed(box_f64(b, r))
-                });
-            }
+    if let [arg] = args
+        && ctx.ssa.value_ty(*arg) == SlotKind::Float
+    {
+        let x = load_value(b, ctx, values, *arg)?;
+        if let Some(r) = float_instruction(b, ctx, wire, x) {
+            let float_dest = dest.is_some_and(|d| ctx.ssa.value_ty(d) == SlotKind::Float);
+            return Ok(if float_dest {
+                Out::Native(r)
+            } else {
+                Out::Boxed(box_f64(b, r))
+            });
         }
     }
     let ectx = exec_ctx(ctx);

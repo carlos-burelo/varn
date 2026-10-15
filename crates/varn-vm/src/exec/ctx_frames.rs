@@ -157,10 +157,10 @@ impl ExecCtx {
         }
         let mut to_close = Vec::new();
         for (s, _) in self.open_upvalues.iter() {
-            if let Some(reg) = self.stack.reg_of_addr(alloc, *s) {
-                if reg >= lowest {
-                    to_close.push(*s);
-                }
+            if let Some(reg) = self.stack.reg_of_addr(alloc, *s)
+                && reg >= lowest
+            {
+                to_close.push(*s);
             }
         }
         for s in &to_close {

@@ -29,10 +29,10 @@ pub(crate) fn op_define_static(
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
 
-    if val_nv.is_heap() {
-        if let Some(HeapObj::EnumVariant(ev)) = heap.get_mut(val_nv.as_heap()) {
-            ev.enum_class_id = Some(cls.id);
-        }
+    if val_nv.is_heap()
+        && let Some(HeapObj::EnumVariant(ev)) = heap.get_mut(val_nv.as_heap())
+    {
+        ev.enum_class_id = Some(cls.id);
     }
     cls.add_static(name, val_nv);
     Ok(())
@@ -44,28 +44,26 @@ pub(crate) fn op_inherit(
     heap: &mut Heap,
 ) -> VmResult<()> {
     let superclass = get_class_arc(superclass_nv, heap)?;
-    if subclass_nv.is_heap() {
-        if let Some(HeapObj::Class(sub)) = heap.get_mut(subclass_nv.as_heap()) {
-            *sub.superclass.borrow_mut() = Some(superclass.clone());
+    if subclass_nv.is_heap()
+        && let Some(HeapObj::Class(sub)) = heap.get_mut(subclass_nv.as_heap())
+    {
+        *sub.superclass.borrow_mut() = Some(superclass.clone());
 
-            *sub.vtable.borrow_mut() = superclass.vtable.borrow().clone();
-            *sub.vtable_owners.borrow_mut() = superclass.vtable_owners.borrow().clone();
-            *sub.method_map.borrow_mut() = superclass.method_map.borrow().clone();
+        *sub.vtable.borrow_mut() = superclass.vtable.borrow().clone();
+        *sub.vtable_owners.borrow_mut() = superclass.vtable_owners.borrow().clone();
+        *sub.method_map.borrow_mut() = superclass.method_map.borrow().clone();
 
-            sub.set_layout(superclass.layout());
+        sub.set_layout(superclass.layout());
 
-            *sub.getter_map.borrow_mut() = superclass.getter_map.borrow().clone();
-            *sub.getter_vtable.borrow_mut() = superclass.getter_vtable.borrow().clone();
-            *sub.getter_vtable_owners.borrow_mut() =
-                superclass.getter_vtable_owners.borrow().clone();
+        *sub.getter_map.borrow_mut() = superclass.getter_map.borrow().clone();
+        *sub.getter_vtable.borrow_mut() = superclass.getter_vtable.borrow().clone();
+        *sub.getter_vtable_owners.borrow_mut() = superclass.getter_vtable_owners.borrow().clone();
 
-            *sub.setter_map.borrow_mut() = superclass.setter_map.borrow().clone();
-            *sub.setter_vtable.borrow_mut() = superclass.setter_vtable.borrow().clone();
-            *sub.setter_vtable_owners.borrow_mut() =
-                superclass.setter_vtable_owners.borrow().clone();
+        *sub.setter_map.borrow_mut() = superclass.setter_map.borrow().clone();
+        *sub.setter_vtable.borrow_mut() = superclass.setter_vtable.borrow().clone();
+        *sub.setter_vtable_owners.borrow_mut() = superclass.setter_vtable_owners.borrow().clone();
 
-            return Ok(());
-        }
+        return Ok(());
     }
     Err(RuntimeError::new("OpInherit: not a class"))
 }
@@ -75,11 +73,11 @@ pub(crate) fn op_declare_layout(
     layout: Rc<varn_core::layout::ClassLayout>,
     heap: &mut Heap,
 ) -> VmResult<()> {
-    if class_nv.is_heap() {
-        if let Some(HeapObj::Class(cls)) = heap.get_mut(class_nv.as_heap()) {
-            cls.set_layout(layout);
-            return Ok(());
-        }
+    if class_nv.is_heap()
+        && let Some(HeapObj::Class(cls)) = heap.get_mut(class_nv.as_heap())
+    {
+        cls.set_layout(layout);
+        return Ok(());
     }
     Err(RuntimeError::new(format!(
         "OpDeclareLayout: expected class, got {}",
@@ -88,11 +86,11 @@ pub(crate) fn op_declare_layout(
 }
 
 pub(crate) fn op_alloc_instance(class_nv: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
-    if class_nv.is_heap() {
-        if let Some(HeapObj::Class(cls)) = heap.get(class_nv.as_heap()) {
-            let cls = cls.clone();
-            return Ok(VmValue::from_heap(heap.alloc_instance(&cls).0));
-        }
+    if class_nv.is_heap()
+        && let Some(HeapObj::Class(cls)) = heap.get(class_nv.as_heap())
+    {
+        let cls = cls.clone();
+        return Ok(VmValue::from_heap(heap.alloc_instance(&cls).0));
     }
     Err(RuntimeError::new(format!(
         "new: expected a class, got {}",
@@ -226,10 +224,10 @@ fn default_constructor(
 }
 
 fn get_class_arc(nv: VmValue, heap: &Heap) -> VmResult<Rc<ClassObj>> {
-    if nv.is_heap() {
-        if let Some(HeapObj::Class(c)) = heap.get(nv.as_heap()) {
-            return Ok(c.clone());
-        }
+    if nv.is_heap()
+        && let Some(HeapObj::Class(c)) = heap.get(nv.as_heap())
+    {
+        return Ok(c.clone());
     }
     Err(RuntimeError::new("expected class"))
 }

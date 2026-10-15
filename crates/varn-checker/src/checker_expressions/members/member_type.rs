@@ -68,30 +68,29 @@ impl<'r> Checker<'r> {
             | TypeKind::Infer(_)
             | TypeKind::TypePredicate { .. } => None,
         };
-        if res.is_none() {
-            if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
+        if res.is_none()
+            && let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
                 self,
                 ty,
                 &self.ty_table,
                 bind,
-            ) {
-                if let Some(mangled) = bind.extensions.methods.get(&tn).and_then(|m| m.get(key)) {
-                    let mangled = mangled.clone();
-                    if let Some(sym_ty) = super::member_util::extension_method_type(
-                        bind,
-                        &mangled,
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    ) {
-                        return Some((sym_ty, None));
-                    }
+            )
+        {
+            if let Some(mangled) = bind.extensions.methods.get(&tn).and_then(|m| m.get(key)) {
+                let mangled = mangled.clone();
+                if let Some(sym_ty) = super::member_util::extension_method_type(
+                    bind,
+                    &mangled,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                ) {
+                    return Some((sym_ty, None));
                 }
-                if let Some(mangled) = bind.extensions.getters.get(&tn).and_then(|m| m.get(key)) {
-                    if let Some(sym_ty) =
-                        super::member_util::extension_getter_type(bind, mangled, &self.ty_table)
-                    {
-                        return Some((sym_ty, None));
-                    }
-                }
+            }
+            if let Some(mangled) = bind.extensions.getters.get(&tn).and_then(|m| m.get(key))
+                && let Some(sym_ty) =
+                    super::member_util::extension_getter_type(bind, mangled, &self.ty_table)
+            {
+                return Some((sym_ty, None));
             }
         }
         res
@@ -153,36 +152,35 @@ impl<'r> Checker<'r> {
                             let mut visiting = Vec::new();
                             Some(self.resolver.module_exports(&origin_path, &mut visiting))
                         };
-                        if let Some(exports) = exports {
-                            if let Some(sym) = exports.get(key) {
-                                let mut sym_ty = sym.ty.unwrap_or(Type::Dynamic);
-                                if let Some(origin) = &sym.origin_module {
-                                    let origin_str =
-                                        self.resolve_bind_atom(bind, *origin).to_string();
-                                    let table = std::sync::Arc::make_mut(&mut self.ty_table);
-                                    let origin_atom = table.intern_name(&origin_str);
-                                    sym_ty = sym_ty.with_origin(origin_atom, table);
-                                }
-                                return Some(ObjectTypeMember::Property {
-                                    name: Arc::from(key),
-                                    ty: sym_ty.0,
-                                    optional: false,
-                                    readonly: true,
-                                });
+                        if let Some(exports) = exports
+                            && let Some(sym) = exports.get(key)
+                        {
+                            let mut sym_ty = sym.ty.unwrap_or(Type::Dynamic);
+                            if let Some(origin) = &sym.origin_module {
+                                let origin_str = self.resolve_bind_atom(bind, *origin).to_string();
+                                let table = std::sync::Arc::make_mut(&mut self.ty_table);
+                                let origin_atom = table.intern_name(&origin_str);
+                                sym_ty = sym_ty.with_origin(origin_atom, table);
                             }
+                            return Some(ObjectTypeMember::Property {
+                                name: Arc::from(key),
+                                ty: sym_ty.0,
+                                optional: false,
+                                readonly: true,
+                            });
                         }
                     }
                     return None;
                 }
-                if let Some(entry) = bind.get_class_entry(name.as_ref()) {
-                    if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
-                        return Some(ObjectTypeMember::Property {
-                            name: m.name.clone(),
-                            ty: m.ty.0,
-                            optional: m.is_optional,
-                            readonly: m.is_readonly,
-                        });
-                    }
+                if let Some(entry) = bind.get_class_entry(name.as_ref())
+                    && let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key)
+                {
+                    return Some(ObjectTypeMember::Property {
+                        name: m.name.clone(),
+                        ty: m.ty.0,
+                        optional: m.is_optional,
+                        readonly: m.is_readonly,
+                    });
                 }
                 if let Some(parent) = bind.class_parents.get(name.as_ref()) {
                     let parent = parent.clone();
@@ -193,38 +191,38 @@ impl<'r> Checker<'r> {
             }
             TypeKind::Generic(name_atom, args_list, origin_atom) => {
                 let name: Arc<str> = self.resolve_bind_atom(bind, name_atom);
-                if let Some(entry) = bind.get_class_entry(name.as_ref()) {
-                    if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
-                        let origin: Option<Arc<str>> =
-                            origin_atom.map(|o| self.resolve_bind_atom(bind, o));
-                        let args: Vec<Type> = self
-                            .ty_table
-                            .get_list(args_list)
-                            .iter()
-                            .map(|id| Type::resolved(*id))
-                            .collect();
-                        let mapping = super::member_util::generic_mapping(
-                            self.resolver,
-                            name.as_ref(),
-                            &args,
-                            origin.as_ref(),
-                            bind,
-                        );
-                        return Some(ObjectTypeMember::Property {
-                            name: m.name.clone(),
-                            ty: if mapping.is_empty() {
-                                m.ty.0
-                            } else {
-                                m.ty.map_generics(
-                                    &mapping,
-                                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                                )
-                                .0
-                            },
-                            optional: m.is_optional,
-                            readonly: m.is_readonly,
-                        });
-                    }
+                if let Some(entry) = bind.get_class_entry(name.as_ref())
+                    && let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key)
+                {
+                    let origin: Option<Arc<str>> =
+                        origin_atom.map(|o| self.resolve_bind_atom(bind, o));
+                    let args: Vec<Type> = self
+                        .ty_table
+                        .get_list(args_list)
+                        .iter()
+                        .map(|id| Type::resolved(*id))
+                        .collect();
+                    let mapping = super::member_util::generic_mapping(
+                        self.resolver,
+                        name.as_ref(),
+                        &args,
+                        origin.as_ref(),
+                        bind,
+                    );
+                    return Some(ObjectTypeMember::Property {
+                        name: m.name.clone(),
+                        ty: if mapping.is_empty() {
+                            m.ty.0
+                        } else {
+                            m.ty.map_generics(
+                                &mapping,
+                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                            )
+                            .0
+                        },
+                        optional: m.is_optional,
+                        readonly: m.is_readonly,
+                    });
                 }
                 if let Some(parent) = bind.class_parents.get(name.as_ref()) {
                     let parent = parent.clone();
@@ -251,76 +249,76 @@ impl<'r> Checker<'r> {
             | TypeKind::Infer(_)
             | TypeKind::TypePredicate { .. } => None,
         };
-        if res.is_none() {
-            if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
+        if res.is_none()
+            && let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
                 self,
                 ty,
                 &self.ty_table,
                 bind,
-            ) {
-                if let Some(mangled) = bind.extensions.methods.get(&tn).and_then(|m| m.get(key)) {
-                    let mangled = mangled.clone();
-                    if let Some(sym) = super::member_util::extension_method_type(
-                        bind,
-                        &mangled,
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    ) {
-                        let sym_kind = self.ty_table.get(sym.0);
-                        let (params, return_type) = match sym_kind {
-                            varn_core::TypeKind::Fn(fid) => {
-                                let ft = self.ty_table.get_function(fid).clone();
-                                (ft.params, ft.return_type)
-                            }
-                            varn_core::TypeKind::Primitive(_)
-                            | varn_core::TypeKind::Builtin(_)
-                            | varn_core::TypeKind::Literal(_)
-                            | varn_core::TypeKind::This
-                            | varn_core::TypeKind::Array(_)
-                            | varn_core::TypeKind::Union(_)
-                            | varn_core::TypeKind::Intersection(_)
-                            | varn_core::TypeKind::Tuple(_)
-                            | varn_core::TypeKind::Named(..)
-                            | varn_core::TypeKind::Generic(..)
-                            | varn_core::TypeKind::TemplateLiteral(_)
-                            | varn_core::TypeKind::Object(_)
-                            | varn_core::TypeKind::Typeof(_)
-                            | varn_core::TypeKind::KeyOf(_)
-                            | varn_core::TypeKind::IndexedAccess { .. }
-                            | varn_core::TypeKind::Mapped { .. }
-                            | varn_core::TypeKind::Conditional { .. }
-                            | varn_core::TypeKind::Infer(_)
-                            | varn_core::TypeKind::EnumVariant { .. }
-                            | varn_core::TypeKind::TypePredicate { .. } => {
-                                (vec![], Type::Dynamic.0)
-                            }
-                        };
-                        return Some(ObjectTypeMember::Method {
-                            name: Arc::from(key),
-                            params,
-                            return_type,
-                            optional: false,
-                            is_arrow: false,
-                        });
-                    }
+            )
+        {
+            if let Some(mangled) = bind.extensions.methods.get(&tn).and_then(|m| m.get(key)) {
+                let mangled = mangled.clone();
+                if let Some(sym) = super::member_util::extension_method_type(
+                    bind,
+                    &mangled,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                ) {
+                    let sym_kind = self.ty_table.get(sym.0);
+                    let (params, return_type, type_params) = match sym_kind {
+                        varn_core::TypeKind::Fn(fid) => {
+                            let ft = self.ty_table.get_function(fid).clone();
+                            (ft.params, ft.return_type, ft.type_params)
+                        }
+                        varn_core::TypeKind::Primitive(_)
+                        | varn_core::TypeKind::Builtin(_)
+                        | varn_core::TypeKind::Literal(_)
+                        | varn_core::TypeKind::This
+                        | varn_core::TypeKind::Array(_)
+                        | varn_core::TypeKind::Union(_)
+                        | varn_core::TypeKind::Intersection(_)
+                        | varn_core::TypeKind::Tuple(_)
+                        | varn_core::TypeKind::Named(..)
+                        | varn_core::TypeKind::Generic(..)
+                        | varn_core::TypeKind::TemplateLiteral(_)
+                        | varn_core::TypeKind::Object(_)
+                        | varn_core::TypeKind::Typeof(_)
+                        | varn_core::TypeKind::KeyOf(_)
+                        | varn_core::TypeKind::IndexedAccess { .. }
+                        | varn_core::TypeKind::Mapped { .. }
+                        | varn_core::TypeKind::Conditional { .. }
+                        | varn_core::TypeKind::Infer(_)
+                        | varn_core::TypeKind::EnumVariant { .. }
+                        | varn_core::TypeKind::TypePredicate { .. } => {
+                            (vec![], Type::Dynamic.0, Vec::new())
+                        }
+                    };
+                    return Some(ObjectTypeMember::Method {
+                        name: Arc::from(key),
+                        params,
+                        return_type,
+                        optional: false,
+                        is_arrow: false,
+                        type_params,
+                    });
                 }
-                if let Some(mangled) = bind.extensions.getters.get(&tn).and_then(|m| m.get(key)) {
-                    if let Some(sym) =
-                        super::member_util::extension_getter_type(bind, mangled, &self.ty_table)
-                    {
-                        let has_setter = bind
-                            .extensions
-                            .setters
-                            .get(&tn)
-                            .and_then(|m| m.get(key))
-                            .is_some();
-                        return Some(ObjectTypeMember::Property {
-                            name: Arc::from(key),
-                            ty: sym.0,
-                            optional: false,
-                            readonly: !has_setter,
-                        });
-                    }
-                }
+            }
+            if let Some(mangled) = bind.extensions.getters.get(&tn).and_then(|m| m.get(key))
+                && let Some(sym) =
+                    super::member_util::extension_getter_type(bind, mangled, &self.ty_table)
+            {
+                let has_setter = bind
+                    .extensions
+                    .setters
+                    .get(&tn)
+                    .and_then(|m| m.get(key))
+                    .is_some();
+                return Some(ObjectTypeMember::Property {
+                    name: Arc::from(key),
+                    ty: sym.0,
+                    optional: false,
+                    readonly: !has_setter,
+                });
             }
         }
         res

@@ -162,7 +162,26 @@ fn lower_kind(
                 BackendTy::Dynamic(_) if local => {
                     lower_alias(interner.resolve(name), table, interner, tt, names)
                 }
-                resolved => resolved,
+                resolved @ BackendTy::Int
+                | resolved @ BackendTy::Float
+                | resolved @ BackendTy::Bool
+                | resolved @ BackendTy::Char
+                | resolved @ BackendTy::Str
+                | resolved @ BackendTy::Bytes
+                | resolved @ BackendTy::Decimal
+                | resolved @ BackendTy::BigInt
+                | resolved @ BackendTy::Array(_)
+                | resolved @ BackendTy::Map(..)
+                | resolved @ BackendTy::Dict(_)
+                | resolved @ BackendTy::Set(_)
+                | resolved @ BackendTy::Tuple(_)
+                | resolved @ BackendTy::Class(_)
+                | resolved @ BackendTy::Enum(_)
+                | resolved @ BackendTy::Fn(_)
+                | resolved @ BackendTy::Nullable(_)
+                | resolved @ BackendTy::Void
+                | resolved @ BackendTy::Never
+                | resolved @ BackendTy::Dynamic(_) => resolved,
             }
         }
 

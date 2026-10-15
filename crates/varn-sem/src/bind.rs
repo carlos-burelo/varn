@@ -85,6 +85,7 @@ pub struct BindResult {
     pub class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
     pub type_members: TypeMembers,
     pub class_parents: FxHashMap<Arc<str>, ClassParent>,
+    pub type_param_variance: FxHashMap<Arc<str>, Vec<crate::compat::variance::Variance>>,
     pub source_file: Arc<str>,
     pub sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,
     pub sum_variant_parent: FxHashMap<Arc<str>, Arc<str>>,
@@ -128,7 +129,8 @@ impl BindResult {
         let mut set = |kind| {
             debug_assert!(
                 found.is_none(),
-                "type '{name}' registered as multiple decl kinds"
+                "type '{name}' registered as multiple decl kinds in '{}'",
+                self.source_file
             );
             if found.is_none() {
                 found = Some(kind);
@@ -390,7 +392,20 @@ impl TypeContext for BindView<'_> {
             crate::symbol::SymbolKind::Class | crate::symbol::SymbolKind::Interface => {
                 (!sym.type_params.is_empty()).then(|| sym.type_param_defaults.clone())
             }
-            _ => None,
+            crate::symbol::SymbolKind::Var
+            | crate::symbol::SymbolKind::Let
+            | crate::symbol::SymbolKind::Const
+            | crate::symbol::SymbolKind::Function
+            | crate::symbol::SymbolKind::TypeAlias
+            | crate::symbol::SymbolKind::Enum
+            | crate::symbol::SymbolKind::Parameter
+            | crate::symbol::SymbolKind::Property
+            | crate::symbol::SymbolKind::Method
+            | crate::symbol::SymbolKind::TypeParameter
+            | crate::symbol::SymbolKind::Namespace
+            | crate::symbol::SymbolKind::Struct
+            | crate::symbol::SymbolKind::Extension
+            | crate::symbol::SymbolKind::EnumMember => None,
         }
     }
 

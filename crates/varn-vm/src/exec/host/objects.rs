@@ -19,20 +19,20 @@ impl ExecCtx {
         }
     }
     pub(super) fn host_object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
-        if obj.is_heap() {
-            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap()) {
-                for (k, v) in o.borrow().iter() {
-                    f(k.as_ref(), v);
-                }
+        if obj.is_heap()
+            && let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap())
+        {
+            for (k, v) in o.borrow().iter() {
+                f(k.as_ref(), v);
             }
         }
     }
     pub(super) fn host_map_for_each(&self, map: VmValue, f: &mut dyn FnMut(VmValue, VmValue)) {
-        if map.is_heap() {
-            if let Some(HeapObj::Map(m)) = self.heap.get(map.as_heap()) {
-                for (k, v) in m.read().iter() {
-                    f(k.0, *v);
-                }
+        if map.is_heap()
+            && let Some(HeapObj::Map(m)) = self.heap.get(map.as_heap())
+        {
+            for (k, v) in m.read().iter() {
+                f(k.0, *v);
             }
         }
     }
@@ -40,10 +40,10 @@ impl ExecCtx {
         &self,
         obj: VmValue,
     ) -> Option<std::rc::Rc<varn_types::Shape>> {
-        if obj.is_heap() {
-            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap()) {
-                return Some(std::rc::Rc::clone(o.borrow().shape()));
-            }
+        if obj.is_heap()
+            && let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap())
+        {
+            return Some(std::rc::Rc::clone(o.borrow().shape()));
         }
         None
     }
@@ -77,10 +77,10 @@ impl ExecCtx {
                 let field = ClassObj::find_by_id(inst.class_id)
                     .map(|cls| cls.layout())
                     .and_then(|layout| layout.get_field(key).cloned());
-                if let Some(f) = field {
-                    if inst.write_field(&f, val).is_ok() {
-                        self.heap.write_barrier(idx, val);
-                    }
+                if let Some(f) = field
+                    && inst.write_field(&f, val).is_ok()
+                {
+                    self.heap.write_barrier(idx, val);
                 }
             } else if let Some(HeapObj::Module(m)) = self.heap.get_mut(idx) {
                 if let Some(s) = m.export_map.get(key).copied() {

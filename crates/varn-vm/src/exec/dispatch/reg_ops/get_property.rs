@@ -69,12 +69,11 @@ impl ExecCtx {
             shared_name.as_ref()
         };
 
-        if obj.is_heap() {
-            if let Some(crate::heap::HeapObj::Class(class)) = self.heap.get(obj.as_heap()) {
-                if let Some(held) = class.get_static(name) {
-                    return Ok(PropRead::Value(held));
-                }
-            }
+        if obj.is_heap()
+            && let Some(crate::heap::HeapObj::Class(class)) = self.heap.get(obj.as_heap())
+            && let Some(held) = class.get_static(name)
+        {
+            return Ok(PropRead::Value(held));
         }
 
         let is_megamorphic = closure
@@ -108,31 +107,28 @@ impl ExecCtx {
                     }
 
                     if entry.is_class == ICKind::INSTANCE_FIELD {
-                        if obj.is_heap() {
-                            if let Some(inst) = self.heap.instance(obj.as_heap()) {
-                                if inst.class_id == entry.id {
-                                    if let Some(v) = inst.field_at(entry.slot as usize) {
-                                        found_slot_val = Some(v);
-                                        hit_found = true;
-                                        break 'entries;
-                                    }
-                                }
-                            }
+                        if obj.is_heap()
+                            && let Some(inst) = self.heap.instance(obj.as_heap())
+                            && inst.class_id == entry.id
+                            && let Some(v) = inst.field_at(entry.slot as usize)
+                        {
+                            found_slot_val = Some(v);
+                            hit_found = true;
+                            break 'entries;
                         }
                     } else if entry.is_class == ICKind::SHAPE_PROP {
-                        if obj.is_heap() {
-                            if let Some(
+                        if obj.is_heap()
+                            && let Some(
                                 crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o),
                             ) = self.heap.get(obj.as_heap())
+                        {
+                            let guard = o.read();
+                            if guard.shape().id == entry.id
+                                && let Some(v) = guard.field_at(entry.slot as usize)
                             {
-                                let guard = o.read();
-                                if guard.shape().id == entry.id {
-                                    if let Some(v) = guard.field_at(entry.slot as usize) {
-                                        found_slot_val = Some(v);
-                                        hit_found = true;
-                                        break 'entries;
-                                    }
-                                }
+                                found_slot_val = Some(v);
+                                hit_found = true;
+                                break 'entries;
                             }
                         }
                     } else if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
@@ -183,49 +179,49 @@ impl ExecCtx {
             }
         }
 
-        if name == varn_core::MemberKey::Length.as_str() {
-            if let Some(v) = crate::exec::strings::fast_length(obj, &self.heap) {
-                if cs_idx < cache_len && !is_megamorphic {
-                    let is_str = obj.is_sso()
-                        || matches!(
-                            self.heap.get(obj.as_heap()),
-                            Some(crate::heap::HeapObj::Str(_))
-                        );
-                    if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                        let entry = varn_types::chunk::CacheEntry {
-                            id: cls.id,
-                            slot: 0,
-                            is_class: if is_str {
-                                ICKind::STR_LENGTH
-                            } else {
-                                ICKind::ARRAY_LENGTH
-                            },
-                            vtable_ver: 0,
-                            class: None,
-                        };
-                        closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
-                        closure.feedback.borrow_mut().observe(cs_idx, cls.id);
-                    }
+        if name == varn_core::MemberKey::Length.as_str()
+            && let Some(v) = crate::exec::strings::fast_length(obj, &self.heap)
+        {
+            if cs_idx < cache_len && !is_megamorphic {
+                let is_str = obj.is_sso()
+                    || matches!(
+                        self.heap.get(obj.as_heap()),
+                        Some(crate::heap::HeapObj::Str(_))
+                    );
+                if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
+                    let entry = varn_types::chunk::CacheEntry {
+                        id: cls.id,
+                        slot: 0,
+                        is_class: if is_str {
+                            ICKind::STR_LENGTH
+                        } else {
+                            ICKind::ARRAY_LENGTH
+                        },
+                        vtable_ver: 0,
+                        class: None,
+                    };
+                    closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
+                    closure.feedback.borrow_mut().observe(cs_idx, cls.id);
                 }
-                return Ok(PropRead::Value(v));
             }
+            return Ok(PropRead::Value(v));
         }
 
         if let Some(getter_val) = crate::exec::props::find_getter(obj, name, &self.heap) {
-            if cs_idx < cache_len && !is_megamorphic {
-                if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                    if let Some(&slot) = cls.getter_map.borrow().get(name) {
-                        let entry = varn_types::chunk::CacheEntry {
-                            id: cls.id,
-                            slot: slot as u16,
-                            is_class: ICKind::CLASS_GETTER,
-                            vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
-                            class: Some(cls.clone()),
-                        };
-                        closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
-                        closure.feedback.borrow_mut().observe(cs_idx, cls.id);
-                    }
-                }
+            if cs_idx < cache_len
+                && !is_megamorphic
+                && let Some(cls) = crate::exec::props::get_class(obj, &self.heap)
+                && let Some(&slot) = cls.getter_map.borrow().get(name)
+            {
+                let entry = varn_types::chunk::CacheEntry {
+                    id: cls.id,
+                    slot: slot as u16,
+                    is_class: ICKind::CLASS_GETTER,
+                    vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
+                    class: Some(cls.clone()),
+                };
+                closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
+                closure.feedback.borrow_mut().observe(cs_idx, cls.id);
             }
             return Ok(PropRead::Getter(getter_val));
         }
@@ -239,40 +235,40 @@ impl ExecCtx {
 
         if cs_idx < cache_len && !is_megamorphic {
             if obj.is_heap() {
-                if let Some(inst) = self.heap.instance(obj.as_heap()) {
-                    if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
-                        let root = cls.root_shape.borrow();
-                        if let Some(&slot) = root.property_names.get(name) {
-                            let entry = varn_types::chunk::CacheEntry {
-                                id: inst.class_id,
-                                slot: slot as u16,
-                                is_class: ICKind::INSTANCE_FIELD,
-                                vtable_ver: 0,
-                                class: None,
-                            };
-                            closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
-                            closure.feedback.borrow_mut().observe(cs_idx, inst.class_id);
-                            return Ok(PropRead::Value(val));
-                        }
+                if let Some(inst) = self.heap.instance(obj.as_heap())
+                    && let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id)
+                {
+                    let root = cls.root_shape.borrow();
+                    if let Some(&slot) = root.property_names.get(name) {
+                        let entry = varn_types::chunk::CacheEntry {
+                            id: inst.class_id,
+                            slot: slot as u16,
+                            is_class: ICKind::INSTANCE_FIELD,
+                            vtable_ver: 0,
+                            class: None,
+                        };
+                        closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
+                        closure.feedback.borrow_mut().observe(cs_idx, inst.class_id);
+                        return Ok(PropRead::Value(val));
                     }
                 }
                 match self.heap.get(obj.as_heap()) {
                     Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
                         let guard = o.read();
-                        if let Some(&slot) = guard.shape().property_names.get(name) {
-                            if slot < guard.slot_count() {
-                                let shape_id = guard.shape().id;
-                                let entry = varn_types::chunk::CacheEntry {
-                                    id: shape_id,
-                                    slot: slot as u16,
-                                    is_class: ICKind::SHAPE_PROP,
-                                    vtable_ver: 0,
-                                    class: None,
-                                };
-                                closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
-                                closure.feedback.borrow_mut().observe(cs_idx, shape_id);
-                                return Ok(PropRead::Value(val));
-                            }
+                        if let Some(&slot) = guard.shape().property_names.get(name)
+                            && slot < guard.slot_count()
+                        {
+                            let shape_id = guard.shape().id;
+                            let entry = varn_types::chunk::CacheEntry {
+                                id: shape_id,
+                                slot: slot as u16,
+                                is_class: ICKind::SHAPE_PROP,
+                                vtable_ver: 0,
+                                class: None,
+                            };
+                            closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
+                            closure.feedback.borrow_mut().observe(cs_idx, shape_id);
+                            return Ok(PropRead::Value(val));
                         }
                     }
                     Some(
@@ -302,18 +298,18 @@ impl ExecCtx {
                     | None => {}
                 }
             }
-            if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                if let Some(&slot) = cls.method_map.borrow().get(name) {
-                    let entry = varn_types::chunk::CacheEntry {
-                        id: cls.id,
-                        slot: slot as u16,
-                        is_class: ICKind::CLASS_METHOD,
-                        vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
-                        class: Some(cls.clone()),
-                    };
-                    closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
-                    closure.feedback.borrow_mut().observe(cs_idx, cls.id);
-                }
+            if let Some(cls) = crate::exec::props::get_class(obj, &self.heap)
+                && let Some(&slot) = cls.method_map.borrow().get(name)
+            {
+                let entry = varn_types::chunk::CacheEntry {
+                    id: cls.id,
+                    slot: slot as u16,
+                    is_class: ICKind::CLASS_METHOD,
+                    vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
+                    class: Some(cls.clone()),
+                };
+                closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
+                closure.feedback.borrow_mut().observe(cs_idx, cls.id);
             }
         }
 

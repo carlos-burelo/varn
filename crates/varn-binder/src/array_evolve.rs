@@ -106,13 +106,14 @@ impl<'r> Binder<'r> {
         while i < self.array_watch.len() {
             if self.array_watch[i].owner_scope == scope {
                 let c = self.array_watch.remove(i);
-                if !c.escaped && !c.conflict {
-                    if let Some(elem) = c.elem_ty {
-                        let offset = self.arena.get(c.sym_id).offset;
-                        let array_ty =
-                            Type::array(elem, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                        self.evolved_array_types.insert(offset, array_ty);
-                    }
+                if !c.escaped
+                    && !c.conflict
+                    && let Some(elem) = c.elem_ty
+                {
+                    let offset = self.arena.get(c.sym_id).offset;
+                    let array_ty =
+                        Type::array(elem, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                    self.evolved_array_types.insert(offset, array_ty);
                 }
             } else {
                 i += 1;

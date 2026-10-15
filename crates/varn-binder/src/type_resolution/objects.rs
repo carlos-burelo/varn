@@ -36,6 +36,7 @@ pub(super) fn resolve_object_type(
             }
             InterfaceMember::Method {
                 key,
+                type_params,
                 params,
                 return_type,
                 optional,
@@ -73,6 +74,10 @@ pub(super) fn resolve_object_type(
                     return_type: ret.0,
                     optional: *optional,
                     is_arrow: false,
+                    type_params: type_params
+                        .iter()
+                        .map(|tp| Arc::from(interner.resolve(tp.name)))
+                        .collect(),
                 }
             }
             InterfaceMember::Index {

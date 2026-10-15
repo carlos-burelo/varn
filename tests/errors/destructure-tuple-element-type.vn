@@ -1,3 +1,3 @@
-// VN3001
+// expect: error[VN3001]
 const [count, label] = #[1, "one"]
 const n: int = label

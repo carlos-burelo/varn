@@ -54,18 +54,15 @@ fn resolve_recursive(
         }
 
         let resolved = if !force_update {
-            if let Some(lock) = existing_lock {
-                if let Some(entry) = lock.by_name().get(alias.as_str()) {
-                    if let Ok(dep_origin) = DepOrigin::parse(&entry.origin) {
-                        if dep_origin == *origin
-                            && cache::is_cached(&dep_origin, &entry.version, &entry.integrity)
-                        {
-                            packages.push((*entry).clone());
-                            install_from_cache(project_root, alias, &dep_origin, &entry.version)?;
-                            continue;
-                        }
-                    }
-                }
+            if let Some(lock) = existing_lock
+                && let Some(entry) = lock.by_name().get(alias.as_str())
+                && let Ok(dep_origin) = DepOrigin::parse(&entry.origin)
+                && dep_origin == *origin
+                && cache::is_cached(&dep_origin, &entry.version, &entry.integrity)
+            {
+                packages.push((*entry).clone());
+                install_from_cache(project_root, alias, &dep_origin, &entry.version)?;
+                continue;
             }
             resolver::resolve_version(origin)?
         } else {
@@ -110,19 +107,18 @@ fn resolve_recursive(
 
         let installed_pkg_dir = cache::local_package_path(project_root, alias);
         let child_manifest_path = installed_pkg_dir.join(varn_modules::PACKAGE_MANIFEST_FILE);
-        if child_manifest_path.exists() {
-            if let Ok(child_manifest) = ProjectManifest::load(&child_manifest_path) {
-                if let Ok(child_deps) = child_manifest.parsed_deps() {
-                    resolve_recursive(
-                        project_root,
-                        &child_deps,
-                        existing_lock,
-                        force_update,
-                        packages,
-                        visited,
-                    )?;
-                }
-            }
+        if child_manifest_path.exists()
+            && let Ok(child_manifest) = ProjectManifest::load(&child_manifest_path)
+            && let Ok(child_deps) = child_manifest.parsed_deps()
+        {
+            resolve_recursive(
+                project_root,
+                &child_deps,
+                existing_lock,
+                force_update,
+                packages,
+                visited,
+            )?;
         }
     }
 
@@ -180,10 +176,9 @@ fn install_from_cache(
         if let (Ok(a), Ok(b)) = (
             std::fs::read_to_string(&src_integrity),
             std::fs::read_to_string(&dst_integrity),
-        ) {
-            if a.trim() == b.trim() {
-                return Ok(());
-            }
+        ) && a.trim() == b.trim()
+        {
+            return Ok(());
         }
         std::fs::remove_dir_all(&dst)
             .map_err(|e| format!("cannot remove {}: {e}", dst.display()))?;

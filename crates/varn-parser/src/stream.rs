@@ -330,10 +330,10 @@ impl TokenStream {
         } else {
             None
         };
-        if let Some(prev) = prev {
-            if prev.range.end.line < tok.range.start.line {
-                return Ok(());
-            }
+        if let Some(prev) = prev
+            && prev.range.end.line < tok.range.start.line
+        {
+            return Ok(());
         }
         let lex = tok.get_lexeme(&self.lexeme_buf);
         Err(format!(

@@ -22,8 +22,9 @@ pub mod runtime_ops;
 pub use dispatch::all_native_module_ids;
 #[cfg(feature = "runtime")]
 pub use dispatch::{
-    capability_for_op, check_native_op_capability, describe_op, dispatch_runtime_op,
-    find_native_op_entry, native_op_fn, native_op_name_by_fn, register_globals_vm,
+    capability_for_op, check_native_fn_capability, check_native_op_capability, describe_op,
+    dispatch_runtime_op, find_native_op_entry, native_op_fn, native_op_name_by_fn,
+    register_globals_vm,
 };
 #[cfg(feature = "runtime")]
 pub use modules::build_module;

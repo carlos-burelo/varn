@@ -123,10 +123,10 @@ pub(crate) fn scratch_max(ssa: &SsaProto) -> usize {
 }
 
 pub(crate) fn scratch_addr(b: &mut FunctionBuilder, ctx: &Ctx<'_>, count: usize) -> Value {
-    if let Some(s) = &ctx.scratch {
-        if count <= s.max {
-            return s.addr;
-        }
+    if let Some(s) = &ctx.scratch
+        && count <= s.max
+    {
+        return s.addr;
     }
     let slot = b.create_sized_stack_slot(StackSlotData::new(
         StackSlotKind::ExplicitSlot,

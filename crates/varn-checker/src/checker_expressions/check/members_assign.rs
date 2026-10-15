@@ -52,14 +52,13 @@ impl<'r> Checker<'r> {
 
         let obj_ty = self.infer_type(rec, object, bind);
         let non_null = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-        if let Some(tn) = extension_type_name(self, &non_null, &self.ty_table, bind) {
-            if let Some(setter_map) = bind.extensions.setters.get(tn.as_ref()) {
-                if let Some(mangled) = setter_map.get(prop_name) {
-                    rec.desugar
-                        .extension_set_members
-                        .insert(target_range.start.offset, mangled.clone());
-                }
-            }
+        if let Some(tn) = extension_type_name(self, &non_null, &self.ty_table, bind)
+            && let Some(setter_map) = bind.extensions.setters.get(tn.as_ref())
+            && let Some(mangled) = setter_map.get(prop_name)
+        {
+            rec.desugar
+                .extension_set_members
+                .insert(target_range.start.offset, mangled.clone());
         }
         self.check_accessor_side(&obj_ty, prop_name, true, &target_range, bind);
         let frozen = matches!(

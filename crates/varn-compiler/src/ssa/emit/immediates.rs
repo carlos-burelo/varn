@@ -58,10 +58,10 @@ pub(super) fn plan_immediates(ssa: &SsaFunc) -> Immediates {
     let mut imm: Vec<Option<i8>> = vec![None; n];
     for block in &ssa.blocks {
         for inst in &block.insts {
-            if let (Some(d), InstKind::ConstInt(i)) = (inst.dest, &inst.kind) {
-                if let Ok(small) = i8::try_from(*i) {
-                    imm[d.0 as usize] = Some(small);
-                }
+            if let (Some(d), InstKind::ConstInt(i)) = (inst.dest, &inst.kind)
+                && let Ok(small) = i8::try_from(*i)
+            {
+                imm[d.0 as usize] = Some(small);
             }
         }
     }

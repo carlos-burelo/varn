@@ -37,29 +37,28 @@ pub fn run(func: &mut SsaFunc) -> bool {
             else_blk,
             else_args,
         } = term
+            && let Some(InstKind::ConstBool(b)) = const_map.get(&cond)
         {
-            if let Some(InstKind::ConstBool(b)) = const_map.get(&cond) {
-                if *b {
-                    func.blocks[b_id.0 as usize].term = Terminator::Jump {
-                        target: then_blk,
-                        args: then_args,
-                    };
-                    let preds = &mut func.blocks[else_blk.0 as usize].preds;
-                    if let Some(pos) = preds.iter().position(|p| *p == b_id) {
-                        preds.remove(pos);
-                    }
-                } else {
-                    func.blocks[b_id.0 as usize].term = Terminator::Jump {
-                        target: else_blk,
-                        args: else_args,
-                    };
-                    let preds = &mut func.blocks[then_blk.0 as usize].preds;
-                    if let Some(pos) = preds.iter().position(|p| *p == b_id) {
-                        preds.remove(pos);
-                    }
+            if *b {
+                func.blocks[b_id.0 as usize].term = Terminator::Jump {
+                    target: then_blk,
+                    args: then_args,
+                };
+                let preds = &mut func.blocks[else_blk.0 as usize].preds;
+                if let Some(pos) = preds.iter().position(|p| *p == b_id) {
+                    preds.remove(pos);
                 }
-                changed = true;
+            } else {
+                func.blocks[b_id.0 as usize].term = Terminator::Jump {
+                    target: else_blk,
+                    args: else_args,
+                };
+                let preds = &mut func.blocks[then_blk.0 as usize].preds;
+                if let Some(pos) = preds.iter().position(|p| *p == b_id) {
+                    preds.remove(pos);
+                }
             }
+            changed = true;
         }
     }
 

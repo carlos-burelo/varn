@@ -71,13 +71,14 @@ pub fn infer_object_member_type(
             params,
             return_type,
             is_arrow,
+            type_params,
             ..
         } if name.as_ref() == prop_name => Some(Type::fn_(
             FunctionType {
                 params: params.clone(),
                 return_type: *return_type,
                 is_arrow: *is_arrow,
-                type_params: vec![],
+                type_params: type_params.clone(),
             },
             table,
         )),

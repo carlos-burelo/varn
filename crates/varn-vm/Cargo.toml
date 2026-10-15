@@ -8,7 +8,7 @@ profiling = []
 clif = ["varn-jit/clif"]
 
 [dependencies]
-varn-op-macros = { path = "../varn-op-macros" }
+varn-macros = { path = "../varn-macros" }
 varn-types    = { path = "../varn-types" }
 varn-core     = { path = "../varn-core" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }

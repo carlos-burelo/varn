@@ -52,28 +52,32 @@ impl<'r> Checker<'r> {
         if let Some(rb) = self
             .resolver
             .find_stdlib_bind(&mut |rb| rb.class_parents.contains_key(class.name.as_ref()))
+            && let Some(parent) = rb.class_parents.get(class.name.as_ref())
         {
-            if let Some(parent) = rb.class_parents.get(class.name.as_ref()) {
-                return Some(varn_sem::bind::ClassParent {
-                    name: parent.name.clone(),
-                    origin: parent
-                        .origin
-                        .clone()
-                        .or_else(|| Some(rb.source_file.clone())),
-                    args: Vec::new(),
-                });
-            }
+            return Some(varn_sem::bind::ClassParent {
+                name: parent.name.clone(),
+                origin: parent
+                    .origin
+                    .clone()
+                    .or_else(|| Some(rb.source_file.clone())),
+                args: Vec::new(),
+            });
         }
         None
     }
 
     pub(crate) fn is_throwable(&self, ty: &Type, bind: &varn_sem::bind::BindResult) -> bool {
+        let named = |name: varn_core::Atom| -> Option<&str> {
+            self.ty_table
+                .name(name)
+                .or_else(|| bind.interner.try_resolve(name))
+        };
         match self.ty_table.get(ty.0) {
             varn_core::TypeKind::Named(name, _) => {
-                self.is_subclass_or_same(bind.interner.resolve(name), "Error", bind)
+                named(name).is_some_and(|n| self.is_subclass_or_same(n, "Error", bind))
             }
             varn_core::TypeKind::Generic(name, _, _) => {
-                self.is_subclass_or_same(bind.interner.resolve(name), "Error", bind)
+                named(name).is_some_and(|n| self.is_subclass_or_same(n, "Error", bind))
             }
             varn_core::TypeKind::Union(list) => self
                 .ty_table

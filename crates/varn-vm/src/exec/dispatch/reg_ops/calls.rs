@@ -15,29 +15,30 @@ impl ExecCtx {
         let mut pending_receiver: Option<VmValue> = None;
         if callee.is_heap() {
             let heap_idx = callee.as_heap();
-            if let Some(crate::heap::HeapObj::VmClosure(nc)) = self.heap.get(heap_idx) {
-                if !nc.proto.is_generator && !nc.proto.is_async {
-                    let arity = nc.proto.arity;
-                    if !nc.proto.has_rest && arg_count <= arity {
-                        let nc = nc.clone();
-                        if self.hotspot_counters.is_some() {
-                            let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>");
-                            let is_jit = nc.jit_fn().is_some();
-                            self.record_hotspot_fn(fn_name, is_jit);
-                        }
-                        if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
-                            return Err(crate::error::RuntimeError::new(
-                                "stack overflow: call depth exceeded 10000",
-                            ));
-                        }
-
-                        let alloc = self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
-                        let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
-                        frame.return_reg = dest as u16;
-                        self.record_call_vm_fast();
-                        self.frames.push(frame);
-                        return Ok(true);
+            if let Some(crate::heap::HeapObj::VmClosure(nc)) = self.heap.get(heap_idx)
+                && !nc.proto.is_generator
+                && !nc.proto.is_async
+            {
+                let arity = nc.proto.arity;
+                if !nc.proto.has_rest && arg_count <= arity {
+                    let nc = nc.clone();
+                    if self.hotspot_counters.is_some() {
+                        let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>");
+                        let is_jit = nc.jit_fn().is_some();
+                        self.record_hotspot_fn(fn_name, is_jit);
                     }
+                    if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                        return Err(crate::error::RuntimeError::new(
+                            "stack overflow: call depth exceeded 10000",
+                        ));
+                    }
+
+                    let alloc = self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
+                    let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
+                    frame.return_reg = dest as u16;
+                    self.record_call_vm_fast();
+                    self.frames.push(frame);
+                    return Ok(true);
                 }
             }
 

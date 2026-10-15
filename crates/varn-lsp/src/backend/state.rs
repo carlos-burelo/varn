@@ -44,10 +44,10 @@ impl Backend {
             scope_uri: None,
             section: Some("Varn".to_owned()),
         }];
-        if let Ok(values) = self.client.configuration(items).await {
-            if let Some(value) = values.first() {
-                self.settings.apply(value);
-            }
+        if let Ok(values) = self.client.configuration(items).await
+            && let Some(value) = values.first()
+        {
+            self.settings.apply(value);
         }
     }
 

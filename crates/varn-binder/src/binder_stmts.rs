@@ -44,16 +44,13 @@ impl<'r> Binder<'r> {
                 declarator.type_ann.is_some(),
             );
 
-            if let Pattern::Identifier { name, .. } = &declarator.id {
-                if let Some(init_expr) = declarator.init {
-                    if let ExprKind::Object { properties, .. } =
-                        &self.ast_arena.expr(init_expr).kind
-                    {
-                        let fields = self.collect_object_members(properties);
-                        if !fields.is_empty() {
-                            self.type_members.objects.insert(*name, fields);
-                        }
-                    }
+            if let Pattern::Identifier { name, .. } = &declarator.id
+                && let Some(init_expr) = declarator.init
+                && let ExprKind::Object { properties, .. } = &self.ast_arena.expr(init_expr).kind
+            {
+                let fields = self.collect_object_members(properties);
+                if !fields.is_empty() {
+                    self.type_members.objects.insert(*name, fields);
                 }
             }
 

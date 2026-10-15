@@ -47,13 +47,13 @@ pub(crate) fn check_break(
             (*ctx).debug_skip = None;
             return false;
         }
-        if let Some(table) = c.debug_breaks.as_ref() {
-            if table.contains_key(&(proto_ptr, ip)) {
-                let m = &mut *ctx;
-                m.frames[frame_idx].ip = ip;
-                m.vm_suspend = Some(VmSuspend::DebugBreak);
-                return true;
-            }
+        if let Some(table) = c.debug_breaks.as_ref()
+            && table.contains_key(&(proto_ptr, ip))
+        {
+            let m = &mut *ctx;
+            m.frames[frame_idx].ip = ip;
+            m.vm_suspend = Some(VmSuspend::DebugBreak);
+            return true;
         }
         if let Some(step) = c.debug_step.as_ref() {
             let step = *step;

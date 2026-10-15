@@ -2,7 +2,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow(field = "object_keys")]
+#[varn_macros::jit_slow(field = "object_keys")]
 pub(crate) extern "C" fn jit_object_keys(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -14,7 +14,7 @@ pub(crate) extern "C" fn jit_object_keys(ctx: *mut ExecCtx, val_tag: u64, val_pa
     }
 }
 
-#[varn_op_macros::jit_slow(field = "op_in")]
+#[varn_macros::jit_slow(field = "op_in")]
 pub(crate) extern "C" fn jit_op_in(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -30,7 +30,7 @@ pub(crate) extern "C" fn jit_op_in(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "object_merge")]
+#[varn_macros::jit_slow(field = "object_merge")]
 pub(crate) extern "C" fn jit_object_merge(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -49,7 +49,7 @@ pub(crate) extern "C" fn jit_object_merge(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "object_rest")]
+#[varn_macros::jit_slow(field = "object_rest")]
 pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -85,7 +85,7 @@ pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) {
     }
 }
 
-#[varn_op_macros::jit_slow(field = "object_rest_window")]
+#[varn_macros::jit_slow(field = "object_rest_window")]
 pub(crate) extern "C" fn jit_object_rest_window(
     ctx: *mut ExecCtx,
     obj_tag: u64,

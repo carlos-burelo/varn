@@ -1,0 +1,47 @@
+import { ui, signal, computed, component, TextStyle, MainAxis, Theme, run } from "std:ui";
+import { UiFrame, Focus } from "std:ui";
+
+@component
+function Counter(): dynamic {
+    const count = signal(0);
+    const doubled = computed(() => count() * 2);
+    return ui.column(
+        gap: 8.0,
+        padding: 16.0,
+        children: [
+            ui.text("Counter", style: TextStyle.title),
+            ui.text(`Count: ${count()}`),
+            ui.text(`Doubled: ${doubled()}`),
+            ui.button(text: "Increment", onPress: () => count(count() + 1))
+        ]
+    );
+}
+
+@component
+function Dashboard(): dynamic {
+    return ui.column(
+        gap: 16.0,
+        padding: 24.0,
+        children: [
+            ui.text("Dashboard", style: TextStyle.title),
+            ui.row(
+                gap: 12.0,
+                mainAxis: MainAxis.spaceBetween,
+                children: [
+                    ui.text("Revenue"),
+                    ui.text("$24,500")
+                ]
+            ),
+            ui.container(
+                padding: 16.0,
+                background: Theme.colors.surface,
+                radius: 12.0,
+                child: ui.text("Card", color: Theme.colors.onSurface)
+            )
+        ]
+    );
+}
+
+run("declarative demo", build: (fr: UiFrame, focus: Focus): dynamic => Dashboard(), w: 800, h: 600, maxFrames: 5);
+run("counter demo", build: (fr: UiFrame, focus: Focus): dynamic => Counter(), w: 800, h: 600, maxFrames: 5);
+print("declarative demo done");

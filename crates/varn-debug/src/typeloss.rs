@@ -143,10 +143,10 @@ fn count_one(proto: &FunctionProto) -> Counts {
                 | Operand::Imm { .. }
                 | Operand::Jump { .. } => None,
             });
-            if let Some(name) = name {
-                if !c.members.contains(&name) {
-                    c.members.push(name);
-                }
+            if let Some(name) = name
+                && !c.members.contains(&name)
+            {
+                c.members.push(name);
             }
         }
         for (typed, gen_op) in PAIRS {

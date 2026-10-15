@@ -1,2 +1,2 @@
-// VN3016
+// expect: error[VN3016]
 const [a, b, c] = #[1, 2]

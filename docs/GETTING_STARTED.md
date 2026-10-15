@@ -36,7 +36,7 @@ Salida esperada: `Hola, Mundo desde Varn!`
 
 | Comando | Args clave (`cli.rs`) | Uso |
 |---|---|---|
-| `run` | `file`, `--eval`, `--trace`, `--allow-*`, `--sandbox`, `--allow-ffi` (`58-96`) | Ejecutar |
+| `run` | `file`, `--eval`, `--trace`, `--allow-*`, `--sandbox`, `--allow-ffi`, `--allow-ui` (`58-99`) | Ejecutar |
 | `check` | `file` (`116-121`) | Solo tipos, sin correr |
 | `debug` | `-p/--phase=all`, `--fn NAME`, `--list-phases` (`99-113`) | Inspección fases |
 | `build` | `file`, `-o`, `--target=bytecode` (`192-206`) | Artefacto |

@@ -93,19 +93,19 @@ pub(super) fn infer_member(c: &mut CallTypeCtx, object: ExprId, property: ExprId
     };
 
     if let Some(ctx) = c.ctx {
-        if let Some(members) = ctx.get_class_members(&class_name, origin.as_deref()) {
-            if let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name) {
-                return Some(m.ty);
-            }
+        if let Some(members) = ctx.get_class_members(&class_name, origin.as_deref())
+            && let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name)
+        {
+            return Some(m.ty);
         }
         if let Some(ext_ty) = ctx.get_extension_method(&class_name, prop_name) {
             return Some(ext_ty);
         }
     }
-    if let Some(methods) = c.class_methods.get(class_name.as_str()) {
-        if let Some(ty) = methods.get(prop_name) {
-            return Some(*ty);
-        }
+    if let Some(methods) = c.class_methods.get(class_name.as_str())
+        && let Some(ty) = methods.get(prop_name)
+    {
+        return Some(*ty);
     }
     None
 }

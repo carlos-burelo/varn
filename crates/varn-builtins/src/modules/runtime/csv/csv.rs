@@ -1,4 +1,4 @@
-use varn_contract::varn_contract;
+use varn_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct CsvRuntime;

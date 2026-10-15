@@ -14,12 +14,11 @@ pub(crate) fn get_fixed_field_at(
     tag: Option<varn_core::RuntimeKind>,
     heap: &Heap,
 ) -> VmResult<VmValue> {
-    if obj.is_heap() {
-        if let Some(inst) = heap.instance(obj.as_heap()) {
-            if let Some(v) = inst.read_field_at(offset, tag) {
-                return Ok(v);
-            }
-        }
+    if obj.is_heap()
+        && let Some(inst) = heap.instance(obj.as_heap())
+        && let Some(v) = inst.read_field_at(offset, tag)
+    {
+        return Ok(v);
     }
     Err(RuntimeError::new(format!(
         "OpGetFixedField: bad compact field offset {offset} on {obj:?}"
@@ -33,13 +32,12 @@ pub(crate) fn set_fixed_field_at(
     val: VmValue,
     heap: &mut Heap,
 ) -> VmResult<()> {
-    if obj.is_heap() {
-        if let Some(inst) = heap.instance(obj.as_heap()) {
-            if inst.write_field_at(offset, tag, val).is_ok() {
-                heap.write_barrier(obj.as_heap(), val);
-                return Ok(());
-            }
-        }
+    if obj.is_heap()
+        && let Some(inst) = heap.instance(obj.as_heap())
+        && inst.write_field_at(offset, tag, val).is_ok()
+    {
+        heap.write_barrier(obj.as_heap(), val);
+        return Ok(());
     }
     Err(RuntimeError::new(format!(
         "OpSetFixedField: bad compact field offset {offset} on {obj:?}"
@@ -48,10 +46,10 @@ pub(crate) fn set_fixed_field_at(
 
 pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(inst) = heap.instance(obj.as_heap()) {
-            if let Some(v) = inst.field_at(slot) {
-                return Ok(v);
-            }
+        if let Some(inst) = heap.instance(obj.as_heap())
+            && let Some(v) = inst.field_at(slot)
+        {
+            return Ok(v);
         }
         let found = match heap.get(obj.as_heap()) {
             Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.field_at(slot),

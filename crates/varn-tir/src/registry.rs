@@ -77,8 +77,8 @@ mod tests {
     use crate::Ancestry;
 
     fn sample_class(name: &str) -> ClassInfo {
-        let mut tt = TyTable::default();
-        ClassInfo::new(Arc::from(name), Ancestry::Root, Vec::new(), &mut tt)
+        let tt = TyTable::default();
+        ClassInfo::new(Arc::from(name), Ancestry::Root, Vec::new(), &tt)
     }
 
     #[test]

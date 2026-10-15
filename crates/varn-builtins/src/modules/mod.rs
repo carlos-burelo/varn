@@ -14,6 +14,8 @@ pub mod ffi;
 pub mod fs;
 #[path = "core/globals/globals.rs"]
 pub mod globals;
+#[path = "runtime/gpu/gpu.rs"]
+pub mod gpu;
 #[path = "runtime/io/io.rs"]
 pub mod io;
 #[path = "runtime/json/json.rs"]
@@ -39,10 +41,16 @@ pub mod sys;
 pub mod task;
 #[path = "runtime/testing/testing.rs"]
 pub mod testing;
+#[path = "runtime/text/text.rs"]
+pub mod text;
 #[path = "runtime/time/time.rs"]
 pub mod time;
 #[path = "core/types/mod.rs"]
 pub mod types;
+#[path = "runtime/ui/ui.rs"]
+pub mod ui;
+#[path = "runtime/ui/draw.rs"]
+pub mod ui_draw;
 #[path = "runtime/ws/ws.rs"]
 pub mod ws;
 
@@ -73,6 +81,7 @@ pub fn force_link_builtins() -> usize {
     register_marker!(csv, __VARN_LINK_MARKER_RUNTIME_CSV);
     register_marker!(ffi, __VARN_LINK_MARKER_RUNTIME_FFI);
     register_marker!(fs, __VARN_LINK_MARKER_RUNTIME_FS);
+    register_marker!(gpu, __VARN_LINK_MARKER_RUNTIME_GPU);
     register_marker!(globals, __VARN_LINK_MARKER_GLOBALS);
     register_marker!(errors, __VARN_LINK_MARKER_ERROR);
     register_marker!(errors, __VARN_LINK_MARKER_TYPEERROR);
@@ -94,6 +103,8 @@ pub fn force_link_builtins() -> usize {
     register_marker!(task, __VARN_LINK_MARKER_CHANNEL);
     register_marker!(task, __VARN_LINK_MARKER_CHANNELCLOSED);
     register_marker!(time, __VARN_LINK_MARKER_RUNTIME_TIME);
+    register_marker!(text, __VARN_LINK_MARKER_RUNTIME_TEXT);
+    register_marker!(ui, __VARN_LINK_MARKER_RUNTIME_UI);
     register_marker!(ws, __VARN_LINK_MARKER_RUNTIME_WS);
 
     register_marker!(types::array, __VARN_LINK_MARKER_ARRAY);

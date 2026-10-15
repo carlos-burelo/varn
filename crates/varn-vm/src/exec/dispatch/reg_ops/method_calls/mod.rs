@@ -58,10 +58,10 @@ impl ExecCtx {
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("CallMethod: non-string name"))?;
 
-        if let Some(template) = self.enum_variant_template(this_val, name.as_ref()) {
-            if let Some(built) = self.construct_enum_variant(&template, args) {
-                return Ok(MethodOutcome::Value(built));
-            }
+        if let Some(template) = self.enum_variant_template(this_val, name.as_ref())
+            && let Some(built) = self.construct_enum_variant(&template, args)
+        {
+            return Ok(MethodOutcome::Value(built));
         }
 
         if let Some(v) = self.intrinsic_method(this_val, name.as_ref(), args) {
@@ -100,35 +100,36 @@ impl ExecCtx {
         let receiver_class = receiver_class.as_ref();
         let method_nv = crate::exec::props::get_property(this_val, &name, &mut self.heap)?;
 
-        if method_nv.is_heap() {
-            if let Some(HeapObj::BoundMethod(bm)) = self.heap.get(method_nv.as_heap()) {
-                match &bm.target {
-                    BoundMethodTarget::Native { func, .. } => {
-                        let f = *func;
+        if method_nv.is_heap()
+            && let Some(HeapObj::BoundMethod(bm)) = self.heap.get(method_nv.as_heap())
+        {
+            match &bm.target {
+                BoundMethodTarget::Native { func, .. } => {
+                    let f = *func;
+                    ic::record(
+                        closure,
+                        site,
+                        receiver_class,
+                        name.as_ref(),
+                        ICKind::NATIVE_VTABLE_METHOD,
+                    );
+                    return self.call_native_method(f, this_val, args, name.as_ref());
+                }
+                BoundMethodTarget::Vm {
+                    closure: method_closure,
+                    ..
+                } => {
+                    if let Some(nc) = self.heap.closure_of(*method_closure)
+                        && !nc.proto.is_generator
+                        && !nc.proto.is_async
+                    {
                         ic::record(
                             closure,
                             site,
                             receiver_class,
                             name.as_ref(),
-                            ICKind::NATIVE_VTABLE_METHOD,
+                            ICKind::VM_VTABLE_METHOD,
                         );
-                        return self.call_native_method(f, this_val, args, name.as_ref());
-                    }
-                    BoundMethodTarget::Vm {
-                        closure: method_closure,
-                        ..
-                    } => {
-                        if let Some(nc) = self.heap.closure_of(*method_closure) {
-                            if !nc.proto.is_generator && !nc.proto.is_async {
-                                ic::record(
-                                    closure,
-                                    site,
-                                    receiver_class,
-                                    name.as_ref(),
-                                    ICKind::VM_VTABLE_METHOD,
-                                );
-                            }
-                        }
                     }
                 }
             }

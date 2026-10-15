@@ -1,2 +1,2 @@
-// VN4018
+// expect: error[VN4018]
 function count(): int { }

@@ -1,7 +1,7 @@
 use super::calls_static::{hand_off, settle, Handoff};
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-#[varn_op_macros::jit_slow(field = "jit_call_method_cached_window")]
+#[varn_macros::jit_slow(field = "jit_call_method_cached_window")]
 pub(crate) extern "C" fn jit_call_method_cached_window(
     ctx: *mut ExecCtx,
     class_ptr: usize,
@@ -134,7 +134,7 @@ unsafe fn fallback_method_call(
     unsafe { finish_method_outcome(ctx_ref, caller_depth, outcome, out) }
 }
 
-#[varn_op_macros::jit_slow(field = "jit_call_method_window")]
+#[varn_macros::jit_slow(field = "jit_call_method_window")]
 pub(crate) extern "C" fn jit_call_method_window(
     ctx: *mut ExecCtx,
     name_idx: usize,

@@ -1,4 +1,4 @@
-use varn_contract::varn_contract;
+use varn_macros::varn_contract;
 use varn_types::str_util::{
     byte_to_char_idx, char_len, char_range_to_bytes, find_bytes, rfind_bytes,
 };
@@ -25,11 +25,10 @@ varn_contract! {
         fn fromCharCode(_ctx: &mut dyn NativeCtx, codes: &[VmValue]) -> String {
             let mut res = String::new();
             for &v in codes {
-                if v.is_int() {
-                    if let Some(c) = std::char::from_u32(v.as_int() as u32) {
+                if v.is_int()
+                    && let Some(c) = std::char::from_u32(v.as_int() as u32) {
                         res.push(c);
                     }
-                }
             }
             res
         }
@@ -322,10 +321,10 @@ fn pad_end(s: &str, target: i64, pad: Option<&str>) -> String {
 pub fn str_from_char_code(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
     let mut res = String::new();
     for &v in args {
-        if v.is_int() {
-            if let Some(c) = std::char::from_u32(v.as_int() as u32) {
-                res.push(c);
-            }
+        if v.is_int()
+            && let Some(c) = std::char::from_u32(v.as_int() as u32)
+        {
+            res.push(c);
         }
     }
     Ok(ctx.alloc_str_owned(res))

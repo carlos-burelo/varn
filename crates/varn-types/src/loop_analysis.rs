@@ -97,13 +97,13 @@ pub fn natural_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<NaturalLoop> 
                 if info.call_args.is_some() {
                     has_calls = true;
                 }
-                if let Some(op) = OpCode::from_u16(code[instr_offset]) {
-                    if matches!(
+                if let Some(op) = OpCode::from_u16(code[instr_offset])
+                    && matches!(
                         op,
                         OpCode::ArrayPush | OpCode::ArrayPop | OpCode::ArrayExtend
-                    ) {
-                        mutates_arrays = true;
-                    }
+                    )
+                {
+                    mutates_arrays = true;
                 }
             }
             NaturalLoop {

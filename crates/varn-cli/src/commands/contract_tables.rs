@@ -16,14 +16,14 @@ fn contract_refs(rs_source: &str) -> Vec<String> {
     while let Some(pos) = rest.find("contract:") {
         rest = &rest[pos + "contract:".len()..];
         let trimmed = rest.trim_start();
-        if let Some(quoted) = trimmed.strip_prefix('"') {
-            if let Some(end) = quoted.find('"') {
-                let lit = &quoted[..end];
-                if !lit.is_empty() && !lit.contains('\n') && !out.contains(&lit.to_string()) {
-                    out.push(lit.to_string());
-                }
-                rest = &quoted[end.min(quoted.len())..];
+        if let Some(quoted) = trimmed.strip_prefix('"')
+            && let Some(end) = quoted.find('"')
+        {
+            let lit = &quoted[..end];
+            if !lit.is_empty() && !lit.contains('\n') && !out.contains(&lit.to_string()) {
+                out.push(lit.to_string());
             }
+            rest = &quoted[end.min(quoted.len())..];
         }
     }
     out.sort();

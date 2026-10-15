@@ -10,7 +10,7 @@ pub struct JitClassMemberArgs {
     pub kind: u8,
 }
 
-#[varn_op_macros::jit_slow(field = "get_super")]
+#[varn_macros::jit_slow(field = "get_super")]
 pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -33,7 +33,7 @@ pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
     }
 }
 
-#[varn_op_macros::jit_slow(field = "alloc_instance")]
+#[varn_macros::jit_slow(field = "alloc_instance")]
 pub(crate) extern "C" fn jit_alloc_instance(ctx: *mut ExecCtx, class_tag: u64, class_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -45,7 +45,7 @@ pub(crate) extern "C" fn jit_alloc_instance(ctx: *mut ExecCtx, class_tag: u64, c
     }
 }
 
-#[varn_op_macros::jit_slow(field = "declare_layout")]
+#[varn_macros::jit_slow(field = "declare_layout")]
 pub(crate) extern "C" fn jit_declare_layout(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -67,7 +67,7 @@ pub(crate) extern "C" fn jit_declare_layout(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "make_class")]
+#[varn_macros::jit_slow(field = "make_class")]
 pub(crate) extern "C" fn jit_make_class(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -82,16 +82,16 @@ pub(crate) extern "C" fn jit_make_class(
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
         let cls = crate::exec::class::op_class(&name, &mut ctx_ref.heap);
         let super_val = VmValue::from_raw_parts(super_tag, super_payload);
-        if !super_val.is_null() {
-            if let Err(e) = crate::exec::class::op_inherit(cls, super_val, &mut ctx_ref.heap) {
-                jit_propagate_error(ctx_ref, e);
-            }
+        if !super_val.is_null()
+            && let Err(e) = crate::exec::class::op_inherit(cls, super_val, &mut ctx_ref.heap)
+        {
+            jit_propagate_error(ctx_ref, e);
         }
         ctx_ref.jit_native_result = cls;
     }
 }
 
-#[varn_op_macros::jit_slow(field = "inherit")]
+#[varn_macros::jit_slow(field = "inherit")]
 pub(crate) extern "C" fn jit_inherit(
     ctx: *mut ExecCtx,
     class_tag: u64,
@@ -109,7 +109,7 @@ pub(crate) extern "C" fn jit_inherit(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "class_member_op")]
+#[varn_macros::jit_slow(field = "class_member_op")]
 pub(crate) extern "C" fn jit_class_member_op(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,

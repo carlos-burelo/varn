@@ -54,7 +54,7 @@ fn direct_entry(closure: &VmClosure) -> Option<usize> {
     closure.jit_fn().map(|f| f as usize)
 }
 
-#[varn_op_macros::jit_slow(field = "jit_call_leave")]
+#[varn_macros::jit_slow(field = "jit_call_leave")]
 pub(crate) extern "C" fn jit_call_leave(ctx: *mut ExecCtx, alloc: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -63,7 +63,7 @@ pub(crate) extern "C" fn jit_call_leave(ctx: *mut ExecCtx, alloc: usize) {
     }
 }
 
-#[varn_op_macros::jit_slow(field = "jit_call_self_window")]
+#[varn_macros::jit_slow(field = "jit_call_self_window")]
 pub(crate) extern "C" fn jit_call_self_window(
     ctx: *mut ExecCtx,
     window: *const VmValue,
@@ -92,7 +92,7 @@ pub(crate) extern "C" fn jit_call_self_window(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "jit_push_native_frame")]
+#[varn_macros::jit_slow(field = "jit_push_native_frame")]
 pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *const VmClosure) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -111,7 +111,7 @@ pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *cons
     }
 }
 
-#[varn_op_macros::jit_slow(field = "jit_release_closure")]
+#[varn_macros::jit_slow(field = "jit_release_closure")]
 pub(crate) extern "C" fn jit_release_closure(closure: *const VmClosure) {
     unsafe { drop(std::rc::Rc::from_raw(closure)) }
 }

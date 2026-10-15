@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+function* numbers(): int { yield 1; yield 2 }
+const loose: Generator<int | str> = numbers()

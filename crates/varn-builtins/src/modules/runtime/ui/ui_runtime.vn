@@ -1,0 +1,17 @@
+// runtime:ui — headless window/event/draw backend (v1, no winit).
+// Single event queue + command log per window. Real backend feeds the same
+// queue and draws instead of logging. Same API, no dual paths.
+
+export declare function open$(title: str, w: int, h: int): int;
+export declare function close$(id: int): void;
+export declare function shouldClose$(id: int): bool;
+export declare function size$(id: int): int[];
+export declare function inject$(id: int, kind: str, a: int, b: int, c: int): void;
+export declare function poll$(id: int): dynamic[];
+export declare function rect$(id: int, x: float, y: float, w: float, h: float, color: int, radius: float): void;
+export declare function text$(id: int, x: float, y: float, s: str, size: float, color: int): void;
+export declare function clear$(id: int, color: int): void;
+export declare function present$(id: int): int;
+export declare function commands$(id: int): str[];
+export declare function real$(id: int): bool;
+export declare function keyCode$(name: str): int;

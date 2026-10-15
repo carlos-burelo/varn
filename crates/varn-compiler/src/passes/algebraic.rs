@@ -41,10 +41,10 @@ pub fn run(func: &mut SsaFunc) -> bool {
 
     let mut changed = !to_const.is_empty();
     for (b, i, kind) in to_const {
-        if let Some(dest) = func.blocks[b].insts[i].dest {
-            if let Some(ty) = const_inst_ty(&kind) {
-                func.values[dest.0 as usize].ty = ty;
-            }
+        if let Some(dest) = func.blocks[b].insts[i].dest
+            && let Some(ty) = const_inst_ty(&kind)
+        {
+            func.values[dest.0 as usize].ty = ty;
         }
         func.blocks[b].insts[i].kind = kind;
     }

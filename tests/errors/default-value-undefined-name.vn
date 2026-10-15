@@ -1,2 +1,2 @@
-// VN3002
+// expect: error[VN3002]
 function pick(x: int = missing): int { return x }

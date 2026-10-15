@@ -138,10 +138,10 @@ pub(super) fn bind_match_pattern_vars(b: &mut Binder, pattern: &MatchPattern) {
         }
         MatchPattern::Record { fields, .. } => {
             let variant_name = fields.first().and_then(|(key, sub)| {
-                if b.interner.resolve(*key) == varn_core::MemberKey::Variant.as_str() {
-                    if let Some(MatchPattern::Identifier(n)) = sub {
-                        return Some(*n);
-                    }
+                if b.interner.resolve(*key) == varn_core::MemberKey::Variant.as_str()
+                    && let Some(MatchPattern::Identifier(n)) = sub
+                {
+                    return Some(*n);
                 }
                 None
             });
@@ -171,10 +171,10 @@ pub(super) fn bind_match_pattern_vars(b: &mut Binder, pattern: &MatchPattern) {
                     let sym = Symbol::new(SymbolKind::Let, binding_name, 0).with_type(ty);
                     b.define(binding_name, sym);
 
-                    if let Some(sub) = sub_pat {
-                        if !matches!(sub, MatchPattern::Identifier(_)) {
-                            bind_match_pattern_vars(b, sub);
-                        }
+                    if let Some(sub) = sub_pat
+                        && !matches!(sub, MatchPattern::Identifier(_))
+                    {
+                        bind_match_pattern_vars(b, sub);
                     }
                 }
             } else {
@@ -188,10 +188,10 @@ pub(super) fn bind_match_pattern_vars(b: &mut Binder, pattern: &MatchPattern) {
                             Symbol::new(SymbolKind::Let, binding_name, 0).with_type(Type::Dynamic);
                         b.define(binding_name, sym);
                     }
-                    if let Some(sub) = sub_pat {
-                        if !matches!(sub, MatchPattern::Identifier(_)) {
-                            bind_match_pattern_vars(b, sub);
-                        }
+                    if let Some(sub) = sub_pat
+                        && !matches!(sub, MatchPattern::Identifier(_))
+                    {
+                        bind_match_pattern_vars(b, sub);
                     }
                 }
             }

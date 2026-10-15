@@ -1,4 +1,4 @@
-// VN3301
+// expect: error[VN3301]
 function f(x: str?): int {
     if (x == null) { return 0 }
     x = null

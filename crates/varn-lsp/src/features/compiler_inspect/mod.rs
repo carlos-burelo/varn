@@ -55,13 +55,12 @@ fn std_list() -> serde_json::Value {
 }
 
 fn std_read(specifier: &str) -> Result<String, String> {
-    if let Some(provider) = varn_modules::provider::get() {
-        if let Some(source) = provider
+    if let Some(provider) = varn_modules::provider::get()
+        && let Some(source) = provider
             .bundled_source(specifier)
             .or_else(|| provider.embedded_source(specifier))
-        {
-            return Ok(source.to_owned());
-        }
+    {
+        return Ok(source.to_owned());
     }
     let path = crate::workspace::std_sources::resolve_module_file(specifier)
         .ok_or_else(|| format!("Unknown std module: {specifier}"))?;

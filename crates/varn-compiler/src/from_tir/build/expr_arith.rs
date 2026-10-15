@@ -359,10 +359,10 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         use varn_core::NumericDomain as D;
         let v = self.lower_expr(operand)?;
-        if ty == HirType::Bool {
-            if let Some(holds) = self.static_truthiness(v) {
-                return Ok(holds);
-            }
+        if ty == HirType::Bool
+            && let Some(holds) = self.static_truthiness(v)
+        {
+            return Ok(holds);
         }
         let from = match self.value_ty(v) {
             HirType::Int => Some(D::Int),

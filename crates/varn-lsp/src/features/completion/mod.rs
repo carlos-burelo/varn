@@ -209,19 +209,19 @@ pub fn build_completion_response(
     let kw_n = items.len() - scope_n;
 
     let mut auto_n = 0;
-    if let Some(idx) = index {
-        if !prefix.is_empty() {
-            let already_known: FxHashSet<String> = state.symbol_map.keys().cloned().collect();
-            let auto = autoimport::build_autoimport_completions(
-                &state.source,
-                &state.uri,
-                idx,
-                &already_known,
-                Some(&prefix),
-            );
-            auto_n = auto.len();
-            items.extend(auto);
-        }
+    if let Some(idx) = index
+        && !prefix.is_empty()
+    {
+        let already_known: FxHashSet<String> = state.symbol_map.keys().cloned().collect();
+        let auto = autoimport::build_autoimport_completions(
+            &state.source,
+            &state.uri,
+            idx,
+            &already_known,
+            Some(&prefix),
+        );
+        auto_n = auto.len();
+        items.extend(auto);
     }
 
     let line_txt: String = state
@@ -288,10 +288,10 @@ pub fn preview_items(items: &[tower_lsp_f::lsp_types::CompletionItem], n: usize)
                     }
                 }
             }
-            if let Some(f) = &i.filter_text {
-                if f != &i.label {
-                    s.push_str(&format!("?{f}"));
-                }
+            if let Some(f) = &i.filter_text
+                && f != &i.label
+            {
+                s.push_str(&format!("?{f}"));
             }
             s
         })

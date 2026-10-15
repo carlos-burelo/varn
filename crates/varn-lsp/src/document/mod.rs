@@ -201,15 +201,15 @@ impl DocumentState {
     }
 
     pub fn resolve_symbol_id_at_offset(&self, offset: u32) -> Option<varn_sem::symbol::SymbolId> {
-        if let Some(entry) = self.expr_entry_at_offset(offset) {
-            if let Some(sid) = entry.symbol_id {
-                return Some(sid);
-            }
+        if let Some(entry) = self.expr_entry_at_offset(offset)
+            && let Some(sid) = entry.symbol_id
+        {
+            return Some(sid);
         }
-        if let Some(info) = self.db.expr_types.get(&offset) {
-            if let Some(sid) = info.symbol_id {
-                return Some(sid);
-            }
+        if let Some(info) = self.db.expr_types.get(&offset)
+            && let Some(sid) = info.symbol_id
+        {
+            return Some(sid);
         }
         let token = self.tokens.iter().find(|t| t.offset == offset)?;
         if let Some((sid, _)) = self.db.resolve_at(self.lexeme(token), token.offset) {
@@ -286,13 +286,13 @@ impl DocumentState {
     }
 
     pub fn symbol_target_at_offset(&self, offset: u32) -> Option<SymbolTarget> {
-        if let Some(token) = self.tokens.iter().find(|t| t.offset == offset) {
-            if let Some((parent_name, member)) = self.member_at_pos(token.line, token.col) {
-                return Some(SymbolTarget::Member {
-                    parent_name,
-                    member_name: member.name.to_string(),
-                });
-            }
+        if let Some(token) = self.tokens.iter().find(|t| t.offset == offset)
+            && let Some((parent_name, member)) = self.member_at_pos(token.line, token.col)
+        {
+            return Some(SymbolTarget::Member {
+                parent_name,
+                member_name: member.name.to_string(),
+            });
         }
         let sid = self.resolve_symbol_id_at_offset(offset)?;
         self.symbol_target_for_id(sid)

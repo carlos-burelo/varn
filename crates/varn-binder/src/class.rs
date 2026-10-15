@@ -100,7 +100,7 @@ impl<'r> super::Binder<'r> {
             let owned_members: Vec<ClassMemberInfo> = parent_is_local
                 .then(|| self.local_class_members(parent_name.as_ref()))
                 .flatten()
-                .map(|v| v.clone())
+                .cloned()
                 .unwrap_or_default();
             let mapping = self.parent_param_mapping(&parent_name, &parent_args);
             self.class_parents.insert(

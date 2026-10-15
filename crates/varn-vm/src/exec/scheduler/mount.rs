@@ -16,10 +16,10 @@ fn closure_for(ctx: &mut ExecCtx, task: &LazyTask) -> Rc<VmClosure> {
         let cached = unsafe { &*ctx.static_closures.get() }
             .get(&key)
             .map(|&(_, val)| val);
-        if let Some(val) = cached {
-            if let Some(HeapObj::VmClosure(closure)) = ctx.heap.get(val.as_heap()) {
-                return Rc::clone(closure);
-            }
+        if let Some(val) = cached
+            && let Some(HeapObj::VmClosure(closure)) = ctx.heap.get(val.as_heap())
+        {
+            return Rc::clone(closure);
         }
     }
     let constants = ctx.shared_constants(&task.proto);

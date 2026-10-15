@@ -1,4 +1,4 @@
-// VN3001
+// expect: error[VN3001]
 namespace A { export class Item { v: int = 1 } }
 namespace B { export class Item { v: str = "s" } }
 const x: A.Item = new B.Item()

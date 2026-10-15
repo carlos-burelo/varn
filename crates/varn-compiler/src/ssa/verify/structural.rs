@@ -127,10 +127,10 @@ pub(super) fn block_succs(block: &Block) -> Vec<BlockId> {
 
 fn edge_arg_count(func: &SsaFunc, pred: BlockId, block: BlockId) -> Result<usize, String> {
     for inst in &func.blocks[pred.0 as usize].insts {
-        if let InstKind::Try { handler } = &inst.kind {
-            if *handler == block {
-                return Ok(0);
-            }
+        if let InstKind::Try { handler } = &inst.kind
+            && *handler == block
+        {
+            return Ok(0);
         }
     }
     match &func.blocks[pred.0 as usize].term {

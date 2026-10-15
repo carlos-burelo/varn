@@ -19,14 +19,12 @@ pub(crate) fn format_expr_short(
             ..
         } => {
             let (object, property, computed) = (*object, *property, *computed);
-            if !computed {
-                if let ExprKind::Identifier { name } = &arena.expr(property).kind {
-                    return format!(
-                        "{}.{}",
-                        format_expr_short(object, arena, interner),
-                        interner.resolve(*name)
-                    );
-                }
+            if !computed && let ExprKind::Identifier { name } = &arena.expr(property).kind {
+                return format!(
+                    "{}.{}",
+                    format_expr_short(object, arena, interner),
+                    interner.resolve(*name)
+                );
             }
             format!("{}[...]", format_expr_short(object, arena, interner))
         }

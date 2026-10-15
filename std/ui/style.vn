@@ -1,0 +1,97 @@
+export enum TextStyle {
+    body,
+    title,
+    headline,
+    caption
+}
+
+export enum MainAxis {
+    start,
+    center,
+    end,
+    spaceBetween,
+    spaceAround,
+    spaceEvenly
+}
+
+export enum CrossAxis {
+    start,
+    center,
+    end,
+    stretch
+}
+
+export enum Alignment {
+    topLeft,
+    topCenter,
+    topRight,
+    centerLeft,
+    center,
+    centerRight,
+    bottomLeft,
+    bottomCenter,
+    bottomRight
+}
+
+export enum BoxFit {
+    contain,
+    cover,
+    fill,
+    fitWidth,
+    fitHeight,
+    none
+}
+
+export enum Curve {
+    linear,
+    easeIn,
+    easeOut,
+    easeInOut
+}
+
+export const Colors = {
+    black: 4278190080,
+    white: 4294967295,
+    red: 4294901760,
+    green: 4278255360,
+    blue: 4280391411,
+    gray: 4287137928,
+    transparent: 0
+};
+
+export const Theme = {
+    colors: {
+        surface: 4278190080,
+        onSurface: 4294967295,
+        primary: 4280391411,
+        muted: 4287137928,
+        danger: 4294901760,
+        success: 4278255360
+    },
+    text: {
+        titleSize: 24.0,
+        bodySize: 20.0,
+        headlineSize: 32.0,
+        captionSize: 14.0
+    }
+};
+
+export function textSizeFor(style: TextStyle): float {
+    if (style == TextStyle.title) {
+        return Theme.text.titleSize;
+    }
+    if (style == TextStyle.headline) {
+        return Theme.text.headlineSize;
+    }
+    if (style == TextStyle.caption) {
+        return Theme.text.captionSize;
+    }
+    return Theme.text.bodySize;
+}
+
+export function textColorFor(style: TextStyle): int {
+    if (style == TextStyle.caption) {
+        return Theme.colors.muted;
+    }
+    return Theme.colors.onSurface;
+}

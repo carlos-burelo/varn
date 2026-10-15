@@ -60,20 +60,19 @@ pub fn fold_tokens(source: &str, tokens: &[TokenRecord]) -> Vec<FoldingRange> {
         match tok.kind {
             TokenKind::LBrace => brace_stack.push((tok.line, i)),
             TokenKind::RBrace => {
-                if let Some((start, open_idx)) = brace_stack.pop() {
-                    if tok.line > start {
-                        let kind =
-                            classify_brace_kind(source, tokens, open_idx, start, &import_lines);
-                        ranges.push(fold(start, tok.line, kind));
-                    }
+                if let Some((start, open_idx)) = brace_stack.pop()
+                    && tok.line > start
+                {
+                    let kind = classify_brace_kind(source, tokens, open_idx, start, &import_lines);
+                    ranges.push(fold(start, tok.line, kind));
                 }
             }
             TokenKind::LBracket => bracket_stack.push(tok.line),
             TokenKind::RBracket => {
-                if let Some(start) = bracket_stack.pop() {
-                    if tok.line > start {
-                        ranges.push(fold(start, tok.line, None));
-                    }
+                if let Some(start) = bracket_stack.pop()
+                    && tok.line > start
+                {
+                    ranges.push(fold(start, tok.line, None));
                 }
             }
             TokenKind::EOF

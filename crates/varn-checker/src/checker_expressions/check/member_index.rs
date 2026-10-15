@@ -49,19 +49,19 @@ impl<'r> Checker<'r> {
             }
             TypeKind::Tuple(slots) => {
                 let arity = self.ty_table.get_list(slots).len();
-                if let ExprKind::IntLiteral { value, .. } = &self.ast_arena.expr(property).kind {
-                    if usize::try_from(*value).map_or(true, |at| at >= arity) {
-                        self.emit(
-                            Diagnostic::error(
-                                ErrorCode::TupleIndexOutOfBounds,
-                                format!(
-                                    "tuple index {value} is out of bounds: '{}' has {arity} elements",
-                                    check_ty.display(&self.ty_table, &bind.interner)
-                                ),
-                            )
-                            .with_range(property_range),
-                        );
-                    }
+                if let ExprKind::IntLiteral { value, .. } = &self.ast_arena.expr(property).kind
+                    && usize::try_from(*value).map_or(true, |at| at >= arity)
+                {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::TupleIndexOutOfBounds,
+                            format!(
+                                "tuple index {value} is out of bounds: '{}' has {arity} elements",
+                                check_ty.display(&self.ty_table, &bind.interner)
+                            ),
+                        )
+                        .with_range(property_range),
+                    );
                 }
                 Some(Type::Int)
             }
@@ -112,6 +112,5 @@ impl<'r> Checker<'r> {
         } else {
             self.check_expr(rec, property, bind);
         }
-        return;
     }
 }

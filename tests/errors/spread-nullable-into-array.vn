@@ -1,3 +1,3 @@
-// VN3001
+// expect: error[VN3001]
 const maybe: int[]? = null
 const listed = [0, ...maybe]

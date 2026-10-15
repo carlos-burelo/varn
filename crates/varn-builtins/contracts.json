@@ -3546,6 +3546,212 @@
         }
       ]
     },
+    "src/modules/runtime/gpu/gpu_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "backend$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "int",
+          "symbol": "deviceCount$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "str",
+          "symbol": "adapterName$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "engine$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "create$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "destroy$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "len$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "array",
+          "symbol": "dims$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "void",
+          "symbol": "reshape$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "array"
+            }
+          ],
+          "ret": "int",
+          "symbol": "upload$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "array",
+          "symbol": "download$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "add$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "mul$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "int",
+          "symbol": "scale$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "float",
+          "symbol": "dot$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "matMul$"
+        }
+      ]
+    },
     "src/modules/runtime/io/io_runtime.vn": {
       "classes": {},
       "functions": [
@@ -4861,6 +5067,108 @@
         }
       ]
     },
+    "src/modules/runtime/text/text_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "int",
+          "symbol": "fontCount$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "array",
+          "symbol": "fonts$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "shape$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "dynamic",
+          "symbol": "rasterGlyph$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [],
+          "ret": "int",
+          "symbol": "glyphCacheSize$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "ascent$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "float",
+          "symbol": "descent$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "array",
+          "symbol": "wrap$"
+        }
+      ]
+    },
     "src/modules/runtime/time/time_runtime.vn": {
       "classes": {},
       "functions": [
@@ -4906,6 +5214,239 @@
           ],
           "ret": "int",
           "symbol": "partsToMs$"
+        }
+      ]
+    },
+    "src/modules/runtime/ui/ui_runtime.vn": {
+      "classes": {},
+      "functions": [
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "open$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "close$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "shouldClose$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "array",
+          "symbol": "size$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "inject$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "array",
+          "symbol": "poll$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            }
+          ],
+          "ret": "void",
+          "symbol": "rect$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "str"
+            },
+            {
+              "rest": false,
+              "ty": "float"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "text$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            },
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "void",
+          "symbol": "clear$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "int",
+          "symbol": "present$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "array",
+          "symbol": "commands$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "int"
+            }
+          ],
+          "ret": "bool",
+          "symbol": "real$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
+          "params": [
+            {
+              "rest": false,
+              "ty": "str"
+            }
+          ],
+          "ret": "int",
+          "symbol": "keyCode$"
         }
       ]
     },
@@ -4999,6 +5540,7 @@
     "src/modules/runtime/csv/csv_runtime.vn": "b2b54bdac48c554c",
     "src/modules/runtime/ffi/ffi_runtime.vn": "93aa79ed79baa8c7",
     "src/modules/runtime/fs/fs_runtime.vn": "f3e97b53782fcbae",
+    "src/modules/runtime/gpu/gpu_runtime.vn": "672a603f13a06866",
     "src/modules/runtime/io/io_runtime.vn": "1815b87646c5c725",
     "src/modules/runtime/json/json_runtime.vn": "839713f2280e584e",
     "src/modules/runtime/math/math_runtime.vn": "e9a027b63373cc9b",
@@ -5010,7 +5552,9 @@
     "src/modules/runtime/sqlite/sqlite_runtime.vn": "85b566f5fac5e032",
     "src/modules/runtime/sys/sys_runtime.vn": "c8ee866f3bfb7849",
     "src/modules/runtime/task/task_runtime.vn": "18090b06e3b71a8f",
+    "src/modules/runtime/text/text_runtime.vn": "3bb09cff6d5c08ca",
     "src/modules/runtime/time/time_runtime.vn": "63102a15b1bd3f56",
+    "src/modules/runtime/ui/ui_runtime.vn": "678f8964a1d8235c",
     "src/modules/runtime/ws/ws_runtime.vn": "6f22dbfe8544d40e"
   },
   "version": 1

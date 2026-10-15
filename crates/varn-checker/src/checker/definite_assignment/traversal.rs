@@ -292,10 +292,8 @@ impl<'r> Checker<'r> {
                         }
                     });
                 }
-                if has_default {
-                    if let Some(a) = acc {
-                        *flow = a;
-                    }
+                if has_default && let Some(a) = acc {
+                    *flow = a;
                 }
             }
 

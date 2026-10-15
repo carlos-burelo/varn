@@ -118,6 +118,11 @@ impl SsaProto {
         self.secondary_entries
             .iter()
             .find(|e| e.ip as usize == ip && e.kind == SsaEntryKind::Resume)
+            .or_else(|| {
+                self.secondary_entries
+                    .iter()
+                    .find(|e| e.ip as usize == ip && e.kind == SsaEntryKind::Loop)
+            })
     }
 
     pub fn catch_at(&self, ip: usize) -> Option<&SsaSecondaryEntry> {

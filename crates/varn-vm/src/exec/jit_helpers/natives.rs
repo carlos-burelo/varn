@@ -2,7 +2,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow(field = "jit_call_native_window")]
+#[varn_macros::jit_slow(field = "jit_call_native_window")]
 pub(crate) extern "C" fn jit_call_native_window(
     ctx: *mut ExecCtx,
     fn_addr: usize,
@@ -12,10 +12,6 @@ pub(crate) extern "C" fn jit_call_native_window(
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        if let Err(e) = varn_builtins::check_native_op_capability(op_id, &*ctx_ref) {
-            jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(e));
-            return;
-        }
         let f = resolve_native(ctx_ref, fn_addr, op_id);
         ctx_ref.record_call_native(f, None);
         let args = std::slice::from_raw_parts(window, total);

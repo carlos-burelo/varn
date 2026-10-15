@@ -1,0 +1,11 @@
+export {
+    backend,
+    deviceCount,
+    adapterName,
+    engine,
+    isAvailable,
+    GpuInfo,
+    getInfo
+} from "std:gpu/device";
+
+export { GpuBuffer } from "std:gpu/buffer";

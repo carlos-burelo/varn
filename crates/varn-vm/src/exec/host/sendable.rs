@@ -56,7 +56,7 @@ pub(super) fn to_sendable(
                 Ok(varn_types::value::SendValue::Object(map))
             }
             Some(HeapObj::Map(map_ref)) => {
-                let map_ref = map_ref.clone();
+                let map_ref = *map_ref;
                 let mut items = Vec::new();
                 for (k, v) in map_ref.read().iter() {
                     items.push((ctx.to_sendable(k.0)?, ctx.to_sendable(*v)?));
@@ -64,7 +64,7 @@ pub(super) fn to_sendable(
                 Ok(varn_types::value::SendValue::Map(items))
             }
             Some(HeapObj::Set(set_ref)) => {
-                let set_ref = set_ref.clone();
+                let set_ref = *set_ref;
                 let mut items = Vec::new();
                 for v in set_ref.read().iter() {
                     items.push(ctx.to_sendable(v.0)?);

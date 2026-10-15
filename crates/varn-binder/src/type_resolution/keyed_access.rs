@@ -12,10 +12,10 @@ pub(super) fn resolve_keyof(
     if let TypeKind::Object(mid) = table.get(ty.0) {
         let mut key_types: Vec<CheckerTyId> = vec![];
         for member in table.get_object_members(mid).to_vec() {
-            if let ObjectTypeMember::Index { key_ty, .. } = member {
-                if !key_types.contains(&key_ty) {
-                    key_types.push(key_ty);
-                }
+            if let ObjectTypeMember::Index { key_ty, .. } = member
+                && !key_types.contains(&key_ty)
+            {
+                key_types.push(key_ty);
             }
         }
         if !key_types.is_empty() {
@@ -154,6 +154,7 @@ pub(super) fn resolve_indexed_access(
                         params,
                         return_type,
                         is_arrow,
+                        type_params,
                         ..
                     } if name.as_ref() == key_name => {
                         return Type::fn_(
@@ -161,7 +162,7 @@ pub(super) fn resolve_indexed_access(
                                 params: params.clone(),
                                 return_type: *return_type,
                                 is_arrow: *is_arrow,
-                                type_params: vec![],
+                                type_params: type_params.clone(),
                             },
                             table,
                         );
@@ -232,20 +233,20 @@ pub(super) fn resolve_indexed_access(
         }
     }
 
-    if let TypeKind::Named(name, origin) = table.get(obj.0) {
-        if let Some(key_name) = key_name {
-            let name_str = ctx.and_then(|c| c.atom_text(name));
-            let origin_str = origin.and_then(|o| ctx.and_then(|c| c.atom_text(o)));
-            if let Some(name_str) = name_str {
-                if let Some(members) = ctx.and_then(|c| {
-                    c.get_interface_members(&name_str, origin_str.as_deref())
-                        .or_else(|| c.get_class_members(&name_str, origin_str.as_deref()))
-                }) {
-                    for m in members {
-                        if m.name.as_ref() == key_name {
-                            return m.ty;
-                        }
-                    }
+    if let TypeKind::Named(name, origin) = table.get(obj.0)
+        && let Some(key_name) = key_name
+    {
+        let name_str = ctx.and_then(|c| c.atom_text(name));
+        let origin_str = origin.and_then(|o| ctx.and_then(|c| c.atom_text(o)));
+        if let Some(name_str) = name_str
+            && let Some(members) = ctx.and_then(|c| {
+                c.get_interface_members(&name_str, origin_str.as_deref())
+                    .or_else(|| c.get_class_members(&name_str, origin_str.as_deref()))
+            })
+        {
+            for m in members {
+                if m.name.as_ref() == key_name {
+                    return m.ty;
                 }
             }
         }

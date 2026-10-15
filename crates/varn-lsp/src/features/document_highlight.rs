@@ -39,20 +39,19 @@ pub fn build_document_highlights(
             if !(t.kind == TokenKind::Identifier || t.kind.can_be_identifier()) {
                 continue;
             }
-            if let Some(info) = state.db.expr_types.get(&t.offset) {
-                if info.symbol_id == Some(target_sid) {
-                    let kind = if decl_positions.contains(&(t.line, t.col))
-                        || is_assignment_lhs(state, t)
-                    {
+            if let Some(info) = state.db.expr_types.get(&t.offset)
+                && info.symbol_id == Some(target_sid)
+            {
+                let kind =
+                    if decl_positions.contains(&(t.line, t.col)) || is_assignment_lhs(state, t) {
                         DocumentHighlightKind::Write
                     } else {
                         DocumentHighlightKind::Read
                     };
-                    highlights.push(DocumentHighlight {
-                        range: range_on_line(t.line, t.col, t.col + t.length),
-                        kind: Some(kind),
-                    });
-                }
+                highlights.push(DocumentHighlight {
+                    range: range_on_line(t.line, t.col, t.col + t.length),
+                    kind: Some(kind),
+                });
             }
         }
         if !highlights.is_empty() {

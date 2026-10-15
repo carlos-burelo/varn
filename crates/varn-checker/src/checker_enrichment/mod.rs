@@ -151,28 +151,26 @@ pub fn enrich_call_returns(
                     }
                     if let Some(class_info) =
                         bind.type_members.classes.get_mut(class_name_str.as_str())
-                    {
-                        if let Some(m) = class_info
+                        && let Some(m) = class_info
                             .members
                             .iter_mut()
                             .find(|m| m.name.as_ref() == key_str)
+                    {
+                        let new_ty = with_new_return_type(
+                            m.ty,
+                            final_ret,
+                            &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
+                        );
+                        m.ty = new_ty;
+                        if let Some(symbol_id) = m.symbol_id
+                            && let Some(old) = bind.arena.get(symbol_id).ty
                         {
                             let new_ty = with_new_return_type(
-                                m.ty,
+                                old,
                                 final_ret,
                                 &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
                             );
-                            m.ty = new_ty;
-                            if let Some(symbol_id) = m.symbol_id {
-                                if let Some(old) = bind.arena.get(symbol_id).ty {
-                                    let new_ty = with_new_return_type(
-                                        old,
-                                        final_ret,
-                                        &mut *std::sync::Arc::make_mut(&mut bind.ty_table),
-                                    );
-                                    bind.arena.get_mut(symbol_id).ty = Some(new_ty);
-                                }
-                            }
+                            bind.arena.get_mut(symbol_id).ty = Some(new_ty);
                         }
                     }
                 }
@@ -209,23 +207,20 @@ pub fn enrich_call_returns(
                 bind.ty_table = std::sync::Arc::new(table);
                 if !ret.is_dynamic() {
                     if let Some(ft_map) = bind.type_members.getters.get_mut(class_name_str.as_str())
+                        && let Some(ty) = ft_map.get_mut(key_str.as_str())
                     {
-                        if let Some(ty) = ft_map.get_mut(key_str.as_str()) {
-                            *ty = ret;
-                        }
+                        *ty = ret;
                     }
                     if let Some(class_info) =
                         bind.type_members.classes.get_mut(class_name_str.as_str())
-                    {
-                        if let Some(m) = class_info
+                        && let Some(m) = class_info
                             .members
                             .iter_mut()
                             .find(|m| m.name.as_ref() == key_str)
-                        {
-                            m.ty = ret;
-                            if let Some(symbol_id) = m.symbol_id {
-                                bind.arena.get_mut(symbol_id).ty = Some(ret);
-                            }
+                    {
+                        m.ty = ret;
+                        if let Some(symbol_id) = m.symbol_id {
+                            bind.arena.get_mut(symbol_id).ty = Some(ret);
                         }
                     }
                 }

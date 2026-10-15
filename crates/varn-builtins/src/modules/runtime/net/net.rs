@@ -3,7 +3,7 @@ pub mod http_parser;
 
 use driver::driver;
 use urlencoding::{decode, encode};
-use varn_contract::varn_contract;
+use varn_macros::varn_contract;
 use varn_types::{HostOpen, NativeCtx, VmValue};
 
 pub struct NetRuntime;
@@ -124,11 +124,10 @@ varn_contract! {
 
             let cookie_len = cookies.len(ctx);
             for i in 0..cookie_len {
-                if let Some(v) = cookies.get(ctx, i) {
-                    if let Some(c) = ctx.str_owned(v) {
+                if let Some(v) = cookies.get(ctx, i)
+                    && let Some(c) = ctx.str_owned(v) {
                         let _ = write!(&mut out, "Set-Cookie: {c}\r\n");
                     }
-                }
             }
 
             let _ = write!(&mut out, "\r\n");

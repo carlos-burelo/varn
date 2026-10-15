@@ -13,6 +13,7 @@ pub(crate) mod decorator_receiver;
 pub(crate) mod decorator_signature;
 mod definite_assignment;
 pub(crate) mod foreign_classes;
+pub(crate) mod foreign_collect;
 mod foreign_enums;
 mod literal_fit;
 mod param_defaults;

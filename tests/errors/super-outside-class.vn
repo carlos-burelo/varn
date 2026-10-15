@@ -1,2 +1,2 @@
-// VN4114
+// expect: error[VN4114]
 function outside(): int { return super.size() }

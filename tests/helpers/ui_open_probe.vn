@@ -1,0 +1,4 @@
+import { UiWindow } from "std:ui";
+
+using win = UiWindow.open("probe", 200, 200);
+print("probe opened");

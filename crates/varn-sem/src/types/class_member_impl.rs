@@ -10,6 +10,7 @@ impl ClassMemberInfo {
                 return_type: ft.return_type,
                 optional: self.is_optional,
                 is_arrow: ft.is_arrow,
+                type_params: ft.type_params.clone(),
             };
         }
         ObjectTypeMember::Property {

@@ -1,2 +1,2 @@
-// VN3001
+// expect: error[VN3001]
 function make<T>(seed: int): T { return seed }

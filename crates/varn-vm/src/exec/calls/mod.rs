@@ -14,24 +14,21 @@ pub(crate) fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<V
         .chunk
         .constants
         .iter()
-        .map(|entry| {
-            let res = match entry {
-                PoolEntry::Literal(lit) => match lit {
-                    Literal::Null => VmValue::null(),
-                    Literal::Bool(b) => VmValue::from_bool(*b),
-                    Literal::Int(n) => VmValue::from_int(*n),
-                    Literal::Float(f) => VmValue::from_f64(*f),
-                    Literal::Str(s) => heap.alloc_str_interned(s.as_ref()),
-                    Literal::BigInt(n) => heap.alloc_bigint(n.clone()),
-                    Literal::Decimal(d) => heap.alloc_decimal(d.clone()),
-                    Literal::Symbol(s) => heap.alloc_symbol(s.clone()),
-                    Literal::Char(c) => heap.alloc_char(*c),
-                },
-                PoolEntry::Function(_) => VmValue::null(),
-                PoolEntry::Shape(_) => VmValue::null(),
-                PoolEntry::Layout(_) => VmValue::null(),
-            };
-            res
+        .map(|entry| match entry {
+            PoolEntry::Literal(lit) => match lit {
+                Literal::Null => VmValue::null(),
+                Literal::Bool(b) => VmValue::from_bool(*b),
+                Literal::Int(n) => VmValue::from_int(*n),
+                Literal::Float(f) => VmValue::from_f64(*f),
+                Literal::Str(s) => heap.alloc_str_interned(s.as_ref()),
+                Literal::BigInt(n) => heap.alloc_bigint(n.clone()),
+                Literal::Decimal(d) => heap.alloc_decimal(d.clone()),
+                Literal::Symbol(s) => heap.alloc_symbol(s.clone()),
+                Literal::Char(c) => heap.alloc_char(*c),
+            },
+            PoolEntry::Function(_) => VmValue::null(),
+            PoolEntry::Shape(_) => VmValue::null(),
+            PoolEntry::Layout(_) => VmValue::null(),
         })
         .collect()
 }

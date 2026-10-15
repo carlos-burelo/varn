@@ -1,4 +1,4 @@
-// VN3201
+// expect: error[VN3201]
 class Stack<T> {
     items: T[] = []
 }

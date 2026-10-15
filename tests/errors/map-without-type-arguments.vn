@@ -1,2 +1,2 @@
-// VN3201
+// expect: error[VN3201]
 const seen = new Map()

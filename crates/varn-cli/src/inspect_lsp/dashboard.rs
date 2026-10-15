@@ -50,31 +50,30 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
             RESET = R
         ));
         for tok in &analysis.tokens {
-            if tok.kind == varn_core::TokenKind::Identifier || tok.kind.can_be_identifier() {
-                if let Some(hover) =
+            if (tok.kind == varn_core::TokenKind::Identifier || tok.kind.can_be_identifier())
+                && let Some(hover) =
                     varn_lsp::features::hover::build_hover(&analysis, tok.line, tok.col)
-                {
-                    let content = if let Contents::MarkupContent(m) = hover.contents {
-                        m.value
-                            .replace("```varn\n", "")
-                            .replace("```Varn\n", "")
-                            .replace("\n```", "")
-                            .replace("```", "")
-                    } else {
-                        String::new()
-                    };
-                    terminal::log(format!(
-                        "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {BOLD}{}{RESET}",
-                        tok.line + 1,
-                        tok.col + 1,
-                        analysis.lexeme(tok),
-                        content.replace('\n', " "),
-                        DIM = DIM,
-                        RESET = R,
-                        YELLOW = YELLOW,
-                        BOLD = BOLD
-                    ));
-                }
+            {
+                let content = if let Contents::MarkupContent(m) = hover.contents {
+                    m.value
+                        .replace("```varn\n", "")
+                        .replace("```Varn\n", "")
+                        .replace("\n```", "")
+                        .replace("```", "")
+                } else {
+                    String::new()
+                };
+                terminal::log(format!(
+                    "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {BOLD}{}{RESET}",
+                    tok.line + 1,
+                    tok.col + 1,
+                    analysis.lexeme(tok),
+                    content.replace('\n', " "),
+                    DIM = DIM,
+                    RESET = R,
+                    YELLOW = YELLOW,
+                    BOLD = BOLD
+                ));
             }
         }
         terminal::blank();

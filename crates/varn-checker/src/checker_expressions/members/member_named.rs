@@ -50,17 +50,17 @@ impl<'r> Checker<'r> {
                     let mut visiting = Vec::new();
                     Some(self.resolver.module_exports(origin_path, &mut visiting))
                 };
-                if let Some(exports) = exports {
-                    if let Some(sym) = exports.get(key) {
-                        let mut sym_ty = sym.ty.unwrap_or(Type::Dynamic);
-                        if let Some(origin) = &sym.origin_module {
-                            let origin_str = self.resolve_bind_atom(bind, *origin).to_string();
-                            let table = std::sync::Arc::make_mut(&mut self.ty_table);
-                            let origin_atom = table.intern_name(&origin_str);
-                            sym_ty = sym_ty.with_origin(origin_atom, table);
-                        }
-                        return Some((sym_ty, None));
+                if let Some(exports) = exports
+                    && let Some(sym) = exports.get(key)
+                {
+                    let mut sym_ty = sym.ty.unwrap_or(Type::Dynamic);
+                    if let Some(origin) = &sym.origin_module {
+                        let origin_str = self.resolve_bind_atom(bind, *origin).to_string();
+                        let table = std::sync::Arc::make_mut(&mut self.ty_table);
+                        let origin_atom = table.intern_name(&origin_str);
+                        sym_ty = sym_ty.with_origin(origin_atom, table);
                     }
+                    return Some((sym_ty, None));
                 }
             }
             return None;
@@ -97,27 +97,24 @@ impl<'r> Checker<'r> {
             if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
                 variants.extend(members.iter().map(|m| m.name.clone()));
             }
-            if let Some(ext_bind) = self.resolver.find_bind_for_type(&name, &origin_modules) {
-                if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
-                    variants.extend(members.iter().map(|m| m.name.clone()));
-                }
+            if let Some(ext_bind) = self.resolver.find_bind_for_type(&name, &origin_modules)
+                && let Some(members) = ext_bind.get_enum_members_local(name.as_ref())
+            {
+                variants.extend(members.iter().map(|m| m.name.clone()));
             }
             let mut found_tys = Vec::new();
             for v in &variants {
-                if let Some(fields) = bind.sum_variant_fields.get(v) {
-                    if let Some((_, ty)) = fields.iter().find(|(fname, _)| fname.as_ref() == key) {
-                        found_tys.push(*ty);
-                    }
+                if let Some(fields) = bind.sum_variant_fields.get(v)
+                    && let Some((_, ty)) = fields.iter().find(|(fname, _)| fname.as_ref() == key)
+                {
+                    found_tys.push(*ty);
                 }
-                if let Some(ext_bind) = self.resolver.find_bind_for_type(&name, &origin_modules) {
-                    if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
-                        if let Some((_, ty)) =
-                            fields.iter().find(|(fname, _)| fname.as_ref() == key)
-                        {
-                            let ty = *ty;
-                            found_tys.push(self.reintern_foreign_ty(&ext_bind, ty));
-                        }
-                    }
+                if let Some(ext_bind) = self.resolver.find_bind_for_type(&name, &origin_modules)
+                    && let Some(fields) = ext_bind.sum_variant_fields.get(v)
+                    && let Some((_, ty)) = fields.iter().find(|(fname, _)| fname.as_ref() == key)
+                {
+                    let ty = *ty;
+                    found_tys.push(self.reintern_foreign_ty(&ext_bind, ty));
                 }
             }
             if !found_tys.is_empty() {
@@ -130,30 +127,30 @@ impl<'r> Checker<'r> {
                 ));
             }
         }
-        if let Some(members) = bind.type_members.classes.get(&name) {
-            if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
-                let ty = if m.is_optional {
-                    Type::make_nullable(m.ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
-                } else {
-                    m.ty
-                };
-                return Some((ty, m.symbol_id));
-            }
+        if let Some(members) = bind.type_members.classes.get(&name)
+            && let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key)
+        {
+            let ty = if m.is_optional {
+                Type::make_nullable(m.ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+            } else {
+                m.ty
+            };
+            return Some((ty, m.symbol_id));
         }
-        if let Some(members) = bind.type_members.interfaces.get(&name) {
-            if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                let ty = if m.is_optional {
-                    Type::make_nullable(m.ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
-                } else {
-                    m.ty
-                };
-                return Some((ty, m.symbol_id));
-            }
+        if let Some(members) = bind.type_members.interfaces.get(&name)
+            && let Some(m) = members.iter().find(|m| m.name.as_ref() == key)
+        {
+            let ty = if m.is_optional {
+                Type::make_nullable(m.ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+            } else {
+                m.ty
+            };
+            return Some((ty, m.symbol_id));
         }
-        if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
-            if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                return Some((m.ty, m.symbol_id));
-            }
+        if let Some(members) = bind.get_enum_members_local(name.as_ref())
+            && let Some(m) = members.iter().find(|m| m.name.as_ref() == key)
+        {
+            return Some((m.ty, m.symbol_id));
         }
 
         if let Some(ty) = bind
@@ -163,20 +160,20 @@ impl<'r> Checker<'r> {
             return Some((*ty, None));
         }
         if let Some(b) = &bind.core {
-            if let Some(members) = b.class_members.get(name.as_ref()) {
-                if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
-                    return Some((m.ty, m.symbol_id));
-                }
+            if let Some(members) = b.class_members.get(name.as_ref())
+                && let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key)
+            {
+                return Some((m.ty, m.symbol_id));
             }
-            if let Some(members) = b.flattened_members.get(name.as_ref()) {
-                if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                    return Some((m.ty, m.symbol_id));
-                }
+            if let Some(members) = b.flattened_members.get(name.as_ref())
+                && let Some(m) = members.iter().find(|m| m.name.as_ref() == key)
+            {
+                return Some((m.ty, m.symbol_id));
             }
-            if let Some(methods) = b.class_methods.get(name.as_ref()) {
-                if let Some(ty) = methods.get(key) {
-                    return Some((*ty, None));
-                }
+            if let Some(methods) = b.class_methods.get(name.as_ref())
+                && let Some(ty) = methods.get(key)
+            {
+                return Some((*ty, None));
             }
         }
         if let Some(parent) = bind.class_parents.get(&name) {
@@ -210,29 +207,29 @@ impl<'r> Checker<'r> {
         name: &Arc<str>,
         key: &str,
     ) -> Option<(Type, Option<usize>)> {
-        if let Some(members) = ext_bind.type_members.classes.get(name) {
-            if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
-                let ty = m.ty;
-                return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
-            }
+        if let Some(members) = ext_bind.type_members.classes.get(name)
+            && let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key)
+        {
+            let ty = m.ty;
+            return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
         }
-        if let Some(entry) = ext_bind.get_class_entry(name) {
-            if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
-                let ty = m.ty;
-                return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
-            }
+        if let Some(entry) = ext_bind.get_class_entry(name)
+            && let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key)
+        {
+            let ty = m.ty;
+            return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
         }
-        if let Some(members) = ext_bind.type_members.interfaces.get(name) {
-            if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                let ty = m.ty;
-                return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
-            }
+        if let Some(members) = ext_bind.type_members.interfaces.get(name)
+            && let Some(m) = members.iter().find(|m| m.name.as_ref() == key)
+        {
+            let ty = m.ty;
+            return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
         }
-        if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
-            if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
-                let ty = m.ty;
-                return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
-            }
+        if let Some(members) = ext_bind.get_enum_members_local(name.as_ref())
+            && let Some(m) = members.iter().find(|m| m.name.as_ref() == key)
+        {
+            let ty = m.ty;
+            return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
         }
         if let Some(ty) = ext_bind
             .get_class_methods_for(name.as_ref())

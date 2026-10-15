@@ -101,12 +101,13 @@ impl Checker<'_> {
         let Some(resolved) = self.resolve_operator(&l_ty, method, bind) else {
             return false;
         };
-        if let Some(param) = resolved.param {
-            if !self.value_fits(rec, &param, &r_ty, Some(right), Some(bind)) {
-                let recv_s = l_ty.display(&self.ty_table, &bind.interner);
-                let param_s = param.display(&self.ty_table, &bind.interner);
-                let arg_s = r_ty.display(&self.ty_table, &bind.interner);
-                self.emit(
+        if let Some(param) = resolved.param
+            && !self.value_fits(rec, &param, &r_ty, Some(right), Some(bind))
+        {
+            let recv_s = l_ty.display(&self.ty_table, &bind.interner);
+            let param_s = param.display(&self.ty_table, &bind.interner);
+            let arg_s = r_ty.display(&self.ty_table, &bind.interner);
+            self.emit(
                     Diagnostic::error(
                         ErrorCode::InvalidTypeOperator,
                         format!(
@@ -116,7 +117,6 @@ impl Checker<'_> {
                     )
                     .with_range(self.ast_arena.expr(expr).range),
                 );
-            }
         }
         rec.desugar.operator_calls.insert(expr.index());
         true

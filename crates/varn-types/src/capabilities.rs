@@ -8,6 +8,7 @@ pub const CAP_NET_SERVER: u64 = 1 << 3;
 pub const CAP_SYS_ENV: u64 = 1 << 4;
 pub const CAP_SYS_EXEC: u64 = 1 << 5;
 pub const CAP_SYS_FFI: u64 = 1 << 6;
+pub const CAP_UI: u64 = 1 << 7;
 pub const CAP_ALL: u64 = u64::MAX;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,6 +69,7 @@ impl CapabilitySet {
             "sys.env" | "sys:env" => self.has_mask(CAP_SYS_ENV),
             "sys.exec" | "sys:exec" => self.has_mask(CAP_SYS_EXEC),
             "sys.ffi" | "sys:ffi" => self.has_mask(CAP_SYS_FFI),
+            "ui" => self.has_mask(CAP_UI),
             _ => false,
         }
     }
@@ -140,6 +142,11 @@ impl CapabilitySet {
     #[inline(always)]
     pub fn check_exec(&self) -> bool {
         self.has_mask(CAP_SYS_EXEC)
+    }
+
+    #[inline(always)]
+    pub fn check_ui(&self) -> bool {
+        self.has_mask(CAP_UI)
     }
 }
 

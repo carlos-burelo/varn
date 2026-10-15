@@ -84,10 +84,10 @@ pub fn run_global(func: &mut SsaFunc) -> bool {
     let mut uses: Vec<Vec<u32>> = vec![Vec::new(); func.values.len()];
     for (b, block) in func.blocks.iter().enumerate() {
         let mut push = |v: crate::ssa::ir::Value| {
-            if let Some(slot) = uses.get_mut(v.0 as usize) {
-                if slot.last() != Some(&(b as u32)) {
-                    slot.push(b as u32);
-                }
+            if let Some(slot) = uses.get_mut(v.0 as usize)
+                && slot.last() != Some(&(b as u32))
+            {
+                slot.push(b as u32);
             }
         };
         for inst in &block.insts {

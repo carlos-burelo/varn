@@ -2,7 +2,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-#[varn_op_macros::jit_slow(field = "typeof_val")]
+#[varn_macros::jit_slow(field = "typeof_val")]
 pub(crate) extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v_tag: u64, v_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -12,7 +12,7 @@ pub(crate) extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v_tag: u64, v_payload
     }
 }
 
-#[varn_op_macros::jit_slow(field = "instanceof")]
+#[varn_macros::jit_slow(field = "instanceof")]
 pub(crate) extern "C" fn jit_instanceof(
     ctx: *mut ExecCtx,
     a_tag: u64,
@@ -33,7 +33,7 @@ pub(crate) extern "C" fn jit_instanceof(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "get_enum_tag")]
+#[varn_macros::jit_slow(field = "get_enum_tag")]
 pub(crate) extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -45,12 +45,12 @@ pub(crate) extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val_tag: u64, val_p
     }
 }
 
-#[varn_op_macros::jit_slow(field = "truthy")]
+#[varn_macros::jit_slow(field = "truthy")]
 pub(crate) extern "C" fn jit_truthy(tag: u64, payload: u64) -> u64 {
     u64::from(VmValue::from_raw_parts(tag, payload).is_truthy())
 }
 
-#[varn_op_macros::jit_slow(field = "is_array")]
+#[varn_macros::jit_slow(field = "is_array")]
 pub(crate) extern "C" fn jit_is_array(ctx: *mut ExecCtx, val_tag: u64, val_payload: u64) -> u64 {
     unsafe {
         let ctx_ref = &*ctx;
@@ -63,7 +63,7 @@ pub(crate) extern "C" fn jit_is_array(ctx: *mut ExecCtx, val_tag: u64, val_paylo
     }
 }
 
-#[varn_op_macros::jit_slow(field = "make_enum_variant")]
+#[varn_macros::jit_slow(field = "make_enum_variant")]
 pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -79,7 +79,7 @@ pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usi
     }
 }
 
-#[varn_op_macros::jit_slow(field = "make_enum_variant_const")]
+#[varn_macros::jit_slow(field = "make_enum_variant_const")]
 pub(crate) extern "C" fn jit_make_enum_variant_const(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -95,7 +95,7 @@ pub(crate) extern "C" fn jit_make_enum_variant_const(
     }
 }
 
-#[varn_op_macros::jit_slow(field = "convert")]
+#[varn_macros::jit_slow(field = "convert")]
 pub(crate) extern "C" fn jit_convert(ctx: *mut ExecCtx, conv: u64, tag: u64, payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;

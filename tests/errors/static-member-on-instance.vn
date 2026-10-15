@@ -1,4 +1,4 @@
-// VN4106
+// expect: error[VN4106]
 class Counter { static total: int = 0 }
 const c = new Counter()
 print(c.total)

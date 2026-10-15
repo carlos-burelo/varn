@@ -55,5 +55,5 @@ pub(crate) fn emit_self_call_framed(
         ctx.helpers.jit_call_self_window,
         &[frame.exec_ctx, window, argc, out],
     );
-    Ok(run_entered_or(b, ctx, entry, out)?)
+    run_entered_or(b, ctx, entry, out)
 }

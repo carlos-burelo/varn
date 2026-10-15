@@ -74,15 +74,15 @@ impl PmLockfile {
                 && pkg.integrity != "sha256:unknown"
             {
                 let integrity_file = installed_path.join(".integrity");
-                if let Ok(stored) = std::fs::read_to_string(&integrity_file) {
-                    if stored.trim() != pkg.integrity {
-                        issues.push(format!(
-                            "checksum mismatch for '{}': lockfile expects {}, installed is {}",
-                            pkg.name,
-                            pkg.integrity,
-                            stored.trim()
-                        ));
-                    }
+                if let Ok(stored) = std::fs::read_to_string(&integrity_file)
+                    && stored.trim() != pkg.integrity
+                {
+                    issues.push(format!(
+                        "checksum mismatch for '{}': lockfile expects {}, installed is {}",
+                        pkg.name,
+                        pkg.integrity,
+                        stored.trim()
+                    ));
                 }
             }
         }

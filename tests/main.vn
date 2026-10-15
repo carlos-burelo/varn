@@ -205,6 +205,15 @@ import "./210-static-field-slots.vn"
 import "./211-static-method-dispatch.vn"
 import "./212-generic-ancestor-contracts.vn"
 import "./213-never-call-ends-branch.vn"
+import "./214-gpu-compute.vn"
+import "./215-ui-headless.vn"
+import "./216-text-shaping.vn"
+import "./217-ui-capabilities.vn"
+import "./218-using-top-level-loops.vn"
+import "./219-widgets.vn"
+import "./220-ui-declarative.vn"
+import "./221-generics-named-edges.vn"
+import "./222-native-lowering-edges.vn"
 
 summary()
 

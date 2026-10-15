@@ -1,5 +1,5 @@
 [package]
-name = "varn-contract"
+name = "varn-macros"
 version.workspace = true
 edition.workspace = true
 

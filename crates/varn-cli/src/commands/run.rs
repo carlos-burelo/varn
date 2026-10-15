@@ -46,7 +46,8 @@ pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {
         || args.allow_write.is_some()
         || args.allow_net.is_some()
         || args.allow_env.is_some()
-        || args.allow_ffi;
+        || args.allow_ffi
+        || args.allow_ui;
 
     if args.allow_all || !has_any_allow_flag {
         return CapabilitySet::allow_all();
@@ -93,14 +94,14 @@ pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {
                 if p.is_empty() {
                     continue;
                 }
-                if let Some((h, port_str)) = p.rsplit_once(':') {
-                    if let Ok(port) = port_str.parse::<i64>() {
-                        if !h.is_empty() {
-                            hosts.push(h.to_string());
-                        }
-                        ports.push(port);
-                        continue;
+                if let Some((h, port_str)) = p.rsplit_once(':')
+                    && let Ok(port) = port_str.parse::<i64>()
+                {
+                    if !h.is_empty() {
+                        hosts.push(h.to_string());
                     }
+                    ports.push(port);
+                    continue;
                 }
                 hosts.push(p.to_string());
             }
@@ -122,6 +123,10 @@ pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {
 
     if args.allow_ffi {
         mask |= CAP_SYS_FFI;
+    }
+
+    if args.allow_ui {
+        mask |= CAP_UI;
     }
 
     CapabilitySet {

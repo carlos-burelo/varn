@@ -1,0 +1,104 @@
+import { measure, ascent, descent } from "std:text";
+
+export function pad(x: float, y: float, w: float, h: float, p: float): float[] {
+    return [x + p, y + p, w - 2.0 * p, h - 2.0 * p];
+}
+
+export function textX(x: float, w: float, s: str, size: float): float {
+    return x + (w - measure(s, size)) / 2.0;
+}
+
+export function textY(y: float, h: float, size: float): float {
+    return y + (h - ascent(size) - descent(size)) / 2.0;
+}
+
+export function ellipsize(s: str, size: float, max: float): str {
+    if (measure(s, size) <= max) {
+        return s;
+    }
+    const dots = "…";
+    const dw = measure(dots, size);
+    if (max <= dw) {
+        return "";
+    }
+    let n = s.length;
+    while (n > 0 && measure(s.slice(0, n), size) + dw > max) {
+        n = n - 1;
+    }
+    return s.slice(0, n) + dots;
+}
+
+export function row(
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    weights: float[],
+    gap: float
+): float[][] {
+    return rowCol(true, x, y, w, h, weights, gap);
+}
+
+export function col(
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    weights: float[],
+    gap: float
+): float[][] {
+    return rowCol(false, x, y, w, h, weights, gap);
+}
+
+function rowCol(
+    horizontal: bool,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    weights: float[],
+    gap: float
+): float[][] {
+    const out: float[][] = [];
+    const n = weights.length;
+    if (n == 0) {
+        return out;
+    }
+    let fixed = 0.0;
+    let flexTotal = 0.0;
+    let flexCount = 0;
+    for (let i = 0; i < n; i = i + 1) {
+        if (weights[i] < 0.0) {
+            fixed = fixed - weights[i];
+        } else {
+            flexTotal = flexTotal + weights[i];
+            flexCount = flexCount + 1;
+        }
+    }
+    const total = horizontal ? w : h;
+    let flexBase = total - gap * ((n - 1) as float) - fixed;
+    if (flexBase < 0.0) {
+        flexBase = 0.0;
+    }
+    let c = horizontal ? x : y;
+    for (let i = 0; i < n; i = i + 1) {
+        let cw = 0.0;
+        if (weights[i] < 0.0) {
+            cw = 0.0 - weights[i];
+        } else if (flexTotal > 0.0) {
+            cw = flexBase * weights[i] / flexTotal;
+        } else if (flexCount > 0) {
+            cw = flexBase / (flexCount as float);
+        }
+        if (cw < 0.0) {
+            cw = 0.0;
+        }
+        if (horizontal) {
+            out.push([c, y, cw, h]);
+        } else {
+            out.push([x, c, w, cw]);
+        }
+        c = c + cw + gap;
+    }
+    return out;
+}

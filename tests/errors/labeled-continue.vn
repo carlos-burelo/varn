@@ -1,4 +1,4 @@
-// VN4006
+// expect: error[VN4006]
 function f(): int {
     let n = 0
     for (let i = 0; i < 3; i = i + 1) {

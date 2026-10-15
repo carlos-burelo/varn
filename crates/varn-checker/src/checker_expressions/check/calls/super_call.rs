@@ -52,7 +52,26 @@ impl<'r> Checker<'r> {
             let ty = self.effective_ctor_ty(&parent.name, owner);
             let params = match self.ty_table.get(ty.0) {
                 TypeKind::Fn(fid) => self.ty_table.get_function(fid).params.clone(),
-                _ => Vec::new(),
+                TypeKind::Primitive(_)
+                | TypeKind::Builtin(_)
+                | TypeKind::Literal(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Union(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Tuple(_)
+                | TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Object(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Conditional { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => Vec::new(),
             };
             self.validate_call_arguments(rec, args, &params, range, call_id, bind);
             return;

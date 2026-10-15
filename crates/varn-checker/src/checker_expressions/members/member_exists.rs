@@ -5,36 +5,36 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
 fn check_in_bind(name: &Arc<str>, key: &str, ext_bind: &varn_sem::bind::BindResult) -> bool {
-    if let Some(members) = ext_bind.type_members.classes.get(name) {
-        if members.members.iter().any(|m| m.name.as_ref() == key) {
-            return true;
-        }
+    if let Some(members) = ext_bind.type_members.classes.get(name)
+        && members.members.iter().any(|m| m.name.as_ref() == key)
+    {
+        return true;
     }
 
-    if let Some(entry) = ext_bind.get_class_entry(name) {
-        if entry.members.iter().any(|m| m.name.as_ref() == key) {
-            return true;
-        }
+    if let Some(entry) = ext_bind.get_class_entry(name)
+        && entry.members.iter().any(|m| m.name.as_ref() == key)
+    {
+        return true;
     }
-    if let Some(members) = ext_bind.type_members.interfaces.get(name) {
-        if members.iter().any(|m| m.name.as_ref() == key) {
-            return true;
-        }
+    if let Some(members) = ext_bind.type_members.interfaces.get(name)
+        && members.iter().any(|m| m.name.as_ref() == key)
+    {
+        return true;
     }
-    if let Some(members) = ext_bind.type_members.namespaces.get(name) {
-        if members.iter().any(|m| m.name.as_ref() == key) {
-            return true;
-        }
+    if let Some(members) = ext_bind.type_members.namespaces.get(name)
+        && members.iter().any(|m| m.name.as_ref() == key)
+    {
+        return true;
     }
-    if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
-        if members.iter().any(|m| m.name.as_ref() == key) {
-            return true;
-        }
+    if let Some(members) = ext_bind.get_enum_members_local(name.as_ref())
+        && members.iter().any(|m| m.name.as_ref() == key)
+    {
+        return true;
     }
-    if let Some(methods) = ext_bind.get_class_methods_for(name.as_ref()) {
-        if methods.contains_key(key) {
-            return true;
-        }
+    if let Some(methods) = ext_bind.get_class_methods_for(name.as_ref())
+        && methods.contains_key(key)
+    {
+        return true;
     }
     false
 }
@@ -46,10 +46,10 @@ fn check_origin_module(
     key: &str,
 ) -> bool {
     let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-    if let Some(ext_bind) = resolver.find_bind_for_type(name, &origin_modules) {
-        if check_in_bind(name, key, &ext_bind) {
-            return true;
-        }
+    if let Some(ext_bind) = resolver.find_bind_for_type(name, &origin_modules)
+        && check_in_bind(name, key, &ext_bind)
+    {
+        return true;
     }
 
     if origin.is_none() {
@@ -81,13 +81,11 @@ impl<'r> Checker<'r> {
                 if key == varn_core::MemberKey::Length.as_str() {
                     return true;
                 }
-                if let Some(b) = &bind.core {
-                    if let Some(members) = b.class_members.get(varn_core::LangPrimitive::Str.name())
-                    {
-                        if members.members.iter().any(|m| m.name.as_ref() == key) {
-                            return true;
-                        }
-                    }
+                if let Some(b) = &bind.core
+                    && let Some(members) = b.class_members.get(varn_core::LangPrimitive::Str.name())
+                    && members.members.iter().any(|m| m.name.as_ref() == key)
+                {
+                    return true;
                 }
                 false
             }
@@ -95,24 +93,21 @@ impl<'r> Checker<'r> {
                 if key == varn_core::MemberKey::Length.as_str() {
                     return true;
                 }
-                if let Some(b) = &bind.core {
-                    if let Some(members) = b.class_members.get(varn_core::BuiltinType::Bytes.name())
-                    {
-                        if members.members.iter().any(|m| m.name.as_ref() == key) {
-                            return true;
-                        }
-                    }
+                if let Some(b) = &bind.core
+                    && let Some(members) = b.class_members.get(varn_core::BuiltinType::Bytes.name())
+                    && members.members.iter().any(|m| m.name.as_ref() == key)
+                {
+                    return true;
                 }
                 false
             }
             kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
                 let name = kind.lang_name().unwrap_or_default();
-                if let Some(b) = &bind.core {
-                    if let Some(members) = b.class_members.get(name) {
-                        if members.members.iter().any(|m| m.name.as_ref() == key) {
-                            return true;
-                        }
-                    }
+                if let Some(b) = &bind.core
+                    && let Some(members) = b.class_members.get(name)
+                    && members.members.iter().any(|m| m.name.as_ref() == key)
+                {
+                    return true;
                 }
                 false
             }
@@ -142,19 +137,19 @@ impl<'r> Checker<'r> {
             TypeKind::Named(name_atom, origin_atom) => {
                 let name: Arc<str> = self.resolve_bind_atom(bind, name_atom);
                 let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
-                if name.as_ref() == "*" {
-                    if let Some(origin_path) = &origin {
-                        let exports = if varn_binder::paths::is_known_module(origin_path) {
-                            Some(self.resolver.stdlib_exports(origin_path))
-                        } else {
-                            let mut visiting = Vec::new();
-                            Some(self.resolver.module_exports(origin_path, &mut visiting))
-                        };
-                        if let Some(exports) = exports {
-                            if exports.contains_key(key) {
-                                return true;
-                            }
-                        }
+                if name.as_ref() == "*"
+                    && let Some(origin_path) = &origin
+                {
+                    let exports = if varn_binder::paths::is_known_module(origin_path) {
+                        Some(self.resolver.stdlib_exports(origin_path))
+                    } else {
+                        let mut visiting = Vec::new();
+                        Some(self.resolver.module_exports(origin_path, &mut visiting))
+                    };
+                    if let Some(exports) = exports
+                        && exports.contains_key(key)
+                    {
+                        return true;
                     }
                 }
 
@@ -185,51 +180,48 @@ impl<'r> Checker<'r> {
                         variants.extend(members.iter().map(|m| m.name.clone()));
                     }
                     if let Some(ext_bind) = self.resolver.find_bind_for_type(&name, &origin_modules)
+                        && let Some(members) = ext_bind.get_enum_members_local(name.as_ref())
                     {
-                        if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
-                            variants.extend(members.iter().map(|m| m.name.clone()));
-                        }
+                        variants.extend(members.iter().map(|m| m.name.clone()));
                     }
                     if variants.iter().any(|v| v.as_ref() == key) {
                         return true;
                     }
                     for v in &variants {
-                        if let Some(fields) = bind.sum_variant_fields.get(v) {
-                            if fields.iter().any(|(fname, _)| fname.as_ref() == key) {
-                                return true;
-                            }
+                        if let Some(fields) = bind.sum_variant_fields.get(v)
+                            && fields.iter().any(|(fname, _)| fname.as_ref() == key)
+                        {
+                            return true;
                         }
                         if let Some(ext_bind) =
                             self.resolver.find_bind_for_type(&name, &origin_modules)
+                            && let Some(fields) = ext_bind.sum_variant_fields.get(v)
+                            && fields.iter().any(|(fname, _)| fname.as_ref() == key)
                         {
-                            if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
-                                if fields.iter().any(|(fname, _)| fname.as_ref() == key) {
-                                    return true;
-                                }
-                            }
+                            return true;
                         }
                     }
                 }
 
-                if let Some(members) = bind.type_members.classes.get(&name) {
-                    if members.members.iter().any(|m| m.name.as_ref() == key) {
-                        return true;
-                    }
+                if let Some(members) = bind.type_members.classes.get(&name)
+                    && members.members.iter().any(|m| m.name.as_ref() == key)
+                {
+                    return true;
                 }
-                if let Some(members) = bind.type_members.interfaces.get(&name) {
-                    if members.iter().any(|m| m.name.as_ref() == key) {
-                        return true;
-                    }
+                if let Some(members) = bind.type_members.interfaces.get(&name)
+                    && members.iter().any(|m| m.name.as_ref() == key)
+                {
+                    return true;
                 }
-                if let Some(members) = bind.type_members.enums.get(&name) {
-                    if members.iter().any(|m| m.name.as_ref() == key) {
-                        return true;
-                    }
+                if let Some(members) = bind.type_members.enums.get(&name)
+                    && members.iter().any(|m| m.name.as_ref() == key)
+                {
+                    return true;
                 }
-                if let Some(members) = bind.type_members.namespaces.get(&name) {
-                    if members.iter().any(|m| m.name.as_ref() == key) {
-                        return true;
-                    }
+                if let Some(members) = bind.type_members.namespaces.get(&name)
+                    && members.iter().any(|m| m.name.as_ref() == key)
+                {
+                    return true;
                 }
 
                 if bind
@@ -239,15 +231,15 @@ impl<'r> Checker<'r> {
                     return true;
                 }
                 if let Some(b) = &bind.core {
-                    if let Some(members) = b.class_members.get(name.as_ref()) {
-                        if members.members.iter().any(|m| m.name.as_ref() == key) {
-                            return true;
-                        }
+                    if let Some(members) = b.class_members.get(name.as_ref())
+                        && members.members.iter().any(|m| m.name.as_ref() == key)
+                    {
+                        return true;
                     }
-                    if let Some(members) = b.interface_members.get(name.as_ref()) {
-                        if members.iter().any(|m| m.name.as_ref() == key) {
-                            return true;
-                        }
+                    if let Some(members) = b.interface_members.get(name.as_ref())
+                        && members.iter().any(|m| m.name.as_ref() == key)
+                    {
+                        return true;
                     }
                 }
                 if let Some(parent) = bind.class_parents.get(&name) {
@@ -279,11 +271,10 @@ impl<'r> Checker<'r> {
 
             TypeKind::Tuple(_) => key == varn_core::MemberKey::Length.as_str(),
             TypeKind::Array(_) => {
-                if let Some(b) = &bind.core {
-                    if let Some(members) = b.class_members.get(varn_core::BuiltinType::Array.name())
-                    {
-                        return members.members.iter().any(|m| m.name.as_ref() == key);
-                    }
+                if let Some(b) = &bind.core
+                    && let Some(members) = b.class_members.get(varn_core::BuiltinType::Array.name())
+                {
+                    return members.members.iter().any(|m| m.name.as_ref() == key);
                 }
                 false
             }
@@ -308,37 +299,37 @@ impl<'r> Checker<'r> {
             | TypeKind::Infer(_)
             | TypeKind::TypePredicate { .. } => false,
         };
-        if !res {
-            if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
+        if !res
+            && let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
                 self,
                 ty,
                 &self.ty_table,
                 bind,
-            ) {
-                if bind
-                    .extensions
-                    .methods
-                    .get(&tn)
-                    .is_some_and(|m| m.contains_key(key))
-                {
-                    return true;
-                }
-                if bind
-                    .extensions
-                    .getters
-                    .get(&tn)
-                    .is_some_and(|m| m.contains_key(key))
-                {
-                    return true;
-                }
-                if bind
-                    .extensions
-                    .setters
-                    .get(&tn)
-                    .is_some_and(|m| m.contains_key(key))
-                {
-                    return true;
-                }
+            )
+        {
+            if bind
+                .extensions
+                .methods
+                .get(&tn)
+                .is_some_and(|m| m.contains_key(key))
+            {
+                return true;
+            }
+            if bind
+                .extensions
+                .getters
+                .get(&tn)
+                .is_some_and(|m| m.contains_key(key))
+            {
+                return true;
+            }
+            if bind
+                .extensions
+                .setters
+                .get(&tn)
+                .is_some_and(|m| m.contains_key(key))
+            {
+                return true;
             }
         }
         res

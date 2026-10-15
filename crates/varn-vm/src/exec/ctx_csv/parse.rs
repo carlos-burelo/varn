@@ -113,10 +113,10 @@ fn parse_cell_value(ctx: &mut ExecCtx, s: &str) -> VmValue {
         }
     }
 
-    if let Ok(f) = s.parse::<f64>() {
-        if f.is_finite() {
-            return VmValue::from_f64(f);
-        }
+    if let Ok(f) = s.parse::<f64>()
+        && f.is_finite()
+    {
+        return VmValue::from_f64(f);
     }
 
     if let Some(sso) = VmValue::try_from_sso(s) {

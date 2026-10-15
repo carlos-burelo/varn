@@ -123,10 +123,10 @@ impl Vm {
         let mut result = Vec::new();
         for (i, c) in counts.iter().enumerate() {
             let val = c.load(Ordering::Relaxed);
-            if val > 0 {
-                if let Some(op) = OpCode::from_u16(i as u16) {
-                    result.push((op, val));
-                }
+            if val > 0
+                && let Some(op) = OpCode::from_u16(i as u16)
+            {
+                result.push((op, val));
             }
         }
         result.sort_by_key(|(_, c)| Reverse(*c));
@@ -145,16 +145,16 @@ pub fn prefill_native_modules(vm: &mut Vm) {
             continue;
         }
 
-        if let Some(spec) = varn_builtins::spec_for(&raw_id) {
-            if spec.pure {
-                continue;
-            }
+        if let Some(spec) = varn_builtins::spec_for(&raw_id)
+            && spec.pure
+        {
+            continue;
         }
 
-        if let Some(nv) = varn_builtins::build_module(&raw_id, &mut vm.ctx.heap) {
-            if let Ok(converted) = vm.ctx.convert_to_module_obj(resolved.clone(), nv) {
-                unsafe { &mut *vm.ctx.modules.get() }.insert(resolved, converted);
-            }
+        if let Some(nv) = varn_builtins::build_module(&raw_id, &mut vm.ctx.heap)
+            && let Ok(converted) = vm.ctx.convert_to_module_obj(resolved.clone(), nv)
+        {
+            unsafe { &mut *vm.ctx.modules.get() }.insert(resolved, converted);
         }
     }
 
@@ -178,14 +178,13 @@ fn freeze_pure_modules(vm: &mut Vm) {
     }
 
     for (id, &val) in unsafe { &*vm.ctx.modules.get() }.iter() {
-        if matches!(id, varn_core::ModuleId::Runtime(_)) {
-            if let Some(frozen_arc) =
+        if matches!(id, varn_core::ModuleId::Runtime(_))
+            && let Some(frozen_arc) =
                 crate::exec::module_freeze::freeze_module(val, id.clone(), &vm.ctx.heap)
-            {
-                let fv = scratch.ctx.heap.alloc_frozen_module(frozen_arc);
-                unsafe { &mut *scratch.ctx.modules.get() }.insert(id.clone(), fv);
-                scratch.ctx.linker.set_done(id.clone(), fv);
-            }
+        {
+            let fv = scratch.ctx.heap.alloc_frozen_module(frozen_arc);
+            unsafe { &mut *scratch.ctx.modules.get() }.insert(id.clone(), fv);
+            scratch.ctx.linker.set_done(id.clone(), fv);
         }
     }
 

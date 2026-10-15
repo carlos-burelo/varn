@@ -2,7 +2,7 @@
 
 mod ordering;
 
-use varn_contract::varn_contract;
+use varn_macros::varn_contract;
 use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 pub struct Array;
@@ -147,33 +147,30 @@ varn_contract! {
         fn includes(ctx: &mut dyn NativeCtx, this: VnArray, search: VmValue) -> bool {
             let len = this.len(ctx);
             for i in 0..len {
-                if let Some(v) = this.get(ctx, i) {
-                    if vm_eq(ctx, v, search) {
+                if let Some(v) = this.get(ctx, i)
+                    && vm_eq(ctx, v, search) {
                         return true;
                     }
-                }
             }
             false
         }
         fn indexOf(ctx: &mut dyn NativeCtx, this: VnArray, search: VmValue) -> i64 {
             let len = this.len(ctx);
             for i in 0..len {
-                if let Some(v) = this.get(ctx, i) {
-                    if vm_eq(ctx, v, search) {
+                if let Some(v) = this.get(ctx, i)
+                    && vm_eq(ctx, v, search) {
                         return i as i64;
                     }
-                }
             }
             -1
         }
         fn lastIndexOf(ctx: &mut dyn NativeCtx, this: VnArray, search: VmValue) -> i64 {
             let len = this.len(ctx);
             for i in (0..len).rev() {
-                if let Some(v) = this.get(ctx, i) {
-                    if vm_eq(ctx, v, search) {
+                if let Some(v) = this.get(ctx, i)
+                    && vm_eq(ctx, v, search) {
                         return i as i64;
                     }
-                }
             }
             -1
         }
@@ -372,11 +369,10 @@ varn_contract! {
                     .map(|i| ctx.array_get(value, i).unwrap_or_else(VmValue::null))
                     .collect();
             }
-            if ctx.is_string(value) {
-                if let Some(s) = ctx.str_owned(value) {
+            if ctx.is_string(value)
+                && let Some(s) = ctx.str_owned(value) {
                     return s.chars().map(|c| ctx.alloc_str_owned(c.to_string())).collect();
                 }
-            }
             Vec::new()
         }
     }

@@ -121,10 +121,10 @@ pub(crate) fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult
                 .and_then(|&s| m.get_slot(s))
                 .unwrap_or(VmValue::null()));
         }
-        if let Some(HeapObj::Class(cls)) = heap.get(obj.as_heap()) {
-            if let Some(held) = cls.get_static(key) {
-                return Ok(held);
-            }
+        if let Some(HeapObj::Class(cls)) = heap.get(obj.as_heap())
+            && let Some(held) = cls.get_static(key)
+        {
+            return Ok(held);
         }
     }
     if let Some(stripped) = key.strip_prefix("::") {
@@ -170,11 +170,11 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
         let cls = ClassObj::find_by_id(inst.class_id);
         let layout = cls.as_ref().map(|c| c.layout());
         let field = layout.as_ref().and_then(|l| l.get_field(key));
-        if let Some(f) = field {
-            if inst.write_field(f, val).is_ok() {
-                heap.write_barrier(idx, val);
-                return Ok(());
-            }
+        if let Some(f) = field
+            && inst.write_field(f, val).is_ok()
+        {
+            heap.write_barrier(idx, val);
+            return Ok(());
         }
         return Err(RuntimeError::new(format!(
             "cannot set property '{}': no such field on class {:?}",

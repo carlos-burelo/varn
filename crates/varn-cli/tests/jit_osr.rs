@@ -29,7 +29,7 @@ fn osr_entries_resume_from_ssa() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        out.status.success() && stdout.contains("[PASSED] 151."),
+        out.status.success() && stdout.contains("=== Suite: 151 jit osr ==="),
         "OSR run failed:\n{stdout}\n{stderr}"
     );
     for name in ["osSingle", "osNested", "osTriple", "osDown"] {

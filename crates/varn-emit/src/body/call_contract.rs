@@ -127,10 +127,10 @@ impl<'a> FnEmitter<'a> {
             TirArg::Spread(e) => self.spreads_untyped(e.ty),
             TirArg::Named { .. } => false,
         };
-        if let Some(first_spread) = args.iter().position(TirArg::is_spread) {
-            if args[first_spread..].iter().any(untyped_arg) {
-                return true;
-            }
+        if let Some(first_spread) = args.iter().position(TirArg::is_spread)
+            && args[first_spread..].iter().any(untyped_arg)
+        {
+            return true;
         }
         if fallback.is_some() {
             return false;
@@ -371,10 +371,10 @@ impl<'a> FnEmitter<'a> {
         call_id: Option<varn_core::ast::AstId>,
         fallback: Option<SigId>,
     ) -> Option<(Vec<BackendTy>, bool)> {
-        if let Some(call_id) = call_id {
-            if let Some(shape) = self.checked_shape(call_id) {
-                return Some(shape);
-            }
+        if let Some(call_id) = call_id
+            && let Some(shape) = self.checked_shape(call_id)
+        {
+            return Some(shape);
         }
         let sig = fallback.and_then(|s| self.signatures.get(s.0 as usize))?;
         Some((sig.params.clone(), sig.has_rest))

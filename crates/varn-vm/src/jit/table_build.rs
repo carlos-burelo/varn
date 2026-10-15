@@ -1,5 +1,5 @@
 use crate::exec::ctx;
-use varn_op_macros::jit_helper_table;
+use varn_macros::jit_helper_table;
 
 macro_rules! fill_tail {
     ( $( $field:ident : $path:path ),* $(,)? ) => {{

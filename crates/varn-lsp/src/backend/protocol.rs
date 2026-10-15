@@ -34,10 +34,9 @@ impl LanguageServer for Backend {
                 #[allow(deprecated)]
                 params.root_uri.clone()
             })
+            && let Ok(path) = root_uri.to_file_path()
         {
-            if let Ok(path) = root_uri.to_file_path() {
-                let _ = std::env::set_current_dir(path);
-            }
+            let _ = std::env::set_current_dir(path);
         }
 
         Ok(InitializeResult {

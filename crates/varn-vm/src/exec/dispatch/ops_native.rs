@@ -77,9 +77,6 @@ impl ExecCtx {
                 let f = (crate::exec::contract::native_op(op_id).ok_or_else(|| {
                     crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}"))
                 }))?;
-                if let Err(e) = varn_builtins::check_native_op_capability(op_id, &mut *self) {
-                    return Err(crate::error::RuntimeError::new(e));
-                }
                 let receiver = self.stack.box_reg(base, first_reg);
 
                 let result = (self.call_native_with_receiver(

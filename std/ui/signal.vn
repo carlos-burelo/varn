@@ -1,0 +1,209 @@
+export type Signal<T> = dynamic;
+
+let _stack: dynamic[] = [];
+let _depth = 0;
+let _pending: dynamic[] = [];
+
+function _top(): dynamic {
+    if (_stack.length == 0) {
+        return null;
+    }
+    return _stack[_stack.length - 1];
+}
+
+function _links(subs: dynamic[]): void {
+    const ob: dynamic = _top();
+    if (ob == null) {
+        return;
+    }
+    let found = false;
+    for (let i = 0; i < subs.length; i = i + 1) {
+        if (subs[i] == ob) {
+            found = true;
+        }
+    }
+    if (!found) {
+        subs.push(ob);
+    }
+    const deps: dynamic[] = ob.deps;
+    let back = false;
+    for (let i = 0; i < deps.length; i = i + 1) {
+        if (deps[i] == subs) {
+            back = true;
+        }
+    }
+    if (!back) {
+        deps.push(subs);
+    }
+}
+
+function _unlink(ob: dynamic): void {
+    const deps: dynamic[] = ob.deps;
+    for (let i = 0; i < deps.length; i = i + 1) {
+        const subs: dynamic[] = deps[i];
+        for (let j = subs.length - 1; j >= 0; j = j - 1) {
+            if (subs[j] == ob) {
+                subs.splice(j, 1);
+            }
+        }
+    }
+    ob.deps = [];
+}
+
+function _queue(ob: dynamic): void {
+    for (let i = 0; i < _pending.length; i = i + 1) {
+        if (_pending[i] == ob) {
+            return;
+        }
+    }
+    _pending.push(ob);
+}
+
+function _fire(subs: dynamic[]): void {
+    const snap = subs.slice(0, subs.length);
+    for (let i = 0; i < snap.length; i = i + 1) {
+        const ob: dynamic = snap[i];
+        if (!ob.alive) {
+            continue;
+        }
+        if (_depth > 0 && ob.kind == "effect") {
+            _queue(ob);
+        } else {
+            ob.fire();
+        }
+    }
+}
+
+export function signal<T>(init: T): Signal<T> {
+    let cur: T = init;
+    const subs: dynamic[] = [];
+    const f = (...v: T[]): T => {
+        if (v.length == 0) {
+            _links(subs);
+            return cur;
+        }
+        if (v[0] == cur) {
+            return cur;
+        }
+        cur = v[0];
+        _fire(subs);
+        return cur;
+    };
+    return f;
+}
+
+export function computed<T>(derive: () => T): () => T {
+    const subs: dynamic[] = [];
+    const ob: dynamic = { kind: "computed", deps: [], dirty: true, cached: null, alive: true };
+    ob.fire = () => {
+        if (!ob.alive || ob.dirty) {
+            return;
+        }
+        ob.dirty = true;
+        _fire(subs);
+    };
+    const read = (): T => {
+        if (ob.dirty) {
+            _unlink(ob);
+            _stack.push(ob);
+            let next: T;
+            try {
+                next = derive();
+            } finally {
+                _stack.pop();
+            }
+            const changed = next != ob.cached;
+            ob.cached = next;
+            ob.dirty = false;
+            _links(subs);
+            if (changed) {
+                _fire(subs);
+            }
+            return next;
+        }
+        _links(subs);
+        return ob.cached;
+    };
+    ob.run = read;
+    return read;
+}
+
+export function effect(fn: () => void): () => void {
+    const ob: dynamic = { kind: "effect", deps: [], alive: true, running: false };
+    const run = (): void => {
+        if (!ob.alive || ob.running) {
+            return;
+        }
+        ob.running = true;
+        _unlink(ob);
+        _stack.push(ob);
+        try {
+            fn();
+        } finally {
+            _stack.pop();
+            ob.running = false;
+        }
+    };
+    ob.run = run;
+    ob.fire = () => {
+        if (!ob.alive || ob.running) {
+            return;
+        }
+        if (_depth > 0) {
+            _queue(ob);
+        } else {
+            run();
+        }
+    };
+    run();
+    return () => {
+        ob.alive = false;
+        _unlink(ob);
+    };
+}
+
+export function batch(fn: () => void): void {
+    _depth = _depth + 1;
+    try {
+        fn();
+    } finally {
+        _depth = _depth - 1;
+    }
+    if (_depth == 0) {
+        while (_pending.length > 0) {
+            const q = _pending.slice(0, _pending.length);
+            while (_pending.length > 0) {
+                _pending.pop();
+            }
+            for (let i = 0; i < q.length; i = i + 1) {
+                const ob: dynamic = q[i];
+                if (ob.alive) {
+                    ob.run();
+                }
+            }
+        }
+    }
+}
+
+function _restore(saved: dynamic[]): void {
+    while (_stack.length > 0) {
+        _stack.pop();
+    }
+    for (let i = 0; i < saved.length; i = i + 1) {
+        _stack.push(saved[i]);
+    }
+}
+
+export function untracked<T>(fn: () => T): T {
+    const saved = _stack.slice(0, _stack.length);
+    while (_stack.length > 0) {
+        _stack.pop();
+    }
+    try {
+        const out = fn();
+        _restore(saved);
+        return out;
+    } finally {
+        _restore(saved);
+    }
+}

@@ -105,6 +105,7 @@ impl<'r> Binder<'r> {
         b.finalize_array_watch(global);
         b.resolve_decorator_roles();
         Arc::make_mut(&mut b.ty_table).absorb_names(&b.interner);
+        let type_param_variance = super::variance::compute_type_param_variance(&b);
 
         varn_sem::bind::BindResult {
             arena: b.arena,
@@ -119,6 +120,7 @@ impl<'r> Binder<'r> {
             class_methods: b.class_methods,
             type_members: b.type_members,
             class_parents: b.class_parents,
+            type_param_variance,
             source_file: b.source_file,
             sum_type_variants: b.sum_type_variants,
             sum_variant_parent: b.sum_variant_parent,

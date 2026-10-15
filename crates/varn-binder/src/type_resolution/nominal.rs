@@ -30,25 +30,26 @@ pub(super) fn resolve_generic_type(
         return member;
     }
 
-    if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(&name_str)) {
-        if !params.is_empty() && params.len() == resolved_args.len() {
-            let alias_ctx = AliasSubstitutionContext {
-                inner: ctx,
-                params,
-                args: resolved_args,
-            };
-            return resolve_type_node(&alias_node, Some(&alias_ctx), table);
-        }
+    if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(&name_str))
+        && !params.is_empty()
+        && params.len() == resolved_args.len()
+    {
+        let alias_ctx = AliasSubstitutionContext {
+            inner: ctx,
+            params,
+            args: resolved_args,
+        };
+        return resolve_type_node(&alias_node, Some(&alias_ctx), table);
     }
 
     if let Some(ty) = try_stdlib_generic_alias(&name_str, &resolved_args, ctx, table) {
         return ty;
     }
 
-    if name_str.as_ref() == varn_core::BuiltinType::Array.name() {
-        if let [el] = resolved_args.as_slice() {
-            return Type::array(*el, table);
-        }
+    if name_str.as_ref() == varn_core::BuiltinType::Array.name()
+        && let [el] = resolved_args.as_slice()
+    {
+        return Type::array(*el, table);
     }
 
     let source_origin = ctx
@@ -99,10 +100,10 @@ pub(super) fn resolve_named_type(
         return prim;
     }
 
-    if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(&name_str)) {
-        if params.is_empty() {
-            return resolve_type_node(&alias_node, ctx, table);
-        }
+    if let Some((params, alias_node)) = ctx.and_then(|c| c.get_alias_node(&name_str))
+        && params.is_empty()
+    {
+        return resolve_type_node(&alias_node, ctx, table);
     }
 
     if let Some(resolved) = ctx.and_then(|c| c.resolve_symbol(&name_str)) {
@@ -112,13 +113,13 @@ pub(super) fn resolve_named_type(
         ) {
             return resolved.with_origin(origin, table);
         }
-        if let TypeKind::Named(n, o) = table.get(resolved.0) {
-            if let Some(defaults) = ctx.and_then(|c| c.generic_defaults(&name_str)) {
-                if !defaults.is_empty() && defaults.iter().all(|d| d.is_some()) {
-                    let args = defaults.into_iter().map(|d| d.unwrap()).collect();
-                    return Type::generic_atom(n, args, o, table);
-                }
-            }
+        if let TypeKind::Named(n, o) = table.get(resolved.0)
+            && let Some(defaults) = ctx.and_then(|c| c.generic_defaults(&name_str))
+            && !defaults.is_empty()
+            && defaults.iter().all(|d| d.is_some())
+        {
+            let args = defaults.into_iter().map(|d| d.unwrap()).collect();
+            return Type::generic_atom(n, args, o, table);
         }
         return resolved;
     }

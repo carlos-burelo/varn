@@ -177,10 +177,10 @@ fn verify_super_spread_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Nati
 }
 
 pub(crate) fn class_method(ctx: &ExecCtx, class: VmValue, name: &str) -> VmValue {
-    if class.is_heap() {
-        if let Some(HeapObj::Class(class)) = ctx.heap.get(class.as_heap()) {
-            return class.find_method(name).unwrap_or_else(VmValue::null);
-        }
+    if class.is_heap()
+        && let Some(HeapObj::Class(class)) = ctx.heap.get(class.as_heap())
+    {
+        return class.find_method(name).unwrap_or_else(VmValue::null);
     }
     VmValue::null()
 }
@@ -210,15 +210,15 @@ pub(crate) fn method_callee(ctx: &ExecCtx, recv: VmValue, name: &str) -> VmValue
             .and_then(|class| class.find_method(name))
             .unwrap_or_else(VmValue::null);
     }
-    if recv.is_heap() {
-        if let Some(HeapObj::Class(class)) = ctx.heap.get(recv.as_heap()) {
-            return class
-                .statics
-                .borrow()
-                .get(name)
-                .copied()
-                .unwrap_or_else(VmValue::null);
-        }
+    if recv.is_heap()
+        && let Some(HeapObj::Class(class)) = ctx.heap.get(recv.as_heap())
+    {
+        return class
+            .statics
+            .borrow()
+            .get(name)
+            .copied()
+            .unwrap_or_else(VmValue::null);
     }
     NativeCtx::get_field(ctx, recv, name).unwrap_or_else(VmValue::null)
 }

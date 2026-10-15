@@ -3,7 +3,7 @@ use super::super::load_value;
 use super::super::store::Out;
 use super::super::Ctx;
 use super::extra_shared::{frame, native, stage};
-use cranelift_codegen::ir::{types, InstBuilder, Value};
+use cranelift_codegen::ir::{types, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::FunctionBuilder;
 
 pub(super) fn iter_call(
@@ -84,9 +84,14 @@ pub(super) fn extension_call(
     let mut full = Vec::with_capacity(args.len() + 1);
     full.push(recv);
     full.extend_from_slice(args);
-    let w = super::super::call::boxed_window(b, ctx, values, callee, &full)?;
+    let addr = super::super::call::scratch_addr(b, ctx, full.len().max(1));
+    for (i, v) in full.iter().enumerate() {
+        let boxed = boxed_value(b, ctx, values, *v)?;
+        b.ins()
+            .store(MemFlagsData::trusted(), boxed, addr, (i * 16) as i32);
+    }
     let (ct, cp) = b.ins().isplit(callee);
-    let r = super::super::call::emit_invoke(b, ctx, w, (ct, cp), full.len() + 1)?;
+    let r = super::super::call::emit_invoke(b, ctx, addr, (ct, cp), full.len())?;
     Ok(Some(Some(Out::Boxed(r))))
 }
 

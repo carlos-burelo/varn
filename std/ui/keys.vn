@@ -1,0 +1,37 @@
+import { keyCode$ } from "runtime:ui";
+
+export const KEY_BACKSPACE: int = 8;
+export const KEY_TAB: int = 9;
+export const KEY_ENTER: int = 13;
+export const KEY_ESCAPE: int = 27;
+export const KEY_SPACE: int = 32;
+export const KEY_DELETE: int = 127;
+export const KEY_ARROW_LEFT: int = 8592;
+export const KEY_ARROW_UP: int = 8593;
+export const KEY_ARROW_RIGHT: int = 8594;
+export const KEY_ARROW_DOWN: int = 8595;
+
+export const MOUSE_LEFT: int = 0;
+export const MOUSE_RIGHT: int = 1;
+export const MOUSE_MIDDLE: int = 2;
+
+export function keyCode(name: str): int {
+    return keyCode$(name);
+}
+
+export function isNamedKey(k: int): bool {
+    return k == KEY_BACKSPACE
+        || k == KEY_TAB
+        || k == KEY_ENTER
+        || k == KEY_ESCAPE
+        || k == KEY_SPACE
+        || k == KEY_DELETE
+        || k == KEY_ARROW_LEFT
+        || k == KEY_ARROW_UP
+        || k == KEY_ARROW_RIGHT
+        || k == KEY_ARROW_DOWN;
+}
+
+export function hit(x: float, y: float, rx: float, ry: float, rw: float, rh: float): bool {
+    return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+}

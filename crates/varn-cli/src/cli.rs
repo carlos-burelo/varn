@@ -88,6 +88,9 @@ pub struct RunArgs {
     #[arg(long = "allow-ffi")]
     pub allow_ffi: bool,
 
+    #[arg(long = "allow-ui")]
+    pub allow_ui: bool,
+
     #[arg(long = "sandbox")]
     pub sandbox: bool,
 

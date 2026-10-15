@@ -1,4 +1,4 @@
-// VN3001
+// expect: error[VN3001]
 class Meter {
     read(unit: str = 3): str { return unit }
 }

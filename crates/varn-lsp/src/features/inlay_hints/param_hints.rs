@@ -6,10 +6,10 @@ use crate::document::DocumentState;
 pub fn build_parameter_hints(state: &DocumentState) -> Vec<InlayHint> {
     let mut hints = Vec::new();
     for expr in state.spatial_index.exprs() {
-        if let ExprKind::Call { callee, args, .. } = &state.ast_arena.expr(expr).kind {
-            if !args.is_empty() {
-                call_hints(state, *callee, args, &mut hints);
-            }
+        if let ExprKind::Call { callee, args, .. } = &state.ast_arena.expr(expr).kind
+            && !args.is_empty()
+        {
+            call_hints(state, *callee, args, &mut hints);
         }
     }
     hints
@@ -27,10 +27,10 @@ fn call_hints(state: &DocumentState, callee: ExprId, args: &[Arg], hints: &mut V
             continue;
         }
 
-        if let ExprKind::Identifier { name } = &arg_expr.kind {
-            if state.name(*name) == param_name {
-                continue;
-            }
+        if let ExprKind::Identifier { name } = &arg_expr.kind
+            && state.name(*name) == param_name
+        {
+            continue;
         }
         let arg_start = &arg_expr.range.start;
         hints.push(InlayHint {
@@ -66,21 +66,19 @@ fn resolve_callee_params(state: &DocumentState, callee: ExprId) -> Vec<String> {
             .collect();
     }
 
-    if let Some(entry) = state.db.expr_table.get(&callee.index()) {
-        if let Some(f) = state.db.callable_shape(&entry.ty) {
-            return names(f);
-        }
+    if let Some(entry) = state.db.expr_table.get(&callee.index())
+        && let Some(f) = state.db.callable_shape(&entry.ty)
+    {
+        return names(f);
     }
 
-    if let ExprKind::Identifier { name } = &node.kind {
-        if let Some((_, ty)) = state
+    if let ExprKind::Identifier { name } = &node.kind
+        && let Some((_, ty)) = state
             .db
             .resolve_at(state.name(*name), node.range.start.offset)
-        {
-            if let Some(f) = state.db.fn_shape(&ty) {
-                return names(f);
-            }
-        }
+        && let Some(f) = state.db.fn_shape(&ty)
+    {
+        return names(f);
     }
 
     Vec::new()

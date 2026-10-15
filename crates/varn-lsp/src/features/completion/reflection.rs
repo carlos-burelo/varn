@@ -164,95 +164,95 @@ pub fn build_reflection_completions(
         });
     }
 
-    if let Some((sid, _)) = state.db.resolve_at(receiver_name, receiver_offset) {
-        if sid < state.db.bind.arena.len() {
-            let sym = state.symbol(sid);
-            if sym.kind() == SymbolKind::Enum {
-                let members = state.members_of(sym);
-                for m in members {
-                    let m_name = m.name.to_string();
-                    if seen.insert(m_name.clone()) {
-                        items.push(CompletionItem {
-                            label: m_name.clone(),
-                            kind: Some(CompletionItemKind::EnumMember),
-                            detail: Some(format!("{}::{}", receiver_name, m_name)),
-                            sort_text: Some(format!(
-                                "1_{}_{}_{}",
-                                member_group(m.kind),
-                                prefix_boost(&m_name, prefix),
-                                m_name
-                            )),
-                            ..Default::default()
-                        });
-                    }
+    if let Some((sid, _)) = state.db.resolve_at(receiver_name, receiver_offset)
+        && sid < state.db.bind.arena.len()
+    {
+        let sym = state.symbol(sid);
+        if sym.kind() == SymbolKind::Enum {
+            let members = state.members_of(sym);
+            for m in members {
+                let m_name = m.name.to_string();
+                if seen.insert(m_name.clone()) {
+                    items.push(CompletionItem {
+                        label: m_name.clone(),
+                        kind: Some(CompletionItemKind::EnumMember),
+                        detail: Some(format!("{}::{}", receiver_name, m_name)),
+                        sort_text: Some(format!(
+                            "1_{}_{}_{}",
+                            member_group(m.kind),
+                            prefix_boost(&m_name, prefix),
+                            m_name
+                        )),
+                        ..Default::default()
+                    });
                 }
-            } else if sym.kind() == SymbolKind::Class || sym.kind() == SymbolKind::Interface {
-                let members = state.members_of(sym);
-                for m in members {
-                    let m_name = m.name.to_string();
-                    if m.is_static && seen.insert(m_name.clone()) {
-                        items.push(CompletionItem {
-                            label: m_name.clone(),
-                            kind: Some(
-                                if matches!(
-                                    m.kind,
-                                    varn_sem::semantic_info::ResolvedMemberKind::Method
-                                        | varn_sem::semantic_info::ResolvedMemberKind::StaticMethod
-                                ) {
-                                    CompletionItemKind::Method
-                                } else {
-                                    CompletionItemKind::Property
-                                },
-                            ),
-                            detail: Some(format!(
-                                "static {}::{}: {}",
-                                receiver_name,
-                                m_name,
-                                state.ty_text(&m.ty)
-                            )),
-                            sort_text: Some(format!(
-                                "1_{}_{}_{}",
-                                member_group(m.kind),
-                                prefix_boost(&m_name, prefix),
-                                m_name
-                            )),
-                            ..Default::default()
-                        });
-                    }
+            }
+        } else if sym.kind() == SymbolKind::Class || sym.kind() == SymbolKind::Interface {
+            let members = state.members_of(sym);
+            for m in members {
+                let m_name = m.name.to_string();
+                if m.is_static && seen.insert(m_name.clone()) {
+                    items.push(CompletionItem {
+                        label: m_name.clone(),
+                        kind: Some(
+                            if matches!(
+                                m.kind,
+                                varn_sem::semantic_info::ResolvedMemberKind::Method
+                                    | varn_sem::semantic_info::ResolvedMemberKind::StaticMethod
+                            ) {
+                                CompletionItemKind::Method
+                            } else {
+                                CompletionItemKind::Property
+                            },
+                        ),
+                        detail: Some(format!(
+                            "static {}::{}: {}",
+                            receiver_name,
+                            m_name,
+                            state.ty_text(&m.ty)
+                        )),
+                        sort_text: Some(format!(
+                            "1_{}_{}_{}",
+                            member_group(m.kind),
+                            prefix_boost(&m_name, prefix),
+                            m_name
+                        )),
+                        ..Default::default()
+                    });
                 }
-            } else if sym.kind() == SymbolKind::Namespace {
-                let members = state.members_of(sym);
-                for m in members {
-                    let m_name = m.name.to_string();
-                    if seen.insert(m_name.clone()) {
-                        items.push(CompletionItem {
-                            label: m_name.clone(),
-                            kind: Some(
-                                if matches!(
-                                    m.kind,
-                                    varn_sem::semantic_info::ResolvedMemberKind::Method
-                                        | varn_sem::semantic_info::ResolvedMemberKind::StaticMethod
-                                ) {
-                                    CompletionItemKind::Method
-                                } else {
-                                    CompletionItemKind::Property
-                                },
-                            ),
-                            detail: Some(format!(
-                                "{}::{}: {}",
-                                receiver_name,
-                                m_name,
-                                state.ty_text(&m.ty)
-                            )),
-                            sort_text: Some(format!(
-                                "1_{}_{}_{}",
-                                member_group(m.kind),
-                                prefix_boost(&m_name, prefix),
-                                m_name
-                            )),
-                            ..Default::default()
-                        });
-                    }
+            }
+        } else if sym.kind() == SymbolKind::Namespace {
+            let members = state.members_of(sym);
+            for m in members {
+                let m_name = m.name.to_string();
+                if seen.insert(m_name.clone()) {
+                    items.push(CompletionItem {
+                        label: m_name.clone(),
+                        kind: Some(
+                            if matches!(
+                                m.kind,
+                                varn_sem::semantic_info::ResolvedMemberKind::Method
+                                    | varn_sem::semantic_info::ResolvedMemberKind::StaticMethod
+                            ) {
+                                CompletionItemKind::Method
+                            } else {
+                                CompletionItemKind::Property
+                            },
+                        ),
+                        detail: Some(format!(
+                            "{}::{}: {}",
+                            receiver_name,
+                            m_name,
+                            state.ty_text(&m.ty)
+                        )),
+                        sort_text: Some(format!(
+                            "1_{}_{}_{}",
+                            member_group(m.kind),
+                            prefix_boost(&m_name, prefix),
+                            m_name
+                        )),
+                        ..Default::default()
+                    });
                 }
             }
         }

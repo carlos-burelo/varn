@@ -178,7 +178,27 @@ impl<'r> Checker<'r> {
                                     bind,
                                 )
                             }
-                            _ => rustc_hash::FxHashMap::default(),
+                            TypeKind::Primitive(_)
+                            | TypeKind::Builtin(_)
+                            | TypeKind::Literal(_)
+                            | TypeKind::This
+                            | TypeKind::Array(_)
+                            | TypeKind::Union(_)
+                            | TypeKind::Intersection(_)
+                            | TypeKind::Tuple(_)
+                            | TypeKind::Named(..)
+                            | TypeKind::Generic(..)
+                            | TypeKind::TemplateLiteral(_)
+                            | TypeKind::Fn(_)
+                            | TypeKind::Object(_)
+                            | TypeKind::Typeof(_)
+                            | TypeKind::KeyOf(_)
+                            | TypeKind::IndexedAccess { .. }
+                            | TypeKind::Mapped { .. }
+                            | TypeKind::Conditional { .. }
+                            | TypeKind::Infer(_)
+                            | TypeKind::EnumVariant { .. }
+                            | TypeKind::TypePredicate { .. } => rustc_hash::FxHashMap::default(),
                         };
                         let table = &mut *std::sync::Arc::make_mut(&mut self.ty_table);
 
@@ -195,6 +215,7 @@ impl<'r> Checker<'r> {
                                         return_type: ft.return_type,
                                         optional: m.is_optional,
                                         is_arrow: ft.is_arrow,
+                                        type_params: ft.type_params.clone(),
                                     }
                                 } else {
                                     ObjectTypeMember::Property {

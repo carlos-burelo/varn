@@ -1,0 +1,85 @@
+import {
+    open$,
+    close$,
+    shouldClose$,
+    size$,
+    inject$,
+    poll$,
+    rect$,
+    text$,
+    clear$,
+    present$,
+    commands$,
+    real$
+} from "runtime:ui";
+
+export type UiEvent = {
+    kind: str,
+    key: int,
+    pressed: bool,
+    x: int,
+    y: int,
+    button: int,
+    w: int,
+    h: int
+};
+
+export class UiWindow {
+    id: int;
+
+    constructor(id: int) {
+        this.id = id;
+    }
+
+    static open(title: str, w: int, h: int): UiWindow {
+        return new UiWindow(open$(title, w, h));
+    }
+
+    close(): void {
+        close$(this.id);
+    }
+
+    dispose(): void {
+        close$(this.id);
+    }
+
+    shouldClose(): bool {
+        return shouldClose$(this.id);
+    }
+
+    size(): int[] {
+        return size$(this.id);
+    }
+
+    inject(kind: str, a: int, b: int, c: int): void {
+        inject$(this.id, kind, a, b, c);
+    }
+
+    poll(): UiEvent[] {
+        return poll$(this.id);
+    }
+
+    rect(x: float, y: float, w: float, h: float, color: int, radius: float = 0.0): void {
+        rect$(this.id, x, y, w, h, color, radius);
+    }
+
+    text(x: float, y: float, s: str, size: float, color: int): void {
+        text$(this.id, x, y, s, size, color);
+    }
+
+    clear(color: int): void {
+        clear$(this.id, color);
+    }
+
+    present(): int {
+        return present$(this.id);
+    }
+
+    real(): bool {
+        return real$(this.id);
+    }
+
+    commands(): str[] {
+        return commands$(this.id);
+    }
+}

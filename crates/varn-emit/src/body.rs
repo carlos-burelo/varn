@@ -66,10 +66,10 @@ impl<'a> FnEmitter<'a> {
             ExprKind::Paren { expression } => return self.lower_expr(*expression),
 
             ExprKind::Binary { op, left, right } => {
-                if self.m.desugar.operator_calls.contains(&e.index()) {
-                    if let Some(method) = varn_core::capability::binary_operator_method(*op) {
-                        return self.lower_operator_call(method, *left, Some(*right), ty, span);
-                    }
+                if self.m.desugar.operator_calls.contains(&e.index())
+                    && let Some(method) = varn_core::capability::binary_operator_method(*op)
+                {
+                    return self.lower_operator_call(method, *left, Some(*right), ty, span);
                 }
                 return self.lower_binary(*op, *left, *right, ty, span);
             }
@@ -78,10 +78,10 @@ impl<'a> FnEmitter<'a> {
                 operand,
                 prefix: _,
             } => {
-                if self.m.desugar.operator_calls.contains(&e.index()) {
-                    if let Some(method) = varn_core::capability::unary_operator_method(*op) {
-                        return self.lower_operator_call(method, *operand, None, ty, span);
-                    }
+                if self.m.desugar.operator_calls.contains(&e.index())
+                    && let Some(method) = varn_core::capability::unary_operator_method(*op)
+                {
+                    return self.lower_operator_call(method, *operand, None, ty, span);
                 }
                 return self.lower_unary(*op, *operand, ty, span);
             }

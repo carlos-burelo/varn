@@ -23,16 +23,16 @@ pub fn run(func: &mut SsaFunc) -> bool {
 
         let old_insts = std::mem::take(&mut func.blocks[b_id.0 as usize].insts);
         for mut inst in old_insts {
-            if let Some(dest) = inst.dest {
-                if !used.contains(&dest) {
-                    if is_pure(&inst.kind) {
-                        changed = true;
-                        continue;
-                    }
-                    if dest_droppable(&inst.kind) {
-                        inst.dest = None;
-                        changed = true;
-                    }
+            if let Some(dest) = inst.dest
+                && !used.contains(&dest)
+            {
+                if is_pure(&inst.kind) {
+                    changed = true;
+                    continue;
+                }
+                if dest_droppable(&inst.kind) {
+                    inst.dest = None;
+                    changed = true;
                 }
             }
             new_insts.push(inst);

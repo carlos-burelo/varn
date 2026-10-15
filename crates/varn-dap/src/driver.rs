@@ -58,14 +58,12 @@ impl Driver {
         self.main = Some(main);
         self.machine = Some(machine);
         self.refresh_table();
-        if stop_on_entry {
-            if let Some(m) = self.machine.as_mut() {
-                m.ctx.debug_step = Some(StepState {
-                    kind: StepKind::In,
-                    depth: usize::MAX,
-                    line: u32::MAX,
-                });
-            }
+        if stop_on_entry && let Some(m) = self.machine.as_mut() {
+            m.ctx.debug_step = Some(StepState {
+                kind: StepKind::In,
+                depth: usize::MAX,
+                line: u32::MAX,
+            });
         }
         Ok(stop_on_entry)
     }

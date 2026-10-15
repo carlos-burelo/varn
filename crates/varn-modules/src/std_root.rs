@@ -67,10 +67,10 @@ pub fn resolve() -> (StdSource, StdProvenance) {
 fn resolve_uncached() -> (StdSource, StdProvenance) {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let project_root = crate::artifact::find_project_root(&cwd);
-    if let Some(p) = project_std_override(&project_root) {
-        if let Some(src) = classify(&p) {
-            return (src, StdProvenance::ProjectOverride);
-        }
+    if let Some(p) = project_std_override(&project_root)
+        && let Some(src) = classify(&p)
+    {
+        return (src, StdProvenance::ProjectOverride);
     }
     if let Ok(p) = std::env::var(ENV_VARN_STD) {
         if p == STD_EMBEDDED_SENTINEL {

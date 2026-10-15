@@ -86,6 +86,7 @@ pub enum ObjectTypeMember {
         return_type: CheckerTyId,
         optional: bool,
         is_arrow: bool,
+        type_params: Vec<Arc<str>>,
     },
     Index {
         param_name: Arc<str>,

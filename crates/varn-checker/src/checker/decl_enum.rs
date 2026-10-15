@@ -40,11 +40,12 @@ impl<'r> Checker<'r> {
                             bind,
                         );
                     }
-                    if let Some(init_expr) = *init {
-                        if let Some(ann) = type_ann {
-                            let prop_ty = self.resolve_type_node_cached(ann, bind);
-                            let key_str = bind.interner.resolve(*key);
-                            self.with_expected(Some(prop_ty), |checker| {
+                    if let Some(init_expr) = *init
+                        && let Some(ann) = type_ann
+                    {
+                        let prop_ty = self.resolve_type_node_cached(ann, bind);
+                        let key_str = bind.interner.resolve(*key);
+                        self.with_expected(Some(prop_ty), |checker| {
                                 checker.check_expr(rec, init_expr, bind);
                                 let init_ty = checker.infer_type(rec, init_expr, bind);
                                 if !checker.value_fits(rec, &prop_ty, &init_ty, Some(init_expr), Some(bind)) {
@@ -59,7 +60,6 @@ impl<'r> Checker<'r> {
                                     );
                                 }
                             });
-                        }
                     }
                 }
                 ClassMember::Method {
@@ -82,20 +82,20 @@ impl<'r> Checker<'r> {
                             key_str,
                             bind,
                         );
-                        if let Some(body_stmt) = *body {
-                            if super::decorator_receiver::method_uses_receiver(
+                        if let Some(body_stmt) = *body
+                            && super::decorator_receiver::method_uses_receiver(
                                 self.ast_arena,
                                 params,
                                 body_stmt,
-                            ) {
-                                self.emit(
+                            )
+                        {
+                            self.emit(
                                     Diagnostic::error(
                                         ErrorCode::InvalidDecoratorTarget,
                                         format!("decorated method '{key_str}' cannot use 'this' or 'super': the wrapper loses the receiver"),
                                     )
                                     .with_range(*range),
                                 );
-                            }
                         }
                     }
                     if let Some(body_stmt) = *body {
@@ -161,20 +161,20 @@ impl<'r> Checker<'r> {
                             key_str,
                             bind,
                         );
-                        if let Some(body_stmt) = *body {
-                            if super::decorator_receiver::method_uses_receiver(
+                        if let Some(body_stmt) = *body
+                            && super::decorator_receiver::method_uses_receiver(
                                 self.ast_arena,
                                 &[],
                                 body_stmt,
-                            ) {
-                                self.emit(
+                            )
+                        {
+                            self.emit(
                                     Diagnostic::error(
                                         ErrorCode::InvalidDecoratorTarget,
                                         format!("decorated getter '{key_str}' cannot use 'this' or 'super': the wrapper loses the receiver"),
                                     )
                                     .with_range(*range),
                                 );
-                            }
                         }
                     }
                     if let Some(body_stmt) = *body {
@@ -226,20 +226,20 @@ impl<'r> Checker<'r> {
                             key_str,
                             bind,
                         );
-                        if let Some(body_stmt) = *body {
-                            if super::decorator_receiver::method_uses_receiver(
+                        if let Some(body_stmt) = *body
+                            && super::decorator_receiver::method_uses_receiver(
                                 self.ast_arena,
                                 std::slice::from_ref(param),
                                 body_stmt,
-                            ) {
-                                self.emit(
+                            )
+                        {
+                            self.emit(
                                     Diagnostic::error(
                                         ErrorCode::InvalidDecoratorTarget,
                                         format!("decorated setter '{key_str}' cannot use 'this' or 'super': the wrapper loses the receiver"),
                                     )
                                     .with_range(*range),
                                 );
-                            }
                         }
                     }
                     if let Some(body_stmt) = *body {
@@ -255,18 +255,14 @@ impl<'r> Checker<'r> {
                             .map(|node| self.resolve_type_node_cached(node, bind))
                             .unwrap_or(Type::Dynamic);
 
-                        if param_ty.is_dynamic() {
-                            if let Some(ref class_name) = self.current_class {
-                                if let Some(members) =
-                                    bind.get_class_entry(class_name).map(|e| e.members.clone())
-                                {
-                                    let key_str = bind.interner.resolve(*key);
-                                    if let Some(m) =
-                                        members.iter().find(|m| m.name.as_ref() == key_str)
-                                    {
-                                        param_ty = m.ty;
-                                    }
-                                }
+                        if param_ty.is_dynamic()
+                            && let Some(ref class_name) = self.current_class
+                            && let Some(members) =
+                                bind.get_class_entry(class_name).map(|e| e.members.clone())
+                        {
+                            let key_str = bind.interner.resolve(*key);
+                            if let Some(m) = members.iter().find(|m| m.name.as_ref() == key_str) {
+                                param_ty = m.ty;
                             }
                         }
 

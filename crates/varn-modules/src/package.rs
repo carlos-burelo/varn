@@ -189,10 +189,10 @@ fn find_package_root(base_dir: &Path, package_name: &str) -> Option<PathBuf> {
             return Some(env_modules);
         }
 
-        if let Ok(manifest) = load_package_manifest(dir) {
-            if manifest.name.as_deref() == Some(package_name) {
-                return Some(dir.to_path_buf());
-            }
+        if let Ok(manifest) = load_package_manifest(dir)
+            && manifest.name.as_deref() == Some(package_name)
+        {
+            return Some(dir.to_path_buf());
         }
     }
     None

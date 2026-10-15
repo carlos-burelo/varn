@@ -1,4 +1,4 @@
-// VN4018
+// expect: error[VN4018]
 class Meter {
     get reading(): float { }
 }

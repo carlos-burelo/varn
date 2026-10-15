@@ -60,20 +60,13 @@ pub(super) fn emit_term(
         } => polls(*then_blk) || polls(*else_blk),
         SsaTerm::Return(_) | SsaTerm::Throw(_) | SsaTerm::Unreachable => false,
     };
-    if loops {
-        if let Some(frame) = &ctx.frame {
-            let exec_ctx = frame.exec_ctx;
-            super::super::alloc::emit_gc_poll(b, ctx.helpers, exec_ctx, |b| {
-                super::super::emit::call_helper_void(
-                    b,
-                    ctx.cc,
-                    ctx.helpers.gc_safepoint,
-                    &[exec_ctx],
-                );
+    if loops && let Some(frame) = &ctx.frame {
+        let exec_ctx = frame.exec_ctx;
+        super::super::alloc::emit_gc_poll(b, ctx.helpers, exec_ctx, |b| {
+            super::super::emit::call_helper_void(b, ctx.cc, ctx.helpers.gc_safepoint, &[exec_ctx]);
 
-                ctx.views.clear_all(b);
-            });
-        }
+            ctx.views.clear_all(b);
+        });
     }
     match term {
         SsaTerm::Return(Some(v)) => {
@@ -85,6 +78,9 @@ pub(super) fn emit_term(
                     heap::unbox_dest(b, ret, boxed)?
                 } else if kind == ret {
                     load_value(b, ctx, values, *v)?
+                } else if matches!((kind, ret), (SlotKind::Int, SlotKind::Float)) {
+                    let a = load_value(b, ctx, values, *v)?;
+                    b.ins().fcvt_from_sint(types::F64, a)
                 } else {
                     return Err(format!("from_ssa: {kind:?} value returned as {ret:?}"));
                 };

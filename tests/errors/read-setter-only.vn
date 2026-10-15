@@ -1,4 +1,4 @@
-// VN3005
+// expect: error[VN3005]
 class Meter {
     private held: int = 1
     set value(v: int) { this.held = v }

@@ -103,7 +103,8 @@ impl<'r> Checker<'r> {
         let ret = map_generics_cached(self, &Type::resolved(ft.return_type), &mapping);
 
         let ret_kind = self.ty_table.get(ret.0);
-        let ret = if matches!(ret_kind, TypeKind::This) {
+
+        if matches!(ret_kind, TypeKind::This) {
             if let ExprKind::Member { object, .. } = &arena.expr(callee).kind {
                 let receiver_ty = self.infer_type(rec, *object, bind);
                 if !receiver_ty.is_dynamic() {
@@ -116,9 +117,7 @@ impl<'r> Checker<'r> {
             }
         } else {
             ret
-        };
-
-        ret
+        }
     }
 
     pub(super) fn infer_arrow_type(

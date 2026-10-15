@@ -1,0 +1,14 @@
+[package]
+name = "varn-ui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bytemuck = "1"
+parking_lot = { workspace = true }
+pollster = "0.3"
+wgpu = "22"
+winit = "0.30"
+
+[lints]
+workspace = true

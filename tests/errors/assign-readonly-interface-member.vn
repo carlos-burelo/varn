@@ -1,4 +1,4 @@
-// VN3005
+// expect: error[VN3005]
 interface Sized { readonly size: int }
 class Crate { size: int = 3 }
 const s: Sized = new Crate()

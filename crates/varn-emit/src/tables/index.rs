@@ -48,14 +48,13 @@ impl NameIndex {
         if let Some(id) = self.classes.get(parent.name.as_ref()).copied() {
             return Some(id);
         }
-        if let Some(origin) = parent.origin.as_deref() {
-            if let Some(id) = self
+        if let Some(origin) = parent.origin.as_deref()
+            && let Some(id) = self
                 .foreign_classes
                 .get(&(parent.name.clone(), Arc::from(origin)))
                 .copied()
-            {
-                return Some(id);
-            }
+        {
+            return Some(id);
         }
         self.foreign_classes
             .iter()

@@ -14,12 +14,12 @@ pub struct LineMapping {
 
 impl LineMapping {
     pub fn add(&mut self, line: u32) {
-        if let Some(last) = self.entries.last_mut() {
-            if last.line == line {
-                last.count += 1;
+        if let Some(last) = self.entries.last_mut()
+            && last.line == line
+        {
+            last.count += 1;
 
-                return;
-            }
+            return;
         }
 
         let next_start: u32 = self.starts.last().copied().unwrap_or(0)

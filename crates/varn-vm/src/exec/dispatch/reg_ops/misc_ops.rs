@@ -14,12 +14,11 @@ impl ExecCtx {
         offset: u16,
         tag: u8,
     ) -> VmResult<VmValue> {
-        if let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag) {
-            if let Ok(v) =
+        if let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag)
+            && let Ok(v) =
                 crate::exec::props::get_fixed_field_at(obj, offset as u32, kind, &self.heap)
-            {
-                return Ok(v);
-            }
+        {
+            return Ok(v);
         }
 
         crate::exec::props::get_fixed_field(obj, slot, &mut self.heap)
@@ -34,12 +33,11 @@ impl ExecCtx {
         tag: u8,
         val: VmValue,
     ) -> VmResult<()> {
-        if let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag) {
-            if crate::exec::props::set_fixed_field_at(obj, offset as u32, kind, val, &mut self.heap)
+        if let varn_core::FieldAccess::Compact(kind) = varn_core::FieldAccess::decode(tag)
+            && crate::exec::props::set_fixed_field_at(obj, offset as u32, kind, val, &mut self.heap)
                 .is_ok()
-            {
-                return Ok(());
-            }
+        {
+            return Ok(());
         }
         crate::exec::props::set_fixed_field(obj, slot, val, &mut self.heap)
     }
@@ -183,15 +181,15 @@ impl ExecCtx {
         if v.is_sso() {
             return Ok(VmValue::from_int(v.sso_char_len() as i64));
         }
-        if v.is_heap() {
-            if let Some(HeapObj::Str(s)) = self.heap.get(v.as_heap()) {
-                let len = if s.is_ascii() {
-                    s.len()
-                } else {
-                    s.chars().count()
-                };
-                return Ok(VmValue::from_int(len as i64));
-            }
+        if v.is_heap()
+            && let Some(HeapObj::Str(s)) = self.heap.get(v.as_heap())
+        {
+            let len = if s.is_ascii() {
+                s.len()
+            } else {
+                s.chars().count()
+            };
+            return Ok(VmValue::from_int(len as i64));
         }
         Ok(VmValue::from_int(0))
     }

@@ -9,12 +9,23 @@ use varn_tir::{BackendTy, DynReason, Resolution, Span, TirExpr, TirExprKind, Tir
 impl<'a> FnEmitter<'a> {
     pub fn lower_block(&mut self, stmts: &[StmtId]) -> Vec<TirStmt> {
         self.scopes.push(FxHashMap::default());
-        self.disposables.push(Vec::new());
+        self.push_dispose_frame();
         let mut out = Vec::new();
         for &s in stmts {
             out.extend(self.lower_stmt(s));
         }
 
+        out.extend(self.drain_dispose_frame());
+        self.scopes.pop();
+        out
+    }
+
+    pub fn push_dispose_frame(&mut self) {
+        self.disposables.push(Vec::new());
+    }
+
+    pub fn drain_dispose_frame(&mut self) -> Vec<TirStmt> {
+        let mut out = Vec::new();
         for resource in self.disposables.pop().unwrap_or_default().into_iter().rev() {
             out.push(TirStmt::Expr(TirExpr {
                 kind: TirExprKind::MethodCall {
@@ -30,7 +41,6 @@ impl<'a> FnEmitter<'a> {
                 span: Span::EMPTY,
             }));
         }
-        self.scopes.pop();
         out
     }
 
@@ -105,11 +115,11 @@ impl<'a> FnEmitter<'a> {
 
             StmtKind::Return { argument } => {
                 let argument = *argument;
-                if let Some(arg) = argument {
-                    if let ExprKind::Match { subject, cases } = &self.ast_arena.expr(arg).kind {
-                        let (subject, cases) = (*subject, cases);
-                        return self.lower_match(subject, cases, MatchDest::Return);
-                    }
+                if let Some(arg) = argument
+                    && let ExprKind::Match { subject, cases } = &self.ast_arena.expr(arg).kind
+                {
+                    let (subject, cases) = (*subject, cases);
+                    return self.lower_match(subject, cases, MatchDest::Return);
                 }
                 let a = argument.map(|a| {
                     let value = self.lower_expr(a);

@@ -1,0 +1,333 @@
+import { describe, it, expect } from "std:test";
+import {
+    UiWindow, UiFrame, Focus, VNode, render,
+    ui, signal, computed, effect, batch, untracked, component, memo,
+    TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Curve, Colors, Theme,
+    textSizeFor, textColorFor, run
+} from "std:ui";
+import { MOUSE_LEFT } from "std:ui";
+
+type Todo = {
+    id: int,
+    title: str
+};
+
+@component
+function Counter(): VNode {
+    return ui.column(
+        children: [
+            ui.text("Counter")
+        ]
+    );
+}
+
+@component
+function Dashboard(): VNode {
+    return ui.column(
+        gap: 16.0,
+        padding: 24.0,
+        children: [
+            ui.text(
+                "Dashboard",
+                style: TextStyle.title
+            ),
+            ui.row(
+                gap: 12.0,
+                mainAxis: MainAxis.spaceBetween,
+                children: [
+                    ui.text("Revenue"),
+                    ui.text("$24,500")
+                ]
+            )
+        ]
+    );
+}
+
+@component
+function ConnectionStatus(): VNode {
+    const connected = signal(false);
+    return ui.column(
+        children: [
+            ui.when(
+                condition: connected(),
+                then: () => ui.text("Connected"),
+                otherwise: () => ui.text("Disconnected")
+            )
+        ]
+    );
+}
+
+@component
+function TodoRow(todo: Todo): VNode {
+    return ui.text(todo.title);
+}
+
+@component
+@memo
+function PriceLabel(price: float): VNode {
+    return ui.text(price.toString(), style: TextStyle.title);
+}
+
+await describe("220 ui declarative", async () => {
+    await it("counter builds a column with one text", () => {
+        const tree = Counter();
+        expect(tree.kind).toBe("column");
+        expect(tree.children.length).toBe(1);
+        expect(tree.children[0].kind).toBe("label");
+        expect(tree.children[0].text).toBe("Counter");
+    });
+
+    await it("dashboard composes title and revenue row", () => {
+        const tree = Dashboard();
+        expect(tree.kind).toBe("column");
+        expect(tree.gap).toBe(16.0);
+        expect(tree.children.length).toBe(2);
+        expect(tree.children[0].style).toBe(TextStyle.title);
+        const rowNode = tree.children[1];
+        expect(rowNode.kind).toBe("row");
+        expect(rowNode.mainAxis).toBe(MainAxis.spaceBetween);
+        expect(rowNode.children.length).toBe(2);
+        expect(rowNode.children[0].text).toBe("Revenue");
+        expect(rowNode.children[1].text).toBe("$24,500");
+    });
+
+    await it("connection status flips on signal", () => {
+        const connected = signal(false);
+        const build = (): VNode => ui.column(
+            children: [
+                ui.when(
+                    condition: connected(),
+                    then: () => ui.text("Connected"),
+                    otherwise: () => ui.text("Disconnected")
+                )
+            ]
+        );
+        expect(build().children[0].text).toBe("Disconnected");
+        connected(true);
+        expect(build().children[0].text).toBe("Connected");
+        expect(ConnectionStatus().kind).toBe("column");
+    });
+
+    await it("equal writes skip notification", () => {
+        const count = signal(0);
+        let runs = 0;
+        effect(() => {
+            count();
+            runs = runs + 1;
+        });
+        expect(runs).toBe(1);
+        count(0);
+        expect(runs).toBe(1);
+        count(1);
+        expect(runs).toBe(2);
+    });
+
+    await it("computed memos until deps change", () => {
+        const count = signal(1);
+        let derives = 0;
+        const doubled = computed(() => {
+            derives = derives + 1;
+            return count() * 2;
+        });
+        expect(doubled()).toBe(2);
+        expect(doubled()).toBe(2);
+        expect(derives).toBe(1);
+        count(2);
+        expect(doubled()).toBe(4);
+        expect(derives).toBe(2);
+    });
+
+    await it("diamond batch notifies once", () => {
+        const base = signal(1);
+        const dbl = computed(() => base() * 2);
+        const quad = computed(() => dbl() * 2);
+        expect(quad()).toBe(4);
+        let runs = 0;
+        effect(() => {
+            dbl();
+            quad();
+            runs = runs + 1;
+        });
+        expect(runs).toBe(1);
+        batch(() => {
+            base(2);
+        });
+        expect(quad()).toBe(8);
+        expect(runs).toBe(2);
+    });
+
+    await it("array signals compare by identity", () => {
+        const s = signal([1]);
+        let runs = 0;
+        effect(() => {
+            s();
+            runs = runs + 1;
+        });
+        expect(runs).toBe(1);
+        s([1]);
+        expect(runs).toBe(2);
+        const same = s();
+        s(same);
+        expect(runs).toBe(2);
+    });
+
+    await it("effect disposes and batch coalesces", () => {
+        const first = signal(0);
+        const second = signal(0);
+        let runs = 0;
+        const dispose = effect(() => {
+            first();
+            second();
+            runs = runs + 1;
+        });
+        expect(runs).toBe(1);
+        batch(() => {
+            first(1);
+            second(2);
+        });
+        expect(runs).toBe(2);
+        dispose();
+        first(10);
+        expect(runs).toBe(2);
+    });
+
+    await it("untracked reads skip deps", () => {
+        const tracked = signal(0);
+        const skipped = signal(0);
+        let runs = 0;
+        effect(() => {
+            tracked();
+            untracked(() => skipped());
+            runs = runs + 1;
+        });
+        expect(runs).toBe(1);
+        skipped(1);
+        expect(runs).toBe(1);
+        tracked(1);
+        expect(runs).toBe(2);
+    });
+
+    await it("each keeps stable order with keys", () => {
+        const todos: Todo[] = [{ id: 1, title: "a" }, { id: 2, title: "b" }];
+        const list = ui.each(todos,
+            key: t => t.id,
+            render: t => TodoRow(todo: t)
+        );
+        expect(list.kind).toBe("column");
+        expect(list.children.length).toBe(2);
+        expect(list.children[0].text).toBe("a");
+        expect(list.children[1].text).toBe("b");
+        expect(PriceLabel(9.5).text).toBe("9.5");
+    });
+
+    await it("disabled button ignores clicks", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        const focus = new Focus();
+        const hits: bool[] = [];
+        const tree = ui.column(children: [
+            ui.button(text: "no", onPress: () => { hits.push(true); }, enabled: false)
+        ]);
+        renderTree(win, fr, focus, tree);
+        win.inject("mouseDown", 400, 22, MOUSE_LEFT);
+        fr.update(win);
+        renderTree(win, fr, focus, tree);
+        win.inject("mouseUp", 400, 22, MOUSE_LEFT);
+        fr.update(win);
+        renderTree(win, fr, focus, tree);
+        expect(hits.length).toBe(0);
+        const hits2: bool[] = [];
+        const tree2 = ui.column(children: [
+            ui.button(text: "yes", onPress: () => { hits2.push(true); })
+        ]);
+        const fr2 = new UiFrame(800, 600);
+        const focus2 = new Focus();
+        renderTree(win, fr2, focus2, tree2);
+        win.inject("mouseDown", 400, 22, MOUSE_LEFT);
+        fr2.update(win);
+        renderTree(win, fr2, focus2, tree2);
+        win.inject("mouseUp", 400, 22, MOUSE_LEFT);
+        fr2.update(win);
+        renderTree(win, fr2, focus2, tree2);
+        expect(hits2.length).toBe(1);
+    });
+
+    await it("input echoes typed text into signal", () => {
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        const focus = new Focus();
+        const name = signal("");
+        const build = (): VNode => ui.input(
+            value: name(),
+            onChange: (v: str) => { name(v); },
+            placeholder: "Name"
+        );
+        renderTree(win, fr, focus, build());
+        win.inject("mouseDown", 30, 30, MOUSE_LEFT);
+        fr.update(win);
+        win.inject("mouseUp", 30, 30, MOUSE_LEFT);
+        fr.update(win);
+        renderTree(win, fr, focus, build());
+        win.inject("key", 72, 1, 0);
+        fr.update(win);
+        renderTree(win, fr, focus, build());
+        win.inject("key", 72, 0, 0);
+        fr.update(win);
+        renderTree(win, fr, focus, build());
+        expect(name()).toBe("H");
+    });
+
+    await it("run loop renders declarative trees headless", () => {
+        const builds: int[] = [];
+        run("t", build: (fr: UiFrame, focus: Focus): VNode => {
+            builds.push(1);
+            return Counter();
+        }, w: 200, h: 100, maxFrames: 3);
+        expect(builds.length).toBe(3);
+    });
+
+    await it("theme and style resolve", () => {
+        expect(textSizeFor(TextStyle.title)).toBe(Theme.text.titleSize);
+        expect(textSizeFor(TextStyle.body)).toBe(Theme.text.bodySize);
+        expect(textColorFor(TextStyle.caption)).toBe(Theme.colors.muted);
+        expect(textColorFor(TextStyle.body)).toBe(Theme.colors.onSurface);
+        expect(Theme.colors.surface).toBe(Colors.black);
+        expect(ui.text("x").size).toBe(Theme.text.bodySize);
+        expect(ui.text("x", style: TextStyle.title).size).toBe(Theme.text.titleSize);
+        expect(CrossAxis.stretch == CrossAxis.stretch).toBe(true);
+        expect(Alignment.center == Alignment.center).toBe(true);
+        expect(BoxFit.cover == BoxFit.cover).toBe(true);
+        expect(Curve.easeInOut == Curve.easeInOut).toBe(true);
+    });
+
+    await it("layout primitives nest", () => {
+        const tree = ui.container(
+            padding: 16.0,
+            background: Theme.colors.surface,
+            radius: 12.0,
+            child: ui.padding(
+                all: 8.0,
+                child: ui.stack(
+                    alignment: Alignment.center,
+                    children: [
+                        ui.sizedBox(width: 120.0, height: 48.0, child: ui.text("Fixed")),
+                        ui.spacer()
+                    ]
+                )
+            )
+        );
+        expect(tree.kind).toBe("box");
+        expect(tree.child.kind).toBe("padding");
+        using win = UiWindow.open("t", 800, 600);
+        const fr = new UiFrame(800, 600);
+        const focus = new Focus();
+        win.clear(Theme.colors.surface);
+        renderTree(win, fr, focus, tree);
+        expect(win.commands().length > 0).toBe(true);
+        expect(win.present() > 0).toBe(true);
+    });
+});
+
+function renderTree(win: UiWindow, fr: UiFrame, focus: Focus, tree: VNode): void {
+    render(win, fr, focus, tree, 0.0, 0.0, 800.0, 600.0);
+}

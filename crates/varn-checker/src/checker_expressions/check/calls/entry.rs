@@ -1,6 +1,6 @@
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
-use crate::checker_generics::build_call_mapping;
+use crate::checker_generics::{build_call_mapping, check_call_type_arg_arity};
 use crate::generic_substitution::map_generics_cached;
 use varn_core::ast::{Arg, ExprId, ExprKind, TypeNode};
 use varn_core::source::SourceRange;
@@ -148,6 +148,7 @@ impl<'r> Checker<'r> {
 
         let effective_callee_ty = if let TypeKind::Fn(fid) = callee_kind {
             let ft = self.ty_table.get_function(fid).clone();
+            check_call_type_arg_arity(callee, type_args, &ft, self, range, bind);
             let mapping = build_call_mapping(callee, type_args, args, &ft, self, rec, bind);
             if type_args.is_empty() {
                 self.check_inferred_constraints(callee, &mapping, range, bind);
@@ -185,108 +186,108 @@ impl<'r> Checker<'r> {
             self.validate_call_arguments(rec, args, &params, range, call_id, bind);
         }
 
-        if rec.enabled {
-            if let TypeKind::Fn(fid) = effective_kind {
-                let ft = self.ty_table.get_function(fid).clone();
-                let callee_name = match &arena.expr(callee).kind {
-                    ExprKind::Identifier { name } => {
+        if rec.enabled
+            && let TypeKind::Fn(fid) = effective_kind
+        {
+            let ft = self.ty_table.get_function(fid).clone();
+            let callee_name = match &arena.expr(callee).kind {
+                ExprKind::Identifier { name } => {
+                    Some(std::sync::Arc::from(bind.interner.resolve(*name)))
+                }
+                ExprKind::Member { property, .. } => {
+                    if let ExprKind::Identifier { name } = &arena.expr(*property).kind {
                         Some(std::sync::Arc::from(bind.interner.resolve(*name)))
+                    } else {
+                        None
                     }
-                    ExprKind::Member { property, .. } => {
-                        if let ExprKind::Identifier { name } = &arena.expr(*property).kind {
-                            Some(std::sync::Arc::from(bind.interner.resolve(*name)))
-                        } else {
-                            None
-                        }
-                    }
-                    ExprKind::IntLiteral { .. }
-                    | ExprKind::FloatLiteral { .. }
-                    | ExprKind::BigIntLiteral { .. }
-                    | ExprKind::DecimalLiteral { .. }
-                    | ExprKind::StrLiteral { .. }
-                    | ExprKind::CharLiteral { .. }
-                    | ExprKind::BoolLiteral { .. }
-                    | ExprKind::NullLiteral
-                    | ExprKind::RegexLiteral { .. }
-                    | ExprKind::Template { .. }
-                    | ExprKind::TaggedTemplate { .. }
-                    | ExprKind::Missing
-                    | ExprKind::This
-                    | ExprKind::Super
-                    | ExprKind::Array { .. }
-                    | ExprKind::Object { .. }
-                    | ExprKind::Tuple { .. }
-                    | ExprKind::Record { .. }
-                    | ExprKind::Unary { .. }
-                    | ExprKind::Update { .. }
-                    | ExprKind::Binary { .. }
-                    | ExprKind::Logical { .. }
-                    | ExprKind::Assign { .. }
-                    | ExprKind::Conditional { .. }
-                    | ExprKind::Call { .. }
-                    | ExprKind::New { .. }
-                    | ExprKind::Function { .. }
-                    | ExprKind::Arrow { .. }
-                    | ExprKind::Sequence { .. }
-                    | ExprKind::Paren { .. }
-                    | ExprKind::Await { .. }
-                    | ExprKind::Spawn { .. }
-                    | ExprKind::Yield { .. }
-                    | ExprKind::Spread { .. }
-                    | ExprKind::Pipeline { .. }
-                    | ExprKind::Range { .. }
-                    | ExprKind::NonNull { .. }
-                    | ExprKind::Try { .. }
-                    | ExprKind::As { .. }
-                    | ExprKind::Satisfies { .. }
-                    | ExprKind::ClassExpr { .. }
-                    | ExprKind::Match { .. }
-                    | ExprKind::Is { .. }
-                    | ExprKind::With { .. }
-                    | ExprKind::MetaAccess { .. } => None,
-                };
-                let params = ft
-                    .params
-                    .iter()
-                    .map(|p| varn_sem::semantic_info::CallParamInfo {
-                        name: p.name.clone(),
-                        ty: Type::resolved(p.ty),
-                        optional: p.optional,
-                        is_rest: p.is_rest,
-                    })
-                    .collect();
+                }
+                ExprKind::IntLiteral { .. }
+                | ExprKind::FloatLiteral { .. }
+                | ExprKind::BigIntLiteral { .. }
+                | ExprKind::DecimalLiteral { .. }
+                | ExprKind::StrLiteral { .. }
+                | ExprKind::CharLiteral { .. }
+                | ExprKind::BoolLiteral { .. }
+                | ExprKind::NullLiteral
+                | ExprKind::RegexLiteral { .. }
+                | ExprKind::Template { .. }
+                | ExprKind::TaggedTemplate { .. }
+                | ExprKind::Missing
+                | ExprKind::This
+                | ExprKind::Super
+                | ExprKind::Array { .. }
+                | ExprKind::Object { .. }
+                | ExprKind::Tuple { .. }
+                | ExprKind::Record { .. }
+                | ExprKind::Unary { .. }
+                | ExprKind::Update { .. }
+                | ExprKind::Binary { .. }
+                | ExprKind::Logical { .. }
+                | ExprKind::Assign { .. }
+                | ExprKind::Conditional { .. }
+                | ExprKind::Call { .. }
+                | ExprKind::New { .. }
+                | ExprKind::Function { .. }
+                | ExprKind::Arrow { .. }
+                | ExprKind::Sequence { .. }
+                | ExprKind::Paren { .. }
+                | ExprKind::Await { .. }
+                | ExprKind::Spawn { .. }
+                | ExprKind::Yield { .. }
+                | ExprKind::Spread { .. }
+                | ExprKind::Pipeline { .. }
+                | ExprKind::Range { .. }
+                | ExprKind::NonNull { .. }
+                | ExprKind::Try { .. }
+                | ExprKind::As { .. }
+                | ExprKind::Satisfies { .. }
+                | ExprKind::ClassExpr { .. }
+                | ExprKind::Match { .. }
+                | ExprKind::Is { .. }
+                | ExprKind::With { .. }
+                | ExprKind::MetaAccess { .. } => None,
+            };
+            let params = ft
+                .params
+                .iter()
+                .map(|p| varn_sem::semantic_info::CallParamInfo {
+                    name: p.name.clone(),
+                    ty: Type::resolved(p.ty),
+                    optional: p.optional,
+                    is_rest: p.is_rest,
+                })
+                .collect();
 
-                let mut arg_to_param_map = Vec::with_capacity(args.len());
-                for (i, arg) in args.iter().enumerate() {
-                    match arg {
-                        Arg::Named { label, .. } => {
-                            if let Some(pos) = ft
-                                .params
-                                .iter()
-                                .position(|p| p.name.as_deref() == Some(label.as_str()))
-                            {
-                                arg_to_param_map.push(pos);
-                            } else {
-                                arg_to_param_map.push(i);
-                            }
-                        }
-                        Arg::Positional(_) | Arg::Spread(_) => {
+            let mut arg_to_param_map = Vec::with_capacity(args.len());
+            for (i, arg) in args.iter().enumerate() {
+                match arg {
+                    Arg::Named { label, .. } => {
+                        if let Some(pos) = ft
+                            .params
+                            .iter()
+                            .position(|p| p.name.as_deref() == Some(label.as_str()))
+                        {
+                            arg_to_param_map.push(pos);
+                        } else {
                             arg_to_param_map.push(i);
                         }
                     }
+                    Arg::Positional(_) | Arg::Spread(_) => {
+                        arg_to_param_map.push(i);
+                    }
                 }
-
-                let call_res = varn_sem::semantic_info::CallResolution {
-                    callee_name,
-                    params,
-                    return_ty: Type::resolved(ft.return_type),
-                    arg_to_param_map,
-                };
-                rec.call_resolutions
-                    .insert(range.start.offset, call_res.clone());
-                rec.call_resolutions
-                    .insert(arena.expr(callee).range.start.offset, call_res);
             }
+
+            let call_res = varn_sem::semantic_info::CallResolution {
+                callee_name,
+                params,
+                return_ty: Type::resolved(ft.return_type),
+                arg_to_param_map,
+            };
+            rec.call_resolutions
+                .insert(range.start.offset, call_res.clone());
+            rec.call_resolutions
+                .insert(arena.expr(callee).range.start.offset, call_res);
         }
 
         self.check_type_arg_constraints(callee, type_args, range, bind);

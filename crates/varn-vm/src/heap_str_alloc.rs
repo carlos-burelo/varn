@@ -97,12 +97,11 @@ impl HeapInner {
         bytes[..a_bytes.len()].copy_from_slice(a_bytes);
         bytes[a_bytes.len()..total].copy_from_slice(b_bytes);
 
-        if total <= 5 {
-            if let Ok(s) = std::str::from_utf8(&bytes[..total]) {
-                if let Some(sso) = VmValue::try_from_sso(s) {
-                    return Some(sso);
-                }
-            }
+        if total <= 5
+            && let Ok(s) = std::str::from_utf8(&bytes[..total])
+            && let Some(sso) = VmValue::try_from_sso(s)
+        {
+            return Some(sso);
         }
 
         let ascii = if a_bytes.is_ascii() && b_bytes.is_ascii() {

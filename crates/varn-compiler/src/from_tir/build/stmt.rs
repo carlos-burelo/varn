@@ -198,6 +198,7 @@ impl<'m> Builder<'m> {
 
                 self.current = head;
                 let c = self.lower_expr(cond)?;
+                let branch_blk = self.current;
                 self.set_term(Terminator::Branch {
                     cond: c,
                     then_blk: body_blk,
@@ -205,8 +206,8 @@ impl<'m> Builder<'m> {
                     else_blk: exit,
                     else_args: vec![],
                 });
-                self.add_pred(body_blk, head);
-                self.add_pred(exit, head);
+                self.add_pred(body_blk, branch_blk);
+                self.add_pred(exit, branch_blk);
                 self.seal_block(body_blk);
 
                 self.loops.push(LoopCtx {

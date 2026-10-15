@@ -278,7 +278,7 @@ impl HeapInner {
 
     pub(crate) fn map_of(&self, v: VmValue) -> Option<varn_types::value::MapRef> {
         match self.get(self.heap_ref(v)?)? {
-            HeapObj::Map(m) => Some(m.clone()),
+            HeapObj::Map(m) => Some(*m),
             HeapObj::Str(_)
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)
@@ -307,7 +307,7 @@ impl HeapInner {
 
     pub(crate) fn set_of(&self, v: VmValue) -> Option<varn_types::value::SetRef> {
         match self.get(self.heap_ref(v)?)? {
-            HeapObj::Set(s) => Some(s.clone()),
+            HeapObj::Set(s) => Some(*s),
             HeapObj::Str(_)
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)

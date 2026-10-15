@@ -60,10 +60,10 @@ impl Workspace {
     }
 
     pub fn update_file(&self, uri: String, source: String) {
-        if let Some(existing) = self.files.get(&uri) {
-            if existing.source == source {
-                return;
-            }
+        if let Some(existing) = self.files.get(&uri)
+            && existing.source == source
+        {
+            return;
         }
 
         self.invalidate(&Self::module_id_of(&uri));

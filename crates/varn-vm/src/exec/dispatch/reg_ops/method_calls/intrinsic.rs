@@ -15,10 +15,10 @@ fn str_of<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; SSO_MAX_LEN]) -> Opt
     if v.is_sso() {
         return Some(v.sso_as_str(buf));
     }
-    if v.is_heap() {
-        if let Some(HeapObj::Str(hs)) = heap.get(v.as_heap()) {
-            return Some(hs.as_str());
-        }
+    if v.is_heap()
+        && let Some(HeapObj::Str(hs)) = heap.get(v.as_heap())
+    {
+        return Some(hs.as_str());
     }
     None
 }
@@ -31,24 +31,24 @@ impl ExecCtx {
         args: MethodArgs<'_>,
     ) -> Option<VmValue> {
         let arg_count = args.len();
-        if this_val.is_heap() {
-            if let Some(HeapObj::Array(arr)) = self.heap.get(this_val.as_heap()) {
-                if name == MemberKey::Push.as_str() && arg_count == 1 {
-                    let val = args.get(&self.stack, 0);
-                    arr.push_vm(val);
-                    self.heap.write_barrier(this_val.as_heap(), val);
-                    self.record_ic_hit_callmethod();
-                    self.record_call_native(|_, _| Ok(VmValue::null()), Some("push"));
-                    return Some(VmValue::null());
-                }
-                if name == MemberKey::Pop.as_str() && arg_count == 0 {
-                    let val = arr.pop_vm().unwrap_or(VmValue::null());
-                    self.record_ic_hit_callmethod();
-                    self.record_call_native(|_, _| Ok(VmValue::null()), Some("pop"));
-                    return Some(val);
-                }
-                return None;
+        if this_val.is_heap()
+            && let Some(HeapObj::Array(arr)) = self.heap.get(this_val.as_heap())
+        {
+            if name == MemberKey::Push.as_str() && arg_count == 1 {
+                let val = args.get(&self.stack, 0);
+                arr.push_vm(val);
+                self.heap.write_barrier(this_val.as_heap(), val);
+                self.record_ic_hit_callmethod();
+                self.record_call_native(|_, _| Ok(VmValue::null()), Some("push"));
+                return Some(VmValue::null());
             }
+            if name == MemberKey::Pop.as_str() && arg_count == 0 {
+                let val = arr.pop_vm().unwrap_or(VmValue::null());
+                self.record_ic_hit_callmethod();
+                self.record_call_native(|_, _| Ok(VmValue::null()), Some("pop"));
+                return Some(val);
+            }
+            return None;
         }
         if arg_count != 1 {
             return None;

@@ -119,6 +119,9 @@ jobs:
       - name: Stability Benchmark
         run: ${{ matrix.bin_path }} bench ./tests/benchmarks/bench_fib.vn -v
 
+      - name: Error Corpus (negative suite)
+        run: cargo test --release -p varn-cli --test error_corpus
+
   # Runs only on direct push to main (not on PRs).
   # Builds dist binaries for all 5 targets and publishes a GitHub Release.
   # Uses GITHUB_TOKEN directly — no PAT, no cross-workflow trigger needed.

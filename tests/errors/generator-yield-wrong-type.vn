@@ -1,2 +1,2 @@
-// VN3001
+// expect: error[VN3001]
 function* numbers(): int { yield "one" }

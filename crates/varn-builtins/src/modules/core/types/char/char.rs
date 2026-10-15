@@ -1,4 +1,4 @@
-use varn_contract::varn_contract;
+use varn_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct Char;
@@ -15,11 +15,10 @@ varn_contract! {
         fn toString(_ctx: &mut dyn NativeCtx, this: char) -> String { this.to_string() }
         fn toStr(_ctx: &mut dyn NativeCtx, this: char) -> String { this.to_string() }
         fn charCodeAt(_ctx: &mut dyn NativeCtx, this: char, pos: Option<i64>) -> i64 {
-            if let Some(p) = pos {
-                if p != 0 {
+            if let Some(p) = pos
+                && p != 0 {
                     return -1;
                 }
-            }
             this as i64
         }
 
