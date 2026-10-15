@@ -56,7 +56,7 @@ impl HeapInner {
         byte_len: usize,
     ) -> VmValue {
         if v.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let s = v.sso_as_str(&mut buf);
             let start = byte_start.min(s.len());
             let len = byte_len.min(s.len() - start);
@@ -110,7 +110,7 @@ impl HeapInner {
 
     pub(crate) fn str_val(&self, nv: VmValue) -> Option<RuntimeString> {
         if nv.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let s = nv.sso_as_str(&mut buf);
             return Some(Arc::from(s));
         }
@@ -135,7 +135,7 @@ impl HeapInner {
 
     pub(crate) fn str_owned(&self, nv: VmValue) -> Option<String> {
         if nv.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let s = nv.sso_as_str(&mut buf);
             return Some(s.to_owned());
         }
@@ -174,7 +174,7 @@ impl HeapInner {
                 let _ = write!(out, "{}", f);
             }
         } else if nv.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let _ = out.write_str(nv.sso_as_str(&mut buf));
         } else if nv.is_heap() {
             if let Some(HeapObj::Str(s)) = self.get(nv.as_heap()) {
@@ -205,7 +205,7 @@ impl HeapInner {
             return format!("{}", f);
         }
         if nv.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             return nv.sso_as_str(&mut buf).to_owned();
         }
         if nv.is_heap() {
@@ -278,7 +278,7 @@ impl HeapInner {
             return VmValue::null();
         };
         if text.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let short = text.sso_as_str(&mut buf);
             let found = if short.is_ascii() {
                 short.as_bytes().get(at).map(|byte| *byte as char)

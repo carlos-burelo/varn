@@ -66,7 +66,7 @@ pub(crate) extern "C" fn jit_str_substring(
         let s_val = VmValue::from_raw_parts(s_tag, s_payload);
         let start_val = VmValue::from_raw_parts(start_tag, start_payload);
         let end_val = VmValue::from_raw_parts(end_tag, end_payload);
-        let mut sso_buf = [0u8; 5];
+        let mut sso_buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         let (text, ascii): (&str, bool) = if s_val.is_sso() {
             let s = s_val.sso_as_str(&mut sso_buf);
             (s, s.is_ascii())

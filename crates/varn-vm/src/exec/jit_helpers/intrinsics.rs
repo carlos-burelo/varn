@@ -69,7 +69,7 @@ pub(crate) extern "C" fn jit_str_char_code_at(
         let idx = signed as usize;
 
         if receiver.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let s = receiver.sso_as_str(&mut buf);
             if s.is_ascii() {
                 return s.as_bytes().get(idx).map(|&b| b as i64).unwrap_or(-1);
@@ -158,7 +158,11 @@ fn ascii_view(heap: &crate::heap::Heap, receiver: VmValue) -> Option<&str> {
 }
 
 #[inline(always)]
-unsafe fn borrow_str_fast<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) -> Option<&'a str> {
+unsafe fn borrow_str_fast<'a>(
+    v: VmValue,
+    heap: &'a Heap,
+    buf: &'a mut [u8; varn_types::vm_value::SSO_MAX_LEN],
+) -> Option<&'a str> {
     if v.is_sso() {
         return Some(v.sso_as_str(buf));
     }
@@ -210,7 +214,7 @@ pub(crate) extern "C" fn jit_str_starts_with(
             let n_len = search.sso_len();
             let s_bytes = h.as_str().as_bytes();
             if s_bytes.len() >= n_len {
-                let mut b2 = [0u8; 5];
+                let mut b2 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
                 search.sso_copy_bytes(&mut b2);
                 return if s_bytes[..n_len] == b2[..n_len] {
                     1
@@ -231,8 +235,8 @@ pub(crate) extern "C" fn jit_str_starts_with(
                 0
             };
         }
-        let mut b1 = [0u8; 5];
-        let mut b2 = [0u8; 5];
+        let mut b1 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
+        let mut b2 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         if let (Some(s), Some(n)) = (
             borrow_str_fast(receiver, heap, &mut b1),
             borrow_str_fast(search, heap, &mut b2),
@@ -293,7 +297,7 @@ pub(crate) extern "C" fn jit_str_ends_with(
             let n_len = search.sso_len();
             let s_bytes = h.as_str().as_bytes();
             if s_bytes.len() >= n_len {
-                let mut b2 = [0u8; 5];
+                let mut b2 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
                 search.sso_copy_bytes(&mut b2);
                 return if s_bytes[s_bytes.len() - n_len..] == b2[..n_len] {
                     1
@@ -314,8 +318,8 @@ pub(crate) extern "C" fn jit_str_ends_with(
                 0
             };
         }
-        let mut b1 = [0u8; 5];
-        let mut b2 = [0u8; 5];
+        let mut b1 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
+        let mut b2 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         if let (Some(s), Some(n)) = (
             borrow_str_fast(receiver, heap, &mut b1),
             borrow_str_fast(search, heap, &mut b2),
@@ -346,8 +350,8 @@ pub(crate) extern "C" fn jit_str_index_of(
         let heap = &(*ctx).heap;
         let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
         let search = VmValue::from_raw_parts(search_tag, search_payload);
-        let mut b1 = [0u8; 5];
-        let mut b2 = [0u8; 5];
+        let mut b1 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
+        let mut b2 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         if let (Some(s), Some(n)) = (
             borrow_str_fast(receiver, heap, &mut b1),
             borrow_str_fast(search, heap, &mut b2),
@@ -381,8 +385,8 @@ pub(crate) extern "C" fn jit_str_includes(
         let heap = &(*ctx).heap;
         let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
         let search = VmValue::from_raw_parts(search_tag, search_payload);
-        let mut b1 = [0u8; 5];
-        let mut b2 = [0u8; 5];
+        let mut b1 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
+        let mut b2 = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         if let (Some(s), Some(n)) = (
             borrow_str_fast(receiver, heap, &mut b1),
             borrow_str_fast(search, heap, &mut b2),
@@ -408,7 +412,7 @@ pub(crate) extern "C" fn jit_str_split(
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let mut buf = [0u8; 5];
+        let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         let s_val = VmValue::from_raw_parts(s_tag, s_payload);
         let Some(text) = borrow_str_fast(s_val, &ctx_ref.heap, &mut buf) else {
             jit_propagate_error(
@@ -422,7 +426,7 @@ pub(crate) extern "C" fn jit_str_split(
             None
         } else {
             let sep_val = VmValue::from_raw_parts(sep_tag, sep_payload);
-            let mut sbuf = [0u8; 5];
+            let mut sbuf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             match borrow_str_fast(sep_val, &ctx_ref.heap, &mut sbuf) {
                 Some(sep) => Some(sep.to_owned()),
                 None => {
@@ -477,7 +481,7 @@ pub(crate) extern "C" fn jit_str_slice_range(
     use varn_types::str_util::{char_len, char_range_to_bytes};
     unsafe {
         let ctx_ref = &mut *ctx;
-        let mut buf = [0u8; 5];
+        let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         let s_val = VmValue::from_raw_parts(s_tag, s_payload);
         let start_val = VmValue::from_raw_parts(start_tag, start_payload);
         let end_val = VmValue::from_raw_parts(end_tag, end_payload);

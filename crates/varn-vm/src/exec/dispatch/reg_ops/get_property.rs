@@ -57,7 +57,7 @@ impl ExecCtx {
         closure: &VmClosure,
     ) -> VmResult<PropRead> {
         let name_nv = closure.constants[name_idx];
-        let mut inline_name = [0u8; 5];
+        let mut inline_name = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         let shared_name;
         let name: &str = if name_nv.is_sso() {
             name_nv.sso_as_str(&mut inline_name)

@@ -5,7 +5,7 @@ impl HeapInner {
     pub(crate) fn alloc_str_concat_inline(&mut self, a: VmValue, b: VmValue) -> Option<VmValue> {
         use crate::strbuf::{itoa, INT_MAX_DIGITS};
 
-        let mut a_sso_buf = [0u8; 5];
+        let mut a_sso_buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         let a_bytes: &[u8] = if a.is_sso() {
             a.sso_as_str(&mut a_sso_buf).as_bytes()
         } else if a.is_heap() {
@@ -47,7 +47,7 @@ impl HeapInner {
             return None;
         }
 
-        let mut b_sso_buf = [0u8; 5];
+        let mut b_sso_buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         let mut digits = [0u8; INT_MAX_DIGITS];
         let b_bytes: &[u8] = if b.is_int() {
             itoa(b.as_int(), &mut digits).as_bytes()

@@ -77,7 +77,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                 return;
             }
             Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
-                let mut buf = [0u8; 5];
+                let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
                 let key_str = if key.is_sso() {
                     Some(key.sso_as_str(&mut buf))
                 } else if key.is_heap() {
@@ -205,7 +205,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
         }
         if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(heap_idx) {
             let o = *o;
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let key_str = if key.is_sso() {
                 Some(key.sso_as_str(&mut buf))
             } else if key.is_heap() {

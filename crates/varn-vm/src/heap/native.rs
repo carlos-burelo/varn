@@ -115,7 +115,7 @@ impl NativeCtx for Heap {
 
     fn str_shared(&self, v: VmValue) -> Option<std::sync::Arc<str>> {
         if v.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             return Some(std::sync::Arc::from(v.sso_as_str(&mut buf)));
         }
         if v.is_heap()
@@ -149,7 +149,7 @@ impl NativeCtx for Heap {
 
     fn str_is_ascii(&self, v: VmValue) -> bool {
         if v.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             return v.sso_as_str(&mut buf).is_ascii();
         }
         if v.is_heap()

@@ -12,8 +12,8 @@ fn vm_eq(ctx: &dyn NativeCtx, a: VmValue, b: VmValue) -> bool {
         return true;
     }
     if a.is_sso() && b.is_sso() {
-        let mut ba = [0u8; 5];
-        let mut bb = [0u8; 5];
+        let mut ba = [0u8; varn_types::vm_value::SSO_MAX_LEN];
+        let mut bb = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         return a.sso_as_str(&mut ba) == b.sso_as_str(&mut bb);
     }
     if ctx.is_string(a) && ctx.is_string(b) {
@@ -97,7 +97,7 @@ varn_contract! {
             }
             let mut out = String::with_capacity(len * (sep.len() + 8));
             let mut first = true;
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             for i in 0..len {
                 if !first {
                     out.push_str(sep);

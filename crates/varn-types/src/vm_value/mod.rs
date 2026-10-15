@@ -19,9 +19,9 @@ pub const KIND_SYMBOL: u64 = 6;
 
 const SSO_LEN_SHIFT: u32 = 8;
 
-pub const SSO_MAX_LEN: usize = 5;
+pub const SSO_MAX_LEN: usize = 8;
 
-pub const SSO_HIGH_BITS: u64 = 0x0000_0080_8080_8080;
+pub const SSO_HIGH_BITS: u64 = 0x8080_8080_8080_8080;
 
 impl VmValue {
     #[inline(always)]

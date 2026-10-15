@@ -58,7 +58,11 @@ impl FromVm for String {
 }
 
 pub enum VnStr {
-    Sso { buf: [u8; 5], len: u8, ascii: bool },
+    Sso {
+        buf: [u8; crate::vm_value::SSO_MAX_LEN],
+        len: u8,
+        ascii: bool,
+    },
     Shared(std::sync::Arc<str>, bool),
 }
 
@@ -113,7 +117,7 @@ impl FromVm for VnStr {
     #[inline]
     fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
         if v.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; crate::vm_value::SSO_MAX_LEN];
             let len = v.sso_as_str(&mut buf).len() as u8;
             let ascii = buf[..len as usize].is_ascii();
             return Ok(VnStr::Sso { buf, len, ascii });

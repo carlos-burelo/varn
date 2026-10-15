@@ -46,7 +46,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
         return;
     }
     if val.is_sso() {
-        let mut buf = [0u8; 5];
+        let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         write_json_str(val.sso_as_str(&mut buf), out);
         return;
     }

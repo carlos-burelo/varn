@@ -230,7 +230,7 @@ fn write_vm_value_csv(out: &mut String, ctx: &ExecCtx, val: VmValue, delimiter: 
         return;
     }
     if val.is_sso() {
-        let mut buf = [0u8; 5];
+        let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         let s = val.sso_as_str(&mut buf);
         write_csv_cell(out, s, delimiter);
         return;

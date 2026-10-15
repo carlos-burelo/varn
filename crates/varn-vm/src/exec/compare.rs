@@ -231,7 +231,11 @@ pub(crate) fn neq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     !eq(a, b, heap)
 }
 
-fn text_bytes<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) -> Option<&'a [u8]> {
+fn text_bytes<'a>(
+    v: VmValue,
+    heap: &'a Heap,
+    buf: &'a mut [u8; varn_types::vm_value::SSO_MAX_LEN],
+) -> Option<&'a [u8]> {
     if v.is_sso() {
         return Some(v.sso_as_str(buf).as_bytes());
     }
@@ -273,7 +277,10 @@ fn text_bytes<'a>(v: VmValue, heap: &'a Heap, buf: &'a mut [u8; 5]) -> Option<&'
 }
 
 fn text_order(a: VmValue, b: VmValue, heap: &Heap) -> Option<std::cmp::Ordering> {
-    let (mut left, mut right) = ([0u8; 5], [0u8; 5]);
+    let (mut left, mut right) = (
+        [0u8; varn_types::vm_value::SSO_MAX_LEN],
+        [0u8; varn_types::vm_value::SSO_MAX_LEN],
+    );
     let left = text_bytes(a, heap, &mut left)?;
     let right = text_bytes(b, heap, &mut right)?;
     Some(left.cmp(right))

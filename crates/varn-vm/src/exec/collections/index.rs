@@ -163,7 +163,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
     }
     match heap.get(obj.as_heap()) {
         Some(HeapObj::Object(o) | HeapObj::Record(o)) => {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let key_str = if key.is_sso() {
                 key.sso_as_str(&mut buf)
             } else if key.is_heap() {
@@ -228,7 +228,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
 }
 
 fn index_instance_fallback(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
-    let mut buf = [0u8; 5];
+    let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
     let key_str: String = if key.is_sso() {
         key.sso_as_str(&mut buf).to_string()
     } else if key.is_heap() {
@@ -288,7 +288,7 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
             Ok(())
         }
         Some(HeapObj::Object(o)) => {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let key_str = if key.is_sso() {
                 key.sso_as_str(&mut buf)
             } else if key.is_heap() {

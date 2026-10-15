@@ -20,7 +20,7 @@ pub(super) fn to_sendable(
         return Ok(varn_types::value::SendValue::Float(val.as_f64().to_bits()));
     }
     if val.is_sso() {
-        let mut buf = [0u8; 5];
+        let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
         return Ok(varn_types::value::SendValue::Str(
             val.sso_as_str(&mut buf).to_owned(),
         ));

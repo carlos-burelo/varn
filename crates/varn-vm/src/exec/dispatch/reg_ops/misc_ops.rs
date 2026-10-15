@@ -219,7 +219,7 @@ impl ExecCtx {
                 return Ok(self.heap.alloc_str_view_of(s, boff, total - boff));
             }
         } else if s.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let st = s.sso_as_str(&mut buf);
             let start = idx.as_i32().max(0) as usize;
             let sliced: String = st.chars().skip(start).collect();
