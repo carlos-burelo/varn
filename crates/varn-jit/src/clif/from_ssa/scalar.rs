@@ -134,9 +134,9 @@ pub(super) fn emit_inst(
             args,
             op_id,
         } => {
-            return Ok(Some(call::emit_call_native_op(
+            return Ok(Some(Out::Boxed(call::emit_call_native_op(
                 b, ctx, values, *object, args, *op_id,
-            )?))
+            )?)))
         }
         SsaOp::Call { callee, args } => {
             return Ok(Some(call::emit_call(b, ctx, values, *callee, args, dest)?))
