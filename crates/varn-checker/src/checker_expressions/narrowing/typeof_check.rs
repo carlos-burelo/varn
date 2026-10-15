@@ -61,6 +61,21 @@ impl<'r> Checker<'r> {
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         if is_eq == is_true_branch {
+            if let Some(current) = self.narrowing_base(id, bind.arena.get(id).ty) {
+                match self.ty_table.get(current.0) {
+                    varn_core::TypeKind::Tuple(_)
+                        if value == varn_core::RuntimeKind::Tuple.name() =>
+                    {
+                        return
+                    }
+                    varn_core::TypeKind::Array(_)
+                        if value == varn_core::RuntimeKind::Array.name() =>
+                    {
+                        return
+                    }
+                    _ => {}
+                }
+            }
             out.push((id, named));
             return;
         }
