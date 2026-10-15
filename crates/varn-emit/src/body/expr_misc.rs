@@ -76,7 +76,7 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Decimal
             | BackendTy::BigInt
             | BackendTy::Dynamic(varn_tir::DynReason::Callable | varn_tir::DynReason::Shape(_)) => {
-                untyped
+                untyped || matches!(reason, varn_tir::DynReason::NotYetSupported)
             }
             BackendTy::Dynamic(
                 varn_tir::DynReason::HostBoundary
