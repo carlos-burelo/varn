@@ -30,4 +30,5 @@ mod coverage;
 pub use coverage::Coverage;
 
 mod registry;
+pub mod walk;
 pub use registry::{ClassRegistry, ClassRegistryBuilder, GlobalClassId};
