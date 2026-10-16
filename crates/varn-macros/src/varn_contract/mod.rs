@@ -8,7 +8,7 @@ use quote::{format_ident, quote};
 use std::path::Path;
 use syn::LitStr;
 
-use crate::tables::LookupFailure;
+use crate::contract_parse::LookupFailure;
 use input::ContractInput;
 
 pub(crate) use mapping::Mapped;
@@ -16,37 +16,25 @@ pub(crate) use mapping::Mapped;
 pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as ContractInput);
 
-    let (is_inline, abs_path_str) = if input.contract.trim().starts_with("declare")
+    if input.contract.trim().starts_with("declare")
         || input.contract.trim().starts_with("export")
         || input.contract.contains('\n')
     {
-        (true, "<inline>".to_string())
-    } else {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
-        let abs_path = Path::new(&manifest_dir).join(&input.contract);
-        let abs_path_str = abs_path.to_string_lossy().replace('\\', "/");
-        if std::fs::read_to_string(&abs_path).is_err() {
-            return err(format!("cannot read contract `{abs_path_str}`"));
-        }
-        (false, abs_path_str)
-    };
-    if is_inline {
         return err(
-            "inline contracts are not supported: move the contract to a .vn file listed in contracts.json".to_string(),
+            "inline contracts are not supported: move the contract to a .vn file".to_string(),
         );
     }
-
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+    let abs_path = Path::new(&manifest_dir).join(&input.contract);
+    let abs_path_str = abs_path.to_string_lossy().replace('\\', "/");
+    let Ok(source) = std::fs::read_to_string(&abs_path) else {
+        return err(format!("cannot read contract `{abs_path_str}`"));
+    };
+
     let members =
-        match crate::tables::lookup(&input.contract, &manifest_dir, input.class.as_deref()) {
+        match crate::contract_parse::lookup(&source, &input.contract, input.class.as_deref()) {
             Ok(members) => members,
-            Err(LookupFailure::TablesUnreadable(reason)) => return err(reason),
-            Err(LookupFailure::ContractUnknown) => {
-                return err(format!(
-                    "contract `{}` not found in contracts.json; run `vn gen-contract-tables`",
-                    input.contract
-                ))
-            }
+            Err(LookupFailure::Unparsable(reason)) => return err(reason),
             Err(LookupFailure::ClassNotFound) => {
                 let class = input.class.clone().unwrap_or_default();
                 return err(format!(
@@ -58,7 +46,6 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                     "no `declare function`s found in contract `{abs_path_str}`"
                 ))
             }
-            Err(LookupFailure::BadEntry(reason)) => return err(reason),
         };
 
     let prefix = input.class.clone().unwrap_or_else(|| input.module.clone());

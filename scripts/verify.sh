@@ -112,15 +112,6 @@ fi
 
 VN_BIN="./target/release/vn"
 
-# 4b. Artefactos derivados (tablas de contratos + bundle std para cuadrantes embedded)
-header "4b/6: Artefactos derivados (gen-contract-tables --check)"
-if $VN_BIN gen-contract-tables --check; then
-    pass "Tablas de contratos al dia."
-else
-    fail "Tablas de contratos stale: regenerar con 'vn gen-contract-tables'."
-    FAILED_STEPS+=("gen-contract-tables --check")
-fi
-
 header "4c/6: Bundle std para cuadrantes @embedded (vn std-bundle)"
 if $VN_BIN std-bundle --std-dir "std" --out "dist/std.vnb"; then
     pass "Bundle std listo."

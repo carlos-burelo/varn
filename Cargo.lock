@@ -3483,7 +3483,6 @@ dependencies = [
  "regex",
  "rusqlite",
  "rustc-hash 1.1.0",
- "serde_json",
  "sha1",
  "sha2",
  "socket2",
@@ -3497,7 +3496,6 @@ dependencies = [
  "varn-text",
  "varn-types",
  "varn-ui",
- "xxhash-rust",
  "zip",
 ]
 
@@ -3521,7 +3519,6 @@ dependencies = [
  "mimalloc",
  "postcard",
  "rustc-hash 1.1.0",
- "serde_json",
  "tower-lsp-f",
  "varn-builtins",
  "varn-checker",
@@ -3540,7 +3537,6 @@ dependencies = [
  "varn-sem",
  "varn-types",
  "varn-vm",
- "xxhash-rust",
 ]
 
 [[package]]
@@ -3679,8 +3675,10 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "serde_json",
  "syn 2.0.117",
+ "varn-core",
+ "varn-lexer",
+ "varn-parser",
 ]
 
 [[package]]

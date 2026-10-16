@@ -19,25 +19,6 @@ pub(crate) enum Mapped {
     Opt(Box<Mapped>),
 }
 
-impl Mapped {
-    pub(crate) fn from_code(code: &str) -> Option<Mapped> {
-        match code {
-            "int" => Some(Mapped::Int),
-            "float" => Some(Mapped::Float),
-            "bool" => Some(Mapped::Bool),
-            "char" => Some(Mapped::Char),
-            "str" => Some(Mapped::Str),
-            "array" => Some(Mapped::Array),
-            "dynamic" => Some(Mapped::Dynamic),
-            "void" => Some(Mapped::Void),
-            _ => {
-                let inner = code.strip_prefix("opt(")?.strip_suffix(')')?;
-                Some(Mapped::Opt(Box::new(Mapped::from_code(inner)?)))
-            }
-        }
-    }
-}
-
 fn primitive_mapped(name: &str) -> Option<Mapped> {
     match name {
         "int" => Some(Mapped::Int),

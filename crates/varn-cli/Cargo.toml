@@ -44,8 +44,6 @@ varn-modules  = { path = "../varn-modules" }
 varn-jit      = { path = "../varn-jit" }
 tower-lsp-f   = { workspace = true, optional = true }
 postcard      = { workspace = true }
-serde_json    = { workspace = true }
-xxhash-rust   = { workspace = true }
 clap          = { version = "4", features = ["derive"] }
 clap_complete = "4"
 rustc-hash    = { workspace = true }

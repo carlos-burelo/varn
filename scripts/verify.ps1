@@ -134,16 +134,6 @@ if (-not (Test-Path $vnBin)) {
     $vnBin = Join-Path $RootDir "target\$BuildProfile\vn"
 }
 
-# 4b. Artefactos derivados (tablas de contratos + bundle std para cuadrantes embedded)
-Write-StepHeader "4b/6: Artefactos derivados (gen-contract-tables --check)"
-& $vnBin gen-contract-tables --check
-if ($LASTEXITCODE -ne 0) {
-    Write-Failure "Tablas de contratos stale: regenerar con 'vn gen-contract-tables'."
-    $failedSteps += "gen-contract-tables --check"
-} else {
-    Write-Success "Tablas de contratos al dia."
-}
-
 $stdBundle = Join-Path $RootDir "dist\std.vnb"
 if (-not $Quick) {
     Write-StepHeader "4c/6: Bundle std para cuadrantes @embedded (vn std-bundle)"

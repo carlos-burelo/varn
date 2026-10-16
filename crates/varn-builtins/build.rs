@@ -3,10 +3,7 @@ use std::io::Write;
 use std::path::Path;
 
 fn main() {
-    check_contract_tables();
-
     println!("cargo:rerun-if-changed=src/modules");
-    println!("cargo:rerun-if-changed=contracts.json");
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let out_path = Path::new(&out_dir).join("registry.generated.rs");
@@ -21,51 +18,6 @@ fn main() {
         collect_modules(&root, &root, layer, kind, &mut out);
     }
     writeln!(out, "];").unwrap();
-}
-
-fn normalized_bytes(bytes: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'\r' if bytes.get(i + 1) == Some(&b'\n') => {
-                i += 1;
-                out.push(b'\n');
-                i += 1;
-            }
-            b'\r' => {
-                out.push(b'\n');
-                i += 1;
-            }
-            b => {
-                out.push(b);
-                i += 1;
-            }
-        }
-    }
-    out
-}
-
-fn check_contract_tables() {
-    let raw = fs::read_to_string("contracts.json")
-        .expect("contracts.json missing: run `vn gen-contract-tables` from the workspace root");
-    let tables: serde_json::Value =
-        serde_json::from_str(&raw).expect("contracts.json corrupt: regenerate it");
-    let files = tables
-        .get("files")
-        .and_then(|f| f.as_object())
-        .expect("contracts.json without files");
-    for (path, expected) in files {
-        let expected = expected.as_str().unwrap_or_default();
-        let bytes = fs::read(path).unwrap_or_else(|e| panic!("cannot read contract `{path}`: {e}"));
-        let actual = format!(
-            "{:016x}",
-            xxhash_rust::xxh3::xxh3_64(&normalized_bytes(&bytes))
-        );
-        if actual != expected {
-            panic!("contract tables stale for `{path}`: run `vn gen-contract-tables`");
-        }
-    }
 }
 
 fn collect_modules(root: &Path, dir: &Path, layer: &str, kind: &str, out: &mut impl Write) {

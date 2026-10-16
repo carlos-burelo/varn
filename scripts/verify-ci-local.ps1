@@ -12,8 +12,7 @@
       rustup target add x86_64-unknown-linux-gnu aarch64-apple-darwin
 #>
 param(
-    [switch]$SkipCross,
-    [switch]$SkipLineEndings
+    [switch]$SkipCross
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,31 +52,6 @@ if (-not $SkipCross) {
         New-Item -ItemType Directory -Force -Path $out | Out-Null
         rustc --edition 2021 --crate-type lib --target x86_64-unknown-linux-gnu (Join-Path $tmp "fallback.rs") --out-dir $out > $null 2> $null
         if ($LASTEXITCODE -ne 0) { throw "rustc fallback exit=$LASTEXITCODE" }
-    }
-}
-
-if (-not $SkipLineEndings) {
-    Step "contract-check en arbol LF (simula checkout Linux)" {
-        $j = Get-Content crates/varn-builtins/contracts.json -Raw | ConvertFrom-Json
-        $files = @()
-        foreach ($prop in $j.files.PSObject.Properties) { $files += ('crates/varn-builtins/' + $prop.Name) }
-        $bak = Join-Path $env:TEMP "vn-lfSimBak"
-        New-Item -ItemType Directory -Force -Path $bak | Out-Null
-        $i = 0
-        foreach ($f in $files) { Copy-Item $f (Join-Path $bak "$i.vn") -Force; $i++ }
-        try {
-            foreach ($f in $files) {
-                $raw = [System.IO.File]::ReadAllBytes($f)
-                $t = [System.Text.Encoding]::UTF8.GetString($raw)
-                $nt = ($t -replace "`r`n", "`n") -replace "`r", "`n"
-                [System.IO.File]::WriteAllBytes($f, [System.Text.Encoding]::UTF8.GetBytes($nt))
-            }
-            cargo build --profile quick --bin vn > $null 2> $null
-            if ($LASTEXITCODE -ne 0) { throw "cargo build en arbol LF exit=$LASTEXITCODE" }
-        } finally {
-            $i = 0
-            foreach ($f in $files) { Copy-Item (Join-Path $bak "$i.vn") $f -Force; $i++ }
-        }
     }
 }
 

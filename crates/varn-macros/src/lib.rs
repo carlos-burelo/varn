@@ -1,7 +1,7 @@
 mod contract_members;
+mod contract_parse;
 mod jit_helper_table;
 mod jit_slow;
-mod tables;
 mod varn_contract;
 
 use proc_macro::TokenStream;

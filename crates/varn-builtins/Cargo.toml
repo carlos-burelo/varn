@@ -61,9 +61,5 @@ httparse     = { workspace = true, optional = true }
 rustc-hash   = { workspace = true }
 parking_lot  = { workspace = true }
 
-[build-dependencies]
-serde_json  = { workspace = true }
-xxhash-rust = { workspace = true }
-
 [lints]
 workspace = true

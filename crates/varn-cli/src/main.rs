@@ -142,7 +142,6 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
             "vn was built without the \"pm\" feature".to_string(),
         )),
         Commands::StdBundle(args) => commands::std_bundle::execute(args),
-        Commands::GenContractTables(args) => commands::contract_tables::execute(args),
     }
 }
 
@@ -165,7 +164,6 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
         "completions",
         "dap",
         "std-bundle",
-        "gen-contract-tables",
         "help",
         "--help",
         "-h",

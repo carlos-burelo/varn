@@ -10,7 +10,9 @@ proc-macro = true
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full"] }
-serde_json = { workspace = true }
+varn-core = { path = "../varn-core" }
+varn-lexer = { path = "../varn-lexer" }
+varn-parser = { path = "../varn-parser" }
 
 [lints]
 workspace = true
