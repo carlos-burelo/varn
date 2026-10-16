@@ -5,7 +5,7 @@ use varn_types::ssa::SsaOp;
 use super::super::emit::unbox_int;
 use varn_types::Literal;
 
-use super::{classops, globals, heap, load_value, pool, props, Ctx, Out};
+use super::{build_object, classops, globals, heap, load_value, pool, props, Ctx, Out};
 
 pub(super) fn emit(
     b: &mut FunctionBuilder,
@@ -251,7 +251,7 @@ pub(super) fn emit(
             values: ids,
             is_record,
         } => {
-            let boxed = heap::emit_build_object(b, ctx, values, ids, keys, *is_record)?;
+            let boxed = build_object::emit_build_object(b, ctx, values, ids, keys, *is_record)?;
             Out::Boxed(boxed)
         }
         SsaOp::GetIndex { object, index } => {

@@ -1,6 +1,7 @@
 mod arrays;
 mod block;
 mod boxed;
+mod build_object;
 mod bytes;
 mod call;
 mod cfg;
