@@ -18,6 +18,7 @@ pub enum ScopeKind {
 pub struct CheckerScope {
     pub kind: ScopeKind,
     pub parent: Option<ScopeId>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub bindings: FxHashMap<Atom, SymbolId>,
     pub children: Vec<ScopeId>,
     pub ordered: Vec<SymbolId>,

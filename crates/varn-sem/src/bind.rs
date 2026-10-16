@@ -41,20 +41,31 @@ pub enum PendingEnrich {
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TypeMembers {
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub classes: FxHashMap<Arc<str>, ClassMemberInfo>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub interfaces: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub objects: FxHashMap<Atom, Vec<ClassMemberInfo>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub enums: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub namespaces: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub flattened: FxHashMap<Arc<str>, Vec<ClassMemberInfo>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted_nested")]
     pub getters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted_nested")]
     pub setters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
 }
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Extensions {
+    #[serde(serialize_with = "crate::portable::canonical::sorted_nested")]
     pub methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted_nested")]
     pub getters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted_nested")]
     pub setters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
 }
 
@@ -82,13 +93,19 @@ pub struct BindResult {
     pub annotation_types: FxHashMap<varn_core::ast::AstId, Type>,
     #[serde(skip, default)]
     pub match_arm_scopes: FxHashMap<varn_core::ast::AstId, Vec<ScopeId>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted_nested")]
     pub class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
     pub type_members: TypeMembers,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub class_parents: FxHashMap<Arc<str>, ClassParent>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub type_param_variance: FxHashMap<Arc<str>, Vec<crate::compat::variance::Variance>>,
     pub source_file: Arc<str>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub sum_variant_parent: FxHashMap<Arc<str>, Arc<str>>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub sum_variant_fields: FxHashMap<Arc<str>, Vec<(Arc<str>, Type)>>,
     pub extensions: Extensions,
     #[serde(skip)]

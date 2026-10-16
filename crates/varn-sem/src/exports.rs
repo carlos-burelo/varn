@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ExportMap {
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     symbols: FxHashMap<String, Symbol>,
     #[serde(skip)]
     pub table: Arc<CheckerTyTable>,
