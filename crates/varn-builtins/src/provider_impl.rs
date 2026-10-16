@@ -4,10 +4,23 @@ use std::sync::OnceLock;
 use varn_modules::provider::StdlibProvider;
 use varn_modules::spec::ModuleSpec;
 use varn_modules::std_image::StdImage;
-use varn_modules::std_root::{resolve, StdProvenance, StdSource};
+use varn_modules::std_root::StdProvenance;
 
 use crate::loader::CoreSourceLocator;
 use crate::registry::{spec_for, MODULE_REGISTRY};
+
+pub enum StdInput {
+    Image {
+        bytes: &'static [u8],
+        tree_root: Option<PathBuf>,
+        provenance: StdProvenance,
+    },
+    Tree {
+        root: PathBuf,
+        provenance: StdProvenance,
+    },
+    Unavailable(String),
+}
 
 struct ActiveStd {
     specs: &'static [ModuleSpec],
@@ -19,29 +32,23 @@ struct ActiveStd {
     provenance: StdProvenance,
 }
 
+static STD_INPUT: OnceLock<StdInput> = OnceLock::new();
 static ACTIVE_STD: OnceLock<Result<Option<ActiveStd>, String>> = OnceLock::new();
-static EMBEDDED_STDLIB_BYTES: OnceLock<&'static [u8]> = OnceLock::new();
 
-pub fn register_embedded_stdlib(bytes: &'static [u8]) {
-    let _ = EMBEDDED_STDLIB_BYTES.set(bytes);
+pub fn register_std(input: StdInput) {
+    let _ = STD_INPUT.set(input);
 }
 
 fn active_std_result() -> &'static Result<Option<ActiveStd>, String> {
-    ACTIVE_STD.get_or_init(|| {
-        let (source, provenance) = resolve();
-        match source {
-            StdSource::SourceTree(root) => load_tree_std(&root, provenance).map(Some),
-            StdSource::Embedded => match EMBEDDED_STDLIB_BYTES.get() {
-                Some(bytes) => load_embedded_std(bytes).map(Some),
-
-                None if provenance == StdProvenance::Env => Err(format!(
-                    "{}={} was requested but this binary has no stdlib compiled into it",
-                    varn_modules::std_root::ENV_VARN_STD,
-                    varn_modules::std_root::STD_EMBEDDED_SENTINEL
-                )),
-                None => Ok(None),
-            },
-        }
+    ACTIVE_STD.get_or_init(|| match STD_INPUT.get() {
+        None => Ok(None),
+        Some(StdInput::Image {
+            bytes,
+            tree_root,
+            provenance,
+        }) => load_image(bytes, tree_root.clone(), *provenance).map(Some),
+        Some(StdInput::Tree { root, provenance }) => Ok(Some(load_tree(root, *provenance))),
+        Some(StdInput::Unavailable(reason)) => Err(reason.clone()),
     })
 }
 
@@ -53,11 +60,15 @@ pub fn std_load_error() -> Option<&'static str> {
     active_std_result().as_ref().err().map(String::as_str)
 }
 
-fn load_embedded_std(bytes: &'static [u8]) -> Result<ActiveStd, String> {
-    let image = StdImage::parse(bytes).map_err(|e| format!("embedded stdlib corrupt: {e}"))?;
+fn load_image(
+    bytes: &'static [u8],
+    tree_root: Option<PathBuf>,
+    provenance: StdProvenance,
+) -> Result<ActiveStd, String> {
+    let image = StdImage::parse(bytes).map_err(|e| format!("stdlib image corrupt: {e}"))?;
     if image.host_api_version != varn_core::HOST_API_VERSION {
         return Err(format!(
-            "embedded stdlib incompatible: std image requires host API v{} but this vn provides v{}",
+            "stdlib image incompatible: it requires host API v{} but this vn provides v{}",
             image.host_api_version,
             varn_core::HOST_API_VERSION
         ));
@@ -70,45 +81,31 @@ fn load_embedded_std(bytes: &'static [u8]) -> Result<ActiveStd, String> {
         .collect();
     Ok(ActiveStd {
         specs: Box::leak(specs.into_boxed_slice()),
-        description: format!("embedded stdlib v{}", image.std_version),
+        description: format!("stdlib image v{}", image.std_version),
         image: Some(image),
-        tree_root: None,
-        provenance: StdProvenance::Embedded,
+        tree_root,
+        provenance,
     })
 }
 
-fn load_tree_std(root: &std::path::Path, provenance: StdProvenance) -> Result<ActiveStd, String> {
-    let manifest = crate::std_manifest::read_manifest(root)
-        .ok_or_else(|| format!("cannot read std manifest in source tree {}", root.display()))?;
-    if manifest.host_api != varn_core::HOST_API_VERSION {
-        return Err(format!(
-            "std source tree {} requires host API v{} but this vn provides v{}",
-            root.display(),
-            manifest.host_api,
-            varn_core::HOST_API_VERSION
-        ));
-    }
-    let mut specs = Vec::new();
-    for m in manifest.modules {
-        let file = m.id.strip_prefix("std:").unwrap_or(&m.id);
-        let vn_source = if root.join(format!("{file}/mod.vn")).exists() {
-            format!("{file}/mod.vn")
-        } else {
-            format!("{file}.vn")
-        };
-        specs.push(ModuleSpec::stdlib(
-            Box::leak(m.id.into_boxed_str()),
-            Box::leak(vn_source.into_boxed_str()),
-            m.pure,
-        ));
-    }
-    Ok(ActiveStd {
+fn load_tree(root: &std::path::Path, provenance: StdProvenance) -> ActiveStd {
+    let specs: Vec<ModuleSpec> = varn_modules::std_root::tree_modules(root)
+        .into_iter()
+        .map(|m| {
+            ModuleSpec::stdlib(
+                Box::leak(m.id.into_boxed_str()),
+                Box::leak(m.path.into_boxed_str()),
+                false,
+            )
+        })
+        .collect();
+    ActiveStd {
         specs: Box::leak(specs.into_boxed_slice()),
         image: None,
         tree_root: Some(root.to_path_buf()),
-        description: format!("source tree {} v{}", root.display(), manifest.version),
+        description: format!("source tree {}", root.display()),
         provenance,
-    })
+    }
 }
 
 struct BuiltinsProvider;
@@ -185,6 +182,12 @@ impl StdlibProvider for BuiltinsProvider {
     fn std_provenance(&self) -> Option<(String, StdProvenance)> {
         let std = active_std()?;
         Some((std.description.clone(), std.provenance))
+    }
+
+    fn image_identity(&self) -> u64 {
+        active_std()
+            .and_then(|std| std.image.as_ref())
+            .map_or(0, |image| image.identity)
     }
 }
 

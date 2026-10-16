@@ -348,6 +348,13 @@ pub fn read_artifact(expected: ArtifactKind, bytes: &[u8]) -> Result<&[u8], Arti
     Ok(payload)
 }
 
+pub fn artifact_identity(bytes: &[u8]) -> u64 {
+    bytes
+        .get(17..HEADER_LEN)
+        .and_then(|b| b.try_into().ok())
+        .map_or(0, u64::from_le_bytes)
+}
+
 pub fn write_artifact_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::sync::atomic::{AtomicU64, Ordering};
     static WRITE_SEQ: AtomicU64 = AtomicU64::new(0);

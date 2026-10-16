@@ -40,8 +40,6 @@ varn-ui        = { path = "../varn-ui" }
 bigdecimal   = { workspace = true, optional = true }
 num-bigint   = { workspace = true, optional = true }
 num-traits   = { workspace = true, optional = true }
-serde        = { workspace = true }
-serde_json   = { workspace = true }
 rand         = { version = "0.8", optional = true }
 sha2         = { workspace = true, optional = true }
 hmac         = { version = "0.12", optional = true }

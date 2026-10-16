@@ -18,6 +18,7 @@ mod formatter;
 #[cfg(feature = "lsp")]
 mod inspect_lsp;
 mod pipeline;
+mod std_source;
 mod tester;
 
 use clap::Parser;
@@ -53,7 +54,7 @@ fn main() {
 fn run_cli() {
     env_file::load();
 
-    register_embedded_stdlib_if_available();
+    std_source::register();
     varn_builtins::register_provider();
 
     try_run_standalone_executable();
@@ -101,26 +102,6 @@ fn run_cli() {
             terminal::error(&e);
         }
         process::exit(e.exit_code);
-    }
-}
-
-fn register_embedded_stdlib_if_available() {
-    #[cfg(feature = "embed-std")]
-    {
-        const STDLIB_BYTES: &[u8] = include_bytes!("../../../dist/std.vnb");
-        varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
-        return;
-    }
-    #[cfg(not(feature = "embed-std"))]
-    {
-        let Ok(path) = std::env::var("VARN_STD_BUNDLE") else {
-            return;
-        };
-        let Ok(bytes) = std::fs::read(&path) else {
-            return;
-        };
-        let leaked: &'static [u8] = Box::leak(bytes.into_boxed_slice());
-        varn_builtins::register_embedded_stdlib(leaked);
     }
 }
 

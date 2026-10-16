@@ -166,33 +166,6 @@ fn std_imports_are_pure(id: &str, source: &str) -> Result<bool, String> {
     Ok(pure)
 }
 
-fn std_tree_modules(std_dir: &std::path::Path) -> Vec<(String, String)> {
-    fn walk(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<(String, String)>) {
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            return;
-        };
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if p.is_dir() {
-                walk(base, &p, out);
-            } else if p.extension().is_some_and(|e| e == "vn")
-                && let Ok(rel) = p.strip_prefix(base)
-            {
-                let rel = rel.to_string_lossy().replace('\\', "/");
-                let stem = rel
-                    .strip_suffix("/mod.vn")
-                    .or_else(|| rel.strip_suffix(".vn"))
-                    .unwrap_or(&rel);
-                out.push((format!("std:{stem}"), rel.clone()));
-            }
-        }
-    }
-    let mut out = Vec::new();
-    walk(std_dir, std_dir, &mut out);
-    out.sort();
-    out
-}
-
 struct ImageUnit {
     id: String,
     path: String,
@@ -223,15 +196,15 @@ fn core_units() -> Result<Vec<ImageUnit>, String> {
 }
 
 fn std_units(std_dir: &std::path::Path) -> Result<Vec<ImageUnit>, String> {
-    std_tree_modules(std_dir)
+    varn_modules::std_root::tree_modules(std_dir)
         .into_iter()
-        .map(|(id, path)| {
-            let file = std_dir.join(&path);
+        .map(|m| {
+            let file = std_dir.join(&m.path);
             let source = std::fs::read_to_string(&file)
                 .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
             Ok(ImageUnit {
-                id,
-                path,
+                id: m.id,
+                path: m.path,
                 source,
                 pure: None,
             })

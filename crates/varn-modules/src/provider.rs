@@ -25,6 +25,10 @@ pub trait StdlibProvider: Send + Sync {
     fn std_provenance(&self) -> Option<(String, StdProvenance)> {
         None
     }
+
+    fn image_identity(&self) -> u64 {
+        0
+    }
 }
 
 static PROVIDER: OnceLock<&'static dyn StdlibProvider> = OnceLock::new();

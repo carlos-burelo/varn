@@ -18,11 +18,12 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
 
     let stem = path.file_stem().unwrap_or_default().to_string_lossy();
 
+    let std_identity = varn_modules::provider::get().map_or(0, |p| p.image_identity());
     varn_modules::artifact::get_bytecode_cache_dir(&project_root).join(format!(
-        "{}.{:x}.{:08x}.vncache",
+        "{}.{:x}.{:016x}.vncache",
         stem,
         path_hash as u32,
-        varn_modules::artifact::cache_key()
+        u64::from(varn_modules::artifact::cache_key()) ^ std_identity
     ))
 }
 
@@ -67,31 +68,15 @@ pub fn load_cached_graph(
             continue;
         }
 
-        if let Some(provider) = varn_modules::provider::get() {
-            if let Some(src) = provider.embedded_source(path) {
-                let current_hash = varn_core::fingerprint::fingerprint(src.as_bytes());
-                if cached_hash != current_hash {
-                    reason(format_args!("el módulo embebido {path} cambió"));
-                    return Ok(None);
-                }
-                continue;
+        if let Some(provider) = varn_modules::provider::get()
+            && let Some(src) = provider.embedded_source(path)
+        {
+            let current_hash = varn_core::fingerprint::fingerprint(src.as_bytes());
+            if cached_hash != current_hash {
+                reason(format_args!("el módulo embebido {path} cambió"));
+                return Ok(None);
             }
-            if let Some(p) = provider.source_path(path) {
-                match std::fs::read(&p) {
-                    Ok(src) => {
-                        let current_hash = varn_core::fingerprint::fingerprint(&src);
-                        if cached_hash != current_hash {
-                            reason(format_args!("la fuente std {path} cambió"));
-                            return Ok(None);
-                        }
-                        continue;
-                    }
-                    Err(e) => {
-                        reason(format_args!("la fuente std {path} no se pudo leer: {e}"));
-                        return Ok(None);
-                    }
-                }
-            }
+            continue;
         }
 
         match std::fs::read(path) {

@@ -1,8 +1,6 @@
 use std::path::{Path, PathBuf};
 
 pub const ENV_VARN_STD: &str = "VARN_STD";
-pub const STD_MANIFEST_FILE: &str = "std.json";
-pub const STD_BUNDLE_FILE: &str = "std.vnb";
 pub const STD_DIR_NAME: &str = "std";
 
 pub const STD_EMBEDDED_SENTINEL: &str = "@embedded";
@@ -25,9 +23,9 @@ pub enum StdProvenance {
 }
 
 pub fn classify(path: &Path) -> Option<StdSource> {
-    (path.is_dir()
-        && (path.join(STD_MANIFEST_FILE).is_file() || path.join("math/mod.vn").is_file()))
-    .then(|| StdSource::SourceTree(path.to_path_buf()))
+    path.join("math/mod.vn")
+        .is_file()
+        .then(|| StdSource::SourceTree(path.to_path_buf()))
 }
 
 pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
@@ -115,4 +113,55 @@ fn find_dev_std_from(start: &Path) -> Option<StdSource> {
     start
         .ancestors()
         .find_map(|dir| classify(&dir.join(STD_DIR_NAME)))
+}
+
+pub struct TreeModule {
+    pub id: String,
+    pub path: String,
+    pub len: u64,
+    pub modified_nanos: u128,
+}
+
+pub fn tree_modules(root: &Path) -> Vec<TreeModule> {
+    fn walk(base: &Path, dir: &Path, out: &mut Vec<TreeModule>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let Ok(meta) = entry.metadata() else {
+                continue;
+            };
+            let p = entry.path();
+            if meta.is_dir() {
+                walk(base, &p, out);
+                continue;
+            }
+            if p.extension().is_none_or(|e| e != "vn") {
+                continue;
+            }
+            let Ok(rel) = p.strip_prefix(base) else {
+                continue;
+            };
+            let rel = rel.to_string_lossy().replace('\\', "/");
+            let stem = rel
+                .strip_suffix("/mod.vn")
+                .or_else(|| rel.strip_suffix(".vn"))
+                .unwrap_or(&rel);
+            let modified_nanos = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |d| d.as_nanos());
+            out.push(TreeModule {
+                id: format!("{}{stem}", crate::spec::STD_PREFIX),
+                path: rel.clone(),
+                len: meta.len(),
+                modified_nanos,
+            });
+        }
+    }
+    let mut out = Vec::new();
+    walk(root, root, &mut out);
+    out.sort_by(|a, b| a.id.cmp(&b.id));
+    out
 }

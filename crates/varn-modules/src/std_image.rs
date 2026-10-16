@@ -10,6 +10,7 @@ pub struct ImageModule<'a> {
 }
 
 pub struct StdImage {
+    pub identity: u64,
     pub std_version: &'static str,
     pub host_api_version: u32,
     modules: Vec<ImageModule<'static>>,
@@ -46,6 +47,7 @@ impl StdImage {
             return Err("std image module table is not sorted".to_owned());
         }
         Ok(Self {
+            identity: crate::artifact::artifact_identity(bytes),
             std_version,
             host_api_version,
             modules,

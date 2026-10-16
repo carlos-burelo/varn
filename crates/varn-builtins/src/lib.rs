@@ -3,9 +3,8 @@ pub mod loader;
 pub mod provider_impl;
 pub mod registry;
 pub mod runtime;
-mod std_manifest;
 
-pub use provider_impl::{register_embedded_stdlib, register_provider, std_load_error};
+pub use provider_impl::{register_provider, register_std, std_load_error, StdInput};
 
 pub use loader::CoreSourceLocator;
 pub use registry::{is_known, spec_for, MODULE_REGISTRY};

@@ -279,12 +279,8 @@ fn read_module_source(module_path: &str) -> Result<String, String> {
             .ok_or_else(|| "stdlib provider not registered".to_owned())?;
         return provider
             .embedded_source(module_path)
-            .map(|s| s.to_owned())
-            .or_else(|| {
-                provider
-                    .source_path(module_path)
-                    .and_then(|p| std::fs::read_to_string(p).ok())
-            })
+            .or_else(|| provider.bundled_source(module_path))
+            .map(str::to_owned)
             .ok_or_else(|| format!("stdlib source not found: {module_path}"));
     }
     std::fs::read_to_string(module_path).map_err(|e| e.to_string())
@@ -301,16 +297,9 @@ pub fn resolve_import_specifier(
         ImportSpecifier::Stdlib(_) | ImportSpecifier::Core(_) => {
             let provider = varn_modules::provider::get()
                 .ok_or_else(|| "stdlib provider not registered".to_owned())?;
-            if provider.embedded_source(specifier).is_some() {
-                return Ok(Some(specifier.to_owned()));
-            }
-            if provider.source_path(specifier).is_some() {
-                return Ok(Some(specifier.to_owned()));
-            }
-            if provider.bytecode_blob(specifier).is_some() {
-                return Ok(Some(specifier.to_owned()));
-            }
-            Ok(None)
+            let known = provider.embedded_source(specifier).is_some()
+                || provider.bytecode_blob(specifier).is_some();
+            Ok(known.then(|| specifier.to_owned()))
         }
 
         ImportSpecifier::Runtime(_) => Ok(Some(specifier.to_owned())),
