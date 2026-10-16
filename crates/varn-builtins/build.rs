@@ -23,6 +23,29 @@ fn main() {
     writeln!(out, "];").unwrap();
 }
 
+fn normalized_bytes(bytes: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\r' if bytes.get(i + 1) == Some(&b'\n') => {
+                i += 1;
+                out.push(b'\n');
+                i += 1;
+            }
+            b'\r' => {
+                out.push(b'\n');
+                i += 1;
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    out
+}
+
 fn check_contract_tables() {
     let raw = fs::read_to_string("contracts.json")
         .expect("contracts.json missing: run `vn gen-contract-tables` from the workspace root");
@@ -35,7 +58,10 @@ fn check_contract_tables() {
     for (path, expected) in files {
         let expected = expected.as_str().unwrap_or_default();
         let bytes = fs::read(path).unwrap_or_else(|e| panic!("cannot read contract `{path}`: {e}"));
-        let actual = format!("{:016x}", xxhash_rust::xxh3::xxh3_64(&bytes));
+        let actual = format!(
+            "{:016x}",
+            xxhash_rust::xxh3::xxh3_64(&normalized_bytes(&bytes))
+        );
         if actual != expected {
             panic!("contract tables stale for `{path}`: run `vn gen-contract-tables`");
         }

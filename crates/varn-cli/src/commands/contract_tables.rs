@@ -49,10 +49,36 @@ fn find_crate_dir_arg(arg: &str) -> Option<PathBuf> {
     }
 }
 
+fn normalized_bytes(bytes: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\r' if bytes.get(i + 1) == Some(&b'\n') => {
+                i += 1;
+                out.push(b'\n');
+                i += 1;
+            }
+            b'\r' => {
+                out.push(b'\n');
+                i += 1;
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    out
+}
+
 fn file_hash(path: &Path) -> Result<String, String> {
     let bytes =
         std::fs::read(path).map_err(|e| format!("cannot read '{}': {e}", path.display()))?;
-    Ok(format!("{:016x}", xxhash_rust::xxh3::xxh3_64(&bytes)))
+    Ok(format!(
+        "{:016x}",
+        xxhash_rust::xxh3::xxh3_64(&normalized_bytes(&bytes))
+    ))
 }
 
 pub(crate) fn generate(crate_dir: &Path) -> Result<String, String> {
