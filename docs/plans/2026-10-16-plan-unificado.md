@@ -53,6 +53,11 @@ dev-checkout corre de imagen en caché, el árbol solo la construye
 (`aeb1cff7`); interfaz canónica solo-importador (`1f264fde`, 2.25 MB→
 512 KB, imagen idéntica fría/tibia). `run` vacío < 1 ms sobre
 `--version`.
+Caché JIT persistente (2026-10-16): lowering con relocaciones para todo
+valor del proceso (`5577e184`, lowering puro sin linker) y caché de
+imágenes en `<cache>/jit/` con modo `VARN_JIT_CACHE=verify` como
+cuadrante 5 de `verify.ps1` (`5489ec54`). http_routing 262→227 ms
+(bun 219).
 
 ## 2. Pendiente, por orden
 
