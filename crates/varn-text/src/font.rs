@@ -40,6 +40,17 @@ pub(crate) fn sans_bytes() -> Result<(Vec<u8>, u32), String> {
             families: &[fontdb::Family::SansSerif],
             ..Default::default()
         })
+        .or_else(|| {
+            db.faces()
+                .filter(|f| {
+                    f.families
+                        .iter()
+                        .any(|(name, _)| name.to_lowercase().contains("sans"))
+                })
+                .map(|f| f.id)
+                .next()
+        })
+        .or_else(|| db.faces().map(|f| f.id).next())
     })
     .ok_or_else(|| "text: no system font".to_string())?;
     with_db(|db| db.with_face_data(id, |bytes, idx| (bytes.to_vec(), idx)))

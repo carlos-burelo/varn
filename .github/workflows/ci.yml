@@ -126,7 +126,7 @@ jobs:
       # quadrants above. Do not interpret slow bench numbers on macOS as a
       # regression unless the same workload regresses on Linux or Windows.
       - name: Stability Benchmark
-        run: ${{ matrix.bin_path }} bench ./tests/benchmarks/bench_fib.vn -v
+        run: ${{ matrix.bin_path }} bench ./tests/benchmarks/vn/bench_fib.vn -v
 
       - name: Error Corpus (negative suite)
         run: cargo test --release -p varn-cli --test error_corpus
