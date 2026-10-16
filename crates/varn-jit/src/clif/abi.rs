@@ -12,7 +12,7 @@ use super::native_abi::{NativeClass, NativeShape};
 use super::piece::{compile_piece, CompiledPiece};
 use crate::JitHelpers;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Activation {
     Native,
     Framed,

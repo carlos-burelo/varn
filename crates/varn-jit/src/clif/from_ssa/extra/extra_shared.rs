@@ -16,7 +16,7 @@ pub(super) fn stage(b: &mut FunctionBuilder, ctx: &Ctx<'_>, vals: &[Value]) -> (
     (addr, b.ins().iconst(types::I64, vals.len() as i64))
 }
 
-pub(super) fn frame<'a>(ctx: &'a Ctx<'a>) -> Result<&'a super::super::FrameIo<'a>, String> {
+pub(super) fn frame<'a>(ctx: &'a Ctx<'a>) -> Result<&'a super::super::FrameIo, String> {
     ctx.frame
         .as_ref()
         .ok_or_else(|| "from_ssa: extra op without a frame".to_owned())

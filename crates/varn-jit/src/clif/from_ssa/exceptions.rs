@@ -5,7 +5,7 @@ use cranelift_codegen::ir::{types, Block, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::FunctionBuilder;
 use varn_types::register_meta::SlotKind;
 
-fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
+fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo, String> {
     ctx.frame
         .as_ref()
         .ok_or_else(|| "from_ssa: try/throw without a frame".into())

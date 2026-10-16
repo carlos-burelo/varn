@@ -29,17 +29,15 @@ pub(super) fn emit_build_object(
             | varn_types::PoolEntry::Layout(_) => false,
         })
         .ok_or("from_ssa: object shape not in pool")?;
-    let shape = ctx
-        .proto
+    ctx.proto
         .resolved_shape(idx)
         .ok_or("from_ssa: unresolved object shape")?;
-    let shape_ptr = std::rc::Rc::as_ptr(&shape) as usize;
     let count = ids.len();
     let total = ctx.helpers.object_layout.data_off + varn_types::ObjData::bytes_for(count);
     let Some(class_idx) = varn_types::cell::class_for(total) else {
         return emit_build_object_slow(b, ctx, values, ids, keys, false);
     };
-    emit_build_object_inline(b, ctx, values, ids, keys, shape_ptr, count, class_idx)
+    emit_build_object_inline(b, ctx, values, ids, keys, idx, count, class_idx)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -49,7 +47,7 @@ fn emit_build_object_inline(
     values: &[Option<Value>],
     ids: &[u32],
     keys: &[Box<str>],
-    shape_ptr: usize,
+    shape_idx: usize,
     count: usize,
     class_idx: usize,
 ) -> Result<Value, String> {
@@ -152,7 +150,7 @@ fn emit_build_object_inline(
 
     b.switch_to_block(header_blk);
     let r = b.block_params(header_blk)[0];
-    emit_build_object_body(b, ctx, &vals, shape_ptr, count, class_idx, r);
+    emit_build_object_body(b, ctx, &vals, shape_idx, count, class_idx, r);
 
     let full = b
         .ins()
@@ -182,7 +180,7 @@ fn emit_build_object_body(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     vals: &[Value],
-    shape_ptr: usize,
+    shape_idx: usize,
     count: usize,
     class_idx: usize,
     r: Value,
@@ -228,7 +226,8 @@ fn emit_build_object_body(
     let len_meta = b.ins().iconst(types::I64, count as i64);
     b.ins()
         .store(flags, len_meta, r, olay.payload_len_off as i32);
-    let shape_v = b.ins().iconst(types::I64, shape_ptr as i64);
+    let shape_v =
+        crate::clif::reloc::abs_value(b, crate::clif::reloc::AbsSym::Shape(shape_idx as u32));
     let rc_lay = &ctx.helpers.call_layout;
     let shape_ctl = b.ins().iadd_imm_s(shape_v, -(rc_lay.rc_value_off as i64));
     b.ins().store(flags, shape_ctl, data, olay.shape_off as i32);
@@ -274,11 +273,9 @@ fn emit_build_object_slow(
             | varn_types::PoolEntry::Layout(_) => false,
         })
         .ok_or("from_ssa: object shape not in pool")?;
-    let shape = ctx
-        .proto
+    ctx.proto
         .resolved_shape(idx)
         .ok_or("from_ssa: unresolved object shape")?;
-    let shape_ptr = std::rc::Rc::as_ptr(&shape) as usize;
 
     let vals: Vec<Value> = ids
         .iter()
@@ -301,7 +298,7 @@ fn emit_build_object_slow(
         );
     }
     let count_v = b.ins().iconst(types::I64, count as i64);
-    let shape_v = b.ins().iconst(types::I64, shape_ptr as i64);
+    let shape_v = crate::clif::reloc::abs_value(b, crate::clif::reloc::AbsSym::Shape(idx as u32));
     let rec_v = b.ins().iconst(types::I64, is_record as i64);
     super::exceptions::call_checked(
         b,

@@ -8,7 +8,6 @@ use varn_types::FunctionProto;
 
 use super::super::abi::Activation;
 use super::super::homes::Homes;
-use super::super::lower::ClifLinker;
 use super::super::native_abi::NativeShape;
 use super::frame_policy::needs_frame;
 use super::store::{clif_ty, is_heap};
@@ -173,25 +172,24 @@ pub(super) fn reachability(ssa: &SsaProto, start: usize, with_full: bool) -> Res
     })
 }
 
-pub(super) struct EntryState<'a> {
+pub(super) struct EntryState {
     pub views: Views,
     pub exec_ctx: Value,
-    pub frame: Option<FrameIo<'a>>,
+    pub frame: Option<FrameIo>,
     pub this: Option<Value>,
 }
 
-pub(super) fn enter<'a>(
+pub(super) fn enter(
     b: &mut FunctionBuilder,
     ssa: &SsaProto,
     proto: &FunctionProto,
     helpers: &JitHelpers,
-    linker: &'a dyn ClifLinker,
     activation: Activation,
     frame_aware: bool,
     abi_params: usize,
     shape: &NativeShape,
     entry_blk: Block,
-) -> Result<EntryState<'a>, String> {
+) -> Result<EntryState, String> {
     let views = Views::declare(b, ssa);
 
     let entry_params = b.block_params(entry_blk).to_vec();
@@ -210,7 +208,6 @@ pub(super) fn enter<'a>(
         exec_ctx,
         closure,
         base,
-        linker,
         layout: varn_types::register_meta::FrameLayout::for_proto(proto),
     });
     let this = match (&frame, activation) {

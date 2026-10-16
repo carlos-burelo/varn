@@ -179,8 +179,12 @@ pub(crate) fn emit_call_native_op(
         ));
     }
     let window = boxed_window(b, ctx, values, receiver, args)?;
-    let target = (ctx.helpers.resolve_native_op)(op_id);
-    let fn_v = b.ins().iconst(types::I64, target.func_ptr as i64);
+    let slot = {
+        let mut natives = ctx.natives.borrow_mut();
+        natives.push(op_id);
+        natives.len() - 1
+    };
+    let fn_v = crate::clif::reloc::abs_value(b, crate::clif::reloc::AbsSym::Native(slot as u32));
     let op_v = b.ins().iconst(types::I64, op_id as i64);
     let total = b.ins().iconst(types::I64, (args.len() + 1) as i64);
     crate::clif::from_ssa::exceptions::call_checked(

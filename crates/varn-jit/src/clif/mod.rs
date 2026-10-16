@@ -10,6 +10,7 @@ pub(crate) mod homes;
 pub mod lower;
 pub(crate) mod native_abi;
 pub(crate) mod piece;
+pub mod reloc;
 pub(crate) mod strings;
 
 use cranelift_codegen::control::ControlPlane;

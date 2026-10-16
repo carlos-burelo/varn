@@ -6,17 +6,15 @@ use varn_types::ssa::SsaProto;
 use varn_types::{FunctionProto, VmValue};
 
 use super::super::abi::Activation;
-use super::super::lower::ClifLinker;
 use super::super::piece::CompiledPiece;
 use super::call;
 use super::views;
 use crate::JitHelpers;
 
-pub(super) struct FrameIo<'a> {
+pub(super) struct FrameIo {
     pub exec_ctx: Value,
     pub closure: Value,
     pub base: Option<Value>,
-    pub linker: &'a dyn ClifLinker,
 
     pub layout: FrameLayout,
 }
@@ -32,7 +30,7 @@ pub(super) struct Ctx<'a> {
 
     pub exec_ctx: Value,
 
-    pub frame: Option<FrameIo<'a>>,
+    pub frame: Option<FrameIo>,
     pub activation: Activation,
 
     pub this: Option<Value>,
@@ -57,6 +55,8 @@ pub(super) struct Ctx<'a> {
 
     pub home_addrs: std::cell::RefCell<FxHashMap<u32, Value>>,
 
+    pub natives: std::cell::RefCell<Vec<u64>>,
+
     pub scratch: Option<call::ScratchWin>,
 }
 
@@ -73,6 +73,8 @@ pub(super) struct PureTryState {
 
 pub(in crate::clif) struct Lowered {
     pub piece: CompiledPiece,
+
+    pub natives: Vec<u64>,
 
     pub frameless: bool,
 }

@@ -49,13 +49,6 @@ pub trait ClifLinker {
     fn current_epoch(&self) -> u64;
 }
 
-pub struct NoLinker;
-impl ClifLinker for NoLinker {
-    fn current_epoch(&self) -> u64 {
-        0
-    }
-}
-
 fn boxed_slots(proto: &FunctionProto) -> bool {
     use varn_types::register_meta::SlotKind;
     let scalar = |k: &SlotKind| matches!(k, SlotKind::Int | SlotKind::Float | SlotKind::Bool);
@@ -110,15 +103,16 @@ pub fn try_compile(
     constants: &[VmValue],
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
-    linker: &dyn ClifLinker,
     osr_req: Option<varn_types::ssa::OsrRequest>,
     mut debug: Option<&mut ClifDebugSink>,
-) -> Result<ClifArtifact, String> {
+) -> Result<CodeImage, String> {
     if crate::PAIR_MIGRATION_PENDING {
         return Err(crate::PAIR_MIGRATION_BAIL.to_owned());
     }
 
     super::emit::reset_disabled_helper_hit();
+    super::reloc::reset_pinned_address();
+    super::reloc::bind_helpers(helpers);
 
     if let Some(reason) = gate_reason(proto) {
         if super::trace() {
@@ -161,7 +155,6 @@ pub fn try_compile(
         constants,
         helpers,
         isa,
-        linker,
         osr_req,
         Activation::Native,
         debug.as_deref_mut(),
@@ -175,7 +168,6 @@ pub fn try_compile(
                 constants,
                 helpers,
                 isa,
-                linker,
                 osr_req,
                 Activation::Framed,
                 debug.as_deref_mut(),
@@ -196,7 +188,14 @@ pub fn try_compile(
                 );
             }
             let wrapper = build_wrapper(proto, helpers, isa, activation, osr_req.is_some())?;
-            finish_artifact(lowered, wrapper, activation, debug)
+            let image = CodeImage::assemble(lowered, wrapper, activation);
+            super::debug::capture_code(
+                &mut debug,
+                &image.code,
+                image.raw_len(),
+                image.wrapper_off as usize,
+            );
+            Ok(image)
         }
         Ok(_) => Err("clif: uses a helper disabled in fase B".into()),
         Err(reason) => {
@@ -211,42 +210,132 @@ pub fn try_compile(
     }
 }
 
-fn finish_artifact(
-    lowered: super::from_ssa::Lowered,
-    wrapper: super::piece::CompiledPiece,
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CodeImage {
+    code: Vec<u8>,
+    wrapper_off: u32,
+    call_relocs: Vec<u32>,
+    abs_relocs: Vec<(u32, super::reloc::AbsSym)>,
+    natives: Vec<u64>,
+    safepoints: Vec<(u32, Box<[u32]>)>,
     activation: Activation,
-    mut debug: Option<&mut ClifDebugSink>,
-) -> Result<ClifArtifact, String> {
-    let raw = lowered.piece;
-    let wrapper_off = (raw.code.len() + 15) & !15;
-    let total = wrapper_off + wrapper.code.len();
-    let mut buf = JitBuffer::new(total.max(16))?;
-    {
-        let slice = buf.as_mut_slice();
-        slice[..raw.code.len()].copy_from_slice(&raw.code);
-        slice[wrapper_off..wrapper_off + wrapper.code.len()].copy_from_slice(&wrapper.code);
-        for r in &raw.call_reloc_offsets {
-            patch_rel32(slice, *r, 0)?;
-        }
-        for r in &wrapper.call_reloc_offsets {
-            patch_rel32(slice, wrapper_off + *r, 0)?;
+    frameless: bool,
+    #[serde(skip)]
+    pinned: bool,
+}
+
+impl CodeImage {
+    fn assemble(
+        lowered: super::from_ssa::Lowered,
+        wrapper: super::piece::CompiledPiece,
+        activation: Activation,
+    ) -> Self {
+        let raw = lowered.piece;
+        let wrapper_off = (raw.code.len() + 15) & !15;
+        let mut code = vec![0u8; wrapper_off + wrapper.code.len()];
+        code[..raw.code.len()].copy_from_slice(&raw.code);
+        code[wrapper_off..].copy_from_slice(&wrapper.code);
+        let shift = |off: usize| (wrapper_off + off) as u32;
+        let call_relocs = raw
+            .call_reloc_offsets
+            .iter()
+            .map(|&r| r as u32)
+            .chain(wrapper.call_reloc_offsets.iter().map(|&r| shift(r)))
+            .collect();
+        let abs_relocs = raw
+            .abs_relocs
+            .iter()
+            .copied()
+            .chain(
+                wrapper
+                    .abs_relocs
+                    .iter()
+                    .map(|&(off, sym)| (shift(off as usize), sym)),
+            )
+            .collect();
+        let safepoints = raw
+            .safepoints
+            .into_iter()
+            .map(|s| (s.return_offset, s.slots))
+            .chain(
+                wrapper
+                    .safepoints
+                    .into_iter()
+                    .map(|s| (shift(s.return_offset as usize), s.slots)),
+            )
+            .collect();
+        CodeImage {
+            code,
+            wrapper_off: wrapper_off as u32,
+            call_relocs,
+            abs_relocs,
+            natives: lowered.natives,
+            safepoints,
+            activation,
+            frameless: lowered.frameless,
+            pinned: super::reloc::pinned_address(),
         }
     }
-    super::debug::capture_code(&mut debug, &mut buf, raw.code.len(), wrapper_off, total);
-    buf.make_executable()?;
-    let raw_ptr = buf.as_ptr();
-    let mut safepoints = raw.safepoints;
-    for mut site in wrapper.safepoints {
-        site.return_offset += wrapper_off as u32;
-        safepoints.push(site);
+
+    fn raw_len(&self) -> usize {
+        self.wrapper_off as usize
     }
-    crate::stack_roots::register(raw_ptr as usize, total, safepoints);
-    let entry = unsafe { buf.as_ptr().add(wrapper_off) };
-    Ok(ClifArtifact {
-        buffer: buf,
-        entry,
-        raw: raw_ptr,
-        activation,
-        frameless: lowered.frameless,
-    })
+
+    pub fn code_len(&self) -> usize {
+        self.code.len()
+    }
+
+    pub fn persistable(&self) -> bool {
+        !self.pinned
+    }
+
+    pub fn frameless(&self) -> bool {
+        self.frameless
+    }
+
+    pub fn activation(&self) -> Activation {
+        self.activation
+    }
+
+    pub fn install(&self, resolver: &super::reloc::Resolver<'_>) -> Result<ClifArtifact, String> {
+        let natives = super::reloc::Resolver {
+            natives: &self.natives,
+            ..*resolver
+        };
+        let mut buf = JitBuffer::new(self.code.len().max(16))?;
+        {
+            let slice = buf.as_mut_slice();
+            slice[..self.code.len()].copy_from_slice(&self.code);
+            for &r in &self.call_relocs {
+                patch_rel32(slice, r as usize, 0)?;
+            }
+            for &(off, sym) in &self.abs_relocs {
+                let value = natives.resolve(sym)?;
+                let at = off as usize;
+                slice
+                    .get_mut(at..at + 8)
+                    .ok_or("clif: absolute reloc out of bounds")?
+                    .copy_from_slice(&value.to_le_bytes());
+            }
+        }
+        buf.make_executable()?;
+        let raw_ptr = buf.as_ptr();
+        let safepoints = self
+            .safepoints
+            .iter()
+            .map(|(return_offset, slots)| crate::stack_roots::SafepointMap {
+                return_offset: *return_offset,
+                slots: slots.clone(),
+            })
+            .collect();
+        crate::stack_roots::register(raw_ptr as usize, self.code.len(), safepoints);
+        let entry = unsafe { buf.as_ptr().add(self.wrapper_off as usize) };
+        Ok(ClifArtifact {
+            buffer: buf,
+            entry,
+            raw: raw_ptr,
+            activation: self.activation,
+            frameless: self.frameless,
+        })
+    }
 }

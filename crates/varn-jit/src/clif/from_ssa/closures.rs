@@ -4,7 +4,7 @@ use varn_types::ssa::{SsaUpvalue, UPVALUE_LOCAL};
 
 use super::{heap, home_load, home_store, Ctx, FrameIo};
 
-fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo<'a>, String> {
+fn frame<'a>(ctx: &'a Ctx<'_>) -> Result<&'a FrameIo, String> {
     ctx.frame
         .as_ref()
         .ok_or_else(|| "from_ssa: closure op without a frame".into())

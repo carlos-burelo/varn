@@ -1,5 +1,5 @@
 use varn_jit::clif::debug::inspect;
-use varn_jit::clif::lower::{gate_reason, NoLinker};
+use varn_jit::clif::lower::gate_reason;
 use varn_jit::JitHelpers;
 use varn_types::{FunctionProto, PoolEntry};
 
@@ -77,7 +77,7 @@ fn walk(
         });
     } else {
         let constants = constants_for_inspect(proto);
-        let insp = inspect(proto, &constants, helpers, isa, &NoLinker);
+        let insp = inspect(proto, &constants, helpers, isa);
         let tier = match &insp.route {
             Ok(()) => Tier::Clif,
             Err(e) => Tier::Bail(e.clone()),

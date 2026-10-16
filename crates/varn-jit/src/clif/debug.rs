@@ -23,8 +23,6 @@ use varn_types::ssa::SsaProto;
 
 use cranelift_codegen::ir::Function;
 
-use crate::mem::JitBuffer;
-
 pub(super) fn capture_ir(debug: &mut Option<&mut ClifDebugSink>, func: &Function) {
     if let Some(sink) = debug.as_deref_mut() {
         sink.clif_ir = Some(func.display().to_string());
@@ -60,16 +58,13 @@ fn val_class(ssa: &SsaProto, v: u32) -> String {
 
 pub(super) fn capture_code(
     debug: &mut Option<&mut ClifDebugSink>,
-    buf: &mut JitBuffer,
+    code: &[u8],
     raw_len: usize,
     wrapper_off: usize,
-    total: usize,
 ) {
     if let Some(sink) = debug.as_deref_mut() {
-        let slice = buf.as_mut_slice();
-        let end = total.min(slice.len());
         sink.code = Some(CodeBytes {
-            bytes: slice[..end].to_vec(),
+            bytes: code.to_vec(),
             raw_off: 0,
             raw_len,
             entry_off: wrapper_off,
@@ -77,7 +72,7 @@ pub(super) fn capture_code(
     }
 }
 
-use super::lower::{try_compile, ClifLinker};
+use super::lower::try_compile;
 use crate::JitHelpers;
 use cranelift_codegen::isa::OwnedTargetIsa;
 use varn_types::{FunctionProto, VmValue};
@@ -101,23 +96,14 @@ pub fn inspect(
     constants: &[VmValue],
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
-    linker: &dyn ClifLinker,
 ) -> ClifInspection {
     let mut sink = ClifDebugSink::default();
-    let result = try_compile(
-        proto,
-        constants,
-        helpers,
-        isa,
-        linker,
-        None,
-        Some(&mut sink),
-    );
+    let result = try_compile(proto, constants, helpers, isa, None, Some(&mut sink));
     let (route, frame_aware, framed) = match &result {
-        Ok(art) => (
+        Ok(image) => (
             Ok(()),
-            !art.frameless,
-            art.activation == super::abi::Activation::Framed,
+            !image.frameless(),
+            image.activation() == super::abi::Activation::Framed,
         ),
         Err(e) => (Err(e.clone()), false, false),
     };

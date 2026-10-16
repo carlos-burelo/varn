@@ -27,13 +27,6 @@ pub mod clif {
             fn current_epoch(&self) -> u64;
         }
 
-        pub struct NoLinker;
-        impl ClifLinker for NoLinker {
-            fn current_epoch(&self) -> u64 {
-                0
-            }
-        }
-
         pub fn gate_reason(proto: &FunctionProto) -> Option<String> {
             let words = proto.chunk.code.len();
             if words > crate::SIZE_GATE_WORDS {
@@ -87,7 +80,6 @@ pub mod clif {
             _constants: &[VmValue],
             _helpers: &JitHelpers,
             _isa: &crate::OwnedTargetIsa,
-            _linker: &dyn ClifLinker,
         ) -> ClifInspection {
             ClifInspection {
                 name: proto.name.as_deref().unwrap_or("<top-level>").to_string(),
@@ -178,7 +170,20 @@ pub(crate) const PAIR_MIGRATION_PENDING: bool = false;
 pub(crate) const PAIR_MIGRATION_BAIL: &str =
     "clif: disabled while `VmValue` moves to a (tag, payload) pair; the lowering still models every register as one machine word";
 
-#[allow(unused_variables)]
+#[cfg(feature = "clif")]
+pub use clif::lower::CodeImage;
+
+#[cfg(not(feature = "clif"))]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CodeImage;
+
+#[cfg(not(feature = "clif"))]
+impl CodeImage {
+    pub fn persistable(&self) -> bool {
+        false
+    }
+}
+
 pub fn compile(
     proto: &FunctionProto,
     constants: &[VmValue],
@@ -186,16 +191,27 @@ pub fn compile(
     linker: &dyn clif::lower::ClifLinker,
     osr_req: Option<varn_types::ssa::OsrRequest>,
 ) -> Result<Compiled, String> {
+    let image = lower(proto, constants, helpers, osr_req)?;
+    install(&image, proto, constants, helpers, linker)
+}
+
+#[allow(unused_variables)]
+pub fn lower(
+    proto: &FunctionProto,
+    constants: &[VmValue],
+    helpers: JitHelpers,
+    osr_req: Option<varn_types::ssa::OsrRequest>,
+) -> Result<CodeImage, String> {
     #[cfg(feature = "clif")]
     if clif::enabled()
         && let Ok(isa) = clif::shared_isa()
     {
         let start = std::time::Instant::now();
-        let res = clif::lower::try_compile(proto, constants, &helpers, isa, linker, osr_req, None);
+        let res = clif::lower::try_compile(proto, constants, &helpers, isa, osr_req, None);
         let elapsed = start.elapsed().as_nanos() as u64;
         let words = proto.chunk.code.len();
-        match res {
-            Ok(art) => {
+        match &res {
+            Ok(image) => {
                 if clif::trace() {
                     eprintln!("CLIF ROUTE {:?}", proto.name);
                 }
@@ -205,20 +221,12 @@ pub fn compile(
                     .fetch_add(elapsed, Ordering::Relaxed);
                 JIT_STATS
                     .total_code_size_bytes
-                    .fetch_add(art.buffer.size() as u64, Ordering::Relaxed);
+                    .fetch_add(image.code_len() as u64, Ordering::Relaxed);
                 record(|| CompileRecord {
                     name: fn_name(proto),
                     words,
                     outcome: CompileOutcome::Routed,
                     compile_ns: elapsed,
-                });
-                let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
-                let (native, native_sig) = art.native_entry(proto);
-                return Ok(Compiled {
-                    entry: jit_fn,
-                    native,
-                    native_sig,
-                    code: Rc::new(art) as Rc<dyn Any>,
                 });
             }
             Err(e) => {
@@ -235,10 +243,41 @@ pub fn compile(
                     outcome: CompileOutcome::Bailed(e.clone()),
                     compile_ns: elapsed,
                 });
-                return Err(e);
             }
         }
+        return res;
     }
 
+    Err("JIT disabled or unsupported proto".into())
+}
+
+#[allow(unused_variables)]
+pub fn install(
+    image: &CodeImage,
+    proto: &FunctionProto,
+    constants: &[VmValue],
+    helpers: JitHelpers,
+    linker: &dyn clif::lower::ClifLinker,
+) -> Result<Compiled, String> {
+    #[cfg(feature = "clif")]
+    {
+        let resolver = clif::reloc::Resolver {
+            helpers: &helpers,
+            proto,
+            constants,
+            natives: &[],
+            epoch: linker.current_epoch(),
+        };
+        let art = image.install(&resolver)?;
+        let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
+        let (native, native_sig) = art.native_entry(proto);
+        Ok(Compiled {
+            entry: jit_fn,
+            native,
+            native_sig,
+            code: Rc::new(art) as Rc<dyn Any>,
+        })
+    }
+    #[cfg(not(feature = "clif"))]
     Err("JIT disabled or unsupported proto".into())
 }

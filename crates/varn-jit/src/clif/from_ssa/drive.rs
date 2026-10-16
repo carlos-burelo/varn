@@ -1,5 +1,4 @@
 use super::super::abi::{raw_signature, Activation};
-use super::super::lower::ClifLinker;
 use super::super::native_abi::NativeShape;
 use super::super::piece::compile_piece;
 use super::{
@@ -45,7 +44,6 @@ pub(in crate::clif) fn try_lower(
     constants: &[VmValue],
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
-    linker: &dyn ClifLinker,
     osr_req: Option<OsrRequest>,
     activation: Activation,
     mut debug: Option<&mut super::super::debug::ClifDebugSink>,
@@ -98,7 +96,6 @@ pub(in crate::clif) fn try_lower(
         ssa,
         proto,
         helpers,
-        linker,
         activation,
         flags.frame_aware,
         flags.abi_params,
@@ -146,6 +143,7 @@ pub(in crate::clif) fn try_lower(
         fast_bounds: rustc_hash::FxHashSet::default(),
         elide: std::cell::Cell::new(false),
         home_addrs: Default::default(),
+        natives: Default::default(),
         scratch,
         carried: match osr {
             Some(h) => osr::carried(&mut b, ssa, h, &reach.reached),
@@ -328,6 +326,7 @@ pub(in crate::clif) fn try_lower(
     let frameless = flags.frameless;
     Ok(Lowered {
         piece: compile_piece(func, isa)?,
+        natives: ctx.natives.take(),
         frameless,
     })
 }

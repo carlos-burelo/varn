@@ -87,8 +87,8 @@ pub(crate) fn emit(
     let has_entry = b.ins().icmp_imm_u(IntCC::NotEqual, entry, 0);
     let sig_core = b.ins().band_imm_u(sig, !NATIVE_FRAMELESS as i64);
     let same_sig = b.ins().icmp_imm_u(IntCC::Equal, sig_core, id as i64);
-    let baked_epoch = frame.linker.current_epoch();
-    let same_epoch = b.ins().icmp_imm_u(IntCC::Equal, epoch, baked_epoch as i64);
+    let baked_epoch = crate::clif::reloc::abs_value(b, crate::clif::reloc::AbsSym::Epoch);
+    let same_epoch = b.ins().icmp(IntCC::Equal, epoch, baked_epoch);
     let matched = b.ins().band(same_sig, same_epoch);
     let enter = b.ins().band(has_entry, matched);
     let entered = b.create_block();

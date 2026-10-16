@@ -3629,6 +3629,7 @@ dependencies = [
  "cranelift-native",
  "cranelift-object",
  "rustc-hash 1.1.0",
+ "serde",
  "varn-core",
  "varn-jit-abi",
  "varn-types",

@@ -32,6 +32,7 @@ macro_rules! fill_tail {
             poly_ic_slot_size: varn_types::chunk::POLY_IC_SLOT_SIZE,
             frame_layout: super::frame_layout::probe(),
             call_layout: super::call_layout::probe(),
+            call_targets: Box::leak(Box::new([ $( $path as *const () as usize, )* ])),
         }
     }};
 }
@@ -39,10 +40,11 @@ macro_rules! fill_tail {
 pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     assert_eq!(
         varn_jit::JIT_HELPERS_VERSION,
-        5,
+        6,
         "JitHelpers ABI version mismatch: review offset_of layout after varn-jit-abi change"
     );
-    jit_helper_table!(fill, "src/exec/jit_helpers")
+    static HELPERS: std::sync::OnceLock<varn_jit::JitHelpers> = std::sync::OnceLock::new();
+    *HELPERS.get_or_init(|| jit_helper_table!(fill, "src/exec/jit_helpers"))
 }
 
 fn resolve_native_op_target(op_id: u64) -> varn_types::NativeOpTarget {

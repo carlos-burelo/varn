@@ -6,14 +6,30 @@ pub(super) struct CompiledPiece {
     pub safepoints: Vec<crate::stack_roots::SafepointMap>,
 
     pub call_reloc_offsets: Vec<usize>,
+
+    pub abs_relocs: Vec<(u32, super::reloc::AbsSym)>,
 }
 
 pub(super) fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, String> {
+    let names = func.params.user_named_funcs().clone();
     super::with_ctx(func, isa.as_ref(), |compiled| {
         let mut call_reloc_offsets = Vec::new();
+        let mut abs_relocs = Vec::new();
         for reloc in compiled.buffer.relocs() {
             match &reloc.target {
-                cranelift_codegen::FinalizedRelocTarget::ExternalName(ExternalName::User(_)) => {
+                cranelift_codegen::FinalizedRelocTarget::ExternalName(ExternalName::User(r)) => {
+                    if let Some(sym) = super::reloc::AbsSym::from_name(&names[*r]) {
+                        if reloc.kind != cranelift_codegen::binemit::Reloc::Abs8
+                            || reloc.addend != 0
+                        {
+                            return Err(format!(
+                                "clif: unexpected absolute reloc {:?}+{}",
+                                reloc.kind, reloc.addend
+                            ));
+                        }
+                        abs_relocs.push((reloc.offset, sym));
+                        continue;
+                    }
                     if reloc.addend != -4 {
                         return Err(format!("clif: unexpected reloc addend {}", reloc.addend));
                     }
@@ -43,6 +59,7 @@ pub(super) fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<Comp
             code: compiled.code_buffer().to_vec(),
             safepoints,
             call_reloc_offsets,
+            abs_relocs,
         })
     })
 }

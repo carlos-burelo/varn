@@ -1,7 +1,6 @@
 #[cfg(target_arch = "x86_64")]
 use iced_x86::{Decoder, DecoderOptions, Formatter, Instruction, IntelFormatter};
 use varn_jit::clif::debug::{inspect, ClifInspection};
-use varn_jit::clif::lower::NoLinker;
 use varn_jit::JitHelpers;
 use varn_types::{FunctionProto, PoolEntry};
 
@@ -45,7 +44,7 @@ fn render_recursive(
             .contains(needle.as_str())
     }) {
         let constants = constants_for_inspect(proto);
-        let insp = inspect(proto, &constants, helpers, isa, &NoLinker);
+        let insp = inspect(proto, &constants, helpers, isa);
         render_one(&insp, flags);
     }
     for entry in &proto.chunk.constants {

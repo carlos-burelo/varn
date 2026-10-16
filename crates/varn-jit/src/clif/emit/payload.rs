@@ -48,7 +48,7 @@ pub(in crate::clif) fn call_helper(
     }
     sig.returns.push(AbiParam::new(types::I64));
     let sig_ref = b.import_signature(sig);
-    let ptr = b.ins().iconst(types::I64, helper as i64);
+    let ptr = crate::clif::reloc::helper_value(b, helper);
     let call = b.ins().call_indirect(sig_ref, ptr, args);
     b.inst_results(call)[0]
 }
@@ -65,7 +65,7 @@ pub(in crate::clif) fn call_helper_void(
         sig.params.push(AbiParam::new(types::I64));
     }
     let sig_ref = b.import_signature(sig);
-    let ptr = b.ins().iconst(types::I64, helper as i64);
+    let ptr = crate::clif::reloc::helper_value(b, helper);
     b.ins().call_indirect(sig_ref, ptr, args);
 }
 
