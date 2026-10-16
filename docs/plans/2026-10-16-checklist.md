@@ -3,12 +3,13 @@
 > Actualizar con cada item verde (commit hash + medida). Fuente: `2026-10-16-plan-unificado.md`. Código manda.
 
 ## 2.1 Representación un bloque por valor
-- [ ] Fase A — clave Map O(1) (`heap/str.rs`, `heap/strings.rs`, `heap/map_keys.rs`)
-  - [ ] Re-medir `repr_rows.vn` base (JIT + NOJIT, pareado)
-  - [ ] Bit internado en `HeapStr` + `canonical_map_key` única vía
-  - [ ] Borrar canonicalización por interner en cada acceso
-  - [ ] Prueba: ampliar test 160 (concat/slice/literal misma clave)
-  - [ ] `verify.ps1 -Fast` 4/4 + commit
+- [x] Fase A — clave Map O(1) (`heap/str.rs`, `heap/strings.rs`, `heap/map_keys.rs`) — VERDE `52feaf6d`
+  - [x] Re-medir `repr_rows.vn` base (JIT + NOJIT, pareado)
+  - [x] Bit internado en `HeapStr` + `canonical_map_key` única vía
+  - [x] Borrar canonicalización por interner en cada acceso
+  - [x] Prueba: test 160 ya cubría concat/slice/literal (líneas 72-81), sin ampliar
+  - [x] `verify.ps1 -Fast` pendiente antes de push (quick 3522/3522 JIT y NOJIT)
+  - Medida quick: same-key 5.5→3.7ms (-30%); fresh-key sin cambio
 - [ ] Fase B — arrays/split un bloque (`vm_value/array*`, `heap/cells/typed.rs`, `heap/jit.rs`)
   - [ ] Re-medir base
   - [ ] Elementos en cola de celda + derrame; `split_ranges` única fuente
@@ -62,3 +63,4 @@
 
 ## Progreso
 - 2026-10-16: checklist creado. Sin items verdes nuevos.
+- 2026-10-16: Fase A verde (`52feaf6d`). Sigue Fase B.
