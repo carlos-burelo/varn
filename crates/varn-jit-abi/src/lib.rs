@@ -1,6 +1,6 @@
 use varn_types::{NativeOpTarget, VmValue};
 
-pub const JIT_HELPERS_VERSION: u32 = 4;
+pub const JIT_HELPERS_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
@@ -71,6 +71,10 @@ pub struct JitObjectLayout {
     pub object_tag: usize,
 
     pub payload_off: usize,
+
+    pub payload_len_off: usize,
+
+    pub data_off: usize,
 
     pub len_off: usize,
 

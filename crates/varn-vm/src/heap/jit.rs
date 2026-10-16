@@ -240,6 +240,11 @@ impl Heap {
         };
         let data = probe.as_ptr() as usize;
         let shape_ptr = Rc::as_ptr(&shape) as *const u8 as usize - RCBOX_PREFIX;
+        assert_eq!(
+            unsafe { *(shape_ptr as *const usize) },
+            2,
+            "Rc<Shape> strong counter tripwire: RcBox strong must sit at value_ptr - 16"
+        );
 
         let values_off = varn_types::OBJ_VALUES_OFF;
         let shape_off = varn_types::OBJ_SHAPE_OFF;
@@ -277,6 +282,34 @@ impl Heap {
             .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == data)
             .expect("object payload probe failed")
             + varn_types::cell::HEADER_BYTES;
+        let data_off = varn_types::cell::HEADER_BYTES + std::mem::size_of::<HeapObj>();
+        let bare_obj = HeapObj::Object(oref);
+        let bare_size = std::mem::size_of::<HeapObj>();
+        let bare =
+            unsafe { std::slice::from_raw_parts(&bare_obj as *const _ as *const u8, bare_size) };
+        let bare_payload = (0..=bare_size - 8)
+            .find(|&off| usize::from_ne_bytes(bare[off..off + 8].try_into().unwrap()) == data)
+            .expect("bare HeapObj payload probe failed");
+        assert_eq!(
+            payload_off - varn_types::cell::HEADER_BYTES,
+            bare_payload,
+            "Option<HeapObj> must share HeapObj field offsets (niche layout)"
+        );
+        assert!(
+            data_off >= varn_types::cell::HEADER_BYTES + bare_payload + 8,
+            "ObjData must start after the whole HeapObj slot"
+        );
+        let payload_len_off = bare_payload + 8 + varn_types::cell::HEADER_BYTES;
+        assert_eq!(
+            usize::from_ne_bytes(
+                bare[bare_payload + 8..bare_payload + 16]
+                    .try_into()
+                    .unwrap()
+            ),
+            TAIL,
+            "ObjRef length metadata must sit right after the payload address"
+        );
+        std::mem::forget(bare_obj);
         unsafe { varn_types::ObjData::drop_at(oref) };
 
         let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
@@ -285,6 +318,8 @@ impl Heap {
         varn_jit::JitObjectLayout {
             object_tag,
             payload_off,
+            payload_len_off,
+            data_off,
             len_off,
             values_off,
             shape_off,

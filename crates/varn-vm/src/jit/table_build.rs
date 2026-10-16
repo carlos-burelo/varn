@@ -39,7 +39,7 @@ macro_rules! fill_tail {
 pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     assert_eq!(
         varn_jit::JIT_HELPERS_VERSION,
-        4,
+        5,
         "JitHelpers ABI version mismatch: review offset_of layout after varn-jit-abi change"
     );
     jit_helper_table!(fill, "src/exec/jit_helpers")
