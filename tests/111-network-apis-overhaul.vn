@@ -2,7 +2,6 @@ import { TcpListener, TcpStream, connect, listen, isIP, isIPv4, isIPv6 } from "s
 import { HttpServer, Request, Response, HttpStatus, json, get, post, put, patch, del, fetch } from "std:http";
 import { WebSocket, WebSocketReadyState } from "std:ws";
 import { Process } from "std:process";
-import { platform } from "std:sys";
 import { delay, Task } from "std:task";
 import { describe, it, expect } from "std:test";
 
@@ -78,7 +77,7 @@ function testWebSocket(): void {
 
 }
 let testPort = 19876;
-let vnBin = platform() == "windows" ? "target/debug/vn.exe" : "target/debug/vn";
+let vnBin = Process.currentExe();
 let proc = Process.spawn(vnBin, ["run", "tests/helpers/tcp_echo_server.vn"]);
 
 async function main(): Task<void> {

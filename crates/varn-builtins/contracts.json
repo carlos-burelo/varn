@@ -4479,6 +4479,13 @@
         {
           "fallible": false,
           "kind": "function",
+          "params": [],
+          "ret": "str",
+          "symbol": "currentExe$"
+        },
+        {
+          "fallible": false,
+          "kind": "function",
           "params": [
             {
               "rest": false,
@@ -5546,7 +5553,7 @@
     "src/modules/runtime/math/math_runtime.vn": "49dbbe2be34fbb1e",
     "src/modules/runtime/net/net_runtime.vn": "493b1022cdba48f8",
     "src/modules/runtime/path/path_runtime.vn": "ea5d0d4d782e9559",
-    "src/modules/runtime/process/process_runtime.vn": "9e7a2b788f5fa3ea",
+    "src/modules/runtime/process/process_runtime.vn": "b620362e821a7bed",
     "src/modules/runtime/reflect/reflect_runtime.vn": "cae7aad7f410e80c",
     "src/modules/runtime/regex/regex_runtime.vn": "abf9d2c24799f07e",
     "src/modules/runtime/sqlite/sqlite_runtime.vn": "ae3b5b13b16acc47",

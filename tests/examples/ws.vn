@@ -12,7 +12,7 @@ await describe("example std:ws", async () => {
     });
 
     await it("echoes over a loopback socket via child server", async () => {
-        let proc = Process.spawn("target/debug/vn.exe", ["run", "tests/examples/servers/ws-echo.vn"]);
+        let proc = Process.spawn(Process.currentExe(), ["run", "tests/examples/servers/ws-echo.vn"]);
         await delay(800);
         let client = await WebSocket.connect("ws://127.0.0.1:19884/chat");
         expect(client.isOpen).toBe(true);

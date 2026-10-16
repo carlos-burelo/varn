@@ -84,6 +84,12 @@ varn_contract! {
             Ok(obj)
         }
 
+        fn currentExe(ctx: &mut dyn NativeCtx) -> Result<VmValue, String> {
+            let path = std::env::current_exe()
+                .map_err(|e| format!("Failed to resolve current executable: {e}"))?;
+            Ok(ctx.alloc_str_owned(path.to_string_lossy().into_owned()))
+        }
+
         fn killProcess(_ctx: &mut dyn NativeCtx, pid: i64) -> Result<bool, String> {
             if pid < 0 {
                 return Err("Invalid process handle".to_string());

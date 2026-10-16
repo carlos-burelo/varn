@@ -5,7 +5,7 @@ import { delay } from "std:task";
 
 await describe("example std:net", async () => {
     await it("echoes over tcp loopback via child server", async () => {
-        let proc = Process.spawn("target/debug/vn.exe", ["run", "tests/examples/servers/tcp-echo.vn"]);
+        let proc = Process.spawn(Process.currentExe(), ["run", "tests/examples/servers/tcp-echo.vn"]);
         await delay(500);
         let cli = await connect("127.0.0.1", 19881);
         expect(cli.isOpen).toBe(true);

@@ -1,5 +1,6 @@
 import {
     exec$,
+    currentExe$,
     spawnProcess$,
     waitProcess$,
     killProcess$
@@ -29,6 +30,10 @@ export class ChildProcess {
 }
 
 export namespace Process {
+    export function currentExe(): str {
+        return currentExe$();
+    }
+
     export function exec(command: str): ProcessResult {
         return exec$(command);
     }
