@@ -90,6 +90,13 @@ jobs:
       - name: Build Release Binary
         run: cargo build --release --bin vn
 
+      - name: Install system fonts (Linux text suite)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fonts-dejavu-core fontconfig && fc-cache -f
+
+      - name: Bundle std for @embedded quadrants
+        run: ${{ matrix.bin_path }} std-bundle --std-dir "std" --out dist/std.vnb
+
       - name: Quadrant 1 (dev-checkout + JIT)
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
@@ -101,11 +108,13 @@ jobs:
       - name: Quadrant 3 (@embedded + JIT)
         env:
           VARN_STD: "@embedded"
+          VARN_STD_BUNDLE: "dist/std.vnb"
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
       - name: Quadrant 4 (@embedded + No-JIT)
         env:
           VARN_STD: "@embedded"
+          VARN_STD_BUNDLE: "dist/std.vnb"
           VARN_NO_JIT: "1"
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
