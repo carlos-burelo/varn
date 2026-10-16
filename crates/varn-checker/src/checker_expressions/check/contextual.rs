@@ -159,22 +159,30 @@ impl<'r> Checker<'r> {
                             .unwrap_or_default();
 
                         let mapping = match self.ty_table.get(ty.0) {
-                            TypeKind::Generic(_, args, _)
-                                if origin
-                                    .as_deref()
-                                    .is_none_or(|o| o == bind.source_file.as_ref()) =>
-                            {
+                            TypeKind::Generic(_, args, _) => {
                                 let args: Vec<Type> = self
                                     .ty_table
                                     .get_list(args)
                                     .iter()
                                     .map(|id| Type::resolved(*id))
                                     .collect();
+                                let mapping_origin: Option<std::sync::Arc<str>> = match origin_atom
+                                {
+                                    Some(a) => {
+                                        let s = resolve_atom(a);
+                                        if s.is_empty() || s.as_str() == bind.source_file.as_ref() {
+                                            None
+                                        } else {
+                                            Some(std::sync::Arc::from(s))
+                                        }
+                                    }
+                                    None => None,
+                                };
                                 crate::checker_expressions::members::member_util::generic_mapping(
                                     self.resolver,
                                     &name,
                                     &args,
-                                    None,
+                                    mapping_origin.as_ref(),
                                     bind,
                                 )
                             }
@@ -187,7 +195,6 @@ impl<'r> Checker<'r> {
                             | TypeKind::Intersection(_)
                             | TypeKind::Tuple(_)
                             | TypeKind::Named(..)
-                            | TypeKind::Generic(..)
                             | TypeKind::TemplateLiteral(_)
                             | TypeKind::Fn(_)
                             | TypeKind::Object(_)
