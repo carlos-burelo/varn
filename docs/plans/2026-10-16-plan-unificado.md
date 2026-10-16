@@ -64,6 +64,26 @@ varn-emit (`5e652ef0`); class_fields 6.4→3.6 ms.
 
 ## 2. Pendiente, por orden
 
+### 2.0 Módulos / LBI / ABI: un mecanismo por hecho (en curso)
+
+Auditoría 2026-10-16 (código): el conjunto de nativos se enumera 4 veces
+(escaneo en build.rs, `#[path] mod`, `register_marker!`, secciones del
+linker); identidad de op = FNV de strings en 7 sitios + 5 `FxHashMap`
+al arrancar; capacidades por `match` hardcodeado; ops del VM en tabla
+aparte; 4 resoluciones de ruta y 4 abstracciones de carga
+(`CompositeLoader` muerto); `AbiCtx`/`AbiHeader` sin uso.
+
+- **F1** macro parsea el contrato `.vn` (`78a47de6`): borra
+  `contracts.json` y `gen-contract-tables`, rompe el ciclo de bootstrap.
+- **F2** build.rs genera mods + tabla de ops + specs con el parser real;
+  capacidades en el contrato. Borra secciones del linker, markers,
+  `#[path]`, tokenizador casero, `capability_for_op`.
+- **F3** `NativeOpId(u32)` denso por build; dispatch = índice; ops del
+  VM en la misma tabla. Borra FNV y los 5 mapas.
+- **F4** un resolvedor y un cargador de fuente para checker, grafo y VM.
+- **F5** ABI: terminar o borrar `AbiCtx`/`AbiHeader`; `NATIVE_GLOBALS`
+  al registro.
+
 ### 2.1 Representación: un bloque por valor
 
 Cada fase: re-medir filas del probe `repr_rows.vn` antes (paso 1),
