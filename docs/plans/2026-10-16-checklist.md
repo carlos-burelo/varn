@@ -10,20 +10,18 @@
   - [x] Prueba: test 160 ya cubría concat/slice/literal (líneas 72-81), sin ampliar
   - [x] `verify.ps1 -Fast` pendiente antes de push (quick 3522/3522 JIT y NOJIT)
   - Medida quick: same-key 5.5→3.7ms (-30%); fresh-key sin cambio
-- [ ] Fase B — arrays/split un bloque (`vm_value/array*`, `heap/cells/typed.rs`, `heap/jit.rs`)
-  - [ ] Re-medir base
-  - [ ] Elementos en cola de celda + derrame; `split_ranges` única fuente
-  - [ ] Prueba suite nueva (push oltre inline, I64→Boxed, pop/shift, split vacío/multi)
-  - [ ] `verify.ps1 -Fast` 4/4 + commit
-- [ ] Fase C — vistas string sin `Arc` (`heap/str.rs`, `heap/children.rs`)
-  - [ ] Re-medir base
-  - [ ] Vista referencia celda padre trazada por GC
-  - [ ] Prueba: sobrevive a padre, realloc, GC en medio, `spawnIsolate`
-  - [ ] `verify.ps1 -Fast` 4/4 + commit
-- [ ] Fase D — objetos literales inline (compuerta: `objlit3` > 1,5× `instance3` tras A–C)
-  - [ ] Medir compuerta (si no abre, aparcar con cifra)
-  - [ ] JIT toma celda sin helper; borrar `jit_build_object_with_shape`, `jit_build_record_with_shape`
-  - [ ] `verify.ps1 -Fast` 4/4 + commit
+- [ ] Fase B — arrays/split un bloque (`vm_value/array*`, `heap/cells/typed.rs`, `heap/jit.rs`) — APARCADA CON MEDICIÓN 2026-10-16
+  - Medida quick: push 200k 1.41ms, get 0.33ms, set 0.28ms, trans 1.07ms; slice 20×100k 15.3ms pero slice es COPIA semántica (sonda: mutar slice no afecta original) → vista exigiría CoW, subsistema nuevo
+  - `gc_alloc` ya en verde (§2.4): sin gap medido que lo pague. Reactivar solo si bench muestra gap en alloc-arrays
+- [ ] Fase C — vistas string sin `Arc` (`heap/str.rs`, `heap/children.rs`) — APARCADA CON MEDICIÓN 2026-10-16
+  - `Arc::clone` es inc atómico (~ns); quitarlo pide trazado GC del padre (riesgo UAF) por ganancia ~nula en tiempo (solo retención de memoria vista-pequeña-de-string-grande). Reactivar solo con caso de memoria medido
+- [x] Fase D — objetos literales inline (compuerta: `objlit3` > 1,5× `instance3`) — VERDE (v1 solo Object, records van slow)
+  - [x] Compuerta medida: repr_rows objlit3/instance3 = 51/25 = 2,04× → abre
+  - [x] JIT emite alloc bump + header + `HeapObj` + `ObjData` inline; borra solo el uso del helper en vía fast (helper queda como fallback slow; `jit_build_*_with_shape` NO se borran aún: records + fallback los usan)
+  - [x] Claves del fix: `ObjData` va tras `HeapObj` completo (`data_off`), forma es CONTROL (`as_ptr-16`), `ObjRef` gordo necesita `len` (`payload_len_off`); todo con tripwires en `heap/jit.rs`
+  - [x] Medida quick: push3 ~12%, repr_rows objlit3 51→42 (~18%); checksums iguales
+  - [x] Suite 3522/3522 JIT y NOJIT + 14 sondas crash + `VARN_ALLOC_SLOW` intacto
+  - Deuda v1: records por helper; `payload_len_off`/`data_off`/`JIT_HELPERS_VERSION=5` quedan como ABI
 - [ ] Fase E — tipos objeto exactos como instancias (compuerta: D)
   - [ ] Graduar `DynReason::Shape` a `BackendTy` con layout
   - [ ] Decidir tipado→`dynamic`→agregar-campo (prohibir o desoptimizar)
@@ -64,3 +62,4 @@
 ## Progreso
 - 2026-10-16: checklist creado. Sin items verdes nuevos.
 - 2026-10-16: Fase A verde (`52feaf6d`). Sigue Fase B.
+- 2026-10-16: Fase D verde (v1 Object-only). Fases B/C aparcadas con medición (sin gap que pague rewrite). Sigue Fase E (proyecto grande) / B1 / gates.
