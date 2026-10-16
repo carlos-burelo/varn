@@ -132,9 +132,9 @@ impl Views {
         }
         for inst in ssa.blocks.iter().flat_map(|blk| &blk.insts) {
             let object = match &inst.op {
-                SsaOp::ArrayGetIndex { object, .. } | SsaOp::ArraySetIndex { object, .. } => {
-                    *object
-                }
+                SsaOp::ArrayGetIndex { object, .. }
+                | SsaOp::ArraySetIndex { object, .. }
+                | SsaOp::BytesGetIndex { object, .. } => *object,
                 SsaOp::ConstInt(_)
                 | SsaOp::ConstFloat(_)
                 | SsaOp::ConstBool(_)
