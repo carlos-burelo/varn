@@ -10,6 +10,7 @@ mod functions;
 mod imports_exports;
 mod module_ctx;
 mod module_globals;
+mod module_locals;
 mod module_top;
 mod namespace_scope;
 mod namespaces;
@@ -184,7 +185,7 @@ pub fn emit_module(
     namespace_scope::import_members(&mut imports, &bind.namespace_imports);
     let exports = collect_exports(program, ast_arena, interner, &namespace_exports);
 
-    TirModule {
+    let mut module = TirModule {
         source_file: Arc::from(program.filename.as_ref()),
         imports,
         exports,
@@ -198,5 +199,7 @@ pub fn emit_module(
         global_names,
         class_defs,
         top_level,
-    }
+    };
+    module_locals::promote(&mut module, program, ast_arena, interner);
+    module
 }
