@@ -98,6 +98,8 @@ pub enum ArtifactKind {
     CheckerInterface = 2,
 
     StdBundle = 3,
+
+    JitCode = 4,
 }
 
 impl ArtifactKind {
@@ -106,6 +108,7 @@ impl ArtifactKind {
             1 => Some(Self::ModuleGraph),
             2 => Some(Self::CheckerInterface),
             3 => Some(Self::StdBundle),
+            4 => Some(Self::JitCode),
             _ => None,
         }
     }
@@ -115,6 +118,7 @@ impl ArtifactKind {
             Self::ModuleGraph => "grafo de modulos",
             Self::CheckerInterface => "interfaz de checker",
             Self::StdBundle => "bundle de stdlib",
+            Self::JitCode => "codigo JIT",
         }
     }
 }

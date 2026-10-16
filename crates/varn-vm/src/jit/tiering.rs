@@ -95,7 +95,7 @@ impl VmClosure {
         };
         let helpers = super::table_build::build_jit_helpers();
         let linker = crate::clif_link::CtxLinker;
-        match varn_jit::compile(&self.proto, &self.constants, helpers, &linker, None) {
+        match super::code_cache::compile(&self.proto, &self.constants, helpers, &linker, None) {
             Ok(compiled) => {
                 let entry_usize: usize = compiled.entry as usize;
                 self.proto.jit_epoch.set(epoch);
@@ -152,7 +152,7 @@ impl VmClosure {
 
         let helpers = super::table_build::build_jit_helpers();
         let linker = crate::clif_link::CtxLinker;
-        match varn_jit::compile(proto, &self.constants, helpers, &linker, Some(req)) {
+        match super::code_cache::compile(proto, &self.constants, helpers, &linker, Some(req)) {
             Ok(compiled) => {
                 let entry_usize: usize = compiled.entry as usize;
                 debug_assert_eq!(

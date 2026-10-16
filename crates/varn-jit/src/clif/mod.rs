@@ -36,6 +36,20 @@ pub fn shared_isa() -> Result<&'static OwnedTargetIsa, String> {
     ISA.get_or_init(host_isa).as_ref().map_err(|e| e.clone())
 }
 
+pub fn isa_identity() -> u64 {
+    static ID: OnceLock<u64> = OnceLock::new();
+    *ID.get_or_init(|| match shared_isa() {
+        Ok(isa) => {
+            let mut text = isa.triple().to_string();
+            for v in isa.flags().iter().chain(isa.isa_flags()) {
+                text.push_str(&format!(";{v}"));
+            }
+            varn_core::fingerprint::fingerprint(text.as_bytes())
+        }
+        Err(_) => 0,
+    })
+}
+
 pub fn host_isa() -> Result<OwnedTargetIsa, String> {
     let mut flags = settings::builder();
     let opt = std::env::var("VARN_CLIF_OPT").unwrap_or_else(|_| "speed".to_owned());

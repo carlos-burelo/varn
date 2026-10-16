@@ -173,6 +173,14 @@ pub(crate) const PAIR_MIGRATION_BAIL: &str =
 #[cfg(feature = "clif")]
 pub use clif::lower::CodeImage;
 
+#[cfg(feature = "clif")]
+pub use clif::isa_identity;
+
+#[cfg(not(feature = "clif"))]
+pub fn isa_identity() -> u64 {
+    0
+}
+
 #[cfg(not(feature = "clif"))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct CodeImage;

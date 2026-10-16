@@ -8,6 +8,7 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 
 mod bench;
 mod cli;
+mod code_store;
 mod commands;
 mod cpu_freq;
 mod debug_sink;
@@ -55,6 +56,7 @@ fn run_cli() {
     env_file::load();
 
     std_source::register();
+    code_store::register();
     varn_builtins::register_provider();
 
     try_run_standalone_executable();

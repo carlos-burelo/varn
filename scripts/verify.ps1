@@ -210,6 +210,10 @@ if (-not $q3) { $failedSteps += "Cuadrante 3 (@embedded + JIT)" }
 # Q4: @embedded + No-JIT (Interprete Pure)
 $q4 = Run-Quadrant "4/4: [@embedded std] + [Interprete Pure (VARN_NO_JIT=1)]" @{ "VARN_STD" = "@embedded"; "VARN_STD_BUNDLE" = $stdBundle; "VARN_NO_JIT" = "1" } @("run", "tests/main.vn")
 if (-not $q4) { $failedSteps += "Cuadrante 4 (@embedded + No-JIT)" }
+
+# Q5: cache JIT tibia (de Q1/Q3) recompilada y comparada byte a byte
+$q5 = Run-Quadrant "5: [cache JIT] + [VARN_JIT_CACHE=verify]" @{ "VARN_JIT_CACHE" = "verify" } @("run", "tests/main.vn")
+if (-not $q5) { $failedSteps += "Cuadrante 5 (cache JIT verify)" }
 }
 
 # 6. Benchmark de Estabilidad
