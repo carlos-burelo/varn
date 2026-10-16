@@ -62,15 +62,13 @@ fn emit_spec_entry(out: &mut impl Write, id: &str, kind_expr: &str, contract: &P
     let include_path = contract.to_string_lossy().replace('\\', "/");
     let source =
         fs::read_to_string(contract).unwrap_or_else(|e| panic!("cannot read {include_path}: {e}"));
-    let exports: String = extract_exports_from_source(&source)
+    let surface = ContractSurface::parse(&source, &include_path);
+    let exports: String = surface
+        .exports
         .iter()
         .map(|e| format!(r#""{e}","#))
         .collect();
-    let code = if has_code(&source) {
-        ".with_code()"
-    } else {
-        ""
-    };
+    let code = if surface.has_code { ".with_code()" } else { "" };
     writeln!(
         out,
         r#"    ModuleSpec::new("{id}", {kind_expr}, "crates/varn-builtins/{include_path}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{include_path}"))).with_exports(&[{exports}]){code},"#,
@@ -78,169 +76,61 @@ fn emit_spec_entry(out: &mut impl Write, id: &str, kind_expr: &str, contract: &P
     .unwrap();
 }
 
-fn has_code(source: &str) -> bool {
-    source.lines().any(|line| {
-        line.strip_prefix("export ").is_some_and(|rest| {
-            !["declare ", "type ", "interface "]
-                .iter()
-                .any(|k| rest.trim_start().starts_with(k))
-        })
-    })
+struct ContractSurface {
+    exports: Vec<String>,
+    has_code: bool,
 }
 
-fn extract_exports_from_source(source: &str) -> Vec<String> {
-    let mut exports = Vec::new();
-    let mut brace_depth = 0;
-    let mut chars = source.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        match c {
-            '/' => {
-                if chars.peek() == Some(&'/') {
-                    chars.next();
-                    for next_c in chars.by_ref() {
-                        if next_c == '\n' {
-                            break;
-                        }
-                    }
-                } else if chars.peek() == Some(&'*') {
-                    chars.next();
-                    while let Some(next_c) = chars.next() {
-                        if next_c == '*' && chars.peek() == Some(&'/') {
-                            chars.next();
-                            break;
-                        }
-                    }
-                }
-            }
-            '"' | '\'' | '`' => {
-                let quote = c;
-                let mut escaped = false;
-                for next_c in chars.by_ref() {
-                    if escaped {
-                        escaped = false;
-                    } else if next_c == '\\' {
-                        escaped = true;
-                    } else if next_c == quote {
-                        break;
-                    }
-                }
-            }
-            '{' => {
-                brace_depth += 1;
-            }
-            '}' => {
-                if brace_depth > 0 {
-                    brace_depth -= 1;
-                }
-            }
-            _ => {
-                if brace_depth == 0 && (c.is_alphabetic() || c == '_' || c == '$') {
-                    let mut word = String::new();
-                    word.push(c);
-                    while let Some(&next_c) = chars.peek() {
-                        if next_c.is_alphanumeric() || next_c == '_' || next_c == '$' {
-                            word.push(next_c);
-                            chars.next();
-                        } else {
-                            break;
-                        }
-                    }
-
-                    if word == "export" {
-                        let mut words = Vec::new();
-                        while words.len() < 5 {
-                            skip_whitespace_and_comments(&mut chars);
-
-                            if let Some(&next_c) = chars.peek() {
-                                if next_c.is_alphanumeric() || next_c == '_' || next_c == '$' {
-                                    let mut w = String::new();
-                                    while let Some(&nc) = chars.peek() {
-                                        if nc.is_alphanumeric() || nc == '_' || nc == '$' {
-                                            w.push(nc);
-                                            chars.next();
-                                        } else {
-                                            break;
-                                        }
-                                    }
-                                    words.push(w);
-                                } else if next_c == '{'
-                                    || next_c == '*'
-                                    || next_c == '='
-                                    || next_c == ';'
-                                {
-                                    break;
-                                } else {
-                                    chars.next();
-                                    break;
-                                }
-                            } else {
-                                break;
-                            }
-                        }
-
-                        let mut keyword_idx = 0;
-                        if keyword_idx < words.len() && words[keyword_idx] == "declare" {
-                            keyword_idx += 1;
-                        }
-
-                        if keyword_idx < words.len() {
-                            let kw = &words[keyword_idx];
-                            if [
-                                "function",
-                                "class",
-                                "interface",
-                                "namespace",
-                                "type",
-                                "enum",
-                                "struct",
-                                "const",
-                                "let",
-                            ]
-                            .contains(&kw.as_str())
-                                && keyword_idx + 1 < words.len()
-                            {
-                                let name = &words[keyword_idx + 1];
-                                exports.push(name.clone());
-                            }
-                        }
-                    }
-                }
-            }
+impl ContractSurface {
+    fn parse(source: &str, name: &str) -> Self {
+        use varn_core::ast::{Decl, ExportDecl, StmtKind};
+        let (tokens, lexeme_buf, _) = varn_lexer::scan(source, name);
+        let (program, interner, arena) =
+            varn_parser::parse(tokens, lexeme_buf, name, varn_core::AtomInterner::new())
+                .unwrap_or_else(|_| panic!("cannot parse contract {name}"));
+        let mut exports = Vec::new();
+        let mut has_code = false;
+        for &stmt in &program.body {
+            let StmtKind::Decl(decl) = &arena.stmt(stmt).kind else {
+                continue;
+            };
+            let Decl::Export(export) = decl.as_ref() else {
+                continue;
+            };
+            let ExportDecl::Decl { declaration, .. } = export else {
+                has_code = true;
+                continue;
+            };
+            let name = |a: varn_core::Atom| interner.resolve(a).to_string();
+            let (names, declared): (Vec<String>, bool) = match declaration.as_ref() {
+                Decl::Function(f) => (vec![name(f.id)], f.modifiers.is_declare),
+                Decl::Class(c) => (c.id.map(name).into_iter().collect(), c.modifiers.is_declare),
+                Decl::Interface(i) => (vec![name(i.id)], true),
+                Decl::TypeAlias(t) => (vec![name(t.id)], true),
+                Decl::Namespace(n) => (vec![name(n.id)], n.is_declare),
+                Decl::Enum(e) => (vec![name(e.id)], false),
+                Decl::Struct(st) => (vec![name(st.id)], false),
+                Decl::SumType(st) => (vec![name(st.id)], false),
+                Decl::Variable(v) => (
+                    v.declarators
+                        .iter()
+                        .filter_map(|d| match &d.id {
+                            varn_core::ast::Pattern::Identifier { name: n, .. } => Some(name(*n)),
+                            varn_core::ast::Pattern::Array { .. }
+                            | varn_core::ast::Pattern::Object { .. }
+                            | varn_core::ast::Pattern::Assignment { .. }
+                            | varn_core::ast::Pattern::Rest { .. } => None,
+                        })
+                        .collect(),
+                    v.is_declare,
+                ),
+                Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) => (Vec::new(), false),
+            };
+            exports.extend(names);
+            has_code |= !declared;
         }
-    }
-
-    exports.sort();
-    exports.dedup();
-    exports
-}
-
-fn skip_whitespace_and_comments(chars: &mut std::iter::Peekable<std::str::Chars>) {
-    while let Some(&c) = chars.peek() {
-        if c.is_whitespace() {
-            chars.next();
-        } else if c == '/' {
-            chars.next();
-            if chars.peek() == Some(&'/') {
-                chars.next();
-                for next_c in chars.by_ref() {
-                    if next_c == '\n' {
-                        break;
-                    }
-                }
-            } else if chars.peek() == Some(&'*') {
-                chars.next();
-                while let Some(next_c) = chars.next() {
-                    if next_c == '*' && chars.peek() == Some(&'/') {
-                        chars.next();
-                        break;
-                    }
-                }
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
+        exports.sort();
+        exports.dedup();
+        ContractSurface { exports, has_code }
     }
 }

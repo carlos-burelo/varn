@@ -61,5 +61,10 @@ httparse     = { workspace = true, optional = true }
 rustc-hash   = { workspace = true }
 parking_lot  = { workspace = true }
 
+[build-dependencies]
+varn-core   = { path = "../varn-core" }
+varn-lexer  = { path = "../varn-lexer" }
+varn-parser = { path = "../varn-parser" }
+
 [lints]
 workspace = true
