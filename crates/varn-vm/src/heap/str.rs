@@ -6,6 +6,7 @@ pub(crate) mod ascii_flag {
     pub const UNKNOWN: u8 = 0;
     pub const YES: u8 = 1;
     pub const NO: u8 = 2;
+    pub const INTERNED_BIT: u8 = 0x80;
 }
 
 pub const INLINE_STR_CAP: usize = 37;
@@ -108,10 +109,10 @@ impl HeapStr {
     #[inline]
     pub(crate) fn ascii_state(&self) -> u8 {
         match self {
-            HeapStr::Shared(_, ascii) => ascii.get(),
-            HeapStr::Ext { ascii, .. } => ascii.get(),
-            HeapStr::Inline { ascii, .. } => ascii.get(),
-            HeapStr::View { ascii, .. } => ascii.get(),
+            HeapStr::Shared(_, ascii) => ascii.get() & !ascii_flag::INTERNED_BIT,
+            HeapStr::Ext { ascii, .. } => ascii.get() & !ascii_flag::INTERNED_BIT,
+            HeapStr::Inline { ascii, .. } => ascii.get() & !ascii_flag::INTERNED_BIT,
+            HeapStr::View { ascii, .. } => ascii.get() & !ascii_flag::INTERNED_BIT,
         }
     }
 
@@ -179,10 +180,38 @@ impl HeapStr {
     #[inline]
     fn set_ascii_state(&self, state: u8) {
         match self {
-            HeapStr::Shared(_, ascii) => ascii.set(state),
-            HeapStr::Ext { ascii, .. } => ascii.set(state),
-            HeapStr::Inline { ascii, .. } => ascii.set(state),
-            HeapStr::View { ascii, .. } => ascii.set(state),
+            HeapStr::Shared(_, ascii) => {
+                ascii.set(state | (ascii.get() & ascii_flag::INTERNED_BIT))
+            }
+            HeapStr::Ext { ascii, .. } => {
+                ascii.set(state | (ascii.get() & ascii_flag::INTERNED_BIT))
+            }
+            HeapStr::Inline { ascii, .. } => {
+                ascii.set(state | (ascii.get() & ascii_flag::INTERNED_BIT))
+            }
+            HeapStr::View { ascii, .. } => {
+                ascii.set(state | (ascii.get() & ascii_flag::INTERNED_BIT))
+            }
+        }
+    }
+
+    #[inline]
+    pub(crate) fn is_interned(&self) -> bool {
+        match self {
+            HeapStr::Shared(_, ascii) => ascii.get() & ascii_flag::INTERNED_BIT != 0,
+            HeapStr::Ext { ascii, .. } => ascii.get() & ascii_flag::INTERNED_BIT != 0,
+            HeapStr::Inline { ascii, .. } => ascii.get() & ascii_flag::INTERNED_BIT != 0,
+            HeapStr::View { ascii, .. } => ascii.get() & ascii_flag::INTERNED_BIT != 0,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn mark_interned(&self) {
+        match self {
+            HeapStr::Shared(_, ascii) => ascii.set(ascii.get() | ascii_flag::INTERNED_BIT),
+            HeapStr::Ext { ascii, .. } => ascii.set(ascii.get() | ascii_flag::INTERNED_BIT),
+            HeapStr::Inline { ascii, .. } => ascii.set(ascii.get() | ascii_flag::INTERNED_BIT),
+            HeapStr::View { ascii, .. } => ascii.set(ascii.get() | ascii_flag::INTERNED_BIT),
         }
     }
 

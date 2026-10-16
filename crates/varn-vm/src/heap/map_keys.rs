@@ -24,7 +24,12 @@ impl HeapInner {
             return Some(MapKey(v));
         }
         match self.get(v.as_heap()) {
-            Some(HeapObj::Str(s)) => self.lookup_str_map_key(s.as_str()),
+            Some(HeapObj::Str(s)) => {
+                if s.is_interned() {
+                    return Some(MapKey(v));
+                }
+                self.lookup_str_map_key(s.as_str())
+            }
             Some(HeapObj::Char(c)) => self
                 .char_interner
                 .get(c)
@@ -73,12 +78,19 @@ impl HeapInner {
         if !v.is_heap() {
             return MapKey(v);
         }
-        let str_action = match self.get(v.as_heap()) {
+        let heap_idx = v.as_heap();
+        let str_action = match self.get(heap_idx) {
             Some(HeapObj::Str(s)) => {
+                if s.is_interned() {
+                    return MapKey(v);
+                }
                 if let Some(k) = self.lookup_str_map_key(s.as_str()) {
                     return k;
                 }
-                Some(s.as_str().to_owned())
+                Some((
+                    s.as_str().to_owned(),
+                    matches!(s, super::str::HeapStr::Shared(..)),
+                ))
             }
             Some(
                 HeapObj::Array(_)
@@ -107,7 +119,15 @@ impl HeapInner {
             )
             | None => None,
         };
-        if let Some(s_owned) = str_action {
+        if let Some((s_owned, was_shared)) = str_action {
+            if was_shared {
+                let key: varn_types::RuntimeString = std::sync::Arc::from(s_owned.as_str());
+                if let Some(HeapObj::Str(hs)) = self.get_mut(heap_idx) {
+                    hs.mark_interned();
+                }
+                self.string_interner.insert(key, heap_idx);
+                return MapKey(v);
+            }
             return MapKey(self.alloc_str_interned(s_owned));
         }
         match self.get(v.as_heap()) {

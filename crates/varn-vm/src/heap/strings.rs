@@ -30,6 +30,9 @@ impl HeapInner {
         let idx = self
             .cells
             .alloc(HeapObj::Str(HeapStr::shared(rs.clone())), SlotState::Old);
+        if let HeapObj::Str(hs) = self.cells.get(idx) {
+            hs.mark_interned();
+        }
         self.string_interner.insert(rs, idx);
         VmValue::from_heap(idx)
     }
@@ -69,14 +72,16 @@ impl HeapInner {
                 HeapStr::Shared(s, ascii) => (
                     Arc::clone(s),
                     0usize,
-                    ascii.get() == super::str::ascii_flag::YES,
+                    ascii.get() & !super::str::ascii_flag::INTERNED_BIT
+                        == super::str::ascii_flag::YES,
                 ),
                 HeapStr::Ext { buf, len, ascii } => {
                     let slice = unsafe { &(&*buf.get())[..*len] };
                     (
                         Arc::from(slice),
                         0usize,
-                        ascii.get() == super::str::ascii_flag::YES,
+                        ascii.get() & !super::str::ascii_flag::INTERNED_BIT
+                            == super::str::ascii_flag::YES,
                     )
                 }
                 HeapStr::Inline { len, bytes, ascii } => {
@@ -84,7 +89,8 @@ impl HeapInner {
                     (
                         Arc::from(slice),
                         0usize,
-                        ascii.get() == super::str::ascii_flag::YES,
+                        ascii.get() & !super::str::ascii_flag::INTERNED_BIT
+                            == super::str::ascii_flag::YES,
                     )
                 }
                 HeapStr::View {
@@ -92,7 +98,8 @@ impl HeapInner {
                 } => (
                     Arc::clone(base),
                     *start,
-                    ascii.get() == super::str::ascii_flag::YES,
+                    ascii.get() & !super::str::ascii_flag::INTERNED_BIT
+                        == super::str::ascii_flag::YES,
                 ),
             };
             start += byte_start.min(base.len().saturating_sub(start));
