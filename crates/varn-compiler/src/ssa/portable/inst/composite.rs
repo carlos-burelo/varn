@@ -93,6 +93,7 @@ pub(super) fn try_project(kind: &InstKind, value_tys: &[HirType], site: &Site) -
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ObjectMerge { .. }
@@ -169,6 +170,15 @@ fn project_indexed(kind: &InstKind, value_tys: &[HirType]) -> Option<SsaOp> {
             index: index.0,
             value: value.0,
         }),
+        InstKind::BytesSetIndex {
+            object,
+            index,
+            value,
+        } if is_int(value_tys, *index) => Some(SsaOp::BytesSetIndex {
+            object: object.0,
+            index: index.0,
+            value: value.0,
+        }),
         InstKind::GetIndex { object, index }
         | InstKind::ArrayGetIndex { object, index }
         | InstKind::BytesGetIndex { object, index }
@@ -182,6 +192,11 @@ fn project_indexed(kind: &InstKind, value_tys: &[HirType]) -> Option<SsaOp> {
             value,
         }
         | InstKind::ArraySetIndex {
+            object,
+            index,
+            value,
+        }
+        | InstKind::BytesSetIndex {
             object,
             index,
             value,
@@ -328,6 +343,7 @@ fn project_object(kind: &InstKind) -> Option<SsaOp> {
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::MethodCall { .. }
@@ -474,6 +490,7 @@ fn project_class(kind: &InstKind) -> Option<SsaOp> {
         | InstKind::SetProperty { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ObjectMerge { .. }

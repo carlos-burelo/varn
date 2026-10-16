@@ -230,6 +230,17 @@ impl ExecCtx {
                 self.exec_array_set_index(obj, idx, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
+            OpCode::BytesSetIndex => {
+                let w1 = code[*ip];
+                *ip += 1;
+                let idx_reg = hi(w1);
+                let val_reg = lo(w1);
+                let obj = self.stack.box_reg(base, first_reg);
+                let idx = self.stack.box_reg(base, idx_reg);
+                let val = self.stack.box_reg(base, val_reg);
+                self.exec_bytes_set_index(obj, idx, val)?;
+                Ok(Some(ObjectFlow::ContinueInstruction))
+            }
             OpCode::MapSetIndex => {
                 let w1 = code[*ip];
                 *ip += 1;

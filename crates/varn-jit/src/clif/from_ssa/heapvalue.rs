@@ -73,6 +73,7 @@ pub(super) fn emit(
         | SsaOp::ArrayGetIndex { .. }
         | SsaOp::BytesGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
+        | SsaOp::BytesSetIndex { .. }
         | SsaOp::ConstChar(_)
         | SsaOp::ConstBigInt(_)
         | SsaOp::ConstDecimal(_)
@@ -320,6 +321,7 @@ pub(super) fn emit(
         | SsaOp::ArrayGetIndex { .. }
         | SsaOp::BytesGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
+        | SsaOp::BytesSetIndex { .. }
         | SsaOp::IntrinsicCall { .. }
         | SsaOp::Try { .. }
         | SsaOp::PopTry

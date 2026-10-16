@@ -95,6 +95,7 @@ fn index_order_slots(proto: &FunctionProto) -> Vec<u16> {
             | SsaOp::LoadGlobalIdx(_)
             | SsaOp::ArrayGetIndex { .. }
             | SsaOp::ArraySetIndex { .. }
+            | SsaOp::BytesSetIndex { .. }
             | SsaOp::BytesGetIndex { .. }
             | SsaOp::ConstChar(_)
             | SsaOp::ConstBigInt(_)

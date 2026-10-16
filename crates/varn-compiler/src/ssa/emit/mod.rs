@@ -296,6 +296,7 @@ fn emit_inst(
             | InstKind::SetFixedField { .. }
             | InstKind::SetIndex { .. }
             | InstKind::ArraySetIndex { .. }
+            | InstKind::BytesSetIndex { .. }
             | InstKind::MapSetIndex { .. }
             | InstKind::ArrayPush { .. }
             | InstKind::ObjectMerge { .. }

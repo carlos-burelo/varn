@@ -281,6 +281,7 @@ pub(super) fn emit_value(
         | InstKind::SetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ObjectMerge { .. }
         | InstKind::AssertNotNull { .. }

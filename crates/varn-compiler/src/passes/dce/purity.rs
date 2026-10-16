@@ -121,6 +121,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | SetFixedField { .. }
         | SetIndex { .. }
         | ArraySetIndex { .. }
+        | BytesSetIndex { .. }
         | MapSetIndex { .. }
         | ObjectMerge { .. } => false,
 

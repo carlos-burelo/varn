@@ -227,6 +227,7 @@ fn merge_blocks(func: &mut SsaFunc) -> bool {
                         | InstKind::SetFixedField { .. }
                         | InstKind::SetIndex { .. }
                         | InstKind::ArraySetIndex { .. }
+                        | InstKind::BytesSetIndex { .. }
                         | InstKind::MapSetIndex { .. }
                         | InstKind::ArrayPush { .. }
                         | InstKind::ObjectMerge { .. }

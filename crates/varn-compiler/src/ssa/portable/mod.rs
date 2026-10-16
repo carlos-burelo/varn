@@ -130,6 +130,7 @@ pub(crate) fn project(
                     | InstKind::SetFixedField { .. }
                     | InstKind::SetIndex { .. }
                     | InstKind::ArraySetIndex { .. }
+                    | InstKind::BytesSetIndex { .. }
                     | InstKind::MapSetIndex { .. }
                     | InstKind::ArrayPush { .. }
                     | InstKind::ObjectMerge { .. }
@@ -227,6 +228,7 @@ pub(crate) fn project(
                     | InstKind::SetFixedField { .. }
                     | InstKind::SetIndex { .. }
                     | InstKind::ArraySetIndex { .. }
+                    | InstKind::BytesSetIndex { .. }
                     | InstKind::MapSetIndex { .. }
                     | InstKind::ArrayPush { .. }
                     | InstKind::ObjectMerge { .. }
@@ -399,6 +401,7 @@ fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
         | other @ InstKind::SetFixedField { .. }
         | other @ InstKind::SetIndex { .. }
         | other @ InstKind::ArraySetIndex { .. }
+        | other @ InstKind::BytesSetIndex { .. }
         | other @ InstKind::MapSetIndex { .. }
         | other @ InstKind::ArrayPush { .. }
         | other @ InstKind::ObjectMerge { .. }

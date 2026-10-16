@@ -157,6 +157,7 @@ impl ExecCtx {
             | OpCode::ArrayGetIndex
             | OpCode::BytesGetIndex
             | OpCode::ArraySetIndex
+            | OpCode::BytesSetIndex
             | OpCode::CallNativeOp
             | OpCode::IntrinsicDirect
             | OpCode::LoadNativeGlobalIdx
@@ -321,6 +322,7 @@ impl ExecCtx {
             | OpCode::ArrayGetIndex
             | OpCode::BytesGetIndex
             | OpCode::ArraySetIndex
+            | OpCode::BytesSetIndex
             | OpCode::CallNativeOp
             | OpCode::IntrinsicDirect
             | OpCode::LoadNativeGlobalIdx

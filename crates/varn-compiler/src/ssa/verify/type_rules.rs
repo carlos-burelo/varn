@@ -163,7 +163,8 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         }
         InstKind::ArrayGetIndex { index, .. }
         | InstKind::ArraySetIndex { index, .. }
-        | InstKind::BytesGetIndex { index, .. } => {
+        | InstKind::BytesGetIndex { index, .. }
+        | InstKind::BytesSetIndex { index, .. } => {
             let ity = func.value_ty(*index);
             if ity != HirType::Int && ity != HirType::Dynamic {
                 return Err(format!(

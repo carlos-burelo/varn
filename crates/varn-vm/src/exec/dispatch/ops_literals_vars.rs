@@ -244,6 +244,7 @@ impl ExecCtx {
             | OpCode::ArrayGetIndex
             | OpCode::BytesGetIndex
             | OpCode::ArraySetIndex
+            | OpCode::BytesSetIndex
             | OpCode::CallNativeOp
             | OpCode::IntrinsicDirect
             | OpCode::BuildMap

@@ -191,6 +191,7 @@ fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ObjectMerge { .. }

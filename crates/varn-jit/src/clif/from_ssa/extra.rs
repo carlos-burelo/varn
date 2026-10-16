@@ -98,6 +98,7 @@ pub(super) fn try_emit(
         | SsaOp::ArrayGetIndex { .. }
         | SsaOp::BytesGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
+        | SsaOp::BytesSetIndex { .. }
         | SsaOp::ConstChar(_)
         | SsaOp::ConstBigInt(_)
         | SsaOp::ConstDecimal(_)

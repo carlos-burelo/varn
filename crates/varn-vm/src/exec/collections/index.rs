@@ -66,6 +66,30 @@ pub(crate) fn bytes_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> Vm
 }
 
 #[inline(always)]
+pub(crate) fn bytes_set_index(
+    obj: VmValue,
+    key: VmValue,
+    val: VmValue,
+    heap: &mut Heap,
+) -> VmResult<()> {
+    if obj.is_heap() {
+        let heap_idx = obj.as_heap();
+        let idx_i = heap.as_int(key);
+        if let Some(HeapObj::Buffer(b)) = heap.get(heap_idx) {
+            let mut slice = b.as_mut_slice();
+            let len = slice.len();
+            let slot = usize::try_from(idx_i)
+                .ok()
+                .and_then(|at| slice.get_mut(at))
+                .ok_or_else(|| RuntimeError::out_of_range(idx_i, len))?;
+            *slot = heap.as_int(val) as u8;
+            return Ok(());
+        }
+    }
+    set_index(obj, key, val, heap)
+}
+
+#[inline(always)]
 pub(crate) fn map_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap();

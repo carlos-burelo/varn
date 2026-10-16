@@ -176,6 +176,7 @@ pub(super) fn lower_block(
             | varn_types::ssa::SsaOp::ArrayGetIndex { .. }
             | varn_types::ssa::SsaOp::BytesGetIndex { .. }
             | varn_types::ssa::SsaOp::ArraySetIndex { .. }
+            | varn_types::ssa::SsaOp::BytesSetIndex { .. }
             | varn_types::ssa::SsaOp::ConstChar(_)
             | varn_types::ssa::SsaOp::ConstBigInt(_)
             | varn_types::ssa::SsaOp::ConstDecimal(_)

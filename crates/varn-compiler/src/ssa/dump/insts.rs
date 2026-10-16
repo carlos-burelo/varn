@@ -94,6 +94,18 @@ pub fn inst_kind(kind: &InstKind) -> String {
                 val(*value)
             )
         }
+        InstKind::BytesSetIndex {
+            object,
+            index,
+            value,
+        } => {
+            format!(
+                "bytessetindex {}[{}] = {}",
+                val(*object),
+                val(*index),
+                val(*value)
+            )
+        }
         InstKind::MapSetIndex {
             object,
             index,

@@ -164,6 +164,7 @@ fn is_suspend_site(kind: &InstKind) -> bool {
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ObjectMerge { .. }

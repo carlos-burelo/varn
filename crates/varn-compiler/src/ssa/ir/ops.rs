@@ -130,6 +130,12 @@ pub enum InstKind {
         value: Value,
     },
 
+    BytesSetIndex {
+        object: Value,
+        index: Value,
+        value: Value,
+    },
+
     ArrayPush {
         array: Value,
         value: Value,

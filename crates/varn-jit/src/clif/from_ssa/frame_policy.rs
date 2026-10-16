@@ -37,6 +37,7 @@ pub(super) fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
         | SsaOp::ArrayGetIndex { .. }
         | SsaOp::BytesGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
+        | SsaOp::BytesSetIndex { .. }
         | SsaOp::ConstChar(_)
         | SsaOp::ConstBigInt(_)
         | SsaOp::ConstDecimal(_)
@@ -116,6 +117,7 @@ pub(super) fn needs_frame(ssa: &SsaProto, op: &SsaOp) -> bool {
             | SsaOp::ArrayGetIndex { .. }
             | SsaOp::BytesGetIndex { .. }
             | SsaOp::ArraySetIndex { .. }
+            | SsaOp::BytesSetIndex { .. }
             | SsaOp::LoadGlobal(_)
             | SsaOp::StoreGlobal { .. }
             | SsaOp::BuildTuple { .. }

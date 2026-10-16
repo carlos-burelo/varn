@@ -186,6 +186,7 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ObjectMerge { .. }

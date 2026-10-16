@@ -59,6 +59,7 @@ pub(crate) fn scratch_max(ssa: &SsaProto) -> usize {
                 | SsaOp::ArrayGetIndex { .. }
                 | SsaOp::BytesGetIndex { .. }
                 | SsaOp::ArraySetIndex { .. }
+                | SsaOp::BytesSetIndex { .. }
                 | SsaOp::ConstChar(_)
                 | SsaOp::ConstBigInt(_)
                 | SsaOp::ConstDecimal(_)

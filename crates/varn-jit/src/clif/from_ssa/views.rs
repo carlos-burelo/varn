@@ -58,6 +58,7 @@ impl Views {
                 | SsaOp::LoadGlobalIdx(_)
                 | SsaOp::ArrayGetIndex { .. }
                 | SsaOp::ArraySetIndex { .. }
+                | SsaOp::BytesSetIndex { .. }
                 | SsaOp::BytesGetIndex { .. }
                 | SsaOp::ConstChar(_)
                 | SsaOp::ConstBigInt(_)
@@ -134,7 +135,8 @@ impl Views {
             let object = match &inst.op {
                 SsaOp::ArrayGetIndex { object, .. }
                 | SsaOp::ArraySetIndex { object, .. }
-                | SsaOp::BytesGetIndex { object, .. } => *object,
+                | SsaOp::BytesGetIndex { object, .. }
+                | SsaOp::BytesSetIndex { object, .. } => *object,
                 SsaOp::ConstInt(_)
                 | SsaOp::ConstFloat(_)
                 | SsaOp::ConstBool(_)
@@ -146,7 +148,6 @@ impl Views {
                 | SsaOp::Call { .. }
                 | SsaOp::AllocInstance { .. }
                 | SsaOp::LoadGlobalIdx(_)
-                | SsaOp::BytesGetIndex { .. }
                 | SsaOp::ConstChar(_)
                 | SsaOp::ConstBigInt(_)
                 | SsaOp::ConstDecimal(_)
@@ -296,6 +297,7 @@ pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
         | SsaOp::StoreCaptured { .. }
         | SsaOp::ArrayGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
+        | SsaOp::BytesSetIndex { .. }
         | SsaOp::BytesGetIndex { .. }
         | SsaOp::GetFixedField { .. }
         | SsaOp::ArrayLength { .. }

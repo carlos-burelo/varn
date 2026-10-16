@@ -94,6 +94,7 @@ pub(super) fn try_project(
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ObjectMerge { .. }

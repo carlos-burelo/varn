@@ -124,6 +124,7 @@ fn fold_inst(kind: &InstKind, const_map: &FxHashMap<Value, InstKind>) -> Option<
                 | InstKind::SetFixedField { .. }
                 | InstKind::SetIndex { .. }
                 | InstKind::ArraySetIndex { .. }
+                | InstKind::BytesSetIndex { .. }
                 | InstKind::MapSetIndex { .. }
                 | InstKind::ArrayPush { .. }
                 | InstKind::ObjectMerge { .. }
@@ -210,6 +211,7 @@ fn fold_inst(kind: &InstKind, const_map: &FxHashMap<Value, InstKind>) -> Option<
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ObjectMerge { .. }
@@ -430,6 +432,7 @@ fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ObjectMerge { .. }

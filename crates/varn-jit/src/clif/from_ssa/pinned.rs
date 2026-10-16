@@ -66,6 +66,7 @@ pub(super) fn compute(
                     }
                     match &inst.op {
                         SsaOp::ArraySetIndex { object: o, .. }
+                        | SsaOp::BytesSetIndex { object: o, .. }
                         | SsaOp::ArrayPush { array: o, .. }
                         | SsaOp::ArrayExtend { array: o, .. } => {
                             if o == object {

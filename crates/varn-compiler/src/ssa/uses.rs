@@ -121,6 +121,11 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             index,
             value,
         }
+        | BytesSetIndex {
+            object,
+            index,
+            value,
+        }
         | MapSetIndex {
             object,
             index,
@@ -279,6 +284,11 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
             value,
         }
         | ArraySetIndex {
+            object,
+            index,
+            value,
+        }
+        | BytesSetIndex {
             object,
             index,
             value,

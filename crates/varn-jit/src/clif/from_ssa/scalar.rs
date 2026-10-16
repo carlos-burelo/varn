@@ -53,6 +53,14 @@ pub(super) fn emit_inst(
             arrays::emit_set(b, ctx, values, *object, *index, *value)?;
             return Ok(None);
         }
+        SsaOp::BytesSetIndex {
+            object,
+            index,
+            value,
+        } => {
+            bytes::emit_set(b, ctx, values, *object, *index, *value)?;
+            return Ok(None);
+        }
         SsaOp::IntrinsicCall { object, args, wire } => {
             return Ok(Some(numeric::emit_intrinsic(
                 b, ctx, values, *object, args, *wire, dest,

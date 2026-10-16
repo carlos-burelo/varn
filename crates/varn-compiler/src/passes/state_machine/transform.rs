@@ -97,6 +97,7 @@ fn find_suspend_inst(func: &SsaFunc, operand: Value) -> Option<(BlockId, usize)>
                 | InstKind::SetFixedField { .. }
                 | InstKind::SetIndex { .. }
                 | InstKind::ArraySetIndex { .. }
+                | InstKind::BytesSetIndex { .. }
                 | InstKind::MapSetIndex { .. }
                 | InstKind::ArrayPush { .. }
                 | InstKind::ObjectMerge { .. }

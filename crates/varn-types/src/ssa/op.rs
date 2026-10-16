@@ -53,6 +53,12 @@ pub enum SsaOp {
         value: u32,
     },
 
+    BytesSetIndex {
+        object: u32,
+        index: u32,
+        value: u32,
+    },
+
     ConstChar(char),
 
     ConstBigInt(Box<str>),

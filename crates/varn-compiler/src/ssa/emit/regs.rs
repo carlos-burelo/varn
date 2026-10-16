@@ -101,6 +101,7 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 | InstKind::SetFixedField { .. }
                 | InstKind::SetIndex { .. }
                 | InstKind::ArraySetIndex { .. }
+                | InstKind::BytesSetIndex { .. }
                 | InstKind::MapSetIndex { .. }
                 | InstKind::ArrayPush { .. }
                 | InstKind::ObjectMerge { .. }

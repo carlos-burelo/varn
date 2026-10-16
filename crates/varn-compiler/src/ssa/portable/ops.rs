@@ -156,6 +156,7 @@ pub(super) fn project_bin(
         | OpCode::ArrayGetIndex
         | OpCode::BytesGetIndex
         | OpCode::ArraySetIndex
+        | OpCode::BytesSetIndex
         | OpCode::CallNativeOp
         | OpCode::IntrinsicDirect
         | OpCode::LoadNativeGlobalIdx

@@ -102,6 +102,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
                 | InstKind::SetFixedField { .. }
                 | InstKind::SetIndex { .. }
                 | InstKind::ArraySetIndex { .. }
+                | InstKind::BytesSetIndex { .. }
                 | InstKind::MapSetIndex { .. }
                 | InstKind::ArrayPush { .. }
                 | InstKind::ObjectMerge { .. }

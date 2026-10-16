@@ -91,7 +91,15 @@ impl<'m> Builder<'m> {
             TirExprKind::Index { object, index } => {
                 let obj = self.lower_expr(object)?;
                 let idx = self.lower_expr(index)?;
-                let kind = if matches!(self.value_ty(obj), HirType::Array(_)) {
+                let kind = if matches!(object.ty, varn_tir::BackendTy::Bytes)
+                    && matches!(self.value_ty(idx), HirType::Int | HirType::Dynamic)
+                {
+                    InstKind::BytesSetIndex {
+                        object: obj,
+                        index: idx,
+                        value,
+                    }
+                } else if matches!(self.value_ty(obj), HirType::Array(_)) {
                     InstKind::ArraySetIndex {
                         object: obj,
                         index: idx,

@@ -103,6 +103,84 @@ pub(super) fn emit_get(
     )
 }
 
+pub(super) fn emit_set(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    object: u32,
+    index: u32,
+    value: u32,
+) -> Result<(), String> {
+    let lay = ctx.helpers.buffer_layout;
+    let kind_off = ctx.helpers.array_layout.kind_off as i32;
+    let exec_ctx = heap::exec_ctx(ctx);
+    let key = load_value(b, ctx, values, index)?;
+
+    let slow = b.create_block();
+    b.set_cold_block(slow);
+    let merge = b.create_block();
+
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
+    if ctx.ssa.value_ty(value) == SlotKind::Int {
+        let raw = load_value(b, ctx, values, value)?;
+        let obj = heap::boxed_value(b, ctx, values, object)?;
+        let (obj_tag, obj_payload) = b.ins().isplit(obj);
+        let (data, len) = match ctx.views.of(object) {
+            Some(v) => {
+                let data = b.use_var(v.data);
+                let cached_len = b.use_var(v.len);
+                let cached_disc = b.use_var(v.disc);
+                let ready = b.create_block();
+                b.append_block_param(ready, types::I64);
+                b.append_block_param(ready, types::I64);
+                let miss = b.create_block();
+                b.ins()
+                    .brif(data, ready, &[data.into(), cached_len.into()], miss, &[]);
+                let _ = cached_disc;
+                b.switch_to_block(miss);
+                let (d, l) = resolve_parts(b, &lay, kind_off, obj_tag, obj_payload, slow);
+                b.def_var(v.data, d);
+                b.def_var(v.len, l);
+                let disc = b.ins().iconst(types::I64, BYTES_VIEW_DISC);
+                b.def_var(v.disc, disc);
+                super::store::drop_home_addrs(ctx);
+                b.ins().jump(ready, &[d.into(), l.into()]);
+                b.switch_to_block(ready);
+                let p = b.block_params(ready);
+                (p[0], p[1])
+            }
+            None => resolve_parts(b, &lay, kind_off, obj_tag, obj_payload, slow),
+        };
+        let byte = b.ins().band_imm_u(raw, 0xFF);
+        let in_bounds = b.ins().icmp(IntCC::UnsignedLessThan, key, len);
+        let hit = b.create_block();
+        b.ins().brif(in_bounds, hit, &[], slow, &[]);
+        b.switch_to_block(hit);
+        let at = b.ins().iadd(data, key);
+        b.ins().istore8(m, byte, at, 0);
+        b.ins().jump(merge, &[]);
+    } else {
+        b.ins().jump(slow, &[]);
+    }
+
+    b.switch_to_block(slow);
+    let obj = heap::boxed_value(b, ctx, values, object)?;
+    let (ot, op) = b.ins().isplit(obj);
+    let boxed_key = box_int(b, key);
+    let (kt, kp) = b.ins().isplit(boxed_key);
+    let (vt, vp) = heap::boxed_parts(b, ctx, values, value)?;
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        ctx.helpers.jit_array_set_fast,
+        &[exec_ctx, ot, op, kt, kp, vt, vp],
+    )?;
+    b.ins().jump(merge, &[]);
+
+    b.switch_to_block(merge);
+    Ok(())
+}
+
 fn resolve_parts(
     b: &mut FunctionBuilder,
     lay: &JitBufferLayout,

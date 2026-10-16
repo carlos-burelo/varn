@@ -130,6 +130,16 @@ impl ExecCtx {
     }
 
     #[inline(always)]
+    pub(in crate::exec::dispatch) fn exec_bytes_set_index(
+        &mut self,
+        obj: VmValue,
+        idx: VmValue,
+        val: VmValue,
+    ) -> VmResult<()> {
+        crate::exec::collections::bytes_set_index(obj, idx, val, &mut self.heap)
+    }
+
+    #[inline(always)]
     pub(in crate::exec::dispatch) fn exec_map_get_index(
         &mut self,
         obj: VmValue,

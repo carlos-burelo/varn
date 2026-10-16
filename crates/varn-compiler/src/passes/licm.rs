@@ -186,6 +186,7 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
         | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
         | InstKind::MapSetIndex { .. }
         | InstKind::ArrayPush { .. }
         | InstKind::ObjectMerge { .. }
@@ -262,6 +263,7 @@ fn is_transparent(kind: &InstKind) -> bool {
             | InstKind::SetFixedField { .. }
             | InstKind::ArrayGetIndex { .. }
             | InstKind::ArraySetIndex { .. }
+            | InstKind::BytesSetIndex { .. }
             | InstKind::MapGetIndex { .. }
             | InstKind::MapSetIndex { .. }
             | InstKind::IsNull { .. }

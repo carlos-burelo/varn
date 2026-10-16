@@ -113,6 +113,7 @@ pub(super) fn infix(op: OpCode) -> Option<&'static str> {
         | O::ArrayGetIndex
         | O::BytesGetIndex
         | O::ArraySetIndex
+        | O::BytesSetIndex
         | O::CallNativeOp
         | O::IntrinsicDirect
         | O::LoadNativeGlobalIdx

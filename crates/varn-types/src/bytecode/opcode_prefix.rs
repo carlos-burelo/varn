@@ -141,6 +141,7 @@ pub(super) fn prefix(op: OpCode) -> Option<&'static str> {
         | OpCode::ArrayGetIndex
         | OpCode::BytesGetIndex
         | OpCode::ArraySetIndex
+        | OpCode::BytesSetIndex
         | OpCode::CallNativeOp
         | OpCode::IntrinsicDirect
         | OpCode::LoadNativeGlobalIdx
