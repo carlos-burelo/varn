@@ -98,7 +98,7 @@ pub(super) fn try_parse_decl_stmt_mode(
             if !decorators.is_empty() {
                 return Some(Err("decorators are not supported on namespaces".to_owned()));
             }
-            let mut decl = match super::decls::parse_namespace_decl(s) {
+            let mut decl = match super::decls::parse_namespace_decl(s, is_declare) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };

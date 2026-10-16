@@ -160,7 +160,10 @@ pub fn parse_type_alias_decl(s: &mut TokenStream) -> Result<Decl, String> {
     }))
 }
 
-pub fn parse_namespace_decl(s: &mut TokenStream) -> Result<NamespaceDecl, String> {
+pub fn parse_namespace_decl(
+    s: &mut TokenStream,
+    is_declare: bool,
+) -> Result<NamespaceDecl, String> {
     let range = s.range();
     s.advance();
     let id = s.expect_id()?;
@@ -182,6 +185,7 @@ pub fn parse_namespace_decl(s: &mut TokenStream) -> Result<NamespaceDecl, String
         id,
         ast_id: s.next_ast_id(),
         body,
+        is_declare,
         doc: None,
         range: full_range,
     })

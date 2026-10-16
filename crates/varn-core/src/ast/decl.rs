@@ -256,6 +256,7 @@ pub struct NamespaceDecl {
     pub id: Atom,
     pub ast_id: AstId,
     pub body: Vec<Decl>,
+    pub is_declare: bool,
     pub doc: Option<String>,
     pub range: SourceRange,
 }
