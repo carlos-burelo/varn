@@ -1,5 +1,4 @@
 pub mod artifact;
-pub mod bundle;
 pub mod contain;
 pub mod ids;
 pub mod layer;
@@ -9,6 +8,7 @@ pub mod provider;
 pub mod registry;
 pub mod resolver;
 pub mod spec;
+pub mod std_image;
 pub mod std_root;
 pub mod uri;
 

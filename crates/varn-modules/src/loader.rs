@@ -22,9 +22,9 @@ pub struct ModuleSource {
     pub text: Arc<str>,
     pub provenance: Provenance,
 
-    pub interface: Option<Arc<[u8]>>,
+    pub interface: Option<&'static [u8]>,
 
-    pub bytecode: Option<Arc<[u8]>>,
+    pub bytecode: Option<&'static [u8]>,
 }
 
 impl ModuleSource {
@@ -36,16 +36,6 @@ impl ModuleSource {
             interface: None,
             bytecode: None,
         }
-    }
-
-    pub fn with_interface(mut self, interface: Arc<[u8]>) -> Self {
-        self.interface = Some(interface);
-        self
-    }
-
-    pub fn with_bytecode(mut self, bytecode: Arc<[u8]>) -> Self {
-        self.bytecode = Some(bytecode);
-        self
     }
 }
 
@@ -124,12 +114,8 @@ impl ModuleLoader for ProviderLoader {
             return Err(LoadError::NotFound { id: id.clone() });
         };
 
-        let interface = provider
-            .interface_blob(spec)
-            .map(|b| Arc::from(b) as Arc<[u8]>);
-        let bytecode = provider
-            .bytecode_blob(spec)
-            .map(|b| Arc::from(b) as Arc<[u8]>);
+        let interface = provider.interface_blob(spec);
+        let bytecode = provider.bytecode_blob(spec);
 
         if let Some(text) = provider
             .embedded_source(spec)

@@ -1,7 +1,7 @@
-use varn_core::fingerprint::fingerprint;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::VecDeque;
 use std::path::Path;
+use varn_core::fingerprint::fingerprint;
 use varn_sem::resolver::ImportResolver;
 
 use varn_compiler::FunctionProto;
@@ -33,7 +33,10 @@ pub fn build_module_graph(
 
     let mut graph: HashMap<String, Vec<String>> = HashMap::default();
     let mut source_hashes: HashMap<String, u64> = HashMap::default();
-    source_hashes.insert(canonical_entry.clone(), fingerprint(entry_source.as_bytes()));
+    source_hashes.insert(
+        canonical_entry.clone(),
+        fingerprint(entry_source.as_bytes()),
+    );
 
     let mut node_sources: HashMap<String, (String, Program, AstArena, varn_core::AtomInterner)> =
         HashMap::default();

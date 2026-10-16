@@ -155,124 +155,107 @@ fn compile_source_inner(
     result
 }
 
-fn validate_imports(id: &str, source: &str) -> Result<(), String> {
+fn std_imports_are_pure(id: &str, source: &str) -> Result<bool, String> {
     let (program, arena, interner) = crate::quiet_parse::parse_only(source, id, "")?;
+    let mut pure = true;
     for spec in crate::import_collector::collect_imports(&program, &arena, &interner) {
         varn_modules::layer::check_import(varn_modules::layer::Layer::Std, &spec)
             .map_err(|message| format!("{id}: {message}"))?;
+        pure &= !spec.starts_with(varn_modules::RUNTIME_PREFIX);
     }
-    Ok(())
+    Ok(pure)
 }
 
-pub fn compile_stdlib_bundle(
+fn std_tree_modules(std_dir: &std::path::Path) -> Vec<(String, String)> {
+    fn walk(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<(String, String)>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                walk(base, &p, out);
+            } else if p.extension().is_some_and(|e| e == "vn")
+                && let Ok(rel) = p.strip_prefix(base)
+            {
+                let rel = rel.to_string_lossy().replace('\\', "/");
+                let stem = rel
+                    .strip_suffix("/mod.vn")
+                    .or_else(|| rel.strip_suffix(".vn"))
+                    .unwrap_or(&rel);
+                out.push((format!("std:{stem}"), rel.clone()));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(std_dir, std_dir, &mut out);
+    out.sort();
+    out
+}
+
+pub fn compile_stdlib_image(
     std_dir: &std::path::Path,
     session: &crate::resolver::Session,
 ) -> Result<Vec<u8>, String> {
-    #[derive(serde::Deserialize)]
-    struct ManifestModule {
+    struct Compiled {
         id: String,
-        #[serde(default)]
+        path: String,
         pure: bool,
+        interface: Vec<u8>,
+        bytecode: Vec<u8>,
+        source: String,
     }
 
-    #[derive(serde::Deserialize)]
-    struct Manifest {
-        version: String,
-        modules: Vec<ManifestModule>,
-    }
-
-    let manifest: Manifest =
-        if let Ok(manifest_raw) = std::fs::read_to_string(std_dir.join("std.json")) {
-            serde_json::from_str(&manifest_raw).map_err(|e| format!("invalid std.json: {e}"))?
-        } else {
-            let mut files = Vec::new();
-            fn collect_vn(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<String>) {
-                if let Ok(entries) = std::fs::read_dir(dir) {
-                    for entry in entries.flatten() {
-                        let p = entry.path();
-                        if p.is_dir() {
-                            collect_vn(base, &p, out);
-                        } else if p.extension().is_some_and(|e| e == "vn")
-                            && let Ok(rel) = p.strip_prefix(base)
-                        {
-                            out.push(rel.to_string_lossy().replace('\\', "/"));
-                        }
-                    }
-                }
-            }
-            collect_vn(std_dir, std_dir, &mut files);
-            files.sort();
-            let mut modules = Vec::new();
-            for rel_path in files {
-                let id = if rel_path.ends_with("/mod.vn") {
-                    let prefix = rel_path.strip_suffix("/mod.vn").unwrap();
-                    format!("std:{prefix}")
-                } else if rel_path.ends_with(".vn") {
-                    let prefix = rel_path.strip_suffix(".vn").unwrap();
-                    format!("std:{prefix}")
-                } else {
-                    continue;
-                };
-                let full_path = std_dir.join(&rel_path);
-                let pure = if let Ok(source) = std::fs::read_to_string(&full_path) {
-                    !source.contains("\"runtime:") && !source.contains("'runtime:")
-                } else {
-                    false
-                };
-                modules.push(ManifestModule { id, pure });
-            }
-            Manifest {
-                version: "0.3.0".to_string(),
-                modules,
-            }
-        };
-
-    let mut modules = Vec::new();
-
+    let mut compiled = Vec::new();
     let mut failures = String::new();
-    for m in &manifest.modules {
-        let rel_id = m.id.strip_prefix("std:").ok_or("invalid std: prefix")?;
-        let file = if std_dir.join(format!("{rel_id}/mod.vn")).exists() {
-            std_dir.join(format!("{rel_id}/mod.vn"))
-        } else {
-            std_dir.join(format!("{rel_id}.vn"))
-        };
+    for (id, path) in std_tree_modules(std_dir) {
+        let file = std_dir.join(&path);
         let source = std::fs::read_to_string(&file)
             .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
 
-        if let Err(e) = validate_imports(&m.id, &source) {
-            failures.push_str(&format!("\n{e}"));
-            continue;
-        }
+        let pure = match std_imports_are_pure(&id, &source) {
+            Ok(pure) => pure,
+            Err(e) => {
+                failures.push_str(&format!(
+                    "
+{e}"
+                ));
+                continue;
+            }
+        };
 
         let resolver = session.resolver();
-        let exports = resolver.stdlib_exports(&m.id);
-        let bind = match resolver.stdlib_bind(&m.id) {
+        let exports = resolver.stdlib_exports(&id);
+        let bind = match resolver.stdlib_bind(&id) {
             Some(b) => b,
             None => {
-                let err_msg = match compile_source_checked(&source, &m.id, session) {
+                let err_msg = match compile_source_checked(&source, &id, session) {
                     Ok(_) => "unknown bind failure".to_string(),
                     Err(e) => e,
                 };
-                return Err(format!("cannot bind {}: {}", m.id, err_msg));
+                return Err(format!("cannot bind {id}: {err_msg}"));
             }
         };
         let interface = varn_sem::codec::serialize_module_interface(&exports, &bind)
-            .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
+            .map_err(|e| format!("interface serialization failed for {id}: {e}"))?;
 
-        let proto = match compile_source_checked(&source, &m.id, session) {
+        let proto = match compile_source_checked(&source, &id, session) {
             Ok(p) => p,
             Err(e) => {
-                failures.push_str(&format!("\n{e}"));
+                failures.push_str(&format!(
+                    "
+{e}"
+                ));
                 continue;
             }
         };
         let bytecode = postcard::to_allocvec(&proto)
-            .map_err(|e| format!("bytecode serialization failed for {}: {e}", m.id))?;
+            .map_err(|e| format!("bytecode serialization failed for {id}: {e}"))?;
 
-        modules.push(varn_modules::bundle::BundleModule {
-            id: m.id.clone(),
-            pure: m.pure,
+        compiled.push(Compiled {
+            id,
+            path,
+            pure,
             interface,
             bytecode,
             source,
@@ -282,11 +265,20 @@ pub fn compile_stdlib_bundle(
         return Err(failures);
     }
 
-    let bundle = varn_modules::bundle::StdBundle {
-        std_version: manifest.version,
-        host_api_version: varn_core::HOST_API_VERSION,
+    let modules = compiled
+        .iter()
+        .map(|m| varn_modules::std_image::ImageModule {
+            id: &m.id,
+            path: &m.path,
+            pure: m.pure,
+            interface: &m.interface,
+            bytecode: &m.bytecode,
+            source: &m.source,
+        })
+        .collect();
+    Ok(varn_modules::std_image::write_image(
+        env!("CARGO_PKG_VERSION"),
+        varn_core::HOST_API_VERSION,
         modules,
-    };
-
-    Ok(varn_modules::bundle::write_bundle(&bundle))
+    ))
 }

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use varn_modules::bundle::{read_bundle, StdBundle};
 use varn_modules::provider::StdlibProvider;
-use varn_modules::spec::{ModuleKind, ModuleSpec};
+use varn_modules::spec::ModuleSpec;
+use varn_modules::std_image::StdImage;
 use varn_modules::std_root::{resolve, StdProvenance, StdSource};
 
 use crate::loader::CoreSourceLocator;
@@ -12,41 +12,11 @@ use crate::registry::{spec_for, MODULE_REGISTRY};
 struct ActiveStd {
     specs: &'static [ModuleSpec],
 
-    blobs: &'static [StdModuleBlobs],
+    image: Option<StdImage>,
 
     tree_root: Option<PathBuf>,
     description: String,
     provenance: StdProvenance,
-}
-
-struct StdModuleBlobs {
-    id: String,
-    interface: &'static [u8],
-    bytecode: &'static [u8],
-    source: &'static str,
-}
-
-fn leak_bundle_modules(
-    modules: Vec<varn_modules::bundle::BundleModule>,
-) -> (Vec<ModuleSpec>, Vec<StdModuleBlobs>) {
-    let mut specs = Vec::with_capacity(modules.len());
-    let mut blobs = Vec::with_capacity(modules.len());
-    for m in modules {
-        let file = format!("{}.vn", m.id.strip_prefix("std:").unwrap_or(&m.id));
-        specs.push(ModuleSpec::leaked(
-            m.id.clone(),
-            ModuleKind::Stdlib,
-            file,
-            m.pure,
-        ));
-        blobs.push(StdModuleBlobs {
-            id: m.id,
-            interface: Box::leak(m.interface.into_boxed_slice()),
-            bytecode: Box::leak(m.bytecode.into_boxed_slice()),
-            source: Box::leak(m.source.into_boxed_str()),
-        });
-    }
-    (specs, blobs)
 }
 
 static ACTIVE_STD: OnceLock<Result<Option<ActiveStd>, String>> = OnceLock::new();
@@ -84,17 +54,24 @@ pub fn std_load_error() -> Option<&'static str> {
 }
 
 fn load_embedded_std(bytes: &'static [u8]) -> Result<ActiveStd, String> {
-    let bundle: StdBundle =
-        read_bundle(bytes).map_err(|e| format!("embedded stdlib corrupt: {e}"))?;
-    bundle
-        .validate_compat_with(varn_core::HOST_API_VERSION)
-        .map_err(|e| format!("embedded stdlib incompatible: {e}"))?;
-    let (specs, blobs) = leak_bundle_modules(bundle.modules);
+    let image = StdImage::parse(bytes).map_err(|e| format!("embedded stdlib corrupt: {e}"))?;
+    if image.host_api_version != varn_core::HOST_API_VERSION {
+        return Err(format!(
+            "embedded stdlib incompatible: std image requires host API v{} but this vn provides v{}",
+            image.host_api_version,
+            varn_core::HOST_API_VERSION
+        ));
+    }
+    let specs: Vec<ModuleSpec> = image
+        .modules()
+        .iter()
+        .map(|m| ModuleSpec::stdlib(m.id, m.path, m.pure))
+        .collect();
     Ok(ActiveStd {
         specs: Box::leak(specs.into_boxed_slice()),
-        blobs: Box::leak(blobs.into_boxed_slice()),
+        description: format!("embedded stdlib v{}", image.std_version),
+        image: Some(image),
         tree_root: None,
-        description: format!("embedded stdlib v{}", bundle.std_version),
         provenance: StdProvenance::Embedded,
     })
 }
@@ -118,16 +95,15 @@ fn load_tree_std(root: &std::path::Path, provenance: StdProvenance) -> Result<Ac
         } else {
             format!("{file}.vn")
         };
-        specs.push(ModuleSpec::leaked(
-            m.id.clone(),
-            ModuleKind::Stdlib,
-            vn_source,
+        specs.push(ModuleSpec::stdlib(
+            Box::leak(m.id.into_boxed_str()),
+            Box::leak(vn_source.into_boxed_str()),
             m.pure,
         ));
     }
     Ok(ActiveStd {
         specs: Box::leak(specs.into_boxed_slice()),
-        blobs: &[],
+        image: None,
         tree_root: Some(root.to_path_buf()),
         description: format!("source tree {} v{}", root.display(), manifest.version),
         provenance,
@@ -140,8 +116,8 @@ fn std_spec(specifier: &str) -> Option<&'static ModuleSpec> {
     active_std()?.specs.iter().find(|s| s.id == specifier)
 }
 
-fn std_blobs(specifier: &str) -> Option<&'static StdModuleBlobs> {
-    active_std()?.blobs.iter().find(|b| b.id == specifier)
+fn std_module(specifier: &str) -> Option<&'static varn_modules::std_image::ImageModule<'static>> {
+    active_std()?.image.as_ref()?.module(specifier)
 }
 
 static COMBINED_SPECS: OnceLock<&'static [ModuleSpec]> = OnceLock::new();
@@ -194,15 +170,15 @@ impl StdlibProvider for BuiltinsProvider {
     }
 
     fn interface_blob(&self, specifier: &str) -> Option<&'static [u8]> {
-        Some(std_blobs(specifier)?.interface)
+        Some(std_module(specifier)?.interface)
     }
 
     fn bundled_source(&self, specifier: &str) -> Option<&'static str> {
-        Some(std_blobs(specifier)?.source)
+        Some(std_module(specifier)?.source)
     }
 
     fn bytecode_blob(&self, specifier: &str) -> Option<&'static [u8]> {
-        Some(std_blobs(specifier)?.bytecode)
+        Some(std_module(specifier)?.bytecode)
     }
 
     fn std_provenance(&self) -> Option<(String, StdProvenance)> {

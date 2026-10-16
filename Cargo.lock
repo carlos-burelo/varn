@@ -3688,7 +3688,6 @@ dependencies = [
 name = "varn-modules"
 version = "0.1.0"
 dependencies = [
- "postcard",
  "rustc-hash 1.1.0",
  "semver",
  "serde",
@@ -3710,8 +3709,6 @@ version = "0.1.0"
 dependencies = [
  "postcard",
  "rustc-hash 1.1.0",
- "serde",
- "serde_json",
  "varn-checker",
  "varn-compiler",
  "varn-core",

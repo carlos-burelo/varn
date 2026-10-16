@@ -11,7 +11,7 @@ pub fn execute(args: StdBundleArgs) -> Result<(), CliError> {
             .map_err(|e| CliError::fatal(format!("cannot create '{}': {e}", parent.display())))?;
     }
     let session = varn_pipeline::resolver::Session::new();
-    let bytes = varn_pipeline::stdlib_loader::compile_stdlib_bundle(&std_dir, &session)
+    let bytes = varn_pipeline::stdlib_loader::compile_stdlib_image(&std_dir, &session)
         .map_err(CliError::fatal)?;
     std::fs::write(&out, &bytes)
         .map_err(|e| CliError::fatal(format!("cannot write '{}': {e}", out.display())))?;

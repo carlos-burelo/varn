@@ -52,11 +52,11 @@ impl ModuleSpec {
         self.embedded
     }
 
-    pub fn leaked(id: String, kind: ModuleKind, vn_source: String, pure: bool) -> Self {
+    pub const fn stdlib(id: &'static str, vn_source: &'static str, pure: bool) -> Self {
         Self {
-            id: Box::leak(id.into_boxed_str()),
-            kind,
-            vn_source: Box::leak(vn_source.into_boxed_str()),
+            id,
+            kind: ModuleKind::Stdlib,
+            vn_source,
             embedded: None,
             exports: &[],
             pure,

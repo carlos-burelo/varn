@@ -17,8 +17,6 @@ varn-types       = { path = "../varn-types" }
 varn-sem         = { path = "../varn-sem" }
 varn-resolver    = { path = "../varn-resolver" }
 rustc-hash       = { workspace = true }
-serde            = { workspace = true }
-serde_json       = { workspace = true }
 postcard     = { workspace = true }
 
 [lints]
