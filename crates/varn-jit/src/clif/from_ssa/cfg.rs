@@ -218,6 +218,7 @@ fn block_exit(ssa: &SsaProto, entry: &[usize], b: usize) -> Option<Vec<usize>> {
             | varn_types::ssa::SsaOp::AllocInstance { .. }
             | varn_types::ssa::SsaOp::LoadGlobalIdx(_)
             | varn_types::ssa::SsaOp::ArrayGetIndex { .. }
+            | varn_types::ssa::SsaOp::BytesGetIndex { .. }
             | varn_types::ssa::SsaOp::ArraySetIndex { .. }
             | varn_types::ssa::SsaOp::ConstChar(_)
             | varn_types::ssa::SsaOp::ConstBigInt(_)
@@ -324,6 +325,7 @@ fn stack_before_try(
             | varn_types::ssa::SsaOp::AllocInstance { .. }
             | varn_types::ssa::SsaOp::LoadGlobalIdx(_)
             | varn_types::ssa::SsaOp::ArrayGetIndex { .. }
+            | varn_types::ssa::SsaOp::BytesGetIndex { .. }
             | varn_types::ssa::SsaOp::ArraySetIndex { .. }
             | varn_types::ssa::SsaOp::ConstChar(_)
             | varn_types::ssa::SsaOp::ConstBigInt(_)

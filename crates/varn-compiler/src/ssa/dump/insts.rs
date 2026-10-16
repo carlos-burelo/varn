@@ -46,6 +46,9 @@ pub fn inst_kind(kind: &InstKind) -> String {
         InstKind::ArrayGetIndex { object, index } => {
             format!("arraygetindex {}[{}]", val(*object), val(*index))
         }
+        InstKind::BytesGetIndex { object, index } => {
+            format!("bytesgetindex {}[{}]", val(*object), val(*index))
+        }
         InstKind::MapGetIndex { object, index } => {
             format!("mapgetindex {}[{}]", val(*object), val(*index))
         }

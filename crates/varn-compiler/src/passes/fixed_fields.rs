@@ -58,6 +58,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
                     | InstKind::GetFixedField { .. }
                     | InstKind::GetIndex { .. }
                     | InstKind::ArrayGetIndex { .. }
+                    | InstKind::BytesGetIndex { .. }
                     | InstKind::MapGetIndex { .. }
                     | InstKind::SetProperty { .. }
                     | InstKind::SetFixedField { .. }
@@ -356,6 +357,7 @@ mod tests {
                 | InstKind::GetFixedField { .. }
                 | InstKind::GetIndex { .. }
                 | InstKind::ArrayGetIndex { .. }
+                | InstKind::BytesGetIndex { .. }
                 | InstKind::MapGetIndex { .. }
                 | InstKind::SetProperty { .. }
                 | InstKind::SetFixedField { .. }
@@ -505,6 +507,7 @@ mod tests {
                 | InstKind::GetFixedField { .. }
                 | InstKind::GetIndex { .. }
                 | InstKind::ArrayGetIndex { .. }
+                | InstKind::BytesGetIndex { .. }
                 | InstKind::MapGetIndex { .. }
                 | InstKind::SetProperty { .. }
                 | InstKind::SetFixedField { .. }

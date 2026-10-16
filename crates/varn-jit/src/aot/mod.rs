@@ -363,6 +363,7 @@ fn emit_module_body(
                     | OpCode::CallSelf
                     | OpCode::Nop
                     | OpCode::ArrayGetIndex
+                    | OpCode::BytesGetIndex
                     | OpCode::ArraySetIndex
                     | OpCode::CallNativeOp
                     | OpCode::IntrinsicDirect
@@ -543,6 +544,7 @@ fn emit_module_body(
             | OpCode::CallSelf
             | OpCode::Nop
             | OpCode::ArrayGetIndex
+            | OpCode::BytesGetIndex
             | OpCode::ArraySetIndex
             | OpCode::CallNativeOp
             | OpCode::IntrinsicDirect

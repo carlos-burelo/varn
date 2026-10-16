@@ -121,6 +121,7 @@ pub(super) fn try_project(kind: &InstKind, site: &Site, captured: &mut Captured)
         | InstKind::GetFixedField { .. }
         | InstKind::GetIndex { .. }
         | InstKind::ArrayGetIndex { .. }
+        | InstKind::BytesGetIndex { .. }
         | InstKind::MapGetIndex { .. }
         | InstKind::SetProperty { .. }
         | InstKind::SetFixedField { .. }

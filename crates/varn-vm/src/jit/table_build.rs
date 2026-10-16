@@ -8,6 +8,7 @@ macro_rules! fill_tail {
             $( $field: $path as *const () as usize, )*
         resolve_native_op: resolve_native_op_target,
             array_layout,
+            buffer_layout: crate::heap::Heap::jit_buffer_layout(),
             object_layout: crate::heap::Heap::jit_object_layout(),
             instance_alloc: crate::heap::Heap::jit_instance_alloc(),
             heap_field_offset: std::mem::offset_of!(ctx::ExecCtx, heap),
@@ -38,7 +39,7 @@ macro_rules! fill_tail {
 pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     assert_eq!(
         varn_jit::JIT_HELPERS_VERSION,
-        3,
+        4,
         "JitHelpers ABI version mismatch: review offset_of layout after varn-jit-abi change"
     );
     jit_helper_table!(fill, "src/exec/jit_helpers")

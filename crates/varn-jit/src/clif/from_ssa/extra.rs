@@ -96,6 +96,7 @@ pub(super) fn try_emit(
         | SsaOp::AllocInstance { .. }
         | SsaOp::LoadGlobalIdx(_)
         | SsaOp::ArrayGetIndex { .. }
+        | SsaOp::BytesGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
         | SsaOp::ConstChar(_)
         | SsaOp::ConstBigInt(_)

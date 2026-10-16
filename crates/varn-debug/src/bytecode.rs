@@ -36,8 +36,8 @@ fn op_color(op: OpCode) -> &'static str {
         | SetFixedField | GetSuper | GetSymbol | AllocInstance | Typeof | IsNull | IsArray
         | AssertNotNull | StrLength | ArrayLength | ArrayPush | ArrayPop | ArrayExtend
         | WrapSpread | GetEnumTag | Await | Yield | InvokeRuntimeStatic | Intrinsic | Nop
-        | ArrayGetIndex | ArraySetIndex | CallNativeOp | IntrinsicDirect | BuildMap
-        | MapGetIndex | MapSetIndex | Convert | BytesLength => "",
+        | ArrayGetIndex | ArraySetIndex | BytesGetIndex | CallNativeOp | IntrinsicDirect
+        | BuildMap | MapGetIndex | MapSetIndex | Convert | BytesLength => "",
     }
 }
 

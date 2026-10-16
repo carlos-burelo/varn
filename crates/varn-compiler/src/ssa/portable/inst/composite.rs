@@ -88,6 +88,7 @@ pub(super) fn try_project(kind: &InstKind, value_tys: &[HirType], site: &Site) -
         | InstKind::GetFixedField { .. }
         | InstKind::GetIndex { .. }
         | InstKind::ArrayGetIndex { .. }
+        | InstKind::BytesGetIndex { .. }
         | InstKind::MapGetIndex { .. }
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
@@ -153,6 +154,12 @@ fn project_indexed(kind: &InstKind, value_tys: &[HirType]) -> Option<SsaOp> {
                 index: index.0,
             })
         }
+        InstKind::BytesGetIndex { object, index } if is_int(value_tys, *index) => {
+            Some(SsaOp::BytesGetIndex {
+                object: object.0,
+                index: index.0,
+            })
+        }
         InstKind::ArraySetIndex {
             object,
             index,
@@ -164,6 +171,7 @@ fn project_indexed(kind: &InstKind, value_tys: &[HirType]) -> Option<SsaOp> {
         }),
         InstKind::GetIndex { object, index }
         | InstKind::ArrayGetIndex { object, index }
+        | InstKind::BytesGetIndex { object, index }
         | InstKind::MapGetIndex { object, index } => Some(SsaOp::GetIndex {
             object: object.0,
             index: index.0,
@@ -314,6 +322,7 @@ fn project_object(kind: &InstKind) -> Option<SsaOp> {
         | InstKind::GetFixedField { .. }
         | InstKind::GetIndex { .. }
         | InstKind::ArrayGetIndex { .. }
+        | InstKind::BytesGetIndex { .. }
         | InstKind::MapGetIndex { .. }
         | InstKind::SetProperty { .. }
         | InstKind::SetFixedField { .. }
@@ -460,6 +469,7 @@ fn project_class(kind: &InstKind) -> Option<SsaOp> {
         | InstKind::GetProperty { .. }
         | InstKind::GetIndex { .. }
         | InstKind::ArrayGetIndex { .. }
+        | InstKind::BytesGetIndex { .. }
         | InstKind::MapGetIndex { .. }
         | InstKind::SetProperty { .. }
         | InstKind::SetIndex { .. }

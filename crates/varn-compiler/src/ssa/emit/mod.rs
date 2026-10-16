@@ -290,6 +290,7 @@ fn emit_inst(
             | InstKind::GetFixedField { .. }
             | InstKind::GetIndex { .. }
             | InstKind::ArrayGetIndex { .. }
+            | InstKind::BytesGetIndex { .. }
             | InstKind::MapGetIndex { .. }
             | InstKind::SetProperty { .. }
             | InstKind::SetFixedField { .. }

@@ -85,6 +85,7 @@ pub(super) fn compute(
                         | SsaOp::AllocInstance { .. }
                         | SsaOp::LoadGlobalIdx(_)
                         | SsaOp::ArrayGetIndex { .. }
+                        | SsaOp::BytesGetIndex { .. }
                         | SsaOp::ConstChar(_)
                         | SsaOp::ConstBigInt(_)
                         | SsaOp::ConstDecimal(_)

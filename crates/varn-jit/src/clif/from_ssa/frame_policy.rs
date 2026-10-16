@@ -35,6 +35,7 @@ pub(super) fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
         | SsaOp::AllocInstance { .. }
         | SsaOp::LoadGlobalIdx(_)
         | SsaOp::ArrayGetIndex { .. }
+        | SsaOp::BytesGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
         | SsaOp::ConstChar(_)
         | SsaOp::ConstBigInt(_)
@@ -113,6 +114,7 @@ pub(super) fn needs_frame(ssa: &SsaProto, op: &SsaOp) -> bool {
             | SsaOp::MakeEnumVariant { .. }
             | SsaOp::IntrinsicCall { .. }
             | SsaOp::ArrayGetIndex { .. }
+            | SsaOp::BytesGetIndex { .. }
             | SsaOp::ArraySetIndex { .. }
             | SsaOp::LoadGlobal(_)
             | SsaOp::StoreGlobal { .. }

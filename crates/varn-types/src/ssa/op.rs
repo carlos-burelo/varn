@@ -42,6 +42,11 @@ pub enum SsaOp {
         index: u32,
     },
 
+    BytesGetIndex {
+        object: u32,
+        index: u32,
+    },
+
     ArraySetIndex {
         object: u32,
         index: u32,

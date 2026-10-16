@@ -58,6 +58,7 @@ impl Views {
                 | SsaOp::LoadGlobalIdx(_)
                 | SsaOp::ArrayGetIndex { .. }
                 | SsaOp::ArraySetIndex { .. }
+                | SsaOp::BytesGetIndex { .. }
                 | SsaOp::ConstChar(_)
                 | SsaOp::ConstBigInt(_)
                 | SsaOp::ConstDecimal(_)
@@ -145,6 +146,7 @@ impl Views {
                 | SsaOp::Call { .. }
                 | SsaOp::AllocInstance { .. }
                 | SsaOp::LoadGlobalIdx(_)
+                | SsaOp::BytesGetIndex { .. }
                 | SsaOp::ConstChar(_)
                 | SsaOp::ConstBigInt(_)
                 | SsaOp::ConstDecimal(_)
@@ -294,6 +296,7 @@ pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
         | SsaOp::StoreCaptured { .. }
         | SsaOp::ArrayGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
+        | SsaOp::BytesGetIndex { .. }
         | SsaOp::GetFixedField { .. }
         | SsaOp::ArrayLength { .. }
         | SsaOp::StrLength { .. }

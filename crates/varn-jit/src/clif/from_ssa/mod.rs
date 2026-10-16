@@ -1,6 +1,7 @@
 mod arrays;
 mod block;
 mod boxed;
+mod bytes;
 mod call;
 mod cfg;
 mod classops;

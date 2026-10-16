@@ -667,6 +667,7 @@ fn version_plans(
                 }
                 match &inst.op {
                     SsaOp::ArrayGetIndex { object, index }
+                    | SsaOp::BytesGetIndex { object, index }
                     | SsaOp::ArraySetIndex { object, index, .. } => {
                         if ssa.value_ty(*index) != SlotKind::Int {
                             ok = false;

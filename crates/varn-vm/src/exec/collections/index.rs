@@ -54,6 +54,18 @@ pub(crate) fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> Vm
 }
 
 #[inline(always)]
+pub(crate) fn bytes_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if obj.is_heap() {
+        let heap_idx = obj.as_heap();
+        let idx = element_index(key, heap);
+        if let Some(HeapObj::Buffer(b)) = heap.get(heap_idx) {
+            return buffer_at(b, idx);
+        }
+    }
+    get_index(obj, key, heap)
+}
+
+#[inline(always)]
 pub(crate) fn map_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
@@ -137,19 +149,22 @@ pub(crate) fn array_set_index(
     set_index(obj, key, val, heap)
 }
 
+pub(crate) fn buffer_at(b: &varn_types::VmBuffer, idx: i64) -> VmResult<VmValue> {
+    let slice = b.as_slice();
+    usize::try_from(idx)
+        .ok()
+        .and_then(|at| slice.get(at))
+        .map(|&byte| VmValue::from_int(byte as i64))
+        .ok_or_else(|| RuntimeError::out_of_range(idx, slice.len()))
+}
+
 pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get(obj.as_heap()) {
             return element_at(a, heap.as_int(key));
         }
         if let Some(HeapObj::Buffer(b)) = heap.get(obj.as_heap()) {
-            let idx = heap.as_int(key);
-            let slice = b.as_slice();
-            return usize::try_from(idx)
-                .ok()
-                .and_then(|at| slice.get(at))
-                .map(|&byte| VmValue::from_int(byte as i64))
-                .ok_or_else(|| RuntimeError::out_of_range(idx, slice.len()));
+            return buffer_at(b, heap.as_int(key));
         }
     }
     if obj.is_sso() {

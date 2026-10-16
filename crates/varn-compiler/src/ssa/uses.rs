@@ -71,6 +71,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         }
         GetIndex { object, index }
         | ArrayGetIndex { object, index }
+        | BytesGetIndex { object, index }
         | MapGetIndex { object, index } => {
             f(*object);
             f(*index);
@@ -232,6 +233,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         }
         GetIndex { object, index }
         | ArrayGetIndex { object, index }
+        | BytesGetIndex { object, index }
         | MapGetIndex { object, index } => {
             f(object);
             f(index);

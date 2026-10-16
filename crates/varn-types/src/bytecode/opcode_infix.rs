@@ -111,6 +111,7 @@ pub(super) fn infix(op: OpCode) -> Option<&'static str> {
         | O::CallSelf
         | O::Nop
         | O::ArrayGetIndex
+        | O::BytesGetIndex
         | O::ArraySetIndex
         | O::CallNativeOp
         | O::IntrinsicDirect

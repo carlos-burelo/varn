@@ -139,6 +139,7 @@ pub(super) fn implied(op: OpCode) -> Option<&'static str> {
         | OpCode::CallSelf
         | OpCode::Nop
         | OpCode::ArrayGetIndex
+        | OpCode::BytesGetIndex
         | OpCode::ArraySetIndex
         | OpCode::CallNativeOp
         | OpCode::IntrinsicDirect

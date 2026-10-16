@@ -186,6 +186,17 @@ impl ExecCtx {
                 self.stack.unbox_into_reg(base, first_reg, result)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
+            OpCode::BytesGetIndex => {
+                let w1 = code[*ip];
+                *ip += 1;
+                let obj_reg = hi(w1);
+                let idx_reg = lo(w1);
+                let obj = self.stack.box_reg(base, obj_reg);
+                let key_nv = self.stack.box_reg(base, idx_reg);
+                let result = self.exec_bytes_get_index(obj, key_nv)?;
+                self.stack.unbox_into_reg(base, first_reg, result)?;
+                Ok(Some(ObjectFlow::ContinueInstruction))
+            }
             OpCode::MapGetIndex => {
                 let w1 = code[*ip];
                 *ip += 1;

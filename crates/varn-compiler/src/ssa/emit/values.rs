@@ -80,6 +80,9 @@ pub(super) fn emit_value(
         InstKind::ArrayGetIndex { object, index } => {
             access::emit_array_get_index(chunk, d, *object, *index, reg, line);
         }
+        InstKind::BytesGetIndex { object, index } => {
+            access::emit_bytes_get_index(chunk, d, *object, *index, reg, line);
+        }
         InstKind::MapGetIndex { object, index } => {
             access::emit_map_get_index(chunk, d, *object, *index, reg, line);
         }

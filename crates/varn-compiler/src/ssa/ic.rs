@@ -71,6 +71,7 @@ fn sites(kind: &InstKind, has_dest: bool) -> u16 {
         | InstKind::GetFixedField { .. }
         | InstKind::GetIndex { .. }
         | InstKind::ArrayGetIndex { .. }
+        | InstKind::BytesGetIndex { .. }
         | InstKind::MapGetIndex { .. }
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }

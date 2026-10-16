@@ -133,6 +133,7 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
     match kind {
         InstKind::GetFixedField { .. }
         | InstKind::ArrayGetIndex { .. }
+        | InstKind::BytesGetIndex { .. }
         | InstKind::MapGetIndex { .. } => facts.memory_stable,
 
         InstKind::Binary { op, ty, .. } => {

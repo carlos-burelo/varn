@@ -25,6 +25,7 @@ const PAIRS: &[(OpCode, OpCode)] = &[
     (OpCode::GetFixedField, OpCode::GetProperty),
     (OpCode::SetFixedField, OpCode::SetProperty),
     (OpCode::ArrayGetIndex, OpCode::GetIndex),
+    (OpCode::BytesGetIndex, OpCode::GetIndex),
     (OpCode::ArraySetIndex, OpCode::SetIndex),
     (OpCode::InvokeVirtual, OpCode::CallMethod),
 ];

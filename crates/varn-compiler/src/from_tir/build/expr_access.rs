@@ -107,6 +107,13 @@ impl<'m> Builder<'m> {
                 args: vec![idx],
                 op_id: varn_core::op_id::str_index_op_id(),
             }
+        } else if matches!(object.ty, varn_tir::BackendTy::Bytes)
+            && matches!(self.value_ty(idx), HirType::Int | HirType::Dynamic)
+        {
+            InstKind::BytesGetIndex {
+                object: obj,
+                index: idx,
+            }
         } else if matches!(self.value_ty(obj), HirType::Array(_) | HirType::Tuple) {
             InstKind::ArrayGetIndex {
                 object: obj,

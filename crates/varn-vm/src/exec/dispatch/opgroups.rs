@@ -106,6 +106,7 @@ macro_rules! object_ops {
             | OpCode::GetIndex
             | OpCode::SetIndex
             | OpCode::ArrayGetIndex
+            | OpCode::BytesGetIndex
             | OpCode::ArraySetIndex
             | OpCode::BuildArray
             | OpCode::BuildTuple

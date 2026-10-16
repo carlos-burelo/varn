@@ -190,6 +190,8 @@ pub enum OpCode {
     ArrayGetIndex,
     ArraySetIndex,
 
+    BytesGetIndex,
+
     CallNativeOp,
 
     IntrinsicDirect,

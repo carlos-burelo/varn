@@ -124,6 +124,7 @@ pub(crate) fn project(
                     | InstKind::GetFixedField { .. }
                     | InstKind::GetIndex { .. }
                     | InstKind::ArrayGetIndex { .. }
+                    | InstKind::BytesGetIndex { .. }
                     | InstKind::MapGetIndex { .. }
                     | InstKind::SetProperty { .. }
                     | InstKind::SetFixedField { .. }
@@ -220,6 +221,7 @@ pub(crate) fn project(
                     | InstKind::GetFixedField { .. }
                     | InstKind::GetIndex { .. }
                     | InstKind::ArrayGetIndex { .. }
+                    | InstKind::BytesGetIndex { .. }
                     | InstKind::MapGetIndex { .. }
                     | InstKind::SetProperty { .. }
                     | InstKind::SetFixedField { .. }
@@ -391,6 +393,7 @@ fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
         | other @ InstKind::GetFixedField { .. }
         | other @ InstKind::GetIndex { .. }
         | other @ InstKind::ArrayGetIndex { .. }
+        | other @ InstKind::BytesGetIndex { .. }
         | other @ InstKind::MapGetIndex { .. }
         | other @ InstKind::SetProperty { .. }
         | other @ InstKind::SetFixedField { .. }

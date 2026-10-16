@@ -140,8 +140,8 @@ pub struct OwnedTargetIsa {
 use std::any::Any;
 use std::rc::Rc;
 pub use varn_jit_abi::{
-    JitArrayLayout, JitCallLayout, JitFrameLayout, JitGetIndexArgs, JitHelpers, JitInstanceAlloc,
-    JitInvokeVirtualArgs, JitObjectLayout, JitSetIndexArgs, JitSetPropertyArgs,
+    JitArrayLayout, JitBufferLayout, JitCallLayout, JitFrameLayout, JitGetIndexArgs, JitHelpers,
+    JitInstanceAlloc, JitInvokeVirtualArgs, JitObjectLayout, JitSetIndexArgs, JitSetPropertyArgs,
     JIT_HELPERS_VERSION,
 };
 use varn_types::FunctionProto;

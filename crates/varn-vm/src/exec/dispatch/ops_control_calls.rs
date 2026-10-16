@@ -341,6 +341,7 @@ impl ExecCtx {
             | OpCode::LoadStaticFn
             | OpCode::Nop
             | OpCode::ArrayGetIndex
+            | OpCode::BytesGetIndex
             | OpCode::ArraySetIndex
             | OpCode::CallNativeOp
             | OpCode::IntrinsicDirect

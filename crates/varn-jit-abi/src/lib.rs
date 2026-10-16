@@ -1,6 +1,6 @@
 use varn_types::{NativeOpTarget, VmValue};
 
-pub const JIT_HELPERS_VERSION: u32 = 3;
+pub const JIT_HELPERS_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
@@ -24,6 +24,26 @@ pub struct JitArrayLayout {
 
     pub elems_ptr_off: usize,
     pub elems_len_off: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitBufferLayout {
+    pub payload_off: usize,
+
+    pub buffer_tag: usize,
+
+    pub buf_rc_off: usize,
+
+    pub buf_offset_off: usize,
+
+    pub buf_len_off: usize,
+
+    pub rc_value_off: usize,
+
+    pub vec_ptr_off: usize,
+
+    pub vec_len_off: usize,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -228,6 +248,7 @@ pub struct JitHelpers {
     pub yield_helper: usize,
     pub resolve_native_op: fn(u64) -> NativeOpTarget,
     pub array_layout: JitArrayLayout,
+    pub buffer_layout: JitBufferLayout,
     pub object_layout: JitObjectLayout,
     pub instance_alloc: JitInstanceAlloc,
     pub heap_field_offset: usize,

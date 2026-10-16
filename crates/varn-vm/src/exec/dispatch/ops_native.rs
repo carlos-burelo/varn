@@ -227,6 +227,7 @@ impl ExecCtx {
             | OpCode::CallSelf
             | OpCode::Nop
             | OpCode::ArrayGetIndex
+            | OpCode::BytesGetIndex
             | OpCode::ArraySetIndex
             | OpCode::LoadNativeGlobalIdx
             | OpCode::BuildMap

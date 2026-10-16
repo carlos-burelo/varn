@@ -193,6 +193,7 @@ impl ExecCtx {
             | OpCode::CallSelf
             | OpCode::Nop
             | OpCode::ArrayGetIndex
+            | OpCode::BytesGetIndex
             | OpCode::ArraySetIndex
             | OpCode::CallNativeOp
             | OpCode::IntrinsicDirect

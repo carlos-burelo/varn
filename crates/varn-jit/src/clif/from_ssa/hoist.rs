@@ -64,6 +64,7 @@ pub(super) fn plan_hoists(
                     | varn_types::ssa::SsaOp::Call { .. }
                     | varn_types::ssa::SsaOp::AllocInstance { .. }
                     | varn_types::ssa::SsaOp::ArrayGetIndex { .. }
+                    | varn_types::ssa::SsaOp::BytesGetIndex { .. }
                     | varn_types::ssa::SsaOp::ArraySetIndex { .. }
                     | varn_types::ssa::SsaOp::ConstChar(_)
                     | varn_types::ssa::SsaOp::ConstBigInt(_)

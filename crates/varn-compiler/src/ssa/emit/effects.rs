@@ -261,6 +261,7 @@ pub(super) fn emit_effect(
         | InstKind::GetFixedField { .. }
         | InstKind::GetIndex { .. }
         | InstKind::ArrayGetIndex { .. }
+        | InstKind::BytesGetIndex { .. }
         | InstKind::MapGetIndex { .. }
         | InstKind::MethodCall { .. }
         | InstKind::IsNull { .. }

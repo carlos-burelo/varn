@@ -161,6 +161,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         | O::NeqStr
         | O::GetIndex
         | O::ArrayGetIndex
+        | O::BytesGetIndex
         | O::MapGetIndex => (2, vec![w(hi(0)), r(hi(1)), r(lo(1))]),
 
         O::SetIndex | O::ArraySetIndex | O::MapSetIndex => (2, vec![r(hi(0)), r(hi(1)), r(lo(1))]),

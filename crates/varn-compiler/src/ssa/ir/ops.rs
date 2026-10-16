@@ -86,6 +86,11 @@ pub enum InstKind {
         index: Value,
     },
 
+    BytesGetIndex {
+        object: Value,
+        index: Value,
+    },
+
     MapGetIndex {
         object: Value,
         index: Value,

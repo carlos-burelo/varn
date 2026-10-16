@@ -40,6 +40,7 @@ pub fn analyze(ssa: &SsaFunc) -> Vec<SuspendPoint> {
                 | InstKind::GetFixedField { .. }
                 | InstKind::GetIndex { .. }
                 | InstKind::ArrayGetIndex { .. }
+                | InstKind::BytesGetIndex { .. }
                 | InstKind::MapGetIndex { .. }
                 | InstKind::SetProperty { .. }
                 | InstKind::SetFixedField { .. }
@@ -147,6 +148,7 @@ pub fn suspend_live_regs(
                 | InstKind::GetFixedField { .. }
                 | InstKind::GetIndex { .. }
                 | InstKind::ArrayGetIndex { .. }
+                | InstKind::BytesGetIndex { .. }
                 | InstKind::MapGetIndex { .. }
                 | InstKind::SetProperty { .. }
                 | InstKind::SetFixedField { .. }
@@ -302,6 +304,7 @@ fn captured_home_regs(ssa: &SsaFunc, nparams: usize) -> Vec<u16> {
                 | InstKind::GetFixedField { .. }
                 | InstKind::GetIndex { .. }
                 | InstKind::ArrayGetIndex { .. }
+                | InstKind::BytesGetIndex { .. }
                 | InstKind::MapGetIndex { .. }
                 | InstKind::SetProperty { .. }
                 | InstKind::SetFixedField { .. }

@@ -34,7 +34,9 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | This
         | CatchParam { .. } => true,
 
-        GetFixedField { .. } | ArrayGetIndex { .. } | MapGetIndex { .. } => true,
+        GetFixedField { .. } | ArrayGetIndex { .. } | BytesGetIndex { .. } | MapGetIndex { .. } => {
+            true
+        }
 
         IsNull { .. } | Cast { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => {
             true

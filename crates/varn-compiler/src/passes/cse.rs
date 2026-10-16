@@ -165,6 +165,7 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
 
         InstKind::GetFixedField { object, slot, .. } => Key::FixedField(id(*object), *slot),
         InstKind::ArrayGetIndex { object, index } => Key::ArrayElem(id(*object), id(*index)),
+        InstKind::BytesGetIndex { object, index } => Key::ArrayElem(id(*object), id(*index)),
         InstKind::ModuleSlot { object, slot } => Key::ModuleSlot(id(*object), *slot),
         InstKind::LoadGlobal(name) => Key::Global(name.clone()),
         InstKind::LoadGlobalIdx(slot) => Key::GlobalIdx(*slot),

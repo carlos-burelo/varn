@@ -7,7 +7,7 @@ use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaUnOp};
 
 use super::{
-    arrays, boxed, call, closures, dynop, exceptions, globals, heap, heapvalue, is_heap,
+    arrays, boxed, bytes, call, closures, dynop, exceptions, globals, heap, heapvalue, is_heap,
     load_value, numeric, Ctx, Out,
 };
 
@@ -37,6 +37,11 @@ pub(super) fn emit_inst(
         }
         SsaOp::ArrayGetIndex { object, index } => {
             return Ok(Some(arrays::emit_get(
+                b, ctx, values, *object, *index, dest,
+            )?))
+        }
+        SsaOp::BytesGetIndex { object, index } => {
+            return Ok(Some(bytes::emit_get(
                 b, ctx, values, *object, *index, dest,
             )?))
         }

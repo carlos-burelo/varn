@@ -100,6 +100,15 @@ impl ExecCtx {
         crate::exec::collections::array_get_index(obj, key_nv, &mut self.heap)
     }
 
+    #[inline(always)]
+    pub(in crate::exec::dispatch) fn exec_bytes_get_index(
+        &mut self,
+        obj: VmValue,
+        key_nv: VmValue,
+    ) -> VmResult<VmValue> {
+        crate::exec::collections::bytes_get_index(obj, key_nv, &mut self.heap)
+    }
+
     pub(in crate::exec::dispatch) fn exec_set_index(
         &mut self,
         obj: VmValue,

@@ -95,6 +95,7 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 | InstKind::GetFixedField { .. }
                 | InstKind::GetIndex { .. }
                 | InstKind::ArrayGetIndex { .. }
+                | InstKind::BytesGetIndex { .. }
                 | InstKind::MapGetIndex { .. }
                 | InstKind::SetProperty { .. }
                 | InstKind::SetFixedField { .. }

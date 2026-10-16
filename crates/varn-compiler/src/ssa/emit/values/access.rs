@@ -123,6 +123,22 @@ pub(super) fn emit_array_get_index(
     );
 }
 
+pub(super) fn emit_bytes_get_index(
+    chunk: &mut Chunk,
+    d: u8,
+    object: Value,
+    index: Value,
+    reg: &[u8],
+    line: u32,
+) {
+    chunk.emit_rrr(
+        OpCode::BytesGetIndex,
+        d,
+        reg[object.0 as usize],
+        reg[index.0 as usize],
+        line,
+    );
+}
 pub(super) fn emit_map_get_index(
     chunk: &mut Chunk,
     d: u8,

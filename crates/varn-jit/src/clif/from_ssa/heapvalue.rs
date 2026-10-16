@@ -71,6 +71,7 @@ pub(super) fn emit(
         | SsaOp::AllocInstance { .. }
         | SsaOp::LoadGlobalIdx(_)
         | SsaOp::ArrayGetIndex { .. }
+        | SsaOp::BytesGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
         | SsaOp::ConstChar(_)
         | SsaOp::ConstBigInt(_)
@@ -317,6 +318,7 @@ pub(super) fn emit(
         | SsaOp::Call { .. }
         | SsaOp::AllocInstance { .. }
         | SsaOp::ArrayGetIndex { .. }
+        | SsaOp::BytesGetIndex { .. }
         | SsaOp::ArraySetIndex { .. }
         | SsaOp::IntrinsicCall { .. }
         | SsaOp::Try { .. }
