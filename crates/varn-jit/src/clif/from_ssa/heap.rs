@@ -206,7 +206,6 @@ fn emit_build_object_inline(
     };
     use varn_types::vm_value::KIND_HEAP;
     let ia = &ctx.helpers.instance_alloc;
-    let olay = &ctx.helpers.object_layout;
     let cell_bytes = CELL_CLASSES[class_idx] as i64;
     let flags = cranelift_codegen::ir::MemFlagsData::trusted();
     let ectx = exec_ctx(ctx);

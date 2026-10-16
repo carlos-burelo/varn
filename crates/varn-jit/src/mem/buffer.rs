@@ -110,7 +110,7 @@ impl JitBuffer {
                 unsafe {
                     sys::pthread_jit_write_protect_np(1);
                     let end = self.ptr as usize + self.size;
-                    extern "C" {
+                    unsafe extern "C" {
                         fn sys_icache_invalidate(start: *mut c_void, size: usize);
                     }
                     sys_icache_invalidate(self.ptr as *mut c_void, self.size);
@@ -141,7 +141,7 @@ impl JitBuffer {
                 #[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
                 unsafe {
                     let end = self.ptr as usize + self.size;
-                    extern "C" {
+                    unsafe extern "C" {
                         fn __clear_cache(start: *mut c_void, end: *mut c_void);
                     }
                     __clear_cache(self.ptr as *mut c_void, end as *mut c_void);

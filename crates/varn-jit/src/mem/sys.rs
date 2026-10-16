@@ -59,7 +59,7 @@ mod imp {
     #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
     pub const MAP_JIT: i32 = 0;
 
-    extern "C" {
+    unsafe extern "C" {
         pub fn mmap(
             addr: *mut c_void,
             length: usize,
@@ -75,7 +75,7 @@ mod imp {
     }
 
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    extern "C" {
+    unsafe extern "C" {
         pub fn pthread_jit_write_protect_np(enabled: i32);
     }
 }

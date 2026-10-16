@@ -10,7 +10,7 @@ impl Default for JmpBuf {
     }
 }
 
-extern "C" {
+unsafe extern "C" {
     fn setjmp(env: *mut JmpBuf) -> std::ffi::c_int;
     fn longjmp(env: *const JmpBuf, val: std::ffi::c_int) -> !;
 }
