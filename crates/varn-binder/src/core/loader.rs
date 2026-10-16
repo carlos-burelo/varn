@@ -8,8 +8,13 @@ pub fn is_core_file(filename: &str) -> bool {
     filename.contains("varn-builtins") || filename.starts_with(CORE_PREFIX)
 }
 
+const CORE_BASE: &str = "core:errors";
+
 pub fn module_globals(filename: &str, resolver: &dyn ImportResolver) -> Option<Arc<CoreExports>> {
-    (!is_core_file(filename)).then(|| resolver.core_exports())
+    if !is_core_file(filename) {
+        return Some(resolver.core_exports());
+    }
+    (filename != CORE_BASE).then(|| Arc::new(exports_of(resolver, [CORE_BASE])))
 }
 
 pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) {
@@ -20,8 +25,15 @@ pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) 
 }
 
 pub fn build_core_exports(resolver: &dyn ImportResolver) -> CoreExports {
+    exports_of(resolver, varn_modules::core_module_ids())
+}
+
+fn exports_of<'a>(
+    resolver: &dyn ImportResolver,
+    specs: impl IntoIterator<Item = &'a str>,
+) -> CoreExports {
     let mut core = CoreExports::default();
-    for spec in varn_modules::core_module_ids() {
+    for spec in specs {
         let exports = resolver.stdlib_exports(spec);
         let table = Arc::make_mut(&mut core.table);
         table.absorb(&exports.table);
