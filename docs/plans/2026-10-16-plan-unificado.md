@@ -58,6 +58,9 @@ valor del proceso (`5577e184`, lowering puro sin linker) y caché de
 imágenes en `<cache>/jit/` con modo `VARN_JIT_CACHE=verify` como
 cuadrante 5 de `verify.ps1` (`5489ec54`). http_routing 262→227 ms
 (bun 219).
+Globales top-level a registros del módulo (regresión de la migración
+HIR→TIR): walker TIR exhaustivo (`7a11028a`) y pase de promoción en
+varn-emit (`5e652ef0`); class_fields 6.4→3.6 ms.
 
 ## 2. Pendiente, por orden
 
