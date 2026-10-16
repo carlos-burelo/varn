@@ -35,6 +35,8 @@ impl<'r> Checker<'r> {
             let expected_kind = self.ty_table.get(expected.0);
             let check_expected = if matches!(expected_kind, TypeKind::TypePredicate { .. }) {
                 Type::Bool
+            } else if self.declared_yield.is_some() {
+                varn_sem::types::yielded_by(expected, &self.ty_table)
             } else {
                 expected
             };
