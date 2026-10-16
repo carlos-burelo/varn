@@ -65,6 +65,7 @@ fn load_embedded_std(bytes: &'static [u8]) -> Result<ActiveStd, String> {
     let specs: Vec<ModuleSpec> = image
         .modules()
         .iter()
+        .filter(|m| m.id.starts_with(varn_modules::spec::STD_PREFIX))
         .map(|m| ModuleSpec::stdlib(m.id, m.path, m.pure))
         .collect();
     Ok(ActiveStd {
@@ -170,7 +171,7 @@ impl StdlibProvider for BuiltinsProvider {
     }
 
     fn interface_blob(&self, specifier: &str) -> Option<&'static [u8]> {
-        Some(std_module(specifier)?.interface)
+        Some(std_module(specifier)?.interface).filter(|b| !b.is_empty())
     }
 
     fn bundled_source(&self, specifier: &str) -> Option<&'static str> {

@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use varn_sem::bind::BindResult;
-use varn_sem::codec::{deserialize_module_interface, serialize_module_interface};
+use varn_sem::codec::{
+    deserialize_module_interface, has_portable_interface, serialize_module_interface,
+};
 use varn_sem::exports::ExportMap;
 
 pub(crate) struct CachedModule {
@@ -66,7 +68,7 @@ pub(crate) fn try_load_cache(
     source: &str,
     carrier: CarrierKind,
 ) -> Option<CachedModule> {
-    if virtual_id == "core:types/aliases" {
+    if !has_portable_interface(virtual_id) {
         return None;
     }
     let id = cache_module_id(virtual_id);
@@ -83,19 +85,26 @@ pub(crate) fn try_load_cache(
             return None;
         }
     }
-    match deserialize_module_interface(&envelope.interface) {
-        Ok((mut exports, mut bind)) => {
-            let expected = varn_modules::canonical_or_original(std::path::Path::new(virtual_id));
-            let got = bind.source_file.to_string();
-            if got != virtual_id && got != expected {
-                return None;
-            }
-            adopt_dependencies(resolver, virtual_id, &mut bind);
-            exports.table = bind.ty_table.clone();
-            Some(CachedModule { exports, bind })
-        }
-        Err(_) => None,
+    adopt_interface(resolver, virtual_id, &envelope.interface)
+}
+
+pub(crate) fn adopt_interface(
+    resolver: &super::super::resolver_disk::DiskResolver,
+    virtual_id: &str,
+    interface: &[u8],
+) -> Option<CachedModule> {
+    if !has_portable_interface(virtual_id) {
+        return None;
     }
+    let (mut exports, mut bind) = deserialize_module_interface(interface).ok()?;
+    let expected = varn_modules::canonical_or_original(std::path::Path::new(virtual_id));
+    let got = bind.source_file.to_string();
+    if got != virtual_id && got != expected {
+        return None;
+    }
+    adopt_dependencies(resolver, virtual_id, &mut bind);
+    exports.table = bind.ty_table.clone();
+    Some(CachedModule { exports, bind })
 }
 
 fn adopt_dependencies(
@@ -132,7 +141,7 @@ pub(crate) fn save_to_cache(
     bind: &BindResult,
     carrier: CarrierKind,
 ) {
-    if virtual_id == "core:types/aliases" {
+    if !has_portable_interface(virtual_id) {
         return;
     }
     let id = cache_module_id(virtual_id);

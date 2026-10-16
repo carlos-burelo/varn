@@ -58,8 +58,7 @@ impl DiskResolver {
     pub(super) fn exports_from_embedded(
         &self,
         virtual_id: &str,
-        source: &str,
-        carrier: super::CarrierKind,
+        source: &varn_modules::loader::ModuleSource,
         visiting: &mut Vec<String>,
     ) -> Arc<ExportMap> {
         if visiting.iter().any(|v| v == virtual_id) {
@@ -67,7 +66,7 @@ impl DiskResolver {
         }
         visiting.push(virtual_id.to_owned());
 
-        if let Some(cached) = super::cache::try_load_cache(self, virtual_id, source, carrier) {
+        if let Some(cached) = self.interface_of(virtual_id, source) {
             self.store_bind(virtual_id.to_owned(), Arc::new(cached.bind));
             visiting.pop();
             return Arc::new(cached.exports);
@@ -78,7 +77,7 @@ impl DiskResolver {
             arena: ast_arena,
             interner,
             ..
-        }) = self.parse_and_cache(source, virtual_id)
+        }) = self.parse_and_cache(&source.text, virtual_id)
         else {
             visiting.pop();
             return Arc::new(ExportMap::default());
@@ -99,21 +98,43 @@ impl DiskResolver {
             visiting,
         );
 
-        super::cache::save_to_cache(self, virtual_id, source, &exports, bind.as_ref(), carrier);
+        super::cache::save_to_cache(
+            self,
+            virtual_id,
+            &source.text,
+            &exports,
+            bind.as_ref(),
+            super::CarrierKind::from(source.provenance.clone()),
+        );
         visiting.pop();
         Arc::new(exports)
+    }
+
+    fn interface_of(
+        &self,
+        virtual_id: &str,
+        source: &varn_modules::loader::ModuleSource,
+    ) -> Option<super::cache::CachedModule> {
+        match source.interface {
+            Some(interface) => super::cache::adopt_interface(self, virtual_id, interface),
+            None => super::cache::try_load_cache(
+                self,
+                virtual_id,
+                &source.text,
+                super::CarrierKind::from(source.provenance.clone()),
+            ),
+        }
     }
 
     pub(super) fn bind_from_embedded(
         &self,
         virtual_id: &str,
-        source: &str,
-        carrier: super::CarrierKind,
+        source: &varn_modules::loader::ModuleSource,
     ) -> Option<Arc<BindResult>> {
         if let Some(cached) = self.cached_bind(virtual_id) {
             return Some(cached);
         }
-        if let Some(cached) = super::cache::try_load_cache(self, virtual_id, source, carrier) {
+        if let Some(cached) = self.interface_of(virtual_id, source) {
             let bind_rc = Arc::new(cached.bind);
             self.store_bind(virtual_id.to_owned(), Arc::clone(&bind_rc));
             self.store_exports(
@@ -127,7 +148,7 @@ impl DiskResolver {
             arena: ast_arena,
             lex_errs,
             interner,
-        } = self.parse_and_cache(source, virtual_id)?;
+        } = self.parse_and_cache(&source.text, virtual_id)?;
         Some(self.bind_and_cache(&program, ast_arena.as_ref(), interner, lex_errs, virtual_id))
     }
 }

@@ -106,9 +106,7 @@ impl ImportResolver for DiskResolver {
         }
 
         let source = self.load_source(&ModuleId::stdlib(specifier))?;
-        let carrier = super::CarrierKind::from(source.provenance);
-
-        self.bind_from_embedded(specifier, source.text.as_ref(), carrier)
+        self.bind_from_embedded(specifier, &source)
     }
 
     fn stdlib_exports(&self, specifier: &str) -> Arc<ExportMap> {
@@ -119,15 +117,7 @@ impl ImportResolver for DiskResolver {
 
         let result = self
             .load_source(&ModuleId::stdlib(specifier))
-            .map(|source| {
-                let carrier = super::CarrierKind::from(source.provenance);
-                self.exports_from_embedded(
-                    specifier,
-                    source.text.as_ref(),
-                    carrier,
-                    &mut Vec::new(),
-                )
-            });
+            .map(|source| self.exports_from_embedded(specifier, &source, &mut Vec::new()));
 
         match result {
             Some(exports) => {

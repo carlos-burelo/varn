@@ -193,59 +193,101 @@ fn std_tree_modules(std_dir: &std::path::Path) -> Vec<(String, String)> {
     out
 }
 
+struct ImageUnit {
+    id: String,
+    path: String,
+    source: String,
+    pure: Option<bool>,
+}
+
+fn core_units() -> Result<Vec<ImageUnit>, String> {
+    let provider =
+        varn_modules::provider::get().ok_or_else(|| "stdlib provider not registered".to_owned())?;
+    varn_modules::core_module_ids()
+        .into_iter()
+        .map(|id| {
+            let spec = provider
+                .spec_for(id)
+                .ok_or_else(|| format!("core module without spec: {id}"))?;
+            let source = provider
+                .embedded_source(id)
+                .ok_or_else(|| format!("core module without source: {id}"))?;
+            Ok(ImageUnit {
+                id: id.to_owned(),
+                path: spec.vn_source.to_owned(),
+                source: source.to_owned(),
+                pure: Some(spec.pure),
+            })
+        })
+        .collect()
+}
+
+fn std_units(std_dir: &std::path::Path) -> Result<Vec<ImageUnit>, String> {
+    std_tree_modules(std_dir)
+        .into_iter()
+        .map(|(id, path)| {
+            let file = std_dir.join(&path);
+            let source = std::fs::read_to_string(&file)
+                .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
+            Ok(ImageUnit {
+                id,
+                path,
+                source,
+                pure: None,
+            })
+        })
+        .collect()
+}
+
 pub fn compile_stdlib_image(
     std_dir: &std::path::Path,
     session: &crate::resolver::Session,
 ) -> Result<Vec<u8>, String> {
     struct Compiled {
-        id: String,
-        path: String,
+        unit: ImageUnit,
         pure: bool,
         interface: Vec<u8>,
         bytecode: Vec<u8>,
-        source: String,
     }
+
+    let mut units = core_units()?;
+    units.extend(std_units(std_dir)?);
 
     let mut compiled = Vec::new();
     let mut failures = String::new();
-    for (id, path) in std_tree_modules(std_dir) {
-        let file = std_dir.join(&path);
-        let source = std::fs::read_to_string(&file)
-            .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
-
-        let pure = match std_imports_are_pure(&id, &source) {
-            Ok(pure) => pure,
-            Err(e) => {
-                failures.push_str(&format!(
-                    "
-{e}"
-                ));
-                continue;
-            }
+    for unit in units {
+        let id = unit.id.as_str();
+        let pure = match unit.pure {
+            Some(pure) => pure,
+            None => match std_imports_are_pure(id, &unit.source) {
+                Ok(pure) => pure,
+                Err(e) => {
+                    failures.push_str(&format!("\n{e}"));
+                    continue;
+                }
+            },
         };
 
         let resolver = session.resolver();
-        let exports = resolver.stdlib_exports(&id);
-        let bind = match resolver.stdlib_bind(&id) {
-            Some(b) => b,
-            None => {
-                let err_msg = match compile_source_checked(&source, &id, session) {
+        let interface = if varn_sem::codec::has_portable_interface(id) {
+            let exports = resolver.stdlib_exports(id);
+            let Some(bind) = resolver.stdlib_bind(id) else {
+                let err_msg = match compile_source_checked(&unit.source, id, session) {
                     Ok(_) => "unknown bind failure".to_string(),
                     Err(e) => e,
                 };
                 return Err(format!("cannot bind {id}: {err_msg}"));
-            }
+            };
+            varn_sem::codec::serialize_module_interface(&exports, &bind)
+                .map_err(|e| format!("interface serialization failed for {id}: {e}"))?
+        } else {
+            Vec::new()
         };
-        let interface = varn_sem::codec::serialize_module_interface(&exports, &bind)
-            .map_err(|e| format!("interface serialization failed for {id}: {e}"))?;
 
-        let proto = match compile_source_checked(&source, &id, session) {
+        let proto = match compile_source_checked(&unit.source, id, session) {
             Ok(p) => p,
             Err(e) => {
-                failures.push_str(&format!(
-                    "
-{e}"
-                ));
+                failures.push_str(&format!("\n{e}"));
                 continue;
             }
         };
@@ -253,12 +295,10 @@ pub fn compile_stdlib_image(
             .map_err(|e| format!("bytecode serialization failed for {id}: {e}"))?;
 
         compiled.push(Compiled {
-            id,
-            path,
+            unit,
             pure,
             interface,
             bytecode,
-            source,
         });
     }
     if !failures.is_empty() {
@@ -268,12 +308,12 @@ pub fn compile_stdlib_image(
     let modules = compiled
         .iter()
         .map(|m| varn_modules::std_image::ImageModule {
-            id: &m.id,
-            path: &m.path,
+            id: &m.unit.id,
+            path: &m.unit.path,
             pure: m.pure,
             interface: &m.interface,
             bytecode: &m.bytecode,
-            source: &m.source,
+            source: &m.unit.source,
         })
         .collect();
     Ok(varn_modules::std_image::write_image(
