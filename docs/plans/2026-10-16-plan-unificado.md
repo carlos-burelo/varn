@@ -70,6 +70,17 @@ permisos `@permission` en el contrato (`9394b438`); ids de op densos con
 (`e6528ef3`, arregla doble evaluación por mayúsculas), un solo lector de
 fuente (`8a5a0217`), provider con `module()` (`c546a8b5`); ABI v2 muerta
 borrada (`877294fc`). `NATIVE_GLOBALS` queda como única tabla ABI.
+Async/generadores (2026-10-17): shape única `{value, done}` (`5fe43f78`);
+`Generator` clase nativa del contrato, `return()` funciona (`275cd974`);
+clase intrínseca por índice de `RuntimeKind` (`77773a75`); nombre SSO sin
+alloc en `call_method` (`ef857719`); `g.next()` baja a `CallNativeOp`
+(`967e9aa1`). pingpong 3M: 706→446 ms (quick). Bugs: escritura a captura
+durante el aparcamiento se perdía en `thaw` (`989d1e75`, test 223); entrada
+OSR/resume leía constantes plegadas de un home nunca escrito (`6058e5b1`,
+test 224); async/generador nunca es `SelfCall` (`19ab9f54`, colgaba con
+recursión). Tarea perezosa aguardada arranca en el acto (`a99e5412`) y el
+`await` JIT continúa sin `longjmp` si termina (`b07bc48d`): cadena await
+300k 155→~74 ms (quick; bun 47).
 
 ## 2. Pendiente, por orden
 
@@ -111,6 +122,11 @@ Verde si B0 + 4 cuadrantes + soak + A/B con ganancia en
 Freeze/thaw (B2, otra sesión); tabla nueva cae en
 `BUILD_FINGERPRINT`.
 
+- **Siguiente (medido 2026-10-17)**: en la cadena await queda crear la
+  tarea perezosa (`new_lazy` ~18%) y montarla en ctx de repuesto
+  (`run_task` ~44%). Palanca: `await f(x)` directo como frame dentro de la
+  misma tarea (Freeze multi-frame, toca B2). En generadores queda la
+  reanudación (`run_until`+OSR+setjmp ~35%) y el objeto resultado (~20%).
 - **B1a**: tabla `resume_ip`→bloque en SSA portable + decidir
   params-args vs solo-homes+`live`. Verifica: dump de
   `bench_generator.vn`, sin cambio de ejecución.
