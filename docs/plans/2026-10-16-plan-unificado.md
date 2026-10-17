@@ -95,6 +95,11 @@ un frame congelado reanudado sobre la pila de quien llama, `yield` por
 retorno, `g.next()` entra directo al código JIT (`57724659`, borra
 `GeneratorDriver` y el `ExecCtx` por generador). next 136→116 ns, crear
 generador ~2× más barato.
+Veto de reanudación (2026-10-17): `resumes_in_interpreter` borrado, cada
+hecho donde se decide (`b49792a6`): activación vetada solo en OSR,
+`direct_entry` solo async/generador, `await` fusionado entra directo a todo
+callee compilado. Pareado quick: try síncrono 406→259 ms, cadena await
+no-hoja 165→118, recursión async 9000 74→43. Residuo en P2b.
 
 ## 2. Pendiente, por orden
 
@@ -136,8 +141,7 @@ Verde si B0 + 4 cuadrantes + soak + A/B con ganancia en
 Freeze/thaw (B2, otra sesión); tabla nueva cae en
 `BUILD_FINGERPRINT`.
 
-- **Siguiente**: P1 y P2 abajo. Orden: P2 primero (más barato, y destraba
-  la entrada directa que P1 aprovecha).
+- **Siguiente**: P2b y P1 abajo.
 
 #### P1 — El paso de un iterador es un par, no un objeto
 
@@ -202,72 +206,31 @@ elementos: `alloc_count` constante respecto a N; pareado `gp.vn` y
 final con `return` (valor del `return`, `done=true`); generadores async (paso
 tras liquidar sus `await`); `return()`.
 
-#### P2 — Borrar `resumes_in_interpreter`: tres hechos en un predicado
+#### P2b — Los vivos de un `try` viajan por memoria, no por registros
 
-**Evidencia (código, 2026-10-17).**
-- `FunctionProto::resumes_in_interpreter`
-  (`varn-types/src/chunk/proto/analysis.rs`) es `true` si el bytecode tiene
-  `Try`, `Yield`, `Await` o `LoadModule` (memo en `resume_memo`).
-- Consumidores: `setup.rs` (prohíbe activación nativa), `lower.rs` (razón
-  "resume" en el diagnóstico de tiers), `calls_static.rs::direct_entry`
-  (entrada directa de llamadas JIT→JIT normales) y `suspend.rs::mounted_entry`
-  (entrada directa del `await` fusionado).
-- Medido (quick, `tryveto.vn`, 3M llamadas): una función **síncrona** con
-  `try/catch` llamada desde JIT cuesta ~95 ns por llamada (275–299 ms) contra
-  ~0,5 ns sin `try` (1–4 ms). `direct_entry` la veta y cada llamada pasa por
-  `hand_off` → `run_until` anidado. Afecta a todo código con `try`, no solo a
-  async.
-- El `await` fusionado solo entra directo a callees hoja: si el callee
-  contiene `await` o `try`, vuelve al dispatch anidado.
+**Evidencia (código + medida, 2026-10-17, tras `b49792a6`).** `tryveto.vn`
+(3M llamadas a una función síncrona con `try`) sigue en `framed: alloc`;
+el mismo cuerpo sin `try` baja `native` (~260 vs ~62 ms, quick, ruido alto).
+Causa: `exceptions.rs::emit_try` derrama `live` a homes, `block.rs` vuelve a
+guardar en su home cada valor de `try_live` al definirse y el landing los
+recarga de homes; sin `base` eso es `NEEDS_ACTIVATION` → `Framed`.
 
-**Causa raíz.** Un predicado mezcla tres hechos, y dos ya no son ciertos:
-1. *Requiere frame.* Ya lo expresa `frame_policy::needs_frame` op por op
-   (`Try`, `PopTry`, `CatchParam`, `Await`, `Yield`, `LoadModule` están en la
-   lista): esas funciones nunca obtienen activación sin frame.
-2. *Puede salir por suspensión (`longjmp`).* Desde `57724659` `yield` retorna
-   normalmente; solo un `await` pendiente salta. `try` nunca salta: el try
-   puro del JIT atrapa en su propio código y lo no atrapado sale por
-   `err_ret` + `jit_error_flag`, que el llamador revisa.
-3. *Llamar crea un objeto.* Async y generador devuelven tarea/generador; eso
-   lo expresa `is_async || is_generator`, no el bytecode.
+**Causa raíz.** Un vivo del landing puede definirse dentro de la región
+(`x = 1; f(); catch { x }`): el landing necesita una phi por registro. El home
+hace de phi en memoria.
 
-**Solución de raíz.** Borrar `resumes_in_interpreter` y `resume_memo`, y
-expresar cada hecho donde vive:
-- *Activación:* la decide `needs_frame`; en `setup.rs` el veto queda solo para
-  entradas OSR (`osr.is_some()`).
-- *Llamadas normales (`direct_entry`):* vetar solo `is_async || is_generator`
-  (la llamada no ejecuta el cuerpo). Una función con `try` o `LoadModule`
-  entra directa como cualquier otra.
-- *`await` fusionado (`mounted_entry`):* entrada directa para todo callee
-  async con código compilado. Invariante que lo hace seguro: **todo frame
-  nativo entre el `setjmp` del bucle de dispatch y un frame que suspende está
-  detenido en un punto de suspensión** (ip = resume_ip, vivos derramados a sus
-  homes). Se cumple por construcción: solo el `await` fusionado anida cuerpos
-  async de forma nativa (una llamada normal nunca ejecuta un cuerpo async). Al
-  saltar, `frames` conserva todos esos frames coherentes; el driver los
-  congela juntos y la reanudación entra por OSR y OSR-al-continuar.
-- *Diagnóstico:* `lower.rs` deja de reportar "resume".
+**Solución de raíz.** Una `Variable` de Cranelift por registro vivo en algún
+landing: `def_var` donde hoy se guarda en el home, `use_var` en el landing
+(el builder construye la phi), declaradas para el stack map si son heap. Se
+borran el derrame de `emit_try`, el `home_store` de `try_live` en `block.rs`
+y la recarga del landing; `try` deja de pedir activación.
 
-**Qué se borra.** `resumes_in_interpreter`, `resume_memo` y las cuatro
-comprobaciones.
+**Verificación.** `tryveto.vn` pareado contra `notry.vn` (objetivo: mismo
+orden); tests 11, 21, 154, 168; vivo redefinido en ambos brazos de un `if`
+dentro del `try`; GC dentro del `try` con vivo heap.
 
-**Ganancia esperada (a medir).** Funciones síncronas con `try` llamadas desde
-JIT: de ~95 ns a costo de llamada directa (orden de magnitud). `await f(x)`
-con callee no-hoja: el mismo camino rápido que hoy solo tienen las hojas
-(22 ms/300k).
-
-**Verificación.** `tryveto.vn` pareado; tests 11, 21, 100, 154, 168, 223, 224
-(suspensión dentro de un callee entrado directo, `catch` a través de `await`,
-http); recursión async de 9000 niveles (ahora recursión nativa: debe caber en
-`VM_STACK_BYTES` = 64 MB; `MAX_CALL_DEPTH` sigue acotando); soak de tareas;
-`VARN_JIT_CACHE=verify`.
-
-**Riesgos.** Profundidad de pila nativa con recursión async profunda;
-`LoadModule` dentro de una función entrada directa (inicializa el módulo con
-un run anidado: comprobar que no salta); manejadores `try` del intérprete al
-entrar por OSR (ya se descartan en `run_compiled_frame` y `generator_entry`);
-`jit_exits_saved`/`stack_exit` tras un salto que cruza varias entradas
-directas.
+**Riesgos.** Bloques clonados por versionado de rangos (`versions.rs`) y el
+`values.to_vec()` que el landing guarda/restaura; sellado de bloques.
 - **B1a**: tabla `resume_ip`→bloque en SSA portable + decidir
   params-args vs solo-homes+`live`. Verifica: dump de
   `bench_generator.vn`, sin cambio de ejecución.
