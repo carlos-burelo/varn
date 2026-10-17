@@ -81,6 +81,13 @@ test 224); async/generador nunca es `SelfCall` (`19ab9f54`, colgaba con
 recursión). Tarea perezosa aguardada arranca en el acto (`a99e5412`) y el
 `await` JIT continúa sin `longjmp` si termina (`b07bc48d`): cadena await
 300k 155→~74 ms (quick; bun 47).
+Await como frame (2026-10-17): aguardar una tarea perezosa monta su cuerpo
+como frame de la tarea que aguarda; la semántica de `await` vive en
+`begin_await` (intérprete y JIT); solo una celda pendiente suspende; drivers
+entregan por `resolve_awaiter`/`reject_awaiter`; `raise` único (`1b48a1cb`,
+borra ctx de repuesto anidado y `reject_awaited`). `await f(x)` fusionado en
+JIT monta el callee sin `LazyTask` (`26194f01`). Cadena await 300k → ~29 ms
+(quick; bun ~47).
 
 ## 2. Pendiente, por orden
 
@@ -122,11 +129,9 @@ Verde si B0 + 4 cuadrantes + soak + A/B con ganancia en
 Freeze/thaw (B2, otra sesión); tabla nueva cae en
 `BUILD_FINGERPRINT`.
 
-- **Siguiente (medido 2026-10-17)**: en la cadena await queda crear la
-  tarea perezosa (`new_lazy` ~18%) y montarla en ctx de repuesto
-  (`run_task` ~44%). Palanca: `await f(x)` directo como frame dentro de la
-  misma tarea (Freeze multi-frame, toca B2). En generadores queda la
-  reanudación (`run_until`+OSR+setjmp ~35%) y el objeto resultado (~20%).
+- **Siguiente**: generadores — reanudación (`run_until`+OSR+setjmp) y
+  objeto `{value, done}`; `await` fusionado podría entrar directo al código
+  JIT del callee (hoy pasa por el dispatch anidado).
 - **B1a**: tabla `resume_ip`→bloque en SSA portable + decidir
   params-args vs solo-homes+`live`. Verifica: dump de
   `bench_generator.vn`, sin cambio de ejecución.
