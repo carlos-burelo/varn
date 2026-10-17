@@ -63,13 +63,7 @@ impl ExecCtx {
         }
         for &frozen in &scope.frozen {
             let st: &super::scheduler::Frozen = unsafe { &*frozen };
-            if !st.has_refs {
-                continue;
-            }
-            for sf in st.frames() {
-                sf.dyn_.iter().for_each(|&v| value(&mut roots, v));
-                roots.extend(sf.refs.iter().flatten());
-            }
+            st.trace(&mut |v| value(&mut roots, v));
         }
         self.local_roots(&mut roots);
         roots.extend_from_slice(self.heap.cells.native_roots());
