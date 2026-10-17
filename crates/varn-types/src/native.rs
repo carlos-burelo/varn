@@ -80,16 +80,10 @@ impl NativeOpTarget {
     }
 }
 
-#[repr(C, align(16))]
 pub struct NativeOpEntry {
-    pub module_id: *const u8,
-    pub module_id_len: u32,
-
-    pub namespace_path: *const u8,
-    pub namespace_path_len: u32,
-
-    pub symbol_name: *const u8,
-    pub symbol_name_len: u32,
+    pub module_id: &'static str,
+    pub namespace_path: &'static str,
+    pub symbol_name: &'static str,
 
     pub func_ptr: *const u8,
     pub raw_func_ptr: *const u8,
@@ -104,26 +98,16 @@ unsafe impl Sync for NativeOpEntry {}
 unsafe impl Send for NativeOpEntry {}
 
 impl NativeOpEntry {
-    pub fn module_id(&self) -> &str {
-        unsafe {
-            let slice = std::slice::from_raw_parts(self.module_id, self.module_id_len as usize);
-            std::str::from_utf8_unchecked(slice)
-        }
+    pub fn module_id(&self) -> &'static str {
+        self.module_id
     }
 
-    pub fn namespace_path(&self) -> &str {
-        unsafe {
-            let slice =
-                std::slice::from_raw_parts(self.namespace_path, self.namespace_path_len as usize);
-            std::str::from_utf8_unchecked(slice)
-        }
+    pub fn namespace_path(&self) -> &'static str {
+        self.namespace_path
     }
 
-    pub fn symbol_name(&self) -> &str {
-        unsafe {
-            let slice = std::slice::from_raw_parts(self.symbol_name, self.symbol_name_len as usize);
-            std::str::from_utf8_unchecked(slice)
-        }
+    pub fn symbol_name(&self) -> &'static str {
+        self.symbol_name
     }
 
     pub fn capability(&self) -> Option<&'static str> {

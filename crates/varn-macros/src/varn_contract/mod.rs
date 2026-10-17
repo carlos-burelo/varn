@@ -144,12 +144,9 @@ fn expand_section(
             }
 
             static #entry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
-                module_id: #module.as_ptr(),
-                module_id_len: #module.len() as u32,
-                namespace_path: #ns.as_ptr(),
-                namespace_path_len: #ns.len() as u32,
-                symbol_name: #class.as_ptr(),
-                symbol_name_len: #class.len() as u32,
+                module_id: #module,
+                namespace_path: #ns,
+                symbol_name: #class,
                 func_ptr: #builder_ident as *const u8,
                 raw_func_ptr: ::core::ptr::null(),
                 signature: ::varn_types::SignatureDescriptor::empty(),

@@ -205,12 +205,9 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
         out.generated_entry_idents.push(fn_entry_ident.clone());
         out.fn_entries.push(quote! {
             static #fn_entry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
-                module_id: #module.as_ptr(),
-                module_id_len: #module.len() as u32,
-                namespace_path: #ns.as_ptr(),
-                namespace_path_len: #ns.len() as u32,
-                symbol_name: #sym.as_ptr(),
-                symbol_name_len: #sym.len() as u32,
+                module_id: #module,
+                namespace_path: #ns,
+                symbol_name: #sym,
                 func_ptr: #wrap_ident::<#self_ty> as *const u8,
                 raw_func_ptr: #raw_func_val,
                 signature: #sig_val,
@@ -249,12 +246,9 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
             out.generated_entry_idents.push(mentry_ident.clone());
             out.method_entries.push(quote! {
                 static #mentry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
-                    module_id: #module.as_ptr(),
-                    module_id_len: #module.len() as u32,
-                    namespace_path: #class_name_str.as_ptr(),
-                    namespace_path_len: #class_name_str.len() as u32,
-                    symbol_name: #sym.as_ptr(),
-                    symbol_name_len: #sym.len() as u32,
+                    module_id: #module,
+                    namespace_path: #class_name_str,
+                    symbol_name: #sym,
                     func_ptr: #wrap_ident::<#self_ty> as *const u8,
                     raw_func_ptr: #raw_func_val,
                     signature: #sig_val,
