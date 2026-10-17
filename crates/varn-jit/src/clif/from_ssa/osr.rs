@@ -2,9 +2,9 @@ use rustc_hash::FxHashMap;
 
 use cranelift_codegen::ir::{types, Block, BlockArg, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::{FunctionBuilder, Variable};
-use varn_types::ssa::{SsaProto, SsaSecondaryEntry, SsaTerm};
+use varn_types::ssa::{SsaOp, SsaProto, SsaSecondaryEntry, SsaTerm};
 
-use super::store::{clif_ty, define, is_heap, load_home_value};
+use super::store::{clif_ty, define, is_heap, land, load_home_value};
 use super::Ctx;
 
 pub(super) fn carried(
@@ -69,7 +69,25 @@ pub(super) fn emit_entry(
     header_blk: Block,
 ) -> Result<(), String> {
     let ssa = ctx.ssa;
+    let consts: FxHashMap<u32, &SsaOp> = ssa
+        .blocks
+        .iter()
+        .flat_map(|blk| blk.insts.iter())
+        .filter(|inst| {
+            matches!(
+                inst.op,
+                SsaOp::ConstInt(_) | SsaOp::ConstFloat(_) | SsaOp::ConstBool(_)
+            )
+        })
+        .filter_map(|inst| Some((inst.dest?, &inst.op)))
+        .collect();
     for &v in &header.live {
+        if let Some(op) = consts.get(&v) {
+            if let Some(out) = super::scalar::emit_inst(b, ctx, values, op, Some(v))? {
+                land(b, ctx, values, Some(v), out)?;
+            }
+            continue;
+        }
         let x = load_home_value(b, ctx, ssa.reg(v), ssa.value_ty(v))?;
         define(b, ctx, values, v, x);
     }

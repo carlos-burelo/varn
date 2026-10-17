@@ -1,0 +1,30 @@
+import { describe, it, expect } from "std:test";
+
+async function countDown(n: int): int {
+    if (n == 0) { return 0 }
+    const r = await countDown(n - 1)
+    return r + 1
+}
+
+async function fromTen(n: int): int {
+    if (n == 0) { return 10 }
+    return (await fromTen(n - 1)) + 1
+}
+
+async function scaled(n: int): int {
+    if (n == 0) { return 1 }
+    return 2 * (await scaled(n - 1))
+}
+
+await describe("224 async resume values", async () => {
+    await it("a recursive async function sees the value it awaited", async () => {
+        expect(await countDown(1)).toBe(1)
+        expect(await countDown(5)).toBe(5)
+    })
+
+    await it("a constant used after the await survives the resume", async () => {
+        expect(await fromTen(1)).toBe(11)
+        expect(await scaled(10)).toBe(1024)
+    })
+
+})

@@ -215,6 +215,7 @@ import "./220-ui-declarative.vn"
 import "./221-generics-named-edges.vn"
 import "./222-native-lowering-edges.vn"
 import "./223-captures-across-await.vn"
+import "./224-async-resume-values.vn"
 
 summary()
 
