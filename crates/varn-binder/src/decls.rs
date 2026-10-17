@@ -122,9 +122,16 @@ impl<'r> super::Binder<'r> {
                 let range = arena.expr(id).range;
                 self.bind_inline_function(&[], params, return_type.as_ref(), *body, &range);
             }
-            ExprKind::As { expression, .. }
-            | ExprKind::Is { expression, .. }
-            | ExprKind::Satisfies { expression, .. } => self.bind_expr(*expression),
+            ExprKind::Is {
+                expression,
+                type_ann,
+            } => {
+                self.resolve_type(type_ann);
+                self.bind_expr(*expression);
+            }
+            ExprKind::As { expression, .. } | ExprKind::Satisfies { expression, .. } => {
+                self.bind_expr(*expression)
+            }
             ExprKind::MetaAccess { target, .. } => self.bind_expr(*target),
             ExprKind::Await { argument } | ExprKind::Spawn { argument } => {
                 self.bind_expr(*argument)

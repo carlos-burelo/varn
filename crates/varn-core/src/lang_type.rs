@@ -162,6 +162,20 @@ impl BuiltinType {
             .map(|&(_, _, b)| b)
     }
 
+    pub const fn runtime_kind(self) -> crate::RuntimeKind {
+        use crate::RuntimeKind as K;
+        match self {
+            Self::Array => K::Array,
+            Self::Map => K::Map,
+            Self::Set => K::Set,
+            Self::Range => K::Range,
+            Self::Bytes => K::Bytes,
+            Self::Task => K::Task,
+            Self::TaskHandle => K::TaskHandle,
+            Self::Generator | Self::AsyncGenerator => K::Generator,
+        }
+    }
+
     pub const fn core_module(self) -> &'static str {
         match self {
             Self::Array => "core:types/array",

@@ -56,33 +56,6 @@ impl RuntimeKind {
             Self::Bytes => "Bytes",
         }
     }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "null" => Some(Self::Null),
-            "bool" => Some(Self::Bool),
-            "int" => Some(Self::Int),
-            "float" => Some(Self::Float),
-            "str" => Some(Self::Str),
-            "bigint" => Some(Self::BigInt),
-            "decimal" => Some(Self::Decimal),
-            "char" => Some(Self::Char),
-            "Array" => Some(Self::Array),
-            "Map" => Some(Self::Map),
-            "Set" => Some(Self::Set),
-            "Tuple" => Some(Self::Tuple),
-            "object" => Some(Self::Object),
-            "class" => Some(Self::Class),
-            "function" | "fn" => Some(Self::Function),
-            "Generator" | "generator" => Some(Self::Generator),
-            "Task" => Some(Self::Task),
-            "Range" => Some(Self::Range),
-            "Bytes" => Some(Self::Bytes),
-            "enum" => Some(Self::Enum),
-
-            _ => None,
-        }
-    }
 }
 
 impl RuntimeKind {
