@@ -64,4 +64,4 @@ Medido desde `std/` real. Código manda.
 
 ## Macros
 
-- `varn-macros` (`crates/varn-macros`): único crate proc-macro (fusión de `varn-contract` + `varn-op-macros`). Expone `varn_contract!` (`src/varn_contract/` + `contract_members.rs` + `tables.rs`), `#[jit_slow]` (`src/jit_slow.rs`) y `jit_helper_table!` (`src/jit_helper_table.rs`). Consumidores: `varn-builtins` (contratos) y `varn-vm` (helpers JIT).
+- `varn-macros` (`crates/varn-macros`): único crate proc-macro (fusión de `varn-contract` + `varn-op-macros`). Expone `varn_contract!` (`src/varn_contract/` + `contract_members.rs` + `contract_parse.rs`, que parsea el `.vn` con el parser real), `#[jit_slow]` (`src/jit_slow.rs`) y `jit_helper_table!` (`src/jit_helper_table.rs`). Consumidores: `varn-builtins` (contratos) y `varn-vm` (helpers JIT).

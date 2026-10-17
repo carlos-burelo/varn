@@ -1,32 +1,29 @@
-# LBI: nativos linker-bound
+# LBI: nativos con contrato `.vn`
 
-Código manda. Fuentes: `crates/varn-contract/src/lib.rs:8`, `crates/varn-contract/src/varn_contract/mod.rs:16-184`, `crates/varn-builtins/src/dispatch/mod.rs:10-97`, `crates/varn-builtins/src/modules/mod.rs:1-113`, `crates/varn-op-macros/src/lib.rs:6-13`.
+Código manda. Fuentes: `crates/varn-macros/src/varn_contract/`, `crates/varn-macros/src/contract_parse.rs`, `crates/varn-builtins/build.rs`, `crates/varn-builtins/src/modules/mod.rs`, `crates/varn-builtins/src/dispatch/mod.rs`, `crates/varn-core/src/op_id.rs`, `crates/varn-core/src/abi.rs`.
 
 ## Piezas reales
 
-1. `varn_contract` proc-macro (`varn-contract/src/lib.rs:8`). Expande (`varn_contract/mod.rs:16-37`): contrato debe ser path `.vn` listado en `contracts.json`; inline rechazado con error. Lee miembros vía `tables::lookup` (error pide `vn gen-contract-tables` si falta, `mod.rs:40-62`).
-2. Genera trait `__VarnContract_<mod>` + wrappers + tabla `__VARN_LINK_MARKER_<MOD>` (`mod.rs:160-181`), más `include_bytes!` del contrato para trazabilidad.
-3. Cada entry `NativeOpEntry` en sección linker (`mod.rs:125-144`, `dispatch/mod.rs:26-34`): Windows `.varn_ops$B` (marcadores `$A`/`$C`), macOS `__DATA,varn_ops`, resto `varn_ops`.
-4. Boot: `iter_native_ops()` escanea sección y filtra `func_ptr` nulo (`dispatch/mod.rs:36-60`); `all_native_ops()` suma fallback registrados (`62-97`).
-5. Fallback link: `force_link_builtins()` (`modules/mod.rs:60-113`) registra marcadores por módulo para que linker no descarte.
-6. `varn-op-macros` (`op-macros/src/lib.rs:6-13`): solo `#[jit_slow]` y `jit_helper_table!` (helpers JIT, no registro módulos).
+1. **Contrato = un `.vn` por módulo**, junto a su `.rs` en `varn-builtins/src/modules/{core,runtime}/<mod>/`. Un directorio con más de un `.vn` aborta el build.
+2. **`varn_contract!`** (`varn-macros/src/varn_contract/mod.rs`): lee el `.vn` en tiempo de macro y lo parsea con el parser real (`contract_parse.rs`); no hay tabla intermedia. Contratos inline se rechazan. Por cada `declare function` (y miembros de clase) genera wrappers y un `NativeOpEntry`; exporta `NATIVE_ENTRIES: &[&NativeOpEntry]`. Un `include_bytes!` del `.vn` lo hace dependencia de compilación.
+3. **`build.rs` de `varn-builtins`**: recorre `src/modules/{core,runtime}`, parsea cada contrato con `varn-parser` y genera `MODULE_REGISTRY` (`registry.generated.rs`): id `core:<mod>`/`runtime:<mod>`, fuente embebida, exports y si el contrato trae código además de declaraciones.
+4. **Registro estático único**: `native_modules!` (`modules/mod.rs`) enumera los módulos y concatena sus `NATIVE_ENTRIES` en `NATIVE_MODULES`. Sin secciones del linker ni marcadores.
+5. **`varn-macros`** también define `#[jit_slow]` y `jit_helper_table!` (helpers JIT; no registran módulos).
 
-## Módulos nativos (`modules/mod.rs:1-47`)
+## Módulos nativos (`modules/mod.rs`)
 
-23 `pub mod`: `buffer compress crypto csv errors ffi fs globals io json math net path process reflect regex sqlite sys task testing time types ws` (+`core/types/*`: array bigint bytes bool char decimal float int map range set string).
+`buffer compress crypto csv errors ffi fs globals gpu io json math net path process reflect regex sqlite sys task testing text time ui ws` + `types` (`array bigint bool bytes char decimal float int iteration map range set string`). `testing` no aporta entradas nativas.
 
-Entrada: `build_module(id, ctx)` → `dispatch::build_module` (`mod.rs:51-53`); `has_native_builder` chequea id.
+Entrada: `build_module(id, ctx)` → `dispatch::build_module`: crea el objeto módulo y cuelga cada entrada en su ruta de namespace.
 
-## Dispatch (`dispatch/mod.rs:99-153`)
+## Dispatch (`dispatch/mod.rs`)
 
-`entry_op_id` = hash compuesto (módulo, namespace, símbolo). `TABLE: OnceLock<FxHashMap<u64, DispatchEntry>>`, `native_op_fn(id)`, `dispatch_runtime_op` envuelve error como `E_RUNTIME_*`.
+Ids de op **densos**: `registry()` asigna índices en orden de registro, empezando en `FIRST_REGISTRY_ID` (`op_id.rs`). Las ops del módulo núcleo (`CORE_MODULE = "globals"`) que son `KnownOp` toman su id reservado, de modo que el compilador las emite sin buscar por nombre. Búsquedas: `native_op_id(module, ns, symbol)`, `find_native_op_entry(id)` (índice en `Vec`), `native_op_fn(id)`.
+
+`NATIVE_GLOBALS` (`varn-core/src/abi.rs`) es la única tabla ABI de globales nativos; la VM la recorre en ese orden (`varn-vm/src/globals/mod.rs`).
 
 ## Capabilities
 
-Fijas en código, no en proc-macro (`dispatch/mod.rs:122-131`): solo 3 mapeos existen:
+Declaradas en el contrato con `@permission("<dominio>")` sobre la función; el macro las guarda en el `NativeOpEntry` (argumento distinto de un string → error de compilación). Dominios en uso: `sys.ffi` (12), `ui` (13), `sys.env` (2), `sys.exec` (2).
 
-- `runtime:ffi:*` → `sys.ffi`
-- `runtime:sys env|setEnv` → `sys.env`
-- `runtime:process exec|spawnProcess` → `sys.exec`
-
-Resto nativos sin capability individual: gate es máscara CLI (ver `HOST_BOUNDARY_SPEC.md`). Chequeo en `check_native_op_capability` (`203-221`) y en `dispatch_runtime_op` (`228-245`): sin capability → `E_HOST_PERMISSION_DENIED` / `E_RUNTIME_PERMISSION_DENIED`.
+Chequeo en `check_native_fn_capability` (`dispatch/mod.rs`), llamado por la VM antes de invocar el nativo (`varn-vm/src/exec/ctx_gc.rs`): sin la capability → `E_HOST_PERMISSION_DENIED:id=<mod>:<símbolo>:capability=<dominio>`. Nativos sin `@permission` no se filtran individualmente; el resto del gate es la máscara del CLI (ver `HOST_BOUNDARY_SPEC.md`).
