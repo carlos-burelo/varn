@@ -72,13 +72,23 @@ otro código = `panic`. El `setjmp`/`longjmp` vive en `varn-vm/src/arch/`
 
 ## 6. Async, generadores, isolates
 
-- `Yield`/`Await` (`dispatch/mod.rs:358-385`) fijan `ip`, escriben
-  `ctx.vm_suspend = Yield { value, dest_reg } | Await { value, dest_reg }` y
-  retornan `Ok(null)`; el scheduler reanuda después.
-- Generadores: `NanGenDriver` posee un `Box<ExecCtx>` subordinado
-  (`generator.rs:43`); `next` corre `run_until(0)` y traduce `vm_suspend` a
-  `{value, done}` (`generator.rs:64-135`).
+- `Yield` (`exec/dispatch/mod.rs:354`) fija `ip`, escribe
+  `ctx.vm_suspend = Yield { value, dest_reg }` y retorna.
+- `Await` (`exec/dispatch/mod.rs:369`) delega en `begin_await`
+  (`exec/ctx_tasks.rs`): valor no-tarea → `Ready`; `TaskHandle` resuelto/rechazado
+  → `Ready`/`Thrown` (este último por `exceptions::raise`); tarea perezosa →
+  `scheduler::mount` monta su cuerpo como frame de quien aguarda (`Entered`);
+  solo una celda pendiente suspende (`vm_suspend = Await { cell, dest_reg }`).
+  Los drivers entregan con `resolve_awaiter`/`reject_awaiter`. El JIT usa la
+  misma `begin_await` (`jit_helpers/suspend.rs`).
+- Generadores (`generator.rs`): `GenState` con fases `Fresh | Suspended |
+  Running | Done`. `next` monta el frame sobre la pila de quien llama
+  (`enter_generator`); `yield` congela solo ese frame (`freeze_frame`, términos
+  relativos) y lo desmonta (`park_generator`); el siguiente `next` lo descongela
+  (`thaw_frame`). Sin `ExecCtx` propio. El resultado es `{value, done}`
+  (`make_iter_result`). Con código JIT, `generator_entry` entra directo (OSR en
+  modo `Resume` si `ip != 0`).
 - Isolates: un thread OS por isolate (`exec/host/isolates.rs:230-358`,
   `thread::Builder` con `VM_STACK_BYTES`, `Vm` nuevo, `isIsolate = true`).
-  No existe `TaskGroup` (0 hits en `crates/`). No existe crate `varn-runtime`
+  `TaskGroup` vive en la std (`std/task/group.vn`), no en Rust. No existe crate `varn-runtime`
   (el runtime auxiliar es `varn-rt`).

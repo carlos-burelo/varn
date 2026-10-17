@@ -5,7 +5,7 @@ verificadas contra fuentes.
 
 ## 1. Versión y helpers
 
-- `JIT_HELPERS_VERSION: u32 = 3` (`crates/varn-jit-abi/src/lib.rs:3`).
+- `JIT_HELPERS_VERSION: u32 = 9` (`crates/varn-jit-abi/src/lib.rs:3`).
 - `JitHelpers` (`lib.rs:118-246`) es tabla de direcciones de helpers + layouts +
   offsets al `ExecCtx`: `jit_native_result_offset`, `jit_error_flag_offset`,
   `jit_exit_offset`, `globals_offset`, `globals_store_offset`,
@@ -34,12 +34,20 @@ necesite frame ni `SsaTerm::Throw`. `frame_aware = Framed || !frameless`.
 (`clif/native_abi.rs:76`).
 
 Orden de intento (`clif/lower.rs:158-186`): primero `try_lower(Native)`; si falla
-con `NEEDS_ACTIVATION` (`from_ssa/context.rs:63`, también cuando hay OSR o
-`resumes_in_interpreter`), reintenta con `Framed`. Cualquier otro error es bail.
+con `NEEDS_ACTIVATION` (`from_ssa/context.rs`: entrada OSR, o un op que necesita
+homes —vivos de `try`, `await`, `yield`, upvalues—), reintenta con `Framed`. Cualquier otro error es bail.
+
+Entrada directa JIT→JIT (`varn-vm/src/exec/jit_helpers/`): tras empujar el frame
+del callee, `calls_static.rs::direct_entry` devuelve su código compilado salvo que
+sea `is_async || is_generator` (la llamada solo crea la tarea/generador); `try`
+ya no veta. `await f(x)` fusionado (`suspend.rs::mounted_entry`) entra directo a
+todo callee async con código: todo frame nativo entre el `setjmp` del dispatch y
+el que suspende está detenido en un punto de suspensión (ip = `resume_ip`, vivos
+en homes), así que el `longjmp` deja `frames` coherente.
 
 ## 3. Gates y tiering
 
-- `SIZE_GATE_WORDS: usize = 8192` (`varn-jit/src/lib.rs:163`). `gate_reason`
+- `SIZE_GATE_WORDS: usize = 8192` (`varn-jit/src/lib.rs:155`). `gate_reason`
   rechaza protos de más de 8192 words salvo leaf-safe (sin alloc, sync, no
   generador) (`clif/lower.rs:93-106`).
 - Umbrales (`varn-vm/src/jit/tiering.rs:7-11`): `JIT_TIER_THRESHOLD = 1` (con
@@ -51,7 +59,8 @@ con `NEEDS_ACTIVATION` (`from_ssa/context.rs:63`, también cuando hay OSR o
 `grep longjmp|personality crates/varn-jit` vacío; `riscv` ausente (solo host
 vía `cranelift_native`: `x86_64`/`aarch64` en `mem/buffer.rs`, `clif/mod.rs:50-53`).
 
-- `emit_try` (`from_ssa/exceptions.rs:33-64`): vuelca vivos a homes, registra el
+- `emit_try` (`from_ssa/exceptions.rs:33-64`): vuelca vivos a homes (por eso un
+  `try` con vivos exige `Framed`; pendiente P2b del plan), registra el
   landing en `pure_try.stack`. Puro intra-función: `emit_pop_try` lo desapila.
 - `emit_throw`/`emit_throw_boxed` (`:75-114`): con landing salta directo con el
   boxed; sin landing guarda en `jit_native_result_offset`, pone
@@ -79,5 +88,5 @@ Solo prototipado, no backend general. Emite (`:137-421`): `LoadInt`/`Zero`/`One`
 `crates/varn-jit-abi/src/lib.rs` (versión + `JitHelpers` + layouts),
 `varn-jit/src/clif/abi.rs`, `clif/native_abi.rs`, `clif/from_ssa/drive.rs`,
 `clif/from_ssa/context.rs`, `clif/from_ssa/exceptions.rs`, `clif/lower.rs`,
-`varn-jit/src/lib.rs:163`, `varn-vm/src/jit/tiering.rs`,
+`varn-jit/src/lib.rs:155`, `varn-vm/src/jit/tiering.rs`,
 `varn-vm/src/exec/dispatch/jit_frame.rs`.
