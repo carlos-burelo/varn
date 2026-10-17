@@ -13,7 +13,8 @@ pub fn yielded_by(declared: Type, table: &CheckerTyTable) -> Type {
     if let TypeKind::Generic(name, args, _) = table.get(declared.0) {
         let wraps = matches!(
             table.name(name),
-            Some(n) if n == varn_core::BuiltinType::Generator.name() || n == "AsyncGenerator"
+            Some(n) if n == varn_core::BuiltinType::Generator.name()
+                || n == varn_core::BuiltinType::AsyncGenerator.name()
         );
         if let (true, [item]) = (wraps, table.get_list(args)) {
             return Type::resolved(*item);
@@ -29,10 +30,11 @@ pub fn declared_generator(declared: Type, is_async: bool, table: &mut CheckerTyT
 
 pub fn generator_of(yielded: Type, is_async: bool, table: &mut CheckerTyTable) -> Type {
     let name = if is_async {
-        "AsyncGenerator"
+        varn_core::BuiltinType::AsyncGenerator
     } else {
-        varn_core::BuiltinType::Generator.name()
-    };
+        varn_core::BuiltinType::Generator
+    }
+    .name();
     let atom = table.intern_name(name);
     Type::generic_atom(atom, vec![yielded], None, table)
 }

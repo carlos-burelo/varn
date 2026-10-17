@@ -88,10 +88,11 @@ pub enum BuiltinType {
     Task,
     TaskHandle,
     Generator,
+    AsyncGenerator,
 }
 
 impl BuiltinType {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Array,
         Self::Map,
         Self::Set,
@@ -100,6 +101,7 @@ impl BuiltinType {
         Self::Task,
         Self::TaskHandle,
         Self::Generator,
+        Self::AsyncGenerator,
     ];
 
     pub const fn name(self) -> &'static str {
@@ -112,6 +114,7 @@ impl BuiltinType {
             Self::Task => "Task",
             Self::TaskHandle => "TaskHandle",
             Self::Generator => "Generator",
+            Self::AsyncGenerator => "AsyncGenerator",
         }
     }
 
@@ -126,7 +129,9 @@ impl BuiltinType {
             Self::Set => "core:types/set",
             Self::Range => "core:types/range",
             Self::Bytes => "core:types/bytes",
-            Self::Task | Self::TaskHandle | Self::Generator => "core:types/iteration",
+            Self::Task | Self::TaskHandle | Self::Generator | Self::AsyncGenerator => {
+                "core:types/iteration"
+            }
         }
     }
 }
