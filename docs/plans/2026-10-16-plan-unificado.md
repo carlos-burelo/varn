@@ -88,6 +88,13 @@ entregan por `resolve_awaiter`/`reject_awaiter`; `raise` único (`1b48a1cb`,
 borra ctx de repuesto anidado y `reject_awaited`). `await f(x)` fusionado en
 JIT monta el callee sin `LazyTask` (`26194f01`). Cadena await 300k → ~29 ms
 (quick; bun ~47).
+Entrada directa del callee aguardado con código JIT (`9797ad68`, 29→22 ms).
+Generadores (2026-10-17): congelado/descongelado por frame en términos
+relativos, frames congelados trazados completos (`e9817dcc`); un generador es
+un frame congelado reanudado sobre la pila de quien llama, `yield` por
+retorno, `g.next()` entra directo al código JIT (`57724659`, borra
+`GeneratorDriver` y el `ExecCtx` por generador). next 136→116 ns, crear
+generador ~2× más barato.
 
 ## 2. Pendiente, por orden
 
@@ -129,9 +136,9 @@ Verde si B0 + 4 cuadrantes + soak + A/B con ganancia en
 Freeze/thaw (B2, otra sesión); tabla nueva cae en
 `BUILD_FINGERPRINT`.
 
-- **Siguiente**: generadores — reanudación (`run_until`+OSR+setjmp) y
-  objeto `{value, done}`; `await` fusionado podría entrar directo al código
-  JIT del callee (hoy pasa por el dispatch anidado).
+- **Siguiente**: objeto `{value, done}` por `next` (~25% del costo
+  restante); el veto `resumes_in_interpreter` aún impide la entrada directa
+  del await fusionado cuando el callee contiene `await`/`try`.
 - **B1a**: tabla `resume_ip`→bloque en SSA portable + decidir
   params-args vs solo-homes+`live`. Verifica: dump de
   `bench_generator.vn`, sin cambio de ejecución.
