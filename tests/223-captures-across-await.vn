@@ -1,0 +1,29 @@
+import { describe, it, expect } from "std:test";
+
+async function runner(f: () => void): void { f() }
+
+async function bumpedWhileParked(): int {
+    let x = 1
+    const inc = (): void => { x = x + 41 }
+    await runner(inc)
+    return x
+}
+
+async function bumpedTwice(): int {
+    let x = 0
+    const inc = (): void => { x = x + 1 }
+    await runner(inc)
+    x = x + 10
+    await runner(inc)
+    return x
+}
+
+await describe("223 captures across await", async () => {
+    await it("a write through a captured variable while the owner is parked survives the resume", async () => {
+        expect(await bumpedWhileParked()).toBe(42)
+    })
+
+    await it("owner and closure writes interleave across awaits", async () => {
+        expect(await bumpedTwice()).toBe(12)
+    })
+})

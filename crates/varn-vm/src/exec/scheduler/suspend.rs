@@ -178,9 +178,7 @@ pub(crate) fn freeze(ctx: &mut ExecCtx, dest_reg: u16) -> Result<Box<Frozen>, &'
     let open_upvalues = std::mem::take(&mut ctx.open_upvalues);
     let jit_error_flag = std::mem::replace(&mut ctx.jit_error_flag, 0);
     let jit_native_result = std::mem::replace(&mut ctx.jit_native_result, VmValue::null());
-    for (_, uv) in &open_upvalues {
-        uv.close(&ctx.stack);
-    }
+    detach_upvalues(ctx, &open_upvalues);
     ctx.stack.gpr.clear();
     ctx.stack.fpr.clear();
     ctx.stack.refs.clear();
@@ -287,9 +285,21 @@ pub(crate) fn thaw(ctx: &mut ExecCtx, frozen: Frozen) {
     ctx.jit_error_flag = jit_error_flag;
     ctx.jit_native_result = jit_native_result;
     if reopen {
-        for (slot, uv) in &open_upvalues {
-            uv.inner.borrow_mut().stack_slot = Some(*slot);
-        }
+        attach_upvalues(ctx, &open_upvalues);
     }
     ctx.open_upvalues = open_upvalues;
+}
+
+pub(super) fn detach_upvalues(ctx: &ExecCtx, open: &[(SlotAddr, VmUpvalue)]) {
+    for (_, uv) in open {
+        uv.close(&ctx.stack);
+    }
+}
+
+pub(super) fn attach_upvalues(ctx: &mut ExecCtx, open: &[(SlotAddr, VmUpvalue)]) {
+    for (slot, uv) in open {
+        let mut cell = uv.inner.borrow_mut();
+        let _ = ctx.stack.set_addr(*slot, cell.value);
+        cell.stack_slot = Some(*slot);
+    }
 }

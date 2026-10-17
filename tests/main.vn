@@ -214,6 +214,7 @@ import "./219-widgets.vn"
 import "./220-ui-declarative.vn"
 import "./221-generics-named-edges.vn"
 import "./222-native-lowering-edges.vn"
+import "./223-captures-across-await.vn"
 
 summary()
 
