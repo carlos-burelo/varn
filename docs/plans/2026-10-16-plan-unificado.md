@@ -48,6 +48,33 @@ reales del JIT.
 
 ## 2. Pendiente, por orden
 
+### 2.0 Stdlib como imagen única (en curso)
+
+Medido 2026-10-16 (release): embedded paga 6 ms fijos por arranque
+(FNV byte a byte 3 ms + postcard del bundle entero 3 ms); dev-checkout
+escanea y lee los 129 archivos de `std/` (7-10 ms) y recompila cada
+módulo importado desde fuente (precompilación 35.7 ms frío). La
+interfaz del bundle (2.5 MB de 3.5) se escribe y nadie la lee: el
+checker re-parsea el fuente o usa `~/.varn/cache` re-hasheando deps.
+Composición de la interfaz: arena 2.4 MB, tipos 1.4, scopes 0.6;
+lo que un importador lee ~0.4.
+
+- **S1** checksum de artefactos: FNV byte a byte → xxh3. Borra FNV.
+- **S2** `std.vnb` v2: header + tabla de módulos fija + secciones
+  crudas; slices `'static` sin copia; `pure` lo decide el compilador.
+  Borra `StdBundle` postcard, `leak_bundle_modules`, heurística
+  `"runtime:` (2 copias).
+- **S3** el resolver consume la interfaz de la imagen para std (sin
+  parse, sin caché de disco, sin dep-hash).
+- **S4** dev-checkout: imagen en caché con huella del árbol
+  (mtime+len), regenerada por `vn std-bundle` hijo; el modo árbol solo
+  existe para construir la imagen. Borra `load_tree_std`,
+  `scan_std_tree`, compilación de std desde fuente en `run`.
+- **S5** interfaz portable: proyección del scope global + miembros de
+  tipo + tipos alcanzables; borra locales/scopes anidados del blob.
+- Medida: `run` vacío − `--version` < 1 ms de std; benches dev = emb;
+  imagen idéntica byte a byte en dos builds; matriz 4/4.
+
 ### 2.1 Representación: un bloque por valor
 
 Cada fase: re-medir filas del probe `repr_rows.vn` antes (paso 1),
