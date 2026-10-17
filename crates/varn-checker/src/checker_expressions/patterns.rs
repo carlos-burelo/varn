@@ -185,7 +185,7 @@ impl<'r> Checker<'r> {
                         .unwrap_or(Type::Dynamic);
                     if let Some(sub) = sub_pat {
                         self.check_pattern_match(rec, sub, &member_ty, bind);
-                    } else if key_str != "_" && key_str != "__variant__" {
+                    } else if key_str != "_" && key_str != varn_core::MemberKey::Variant.as_str() {
                         let scope = bind.scopes.get(self.current_scope);
                         if let Some(id) = scope.resolve(*key, &bind.scopes) {
                             self.record_type_with_symbol(rec, 0, member_ty, id);

@@ -147,7 +147,7 @@ impl<'r> Checker<'r> {
                             }
                             MatchPattern::Record { fields, .. } => {
                                 fields.first().is_some_and(|(key, sub)| {
-                                    bind.interner.resolve(*key) == "__variant__"
+                                    bind.interner.resolve(*key) == varn_core::MemberKey::Variant.as_str()
                                         && matches!(sub, Some(MatchPattern::Identifier(n)) if bind.interner.resolve(*n) == vname.as_ref())
                                 })
                             }
