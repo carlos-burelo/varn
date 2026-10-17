@@ -105,7 +105,7 @@ impl<'m> Builder<'m> {
             InstKind::CallNativeOp {
                 object: obj,
                 args: vec![idx],
-                op_id: varn_core::op_id::str_index_op_id(),
+                op_id: varn_core::runtime_ops::op_id(varn_core::runtime_ops::STR_INDEX),
             }
         } else if matches!(object.ty, varn_tir::BackendTy::Bytes)
             && matches!(self.value_ty(idx), HirType::Int | HirType::Dynamic)

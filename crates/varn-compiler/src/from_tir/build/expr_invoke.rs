@@ -87,7 +87,7 @@ impl<'m> Builder<'m> {
         }
         let argv = self.lower_args(args)?;
         if let Resolution::NativeOp(op_id) = res {
-            if *op_id == varn_core::op_id::array_push_op_id() && argv.len() == 1 {
+            if *op_id == varn_core::op_id::KnownOp::ArrayPush.id() && argv.len() == 1 {
                 self.emit_effect(InstKind::ArrayPush {
                     array: r,
                     value: argv[0],

@@ -63,11 +63,17 @@ fn str_index_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult
 }
 
 pub(crate) fn runtime_op(op_id: u64) -> Option<NativeFn> {
-    static IDS: std::sync::OnceLock<[u64; 9]> = std::sync::OnceLock::new();
-    let ids = IDS.get_or_init(|| RUNTIME_OPS.map(|(name, _)| varn_core::runtime_ops::op_id(name)));
-    ids.iter()
-        .position(|id| *id == op_id)
-        .map(|at| RUNTIME_OPS[at].1)
+    static BY_ID: std::sync::OnceLock<[NativeFn; 9]> = std::sync::OnceLock::new();
+    let by_id = BY_ID.get_or_init(|| {
+        varn_core::runtime_ops::ALL.map(|name| {
+            RUNTIME_OPS
+                .iter()
+                .find(|(n, _)| *n == name)
+                .map(|(_, f)| *f)
+                .unwrap_or_else(|| panic!("VM runtime op `{name}` has no implementation"))
+        })
+    });
+    by_id.get(usize::try_from(op_id).ok()?).copied()
 }
 
 pub(crate) fn native_op(op_id: u64) -> Option<NativeFn> {

@@ -8,6 +8,23 @@ pub const VERIFY_SUPER_SPREAD: &str = "verify-super-spread";
 pub const STR_INDEX: &str = "str-index";
 pub const INHERITED: &str = "inherited";
 
+pub const ALL: [&str; 9] = [
+    CONFORM,
+    VERIFY_CALL,
+    VERIFY_SPREAD,
+    VERIFY_METHOD,
+    VERIFY_METHOD_SPREAD,
+    VERIFY_SUPER,
+    VERIFY_SUPER_SPREAD,
+    STR_INDEX,
+    INHERITED,
+];
+
+pub const COUNT: u64 = ALL.len() as u64;
+
 pub fn op_id(name: &str) -> u64 {
-    crate::op_id::compound_op_id3(crate::op_id::CORE_MODULE, "<runtime>", name)
+    ALL.iter()
+        .position(|n| *n == name)
+        .map(|i| i as u64)
+        .unwrap_or_else(|| panic!("unknown VM runtime op `{name}`"))
 }

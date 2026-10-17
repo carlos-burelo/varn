@@ -28,7 +28,7 @@ pub(crate) struct ModuleCtx<'a> {
 
     pub desugar: &'a varn_sem::output::Desugarings,
 
-    pub core_ops: &'a FxHashSet<(Arc<str>, Arc<str>)>,
+    pub core_ops: &'a FxHashMap<(Arc<str>, Arc<str>), u64>,
 
     pub math_intrinsics: &'a FxHashMap<Atom, u8>,
 

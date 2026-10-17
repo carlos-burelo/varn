@@ -12,8 +12,11 @@ use varn_core::AtomInterner;
 use varn_sem::bind::BindResult;
 use varn_tir::{BackendTy, DynReason, EnumId, EnumInfo, TyTable};
 
-pub(super) fn core_method_ops(bind: &BindResult) -> FxHashSet<(Arc<str>, Arc<str>)> {
-    let mut out = FxHashSet::default();
+pub(super) fn core_method_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str>), u64> {
+    let mut out = FxHashMap::default();
+    let Some(provider) = varn_modules::provider::get() else {
+        return out;
+    };
     let Some(core) = bind.core.as_ref() else {
         return out;
     };
@@ -30,7 +33,11 @@ pub(super) fn core_method_ops(bind: &BindResult) -> FxHashSet<(Arc<str>, Arc<str
                 && !m.is_async
                 && !m.is_generator
             {
-                out.insert((Arc::from(cname), m.name.clone()));
+                if let Some(id) =
+                    provider.native_op_id(varn_core::op_id::CORE_MODULE, cname, &m.name)
+                {
+                    out.insert((Arc::from(cname), m.name.clone()), id);
+                }
             }
         }
     }

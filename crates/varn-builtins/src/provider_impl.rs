@@ -184,6 +184,18 @@ impl StdlibProvider for BuiltinsProvider {
         Some((std.description.clone(), std.provenance))
     }
 
+    fn native_op_id(&self, module: &str, namespace: &str, symbol: &str) -> Option<u64> {
+        #[cfg(feature = "runtime")]
+        {
+            crate::dispatch::native_op_id(module, namespace, symbol)
+        }
+        #[cfg(not(feature = "runtime"))]
+        {
+            let _ = (module, namespace, symbol);
+            None
+        }
+    }
+
     fn image_identity(&self) -> u64 {
         active_std()
             .and_then(|std| std.image.as_ref())

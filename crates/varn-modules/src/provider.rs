@@ -29,6 +29,10 @@ pub trait StdlibProvider: Send + Sync {
     fn image_identity(&self) -> u64 {
         0
     }
+
+    fn native_op_id(&self, _module: &str, _namespace: &str, _symbol: &str) -> Option<u64> {
+        None
+    }
 }
 
 static PROVIDER: OnceLock<&'static dyn StdlibProvider> = OnceLock::new();

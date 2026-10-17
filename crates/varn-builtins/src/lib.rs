@@ -14,15 +14,13 @@ pub use varn_modules::spec::ModuleSpec;
 pub mod dispatch;
 #[cfg(feature = "runtime")]
 pub mod modules;
-#[cfg(feature = "runtime")]
-pub mod runtime_ops;
 
 #[cfg(feature = "runtime")]
 pub use dispatch::all_native_module_ids;
 #[cfg(feature = "runtime")]
 pub use dispatch::{
-    check_native_fn_capability, check_native_op_capability, describe_op, dispatch_runtime_op,
-    find_native_op_entry, native_op_fn, native_op_name_by_fn, register_globals_vm,
+    check_native_fn_capability, find_native_op_entry, native_op_fn, native_op_id,
+    native_op_name_by_fn, register_globals_vm,
 };
 #[cfg(feature = "runtime")]
 pub use modules::build_module;

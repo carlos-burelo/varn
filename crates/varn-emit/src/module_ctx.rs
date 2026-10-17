@@ -17,7 +17,7 @@ pub(super) struct MCtx<'a> {
     pub(super) decorated_fns: &'a FxHashSet<Atom>,
     pub(super) call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
     pub(super) desugar: &'a varn_sem::output::Desugarings,
-    pub(super) core_ops: &'a FxHashSet<(Arc<str>, Arc<str>)>,
+    pub(super) core_ops: &'a FxHashMap<(Arc<str>, Arc<str>), u64>,
     pub(super) math_intrinsics: &'a FxHashMap<Atom, u8>,
     pub(super) interner: &'a AtomInterner,
     pub(super) checker_table: &'a varn_sem::types::CheckerTyTable,

@@ -19,12 +19,8 @@ impl<'a> FnEmitter<'a> {
 
         if all_positional
             && let Some(cls) = self.core_class_name(recv.ty)
-            && self
-                .m
-                .core_ops
-                .contains(&(Arc::from(cls), Arc::clone(&name)))
+            && let Some(&op_id) = self.m.core_ops.get(&(Arc::from(cls), Arc::clone(&name)))
         {
-            let op_id = varn_core::op_id::core_method_op_id(cls, &name);
             return TirExpr {
                 kind: TirExprKind::MethodCall {
                     recv: Box::new(recv),

@@ -112,13 +112,3 @@ fn collect_module_fields(
         }
     }
 }
-
-pub fn has_native_module_id(id: &str) -> bool {
-    let map = MODULE_OPS.get_or_init(build_module_ops_index);
-    map.contains_key(id)
-}
-
-pub fn all_native_module_ids() -> Vec<String> {
-    let map = MODULE_OPS.get_or_init(build_module_ops_index);
-    map.keys().cloned().collect()
-}
