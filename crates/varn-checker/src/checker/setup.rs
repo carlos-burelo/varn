@@ -29,6 +29,7 @@ impl<'r> Checker<'r> {
             type_node_cache: FxHashMap::default(),
             symbol_type_params_cache: FxHashMap::default(),
             current_class: None,
+            extension_self: None,
             active_type_params: FxHashSet::default(),
             abstract_classes: FxHashSet::default(),
             is_assignment_target: false,

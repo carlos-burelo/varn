@@ -43,6 +43,7 @@ impl<'r> Checker<'r> {
         let saved_class = self
             .current_class
             .replace(ext_class_name.unwrap_or_else(|| Arc::from("_")));
+        let saved_self = self.extension_self.replace(ext_self_ty);
 
         for member in &ext.members {
             let saved_expected = self.expected_return_type.take();
@@ -98,6 +99,7 @@ impl<'r> Checker<'r> {
         }
 
         self.current_class = saved_class;
+        self.extension_self = saved_self;
     }
 
     pub(super) fn check_export(

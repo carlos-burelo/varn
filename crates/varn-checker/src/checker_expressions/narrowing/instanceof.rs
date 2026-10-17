@@ -24,16 +24,17 @@ impl<'r> Checker<'r> {
             let scope = bind.scopes.get(self.current_scope);
             if let Some(id) = scope.resolve(name, &bind.scopes) {
                 let class_name_str = bind.interner.resolve(class_name).to_string();
+                let view =
+                    varn_sem::bind::BindView::new(bind, self.resolver).at(self.current_scope);
+                let table = std::sync::Arc::make_mut(&mut self.ty_table);
+                let origin = varn_binder::nominal_origin(&class_name_str, Some(&view), table);
                 if is_true_branch {
-                    let named = Type::named(
-                        class_name_str,
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    );
+                    let named = Type::named_with_origin_atom(class_name, origin, table);
                     out.push((id, named));
                 } else if let Some(ty) = self.narrowing_base(id, bind.arena.get(id).ty) {
-                    let class_name_atom = varn_core::Atom::of(&class_name_str);
-                    let narrowed = ty.minus_named(
-                        class_name_atom,
+                    let narrowed = ty.minus_nominal(
+                        class_name,
+                        origin,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
                     if bind.interner.get("_") == Some(name) {

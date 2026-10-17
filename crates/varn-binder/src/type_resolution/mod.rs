@@ -8,7 +8,7 @@ mod keyed_access;
 mod mapped;
 mod names;
 mod nominal;
-pub(crate) use nominal::nominal_origin;
+pub use nominal::nominal_origin;
 mod objects;
 mod qualified;
 mod scalar;

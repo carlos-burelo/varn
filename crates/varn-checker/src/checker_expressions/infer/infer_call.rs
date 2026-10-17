@@ -76,23 +76,20 @@ impl<'r> Checker<'r> {
             callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let callee_kind = self.ty_table.get(callee_ty.0);
 
-        if let TypeKind::Named(class_name, _) = callee_kind {
-            let class_name_str = bind.interner.resolve(class_name).to_string();
+        if let TypeKind::Named(class_name, origin) = callee_kind {
             if !type_args.is_empty() {
                 let resolved: Vec<Type> = type_args
                     .iter()
                     .map(|a| self.resolve_type_node_cached(a, bind))
                     .collect();
-                return Type::generic(
-                    class_name_str,
+                return Type::generic_atom(
+                    class_name,
                     resolved,
+                    origin,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
             }
-            return Type::named(
-                class_name_str,
-                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-            );
+            return callee_ty;
         }
         let TypeKind::Fn(fid) = callee_kind else {
             return Type::Dynamic;

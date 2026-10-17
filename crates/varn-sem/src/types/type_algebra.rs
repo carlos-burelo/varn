@@ -88,16 +88,20 @@ impl Type {
         }
     }
 
-    pub fn minus_named(&self, name: varn_core::Atom, table: &mut CheckerTyTable) -> Type {
+    pub fn minus_nominal(
+        &self,
+        name: varn_core::Atom,
+        origin: Option<varn_core::Atom>,
+        table: &mut CheckerTyTable,
+    ) -> Type {
+        let is_class = |kind: InternedTypeKind| matches!(kind, TypeKind::Named(n, o) | TypeKind::Generic(n, _, o) if n == name && o == origin);
         match table.get(self.0) {
-            TypeKind::Named(n, _) if n == name => Type::Never,
+            kind if is_class(kind) => Type::Never,
             TypeKind::Union(list) => {
                 let members: Vec<CheckerTyId> = table.get_list(list).to_vec();
                 let mut kept: Vec<CheckerTyId> = Vec::with_capacity(members.len());
                 for id in members {
-                    let is_named_match =
-                        matches!(table.get(id), TypeKind::Named(n, _) if n == name);
-                    if !is_named_match {
+                    if !is_class(table.get(id)) {
                         kept.push(id);
                     }
                 }

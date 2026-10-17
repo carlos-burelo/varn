@@ -50,7 +50,7 @@ pub(super) fn resolve_generic_type(
     Type::generic_atom(name, resolved_args, origin, table)
 }
 
-pub(crate) fn nominal_origin(
+pub fn nominal_origin(
     name_str: &str,
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,

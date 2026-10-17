@@ -41,7 +41,7 @@ pub(crate) use binding_types::ParamSite;
 pub use inference_utils::build_fn_type;
 pub use type_infer_ops::infer_new;
 pub use type_inference::{infer_expr_type, pattern_lead_name, widen_literal};
-pub use type_resolution::{qualified_type, resolve_primitive, resolve_type_node};
+pub use type_resolution::{nominal_origin, qualified_type, resolve_primitive, resolve_type_node};
 use varn_sem::resolver::ImportResolver;
 
 pub struct Binder<'r> {

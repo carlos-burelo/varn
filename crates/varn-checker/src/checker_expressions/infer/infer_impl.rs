@@ -36,16 +36,15 @@ impl<'r> Checker<'r> {
                     .unwrap_or(Type::Dynamic)
             }
             ExprKind::This => self
-                .current_class
-                .as_ref()
-                .map(|cn| match varn_core::LangPrimitive::from_str(cn) {
-                    Some(p) if p != varn_core::LangPrimitive::Dynamic => {
-                        Type::primitive(p, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
-                    }
-                    None | Some(_) => Type::named(
-                        cn.to_string(),
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    ),
+                .extension_self
+                .or_else(|| {
+                    self.current_class.clone().map(|cn| {
+                        Type::named_with_origin(
+                            cn.to_string(),
+                            Some(bind.source_file.clone()),
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        )
+                    })
                 })
                 .unwrap_or(Type::Dynamic),
 

@@ -61,6 +61,7 @@ pub struct Checker<'r> {
     pub(crate) symbol_type_params_cache: FxHashMap<(Arc<str>, u8), Vec<Arc<str>>>,
 
     pub(crate) current_class: Option<Arc<str>>,
+    pub(crate) extension_self: Option<Type>,
     pub(crate) active_type_params: FxHashSet<Arc<str>>,
     pub(crate) abstract_classes: FxHashSet<Arc<str>>,
     pub(crate) is_assignment_target: bool,

@@ -95,6 +95,14 @@ impl<'r> Checker<'r> {
                     &self.ast_arena.expr(callee).kind
                 {
                     let name_str = bind.interner.resolve(*name).to_string();
+                    let view =
+                        varn_sem::bind::BindView::new(bind, self.resolver).at(self.current_scope);
+                    let origin = varn_binder::nominal_origin(
+                        &name_str,
+                        Some(&view),
+                        std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    let origin_str = origin.map(|o| self.resolve_bind_atom(bind, o));
                     if !type_args.is_empty() {
                         let args: Vec<Type> = type_args
                             .iter()
@@ -103,23 +111,34 @@ impl<'r> Checker<'r> {
                                 self.resolve_type_node_cached(a, bind)
                             })
                             .collect();
-                        Type::generic(
-                            name_str,
+                        Type::generic_atom(
+                            *name,
                             args,
+                            origin,
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         )
                     } else if let Some(contextual) = self.expected_instantiation(*name) {
                         contextual
-                    } else if let Some(args) =
-                        self.instantiation_from_args(rec, callee, &name_str, None, ctor_args, bind)
-                    {
-                        Type::generic(
-                            name_str,
+                    } else if let Some(args) = self.instantiation_from_args(
+                        rec,
+                        callee,
+                        &name_str,
+                        origin_str.as_ref(),
+                        ctor_args,
+                        bind,
+                    ) {
+                        Type::generic_atom(
+                            *name,
                             args,
+                            origin,
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         )
                     } else {
-                        Type::named(name_str, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                        Type::named_with_origin_atom(
+                            *name,
+                            origin,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        )
                     }
                 } else {
                     Type::Dynamic
