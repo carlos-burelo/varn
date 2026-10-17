@@ -1,67 +1,60 @@
-> Estado verificado 2026-10-13: PARCIAL — visión DX, no spec; cada propuesta debe verificarse contra código antes de implementarse (AGENTS.md checklist).
->
-> Histórico. No spec vigente. Código manda. Revalidar antes de usar.
+# Visión de sintaxis y experiencia de desarrollo (DX)
 
-# Visión de Sintaxis y Experiencia de Desarrollo (DX)
+Propuestas de ergonomía y su estado, verificado contra el compilador el
+2026-10-17. Una propuesta pasa a «hecha» solo con un test en `tests/` que la
+ejercite. Para el resto, aplica el checklist de [`AGENTS.md`](../AGENTS.md)
+antes de implementarla.
 
-Este documento esboza la visión estratégica de evolución sintáctica y ergonometría del lenguaje **Varn**, enfocada en maximizar la productividad del desarrollador (DX) manteniendo el rendimiento en tiempo de ejecución.
+## Objetivos
 
----
+1. Menos código repetitivo sin perder claridad estática.
+2. Diagnósticos que enseñan: subrayado del código y sugerencia concreta.
+3. Tooling de primera: LSP sobre el mismo checker, formateador, `vn debug`.
 
-## Tabla de Contenidos
+## Estado de las propuestas
 
-- [1. Objetivos DX](#1-objetivos-dx)
-- [2. Guardas y Patrones Avanzados en `match`](#2-guardas-y-patrones-avanzados-en-match)
-- [3. Enlazado Asíncrono de Pipelines (`|>`)](#3-enlazado-asíncrono-de-pipelines-)
-- [4. Ergonometría del Sistema de Tipos](#4-ergonometría-del-sistema-de-tipos)
+| Propuesta | Estado | Evidencia |
+|---|---|---|
+| Guardas en `match` | Hecha | `tests/93-match-guards-spread-predicates.vn` |
+| Type guards de usuario (`v is T`) | Hecha | `tests/93-match-guards-spread-predicates.vn` |
+| Constructores primarios | Hecha (modificadores `public`/`private`, no `pub`) | `tests/87-primary-constructors-nullish-assign.vn` |
+| Pipeline asíncrono implícito | Pendiente | `await x \|> f(_)` aplica `await` a `x`, no al resultado |
 
----
+### Guardas en `match`
 
-## 1. Objetivos DX
-
-1. **Sintaxis Expresiva y Fluida**: Reducir el código repetitivo (*boilerplate*) sin perder la claridad estática.
-2. **Mensajes de Error Instructivos**: Diagnósticos comprensibles con subrayado de código y sugerencias contextuales.
-3. **Tooling Integrado de Primera Clase**: LSP reactivo con SemanticDB y formateador automático.
-
----
-
-## 2. Guardas y Patrones Avanzados en `match`
-
-Propuesta para añadir guardas condicionales `if` dentro de las ramas de un `match`:
-
-```Varn
+```varn
 const clasificacion = match (numero) {
     n if n < 0 => "Negativo",
-    n if n % 2 === 0 => "Par positivo",
-    _ => "Impar positivo"
+    n if n % 2 === 0 => "Par",
+    _ => "Impar"
 }
 ```
 
----
+### Type guards
 
-## 3. Enlazado Asíncrono de Pipelines (`|>`)
-
-Permitir que el operador pipeline maneje implícitamente promesas `async`:
-
-```Varn
-const datos = await "https://api.ejemplo.com/data"
-    |> http.get(_)
-    |> json.parse(_)
-    |> procesarRespuesta(_)
+```varn
+function esCadena(v: dynamic): v is str {
+    return typeof v === "str"
+}
 ```
 
----
+### Constructores primarios
 
-## 4. Ergonometría del Sistema de Tipos
+```varn
+class Usuario(public nombre: str, public edad: int, private rol: str = "guest") {}
+```
 
-- **Constructores Simplificados**: Inyección automática de propiedades en constructores:
-  ```Varn
-  class Usuario(pub nombre: str, pub edad: int) {}
-  ```
-- **Type Guards Definidos por el Usuario**:
-  ```Varn
-  function esCadena(v: unknown): v is str {
-      return v instanceof str
-  }
-  ```
+### Pipeline asíncrono (pendiente)
 
+Que `|>` espere implícitamente cada etapa `async`:
+
+```varn
+const datos = await url
+    |> http.get(_)
+    |> json.parse(_)
+    |> procesar(_)
+```
+
+Hoy `await` liga más fuerte que `|>`: hay que escribir `await` en cada etapa.
+Decidir la precedencia es un cambio de semántica (modelo → contrato entre fases
+→ optimización, `AGENTS.md` §7).

@@ -1,6 +1,6 @@
 # Roadmap — Varn
 
-> Estado parcial. Código manda (AGENTS.md Ley 12). Última sync: 2026-10-16 desde código.
+> Estado parcial. Código manda (AGENTS.md Ley 12). Última sync: 2026-10-17 desde código.
 
 Trabajo futuro verificado, no intenciones. Cada entrada cita su evidencia y
 su puerta de validación. Nada aquí se implementa sin pasar por `AGENTS.md`
@@ -8,33 +8,18 @@ su puerta de validación. Nada aquí se implementa sin pasar por `AGENTS.md`
 
 ## LSP: paralelismo real del análisis (futuro)
 
-**Hipótesis 2026-10 (verificar en código antes de usar).** Contenido abajo
-es hipótesis histórica, no estado. Rutas citadas sin verificar en árbol
-actual: `varn-lsp/src/analysis` existe, pero `varn-lsp/src/workspace/resolver.rs`
-no existe (`workspace/` = `mod.rs`, `revision.rs`, `std_sources.rs`);
-`crates/varn-lsp/tests/design_audit_test.rs` existe (casos h1-h10).
-Nada usar sin re-verificar.
-Hipótesis: el análisis vive en un solo hilo (`varn-lsp/src/analysis`):
-el index bulk es secuencial (~1.1s en este repo tras la serie de
-optimizaciones de memoria/throughput) y cada archivo paga el checker
-completo (30–600ms). El index IO ya es concurrente; el cómputo no.
-
-**Verificado (no supuesto).**
-- `DocumentState: Send` y `DiskResolver: Send + Sync` (sonda de compilación;
-  el comentario del `Rc` en `analysis/mod.rs` está obsoleto: cero `Rc` en
-  `varn-lsp`). `ModuleLoader: Send + Sync` (`varn-modules/src/loader.rs`).
-- Lexer/parser/checker sin `thread_local` (solo comentarios históricos);
-  builtins solo `OnceLock`. `thread_local` de vm/jit/compiler no toca esta
-  ruta (el LSP no compila en bulk).
-- Único bloqueador real: `thread_local! RESOLVER`
-  (`varn-lsp/src/workspace/resolver.rs`). Benigno: memo per-thread en
-  `varn-modules/src/std_root.rs` (solo perf).
-- `Checker::check_with` toma `&dyn ImportResolver`: un `Arc<DiskResolver>`
-  entra sin cambiar el checker.
+**Estado (código, 2026-10-17).** El análisis corre en un solo hilo dedicado
+(`varn-lsp/src/analysis/mod.rs`: hilo `varn-analysis` con dos colas de jobs
+`FnOnce(&mut Analyzer) + Send`, primer plano con prioridad sobre fondo). Cada
+documento guarda un `Arc<varn_resolver::DiskResolver>`; no queda ningún
+`thread_local` en `varn-lsp`. `ModuleLoader: Send + Sync`
+(`varn-modules/src/loader.rs`) y `Checker::check_with` toma
+`&dyn ImportResolver`, así que un resolvedor compartido entra sin cambiar el
+checker. El cómputo del index es secuencial; medir antes de citar tiempos.
 
 **Fases.**
-1. Dueño único, mismo hilo (Ley 3, riesgo ~0): `Analyzer` posee
-   `Arc<DiskResolver>`; `with_resolver` lo presta. Sin concurrencia nueva.
+1. Dueño único del resolvedor (Ley 3): hoy cada documento guarda su `Arc`;
+   confirmar que todos apuntan al mismo grafo antes de paralelizar.
 2. Pool para bulk: workers acotados corren `run_pipeline` concurrente; el
    hilo dueño solo publica (`index_file` partido en compute/publish, orden
    canónico). Objetivo: index <0.5s en este repo.
