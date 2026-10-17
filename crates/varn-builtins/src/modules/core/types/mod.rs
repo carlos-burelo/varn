@@ -14,6 +14,8 @@ pub mod decimal;
 pub mod float;
 #[path = "int/int.rs"]
 pub mod int;
+#[path = "iteration/iteration.rs"]
+pub mod iteration;
 #[path = "map/map.rs"]
 pub mod map;
 #[path = "range/range.rs"]

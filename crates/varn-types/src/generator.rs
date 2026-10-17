@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 pub trait GeneratorDriver: std::fmt::Debug {
     fn next(&self, input: VmValue) -> Result<VmValue, String>;
+    fn close(&self);
     fn is_done(&self) -> bool;
     fn is_async(&self) -> bool;
     fn trace_vm_values(&self, _callback: &mut dyn FnMut(crate::VmValue)) {}

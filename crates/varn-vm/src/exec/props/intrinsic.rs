@@ -3,7 +3,6 @@ use std::rc::Rc;
 use varn_core::MemberKey;
 use varn_types::value::{find_method_with_owner, ClassObj};
 
-use crate::generator::generator_next;
 use crate::heap::{Heap, HeapInner, HeapObj};
 use crate::value::VmValue;
 
@@ -50,13 +49,6 @@ pub(super) fn resolve_intrinsic_method_property(
 ) -> Option<VmValue> {
     if obj.is_heap() {
         match heap.get(obj.as_heap()) {
-            Some(HeapObj::Generator(_)) if key == MemberKey::IterNext.as_str() => {
-                return Some(heap.alloc_bound_native(
-                    obj,
-                    generator_next,
-                    MemberKey::IterNext.as_str(),
-                ));
-            }
             Some(HeapObj::EnumVariant(_)) if key == MemberKey::Name.as_str() => return None,
             Some(
                 HeapObj::Str(_)
