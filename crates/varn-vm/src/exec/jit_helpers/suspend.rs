@@ -75,11 +75,10 @@ fn mounted_entry(ctx: &ExecCtx, caller_depth: usize) -> Option<usize> {
     if ctx.frames.len() != caller_depth + 1 {
         return None;
     }
-    let closure = ctx.frames[caller_depth].closure();
-    if closure.proto.resumes_in_interpreter() {
-        return None;
-    }
-    closure.jit_fn().map(|f| f as usize)
+    ctx.frames[caller_depth]
+        .closure()
+        .jit_fn()
+        .map(|f| f as usize)
 }
 
 unsafe fn settle_await(

@@ -77,9 +77,6 @@ pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
     if proto.is_async {
         r.push("async");
     }
-    if proto.resumes_in_interpreter() {
-        r.push("resume");
-    }
     r
 }
 

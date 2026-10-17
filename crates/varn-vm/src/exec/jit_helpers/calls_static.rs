@@ -48,7 +48,7 @@ pub(super) unsafe fn settle(ctx: &mut ExecCtx, handoff: Handoff) -> usize {
 
 fn direct_entry(closure: &VmClosure) -> Option<usize> {
     let proto = &closure.proto;
-    if proto.is_async || proto.is_generator || proto.resumes_in_interpreter() {
+    if proto.is_async || proto.is_generator {
         return None;
     }
     closure.jit_fn().map(|f| f as usize)

@@ -205,7 +205,6 @@ pub(crate) fn emit_function_meta(
         jit_failed: Cell::new(false),
         jit_epoch: Cell::new(0),
         backedge_memo: Cell::new(0),
-        resume_memo: Cell::new(0),
         ic_cache: Rc::new(RefCell::new(
             (0..ic.count()).map(|_| PolyICSlot::new()).collect(),
         )),

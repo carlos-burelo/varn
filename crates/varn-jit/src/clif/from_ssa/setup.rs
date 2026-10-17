@@ -34,7 +34,7 @@ pub(super) fn prepare<'s>(
                 .ok_or_else(|| format!("from_ssa: no secondary entry at ip {}", req.ip))?,
         ),
     };
-    if (osr.is_some() || proto.resumes_in_interpreter()) && activation == Activation::Native {
+    if osr.is_some() && activation == Activation::Native {
         return Err(super::NEEDS_ACTIVATION.into());
     }
     let nparams = proto.arity.saturating_sub(1);
