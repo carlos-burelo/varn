@@ -113,16 +113,12 @@ Run / Check / Eval / Repl / Bench / Debug / Build / Test / Fmt / Pkg / Init / Do
 
 `vn std-bundle [--std-dir D] [--out F]` — defaults `std` / `dist/std.vnb`.
 
-### GenContractTables (`GenContractTablesArgs`, cli.rs:290-299)
-
-`vn gen-contract-tables [--crate-dir D] [--out F] [--check]` — defaults `""` / `""`, `--check: bool`.
-
 ## Verificación
 
 `scripts/verify.ps1` (params verify.ps1:34-39):
 
 - `-Quick`: perfil `quick`, omite lint+bench, solo cuadrante 1 (dev-checkout+JIT). No sustituye matriz completa.
-- `-Fast`: omite benchmark.
+- `-Fast`: omite benchmark. Corre cuadrantes 1–4 y el 5 (`VARN_JIT_CACHE=verify`).
 - `-SkipLint`: omite `cargo fmt --check` + `clippy`.
 - `-CleanCache`: `vn cache clean` antes de cada cuadrante.
 

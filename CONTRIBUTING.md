@@ -19,7 +19,7 @@ Gracias por tu interés en contribuir al desarrollo del lenguaje de programació
 
 1. **Simplicidad sobre Complejidad**: Preferir soluciones pequeñas, locales y cohesionadas. Aplicar DRY y KISS.
 2. **Sin Deuda Técnica Ni Compatibilidad Legada Innecesaria**: Si un subsistema tiene defectos fundamentales, no extenderlo; reemplazarlo.
-3. **Frontend / Backend Boundary**: Mantener límites estrictos entre frontend (`varn-lexer`, `varn-parser`, `varn-checker`), compilador (`varn-compiler`), backend (`varn-compiler::regalloc`), VM (`varn-vm`) y runtime (`varn-runtime`).
+3. **Frontend / Backend Boundary**: Mantener límites estrictos entre frontend (`varn-lexer`, `varn-parser`, `varn-checker`), compilador (`varn-compiler`), backend (`varn-compiler::regalloc`), VM (`varn-vm`) y runtime nativo (`varn-builtins`, `varn-rt` para AOT).
 
 ---
 
@@ -68,6 +68,8 @@ Ninguna tarea o Pull Request se considera completada sin pasar la matriz de 4 cu
 | `dev-checkout` | **Intérprete Pure (`VARN_NO_JIT=1`)** | `VARN_NO_JIT=1 ./target/release/vn run ./tests/main.vn` |
 | `@embedded` | **JIT Activado** | `VARN_STD=@embedded ./target/release/vn run ./tests/main.vn` |
 | `@embedded` | **Intérprete Pure (`VARN_NO_JIT=1`)** | `VARN_STD=@embedded VARN_NO_JIT=1 ./target/release/vn run ./tests/main.vn` |
+
+`verify.ps1` añade un **cuadrante 5**: `VARN_JIT_CACHE=verify ./target/release/vn run ./tests/main.vn` recompila el código JIT cacheado en los cuadrantes 1/3 y lo compara byte a byte. `verify.sh` y CI aún no lo corren.
 
 > [!NOTE]
 > En Windows el binario es `./target/release/vn.exe`. En Linux/macOS es `./target/release/vn` (ver matriz multi-SO en `.github/workflows/ci.yml`).
