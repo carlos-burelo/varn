@@ -12,6 +12,7 @@ use varn_types::{value::RuntimeSymbol, ClassObj, RuntimeString};
 pub struct HeapInner {
     pub jit_epoch: u64,
     pub intrinsic_classes: FxHashMap<String, Rc<ClassObj>>,
+    pub(crate) kind_classes: [Option<Rc<ClassObj>>; varn_core::RuntimeKind::COUNT],
     pub gc_collections: u64,
     pub gc_total_freed: u64,
     pub gc_threshold: u64,
@@ -42,6 +43,7 @@ impl HeapInner {
             jit_epoch: crate::clif_link::next_epoch(),
             cells: CellSpace::default(),
             intrinsic_classes: FxHashMap::default(),
+            kind_classes: Default::default(),
             string_interner: FxHashMap::default(),
             symbol_interner: FxHashMap::default(),
             young_cells: Vec::new(),
@@ -142,7 +144,14 @@ impl HeapInner {
     }
 
     pub(crate) fn set_intrinsic_class(&mut self, name: &str, cls: Rc<ClassObj>) {
+        if let Some(kind) = varn_core::RuntimeKind::named(name) {
+            self.kind_classes[kind as usize] = Some(cls.clone());
+        }
         self.intrinsic_classes.insert(name.to_string(), cls);
+    }
+
+    pub(crate) fn kind_class(&self, kind: varn_core::RuntimeKind) -> Option<Rc<ClassObj>> {
+        self.kind_classes[kind as usize].clone()
     }
 
     pub(crate) fn get_intrinsic_class(&self, name: &str) -> Option<Rc<ClassObj>> {

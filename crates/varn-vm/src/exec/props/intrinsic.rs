@@ -39,7 +39,7 @@ pub(super) fn class_for_property(val: VmValue, heap: &Heap) -> Option<Rc<ClassOb
         | HeapObj::Generator(_)
         | HeapObj::Spread(_) => return None,
     };
-    heap.get_intrinsic_class(kind.name())
+    heap.kind_class(kind)
 }
 
 pub(super) fn resolve_intrinsic_method_property(
@@ -91,7 +91,7 @@ pub(super) fn resolve_intrinsic_method_property(
 
 pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     if val.is_heap() {
-        let intrinsic = |kind: varn_core::RuntimeKind| heap.get_intrinsic_class(kind.name());
+        let intrinsic = |kind: varn_core::RuntimeKind| heap.kind_class(kind);
         if let Some(inst) = heap.instance_of(val) {
             return ClassObj::find_by_id(inst.class_id);
         }
@@ -136,7 +136,7 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     } else {
         return None;
     };
-    heap.get_intrinsic_class(kind.name())
+    heap.kind_class(kind)
 }
 
 pub(crate) fn bind_method_to_receiver(

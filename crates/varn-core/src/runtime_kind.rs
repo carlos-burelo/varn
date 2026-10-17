@@ -94,6 +94,14 @@ impl RuntimeKind {
         }
     }
 
+    pub const COUNT: usize = Self::Bytes as usize + 1;
+
+    pub fn named(name: &str) -> Option<Self> {
+        (0..Self::COUNT as u8)
+            .filter_map(Self::from_u8)
+            .find(|k| k.name() == name)
+    }
+
     pub const fn encode(kind: Option<Self>) -> u8 {
         match kind {
             Some(k) => k as u8,
