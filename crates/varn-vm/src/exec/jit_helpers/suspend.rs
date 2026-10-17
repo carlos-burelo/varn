@@ -32,10 +32,35 @@ pub(crate) extern "C" fn jit_await(
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let fut = VmValue::from_raw_parts(fut_tag, fut_payload);
+        let mut fut = VmValue::from_raw_parts(fut_tag, fut_payload);
         let caller_depth = ctx_ref.frames.len();
         let frame_idx = caller_depth - 1;
         ctx_ref.frames[frame_idx].ip = resume_ip;
+        let lazy = if fut.is_heap()
+            && let Some(crate::heap::HeapObj::Task(lazy)) = ctx_ref.heap.get(fut.as_heap())
+        {
+            Some(std::rc::Rc::clone(lazy))
+        } else {
+            None
+        };
+        if let Some(lazy) = lazy
+            && let Ok(output) = crate::exec::scheduler::start_now(ctx_ref, lazy)
+        {
+            match output.status() {
+                crate::task::Status::Resolved => {
+                    ctx_ref.resume_with_awaited(dest_reg as u16, output.value());
+                    return;
+                }
+                crate::task::Status::Rejected => {
+                    ctx_ref.jit_native_result = output.value();
+                    ctx_ref.jit_error_flag = 1;
+                    return;
+                }
+                crate::task::Status::Pending => {
+                    fut = crate::task::alloc_handle(&mut ctx_ref.heap, output);
+                }
+            }
+        }
         ctx_ref.vm_suspend = Some(crate::exec::VmSuspend::Await {
             value: fut,
             dest_reg: dest_reg as u16,

@@ -8,7 +8,7 @@ use super::suspend::{attach_upvalues, detach_upvalues, freeze, thaw};
 use crate::exec::ctx::ExecCtx;
 use crate::exec::VmSuspend;
 use crate::heap::HeapObj;
-use crate::task::{settle, Outcome, Status, TaskCell};
+use crate::task::{settle, LazyTask, Outcome, Status, TaskCell};
 use crate::value::VmValue;
 
 const SPARE_VEC_CAPACITY: usize = 1024;
@@ -49,30 +49,20 @@ fn settle_for_park(ctx: &mut ExecCtx, value: VmValue) -> ParkAction {
         match ctx.heap.get(value.as_heap()) {
             Some(HeapObj::Task(lazy)) => {
                 let lazy = Rc::clone(lazy);
-                let output = TaskCell::pending();
-                let queue: *const TaskQueue = queue_for(ctx);
-                let queue = unsafe { &*queue };
-                let ready = ReadyTask {
-                    start: Start::Fresh(lazy),
-                    output: Rc::clone(&output),
-                };
-                match EagerStart::enter() {
-                    Some(_depth) => {
-                        let open = std::mem::take(&mut ctx.open_upvalues);
-                        detach_upvalues(ctx, &open);
-                        {
-                            let _held = PumpGuard::hold(ctx, queue);
-                            run_task(ctx, queue, ready);
-                        }
-                        attach_upvalues(ctx, &open);
-                        ctx.open_upvalues = open;
+                return match start_now(ctx, lazy) {
+                    Ok(output) => match output.status() {
+                        Status::Resolved => ParkAction::ResumeOk(output.value()),
+                        Status::Rejected => ParkAction::ResumeErr(output.value()),
+                        Status::Pending => ParkAction::Park(output),
+                    },
+                    Err(lazy) => {
+                        let output = TaskCell::pending();
+                        queue_for(ctx).push_ready(ReadyTask {
+                            start: Start::Fresh(lazy),
+                            output: Rc::clone(&output),
+                        });
+                        ParkAction::Park(output)
                     }
-                    None => queue.push_ready(ready),
-                }
-                return match output.status() {
-                    Status::Resolved => ParkAction::ResumeOk(output.value()),
-                    Status::Rejected => ParkAction::ResumeErr(output.value()),
-                    Status::Pending => ParkAction::Park(output),
                 };
             }
             Some(HeapObj::TaskHandle(cell)) => {
@@ -111,6 +101,34 @@ fn settle_for_park(ctx: &mut ExecCtx, value: VmValue) -> ParkAction {
         }
     }
     ParkAction::ResumeOk(value)
+}
+
+pub(crate) fn start_now(
+    ctx: &mut ExecCtx,
+    lazy: Rc<LazyTask>,
+) -> Result<Rc<TaskCell>, Rc<LazyTask>> {
+    let Some(_depth) = EagerStart::enter() else {
+        return Err(lazy);
+    };
+    let queue: *const TaskQueue = queue_for(ctx);
+    let queue = unsafe { &*queue };
+    let output = TaskCell::pending();
+    let open = std::mem::take(&mut ctx.open_upvalues);
+    detach_upvalues(ctx, &open);
+    {
+        let _held = PumpGuard::hold(ctx, queue);
+        run_task(
+            ctx,
+            queue,
+            ReadyTask {
+                start: Start::Fresh(lazy),
+                output: Rc::clone(&output),
+            },
+        );
+    }
+    attach_upvalues(ctx, &open);
+    ctx.open_upvalues = open;
+    Ok(output)
 }
 
 fn recycle(ctx: &mut ExecCtx) {

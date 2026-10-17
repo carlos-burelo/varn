@@ -4,7 +4,7 @@ mod pumps;
 mod queue;
 mod suspend;
 
-pub(crate) use drive::request_osr;
+pub(crate) use drive::{request_osr, start_now};
 pub(crate) use pumps::{adopt_host, gc_scope, queue_for};
 pub(crate) use queue::{ReadyTask, Start, TaskQueue};
 pub(crate) use suspend::Frozen;
