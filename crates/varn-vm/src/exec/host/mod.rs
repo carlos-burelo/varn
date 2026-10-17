@@ -271,8 +271,23 @@ impl NativeCtx for ExecCtx {
         unsafe { &mut *self.resources.get() }
     }
 
-    fn as_generator(&self, v: VmValue) -> Option<varn_types::GeneratorObj> {
-        self.heap.generator_of(v)
+    fn resume_generator(
+        &mut self,
+        generator: VmValue,
+        input: VmValue,
+    ) -> varn_types::NativeFnResult {
+        let state = self
+            .heap
+            .generator_of(generator)
+            .ok_or_else(|| varn_types::NativeError::from("generator.next: invalid receiver"))?;
+        self.resume_generator(&state, input)
+            .map_err(varn_types::NativeError::from)
+    }
+
+    fn close_generator(&mut self, generator: VmValue) {
+        if let Some(state) = self.heap.generator_of(generator) {
+            state.close();
+        }
     }
 
     fn as_char(&self, v: VmValue) -> Option<char> {

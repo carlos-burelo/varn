@@ -5,9 +5,6 @@ use varn_types::HeapRef;
 impl ExecCtx {
     pub(crate) fn gc_backedge_safepoint(&mut self) {
         debug_assert!(crate::frame_store_abi::debug_check_stacks(&self.stack));
-        if self.gc_inhibited {
-            return;
-        }
         if self.heap.needs_minor_gc() {
             self.run_minor_gc();
         }
@@ -37,9 +34,6 @@ impl ExecCtx {
     }
 
     pub(crate) fn trigger_gc(&mut self) -> usize {
-        if self.gc_inhibited {
-            return 0;
-        }
         let roots = self.gc_roots();
         self.heap.collect(&roots)
     }

@@ -61,7 +61,7 @@ pub struct ExecCtx {
 
     pub resources: Rc<std::cell::UnsafeCell<varn_types::ResourceStore>>,
 
-    pub gc_inhibited: bool,
+    pub(crate) entered_generators: Vec<std::rc::Rc<crate::generator::GenState>>,
     pub capabilities: Rc<varn_types::capabilities::CapabilitySet>,
     pub print_silent: bool,
     pub metadata: SharedMetadata,
@@ -117,7 +117,7 @@ impl ExecCtx {
             jit_error_flag: 0,
             osr_request: None,
             resources: Rc::new(std::cell::UnsafeCell::new(varn_types::ResourceStore::new())),
-            gc_inhibited: false,
+            entered_generators: Vec::new(),
             capabilities: Rc::new(varn_types::capabilities::CapabilitySet::allow_all()),
             print_silent: false,
             metadata: Rc::new(std::cell::UnsafeCell::new(FxHashMap::default())),
@@ -293,7 +293,7 @@ impl ExecCtx {
             jit_error_flag: 0,
             osr_request: None,
             resources: Rc::clone(&self.resources),
-            gc_inhibited: false,
+            entered_generators: Vec::new(),
             capabilities: Rc::clone(&self.capabilities),
             print_silent: self.print_silent,
             metadata: Rc::clone(&self.metadata),

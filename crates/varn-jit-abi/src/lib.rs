@@ -1,6 +1,6 @@
 use varn_types::{NativeOpTarget, VmValue};
 
-pub const JIT_HELPERS_VERSION: u32 = 8;
+pub const JIT_HELPERS_VERSION: u32 = 9;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
@@ -149,6 +149,8 @@ pub struct JitHelpers {
     pub assert_not_null: usize,
     pub await_call: usize,
     pub await_helper: usize,
+    pub generator_enter: usize,
+    pub generator_leave: usize,
     pub bind_method: usize,
     pub bit_and: usize,
     pub bit_or: usize,

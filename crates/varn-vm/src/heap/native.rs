@@ -269,10 +269,6 @@ impl NativeCtx for Heap {
         panic!("resources() unavailable on bare Heap")
     }
 
-    fn as_generator(&self, v: VmValue) -> Option<varn_types::GeneratorObj> {
-        self.deref().generator_of(v)
-    }
-
     fn as_char(&self, v: VmValue) -> Option<char> {
         self.deref().char_of(v)
     }

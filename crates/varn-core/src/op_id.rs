@@ -15,10 +15,11 @@ pub enum KnownOp {
     StrSubstring,
     StrCharCodeAt,
     StrCodePointAt,
+    GeneratorNext,
 }
 
 impl KnownOp {
-    pub const ALL: [KnownOp; 11] = [
+    pub const ALL: [KnownOp; 12] = [
         KnownOp::ArrayPush,
         KnownOp::IntToString,
         KnownOp::StrStartsWith,
@@ -30,6 +31,7 @@ impl KnownOp {
         KnownOp::StrSubstring,
         KnownOp::StrCharCodeAt,
         KnownOp::StrCodePointAt,
+        KnownOp::GeneratorNext,
     ];
 
     pub const fn id(self) -> u64 {
@@ -49,6 +51,7 @@ impl KnownOp {
             KnownOp::StrSubstring => (RuntimeKind::Str, "substring"),
             KnownOp::StrCharCodeAt => (RuntimeKind::Str, "charCodeAt"),
             KnownOp::StrCodePointAt => (RuntimeKind::Str, "codePointAt"),
+            KnownOp::GeneratorNext => (RuntimeKind::Generator, "next"),
         }
     }
 

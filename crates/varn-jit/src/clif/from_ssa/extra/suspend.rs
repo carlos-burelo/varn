@@ -116,6 +116,9 @@ pub(super) fn yield_(
     let rv = b.ins().iconst(types::I64, i64::from(resume_ip));
 
     call_helper_void(b, ctx.cc, h.yield_helper, &[ectx, t, p, dv, rv]);
+    super::super::exceptions::emit_placeholder_return(b, ctx);
+    let after = b.create_block();
+    b.switch_to_block(after);
     Ok(Some(Some(Out::Boxed(home_load(b, ctx, ctx.ssa.reg(d))?))))
 }
 

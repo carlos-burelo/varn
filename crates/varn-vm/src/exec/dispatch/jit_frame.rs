@@ -105,6 +105,14 @@ pub(super) unsafe fn run_compiled_frame(
     let res = unsafe { execute_jit_frame(ctx, jit_fn, closure_ptr, base) };
 
     let res = match res {
+        Ok(_)
+            if matches!(
+                unsafe { &(*ctx).vm_suspend },
+                Some(crate::exec::VmSuspend::Yield { .. })
+            ) =>
+        {
+            return JitFrameOutcome::Done(VmValue::null());
+        }
         Ok(val) => {
             if unsafe { (*ctx).jit_error_flag } != 0 {
                 unsafe { (*ctx).jit_error_flag = 0 };

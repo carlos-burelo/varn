@@ -1,0 +1,122 @@
+import { describe, it, expect } from "std:test";
+import { spawn } from "std:task";
+
+function* counterWithClosure() {
+    let n = 0
+    const bump = (): int => { n = n + 1; return n }
+    while (n < 3) {
+        yield bump()
+    }
+    yield n * 10
+}
+
+function* guarded() {
+    let caught = "none"
+    try {
+        yield 1
+        throw new Error("inside")
+    } catch (e) {
+        caught = e.message
+    }
+    yield caught
+}
+
+function* failing() {
+    yield 1
+    throw new Error("boom")
+}
+
+function* inner(base: int) {
+    yield base + 1
+    yield base + 2
+}
+
+function* outer() {
+    for (const v of inner(10)) {
+        yield v * 2
+    }
+    for (const v of inner(20)) {
+        yield v * 2
+    }
+}
+
+async function* slowCount() {
+    for (let i = 0; i < 3; i = i + 1) {
+        await spawn((async () => i)())
+        yield i
+    }
+}
+
+function collect(g: Generator<int>): int[] {
+    let out: int[] = []
+    let r = g.next()
+    while (!r.done) {
+        out.push(r.value)
+        r = g.next()
+    }
+    return out
+}
+
+await describe("225 generators as frames", async () => {
+    await it("a closure capturing a generator local sees it across yields", async () => {
+        const g = counterWithClosure()
+        let seen: int[] = []
+        for (let i = 0; i < 200; i = i + 1) {
+            const fresh = counterWithClosure()
+            seen = collect(fresh)
+        }
+        expect(seen.join(",")).toBe("1,2,3,30")
+        expect(g.next().value).toBe(1)
+    })
+
+    await it("a try region spans a yield", async () => {
+        let last: dynamic = ""
+        for (let i = 0; i < 200; i = i + 1) {
+            const g = guarded()
+            g.next()
+            last = g.next().value
+        }
+        expect(last).toBe("inside")
+    })
+
+    await it("an error thrown by the body reaches the caller and ends the generator", async () => {
+        let msg = ""
+        let after = false
+        for (let i = 0; i < 200; i = i + 1) {
+            const g = failing()
+            g.next()
+            try {
+                g.next()
+            } catch (e) {
+                msg = e.message
+            }
+            after = g.next().done
+        }
+        expect(msg).toBe("boom")
+        expect(after).toBe(true)
+    })
+
+    await it("generators driven from inside a generator keep their own state", async () => {
+        let got = ""
+        for (let i = 0; i < 200; i = i + 1) {
+            got = collect(outer()).join(",")
+        }
+        expect(got).toBe("22,24,42,44")
+    })
+
+    await it("a generator created in one task is resumed in another", async () => {
+        const g = inner(0)
+        expect(g.next().value).toBe(1)
+        const second = await spawn((async () => g.next().value)())
+        expect(second).toBe(2)
+        expect(g.next().done).toBe(true)
+    })
+
+    await it("an async generator settles its awaits inside next", async () => {
+        let out: int[] = []
+        for await (const v of slowCount()) {
+            out.push(v)
+        }
+        expect(out.join(",")).toBe("0,1,2")
+    })
+})

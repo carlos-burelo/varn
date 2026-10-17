@@ -149,20 +149,11 @@ pub(crate) extern "C" fn jit_yield(
     unsafe {
         let ctx_ref = &mut *ctx;
         let val = VmValue::from_raw_parts(val_tag, val_payload);
-        let caller_depth = ctx_ref.frames.len();
-        let frame_idx = caller_depth - 1;
+        let frame_idx = ctx_ref.frames.len() - 1;
         ctx_ref.frames[frame_idx].ip = resume_ip;
         ctx_ref.vm_suspend = Some(crate::exec::VmSuspend::Yield {
             value: val,
             dest_reg: dest_reg as u8,
         });
-        ctx_ref.jit_panic_suspend_resume_ip = Some(resume_ip);
-
-        let buf = ctx_ref.jit_suspend_buf;
-        if !buf.is_null() {
-            crate::exec::ctx::my_longjmp(buf, 2);
-        } else {
-            panic!("JIT suspend triggered but no jump buffer registered");
-        }
     }
 }

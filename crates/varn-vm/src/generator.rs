@@ -1,8 +1,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use varn_types::generator::GeneratorDriver;
 
+use crate::closure::VmClosure;
+use crate::error::{RuntimeError, VmResult};
+use crate::exec::scheduler::{freeze_frame, thaw_frame, FrameBuffers, FrozenFrame};
 use crate::exec::{ExecCtx, VmSuspend};
+use crate::frame::CallFrame;
 use crate::value::VmValue;
 
 fn make_iter_result(heap: &mut crate::heap::Heap, value: VmValue, done: bool) -> VmValue {
@@ -12,152 +15,232 @@ fn make_iter_result(heap: &mut crate::heap::Heap, value: VmValue, done: bool) ->
     )
 }
 
-struct NanGenInner {
-    ctx: Box<ExecCtx>,
-    started: bool,
-    done: bool,
-    resume_dest: Option<u8>,
+enum Phase {
+    Fresh {
+        closure: Rc<VmClosure>,
+        args: Vec<VmValue>,
+        current_class: Option<Rc<varn_types::ClassObj>>,
+    },
+    Suspended {
+        frame: FrozenFrame,
+        dest_reg: u8,
+    },
+    Running,
+    Done,
 }
 
-impl std::fmt::Debug for NanGenInner {
+pub struct GenState {
+    phase: RefCell<Phase>,
+    spare: RefCell<FrameBuffers>,
+    pub(crate) is_async: bool,
+}
+
+impl std::fmt::Debug for GenState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NanGenInner(done={})", self.done)
+        write!(f, "Generator(async={})", self.is_async)
     }
 }
 
-#[derive(Debug)]
-pub struct NanGenDriver {
-    inner: RefCell<NanGenInner>,
-
-    is_async: bool,
-}
-
-impl NanGenDriver {
-    pub(crate) fn new(ctx: Box<ExecCtx>, is_async: bool) -> Rc<Self> {
-        Rc::new(NanGenDriver {
-            inner: RefCell::new(NanGenInner {
-                ctx,
-                started: false,
-                done: false,
-                resume_dest: None,
+impl GenState {
+    pub(crate) fn new(
+        closure: Rc<VmClosure>,
+        args: Vec<VmValue>,
+        current_class: Option<Rc<varn_types::ClassObj>>,
+    ) -> Rc<Self> {
+        let is_async = closure.proto.is_async;
+        Rc::new(GenState {
+            phase: RefCell::new(Phase::Fresh {
+                closure,
+                args,
+                current_class,
             }),
+            spare: RefCell::new(FrameBuffers::default()),
             is_async,
         })
     }
-}
 
-impl GeneratorDriver for NanGenDriver {
-    fn next(&self, input: VmValue) -> Result<VmValue, String> {
-        let mut inner = self.inner.borrow_mut();
+    pub(crate) fn close(&self) {
+        *self.phase.borrow_mut() = Phase::Done;
+    }
 
-        if inner.done {
-            return Ok(make_iter_result(&mut inner.ctx.heap, VmValue::null(), true));
-        }
-
-        if inner.started {
-            if let Some(dest_reg) = inner.resume_dest.take() {
-                let input_nv = input;
-                if let Some(frame) = inner.ctx.frames.last() {
-                    let base = frame.base;
-                    let nregs = frame.closure().proto.register_count as usize;
-                    inner.ctx.stack.ensure_frame_size(base, nregs);
-                    if (dest_reg as usize) < nregs {
-                        let _ = inner
-                            .ctx
-                            .stack
-                            .unbox_into_reg(base, dest_reg as usize, input_nv);
-                    }
+    pub(crate) fn trace(&self, value: &mut dyn FnMut(VmValue)) {
+        let Ok(phase) = self.phase.try_borrow() else {
+            return;
+        };
+        match &*phase {
+            Phase::Fresh { closure, args, .. } => {
+                args.iter().for_each(|&v| value(v));
+                for uv in &closure.upvalues {
+                    value(uv.inner.borrow().value);
                 }
             }
-            crate::exec::scheduler::request_osr(&mut inner.ctx, varn_types::ssa::OsrMode::Resume);
+            Phase::Suspended { frame, .. } => frame.trace(value),
+            Phase::Running | Phase::Done => {}
         }
-        inner.started = true;
+    }
+}
 
-        loop {
-            let result = inner.ctx.run_until(0);
+pub(crate) enum Entry {
+    Done(VmValue),
+    Mounted(usize),
+}
 
-            match inner.ctx.vm_suspend.take() {
-                Some(VmSuspend::Yield {
-                    value: nv,
-                    dest_reg,
-                }) => {
-                    inner.resume_dest = Some(dest_reg);
-                    return Ok(make_iter_result(&mut inner.ctx.heap, nv, false));
+impl ExecCtx {
+    pub(crate) fn resume_generator(
+        &mut self,
+        generator: &Rc<GenState>,
+        input: VmValue,
+    ) -> VmResult<VmValue> {
+        match self.enter_generator(generator, input)? {
+            Entry::Done(v) => Ok(v),
+            Entry::Mounted(depth) => self.run_generator(generator, depth),
+        }
+    }
+
+    pub(crate) fn enter_generator(
+        &mut self,
+        generator: &Rc<GenState>,
+        input: VmValue,
+    ) -> VmResult<Entry> {
+        let phase = std::mem::replace(&mut *generator.phase.borrow_mut(), Phase::Running);
+        let depth = self.frames.len();
+        match phase {
+            Phase::Done => {
+                *generator.phase.borrow_mut() = Phase::Done;
+                Ok(Entry::Done(make_iter_result(
+                    &mut self.heap,
+                    VmValue::null(),
+                    true,
+                )))
+            }
+            Phase::Running => Err(RuntimeError::new("generator is already running")),
+            Phase::Fresh {
+                closure,
+                args,
+                current_class,
+            } => {
+                if depth >= crate::frame::MAX_CALL_DEPTH {
+                    *generator.phase.borrow_mut() = Phase::Done;
+                    return Err(RuntimeError::new(
+                        "stack overflow: call depth exceeded 10000",
+                    ));
                 }
-                Some(VmSuspend::Await { cell, dest_reg }) if self.is_async => {
-                    match inner.ctx.settle_awaited(&cell) {
-                        Ok(resolved) => inner.ctx.resolve_awaiter(dest_reg, resolved),
-                        Err(thrown) => inner.ctx.reject_awaiter(thrown),
+                let alloc = self.stack.push_frame(&closure.proto);
+                let nregs = closure.proto.register_count as usize;
+                self.stack.adopt_values(alloc, 0, &args, nregs);
+                let mut frame = CallFrame::new_owned(closure, alloc);
+                frame.current_class = current_class;
+                self.frames.push(frame);
+                Ok(Entry::Mounted(depth))
+            }
+            Phase::Suspended { frame, dest_reg } => {
+                *generator.spare.borrow_mut() = thaw_frame(self, frame);
+                let base = self.frames[depth].base;
+                let _ = self.stack.unbox_into_reg(base, dest_reg as usize, input);
+                Ok(Entry::Mounted(depth))
+            }
+        }
+    }
+
+    pub(crate) fn run_generator(
+        &mut self,
+        generator: &Rc<GenState>,
+        depth: usize,
+    ) -> VmResult<VmValue> {
+        crate::exec::scheduler::request_osr(self, varn_types::ssa::OsrMode::Resume);
+        loop {
+            let outer = std::mem::replace(&mut self.jit_suspend_buf, std::ptr::null_mut());
+            let ran = self.run_until(depth);
+            self.jit_suspend_buf = outer;
+            let returned = match ran {
+                Ok(v) => v,
+                Err(e) => {
+                    self.abandon_generator(generator, depth);
+                    return Err(e);
+                }
+            };
+            match self.vm_suspend.take() {
+                Some(VmSuspend::Yield { value, dest_reg }) => {
+                    return self.park_generator(generator, depth, value, dest_reg);
+                }
+                Some(VmSuspend::Await { cell, dest_reg }) if generator.is_async => {
+                    match self.settle_awaited(&cell) {
+                        Ok(resolved) => self.resolve_awaiter(dest_reg, resolved),
+                        Err(thrown) => self.reject_awaiter(thrown),
                     }
                 }
                 Some(VmSuspend::Await { .. }) => {
-                    inner.done = true;
-                    return Err(
-                        "cannot use `await` inside a sync generator — declare it `async function*`"
-                            .to_string(),
-                    );
+                    self.abandon_generator(generator, depth);
+                    return Err(RuntimeError::new(
+                        "cannot use `await` inside a sync generator — declare it `async function*`",
+                    ));
                 }
                 Some(VmSuspend::DebugBreak) => {}
                 None => {
-                    inner.done = true;
-                    let ret = result.map_err(|e| e.message)?;
-                    return Ok(make_iter_result(&mut inner.ctx.heap, ret, true));
+                    *generator.phase.borrow_mut() = Phase::Done;
+                    return Ok(make_iter_result(&mut self.heap, returned, true));
                 }
             }
         }
     }
 
-    fn close(&self) {
-        self.inner.borrow_mut().done = true;
-    }
-
-    fn is_done(&self) -> bool {
-        self.inner.borrow_mut().done
-    }
-
-    fn is_async(&self) -> bool {
-        self.is_async
-    }
-
-    fn trace_vm_values(&self, callback: &mut dyn FnMut(varn_types::VmValue)) {
-        let inner = self.inner.borrow();
-
-        for &nv in &inner.ctx.stack.dyn_ {
-            callback(nv);
+    pub(crate) fn generator_entry(&mut self, depth: usize) -> Option<usize> {
+        let frame = &self.frames[depth];
+        let closure = frame.closure();
+        if self.settings.no_jit {
+            return None;
         }
-        for &h in inner.ctx.stack.refs.iter().flatten() {
-            callback(VmValue::from_heap(h));
-        }
+        let entry = if frame.ip == 0 {
+            closure.hot_jit_fn()
+        } else {
+            closure.osr_jit_fn(varn_types::ssa::OsrRequest {
+                ip: frame.ip,
+                mode: varn_types::ssa::OsrMode::Resume,
+            })
+        }?;
+        let owner = depth + 1;
+        self.try_handlers.retain(|h| h.frame_depth != owner);
+        Some(entry as usize)
+    }
 
-        for frame in &inner.ctx.frames {
-            for &c in frame.closure().constants.iter() {
-                callback(c);
+    pub(crate) fn leave_generator(
+        &mut self,
+        generator: &Rc<GenState>,
+        depth: usize,
+        returned: VmValue,
+    ) -> VmResult<VmValue> {
+        match self.vm_suspend.take() {
+            Some(VmSuspend::Yield { value, dest_reg }) => {
+                self.park_generator(generator, depth, value, dest_reg)
             }
-            for uv in &frame.closure().upvalues {
-                if let Ok(upval_inner) = uv.inner.try_borrow() {
-                    callback(upval_inner.value);
-                }
-            }
-        }
-
-        for (_, uv) in &inner.ctx.open_upvalues {
-            if let Ok(upval_inner) = uv.inner.try_borrow() {
-                callback(upval_inner.value);
+            Some(VmSuspend::Await { .. }) | Some(VmSuspend::DebugBreak) | None => {
+                self.abandon_generator(generator, depth);
+                Ok(make_iter_result(&mut self.heap, returned, true))
             }
         }
-
-        for (_, nv) in &inner.ctx.pending_constructors {
-            callback(*nv);
-        }
-        for (_, nv) in &inner.ctx.pending_setters {
-            callback(*nv);
-        }
     }
 
-    fn trace_closures(&self, callback: &mut dyn FnMut(usize)) {
-        let inner = self.inner.borrow();
-        for frame in &inner.ctx.frames {
-            callback(frame.closure_ptr as *const () as usize);
+    fn park_generator(
+        &mut self,
+        generator: &GenState,
+        depth: usize,
+        value: VmValue,
+        dest_reg: u8,
+    ) -> VmResult<VmValue> {
+        let buffers = std::mem::take(&mut *generator.spare.borrow_mut());
+        let frame = freeze_frame(self, depth, false, buffers).map_err(RuntimeError::new)?;
+        self.frames.pop();
+        self.stack.pop_frame();
+        *generator.phase.borrow_mut() = Phase::Suspended { frame, dest_reg };
+        Ok(make_iter_result(&mut self.heap, value, false))
+    }
+
+    pub(crate) fn abandon_generator(&mut self, generator: &GenState, depth: usize) {
+        while self.frames.len() > depth {
+            let frame = self.frames.pop().expect("a frame above the generator");
+            self.drop_frame_storage(frame.base);
         }
+        self.try_handlers.retain(|h| h.frame_depth <= depth);
+        *generator.phase.borrow_mut() = Phase::Done;
     }
 }

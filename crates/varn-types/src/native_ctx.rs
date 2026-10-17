@@ -212,9 +212,13 @@ pub trait NativeCtx: crate::Buffers {
         v.is_null()
     }
 
-    fn as_generator(&self, _v: VmValue) -> Option<crate::GeneratorObj> {
-        None
+    fn resume_generator(&mut self, _generator: VmValue, _input: VmValue) -> crate::NativeFnResult {
+        Err(crate::NativeError::from(
+            "generators can only be resumed by the VM",
+        ))
     }
+
+    fn close_generator(&mut self, _generator: VmValue) {}
 
     fn as_char(&self, _v: VmValue) -> Option<char> {
         None

@@ -21,6 +21,9 @@ pub(crate) fn emit_call_native_op(
         return heap::emit_unary_boxed(b, ctx, values, object, ctx.helpers.to_string);
     }
     let receiver = heap::boxed_value(b, ctx, values, object)?;
+    if args.len() <= 1 && op_id == varn_core::op_id::KnownOp::GeneratorNext.id() {
+        return emit_generator_next(b, ctx, values, receiver, args.first().copied());
+    }
     if args.len() == 1
         && (op_id == varn_core::op_id::KnownOp::StrCharCodeAt.id()
             || op_id == varn_core::op_id::KnownOp::StrCodePointAt.id())
@@ -202,6 +205,57 @@ pub(crate) fn emit_call_native_op(
         types::I128,
         cranelift_codegen::ir::MemFlagsData::trusted(),
         frame.exec_ctx,
+        ctx.helpers.jit_native_result_offset as i32,
+    ))
+}
+
+fn emit_generator_next(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    receiver: Value,
+    input: Option<u32>,
+) -> Result<Value, String> {
+    let exec_ctx = ctx.exec_ctx;
+    let (gen_tag, gen_payload) = b.ins().isplit(receiver);
+    let (in_tag, in_payload) = match input {
+        Some(v) => heap::boxed_parts(b, ctx, values, v)?,
+        None => (
+            b.ins()
+                .iconst(types::I64, varn_types::vm_value::KIND_NULL as i64),
+            b.ins().iconst(types::I64, 0),
+        ),
+    };
+    let out = super::direct::entry_out_slot(b);
+    let entry = super::super::super::emit::call_helper(
+        b,
+        ctx.cc,
+        ctx.helpers.generator_enter,
+        &[exec_ctx, gen_tag, gen_payload, in_tag, in_payload, out],
+    );
+    let entered = b.create_block();
+    let merge = b.create_block();
+    let taken = b
+        .ins()
+        .icmp_imm_u(cranelift_codegen::ir::condcodes::IntCC::NotEqual, entry, 0);
+    b.ins().brif(taken, entered, &[], merge, &[]);
+    b.switch_to_block(entered);
+    let (returned, _) = super::direct::call_entry(b, ctx, entry, out)?;
+    let (ret_tag, ret_payload) = b.ins().isplit(returned);
+    super::super::super::emit::call_helper_void(
+        b,
+        ctx.cc,
+        ctx.helpers.generator_leave,
+        &[exec_ctx, ret_tag, ret_payload],
+    );
+    b.ins().jump(merge, &[]);
+    b.switch_to_block(merge);
+    super::super::store::drop_home_addrs(ctx);
+    crate::clif::from_ssa::exceptions::check_error_branch(b, ctx)?;
+    Ok(b.ins().load(
+        types::I128,
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        exec_ctx,
         ctx.helpers.jit_native_result_offset as i32,
     ))
 }

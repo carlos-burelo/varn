@@ -131,7 +131,10 @@ impl HeapInner {
         }
     }
 
-    pub(crate) fn generator_of(&self, v: VmValue) -> Option<varn_types::GeneratorObj> {
+    pub(crate) fn generator_of(
+        &self,
+        v: VmValue,
+    ) -> Option<std::rc::Rc<crate::generator::GenState>> {
         match self.get(self.heap_ref(v)?)? {
             HeapObj::Generator(g) => Some(g.clone()),
             HeapObj::Str(_)

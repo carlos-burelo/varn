@@ -51,6 +51,18 @@ pub(crate) fn run_entered(
     entry: Value,
     out: Value,
 ) -> Result<Value, String> {
+    let (result, base) = call_entry(b, ctx, entry, out)?;
+    call_helper_void(b, ctx.cc, ctx.helpers.jit_call_leave, &[ctx.exec_ctx, base]);
+    crate::clif::from_ssa::exceptions::check_error_branch(b, ctx)?;
+    Ok(result)
+}
+
+pub(crate) fn call_entry(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    entry: Value,
+    out: Value,
+) -> Result<(Value, Value), String> {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let closure = b.ins().load(types::I64, m, out, 0);
     let base = b.ins().load(types::I64, m, out, 8);
@@ -72,7 +84,5 @@ pub(crate) fn run_entered(
         b.ins().iconcat(parts[0], parts[1])
     };
     super::super::stack_exit::publish(b, ctx.helpers, ctx.exec_ctx);
-    call_helper_void(b, ctx.cc, ctx.helpers.jit_call_leave, &[ctx.exec_ctx, base]);
-    crate::clif::from_ssa::exceptions::check_error_branch(b, ctx)?;
-    Ok(result)
+    Ok((result, base))
 }

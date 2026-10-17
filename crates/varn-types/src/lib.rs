@@ -4,7 +4,6 @@ pub mod bytecode;
 pub mod capabilities;
 pub mod cell;
 pub mod chunk;
-pub mod generator;
 pub mod loop_analysis;
 pub mod marshal;
 pub mod module_graph;
@@ -24,7 +23,6 @@ pub use buffers::Buffers;
 pub use chunk::{
     Chunk, FunctionProto, Literal, PoolEntry, FIRST_RESUME, STATE_DONE, STATE_YIELDED,
 };
-pub use generator::{GeneratorDriver, GeneratorObj};
 pub use marshal::{FromVm, IntoVm, VnArray, VnStr};
 pub use module_graph::{ModuleGraphArtifact, PackageNode};
 pub use native::{

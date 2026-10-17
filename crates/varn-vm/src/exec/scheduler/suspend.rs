@@ -39,6 +39,13 @@ impl FrozenFrame {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct FrameBuffers {
+    plain: Vec<u64>,
+    refs: Vec<Option<varn_types::HeapRef>>,
+    dyn_: Vec<VmValue>,
+}
+
 pub(crate) struct Frozen {
     frames: Vec<FrozenFrame>,
     pub(crate) dest_reg: u16,
@@ -80,6 +87,7 @@ pub(crate) fn freeze_frame(
     ctx: &mut ExecCtx,
     index: usize,
     compact: bool,
+    buffers: FrameBuffers,
 ) -> Result<FrozenFrame, &'static str> {
     let frame = &ctx.frames[index];
     let closure = frame
@@ -124,26 +132,44 @@ pub(crate) fn freeze_frame(
     } else {
         None
     };
-    let mut plain: Vec<u64> = Vec::new();
-    for (r, &(class, idx)) in layout.slots.iter().enumerate() {
-        if class == SlotClass::Gpr && keeps(regs, &open, r, class, idx) {
-            plain.push(ctx.stack.gpr[(bases[0] + idx) as usize] as u64);
+    let FrameBuffers {
+        mut plain,
+        mut refs,
+        mut dyn_,
+    } = buffers;
+    let gpr_len = match regs {
+        None => {
+            let range = |c: usize| bases[c] as usize..(bases[c] + layout.counts[c]) as usize;
+            plain.extend(ctx.stack.gpr[range(0)].iter().map(|&v| v as u64));
+            let gpr_len = plain.len() as u32;
+            plain.extend(ctx.stack.fpr[range(1)].iter().map(|v| v.to_bits()));
+            refs.extend_from_slice(&ctx.stack.refs[range(2)]);
+            dyn_.extend_from_slice(&ctx.stack.dyn_[range(3)]);
+            gpr_len
         }
-    }
-    let gpr_len = plain.len() as u32;
-    let mut refs: Vec<Option<varn_types::HeapRef>> = Vec::new();
-    let mut dyn_: Vec<VmValue> = Vec::new();
-    for (r, &(class, idx)) in layout.slots.iter().enumerate() {
-        if !keeps(regs, &open, r, class, idx) {
-            continue;
+        Some(_) => {
+            for (r, &(class, idx)) in layout.slots.iter().enumerate() {
+                if class == SlotClass::Gpr && keeps(regs, &open, r, class, idx) {
+                    plain.push(ctx.stack.gpr[(bases[0] + idx) as usize] as u64);
+                }
+            }
+            let gpr_len = plain.len() as u32;
+            for (r, &(class, idx)) in layout.slots.iter().enumerate() {
+                if !keeps(regs, &open, r, class, idx) {
+                    continue;
+                }
+                match class {
+                    SlotClass::Gpr => {}
+                    SlotClass::Fpr => {
+                        plain.push(ctx.stack.fpr[(bases[1] + idx) as usize].to_bits())
+                    }
+                    SlotClass::Ref => refs.push(ctx.stack.refs[(bases[2] + idx) as usize]),
+                    SlotClass::Dyn => dyn_.push(ctx.stack.dyn_[(bases[3] + idx) as usize]),
+                }
+            }
+            gpr_len
         }
-        match class {
-            SlotClass::Gpr => {}
-            SlotClass::Fpr => plain.push(ctx.stack.fpr[(bases[1] + idx) as usize].to_bits()),
-            SlotClass::Ref => refs.push(ctx.stack.refs[(bases[2] + idx) as usize]),
-            SlotClass::Dyn => dyn_.push(ctx.stack.dyn_[(bases[3] + idx) as usize]),
-        }
-    }
+    };
     let compact = regs.is_some();
     Ok(FrozenFrame {
         closure,
@@ -161,7 +187,7 @@ pub(crate) fn freeze_frame(
     })
 }
 
-pub(crate) fn thaw_frame(ctx: &mut ExecCtx, sf: FrozenFrame) {
+pub(crate) fn thaw_frame(ctx: &mut ExecCtx, sf: FrozenFrame) -> FrameBuffers {
     let id = ctx.stack.allocs.len();
     let bases = [
         ctx.stack.gpr.len() as u32,
@@ -170,56 +196,62 @@ pub(crate) fn thaw_frame(ctx: &mut ExecCtx, sf: FrozenFrame) {
         ctx.stack.dyn_.len() as u32,
     ];
     let layout = sf.closure.proto.frame_layout();
-    ctx.stack
-        .gpr
-        .resize(ctx.stack.gpr.len() + layout.counts[0] as usize, 0);
-    ctx.stack
-        .fpr
-        .resize(ctx.stack.fpr.len() + layout.counts[1] as usize, 0.0);
-    ctx.stack
-        .refs
-        .resize(ctx.stack.refs.len() + layout.counts[2] as usize, None);
-    ctx.stack.dyn_.resize(
-        ctx.stack.dyn_.len() + layout.counts[3] as usize,
-        VmValue::null(),
-    );
-    let regs = if sf.compact {
-        live_regs(&sf.closure, sf.ip)
+    if sf.compact {
+        ctx.stack
+            .gpr
+            .resize(ctx.stack.gpr.len() + layout.counts[0] as usize, 0);
+        ctx.stack
+            .fpr
+            .resize(ctx.stack.fpr.len() + layout.counts[1] as usize, 0.0);
+        ctx.stack
+            .refs
+            .resize(ctx.stack.refs.len() + layout.counts[2] as usize, None);
+        ctx.stack.dyn_.resize(
+            ctx.stack.dyn_.len() + layout.counts[3] as usize,
+            VmValue::null(),
+        );
+        let regs = live_regs(&sf.closure, sf.ip);
+        let (gpr_vals, fpr_vals) = sf.plain.split_at(sf.gpr_len as usize);
+        let mut gpr_it = gpr_vals.iter();
+        let mut fpr_it = fpr_vals.iter();
+        let mut ref_it = sf.refs.iter();
+        let mut dyn_it = sf.dyn_.iter();
+        for (r, &(class, idx)) in layout.slots.iter().enumerate() {
+            if !keeps(regs, &sf.open, r, class, idx) {
+                continue;
+            }
+            let at = (bases[class.index()] + idx) as usize;
+            match class {
+                SlotClass::Gpr => {
+                    if let Some(&v) = gpr_it.next() {
+                        ctx.stack.gpr[at] = v as i64;
+                    }
+                }
+                SlotClass::Fpr => {
+                    if let Some(&v) = fpr_it.next() {
+                        ctx.stack.fpr[at] = f64::from_bits(v);
+                    }
+                }
+                SlotClass::Ref => {
+                    if let Some(&v) = ref_it.next() {
+                        ctx.stack.refs[at] = v;
+                    }
+                }
+                SlotClass::Dyn => {
+                    if let Some(&v) = dyn_it.next() {
+                        ctx.stack.dyn_[at] = v;
+                    }
+                }
+            }
+        }
     } else {
-        None
-    };
-    let (gpr_vals, fpr_vals) = sf.plain.split_at(sf.gpr_len as usize);
-    let mut gpr_it = gpr_vals.iter();
-    let mut fpr_it = fpr_vals.iter();
-    let mut ref_it = sf.refs.iter();
-    let mut dyn_it = sf.dyn_.iter();
-    for (r, &(class, idx)) in layout.slots.iter().enumerate() {
-        if !keeps(regs, &sf.open, r, class, idx) {
-            continue;
-        }
-        let at = (bases[class.index()] + idx) as usize;
-        match class {
-            SlotClass::Gpr => {
-                if let Some(&v) = gpr_it.next() {
-                    ctx.stack.gpr[at] = v as i64;
-                }
-            }
-            SlotClass::Fpr => {
-                if let Some(&v) = fpr_it.next() {
-                    ctx.stack.fpr[at] = f64::from_bits(v);
-                }
-            }
-            SlotClass::Ref => {
-                if let Some(&v) = ref_it.next() {
-                    ctx.stack.refs[at] = v;
-                }
-            }
-            SlotClass::Dyn => {
-                if let Some(&v) = dyn_it.next() {
-                    ctx.stack.dyn_[at] = v;
-                }
-            }
-        }
+        let (gpr_vals, fpr_vals) = sf.plain.split_at(sf.gpr_len as usize);
+        ctx.stack.gpr.extend(gpr_vals.iter().map(|&v| v as i64));
+        ctx.stack
+            .fpr
+            .extend(fpr_vals.iter().map(|&v| f64::from_bits(v)));
+        ctx.stack.refs.extend_from_slice(&sf.refs);
+        ctx.stack.dyn_.extend_from_slice(&sf.dyn_);
     }
     ctx.stack.allocs.push(FrameAlloc { bases, layout });
     for (class, rel, uv) in sf.open {
@@ -248,6 +280,11 @@ pub(crate) fn thaw_frame(ctx: &mut ExecCtx, sf: FrozenFrame) {
             err_reg,
         });
     }
+    let (mut plain, mut refs, mut dyn_) = (sf.plain, sf.refs, sf.dyn_);
+    plain.clear();
+    refs.clear();
+    dyn_.clear();
+    FrameBuffers { plain, refs, dyn_ }
 }
 
 fn check_contiguous(ctx: &ExecCtx) -> Result<(), &'static str> {
@@ -277,7 +314,7 @@ pub(crate) fn freeze(ctx: &mut ExecCtx, dest_reg: u16) -> Result<Box<Frozen>, &'
     let n = ctx.frames.len();
     let mut frames = Vec::with_capacity(n);
     for i in 0..n {
-        frames.push(freeze_frame(ctx, i, i + 1 == n)?);
+        frames.push(freeze_frame(ctx, i, i + 1 == n, FrameBuffers::default())?);
     }
     let jit_error_flag = std::mem::replace(&mut ctx.jit_error_flag, 0);
     let jit_native_result = std::mem::replace(&mut ctx.jit_native_result, VmValue::null());

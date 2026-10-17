@@ -4,7 +4,6 @@ use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::Arc;
 use varn_types::{
-    generator::GeneratorObj,
     value::{
         BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData,
         RuntimeSymbol, SetRef,
@@ -39,7 +38,7 @@ pub enum HeapObj {
     BigInt(Box<num_bigint::BigInt>),
     Decimal(Box<bigdecimal::BigDecimal>),
     Char(char),
-    Generator(GeneratorObj),
+    Generator(Rc<crate::generator::GenState>),
     Spread(VmValue),
 }
 

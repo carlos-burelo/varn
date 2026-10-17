@@ -36,7 +36,6 @@ fn recycle(ctx: &mut ExecCtx) {
     ctx.jit_native_result = VmValue::null();
     ctx.jit_error_flag = 0;
     ctx.osr_request = None;
-    ctx.gc_inhibited = false;
 }
 
 fn finish(queue: &TaskQueue, mut ctx: Box<ExecCtx>, output: &Rc<TaskCell>, res: Outcome) {

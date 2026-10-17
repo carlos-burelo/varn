@@ -228,6 +228,11 @@ pub(super) fn emit_pure_err_ret(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Resul
     };
     drop(st);
     b.switch_to_block(err_ret);
+    emit_placeholder_return(b, ctx);
+    Ok(())
+}
+
+pub(super) fn emit_placeholder_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
     match ctx.activation {
         Activation::Framed => match ctx.proto.return_kind {
             SlotKind::Int | SlotKind::Bool => {
@@ -263,5 +268,4 @@ pub(super) fn emit_pure_err_ret(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Resul
             }
         }
     }
-    Ok(())
 }

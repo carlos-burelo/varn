@@ -10,21 +10,8 @@ impl ExecCtx {
         args: Vec<VmValue>,
         current_class: Option<std::rc::Rc<varn_types::ClassObj>>,
     ) -> VmValue {
-        let mut gen_ctx = Box::new(self.fork_for_task());
-        gen_ctx.gc_inhibited = true;
-
-        let alloc = gen_ctx.stack.push_frame(&closure.proto);
-        let nregs = closure.proto.register_count as usize;
-        gen_ctx.stack.adopt_values(alloc, 0, &args, nregs);
-        let is_async = closure.proto.is_async;
-        let mut frame = crate::frame::CallFrame::new_owned(closure, alloc);
-        frame.current_class = current_class;
-        gen_ctx.frames.push(frame);
-
-        let driver = crate::generator::NanGenDriver::new(gen_ctx, is_async);
-        VmValue::from_heap(self.heap.alloc(crate::heap::HeapObj::Generator(
-            varn_types::generator::GeneratorObj(driver),
-        )))
+        let state = crate::generator::GenState::new(closure, args, current_class);
+        VmValue::from_heap(self.heap.alloc(crate::heap::HeapObj::Generator(state)))
     }
 }
 
@@ -99,11 +86,11 @@ impl ExecCtx {
 
                 self.frames.push(frame);
 
-                if !self.gc_inhibited && self.heap.needs_minor_gc() {
+                if self.heap.needs_minor_gc() {
                     self.run_minor_gc();
                 }
 
-                if !self.gc_inhibited && self.heap.needs_gc() {
+                if self.heap.needs_gc() {
                     self.trigger_gc();
                 }
             }

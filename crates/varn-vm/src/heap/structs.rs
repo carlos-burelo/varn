@@ -66,7 +66,7 @@ impl HeapInner {
     pub(super) fn identity_key(obj: &HeapObj) -> Option<usize> {
         match obj {
             HeapObj::Class(c) => Some(Rc::as_ptr(c) as usize),
-            HeapObj::Generator(g) => Some(Rc::as_ptr(&g.0) as *const () as usize),
+            HeapObj::Generator(g) => Some(Rc::as_ptr(g) as usize),
             HeapObj::VmClosure(c) => Some(Rc::as_ptr(c) as usize),
             HeapObj::Str(_)
             | HeapObj::Array(_)
