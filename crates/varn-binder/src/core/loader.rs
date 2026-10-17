@@ -8,7 +8,7 @@ pub fn is_core_file(filename: &str) -> bool {
     filename.contains("varn-builtins") || filename.starts_with(CORE_PREFIX)
 }
 
-const CORE_BASE: &str = "core:errors";
+const CORE_BASE: &str = varn_core::RuntimeErrorKind::MODULE;
 
 pub fn module_globals(filename: &str, resolver: &dyn ImportResolver) -> Option<Arc<CoreExports>> {
     if !is_core_file(filename) {

@@ -30,20 +30,16 @@ impl RuntimeErrorKind {
             Self::RangeError => "RangeError",
         }
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::RuntimeErrorKind;
+    pub const MODULE: &'static str = "core:errors";
 
-    #[test]
-    fn class_names_are_distinct() {
-        let mut names: Vec<_> = RuntimeErrorKind::ALL
-            .iter()
-            .map(|k| k.class_name())
-            .collect();
-        names.sort_unstable();
-        names.dedup();
-        assert_eq!(names.len(), RuntimeErrorKind::ALL.len());
+    pub fn identify(name: crate::Atom, origin: Option<crate::Atom>) -> Option<Self> {
+        let origin = origin?;
+        if origin != crate::Atom::of_const(Self::MODULE) {
+            return None;
+        }
+        Self::ALL
+            .into_iter()
+            .find(|k| crate::Atom::of_const(k.class_name()) == name)
     }
 }

@@ -1,5 +1,5 @@
 use super::{CheckerTyTable, Type};
-use varn_core::{BuiltinType, CoreSum, TypeKind};
+use varn_core::{BuiltinType, CoreSum, RuntimeErrorKind, TypeKind};
 
 impl Type {
     pub fn builtin(b: BuiltinType, args: Vec<Type>, table: &mut CheckerTyTable) -> Self {
@@ -82,5 +82,11 @@ impl Type {
             .map(|&id| Type::resolved(id))
             .collect();
         Some((sum, args))
+    }
+
+    pub fn core_error(kind: RuntimeErrorKind, table: &mut CheckerTyTable) -> Self {
+        let name = table.intern_name(kind.class_name());
+        let origin = Some(table.intern_name(RuntimeErrorKind::MODULE));
+        Type::named_with_origin_atom(name, origin, table)
     }
 }

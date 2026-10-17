@@ -1,0 +1,7 @@
+// expect: error[VN4008]
+class Error {
+    message: str = "not the core error"
+}
+function fail(): void {
+    throw new Error()
+}

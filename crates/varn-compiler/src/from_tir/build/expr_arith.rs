@@ -196,10 +196,12 @@ impl<'m> Builder<'m> {
                 HirType::Str,
             );
         }
-        let type_error = varn_core::abi::native_global_index(varn_core::well_known::TYPE_ERROR)
-            .ok_or(crate::OptError::Unsupported(
-                "from_tir: TypeError is not a native global",
-            ))?;
+        let type_error = varn_core::abi::native_global_index(
+            varn_core::RuntimeErrorKind::TypeError.class_name(),
+        )
+        .ok_or(crate::OptError::Unsupported(
+            "from_tir: TypeError is not a native global",
+        ))?;
         let ctor = self.emit(InstKind::LoadNativeGlobalIdx(type_error), HirType::Ref);
         let error = self.emit(
             InstKind::Call {

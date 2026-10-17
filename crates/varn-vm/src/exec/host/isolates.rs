@@ -288,7 +288,7 @@ pub(super) fn spawn_isolate(
 ) -> Result<varn_types::HostPromise, String> {
     fn worker_error(msg: &str) -> varn_types::value::SendValue {
         varn_types::value::SendValue::Error {
-            class: "Error".to_string(),
+            class: varn_core::RuntimeErrorKind::Error.class_name().to_string(),
             message: msg.to_string(),
         }
     }

@@ -60,7 +60,7 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
                 .and_then(|f| inst.read_field(f))
                 .map(|nv| heap.str_repr(nv));
             return match message {
-                Some(msg) if &*cls.name == varn_core::well_known::ERROR => msg,
+                Some(msg) if &*cls.name == varn_core::RuntimeErrorKind::Error.class_name() => msg,
                 Some(msg) => format!("{}: {}", cls.name, msg),
                 None => format!("[{}]", cls.name),
             };
@@ -74,7 +74,7 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
                 if let Some(name_nv) = obj.get_field("name") {
                     let name = heap.str_repr(name_nv);
                     if !name.is_empty()
-                        && name != varn_core::well_known::ERROR
+                        && name != varn_core::RuntimeErrorKind::Error.class_name()
                         && name != RuntimeKind::Null.name()
                     {
                         return format!("{}: {}", name, msg);

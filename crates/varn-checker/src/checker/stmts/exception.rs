@@ -25,8 +25,8 @@ impl<'r> Checker<'r> {
                         let catch_ty = if let Some(ann) = &clause.type_ann {
                             checker.resolve_type_node_cached(ann, bind)
                         } else {
-                            Type::named(
-                                "Error",
+                            Type::core_error(
+                                varn_core::RuntimeErrorKind::Error,
                                 &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
                             )
                         };

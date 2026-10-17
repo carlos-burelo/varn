@@ -1,3 +1,4 @@
+use varn_core::RuntimeErrorKind;
 use varn_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
@@ -31,7 +32,7 @@ varn_contract! {
     class: "Error",
     impl ErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
-            init_error(ctx, this, message, "Error");
+            init_error(ctx, this, message, RuntimeErrorKind::Error.class_name());
             this
         }
 
@@ -39,7 +40,7 @@ varn_contract! {
             let name = ctx
                 .get_field(this, "name")
                 .and_then(|v| ctx.str_owned(v))
-                .unwrap_or_else(|| "Error".to_owned());
+                .unwrap_or_else(|| RuntimeErrorKind::Error.class_name().to_owned());
             let message = ctx
                 .get_field(this, "message")
                 .and_then(|v| ctx.str_owned(v))
@@ -55,7 +56,7 @@ varn_contract! {
     class: "TypeError",
     impl TypeErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
-            init_error(ctx, this, message, "TypeError");
+            init_error(ctx, this, message, RuntimeErrorKind::TypeError.class_name());
             this
         }
     }
@@ -63,7 +64,7 @@ varn_contract! {
     class: "RangeError",
     impl RangeErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
-            init_error(ctx, this, message, "RangeError");
+            init_error(ctx, this, message, RuntimeErrorKind::RangeError.class_name());
             this
         }
     }
@@ -71,7 +72,7 @@ varn_contract! {
     class: "IntegerOverflow",
     impl IntegerOverflowClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
-            init_error(ctx, this, message, "IntegerOverflow");
+            init_error(ctx, this, message, RuntimeErrorKind::IntegerOverflow.class_name());
             this
         }
     }
@@ -79,7 +80,7 @@ varn_contract! {
     class: "DivisionByZero",
     impl DivisionByZeroClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
-            init_error(ctx, this, message, "DivisionByZero");
+            init_error(ctx, this, message, RuntimeErrorKind::DivisionByZero.class_name());
             this
         }
     }
@@ -87,7 +88,7 @@ varn_contract! {
     class: "MatchError",
     impl MatchErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
-            init_error(ctx, this, message, "MatchError");
+            init_error(ctx, this, message, RuntimeErrorKind::MatchError.class_name());
             this
         }
     }

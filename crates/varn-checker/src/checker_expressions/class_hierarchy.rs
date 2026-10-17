@@ -8,14 +8,24 @@ impl<'r> Checker<'r> {
         target: &str,
         bind: &varn_sem::bind::BindResult,
     ) -> bool {
-        let mut visited: Vec<varn_sem::bind::ClassParent> = Vec::new();
-        let mut current = varn_sem::bind::ClassParent {
+        let start = varn_sem::bind::ClassParent {
             name: std::sync::Arc::from(candidate),
             origin: None,
             args: Vec::new(),
         };
+        self.ancestry_any(start, bind, |class| class.name.as_ref() == target)
+    }
+
+    fn ancestry_any(
+        &self,
+        start: varn_sem::bind::ClassParent,
+        bind: &varn_sem::bind::BindResult,
+        found: impl Fn(&varn_sem::bind::ClassParent) -> bool,
+    ) -> bool {
+        let mut visited: Vec<varn_sem::bind::ClassParent> = Vec::new();
+        let mut current = start;
         loop {
-            if current.name.as_ref() == target {
+            if found(&current) {
                 return true;
             }
             if visited.contains(&current) {
@@ -67,27 +77,40 @@ impl<'r> Checker<'r> {
     }
 
     pub(crate) fn is_throwable(&self, ty: &Type, bind: &varn_sem::bind::BindResult) -> bool {
-        let named = |name: varn_core::Atom| -> Option<&str> {
-            self.ty_table
-                .name(name)
-                .or_else(|| bind.interner.try_resolve(name))
+        let is_core_error = |class: &varn_sem::bind::ClassParent| {
+            varn_core::RuntimeErrorKind::identify(
+                varn_core::Atom::of(&class.name),
+                class.origin.as_deref().map(varn_core::Atom::of),
+            ) == Some(varn_core::RuntimeErrorKind::Error)
+        };
+        let start = |name: varn_core::Atom, origin: Option<varn_core::Atom>| {
+            let origin = origin
+                .map(|o| self.resolve_bind_atom(bind, o))
+                .filter(|o| o.as_ref() != bind.source_file.as_ref());
+            varn_sem::bind::ClassParent {
+                name: self.resolve_bind_atom(bind, name),
+                origin,
+                args: Vec::new(),
+            }
         };
         match self.ty_table.get(ty.0) {
-            varn_core::TypeKind::Named(name, _) => {
-                named(name).is_some_and(|n| self.is_subclass_or_same(n, "Error", bind))
-            }
-            varn_core::TypeKind::Generic(name, _, _) => {
-                named(name).is_some_and(|n| self.is_subclass_or_same(n, "Error", bind))
+            varn_core::TypeKind::Named(name, origin)
+            | varn_core::TypeKind::Generic(name, _, origin) => {
+                self.ancestry_any(start(name, origin), bind, is_core_error)
             }
             varn_core::TypeKind::Union(list) => self
                 .ty_table
                 .get_list(list)
                 .iter()
                 .all(|id| self.is_throwable(&Type::resolved(*id), bind)),
-            varn_core::TypeKind::This => self
-                .current_class
-                .as_deref()
-                .is_some_and(|c| self.is_subclass_or_same(c, "Error", bind)),
+            varn_core::TypeKind::This => self.current_class.as_deref().is_some_and(|c| {
+                let local = varn_sem::bind::ClassParent {
+                    name: std::sync::Arc::from(c),
+                    origin: None,
+                    args: Vec::new(),
+                };
+                self.ancestry_any(local, bind, is_core_error)
+            }),
             varn_core::TypeKind::Primitive(_)
             | varn_core::TypeKind::Literal(_)
             | varn_core::TypeKind::Array(_)
