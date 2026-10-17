@@ -29,11 +29,10 @@ impl ImportResolver for DiskResolver {
         }
 
         let source = self.load_source(&ModuleId::local_str(&canonical))?;
-        let carrier = super::CarrierKind::from(source.provenance);
         let source = source.text;
         let source = source.as_ref();
 
-        if let Some(cached) = super::cache::try_load_cache(self, &canonical, source, carrier) {
+        if let Some(cached) = super::cache::try_load_cache(self, &canonical, source) {
             let bind_rc = Arc::new(cached.bind);
             self.store_bind(canonical.clone(), Arc::clone(&bind_rc));
             self.store_exports(canonical, Arc::new(cached.exports));
@@ -58,7 +57,7 @@ impl ImportResolver for DiskResolver {
             base_dir,
             &mut Vec::new(),
         );
-        super::cache::save_to_cache(self, &canonical, source, &exports, bind.as_ref(), carrier);
+        super::cache::save_to_cache(self, &canonical, source, &exports, bind.as_ref());
 
         Some(bind)
     }

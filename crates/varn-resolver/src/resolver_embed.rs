@@ -98,14 +98,7 @@ impl DiskResolver {
             visiting,
         );
 
-        super::cache::save_to_cache(
-            self,
-            virtual_id,
-            &source.text,
-            &exports,
-            bind.as_ref(),
-            super::CarrierKind::from(source.provenance.clone()),
-        );
+        super::cache::save_to_cache(self, virtual_id, &source.text, &exports, bind.as_ref());
         visiting.pop();
         Arc::new(exports)
     }
@@ -117,12 +110,7 @@ impl DiskResolver {
     ) -> Option<super::cache::CachedModule> {
         match source.interface {
             Some(interface) => super::cache::adopt_interface(self, virtual_id, interface),
-            None => super::cache::try_load_cache(
-                self,
-                virtual_id,
-                &source.text,
-                super::CarrierKind::from(source.provenance.clone()),
-            ),
+            None => super::cache::try_load_cache(self, virtual_id, &source.text),
         }
     }
 

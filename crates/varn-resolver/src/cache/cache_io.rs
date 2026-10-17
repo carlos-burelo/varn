@@ -15,8 +15,6 @@ pub(super) fn get_cache_dir(resolver: &super::super::resolver_disk::DiskResolver
     resolver.types_cache_dir()
 }
 
-pub(super) use super::super::CarrierKind;
-
 pub(super) fn cache_module_id(virtual_id: &str) -> varn_core::ModuleId {
     if virtual_id.starts_with("std:")
         || virtual_id.starts_with("core:")
@@ -28,8 +26,8 @@ pub(super) fn cache_module_id(virtual_id: &str) -> varn_core::ModuleId {
     }
 }
 
-pub(super) fn cache_fingerprint(source: &str, carrier: CarrierKind) -> u64 {
-    varn_core::fingerprint::fingerprint(source.as_bytes()) ^ ((carrier as u64) << 56)
+pub(super) fn cache_fingerprint(source: &str) -> u64 {
+    varn_core::fingerprint::fingerprint(source.as_bytes())
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -57,13 +55,12 @@ pub(crate) fn try_load_cache(
     resolver: &super::super::resolver_disk::DiskResolver,
     virtual_id: &str,
     source: &str,
-    carrier: CarrierKind,
 ) -> Option<CachedModule> {
     if !has_portable_interface(virtual_id) {
         return None;
     }
     let id = cache_module_id(virtual_id);
-    let fingerprint = cache_fingerprint(source, carrier);
+    let fingerprint = cache_fingerprint(source);
     let payload = varn_modules::artifact::read_module_artifact(
         &get_cache_dir(resolver),
         varn_modules::artifact::ArtifactKind::CheckerInterface,
@@ -130,13 +127,12 @@ pub(crate) fn save_to_cache(
     source: &str,
     exports: &ExportMap,
     bind: &BindResult,
-    carrier: CarrierKind,
 ) {
     if !has_portable_interface(virtual_id) {
         return;
     }
     let id = cache_module_id(virtual_id);
-    let fingerprint = cache_fingerprint(source, carrier);
+    let fingerprint = cache_fingerprint(source);
     if let Ok(payload) = serialize_module_interface(exports, bind) {
         let Some(dep_hashes) = current_dep_hashes(bind) else {
             return;
