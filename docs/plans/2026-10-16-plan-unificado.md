@@ -100,6 +100,10 @@ hecho donde se decide (`b49792a6`): activación vetada solo en OSR,
 `direct_entry` solo async/generador, `await` fusionado entra directo a todo
 callee compilado. Pareado quick: try síncrono 406→259 ms, cadena await
 no-hoja 165→118, recursión async 9000 74→43. Residuo en P2b.
+Checker (2026-10-17, hallados al compilar los ejemplos de `docs/`): asignar a
+un nombre no declarado no daba error y llegaba al verificador TIR como
+`InvalidTir` (`1f274bea`); las sentencias inalcanzables solo avisaban y no se
+chequeaban, pero se emitían (`94f63b09`). Corpus `tests/errors` 206/0.
 
 ## 2. Pendiente, por orden
 
