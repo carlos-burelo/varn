@@ -16,7 +16,7 @@ pub use instance::{InstanceData, InstanceRef, INST_CLASS_ID_OFF, INST_PAYLOAD_OF
 pub use module::{FrozenExport, FrozenModuleObj, ModuleObj};
 pub use object::{ObjData, OBJ_INLINE_LEN_OFF, OBJ_SHAPE_OFF, OBJ_VALUES_OFF};
 pub use sendable::{SendEnumVariant, SendValue};
-pub use shape::{root_shape, Shape, SHAPE_ID_OFF};
+pub use shape::{iter_result_shape, root_shape, Shape, SHAPE_ID_OFF};
 use std::rc::Rc;
 use std::sync::Arc;
 pub use varn_core::RuntimeKind;

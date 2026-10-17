@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use varn_types::value::SendValue;
-use varn_types::{Completion, HostOpen, NativeCtx};
+use varn_types::{Completion, HostOpen};
 
 use super::ctx::ExecCtx;
 use crate::task::{settle, Outcome, TaskCell};
@@ -31,11 +31,10 @@ fn closed_error(ctx: &mut ExecCtx) -> VmValue {
 }
 
 fn iter_result(ctx: &mut ExecCtx, value: VmValue, done: bool) -> VmValue {
-    let obj = ctx.alloc_object();
-    ctx.set_field(obj, "value", value);
-    let done_nv = ctx.bool_val(done);
-    ctx.set_field(obj, "done", done_nv);
-    obj
+    ctx.heap.alloc_object_with_shape_slice(
+        &varn_types::iter_result_shape(),
+        &[value, VmValue::from_bool(done)],
+    )
 }
 
 fn materialize(ctx: &mut ExecCtx, done: Completion, open: HostOpen) -> Outcome {

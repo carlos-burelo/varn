@@ -81,11 +81,10 @@ pub fn open_sent(ctx: &mut dyn NativeCtx, value: &SendValue) -> VmValue {
 }
 
 fn next_result(ctx: &mut dyn NativeCtx, value_nv: VmValue, done: bool) -> VmValue {
-    let obj = ctx.alloc_object();
-    ctx.set_field(obj, "value", value_nv);
-    let done_nv = ctx.bool_val(done);
-    ctx.set_field(obj, "done", done_nv);
-    obj
+    ctx.alloc_object_with_shape(
+        &varn_types::iter_result_shape(),
+        vec![value_nv, VmValue::from_bool(done)],
+    )
 }
 
 varn_contract! {

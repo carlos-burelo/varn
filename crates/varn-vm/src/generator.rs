@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
 use varn_types::generator::GeneratorDriver;
 use varn_types::{NativeCtx, NativeFnResult};
 
@@ -20,10 +19,10 @@ pub(crate) fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Nativ
 }
 
 fn make_iter_result(heap: &mut crate::heap::Heap, value: VmValue, done: bool) -> VmValue {
-    heap.alloc_object_pairs([
-        (Arc::from("value"), value),
-        (Arc::from("done"), VmValue::from_bool(done)),
-    ])
+    heap.alloc_object_with_shape_slice(
+        &varn_types::iter_result_shape(),
+        &[value, VmValue::from_bool(done)],
+    )
 }
 
 struct NanGenInner {
