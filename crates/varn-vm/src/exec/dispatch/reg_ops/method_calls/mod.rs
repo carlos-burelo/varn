@@ -53,18 +53,25 @@ impl ExecCtx {
         closure: &VmClosure,
     ) -> VmResult<MethodOutcome> {
         let name_nv = closure.constants[name_idx];
-        let name = self
-            .heap
-            .str_val(name_nv)
-            .ok_or_else(|| RuntimeError::new("CallMethod: non-string name"))?;
+        let mut sso = [0u8; varn_types::vm_value::SSO_MAX_LEN];
+        let shared;
+        let name: &str = if name_nv.is_sso() {
+            name_nv.sso_as_str(&mut sso)
+        } else {
+            shared = self
+                .heap
+                .str_val(name_nv)
+                .ok_or_else(|| RuntimeError::new("CallMethod: non-string name"))?;
+            &shared
+        };
 
-        if let Some(template) = self.enum_variant_template(this_val, name.as_ref())
+        if let Some(template) = self.enum_variant_template(this_val, name)
             && let Some(built) = self.construct_enum_variant(&template, args)
         {
             return Ok(MethodOutcome::Value(built));
         }
 
-        if let Some(v) = self.intrinsic_method(this_val, name.as_ref(), args) {
+        if let Some(v) = self.intrinsic_method(this_val, name, args) {
             return Ok(MethodOutcome::Value(v));
         }
 
@@ -75,7 +82,7 @@ impl ExecCtx {
                 match ic::probe(&self.heap, closure, site, cls, args.len()) {
                     Some(IcHit::Native(f)) => {
                         self.record_ic_hit_callmethod();
-                        return self.call_native_method(f, this_val, args, name.as_ref());
+                        return self.call_native_method(f, this_val, args, name);
                     }
                     Some(IcHit::Vm(nc, owner)) => {
                         self.record_ic_hit_callmethod();
@@ -84,21 +91,21 @@ impl ExecCtx {
                             Some(owner),
                             this_val,
                             args,
-                            name.as_ref(),
+                            name,
                         );
                     }
                     None => self.record_ic_miss_callmethod(),
                 }
             }
             if let Some(outcome) =
-                self.call_class_method(cls, this_val, name.as_ref(), args, closure, site)?
+                self.call_class_method(cls, this_val, name, args, closure, site)?
             {
                 return Ok(outcome);
             }
         }
 
         let receiver_class = receiver_class.as_ref();
-        let method_nv = crate::exec::props::get_property(this_val, &name, &mut self.heap)?;
+        let method_nv = crate::exec::props::get_property(this_val, name, &mut self.heap)?;
 
         if method_nv.is_heap()
             && let Some(HeapObj::BoundMethod(bm)) = self.heap.get(method_nv.as_heap())
@@ -110,10 +117,10 @@ impl ExecCtx {
                         closure,
                         site,
                         receiver_class,
-                        name.as_ref(),
+                        name,
                         ICKind::NATIVE_VTABLE_METHOD,
                     );
-                    return self.call_native_method(f, this_val, args, name.as_ref());
+                    return self.call_native_method(f, this_val, args, name);
                 }
                 BoundMethodTarget::Vm {
                     closure: method_closure,
@@ -127,7 +134,7 @@ impl ExecCtx {
                             closure,
                             site,
                             receiver_class,
-                            name.as_ref(),
+                            name,
                             ICKind::VM_VTABLE_METHOD,
                         );
                     }
