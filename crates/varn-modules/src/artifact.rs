@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use varn_core::fingerprint::fingerprint;
 use varn_core::ModuleId;
 
 pub const ENV_DIR_NAME: &str = ".vn";
@@ -14,28 +15,23 @@ include!(concat!(env!("OUT_DIR"), "/build_fingerprint.rs"));
 pub fn producer_fingerprint() -> u32 {
     static FP: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
     *FP.get_or_init(|| {
-        let mut hash: u64 = 0xcbf29ce484222325;
-        let mut eat = |bytes: &[u8]| {
-            for b in bytes {
-                hash ^= *b as u64;
-                hash = hash.wrapping_mul(0x100000001b3);
-            }
-        };
+        let mut stamp = Vec::new();
         match std::env::current_exe() {
             Ok(exe) => {
-                eat(exe.to_string_lossy().as_bytes());
+                stamp.extend_from_slice(exe.to_string_lossy().as_bytes());
                 if let Ok(meta) = std::fs::metadata(&exe) {
-                    eat(&meta.len().to_le_bytes());
+                    stamp.extend_from_slice(&meta.len().to_le_bytes());
                     if let Ok(modified) = meta.modified()
                         && let Ok(since) = modified.duration_since(std::time::UNIX_EPOCH)
                     {
-                        eat(&since.as_nanos().to_le_bytes());
+                        stamp.extend_from_slice(&since.as_nanos().to_le_bytes());
                     }
                 }
             }
 
-            Err(_) => eat(b"varn-unknown-producer"),
+            Err(_) => stamp.extend_from_slice(b"varn-unknown-producer"),
         }
+        let hash = fingerprint(&stamp);
         (hash ^ (hash >> 32)) as u32
     })
 }
@@ -92,7 +88,7 @@ pub const MAGIC: &[u8; 4] = b"VARN";
 
 pub const MAGIC_VEXE: &[u8; 4] = b"VEXE";
 
-const ENVELOPE_VERSION: u16 = 1;
+const ENVELOPE_VERSION: u16 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
@@ -189,15 +185,6 @@ impl std::fmt::Display for ArtifactError {
     }
 }
 
-fn payload_checksum(payload: &[u8]) -> u32 {
-    let mut hash: u32 = 0x811c9dc5;
-    for &b in payload {
-        hash ^= b as u32;
-        hash = hash.wrapping_mul(0x0100_0193);
-    }
-    hash
-}
-
 pub fn find_project_root(start_path: &Path) -> PathBuf {
     start_path
         .ancestors()
@@ -233,22 +220,12 @@ pub fn get_types_cache_dir(project_root: &Path) -> PathBuf {
     get_cache_dir(project_root).join(TYPES_DIR_NAME)
 }
 
-pub fn source_fingerprint(source: &str) -> u64 {
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for b in source.as_bytes() {
-        hash ^= *b as u64;
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    hash
-}
-
-pub fn module_key(id: &ModuleId, fingerprint: u64) -> String {
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for b in id.as_str().as_bytes() {
-        hash ^= *b as u64;
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    format!("{:016x}_{:016x}", hash, fingerprint)
+pub fn module_key(id: &ModuleId, fingerprint_of_source: u64) -> String {
+    format!(
+        "{:016x}_{:016x}",
+        fingerprint(id.as_str().as_bytes()),
+        fingerprint_of_source
+    )
 }
 
 pub fn module_artifact_path(
@@ -305,7 +282,7 @@ fn dirs_home() -> Option<PathBuf> {
     }
 }
 
-const HEADER_LEN: usize = 21;
+const HEADER_LEN: usize = 25;
 
 pub fn write_artifact(kind: ArtifactKind, class: ArtifactClass, payload: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(HEADER_LEN + payload.len());
@@ -315,7 +292,7 @@ pub fn write_artifact(kind: ArtifactKind, class: ArtifactClass, payload: &[u8]) 
     out.push(class as u8);
     out.extend_from_slice(&BUILD_FINGERPRINT.to_le_bytes());
     out.extend_from_slice(&class.producer_stamp().to_le_bytes());
-    out.extend_from_slice(&payload_checksum(payload).to_le_bytes());
+    out.extend_from_slice(&fingerprint(payload).to_le_bytes());
     out.extend_from_slice(payload);
     out
 }
@@ -360,12 +337,12 @@ pub fn read_artifact(expected: ArtifactKind, bytes: &[u8]) -> Result<&[u8], Arti
     if producer != class.producer_stamp() {
         return Err(ArtifactError::Superseded);
     }
-    let Ok(expected_sum) = bytes[17..21].try_into().map(u32::from_le_bytes) else {
+    let Ok(expected_sum) = bytes[17..25].try_into().map(u64::from_le_bytes) else {
         return Err(ArtifactError::Corrupt);
     };
     let payload = &bytes[HEADER_LEN..];
 
-    if payload_checksum(payload) != expected_sum {
+    if fingerprint(payload) != expected_sum {
         return Err(ArtifactError::Corrupt);
     }
     Ok(payload)

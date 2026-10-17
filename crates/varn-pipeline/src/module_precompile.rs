@@ -1,4 +1,4 @@
-use crate::hash::fnv1a64;
+use varn_core::fingerprint::fingerprint;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::VecDeque;
 use std::path::Path;
@@ -33,7 +33,7 @@ pub fn build_module_graph(
 
     let mut graph: HashMap<String, Vec<String>> = HashMap::default();
     let mut source_hashes: HashMap<String, u64> = HashMap::default();
-    source_hashes.insert(canonical_entry.clone(), fnv1a64(entry_source.as_bytes()));
+    source_hashes.insert(canonical_entry.clone(), fingerprint(entry_source.as_bytes()));
 
     let mut node_sources: HashMap<String, (String, Program, AstArena, varn_core::AtomInterner)> =
         HashMap::default();
@@ -73,7 +73,7 @@ pub fn build_module_graph(
 
         let source = read_module_source(&module_path)
             .map_err(|e| format!("cannot read module '{module_path}': {e}"))?;
-        source_hashes.insert(module_path.clone(), fnv1a64(source.as_bytes()));
+        source_hashes.insert(module_path.clone(), fingerprint(source.as_bytes()));
 
         let (program, arena, interner) = crate::quiet_parse::parse_module(
             &source,
@@ -323,7 +323,7 @@ pub fn resolve_import_specifier(
         ImportSpecifier::Package(_) => {
             let resolved = varn_modules::resolve_pkg_specifier_detailed(module_dir, specifier)?;
             let integrity = std::fs::read(&resolved.resolved_path)
-                .map(|bytes| format!("{:016x}", fnv1a64(&bytes)))
+                .map(|bytes| format!("{:016x}", fingerprint(&bytes)))
                 .unwrap_or_else(|_| UNKNOWN_INTEGRITY_HASH.to_owned());
             package_nodes
                 .entry(specifier.to_owned())

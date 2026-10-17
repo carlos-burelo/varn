@@ -6,6 +6,7 @@ pub mod debug_flags;
 pub mod diagnostics;
 pub mod doc;
 pub mod errors;
+pub mod fingerprint;
 pub mod fmt;
 pub mod intrinsic_ops;
 pub mod intrinsics;

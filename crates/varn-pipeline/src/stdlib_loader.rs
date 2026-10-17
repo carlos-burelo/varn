@@ -78,7 +78,7 @@ impl ModuleLoader for PipelineLoader {
                 .map_err(|e| ModuleError::new(format!("corrupt bytecode for {id:?}: {e}")));
         }
         let text = source.text;
-        let fingerprint = varn_modules::artifact::source_fingerprint(text.as_ref());
+        let fingerprint = varn_core::fingerprint::fingerprint(text.as_bytes());
         let key = varn_modules::artifact::module_key(id, fingerprint);
         if let Some(hit) = self.cached_proto(&key, fingerprint) {
             return Ok(Some(hit));

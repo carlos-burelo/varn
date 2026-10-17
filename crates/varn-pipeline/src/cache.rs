@@ -14,7 +14,7 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     let project_root = varn_modules::artifact::find_project_root(file_dir);
 
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    let path_hash = crate::hash::fnv1a64(canonical.to_string_lossy().as_bytes());
+    let path_hash = varn_core::fingerprint::fingerprint(canonical.to_string_lossy().as_bytes());
 
     let stem = path.file_stem().unwrap_or_default().to_string_lossy();
 
@@ -50,7 +50,7 @@ pub fn load_cached_graph(
 
     match graph.source_hashes.get(&graph.entry_path) {
         Some(&cached_hash) => {
-            let current_hash = crate::hash::fnv1a64(entry_source.as_bytes());
+            let current_hash = varn_core::fingerprint::fingerprint(entry_source.as_bytes());
             if cached_hash != current_hash {
                 reason(format_args!("el fuente de entrada cambió"));
                 return Ok(None);
@@ -69,7 +69,7 @@ pub fn load_cached_graph(
 
         if let Some(provider) = varn_modules::provider::get() {
             if let Some(src) = provider.embedded_source(path) {
-                let current_hash = crate::hash::fnv1a64(src.as_bytes());
+                let current_hash = varn_core::fingerprint::fingerprint(src.as_bytes());
                 if cached_hash != current_hash {
                     reason(format_args!("el módulo embebido {path} cambió"));
                     return Ok(None);
@@ -79,7 +79,7 @@ pub fn load_cached_graph(
             if let Some(p) = provider.source_path(path) {
                 match std::fs::read(&p) {
                     Ok(src) => {
-                        let current_hash = crate::hash::fnv1a64(&src);
+                        let current_hash = varn_core::fingerprint::fingerprint(&src);
                         if cached_hash != current_hash {
                             reason(format_args!("la fuente std {path} cambió"));
                             return Ok(None);
@@ -96,7 +96,7 @@ pub fn load_cached_graph(
 
         match std::fs::read(path) {
             Ok(src) => {
-                let current_hash = crate::hash::fnv1a64(&src);
+                let current_hash = varn_core::fingerprint::fingerprint(&src);
                 if cached_hash != current_hash {
                     reason(format_args!("la dependencia {path} cambió"));
                     return Ok(None);

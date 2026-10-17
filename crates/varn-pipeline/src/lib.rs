@@ -6,7 +6,6 @@ mod debug_sink;
 mod error;
 mod execute;
 pub mod fmt;
-pub mod hash;
 pub mod import_collector;
 pub mod module_precompile;
 mod opts;
