@@ -260,7 +260,6 @@ fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type
             split_bool(Type::Bool, &mut out, table)
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)
@@ -322,7 +321,6 @@ fn pattern_covers(
                     bind.interner.try_resolve(n) == Some(name)
                 }
                 kind @ TypeKind::Primitive(_)
-                | kind @ TypeKind::Builtin(_)
                 | kind @ TypeKind::Literal(_)
                 | kind @ TypeKind::This
                 | kind @ TypeKind::Array(_)

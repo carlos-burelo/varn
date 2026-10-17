@@ -35,7 +35,7 @@ pub fn expr_satisfies_target_type(
         return true;
     }
     if let (Some(elem_ty), ExprKind::Array { elements }) =
-        (array_element_type(target_ty, table, interner), expr_kind)
+        (array_element_type(target_ty, table), expr_kind)
     {
         let literal_elem = matches!(
             table.get(elem_ty.0),
@@ -44,7 +44,7 @@ pub fn expr_satisfies_target_type(
                     | varn_core::LangPrimitive::Decimal
                     | varn_core::LangPrimitive::BigInt
             )
-        ) || array_element_type(&elem_ty, table, interner).is_some();
+        ) || array_element_type(&elem_ty, table).is_some();
         if literal_elem && !elements.is_empty() {
             return elements.iter().all(|el| match el {
                 ArrayEl::Expr(e) => {

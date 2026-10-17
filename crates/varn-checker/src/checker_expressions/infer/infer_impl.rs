@@ -255,7 +255,6 @@ impl<'r> Checker<'r> {
                         Type::resolved(self.ty_table.get_function(fid).return_type)
                     }
                     TypeKind::Primitive(_)
-                    | TypeKind::Builtin(_)
                     | TypeKind::Literal(_)
                     | TypeKind::This
                     | TypeKind::Array(_)

@@ -194,7 +194,9 @@ impl<'m> Builder<'m> {
             }
             Resolution::Upvalue(uv) => Ok(self.emit(InstKind::LoadUpvalue(*uv), ty)),
             Resolution::GlobalSlot(n) => Ok(self.emit(InstKind::LoadGlobalIdx(*n), ty)),
-            Resolution::NativeGlobal(n) => Ok(self.emit(InstKind::LoadNativeGlobalIdx(*n), ty)),
+            Resolution::NativeGlobal(n) => {
+                Ok(self.emit(InstKind::LoadNativeGlobalIdx(*n), native_global_ty(*n)))
+            }
             Resolution::ModuleSlot { .. } => Err(OptError::Unsupported("from_tir: module slot")),
             Resolution::ByName { name, .. } => {
                 Ok(self.emit(InstKind::LoadGlobal(name.clone()), ty))
@@ -270,5 +272,14 @@ impl<'m> Builder<'m> {
         self.seal_block(join);
         self.current = join;
         Ok(phi)
+    }
+}
+
+fn native_global_ty(index: u32) -> HirType {
+    use varn_core::abi::{NativeValue, NATIVE_GLOBALS};
+    match NATIVE_GLOBALS.get(index as usize).map(|g| g.value) {
+        Some(NativeValue::Float) => HirType::Float,
+        Some(NativeValue::Bool) => HirType::Bool,
+        Some(NativeValue::Class | NativeValue::Function) | None => HirType::Ref,
     }
 }

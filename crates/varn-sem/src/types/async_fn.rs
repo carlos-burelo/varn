@@ -1,26 +1,20 @@
 use super::{CheckerTyTable, Type};
-use varn_core::TypeKind;
+use varn_core::{BuiltinType, TypeKind};
 
 pub fn async_fn_return(ret: Type, is_async: bool, table: &mut CheckerTyTable) -> Type {
     if !is_async || ret.is_dynamic() || is_awaitable(&ret, table) {
         return ret;
     }
-    let atom = table.intern_name(varn_core::BuiltinType::Task.name());
-    Type::generic_atom(atom, vec![ret], None, table)
+    Type::builtin(BuiltinType::Task, vec![ret], table)
 }
 
 pub fn yielded_by(declared: Type, table: &CheckerTyTable) -> Type {
-    if let TypeKind::Generic(name, args, _) = table.get(declared.0) {
-        let wraps = matches!(
-            table.name(name),
-            Some(n) if n == varn_core::BuiltinType::Generator.name()
-                || n == varn_core::BuiltinType::AsyncGenerator.name()
-        );
-        if let (true, [item]) = (wraps, table.get_list(args)) {
-            return Type::resolved(*item);
+    match declared.builtin_of(table) {
+        Some(BuiltinType::Generator | BuiltinType::AsyncGenerator) => {
+            declared.builtin_arg(0, table)
         }
+        Some(_) | None => declared,
     }
-    declared
 }
 
 pub fn declared_generator(declared: Type, is_async: bool, table: &mut CheckerTyTable) -> Type {
@@ -29,48 +23,20 @@ pub fn declared_generator(declared: Type, is_async: bool, table: &mut CheckerTyT
 }
 
 pub fn generator_of(yielded: Type, is_async: bool, table: &mut CheckerTyTable) -> Type {
-    let name = if is_async {
-        varn_core::BuiltinType::AsyncGenerator
+    let generator = if is_async {
+        BuiltinType::AsyncGenerator
     } else {
-        varn_core::BuiltinType::Generator
-    }
-    .name();
-    let atom = table.intern_name(name);
-    Type::generic_atom(atom, vec![yielded], None, table)
+        BuiltinType::Generator
+    };
+    Type::builtin(generator, vec![yielded], table)
 }
 
 pub fn is_awaitable(ty: &Type, table: &CheckerTyTable) -> bool {
-    match table.get(ty.0) {
-        TypeKind::Generic(name, args, _) => {
-            table.get_list(args).len() == 1
-                && matches!(
-                    table.name(name),
-                    Some(n)
-                        if n == varn_core::BuiltinType::Task.name()
-                            || n == varn_core::BuiltinType::TaskHandle.name()
-                )
-        }
-        TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
-        | TypeKind::Literal(_)
-        | TypeKind::This
-        | TypeKind::Array(_)
-        | TypeKind::Union(_)
-        | TypeKind::Intersection(_)
-        | TypeKind::Tuple(_)
-        | TypeKind::Named(..)
-        | TypeKind::TemplateLiteral(_)
-        | TypeKind::Fn(_)
-        | TypeKind::Object(_)
-        | TypeKind::Typeof(_)
-        | TypeKind::KeyOf(_)
-        | TypeKind::IndexedAccess { .. }
-        | TypeKind::Mapped { .. }
-        | TypeKind::Conditional { .. }
-        | TypeKind::Infer(_)
-        | TypeKind::EnumVariant { .. }
-        | TypeKind::TypePredicate { .. } => false,
-    }
+    matches!(table.get(ty.0), TypeKind::Generic(_, args, _) if table.get_list(args).len() == 1)
+        && matches!(
+            ty.builtin_of(table),
+            Some(BuiltinType::Task | BuiltinType::TaskHandle)
+        )
 }
 
 pub fn awaited(ty: &Type, table: &CheckerTyTable) -> Type {
@@ -79,7 +45,6 @@ pub fn awaited(ty: &Type, table: &CheckerTyTable) -> Type {
             Type::resolved(table.get_list(args)[0])
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

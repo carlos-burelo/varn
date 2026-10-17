@@ -249,7 +249,6 @@ impl<'r> Checker<'r> {
                 o.map(|o| std::sync::Arc::from(bind.interner.resolve(o))),
             ),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

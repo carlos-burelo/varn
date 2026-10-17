@@ -15,7 +15,6 @@ pub fn numeric_operand(t: &Type, table: &CheckerTyTable) -> Option<varn_core::Nu
         TypeKind::Primitive(varn_core::LangPrimitive::Decimal) => Some(NumericOperand::Decimal),
         TypeKind::Primitive(varn_core::LangPrimitive::BigInt) => Some(NumericOperand::BigInt),
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)
@@ -122,7 +121,7 @@ pub(crate) fn infer_binary(
     }
 }
 
-pub(crate) fn infer_new(
+pub fn infer_new(
     callee: ExprId,
     type_args: &[varn_core::ast::TypeNode],
     arena: &AstArena,
@@ -135,11 +134,10 @@ pub(crate) fn infer_new(
             .and_then(|c| c.interner())
             .map(|i| i.resolve(*name).to_owned())
             .unwrap_or_default();
-        let origin = ctx
-            .and_then(|c| c.source_file())
-            .map(|s| table.intern_name(s));
+        let origin = super::type_resolution::nominal_origin(&name_str, ctx, table);
         if type_args.is_empty() {
-            if name_str == varn_core::BuiltinType::Map.name() {
+            if varn_core::BuiltinType::identify(*name, origin) == Some(varn_core::BuiltinType::Map)
+            {
                 return Type::generic_atom(
                     *name,
                     vec![Type::Dynamic, Type::Dynamic],
@@ -167,7 +165,6 @@ pub(crate) fn infer_new(
                 return Type::generic_atom(name, arg_tys, origin, table);
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

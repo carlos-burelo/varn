@@ -207,7 +207,6 @@ impl<'r> Checker<'r> {
                 }
                 TypeKind::Primitive(p) => p.core_module().map(std::sync::Arc::from),
                 TypeKind::Literal(l) => l.base().core_module().map(std::sync::Arc::from),
-                TypeKind::Builtin(b) => Some(std::sync::Arc::from(b.core_module())),
                 TypeKind::This
                 | TypeKind::Array(_)
                 | TypeKind::Union(_)
@@ -246,7 +245,6 @@ impl<'r> Checker<'r> {
                 Some(self.resolve_bind_atom(bind, n).to_string())
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -281,7 +279,7 @@ pub(crate) fn extension_type_name(
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
             Some(checker.resolve_bind_atom(bind, n))
         }
-        k @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
+        k @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => {
             k.lang_name().map(std::sync::Arc::from)
         }
         TypeKind::This

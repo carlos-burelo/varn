@@ -89,19 +89,7 @@ impl<'r> Checker<'r> {
                 }
                 false
             }
-            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
-                if key == varn_core::MemberKey::Length.as_str() {
-                    return true;
-                }
-                if let Some(b) = &bind.core
-                    && let Some(members) = b.class_members.get(varn_core::BuiltinType::Bytes.name())
-                    && members.members.iter().any(|m| m.name.as_ref() == key)
-                {
-                    return true;
-                }
-                false
-            }
-            kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
+            kind @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => {
                 let name = kind.lang_name().unwrap_or_default();
                 if let Some(b) = &bind.core
                     && let Some(members) = b.class_members.get(name)

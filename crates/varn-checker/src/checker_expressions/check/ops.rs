@@ -313,7 +313,6 @@ impl<'r> Checker<'r> {
                     .then_some(ctor)
             }
             varn_core::TypeKind::Primitive(_)
-            | varn_core::TypeKind::Builtin(_)
             | varn_core::TypeKind::Literal(_)
             | varn_core::TypeKind::This
             | varn_core::TypeKind::Array(_)

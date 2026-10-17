@@ -69,7 +69,6 @@ impl<'r> super::Binder<'r> {
                 TypeKind::Named(n, o) => Some((n, o, args)),
                 TypeKind::Generic(n, _, o) => Some((n, o, args)),
                 TypeKind::Primitive(_)
-                | TypeKind::Builtin(_)
                 | TypeKind::Literal(_)
                 | TypeKind::This
                 | TypeKind::Array(_)

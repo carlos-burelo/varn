@@ -100,7 +100,6 @@ pub(crate) fn collect_type_inferences(
             }
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Intersection(_)

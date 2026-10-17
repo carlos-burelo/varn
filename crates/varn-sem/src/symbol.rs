@@ -25,6 +25,27 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
+    pub const fn denotes_type(self) -> bool {
+        match self {
+            SymbolKind::Class
+            | SymbolKind::Interface
+            | SymbolKind::TypeAlias
+            | SymbolKind::Enum
+            | SymbolKind::TypeParameter
+            | SymbolKind::Struct => true,
+            SymbolKind::Var
+            | SymbolKind::Let
+            | SymbolKind::Const
+            | SymbolKind::Function
+            | SymbolKind::Parameter
+            | SymbolKind::Property
+            | SymbolKind::Method
+            | SymbolKind::Namespace
+            | SymbolKind::Extension
+            | SymbolKind::EnumMember => false,
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             SymbolKind::Var => "var  ",

@@ -27,7 +27,6 @@ impl<'r> Checker<'r> {
                     match self.ty_table.get(p.ty) {
                         TypeKind::Array(inner) => Type::resolved(inner),
                         TypeKind::Primitive(_)
-                        | TypeKind::Builtin(_)
                         | TypeKind::Literal(_)
                         | TypeKind::This
                         | TypeKind::Union(_)

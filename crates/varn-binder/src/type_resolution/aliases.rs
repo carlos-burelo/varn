@@ -29,7 +29,7 @@ pub fn resolve_primitive(
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
-    if let Some(kind) = TypeKind::of_lang_name(name) {
+    if let Some(kind) = TypeKind::of_primitive_name(name) {
         return Type::resolved(table.intern(kind));
     }
     let name_atom = table.intern_name(name);

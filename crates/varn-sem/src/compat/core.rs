@@ -83,7 +83,6 @@ pub(super) fn types_compatible_impl(
     let given_alias = match d {
         TypeKind::Union(_) => super::nominal::expanded_alias(inferred, bind, table),
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)
@@ -117,10 +116,9 @@ pub(super) fn types_compatible_impl(
 
         (a, b) if a == b => true,
 
-        (
-            TypeKind::Primitive(_) | TypeKind::Builtin(_),
-            TypeKind::Primitive(_) | TypeKind::Builtin(_),
-        ) => simple_types_compatible(declared, inferred, table),
+        (TypeKind::Primitive(_), TypeKind::Primitive(_)) => {
+            simple_types_compatible(declared, inferred, table)
+        }
         (TypeKind::Primitive(p), TypeKind::Literal(l)) => {
             use varn_core::LangPrimitive as P;
             let base = l.base();
@@ -129,11 +127,11 @@ pub(super) fn types_compatible_impl(
         (TypeKind::Primitive(varn_core::LangPrimitive::Str), TypeKind::TemplateLiteral(_)) => true,
         (TypeKind::TemplateLiteral(a), TypeKind::TemplateLiteral(b)) => a == b,
 
-        (lang @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)), TypeKind::Named(name, _))
-        | (TypeKind::Named(name, _), lang @ (TypeKind::Primitive(_) | TypeKind::Builtin(_)))
+        (lang @ TypeKind::Primitive(_), TypeKind::Named(name, _))
+        | (TypeKind::Named(name, _), lang @ TypeKind::Primitive(_))
             if resolve_atom(bind, name)
                 .as_deref()
-                .and_then(TypeKind::of_lang_name)
+                .and_then(TypeKind::of_primitive_name)
                 .is_some_and(|k| k == lang) =>
         {
             true

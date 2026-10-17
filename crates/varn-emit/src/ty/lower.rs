@@ -13,7 +13,10 @@ pub fn lower_type(
     tt: &mut TyTable,
     names: &dyn NameResolver,
 ) -> BackendTy {
-    lower_kind(&table.get(ty.0), table, interner, tt, names)
+    match ty.builtin_of(table) {
+        Some(b) if b != BuiltinType::Array => lower_builtin(b, ty, table, interner, tt, names),
+        Some(_) | None => lower_kind(&table.get(ty.0), table, interner, tt, names),
+    }
 }
 
 fn opaque() -> BackendTy {
@@ -79,68 +82,8 @@ fn lower_kind(
     names: &dyn NameResolver,
 ) -> BackendTy {
     match *kind {
-        TypeKind::Generic(name, args, _)
-            if interner.resolve(name) == BuiltinType::Map.name()
-                && table.get_list(args).len() == 2 =>
-        {
-            let arg_ids = table.get_list(args).to_vec();
-            let k = lower_type(&Type::resolved(arg_ids[0]), table, interner, tt, names);
-            let v = lower_type(&Type::resolved(arg_ids[1]), table, interner, tt, names);
-            BackendTy::Map(tt.intern(k), tt.intern(v))
-        }
-        TypeKind::Generic(name, args, _)
-            if interner.resolve(name) == BuiltinType::Set.name()
-                && table.get_list(args).len() == 1 =>
-        {
-            let el = lower_type(
-                &Type::resolved(table.get_list(args)[0]),
-                table,
-                interner,
-                tt,
-                names,
-            );
-            BackendTy::Set(tt.intern(el))
-        }
-        TypeKind::Generic(name, args, _)
-            if interner.resolve(name) == BuiltinType::Task.name()
-                && table.get_list(args).len() == 1 =>
-        {
-            let result = lower_type(
-                &Type::resolved(table.get_list(args)[0]),
-                table,
-                interner,
-                tt,
-                names,
-            );
-            BackendTy::Dynamic(DynReason::Awaitable(tt.intern(result)))
-        }
-        TypeKind::Generic(name, args, _)
-            if [BuiltinType::Generator, BuiltinType::AsyncGenerator]
-                .iter()
-                .any(|b| interner.resolve(name) == b.name())
-                && table.get_list(args).len() == 1 =>
-        {
-            let yielded = lower_type(
-                &Type::resolved(table.get_list(args)[0]),
-                table,
-                interner,
-                tt,
-                names,
-            );
-            BackendTy::Dynamic(DynReason::Yields(tt.intern(yielded)))
-        }
-        TypeKind::Builtin(varn_core::BuiltinType::Map) => {
-            let d = tt.intern(opaque());
-            BackendTy::Map(d, d)
-        }
-        TypeKind::Builtin(varn_core::BuiltinType::Set) => {
-            let d = tt.intern(opaque());
-            BackendTy::Set(d)
-        }
-
         TypeKind::Primitive(p) => lower_primitive(p),
         TypeKind::Literal(l) => lower_primitive(l.base()),
-        TypeKind::Builtin(b) => lower_builtin(b),
 
         TypeKind::Array(el) => {
             let inner = lower_type(&Type::resolved(el), table, interner, tt, names);
@@ -291,17 +234,69 @@ fn lower_primitive(p: LangPrimitive) -> BackendTy {
     }
 }
 
-fn lower_builtin(b: BuiltinType) -> BackendTy {
-    match b {
-        BuiltinType::Bytes => BackendTy::Bytes,
-        BuiltinType::Array
-        | BuiltinType::Map
-        | BuiltinType::Set
-        | BuiltinType::Range
-        | BuiltinType::Task
-        | BuiltinType::TaskHandle
-        | BuiltinType::Generator
-        | BuiltinType::AsyncGenerator => opaque(),
+fn lower_builtin(
+    b: BuiltinType,
+    ty: &Type,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &dyn NameResolver,
+) -> BackendTy {
+    let args: Vec<Type> = match table.get(ty.0) {
+        TypeKind::Generic(_, list, _) => table
+            .get_list(list)
+            .iter()
+            .map(|&id| Type::resolved(id))
+            .collect(),
+        TypeKind::Array(el) => vec![Type::resolved(el)],
+        TypeKind::Named(..)
+        | TypeKind::Primitive(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Union(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => vec![],
+    };
+    let lower = |t: &Type, tt: &mut TyTable| {
+        let lowered = lower_type(t, table, interner, tt, names);
+        tt.intern(lowered)
+    };
+    match (b, args.as_slice()) {
+        (BuiltinType::Map, [k, v]) => BackendTy::Map(lower(k, tt), lower(v, tt)),
+        (BuiltinType::Map, _) => {
+            let d = tt.intern(opaque());
+            BackendTy::Map(d, d)
+        }
+        (BuiltinType::Set, [el]) => BackendTy::Set(lower(el, tt)),
+        (BuiltinType::Set, _) => BackendTy::Set(tt.intern(opaque())),
+        (BuiltinType::Array, [el]) => BackendTy::Array(lower(el, tt)),
+        (BuiltinType::Task, [result]) => {
+            BackendTy::Dynamic(DynReason::Awaitable(lower(result, tt)))
+        }
+        (BuiltinType::Generator | BuiltinType::AsyncGenerator, [yielded]) => {
+            BackendTy::Dynamic(DynReason::Yields(lower(yielded, tt)))
+        }
+        (BuiltinType::Bytes, _) => BackendTy::Bytes,
+        (
+            BuiltinType::Array
+            | BuiltinType::Range
+            | BuiltinType::Task
+            | BuiltinType::TaskHandle
+            | BuiltinType::Generator
+            | BuiltinType::AsyncGenerator,
+            _,
+        ) => opaque(),
     }
 }
 

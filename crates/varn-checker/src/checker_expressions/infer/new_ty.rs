@@ -74,7 +74,6 @@ impl<'r> Checker<'r> {
                 )
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -196,7 +195,6 @@ impl<'r> Checker<'r> {
         match self.ty_table.get(expected.0) {
             TypeKind::Generic(expected_name, _, _) if expected_name == name => Some(expected),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

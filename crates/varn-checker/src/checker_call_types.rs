@@ -4,7 +4,6 @@ mod call_composite;
 mod call_control;
 mod call_invoke;
 mod call_member;
-mod call_new;
 
 use call_binary::infer_binary;
 use call_closure::infer_closure;
@@ -12,7 +11,6 @@ use call_composite::infer_match;
 use call_control::{infer_await, infer_conditional};
 use call_invoke::infer_invoke;
 use call_member::infer_member;
-use call_new::infer_new;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_binder::resolve_type_node;
@@ -63,7 +61,13 @@ impl<'a> CallTypeCtx<'a> {
             } => infer_invoke(self, callee, &type_args),
             ExprKind::New {
                 callee, type_args, ..
-            } => infer_new(self, callee, &type_args),
+            } => Some(varn_binder::infer_new(
+                callee,
+                &type_args,
+                self.ast_arena,
+                self.ctx,
+                self.table,
+            )),
             ExprKind::Paren { expression } => self.infer(expression),
             ExprKind::As { type_ann, .. } => {
                 let ctx = self.ctx;

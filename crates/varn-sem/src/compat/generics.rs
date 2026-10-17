@@ -1,4 +1,3 @@
-use super::resolve::is_intrinsic;
 use super::scalar::t;
 use super::variance::Variance;
 use crate::bind::BindView;
@@ -39,20 +38,7 @@ pub(super) fn generic_arms(
         (TypeKind::Generic(n1, a1, o1), TypeKind::Generic(n2, a2, _o2)) => {
             let l1 = table.get_list(a1);
             let l2 = table.get_list(a2);
-            if is_intrinsic(bind, n1, varn_core::BuiltinType::Array.name())
-                && is_intrinsic(bind, n2, varn_core::BuiltinType::Array.name())
-                && l1.len() == 1
-                && l2.len() == 1
-            {
-                Some(super::arrays::same_element(
-                    &t(l1[0]),
-                    &t(l2[0]),
-                    bind,
-                    cache,
-                    in_progress,
-                    table,
-                ))
-            } else if n1 == n2 {
+            if n1 == n2 {
                 let vars = measured_variance(bind, n1, o1).unwrap_or_default();
                 Some(
                     l1.len() == l2.len()

@@ -1,55 +1,11 @@
 use crate::symbol::Symbol;
 use crate::types::{CheckerTyTable, Type};
 
-pub fn canonicalize_lang_named(ty: Type, table: &mut CheckerTyTable) -> Type {
-    let (name_atom, origin_atom) = match table.get(ty.0) {
-        varn_core::TypeKind::Named(n, o) => (n, o),
-        varn_core::TypeKind::Primitive(_)
-        | varn_core::TypeKind::Builtin(_)
-        | varn_core::TypeKind::Literal(_)
-        | varn_core::TypeKind::This
-        | varn_core::TypeKind::Array(_)
-        | varn_core::TypeKind::Union(_)
-        | varn_core::TypeKind::Intersection(_)
-        | varn_core::TypeKind::Tuple(_)
-        | varn_core::TypeKind::Generic(..)
-        | varn_core::TypeKind::TemplateLiteral(_)
-        | varn_core::TypeKind::Fn(_)
-        | varn_core::TypeKind::Object(_)
-        | varn_core::TypeKind::Typeof(_)
-        | varn_core::TypeKind::KeyOf(_)
-        | varn_core::TypeKind::IndexedAccess { .. }
-        | varn_core::TypeKind::Mapped { .. }
-        | varn_core::TypeKind::Conditional { .. }
-        | varn_core::TypeKind::Infer(_)
-        | varn_core::TypeKind::EnumVariant { .. }
-        | varn_core::TypeKind::TypePredicate { .. } => return ty,
-    };
-    let Some(origin) = origin_atom else {
-        return ty;
-    };
-    let (Some(name_s), Some(origin_s)) = (table.name(name_atom), table.name(origin)) else {
-        return ty;
-    };
-    let (name_s, origin_s) = (name_s.to_string(), origin_s.to_string());
-    if let Some(b) = varn_core::BuiltinType::from_str(&name_s)
-        && origin_s == b.core_module()
-    {
-        return Type::builtin(b, table);
-    }
-    if let Some(p) = varn_core::LangPrimitive::from_str(&name_s)
-        && Some(origin_s.as_str()) == p.core_module()
-    {
-        return Type::primitive(p, table);
-    }
-    ty
-}
-
 pub fn rehome_ty(ty: Type, from: &CheckerTyTable, to: &mut CheckerTyTable) -> Type {
     if !to.contains(ty.0) {
         to.absorb(from);
     }
-    canonicalize_lang_named(ty, to)
+    ty
 }
 
 pub fn rehome_ty_with_origin(
@@ -64,8 +20,7 @@ pub fn rehome_ty_with_origin(
         varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
     ) {
         let origin = to.intern_name(from_source_file);
-        let ty = ty.with_origin(origin, to);
-        return canonicalize_lang_named(ty, to);
+        return ty.with_origin(origin, to);
     }
     ty
 }

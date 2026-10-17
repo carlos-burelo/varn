@@ -127,7 +127,6 @@ fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
             }
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Union(_)

@@ -28,11 +28,7 @@ pub(super) fn type_node_to_name(node: &TypeNode, interner: &varn_core::AtomInter
         }
         TypeKind::Named(n, _) => interner.resolve(*n).to_owned(),
         TypeKind::Generic(n, _, _) => interner.resolve(*n).to_owned(),
-        TypeKind::Builtin(varn_core::BuiltinType::Array) => {
-            varn_core::BuiltinType::Array.name().to_owned()
-        }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

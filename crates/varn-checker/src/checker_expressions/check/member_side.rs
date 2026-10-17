@@ -21,7 +21,6 @@ impl<'r> Checker<'r> {
                 origin.map(|o| self.resolve_bind_atom(bind, o)),
             ),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

@@ -53,7 +53,6 @@ impl<'r> Checker<'r> {
             let params = match self.ty_table.get(ty.0) {
                 TypeKind::Fn(fid) => self.ty_table.get_function(fid).params.clone(),
                 TypeKind::Primitive(_)
-                | TypeKind::Builtin(_)
                 | TypeKind::Literal(_)
                 | TypeKind::This
                 | TypeKind::Array(_)

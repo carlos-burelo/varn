@@ -38,7 +38,6 @@ impl<'r> Checker<'r> {
                 names
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

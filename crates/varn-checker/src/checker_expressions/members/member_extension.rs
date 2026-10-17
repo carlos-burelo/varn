@@ -118,9 +118,9 @@ fn extension_key(ty: &Type, table: &CheckerTyTable, bind: &BindResult) -> Option
         varn_core::TypeKind::Named(n, _) | varn_core::TypeKind::Generic(n, _, _) => {
             Some(Arc::from(super::member_atom::resolve_atom_text(bind, n)))
         }
-        k @ (varn_core::TypeKind::Primitive(_)
-        | varn_core::TypeKind::Builtin(_)
-        | varn_core::TypeKind::Literal(_)) => k.lang_name().map(Arc::from),
+        k @ (varn_core::TypeKind::Primitive(_) | varn_core::TypeKind::Literal(_)) => {
+            k.lang_name().map(Arc::from)
+        }
         varn_core::TypeKind::Array(_) => Some(Arc::from(varn_core::BuiltinType::Array.name())),
         varn_core::TypeKind::This
         | varn_core::TypeKind::Union(_)

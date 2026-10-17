@@ -40,9 +40,10 @@ impl<'r> Checker<'r> {
         }
         let prop_ty = self.infer_type(rec, property, bind);
         let obj_kind = self.ty_table.get(obj_ty.0);
+        let builtin = obj_ty.builtin_of(&self.ty_table);
         let keyed = match obj_kind {
-            TypeKind::Generic(name, _, _) => {
-                bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name)
+            TypeKind::Generic(..) | TypeKind::Named(..) => {
+                builtin == Some(varn_core::BuiltinType::Map)
             }
             TypeKind::Object(mid) => self
                 .ty_table
@@ -50,14 +51,12 @@ impl<'r> Checker<'r> {
                 .iter()
                 .any(|m| matches!(m, ObjectTypeMember::Index { .. })),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
             | TypeKind::Union(_)
             | TypeKind::Intersection(_)
             | TypeKind::Tuple(_)
-            | TypeKind::Named(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Typeof(_)
@@ -98,30 +97,16 @@ impl<'r> Checker<'r> {
                 }
             }
             TypeKind::Primitive(varn_core::LangPrimitive::Str) if prop_ty.is_int() => Type::Str,
-            TypeKind::Builtin(varn_core::BuiltinType::Bytes) if prop_ty.is_int() => Type::Int,
-            TypeKind::Named(name, _)
-                if prop_ty.is_int()
-                    && bind.interner.get(varn_core::LangPrimitive::Str.name()) == Some(name) =>
-            {
-                Type::Str
-            }
-            TypeKind::Named(name, _)
-                if bind.interner.get(varn_core::BuiltinType::Bytes.name()) == Some(name)
-                    && prop_ty.is_int() =>
+            TypeKind::Named(..)
+                if builtin == Some(varn_core::BuiltinType::Bytes) && prop_ty.is_int() =>
             {
                 Type::Int
             }
-            TypeKind::Generic(name, args, _)
-                if bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name) =>
+            TypeKind::Generic(..) | TypeKind::Named(..)
+                if builtin == Some(varn_core::BuiltinType::Map) =>
             {
-                let arg_ids = self.ty_table.get_list(args).to_vec();
-                if arg_ids.len() == 2 {
-                    Type::resolved(arg_ids[1])
-                } else {
-                    Type::Dynamic
-                }
+                obj_ty.builtin_arg(1, &self.ty_table)
             }
-            TypeKind::Builtin(varn_core::BuiltinType::Map) => Type::Dynamic,
             TypeKind::Object(mid) => self
                 .ty_table
                 .get_object_members(mid)
@@ -134,7 +119,6 @@ impl<'r> Checker<'r> {
                 })
                 .unwrap_or(Type::Dynamic),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -181,7 +165,6 @@ impl<'r> Checker<'r> {
                     members.len() == 1 && matches!(&members[0], ObjectTypeMember::Index { .. })
                 }
                 TypeKind::Primitive(_)
-                | TypeKind::Builtin(_)
                 | TypeKind::Literal(_)
                 | TypeKind::This
                 | TypeKind::Array(_)

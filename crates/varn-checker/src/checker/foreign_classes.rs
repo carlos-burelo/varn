@@ -90,7 +90,6 @@ impl Checker<'_> {
                 origin.map(|o| self.resolve_bind_atom(bind, o)),
             ),
             varn_core::TypeKind::Primitive(_)
-            | varn_core::TypeKind::Builtin(_)
             | varn_core::TypeKind::Literal(_)
             | varn_core::TypeKind::This
             | varn_core::TypeKind::Array(_)
@@ -138,7 +137,6 @@ impl Checker<'_> {
                 ty.map_generics(&mapping, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
             }
             varn_core::TypeKind::Primitive(_)
-            | varn_core::TypeKind::Builtin(_)
             | varn_core::TypeKind::Literal(_)
             | varn_core::TypeKind::This
             | varn_core::TypeKind::Array(_)
@@ -161,7 +159,6 @@ impl Checker<'_> {
         Some(match self.ty_table.get(ty.0) {
             varn_core::TypeKind::Fn(fid) => self.ty_table.get_function(fid).params.clone(),
             varn_core::TypeKind::Primitive(_)
-            | varn_core::TypeKind::Builtin(_)
             | varn_core::TypeKind::Literal(_)
             | varn_core::TypeKind::This
             | varn_core::TypeKind::Array(_)

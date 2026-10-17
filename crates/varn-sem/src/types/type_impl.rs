@@ -51,7 +51,6 @@ impl Type {
                 shared.map_or(*self, base)
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::This
             | TypeKind::Array(_)
             | TypeKind::Intersection(_)
@@ -78,44 +77,15 @@ impl Type {
         } else {
             Type::Int
         };
-        Type::generic(varn_core::BuiltinType::Range.name(), vec![elem], table)
+        Type::builtin(varn_core::BuiltinType::Range, vec![elem], table)
     }
 
-    pub fn is_range(&self, table: &CheckerTyTable, interner: &varn_core::AtomInterner) -> bool {
-        match table.get(self.0) {
-            TypeKind::Builtin(varn_core::BuiltinType::Range) => true,
-            TypeKind::Generic(name, _, _) => {
-                interner.try_resolve(name) == Some(varn_core::BuiltinType::Range.name())
-            }
-            TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
-            | TypeKind::Literal(_)
-            | TypeKind::This
-            | TypeKind::Array(_)
-            | TypeKind::Union(_)
-            | TypeKind::Intersection(_)
-            | TypeKind::Tuple(_)
-            | TypeKind::Named(..)
-            | TypeKind::TemplateLiteral(_)
-            | TypeKind::Fn(_)
-            | TypeKind::Object(_)
-            | TypeKind::Typeof(_)
-            | TypeKind::KeyOf(_)
-            | TypeKind::IndexedAccess { .. }
-            | TypeKind::Mapped { .. }
-            | TypeKind::Conditional { .. }
-            | TypeKind::Infer(_)
-            | TypeKind::EnumVariant { .. }
-            | TypeKind::TypePredicate { .. } => false,
-        }
+    pub fn is_range(&self, table: &CheckerTyTable) -> bool {
+        self.is_builtin(varn_core::BuiltinType::Range, table)
     }
 
     pub fn literal(l: varn_core::TypeLiteral<varn_core::Atom>, table: &mut CheckerTyTable) -> Self {
         Type::resolved(table.intern(TypeKind::Literal(l)))
-    }
-
-    pub fn builtin(b: varn_core::BuiltinType, table: &mut CheckerTyTable) -> Self {
-        Type::resolved(table.intern(TypeKind::Builtin(b)))
     }
 
     pub fn sanitize_foreign(self) -> Type {
@@ -126,7 +96,6 @@ impl Type {
         match table.get(self.0) {
             TypeKind::Array(inner) => Type::resolved(inner),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)
@@ -251,7 +220,6 @@ impl Type {
                     }
                 }
                 TypeKind::Primitive(_)
-                | TypeKind::Builtin(_)
                 | TypeKind::Literal(_)
                 | TypeKind::This
                 | TypeKind::Array(_)
@@ -328,12 +296,11 @@ impl Type {
                 | varn_core::LangPrimitive::Never
                 | varn_core::LangPrimitive::Dynamic => None,
             },
-            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
+            TypeKind::Array(_) => Some(varn_core::BuiltinType::Array.name()),
+            TypeKind::Named(..) if self.is_bytes(table) => {
                 Some(varn_core::BuiltinType::Bytes.name())
             }
-            TypeKind::Array(_) => Some(varn_core::BuiltinType::Array.name()),
-            TypeKind::Builtin(_)
-            | TypeKind::Literal(_)
+            TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)
             | TypeKind::Intersection(_)
@@ -365,7 +332,6 @@ impl Type {
         match table.get(self.0) {
             TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(interner.resolve(n)),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

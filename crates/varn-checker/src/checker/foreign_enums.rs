@@ -17,7 +17,6 @@ impl Checker<'_> {
             let members = match self.ty_table.get(ty.0) {
                 TypeKind::Union(list) => self.ty_table.get_list(list).to_vec(),
                 TypeKind::Primitive(_)
-                | TypeKind::Builtin(_)
                 | TypeKind::Literal(_)
                 | TypeKind::This
                 | TypeKind::Array(_)

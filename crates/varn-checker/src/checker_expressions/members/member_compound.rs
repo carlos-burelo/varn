@@ -14,20 +14,33 @@ impl<'r> Checker<'r> {
         key: &str,
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
-        let base = Type::named_with_origin_atom(
-            name_atom,
-            origin_atom,
-            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-        );
-        let name: Arc<str> = self.resolve_bind_atom(bind, name_atom);
-        let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
         let args: Vec<Type> = self
             .ty_table
             .get_list(args_list)
             .iter()
             .map(|id| Type::resolved(*id))
             .collect();
-        self.find_member_info_uncached(&base, key, bind)
+        let base = Type::named_with_origin_atom(
+            name_atom,
+            origin_atom,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        );
+        self.member_instantiated(&base, args, key, bind)
+    }
+
+    fn member_instantiated(
+        &mut self,
+        base: &Type,
+        args: Vec<Type>,
+        key: &str,
+        bind: &BindResult,
+    ) -> Option<(Type, Option<usize>)> {
+        let TypeKind::Named(name_atom, origin_atom) = self.ty_table.get(base.0) else {
+            return self.find_member_info_uncached(base, key, bind);
+        };
+        let name: Arc<str> = self.resolve_bind_atom(bind, name_atom);
+        let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
+        self.find_member_info_uncached(base, key, bind)
             .map(|(member_ty, sym)| {
                 let mapping = super::member_util::generic_mapping(
                     self.resolver,
@@ -139,9 +152,8 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
         let table = std::sync::Arc::make_mut(&mut self.ty_table);
-        let atom = table.intern_name(varn_core::BuiltinType::Array.name());
-        let array_ty = Type::generic_atom(atom, vec![Type::resolved(inner)], None, table);
-        self.find_member_info_uncached(&array_ty, key, bind)
+        let array_class = Type::builtin(varn_core::BuiltinType::Array, vec![], table);
+        self.member_instantiated(&array_class, vec![Type::resolved(inner)], key, bind)
     }
 
     pub(super) fn member_scalar(
@@ -158,17 +170,10 @@ impl<'r> Checker<'r> {
                     intrinsic_member_info(bind, varn_core::LangPrimitive::Str.name(), key)
                 }
             }
-            TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
-                if key == varn_core::MemberKey::Length.as_str() {
-                    Some((Type::Int, None))
-                } else {
-                    intrinsic_member_info(bind, varn_core::BuiltinType::Bytes.name(), key)
-                }
-            }
             TypeKind::Tuple(_) if key == varn_core::MemberKey::Length.as_str() => {
                 Some((Type::Int, None))
             }
-            kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
+            kind @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => {
                 let name = kind.lang_name().unwrap_or_default();
                 intrinsic_member_info(bind, name, key)
             }
@@ -191,16 +196,5 @@ impl<'r> Checker<'r> {
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => None,
         }
-    }
-
-    pub(super) fn member_range_fallback(
-        &mut self,
-        key: &str,
-        bind: &BindResult,
-    ) -> Option<(Type, Option<usize>)> {
-        let table = std::sync::Arc::make_mut(&mut self.ty_table);
-        let atom = table.intern_name(varn_core::BuiltinType::Range.name());
-        let range_ty = Type::named_atom(atom, table);
-        self.find_member_info_uncached(&range_ty, key, bind)
     }
 }

@@ -36,7 +36,6 @@ impl SemanticDB {
         match ty.kind(&types) {
             TypeKind::Fn(f) => Some(types.get_function(f).clone()),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -63,7 +62,6 @@ impl SemanticDB {
             TypeKind::Fn(_) => self.fn_shape(ty),
             TypeKind::Union(list) => self.ty_list(list).iter().find_map(|t| self.fn_shape(t)),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -116,7 +114,6 @@ impl SemanticDB {
             TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(self.name(n).to_owned()),
             TypeKind::Primitive(LangPrimitive::Dynamic) => None,
             TypeKind::Primitive(p) => Some(p.name().to_owned()),
-            TypeKind::Builtin(b) => Some(b.name().to_owned()),
             TypeKind::Array(_) => Some(BuiltinType::Array.name().to_owned()),
             TypeKind::Literal(_)
             | TypeKind::This

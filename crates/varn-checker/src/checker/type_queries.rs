@@ -62,7 +62,6 @@ impl<'r> Checker<'r> {
         let same_parameter = match self.ty_table.get(inferred.0) {
             varn_core::TypeKind::Named(given, _) => self.resolve_bind_atom(bind?, given) == name,
             varn_core::TypeKind::Primitive(_)
-            | varn_core::TypeKind::Builtin(_)
             | varn_core::TypeKind::Literal(_)
             | varn_core::TypeKind::This
             | varn_core::TypeKind::Array(_)

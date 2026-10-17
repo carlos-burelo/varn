@@ -8,6 +8,12 @@ pub(super) struct InferBindingContext<'a> {
     pub(super) bindings: FxHashMap<String, Type>,
 }
 
+impl InferBindingContext<'_> {
+    fn binds_type_param(&self, name: &str) -> bool {
+        self.bindings.contains_key(name)
+    }
+}
+
 impl TypeContext for InferBindingContext<'_> {
     fn resolver(&self) -> Option<&dyn varn_sem::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
@@ -38,6 +44,13 @@ impl TypeContext for InferBindingContext<'_> {
 
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
         self.inner.and_then(|c| c.symbol_origin(name))
+    }
+
+    fn symbol_kind(&self, name: &str) -> Option<varn_sem::symbol::SymbolKind> {
+        if self.binds_type_param(name) {
+            return Some(varn_sem::symbol::SymbolKind::TypeParameter);
+        }
+        self.inner.and_then(|c| c.symbol_kind(name))
     }
 
     fn get_interface_members(
@@ -105,7 +118,6 @@ pub(super) fn is_member_optional(
             .unwrap_or(false)
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)
@@ -130,6 +142,12 @@ pub(super) struct MappedContext<'a> {
     pub(super) inner: Option<&'a dyn TypeContext>,
     pub(super) key_var: String,
     pub(super) key_value: Type,
+}
+
+impl MappedContext<'_> {
+    fn binds_type_param(&self, name: &str) -> bool {
+        name == self.key_var
+    }
 }
 
 impl TypeContext for MappedContext<'_> {
@@ -162,6 +180,13 @@ impl TypeContext for MappedContext<'_> {
 
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
         self.inner.and_then(|c| c.symbol_origin(name))
+    }
+
+    fn symbol_kind(&self, name: &str) -> Option<varn_sem::symbol::SymbolKind> {
+        if self.binds_type_param(name) {
+            return Some(varn_sem::symbol::SymbolKind::TypeParameter);
+        }
+        self.inner.and_then(|c| c.symbol_kind(name))
     }
 
     fn get_interface_members(
@@ -201,6 +226,12 @@ pub(super) struct AliasSubstitutionContext<'a> {
     pub(super) args: Vec<Type>,
 }
 
+impl AliasSubstitutionContext<'_> {
+    fn binds_type_param(&self, name: &str) -> bool {
+        self.params.iter().any(|p| p == name)
+    }
+}
+
 impl TypeContext for AliasSubstitutionContext<'_> {
     fn resolver(&self) -> Option<&dyn varn_sem::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
@@ -231,6 +262,13 @@ impl TypeContext for AliasSubstitutionContext<'_> {
 
     fn symbol_origin(&self, name: &str) -> Option<varn_core::Atom> {
         self.inner.and_then(|c| c.symbol_origin(name))
+    }
+
+    fn symbol_kind(&self, name: &str) -> Option<varn_sem::symbol::SymbolKind> {
+        if self.binds_type_param(name) {
+            return Some(varn_sem::symbol::SymbolKind::TypeParameter);
+        }
+        self.inner.and_then(|c| c.symbol_kind(name))
     }
 
     fn get_interface_members(

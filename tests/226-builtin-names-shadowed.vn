@@ -1,0 +1,42 @@
+import { describe, it, expect } from "std:test";
+
+class Map<K, V> {
+    size: int = 7
+    get(k: K): str { return "user map" }
+}
+
+class Set<T> {
+    has(v: T): str { return "user set" }
+}
+
+class Array<T> {
+    get(i: int): str { return "user array" }
+}
+
+class Range {
+    length: int = 42
+}
+
+function userMapGet(m: Map<str, int>): str {
+    return m.get("a")
+}
+
+await describe("226 builtin names shadowed", async () => {
+    await it("a user class named like a builtin is the user class", async () => {
+        let m: Map<str, int> = new Map<str, int>()
+        expect(m.size).toBe(7)
+        expect(m.get("a")).toBe("user map")
+        expect(userMapGet(m)).toBe("user map")
+        expect(new Set<int>().has(1)).toBe("user set")
+        expect(new Array<int>().get(0)).toBe("user array")
+        let r: Range = new Range()
+        expect(r.length).toBe(42)
+    });
+
+    await it("the core builtins stay reachable through literals", async () => {
+        let xs = [1, 2, 3]
+        expect(xs.length).toBe(3)
+        let span = 0..4
+        expect(span.length).toBe(4)
+    });
+});

@@ -35,7 +35,6 @@ impl<'r> Checker<'r> {
                             .map(|item| Type::resolved(*item))
                             .collect(),
                         varn_core::TypeKind::Primitive(_)
-                        | varn_core::TypeKind::Builtin(_)
                         | varn_core::TypeKind::Literal(_)
                         | varn_core::TypeKind::This
                         | varn_core::TypeKind::Union(_)

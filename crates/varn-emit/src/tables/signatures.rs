@@ -57,7 +57,6 @@ pub(crate) fn intern_signature(
             (p_tys, return_ty, has_rest)
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

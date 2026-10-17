@@ -31,12 +31,11 @@ impl<'r> Checker<'r> {
                     TypeKind::Primitive(prim) => Some(prim.to_string()),
                     TypeKind::Named(name, _) => {
                         let text = self.resolve_bind_atom(bind, *name);
-                        TypeKind::<(), (), (), (), ()>::of_lang_name(&text)
+                        TypeKind::<(), (), (), (), ()>::of_primitive_name(&text)
                             .is_some()
                             .then(|| text.to_string())
                     }
-                    TypeKind::Builtin(_)
-                    | TypeKind::Literal(_)
+                    TypeKind::Literal(_)
                     | TypeKind::This
                     | TypeKind::Array(_)
                     | TypeKind::Union(_)
@@ -70,7 +69,6 @@ impl<'r> Checker<'r> {
                 self.check_type_names(object, bind) & self.check_type_names(index, bind)
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::TemplateLiteral(_)
@@ -93,7 +91,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> bool {
         let text = self.resolve_bind_atom(bind, name);
-        if TypeKind::<(), (), (), (), ()>::of_lang_name(&text).is_some()
+        if TypeKind::<(), (), (), (), ()>::of_primitive_name(&text).is_some()
             || text.as_ref() == varn_core::well_known::RECORD
             || self.active_type_params.contains(text.as_ref())
         {

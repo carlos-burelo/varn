@@ -44,14 +44,7 @@ impl<'r> Checker<'r> {
             .expected_type
             .and_then(|t| match self.ty_table.get(t.0) {
                 TypeKind::Array(inner) => Some(Type::resolved(inner)),
-                TypeKind::Generic(name, args, _)
-                    if bind.interner.get(varn_core::BuiltinType::Array.name()) == Some(name)
-                        && self.ty_table.get_list(args).len() == 1 =>
-                {
-                    Some(Type::resolved(self.ty_table.get_list(args)[0]))
-                }
                 TypeKind::Primitive(_)
-                | TypeKind::Builtin(_)
                 | TypeKind::Literal(_)
                 | TypeKind::This
                 | TypeKind::Union(_)
@@ -128,8 +121,8 @@ impl<'r> Checker<'r> {
                 let ty_kind = self.ty_table.get(ty.0);
                 let resolved = match ty_kind {
                     TypeKind::Object(mid) => self.ty_table.get_object_members(mid).to_vec(),
-                    TypeKind::Generic(name, args, _)
-                        if bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name)
+                    TypeKind::Generic(_, args, _)
+                        if ty.is_builtin(varn_core::BuiltinType::Map, &self.ty_table)
                             && self.ty_table.get_list(args).len() == 2 =>
                     {
                         let arg_ids = self.ty_table.get_list(args).to_vec();
@@ -187,7 +180,6 @@ impl<'r> Checker<'r> {
                                 )
                             }
                             TypeKind::Primitive(_)
-                            | TypeKind::Builtin(_)
                             | TypeKind::Literal(_)
                             | TypeKind::This
                             | TypeKind::Array(_)
@@ -236,7 +228,6 @@ impl<'r> Checker<'r> {
                             .collect()
                     }
                     TypeKind::Primitive(_)
-                    | TypeKind::Builtin(_)
                     | TypeKind::Literal(_)
                     | TypeKind::This
                     | TypeKind::Array(_)

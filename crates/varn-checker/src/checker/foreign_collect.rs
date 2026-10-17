@@ -67,7 +67,6 @@ impl Checker<'_> {
                 self.collect_named_ref(bind, ty, out);
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Intersection(_)
@@ -96,14 +95,14 @@ impl Checker<'_> {
         else {
             return;
         };
+        if varn_core::is_lang_type(name, Some(origin)) {
+            return;
+        }
         let origin = self.resolve_bind_atom(bind, origin);
         if origin.as_ref() == bind.source_file.as_ref() {
             return;
         }
         let name = self.resolve_bind_atom(bind, name);
-        if varn_core::is_lang_type_name(name.as_ref()) {
-            return;
-        }
         let key = (name, origin);
         if !out.contains(&key) {
             out.push(key);

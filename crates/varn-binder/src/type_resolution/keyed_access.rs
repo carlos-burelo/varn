@@ -91,7 +91,6 @@ pub(super) fn collect_type_keys(
                 .collect()
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)
@@ -119,7 +118,6 @@ pub(super) fn resolve_indexed_access(
     let key_name_atom = match table.get(index.0) {
         TypeKind::Named(name, _) => Some(name),
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)
@@ -190,7 +188,6 @@ pub(super) fn resolve_indexed_access(
                 };
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -266,7 +263,6 @@ pub(super) fn resolve_indexed_access(
             }
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

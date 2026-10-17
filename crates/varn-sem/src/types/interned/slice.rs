@@ -85,7 +85,6 @@ impl Reach {
         self.entries.insert(id, kind);
         match kind {
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Named(..)
@@ -147,7 +146,6 @@ fn kind_atoms(kind: &InternedTypeKind, out: &mut Vec<Atom>) {
         TypeKind::TypePredicate { parameter_name, .. } => out.push(parameter_name),
         TypeKind::Literal(TypeLiteral::Int(_) | TypeLiteral::Bool(_) | TypeLiteral::Char(_))
         | TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::This
         | TypeKind::Array(_)
         | TypeKind::Union(_)

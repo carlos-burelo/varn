@@ -28,7 +28,8 @@ impl GlobalStore {
         let mut names = FxHashMap::default();
         let mut idx_to_name: Vec<Arc<str>> = Vec::with_capacity(order.len());
 
-        for &name in order {
+        for global in order {
+            let name = global.name;
             let rc_name: Arc<str> = Arc::from(name);
             let Some(val) = native_map.remove(name) else {
                 panic!("native global '{name}' sin valor en builtins");

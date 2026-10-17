@@ -122,6 +122,13 @@ impl TypeContext for Binder<'_> {
         self.arena.get(id).origin_module
     }
 
+    fn symbol_kind(&self, name: &str) -> Option<varn_sem::symbol::SymbolKind> {
+        let scope = self.scopes.get(self.current);
+        let atom = self.interner.get(name)?;
+        let id = scope.resolve(atom, &self.scopes)?;
+        Some(self.arena.get(id).kind)
+    }
+
     fn source_file(&self) -> Option<&str> {
         Some(self.source_file.as_ref())
     }

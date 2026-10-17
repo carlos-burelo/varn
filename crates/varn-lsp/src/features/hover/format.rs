@@ -22,7 +22,6 @@ pub fn format_type_params_str(state: &DocumentState, ty: &varn_sem::types::Type)
             format!("<{}>", names.join(", "))
         }
         varn_core::TypeKind::Primitive(_)
-        | varn_core::TypeKind::Builtin(_)
         | varn_core::TypeKind::Literal(_)
         | varn_core::TypeKind::This
         | varn_core::TypeKind::Array(_)

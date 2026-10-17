@@ -47,7 +47,6 @@ impl<'r> Binder<'r> {
             TypeKind::Primitive(varn_core::LangPrimitive::Int) => Some(Type::Int),
             TypeKind::Primitive(varn_core::LangPrimitive::Float) => Some(Type::Float),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

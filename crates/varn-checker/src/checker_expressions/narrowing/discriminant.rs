@@ -91,7 +91,6 @@ impl<'r> Checker<'r> {
                         let union_list = original_ty.and_then(|t| match self.ty_table.get(t.0) {
                             TypeKind::Union(list) => Some(list),
                             TypeKind::Primitive(_)
-                            | TypeKind::Builtin(_)
                             | TypeKind::Literal(_)
                             | TypeKind::This
                             | TypeKind::Array(_)
@@ -149,7 +148,6 @@ impl<'r> Checker<'r> {
                                             })
                                     }
                                     TypeKind::Primitive(_)
-                                    | TypeKind::Builtin(_)
                                     | TypeKind::Literal(_)
                                     | TypeKind::This
                                     | TypeKind::Array(_)
@@ -293,7 +291,6 @@ impl<'r> Checker<'r> {
                     })
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

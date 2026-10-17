@@ -103,18 +103,14 @@ impl<'r> Checker<'r> {
         self.check_expr(rec, right, bind);
         let right_ty = self.infer_type(rec, right, bind);
         let right_kind = self.ty_table.get(right_ty.0);
+        let builtin = right_ty.builtin_of(&self.ty_table);
         let elem_ty = match right_kind {
             TypeKind::Array(inner) => Type::resolved(inner),
             TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::TemplateLiteral(_) => {
                 Type::Char
             }
-            TypeKind::Named(name, _)
-                if bind.interner.get(varn_core::LangPrimitive::Str.name()) == Some(name) =>
-            {
-                Type::Char
-            }
-            TypeKind::Generic(name, args, _)
-                if bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name)
+            TypeKind::Generic(_, args, _)
+                if builtin == Some(varn_core::BuiltinType::Map)
                     && self.ty_table.get_list(args).len() == 2 =>
             {
                 let arg_ids = self.ty_table.get_list(args).to_vec();
@@ -126,9 +122,8 @@ impl<'r> Checker<'r> {
             TypeKind::Generic(_name, args, _) if self.ty_table.get_list(args).len() == 1 => {
                 Type::resolved(self.ty_table.get_list(args)[0])
             }
-            TypeKind::Builtin(varn_core::BuiltinType::Range) => Type::Int,
+            TypeKind::Named(..) if builtin == Some(varn_core::BuiltinType::Range) => Type::Int,
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)

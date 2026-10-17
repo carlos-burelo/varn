@@ -43,14 +43,8 @@ impl<'r> Checker<'r> {
             TypeKind::Object(mid) => self.member_object(mid, key),
             TypeKind::Union(list) => self.member_union(list, key, bind),
             TypeKind::Array(inner) => self.member_array(inner, key, bind),
-            kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
-                match self.member_scalar(&kind, key, bind) {
-                    Some(r) => Some(r),
-                    None if kind == TypeKind::Builtin(varn_core::BuiltinType::Range) => {
-                        self.member_range_fallback(key, bind)
-                    }
-                    None => None,
-                }
+            kind @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => {
+                self.member_scalar(&kind, key, bind)
             }
             TypeKind::Tuple(_) if key == varn_core::MemberKey::Length.as_str() => {
                 Some((Type::Int, None))
@@ -232,7 +226,6 @@ impl<'r> Checker<'r> {
                 None
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -271,7 +264,6 @@ impl<'r> Checker<'r> {
                             (ft.params, ft.return_type, ft.type_params)
                         }
                         varn_core::TypeKind::Primitive(_)
-                        | varn_core::TypeKind::Builtin(_)
                         | varn_core::TypeKind::Literal(_)
                         | varn_core::TypeKind::This
                         | varn_core::TypeKind::Array(_)

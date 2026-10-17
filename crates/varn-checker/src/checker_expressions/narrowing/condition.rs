@@ -74,8 +74,7 @@ impl<'r> Checker<'r> {
             TypeKind::Literal(TypeLiteral::Int(_) | TypeLiteral::Str(_) | TypeLiteral::Char(_)) => {
                 true
             }
-            TypeKind::Builtin(_)
-            | TypeKind::Array(_)
+            TypeKind::Array(_)
             | TypeKind::Tuple(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)

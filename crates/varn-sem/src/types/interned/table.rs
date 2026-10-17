@@ -71,7 +71,7 @@ impl CheckerTyTable {
             delta_lists: FxHashMap::default(),
             delta_functions: FxHashMap::default(),
             delta_object_members: FxHashMap::default(),
-            names: super::names::builtin_names(),
+            names: varn_core::AtomInterner::new(),
         }
     }
 

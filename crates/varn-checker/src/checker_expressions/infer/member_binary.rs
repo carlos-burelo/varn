@@ -57,7 +57,6 @@ pub(super) fn infer_member_type(
             }
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Union(_)

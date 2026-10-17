@@ -1,4 +1,4 @@
-use crate::lang_type::{BuiltinType, LangPrimitive};
+use crate::lang_type::LangPrimitive;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -27,7 +27,6 @@ impl<N> TypeLiteral<N> {
 
 pub enum TypeKind<T, N, C, F, O, E = ()> {
     Primitive(LangPrimitive),
-    Builtin(BuiltinType),
     Literal(TypeLiteral<N>),
     This,
     Array(T),
@@ -87,7 +86,6 @@ impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
     pub fn lang_name(&self) -> Option<&'static str> {
         match self {
             TypeKind::Primitive(p) => Some(p.name()),
-            TypeKind::Builtin(b) => Some(b.name()),
             TypeKind::Literal(l) => Some(l.base().name()),
             TypeKind::This
             | TypeKind::Array(_)
@@ -110,9 +108,7 @@ impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
         }
     }
 
-    pub fn of_lang_name(name: &str) -> Option<Self> {
-        LangPrimitive::from_str(name)
-            .map(TypeKind::Primitive)
-            .or_else(|| BuiltinType::from_str(name).map(TypeKind::Builtin))
+    pub fn of_primitive_name(name: &str) -> Option<Self> {
+        LangPrimitive::from_str(name).map(TypeKind::Primitive)
     }
 }

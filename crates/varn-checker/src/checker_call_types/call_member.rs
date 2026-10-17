@@ -69,7 +69,6 @@ pub(super) fn infer_member(c: &mut CallTypeCtx, object: ExprId, property: ExprId
             (text_of(c, name), origin.and_then(|o| text_of(c, o)))
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

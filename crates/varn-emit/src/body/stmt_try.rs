@@ -16,7 +16,6 @@ impl<'a> FnEmitter<'a> {
                 .flat_map(|x| self.catch_type_names(x))
                 .collect(),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

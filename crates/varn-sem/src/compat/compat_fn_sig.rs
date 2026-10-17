@@ -37,7 +37,6 @@ pub(super) fn fn_signature_compatible_type(
                 })
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)
@@ -98,7 +97,6 @@ pub(super) fn types_compatible_with_fn_signature(
                 })
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

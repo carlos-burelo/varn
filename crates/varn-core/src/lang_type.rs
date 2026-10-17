@@ -1,3 +1,5 @@
+use crate::Atom;
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -49,6 +51,29 @@ impl LangPrimitive {
 
     pub fn from_str(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|p| p.name() == name)
+    }
+
+    const IDENTITY: [(Atom, Option<Atom>, Self); 11] = {
+        let mut out = [(Atom::of_const(""), None, Self::Null); 11];
+        let mut i = 0;
+        while i < Self::ALL.len() {
+            let p = Self::ALL[i];
+            let module = match p.core_module() {
+                Some(m) => Some(Atom::of_const(m)),
+                None => None,
+            };
+            out[i] = (Atom::of_const(p.name()), module, p);
+            i += 1;
+        }
+        out
+    };
+
+    pub fn identify(name: Atom, origin: Option<Atom>) -> Option<Self> {
+        let origin = origin?;
+        Self::IDENTITY
+            .iter()
+            .find(|(n, m, _)| *n == name && *m == Some(origin))
+            .map(|&(_, _, p)| p)
     }
 
     pub const fn core_module(self) -> Option<&'static str> {
@@ -118,8 +143,23 @@ impl BuiltinType {
         }
     }
 
-    pub fn from_str(name: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|b| b.name() == name)
+    const IDENTITY: [(Atom, Atom, Self); 9] = {
+        let mut out = [(Atom::of_const(""), Atom::of_const(""), Self::Array); 9];
+        let mut i = 0;
+        while i < Self::ALL.len() {
+            let b = Self::ALL[i];
+            out[i] = (Atom::of_const(b.name()), Atom::of_const(b.core_module()), b);
+            i += 1;
+        }
+        out
+    };
+
+    pub fn identify(name: Atom, origin: Option<Atom>) -> Option<Self> {
+        let origin = origin?;
+        Self::IDENTITY
+            .iter()
+            .find(|(n, m, _)| *n == name && *m == origin)
+            .map(|&(_, _, b)| b)
     }
 
     pub const fn core_module(self) -> &'static str {
@@ -170,32 +210,6 @@ impl CoreSum {
     }
 }
 
-pub fn is_lang_type_name(name: &str) -> bool {
-    LangPrimitive::from_str(name).is_some() || BuiltinType::from_str(name).is_some()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn names_round_trip() {
-        for p in LangPrimitive::ALL {
-            assert_eq!(LangPrimitive::from_str(p.name()), Some(p));
-        }
-        for b in BuiltinType::ALL {
-            assert_eq!(BuiltinType::from_str(b.name()), Some(b));
-        }
-        assert_eq!(LangPrimitive::from_str("symbol"), None);
-    }
-
-    #[test]
-    fn core_sums_are_known_by_origin() {
-        assert_eq!(
-            CoreSum::identify("Result", Some("core:types/result")),
-            Some(CoreSum::Result)
-        );
-        assert_eq!(CoreSum::identify("Result", Some("/app/result.vn")), None);
-        assert_eq!(CoreSum::identify("Result", None), None);
-    }
+pub fn is_lang_type(name: Atom, origin: Option<Atom>) -> bool {
+    LangPrimitive::identify(name, origin).is_some() || BuiltinType::identify(name, origin).is_some()
 }

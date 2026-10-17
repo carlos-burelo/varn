@@ -44,7 +44,6 @@ pub(super) fn resolve_intersection_type(
                 )
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

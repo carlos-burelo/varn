@@ -81,7 +81,6 @@ pub fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTable) -> 
             .iter()
             .any(|m| int_literal_adopts(&Type::resolved(*m), value, table)),
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

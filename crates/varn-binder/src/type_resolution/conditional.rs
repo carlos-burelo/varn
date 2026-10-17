@@ -155,7 +155,6 @@ fn resolve_extends_with_infer(
             resolve_type_node(node, ctx, table)
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Union(_)
@@ -185,7 +184,6 @@ fn type_satisfies_extends(check: &Type, extends: &Type, table: &CheckerTyTable) 
 
     match (table.get(check.0), table.get(extends.0)) {
         (TypeKind::Primitive(p1), TypeKind::Primitive(p2)) => return p1 == p2,
-        (TypeKind::Builtin(b1), TypeKind::Builtin(b2)) => return b1 == b2,
         _ => {}
     }
 

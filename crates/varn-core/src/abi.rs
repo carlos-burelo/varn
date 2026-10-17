@@ -65,38 +65,59 @@ pub struct AbiFrameArena {
     pub cap: u32,
 }
 
-pub const NATIVE_GLOBALS: &[&str] = &[
-    "print",
-    "Array",
-    "Bytes",
-    "DivisionByZero",
-    "Error",
-    "Infinity",
-    "IntegerOverflow",
-    "Map",
-    "MatchError",
-    "NaN",
-    "Range",
-    "RangeError",
-    "Set",
-    "TypeError",
-    "assertSummary",
-    "bigint",
-    "bool",
-    "char",
-    "debug",
-    "decimal",
-    "float",
-    "input",
-    "int",
-    "isIsolate",
-    "str",
-];
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeValue {
+    Function,
+    Class,
+    Float,
+    Bool,
+}
+
+pub struct NativeGlobal {
+    pub name: &'static str,
+    pub value: NativeValue,
+}
+
+const fn native(name: &'static str, value: NativeValue) -> NativeGlobal {
+    NativeGlobal { name, value }
+}
+
+pub const NATIVE_GLOBALS: &[NativeGlobal] = {
+    use crate::{BuiltinType as B, LangPrimitive as P, RuntimeErrorKind as E};
+    use NativeValue::{Bool, Class, Float, Function};
+    &[
+        native("print", Function),
+        native(B::Array.name(), Class),
+        native(B::Bytes.name(), Class),
+        native(E::DivisionByZero.class_name(), Class),
+        native(E::Error.class_name(), Class),
+        native("Infinity", Float),
+        native(E::IntegerOverflow.class_name(), Class),
+        native(B::Map.name(), Class),
+        native(E::MatchError.class_name(), Class),
+        native("NaN", Float),
+        native(B::Range.name(), Class),
+        native(E::RangeError.class_name(), Class),
+        native(B::Set.name(), Class),
+        native(E::TypeError.class_name(), Class),
+        native("assertSummary", Function),
+        native(P::BigInt.name(), Class),
+        native(P::Bool.name(), Class),
+        native(P::Char.name(), Class),
+        native("debug", Function),
+        native(P::Decimal.name(), Class),
+        native(P::Float.name(), Class),
+        native("input", Function),
+        native(P::Int.name(), Class),
+        native("isIsolate", Bool),
+        native(P::Str.name(), Class),
+    ]
+};
 
 pub fn native_global_index(name: &str) -> Option<u32> {
     NATIVE_GLOBALS
         .iter()
-        .position(|n| *n == name)
+        .position(|g| g.name == name)
         .map(|i| i as u32)
 }
 

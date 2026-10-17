@@ -52,7 +52,6 @@ impl fmt::Display for TypeDisplay<'_> {
                 varn_core::TypeLiteral::Bool(v) => write!(f, "{v}"),
                 varn_core::TypeLiteral::Char(v) => write!(f, "{v:?}"),
             },
-            TypeKind::Builtin(b) => write!(f, "{}", b.name()),
             TypeKind::This => write!(f, "this"),
             TypeKind::Array(t) => match table.get(t) {
                 TypeKind::Union(_)
@@ -60,7 +59,6 @@ impl fmt::Display for TypeDisplay<'_> {
                 | TypeKind::Fn(_)
                 | TypeKind::Conditional { .. } => write!(f, "({})[]", self.child(t)),
                 TypeKind::Primitive(_)
-                | TypeKind::Builtin(_)
                 | TypeKind::Literal(_)
                 | TypeKind::This
                 | TypeKind::Array(_)
@@ -233,7 +231,6 @@ impl fmt::Display for TypeDisplay<'_> {
                     match table.get(*m) {
                         TypeKind::Union(_) => write!(f, "({})", self.child(*m))?,
                         TypeKind::Primitive(_)
-                        | TypeKind::Builtin(_)
                         | TypeKind::Literal(_)
                         | TypeKind::This
                         | TypeKind::Array(_)

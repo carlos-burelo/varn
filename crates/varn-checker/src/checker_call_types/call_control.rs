@@ -5,17 +5,13 @@ use varn_sem::types::Type;
 
 pub(super) fn infer_await(c: &mut CallTypeCtx, argument: ExprId) -> Option<Type> {
     let ty = c.infer(argument)?;
-    let interner = c.interner;
     match c.table.get(ty.0) {
-        TypeKind::Generic(name, args, _)
-            if (interner.get(varn_core::BuiltinType::Task.name()) == Some(name)
-                || interner.get(varn_core::BuiltinType::TaskHandle.name()) == Some(name))
-                && c.table.get_list(args).len() == 1 =>
+        TypeKind::Generic(_, args, _)
+            if varn_sem::types::is_awaitable(&ty, c.table) && c.table.get_list(args).len() == 1 =>
         {
             Some(Type::resolved(c.table.get_list(args)[0]))
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

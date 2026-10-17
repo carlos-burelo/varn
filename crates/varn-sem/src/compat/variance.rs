@@ -166,7 +166,6 @@ fn walk(ctx: &mut Ctx, id: crate::types::CheckerTyId, pol: Pol, shadow: &[String
             walk_both(ctx, target_type, shadow);
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Typeof(_)
@@ -203,7 +202,6 @@ pub fn measure_params(
                         walk(&mut ctx, ft.return_type, Pol::Out, &shadow);
                     }
                     TypeKind::Primitive(_)
-                    | TypeKind::Builtin(_)
                     | TypeKind::Literal(_)
                     | TypeKind::This
                     | TypeKind::Array(_)

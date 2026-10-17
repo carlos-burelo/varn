@@ -2,10 +2,7 @@ use super::*;
 
 impl Type {
     pub fn is_bytes(&self, table: &CheckerTyTable) -> bool {
-        matches!(
-            table.get(self.0),
-            TypeKind::Builtin(varn_core::BuiltinType::Bytes)
-        )
+        self.is_builtin(varn_core::BuiltinType::Bytes, table)
     }
 
     pub fn is_nullable(&self, table: &CheckerTyTable) -> bool {
@@ -16,7 +13,6 @@ impl Type {
                 .iter()
                 .any(|m| Type::resolved(*m).is_nullable(table)),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -71,7 +67,6 @@ impl Type {
                 }
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -116,7 +111,6 @@ impl Type {
                 }
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -172,7 +166,6 @@ impl Type {
                 }
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -270,7 +263,6 @@ impl Type {
                 Type(table.intern(TypeKind::Tuple(new_list)), self.1)
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Intersection(_)
@@ -294,7 +286,6 @@ impl Type {
                 self.1,
             ),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

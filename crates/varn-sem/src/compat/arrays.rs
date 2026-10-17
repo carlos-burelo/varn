@@ -1,5 +1,4 @@
 use super::core::types_compatible_impl;
-use super::resolve::is_intrinsic;
 use super::scalar::t;
 use crate::bind::BindView;
 use crate::types::InternedTypeKind;
@@ -25,40 +24,8 @@ pub(super) fn array_arms(
             in_progress,
             table,
         )),
-        (TypeKind::Generic(name, args, _origin), TypeKind::Array(inner)) => {
-            let list = table.get_list(args);
-            if is_intrinsic(bind, name, varn_core::BuiltinType::Array.name()) && list.len() == 1 {
-                if t(inner).is_dynamic() {
-                    Some(true)
-                } else {
-                    Some(same_element(
-                        &t(list[0]),
-                        &t(inner),
-                        bind,
-                        cache,
-                        in_progress,
-                        table,
-                    ))
-                }
-            } else {
-                Some(false)
-            }
-        }
-        (TypeKind::Array(inner), TypeKind::Generic(name, args, _origin)) => {
-            let list = table.get_list(args);
-            if is_intrinsic(bind, name, varn_core::BuiltinType::Array.name()) && list.len() == 1 {
-                Some(same_element(
-                    &t(inner),
-                    &t(list[0]),
-                    bind,
-                    cache,
-                    in_progress,
-                    table,
-                ))
-            } else {
-                Some(false)
-            }
-        }
+        (TypeKind::Generic(..), TypeKind::Array(_))
+        | (TypeKind::Array(_), TypeKind::Generic(..)) => Some(false),
         _ => None,
     }
 }

@@ -217,6 +217,7 @@ import "./222-native-lowering-edges.vn"
 import "./223-captures-across-await.vn"
 import "./224-async-resume-values.vn"
 import "./225-generators-as-frames.vn"
+import "./226-builtin-names-shadowed.vn"
 
 summary()
 

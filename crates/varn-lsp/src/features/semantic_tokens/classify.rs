@@ -1,4 +1,4 @@
-use varn_core::{is_lang_type_name, TokenKind, TypeKind};
+use varn_core::{LangPrimitive, TokenKind, TypeKind};
 use varn_sem::symbol::SymbolKind;
 use varn_sem::types::Type;
 
@@ -116,7 +116,7 @@ pub fn resolve_token(
         ));
     }
 
-    if is_lang_type_name(state.lexeme(tok)) {
+    if LangPrimitive::from_str(state.lexeme(tok)).is_some() {
         return Some(TT_TYPE);
     }
 
@@ -179,7 +179,6 @@ fn is_enum_type(state: &DocumentState, ty: &Type) -> bool {
             matches!(state.symbol_map.get(state.name(n)), Some(SymbolKind::Enum))
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

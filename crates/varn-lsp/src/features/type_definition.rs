@@ -103,7 +103,6 @@ fn extract_type_identifier(state: &DocumentState, ty: &varn_sem::types::Type) ->
             }
         }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Intersection(_)

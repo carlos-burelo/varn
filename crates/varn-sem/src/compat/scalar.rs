@@ -7,10 +7,7 @@ pub(super) fn t(id: CheckerTyId) -> Type {
 }
 
 pub(super) fn is_simple_type(ty: &Type, table: &CheckerTyTable) -> bool {
-    matches!(
-        table.get(ty.0),
-        TypeKind::Primitive(_) | TypeKind::Builtin(_)
-    )
+    matches!(table.get(ty.0), TypeKind::Primitive(_))
 }
 
 pub(super) fn simple_types_compatible(
@@ -74,7 +71,6 @@ pub(super) fn literal_expr_admitted(
         TypeKind::Union(list) => table.get_list(list).iter().any(|m| match table.get(*m) {
             TypeKind::Literal(l) => is_value(l),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::This
             | TypeKind::Array(_)
             | TypeKind::Union(_)
@@ -95,7 +91,6 @@ pub(super) fn literal_expr_admitted(
             | TypeKind::TypePredicate { .. } => false,
         }),
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::This
         | TypeKind::Array(_)
         | TypeKind::Intersection(_)
@@ -116,22 +111,10 @@ pub(super) fn literal_expr_admitted(
     }
 }
 
-pub(super) fn array_element_type(
-    ty: &Type,
-    table: &CheckerTyTable,
-    interner: Option<&varn_core::AtomInterner>,
-) -> Option<Type> {
+pub(super) fn array_element_type(ty: &Type, table: &CheckerTyTable) -> Option<Type> {
     match table.get(ty.0) {
         TypeKind::Array(inner) => Some(Type::resolved(inner)),
-        TypeKind::Generic(name, args, _)
-            if table.get_list(args).len() == 1
-                && interner
-                    .is_some_and(|it| it.resolve(name) == varn_core::BuiltinType::Array.name()) =>
-        {
-            Some(Type::resolved(table.get_list(args)[0]))
-        }
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Union(_)

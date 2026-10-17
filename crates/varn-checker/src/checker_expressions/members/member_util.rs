@@ -11,7 +11,10 @@ pub(crate) fn class_type_params(
     bind: &BindResult,
 ) -> Vec<Arc<str>> {
     let local = params_in(name, bind);
-    if !local.is_empty() {
+    let declared_here = origin.is_none_or(|o| o.as_ref() == bind.source_file.as_ref())
+        && (bind.type_members.classes.contains_key(name)
+            || bind.type_members.interfaces.contains_key(name));
+    if declared_here || !local.is_empty() {
         return local;
     }
     if let Some(params) = bind
@@ -114,7 +117,6 @@ pub(super) fn extension_getter_type(
     match table.get(sym_ty.0) {
         TypeKind::Fn(fid) => Some(Type::resolved(table.get_function(fid).return_type)),
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

@@ -89,7 +89,6 @@ impl<'r> Checker<'r> {
                 .as_deref()
                 .is_some_and(|c| self.is_subclass_or_same(c, "Error", bind)),
             varn_core::TypeKind::Primitive(_)
-            | varn_core::TypeKind::Builtin(_)
             | varn_core::TypeKind::Literal(_)
             | varn_core::TypeKind::Array(_)
             | varn_core::TypeKind::Intersection(_)

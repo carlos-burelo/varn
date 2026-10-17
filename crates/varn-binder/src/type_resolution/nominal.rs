@@ -46,21 +46,29 @@ pub(super) fn resolve_generic_type(
         return ty;
     }
 
-    if name_str.as_ref() == varn_core::BuiltinType::Array.name()
-        && let [el] = resolved_args.as_slice()
-    {
-        return Type::array(*el, table);
-    }
+    let origin = nominal_origin(&name_str, ctx, table);
+    Type::generic_atom(name, resolved_args, origin, table)
+}
 
+pub(crate) fn nominal_origin(
+    name_str: &str,
+    ctx: Option<&dyn TypeContext>,
+    table: &mut CheckerTyTable,
+) -> Option<varn_core::Atom> {
     let source_origin = ctx
         .and_then(|c| c.source_file())
         .map(|s| table.intern_name(s));
-    let origin = ctx
-        .and_then(|c| c.resolve_symbol(&name_str))
+    if ctx
+        .and_then(|c| c.symbol_kind(name_str))
+        .is_some_and(|k| !k.denotes_type())
+        && let Some(core) = core_type_origin(name_str, ctx)
+    {
+        return Some(core);
+    }
+    ctx.and_then(|c| c.resolve_symbol(name_str))
         .and_then(|t| match table.get(t.0) {
             TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => o,
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -79,9 +87,17 @@ pub(super) fn resolve_generic_type(
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => None,
         })
-        .or_else(|| ctx.and_then(|c| c.symbol_origin(&name_str)))
-        .or(source_origin);
-    Type::generic_atom(name, resolved_args, origin, table)
+        .or_else(|| ctx.and_then(|c| c.symbol_origin(name_str)))
+        .or(source_origin)
+}
+
+fn core_type_origin(name_str: &str, ctx: Option<&dyn TypeContext>) -> Option<varn_core::Atom> {
+    let core = ctx?.resolver()?.core_exports();
+    let sym = core.symbols.get(name_str)?;
+    sym.kind
+        .denotes_type()
+        .then_some(sym.origin_module)
+        .flatten()
 }
 
 pub(super) fn resolve_named_type(

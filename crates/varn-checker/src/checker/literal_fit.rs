@@ -120,7 +120,6 @@ impl Checker<'_> {
                 }
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -296,7 +295,6 @@ impl Checker<'_> {
                 .collect(),
             TypeKind::Array(inner) => vec![Type::resolved(inner)],
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)

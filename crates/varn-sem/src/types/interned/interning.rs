@@ -4,9 +4,11 @@ use super::ids::{
 };
 use super::table::CheckerTyTable;
 use crate::types::{FunctionType, ObjectTypeMember};
+use varn_core::{BuiltinType, LangPrimitive, TypeKind};
 
 impl CheckerTyTable {
     pub fn intern(&mut self, kind: InternedTypeKind) -> CheckerTyId {
+        let kind = self.canonical(kind);
         if let Some(id) = seeded_id(&kind) {
             return id;
         }
@@ -71,5 +73,40 @@ impl CheckerTyTable {
         self.delta_object_members.insert(id, members);
         self.maybe_freeze();
         id
+    }
+
+    fn canonical(&self, kind: InternedTypeKind) -> InternedTypeKind {
+        match kind {
+            TypeKind::Named(name, origin) => {
+                LangPrimitive::identify(name, origin).map_or(kind, TypeKind::Primitive)
+            }
+            TypeKind::Generic(name, args, origin)
+                if BuiltinType::identify(name, origin) == Some(BuiltinType::Array) =>
+            {
+                match self.get_list(args) {
+                    [elem] => TypeKind::Array(*elem),
+                    _ => kind,
+                }
+            }
+            TypeKind::Generic(..)
+            | TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Object(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => kind,
+        }
     }
 }

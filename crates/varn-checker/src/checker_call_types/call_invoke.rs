@@ -139,7 +139,6 @@ pub(super) fn infer_invoke(
     match c.table.get(callee_ty.0) {
         TypeKind::Fn(fid) => Some(Type::resolved(c.table.get_function(fid).return_type)),
         TypeKind::Primitive(_)
-        | TypeKind::Builtin(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Array(_)

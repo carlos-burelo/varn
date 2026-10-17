@@ -152,10 +152,7 @@ impl<'r> super::Binder<'r> {
                             s.origin_module = s.origin_module.or(module_path_atom);
                             if let (Some(ty), Some(origin)) = (&mut s.ty, &s.origin_module) {
                                 let table = &mut *std::sync::Arc::make_mut(&mut self.ty_table);
-                                *ty = varn_sem::rehome::canonicalize_lang_named(
-                                    ty.with_origin(*origin, table),
-                                    table,
-                                );
+                                *ty = ty.with_origin(*origin, table);
                             }
 
                             if let Some(mp) = &module_path {

@@ -30,6 +30,10 @@ pub trait TypeContext {
     fn symbol_origin(&self, _name: &str) -> Option<varn_core::Atom> {
         None
     }
+
+    fn symbol_kind(&self, _name: &str) -> Option<crate::symbol::SymbolKind> {
+        None
+    }
     fn source_file(&self) -> Option<&str>;
 
     fn get_alias_node(&self, _name: &str) -> Option<(Vec<String>, varn_core::ast::TypeNode)> {

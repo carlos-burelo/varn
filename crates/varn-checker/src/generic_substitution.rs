@@ -7,7 +7,7 @@ use varn_sem::types::{CheckerTyTable, Type};
 fn is_generic_possible(ty: &Type, table: &CheckerTyTable) -> bool {
     !matches!(
         table.get(ty.0),
-        TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_) | TypeKind::This
+        TypeKind::Primitive(_) | TypeKind::Literal(_) | TypeKind::This
     )
 }
 

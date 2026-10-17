@@ -70,12 +70,7 @@ impl<'r> Binder<'r> {
                 }
                 vec![]
             }
-            K::Primitive(_)
-            | K::Builtin(_)
-            | K::Literal(_)
-            | K::This
-            | K::Named(..)
-            | K::Typeof(_) => {
+            K::Primitive(_) | K::Literal(_) | K::This | K::Named(..) | K::Typeof(_) => {
                 vec![]
             }
         };

@@ -1,13 +1,5 @@
 use super::table::CheckerTyTable;
-use varn_core::{Atom, AtomInterner, BuiltinType};
-
-pub(super) fn builtin_names() -> AtomInterner {
-    let mut names = AtomInterner::new();
-    for builtin in BuiltinType::ALL {
-        names.intern(builtin.name());
-    }
-    names
-}
+use varn_core::{Atom, AtomInterner};
 
 impl CheckerTyTable {
     pub fn intern_name(&mut self, text: &str) -> Atom {

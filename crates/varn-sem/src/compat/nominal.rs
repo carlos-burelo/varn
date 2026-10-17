@@ -3,7 +3,7 @@ use super::compat_lookup::{
     object_matches_class_members,
 };
 use super::core::types_compatible_impl;
-use super::resolve::{is_intrinsic, m_ty, resolve_atom};
+use super::resolve::{m_ty, resolve_atom};
 use super::scalar::t;
 use crate::bind::BindView;
 use crate::types::{CheckerTyTable, InternedTypeKind, Type};
@@ -150,9 +150,9 @@ pub(super) fn nominal_arms(
             table,
             false,
         )),
-        (TypeKind::Generic(name, args, _origin), _) => {
+        (TypeKind::Generic(_, args, _), _) => {
             let list = table.get_list(args);
-            if is_intrinsic(bind, name, varn_core::BuiltinType::Task.name()) && list.len() == 1 {
+            if declared.is_builtin(varn_core::BuiltinType::Task, table) && list.len() == 1 {
                 Some(types_compatible_impl(
                     &t(list[0]),
                     inferred,

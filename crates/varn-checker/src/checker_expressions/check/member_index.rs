@@ -22,10 +22,9 @@ impl<'r> Checker<'r> {
         let obj_ty = self.infer_type(rec, object, bind);
         let check_ty = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let check_kind = self.ty_table.get(check_ty.0);
+        let builtin = check_ty.builtin_of(&self.ty_table);
         let key_expected = match check_kind {
-            TypeKind::Generic(name, args, _)
-                if bind.interner.get(varn_core::BuiltinType::Map.name()) == Some(name) =>
-            {
+            TypeKind::Generic(_, args, _) if builtin == Some(varn_core::BuiltinType::Map) => {
                 let arg_ids = self.ty_table.get_list(args).to_vec();
                 if arg_ids.len() == 2 {
                     Some(Type::resolved(arg_ids[0]))
@@ -44,7 +43,8 @@ impl<'r> Checker<'r> {
                         | ObjectTypeMember::Callable { .. } => None,
                     })
             }
-            TypeKind::Array(_) | TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
+            TypeKind::Array(_) => Some(Type::Int),
+            TypeKind::Named(..) if builtin == Some(varn_core::BuiltinType::Bytes) => {
                 Some(Type::Int)
             }
             TypeKind::Tuple(slots) => {
@@ -66,7 +66,6 @@ impl<'r> Checker<'r> {
                 Some(Type::Int)
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)
@@ -87,12 +86,11 @@ impl<'r> Checker<'r> {
         if let Some(expected_k) = key_expected {
             self.with_expected(Some(expected_k), |c| c.check_expr(rec, property, bind));
             let actual_k = self.infer_type(rec, property, bind);
-            let is_range_slice = matches!(
+            let is_range_slice = (matches!(
                 check_kind,
-                TypeKind::Array(_)
-                    | TypeKind::Primitive(varn_core::LangPrimitive::Str)
-                    | TypeKind::Builtin(varn_core::BuiltinType::Bytes)
-            ) && actual_k.is_range(&self.ty_table, &bind.interner);
+                TypeKind::Array(_) | TypeKind::Primitive(varn_core::LangPrimitive::Str)
+            ) || builtin == Some(varn_core::BuiltinType::Bytes))
+                && actual_k.is_range(&self.ty_table);
             if !actual_k.is_dynamic()
                 && !is_range_slice
                 && !self.types_compatible_cached(&expected_k, &actual_k, Some(bind))

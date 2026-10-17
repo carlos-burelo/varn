@@ -54,24 +54,8 @@ pub(crate) fn infer_member(
         return match table.get(obj_ty.0) {
             TypeKind::Array(inner) => Type::resolved(inner),
             TypeKind::Primitive(varn_core::LangPrimitive::Str) => Type::Str,
-            TypeKind::Named(name, _)
-                if ctx
-                    .and_then(|c| c.interner())
-                    .is_some_and(|i| i.get(varn_core::LangPrimitive::Str.name()) == Some(name)) =>
-            {
-                Type::Str
-            }
-            TypeKind::Generic(name, args, _)
-                if ctx
-                    .and_then(|c| c.interner())
-                    .is_some_and(|i| i.get(varn_core::BuiltinType::Map.name()) == Some(name)) =>
-            {
-                let arg_ids = table.get_list(args).to_vec();
-                if arg_ids.len() == 2 {
-                    Type::resolved(arg_ids[1])
-                } else {
-                    Type::Dynamic
-                }
+            TypeKind::Generic(..) if obj_ty.is_builtin(varn_core::BuiltinType::Map, table) => {
+                obj_ty.builtin_arg(1, table)
             }
             TypeKind::Object(mid) => table
                 .get_object_members(mid)
@@ -85,7 +69,6 @@ pub(crate) fn infer_member(
                 .map(Type::resolved)
                 .unwrap_or(Type::Dynamic),
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)
@@ -232,7 +215,6 @@ pub(crate) fn infer_member(
                 }
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)

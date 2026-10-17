@@ -31,15 +31,13 @@ pub fn infer_expr_type(
         ExprKind::Await { argument } => {
             let inner = infer_expr_type(*argument, arena, ctx, table);
             match table.get(inner.0) {
-                TypeKind::Generic(name, args, _)
-                    if ctx.and_then(|c| c.interner()).is_some_and(|i| {
-                        i.get(varn_core::BuiltinType::Task.name()) == Some(name)
-                    }) && table.get_list(args).len() == 1 =>
+                TypeKind::Generic(_, args, _)
+                    if inner.is_builtin(varn_core::BuiltinType::Task, table)
+                        && table.get_list(args).len() == 1 =>
                 {
                     Type::resolved(table.get_list(args)[0])
                 }
                 TypeKind::Primitive(_)
-                | TypeKind::Builtin(_)
                 | TypeKind::Literal(_)
                 | TypeKind::This
                 | TypeKind::Array(_)
@@ -109,7 +107,6 @@ pub fn infer_expr_type(
                 UnaryOp::BitNot => match table.get(inner.0) {
                     TypeKind::Primitive(varn_core::LangPrimitive::Int) => Type::Int,
                     TypeKind::Primitive(_)
-                    | TypeKind::Builtin(_)
                     | TypeKind::Literal(_)
                     | TypeKind::This
                     | TypeKind::Array(_)

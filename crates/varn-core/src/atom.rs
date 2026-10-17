@@ -20,6 +20,10 @@ impl Atom {
     pub fn of(text: &str) -> Atom {
         Atom(xxhash_rust::xxh3::xxh3_128(text.as_bytes()))
     }
+
+    pub const fn of_const(text: &str) -> Atom {
+        Atom(xxhash_rust::const_xxh3::xxh3_128(text.as_bytes()))
+    }
 }
 
 const FREEZE_THRESHOLD: usize = 2048;

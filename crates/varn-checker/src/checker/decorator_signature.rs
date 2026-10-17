@@ -278,7 +278,6 @@ impl<'r> Checker<'r> {
             | TypeKind::Named(_, _)
             | TypeKind::Generic(_, _, _)
             | TypeKind::Object(_)
-            | TypeKind::Builtin(_)
             | TypeKind::EnumVariant { .. } => true,
             TypeKind::Primitive(p) => matches!(
                 p,

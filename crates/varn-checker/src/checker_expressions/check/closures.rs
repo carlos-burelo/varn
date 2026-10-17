@@ -41,18 +41,19 @@ impl<'r> Checker<'r> {
         let mut injected_type_params: Vec<Arc<str>> = vec![];
         if let Some(expected_fn) = self.expected_fn_type() {
             for ep in &expected_fn.params {
-                if let varn_core::TypeKind::Named(n, _) = self.ty_table.get(ep.ty) {
+                if let varn_core::TypeKind::Named(n, origin) = self.ty_table.get(ep.ty)
+                    && !varn_core::is_lang_type(n, origin)
+                {
                     let n_str = bind.interner.try_resolve(n).unwrap_or_default();
-                    if !varn_core::is_lang_type_name(n_str) {
-                        injected_type_params.push(Arc::from(n_str));
-                    }
-                }
-            }
-            if let varn_core::TypeKind::Named(n, _) = self.ty_table.get(expected_fn.return_type) {
-                let n_str = bind.interner.try_resolve(n).unwrap_or_default();
-                if !varn_core::is_lang_type_name(n_str) {
                     injected_type_params.push(Arc::from(n_str));
                 }
+            }
+            if let varn_core::TypeKind::Named(n, origin) =
+                self.ty_table.get(expected_fn.return_type)
+                && !varn_core::is_lang_type(n, origin)
+            {
+                let n_str = bind.interner.try_resolve(n).unwrap_or_default();
+                injected_type_params.push(Arc::from(n_str));
             }
             for tp in &injected_type_params {
                 self.active_type_params.insert(tp.clone());

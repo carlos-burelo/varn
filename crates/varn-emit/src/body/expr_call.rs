@@ -464,7 +464,6 @@ fn checked_widen_ty(
     let rest_inner = |param: &varn_sem::output::CheckedParam| match table.get(param.ty.0) {
         varn_core::TypeKind::Array(inner) => Some(varn_sem::types::Type::resolved(inner)),
         varn_core::TypeKind::Primitive(_)
-        | varn_core::TypeKind::Builtin(_)
         | varn_core::TypeKind::Literal(_)
         | varn_core::TypeKind::This
         | varn_core::TypeKind::Union(_)

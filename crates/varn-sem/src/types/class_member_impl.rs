@@ -27,7 +27,6 @@ impl ClassMemberInfo {
                 format_fn_params(&table.get_function(fid).params.clone(), table, interner)
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -60,7 +59,6 @@ impl ClassMemberInfo {
                 Type::resolved(ret).display(table, interner).to_string()
             }
             TypeKind::Primitive(_)
-            | TypeKind::Builtin(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)

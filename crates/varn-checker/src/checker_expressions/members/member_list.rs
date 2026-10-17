@@ -37,29 +37,6 @@ pub fn get_members_of_type(
         }
     };
 
-    fn add_declared(
-        results: &mut Vec<varn_sem::semantic_info::ResolvedMemberSummary>,
-        seen: &mut rustc_hash::FxHashSet<Arc<str>>,
-        m: &varn_sem::types::ClassMemberInfo,
-        ty: Type,
-        kind: varn_sem::semantic_info::ResolvedMemberKind,
-    ) {
-        if seen.insert(m.name.clone()) {
-            results.push(varn_sem::semantic_info::ResolvedMemberSummary {
-                name: m.name.clone(),
-                ty,
-                kind,
-                is_static: m.is_static,
-                optional: m.is_optional,
-                readonly: m.is_readonly,
-                def_line: (m.line > 0).then_some(m.line),
-                def_col: m.col,
-                is_async: m.is_async,
-                is_generator: m.is_generator,
-            });
-        }
-    }
-
     let ty_kind = table.get(ty.0);
     match ty_kind {
         TypeKind::Object(mid) => {
@@ -139,96 +116,39 @@ pub fn get_members_of_type(
                 true,
             );
         }
-        TypeKind::Array(inner) => {
-            let atom = table.intern_name(varn_core::BuiltinType::Array.name());
-            let array_ty = Type::generic_atom(atom, vec![Type::resolved(inner)], None, table);
-            return get_members_of_type(resolver, &array_ty, bind, table);
-        }
+        TypeKind::Array(inner) => list_nominal(
+            resolver,
+            bind,
+            table,
+            Arc::from(varn_core::BuiltinType::Array.name()),
+            Some(Arc::from(varn_core::BuiltinType::Array.core_module())),
+            &[Type::resolved(inner)],
+            &mut results,
+            &mut seen,
+        ),
         TypeKind::Named(cn_atom, origin_atom) | TypeKind::Generic(cn_atom, _, origin_atom) => {
             let cn: Arc<str> = Arc::from(super::member_atom::resolve_atom_text(bind, cn_atom));
             let origin: Option<Arc<str>> =
                 origin_atom.map(|o| Arc::from(super::member_atom::resolve_atom_text(bind, o)));
-            let mapping = if let TypeKind::Generic(_, args_list, _) = ty_kind {
-                let args: Vec<Type> = table
+            let args: Vec<Type> = if let TypeKind::Generic(_, args_list, _) = ty_kind {
+                table
                     .get_list(args_list)
                     .iter()
                     .map(|id| Type::resolved(*id))
-                    .collect();
-                super::member_util::generic_mapping(
-                    resolver,
-                    cn.as_ref(),
-                    &args,
-                    origin.as_ref(),
-                    bind,
-                )
+                    .collect()
             } else {
-                rustc_hash::FxHashMap::default()
+                Vec::new()
             };
-
-            let map_ty = |t: &Type, table: &mut CheckerTyTable| {
-                if mapping.is_empty() {
-                    *t
-                } else {
-                    t.map_generics(&mapping, table)
-                }
-            };
-
-            if let Some(entry) = bind.type_members.classes.get(&cn) {
-                for m in &entry.members {
-                    let kind = super::member_kind::map_class_member_kind(m.kind);
-                    let mapped = map_ty(&m.ty, table);
-                    add_declared(&mut results, &mut seen, m, mapped, kind);
-                }
-            }
-            if let Some(entry) = bind.type_members.interfaces.get(&cn) {
-                for m in entry {
-                    let kind = super::member_kind::map_class_member_kind(m.kind);
-                    let mapped = map_ty(&m.ty, table);
-                    add_declared(&mut results, &mut seen, m, mapped, kind);
-                }
-            }
-            if let Some(entry) = bind.type_members.enums.get(&cn) {
-                for m in entry {
-                    let kind = super::member_kind::map_class_member_kind(m.kind);
-                    let mapped = map_ty(&m.ty, table);
-                    add_declared(&mut results, &mut seen, m, mapped, kind);
-                }
-            }
-            if let Some(entry) = bind.type_members.namespaces.get(&cn) {
-                for m in entry {
-                    let kind = super::member_kind::map_class_member_kind(m.kind);
-                    let mapped = map_ty(&m.ty, table);
-                    add_declared(&mut results, &mut seen, m, mapped, kind);
-                }
-            }
-
-            if let Some(b) = &bind.core {
-                if let Some(entry) = b.class_members.get(cn.as_ref()) {
-                    for m in &entry.members {
-                        let kind = super::member_kind::map_class_member_kind(m.kind);
-                        let mapped = map_ty(&m.ty, table);
-                        add_declared(&mut results, &mut seen, m, mapped, kind);
-                    }
-                }
-                if let Some(members) = b.flattened_members.get(cn.as_ref()) {
-                    for m in members {
-                        let kind = super::member_kind::map_class_member_kind(m.kind);
-                        let mapped = map_ty(&m.ty, table);
-                        add_declared(&mut results, &mut seen, m, mapped, kind);
-                    }
-                }
-            }
-
-            let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-            if let Some(ext_bind) = resolver.find_bind_for_type(&cn, &origin_modules)
-                && let Some(entry) = ext_bind.type_members.classes.get(&cn)
-            {
-                for m in &entry.members {
-                    let kind = super::member_kind::map_class_member_kind(m.kind);
-                    let mapped = map_ty(&m.ty, table);
-                    add_declared(&mut results, &mut seen, m, mapped, kind);
-                }
-            }
+            list_nominal(
+                resolver,
+                bind,
+                table,
+                cn,
+                origin,
+                &args,
+                &mut results,
+                &mut seen,
+            );
         }
         TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
             add_member(
@@ -244,21 +164,7 @@ pub fn get_members_of_type(
             let str_ty = Type::named(varn_core::RuntimeKind::Str.name().to_owned(), table);
             return get_members_of_type(resolver, &str_ty, bind, table);
         }
-        TypeKind::Builtin(varn_core::BuiltinType::Bytes) => {
-            add_member(
-                &mut results,
-                &mut seen,
-                Arc::from(varn_core::MemberKey::Length.as_str()),
-                Type::Int,
-                varn_sem::semantic_info::ResolvedMemberKind::Property,
-                false,
-                false,
-                true,
-            );
-            let bytes_ty = Type::named(varn_core::RuntimeKind::Bytes.name().to_owned(), table);
-            return get_members_of_type(resolver, &bytes_ty, bind, table);
-        }
-        kind @ (TypeKind::Primitive(_) | TypeKind::Builtin(_) | TypeKind::Literal(_)) => {
+        kind @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => {
             let name = kind.lang_name().unwrap_or_default();
             let named_ty = Type::named(name.to_owned(), table);
             return get_members_of_type(resolver, &named_ty, bind, table);
@@ -305,4 +211,110 @@ pub fn get_members_of_type(
 
     super::member_extension::collect_extension_members(&mut results, &mut seen, ty, bind, table);
     results
+}
+
+#[allow(clippy::too_many_arguments)]
+fn list_nominal(
+    resolver: &dyn varn_sem::resolver::ImportResolver,
+    bind: &BindResult,
+    table: &mut CheckerTyTable,
+    cn: Arc<str>,
+    origin: Option<Arc<str>>,
+    args: &[Type],
+    results: &mut Vec<varn_sem::semantic_info::ResolvedMemberSummary>,
+    seen: &mut rustc_hash::FxHashSet<Arc<str>>,
+) {
+    let mapping = if args.is_empty() {
+        rustc_hash::FxHashMap::default()
+    } else {
+        super::member_util::generic_mapping(resolver, cn.as_ref(), args, origin.as_ref(), bind)
+    };
+
+    let map_ty = |t: &Type, table: &mut CheckerTyTable| {
+        if mapping.is_empty() {
+            *t
+        } else {
+            t.map_generics(&mapping, table)
+        }
+    };
+
+    if let Some(entry) = bind.type_members.classes.get(&cn) {
+        for m in &entry.members {
+            let kind = super::member_kind::map_class_member_kind(m.kind);
+            let mapped = map_ty(&m.ty, table);
+            add_declared(results, seen, m, mapped, kind);
+        }
+    }
+    if let Some(entry) = bind.type_members.interfaces.get(&cn) {
+        for m in entry {
+            let kind = super::member_kind::map_class_member_kind(m.kind);
+            let mapped = map_ty(&m.ty, table);
+            add_declared(results, seen, m, mapped, kind);
+        }
+    }
+    if let Some(entry) = bind.type_members.enums.get(&cn) {
+        for m in entry {
+            let kind = super::member_kind::map_class_member_kind(m.kind);
+            let mapped = map_ty(&m.ty, table);
+            add_declared(results, seen, m, mapped, kind);
+        }
+    }
+    if let Some(entry) = bind.type_members.namespaces.get(&cn) {
+        for m in entry {
+            let kind = super::member_kind::map_class_member_kind(m.kind);
+            let mapped = map_ty(&m.ty, table);
+            add_declared(results, seen, m, mapped, kind);
+        }
+    }
+
+    if let Some(b) = &bind.core {
+        if let Some(entry) = b.class_members.get(cn.as_ref()) {
+            for m in &entry.members {
+                let kind = super::member_kind::map_class_member_kind(m.kind);
+                let mapped = map_ty(&m.ty, table);
+                add_declared(results, seen, m, mapped, kind);
+            }
+        }
+        if let Some(members) = b.flattened_members.get(cn.as_ref()) {
+            for m in members {
+                let kind = super::member_kind::map_class_member_kind(m.kind);
+                let mapped = map_ty(&m.ty, table);
+                add_declared(results, seen, m, mapped, kind);
+            }
+        }
+    }
+
+    let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
+    if let Some(ext_bind) = resolver.find_bind_for_type(&cn, &origin_modules)
+        && let Some(entry) = ext_bind.type_members.classes.get(&cn)
+    {
+        for m in &entry.members {
+            let kind = super::member_kind::map_class_member_kind(m.kind);
+            let mapped = map_ty(&m.ty, table);
+            add_declared(results, seen, m, mapped, kind);
+        }
+    }
+}
+
+fn add_declared(
+    results: &mut Vec<varn_sem::semantic_info::ResolvedMemberSummary>,
+    seen: &mut rustc_hash::FxHashSet<Arc<str>>,
+    m: &varn_sem::types::ClassMemberInfo,
+    ty: Type,
+    kind: varn_sem::semantic_info::ResolvedMemberKind,
+) {
+    if seen.insert(m.name.clone()) {
+        results.push(varn_sem::semantic_info::ResolvedMemberSummary {
+            name: m.name.clone(),
+            ty,
+            kind,
+            is_static: m.is_static,
+            optional: m.is_optional,
+            readonly: m.is_readonly,
+            def_line: (m.line > 0).then_some(m.line),
+            def_col: m.col,
+            is_async: m.is_async,
+            is_generator: m.is_generator,
+        });
+    }
 }

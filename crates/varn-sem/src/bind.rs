@@ -224,16 +224,6 @@ impl BindResult {
             .or_else(|| self.core.as_ref().and_then(|b| b.class_members.get(name)))
     }
 
-    #[inline]
-    pub fn is_user_class(&self, name: &str) -> bool {
-        if varn_core::is_lang_type_name(name) {
-            return false;
-        }
-        self.get_class_entry(name)
-            .map(|entry| !entry.is_builtin_or_intrinsic)
-            .unwrap_or(false)
-    }
-
     pub fn get_interface_members_local(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {
         self.type_members.interfaces.get(name).or_else(|| {
             self.core
@@ -431,6 +421,13 @@ impl TypeContext for BindView<'_> {
         let atom = self.bind.interner.get(name)?;
         let id = scope.resolve(atom, &self.bind.scopes)?;
         self.bind.arena.get(id).origin_module
+    }
+
+    fn symbol_kind(&self, name: &str) -> Option<crate::symbol::SymbolKind> {
+        let scope = self.bind.scopes.get(self.scope);
+        let atom = self.bind.interner.get(name)?;
+        let id = scope.resolve(atom, &self.bind.scopes)?;
+        Some(self.bind.arena.get(id).kind)
     }
 
     fn source_file(&self) -> Option<&str> {
