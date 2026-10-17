@@ -27,6 +27,7 @@ impl<'r> Checker<'r> {
                         Diagnostic::warning(ErrorCode::UnreachableCode, "unreachable code")
                             .with_range(later.range),
                     );
+                    self.check_stmt(rec, later_id, bind);
                 }
                 return;
             }

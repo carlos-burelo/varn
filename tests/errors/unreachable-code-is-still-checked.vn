@@ -1,0 +1,5 @@
+// expect: error[VN3002]
+function f(): void {
+    throw new Error("first")
+    missing()
+}
