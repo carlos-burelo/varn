@@ -32,7 +32,7 @@ Para evitar la creación de *God Files*, el proyecto aplica reglas estrictas sob
 | `< 300` | **Ideal** | Tamaño óptimo y enfocado. |
 | `300 - 400` | **Advertencia** | Monitorear responsabilidad del módulo. |
 | `400 - 1000` | **Refactor Requerido (AGENTS §6)** | Partir por dominio antes de agregar nada. Puerta CI avisa; `verify.ps1`/`verify.sh`/`ci.yml` advierten >400. |
-| `> 1000` | **Prohibido salvo exención legacy** | **Prohibido** añadir nuevas funciones sin dividir el archivo, salvo exenciones legacy listadas en `LEGACY_EXEMPTIONS` (`.github/workflows/ci.yml:41`). CI falla si un archivo no exento supera 1000 líneas. |
+| `> 1000` | **Prohibido salvo exención legacy** | **Prohibido** añadir nuevas funciones sin dividir el archivo, salvo exenciones legacy listadas en `LEGACY_EXEMPTIONS` (`.github/workflows/ci.yml`). CI falla si un archivo no exento supera 1000 líneas. |
 
 ---
 
@@ -83,8 +83,8 @@ Para simplificar la validación y asegurar cero roturas antes de hacer commit/pu
 
 - **Windows (PowerShell)**:
   ```powershell
-  .\scripts\verify.ps1              # Ejecución completa (fmt + clippy + audit + release + 4 cuadrantes + bench)
-  .\scripts\verify.ps1 -Fast        # Release sin benchmark (matriz completa de 4 cuadrantes)
+  .\scripts\verify.ps1              # Ejecución completa (fmt + clippy + audit + release + 5 cuadrantes + bench)
+  .\scripts\verify.ps1 -Fast        # Release sin benchmark (4 cuadrantes + cuadrante 5 de caché JIT)
   .\scripts\verify.ps1 -Quick       # Iteración: perfil `quick` (sin LTO) + solo cuadrante 1, sin lint ni bench
   .\scripts\verify.ps1 -SkipLint    # Omite cargo fmt y cargo clippy
   .\scripts\verify.ps1 -CleanCache  # Limpia la caché de Varn antes de cada cuadrante
@@ -105,14 +105,16 @@ Para simplificar la validación y asegurar cero roturas antes de hacer commit/pu
 
 ## CI/CD en GitHub Actions
 
-El repositorio cuenta con dos flujos automatizados en `.github/workflows/`:
+Un solo flujo, `.github/workflows/ci.yml`, en cada push y pull request sobre `main`, `master` y `develop`:
 
-1. **`ci.yml`**: Se ejecuta en cada Push y Pull Request sobre ramas principales. Valida formato (`rustfmt`), linter (`clippy`), límites de tamaño de archivo (regla anti-god files) y ejecuta la matriz multi-SO en Linux, Windows y macOS.
-2. **`release.yml`**: Se dispara con tags de versión (`v*`) o manualmente (`workflow_dispatch`). Compila binarios optimizados de producción para todas las arquitecturas (`x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`), genera sumas de verificación criptográficas `SHA256SUMS.txt` y publica los artefactos automáticamente en GitHub Releases. Fuente de targets: `.github/workflows/ci.yml` (job `release`); no existe `release.yml` separado.
+1. **`lint`**: `rustfmt`, `clippy` y la regla de tamaño de archivos (falla por encima de 1000 líneas salvo `LEGACY_EXEMPTIONS`).
+2. **`test-matrix`**: la matriz de 4 cuadrantes en Linux, Windows y macOS.
+3. **`release`** (solo en push a `main`, tras `lint` y `test-matrix`): compila el perfil `dist` para `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin` y `aarch64-apple-darwin`, con humo (`--version` + `run tests/main.vn`). Se salta si la etiqueta de la versión ya existe.
+4. **`publish-release`**: genera `SHA256SUMS.txt` y publica los artefactos en GitHub Releases con la etiqueta `v<versión de Cargo.toml>`.
 
 ---
 
 ## Reglas Estrictas del Repositorio
 
 > [!CAUTION]
-> **Prohibición de comandos de Git automáticos**: No ejecutar comandos `git` ni alterar el directorio `.git`. El control de versiones es gestionado exclusivamente por el usuario.
+> **Git**: commits atómicos, uno por cambio (`AGENTS.md`, Ley 9). `git add`, `commit` y `push` no requieren autorización; cualquier comando que reescriba o descarte trabajo (`reset`, `rebase`, `checkout --`, `clean -f`…) debe justificarse. Nunca `git add` de directorios enteros sin revisar lo que entra.
