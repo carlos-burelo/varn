@@ -2,16 +2,29 @@
 // Single event queue + command log per window. Real backend feeds the same
 // queue and draws instead of logging. Same API, no dual paths.
 
+@permission("ui")
 export declare function open$(title: str, w: int, h: int): int;
+@permission("ui")
 export declare function close$(id: int): void;
+@permission("ui")
 export declare function shouldClose$(id: int): bool;
+@permission("ui")
 export declare function size$(id: int): int[];
+@permission("ui")
 export declare function inject$(id: int, kind: str, a: int, b: int, c: int): void;
+@permission("ui")
 export declare function poll$(id: int): dynamic[];
+@permission("ui")
 export declare function rect$(id: int, x: float, y: float, w: float, h: float, color: int, radius: float): void;
+@permission("ui")
 export declare function text$(id: int, x: float, y: float, s: str, size: float, color: int): void;
+@permission("ui")
 export declare function clear$(id: int, color: int): void;
+@permission("ui")
 export declare function present$(id: int): int;
+@permission("ui")
 export declare function commands$(id: int): str[];
+@permission("ui")
 export declare function real$(id: int): bool;
+@permission("ui")
 export declare function keyCode$(name: str): int;

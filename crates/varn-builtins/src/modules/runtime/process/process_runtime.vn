@@ -1,7 +1,9 @@
 // runtime:process — low-level host process execution operations.
 
+@permission("sys.exec")
 export declare function exec$(command: str): dynamic;
 export declare function currentExe$(): str;
+@permission("sys.exec")
 export declare function spawnProcess$(command: str, args: str[]): int;
 export declare function waitProcess$(pid: int): dynamic;
 export declare function killProcess$(pid: int): bool;

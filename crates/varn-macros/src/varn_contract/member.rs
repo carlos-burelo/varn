@@ -195,6 +195,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
 
     out.wrappers.push(fast_wrapper);
 
+    let capability = m.capability.clone().unwrap_or_default();
     if m.kind == Kind::Function {
         let fn_entry_ident = format_ident!(
             "__VARN_OP_{}_{}",
@@ -215,7 +216,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
                 signature: #sig_val,
                 entry_kind: 0x01,
                 flags: 0,
-                _reserved: [0; 7],
+                capability: #capability,
             };
         });
     } else {
@@ -259,7 +260,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
                     signature: #sig_val,
                     entry_kind: #mkind,
                     flags: 0,
-                    _reserved: [0; 7],
+                    capability: #capability,
                 };
             });
         }

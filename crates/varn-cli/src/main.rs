@@ -69,10 +69,11 @@ fn run_cli() {
         println!("--- CLI NATIVE OPERATIONS ---");
         for entry in varn_builtins::dispatch::all_native_ops() {
             println!(
-                "module: {} | ns: {} | symbol: {} | func_ptr: {:?}",
+                "module: {} | ns: {} | symbol: {} | capability: {} | func_ptr: {:?}",
                 entry.module_id(),
                 entry.namespace_path(),
                 entry.symbol_name(),
+                entry.capability().unwrap_or("-"),
                 entry.func_ptr
             );
         }

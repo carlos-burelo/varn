@@ -12,6 +12,7 @@ use crate::varn_contract::Mapped;
 
 pub(crate) enum LookupFailure {
     Unparsable(String),
+    BadCapability(String),
     ClassNotFound,
     NoFunctions,
 }
@@ -53,11 +54,11 @@ fn parse(source: &str, name: &str) -> Result<Contract, LookupFailure> {
                 if let Some(id) = c.id {
                     classes.insert(
                         interner.resolve(id).to_string(),
-                        class_members(c, &arena, &interner),
+                        class_members(c, &arena, &interner)?,
                     );
                 }
             }
-            Decl::Function(f) => functions.push(function_member(f, &interner)),
+            Decl::Function(f) => functions.push(function_member(f, &arena, &interner)?),
             Decl::Variable(_)
             | Decl::Interface(_)
             | Decl::TypeAlias(_)
@@ -176,7 +177,41 @@ fn is_fallible(
     })
 }
 
-fn class_members(decl: &ClassDecl, arena: &AstArena, interner: &AtomInterner) -> Vec<Member> {
+fn capability(
+    decorators: &[varn_core::ast::Decorator],
+    arena: &AstArena,
+    interner: &AtomInterner,
+) -> Result<Option<String>, LookupFailure> {
+    use varn_core::ast::Arg;
+    let bad = || {
+        LookupFailure::BadCapability("`@permission` takes exactly one string domain".to_string())
+    };
+    for d in decorators {
+        let ExprKind::Call { callee, args, .. } = &arena.expr(d.expression).kind else {
+            continue;
+        };
+        let ExprKind::Identifier { name } = &arena.expr(*callee).kind else {
+            continue;
+        };
+        if interner.resolve(*name) != "permission" {
+            continue;
+        }
+        let [Arg::Positional(arg)] = args.as_slice() else {
+            return Err(bad());
+        };
+        let ExprKind::StrLiteral { value } = &arena.expr(*arg).kind else {
+            return Err(bad());
+        };
+        return Ok(Some(value.clone()));
+    }
+    Ok(None)
+}
+
+fn class_members(
+    decl: &ClassDecl,
+    arena: &AstArena,
+    interner: &AtomInterner,
+) -> Result<Vec<Member>, LookupFailure> {
     let mut out = Vec::new();
     for m in &decl.body {
         match m {
@@ -197,6 +232,7 @@ fn class_members(decl: &ClassDecl, arena: &AstArena, interner: &AtomInterner) ->
                 params: params(ps, interner),
                 ret: classify_or(return_type.as_ref(), interner, Mapped::Void),
                 fallible: is_fallible(decorators, arena, interner),
+                capability: capability(decorators, arena, interner)?,
             }),
             ClassMember::Getter {
                 key,
@@ -213,6 +249,7 @@ fn class_members(decl: &ClassDecl, arena: &AstArena, interner: &AtomInterner) ->
                 params: Vec::new(),
                 ret: classify_or(return_type.as_ref(), interner, Mapped::Dynamic),
                 fallible: false,
+                capability: None,
             }),
             ClassMember::Property {
                 key,
@@ -232,6 +269,7 @@ fn class_members(decl: &ClassDecl, arena: &AstArena, interner: &AtomInterner) ->
                 params: Vec::new(),
                 ret: classify_or(type_ann.as_ref(), interner, Mapped::Dynamic),
                 fallible: false,
+                capability: None,
             }),
             ClassMember::Constructor { params: ps, .. } => out.push(Member {
                 symbol: "constructor".to_string(),
@@ -239,6 +277,7 @@ fn class_members(decl: &ClassDecl, arena: &AstArena, interner: &AtomInterner) ->
                 params: params(ps, interner),
                 ret: Mapped::Dynamic,
                 fallible: false,
+                capability: None,
             }),
             ClassMember::Destructor { .. }
             | ClassMember::Property { .. }
@@ -246,15 +285,20 @@ fn class_members(decl: &ClassDecl, arena: &AstArena, interner: &AtomInterner) ->
             | ClassMember::StaticBlock { .. } => {}
         }
     }
-    out
+    Ok(out)
 }
 
-fn function_member(f: &FunctionDecl, interner: &AtomInterner) -> Member {
-    Member {
+fn function_member(
+    f: &FunctionDecl,
+    arena: &AstArena,
+    interner: &AtomInterner,
+) -> Result<Member, LookupFailure> {
+    Ok(Member {
         symbol: interner.resolve(f.id).to_string(),
         kind: Kind::Function,
         params: params(&f.params, interner),
         ret: classify_or(f.return_type.as_ref(), interner, Mapped::Void),
         fallible: false,
-    }
+        capability: capability(&f.decorators, arena, interner)?,
+    })
 }

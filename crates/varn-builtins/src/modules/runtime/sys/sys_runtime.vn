@@ -4,6 +4,8 @@ export declare function platform$(): str;
 export declare function cwd$(): str;
 export declare function args$(): str[];
 export declare function exit$(code?: int): void;
+@permission("sys.env")
 export declare function env$(key: str): str;
+@permission("sys.env")
 export declare function setEnv$(key: str, val: str): void;
 export declare function now$(): float;

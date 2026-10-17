@@ -97,7 +97,7 @@ pub struct NativeOpEntry {
 
     pub entry_kind: u8,
     pub flags: u32,
-    pub _reserved: [u8; 7],
+    pub capability: &'static str,
 }
 
 unsafe impl Sync for NativeOpEntry {}
@@ -124,6 +124,10 @@ impl NativeOpEntry {
             let slice = std::slice::from_raw_parts(self.symbol_name, self.symbol_name_len as usize);
             std::str::from_utf8_unchecked(slice)
         }
+    }
+
+    pub fn capability(&self) -> Option<&'static str> {
+        (!self.capability.is_empty()).then_some(self.capability)
     }
 
     pub fn func(&self) -> NativeFn {

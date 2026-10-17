@@ -1,15 +1,27 @@
 // runtime:ffi — native host Foreign Function Interface (FFI) operations.
 
+@permission("sys.ffi")
 export declare function dlopen$(path: str): int;
+@permission("sys.ffi")
 export declare function dlclose$(libHandle: int): bool;
+@permission("sys.ffi")
 export declare function dlsym$(libHandle: int, symbol: str): int;
+@permission("sys.ffi")
 export declare function call$(fnPtr: int, retType: int, args: dynamic[]): dynamic;
+@permission("sys.ffi")
 export declare function alloc$(size: int): int;
+@permission("sys.ffi")
 export declare function free$(ptr: int): void;
+@permission("sys.ffi")
 export declare function readInt$(ptr: int, offset: int, size: int): int;
+@permission("sys.ffi")
 export declare function writeInt$(ptr: int, offset: int, val: int, size: int): void;
+@permission("sys.ffi")
 export declare function readFloat$(ptr: int, offset: int, isDouble: bool): float;
+@permission("sys.ffi")
 export declare function writeFloat$(ptr: int, offset: int, val: float, isDouble: bool): void;
+@permission("sys.ffi")
 export declare function readCString$(ptr: int, offset: int): str;
+@permission("sys.ffi")
 export declare function allocCString$(s: str): int;
 

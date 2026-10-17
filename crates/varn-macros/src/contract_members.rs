@@ -24,4 +24,6 @@ pub(crate) struct Member {
     pub(crate) ret: Mapped,
 
     pub(crate) fallible: bool,
+
+    pub(crate) capability: Option<String>,
 }

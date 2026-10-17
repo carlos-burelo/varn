@@ -65,7 +65,9 @@ fn expand_section(
     let members =
         match crate::contract_parse::lookup(source, &input.contract, section.class.as_deref()) {
             Ok(members) => members,
-            Err(LookupFailure::Unparsable(reason)) => return Err(reason),
+            Err(LookupFailure::Unparsable(reason)) | Err(LookupFailure::BadCapability(reason)) => {
+                return Err(reason)
+            }
             Err(LookupFailure::ClassNotFound) => {
                 let class = section.class.clone().unwrap_or_default();
                 return Err(format!(
@@ -153,7 +155,7 @@ fn expand_section(
                 signature: ::varn_types::SignatureDescriptor::empty(),
                 entry_kind: 0x10,
                 flags: 0,
-                _reserved: [0; 7],
+                capability: "",
             };
 
             #(#method_entries)*

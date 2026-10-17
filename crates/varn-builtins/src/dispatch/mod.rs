@@ -51,27 +51,11 @@ fn fn_table() -> &'static FxHashMap<usize, DispatchEntry> {
                 module_id: entry.module_id(),
                 name: entry.symbol_name(),
                 func: entry.func(),
-                capability: capability_for_op(
-                    entry.module_id(),
-                    entry.namespace_path(),
-                    entry.symbol_name(),
-                ),
+                capability: entry.capability(),
             });
         }
         table
     })
-}
-
-pub fn capability_for_op(module_id: &str, namespace: &str, symbol: &str) -> Option<&'static str> {
-    let _ = namespace;
-    let sym = symbol.trim_end_matches('$');
-    match (module_id, sym) {
-        ("runtime:ffi", _) => Some("sys.ffi"),
-        ("runtime:ui", _) => Some("ui"),
-        ("runtime:sys", "env" | "setEnv") => Some("sys.env"),
-        ("runtime:process", "exec" | "spawnProcess") => Some("sys.exec"),
-        _ => None,
-    }
 }
 
 fn build_table() -> FxHashMap<u64, DispatchEntry> {
@@ -85,11 +69,7 @@ fn build_table() -> FxHashMap<u64, DispatchEntry> {
                 module_id: entry.module_id(),
                 name: entry.symbol_name(),
                 func: entry.func(),
-                capability: capability_for_op(
-                    entry.module_id(),
-                    entry.namespace_path(),
-                    entry.symbol_name(),
-                ),
+                capability: entry.capability(),
             },
         );
     }
@@ -136,11 +116,7 @@ pub fn describe_op(id: u64) -> Option<OpMeta> {
         name: entry.symbol_name(),
         op_id: id,
         is_async: false,
-        capability: capability_for_op(
-            entry.module_id(),
-            entry.namespace_path(),
-            entry.symbol_name(),
-        ),
+        capability: entry.capability(),
     })
 }
 
@@ -200,53 +176,6 @@ pub fn dispatch_runtime_op(
         return (entry.func)(ctx, args).map_err(|err| format!("E_RUNTIME_FAILURE:id={id}:{err}"));
     }
     Err(format!("E_RUNTIME_UNKNOWN_WIRE:id={id}"))
-}
-
-#[cfg(test)]
-mod capability_tests {
-    use super::*;
-
-    fn symbols_of(module: &str) -> std::collections::BTreeSet<String> {
-        all_native_ops()
-            .iter()
-            .filter(|e| e.module_id() == module)
-            .map(|e| e.symbol_name().trim_end_matches('$').to_string())
-            .collect()
-    }
-
-    #[test]
-    fn mapped_symbols_exist() {
-        for (module, symbols) in [
-            ("runtime:ffi", &["dlopen", "dlsym", "call"][..]),
-            ("runtime:sys", &["env", "setEnv"][..]),
-            ("runtime:process", &["exec", "spawnProcess"][..]),
-        ] {
-            let have = symbols_of(module);
-            for &s in symbols {
-                assert!(
-                    have.iter().any(|h| h == s),
-                    "capability mapping references missing op {module}:{s}"
-                );
-                assert!(
-                    capability_for_op(module, "", s).is_some(),
-                    "mapped op {module}:{s} must resolve a capability"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn ffi_ops_require_sys_ffi() {
-        for e in all_native_ops() {
-            if e.module_id() == "runtime:ffi" {
-                assert_eq!(
-                    capability_for_op(e.module_id(), e.namespace_path(), e.symbol_name()),
-                    Some("sys.ffi"),
-                    "every ffi op must gate sys.ffi"
-                );
-            }
-        }
-    }
 }
 
 mod devnull;
