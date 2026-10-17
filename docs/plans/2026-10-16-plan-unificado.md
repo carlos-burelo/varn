@@ -136,9 +136,138 @@ Verde si B0 + 4 cuadrantes + soak + A/B con ganancia en
 Freeze/thaw (B2, otra sesión); tabla nueva cae en
 `BUILD_FINGERPRINT`.
 
-- **Siguiente**: objeto `{value, done}` por `next` (~25% del costo
-  restante); el veto `resumes_in_interpreter` aún impide la entrada directa
-  del await fusionado cuando el callee contiene `await`/`try`.
+- **Siguiente**: P1 y P2 abajo. Orden: P2 primero (más barato, y destraba
+  la entrada directa que P1 aprovecha).
+
+#### P1 — El paso de un iterador es un par, no un objeto
+
+**Evidencia (código, 2026-10-17).**
+- Cada `next()` asigna un objeto: `make_iter_result`
+  (`varn-vm/src/generator.rs`) → `alloc_object_with_shape_slice` con
+  `iter_result_shape()` (TLS + clon de `Rc<Shape>`). Igual en
+  `Generator.return` (`iteration.rs`), `task.rs::next_result` y
+  `host_tasks.rs::iter_result`.
+- `for … of` sobre un iterable no-array
+  (`stmt_for_of.rs::lower_for_of_protocol`) baja a `IterInit` (símbolo de
+  iterador) + `MethodCall "next"` con `Resolution::ByName` + dos `Field` por
+  nombre (`done`, `value`), todo `Dynamic(NotYetSupported)`. Un `for of`
+  sobre un generador **no usa `KnownOp::GeneratorNext`**: paga `call_method`
+  por nombre, la asignación y dos lecturas de propiedad por nombre por
+  elemento.
+- El checker tipa el resultado como `{ value: T; done: bool }`
+  (`iteration.vn`); el backend lo recibe como `Dynamic(Shape)` (§2.1 Fase E,
+  tipos objeto exactos sin graduar).
+- Medido (quick, contadores de ciclos temporales): asignar el objeto es ~25%
+  de un `next` de ~116 ns.
+
+**Causa raíz.** El protocolo se modela como "método que devuelve un objeto"
+aunque el compilador conoce ambos campos y, en el caso abrumador, el objeto
+muere en la misma expresión (`g.next(v).value`, `for of`). Es la mentira de
+representación que combate §2.1: un hecho estático (paso = valor + bandera)
+se materializa en el heap y se relee por nombre.
+
+**Solución de raíz.**
+1. *Primitivo único de paso.* `TirExprKind::IterStep { iter, input }` y op
+   SSA con **dos resultados** (`value`, `done: Bool`), o un valor de paso
+   descompuesto por ops puras `StepValue`/`StepDone` que el regalloc deja en
+   registros. Semántica: avanzar el iterador una vez.
+2. *Emisor.* (a) `for of` cuyo origen tipa `Generator<T>`/`AsyncGenerator<T>`
+   (`Dynamic(Yields)`) baja a `IterStep`, sin `IterInit`/`GetSymbol`/`next`
+   por nombre/`Field`. (b) `g.next(v)` cuyo resultado solo se lee por
+   `.value`/`.done` (análisis local de usos en el emisor) baja a `IterStep`.
+   (c) Si el resultado escapa (se guarda, devuelve o pasa), se materializa con
+   **un solo** constructor `IterResult(value, done)` sobre
+   `iter_result_shape`: conserva la identidad fresca observable de `next()`.
+3. *Runtime.* `resume_generator`/`leave_generator` devuelven
+   `Step::{Yielded(v), Returned(v)}` en vez de un objeto; el nativo
+   `Generator.next` del contrato (camino dinámico) materializa con el mismo
+   constructor. En JIT, `IterStep` reutiliza `jit_generator_enter/leave`: el
+   valor en `jit_native_result` y `done` en un slot de salida, sin asignación.
+4. *Iterables de usuario* (clases con `next()`): `IterStep` llama `next` por
+   la vía normal (IC/vtable) y lee los dos campos con acceso fijo cuando el
+   tipo es exacto (Fase E); el objeto lo asigna el usuario.
+
+**Qué se borra.** `make_iter_result` del camino caliente; la rama
+`lower_for_of_protocol` para generadores; las lecturas `Field` por nombre de
+`done`/`value` cuando el tipo es conocido.
+
+**Ganancia esperada (a medir).** −25% por `next`; −1 asignación por elemento
+en `for of` sobre generadores, que además deja de pasar por `call_method`.
+
+**Verificación.** Tests 20, 77, 225; `vn debug -p gc` sobre un `for of` de 1M
+elementos: `alloc_count` constante respecto a N; pareado `gp.vn` y
+`bench_generator.vn` contra HEAD (mínimo de 10).
+
+**Riesgos.** Identidad cuando escapa (se materializa, se preserva); paso
+final con `return` (valor del `return`, `done=true`); generadores async (paso
+tras liquidar sus `await`); `return()`.
+
+#### P2 — Borrar `resumes_in_interpreter`: tres hechos en un predicado
+
+**Evidencia (código, 2026-10-17).**
+- `FunctionProto::resumes_in_interpreter`
+  (`varn-types/src/chunk/proto/analysis.rs`) es `true` si el bytecode tiene
+  `Try`, `Yield`, `Await` o `LoadModule` (memo en `resume_memo`).
+- Consumidores: `setup.rs` (prohíbe activación nativa), `lower.rs` (razón
+  "resume" en el diagnóstico de tiers), `calls_static.rs::direct_entry`
+  (entrada directa de llamadas JIT→JIT normales) y `suspend.rs::mounted_entry`
+  (entrada directa del `await` fusionado).
+- Medido (quick, `tryveto.vn`, 3M llamadas): una función **síncrona** con
+  `try/catch` llamada desde JIT cuesta ~95 ns por llamada (275–299 ms) contra
+  ~0,5 ns sin `try` (1–4 ms). `direct_entry` la veta y cada llamada pasa por
+  `hand_off` → `run_until` anidado. Afecta a todo código con `try`, no solo a
+  async.
+- El `await` fusionado solo entra directo a callees hoja: si el callee
+  contiene `await` o `try`, vuelve al dispatch anidado.
+
+**Causa raíz.** Un predicado mezcla tres hechos, y dos ya no son ciertos:
+1. *Requiere frame.* Ya lo expresa `frame_policy::needs_frame` op por op
+   (`Try`, `PopTry`, `CatchParam`, `Await`, `Yield`, `LoadModule` están en la
+   lista): esas funciones nunca obtienen activación sin frame.
+2. *Puede salir por suspensión (`longjmp`).* Desde `57724659` `yield` retorna
+   normalmente; solo un `await` pendiente salta. `try` nunca salta: el try
+   puro del JIT atrapa en su propio código y lo no atrapado sale por
+   `err_ret` + `jit_error_flag`, que el llamador revisa.
+3. *Llamar crea un objeto.* Async y generador devuelven tarea/generador; eso
+   lo expresa `is_async || is_generator`, no el bytecode.
+
+**Solución de raíz.** Borrar `resumes_in_interpreter` y `resume_memo`, y
+expresar cada hecho donde vive:
+- *Activación:* la decide `needs_frame`; en `setup.rs` el veto queda solo para
+  entradas OSR (`osr.is_some()`).
+- *Llamadas normales (`direct_entry`):* vetar solo `is_async || is_generator`
+  (la llamada no ejecuta el cuerpo). Una función con `try` o `LoadModule`
+  entra directa como cualquier otra.
+- *`await` fusionado (`mounted_entry`):* entrada directa para todo callee
+  async con código compilado. Invariante que lo hace seguro: **todo frame
+  nativo entre el `setjmp` del bucle de dispatch y un frame que suspende está
+  detenido en un punto de suspensión** (ip = resume_ip, vivos derramados a sus
+  homes). Se cumple por construcción: solo el `await` fusionado anida cuerpos
+  async de forma nativa (una llamada normal nunca ejecuta un cuerpo async). Al
+  saltar, `frames` conserva todos esos frames coherentes; el driver los
+  congela juntos y la reanudación entra por OSR y OSR-al-continuar.
+- *Diagnóstico:* `lower.rs` deja de reportar "resume".
+
+**Qué se borra.** `resumes_in_interpreter`, `resume_memo` y las cuatro
+comprobaciones.
+
+**Ganancia esperada (a medir).** Funciones síncronas con `try` llamadas desde
+JIT: de ~95 ns a costo de llamada directa (orden de magnitud). `await f(x)`
+con callee no-hoja: el mismo camino rápido que hoy solo tienen las hojas
+(22 ms/300k).
+
+**Verificación.** `tryveto.vn` pareado; tests 11, 21, 100, 154, 168, 223, 224
+(suspensión dentro de un callee entrado directo, `catch` a través de `await`,
+http); recursión async de 9000 niveles (ahora recursión nativa: debe caber en
+`VM_STACK_BYTES` = 64 MB; `MAX_CALL_DEPTH` sigue acotando); soak de tareas;
+`VARN_JIT_CACHE=verify`.
+
+**Riesgos.** Profundidad de pila nativa con recursión async profunda;
+`LoadModule` dentro de una función entrada directa (inicializa el módulo con
+un run anidado: comprobar que no salta); manejadores `try` del intérprete al
+entrar por OSR (ya se descartan en `run_compiled_frame` y `generator_entry`);
+`jit_exits_saved`/`stack_exit` tras un salto que cruza varias entradas
+directas.
 - **B1a**: tabla `resume_ip`→bloque en SSA portable + decidir
   params-args vs solo-homes+`live`. Verifica: dump de
   `bench_generator.vn`, sin cambio de ejecución.
