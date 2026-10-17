@@ -357,7 +357,7 @@ const joined = await group.join()
 }   // resource.dispose() corre al salir
 
 // using con ficheros
-using file = File.open("temp_simple.txt", "w");   // tests/45-simple-file-test.vn:8
+using file = File.open(path, "w");   // tests/45-simple-file-test.vn:9
 ```
 
 ---

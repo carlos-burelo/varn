@@ -71,3 +71,6 @@ __pycache__/
 dhat-heap.json
 graphify-out
 .opencode
+
+# tgrep index
+.tgrep/

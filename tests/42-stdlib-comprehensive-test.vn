@@ -4,7 +4,7 @@ import { List, Stack, Queue } from 'std:collections';
 import { fetch } from 'std:http';
 import { Json } from 'std:encoding';
 import { uuid, sha256 } from 'std:crypto';
-import { writeText as fsWrite, exists as fsExists, readText as fsRead } from 'std:fs';
+import { writeText as fsWrite, exists as fsExists, readText as fsRead, tempDir as fsTempDir, remove as fsRemove } from 'std:fs';
 import { write as ioWrite, writeln as ioWriteln } from 'std:io';
 import { PI as mathPI, abs as mathAbs, min as mathMin, max as mathMax } from 'std:math';
 import { platform as sysPlatform, cwd as sysCwd } from 'std:sys';
@@ -79,11 +79,12 @@ async function runComprehensiveTest(): Task<void> {
     expect(rangeObj.contains(3)).toBeTruthy();
 
     // 6. std:fs
-    let testFile = "./temp_test_file.txt";
+    let testFile = Path.join(fsTempDir(), "varn-42-stdlib-fs.txt");
     fsWrite(testFile, "Varn File System Test");
     expect(fsExists(testFile)).toBeTruthy();
     let readContent = fsRead(testFile);
     expect(readContent).toBe("Varn File System Test");
+    fsRemove(testFile);
 
     // 7. std:io
     ioWrite(""); 

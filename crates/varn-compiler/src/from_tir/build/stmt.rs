@@ -62,6 +62,9 @@ impl<'m> Builder<'m> {
         match s {
             TirStmt::Expr(e) => {
                 self.lower_expr(e)?;
+                if e.ty == varn_tir::BackendTy::Never {
+                    self.set_term(Terminator::Unreachable);
+                }
             }
             TirStmt::Let { local, ty, init } => {
                 let declared = self.ty(*ty);
@@ -89,6 +92,12 @@ impl<'m> Builder<'m> {
                     },
                 };
                 self.store_var(var, value);
+                if init
+                    .as_ref()
+                    .is_some_and(|e| e.ty == varn_tir::BackendTy::Never)
+                {
+                    self.set_term(Terminator::Unreachable);
+                }
             }
             TirStmt::Return(v) => {
                 let val = match v {
@@ -184,6 +193,9 @@ impl<'m> Builder<'m> {
 
                 self.seal_block(join);
                 self.current = join;
+                if self.blocks[join.0 as usize].preds.is_empty() {
+                    self.set_term(Terminator::Unreachable);
+                }
             }
             TirStmt::Loop { cond, body } => {
                 let head = self.new_block();
@@ -276,6 +288,9 @@ impl<'m> Builder<'m> {
 
                 self.seal_block(exit);
                 self.current = exit;
+                if self.blocks[exit.0 as usize].preds.is_empty() {
+                    self.set_term(Terminator::Unreachable);
+                }
             }
             TirStmt::BuildClass(n) => {
                 let def = self
