@@ -4,7 +4,7 @@ use std::sync::atomic::Ordering;
 use super::mount::mount;
 use super::pumps::{drain_hosts, host_generation, host_wait, queue_for, PumpGuard};
 use super::queue::{Delivery, ReadyTask, Start, TaskQueue};
-use super::suspend::{freeze, thaw};
+use super::suspend::{attach_upvalues, detach_upvalues, freeze, thaw};
 use crate::exec::ctx::ExecCtx;
 use crate::exec::VmSuspend;
 use crate::heap::HeapObj;
@@ -12,6 +12,31 @@ use crate::task::{settle, Outcome, Status, TaskCell};
 use crate::value::VmValue;
 
 const SPARE_VEC_CAPACITY: usize = 1024;
+const EAGER_START_DEPTH: u32 = 8;
+
+thread_local! {
+    static EAGER_DEPTH: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+struct EagerStart;
+
+impl EagerStart {
+    fn enter() -> Option<Self> {
+        EAGER_DEPTH.with(|depth| {
+            let now = depth.get();
+            (now < EAGER_START_DEPTH).then(|| {
+                depth.set(now + 1);
+                EagerStart
+            })
+        })
+    }
+}
+
+impl Drop for EagerStart {
+    fn drop(&mut self) {
+        EAGER_DEPTH.with(|depth| depth.set(depth.get() - 1));
+    }
+}
 
 enum ParkAction {
     ResumeOk(VmValue),
@@ -25,11 +50,30 @@ fn settle_for_park(ctx: &mut ExecCtx, value: VmValue) -> ParkAction {
             Some(HeapObj::Task(lazy)) => {
                 let lazy = Rc::clone(lazy);
                 let output = TaskCell::pending();
-                queue_for(ctx).push_ready(ReadyTask {
+                let queue: *const TaskQueue = queue_for(ctx);
+                let queue = unsafe { &*queue };
+                let ready = ReadyTask {
                     start: Start::Fresh(lazy),
                     output: Rc::clone(&output),
-                });
-                return ParkAction::Park(output);
+                };
+                match EagerStart::enter() {
+                    Some(_depth) => {
+                        let open = std::mem::take(&mut ctx.open_upvalues);
+                        detach_upvalues(ctx, &open);
+                        {
+                            let _held = PumpGuard::hold(ctx, queue);
+                            run_task(ctx, queue, ready);
+                        }
+                        attach_upvalues(ctx, &open);
+                        ctx.open_upvalues = open;
+                    }
+                    None => queue.push_ready(ready),
+                }
+                return match output.status() {
+                    Status::Resolved => ParkAction::ResumeOk(output.value()),
+                    Status::Rejected => ParkAction::ResumeErr(output.value()),
+                    Status::Pending => ParkAction::Park(output),
+                };
             }
             Some(HeapObj::TaskHandle(cell)) => {
                 let cell = Rc::clone(cell);

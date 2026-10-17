@@ -83,9 +83,13 @@ pub(super) struct PumpGuard;
 
 impl PumpGuard {
     pub(super) fn enter(ctx: &ExecCtx) -> Self {
+        Self::hold(ctx, ctx.queue())
+    }
+
+    pub(super) fn hold(ctx: &ExecCtx, queue: &TaskQueue) -> Self {
         let pump = Pump {
             ctx: ctx as *const ExecCtx as *mut ExecCtx,
-            queue: ctx.queue() as *const TaskQueue,
+            queue: queue as *const TaskQueue,
         };
         PUMPS.with(|pumps| pumps.borrow_mut().push(pump));
         Self
