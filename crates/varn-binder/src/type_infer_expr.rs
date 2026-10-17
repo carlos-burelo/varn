@@ -1,5 +1,5 @@
 use super::inference_utils::{build_fn_type, widen_literal};
-use super::type_infer_member::{ctx_resolve_text, infer_member};
+use super::type_infer_member::infer_member;
 use super::type_infer_ops::{infer_binary, infer_new, infer_object};
 use varn_core::ast::operators::{LogicalOp, UnaryOp};
 use varn_core::ast::{ArrayEl, ArrowBody, AstArena, ExprId, ExprKind, MatchBody};
@@ -63,7 +63,7 @@ pub fn infer_expr_type(
         ExprKind::Try { expression } => {
             let inner = infer_expr_type(*expression, arena, ctx, table);
             let ok_first = inner
-                .core_sum(table, |a| ctx_resolve_text(ctx, a))
+                .core_sum(table)
                 .and_then(|(_, args)| args.first().copied());
             if let Some(ok) = ok_first {
                 ok

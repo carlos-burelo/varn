@@ -189,6 +189,8 @@ pub enum CoreSum {
 }
 
 impl CoreSum {
+    pub const ALL: [Self; 2] = [Self::Option, Self::Result];
+
     pub const fn name(self) -> &'static str {
         match self {
             Self::Option => "Option",
@@ -203,10 +205,31 @@ impl CoreSum {
         }
     }
 
-    pub fn identify(name: &str, origin: Option<&str>) -> Option<Self> {
-        [Self::Option, Self::Result]
+    pub const fn failure_variant(self) -> &'static str {
+        match self {
+            Self::Option => "None",
+            Self::Result => "Err",
+        }
+    }
+
+    pub const fn success_variant(self) -> &'static str {
+        match self {
+            Self::Option => "Some",
+            Self::Result => "Ok",
+        }
+    }
+
+    pub fn identify(name: Atom, origin: Option<Atom>) -> Option<Self> {
+        let origin = origin?;
+        Self::ALL
             .into_iter()
-            .find(|s| s.name() == name && origin == Some(s.module()))
+            .find(|s| Atom::of_const(s.name()) == name && Atom::of_const(s.module()) == origin)
+    }
+
+    pub fn named(name: Atom) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|s| Atom::of_const(s.name()) == name)
     }
 }
 

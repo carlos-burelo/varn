@@ -10,21 +10,18 @@ impl<'a> FnEmitter<'a> {
         span: Span,
     ) -> TirExpr {
         let _ = span;
-        let (table, interner) = (self.m.checker_table, self.m.interner);
+        let table = self.m.checker_table;
         let sum = self
             .expr_table
             .get(&expression.index())
-            .and_then(|entry| entry.ty.core_sum(table, |a| interner.try_resolve(a)))
+            .and_then(|entry| entry.ty.core_sum(table))
             .map(|(sum, _)| sum);
         let inner = self.lower_expr(expression);
         let hoisted = self.hoist(inner);
         let span = hoisted.span;
 
         if let (Some(sum), BackendTy::Enum(eid)) = (sum, hoisted.ty.non_nullable(self.tt)) {
-            let (fail, pass) = match sum {
-                varn_core::CoreSum::Result => ("Err", "Ok"),
-                varn_core::CoreSum::Option => ("None", "Some"),
-            };
+            let (fail, pass) = (sum.failure_variant(), sum.success_variant());
             let tags = self.m.enums.get(eid.0 as usize).and_then(|info| {
                 let variant = |name: &str| info.variants.iter().find(|v| v.name.as_ref() == name);
                 let (fail, pass) = (variant(fail)?, variant(pass)?);

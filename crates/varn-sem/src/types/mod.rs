@@ -2,7 +2,6 @@ mod async_fn;
 mod class_member_impl;
 mod context;
 mod core_nominal;
-mod core_sum;
 mod display;
 pub mod interned;
 pub mod numeric_literal;

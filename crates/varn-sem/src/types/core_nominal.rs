@@ -1,5 +1,5 @@
 use super::{CheckerTyTable, Type};
-use varn_core::{BuiltinType, TypeKind};
+use varn_core::{BuiltinType, CoreSum, TypeKind};
 
 impl Type {
     pub fn builtin(b: BuiltinType, args: Vec<Type>, table: &mut CheckerTyTable) -> Self {
@@ -69,5 +69,18 @@ impl Type {
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => Type::Dynamic,
         }
+    }
+
+    pub fn core_sum(&self, table: &CheckerTyTable) -> Option<(CoreSum, Vec<Type>)> {
+        let TypeKind::Generic(name, args, origin) = table.get(self.0) else {
+            return None;
+        };
+        let sum = CoreSum::identify(name, origin)?;
+        let args = table
+            .get_list(args)
+            .iter()
+            .map(|&id| Type::resolved(id))
+            .collect();
+        Some((sum, args))
     }
 }

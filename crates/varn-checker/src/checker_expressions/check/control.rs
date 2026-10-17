@@ -15,15 +15,14 @@ impl<'r> Checker<'r> {
         self.check_expr(rec, expression, bind);
         let expr_ty = self.infer_type(rec, expression, bind);
 
-        let resolve = |a| bind.interner.try_resolve(a);
-        let operand = expr_ty.core_sum(&self.ty_table, resolve);
+        let operand = expr_ty.core_sum(&self.ty_table);
         let is_nullable = expr_ty.is_nullable(&self.ty_table);
 
         if !expr_ty.is_dynamic() && operand.is_none() && !is_nullable {
             let expr_ty_s = expr_ty.display(&self.ty_table, &bind.interner);
             let shadowed = matches!(
                 self.ty_table.get(expr_ty.0),
-                varn_core::TypeKind::Generic(name, _, _) if matches!(resolve(name), Some("Result" | "Option"))
+                varn_core::TypeKind::Generic(name, _, _) if varn_core::CoreSum::named(name).is_some()
             );
             let note = if shadowed {
                 " (a user declaration shadows the core type here)"
@@ -55,7 +54,7 @@ impl<'r> Checker<'r> {
             return;
         }
 
-        let enclosing = expected_ret.core_sum(&self.ty_table, resolve);
+        let enclosing = expected_ret.core_sum(&self.ty_table);
         match (operand, enclosing) {
             (Some((sum, args)), Some((ret_sum, ret_args))) if sum == ret_sum => {
                 if sum == varn_core::CoreSum::Result
