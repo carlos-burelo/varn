@@ -163,6 +163,11 @@ impl ExecCtx {
                 self.stage.clear();
                 self.stage.push(nv);
             }
+            PreparedCall::Async(parts) => {
+                let nv = crate::task::new_lazy(&mut self.heap, parts);
+                self.stage.clear();
+                self.stage.push(nv);
+            }
         }
         Ok(())
     }

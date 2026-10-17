@@ -357,20 +357,13 @@ pub(crate) fn gather_one(
     }
 }
 
-pub(crate) fn new_lazy(
-    heap: &mut HeapInner,
-    proto: Rc<FunctionProto>,
-    upvalues: Vec<VmValue>,
-    module_base: u32,
-    args: impl ExactSizeIterator<Item = VmValue>,
-    current_class: Option<Rc<ClassObj>>,
-) -> VmValue {
+pub(crate) fn new_lazy(heap: &mut HeapInner, parts: crate::exec::calls::LazyParts) -> VmValue {
     let lazy = Rc::new(LazyTask {
-        proto,
-        upvalues: upvalues.into_iter().map(Cell::new).collect(),
-        module_base,
-        args: TaskArgs::collect(args),
-        current_class,
+        proto: parts.proto,
+        upvalues: parts.upvalues.into_iter().map(Cell::new).collect(),
+        module_base: parts.module_base,
+        args: TaskArgs::collect(parts.args.into_iter()),
+        current_class: parts.current_class,
     });
     track_lazy(heap, &lazy);
     VmValue::from_heap(heap.alloc(HeapObj::Task(lazy)))

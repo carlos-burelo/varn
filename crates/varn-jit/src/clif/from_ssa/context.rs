@@ -51,6 +51,8 @@ pub(super) struct Ctx<'a> {
 
     pub try_live: FxHashSet<u32>,
 
+    pub fused_awaits: FxHashMap<u32, (u32, Vec<u32>)>,
+
     pub pure_try: std::cell::RefCell<PureTryState>,
 
     pub home_addrs: std::cell::RefCell<FxHashMap<u32, Value>>,

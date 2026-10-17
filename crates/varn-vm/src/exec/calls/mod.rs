@@ -70,8 +70,18 @@ pub(crate) fn materialize_frame(
     Ok(CallFrame::new(nc, alloc))
 }
 
+pub struct LazyParts {
+    pub proto: Rc<FunctionProto>,
+    pub upvalues: Vec<VmValue>,
+    pub module_base: u32,
+    pub args: Vec<VmValue>,
+    pub current_class: Option<Rc<varn_types::ClassObj>>,
+}
+
 pub enum PreparedCall {
     Frame(CallFrame),
+
+    Async(LazyParts),
     Constructor(CallFrame, VmValue),
 
     NativeImmediate(varn_types::NativeFn, usize),

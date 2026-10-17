@@ -37,41 +37,71 @@ pub(crate) extern "C" fn jit_await(
         let caller_depth = ctx_ref.frames.len();
         ctx_ref.frames[caller_depth - 1].ip = resume_ip;
         let dest = dest_reg as u16;
-        let resume_at = match ctx_ref.begin_await(fut, dest) {
-            Ok(AwaitStep::Ready(v)) => {
-                ctx_ref.resume_with_awaited(dest, v);
-                return;
-            }
-            Ok(AwaitStep::Thrown(v)) => {
-                ctx_ref.jit_native_result = v;
-                ctx_ref.jit_error_flag = 1;
-                return;
-            }
-            Ok(AwaitStep::Entered) => {
-                if !run_entered(ctx_ref, caller_depth) {
-                    return;
-                }
-                None
-            }
-            Ok(AwaitStep::Pending(cell)) => {
-                ctx_ref.vm_suspend = Some(crate::exec::VmSuspend::Await {
-                    cell,
-                    dest_reg: dest,
-                });
-                Some(resume_ip)
-            }
-            Err(e) => {
-                super::construct::jit_propagate_error(ctx_ref, e);
-                return;
-            }
-        };
-        ctx_ref.jit_panic_suspend_resume_ip = resume_at;
-        let buf = ctx_ref.jit_suspend_buf;
-        if buf.is_null() {
-            panic!("JIT suspend triggered but no jump buffer registered");
-        }
-        crate::exec::ctx::my_longjmp(buf, 2);
+        let step = ctx_ref.begin_await(fut, dest);
+        settle_await(ctx_ref, step, caller_depth, dest, resume_ip);
     }
+}
+
+#[varn_macros::jit_slow(field = "await_call")]
+pub(crate) extern "C" fn jit_await_call(
+    ctx: *mut ExecCtx,
+    window: *const VmValue,
+    total: usize,
+    dest_reg: u32,
+    resume_ip: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let window = std::slice::from_raw_parts(window, total);
+        let caller_depth = ctx_ref.frames.len();
+        ctx_ref.frames[caller_depth - 1].ip = resume_ip;
+        let dest = dest_reg as u16;
+        let step = ctx_ref.await_call(window[0], window, dest);
+        settle_await(ctx_ref, step, caller_depth, dest, resume_ip);
+    }
+}
+
+unsafe fn settle_await(
+    ctx: &mut ExecCtx,
+    step: crate::error::VmResult<AwaitStep>,
+    caller_depth: usize,
+    dest: u16,
+    resume_ip: usize,
+) {
+    let resume_at = match step {
+        Ok(AwaitStep::Ready(v)) => {
+            ctx.resume_with_awaited(dest, v);
+            return;
+        }
+        Ok(AwaitStep::Thrown(v)) => {
+            ctx.jit_native_result = v;
+            ctx.jit_error_flag = 1;
+            return;
+        }
+        Ok(AwaitStep::Entered) => {
+            if !unsafe { run_entered(ctx, caller_depth) } {
+                return;
+            }
+            None
+        }
+        Ok(AwaitStep::Pending(cell)) => {
+            ctx.vm_suspend = Some(crate::exec::VmSuspend::Await {
+                cell,
+                dest_reg: dest,
+            });
+            Some(resume_ip)
+        }
+        Err(e) => {
+            unsafe { super::construct::jit_propagate_error(ctx, e) };
+            return;
+        }
+    };
+    ctx.jit_panic_suspend_resume_ip = resume_at;
+    let buf = ctx.jit_suspend_buf;
+    if buf.is_null() {
+        panic!("JIT suspend triggered but no jump buffer registered");
+    }
+    unsafe { crate::exec::ctx::my_longjmp(buf, 2) }
 }
 
 unsafe fn run_entered(ctx: &mut ExecCtx, caller_depth: usize) -> bool {

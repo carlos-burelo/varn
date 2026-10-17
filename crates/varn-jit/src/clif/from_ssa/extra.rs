@@ -5,6 +5,8 @@ mod modules;
 mod props;
 mod suspend;
 
+pub(super) use suspend::fused_await_calls;
+
 use super::store::Out;
 use super::Ctx;
 use cranelift_codegen::ir::Value;

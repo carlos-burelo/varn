@@ -128,6 +128,11 @@ pub(super) fn lower_block(
                 continue;
             }
         }
+        if let (varn_types::ssa::SsaOp::Call { .. }, Some(d)) = (&inst.op, inst.dest)
+            && ctx.fused_awaits.contains_key(&d)
+        {
+            continue;
+        }
         match scalar::emit_inst(b, ctx, values, &inst.op, inst.dest)? {
             Some(out) => store::land(b, ctx, values, inst.dest, out)?,
             None if inst.dest.is_some() => {

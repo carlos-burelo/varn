@@ -376,6 +376,7 @@ impl ExecCtx {
                         | crate::exec::calls::PreparedCall::RawNativeImmediate(..)
                         | crate::exec::calls::PreparedCall::NativeConstructor(..)
                         | crate::exec::calls::PreparedCall::PushValue(_)
+                        | crate::exec::calls::PreparedCall::Async(_)
                         | crate::exec::calls::PreparedCall::Generator { .. } => None,
                     }
                 }

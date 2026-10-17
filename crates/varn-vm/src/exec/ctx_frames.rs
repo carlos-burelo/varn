@@ -48,6 +48,7 @@ impl ExecCtx {
                         PreparedCall::Constructor(..)
                         | PreparedCall::NativeConstructor(..)
                         | PreparedCall::PushValue(_)
+                        | PreparedCall::Async(_)
                         | PreparedCall::Generator { .. } => {}
                     }
                 }

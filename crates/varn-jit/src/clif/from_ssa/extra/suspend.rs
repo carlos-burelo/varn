@@ -20,15 +20,51 @@ pub(super) fn await_(
     let h = ctx.helpers;
     let d = dest.ok_or("from_ssa: await without dest")?;
     spill(b, ctx, values, live)?;
-    let v = boxed_value(b, ctx, values, operand)?;
-    let (t, p) = b.ins().isplit(v);
     let dv = b.ins().iconst(types::I64, i64::from(ctx.ssa.reg(d)));
     let rv = b.ins().iconst(types::I64, i64::from(resume_ip));
-
-    call_helper_void(b, ctx.cc, h.await_helper, &[ectx, t, p, dv, rv]);
+    match ctx.fused_awaits.get(&operand) {
+        Some((callee, args)) => {
+            let callee_v = load_value(b, ctx, values, *callee)?;
+            let window = super::super::call::boxed_window(b, ctx, values, callee_v, args)?;
+            let total = b.ins().iconst(types::I64, (args.len() + 1) as i64);
+            call_helper_void(b, ctx.cc, h.await_call, &[ectx, window, total, dv, rv]);
+        }
+        None => {
+            let v = boxed_value(b, ctx, values, operand)?;
+            let (t, p) = b.ins().isplit(v);
+            call_helper_void(b, ctx.cc, h.await_helper, &[ectx, t, p, dv, rv]);
+        }
+    }
     super::super::store::drop_home_addrs(ctx);
     super::super::exceptions::check_error_branch(b, ctx)?;
     Ok(Some(Some(Out::Boxed(home_load(b, ctx, ctx.ssa.reg(d))?))))
+}
+
+pub(in crate::clif::from_ssa) fn fused_await_calls(
+    ssa: &varn_types::ssa::SsaProto,
+    try_live: &rustc_hash::FxHashSet<u32>,
+) -> rustc_hash::FxHashMap<u32, (u32, Vec<u32>)> {
+    let mut fused = rustc_hash::FxHashMap::default();
+    for blk in &ssa.blocks {
+        for pair in blk.insts.windows(2) {
+            let (varn_types::ssa::SsaOp::Call { callee, args }, Some(d)) =
+                (&pair[0].op, pair[0].dest)
+            else {
+                continue;
+            };
+            let varn_types::ssa::SsaOp::Await { operand, live, .. } = &pair[1].op else {
+                continue;
+            };
+            if *operand == d
+                && !live.contains(&d)
+                && !try_live.contains(&d)
+                && super::super::store::is_heap(ssa.value_ty(*callee))
+            {
+                fused.insert(d, (*callee, args.clone()));
+            }
+        }
+    }
+    fused
 }
 
 pub(super) fn spawn(

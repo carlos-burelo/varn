@@ -104,17 +104,13 @@ pub(crate) fn prepare_call(
                 }
                 if nc.proto.is_async {
                     let args_start = staging.len().saturating_sub(arg_count);
-                    let upvalues: Vec<VmValue> =
-                        nc.upvalues.iter().map(|uv| uv.read(store)).collect();
-                    let task = crate::task::new_lazy(
-                        heap,
-                        nc.proto.clone(),
-                        upvalues,
-                        nc.module_base,
-                        staging.drain(args_start..),
-                        None,
-                    );
-                    return Ok(PreparedCall::PushValue(task));
+                    return Ok(PreparedCall::Async(super::LazyParts {
+                        proto: nc.proto.clone(),
+                        upvalues: nc.upvalues.iter().map(|uv| uv.read(store)).collect(),
+                        module_base: nc.module_base,
+                        args: staging.drain(args_start..).collect(),
+                        current_class: None,
+                    }));
                 }
                 let window: Vec<VmValue> = stage_window(staging, arg_count).to_vec();
                 let _ = arg_count;
@@ -174,17 +170,13 @@ pub(crate) fn prepare_call(
                         }
                         if nc.proto.is_async {
                             let args_start = staging.len().saturating_sub(full_arg_count);
-                            let upvalues: Vec<VmValue> =
-                                nc.upvalues.iter().map(|uv| uv.read(store)).collect();
-                            let task = crate::task::new_lazy(
-                                heap,
-                                nc.proto.clone(),
-                                upvalues,
-                                nc.module_base,
-                                staging.drain(args_start..),
-                                owner_class,
-                            );
-                            return Ok(PreparedCall::PushValue(task));
+                            return Ok(PreparedCall::Async(super::LazyParts {
+                                proto: nc.proto.clone(),
+                                upvalues: nc.upvalues.iter().map(|uv| uv.read(store)).collect(),
+                                module_base: nc.module_base,
+                                args: staging.drain(args_start..).collect(),
+                                current_class: owner_class,
+                            }));
                         }
                         if !nc.proto.is_generator && !nc.proto.is_async {
                             bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);

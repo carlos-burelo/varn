@@ -45,6 +45,58 @@ impl ExecCtx {
                 return Err(e);
             }
         };
+        self.run_prepared(prepared)
+    }
+
+    pub(crate) fn await_call(
+        &mut self,
+        callee: VmValue,
+        window: &[VmValue],
+        dest: u16,
+    ) -> crate::error::VmResult<crate::exec::ctx_tasks::AwaitStep> {
+        self.stage.clear();
+        self.stage.extend_from_slice(window);
+        let prepared = match self.prepare_call(callee, window.len()) {
+            Ok(p) => p,
+            Err(e) => {
+                self.stage.clear();
+                return Err(e);
+            }
+        };
+        let value = match prepared {
+            PreparedCall::Async(parts) => {
+                self.stage.clear();
+                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                    return Err(crate::error::RuntimeError::new(
+                        "stack overflow: call depth exceeded 10000",
+                    ));
+                }
+                crate::exec::scheduler::mount_parts(
+                    self,
+                    &parts.proto,
+                    &parts.upvalues,
+                    parts.module_base,
+                    &parts.args,
+                    parts.current_class,
+                    dest,
+                );
+                return Ok(crate::exec::ctx_tasks::AwaitStep::Entered);
+            }
+            PreparedCall::Frame(_)
+            | PreparedCall::Constructor(..)
+            | PreparedCall::NativeImmediate(..)
+            | PreparedCall::RawNativeImmediate(..)
+            | PreparedCall::NativeConstructor(..)
+            | PreparedCall::PushValue(_)
+            | PreparedCall::Generator { .. } => match self.run_prepared(prepared)? {
+                Invoked::Value(v) => v,
+                Invoked::Pushed(depth) => self.run_until(depth)?,
+            },
+        };
+        self.begin_await(value, dest)
+    }
+
+    fn run_prepared(&mut self, prepared: PreparedCall) -> crate::error::VmResult<Invoked> {
         let res = match prepared {
             PreparedCall::NativeImmediate(f, arg_count) => {
                 let take = arg_count.min(self.stage.len());
@@ -74,6 +126,7 @@ impl ExecCtx {
                 return Ok(Invoked::Pushed(depth));
             }
             PreparedCall::PushValue(nv) => Ok(nv),
+            PreparedCall::Async(parts) => Ok(crate::task::new_lazy(&mut self.heap, parts)),
             PreparedCall::Generator {
                 closure,
                 args,

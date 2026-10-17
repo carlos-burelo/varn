@@ -120,6 +120,7 @@ pub(in crate::clif) fn try_lower(
     } else {
         None
     };
+    let try_live = exceptions::try_live_set(ssa);
     let mut ctx = Ctx {
         cc,
         helpers,
@@ -156,7 +157,8 @@ pub(in crate::clif) fn try_lower(
                 &reach.reached,
             ),
         },
-        try_live: exceptions::try_live_set(ssa),
+        fused_awaits: super::extra::fused_await_calls(ssa, &try_live),
+        try_live,
         pure_try: Default::default(),
     };
     {
