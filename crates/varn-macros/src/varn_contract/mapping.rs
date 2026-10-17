@@ -20,14 +20,15 @@ pub(crate) enum Mapped {
 }
 
 fn primitive_mapped(name: &str) -> Option<Mapped> {
-    match name {
-        "int" => Some(Mapped::Int),
-        "float" => Some(Mapped::Float),
-        "bool" => Some(Mapped::Bool),
-        "char" => Some(Mapped::Char),
-        "str" => Some(Mapped::Str),
-        "void" => Some(Mapped::Void),
-        _ => None,
+    use varn_core::LangPrimitive as P;
+    match P::from_str(name)? {
+        P::Int => Some(Mapped::Int),
+        P::Float => Some(Mapped::Float),
+        P::Bool => Some(Mapped::Bool),
+        P::Char => Some(Mapped::Char),
+        P::Str => Some(Mapped::Str),
+        P::Void => Some(Mapped::Void),
+        P::Null | P::BigInt | P::Decimal | P::Never | P::Dynamic => None,
     }
 }
 
@@ -45,7 +46,7 @@ pub(super) fn mapped_tag_path(m: &Mapped) -> TS2 {
 }
 
 pub(super) fn receiver_mapped(class: &str) -> Mapped {
-    if class == "Array" {
+    if class == varn_core::BuiltinType::Array.name() {
         return Mapped::Array;
     }
     match primitive_mapped(class) {
