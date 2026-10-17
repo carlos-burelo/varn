@@ -71,7 +71,7 @@ impl<'r> Checker<'r> {
                 continue;
             }
             if let Some(kind) = Self::builtin_kind(b) {
-                self.check_builtin_placement(&kind, target_kind, target_name, d.range, bind);
+                self.check_builtin_placement(&kind, &target, target_name, d.range);
                 continue;
             }
             if let Some(Err(shape)) = &b.result {
@@ -211,18 +211,21 @@ impl<'r> Checker<'r> {
     fn check_builtin_placement(
         &mut self,
         kind: &BuiltinKind,
-        target_kind: &str,
+        target: &DecoratorTarget,
         target_name: &str,
         range: varn_core::SourceRange,
-        bind: &BindResult,
     ) {
-        let _ = bind;
+        let target_kind = target.kind_str();
         let ok = match kind {
             BuiltinKind::Deprecated => true,
-            BuiltinKind::Pure | BuiltinKind::Capability => {
-                matches!(target_kind, "function" | "method" | "getter" | "setter")
-            }
-            BuiltinKind::Inline | BuiltinKind::Test => target_kind == "function",
+            BuiltinKind::Pure | BuiltinKind::Capability => matches!(
+                target,
+                DecoratorTarget::Function
+                    | DecoratorTarget::Method
+                    | DecoratorTarget::Getter
+                    | DecoratorTarget::Setter
+            ),
+            BuiltinKind::Inline | BuiltinKind::Test => matches!(target, DecoratorTarget::Function),
         };
         if !ok {
             self.emit(
