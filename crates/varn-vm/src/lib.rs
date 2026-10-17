@@ -35,7 +35,7 @@ pub use error::{FrameInfo, RuntimeError, VmResult};
 pub use frame::VM_STACK_BYTES;
 pub use globals::GlobalStore;
 pub use heap::{Heap, HeapObj};
-pub use loader::{CompositeLoader, ModuleError, ModuleLoader};
+pub use loader::{ModuleError, ModuleLoader};
 pub use profile::{CallEntry, HotspotCounters, ProfileCounters, VmProfile};
 pub use settings::ExecSettings;
 pub use value::VmValue;

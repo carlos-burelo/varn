@@ -39,14 +39,7 @@ struct CachedInterfaceEnvelope {
 }
 
 fn dep_source_fingerprint(dep: &str) -> Option<u64> {
-    if varn_binder::paths::is_known_module(dep) {
-        let provider = varn_modules::provider::get()?;
-        let src = provider
-            .embedded_source(dep)
-            .or_else(|| provider.bundled_source(dep))?;
-        return Some(varn_core::fingerprint::fingerprint(src.as_bytes()));
-    }
-    let text = std::fs::read_to_string(dep).ok()?;
+    let text = varn_modules::loader::read_module_text(dep).ok()?;
     Some(varn_core::fingerprint::fingerprint(text.as_bytes()))
 }
 

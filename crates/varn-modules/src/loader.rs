@@ -144,6 +144,12 @@ impl ModuleLoader for ProviderLoader {
     }
 }
 
+pub fn read_module_text(canonical: &str) -> Result<Arc<str>, LoadError> {
+    default_registry()
+        .source(&ModuleId::from_canonical_str(canonical))
+        .map(|s| s.text)
+}
+
 pub fn default_registry() -> ModuleRegistry {
     ModuleRegistry::new()
         .with(Box::new(FilesystemLoader))

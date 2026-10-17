@@ -269,21 +269,9 @@ pub fn build_module_graph(
 }
 
 fn read_module_source(module_path: &str) -> Result<String, String> {
-    if matches!(
-        varn_core::ImportSpecifier::parse(module_path),
-        varn_core::ImportSpecifier::Stdlib(_)
-            | varn_core::ImportSpecifier::Core(_)
-            | varn_core::ImportSpecifier::Runtime(_)
-    ) {
-        let provider = varn_modules::provider::get()
-            .ok_or_else(|| "stdlib provider not registered".to_owned())?;
-        return provider
-            .embedded_source(module_path)
-            .or_else(|| provider.bundled_source(module_path))
-            .map(str::to_owned)
-            .ok_or_else(|| format!("stdlib source not found: {module_path}"));
-    }
-    std::fs::read_to_string(module_path).map_err(|e| e.to_string())
+    varn_modules::loader::read_module_text(module_path)
+        .map(|text| text.to_string())
+        .map_err(|e| e.to_string())
 }
 
 pub fn resolve_import_specifier(

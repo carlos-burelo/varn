@@ -68,20 +68,9 @@ pub fn load_cached_graph(
             continue;
         }
 
-        if let Some(provider) = varn_modules::provider::get()
-            && let Some(src) = provider.embedded_source(path)
-        {
-            let current_hash = varn_core::fingerprint::fingerprint(src.as_bytes());
-            if cached_hash != current_hash {
-                reason(format_args!("el módulo embebido {path} cambió"));
-                return Ok(None);
-            }
-            continue;
-        }
-
-        match std::fs::read(path) {
+        match varn_modules::loader::read_module_text(path) {
             Ok(src) => {
-                let current_hash = varn_core::fingerprint::fingerprint(&src);
+                let current_hash = varn_core::fingerprint::fingerprint(src.as_bytes());
                 if cached_hash != current_hash {
                     reason(format_args!("la dependencia {path} cambió"));
                     return Ok(None);

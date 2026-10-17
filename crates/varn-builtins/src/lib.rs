@@ -1,12 +1,10 @@
 #![allow(refining_impl_trait)]
-pub mod loader;
 pub mod provider_impl;
 pub mod registry;
 pub mod runtime;
 
 pub use provider_impl::{register_provider, register_std, std_load_error, StdInput};
 
-pub use loader::CoreSourceLocator;
 pub use registry::{is_known, spec_for, MODULE_REGISTRY};
 pub use varn_modules::spec::ModuleSpec;
 

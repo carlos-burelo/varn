@@ -6,7 +6,6 @@ use varn_modules::spec::ModuleSpec;
 use varn_modules::std_image::StdImage;
 use varn_modules::std_root::StdProvenance;
 
-use crate::loader::CoreSourceLocator;
 use crate::registry::{spec_for, MODULE_REGISTRY};
 
 pub enum StdInput {
@@ -160,7 +159,8 @@ impl StdlibProvider for BuiltinsProvider {
             let root = std.tree_root.as_ref()?;
             return Some(root.join(spec.vn_source));
         }
-        CoreSourceLocator::from_checkout().vn_source_path(specifier)
+        let path = PathBuf::from(spec_for(specifier)?.vn_source);
+        path.exists().then_some(path)
     }
 
     fn all_specs(&self) -> &'static [ModuleSpec] {

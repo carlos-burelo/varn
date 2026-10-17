@@ -23,37 +23,3 @@ pub trait ModuleLoader {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError>;
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError>;
 }
-
-pub struct CompositeLoader {
-    loaders: Vec<Box<dyn ModuleLoader + Send + Sync>>,
-}
-
-impl CompositeLoader {
-    pub fn new(loaders: Vec<Box<dyn ModuleLoader + Send + Sync>>) -> Self {
-        Self { loaders }
-    }
-}
-
-impl ModuleLoader for CompositeLoader {
-    fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, ModuleError> {
-        let mut last_err = ModuleError::new(format!("cannot resolve '{specifier}'"));
-        for loader in &self.loaders {
-            match loader.resolve(specifier, from) {
-                Ok(id) => return Ok(id),
-                Err(e) => last_err = e,
-            }
-        }
-        Err(last_err)
-    }
-
-    fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError> {
-        for loader in &self.loaders {
-            match loader.load(id) {
-                Ok(Some(proto)) => return Ok(Some(proto)),
-                Ok(None) => continue,
-                Err(e) => return Err(e),
-            }
-        }
-        Ok(None)
-    }
-}
