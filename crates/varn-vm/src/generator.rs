@@ -84,23 +84,10 @@ impl GeneratorDriver for NanGenDriver {
                     inner.resume_dest = Some(dest_reg);
                     return Ok(make_iter_result(&mut inner.ctx.heap, nv, false));
                 }
-                Some(VmSuspend::Await { value, dest_reg }) if self.is_async => {
-                    match inner.ctx.settle_awaited(value) {
-                        Ok(resolved) => {
-                            inner.ctx.resume_with_awaited(dest_reg, resolved);
-                            crate::exec::scheduler::request_osr(
-                                &mut inner.ctx,
-                                varn_types::ssa::OsrMode::Resume,
-                            );
-                        }
-                        Err(thrown) => {
-                            inner.ctx.jit_native_result = thrown;
-                            inner.ctx.jit_error_flag = 1;
-                            crate::exec::scheduler::request_osr(
-                                &mut inner.ctx,
-                                varn_types::ssa::OsrMode::Resume,
-                            );
-                        }
+                Some(VmSuspend::Await { cell, dest_reg }) if self.is_async => {
+                    match inner.ctx.settle_awaited(&cell) {
+                        Ok(resolved) => inner.ctx.resolve_awaiter(dest_reg, resolved),
+                        Err(thrown) => inner.ctx.reject_awaiter(thrown),
                     }
                 }
                 Some(VmSuspend::Await { .. }) => {

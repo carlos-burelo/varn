@@ -57,7 +57,18 @@ impl ExecCtx {
 
             let is_first_entry = unsafe { (*ctx).frames[frame_idx].ip == 0 };
 
-            let osr_fn = match unsafe { (*ctx).osr_request.take() } {
+            let pending_osr = unsafe { (*ctx).osr_request.take() }.or_else(|| {
+                let ip = unsafe { (*ctx).frames[frame_idx].ip };
+                let proto = &closure.proto;
+                (!is_first_entry
+                    && (proto.is_async || proto.is_generator)
+                    && proto.ssa.get().is_some_and(|ssa| ssa.is_resume_entry(ip)))
+                .then_some(varn_types::ssa::OsrRequest {
+                    ip,
+                    mode: varn_types::ssa::OsrMode::Resume,
+                })
+            });
+            let osr_fn = match pending_osr {
                 Some(req) if unsafe { req.ip == (*ctx).frames[frame_idx].ip } => {
                     let jit_on = unsafe { !(*ctx).settings.no_jit };
                     let f = jit_on.then(|| closure.osr_jit_fn(req)).flatten();
@@ -68,16 +79,9 @@ impl ExecCtx {
                             if ctxm.jit_error_flag != 0 {
                                 ctxm.jit_error_flag = 0;
                                 let thrown = ctxm.jit_native_result;
-                                match ctxm.reject_awaited(thrown) {
-                                    crate::exec::ctx_tasks::Rejection::Caught => None,
-                                    crate::exec::ctx_tasks::Rejection::Unhandled(thrown) => {
-                                        let err = crate::exec::exceptions::build_thrown_error(
-                                            thrown,
-                                            &ctxm.heap,
-                                            &ctxm.frames,
-                                        );
-                                        return Err(err);
-                                    }
+                                match crate::exec::exceptions::raise(ctx, thrown, depth) {
+                                    Ok(()) => continue 'frame_loop,
+                                    Err(err) => return Err(err),
                                 }
                             } else {
                                 None
@@ -341,18 +345,10 @@ impl ExecCtx {
                         let src = hi(w1);
                         let val = reg_box!(src);
                         unsafe { (*ctx).frames[frame_idx].ip = ip };
-                        let err = crate::exec::exceptions::build_thrown_error(
-                            val,
-                            unsafe { &(*ctx).heap },
-                            unsafe { &(*ctx).frames },
-                        );
-                        let thrown_val = err.thrown.unwrap_or(VmValue::null());
-                        if unsafe {
-                            crate::exec::exceptions::dispatch_to_handler(ctx, thrown_val, depth)
-                        } {
-                            continue 'frame_loop;
+                        match unsafe { crate::exec::exceptions::raise(ctx, val, depth) } {
+                            Ok(()) => continue 'frame_loop,
+                            Err(err) => return Err(err),
                         }
-                        return Err(err);
                     }
 
                     OpCode::Yield => {
@@ -375,13 +371,27 @@ impl ExecCtx {
                         ip += 1;
                         let fut = reg_box!(src);
                         unsafe { (*ctx).frames[frame_idx].ip = ip };
-                        unsafe {
-                            (*ctx).vm_suspend = Some(crate::exec::VmSuspend::Await {
-                                value: fut,
-                                dest_reg: first_reg as u16,
-                            })
-                        };
-                        return Ok(VmValue::null());
+                        match tryv!(unsafe { (*ctx).begin_await(fut, first_reg as u16) }) {
+                            crate::exec::ctx_tasks::AwaitStep::Ready(v) => {
+                                tryv!(unsafe { (*ctx).stack.unbox_into_reg(base, first_reg, v) });
+                            }
+                            crate::exec::ctx_tasks::AwaitStep::Thrown(val) => {
+                                match unsafe { crate::exec::exceptions::raise(ctx, val, depth) } {
+                                    Ok(()) => continue 'frame_loop,
+                                    Err(err) => return Err(err),
+                                }
+                            }
+                            crate::exec::ctx_tasks::AwaitStep::Entered => continue 'frame_loop,
+                            crate::exec::ctx_tasks::AwaitStep::Pending(cell) => {
+                                unsafe {
+                                    (*ctx).vm_suspend = Some(crate::exec::VmSuspend::Await {
+                                        cell,
+                                        dest_reg: first_reg as u16,
+                                    })
+                                };
+                                return Ok(VmValue::null());
+                            }
+                        }
                     }
 
                     OpCode::LoadModule | OpCode::LoadModuleSlot | OpCode::StoreModuleSlot => {

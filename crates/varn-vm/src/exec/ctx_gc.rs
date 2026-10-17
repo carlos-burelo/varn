@@ -103,10 +103,10 @@ impl ExecCtx {
         self.stage.iter().for_each(|&v| value(v));
         value(self.jit_native_result);
         self.module_exports.values().for_each(|&v| value(v));
-        if let Some(VmSuspend::Yield { value: v, .. } | VmSuspend::Await { value: v, .. }) =
-            &self.vm_suspend
-        {
-            value(*v);
+        match &self.vm_suspend {
+            Some(VmSuspend::Yield { value: v, .. }) => value(*v),
+            Some(VmSuspend::Await { cell, .. }) => cell.trace_cells(&mut |c| value(c.get())),
+            Some(VmSuspend::DebugBreak) | None => {}
         }
         self.for_each_jit_slot(|slot| value(unsafe { *slot }));
         for frame in &self.frames {

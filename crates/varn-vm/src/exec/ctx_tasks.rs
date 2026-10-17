@@ -1,64 +1,82 @@
 use std::rc::Rc;
 
 use crate::closure::VmClosure;
+use crate::error::VmResult;
 use crate::heap::HeapObj;
 use crate::task::{LazyTask, Status, TaskCell};
 use crate::value::VmValue;
 
 use super::ctx::ExecCtx;
 
-pub(crate) enum Rejection {
-    Caught,
-    Unhandled(VmValue),
+pub(crate) enum AwaitStep {
+    Ready(VmValue),
+    Thrown(VmValue),
+    Entered,
+    Pending(Rc<TaskCell>),
 }
 
 impl ExecCtx {
-    pub fn settle_awaited(&mut self, value: VmValue) -> Result<VmValue, VmValue> {
-        if value.is_heap() {
-            let cell = match self.heap.get(value.as_heap()) {
-                Some(HeapObj::Task(lazy)) => Some(self.run_lazy_task_sync(Rc::clone(lazy))),
-                Some(HeapObj::TaskHandle(cell)) => Some(Rc::clone(cell)),
-                Some(
-                    HeapObj::Str(_)
-                    | HeapObj::Array(_)
-                    | HeapObj::Tuple(_)
-                    | HeapObj::Object(_)
-                    | HeapObj::Record(_)
-                    | HeapObj::Buffer(_)
-                    | HeapObj::Module(_)
-                    | HeapObj::FrozenModule(_)
-                    | HeapObj::VmClosure(_)
-                    | HeapObj::Class(_)
-                    | HeapObj::NativeFn(..)
-                    | HeapObj::BoundMethod(_)
-                    | HeapObj::Map(_)
-                    | HeapObj::Set(_)
-                    | HeapObj::Range(_)
-                    | HeapObj::Symbol(_)
-                    | HeapObj::EnumVariant(_)
-                    | HeapObj::BigInt(_)
-                    | HeapObj::Decimal(_)
-                    | HeapObj::Char(_)
-                    | HeapObj::Generator(_)
-                    | HeapObj::Spread(_),
-                )
-                | None => None,
-            };
-            if let Some(cell) = cell {
-                if cell.is_pending() {
-                    if cell.is_yield() {
-                        return Ok(VmValue::null());
-                    }
-                    self.pump_until(&cell);
-                }
-                return match cell.status() {
-                    Status::Resolved => Ok(cell.value()),
-                    Status::Rejected => Err(cell.value()),
-                    Status::Pending => Ok(VmValue::null()),
-                };
-            }
+    pub(crate) fn begin_await(&mut self, value: VmValue, dest_reg: u16) -> VmResult<AwaitStep> {
+        if !value.is_heap() {
+            return Ok(AwaitStep::Ready(value));
         }
-        Ok(value)
+        let step = match self.heap.get(value.as_heap()) {
+            Some(HeapObj::Task(lazy)) => {
+                let lazy = Rc::clone(lazy);
+                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                    return Err(crate::error::RuntimeError::new(
+                        "stack overflow: call depth exceeded 10000",
+                    ));
+                }
+                super::scheduler::mount(self, &lazy, dest_reg);
+                AwaitStep::Entered
+            }
+            Some(HeapObj::TaskHandle(cell)) => match cell.status() {
+                Status::Resolved => AwaitStep::Ready(cell.value()),
+                Status::Rejected => AwaitStep::Thrown(cell.value()),
+                Status::Pending => AwaitStep::Pending(Rc::clone(cell)),
+            },
+            Some(
+                HeapObj::Str(_)
+                | HeapObj::Array(_)
+                | HeapObj::Tuple(_)
+                | HeapObj::Object(_)
+                | HeapObj::Record(_)
+                | HeapObj::Buffer(_)
+                | HeapObj::Module(_)
+                | HeapObj::FrozenModule(_)
+                | HeapObj::VmClosure(_)
+                | HeapObj::Class(_)
+                | HeapObj::NativeFn(..)
+                | HeapObj::BoundMethod(_)
+                | HeapObj::Map(_)
+                | HeapObj::Set(_)
+                | HeapObj::Range(_)
+                | HeapObj::Symbol(_)
+                | HeapObj::EnumVariant(_)
+                | HeapObj::BigInt(_)
+                | HeapObj::Decimal(_)
+                | HeapObj::Char(_)
+                | HeapObj::Generator(_)
+                | HeapObj::Spread(_),
+            )
+            | None => AwaitStep::Ready(value),
+        };
+        Ok(step)
+    }
+
+    pub fn settle_awaited(&mut self, cell: &Rc<TaskCell>) -> Result<VmValue, VmValue> {
+        if cell.is_pending() {
+            if cell.is_yield() {
+                return Ok(VmValue::null());
+            }
+            self.pump_until(cell);
+        }
+        match cell.status() {
+            Status::Resolved => Ok(cell.value()),
+            Status::Rejected => Err(cell.value()),
+            Status::Pending => Ok(VmValue::null()),
+        }
     }
 
     pub(crate) fn resume_with_awaited(&mut self, dest_reg: u16, resolved: VmValue) {
@@ -72,18 +90,15 @@ impl ExecCtx {
         }
     }
 
-    pub(crate) fn reject_awaited(&mut self, thrown: VmValue) -> Rejection {
-        let err = crate::exec::exceptions::build_thrown_error(thrown, &self.heap, &self.frames);
-        match self.try_handlers.pop() {
-            Some(handler) => {
-                let thrown_val = err.thrown.unwrap_or(VmValue::null());
-                if crate::exec::frame_ctrl::unwind_to_handler(self, handler, thrown_val).is_err() {
-                    return Rejection::Unhandled(thrown);
-                }
-                Rejection::Caught
-            }
-            None => Rejection::Unhandled(thrown),
-        }
+    pub(crate) fn resolve_awaiter(&mut self, dest_reg: u16, value: VmValue) {
+        self.resume_with_awaited(dest_reg, value);
+        super::scheduler::request_osr(self, varn_types::ssa::OsrMode::Resume);
+    }
+
+    pub(crate) fn reject_awaiter(&mut self, thrown: VmValue) {
+        self.jit_native_result = thrown;
+        self.jit_error_flag = 1;
+        super::scheduler::request_osr(self, varn_types::ssa::OsrMode::Resume);
     }
 
     pub(crate) fn trace_event(

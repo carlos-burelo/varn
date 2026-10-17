@@ -88,6 +88,8 @@ pub(super) unsafe fn run_compiled_frame(
         varn_jit::JIT_STATS
             .osr_entries
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let owner = frame_idx + 1;
+        unsafe { (*ctx).try_handlers.retain(|h| h.frame_depth != owner) };
     }
     if unsafe { (*ctx).settings.trace } {
         let what = if is_osr { "JIT OSR" } else { "JIT ENTRY" };
@@ -121,13 +123,12 @@ pub(super) unsafe fn run_compiled_frame(
                             .try_handlers
                             .retain(|h| h.frame_depth <= (*ctx).frames.len());
                     }
-                }
-                let handler = unsafe { (*ctx).try_handlers.pop_if(|h| h.frame_depth > depth) };
-                if let Some(handler) = handler {
-                    use crate::exec::frame_ctrl::unwind_to_handler;
-                    if let Err(e) = unwind_to_handler(unsafe { &mut *ctx }, handler, error_val) {
-                        return JitFrameOutcome::Failed(e);
+                    if frame.awaited && unsafe { (*ctx).frames.len() } > depth {
+                        unsafe { (*ctx).reject_awaiter(error_val) };
+                        return JitFrameOutcome::Continue;
                     }
+                }
+                if unsafe { crate::exec::exceptions::dispatch_to_handler(ctx, error_val, depth) } {
                     return JitFrameOutcome::Continue;
                 }
                 if let Some(e) = err_obj {

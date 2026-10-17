@@ -158,6 +158,10 @@ pub(crate) unsafe fn dispatch_to_handler(
         let Some((catch_ip, err_reg)) = hit else {
             let popped = ctx.frames.pop().unwrap();
             (*ctx).drop_frame_storage(popped.base);
+            if popped.awaited && ctx.frames.len() > depth {
+                ctx.reject_awaiter(thrown_val);
+                return true;
+            }
             continue;
         };
         let f2 = ctx.frames.len() - 1;
@@ -171,4 +175,18 @@ pub(crate) unsafe fn dispatch_to_handler(
         return true;
     }
     false
+}
+
+pub(crate) unsafe fn raise(
+    ctx: *mut crate::exec::ExecCtx,
+    val: VmValue,
+    depth: usize,
+) -> Result<(), crate::error::RuntimeError> {
+    let err = build_thrown_error(val, unsafe { &(*ctx).heap }, unsafe { &(*ctx).frames });
+    let thrown = err.thrown.unwrap_or(VmValue::null());
+    if unsafe { dispatch_to_handler(ctx, thrown, depth) } {
+        Ok(())
+    } else {
+        Err(err)
+    }
 }

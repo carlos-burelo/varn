@@ -1,4 +1,5 @@
 use crate::exec::ctx::ExecCtx;
+use crate::exec::ctx_tasks::AwaitStep;
 use crate::value::VmValue;
 
 pub(super) unsafe fn jit_suspend_at(ctx: &mut ExecCtx, frame_idx: usize, resume_ip: usize) -> ! {
@@ -32,46 +33,56 @@ pub(crate) extern "C" fn jit_await(
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let mut fut = VmValue::from_raw_parts(fut_tag, fut_payload);
+        let fut = VmValue::from_raw_parts(fut_tag, fut_payload);
         let caller_depth = ctx_ref.frames.len();
-        let frame_idx = caller_depth - 1;
-        ctx_ref.frames[frame_idx].ip = resume_ip;
-        let lazy = if fut.is_heap()
-            && let Some(crate::heap::HeapObj::Task(lazy)) = ctx_ref.heap.get(fut.as_heap())
-        {
-            Some(std::rc::Rc::clone(lazy))
-        } else {
-            None
-        };
-        if let Some(lazy) = lazy
-            && let Ok(output) = crate::exec::scheduler::start_now(ctx_ref, lazy)
-        {
-            match output.status() {
-                crate::task::Status::Resolved => {
-                    ctx_ref.resume_with_awaited(dest_reg as u16, output.value());
-                    return;
-                }
-                crate::task::Status::Rejected => {
-                    ctx_ref.jit_native_result = output.value();
-                    ctx_ref.jit_error_flag = 1;
-                    return;
-                }
-                crate::task::Status::Pending => {
-                    fut = crate::task::alloc_handle(&mut ctx_ref.heap, output);
-                }
+        ctx_ref.frames[caller_depth - 1].ip = resume_ip;
+        let dest = dest_reg as u16;
+        let resume_at = match ctx_ref.begin_await(fut, dest) {
+            Ok(AwaitStep::Ready(v)) => {
+                ctx_ref.resume_with_awaited(dest, v);
+                return;
             }
-        }
-        ctx_ref.vm_suspend = Some(crate::exec::VmSuspend::Await {
-            value: fut,
-            dest_reg: dest_reg as u16,
-        });
-        ctx_ref.jit_panic_suspend_resume_ip = Some(resume_ip);
-
+            Ok(AwaitStep::Thrown(v)) => {
+                ctx_ref.jit_native_result = v;
+                ctx_ref.jit_error_flag = 1;
+                return;
+            }
+            Ok(AwaitStep::Entered) => {
+                if !run_entered(ctx_ref, caller_depth) {
+                    return;
+                }
+                None
+            }
+            Ok(AwaitStep::Pending(cell)) => {
+                ctx_ref.vm_suspend = Some(crate::exec::VmSuspend::Await {
+                    cell,
+                    dest_reg: dest,
+                });
+                Some(resume_ip)
+            }
+            Err(e) => {
+                super::construct::jit_propagate_error(ctx_ref, e);
+                return;
+            }
+        };
+        ctx_ref.jit_panic_suspend_resume_ip = resume_at;
         let buf = ctx_ref.jit_suspend_buf;
-        if !buf.is_null() {
-            crate::exec::ctx::my_longjmp(buf, 2);
-        } else {
+        if buf.is_null() {
             panic!("JIT suspend triggered but no jump buffer registered");
+        }
+        crate::exec::ctx::my_longjmp(buf, 2);
+    }
+}
+
+unsafe fn run_entered(ctx: &mut ExecCtx, caller_depth: usize) -> bool {
+    let outer = std::mem::replace(&mut ctx.jit_suspend_buf, std::ptr::null_mut());
+    let ran = ctx.run_until(caller_depth);
+    ctx.jit_suspend_buf = outer;
+    match ran {
+        Ok(_) => ctx.vm_suspend.is_some(),
+        Err(e) => {
+            unsafe { super::construct::jit_propagate_error(ctx, e) };
+            false
         }
     }
 }

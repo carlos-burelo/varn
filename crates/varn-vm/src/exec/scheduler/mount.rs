@@ -39,7 +39,7 @@ fn closure_for(ctx: &mut ExecCtx, task: &LazyTask) -> Rc<VmClosure> {
     closure
 }
 
-pub(super) fn mount(ctx: &mut ExecCtx, task: &LazyTask) {
+pub(crate) fn mount(ctx: &mut ExecCtx, task: &LazyTask, return_reg: u16) {
     let closure = closure_for(ctx, task);
     let args = task.args.cells();
     let alloc = ctx.stack.push_frame(&task.proto);
@@ -56,5 +56,7 @@ pub(super) fn mount(ctx: &mut ExecCtx, task: &LazyTask) {
     }
     let mut frame = CallFrame::new_owned(closure, alloc);
     frame.current_class = task.current_class.clone();
+    frame.return_reg = return_reg;
+    frame.awaited = return_reg != CallFrame::NO_RETURN_REG;
     ctx.frames.push(frame);
 }

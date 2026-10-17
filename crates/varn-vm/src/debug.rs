@@ -176,50 +176,10 @@ pub fn drive_main(
         match machine.run(main.clone()) {
             Ok(v) => match machine.ctx.vm_suspend.take() {
                 None => return DriveResult::Done(v),
-                Some(VmSuspend::Await { value, dest_reg }) => {
-                    match machine.ctx.settle_awaited(value) {
-                        Ok(resolved) => {
-                            if let Some(frame) = machine.ctx.frames.last() {
-                                let base = frame.base;
-                                let _ = machine.ctx.stack.unbox_into_reg(
-                                    base,
-                                    dest_reg as usize,
-                                    resolved,
-                                );
-                            }
-                        }
-                        Err(thrown) => {
-                            let err = crate::exec::exceptions::build_thrown_error(
-                                thrown,
-                                &machine.ctx.heap,
-                                &machine.ctx.frames,
-                            );
-                            if let Some(handler) = machine.ctx.try_handlers.pop() {
-                                let thrown_val = err.thrown.unwrap_or(varn_types::VmValue::null());
-                                let _ = crate::exec::frame_ctrl::unwind_to_handler(
-                                    &mut machine.ctx,
-                                    handler,
-                                    thrown_val,
-                                );
-                            } else {
-                                let mut err = err;
-                                let trace =
-                                    varn_types::NativeCtx::get_field(&machine.ctx, thrown, "stack")
-                                        .map(|stack| machine.ctx.heap.str_repr(stack))
-                                        .filter(|stack| !stack.is_empty());
-                                err.message = match trace {
-                                    Some(trace) => {
-                                        format!(
-                                            "awaited task failed: {}
-{trace}",
-                                            err.message
-                                        )
-                                    }
-                                    None => format!("awaited task failed: {}", err.message),
-                                };
-                                return DriveResult::Failed(err);
-                            }
-                        }
+                Some(VmSuspend::Await { cell, dest_reg }) => {
+                    match machine.ctx.settle_awaited(&cell) {
+                        Ok(resolved) => machine.ctx.resolve_awaiter(dest_reg, resolved),
+                        Err(thrown) => machine.ctx.reject_awaiter(thrown),
                     }
                 }
                 Some(VmSuspend::Yield { .. }) => {}

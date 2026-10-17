@@ -14,6 +14,8 @@ pub struct CallFrame {
     pub current_class: Option<Rc<varn_types::ClassObj>>,
 
     pub return_reg: u16,
+
+    pub awaited: bool,
 }
 
 unsafe impl Send for CallFrame {}
@@ -32,6 +34,7 @@ impl CallFrame {
             base,
             current_class: None,
             return_reg: Self::NO_RETURN_REG,
+            awaited: false,
         }
     }
 
@@ -43,6 +46,7 @@ impl CallFrame {
             base,
             current_class: None,
             return_reg: Self::NO_RETURN_REG,
+            awaited: false,
         }
     }
 

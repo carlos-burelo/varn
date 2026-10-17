@@ -338,10 +338,9 @@ impl ExecCtx {
                 } else {
                     vec![]
                 };
-                let rest_nv = self.heap.alloc_array_repr(
-                    false,
-                    varn_types::vm_value::ArrayRepr::boxed(rest_items),
-                );
+                let rest_nv = self
+                    .heap
+                    .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(rest_items));
                 if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv) {
                     failed = Some(e);
                 }

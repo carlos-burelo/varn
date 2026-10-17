@@ -40,8 +40,14 @@ use crate::value::VmValue;
 pub use ctx::ExecCtx;
 
 pub enum VmSuspend {
-    Yield { value: VmValue, dest_reg: u8 },
-    Await { value: VmValue, dest_reg: u16 },
+    Yield {
+        value: VmValue,
+        dest_reg: u8,
+    },
+    Await {
+        cell: std::rc::Rc<crate::task::TaskCell>,
+        dest_reg: u16,
+    },
     DebugBreak,
 }
 

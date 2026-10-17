@@ -86,13 +86,7 @@ impl ExecCtx {
                     }
                     Some(IcHit::Vm(nc, owner)) => {
                         self.record_ic_hit_callmethod();
-                        return self.invoke_vm_method_fast(
-                            nc,
-                            Some(owner),
-                            this_val,
-                            args,
-                            name,
-                        );
+                        return self.invoke_vm_method_fast(nc, Some(owner), this_val, args, name);
                     }
                     None => self.record_ic_miss_callmethod(),
                 }

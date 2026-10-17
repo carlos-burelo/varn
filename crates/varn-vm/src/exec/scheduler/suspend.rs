@@ -12,6 +12,7 @@ pub(crate) struct FrozenFrame {
     closure: Rc<VmClosure>,
     ip: usize,
     return_reg: u16,
+    awaited: bool,
     current_class: Option<Rc<varn_types::ClassObj>>,
     compact: bool,
     gpr_len: u32,
@@ -162,6 +163,7 @@ pub(crate) fn freeze(ctx: &mut ExecCtx, dest_reg: u16) -> Result<Box<Frozen>, &'
             closure,
             ip: frame.ip,
             return_reg: frame.return_reg,
+            awaited: frame.awaited,
             current_class: frame.current_class.clone(),
             compact,
             gpr_len,
@@ -278,6 +280,7 @@ pub(crate) fn thaw(ctx: &mut ExecCtx, frozen: Frozen) {
         let mut frame = CallFrame::new_owned(sf.closure, id);
         frame.ip = sf.ip;
         frame.return_reg = sf.return_reg;
+        frame.awaited = sf.awaited;
         frame.current_class = sf.current_class;
         ctx.frames.push(frame);
     }
@@ -290,13 +293,13 @@ pub(crate) fn thaw(ctx: &mut ExecCtx, frozen: Frozen) {
     ctx.open_upvalues = open_upvalues;
 }
 
-pub(super) fn detach_upvalues(ctx: &ExecCtx, open: &[(SlotAddr, VmUpvalue)]) {
+fn detach_upvalues(ctx: &ExecCtx, open: &[(SlotAddr, VmUpvalue)]) {
     for (_, uv) in open {
         uv.close(&ctx.stack);
     }
 }
 
-pub(super) fn attach_upvalues(ctx: &mut ExecCtx, open: &[(SlotAddr, VmUpvalue)]) {
+fn attach_upvalues(ctx: &mut ExecCtx, open: &[(SlotAddr, VmUpvalue)]) {
     for (slot, uv) in open {
         let mut cell = uv.inner.borrow_mut();
         let _ = ctx.stack.set_addr(*slot, cell.value);

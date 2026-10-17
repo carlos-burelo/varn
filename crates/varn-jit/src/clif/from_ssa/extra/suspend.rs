@@ -26,6 +26,7 @@ pub(super) fn await_(
     let rv = b.ins().iconst(types::I64, i64::from(resume_ip));
 
     call_helper_void(b, ctx.cc, h.await_helper, &[ectx, t, p, dv, rv]);
+    super::super::store::drop_home_addrs(ctx);
     super::super::exceptions::check_error_branch(b, ctx)?;
     Ok(Some(Some(Out::Boxed(home_load(b, ctx, ctx.ssa.reg(d))?))))
 }
