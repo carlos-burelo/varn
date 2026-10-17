@@ -2,7 +2,7 @@ use super::type_inference::infer_expr_type;
 use super::type_resolution::resolve_type_node;
 use super::Binder;
 use varn_core::ast::TypeNode;
-use varn_sem::types::Type;
+use varn_sem::types::{Type, TypeContext};
 
 impl<'r> Binder<'r> {
     pub(crate) fn resolve_type(&mut self, node: &TypeNode) -> Type {
@@ -19,6 +19,7 @@ impl<'r> Binder<'r> {
         let children: Vec<&TypeNode> = match &node.kind {
             K::Generic(name, args, _) => {
                 if self.interner.try_resolve(*name) == Some(varn_core::well_known::RECORD)
+                    && self.symbol_kind(varn_core::well_known::RECORD).is_none()
                     && self.reported_type_forms.insert(node.range.start.offset)
                 {
                     self.emit(

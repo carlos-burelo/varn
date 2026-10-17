@@ -15,7 +15,9 @@ pub(super) fn resolve_generic_type(
     table: &mut CheckerTyTable,
 ) -> Type {
     let name_str = resolve_atom_name(name, ctx, interner);
-    if name_str.as_ref() == varn_core::well_known::RECORD {
+    if name_str.as_ref() == varn_core::well_known::RECORD
+        && ctx.and_then(|c| c.symbol_kind(&name_str)).is_none()
+    {
         return Type::Dynamic;
     }
     let resolved_args: Vec<Type> = args
