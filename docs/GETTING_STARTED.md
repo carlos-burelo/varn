@@ -1,20 +1,18 @@
-# Primeros pasos Varn
+# Primeros pasos
 
-Código manda. Fuentes: `crates/varn-cli/src/cli.rs:16-55,58-113`, `Cargo.toml:136-141`, `tests/04-templates.vn:7`, `tests/05-arrays.vn:3`.
-
-## Build
+## 1. Compilar `vn`
 
 ```bash
-git clone <repo-url>
-cd varn-lang
-cargo build --profile quick --bin vn
+git clone https://github.com/carlos-burelo/varn
+cd varn
+cargo build --profile quick --bin vn      # ~3 min; binario en target/quick/vn
 ```
 
-Detalles perfiles en `INSTALL.md`.
+Toolchain, perfiles y PATH: [`INSTALL.md`](INSTALL.md).
 
-## Hola mínimo
+## 2. Hola mundo
 
-Sintaxis verificada contra suite (`function` en `tests/05-arrays.vn:3`, `${}` en `tests/04-templates.vn:7`):
+`hola.vn`:
 
 ```vn
 function saludar(nombre: str): str {
@@ -25,42 +23,74 @@ print(saludar("Mundo"))
 ```
 
 ```bash
-vn run hola.vn
-vn check hola.vn
+vn run hola.vn        # Hola, Mundo desde Varn!
+vn check hola.vn      # solo tipos, sin ejecutar
 vn debug -p bytecode hola.vn
 ```
 
-Salida esperada: `Hola, Mundo desde Varn!`
+## 3. Algo más real
 
-## Comandos núcleo (`cli.rs:16-55`)
+```vn
+class Contador {
+    private n: int = 0
+    inc(): int {
+        this.n = this.n + 1
+        return this.n
+    }
+}
 
-| Comando | Args clave (`cli.rs`) | Uso |
-|---|---|---|
-| `run` | `file`, `--eval`, `--trace`, `--allow-*`, `--sandbox`, `--allow-ffi`, `--allow-ui` (`58-99`) | Ejecutar |
-| `check` | `file` (`116-121`) | Solo tipos, sin correr |
-| `debug` | `-p/--phase=all`, `--fn NAME`, `--list-phases` (`99-113`) | Inspección fases |
-| `build` | `file`, `-o`, `--target=bytecode` (`192-206`) | Artefacto |
-| `bench` | `--runs=10`, `--min-clif-coverage` (`138-158`) | Perf |
-| `test` / `fmt` / `pkg` / `init` / `doctor` / `cache` | — | Ciclo proyecto |
+async function doble(n: int): int {
+    return n * 2
+}
 
-## Proyecto
+const c = new Contador()
+c.inc()
+print(`contador = ${c.inc()}`)
+
+const palabras = ["varn", "es", "tipado"].map((w) => w.length)
+print(palabras)
+print(await doble(21))
+```
+
+Puntos clave:
+
+- Tipos estáticos con inferencia: `let x = 1` es `int`; `dynamic` existe pero es explícito.
+- Nulos explícitos: `str?`, con `?.`, `??` y estrechamiento por flujo.
+- `async`/`await`, generadores (`function*`), `match`, enums con payload, clases, interfaces, extensiones.
+- La std se importa por esquema: `std:fs`, `std:http`, `std:task`, `std:test`…
+
+Guía del lenguaje: [`lang/README.md`](lang/README.md).
+
+## 4. Un proyecto
 
 ```bash
 vn init mi-proyecto
 cd mi-proyecto
+vn run main.vn
 ```
 
-Genera `main.vn` + `varn.toml`. Caché global (`~/.varn/cache` o `VARN_CACHE_DIR`); `vn run` no escribe en proyecto.
+`vn init` crea `main.vn` y `varn.toml`. La caché es global (`~/.vn/cache`, o
+`VARN_HOME`/`VARN_CACHE_DIR`); `vn run` no escribe en el proyecto.
 
-## Puerta
+## 5. Tests
+
+```vn
+import { describe, it, expect } from "std:test"
+
+await describe("suma", async () => {
+    await it("suma enteros", () => {
+        expect(1 + 2).toBe(3)
+    })
+})
+```
 
 ```bash
-vn run tests/main.vn
+vn test               # cada .vn de tests/
+vn test ruta/al/archivo.vn
 ```
-
-4 cuadrantes antes de commit: ver `INSTALL.md`. Suite canónica, único test válido (Ley 11 AGENTS.md).
 
 ## Siguiente
 
-- `docs/CLI_INSPECT.md` — fases debug reales.
-- `docs/LBI_ARCHITECTURE.md` + `docs/HOST_BOUNDARY_SPEC.md` — nativos y capabilities.
+- [`CLI_REFERENCE.md`](CLI_REFERENCE.md) — todos los comandos y variables de entorno.
+- [`CLI_INSPECT.md`](CLI_INSPECT.md) — `vn debug -p …` para ver cada fase.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — cómo está hecho el compilador.

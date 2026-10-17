@@ -1,125 +1,82 @@
-# CLI Reference (`vn`)
+# Referencia del CLI `vn`
 
-Fuente: `crates/varn-cli/src/cli.rs:16-299`. Código manda.
+Fuente: `crates/varn-cli/src/cli.rs` (clap). `vn <comando> --help` es la referencia
+viva; esta página la resume.
 
-## Comandos (`Commands`, cli.rs:16-55)
+## Ejecutar y comprobar
 
-Run / Check / Eval / Repl / Bench / Debug / Build / Test / Fmt / Pkg / Init / Doctor / Cache / Lsp / Completions / Dap / StdBundle / GenContractTables.
+| Comando | Uso | Notas |
+|---|---|---|
+| `run` | `vn run [OPTIONS] [FILE] [-- ARGS...]` | `-e/--eval CODE`, `-v`, `--trace`, permisos (abajo), `--compare-tiers` (corre el programa en intérprete, JIT y JIT tier 1 y compara salidas) |
+| `check` | `vn check [-v] FILE` | Solo lex + parse + check; sale con error si hay diagnósticos de error |
+| `eval` | `vn eval [-v] CODE` | Evalúa una expresión/programa corto |
+| `repl` | `vn repl [--debug-bytecode]` | Bucle interactivo |
+| `test` | `vn test [PATH] [-f FILTER] [-j JOBS] [--fail-fast] [-v]` | Ejecuta cada `.vn` de PATH (por defecto `tests/`) |
+| `bench` | `vn bench [FILE] [-e CODE] [--runs N=10] [--show-output] [-v] [--all-rows] [--min-clif-coverage PCT]` | Tiempos por fase; `--min-clif-coverage` falla si la cobertura JIT queda por debajo |
+| `debug` | `vn debug [FILE] [-e CODE] [-p PHASE=all] [--fn NAME] [--list-phases]` | Inspección por fase; ver [`CLI_INSPECT.md`](CLI_INSPECT.md) |
 
-## Flags reales
+### Permisos (`run`)
 
-### Run (`RunArgs`, cli.rs:58-99)
+Sin ningún `--allow-*` el programa corre con todos los permisos. Con alguno, solo
+lo pedido. `--sandbox` lo niega todo. Detalle en
+[`HOST_BOUNDARY_SPEC.md`](HOST_BOUNDARY_SPEC.md).
 
-`vn run [file] [-e CODE] [-- ARGS] [-v] [--trace] [--allow-*] [--sandbox] [--compare-tiers]`
+`-A/--allow-all`, `--allow-read[=PATHS]`, `--allow-write[=PATHS]`,
+`--allow-net[=HOSTS]`, `--allow-env[=VARS]`, `--allow-ffi`, `--allow-ui`,
+`--sandbox`.
 
-- `file: Option<String>` (posicional)
-- `-e, --eval CODE`
-- `script_args` tras `--`
-- `-v, --verbose`
-- `--trace`
-- `-A, --allow-all`
-- `--allow-read [PATHS]` (=`*` si sin valor)
-- `--allow-write [PATHS]` (idem)
-- `--allow-net [HOSTS]` (idem)
-- `--allow-env [VARS]` (idem)
-- `--allow-ffi`
-- `--allow-ui`
-- `--sandbox`
-- `--compare-tiers`
+## Construir y formatear
 
-### Check (`CheckArgs`, cli.rs:116-121)
+| Comando | Uso | Notas |
+|---|---|---|
+| `build` | `vn build FILE [-o PATH] [-t TARGET=bytecode] [--native] [-v]` | `bytecode` escribe un artefacto portable `.vnc` (grafo de módulos compilado; `vn run app.vnc` lo ejecuta). `native`/`--native` emite un ejecutable vía Cranelift + `lld-link` + `varn-rt` (prototipo AOT) |
+| `fmt` | `vn fmt [PATH] [--check] [-v]` | `--check` no escribe, falla si hay cambios |
+| `std-bundle` | `vn std-bundle [--std-dir std] [--out dist/std.vnb]` | Construye la imagen de la std |
 
-`vn check <file> [-v]` — `file: String`, `-v/--verbose`.
+## Proyecto y paquetes
 
-### Eval (`EvalArgs`, cli.rs:124-129)
+| Comando | Uso |
+|---|---|
+| `init` | `vn init [DIR] [--name NAME]` |
+| `pkg` | `vn pkg add ALIAS ORIGIN` · `remove ALIAS` · `install` · `update` · `tree` · `doctor` · `clean` |
+| `cache` | `vn cache clean` |
+| `doctor` | `vn doctor` — diagnóstico de instalación y de la std resuelta |
 
-`vn eval <code> [-v]` — `code: String`, `-v/--verbose`.
+## Herramientas de editor
 
-### Repl (`ReplArgs`, cli.rs:132-135)
+| Comando | Uso |
+|---|---|
+| `lsp` | `vn lsp [-p PORT] [--tcp HOST:PORT] [--stdio]` (stdio por defecto) |
+| `dap` | `vn dap` (adaptador de depuración por stdio) |
+| `completions` | `vn completions bash\|zsh\|fish\|power-shell\|elvish` |
 
-`vn repl [--debug-bytecode]`.
+## Variables de entorno
 
-### Bench (`BenchArgs`, cli.rs:138-158)
+| Variable | Efecto |
+|---|---|
+| `VARN_STD` | Raíz de la std (directorio fuente) o `@embedded` |
+| `VARN_STD_BUNDLE` | Imagen `.vnb` a usar cuando la std es `@embedded` y el binario no la lleva dentro |
+| `VARN_CACHE_DIR` | Directorio de caché (aislar corridas: un directorio temporal) |
+| `VARN_HOME` | Directorio base de Varn |
+| `VARN_NO_JIT=1` | Solo intérprete |
+| `VARN_NO_CLIF` | Desactiva el backend Cranelift |
+| `VARN_JIT_TIER` / `VARN_JIT_TIER_STRAIGHT` / `VARN_JIT_OSR` | Umbrales de tiering (con bucle / sin bucle / back-edges para OSR) |
+| `VARN_JIT_CACHE` | `off`, `verify` (recompila y compara con la caché) o activo por defecto |
+| `VARN_CLIF_OPT` | `opt_level` de Cranelift (por defecto `speed`) |
+| `VARN_CLIF_VERIFY` | Activa el verificador de Cranelift |
+| `VARN_CLIF_TRACE`, `VARN_CLIF_PRINT_IR` | Traza de lowering / IR de Cranelift |
+| `VARN_GC_TRACE=1` | Una línea por colección menor |
+| `VARN_ALLOC_PROFILE`, `VARN_ALLOC_SLOW` | Perfil de asignaciones / fuerza el camino lento de asignación en JIT |
+| `VARN_UI_REAL=1` | Backend de ventanas real para `std:ui` (por defecto headless) |
+| `VARN_LSP_DEBUG` | Registro de depuración del LSP |
 
-`vn bench [file] [-e CODE] [--runs N] [--show-output] [-v] [--all-rows] [--min-clif-coverage PCT]`
+## Verificación del repo
 
-- `file` opcional, `-e/--eval CODE`
-- `--runs N` default `10`
-- `--show-output`, `-v/--verbose`, `--all-rows`
-- `--min-clif-coverage PCT: Option<f64>`
+`scripts/verify.ps1`:
 
-### Debug (`DebugArgs`, cli.rs:99-113)
-
-`vn debug [file] [-e CODE] [-p PHASE] [--fn NAME] [--list-phases]`
-
-- `file` opcional, `-e/--eval CODE`
-- `-p, --phase PHASE` default `all`
-- `--fn NAME` (`fn_filter`)
-- `--list-phases`
-
-### Build (`BuildArgs`, cli.rs:192-206)
-
-`vn build <file> [-o PATH] [-t TARGET] [--native] [-v]`
-
-- `file: String`
-- `-o, --output PATH`
-- `-t, --target TARGET` default `bytecode`
-- `--native`, `-v/--verbose`
-
-### Test (`TestArgs`, cli.rs:253-267)
-
-`vn test [path] [--filter X] [-j N] [--fail-fast] [-v]`
-
-- `path: Option<String>`
-- `-f/--filter`, `-j/--jobs: Option<usize>`, `--fail-fast`, `-v/--verbose`
-
-### Fmt (`FmtArgs`, cli.rs:270-278)
-
-`vn fmt [path] [--check] [-v]` — `path` opcional, `--check`, `-v/--verbose`.
-
-### Pkg (`PkgCommands`, cli.rs:221-235; `AddArgs` 209-213, `RemoveArgs` 216-218)
-
-- `pkg add <alias> <origin>`
-- `pkg remove <alias>`
-- `pkg install` / `update` / `tree` / `doctor` / `clean`
-
-### Init (`InitArgs`, cli.rs:161-166)
-
-`vn init [dir] [--name X]` — `dir: Option<String>`, `--name: Option<String>`.
-
-### Doctor (cli.rs:41)
-
-`vn doctor`. Sin args.
-
-### Cache (`CacheCommands`, cli.rs:238-240)
-
-- `cache clean`. Único subcomando.
-
-### Lsp (`LspArgs`, cli.rs:174-189)
-
-`vn lsp [-p PORT] [--tcp HOST:PORT] [--stdio]`
-
-- `-p/--port: Option<u16>`, `--tcp: Option<String>`, `--stdio: bool`
-
-### Completions (`CompletionsArgs` + `Shell`, cli.rs:169-171,242-250)
-
-`vn completions <shell>` — `Bash | Zsh | Fish | PowerShell | Elvish`.
-
-### Dap (cli.rs:50)
-
-`vn dap`. Sin args.
-
-### StdBundle (`StdBundleArgs`, cli.rs:281-287)
-
-`vn std-bundle [--std-dir D] [--out F]` — defaults `std` / `dist/std.vnb`.
-
-## Verificación
-
-`scripts/verify.ps1` (params verify.ps1:34-39):
-
-- `-Quick`: perfil `quick`, omite lint+bench, solo cuadrante 1 (dev-checkout+JIT). No sustituye matriz completa.
-- `-Fast`: omite benchmark. Corre cuadrantes 1–4 y el 5 (`VARN_JIT_CACHE=verify`).
-- `-SkipLint`: omite `cargo fmt --check` + `clippy`.
+- `-Quick`: perfil `quick`, sin lint ni bench, solo cuadrante 1 (dev-checkout + JIT).
+- `-Fast`: release, sin benchmark; cuadrantes 1–4 + cuadrante 5 (`VARN_JIT_CACHE=verify`).
+- `-SkipLint`: omite `cargo fmt --check` y `clippy`.
 - `-CleanCache`: `vn cache clean` antes de cada cuadrante.
 
-`scripts/verify.sh` (verify.sh:14-29): `--fast|-f`, `--skip-lint`, `--clean-cache`. Sin modo `-Quick`.
+`scripts/verify.sh`: `--fast|-f`, `--skip-lint`, `--clean-cache`; sin `-Quick` ni cuadrante 5.
