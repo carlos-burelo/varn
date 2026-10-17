@@ -5,27 +5,28 @@ Detalle completo en `docs/JIT_ABI_V2_SPEC.md`; aquí el resumen normativo.
 
 ## 1. Versión
 
-`JIT_HELPERS_VERSION = 3` (`crates/varn-jit-abi/src/lib.rs:3`). `JitHelpers`
-(`lib.rs:118-246`): direcciones de helpers + layouts + offsets al `ExecCtx`
+`JIT_HELPERS_VERSION = 9` (`crates/varn-jit-abi/src/lib.rs`). `JitHelpers`
+(`lib.rs`): direcciones de helpers + layouts + offsets al `ExecCtx`
 (`jit_native_result_offset`, `jit_error_flag_offset`, `jit_exit_offset`,
 `globals_offset`, `young_len_offset/threshold`, `frame_layout`, `call_layout`).
 
 ## 2. Convención de llamada JIT
 
-Dos activaciones (`varn-jit/src/clif/abi.rs:16-19`): `Native` (firma
+Dos activaciones (`varn-jit/src/clif/abi.rs`): `Native` (firma
 `NativeShape`, `CallConv::Tail`, `Int|Bool→i64`, `Float→f64`, resto boxed
 `i64×2`; `NATIVE_FRAMELESS = 1<<63`) y `Framed` (`raw_signature`, `sret` en
 Windows). Se intenta `Native` y se cae a `Framed` con `NEEDS_ACTIVATION`
-(`clif/lower.rs:158-186`). Gate: 8192 words (`SIZE_GATE_WORDS`); tiering
-1 / 128 recto / OSR 1000 (`varn-vm/src/jit/tiering.rs:7-11`).
+(`clif/lower.rs`). Gate: 8192 words (`SIZE_GATE_WORDS`); tiering
+1 / 128 recto / OSR 1000 (`varn-vm/src/jit/tiering.rs`).
 
 ## 3. Valores y registros FFI
 
 `VmValue` = 16 B (`tag: u64, payload: u64`); kinds 0..6
-(NULL/BOOL/INT/FLOAT/HEAP/SSO/SYMBOL), SSO hasta 5 B. Los frames separan
+(NULL/BOOL/INT/FLOAT/HEAP/SSO/SYMBOL), SSO hasta 8 B. Los frames separan
 registros por clase: GPR `i64`, FPR `f64`, Refs `HeapRef`, Dyn `VmValue`
-(`docs/VM_ARCHITECTURE.md` §1-2). Las nativas Rust usan
-`fn(ctx, &[VmValue]) -> VmResult<VmValue>`; structs `#[repr(C)]`.
+(`docs/VM_ARCHITECTURE.md` §1-2). Las nativas Rust tienen tipo `NativeFn = fn(&mut dyn NativeCtx, &[VmValue]) -> NativeFnResult`
+(`varn-types/src/native.rs`); se generan desde el contrato `.vn` con `varn_contract!`
+(ver `LBI_ARCHITECTURE.md`).
 
 ## 4. Errores y plataforma
 

@@ -1,17 +1,47 @@
-# Runtime Varn (estado código)
+# Runtime: tareas, scheduler, isolates
 
-## No existe `varn-runtime`
+Complementa a [`VM_ARCHITECTURE.md`](VM_ARCHITECTURE.md) (intérprete, frames,
+excepciones, generadores). No existe un crate `varn-runtime`: el runtime vive en
+`varn-vm` (ejecución, scheduler), `varn-builtins` (nativos de host) y la std en Varn.
 
-`Cargo.toml` lista 29 miembros workspace (28 crates + `xtask`); ninguno es `varn-runtime`. Cero hits a `varn-runtime|varn_runtime` en manifests. Miembros incluyen `crates/varn-rt`, `crates/varn-vm`, `crates/varn-builtins`.
+## Tareas y `await`
 
-## Runtime real
+- Llamar a una función `async` crea una **tarea perezosa** (`LazyTask`, `varn-vm/src/task.rs`): no corre hasta que alguien la aguarda o la lanza.
+- `await` (`ExecCtx::begin_await`, `exec/ctx_tasks.rs`) monta el cuerpo de una tarea perezosa como frame de quien aguarda (`scheduler::mount`): sin hilo ni cola nueva. Si el valor ya está resuelto o rechazado continúa o lanza en el acto; solo una celda pendiente (`TaskHandle`) suspende.
+- Suspender congela los frames de la tarea (`scheduler/suspend.rs`: `freeze`/`thaw`, por frame y en términos relativos); los drivers la reanudan con `resolve_awaiter`/`reject_awaiter` y la reentrada usa OSR en modo `Resume` si hay código JIT.
+- `spawn(task)` la convierte en tarea desacoplada (`scheduler::enqueue_detached`) y devuelve un `TaskHandle`.
 
-- `crates/varn-rt/src/lib.rs`: mínimo AOT. Solo `main`→`_varn_main`, `varn_rt_print{,_int,_bool}`, `varn_rt_str_concat`, `varn_rt_panic`. Sin scheduler, sin canales, sin GC.
-- `crates/varn-vm/src/exec/host/isolates.rs:230-358`: `spawn_isolate` crea thread OS (`std::thread::Builder::new().stack_size(VM_STACK_BYTES).spawn`), nueva `Vm` + heap propio, `isIsolate=true`, corre export y liquida `HostPromise`.
-- `crates/varn-builtins/src/runtime/channel.rs:9-19`: `SendOutcome {Sent,Parked,Closed}`, `RecvOutcome {Item,Parked,Closed}`; registry global por id, `Mutex<ChannelState>` (`:29-37`), `create/send/try_receive/close`.
-- `crates/varn-builtins/src/modules/runtime/task/task.rs`: `spawn` (`:13-15`), `sleep` (`:17-19`), `parallel` (`:21-23`), `spawnIsolate` (`:35-76`, exige referencia a fn exportada top-level), `channel` (`:78-91`), `Sender::send/close/dispose` (`:196-227`), `Receiver::next/receive/dispose` (`:235-278`), `ChannelClosed extends Error` (`:288-294`).
-- `crates/varn-vm/src/exec/scheduler/`: `drive,mod,mount,pumps,queue,suspend.rs`. Cooperativo; `spawn_if_task`/`enqueue_detached` en `exec/host/isolates.rs:140-194`.
+## Scheduler (`varn-vm/src/exec/scheduler/`)
 
-## `TaskGroup`
+Cooperativo y de un solo hilo por isolate: `drive.rs` (bucle principal),
+`mount.rs` (montar tareas), `queue.rs` (cola de listas), `pumps.rs` (bombea timers
+y promesas de host hasta que una celda se liquida), `suspend.rs` (congelar/descongelar).
 
-0 hits a `TaskGroup` en `crates/**/*.rs`. Vive en Varn: `std/task/group.vn` (`export class TaskGroup<T>`, `spawn/join/cancel`), sobre `parallel$/sleep$` de `runtime:task`. Usado en `tests/21-async.vn:2,43-81`, `42-*.vn:149`, `97-*.vn:36`.
+Temporizadores: `varn-builtins/src/runtime/timer.rs` (`sleep_task`,
+`next_deadline`, `take_due`).
+
+## Isolates
+
+`spawnIsolate(fn, args)` (`varn-vm/src/exec/host/isolates.rs`): un hilo del SO por
+isolate (`std::thread::Builder` con pila `VM_STACK_BYTES`), `Vm` y heap propios. El
+`fn` debe ser una función exportada de nivel superior: el hijo la vuelve a cargar
+por nombre. Devuelve un `IsolateHandle` con `join()`.
+
+Canales entre isolates: `varn-builtins/src/runtime/channel.rs` — registro global
+por id con `Mutex`, `create/send/try_receive/close`, resultados
+`SendOutcome`/`RecvOutcome` (`Sent|Parked|Closed`, `Item|Parked|Closed`).
+Superficie Varn (`runtime:task` → `std:task/channel`): `channel<T>(capacity)` →
+`{ tx: Sender<T>, rx: Receiver<T> }`; `Sender.send/close/dispose`,
+`Receiver.receive/next/dispose`, `ChannelClosed extends Error`.
+
+## En la std (`std/task/`)
+
+Escrito en Varn sobre `runtime:task`: `spawn`, `sleep`, `parallel`, `cancel`,
+`delay`, `setTimeout`/`clearTimeout` y el namespace `Task` (`combinators.vn`);
+`TaskGroup<T>` con `spawn/join/cancel` (`group.vn`); `Mutex`, `Semaphore`,
+`WaitGroup`, `RateLimiter` (`sync.vn`); `Cron` (`cron.vn`).
+
+## AOT (`varn-rt`)
+
+Runtime mínimo para `vn build --native`: `main` → `_varn_main`, `varn_rt_print`,
+`varn_rt_str_concat`, `varn_rt_panic`. Sin scheduler, canales ni GC.

@@ -1,59 +1,69 @@
 # Sistema de módulos
 
-Fuentes en `crates/varn-modules/src/`, `crates/varn-resolver/src/graph.rs`, `crates/varn-sem/src/resolver.rs`. Código manda.
+Fuentes: `crates/varn-modules/src/`, `crates/varn-cli/src/std_source.rs`,
+`crates/varn-builtins/src/provider_impl.rs`, `crates/varn-resolver/src/graph.rs`,
+`crates/varn-sem/src/resolver.rs`. Código manda.
 
-## Provenance (`loader.rs:9-17`)
+## Identidades
 
-```rust
-pub enum Provenance { Memory, File(PathBuf), Bundle, Native }
-```
+`ModuleId` (`varn-core/src/module_id.rs`): `Local(path)`, `Package { .. }`, `Std(spec)`, `Core(spec)`,
+`Runtime(spec)`. Los especificadores `std:x`, `core:x` y `runtime:x` nunca tocan el
+disco del usuario: los sirve el proveedor de la std. Un solo resolvedor de
+especificadores (`resolver.rs`) normaliza rutas relativas y esquemas.
 
-- `Memory`: `MemoryLoader` (`loader.rs:258-288`), mapa en memoria; gana al filesystem en registry.
-- `File(PathBuf)`: `FilesystemLoader` solo `ModuleId::Local` (`loader.rs:234-256`); `ProviderLoader` lee `source_path(spec)` a `File(path)` (`loader.rs:143-158`).
-- `Bundle`: `ProviderLoader` sirve `embedded_source` o `bundled_source` como `Bundle` (`loader.rs:134-141`).
-- `Native`: variante declarada; sin constructor en `loader.rs`.
-
-`ModuleLoader::resolve` default va por `crate::resolver::ModuleResolver` (`loader.rs:94-105`). `ModuleRegistry` prueba backends en orden, salta `NotFound` (`loader.rs:201-230`). `default_registry`: `FilesystemLoader + ProviderLoader` (`loader.rs:163-167`).
-
-## Bundle `.vnb` (`bundle.rs:22-34`)
+## Carga de fuente (`loader.rs`)
 
 ```rust
-pub fn write_bundle(bundle: &StdBundle) -> Vec<u8>   // postcard + write_artifact(StdBundle, Distributable)
-pub fn read_bundle(bytes: &[u8]) -> Result<StdBundle, String>  // read_artifact + postcard::from_bytes
-```
-
-`StdBundle { std_version, host_api_version: u32, modules: Vec<BundleModule> }`; `BundleModule { id, pure, interface, bytecode, source }` (`bundle.rs:6-20`). Compat: `validate_compat_with` compara `host_api_version` (`bundle.rs:37-47`).
-
-## Raíz std (`std_root.rs:5-8`)
-
-```rust
-pub const STD_BUNDLE_FILE: &str = "std.vnb";
-pub const STD_EMBEDDED_SENTINEL: &str = "@embedded";
-```
-
-`ENV_VARN_STD="VARN_STD"`, `STD_MANIFEST_FILE="std.json"`, `STD_DIR_NAME="std"` (`std_root.rs:3-6`). Resolución (`std_root.rs:62-87`): override proyecto → `VARN_STD=@embedded` = Embedded/Env → `classify(path)` = SourceTree/Env → dev-checkout (exe → ancestros + `std/`) → Embedded.
-
-## Artefactos commiteados
-
-`git ls-files "*.vnb"`: 0 ficheros. Ningún `.vnb` en repo.
-
-## ModuleGraph (`crates/varn-resolver/src/graph.rs:27-55`)
-
-Caché en memoria: `binds: FxHashMap<String, Arc<BindResult>>`, `exports: FxHashMap<String, Arc<ExportMap>>`, además `programs`, `arenas`, `resolved_paths`, `reverse_deps` (`graph.rs:8-20`).
-
-- `bind` / `insert_bind` (`graph.rs:27-33`), `exports` / `insert_exports` (`graph.rs:35-41`), `program` / `insert_program` (43-49), `arena` / `insert_arena` (51-57).
-- `invalidate` por `reverse_deps`, `evict_heavy`, `clear` (`graph.rs:83-133`).
-
-Tipos `BindResult` / `ExportMap` vienen de `varn_sem::bind` / `varn_sem::exports` (`graph.rs:5-6`).
-
-## ImportResolver (`crates/varn-sem/src/resolver.rs:6-9`)
-
-```rust
-pub trait ImportResolver {
-    fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>>;
-    fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Arc<ExportMap>;
-    ...
+pub trait ModuleLoader: Send + Sync {
+    fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, LoadError>; // por defecto: resolver::resolve
+    fn source(&self, id: &ModuleId) -> Result<ModuleSource, LoadError>;
 }
 ```
 
-Resto del trait (`resolver.rs:11-60`): `stdlib_bind`, `stdlib_exports`, `resolve_specifier`, `record_dep`, `core_exports`, `evict_heavy`, `graph_stats`, `core_members`, `find_bind_for_type` (default), `stdlib_specs`, `find_stdlib_bind` (default).
+- `FilesystemLoader`: solo `ModuleId::Local`.
+- `ProviderLoader`: `std:`/`core:`/`runtime:` vía el `StdlibProvider` registrado (`provider.rs`). Si el proveedor tiene el módulo en la imagen, devuelve fuente + interfaz + bytecode (`Provenance::Bundle`); si solo conoce una ruta, la lee (`Provenance::File`).
+- `MemoryLoader`: mapa en memoria (LSP, tests).
+- `ModuleRegistry`: prueba backends en orden y salta `NotFound`. `default_registry()` = `FilesystemLoader` + `ProviderLoader`.
+
+`Provenance { Memory, File(PathBuf), Bundle, Native }`.
+
+## La std es siempre una imagen
+
+`std` y los módulos `core:` se consumen siempre desde una imagen `std.vnb`
+(`std_image.rs`): cabecera + tabla de módulos (`id`, `path`, `pure`, `interface`,
+`bytecode`, `source`) indexada sin copiar. `StdImage::parse` valida el sobre del
+artefacto; `write_image` la produce (`vn std-bundle`).
+
+Resolución de la raíz (`std_root.rs::resolve`, una vez por proceso):
+
+1. clave `std` del manifiesto del proyecto (`ProjectOverride`);
+2. `VARN_STD` = ruta a un árbol fuente, o `@embedded` (`Env`);
+3. un `std/` en un ancestro del ejecutable (`DevCheckout`);
+4. imagen embebida (`Embedded`).
+
+Qué imagen se usa (`varn-cli/src/std_source.rs::select`):
+
+- **Árbol fuente** (override, `VARN_STD=<ruta>` o dev-checkout): `vn` construye la imagen en `<cache>/std/std.<huella>.vnb` lanzando `vn std-bundle` como proceso hijo. La huella cubre el binario y ruta/tamaño/mtime de cada módulo, así que cambiar `std/` o recompilar `vn` la regenera. Un error de tipos en `std/` aparece en la primera corrida, no en `cargo check`.
+- **Embebida**: con la feature `embed-std`, `dist/std.vnb` va dentro del binario; si no, se lee de `VARN_STD_BUNDLE`.
+
+El checker lee las interfaces de std/core directamente de la imagen; no recompila la std.
+
+## Grafo y caché de interfaces
+
+`ModuleGraph` (`varn-resolver/src/graph.rs`): caché en memoria por ruta de
+`BindResult`, `ExportMap`, `Program`, `AstArena`, rutas resueltas y dependencias
+inversas (`invalidate` por `reverse_deps`, `evict_heavy`, `clear`).
+
+`ImportResolver` (`varn-sem/src/resolver.rs`) es lo que ve el checker:
+`module_bind`, `module_exports`, `stdlib_bind`, `stdlib_exports`,
+`resolve_specifier`, `record_dep`, `core_exports`, `core_members`, `evict_heavy`,
+`graph_stats`, `find_bind_for_type`, `stdlib_specs`, `find_stdlib_bind`.
+
+Los artefactos en disco (grafo compilado, interfaces) usan el sobre de
+`artifact.rs` y viven en la caché global (`~/.vn/cache`, `VARN_HOME`,
+`VARN_CACHE_DIR`). Ningún `.vnb` está versionado en el repo (`dist/` se ignora).
+
+## Módulos nativos
+
+`runtime:*` y la parte nativa de `core:*` tienen un contrato `.vn` y una
+implementación Rust en `varn-builtins`. Ver [`LBI_ARCHITECTURE.md`](LBI_ARCHITECTURE.md).

@@ -2,12 +2,12 @@
 
 ## `varn-lsp` — `crates/varn-lsp/src/`
 
-10 dirs: `analysis, backend, db, document, features, index, pipeline, query, util, workspace`.
+Directorios: `analysis, backend, db, document, features, index, pipeline, query, util, workspace` (+ `constants.rs`).
 
-- `backend/`: `capabilities, lifecycle, settings, progress, sync/`, handlers vía `Backend::query`.
+- `backend/`: `capabilities, lifecycle, settings, progress, state, protocol, edit, insight, navigate, mem, sync/`.
 - `analysis/`: hilo dedicado dueño del `Workspace`; peticiones como closures `FnOnce(&mut Analyzer)->R, R: Send`.
 - `features/`: `hover, completion, definition, references, rename, diagnostics, semantic_tokens, inlay_hints, folding, formatting, symbols`, etc.
-- `document/position.rs`: único mapeo UTF-16; sync incremental (`INCREMENTAL`).
+- `document/position.rs`: único mapeo UTF-16; sync incremental (`TextDocumentSyncKind::Incremental`).
 - `pipeline/`: lex+parse+check por archivo; invalidación dirigida (editado + importadores transitivos).
 
 ## `varn-dap` — `crates/varn-dap/src/`
@@ -20,6 +20,6 @@
 
 ## CLI (`crates/varn-cli/src/cli.rs`)
 
-- `Lsp(LspArgs)` (`cli.rs:46`): `--port/-p`, `--tcp`, `--stdio` (`cli.rs:173-189`). Ejecución en `commands/lsp.rs`: port→`run_server_tcp(127.0.0.1:port)`, tcp→`run_server_tcp(tcp)`, defecto stdio.
-- `Dap` (`cli.rs:50`): variante unitaria, sin args. Ejecución `commands/dap.rs`: `adapter::run_stdio()`.
-- `Pkg(PkgCommands)` (`cli.rs:36-37`): 7 subcmds (`cli.rs:221-235`): `Add, Remove, Install, Update, Tree, Doctor, Clean`.
+- `Lsp(LspArgs)` (`cli.rs`): `--port/-p`, `--tcp`, `--stdio` (`cli.rs`). Ejecución en `commands/lsp.rs`: port→`run_server_tcp(127.0.0.1:port)`, tcp→`run_server_tcp(tcp)`, defecto stdio.
+- `Dap` (`cli.rs`): variante unitaria, sin args. Ejecución `commands/dap.rs`: `adapter::run_stdio()`.
+- `Pkg(PkgCommands)` (`cli.rs`): 7 subcmds (`cli.rs`): `Add, Remove, Install, Update, Tree, Doctor, Clean`.

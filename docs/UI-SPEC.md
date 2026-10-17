@@ -3,6 +3,15 @@
 Version: 1.0-draft
 Module: `std:ui`
 
+> **Estado de implementación (2026-10-17, verificado en `std/ui/`).**
+> Hecho, en Varn sobre `runtime:ui`: señales `signal`, `computed`, `effect`,
+> `batch`, `untracked` (`signal.vn`); decoradores `component` y `memo`
+> (`component.vn`); `VNode` y el catálogo de primitivas de §8–§10 más
+> `container`, `animated`, `when`, `each` (`catalog.vn`); estilos y temas (`style.vn`).
+> Puerta: `tests/220-ui-declarative.vn`.
+> Pendiente: el decorador `pure` (§12) y la UI IR y su pipeline de compilación
+> (§16–§17); hoy el árbol se construye y se resuelve en tiempo de ejecución.
+
 ## 1. Objetivo
 
 Definir una API declarativa para construir interfaces gráficas nativas en Varn, con composición funcional, estado reactivo, argumentos nombrados, decoradores y renderizado incremental.

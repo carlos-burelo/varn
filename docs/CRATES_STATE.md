@@ -141,7 +141,7 @@ Sin conteos de líneas: viven en el código (`find crates -name "*.rs" | xargs w
 
 | Crate | Dominio |
 |---|---|
-| `varn-core` | AST, opcodes, tokens, diagnósticos, term, `TypeTag` |
+| `varn-core` | AST, opcodes, tokens, diagnósticos, ids de módulo y de op, huellas, `RuntimeKind` |
 | `varn-lexer` | Frontend: tokenización |
 | `varn-parser` | Frontend: parser |
 | `varn-checker` | Frontend: chequeo (sobre `varn-sem` + `varn-binder`) |
@@ -176,13 +176,13 @@ Sin conteos de líneas: viven en el código (`find crates -name "*.rs" | xargs w
 ## 3. Descripción por Dominio Funcional
 
 ### Frontend e IR Intermedio (`varn-lexer`, `varn-parser`, `varn-checker`, `varn-tir`)
-Tokenización con ASI, parser descendente con precedencia Pratt, y type-checker multi-fase que emite un `TirProgram` (`varn-tir`) con tipos y resoluciones canónicas en cada nodo.
+Tokenización (punto y coma opcional), parser descendente con precedencia por niveles, y type-checker que produce un `CheckResult`; `varn-emit` lo baja a un `TirModule` (`varn-tir`) con tipos y resoluciones canónicas en cada nodo.
 
 ### Compilador (`varn-compiler`)
-Baja `TirProgram` vía `from_tir` → SSA → bytecode, ejecuta pases de inlining de leaf functions, DCE, phis triviales, desazucarado canónico de bucles, LICM, CSE, e integra el análisis y reasignación de registros (`regalloc`).
+Baja `TirModule` vía `from_tir` → SSA → bytecode, con pases a punto fijo (const-fold, guardas redundantes, monomorfización, álgebra, CSE, campos fijos, escape, LICM, DCE, simplificación de CFG), transformación a máquina de estados para async/generadores y regalloc. Ver `COMPILER_ARCHITECTURE.md`.
 
 ### Ejecución (`varn-vm`, `varn-jit`)
-VM de registros de 128 bits (`VmValue` con tag + payload de 64 bits, nativo `i64`/`f64` y SSO hasta 8 bytes), GC generacional no copiante (generación joven `born` + marcas pegajosas en old-gen), optimizaciones COW para mapas vacíos e inline caches. El JIT compila eager con Cranelift (x86-64 y ARM64) y comparte la tabla de helpers con la ruta de inspección `vn debug -p clif`.
+VM de registros de 128 bits (`VmValue` con tag + payload de 64 bits, nativo `i64`/`f64` y SSO hasta 8 bytes), GC generacional no copiante (generación joven `born` + marcas pegajosas en old-gen) e inline caches. El JIT (Cranelift, x86-64 y ARM64) entra por tiering: umbral 1 llamada si la función tiene bucle, 128 si no, y OSR a los 1000 back-edges; comparte la tabla de helpers con `vn debug -p clif`.
 
 ### Runtime (`varn-rt`)
 `varn-rt` proporciona el runtime nativo mínimo para compilación AOT estática. No existe `varn-runtime` como crate.
