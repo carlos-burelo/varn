@@ -2,7 +2,7 @@
 
 ## No existe `varn-runtime`
 
-`Cargo.toml:3-29` lista 27 miembros workspace; ninguno es `varn-runtime`. Cero hits a `varn-runtime|varn_runtime` en manifests. Miembros incluyen `crates/varn-rt`, `crates/varn-vm`, `crates/varn-builtins`.
+`Cargo.toml` lista 29 miembros workspace (28 crates + `xtask`); ninguno es `varn-runtime`. Cero hits a `varn-runtime|varn_runtime` en manifests. Miembros incluyen `crates/varn-rt`, `crates/varn-vm`, `crates/varn-builtins`.
 
 ## Runtime real
 
