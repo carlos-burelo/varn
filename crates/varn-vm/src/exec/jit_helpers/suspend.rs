@@ -49,7 +49,8 @@ pub(crate) extern "C" fn jit_await_call(
     total: usize,
     dest_reg: u32,
     resume_ip: usize,
-) {
+    out: *mut usize,
+) -> usize {
     unsafe {
         let ctx_ref = &mut *ctx;
         let window = std::slice::from_raw_parts(window, total);
@@ -57,8 +58,28 @@ pub(crate) extern "C" fn jit_await_call(
         ctx_ref.frames[caller_depth - 1].ip = resume_ip;
         let dest = dest_reg as u16;
         let step = ctx_ref.await_call(window[0], window, dest);
+        if let Ok(AwaitStep::Entered) = step
+            && let Some(entry) = mounted_entry(ctx_ref, caller_depth)
+        {
+            let top = &ctx_ref.frames[caller_depth];
+            out.write(top.closure_ptr as usize);
+            out.add(1).write(top.base);
+            return entry;
+        }
         settle_await(ctx_ref, step, caller_depth, dest, resume_ip);
+        0
     }
+}
+
+fn mounted_entry(ctx: &ExecCtx, caller_depth: usize) -> Option<usize> {
+    if ctx.frames.len() != caller_depth + 1 {
+        return None;
+    }
+    let closure = ctx.frames[caller_depth].closure();
+    if closure.proto.resumes_in_interpreter() {
+        return None;
+    }
+    closure.jit_fn().map(|f| f as usize)
 }
 
 unsafe fn settle_await(

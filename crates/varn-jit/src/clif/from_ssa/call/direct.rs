@@ -45,7 +45,7 @@ pub(crate) fn run_entered_or(
     Ok(b.block_params(merge)[0])
 }
 
-fn run_entered(
+pub(crate) fn run_entered(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
     entry: Value,

@@ -27,7 +27,23 @@ pub(super) fn await_(
             let callee_v = load_value(b, ctx, values, *callee)?;
             let window = super::super::call::boxed_window(b, ctx, values, callee_v, args)?;
             let total = b.ins().iconst(types::I64, (args.len() + 1) as i64);
-            call_helper_void(b, ctx.cc, h.await_call, &[ectx, window, total, dv, rv]);
+            let out = super::super::call::entry_out_slot(b);
+            let entry = call_helper(b, ctx.cc, h.await_call, &[ectx, window, total, dv, rv, out]);
+            let entered = b.create_block();
+            let declined = b.create_block();
+            let merge = b.create_block();
+            let taken =
+                b.ins()
+                    .icmp_imm_u(cranelift_codegen::ir::condcodes::IntCC::NotEqual, entry, 0);
+            b.ins().brif(taken, entered, &[], declined, &[]);
+            b.switch_to_block(entered);
+            let result = super::super::call::run_entered(b, ctx, entry, out)?;
+            super::super::store::drop_home_addrs(ctx);
+            home_store(b, ctx, ctx.ssa.reg(d), result)?;
+            b.ins().jump(merge, &[]);
+            b.switch_to_block(declined);
+            b.ins().jump(merge, &[]);
+            b.switch_to_block(merge);
         }
         None => {
             let v = boxed_value(b, ctx, values, operand)?;

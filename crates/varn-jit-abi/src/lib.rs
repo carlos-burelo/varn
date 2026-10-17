@@ -1,6 +1,6 @@
 use varn_types::{NativeOpTarget, VmValue};
 
-pub const JIT_HELPERS_VERSION: u32 = 7;
+pub const JIT_HELPERS_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
