@@ -19,7 +19,7 @@ pub use ids::{
 };
 pub use package::{
     canonical_or_original, is_pkg_specifier, normalize_path_string, resolve_pkg_specifier,
-    resolve_pkg_specifier_detailed, resolve_specifier_path, PackageManifest, PackageResolution,
+    resolve_pkg_specifier_detailed, PackageManifest, PackageResolution,
 };
 pub use registry::{
     core_module_ids, is_known_stdlib_module, is_prelude_module, prelude_modules, std_module_ids,

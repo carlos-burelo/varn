@@ -146,18 +146,11 @@ fn summary_to_symbol_kind(
 }
 
 fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) -> Option<String> {
-    let from = match doc_dir {
-        Some(dir) => varn_core::ModuleId::local(dir.join("__doc__.vn")),
-        None => varn_core::ModuleId::local_str("__doc__.vn"),
-    };
-    let id = varn_modules::resolver::ModuleResolver::new()
-        .resolve(specifier, &from)
-        .ok()?;
-    match id {
-        varn_core::ModuleId::Local(path) => {
-            let canonical = std::fs::canonicalize(path.as_ref()).ok()?;
-            Some(path_to_uri(&canonical.to_string_lossy()))
-        }
+    let base = doc_dir.unwrap_or(std::path::Path::new("."));
+    match varn_modules::resolver::resolve_in(specifier, base).ok()? {
+        varn_core::ModuleId::Local(path) => std::path::Path::new(path.as_ref())
+            .exists()
+            .then(|| path_to_uri(path.as_ref())),
         varn_core::ModuleId::Std(s)
         | varn_core::ModuleId::Core(s)
         | varn_core::ModuleId::Runtime(s) => {

@@ -133,7 +133,14 @@ impl ImportResolver for DiskResolver {
         if let Some(hit) = self.cached_path(&base_str, specifier) {
             return Some(hit);
         }
-        let resolved = varn_modules::resolver::resolve_specifier_path(base_dir, specifier)?;
+        let resolved = match varn_modules::resolver::resolve_in(specifier, base_dir).ok()? {
+            ModuleId::Local(p) if Path::new(p.as_ref()).exists() => p.to_string(),
+            ModuleId::Local(_)
+            | ModuleId::Core(_)
+            | ModuleId::Std(_)
+            | ModuleId::Runtime(_)
+            | ModuleId::Package { .. } => return None,
+        };
         self.store_path(base_str, specifier.to_owned(), resolved.clone());
         Some(resolved)
     }

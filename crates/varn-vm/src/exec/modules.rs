@@ -12,9 +12,7 @@ pub(crate) fn resolve_specifier_to_id(specifier: &str, from: &ModuleId) -> VmRes
             "E_LAYER: '{specifier}' is a host module reserved for the standard library"
         )));
     }
-    varn_modules::resolver::ModuleResolver::new()
-        .resolve(specifier, from)
-        .map_err(RuntimeError::new)
+    varn_modules::resolver::resolve(specifier, from).map_err(RuntimeError::new)
 }
 
 pub(crate) fn resolve_specifier_from_path(

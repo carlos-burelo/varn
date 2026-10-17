@@ -1,75 +1,50 @@
 pub use super::uri::{path_to_uri, percent_decode, uri_to_path};
 pub use super::{
     canonical_or_original, is_pkg_specifier, normalize_path_string, resolve_pkg_specifier,
-    resolve_pkg_specifier_detailed, resolve_specifier_path,
+    resolve_pkg_specifier_detailed,
 };
 
 use super::contain::check_within_root;
 use std::path::{Component, Path, PathBuf};
 use varn_core::ModuleId;
 
-pub struct ModuleResolver;
+pub fn resolve(spec: &str, referrer: &ModuleId) -> Result<ModuleId, String> {
+    resolve_in(spec, &referrer_dir(referrer))
+}
 
-impl Default for ModuleResolver {
-    fn default() -> Self {
-        Self
+pub fn referrer_dir(referrer: &ModuleId) -> PathBuf {
+    match referrer {
+        ModuleId::Local(s) => PathBuf::from(s.as_ref())
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_path_buf(),
+        ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_) | ModuleId::Package { .. } => {
+            PathBuf::from(".")
+        }
     }
 }
 
-impl ModuleResolver {
-    pub fn new() -> Self {
-        Self
-    }
-
-    pub fn resolve(&self, spec: &str, referrer: &ModuleId) -> Result<ModuleId, String> {
-        use varn_core::ImportSpecifier;
-        match ImportSpecifier::parse(spec) {
-            ImportSpecifier::Stdlib(s) => Ok(ModuleId::Std(s)),
-            ImportSpecifier::Core(s) => Ok(ModuleId::Core(s)),
-            ImportSpecifier::Runtime(s) => Ok(ModuleId::Runtime(s)),
-            ImportSpecifier::Relative(rel) => {
-                let joined = if rel.is_absolute() {
-                    rel
-                } else {
-                    let base = match referrer {
-                        ModuleId::Local(s) => PathBuf::from(s.as_ref()),
-                        ModuleId::Core(_)
-                        | ModuleId::Std(_)
-                        | ModuleId::Runtime(_)
-                        | ModuleId::Package { .. } => PathBuf::from("."),
-                    };
-                    let base_dir = base.parent().unwrap_or(Path::new("."));
-                    base_dir.join(&rel)
-                };
-                let normalized = normalize_components(&joined);
-                let path_str = normalize_path_string(normalized.to_string_lossy().into_owned());
-                let base_dir = match referrer {
-                    ModuleId::Local(s) => PathBuf::from(s.as_ref())
-                        .parent()
-                        .unwrap_or(Path::new("."))
-                        .to_path_buf(),
-                    ModuleId::Core(_)
-                    | ModuleId::Std(_)
-                    | ModuleId::Runtime(_)
-                    | ModuleId::Package { .. } => PathBuf::from("."),
-                };
-                check_within_root(&base_dir, &path_str)?;
-                Ok(ModuleId::local_str(&path_str))
-            }
-            ImportSpecifier::Package(s) => {
-                let base = match referrer {
-                    ModuleId::Local(s) => PathBuf::from(s.as_ref()),
-                    ModuleId::Core(_)
-                    | ModuleId::Std(_)
-                    | ModuleId::Runtime(_)
-                    | ModuleId::Package { .. } => PathBuf::from("."),
-                };
-                let base_dir = base.parent().unwrap_or(Path::new("."));
-                super::resolve_pkg_specifier(base_dir, s.as_ref())
-                    .map(|p| ModuleId::local_str(&p))
-                    .ok_or_else(|| format!("cannot resolve package '{spec}'"))
-            }
+pub fn resolve_in(spec: &str, base_dir: &Path) -> Result<ModuleId, String> {
+    use varn_core::ImportSpecifier;
+    match ImportSpecifier::parse(spec) {
+        ImportSpecifier::Stdlib(s) => Ok(ModuleId::Std(s)),
+        ImportSpecifier::Core(s) => Ok(ModuleId::Core(s)),
+        ImportSpecifier::Runtime(s) => Ok(ModuleId::Runtime(s)),
+        ImportSpecifier::Relative(rel) => {
+            let joined = if rel.is_absolute() {
+                rel
+            } else {
+                base_dir.join(&rel)
+            };
+            let lexical =
+                normalize_path_string(normalize_components(&joined).to_string_lossy().into_owned());
+            let canonical = canonical_or_original(Path::new(&lexical));
+            check_within_root(base_dir, &canonical)?;
+            Ok(ModuleId::local_str(&canonical))
         }
+        ImportSpecifier::Package(s) => super::resolve_pkg_specifier(base_dir, s.as_ref())
+            .map(|p| ModuleId::local_str(&canonical_or_original(Path::new(&p))))
+            .ok_or_else(|| format!("cannot resolve package '{spec}'")),
     }
 }
 

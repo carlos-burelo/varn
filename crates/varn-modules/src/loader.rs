@@ -83,12 +83,10 @@ impl std::error::Error for LoadError {}
 
 pub trait ModuleLoader: Send + Sync {
     fn resolve(&self, specifier: &str, from: &ModuleId) -> Result<ModuleId, LoadError> {
-        crate::resolver::ModuleResolver::new()
-            .resolve(specifier, from)
-            .map_err(|message| LoadError::Resolve {
-                specifier: specifier.to_owned(),
-                message,
-            })
+        crate::resolver::resolve(specifier, from).map_err(|message| LoadError::Resolve {
+            specifier: specifier.to_owned(),
+            message,
+        })
     }
 
     fn source(&self, id: &ModuleId) -> Result<ModuleSource, LoadError>;

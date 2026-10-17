@@ -304,12 +304,15 @@ pub fn resolve_import_specifier(
 
         ImportSpecifier::Runtime(_) => Ok(Some(specifier.to_owned())),
         ImportSpecifier::Relative(_) => {
-            match varn_modules::resolver::resolve_specifier_path(module_dir, specifier) {
-                None => Ok(None),
-                Some(resolved) => {
-                    varn_modules::contain::check_within_root(module_dir, &resolved)?;
-                    Ok(Some(resolved))
+            match varn_modules::resolver::resolve_in(specifier, module_dir)? {
+                varn_core::ModuleId::Local(p) if Path::new(p.as_ref()).exists() => {
+                    Ok(Some(p.to_string()))
                 }
+                varn_core::ModuleId::Local(_)
+                | varn_core::ModuleId::Core(_)
+                | varn_core::ModuleId::Std(_)
+                | varn_core::ModuleId::Runtime(_)
+                | varn_core::ModuleId::Package { .. } => Ok(None),
             }
         }
         ImportSpecifier::Package(_) => {

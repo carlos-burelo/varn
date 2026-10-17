@@ -378,8 +378,3 @@ pub fn canonical_or_original(path: &Path) -> String {
     }
     normalize_path_string(path.to_string_lossy().into_owned())
 }
-
-pub fn resolve_specifier_path(base_dir: &Path, specifier: &str) -> Option<String> {
-    let target = base_dir.join(specifier);
-    resolve_path_candidates(&target)
-}
