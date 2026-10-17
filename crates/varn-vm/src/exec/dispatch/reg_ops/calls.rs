@@ -276,88 +276,86 @@ impl ExecCtx {
             None => VmValue::null(),
         };
 
-        if !closure_ref.proto.is_generator && !closure_ref.proto.is_async {
-            let arity = closure_ref.proto.arity;
+        let arity = closure_ref.proto.arity;
 
-            if !closure_ref.proto.has_rest && arg_count <= arity {
-                if self.hotspot_counters.is_some() {
-                    let fn_name = closure_ref.proto.name.as_deref().unwrap_or("<anon>");
-                    let is_jit = closure_ref.jit_fn().is_some();
-                    self.record_hotspot_fn(fn_name, is_jit);
+        if !closure_ref.proto.has_rest && arg_count <= arity {
+            if self.hotspot_counters.is_some() {
+                let fn_name = closure_ref.proto.name.as_deref().unwrap_or("<anon>");
+                let is_jit = closure_ref.jit_fn().is_some();
+                self.record_hotspot_fn(fn_name, is_jit);
+            }
+            if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                return Err(crate::error::RuntimeError::new(
+                    "stack overflow: call depth exceeded 10000",
+                ));
+            }
+            let owned = self.frames[frame_idx]._owned_closure.clone();
+            let alloc = self.push_call_frame(&closure_ref.proto, base, arg_start, arg_count)?;
+            let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
+            frame._owned_closure = owned;
+            frame.return_reg = dest as u16;
+            self.record_call_vm_fast();
+            self.frames.push(frame);
+            return Ok(true);
+        } else if closure_ref.proto.has_rest && arg_count <= arity {
+            let fn_name2 = closure_ref
+                .proto
+                .name
+                .as_deref()
+                .unwrap_or("<anon>")
+                .to_owned();
+            let is_jit2 = closure_ref.jit_fn().is_some();
+            self.record_hotspot_fn(&fn_name2, is_jit2);
+            if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                return Err(crate::error::RuntimeError::new(
+                    "stack overflow: call depth exceeded 10000",
+                ));
+            }
+            let owned = self.frames[frame_idx]._owned_closure.clone();
+            let alloc = self.stack.push_frame(&closure_ref.proto);
+            let rest_idx = arity.saturating_sub(1);
+            let regular_count = arg_count.min(rest_idx);
+            let mut failed: Option<crate::error::RuntimeError> = None;
+            for i in 0..regular_count {
+                if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i) {
+                    failed = Some(e);
+                    break;
                 }
-                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
-                    return Err(crate::error::RuntimeError::new(
-                        "stack overflow: call depth exceeded 10000",
-                    ));
-                }
-                let owned = self.frames[frame_idx]._owned_closure.clone();
-                let alloc = self.push_call_frame(&closure_ref.proto, base, arg_start, arg_count)?;
-                let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
-                frame._owned_closure = owned;
-                frame.return_reg = dest as u16;
-                self.record_call_vm_fast();
-                self.frames.push(frame);
-                return Ok(true);
-            } else if closure_ref.proto.has_rest && arg_count <= arity {
-                let fn_name2 = closure_ref
-                    .proto
-                    .name
-                    .as_deref()
-                    .unwrap_or("<anon>")
-                    .to_owned();
-                let is_jit2 = closure_ref.jit_fn().is_some();
-                self.record_hotspot_fn(&fn_name2, is_jit2);
-                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
-                    return Err(crate::error::RuntimeError::new(
-                        "stack overflow: call depth exceeded 10000",
-                    ));
-                }
-                let owned = self.frames[frame_idx]._owned_closure.clone();
-                let alloc = self.stack.push_frame(&closure_ref.proto);
-                let rest_idx = arity.saturating_sub(1);
-                let regular_count = arg_count.min(rest_idx);
-                let mut failed: Option<crate::error::RuntimeError> = None;
-                for i in 0..regular_count {
-                    if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i) {
+            }
+            if failed.is_none() {
+                for i in regular_count..rest_idx {
+                    if let Err(e) = self.stack.unbox_into_reg(alloc, i, VmValue::null()) {
                         failed = Some(e);
                         break;
                     }
                 }
-                if failed.is_none() {
-                    for i in regular_count..rest_idx {
-                        if let Err(e) = self.stack.unbox_into_reg(alloc, i, VmValue::null()) {
-                            failed = Some(e);
-                            break;
-                        }
-                    }
-                }
-                if failed.is_none() {
-                    let rest_items: Vec<VmValue> = if arg_count > rest_idx {
-                        (rest_idx..arg_count)
-                            .map(|i| self.stack.box_reg(base, arg_start + i))
-                            .collect()
-                    } else {
-                        vec![]
-                    };
-                    let rest_nv = self.heap.alloc_array_repr(
-                        false,
-                        varn_types::vm_value::ArrayRepr::boxed(rest_items),
-                    );
-                    if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv) {
-                        failed = Some(e);
-                    }
-                }
-                if let Some(e) = failed {
-                    self.stack.pop_frame();
-                    return Err(e);
-                }
-                let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
-                frame._owned_closure = owned;
-                frame.return_reg = dest as u16;
-                self.record_call_vm_fast();
-                self.frames.push(frame);
-                return Ok(true);
             }
+            if failed.is_none() {
+                let rest_items: Vec<VmValue> = if arg_count > rest_idx {
+                    (rest_idx..arg_count)
+                        .map(|i| self.stack.box_reg(base, arg_start + i))
+                        .collect()
+                } else {
+                    vec![]
+                };
+                let rest_nv = self.heap.alloc_array_repr(
+                    false,
+                    varn_types::vm_value::ArrayRepr::boxed(rest_items),
+                );
+                if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv) {
+                    failed = Some(e);
+                }
+            }
+            if let Some(e) = failed {
+                self.stack.pop_frame();
+                return Err(e);
+            }
+            let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
+            frame._owned_closure = owned;
+            frame.return_reg = dest as u16;
+            self.record_call_vm_fast();
+            self.frames.push(frame);
+            return Ok(true);
         }
 
         self.stage.clear();

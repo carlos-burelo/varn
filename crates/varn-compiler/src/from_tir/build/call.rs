@@ -47,8 +47,13 @@ impl<'m> Builder<'m> {
         let Some(f) = self.self_fn else {
             return Ok(None);
         };
-        let declared = self.tir.function(f).map_or(0, |tf| tf.params.len());
-        if args.len() != declared
+        let Some(tf) = self.tir.function(f) else {
+            return Ok(None);
+        };
+        let declared = tf.params.len();
+        if tf.is_async
+            || tf.is_generator
+            || args.len() != declared
             || args
                 .iter()
                 .any(|a| matches!(a, varn_tir::TirArg::Spread(_)))

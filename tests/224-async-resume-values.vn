@@ -27,4 +27,7 @@ await describe("224 async resume values", async () => {
         expect(await scaled(10)).toBe(1024)
     })
 
+    await it("deep async recursion completes", async () => {
+        expect(await countDown(500)).toBe(500)
+    })
 })
