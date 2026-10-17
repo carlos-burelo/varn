@@ -143,14 +143,22 @@ impl StdlibProvider for BuiltinsProvider {
         }
     }
 
-    fn embedded_source(&self, specifier: &str) -> Option<&'static str> {
-        if specifier.starts_with("std:") {
+    fn module(&self, specifier: &str) -> Option<varn_modules::provider::ProvidedModule> {
+        if let Some(m) = std_module(specifier) {
+            return Some(varn_modules::provider::ProvidedModule {
+                source: m.source,
+                interface: Some(m.interface).filter(|b| !b.is_empty()),
+                bytecode: Some(m.bytecode),
+            });
+        }
+        if specifier.starts_with("std:") || std_spec(specifier).is_some() {
             return None;
         }
-        if std_spec(specifier).is_some() {
-            return None;
-        }
-        spec_for(specifier)?.source()
+        Some(varn_modules::provider::ProvidedModule {
+            source: spec_for(specifier)?.source()?,
+            interface: None,
+            bytecode: None,
+        })
     }
 
     fn source_path(&self, specifier: &str) -> Option<PathBuf> {
@@ -165,18 +173,6 @@ impl StdlibProvider for BuiltinsProvider {
 
     fn all_specs(&self) -> &'static [ModuleSpec] {
         combined_specs()
-    }
-
-    fn interface_blob(&self, specifier: &str) -> Option<&'static [u8]> {
-        Some(std_module(specifier)?.interface).filter(|b| !b.is_empty())
-    }
-
-    fn bundled_source(&self, specifier: &str) -> Option<&'static str> {
-        Some(std_module(specifier)?.source)
-    }
-
-    fn bytecode_blob(&self, specifier: &str) -> Option<&'static [u8]> {
-        Some(std_module(specifier)?.bytecode)
     }
 
     fn std_provenance(&self) -> Option<(String, StdProvenance)> {

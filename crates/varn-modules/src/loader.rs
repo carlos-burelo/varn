@@ -112,16 +112,10 @@ impl ModuleLoader for ProviderLoader {
             return Err(LoadError::NotFound { id: id.clone() });
         };
 
-        let interface = provider.interface_blob(spec);
-        let bytecode = provider.bytecode_blob(spec);
-
-        if let Some(text) = provider
-            .embedded_source(spec)
-            .or_else(|| provider.bundled_source(spec))
-        {
-            let mut src = ModuleSource::from_text(id.clone(), text, Provenance::Bundle);
-            src.interface = interface;
-            src.bytecode = bytecode;
+        if let Some(m) = provider.module(spec) {
+            let mut src = ModuleSource::from_text(id.clone(), m.source, Provenance::Bundle);
+            src.interface = m.interface;
+            src.bytecode = m.bytecode;
             return Ok(src);
         }
         if let Some(path) = provider.source_path(spec) {
@@ -135,10 +129,11 @@ impl ModuleLoader for ProviderLoader {
                     }
                 }
             })?;
-            let mut src = ModuleSource::from_text(id.clone(), text, Provenance::File(path));
-            src.interface = interface;
-            src.bytecode = bytecode;
-            return Ok(src);
+            return Ok(ModuleSource::from_text(
+                id.clone(),
+                text,
+                Provenance::File(path),
+            ));
         }
         Err(LoadError::NotFound { id: id.clone() })
     }

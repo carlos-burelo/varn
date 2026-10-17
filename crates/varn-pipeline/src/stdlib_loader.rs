@@ -183,7 +183,8 @@ fn core_units() -> Result<Vec<ImageUnit>, String> {
                 .spec_for(id)
                 .ok_or_else(|| format!("core module without spec: {id}"))?;
             let source = provider
-                .embedded_source(id)
+                .module(id)
+                .map(|m| m.source)
                 .ok_or_else(|| format!("core module without source: {id}"))?;
             Ok(ImageUnit {
                 id: id.to_owned(),

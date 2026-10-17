@@ -56,9 +56,7 @@ fn std_list() -> serde_json::Value {
 
 fn std_read(specifier: &str) -> Result<String, String> {
     if let Some(provider) = varn_modules::provider::get()
-        && let Some(source) = provider
-            .bundled_source(specifier)
-            .or_else(|| provider.embedded_source(specifier))
+        && let Some(source) = provider.module(specifier).map(|m| m.source)
     {
         return Ok(source.to_owned());
     }

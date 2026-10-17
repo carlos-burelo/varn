@@ -17,9 +17,7 @@ fn carried_source(
     provider: &dyn varn_modules::provider::StdlibProvider,
     specifier: &str,
 ) -> Option<&'static str> {
-    provider
-        .bundled_source(specifier)
-        .or_else(|| provider.embedded_source(specifier))
+    provider.module(specifier).map(|m| m.source)
 }
 
 pub fn materialize() {

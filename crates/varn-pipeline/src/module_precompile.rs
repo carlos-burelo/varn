@@ -68,7 +68,9 @@ pub fn build_module_graph(
         enqueued.insert(module_path.clone());
 
         if let Some(provider) = varn_modules::provider::get()
-            && provider.bytecode_blob(&module_path).is_some()
+            && provider
+                .module(&module_path)
+                .is_some_and(|m| m.bytecode.is_some())
         {
             graph.insert(module_path.clone(), Vec::new());
             continue;
@@ -285,8 +287,7 @@ pub fn resolve_import_specifier(
         ImportSpecifier::Stdlib(_) | ImportSpecifier::Core(_) => {
             let provider = varn_modules::provider::get()
                 .ok_or_else(|| "stdlib provider not registered".to_owned())?;
-            let known = provider.embedded_source(specifier).is_some()
-                || provider.bytecode_blob(specifier).is_some();
+            let known = provider.module(specifier).is_some();
             Ok(known.then(|| specifier.to_owned()))
         }
 
