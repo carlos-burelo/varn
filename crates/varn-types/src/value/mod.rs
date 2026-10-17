@@ -1,5 +1,6 @@
 mod alloc;
 mod buffer;
+mod channel;
 mod class;
 mod instance;
 mod map;
@@ -11,6 +12,9 @@ mod shape;
 pub use crate::native::NativeFn;
 pub use alloc::{MapKey, MapRef, ObjRef, RuntimeString, SetRef, ValueMap, ValueSet};
 pub use buffer::VmBuffer;
+pub use channel::{
+    endpoint_id, ChannelEndpoint, CHANNEL_CLASS, CHANNEL_CLOSED_CLASS, ENDPOINT_ID_FIELD,
+};
 pub use class::{find_method_with_owner, ClassObj};
 pub use instance::{InstanceData, InstanceRef, INST_CLASS_ID_OFF, INST_PAYLOAD_OFF};
 pub use module::{FrozenExport, FrozenModuleObj, ModuleObj};

@@ -18,8 +18,7 @@ pub enum SendValue {
     Object(rustc_hash::FxHashMap<String, SendValue>),
     Map(Vec<(SendValue, SendValue)>),
     Set(Vec<SendValue>),
-    ChannelSender(u64),
-    ChannelReceiver(u64),
+    Endpoint(super::ChannelEndpoint, u64),
     EnumVariant(Box<SendEnumVariant>),
 }
 
@@ -33,20 +32,6 @@ pub struct SendEnumVariant {
 }
 
 impl SendValue {
-    pub fn endpoint_for(
-        class_name: &str,
-        chan_id: Option<i64>,
-    ) -> Result<Option<SendValue>, String> {
-        match class_name {
-            "Sender" | "Receiver" => match chan_id {
-                Some(id) if class_name == "Sender" => Ok(Some(SendValue::ChannelSender(id as u64))),
-                Some(id) => Ok(Some(SendValue::ChannelReceiver(id as u64))),
-                None => Err(format!("{class_name}: endpoint sin _chan")),
-            },
-            _ => Ok(None),
-        }
-    }
-
     pub fn to_value_ctx(&self, ctx: &mut dyn crate::NativeCtx) -> VmValue {
         match self {
             SendValue::Null => ctx.null_val(),
@@ -101,8 +86,7 @@ impl SendValue {
                 }
                 ctx.alloc_set(vm_items)
             }
-            SendValue::ChannelSender(id) => endpoint_marker(ctx, "tx", *id),
-            SendValue::ChannelReceiver(id) => endpoint_marker(ctx, "rx", *id),
+            SendValue::Endpoint(end, id) => end.alloc(ctx, *id).unwrap_or(VmValue::null()),
             SendValue::EnumVariant(ev) => {
                 let payload = ev.payload.to_value_ctx(ctx);
                 ctx.alloc_enum_variant(crate::value::EnumVariantData {
@@ -116,13 +100,4 @@ impl SendValue {
             }
         }
     }
-}
-
-fn endpoint_marker(ctx: &mut dyn crate::NativeCtx, dir: &str, id: u64) -> VmValue {
-    let obj = ctx.alloc_object();
-    let dir_val = ctx.alloc_str(dir);
-    ctx.set_field(obj, "__chanEndpoint", dir_val);
-    let id_val = ctx.int_val(id as i64);
-    ctx.set_field(obj, "__chanId", id_val);
-    obj
 }

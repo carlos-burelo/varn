@@ -350,11 +350,7 @@ pub(super) fn spawn_isolate(
 
             let mut vm_args = Vec::new();
             for arg in args {
-                let v_nv = arg.to_value_ctx(&mut machine.ctx);
-                vm_args.push(varn_builtins::modules::task::mint_endpoint_marker(
-                    &mut machine.ctx,
-                    v_nv,
-                ));
+                vm_args.push(arg.to_value_ctx(&mut machine.ctx));
             }
 
             match machine.ctx.call_vm(func_nv, &vm_args) {

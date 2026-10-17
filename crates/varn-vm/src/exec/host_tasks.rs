@@ -19,12 +19,12 @@ pub(crate) fn complete_host(ctx: &mut ExecCtx, cell: &Rc<TaskCell>) {
 }
 
 fn open_value(ctx: &mut ExecCtx, sv: &SendValue) -> VmValue {
-    varn_builtins::modules::task::open_sent(ctx, sv)
+    sv.to_value_ctx(ctx)
 }
 
 fn closed_error(ctx: &mut ExecCtx) -> VmValue {
     SendValue::Error {
-        class: "ChannelClosed".to_string(),
+        class: varn_types::value::CHANNEL_CLOSED_CLASS.to_string(),
         message: "channel closed".to_string(),
     }
     .to_value_ctx(ctx)

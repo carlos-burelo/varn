@@ -1,0 +1,34 @@
+import { describe, it, expect } from "std:test";
+import { channel, spawnIsolate, Sender } from "std:task";
+
+export async function replyThroughBox(box: { reply: Sender<int> }) {
+    await box.reply.send(7)
+    box.reply.close()
+}
+
+export async function echoShape(shape: { __chanEndpoint: str, __chanId: int }, tx: Sender<str>) {
+    await tx.send(shape.__chanEndpoint + shape.__chanId)
+    tx.close()
+}
+
+await describe("227 channel endpoints nested", async () => {
+    await it("an endpoint inside an object crosses an isolate as an endpoint", async () => {
+        if (isIsolate) {
+            return
+        }
+        const ch = channel<int>(1)
+        const handle = await spawnIsolate(replyThroughBox, [{ reply: ch.tx }])
+        expect(await ch.rx.receive()).toBe(7)
+        await handle.join()
+    });
+
+    await it("a plain object shaped like the old marker stays a plain object", async () => {
+        if (isIsolate) {
+            return
+        }
+        const ch = channel<str>(1)
+        const handle = await spawnIsolate(echoShape, [{ __chanEndpoint: "tx", __chanId: 3 }, ch.tx])
+        expect(await ch.rx.receive()).toBe("tx3")
+        await handle.join()
+    });
+});

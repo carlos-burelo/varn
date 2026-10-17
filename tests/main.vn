@@ -218,6 +218,7 @@ import "./223-captures-across-await.vn"
 import "./224-async-resume-values.vn"
 import "./225-generators-as-frames.vn"
 import "./226-builtin-names-shadowed.vn"
+import "./227-channel-endpoints-nested.vn"
 
 summary()
 

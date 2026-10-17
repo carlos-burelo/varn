@@ -1,5 +1,5 @@
 use varn_macros::varn_contract;
-use varn_types::value::SendValue;
+use varn_types::value::{endpoint_id, ChannelEndpoint, SendValue};
 use varn_types::{HostOpen, NativeCtx, VmValue};
 
 pub struct TaskRuntime;
@@ -11,36 +11,6 @@ pub struct ReceiverImpl;
 pub struct ChannelImpl;
 pub struct ChannelClosedImpl;
 
-pub fn alloc_endpoint(
-    ctx: &mut dyn NativeCtx,
-    class_name: &str,
-    id: u64,
-) -> Result<VmValue, String> {
-    let nv = ctx
-        .alloc_instance(class_name)
-        .ok_or_else(|| format!("channel: {class_name} class not registered"))?;
-    ctx.set_field(nv, "_chan", VmValue::from_int(id as i64));
-    if class_name == "Receiver" {
-        let iter_nv = ctx.alloc_bound_native(nv, receiver_self_iterator, "[Symbol.asyncIterator]");
-        ctx.set_field(nv, "Symbol.asyncIterator", iter_nv);
-    }
-    Ok(nv)
-}
-
-fn receiver_self_iterator(
-    _ctx: &mut dyn NativeCtx,
-    args: &[VmValue],
-) -> varn_types::NativeFnResult {
-    args.first()
-        .copied()
-        .ok_or_else(|| "receiver iterator: missing self".into())
-}
-
-fn chan_id(ctx: &mut dyn NativeCtx, this: VmValue) -> Option<u64> {
-    let nv = ctx.get_field(this, "_chan")?;
-    nv.is_int().then(|| nv.as_int() as u64)
-}
-
 fn reject_with_message(ctx: &mut dyn NativeCtx, message: &str) -> VmValue {
     let message_nv = ctx.alloc_str(message);
     let obj = ctx.alloc_object();
@@ -50,34 +20,11 @@ fn reject_with_message(ctx: &mut dyn NativeCtx, message: &str) -> VmValue {
 
 fn reject_closed(ctx: &mut dyn NativeCtx) -> VmValue {
     let error = SendValue::Error {
-        class: "ChannelClosed".to_string(),
+        class: varn_types::value::CHANNEL_CLOSED_CLASS.to_string(),
         message: "channel closed".to_string(),
     }
     .to_value_ctx(ctx);
     ctx.task_rejected(error)
-}
-
-pub fn mint_endpoint_marker(ctx: &mut dyn NativeCtx, nv: VmValue) -> VmValue {
-    let Some(dir_nv) = ctx.get_field(nv, "__chanEndpoint") else {
-        return nv;
-    };
-    let Some(id_nv) = ctx.get_field(nv, "__chanId") else {
-        return nv;
-    };
-    if !id_nv.is_int() {
-        return nv;
-    }
-    let class_name = if ctx.str_owned(dir_nv).as_deref() == Some("tx") {
-        "Sender"
-    } else {
-        "Receiver"
-    };
-    alloc_endpoint(ctx, class_name, id_nv.as_int() as u64).unwrap_or(nv)
-}
-
-pub fn open_sent(ctx: &mut dyn NativeCtx, value: &SendValue) -> VmValue {
-    let nv = value.to_value_ctx(ctx);
-    mint_endpoint_marker(ctx, nv)
 }
 
 fn next_result(ctx: &mut dyn NativeCtx, value_nv: VmValue, done: bool) -> VmValue {
@@ -162,10 +109,10 @@ varn_contract! {
             }
             let id = crate::runtime::channel::create(capacity as usize);
             let ch_nv = ctx
-                .alloc_instance("Channel")
+                .alloc_instance(varn_types::value::CHANNEL_CLASS)
                 .ok_or("channel: Channel class not registered")?;
-            let tx_nv = alloc_endpoint(ctx, "Sender", id)?;
-            let rx_nv = alloc_endpoint(ctx, "Receiver", id)?;
+            let tx_nv = ChannelEndpoint::Sender.alloc(ctx, id)?;
+            let rx_nv = ChannelEndpoint::Receiver.alloc(ctx, id)?;
             ctx.set_field(ch_nv, "tx", tx_nv);
             ctx.set_field(ch_nv, "rx", rx_nv);
             Ok(ch_nv)
@@ -185,7 +132,7 @@ varn_contract! {
     class: "Sender",
     impl SenderImpl {
         fn send(ctx: &mut dyn NativeCtx, this: VmValue, msg: VmValue) -> VmValue {
-            let Some(id) = chan_id(ctx, this) else {
+            let Some(id) = endpoint_id(ctx, this) else {
                 return reject_closed(ctx);
             };
             let send_val = match ctx.to_sendable(msg) {
@@ -205,13 +152,13 @@ varn_contract! {
         }
 
         fn close(ctx: &mut dyn NativeCtx, this: VmValue) {
-            if let Some(id) = chan_id(ctx, this) {
+            if let Some(id) = endpoint_id(ctx, this) {
                 crate::runtime::channel::close(id);
             }
         }
 
         fn dispose(ctx: &mut dyn NativeCtx, this: VmValue) {
-            if let Some(id) = chan_id(ctx, this) {
+            if let Some(id) = endpoint_id(ctx, this) {
                 crate::runtime::channel::close(id);
             }
         }
@@ -225,12 +172,12 @@ varn_contract! {
                 let result = next_result(ctx, null, true);
                 ctx.task_resolved(result)
             };
-            let Some(id) = chan_id(ctx, this) else {
+            let Some(id) = endpoint_id(ctx, this) else {
                 return finished(ctx);
             };
             match crate::runtime::channel::try_receive(id) {
                 crate::runtime::channel::RecvOutcome::Item(item) => {
-                    let value = open_sent(ctx, &item);
+                    let value = item.to_value_ctx(ctx);
                     let result = next_result(ctx, value, false);
                     ctx.task_resolved(result)
                 }
@@ -242,12 +189,12 @@ varn_contract! {
         }
 
         fn receive(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
-            let Some(id) = chan_id(ctx, this) else {
+            let Some(id) = endpoint_id(ctx, this) else {
                 return reject_closed(ctx);
             };
             match crate::runtime::channel::try_receive(id) {
                 crate::runtime::channel::RecvOutcome::Item(item) => {
-                    let value = open_sent(ctx, &item);
+                    let value = item.to_value_ctx(ctx);
                     ctx.task_resolved(value)
                 }
                 crate::runtime::channel::RecvOutcome::Closed => reject_closed(ctx),
@@ -258,7 +205,7 @@ varn_contract! {
         }
 
         fn dispose(ctx: &mut dyn NativeCtx, this: VmValue) {
-            if let Some(id) = chan_id(ctx, this) {
+            if let Some(id) = endpoint_id(ctx, this) {
                 crate::runtime::channel::close(id);
             }
         }

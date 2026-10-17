@@ -38,16 +38,18 @@ pub(super) fn to_sendable(
             Some(HeapObj::Object(obj)) => {
                 let borrow = obj.borrow();
 
-                if let Some(cls) = borrow.class() {
-                    let chan_id = borrow
-                        .get("_chan")
+                if let Some(end) = borrow
+                    .class()
+                    .and_then(|cls| varn_types::value::ChannelEndpoint::of_class(&cls))
+                {
+                    let id = borrow
+                        .get(varn_types::value::ENDPOINT_ID_FIELD)
                         .filter(|v| v.is_int())
-                        .map(|v| v.as_int());
-                    if let Some(sv) =
-                        varn_types::value::SendValue::endpoint_for(cls.name.as_str(), chan_id)?
-                    {
-                        return Ok(sv);
-                    }
+                        .map(|v| v.as_int() as u64)
+                        .ok_or_else(|| {
+                            format!("{}: endpoint without a channel id", end.class_name())
+                        })?;
+                    return Ok(varn_types::value::SendValue::Endpoint(end, id));
                 }
                 let mut map = rustc_hash::FxHashMap::default();
                 for (k, nv) in borrow.iter() {
