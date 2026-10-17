@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Identificadores y Palabras Reservadas
 
 > Fuentes: todos los archivos `tests/*.vn`.
@@ -89,11 +87,11 @@ En destructuring y en el operador pipeline, `_` tiene significado especial:
 ```varn
 // Descarte en destructuring de array
 const [skip1, _, skip3] = [100, 200, 300]
-assert("arr destr skip", skip1 === 100 && skip3 === 300)
+assertTrue("arr destr skip", skip1 === 100 && skip3 === 300)
 
 // Placeholder en pipeline
-assert("pipe placeholder", 7 |> addN(_, 3) === 10)
-assert("pipe multi _",     4 |> addN(_, _) === 8)
+assertTrue("pipe placeholder", 7 |> addN(_, 3) === 10)
+assertTrue("pipe multi _",     4 |> addN(_, _) === 8)
 ```
 
 ---
@@ -101,8 +99,8 @@ assert("pipe multi _",     4 |> addN(_, _) === 8)
 ## 6. Nombres de Tipos en `typeof`
 
 Verificado en tests: `"str"`, `"int"`, `"float"`, `"class"`
-(`tests/79-control-flow-narrowing.vn:32-34`,
-`tests/122-numeric-conversions.vn:47`, `tests/111-network-apis-overhaul.vn:77`).
+(`tests/79-control-flow-narrowing.vn`,
+`tests/122-numeric-conversions.vn`, `tests/111-network-apis-overhaul.vn`).
 Nombres canónicos: `"str"` nunca `"string"`, `"int"` nunca `"integer"`.
 Otros valores (`"bool"`, `"char"`, `"null"`, `"object"`, `"array"`,
 `"function"`): NO-VERIFICADOS.

@@ -2,28 +2,28 @@
 
 # Varn Language — Ejemplos Integrados
 
-Colección de ejemplos completos extraídos directamente de los archivos de prueba `tests/*.vn` (208 ficheros, 206 importados por `tests/main.vn`).
+Colección de ejemplos completos extraídos directamente de los archivos de prueba `tests/*.vn` (220 archivos, 218 importados por `tests/main.vn`).
 
 ---
 
 ## 01 — Aritmética (`tests/01-arithmetic.vn`)
 
 ```varn
-assert("int add",          1 + 2 === 3)
-assert("int sub negative", 3 - 5 === -2)
-assert("int mul zero",     42 * 0 === 0)
-assert("int div",          10 / 2 === 5)
-assert("int mod",          17 % 5 === 2)
-assert("int mod negative", -7 % 3 === -1)
-assert("int power",        2 ** 10 === 1024)
-assert("float add",        0.1 + 0.2 > 0.29 && 0.1 + 0.2 < 0.31)
-assert("unary neg",        -(5) === -5)
-assert("bitwise and",      (12 & 10) === 8)
-assert("bitwise or",       (12 | 3) === 15)
-assert("bitwise xor",      (12 ^ 10) === 6)
-assert("bitwise not",      ~0 === -1)
-assert("left shift",       1 << 4 === 16)
-assert("right shift",      64 >> 2 === 16)
+assertTrue("int add",          1 + 2 === 3)
+assertTrue("int sub negative", 3 - 5 === -2)
+assertTrue("int mul zero",     42 * 0 === 0)
+assertTrue("int div",          10 / 2 === 5)
+assertTrue("int mod",          17 % 5 === 2)
+assertTrue("int mod negative", -7 % 3 === -1)
+assertTrue("int power",        2 ** 10 === 1024)
+assertTrue("float add",        0.1 + 0.2 > 0.29 && 0.1 + 0.2 < 0.31)
+assertTrue("unary neg",        -(5) === -5)
+assertTrue("bitwise and",      (12 & 10) === 8)
+assertTrue("bitwise or",       (12 | 3) === 15)
+assertTrue("bitwise xor",      (12 ^ 10) === 6)
+assertTrue("bitwise not",      ~0 === -1)
+assertTrue("left shift",       1 << 4 === 16)
+assertTrue("right shift",      64 >> 2 === 16)
 ```
 
 ---
@@ -31,13 +31,12 @@ assert("right shift",      64 >> 2 === 16)
 ## 02 — Booleanos (`tests/02-boolean.vn`)
 
 ```varn
-assert("and short-circuit", (false && (1/0 === 0)) === false)
-assert("or short-circuit",  true  || (1/0 === 0) === true)
-assert("not not",           !!true === true)
-assert("triple eq str",     "abc" === "abc")
-assert("triple neq str",    "abc" !== "def")
-assert("triple eq null",    null === null)
-assert("triple neq null",   null !== 0)
+assertTrue("and short-circuit", (false && (1/0 === 0)) === false)
+assertTrue("or short-circuit",  true  || (1/0 === 0) === true)
+assertTrue("not not",           !!true === true)
+assertTrue("triple eq str",     "abc" === "abc")
+assertTrue("triple neq str",    "abc" !== "def")
+assertTrue("triple eq null",    null === null)
 ```
 
 ---
@@ -46,26 +45,26 @@ assert("triple neq null",   null !== 0)
 
 ```varn
 const s = "  Hello, World!  "
-assert("trim",           s.trim() === "Hello, World!")
-assert("toUpperCase",    "hello".toUpperCase() === "HELLO")
-assert("includes",       "typescript".includes("script"))
-assert("startsWith",     "hello world".startsWith("hello"))
-assert("indexOf found",  "abcabc".indexOf("c") === 2)
-assert("slice",          "hello world".slice(6, 11) === "world")
-assert("replace",        "foo bar foo".replace("foo", "baz") === "baz bar foo")
-assert("replaceAll",     "foo bar foo".replaceAll("foo", "baz") === "baz bar baz")
-assert("split",          "a,b,c".split(",").length === 3)
-assert("repeat",         "ab".repeat(3) === "ababab")
-assert("padStart",       "5".padStart(3, "0") === "005")
-assert("length",         "hello".length === 5)
-assert("charCode A",     "A".charCode() === 65)
-assert("isEmpty true",   "".isEmpty())
-assert("capitalize",     "hello".capitalize() === "Hello")
-assert("lines",          "a\nb\nc".lines().length === 3)
-assert("str.from int",   str.from(42) === "42")
-assert("str.EMPTY",      str.EMPTY === "")
-assert("str.fromCharCode", str.fromCharCode(72, 105) === "Hi")
-assert("str.join sep",   str.join(["a", "b", "c"], "-") === "a-b-c")
+assertTrue("trim",           s.trim() === "Hello, World!")
+assertTrue("toUpperCase",    "hello".toUpperCase() === "HELLO")
+assertTrue("includes",       "typescript".includes("script"))
+assertTrue("startsWith",     "hello world".startsWith("hello"))
+assertTrue("indexOf found",  "abcabc".indexOf("c") === 2)
+assertTrue("slice",          "hello world".slice(6, 11) === "world")
+assertTrue("replace",        "foo bar foo".replace("foo", "baz") === "baz bar foo")
+assertTrue("replaceAll",     "foo bar foo".replaceAll("foo", "baz") === "baz bar baz")
+assertTrue("split",          "a,b,c".split(",").length === 3)
+assertTrue("repeat",         "ab".repeat(3) === "ababab")
+assertTrue("padStart",       "5".padStart(3, "0") === "005")
+assertTrue("length",         "hello".length === 5)
+assertTrue("charCode A",     "A".charCode() === 65)
+assertTrue("isEmpty true",   "".isEmpty())
+assertTrue("capitalize",     "hello".capitalize() === "Hello")
+assertTrue("lines",          "a\nb\nc".lines().length === 3)
+assertTrue("str.from int",   str.from(42) === "42")
+assertTrue("str.EMPTY",      str.EMPTY === "")
+assertTrue("str.fromCharCode", str.fromCharCode(72, 105) === "Hi")
+assertTrue("str.join sep",   str.join(["a", "b", "c"], "-") === "a-b-c")
 ```
 
 ---
@@ -74,10 +73,10 @@ assert("str.join sep",   str.join(["a", "b", "c"], "-") === "a-b-c")
 
 ```varn
 const tval = 42
-assert("simple template",   `answer = ${tval}` === "answer = 42")
-assert("expr in template",  `${tval * 2}` === "84")
-assert("nested template",   `prefix_${"mid"}_suffix` === "prefix_mid_suffix")
-assert("template + concat", `a${1 + 1}b` + "c" === "a2bc")
+assertTrue("simple template",   `answer = ${tval}` === "answer = 42")
+assertTrue("expr in template",  `${tval * 2}` === "84")
+assertTrue("nested template",   `prefix_${"mid"}_suffix` === "prefix_mid_suffix")
+assertTrue("template + concat", `a${1 + 1}b` + "c" === "a2bc")
 ```
 
 ---
@@ -86,35 +85,35 @@ assert("template + concat", `a${1 + 1}b` + "c" === "a2bc")
 
 ```varn
 const nums = [3, 1, 4, 1, 5, 9, 2, 6]
-assert("length",  nums.length === 8)
-assert("indexOf", nums.indexOf(5) === 4)
-assert("includes",nums.includes(9))
+assertTrue("length",  nums.length === 8)
+assertTrue("indexOf", nums.indexOf(5) === 4)
+assertTrue("includes",nums.includes(9))
 
 const doubled = nums.map((n) => n * 2)
-assert("map value", doubled[0] === 6)
+assertTrue("map value", doubled[0] === 6)
 
 const evens = nums.filter((n) => n % 2 === 0)
-assert("filter", evens.length === 3)
+assertTrue("filter", evens.length === 3)
 
 const sum = nums.reduce((acc, n) => acc + n, 0)
-assert("reduce sum", sum === 31)
+assertTrue("reduce sum", sum === 31)
 
 const found = nums.find((n) => n > 5)
-assert("find first", found === 9)
+assertTrue("find first", found === 9)
 
 const mut = [1, 2, 3]
 mut.push(4)
-assert("push value", mut[3] === 4)
+assertTrue("push value", mut[3] === 4)
 const popped = mut.pop()
-assert("pop value", popped === 4)
+assertTrue("pop value", popped === 4)
 
 const spread = [...[1, 2], ...[3, 4]]
-assert("spread value", spread[2] === 3)
+assertTrue("spread value", spread[2] === 3)
 
 // Semantic identity: Array<T> ↔ T[]
 let explicitGeneric: Array<int> = [10, 20, 30]
 let explicitBracket: int[] = explicitGeneric
-assert("Array<T> to T[]", explicitBracket[1] === 20)
+assertTrue("Array<T> to T[]", explicitBracket[1] === 20)
 ```
 
 ---
@@ -124,23 +123,23 @@ assert("Array<T> to T[]", explicitBracket[1] === 20)
 ```varn
 const obj1 = { a: 1, b: 2, c: 3 }
 const { a, b } = obj1
-assert("obj destr basic", a === 1 && b === 2)
+assertTrue("obj destr basic", a === 1 && b === 2)
 
 const { a: renamed } = obj1
-assert("obj destr rename", renamed === 1)
+assertTrue("obj destr rename", renamed === 1)
 
 const { name = "default", age = 0 } = { name: "Alice" }
-assert("obj destr default name", name === "Alice")
-assert("obj destr default age",  age === 0)
+assertTrue("obj destr default name", name === "Alice")
+assertTrue("obj destr default age",  age === 0)
 
 const [f1, f2, f3] = [10, 20, 30]
 const [head, ...tail] = [1, 2, 3, 4]
-assert("rest head", head === 1)
-assert("rest tail", tail.length === 3)
+assertTrue("rest head", head === 1)
+assertTrue("rest tail", tail.length === 3)
 
 const base = { x: 1, y: 2 }
 const ext  = { ...base, z: 3 }
-assert("obj spread z", ext.z === 3)
+assertTrue("obj spread z", ext.z === 3)
 ```
 
 ---
@@ -152,16 +151,16 @@ function makeAdder(n: int): (a: int) => int {
     return (x: int) => x + n
 }
 const add5 = makeAdder(5)
-assert("closure add5",        add5(3) === 8)
-assert("closure independent", add5(0) !== makeAdder(10)(0))
+assertTrue("closure add5",        add5(3) === 8)
+assertTrue("closure independent", add5(0) !== makeAdder(10)(0))
 
 function makeCounter(): () => int {
     let c = 0
     return () => { c = c + 1; return c }
 }
 const cnt1 = makeCounter()
-assert("counter1 first",  cnt1() === 1)
-assert("counter1 second", cnt1() === 2)
+assertTrue("counter1 first",  cnt1() === 1)
+assertTrue("counter1 second", cnt1() === 2)
 
 function compose<A, B, C>(f: (a:B) => C, g: (b:A) => B): (c:A) => C {
     return (x: A) => f(g(x))
@@ -169,7 +168,7 @@ function compose<A, B, C>(f: (a:B) => C, g: (b:A) => B): (c:A) => C {
 const double = (n: int) => n * 2
 const inc    = (n: int) => n + 1
 const doubleInc = compose(double, inc)
-assert("compose", doubleInc(4) === 10)
+assertTrue("compose", doubleInc(4) === 10)
 ```
 
 ---
@@ -182,12 +181,13 @@ interface Profile { name: str; address?: Address }
 const p1: Profile? = { name: "Alice", address: { city: "NY" } }
 const p3: Profile? = null
 
-assert("?. non-null chain", p1?.address?.city === "NY")
-assert("?. null root",      p3?.name === null)
-assert("?? left non-null",  (42 ?? 0) === 42)
-assert("?? left null",      (null ?? 99) === 99)
-assert("?. + ??",           (p3?.name ?? "anon") === "anon")
-assert("?? chained",        (null ?? null ?? 7) === 7)
+assertTrue("?. non-null chain", p1?.address?.city === "NY")
+assertTrue("?. null root",      p3?.name === null)
+const maybe: int? = 42
+assertTrue("?? left non-null",  (maybe ?? 0) === 42)
+assertTrue("?? left null",      (null ?? 99) === 99)
+assertTrue("?. + ??",           (p3?.name ?? "anon") === "anon")
+assertTrue("?? chained",        (null ?? null ?? 7) === 7)
 ```
 
 ---
@@ -218,18 +218,18 @@ function sumOdds(max: int): int {
     }
     return total
 }
-assert("for continue", sumOdds(10) === 25)
+assertTrue("for continue", sumOdds(10) === 25)
 
 // for-of
 let forOfSum = 0
 for (const n of [10, 20, 30]) { forOfSum = forOfSum + n }
-assert("for-of sum", forOfSum === 60)
+assertTrue("for-of sum", forOfSum === 60)
 
 // for-in
 const obj2 = { x: 1, y: 2, z: 3 }
 let keyCount = 0
 for (const k in obj2) { keyCount = keyCount + 1 }
-assert("for-in key count", keyCount === 3)
+assertTrue("for-in key count", keyCount === 3)
 ```
 
 ---
@@ -245,8 +245,8 @@ function describeNum(n: int): str {
         _ => "other"
     }
 }
-assert("match 2",     describeNum(2) === "two or three")
-assert("match other", describeNum(99) === "other")
+assertTrue("match 2",     describeNum(2) === "two or three")
+assertTrue("match other", describeNum(99) === "other")
 ```
 
 ---
@@ -258,7 +258,7 @@ assert("match other", describeNum(99) === "other")
 try {
     throw new TypeError("bad type")
 } catch (e) {
-    assert("catch TypeError name", e.name === "TypeError")
+    assertTrue("catch TypeError name", e.name === "TypeError")
 }
 
 // Error personalizado
@@ -275,8 +275,8 @@ class ValidationError extends Error {
 function withFinally(): int {
     try { return 42 } finally { finallyRan = true }
 }
-assert("finally return value", withFinally() === 42)
-assert("finally ran",          finallyRan)
+assertTrue("finally return value", withFinally() === 42)
+assertTrue("finally ran",          finallyRan)
 ```
 
 ---
@@ -287,10 +287,10 @@ assert("finally ran",          finallyRan)
 enum Direction { North, South, East, West }
 enum HttpMethod { GET = 0, POST = 1, PUT = 2, DELETE = 3 }
 
-assert("enum value",    Direction.North === Direction.North)
-assert("enum neq",      Direction.North !== Direction.South)
-assert("enum explicit", HttpMethod.POST.rawValue === 1)
-assert("enum rawValue", Direction.East.rawValue === 2)
+assertTrue("enum value",    Direction.North === Direction.North)
+assertTrue("enum neq",      Direction.North !== Direction.South)
+assertTrue("enum explicit", HttpMethod.POST.rawValue === 1)
+assertTrue("enum rawValue", Direction.East.rawValue === 2)
 
 function describeDir(d: Direction): str {
     return match (d) {
@@ -307,12 +307,12 @@ function describeDir(d: Direction): str {
 ## 19 — Pipeline (`tests/19-pipeline.vn`)
 
 ```varn
-assert("pipe simple",      5 |> double2 === 10)
-assert("pipe placeholder", 7 |> addN(_, 3) === 10)
-assert("pipe multi _",     4 |> addN(_, _) === 8)
-assert("pipe clamp lo",    -5 |> clamp2(0, 10, _) === 0)
+assertTrue("pipe simple",      5 |> double2 === 10)
+assertTrue("pipe placeholder", 7 |> addN(_, 3) === 10)
+assertTrue("pipe multi _",     4 |> addN(_, _) === 8)
+assertTrue("pipe clamp lo",    -5 |> clamp2(0, 10, _) === 0)
 const piped = (3 |> double2) |> double2
-assert("pipe chained", piped === 12)
+assertTrue("pipe chained", piped === 12)
 ```
 
 ---
@@ -325,8 +325,8 @@ function* range_gen(start: int, end: int) {
     while (i < end) { yield i; i = i + 1 }
 }
 const gen = range_gen(0, 5)
-assert("gen value 0", gen.next().value === 0)
-assert("gen done 0",  !gen.next().done)
+assertTrue("gen value 0", gen.next().value === 0)
+assertTrue("gen done 0",  !gen.next().done)
 
 function* fib_gen() {
     let a = 0; let b = 1
@@ -338,7 +338,7 @@ function* fib_gen() {
 const fibs: int[] = []
 const fib2 = fib_gen()
 for (let i = 0; i < 8; i = i + 1) { fibs.push(fib2.next().value) }
-assert("fib gen [7]", fibs[7] === 13)
+assertTrue("fib gen [7]", fibs[7] === 13)
 ```
 
 ---
@@ -351,15 +351,15 @@ import { sleep, TaskGroup, spawn, parallel } from "std:task"
 async function asyncAdd(a: int, b: int): int { return a + b }
 
 async function runAsync(): void {
-    assert("async add", await asyncAdd(5, 6) === 11)
+    assertTrue("async add", await asyncAdd(5, 6) === 11)
 
     const all = await parallel([asyncSquare(2), asyncSquare(3), asyncSquare(4)])
-    assert("parallel[0]", all[0] === 4)
+    assertTrue("parallel[0]", all[0] === 4)
 
     using group = new TaskGroup<int>()
     const g1 = group.spawn(asyncAdd(7, 8))
     const joined = await group.join()
-    assert("group joined[0]", joined[0] === 15)
+    assertTrue("group joined[0]", joined[0] === 15)
 }
 await runAsync()
 ```
@@ -386,10 +386,10 @@ extension IntUtils on int {
     }
 }
 
-assert("str shout",    "hello".shout() === "hello!")
-assert("str times",    "ab".times(3) === "ababab")
-assert("int isEven",   (4).isEven() === true)
-assert("int clamp lo", (2).clamp(5, 10) === 5)
+assertTrue("str shout",    "hello".shout() === "hello!")
+assertTrue("str times",    "ab".times(3) === "ababab")
+assertTrue("int isEven",   (4).isEven() === true)
+assertTrue("int clamp lo", (2).clamp(5, 10) === 5)
 ```
 
 ---
@@ -404,7 +404,7 @@ enum Token {
     Plus, Minus
 }
 const t1 = Token.Number(123)
-assert("payload value", t1.value === 123)
+assertTrue("payload value", t1.value === 123)
 
 // Shared fields + constructor
 enum HttpStatus {
@@ -413,7 +413,7 @@ enum HttpStatus {
     code: int; message: str
     constructor(code: int, message: str) { this.code = code; this.message = message }
 }
-assert("shared field", HttpStatus.Ok.code === 200)
+assertTrue("shared field", HttpStatus.Ok.code === 200)
 
 // Enum with methods
 enum Shape {
@@ -426,13 +426,13 @@ enum Shape {
         }
     }
 }
-assert("circle area", Shape.Circle(10.0).area() === 314.159)
+assertTrue("circle area", Shape.Circle(10.0).area() === 314.159)
 
 // Generic enum
 enum Result<T, E> { Ok(value: T), Err(error: E) }
 const resOk = Result.Ok<int, str>(42)
 const valOk = match (resOk) { Ok(val) => val, Err(err) => 0 }
-assert("generic enum Ok", valOk === 42)
+assertTrue("generic enum Ok", valOk === 42)
 ```
 
 ---
@@ -451,7 +451,7 @@ const in1 = channel<ValueMsg>(1)
 const out1 = channel<int>(1)
 const h1 = await spawnIsolate(workerMain, [in1.rx, out1.tx])
 await in1.tx.send({ value: 10 })
-assert("response from basic worker", await out1.rx.receive() === 20)
+assertTrue("response from basic worker", await out1.rx.receive() === 20)
 await h1.join()
 ```
 
@@ -461,19 +461,19 @@ await h1.join()
 
 ```varn
 let t1 = #[1, "hello", true]
-assert("tuple elem 0", t1[0] == 1)
-assert("tuple length", t1.length == 3)
+assertTrue("tuple elem 0", t1[0] == 1)
+assertTrue("tuple length", t1.length == 3)
 let t2 = #[1, "hello", true]
-assert("tuple eq true", t1 == t2)
+assertTrue("tuple eq true", t1 == t2)
 
 let r1 = #{ name: "Varn", version: 1 }
-assert("record field", r1.name == "Varn")
+assertTrue("record field", r1.name == "Varn")
 let r2 = #{ name: "Varn", version: 1 }
-assert("record eq", r1 == r2)
+assertTrue("record eq", r1 == r2)
 
 let nested1 = #{ point: #[10, 20], meta: #{ active: true } }
 let nested2 = #{ point: #[10, 20], meta: #{ active: true } }
-assert("nested eq true", nested1 == nested2)
+assertTrue("nested eq true", nested1 == nested2)
 ```
 
 ---

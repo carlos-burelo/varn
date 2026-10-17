@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Concurrencia Asíncrona
 
 > Fuentes: `tests/21-async.vn`, `tests/47-isolates-multithread.vn`, `tests/54-channels.vn`, `tests/75-async-shapes.vn`, `tests/77-async-generators.vn`.
@@ -26,10 +24,10 @@ async function asyncChain(): str {
 
 async function runAsync(): void {
     const r1 = await asyncAdd(5, 6)
-    assert("async add", r1 === 11)
+    assertTrue("async add", r1 === 11)
 
     const r2 = await asyncChain()
-    assert("async chain", r2 === "result=17")
+    assertTrue("async chain", r2 === "result=17")
 }
 
 await runAsync()   // top-level await en módulo
@@ -46,7 +44,7 @@ async function asyncError(): str {
     }
 }
 const r3 = await asyncError()
-assert("async catch", r3 === "caught:async fail")
+assertTrue("async catch", r3 === "caught:async fail")
 ```
 
 ---
@@ -55,7 +53,7 @@ assert("async catch", r3 === "caught:async fail")
 
 ```varn
 const h1 = spawn(asyncAdd(1, 2))
-assert("spawn handle await", await h1 === 3)   // tests/21-async.vn:32-33
+assertTrue("spawn handle await", await h1 === 3)   // tests/21-async.vn
 ```
 
 ---
@@ -68,24 +66,24 @@ const all = await parallel([
     asyncSquare(3),
     asyncSquare(4),
 ])
-assert("parallel len",  all.length === 3)
-assert("parallel[0]",   all[0] === 4)
-assert("parallel[1]",   all[1] === 9)
-assert("parallel[2]",   all[2] === 16)
-// tests/21-async.vn:47
+assertTrue("parallel len",  all.length === 3)
+assertTrue("parallel[0]",   all[0] === 4)
+assertTrue("parallel[1]",   all[1] === 9)
+assertTrue("parallel[2]",   all[2] === 16)
+// tests/21-async.vn
 ```
 
 Ejecuta todas las tareas en paralelo y devuelve los resultados en el mismo orden
-(`tests/21-async.vn:34-42`). El primer rechazo gana (`tests/21-async.vn:52-61`).
+(`tests/21-async.vn`). El primer rechazo gana (`tests/21-async.vn`).
 
 ### Combinadores (`Task.all`, `allSettled`, `race`)
 
 ```varn
 import { Task, delay } from "std:task"
 
-let winner = await Task.race([fastTask, slowTask])   // tests/97-stdlib-task-combinators.vn:28-33
-let allRes = await Task.all([t1, t2])                // tests/97-stdlib-task-combinators.vn:9-16
-let settled = await Task.allSettled([okTask, errTask])   // tests/97-stdlib-task-combinators.vn:18-26
+let winner = await Task.race([fastTask, slowTask])   // tests/97-stdlib-task-combinators.vn
+let allRes = await Task.all([t1, t2])                // tests/97-stdlib-task-combinators.vn
+let settled = await Task.allSettled([okTask, errTask])   // tests/97-stdlib-task-combinators.vn
 ```
 
 `cancel(handle)` libre, `clearTimeout` y `Task.yield`: SIN test en
@@ -96,19 +94,19 @@ let settled = await Task.allSettled([okTask, errTask])   // tests/97-stdlib-task
 ## 4. `TaskGroup` — Grupos de tareas
 
 ```varn
-using group = new TaskGroup<int>()   // tests/21-async.vn:43-51
+using group = new TaskGroup<int>()   // tests/21-async.vn
 const g1 = group.spawn(asyncAdd(7, 8))
 const g2 = group.spawn(asyncAdd(9, 10))
 const joined = await group.join()
-assert("group joined len",  joined.length === 2)
-assert("group joined[0]",   joined[0] === 15)
-assert("group joined[1]",   joined[1] === 19)
-assert("group handle 1",    await g1 === 15)
+assertTrue("group joined len",  joined.length === 2)
+assertTrue("group joined[0]",   joined[0] === 15)
+assertTrue("group joined[1]",   joined[1] === 19)
+assertTrue("group handle 1",    await g1 === 15)
 ```
 
 Timeout en `join(ms)` y mensaje de error: NO-VERIFICADOS (sin test).
 
-### Cancelación del grupo (`tests/21-async.vn:62-71`)
+### Cancelación del grupo (`tests/21-async.vn`)
 
 `cancel()` marca el grupo y cancela los joins en vuelo (sus tareas parqueadas
 se descartan en vez de seguir consumiendo drive). Los hijos ya completados no
@@ -120,13 +118,13 @@ const c1 = cancelGroup.spawn(asyncAdd(10, 20))
 cancelGroup.cancel()
 try {
     await c1
-    assert("cancel should reject", false)
+    assertTrue("cancel should reject", false)
 } catch (e) {
-    assert("group cancel rejects handle", true)
+    assertTrue("group cancel rejects handle", true)
 }
 ```
 
-### Disposición asíncrona (`disposeAsync`, `tests/21-async.vn:72-80`)
+### Disposición asíncrona (`disposeAsync`, `tests/21-async.vn`)
 
 ```varn
 using disposeGroup = new TaskGroup<int>()
@@ -135,7 +133,7 @@ await disposeGroup.disposeAsync()
 try {
     await d1
 } catch (e) {
-    assert("disposeAsync rejects handle", true)
+    assertTrue("disposeAsync rejects handle", true)
 }
 ```
 
@@ -152,7 +150,7 @@ import { spawnIsolate, channel, Sender, Receiver, ChannelClosed } from "std:task
 // Función que corre en el isolate hijo (debe ser exportada y top-level)
 export async function workerMain(rx: Receiver<ValueMsg>, tx: Sender<int>) {
     const data = await rx.receive()
-    assert("msg in child", data.value === 10)
+    assertTrue("msg in child", data.value === 10)
     await tx.send(data.value * 2)
 }
 
@@ -161,7 +159,7 @@ const in1 = channel<ValueMsg>(1)
 const out1 = channel<int>(1)
 const h1 = await spawnIsolate(workerMain, [in1.rx, out1.tx])
 await in1.tx.send({ value: 10 })
-assert("response", await out1.rx.receive() === 20)
+assertTrue("response", await out1.rx.receive() === 20)
 await h1.join()
 ```
 
@@ -173,7 +171,7 @@ let threwAnon = false
 try {
     await spawnIsolate((tx: Sender<str>) => {}, [])   // lambda: error
 } catch (e) {
-    assert("error for anon", e.message.indexOf("must be a function reference") >= 0)
+    assertTrue("error for anon", e.message.indexOf("must be a function reference") >= 0)
 }
 
 // Funciones no exportadas también dan error
@@ -181,7 +179,7 @@ let threwUnexported = false
 try {
     await spawnIsolate(localUnexported, [])
 } catch (e) {
-    assert("error for unexported", e.message.indexOf("is not a top-level exported function") >= 0)
+    assertTrue("error for unexported", e.message.indexOf("is not a top-level exported function") >= 0)
 }
 ```
 
@@ -189,10 +187,10 @@ try {
 
 ```varn
 export async function workerArgs(tx: Sender<str>, num: int, text: str, arr: Array<int>, obj: { x: str }) {
-    assert("num arg",    num === 42)
-    assert("text arg",   text === "hello")
-    assert("arr length", arr.length === 3)
-    assert("obj arg",    obj.x === "nested")
+    assertTrue("num arg",    num === 42)
+    assertTrue("text arg",   text === "hello")
+    assertTrue("arr length", arr.length === 3)
+    assertTrue("obj arg",    obj.x === "nested")
     await tx.send("args_ok")
 }
 
@@ -219,8 +217,8 @@ import { channel, ChannelClosed, Sender, Receiver } from "std:task"
 const ch = channel<int>(2)     // canal con capacidad 2
 await ch.tx.send(1)
 await ch.tx.send(2)
-assert("ch recv 1", await ch.rx.receive() === 1)
-assert("ch recv 2", await ch.rx.receive() === 2)
+assertTrue("ch recv 1", await ch.rx.receive() === 1)
+assertTrue("ch recv 2", await ch.rx.receive() === 2)
 ```
 
 ### Close y `ChannelClosed`
@@ -234,7 +232,7 @@ try {
 } catch (e) {
     typed = e instanceof ChannelClosed
 }
-assert("recv closed typed", typed)
+assertTrue("recv closed typed", typed)
 
 let sendClosed = false
 try {
@@ -242,7 +240,7 @@ try {
 } catch (e) {
     sendClosed = e instanceof ChannelClosed
 }
-assert("send closed typed", sendClosed)
+assertTrue("send closed typed", sendClosed)
 ```
 
 ### `for await` sobre canal
@@ -256,7 +254,7 @@ let sum = 0
 for await (const v of ch.rx) {
     sum = sum + v
 }
-assert("for-await drains", sum === 30)
+assertTrue("for-await drains", sum === 30)
 ```
 
 ### `using` para auto-close del Sender
@@ -267,10 +265,10 @@ const ch = channel<int>(1)
     using tx = ch.tx      // tx.dispose() cierra el canal al salir del bloque
     await tx.send(5)
 }
-assert("drained after dispose", await ch.rx.receive() === 5)
+assertTrue("drained after dispose", await ch.rx.receive() === 5)
 let closed = false
 try { await ch.rx.receive() } catch (e) { closed = e instanceof ChannelClosed }
-assert("closed after dispose", closed)
+assertTrue("closed after dispose", closed)
 ```
 
 ### Canal cross-isolate
@@ -287,7 +285,7 @@ const a = channel<int>(4)
 const b = channel<int>(4)
 const handle = await spawnIsolate(echoWorker, [a.rx, b.tx])
 await a.tx.send(21)
-assert("cross-isolate echo", await b.rx.receive() === 42)
+assertTrue("cross-isolate echo", await b.rx.receive() === 42)
 a.tx.close()
 await handle.join()
 ```
@@ -315,7 +313,7 @@ export async function workerDialog(rx: Receiver<Msg>, tx: Sender<int>) {
 
 // En el isolate padre:
 await in3.tx.send(Msg.Val(1))
-assert("dialog 1", await out3.rx.receive() === 2)
+assertTrue("dialog 1", await out3.rx.receive() === 2)
 await in3.tx.send(Msg.Exit)
 await h3.join()
 ```
@@ -335,8 +333,8 @@ await sleep(1)    // pausa de ~1ms (disponible en pruebas como tests/21-async.vn
 Varn soporta `await` a nivel de módulo:
 
 ```varn
-await runAsync()          // tests/21-async.vn:98
-await runAsyncGenerators()   // tests/77-async-generators.vn:105
+await runAsync()          // tests/21-async.vn
+await runAsyncGenerators()   // tests/77-async-generators.vn
 if (!isIsolate) {
     await testIsolates()
 }

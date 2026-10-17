@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Sentencias y Control de Flujo
 
 > Fuentes: `tests/09-control-flow.vn`, `tests/10-match.vn`, `tests/11-errors.vn`, `tests/18-ranges.vn`, `tests/34-char-type.vn`, `tests/47-isolates-multithread.vn`, `tests/54-channels.vn`, `tests/78-try-early-exit.vn`, `tests/79-control-flow-narrowing.vn`.
@@ -11,7 +9,7 @@
 ```varn
 let x = 42              // mutable
 const y = "hello"       // inmutable
-var z = true            // mutable (alias var)
+// `var` no existe: el compilador lo rechaza (VN2002)
 
 let typed: int = 100
 const explicit: str? = null
@@ -58,7 +56,7 @@ Con bloques:
 
 ```varn
 if (val !== null) {
-    return val.length     // type narrowed to str (tests/79-control-flow-narrowing.vn:5)
+    return val.length     // type narrowed to str (tests/79-control-flow-narrowing.vn)
 }
 ```
 
@@ -68,7 +66,7 @@ if (val !== null) {
 
 ```varn
 function describeNum(n: int): str {
-    return match (n) {        // tests/10-match.vn:3
+    return match (n) {        // tests/10-match.vn
         0 => "zero",
         1 => "one",
         2 | 3 => "two or three",   // multi-valor
@@ -86,7 +84,7 @@ let v = match x {
 }
 ```
 
-Match anidado en `this` (`tests/41-advanced-enums.vn:48`, `tests/189-enum-variant-slots.vn:13`):
+Match anidado en `this` (`tests/41-advanced-enums.vn`, `tests/189-enum-variant-slots.vn`):
 
 ```varn
 area(): float {
@@ -107,7 +105,7 @@ while (i < arr.length) {
     if (arr[i] > threshold) { break }
     i = i + 1
 }
-// tests/09-control-flow.vn:12
+// tests/09-control-flow.vn
 ```
 
 ---
@@ -119,7 +117,7 @@ for (let i = 0; i <= max; i = i + 1) {
     if (i % 2 === 0) continue
     total = total + i
 }
-// tests/09-control-flow.vn:25
+// tests/09-control-flow.vn
 ```
 
 ---
@@ -133,14 +131,14 @@ let forOfSum = 0
 for (const n of [10, 20, 30]) {
     forOfSum = forOfSum + n
 }
-assert("for-of sum", forOfSum === 60)   // tests/09-control-flow.vn:34
+assertTrue("for-of sum", forOfSum === 60)   // tests/09-control-flow.vn
 
 // Con rango inclusivo
 let rangeSum = 0
 for (const i of 1..=10) {
     rangeSum = rangeSum + i
 }
-assert("range for-of sum", rangeSum === 55)   // tests/18-ranges.vn:23
+assertTrue("range for-of sum", rangeSum === 55)   // tests/18-ranges.vn
 
 // Con break
 let forOfBreak = 0
@@ -148,7 +146,7 @@ for (const n of [1, 2, 3, 4, 5]) {
     if (n === 3) break
     forOfBreak = forOfBreak + n
 }
-assert("for-of break", forOfBreak === 3)
+assertTrue("for-of break", forOfBreak === 3)
 
 // Con generador
 for (let i = 0; i < 8; i = i + 1) {
@@ -168,7 +166,7 @@ let keyCount = 0
 for (const k in obj2) {
     keyCount = keyCount + 1
 }
-assert("for-in key count", keyCount === 3)   // tests/09-control-flow.vn:48
+assertTrue("for-in key count", keyCount === 3)   // tests/09-control-flow.vn
 ```
 
 ---
@@ -178,11 +176,11 @@ assert("for-in key count", keyCount === 3)   // tests/09-control-flow.vn:48
 Consume iterables asíncronos, como canales o async generators:
 
 ```varn
-for await (const v of ch.rx) {         // tests/54-channels.vn:36
+for await (const v of ch.rx) {         // tests/54-channels.vn
     sum = sum + v
 }
 
-for await (const msg of rx) {          // tests/47-isolates-multithread.vn:27
+for await (const msg of rx) {          // tests/47-isolates-multithread.vn
     match (msg) {
         Val(n) => await tx.send(n + 1),
         Msg.Exit => open = false,
@@ -190,7 +188,7 @@ for await (const msg of rx) {          // tests/47-isolates-multithread.vn:27
     if (!open) break
 }
 
-for await (const v of awaitsThenYields()) {   // tests/77-async-generators.vn:71
+for await (const v of awaitsThenYields()) {   // tests/77-async-generators.vn
     total = total + v
 }
 ```
@@ -236,7 +234,7 @@ function withFinally(): int {
         finallyRan = true    // se ejecuta aunque haya return
     }
 }
-assert("finally ran", finallyRan)   // tests/11-errors.vn:75
+assertTrue("finally ran", finallyRan)   // tests/11-errors.vn
 ```
 
 ---
@@ -247,12 +245,12 @@ assert("finally ran", finallyRan)   // tests/11-errors.vn:75
 function safeDivide(a: int, b: int): float {
     try {
         if (b === 0) throw new RangeError("division by zero")
-        return a / b
+        return (a as float) / (b as float)
     } catch (e) {
         return -1
     }
 }
-// tests/11-errors.vn:2
+// tests/11-errors.vn
 
 // finally siempre se ejecuta
 try {
@@ -280,7 +278,7 @@ try {
 } catch (e) {
     isRangeError = e instanceof RangeError
 }
-assert("catch instanceof", isRangeError)   // tests/11-errors.vn:27
+assertTrue("catch instanceof", isRangeError)   // tests/11-errors.vn
 ```
 
 ### Rethrow
@@ -310,7 +308,7 @@ function conBreak(): void {
         } catch (e) { /* nunca se llega aquí */ }
     }
 }
-// tests/78-try-early-exit.vn:19
+// tests/78-try-early-exit.vn
 
 function conReturn(): void {
     for (let i = 0; i < 3; i = i + 1) {
@@ -319,8 +317,8 @@ function conReturn(): void {
         } catch (e) {}
     }
 }
-assert("break no deja handler colgante", capturaEnElSitioCorrecto("break"))
-assert("return no deja handler colgante", capturaEnElSitioCorrecto("return"))
+assertTrue("break no deja handler colgante", capturaEnElSitioCorrecto("break"))
+assertTrue("return no deja handler colgante", capturaEnElSitioCorrecto("return"))
 ```
 
 ---
@@ -341,23 +339,23 @@ throw e    // re-lanzar una excepción capturada
 Gestión de recursos con disposición automática al salir del bloque:
 
 ```varn
-using group = new TaskGroup<int>()   // tests/21-async.vn:43
+using group = new TaskGroup<int>()   // tests/21-async.vn
 const g1 = group.spawn(asyncAdd(7, 8))
 const joined = await group.join()
 
 // Bloque explícito con using
 {
-    using tx = ch.tx               // tests/54-channels.vn:47
+    using tx = ch.tx               // tests/54-channels.vn
     await tx.send(5)
 }   // tx.dispose() se llama aquí automáticamente
 
 // using con destructuring
 {
-    using { res1, res2 } = resource;   // tests/50-opt-unsupported-phase3.vn:55
+    using { res1, res2 } = resource;   // tests/50-opt-unsupported-phase3.vn
 }   // resource.dispose() corre al salir
 
 // using con ficheros
-using file = File.open(path, "w");   // tests/45-simple-file-test.vn:9
+using file = File.open(path, "w");   // tests/45-simple-file-test.vn
 ```
 
 ---
@@ -368,10 +366,10 @@ using file = File.open(path, "w");   // tests/45-simple-file-test.vn:9
 function classify(n: int): str {
     return n < 0 ? "neg" : n === 0 ? "zero" : "pos"
 }
-assert("nested ternary neg",  classify(-1) === "neg")
-assert("nested ternary zero", classify(0) === "zero")
-assert("nested ternary pos",  classify(1) === "pos")
-// tests/09-control-flow.vn:3
+assertTrue("nested ternary neg",  classify(-1) === "neg")
+assertTrue("nested ternary zero", classify(0) === "zero")
+assertTrue("nested ternary pos",  classify(1) === "pos")
+// tests/09-control-flow.vn
 ```
 
 ---
@@ -392,9 +390,9 @@ mut.push(4)
 ## 18. Expresión `assert` (función de test)
 
 ```varn
-assert("mensaje", condición_booleana)
+assertTrue("mensaje", condición_booleana)
 // Lanza error si la condición es falsa. Presente en casi todos los tests.
-assert("int add", 1 + 2 === 3)
-assert("trim",    s.trim() === "Hello, World!")
+assertTrue("int add", 1 + 2 === 3)
+assertTrue("trim",    s.trim() === "Hello, World!")
 ```
 

@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Lexical Syntax
 
 > Fuentes: `tests/01-arithmetic.vn`, `tests/02-boolean.vn`, `tests/03-strings.vn`, `tests/04-templates.vn`, `tests/34-char-type.vn`, `tests/35-decimal-bigint.vn`, `tests/89-raw-strings-and-with-expressions.vn`.
@@ -57,10 +55,10 @@ NO son keywords: `record`, `spawn`, `parallel`, `dynamic`, `isIsolate`.
 ### 4.1 Literales enteros (`int`)
 
 ```varn
-assert("int add",      1 + 2 === 3)       // tests/01-arithmetic.vn:1
-assert("int power",    2 ** 10 === 1024)  // tests/01-arithmetic.vn:7
-assert("bitwise and",  (12 & 10) === 8)   // tests/01-arithmetic.vn:14
-assert("left shift",   1 << 4 === 16)     // tests/01-arithmetic.vn:18
+assertTrue("int add",      1 + 2 === 3)       // tests/01-arithmetic.vn
+assertTrue("int power",    2 ** 10 === 1024)  // tests/01-arithmetic.vn
+assertTrue("bitwise and",  (12 & 10) === 8)   // tests/01-arithmetic.vn
+assertTrue("left shift",   1 << 4 === 16)     // tests/01-arithmetic.vn
 ```
 
 Soporta notación decimal. Las operaciones son: `+`, `-`, `*`, `/`, `%`, `**` (potencia), `&`, `|`, `^`, `~`, `<<`, `>>`.
@@ -68,23 +66,23 @@ Soporta notación decimal. Las operaciones son: `+`, `-`, `*`, `/`, `%`, `**` (p
 ### 4.2 Literales flotantes (`float`)
 
 ```varn
-assert("float add",  0.1 + 0.2 > 0.29 && 0.1 + 0.2 < 0.31)  // tests/01-arithmetic.vn:8
-assert("float div",  1.0 / 3.0 > 0.333 && 1.0 / 3.0 < 0.334)  // tests/01-arithmetic.vn:9
+assertTrue("float add",  0.1 + 0.2 > 0.29 && 0.1 + 0.2 < 0.31)  // tests/01-arithmetic.vn
+assertTrue("float div",  1.0 / 3.0 > 0.333 && 1.0 / 3.0 < 0.334)  // tests/01-arithmetic.vn
 ```
 
 Requiere punto decimal. `int / int` es `int` truncado
-(`tests/120-int-division.vn:16`); la división `float` usa operandos `float`
-(`tests/120-int-division.vn:13`).
+(`tests/120-int-division.vn`); la división `float` usa operandos `float`
+(`tests/120-int-division.vn`).
 
 ### 4.3 Literales `decimal`
 
 Sufijo `d`. Precisión exacta para cálculos financieros.
 
 ```varn
-const d1: decimal = 1.5d    // tests/35-decimal-bigint.vn:3
+const d1: decimal = 1.5d    // tests/35-decimal-bigint.vn
 const d2: decimal = 2.5d
-assert("decimal add", d1 + d2 === 4.0d)   // tests/35-decimal-bigint.vn:5
-assert("decimal toFixed 2", (3.14159d).toFixed(2) === "3.14")  // tests/35-decimal-bigint.vn:17
+assertTrue("decimal add", d1 + d2 === 4.0d)   // tests/35-decimal-bigint.vn
+assertTrue("decimal toFixed 2", (3.14159d).toFixed(2) === "3.14")  // tests/35-decimal-bigint.vn
 ```
 
 ### 4.4 Literales `bigint`
@@ -92,19 +90,19 @@ assert("decimal toFixed 2", (3.14159d).toFixed(2) === "3.14")  // tests/35-decim
 Sufijo `n`. Enteros de precisión arbitraria.
 
 ```varn
-const bi1: bigint = 100n     // tests/35-decimal-bigint.vn:47
-assert("bigint toString", bi1.toString() === "100")
-assert("bigint toInt",    bi1.toInt() === 100)
-assert("bigint lt",       1n < 100n)
+const bi1: bigint = 100n     // tests/35-decimal-bigint.vn
+assertTrue("bigint toString", bi1.toString() === "100")
+assertTrue("bigint toInt",    bi1.toInt() === 100)
+assertTrue("bigint lt",       1n < 100n)
 ```
 
 ### 4.5 Literales booleanos (`bool`)
 
 ```varn
-assert("and short-circuit", (false && (1/0 === 0)) === false)  // tests/02-boolean.vn:1
-assert("or short-circuit",  true  || (1/0 === 0) === true)    // tests/02-boolean.vn:2
-assert("not false",         !false === true)                   // tests/02-boolean.vn:4
-assert("triple eq null",    null === null)                     // tests/02-boolean.vn:10
+assertTrue("and short-circuit", (false && (1/0 === 0)) === false)  // tests/02-boolean.vn
+assertTrue("or short-circuit",  true  || (1/0 === 0) === true)    // tests/02-boolean.vn
+assertTrue("not false",         !false === true)                   // tests/02-boolean.vn
+assertTrue("triple eq null",    null === null)                     // tests/02-boolean.vn
 ```
 
 ### 4.6 Literales de cadena (`str`)
@@ -113,9 +111,9 @@ Entre comillas dobles. Admiten secuencias de escape estándar: `\n`, `\t`, `\r`,
 
 ```varn
 const s = "  Hello, World!  "
-assert("trim",       s.trim() === "Hello, World!")   // tests/03-strings.vn:3
-assert("slice",      "hello world".slice(6, 11) === "world")
-assert("length",     "hello".length === 5)
+assertTrue("trim",       s.trim() === "Hello, World!")   // tests/03-strings.vn
+assertTrue("slice",      "hello world".slice(6, 11) === "world")
+assertTrue("length",     "hello".length === 5)
 ```
 
 ### 4.7 Raw String Literals (`"""…"""`)
@@ -128,10 +126,10 @@ let jsonStr = """{
   "path": "C:\Program Files\Varn",
   "escapes": "\n \t \r"
 }""";
-// tests/89-raw-strings-and-with-expressions.vn:11-15
+// tests/89-raw-strings-and-with-expressions.vn
 
 let text = """Hello "world" and 'quotes' without escapes!""";
-// tests/89-raw-strings-and-with-expressions.vn:23
+// tests/89-raw-strings-and-with-expressions.vn
 ```
 
 - Pueden ser multilínea sin barras invertidas adicionales.
@@ -142,10 +140,10 @@ let text = """Hello "world" and 'quotes' without escapes!""";
 
 ```varn
 const tval = 42
-assert("simple template",   `answer = ${tval}` === "answer = 42")   // tests/04-templates.vn:3
-assert("expr in template",  `${tval * 2}` === "84")                  // tests/04-templates.vn:4
-assert("nested template",   `prefix_${"mid"}_suffix` === "prefix_mid_suffix")
-assert("template + concat", `a${1 + 1}b` + "c" === "a2bc")
+assertTrue("simple template",   `answer = ${tval}` === "answer = 42")   // tests/04-templates.vn
+assertTrue("expr in template",  `${tval * 2}` === "84")                  // tests/04-templates.vn
+assertTrue("nested template",   `prefix_${"mid"}_suffix` === "prefix_mid_suffix")
+assertTrue("template + concat", `a${1 + 1}b` + "c" === "a2bc")
 ```
 
 Las interpolaciones `${expr}` admiten cualquier expresión.
@@ -155,18 +153,17 @@ Las interpolaciones `${expr}` admiten cualquier expresión.
 Entre comillas simples. Tipo primitivo distinto de `str`.
 
 ```varn
-const a: char = 'a'             // tests/34-char-type.vn:3
-assert("char code point", 'A'.charCodeAt() === 65)
-assert("char from code",  char.fromCode(65) === 'A')
-assert("char toString",   'x'.toString() === "x")
+const a: char = 'a'             // tests/34-char-type.vn
+assertTrue("char code point", 'A'.charCodeAt() === 65)
+assertTrue("char from code",  char.fromCode(65) === 'A')
+assertTrue("char toString",   'x'.toString() === "x")
 ```
 
 ### 4.10 Literal `null`
 
 ```varn
-const p3: Profile? = null    // tests/08-null-safety.vn:13
-assert("triple eq null", null === null)
-assert("triple neq null", null !== 0)
+const p3: Profile? = null    // tests/08-null-safety.vn
+assertTrue("triple eq null", null === null)
 ```
 
 ---
@@ -179,7 +176,7 @@ assert("triple neq null", null !== 0)
 | `+` | Suma / concatenación de strings |
 | `-` | Resta / negación unaria |
 | `*` | Multiplicación |
-| `/` | División: `int / int` es `int` truncado hacia cero (`tests/120-int-division.vn:16`); `float / float` es `float` |
+| `/` | División: `int / int` es `int` truncado hacia cero (`tests/120-int-division.vn`); `float / float` es `float` |
 | `%` | Módulo |
 | `**` | Potencia |
 
@@ -196,15 +193,16 @@ Con cortocircuito: `&&` no evalúa el lado derecho si el izquierdo es falso; `||
 
 ### 5.5 Null-coalescing
 ```varn
-assert("?? left non-null", (42 ?? 0) === 42)     // tests/08-null-safety.vn:18
-assert("?? left null",     (null ?? 99) === 99)   // tests/08-null-safety.vn:19
-assert("?? chained",       (null ?? null ?? 7) === 7)
+const maybe: int? = 42
+assertTrue("?? left non-null", (maybe ?? 0) === 42)  // `??` sobre un no-nulo es error (VN3028)
+assertTrue("?? left null",     (null ?? 99) === 99)   // tests/08-null-safety.vn
+assertTrue("?? chained",       (null ?? null ?? 7) === 7)
 ```
 
 ### 5.6 Null-coalescing Assignment (`??=`)
 ```varn
 let a: int? = null
-a ??= 42          // a es ahora 42  (tests/87-primary-constructors-nullish-assign.vn:75)
+a ??= 42          // a es ahora 42  (tests/87-primary-constructors-nullish-assign.vn)
 a ??= 999         // no cambia: a sigue siendo 42
 ```
 
@@ -212,18 +210,18 @@ Asigna el valor derecho únicamente si la variable (o propiedad, o índice) es `
 
 ### 5.7 Optional Chaining (`?.`)
 ```varn
-assert("?. non-null chain",  p1?.address?.city === "NY")   // tests/08-null-safety.vn:15
-assert("?. missing nested",  p2?.address?.city === null)
-assert("?. null root",       p3?.name === null)
+assertTrue("?. non-null chain",  p1?.address?.city === "NY")   // tests/08-null-safety.vn
+assertTrue("?. missing nested",  p2?.address?.city === null)
+assertTrue("?. null root",       p3?.name === null)
 ```
 
 ### 5.8 Pipeline (`|>`)
 ```varn
-assert("pipe simple",       5 |> double2 === 10)             // tests/19-pipeline.vn:10
-assert("pipe placeholder",  7 |> addN(_, 3) === 10)          // tests/19-pipeline.vn:11
-assert("pipe multi _",      4 |> addN(_, _) === 8)
+assertTrue("pipe simple",       5 |> double2 === 10)             // tests/19-pipeline.vn
+assertTrue("pipe placeholder",  7 |> addN(_, 3) === 10)          // tests/19-pipeline.vn
+assertTrue("pipe multi _",      4 |> addN(_, _) === 8)
 const piped = (3 |> double2) |> double2
-assert("pipe chained", piped === 12)
+assertTrue("pipe chained", piped === 12)
 ```
 
 El `_` en el lado derecho actúa como marcador de posición del valor del lado izquierdo.
@@ -231,27 +229,27 @@ El `_` en el lado derecho actúa como marcador de posición del valor del lado i
 ### 5.9 Ternary
 ```varn
 function classify(n: int): str {
-    return n < 0 ? "neg" : n === 0 ? "zero" : "pos"  // tests/09-control-flow.vn:3
+    return n < 0 ? "neg" : n === 0 ? "zero" : "pos"  // tests/09-control-flow.vn
 }
 ```
 
 ### 5.10 Spread (`...`)
 ```varn
-const spread = [...[1, 2], ...[3, 4]]          // tests/05-arrays.vn:62
-const ext    = { ...base, z: 3 }               // tests/06-destructuring.vn:33
+const spread = [...[1, 2], ...[3, 4]]          // tests/05-arrays.vn
+const ext    = { ...base, z: 3 }               // tests/06-destructuring.vn
 ```
 
 ### 5.11 Instanceof y typeof
 ```varn
-assert("instanceof PoliceDog", pd instanceof PoliceDog)  // tests/12-classes.vn
-assert("processTypeof string", typeof "abc" === "str")   // tests/79-control-flow-narrowing.vn
+assertTrue("instanceof PoliceDog", pd instanceof PoliceDog)  // tests/12-classes.vn
+assertTrue("processTypeof string", typeof "abc" === "str")   // tests/79-control-flow-narrowing.vn
 ```
 // `typeof` verificado: `"str"`, `"int"`, `"float"`, `"class"` (ver `identifiers.md` §6).
 
 ### 5.12 Type Assertion (`is`)
 ```varn
 function describeChar(c: char): str {
-    if (c is char) return "yes"   // tests/34-char-type.vn:38
+    if (c is char) return "yes"   // tests/34-char-type.vn
     return "no"
 }
 ```

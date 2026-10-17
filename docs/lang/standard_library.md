@@ -1,16 +1,14 @@
 # Varn — Biblioteca estándar (puntero)
 
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 Mapa completo de paquetes: `../STDLIB_ARCHITECTURE.md` (30 dirs en `std/`, incl. `gpu`, `ui`, `text`).
 Este archivo no duplica esa lista; solo ancla lo ejercitado por la suite.
 
 ## Núcleo async y tareas (`std:task`)
 
 `async/await`, `spawn`, `parallel`, `TaskGroup`, canales, isolates:
-`async_concurrency.md`. Tests: `tests/21-async.vn:1-2,25-80`,
-`tests/97-stdlib-task-combinators.vn:1,9-33` (`Task.all`, `allSettled`, `race`),
-`tests/110-stdlib-consolidation.vn:3` (`Mutex`, `Semaphore`, `WaitGroup`),
+`async_concurrency.md`. Tests: `tests/21-async.vn`,
+`tests/97-stdlib-task-combinators.vn` (`Task.all`, `allSettled`, `race`),
+`tests/110-stdlib-consolidation.vn` (`Mutex`, `Semaphore`, `WaitGroup`),
 `tests/47-isolates-multithread.vn`, `tests/54-channels.vn`.
 
 ## Colecciones y tipos de plataforma
@@ -21,9 +19,9 @@ Este archivo no duplica esa lista; solo ancla lo ejercitado por la suite.
 - `Range` (`..`, `..=`, `Range.from`, `step`, `toArray`, slicing):
   `tests/18-ranges.vn`, `tests/88-range-indexing.vn`.
 - Tuplas `#[…]` / records `#{…}`: `tests/69-tuples-records.vn`.
-- `str`: `tests/03-strings.vn:7-58` (`trim`, `padStart/End`, `charCode`,
+- `str`: `tests/03-strings.vn` (`trim`, `padStart/End`, `charCode`,
   `substr`, `isEmpty/isBlank/isDigit`, `capitalize`, `str.fromCharCode`, `str.join`).
-- `char`: `tests/34-char-type.vn:3` (`charCodeAt`, `char.fromCode`, `toString`).
+- `char`: `tests/34-char-type.vn` (`charCodeAt`, `char.fromCode`, `toString`).
 - `int` API (`wrapping/saturating/checked*`, `div/floorDiv/ceilDiv/rem/mod`,
   `parse/tryParse`): `tests/123-int-api.vn`.
 - `decimal` / `bigint`: `tests/35-decimal-bigint.vn`,
@@ -36,29 +34,29 @@ Este archivo no duplica esa lista; solo ancla lo ejercitado por la suite.
 
 ## Formatos, red, sistema
 
-- `std:csv`, `std:json`: `tests/82-std-csv.vn:80`.
+- `std:encoding` (`Csv`, `Json`): `tests/82-std-csv.vn`.
 - `std:regex`, `std:crypto` (UUID), `std:time`:
-  `tests/83-canonical-types-regex-uuid-time.vn:59,75`.
+  `tests/83-canonical-types-regex-uuid-time.vn`.
 - `std:process`, `std:compress`, `std:cli`, `std:env`, `std:path`:
-  `tests/84-stdlib-process-compress-cli-env.vn:11,36,48,64`.
-- `std:sqlite`, `std:ws`, archivos: `tests/85-stdlib-sqlite-ws-archive.vn:72,92`.
-- Tagged templates + SQL (`db.sql`, `db.sqlOne`): `tests/86-tagged-templates.vn:6,48-61`.
+  `tests/84-stdlib-process-compress-cli-env.vn`.
+- `std:sqlite`, `std:ws`, archivos: `tests/85-stdlib-sqlite-ws-archive.vn`.
+- Tagged templates + SQL (`db.sql`, `db.sqlOne`): `tests/86-tagged-templates.vn`.
 - `std:encoding`, `std:cli` (Color/Table/Prompt), `std:log`, `std:collections`
-  (PriorityQueue, LRUCache): `tests/110-stdlib-consolidation.vn:3-5,75-181`.
+  (PriorityQueue, LRUCache): `tests/110-stdlib-consolidation.vn`.
 - `std:net`, `std:http`, `std:ws`:
-  `tests/111-network-apis-overhaul.vn:1-3,25-77`.
+  `tests/111-network-apis-overhaul.vn`.
 - Migración y superficie completa: `tests/31-stdlib-migration-test.vn`,
   `tests/42-stdlib-comprehensive-test.vn`.
 
 ## Test y reflexión
 
-- `std:test` (`describe/it/expect`): `tests/21-async.vn:1`,
-  `tests/97-stdlib-task-combinators.vn:2`; framework: `tests/98-stdlib-test-framework.vn`.
+- `std:test` (`describe/it/expect`): `tests/21-async.vn`,
+  `tests/97-stdlib-task-combinators.vn`; framework: `tests/98-stdlib-test-framework.vn`.
 - `std:reflect` (`MetaKey`, `ClassRef`; contextos de decorador globales):
-  `tests/27-decorators.vn:1`.
-- `std:fs` (`read/write/remove/exists`), `std:sys` (`env/platform/cwd`):
-  `tests/80-capabilities-security.vn:6,42`.
-- Ficheros vía `using`: `tests/44-implicit-extensions-test.vn:12-40`,
-  `tests/45-simple-file-test.vn:8-14`.
+  `tests/27-decorators.vn`.
+- `std:fs` (`readText/writeText/remove/exists`), `std:env` (`Env`), `std:sys` (`platform/cwd`):
+  `tests/80-capabilities-security.vn`.
+- Ficheros vía `using`: `tests/44-implicit-extensions-test.vn`,
+  `tests/45-simple-file-test.vn`.
 
 Métodos no citados arriba: NO-VERIFICADOS. Ver `../STDLIB_ARCHITECTURE.md`.

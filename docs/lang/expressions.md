@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Expresiones
 
 > Fuentes: `tests/01-arithmetic.vn`, `tests/04-templates.vn`, `tests/05-arrays.vn`, `tests/06-destructuring.vn`, `tests/07-closures.vn`, `tests/08-null-safety.vn`, `tests/10-match.vn`, `tests/14-generics.vn`, `tests/18-ranges.vn`, `tests/19-pipeline.vn`, `tests/29-option-destructuring.vn`, `tests/37-complex-closures.vn`, `tests/38-advanced-higher-order.vn`, `tests/41-advanced-enums.vn`, `tests/69-tuples-records.vn`, `tests/86-tagged-templates.vn`, `tests/87-primary-constructors-nullish-assign.vn`, `tests/88-range-indexing.vn`, `tests/89-raw-strings-and-with-expressions.vn`.
@@ -29,7 +27,7 @@ null        // null
 ```varn
 let x = 42          // mutable
 const y = "hello"   // inmutable (alias: const)
-var z = true        // mutable (alias: var)
+// `var` no existe: el compilador lo rechaza (VN2002)
 
 let typed: int = 100
 const explicit: str = "world"
@@ -40,7 +38,7 @@ const explicit: str = "world"
 ## 3. Operadores y Precedencia
 
 > NO-VERIFICADO: la tabla completa no está fijada por ningún test. Solo esto:
-> `2 + 3 * 4 === 14`, `(2 + 3) * 4 === 20` (`tests/01-arithmetic.vn:12`).
+> `2 + 3 * 4 === 14`, `(2 + 3) * 4 === 20` (`tests/01-arithmetic.vn`).
 
 | Nivel | Operadores |
 |-------|-----------|
@@ -63,8 +61,8 @@ const explicit: str = "world"
 | 17 | `=`, `??=` |
 
 ```varn
-assert("precedence *+",    2 + 3 * 4 === 14)    // tests/01-arithmetic.vn:12
-assert("precedence parens",(2 + 3) * 4 === 20)
+assertTrue("precedence *+",    2 + 3 * 4 === 14)    // tests/01-arithmetic.vn
+assertTrue("precedence parens",(2 + 3) * 4 === 20)
 ```
 
 ---
@@ -72,12 +70,12 @@ assert("precedence parens",(2 + 3) * 4 === 20)
 ## 4. Literals de Array
 
 ```varn
-const nums = [3, 1, 4, 1, 5, 9]     // tests/05-arrays.vn:2
+const nums = [3, 1, 4, 1, 5, 9]     // tests/05-arrays.vn
 const spread = [...[1, 2], ...[3, 4]]   // spread
 let explicitGeneric: Array<int> = [10, 20, 30]
 
 // Acceso por índice
-assert("index", nums[0] === 3)
+assertTrue("index", nums[0] === 3)
 
 // Acceso por rango
 let slice = nums[1..4]    // [1, 4, 1]  (tests/88-range-indexing.vn)
@@ -89,7 +87,7 @@ let sliceInc = nums[1..=4]
 ## 5. Literals de Objeto
 
 ```varn
-const obj1 = { a: 1, b: 2, c: 3 }    // tests/06-destructuring.vn:2
+const obj1 = { a: 1, b: 2, c: 3 }    // tests/06-destructuring.vn
 const base = { x: 1, y: 2 }
 const ext  = { ...base, z: 3 }        // spread en objeto
 ```
@@ -99,14 +97,14 @@ const ext  = { ...base, z: 3 }        // spread en objeto
 ## 6. Tuplas y Records (Inmutables)
 
 ```varn
-let t = #[1, "hello", true]       // Tuple  (tests/69-tuples-records.vn:4)
+let t = #[1, "hello", true]       // Tuple  (tests/69-tuples-records.vn)
 let r = #{ name: "Varn", v: 1 }   // Record
 
 // Igualdad estructural profunda con ==
 let t2 = #[1, "hello", true]
-assert("tuple eq", t == t2)
+assertTrue("tuple eq", t == t2)
 let r2 = #{ name: "Varn", v: 1 }
-assert("record eq", r == r2)
+assertTrue("record eq", r == r2)
 ```
 
 ---
@@ -115,11 +113,11 @@ assert("record eq", r == r2)
 
 ```varn
 // Positional
-assert("int add", 1 + 2 === 3)
+assertTrue("int add", 1 + 2 === 3)
 identity<int>(42)        // con parámetro de tipo explícito
 
 // Named arguments
-describe(name: "Alice", age: 30, city: "London")   // tests/40-named-arguments.vn:11
+describe(name: "Alice", age: 30, city: "London")   // tests/40-named-arguments.vn
 describe(age: 25, name: "Bob")                      // fuera de orden
 describe("Charlie", age: 40)                         // mezcla posicional y nombrado
 
@@ -169,7 +167,7 @@ function makeAdder(n: int): (a: int) => int {
     return (x: int) => x + n   // captura 'n'
 }
 const add5 = makeAdder(5)
-assert("closure add5", add5(3) === 8)   // tests/07-closures.vn:7
+assertTrue("closure add5", add5(3) === 8)   // tests/07-closures.vn
 
 // Closure mutable
 function makeCounter(): () => int {
@@ -180,8 +178,8 @@ function makeCounter(): () => int {
     }
 }
 const cnt1 = makeCounter()
-assert("counter1 first",  cnt1() === 1)
-assert("counter1 second", cnt1() === 2)
+assertTrue("counter1 first",  cnt1() === 1)
+assertTrue("counter1 second", cnt1() === 2)
 ```
 
 ### Composición de funciones
@@ -191,7 +189,7 @@ function compose<A, B, C>(f: (a:B) => C, g: (b:A) => B): (c:A) => C {
     return (x: A) => f(g(x))
 }
 const doubleInc = compose(double, inc)
-assert("compose", doubleInc(4) === 10)   // tests/07-closures.vn:30
+assertTrue("compose", doubleInc(4) === 10)   // tests/07-closures.vn
 ```
 
 ---
@@ -200,15 +198,15 @@ assert("compose", doubleInc(4) === 10)   // tests/07-closures.vn:30
 
 ```varn
 function describeNum(n: int): str {
-    return match (n) {        // tests/10-match.vn:3
+    return match (n) {        // tests/10-match.vn
         0 => "zero",
         1 => "one",
         2 | 3 => "two or three",
         _ => "other"
     }
 }
-assert("match 2",     describeNum(2) === "two or three")
-assert("match other", describeNum(99) === "other")
+assertTrue("match 2",     describeNum(2) === "two or three")
+assertTrue("match other", describeNum(99) === "other")
 ```
 
 Match sobre enums con payload (`tests/41-advanced-enums.vn`):
@@ -221,7 +219,7 @@ let v = match x {
     A(n) => n,
     B(_) => -1,
 }
-assert("match ok", v === 42)
+assertTrue("match ok", v === 42)
 ```
 
 Match en métodos de enum:
@@ -243,13 +241,13 @@ area(): float {
 function double2(n: int): int { return n * 2 }
 function addN(n: int, x: int): int { return n + x }
 
-assert("pipe simple",      5 |> double2 === 10)            // tests/19-pipeline.vn:10
-assert("pipe placeholder", 7 |> addN(_, 3) === 10)
-assert("pipe multi _",     4 |> addN(_, _) === 8)
-assert("pipe clamp lo",    -5 |> clamp2(0, 10, _) === 0)
+assertTrue("pipe simple",      5 |> double2 === 10)            // tests/19-pipeline.vn
+assertTrue("pipe placeholder", 7 |> addN(_, 3) === 10)
+assertTrue("pipe multi _",     4 |> addN(_, _) === 8)
+assertTrue("pipe clamp lo",    -5 |> clamp2(0, 10, _) === 0)
 
 const piped = (3 |> double2) |> double2
-assert("pipe chained", piped === 12)
+assertTrue("pipe chained", piped === 12)
 ```
 
 ---
@@ -258,7 +256,7 @@ assert("pipe chained", piped === 12)
 
 ```varn
 let u1 = new User(10, "Alice", "admin")
-let u2 = u1 with { name: "Bob", role: "editor" }  // tests/89-raw-strings-and-with-expressions.vn:31
+let u2 = u1 with { name: "Bob", role: "editor" }  // tests/89-raw-strings-and-with-expressions.vn
 ```
 
 Ver [`classes_objects.md`](classes_objects.md) §9 para detalles completos.
@@ -268,10 +266,10 @@ Ver [`classes_objects.md`](classes_objects.md) §9 para detalles completos.
 ## 13. Null Coalescing (`??`) y Optional Chaining (`?.`)
 
 ```varn
-assert("?? left null",     (null ?? 99) === 99)      // tests/08-null-safety.vn:19
-assert("?. non-null",      p1?.address?.city === "NY")
-assert("?. + ??",          (p3?.name ?? "anon") === "anon")
-assert("?? chained",       (null ?? null ?? 7) === 7)
+assertTrue("?? left null",     (null ?? 99) === 99)      // tests/08-null-safety.vn
+assertTrue("?. non-null",      p1?.address?.city === "NY")
+assertTrue("?. + ??",          (p3?.name ?? "anon") === "anon")
+assertTrue("?? chained",       (null ?? null ?? 7) === 7)
 ```
 
 ---
@@ -280,7 +278,7 @@ assert("?? chained",       (null ?? null ?? 7) === 7)
 
 ```varn
 let a: int? = null
-a ??= 42     // asigna solo si es null (tests/87-primary-constructors-nullish-assign.vn:75)
+a ??= 42     // asigna solo si es null (tests/87-primary-constructors-nullish-assign.vn)
 a ??= 999    // no hace nada: a ya es 42
 
 let cfg = new AppConfig()
@@ -299,7 +297,7 @@ items[1] ??= "overwritten_1"   // no cambia: "existing"
 ```varn
 // Interpolación estándar
 const tval = 42
-assert("template", `answer = ${tval}` === "answer = 42")  // tests/04-templates.vn:3
+assertTrue("template", `answer = ${tval}` === "answer = 42")  // tests/04-templates.vn
 
 // Tagged template: función + backtick
 function customTag(strings: str[], ...values: dynamic[]): str {
@@ -313,10 +311,10 @@ function customTag(strings: str[], ...values: dynamic[]): str {
 let name = "Varn"
 let version = 1
 let output = customTag`Language: ${name}, Version: ${version}!`
-assert("tagged template", output === "Language: [Varn], Version: [1]!")   // tests/86-tagged-templates.vn:37
+assertTrue("tagged template", output === "Language: [Varn], Version: [1]!")   // tests/86-tagged-templates.vn
 
 // SQL parametrizado con tagged templates
-let rows = db.sql`SELECT * FROM users WHERE role = ${targetRole} AND active = ${isActive}`   // tests/86-tagged-templates.vn:56
+let rows = db.sql`SELECT * FROM users WHERE role = ${targetRole} AND active = ${isActive}`   // tests/86-tagged-templates.vn
 ```
 
 ---
@@ -324,11 +322,11 @@ let rows = db.sql`SELECT * FROM users WHERE role = ${targetRole} AND active = ${
 ## 16. `instanceof` y `typeof`
 
 ```varn
-assert("instanceof Dog",  pd instanceof Dog)           // tests/12-classes.vn:56
-assert("instanceof Error", ve instanceof Error)        // tests/11-errors.vn:85
+assertTrue("instanceof Dog",  pd instanceof Dog)           // tests/12-classes.vn
+assertTrue("instanceof Error", ve instanceof Error)        // tests/11-errors.vn
 
-// typeof verificado: "str", "int" (tests/79-control-flow-narrowing.vn:32-34),
-// "float" (tests/122-numeric-conversions.vn:47), "class" (tests/111-network-apis-overhaul.vn:77)
+// typeof verificado: "str", "int" (tests/79-control-flow-narrowing.vn),
+// "float" (tests/122-numeric-conversions.vn), "class" (tests/111-network-apis-overhaul.vn)
 ```
 
 ---
@@ -337,7 +335,7 @@ assert("instanceof Error", ve instanceof Error)        // tests/11-errors.vn:85
 
 ```varn
 function describeChar(c: char): str {
-    if (c is char) return "yes"   // tests/34-char-type.vn:7
+    if (c is char) return "yes"   // tests/34-char-type.vn
     return "no"
 }
 ```
@@ -349,7 +347,7 @@ function describeChar(c: char): str {
 
 ```varn
 let jsonObj = JSON.parse("{\"message\": \"hello\", \"status\": 200}")
-let status = (jsonObj as dynamic).status    // tests/82-std-csv.vn:81
+let status = (jsonObj as dynamic).status    // tests/82-std-csv.vn
 assertEqual(status, 200)
 ```
 
@@ -358,7 +356,7 @@ assertEqual(status, 200)
 ## 19. `new` — Creación de Instancias
 
 ```varn
-const map = new Map<int>()              // tests/17-map-set.vn
+const map = new Map<str, int>()         // tests/17-map-set.vn
 const intBox = new Box<int>(10)         // tests/14-generics.vn
 const b = new Box(1)                    // deduce Box<int> (tests/190-generic-instantiation-from-new.vn)
 const u1 = new User(1, "Alice", "admin")   // tests/87-primary-constructors-nullish-assign.vn
@@ -370,7 +368,7 @@ const db = new Database(":memory:")     // tests/85-stdlib-sqlite-ws-archive.vn
 ## 20. Operador Ternario
 
 ```varn
-const label = n < 0 ? "neg" : n === 0 ? "zero" : "pos"  // tests/09-control-flow.vn:3
+const label = n < 0 ? "neg" : n === 0 ? "zero" : "pos"  // tests/09-control-flow.vn
 ```
 
 ---

@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Clases y Objetos
 
 > Fuentes: `tests/11-errors.vn`, `tests/12-classes.vn`, `tests/13-interfaces.vn`, `tests/23-objects.vn`, `tests/24-record.vn`, `tests/25-extensions.vn`, `tests/27-decorators.vn`, `tests/28-extensions-comprehensive.vn`, `tests/36-advanced-generics.vn`, `tests/87-primary-constructors-nullish-assign.vn`, `tests/89-raw-strings-and-with-expressions.vn`.
@@ -11,7 +9,7 @@
 ### Forma estándar
 
 ```varn
-class Animal {                         // tests/12-classes.vn:27
+class Animal {                         // tests/12-classes.vn
     name: str
     constructor(n: str) { this.name = n }
     speak() { return "..." }
@@ -22,7 +20,7 @@ class Animal {                         // tests/12-classes.vn:27
 ### Clases con visibilidad de campos
 
 ```varn
-class Temperature {                    // tests/12-classes.vn:12
+class Temperature {                    // tests/12-classes.vn
     private _celsius: float
     constructor(c: float) { this._celsius = c }
     get celsius() { return this._celsius }
@@ -31,10 +29,10 @@ class Temperature {                    // tests/12-classes.vn:12
 }
 
 const t = new Temperature(100.0)
-assert("getter celsius",    t.celsius === 100.0)
-assert("getter fahrenheit", t.fahrenheit === 212.0)
+assertTrue("getter celsius",    t.celsius === 100.0)
+assertTrue("getter fahrenheit", t.fahrenheit === 212.0)
 t.celsius = 0.0
-assert("setter works",      t.celsius === 0.0)
+assertTrue("setter works",      t.celsius === 0.0)
 ```
 
 ---
@@ -50,15 +48,15 @@ class User(public id: int, public name: str, private role: str = "guest") {
     }
     getRole(): str { return this.role }
 }
-// tests/87-primary-constructors-nullish-assign.vn:6
+// tests/87-primary-constructors-nullish-assign.vn
 
 let u1 = new User(1, "Alice", "admin")
-assert("id",    u1.id === 1)
-assert("name",  u1.name === "Alice")
-assert("greet", u1.greet() === "User #1: Alice [admin]")
+assertTrue("id",    u1.id === 1)
+assertTrue("name",  u1.name === "Alice")
+assertTrue("greet", u1.greet() === "User #1: Alice [admin]")
 
 let u2 = new User(2, "Bob")   // usa el default "guest"
-assert("default role", u2.getRole() === "guest")
+assertTrue("default role", u2.getRole() === "guest")
 ```
 
 ```varn
@@ -66,7 +64,7 @@ class Point(x: int, y: int) {    // sin modificador de acceso: campos públicos
     sum(): int { return this.x + this.y }
 }
 let pt = new Point(10, 25)
-assert("sum", pt.sum() === 35)
+assertTrue("sum", pt.sum() === 35)
 ```
 
 ### Estilo TypeScript: parámetros con modificadores en el constructor
@@ -76,11 +74,11 @@ class Hero {
     constructor(public id: int, public name: str, private power: float = 95.5) {}
     getPower(): float { return this.power }
 }
-// tests/87-primary-constructors-nullish-assign.vn:24
+// tests/87-primary-constructors-nullish-assign.vn
 
 let h = new Hero(101, "Superman")
-assert("id",    h.id === 101)
-assert("power", h.getPower() === 95.5)
+assertTrue("id",    h.id === 101)
+assertTrue("power", h.getPower() === 95.5)
 ```
 
 ---
@@ -88,7 +86,7 @@ assert("power", h.getPower() === 95.5)
 ## 3. Herencia
 
 ```varn
-class Dog extends Animal {             // tests/12-classes.vn:33
+class Dog extends Animal {             // tests/12-classes.vn
     constructor(n: str) { super(n) }
     override speak() { return "Woof" }
 }
@@ -102,10 +100,10 @@ class PoliceDog extends Dog {
 }
 
 const pd = new PoliceDog("K9", 42)
-assert("police dog speak",     pd.speak() === "Woof!")
-assert("instanceof PoliceDog", pd instanceof PoliceDog)
-assert("instanceof Dog",       pd instanceof Dog)
-assert("instanceof Animal",    pd instanceof Animal)
+assertTrue("police dog speak",     pd.speak() === "Woof!")
+assertTrue("instanceof PoliceDog", pd instanceof PoliceDog)
+assertTrue("instanceof Dog",       pd instanceof Dog)
+assertTrue("instanceof Animal",    pd instanceof Animal)
 ```
 
 ---
@@ -113,25 +111,25 @@ assert("instanceof Animal",    pd instanceof Animal)
 ## 4. Clases Abstractas
 
 ```varn
-abstract class Shape {               // tests/12-classes.vn:67
+abstract class Shape {               // tests/12-classes.vn
     abstract area(): float
     describe(): str { return `shape with area ${this.area()}` }
 }
 class Circle extends Shape {
     r: float
-    constructor(r: float) { this.r = r }
+    constructor(r: float) { super(); this.r = r }
     override area(): float { return 3.14159 * this.r * this.r }
 }
 class Rect extends Shape {
     w: float
     h: float
-    constructor(w: float, h: float) { this.w = w; this.h = h }
+    constructor(w: float, h: float) { super(); this.w = w; this.h = h }
     override area(): float { return this.w * this.h }
 }
 
 const circ = new Circle(1.0)
-assert("circle area",    circ.area() > 3.14 && circ.area() < 3.15)
-assert("abstract describe", circ.describe().startsWith("shape with area"))
+assertTrue("circle area",    circ.area() > 3.14 && circ.area() < 3.15)
+assertTrue("abstract describe", circ.describe().startsWith("shape with area"))
 ```
 
 ---
@@ -139,7 +137,7 @@ assert("abstract describe", circ.describe().startsWith("shape with area"))
 ## 5. Métodos y Campos Estáticos
 
 ```varn
-class IdGen {                         // tests/12-classes.vn:1
+class IdGen {                         // tests/12-classes.vn
     private static _next: int = 1
     static next(): int {
         const id = IdGen._next
@@ -149,10 +147,10 @@ class IdGen {                         // tests/12-classes.vn:1
     static reset(): void { IdGen._next = 1 }
 }
 
-assert("static method 1", IdGen.next() === 1)
-assert("static method 2", IdGen.next() === 2)
+assertTrue("static method 1", IdGen.next() === 1)
+assertTrue("static method 2", IdGen.next() === 2)
 IdGen.reset()
-assert("static reset",    IdGen.next() === 1)
+assertTrue("static reset",    IdGen.next() === 1)
 ```
 
 ---
@@ -160,14 +158,14 @@ assert("static reset",    IdGen.next() === 1)
 ## 6. Clases Genéricas
 
 ```varn
-class Box<T> {                        // tests/14-generics.vn:1
+class Box<T> {                        // tests/14-generics.vn
     value: T
     constructor(v: T) { this.value = v }
     get(): T { return this.value }
     map<U>(f: (T) => U): Box<U> { return new Box<U>(f(this.value)) }
 }
 
-class Node<T> {                       // tests/23-objects.vn:15
+class Node<T> {                       // tests/23-objects.vn
     value: T
     next: Node<T> | null
     constructor(v: T) { this.value = v; this.next = null }
@@ -181,7 +179,7 @@ class Node<T> {                       // tests/23-objects.vn:15
 Las extensiones añaden métodos a un tipo existente sin modificar su definición original.
 
 ```varn
-extension StringUtils on str {         // tests/25-extensions.vn:1
+extension StringUtils on str {         // tests/25-extensions.vn
     shout(): str { return this + "!" }
     times(n: int): str {
         let result = ""
@@ -192,8 +190,8 @@ extension StringUtils on str {         // tests/25-extensions.vn:1
     wordCount(): int { /* ... */ }
 }
 
-assert("str shout", "hello".shout() === "hello!")
-assert("str times", "ab".times(3) === "ababab")
+assertTrue("str shout", "hello".shout() === "hello!")
+assertTrue("str times", "ab".times(3) === "ababab")
 ```
 
 Extensiones con `get`/`set` (NO-VERIFICADO: sin cita en `tests/*.vn`):
@@ -203,7 +201,7 @@ extension SlotAccessor on Slot {
     get label(): str { return "Slot(" + this.value + ")" }
     set label(s: str) { this.value = s.length }
 }
-assert("slot getter", slot.label === "Slot(5)")
+assertTrue("slot getter", slot.label === "Slot(5)")
 ```
 
 Extensiones sobre primitivos:
@@ -217,14 +215,14 @@ extension IntUtils on int {
         return this
     }
 }
-assert("int isEven", (4).isEven() === true)
-assert("int clamp",  (2).clamp(5, 10) === 5)
+assertTrue("int isEven", (4).isEven() === true)
+assertTrue("int clamp",  (2).clamp(5, 10) === 5)
 ```
 
 Extensiones sobre clases propias:
 
 ```varn
-extension PointOps on Point {          // tests/28-extensions-comprehensive.vn:43
+extension PointOps on Point {          // tests/28-extensions-comprehensive.vn
     distanceTo(other: Point): float {
         let dx: float = this.x - other.x
         let dy: float = this.y - other.y
@@ -236,8 +234,8 @@ extension PointOps on Point {          // tests/28-extensions-comprehensive.vn:4
 
 const p1 = new Point(3, 4)
 const p2 = new Point(0, 0)
-assert("distance", p1.distanceTo(p2) > 4.9 && p1.distanceTo(p2) < 5.1)
-assert("negate",   p1.negate().x === -3)
+assertTrue("distance", p1.distanceTo(p2) > 4.9 && p1.distanceTo(p2) < 5.1)
+assertTrue("negate",   p1.negate().x === -3)
 ```
 
 ---
@@ -249,7 +247,8 @@ Los decoradores son funciones aplicadas a clases o métodos en tiempo de declara
 ### Decoradores de clase
 
 ```varn
-import { ClassRef } from "std:reflect"   // tests/27-decorators.vn:1
+import { ClassRef, FunctionRef } from "std:reflect"   // tests/27-decorators.vn
+// los bloques siguientes de esta sección reutilizan este import
 
 let deco_log: str[] = []
 function trackClass(cls: ClassRef): void {
@@ -258,8 +257,8 @@ function trackClass(cls: ClassRef): void {
 
 @trackClass
 class DecoratedA {}
-assert("class deco called", deco_log.length === 1)
-assert("class deco name",   deco_log[0] === "DecoratedA")
+assertTrue("class deco called", deco_log.length === 1)
+assertTrue("class deco name",   deco_log[0] === "DecoratedA")
 ```
 
 ### Decoradores con argumentos
@@ -274,8 +273,8 @@ function markDeco(label: str) {
 @markDeco("outer")
 @markDeco("inner")     // los decoradores se aplican de dentro hacia fuera
 class DecoratedB {}
-assert("inner first",  deco_log[1] === "inner:DecoratedB")
-assert("outer second", deco_log[2] === "outer:DecoratedB")
+assertTrue("inner first",  deco_log[1] === "inner:DecoratedB")
+assertTrue("outer second", deco_log[2] === "outer:DecoratedB")
 ```
 
 ### Metadatos con `MetaKey`
@@ -289,7 +288,7 @@ function routeDeco(path: str) {
 @routeDeco("/api/items")
 class ItemController {}
 
-assert("meta route", RouteKey.get(ItemController) === "/api/items")
+assertTrue("meta route", RouteKey.get(ItemController) === "/api/items")
 ```
 
 ### Decoradores de métodos
@@ -310,7 +309,7 @@ class DecoratedCalc {
     @logMethod
     mul(a: int, b: int): int { return a * b }
 }
-assert("method deco result", (new DecoratedCalc()).mul(3, 5) === 15)
+assertTrue("method deco result", (new DecoratedCalc()).mul(3, 5) === 15)
 ```
 
 ### Decoradores de accessors y propiedades
@@ -358,10 +357,10 @@ class User(public id: int, public name: str, public role: str = "guest") {}
 let u1 = new User(10, "Alice", "admin")
 let u2 = u1 with { name: "Bob", role: "editor" }
 
-assert("u2 id",    u2.id === 10)         // preservado de u1
-assert("u2 name",  u2.name === "Bob")    // sobreescrito
-assert("u2 role",  u2.role === "editor") // sobreescrito
-assert("u1 inmutable", u1.name === "Alice")
+assertTrue("u2 id",    u2.id === 10)         // preservado de u1
+assertTrue("u2 name",  u2.name === "Bob")    // sobreescrito
+assertTrue("u2 role",  u2.role === "editor") // sobreescrito
+assertTrue("u1 inmutable", u1.name === "Alice")
 ```
 
 ### En objetos planos
@@ -370,9 +369,9 @@ assert("u1 inmutable", u1.name === "Alice")
 let baseConfig = { host: "localhost", port: 3000, debug: true }
 let prodConfig = baseConfig with { port: 8080, debug: false }
 
-assert("host preservado", prodConfig.host === "localhost")
-assert("port nuevo",      prodConfig.port === 8080)
-assert("baseConfig intacto", baseConfig.port === 3000)
+assertTrue("host preservado", prodConfig.host === "localhost")
+assertTrue("port nuevo",      prodConfig.port === 8080)
+assertTrue("baseConfig intacto", baseConfig.port === 3000)
 ```
 
 ### Cadenas de `with`
@@ -384,9 +383,9 @@ let node1 = new ServerNode("10.0.0.1", 5000, false)
 let node2 = node1 with { port: 5001 }
 let node3 = node2 with { isMaster: true }
 
-assert("node3 host",     node3.host === "10.0.0.1")   // heredado de node1 via node2
-assert("node3 port",     node3.port === 5001)
-assert("node3 isMaster", node3.isMaster === true)
+assertTrue("node3 host",     node3.host === "10.0.0.1")   // heredado de node1 via node2
+assertTrue("node3 port",     node3.port === 5001)
+assertTrue("node3 isMaster", node3.isMaster === true)
 ```
 
 ---
@@ -394,7 +393,7 @@ assert("node3 isMaster", node3.isMaster === true)
 ## 10. Errores y Excepciones Personalizadas
 
 ```varn
-class ValidationError extends Error {   // tests/11-errors.vn:44
+class ValidationError extends Error {   // tests/11-errors.vn
     field: str
     constructor(field: str, msg: str) {
         super(msg)
@@ -407,10 +406,10 @@ try {
     throw new ValidationError("email", "invalid format")
 } catch (e) {
     if (e instanceof ValidationError) {
-        assert("custom error name",    e.name === "ValidationError")
-        assert("custom error message", e.message === "invalid format")
-        assert("custom error field",   e.field === "email")
-        assert("instanceof Error",     e instanceof Error)
+        assertTrue("custom error name",    e.name === "ValidationError")
+        assertTrue("custom error message", e.message === "invalid format")
+        assertTrue("custom error field",   e.field === "email")
+        assertTrue("instanceof Error",     e instanceof Error)
     }
 }
 ```
@@ -420,7 +419,7 @@ try {
 ## 11. Patrón Builder (Método Chaining)
 
 ```varn
-class Builder {                       // tests/23-objects.vn:2
+class Builder {                       // tests/23-objects.vn
     private parts: str[]
     constructor() { this.parts = [] }
     add(s: str): Builder {
@@ -431,6 +430,6 @@ class Builder {                       // tests/23-objects.vn:2
 }
 
 const result = new Builder().add("hello").add("from").add("builder").build()
-assert("builder pattern", result === "hello from builder")
+assertTrue("builder pattern", result === "hello from builder")
 ```
 

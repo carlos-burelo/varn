@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Sistema de Tipos
 
 > Fuentes: `tests/08-null-safety.vn`, `tests/12-classes.vn`, `tests/13-interfaces.vn`, `tests/14-generics.vn`, `tests/15-unions.vn`, `tests/16-enums.vn`, `tests/24-record.vn`, `tests/26-numeric-coercion.vn`, `tests/30-nullable-types.vn`, `tests/34-char-type.vn`, `tests/35-decimal-bigint.vn`, `tests/36-advanced-generics.vn`, `tests/41-advanced-enums.vn`, `tests/69-tuples-records.vn`, `tests/79-control-flow-narrowing.vn`, `tests/87-primary-constructors-nullish-assign.vn`.
@@ -42,8 +40,8 @@ Todos son tipos canónicos únicos; **nunca** se aceptan aliases como `string`, 
 ### 2.1 Arrays
 
 ```varn
-const nums: int[] = [3, 1, 4, 1, 5]       // tests/05-arrays.vn:2
-let explicitGeneric: Array<int> = [10, 20, 30]  // tests/05-arrays.vn:67
+const nums: int[] = [3, 1, 4, 1, 5]       // tests/05-arrays.vn
+let explicitGeneric: Array<int> = [10, 20, 30]  // tests/05-arrays.vn
 let explicitBracket: int[] = explicitGeneric     // Asignable mutuamente
 let nested: int[][] = [[1, 2], [3, 4]]           // 2D array
 ```
@@ -55,12 +53,12 @@ let nested: int[][] = [[1, 2], [3, 4]]           // 2D array
 Colecciones heterogéneas inmutables con igualdad estructural:
 
 ```varn
-let t1 = #[1, "hello", true]    // tests/69-tuples-records.vn:4
-assert("tuple elem 0", t1[0] == 1)
-assert("tuple length", t1.length == 3)
+let t1 = #[1, "hello", true]    // tests/69-tuples-records.vn
+assertTrue("tuple elem 0", t1[0] == 1)
+assertTrue("tuple length", t1.length == 3)
 
 let t2 = #[1, "hello", true]
-assert("tuple eq true", t1 == t2)   // igualdad estructural profunda
+assertTrue("tuple eq true", t1 == t2)   // igualdad estructural profunda
 ```
 
 ### 2.3 Records (`#{…}`)
@@ -68,36 +66,45 @@ assert("tuple eq true", t1 == t2)   // igualdad estructural profunda
 Objetos inmutables con igualdad estructural:
 
 ```varn
-let r1 = #{ name: "Varn", version: 1 }   // tests/69-tuples-records.vn:22
-assert("record field name",    r1.name == "Varn")
-assert("record index name",    r1["name"] == "Varn")
+let r1 = #{ name: "Varn", version: 1 }   // tests/69-tuples-records.vn
+assertTrue("record field name",    r1.name == "Varn")
+assertTrue("record index name",    r1["name"] == "Varn")
 
 let r2 = #{ name: "Varn", version: 1 }
-assert("record eq true", r1 == r2)       // igualdad estructural
+assertTrue("record eq true", r1 == r2)       // igualdad estructural
 ```
 
-### 2.4 Mapas (`Map<K, V>`)
+### 2.4 Diccionarios (`{ [key: K]: V }`) y mapas (`Map<K, V>`)
 
 Contenedores asociativos dinámicos mutables (`tests/17-map-set.vn`,
-`tests/24-record.vn:1`):
+`tests/24-record.vn`):
 
 ```varn
-// Definición con tipo explícito Map<K, V> o firma de índice { [key: K]: V }
-const scores: Map<str, int> = {   // tests/24-record.vn:1
+// Diccionario: firma de índice { [key: K]: V } + literal de objeto
+const scores: { [key: str]: int } = {   // tests/24-record.vn
     "alice": 95,
     "bob": 87,
     "charlie": 72
 }
-assert("map get alice",   scores["alice"] === 95)
-assert("map get bob",     scores["bob"] === 87)
-assert("map get charlie", scores["charlie"] === 72)
+assertTrue("map get alice",   scores["alice"] === 95)
+assertTrue("map get bob",     scores["bob"] === 87)
+assertTrue("map get charlie", scores["charlie"] === 72)
 
 scores["dave"] = 60               // mutación indexada
-assert("map set dave",    scores["dave"] === 60)
+assertTrue("map set dave",    scores["dave"] === 60)
+```
+
+`Map<K, V>` es una colección aparte (`tests/17-map-set.vn`):
+
+```varn
+const m = new Map<str, int>()
+m.set("a", 1)
+assertTrue("map get", m.get("a") === 1)
+assertTrue("map size", m.size === 1)
 ```
 
 > [!NOTE]
-> `Map<K, V>` y `{ [key: K]: V }` son semánticamente idénticos y normalizados a nivel de TIR a `BackendTy::Map`.
+> No son intercambiables: `{ [key: K]: V }` baja a `BackendTy::Dict` (objeto con claves dinámicas) y `Map<K, V>` a `BackendTy::Map`. Asignar un literal de objeto a un `Map<K, V>` es error de tipos (VN3001).
 > La sintaxis `Record<K, V>` está estrictamente prohibida: la palabra `Record` se reserva exclusivamente para registros inmutables por valor (`#{}`).
 
 ### 2.5 Matriz Comparativa Canónica de Tipos Contenedor
@@ -107,7 +114,8 @@ assert("map set dave",    scores["dave"] === 60)
 | **`Object`** | `{ name: "Alice", age: 30 }` | `obj.name` (offset de compilación fijo) | Referencia (`===`) | Mutable |
 | **`Record`** | `#{ name: "Alice", age: 30 }` | `rec.name` | Estructural profunda (`==`) | Inmutable |
 | **`Tuple`** | `#[ 1, "hello" ]` | `tup[0]` | Estructural profunda (`==`) | Inmutable |
-| **`Map<K, V>`** | `{ "a": 1 }` o `new Map<K, V>()` | `m[k]`, `m.get(k)` | Referencia (`===`) | Mutable |
+| **`Map<K, V>`** | `new Map<K, V>()` | `m[k]`, `m.get(k)`, `m.set(k, v)` | Referencia (`===`) | Mutable |
+| **`{ [key: K]: V }`** | `{ "a": 1 }` | `d[k]` | Referencia (`===`) | Mutable |
 
 ### 2.6 Set
 
@@ -115,7 +123,7 @@ assert("map set dave",    scores["dave"] === 60)
 const set = new Set<str>()
 set.add("x")
 set.add("x")     // duplicado ignorado
-assert("set size dedup", set.size === 2)
+assertTrue("set size dedup", set.size === 2)
 ```
 
 ---
@@ -125,7 +133,7 @@ assert("set size dedup", set.size === 2)
 El sistema de tipos distingue entre un tipo no-nulo y su versión nulable:
 
 ```varn
-const a: str? = null       // str | null  (tests/30-nullable-types.vn:3)
+const a: str? = null       // str | null  (tests/30-nullable-types.vn)
 const b: str? = "hello"
 const f: int?[] = [1, null, 3]   // array de int nulables
 const h: int[]? = null            // array nulo
@@ -146,7 +154,7 @@ const j: int?[]? = null           // array nulo de int nulables
 ## 4. Uniones de Tipos
 
 ```varn
-type StringOrInt = str | int    // tests/15-unions.vn:2
+type StringOrInt = str | int    // tests/15-unions.vn
 type MaybeStr = str | null
 
 function processValue(v: StringOrInt): str {
@@ -156,14 +164,14 @@ function processValue(v: StringOrInt): str {
         return "number: " + v
     }
 }
-assert("union str branch", processValue("hello") === "string: hello")
-assert("union int branch", processValue(42) === "number: 42")
+assertTrue("union str branch", processValue("hello") === "string: hello")
+assertTrue("union int branch", processValue(42) === "number: 42")
 ```
 
 ### Tipos unión de clases
 
 ```varn
-type Shape2 = Square2 | Circle2    // tests/15-unions.vn:33
+type Shape2 = Square2 | Circle2    // tests/15-unions.vn
 
 function totalArea(shapes: Shape2[]): float {
     let total = 0.0
@@ -181,24 +189,24 @@ function totalArea(shapes: Shape2[]): float {
 ### 5.1 Enums simples
 
 ```varn
-enum Direction { North, South, East, West }    // tests/16-enums.vn:2
+enum Direction { North, South, East, West }    // tests/16-enums.vn
 
 const dir: Direction = Direction.North
-assert("enum value",    dir === Direction.North)
-assert("enum rawValue", Direction.East.rawValue === 2)
+assertTrue("enum value",    dir === Direction.North)
+assertTrue("enum rawValue", Direction.East.rawValue === 2)
 ```
 
 ### 5.2 Enums con valores explícitos
 
 ```varn
 enum HttpMethod { GET = 0, POST = 1, PUT = 2, DELETE = 3 }   // tests/16-enums.vn
-assert("enum explicit", HttpMethod.POST.rawValue === 1)
+assertTrue("enum explicit", HttpMethod.POST.rawValue === 1)
 ```
 
 ### 5.3 Enums con payload (ADTs)
 
 ```varn
-enum Token {                          // tests/41-advanced-enums.vn:27
+enum Token {                          // tests/41-advanced-enums.vn
     Identifier(name: str),
     Number(value: float),
     String(value: str),
@@ -208,8 +216,8 @@ enum Token {                          // tests/41-advanced-enums.vn:27
 
 const t1 = Token.Number(123)
 const t2 = Token.Identifier(name: "hello")   // named argument
-assert("payload value", t1.value === 123)
-assert("named payload", t2.name === "hello")
+assertTrue("payload value", t1.value === 123)
+assertTrue("named payload", t2.name === "hello")
 ```
 
 ### 5.4 Enums con campos compartidos y constructor
@@ -227,8 +235,8 @@ enum HttpStatus {
         this.message = message
     }
 }
-assert("shared field code Ok",     HttpStatus.Ok.code === 200)
-assert("shared field message",     HttpStatus.Ok.message === "OK")
+assertTrue("shared field code Ok",     HttpStatus.Ok.code === 200)
+assertTrue("shared field message",     HttpStatus.Ok.message === "OK")
 ```
 
 ### 5.5 Enums con métodos y pattern matching en `this`
@@ -245,8 +253,8 @@ enum Shape {
         }
     }
 }
-assert("circle area", Shape.Circle(10.0).area() === 314.159)
-assert("rect area",   Shape.Rectangle(10.0, 20.0).area() === 200.0)
+assertTrue("circle area", Shape.Circle(10.0).area() === 314.159)
+assertTrue("rect area",   Shape.Rectangle(10.0, 20.0).area() === 200.0)
 ```
 
 ### 5.6 Enums genéricos
@@ -265,7 +273,7 @@ const resOk = Result.Ok<int, str>(42)
 ## 6. Interfaces
 
 ```varn
-interface Printable {            // tests/13-interfaces.vn:2
+interface Printable {            // tests/13-interfaces.vn
     toString(): str
 }
 ```
@@ -279,7 +287,7 @@ interface Printable {            // tests/13-interfaces.vn:2
 Ver también [`classes_objects.md`](classes_objects.md).
 
 ```varn
-class Animal {                        // tests/12-classes.vn:27
+class Animal {                        // tests/12-classes.vn
     name: str
     constructor(n: str) { this.name = n }
     speak() { return "..." }
@@ -317,7 +325,7 @@ Contratos que se comprueban en la declaración:
 ## 8. Generics
 
 ```varn
-class Box<T> {                        // tests/14-generics.vn:1
+class Box<T> {                        // tests/14-generics.vn
     value: T
     constructor(v: T) { this.value = v }
     get(): T { return this.value }
@@ -328,9 +336,9 @@ function identity<T>(v: T): T { return v }
 function swap<A, B>(a: A, b: B): B { return b }
 
 const intBox = new Box<int>(10)
-assert("generic box get", intBox.get() === 10)
+assertTrue("generic box get", intBox.get() === 10)
 const strBox = intBox.map((n) => `value=${n}`)
-assert("generic box map", strBox.get() === "value=10")
+assertTrue("generic box map", strBox.get() === "value=10")
 ```
 
 Interfaces genéricas:
@@ -423,7 +431,7 @@ El checker estrecha automáticamente el tipo dentro de bloques condicionales:
 ```varn
 function processOptional(val: str?): int {
     if (val !== null) {
-        return val.length   // val se estrecha a 'str' aquí (tests/79-control-flow-narrowing.vn:7)
+        return val.length   // val se estrecha a 'str' aquí (tests/79-control-flow-narrowing.vn)
     }
     return 0
 }
@@ -594,7 +602,7 @@ lo leen y lo cambian.
 Tipo dinámico para valores cuya naturaleza se determina en tiempo de ejecución:
 
 ```varn
-function processTypeof(val: dynamic): str {    // tests/79-control-flow-narrowing.vn:38
+function processTypeof(val: dynamic): str {    // tests/79-control-flow-narrowing.vn
     if (typeof val === "str") {
         return val.toUpperCase()
     } else if (typeof val === "int") {
@@ -609,14 +617,14 @@ function processTypeof(val: dynamic): str {    // tests/79-control-flow-narrowin
 ## 12. Rangos
 
 ```varn
-const r1 = 0..5     // rango exclusivo [0, 5) (tests/18-ranges.vn:2)
+const r1 = 0..5     // rango exclusivo [0, 5) (tests/18-ranges.vn)
 const r2 = 1..=5    // rango inclusivo [1, 5]
 
-assert("range start",       r1.start === 0)
-assert("range end excl",    r1.end === 5)
-assert("range length excl", r1.length === 5)
-assert("range contains",    r1.contains(3))
-assert("range incl",        r2.contains(5))
+assertTrue("range start",       r1.start === 0)
+assertTrue("range end excl",    r1.end === 5)
+assertTrue("range length excl", r1.length === 5)
+assertTrue("range contains",    r1.contains(3))
+assertTrue("range incl",        r2.contains(5))
 
 const arr = (0..4).toArray()     // [0, 1, 2, 3]
 const stepped = (0..10).step(3)  // [0, 3, 6, 9]
@@ -627,7 +635,7 @@ Indexación directa con rangos en strings y arrays:
 
 ```varn
 let text = "Hello, World!"
-let greeting = text[0..5]     // "Hello"  (tests/88-range-indexing.vn:10)
+let greeting = text[0..5]     // "Hello"  (tests/88-range-indexing.vn)
 let greetingInc = text[0..=4] // "Hello"
 
 let numbers = [10, 20, 30, 40, 50, 60]

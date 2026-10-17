@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Generadores
 
 > Fuentes: `tests/20-generators.vn`, `tests/76-generator-values.vn`, `tests/77-async-generators.vn`.
@@ -18,17 +16,17 @@ function* range_gen(start: int, end: int) {
         i = i + 1
     }
 }
-// tests/20-generators.vn:2
+// tests/20-generators.vn
 
 const gen = range_gen(0, 5)
-assert("gen value 0", gen.next().value === 0)
-assert("gen done 0",  !gen.next().done)
+assertTrue("gen value 0", gen.next().value === 0)
+assertTrue("gen done 0",  !gen.next().done)
 gen.next()
 gen.next()
 const g3 = gen.next()
-assert("gen value 3", g3.value === 3)
+assertTrue("gen value 3", g3.value === 3)
 const gend = gen.next()
-assert("gen done",    gend.done)   // value es null cuando done === true
+assertTrue("gen done",    gend.done)   // value es null cuando done === true
 ```
 
 ---
@@ -46,16 +44,16 @@ function* fib_gen() {
         b = tmp
     }
 }
-// tests/20-generators.vn:23
+// tests/20-generators.vn
 
 const fib2 = fib_gen()
 const fibs: int[] = []
 for (let i = 0; i < 8; i = i + 1) {
     fibs.push(fib2.next().value)
 }
-assert("fib gen [0]", fibs[0] === 0)
-assert("fib gen [1]", fibs[1] === 1)
-assert("fib gen [7]", fibs[7] === 13)
+assertTrue("fib gen [0]", fibs[0] === 0)
+assertTrue("fib gen [1]", fibs[1] === 1)
+assertTrue("fib gen [7]", fibs[7] === 13)
 ```
 
 ---
@@ -68,20 +66,20 @@ Los generadores pueden hacer `yield` de cualquier tipo de heap: strings, arrays,
 function* yieldsStrings() {
     yield "a string"
 }
-assert("yielded string", yieldsStrings().next().value === "a string")
+assertTrue("yielded string", yieldsStrings().next().value === "a string")
 
 function* yieldsArrays() {
     yield [1, 2, 3]
 }
 const arr = yieldsArrays().next().value
-assert("yielded array", arr.length === 3 && arr[1] === 2)
-// tests/76-generator-values.vn:49
+assertTrue("yielded array", arr.length === 3 && arr[1] === 2)
+// tests/76-generator-values.vn
 
 function* yieldsObjects() {
     yield { a: 1, b: 2 }
 }
 const obj = yieldsObjects().next().value
-assert("yielded object", obj.a === 1 && obj.b === 2)
+assertTrue("yielded object", obj.a === 1 && obj.b === 2)
 ```
 
 ---
@@ -99,9 +97,9 @@ function* touchesModuleState() {
     yield bumpCounter()
 }
 const counted = touchesModuleState()
-assert("gen sees module state, first",  counted.next().value === 1)
-assert("gen sees module state, second", counted.next().value === 2)
-// tests/76-generator-values.vn:29
+assertTrue("gen sees module state, first",  counted.next().value === 1)
+assertTrue("gen sees module state, second", counted.next().value === 2)
+// tests/76-generator-values.vn
 ```
 
 ---
@@ -118,8 +116,8 @@ function* returnsAHeapValue() {
 const returning = returnsAHeapValue()
 returning.next()
 const finalResult = returning.next()
-assert("returned heap value", finalResult.done && finalResult.value[0] === 9)
-// tests/76-generator-values.vn:74
+assertTrue("returned heap value", finalResult.done && finalResult.value[0] === 9)
+// tests/76-generator-values.vn
 ```
 
 ---
@@ -134,8 +132,8 @@ function* yieldsAGenerator() {
     yield inner()    // yield el generador como valor
 }
 const nested = yieldsAGenerator().next().value
-assert("generator yields a generator", nested.next().value === 41)
-// tests/76-generator-values.vn:61
+assertTrue("generator yields a generator", nested.next().value === 41)
+// tests/76-generator-values.vn
 ```
 
 ---
@@ -170,13 +168,13 @@ async function* awaitsThenYields() {
     yield await tenTimes(2)    // 20
     yield await tenTimes(3)    // 30
 }
-// tests/77-async-generators.vn:20
+// tests/77-async-generators.vn
 
 const manual = awaitsThenYields()
-assert("async gen first",  manual.next().value === 10)
-assert("async gen second", manual.next().value === 20)
-assert("async gen third",  manual.next().value === 30)
-assert("async gen done",   manual.next().done)
+assertTrue("async gen first",  manual.next().value === 10)
+assertTrue("async gen second", manual.next().value === 20)
+assertTrue("async gen third",  manual.next().value === 30)
+assertTrue("async gen done",   manual.next().done)
 ```
 
 ### `await` entre yields
@@ -190,8 +188,8 @@ async function* awaitsBetweenYields() {
 }
 
 const between = awaitsBetweenYields()
-assert("await before first yield", between.next().value === 40)
-assert("await between yields",     between.next().value === 50)
+assertTrue("await before first yield", between.next().value === 40)
+assertTrue("await between yields",     between.next().value === 50)
 ```
 
 ### Heap values desde async generators
@@ -201,7 +199,7 @@ async function* yieldsHeapValues() {
     yield [await tenTimes(1), await tenTimes(2)]   // [10, 20]
 }
 const heaps = yieldsHeapValues().next().value
-assert("async gen heap value", heaps.length === 2 && heaps[1] === 20)
+assertTrue("async gen heap value", heaps.length === 2 && heaps[1] === 20)
 ```
 
 ### `for await` sobre async generators
@@ -211,14 +209,14 @@ let total = 0
 for await (const v of awaitsThenYields()) {
     total = total + v
 }
-assert("for await sums", total === 60)
+assertTrue("for await sums", total === 60)
 
 // También funciona con for...of normal (valores ya settled)
 let plain = 0
 for (const v of awaitsThenYields()) {
     plain = plain + v
 }
-assert("plain for over async gen", plain === 60)
+assertTrue("plain for over async gen", plain === 60)
 ```
 
 ### Manejo de errores dentro de async generators
@@ -232,7 +230,7 @@ async function* catchesItsOwnRejection() {
         yield 99
     }
 }
-assert("async gen catches rejection", catchesItsOwnRejection().next().value === 99)
+assertTrue("async gen catches rejection", catchesItsOwnRejection().next().value === 99)
 ```
 
 ### `await` de suspensiones reales
@@ -242,7 +240,7 @@ async function* awaitsSleep() {
     await sleep(1)
     yield 7
 }
-assert("async gen awaits sleep", awaitsSleep().next().value === 7)
+assertTrue("async gen awaits sleep", awaitsSleep().next().value === 7)
 ```
 
 ---

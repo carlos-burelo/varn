@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Módulos y Paquetes
 
 > Fuentes: `tests/21-async.vn`, `tests/27-decorators.vn`, `tests/42-stdlib-comprehensive-test.vn`, `tests/47-isolates-multithread.vn`, `tests/54-channels.vn`, `tests/68-module-locals.vn`, `tests/80-capabilities-security.vn`, `tests/82-std-csv.vn`, `tests/83-canonical-types-regex-uuid-time.vn`, `tests/84-stdlib-process-compress-cli-env.vn`, `tests/85-stdlib-sqlite-ws-archive.vn`, `tests/86-tagged-templates.vn`.
@@ -11,17 +9,18 @@
 ### Importación nombrada desde stdlib
 
 ```varn
-import { sleep, TaskGroup, spawn, parallel } from "std:task"   // tests/21-async.vn:2
+import { sleep, TaskGroup, spawn, parallel } from "std:task"   // tests/21-async.vn
 import { channel, Sender, Receiver, ChannelClosed, spawnIsolate } from "std:task"   // tests/47-isolates-multithread.vn
-import { describe, it, expect } from "std:test"   // tests/21-async.vn:1
-import { MetaKey, ClassRef } from "std:reflect"   // tests/27-decorators.vn:1
-import { WebSocket } from "std:ws"   // tests/85-stdlib-sqlite-ws-archive.vn:3
-import { read, write, remove, exists } from "std:fs"   // tests/80-capabilities-security.vn
-import { env, platform, cwd } from "std:sys"   // tests/80-capabilities-security.vn:6
+import { describe, it, expect } from "std:test"   // tests/21-async.vn
+import { MetaKey, ClassRef } from "std:reflect"   // tests/27-decorators.vn
+import { WebSocket } from "std:ws"   // tests/85-stdlib-sqlite-ws-archive.vn
+import { readText, writeText, remove, exists } from "std:fs"   // tests/80-capabilities-security.vn
+import { Env } from "std:env"
+import { platform, cwd } from "std:sys"
 ```
 
 Resto de exports por paquete: ver `standard_library.md` (solo lo citado
-con `tests/*.vn:L-L`).
+con `tests/*.vn`).
 
 ### Importación desde módulo local
 
@@ -37,7 +36,7 @@ import { workerMain } from "./some-module"
 export async function workerMain(rx: Receiver<ValueMsg>, tx: Sender<int>) {
     // ...
 }
-// tests/47-isolates-multithread.vn:8
+// tests/47-isolates-multithread.vn
 ```
 
 Solo las funciones exportadas (`export`) de nivel superior pueden usarse con `spawnIsolate`.
@@ -58,7 +57,7 @@ function* touchesModuleState() {
     yield bumpCounter()    // accede a moduleCounter del módulo
     yield bumpCounter()
 }
-// tests/76-generator-values.vn:29
+// tests/76-generator-values.vn
 ```
 
 ---
@@ -69,15 +68,16 @@ Ver `standard_library.md` (mapa: `../STDLIB_ARCHITECTURE.md`). Aquí solo los
 imports ejercitados:
 
 ```varn
-import { sleep, TaskGroup, spawn, parallel } from "std:task"   // tests/21-async.vn:2
+import { sleep, TaskGroup, spawn, parallel } from "std:task"   // tests/21-async.vn
 import { channel, Sender, Receiver, ChannelClosed, spawnIsolate } from "std:task"   // tests/47-isolates-multithread.vn
-import { describe, it, expect } from "std:test"   // tests/21-async.vn:1
-import { MetaKey, ClassRef } from "std:reflect"   // tests/27-decorators.vn:1
-import { read, write, remove, exists } from "std:fs"   // tests/80-capabilities-security.vn
-import { env, platform, cwd } from "std:sys"   // tests/80-capabilities-security.vn:6
+import { describe, it, expect } from "std:test"   // tests/21-async.vn
+import { MetaKey, ClassRef } from "std:reflect"   // tests/27-decorators.vn
+import { readText, writeText, remove, exists } from "std:fs"   // tests/80-capabilities-security.vn
+import { Env } from "std:env"
+import { platform, cwd } from "std:sys"
 ```
 
 APIs por paquete (`CSV`, `Regex`, `UUID`, `DateTime`, `Process`, `Compress`,
 `CLI`, `Env`, `Path`, `Database`, `WebSocket`): solo lo citado en
-`standard_library.md` con `tests/*.vn:L-L`.
+`standard_library.md` con `tests/*.vn`.
 

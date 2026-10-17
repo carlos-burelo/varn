@@ -1,5 +1,3 @@
-> Precisión parcial. Verificado contra tests/... Código manda.
-
 # Varn Language — Glosario
 
 Este glosario define los términos clave del lenguaje Varn. Las entradas están ordenadas alfabéticamente.
@@ -17,12 +15,12 @@ Colección mutable y ordenada de elementos del tipo `T`. Las dos sintaxis son eq
 **`as`**  
 Operador de cast explícito (narrowing). Ejemplo: `(obj as dynamic).field`.
 
-**`assert(label, condition)`**  
+**`assertTrue(label, condition)`**  
 Función de testing. Lanza un error si `condition` es `false`.
 
 **`async`**
 Modificador de función. La función devuelve un valor awaitable; permite
-`await` dentro del cuerpo (`tests/21-async.vn:4-11`).
+`await` dentro del cuerpo (`tests/21-async.vn`).
 
 **`await`**  
 Operador que pausa la ejecución de la función asíncrona actual hasta que la `Future` se resuelva. También válido a nivel de módulo (top-level await).
@@ -101,7 +99,7 @@ Bloque que se ejecuta siempre después de `try/catch`, independientemente de si 
 **`float`**
 Tipo primitivo de número flotante de 64 bits (IEEE 754 doble precisión).
 `int / int` es `int`; la división flotante usa operandos `float`
-(`tests/120-int-division.vn:13,16-28`).
+(`tests/120-int-division.vn`).
 
 **`for`**  
 Bucle de tres partes estilo C: `for (init; condition; step) { }`.
@@ -157,7 +155,7 @@ Operador de verificación de tipo en tiempo de ejecución. Devuelve `bool`. Tamb
 **`int`**
 Tipo primitivo de entero de 64 bits con signo (`-2^63 .. 2^63-1`).
 La aritmética fuera de rango lanza `IntegerOverflow`; no envuelve
-(`tests/120-int-division.vn:25`, `tests/102-int-overflow.vn`).
+(`tests/120-int-division.vn`, `tests/102-int-overflow.vn`).
 
 **`interface`**  
 Contrato estructural sin implementación. Los campos opcionales se marcan con `?`. Varn usa tipado estructural.
@@ -187,7 +185,7 @@ Declaración de variable mutable.
 ## M
 
 **`Map<K, V>`**  
-Contenedor asociativo dinámico clave→valor mutable. Soporta acceso indexado por corchetes (`m[k]`, `m[k] = v`), firmas de índice contextuales `{ [key: K]: V }` y API de métodos (`.get()`, `.set()`, `.has()`, `.delete()`, `.clear()`). Igualdad por referencia (`===`).
+Contenedor asociativo dinámico clave→valor mutable. Se crea con `new Map<K, V>()`. Soporta acceso indexado por corchetes (`m[k]`, `m[k] = v`) y API de métodos (`.get()`, `.set()`, `.has()`, `.delete()`, `.clear()`). Igualdad por referencia (`===`). Distinto del diccionario `{ [key: K]: V }`, que es un objeto con claves dinámicas.
 
 **`match`**  
 Expresión de pattern matching. Puede coincidir con valores literales, enums, payload de enums y wildcards (`_`). También puede usarse con multi-valor (`2 | 3`).
@@ -200,7 +198,7 @@ API de metadatos tipados (`std:reflect`). Asocia valores arbitrarios a clases a 
 ## N
 
 **`new`**  
-Crea una instancia de clase o de colección (`new Map<int>()`, `new Box<str>()`).
+Crea una instancia de clase o de colección (`new Map<str, int>()`, `new Box<str>()`).
 
 **`null`**  
 Valor que representa ausencia de un valor. Sólo asignable a tipos nulables (`T?`).
@@ -237,7 +235,7 @@ Literal de cadena delimitado por triple comilla. No procesa secuencias de escape
 
 **Record (`#{…}`)**
 Producto estructural inmutable con igualdad profunda (`==`); par de
-`Tuple` (`#[…]`) (`tests/69-tuples-records.vn:22`).
+`Tuple` (`#[…]`) (`tests/69-tuples-records.vn`).
 
 **`return`**  
 Devuelve un valor desde una función y termina su ejecución.
@@ -298,15 +296,15 @@ Tipo que puede ser uno de varios tipos posibles. Ejemplo: `str | int`, `T | null
 
 **`using`**
 Declaración de recurso con disposición automática (`dispose()`) al salir del
-bloque (`tests/21-async.vn:43`, `tests/54-channels.vn:47`,
-`tests/50-opt-unsupported-phase3.vn:55`).
+bloque (`tests/21-async.vn`, `tests/54-channels.vn`,
+`tests/50-opt-unsupported-phase3.vn`).
 
 ---
 
 ## V
 
 **`var`**  
-Declaración de variable mutable (sinónimo de `let`).
+Palabra reservada sin uso: el compilador la rechaza (VN2002, «use `let` or `const`»).
 
 **`void`**  
 Tipo de retorno de funciones que no devuelven ningún valor significativo.
@@ -319,7 +317,7 @@ Tipo de retorno de funciones que no devuelven ningún valor significativo.
 Conversión implícita exacta: `int → bigint`, `int → decimal`. Un **literal**
 entero adopta `float`/`decimal`/`bigint` del contexto si es representable.
 `int → float` de variable NO es implícito: se escribe con `as`
-(`tests/122-numeric-conversions.vn:3-4`).
+(`tests/122-numeric-conversions.vn`).
 
 **`with` Expression**  
 Expresión que clona un objeto o instancia sobreescribiendo solo los campos especificados, manteniendo el original inmutable. Ejemplo: `u1 with { name: "Bob" }`.

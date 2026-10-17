@@ -1,14 +1,18 @@
-# Varn Language — índice (desde tests)
+# Guía del lenguaje Varn
 
-208 ficheros `tests/*.vn`; `tests/main.vn` importa 206; cierra con `summary()` (`main.vn:146,209`). Huecos: 39, 81, 91, 104–108. No importado directo: `75-async-shapes-lib.vn` (auxiliar).
+Documentación del lenguaje escrita **desde la suite**: cada rasgo cita el test de
+`tests/` que lo ejercita. Lo que no tiene test citado no es contrato.
 
-| Doc | Cubre (citas) |
-|---|---|
-| `overview.md` | mapa suite + regla sin sintaxis no probada |
-| `error_handling.md` | `try/catch/finally` `11-errors.vn:5-26,44-48`; `try` prefijo `109-try-operator.vn:18-19,35,44`; multi-catch `90-multi-catch.vn:23-30` |
-| `statements.md` | `match` `10-match.vn:4-9` |
-| `classes_objects.md` | clases `12-classes.vn:3-40` |
-| `async_concurrency.md` | async `21-async.vn:4-38`; isolates `47-isolates-multithread.vn:2,10-39`; canales `54-channels.vn` |
-| `generators.md` | generadores `20-generators.vn:3-34`; async-gen `77-async-generators.vn:22-26` |
+- [`overview.md`](overview.md) — panorama de la suite y rasgos probados.
+- [`specification.md`](specification.md) — índice por área con su test canónico.
+- [`examples.md`](examples.md) — programas cortos que corren.
+- [`glossary.md`](glossary.md) — términos y palabras clave.
 
-Resto de `docs/lang/*.md`: vigente solo lo citado con `tests/*.vn:L-L`.
+Convención de los ejemplos: usan `assertTrue("etiqueta", condición)` y
+`assertEqual(a, b)` de `std:test`; se asume
+`import { assertTrue, assertEqual } from "std:test"`. Varios bloques continúan
+al anterior (reutilizan sus clases y funciones).
+
+Suite: 220 archivos `tests/*.vn`; `tests/main.vn` importa 218 (todos salvo sí
+mismo y `75-async-shapes-lib.vn`, auxiliar de `75-async-shapes.vn`) y cierra con
+`summary()`. Huecos de numeración: 39, 81, 91, 104–108.
