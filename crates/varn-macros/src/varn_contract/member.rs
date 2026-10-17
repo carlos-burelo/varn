@@ -203,25 +203,21 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
         );
         out.generated_entry_idents.push(fn_entry_ident.clone());
         out.fn_entries.push(quote! {
-                #[used]
-                #[cfg_attr(target_os = "windows", unsafe(link_section = ".varn_ops$B"))]
-                #[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,varn_ops"))]
-                #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), unsafe(link_section = "varn_ops"))]
-                static #fn_entry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
-                    module_id: #module.as_ptr(),
-                    module_id_len: #module.len() as u32,
-                    namespace_path: #ns.as_ptr(),
-                    namespace_path_len: #ns.len() as u32,
-                    symbol_name: #sym.as_ptr(),
-                    symbol_name_len: #sym.len() as u32,
-                    func_ptr: #wrap_ident::<#self_ty> as *const u8,
-                    raw_func_ptr: #raw_func_val,
-                    signature: #sig_val,
-                    entry_kind: 0x01,
-                    flags: 0,
-                    _reserved: [0; 7],
-                };
-            });
+            static #fn_entry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
+                module_id: #module.as_ptr(),
+                module_id_len: #module.len() as u32,
+                namespace_path: #ns.as_ptr(),
+                namespace_path_len: #ns.len() as u32,
+                symbol_name: #sym.as_ptr(),
+                symbol_name_len: #sym.len() as u32,
+                func_ptr: #wrap_ident::<#self_ty> as *const u8,
+                raw_func_ptr: #raw_func_val,
+                signature: #sig_val,
+                entry_kind: 0x01,
+                flags: 0,
+                _reserved: [0; 7],
+            };
+        });
     } else {
         let native = quote!(ctx.alloc_fn(#wrap_ident::<#self_ty>, #sym));
         let setup = match m.kind {
@@ -251,25 +247,21 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
             );
             out.generated_entry_idents.push(mentry_ident.clone());
             out.method_entries.push(quote! {
-                    #[used]
-                    #[cfg_attr(target_os = "windows", unsafe(link_section = ".varn_ops$B"))]
-                    #[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,varn_ops"))]
-                    #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), unsafe(link_section = "varn_ops"))]
-                    static #mentry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
-                        module_id: #module.as_ptr(),
-                        module_id_len: #module.len() as u32,
-                        namespace_path: #class_name_str.as_ptr(),
-                        namespace_path_len: #class_name_str.len() as u32,
-                        symbol_name: #sym.as_ptr(),
-                        symbol_name_len: #sym.len() as u32,
-                        func_ptr: #wrap_ident::<#self_ty> as *const u8,
-                        raw_func_ptr: #raw_func_val,
-                        signature: #sig_val,
-                        entry_kind: #mkind,
-                        flags: 0,
-                        _reserved: [0; 7],
-                    };
-                });
+                static #mentry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
+                    module_id: #module.as_ptr(),
+                    module_id_len: #module.len() as u32,
+                    namespace_path: #class_name_str.as_ptr(),
+                    namespace_path_len: #class_name_str.len() as u32,
+                    symbol_name: #sym.as_ptr(),
+                    symbol_name_len: #sym.len() as u32,
+                    func_ptr: #wrap_ident::<#self_ty> as *const u8,
+                    raw_func_ptr: #raw_func_val,
+                    signature: #sig_val,
+                    entry_kind: #mkind,
+                    flags: 0,
+                    _reserved: [0; 7],
+                };
+            });
         }
     }
 }

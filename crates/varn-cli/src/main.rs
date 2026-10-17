@@ -67,7 +67,7 @@ fn run_cli() {
             varn_modules::std_root::resolve()
         );
         println!("--- CLI NATIVE OPERATIONS ---");
-        for entry in varn_builtins::dispatch::iter_native_ops() {
+        for entry in varn_builtins::dispatch::all_native_ops() {
             println!(
                 "module: {} | ns: {} | symbol: {} | func_ptr: {:?}",
                 entry.module_id(),

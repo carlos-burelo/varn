@@ -33,17 +33,24 @@ fn valid_class(name: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
-fn fn_module_rs(mod_name: &str) -> String {
+fn module_rs(mod_name: &str, classes: &[String]) -> String {
     let struct_name = format!("{}Runtime", pascal(mod_name));
-    format!(
-        "use varn_macros::varn_contract;\nuse varn_types::NativeCtx;\n\npub struct {struct_name};\n\nvarn_contract! {{\n    module: \"runtime:{mod_name}\",\n    contract: \"src/modules/runtime/{mod_name}/{mod_name}_runtime.vn\",\n    impl {struct_name} {{\n        fn ping(_ctx: &mut dyn NativeCtx) -> Result<String, String> {{\n            Ok(\"pong\".to_string())\n        }}\n    }}\n}}\n"
-    )
-}
-
-fn class_block_rs(mod_name: &str, class: &str) -> String {
-    format!(
-        "\nvarn_contract! {{\n    module: \"runtime:{mod_name}\",\n    class: \"{class}\",\n    contract: \"src/modules/runtime/{mod_name}/{mod_name}_runtime.vn\",\n    impl {class}Impl {{\n        fn constructor(\n            _ctx: &mut dyn NativeCtx,\n            this: varn_types::VmValue,\n        ) -> varn_types::VmValue {{\n            this\n        }}\n    }}\n}}\n"
-    )
+    let mut out = format!(
+        "use varn_macros::varn_contract;\nuse varn_types::NativeCtx;\n\npub struct {struct_name};\n"
+    );
+    for class in classes {
+        out.push_str(&format!("pub struct {class}Impl;\n"));
+    }
+    out.push_str(&format!(
+        "\nvarn_contract! {{\n    module: \"runtime:{mod_name}\",\n    contract: \"src/modules/runtime/{mod_name}/{mod_name}_runtime.vn\",\n    impl {struct_name} {{\n        fn ping(_ctx: &mut dyn NativeCtx) -> Result<String, String> {{\n            Ok(\"pong\".to_string())\n        }}\n    }}\n"
+    ));
+    for class in classes {
+        out.push_str(&format!(
+            "\n    class: \"{class}\",\n    impl {class}Impl {{\n        fn constructor(\n            _ctx: &mut dyn NativeCtx,\n            this: varn_types::VmValue,\n        ) -> varn_types::VmValue {{\n            this\n        }}\n    }}\n"
+        ));
+    }
+    out.push_str("}\n");
+    out
 }
 
 fn contract_vn(mod_name: &str, classes: &[String]) -> String {
@@ -69,108 +76,34 @@ fn std_mod_vn(mod_name: &str, classes: &[String]) -> String {
     out
 }
 
-fn marker_for_module(mod_name: &str) -> String {
-    format!(
-        "__VARN_LINK_MARKER_RUNTIME_{}",
-        mod_name.to_ascii_uppercase()
-    )
+fn registry_entry(line: &str) -> Option<&str> {
+    let name = line.strip_prefix("    ")?.split(" = \"").next()?;
+    (line.contains(" = \"") && name.chars().all(|c| c.is_ascii_lowercase() || c == '_'))
+        .then_some(name)
 }
 
-fn marker_for_class(class: &str) -> String {
-    let mut out = String::from("__VARN_LINK_MARKER_");
-    for c in class.chars() {
-        if c.is_ascii_alphanumeric() {
-            out.extend(c.to_uppercase());
-        } else {
-            out.push('_');
-        }
-    }
-    out
-}
-
-fn insert_mod_pair(lines: &mut Vec<String>, mod_name: &str) -> bool {
-    let pub_line = format!("pub mod {mod_name};");
-    let path_line = format!("#[path = \"runtime/{mod_name}/{mod_name}.rs\"]");
-    let mut pos = None;
-    for (i, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
-        if let Some(rest) = trimmed.strip_prefix("pub mod ") {
-            let name = rest.trim_end_matches(';');
-            if name > mod_name {
-                pos = Some(i);
-                break;
-            }
-        }
-    }
-    let mut idx = match pos {
-        Some(i) => i,
-        None => return false,
-    };
-    while idx > 0 && lines[idx - 1].trim().starts_with("#[path") {
-        idx -= 1;
-    }
-    lines.insert(idx, path_line);
-    lines.insert(idx + 1, pub_line);
-    true
-}
-
-fn insert_sorted_line(
-    lines: &mut Vec<String>,
-    anchor_prefix: &str,
-    new_line: String,
-    key: &str,
-) -> bool {
-    let mut pos = None;
-    for (i, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
-        if !trimmed.starts_with(anchor_prefix) {
-            continue;
-        }
-        let rest = trimmed[anchor_prefix.len()..].trim();
-        if rest > key {
-            pos = Some(i);
-            break;
-        }
-    }
-    match pos {
-        Some(i) => {
-            lines.insert(i, new_line);
-            true
-        }
-        None => false,
-    }
-}
-
-fn apply_registry(
-    root: &Path,
-    mod_name: &str,
-    classes: &[String],
-) -> Result<(String, String), String> {
+fn apply_registry(root: &Path, mod_name: &str) -> Result<(String, String), String> {
     let path = root.join("crates/varn-builtins/src/modules/mod.rs");
     let text = std::fs::read_to_string(&path)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-    let mut lines: Vec<String> = text.lines().map(|l| l.to_string()).collect();
-
-    let pub_line = format!("pub mod {mod_name};");
-    let mod_line = format!("#[path = \"runtime/{mod_name}/{mod_name}.rs\"]");
-    if text.contains(&mod_line) || text.contains(&pub_line) {
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    if lines.iter().any(|l| registry_entry(l) == Some(mod_name)) {
         return Err(format!("module '{mod_name}' already registered"));
     }
-    if !insert_mod_pair(&mut lines, mod_name) {
-        return Err("no pub mod anchor found".to_string());
-    }
-
-    let mut markers = vec![marker_for_module(mod_name)];
-    for class in classes {
-        markers.push(marker_for_class(class));
-    }
-    for marker in &markers {
-        let line = format!("    register_marker!({mod_name}, {marker});");
-        if !insert_sorted_line(&mut lines, "register_marker!(", line, mod_name) {
-            return Err("no register_marker anchor found".to_string());
-        }
-    }
-
+    let pos = lines
+        .iter()
+        .position(|l| registry_entry(l).is_some_and(|name| name > mod_name))
+        .or_else(|| {
+            lines
+                .iter()
+                .rposition(|l| registry_entry(l).is_some())
+                .map(|i| i + 1)
+        })
+        .ok_or("no native_modules! entries found")?;
+    lines.insert(
+        pos,
+        format!("    {mod_name} = \"runtime/{mod_name}/{mod_name}.rs\" => [{mod_name}::NATIVE_ENTRIES];"),
+    );
     Ok((text, lines.join("\n") + "\n"))
 }
 
@@ -221,14 +154,10 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let vn_file = rs_dir.join(format!("{mod_name}_runtime.vn"));
     let std_file = root.join(format!("std/{mod_name}/mod.vn"));
 
-    let mut rs = fn_module_rs(&mod_name);
-    for class in &classes {
-        rs.push_str(&format!("pub struct {class}Impl;\n"));
-        rs.push_str(&class_block_rs(&mod_name, class));
-    }
+    let rs = module_rs(&mod_name, &classes);
     let contract = contract_vn(&mod_name, &classes);
     let std_mod = std_mod_vn(&mod_name, &classes);
-    let (old_registry, new_registry) = apply_registry(&root, &mod_name, &classes)?;
+    let (old_registry, new_registry) = apply_registry(&root, &mod_name)?;
 
     if dry_run {
         println!("--- {rs_file:?} ---\n{rs}");

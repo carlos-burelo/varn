@@ -6,106 +6,6 @@ pub struct TaskRuntime;
 
 pub struct IsolateHandleImpl;
 
-varn_contract! {
-    module: "runtime:task",
-    contract: "src/modules/runtime/task/task_runtime.vn",
-    impl TaskRuntime {
-        fn spawn(ctx: &mut dyn NativeCtx, target: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
-            ctx.spawn_vm(target, args)
-        }
-
-        fn sleep(ctx: &mut dyn NativeCtx, ms: i64) -> Result<VmValue, String> {
-            Ok(ctx.suspend_timer(ms.max(0) as u64))
-        }
-
-        fn parallel(ctx: &mut dyn NativeCtx, tasks: VmValue) -> Result<VmValue, String> {
-            ctx.task_gather(tasks)
-        }
-
-        fn cancelTask(ctx: &mut dyn NativeCtx, handle_nv: VmValue) -> Result<(), String> {
-            ctx.task_cancel(handle_nv)?;
-            crate::runtime::timer::note_cancel();
-            Ok(())
-        }
-
-        fn yieldTask(ctx: &mut dyn NativeCtx) -> Result<VmValue, String> {
-            Ok(ctx.task_yield())
-        }
-
-        fn spawnIsolate(ctx: &mut dyn NativeCtx, func: VmValue, args: VmValue) -> Result<VmValue, String> {
-            let (resolved_path, export_name) = ctx
-                .get_function_location(func)
-                .ok_or_else(|| "spawnIsolate: first argument must be a function reference".to_string())?;
-
-            let module_val = match ctx.load_module(&resolved_path) {
-                Ok(m) => m,
-                Err(e) => {
-                    let err_msg = format!("spawnIsolate: failed to load module '{resolved_path}': {e}");
-                    return Ok(reject_with_message(ctx, &err_msg));
-                }
-            };
-
-            let exported_fn = ctx.get_field(module_val, &export_name);
-            if exported_fn != Some(func) {
-                let err_msg = if export_name.starts_with('<') {
-                    "spawnIsolate: first argument must be a function reference, not an anonymous closure".to_string()
-                } else {
-                    format!("spawnIsolate: function '{export_name}' is not a top-level exported function of module '{resolved_path}'")
-                };
-                return Ok(reject_with_message(ctx, &err_msg));
-            }
-
-            if !ctx.is_array(args) {
-                return Err("spawnIsolate: arguments must be an array".to_string());
-            }
-            let mut worker_args = Vec::new();
-            let len = ctx.array_len(args);
-            for i in 0..len {
-                if let Some(item_nv) = ctx.array_get(args, i) {
-                    worker_args.push(ctx.to_sendable(item_nv)?);
-                }
-            }
-
-            let done = ctx.spawn_isolate(&resolved_path, &export_name, worker_args)?;
-            let handle_nv = ctx
-                .alloc_instance("IsolateHandle")
-                .ok_or("spawnIsolate: IsolateHandle class not registered")?;
-            let done_nv = ctx.task_from_host(done, HostOpen::Plain);
-            ctx.set_field(handle_nv, "_done", done_nv);
-            Ok(handle_nv)
-        }
-
-        fn channel(ctx: &mut dyn NativeCtx, capacity: i64) -> Result<VmValue, String> {
-            if capacity < 1 {
-                return Err("channel: capacity must be >= 1".to_string());
-            }
-            let id = crate::runtime::channel::create(capacity as usize);
-            let ch_nv = ctx
-                .alloc_instance("Channel")
-                .ok_or("channel: Channel class not registered")?;
-            let tx_nv = alloc_endpoint(ctx, "Sender", id)?;
-            let rx_nv = alloc_endpoint(ctx, "Receiver", id)?;
-            ctx.set_field(ch_nv, "tx", tx_nv);
-            ctx.set_field(ch_nv, "rx", rx_nv);
-            Ok(ch_nv)
-        }
-    }
-}
-
-varn_contract! {
-    module: "runtime:task",
-    class: "IsolateHandle",
-    contract: "src/modules/runtime/task/task_runtime.vn",
-    impl IsolateHandleImpl {
-
-
-
-        fn join(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
-            ctx.get_field(this, "_done").unwrap_or(VmValue::null())
-        }
-    }
-}
-
 pub struct SenderImpl;
 pub struct ReceiverImpl;
 pub struct ChannelImpl;
@@ -190,8 +90,100 @@ fn next_result(ctx: &mut dyn NativeCtx, value_nv: VmValue, done: bool) -> VmValu
 
 varn_contract! {
     module: "runtime:task",
-    class: "Sender",
     contract: "src/modules/runtime/task/task_runtime.vn",
+    impl TaskRuntime {
+        fn spawn(ctx: &mut dyn NativeCtx, target: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
+            ctx.spawn_vm(target, args)
+        }
+
+        fn sleep(ctx: &mut dyn NativeCtx, ms: i64) -> Result<VmValue, String> {
+            Ok(ctx.suspend_timer(ms.max(0) as u64))
+        }
+
+        fn parallel(ctx: &mut dyn NativeCtx, tasks: VmValue) -> Result<VmValue, String> {
+            ctx.task_gather(tasks)
+        }
+
+        fn cancelTask(ctx: &mut dyn NativeCtx, handle_nv: VmValue) -> Result<(), String> {
+            ctx.task_cancel(handle_nv)?;
+            crate::runtime::timer::note_cancel();
+            Ok(())
+        }
+
+        fn yieldTask(ctx: &mut dyn NativeCtx) -> Result<VmValue, String> {
+            Ok(ctx.task_yield())
+        }
+
+        fn spawnIsolate(ctx: &mut dyn NativeCtx, func: VmValue, args: VmValue) -> Result<VmValue, String> {
+            let (resolved_path, export_name) = ctx
+                .get_function_location(func)
+                .ok_or_else(|| "spawnIsolate: first argument must be a function reference".to_string())?;
+
+            let module_val = match ctx.load_module(&resolved_path) {
+                Ok(m) => m,
+                Err(e) => {
+                    let err_msg = format!("spawnIsolate: failed to load module '{resolved_path}': {e}");
+                    return Ok(reject_with_message(ctx, &err_msg));
+                }
+            };
+
+            let exported_fn = ctx.get_field(module_val, &export_name);
+            if exported_fn != Some(func) {
+                let err_msg = if export_name.starts_with('<') {
+                    "spawnIsolate: first argument must be a function reference, not an anonymous closure".to_string()
+                } else {
+                    format!("spawnIsolate: function '{export_name}' is not a top-level exported function of module '{resolved_path}'")
+                };
+                return Ok(reject_with_message(ctx, &err_msg));
+            }
+
+            if !ctx.is_array(args) {
+                return Err("spawnIsolate: arguments must be an array".to_string());
+            }
+            let mut worker_args = Vec::new();
+            let len = ctx.array_len(args);
+            for i in 0..len {
+                if let Some(item_nv) = ctx.array_get(args, i) {
+                    worker_args.push(ctx.to_sendable(item_nv)?);
+                }
+            }
+
+            let done = ctx.spawn_isolate(&resolved_path, &export_name, worker_args)?;
+            let handle_nv = ctx
+                .alloc_instance("IsolateHandle")
+                .ok_or("spawnIsolate: IsolateHandle class not registered")?;
+            let done_nv = ctx.task_from_host(done, HostOpen::Plain);
+            ctx.set_field(handle_nv, "_done", done_nv);
+            Ok(handle_nv)
+        }
+
+        fn channel(ctx: &mut dyn NativeCtx, capacity: i64) -> Result<VmValue, String> {
+            if capacity < 1 {
+                return Err("channel: capacity must be >= 1".to_string());
+            }
+            let id = crate::runtime::channel::create(capacity as usize);
+            let ch_nv = ctx
+                .alloc_instance("Channel")
+                .ok_or("channel: Channel class not registered")?;
+            let tx_nv = alloc_endpoint(ctx, "Sender", id)?;
+            let rx_nv = alloc_endpoint(ctx, "Receiver", id)?;
+            ctx.set_field(ch_nv, "tx", tx_nv);
+            ctx.set_field(ch_nv, "rx", rx_nv);
+            Ok(ch_nv)
+        }
+    }
+
+    class: "IsolateHandle",
+    impl IsolateHandleImpl {
+
+
+
+        fn join(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+            ctx.get_field(this, "_done").unwrap_or(VmValue::null())
+        }
+    }
+
+    class: "Sender",
     impl SenderImpl {
         fn send(ctx: &mut dyn NativeCtx, this: VmValue, msg: VmValue) -> VmValue {
             let Some(id) = chan_id(ctx, this) else {
@@ -225,12 +217,8 @@ varn_contract! {
             }
         }
     }
-}
 
-varn_contract! {
-    module: "runtime:task",
     class: "Receiver",
-    contract: "src/modules/runtime/task/task_runtime.vn",
     impl ReceiverImpl {
         fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
             let finished = |ctx: &mut dyn NativeCtx| {
@@ -276,19 +264,11 @@ varn_contract! {
             }
         }
     }
-}
 
-varn_contract! {
-    module: "runtime:task",
     class: "Channel",
-    contract: "src/modules/runtime/task/task_runtime.vn",
     impl ChannelImpl {}
-}
 
-varn_contract! {
-    module: "runtime:task",
     class: "ChannelClosed",
     extends: "Error",
-    contract: "src/modules/runtime/task/task_runtime.vn",
     impl ChannelClosedImpl {}
 }

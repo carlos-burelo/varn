@@ -31,32 +31,66 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         return err(format!("cannot read contract `{abs_path_str}`"));
     };
 
+    let mut sections = Vec::new();
+    let mut entries = Vec::new();
+    for section in &input.sections {
+        match expand_section(&input, section, &source, &abs_path_str) {
+            Ok((tokens, idents)) => {
+                sections.push(tokens);
+                entries.extend(idents);
+            }
+            Err(msg) => return err(msg),
+        }
+    }
+
+    let abs_lit = LitStr::new(&abs_path_str, proc_macro2::Span::call_site());
+    quote! {
+        const _: &[u8] = include_bytes!(#abs_lit);
+
+        #(#sections)*
+
+        pub static NATIVE_ENTRIES: &[&::varn_types::NativeOpEntry] = &[
+            #(&#entries),*
+        ];
+    }
+    .into()
+}
+
+fn expand_section(
+    input: &ContractInput,
+    section: &input::Section,
+    source: &str,
+    abs_path_str: &str,
+) -> Result<(proc_macro2::TokenStream, Vec<syn::Ident>), String> {
     let members =
-        match crate::contract_parse::lookup(&source, &input.contract, input.class.as_deref()) {
+        match crate::contract_parse::lookup(source, &input.contract, section.class.as_deref()) {
             Ok(members) => members,
-            Err(LookupFailure::Unparsable(reason)) => return err(reason),
+            Err(LookupFailure::Unparsable(reason)) => return Err(reason),
             Err(LookupFailure::ClassNotFound) => {
-                let class = input.class.clone().unwrap_or_default();
-                return err(format!(
+                let class = section.class.clone().unwrap_or_default();
+                return Err(format!(
                     "class `{class}` not found in contract `{abs_path_str}`"
                 ));
             }
             Err(LookupFailure::NoFunctions) => {
-                return err(format!(
+                return Err(format!(
                     "no `declare function`s found in contract `{abs_path_str}`"
                 ))
             }
         };
 
-    let prefix = input.class.clone().unwrap_or_else(|| input.module.clone());
+    let prefix = section
+        .class
+        .clone()
+        .unwrap_or_else(|| input.module.clone());
     let trait_ident = format_ident!("__VarnContract_{}", sanitize(&prefix));
 
-    let self_ty = &input.self_ty;
-    let user_fns = &input.fns;
+    let self_ty = &section.self_ty;
+    let user_fns = &section.fns;
     let module = &input.module;
     let ns = "";
 
-    let class_name_str: String = input.class.clone().unwrap_or_default();
+    let class_name_str: String = section.class.clone().unwrap_or_default();
 
     let cx = member::Cx {
         prefix: &prefix,
@@ -79,13 +113,11 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         mut generated_entry_idents,
     } = generated;
 
-    let abs_lit = LitStr::new(&abs_path_str, proc_macro2::Span::call_site());
-
-    let registration = if let Some(class) = &input.class {
+    let registration = if let Some(class) = &section.class {
         let builder_ident = format_ident!("__varn_build_{}", sanitize(class));
         let entry_ident = format_ident!("__VARN_OP_{}", sanitize(class).to_uppercase());
         generated_entry_idents.push(entry_ident.clone());
-        let superclass_setup = if let Some(parent) = &input.extends {
+        let superclass_setup = if let Some(parent) = &section.extends {
             quote! {
                 if let Some(parent) = ctx.get_class(#parent) {
                     *cls.superclass.borrow_mut() = Some(parent.clone());
@@ -109,10 +141,6 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 Ok(ctx.alloc_class(cls.clone()))
             }
 
-            #[used]
-            #[cfg_attr(target_os = "windows", unsafe(link_section = ".varn_ops$B"))]
-            #[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,varn_ops"))]
-            #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), unsafe(link_section = "varn_ops"))]
             static #entry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
                 module_id: #module.as_ptr(),
                 module_id_len: #module.len() as u32,
@@ -134,20 +162,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         quote! { #(#fn_entries)* }
     };
 
-    let marker_name = if let Some(class) = &input.class {
-        format!("__VARN_LINK_MARKER_{}", sanitize(class).to_uppercase())
-    } else {
-        format!(
-            "__VARN_LINK_MARKER_{}",
-            sanitize(&input.module).to_uppercase()
-        )
-    };
-    let link_marker_ident = format_ident!("{}", marker_name);
-
-    let out = quote! {
-
-        const _: &[u8] = include_bytes!(#abs_lit);
-
+    let tokens = quote! {
         #[allow(non_camel_case_types)]
         pub trait #trait_ident {
             #(#trait_sigs)*
@@ -160,14 +175,9 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 
         #(#wrappers)*
 
-        pub static #link_marker_ident: &[&::varn_types::NativeOpEntry] = &[
-            #(&#generated_entry_idents),*
-        ];
-
         #registration
     };
-
-    out.into()
+    Ok((tokens, generated_entry_idents))
 }
 
 pub(super) fn sanitize(s: &str) -> String {

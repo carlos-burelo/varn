@@ -15,10 +15,20 @@ fn init_error(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>, cla
 
 pub struct ErrorClass;
 
+pub struct TypeErrorClass;
+
+pub struct RangeErrorClass;
+
+pub struct IntegerOverflowClass;
+
+pub struct DivisionByZeroClass;
+
+pub struct MatchErrorClass;
+
 varn_contract! {
     module: "globals",
-    class: "Error",
     contract: "src/modules/core/errors/errors.vn",
+    class: "Error",
     impl ErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "Error");
@@ -41,75 +51,45 @@ varn_contract! {
             }
         }
     }
-}
 
-pub struct TypeErrorClass;
-
-varn_contract! {
-    module: "globals",
     class: "TypeError",
     extends: "Error",
-    contract: "src/modules/core/errors/errors.vn",
     impl TypeErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "TypeError");
             this
         }
     }
-}
 
-pub struct RangeErrorClass;
-
-varn_contract! {
-    module: "globals",
     class: "RangeError",
     extends: "Error",
-    contract: "src/modules/core/errors/errors.vn",
     impl RangeErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "RangeError");
             this
         }
     }
-}
 
-pub struct IntegerOverflowClass;
-
-varn_contract! {
-    module: "globals",
     class: "IntegerOverflow",
     extends: "Error",
-    contract: "src/modules/core/errors/errors.vn",
     impl IntegerOverflowClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "IntegerOverflow");
             this
         }
     }
-}
 
-pub struct DivisionByZeroClass;
-
-varn_contract! {
-    module: "globals",
     class: "DivisionByZero",
     extends: "Error",
-    contract: "src/modules/core/errors/errors.vn",
     impl DivisionByZeroClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "DivisionByZero");
             this
         }
     }
-}
 
-pub struct MatchErrorClass;
-
-varn_contract! {
-    module: "globals",
     class: "MatchError",
     extends: "Error",
-    contract: "src/modules/core/errors/errors.vn",
     impl MatchErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "MatchError");

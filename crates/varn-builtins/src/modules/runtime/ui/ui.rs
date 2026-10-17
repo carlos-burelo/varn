@@ -4,7 +4,9 @@ use std::sync::OnceLock;
 use varn_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-use super::ui_draw::{self, DrawCmd};
+#[path = "draw.rs"]
+mod ui_draw;
+use ui_draw::DrawCmd;
 
 pub struct UiRuntime;
 

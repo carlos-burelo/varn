@@ -7,92 +7,14 @@ use std::sync::OnceLock;
 use varn_core::op_meta::OpMeta;
 use varn_types::{NativeCtx, NativeOpEntry, VmValue};
 
-unsafe extern "C" {
-    #[cfg(target_os = "macos")]
-    #[link_name = "\x01section$start$__DATA$varn_ops"]
-    static __VARN_OPS_START: NativeOpEntry;
-    #[cfg(target_os = "macos")]
-    #[link_name = "\x01section$end$__DATA$varn_ops"]
-    static __VARN_OPS_END: NativeOpEntry;
-
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    #[link_name = "__start_varn_ops"]
-    static __VARN_OPS_START: NativeOpEntry;
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    #[link_name = "__stop_varn_ops"]
-    static __VARN_OPS_END: NativeOpEntry;
-}
-
-#[cfg(target_os = "windows")]
-#[used]
-#[unsafe(link_section = ".varn_ops$A")]
-pub static __VARN_OPS_START_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
-
-#[cfg(target_os = "windows")]
-#[used]
-#[unsafe(link_section = ".varn_ops$C")]
-pub static __VARN_OPS_END_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
-
-pub fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
-    #[cfg(target_os = "windows")]
-    let slice: &'static [NativeOpEntry] = unsafe {
-        let start = &__VARN_OPS_START_MARKER as *const NativeOpEntry;
-        let end = &__VARN_OPS_END_MARKER as *const NativeOpEntry;
-        let start_u = start as usize;
-        let end_u = end as usize;
-        if end_u <= start_u {
-            &[]
-        } else {
-            let len = (end_u - start_u) / std::mem::size_of::<NativeOpEntry>();
-            std::slice::from_raw_parts(start, len)
-        }
-    };
-
-    #[cfg(not(target_os = "windows"))]
-    let slice: &'static [NativeOpEntry] = unsafe {
-        let start = &__VARN_OPS_START as *const NativeOpEntry;
-        let end = &__VARN_OPS_END as *const NativeOpEntry;
-        let len = (end as usize - start as usize) / std::mem::size_of::<NativeOpEntry>();
-        std::slice::from_raw_parts(start, len)
-    };
-
-    slice.iter().filter(|e| !e.func_ptr.is_null())
-}
-
-static FALLBACK_ENTRIES: OnceLock<std::sync::Mutex<Vec<&'static [&'static NativeOpEntry]>>> =
-    OnceLock::new();
-
-pub fn register_fallback_module_entries(entries: &'static [&'static NativeOpEntry]) {
-    let mutex = FALLBACK_ENTRIES.get_or_init(|| std::sync::Mutex::new(Vec::new()));
-    if let Ok(mut guard) = mutex.lock() {
-        guard.push(entries);
-    }
-}
-
 static ALL_OPS: OnceLock<Vec<&'static NativeOpEntry>> = OnceLock::new();
 
 pub fn all_native_ops() -> &'static [&'static NativeOpEntry] {
     ALL_OPS.get_or_init(|| {
-        let mut list: Vec<&'static NativeOpEntry> = Vec::new();
-        let mut seen: rustc_hash::FxHashSet<usize> = rustc_hash::FxHashSet::default();
-        let mut push = |entry: &'static NativeOpEntry, list: &mut Vec<_>| {
-            if !entry.func_ptr.is_null() && seen.insert(entry as *const NativeOpEntry as usize) {
-                list.push(entry);
-            }
-        };
-        for entry in iter_native_ops() {
-            push(entry, &mut list);
-        }
-        if let Some(mutex) = FALLBACK_ENTRIES.get()
-            && let Ok(guard) = mutex.lock()
-        {
-            for slice in guard.iter() {
-                for &entry in *slice {
-                    push(entry, &mut list);
-                }
-            }
-        }
-        list
+        crate::modules::NATIVE_MODULES
+            .iter()
+            .flat_map(|entries| entries.iter().copied())
+            .collect()
     })
 }
 
