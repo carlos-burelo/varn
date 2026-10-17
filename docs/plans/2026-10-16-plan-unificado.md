@@ -61,28 +61,17 @@ cuadrante 5 de `verify.ps1` (`5489ec54`). http_routing 262→227 ms
 Globales top-level a registros del módulo (regresión de la migración
 HIR→TIR): walker TIR exhaustivo (`7a11028a`) y pase de promoción en
 varn-emit (`5e652ef0`); class_fields 6.4→3.6 ms.
+Módulos/LBI/ABI (2026-10-16): el macro parsea el contrato (`78a47de6`,
+borra contracts.json y gen-contract-tables); build.rs con el parser real
+(`9f23745a`, AST de namespace guarda `declare` `f9af54e6`); registro
+estático único en lugar de secciones del linker y markers (`0cd1f048`);
+permisos `@permission` en el contrato (`9394b438`); ids de op densos con
+`KnownOp` reservados (`b88a69e3`); un solo resolvedor de especificadores
+(`e6528ef3`, arregla doble evaluación por mayúsculas), un solo lector de
+fuente (`8a5a0217`), provider con `module()` (`c546a8b5`); ABI v2 muerta
+borrada (`877294fc`). `NATIVE_GLOBALS` queda como única tabla ABI.
 
 ## 2. Pendiente, por orden
-
-### 2.0 Módulos / LBI / ABI: un mecanismo por hecho (en curso)
-
-Auditoría 2026-10-16 (código): el conjunto de nativos se enumera 4 veces
-(escaneo en build.rs, `#[path] mod`, `register_marker!`, secciones del
-linker); identidad de op = FNV de strings en 7 sitios + 5 `FxHashMap`
-al arrancar; capacidades por `match` hardcodeado; ops del VM en tabla
-aparte; 4 resoluciones de ruta y 4 abstracciones de carga
-(`CompositeLoader` muerto); `AbiCtx`/`AbiHeader` sin uso.
-
-- **F1** macro parsea el contrato `.vn` (`78a47de6`): borra
-  `contracts.json` y `gen-contract-tables`, rompe el ciclo de bootstrap.
-- **F2** build.rs genera mods + tabla de ops + specs con el parser real;
-  capacidades en el contrato. Borra secciones del linker, markers,
-  `#[path]`, tokenizador casero, `capability_for_op`.
-- **F3** `NativeOpId(u32)` denso por build; dispatch = índice; ops del
-  VM en la misma tabla. Borra FNV y los 5 mapas.
-- **F4** un resolvedor y un cargador de fuente para checker, grafo y VM.
-- **F5** ABI: terminar o borrar `AbiCtx`/`AbiHeader`; `NATIVE_GLOBALS`
-  al registro.
 
 ### 2.1 Representación: un bloque por valor
 

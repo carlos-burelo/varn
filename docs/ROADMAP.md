@@ -104,9 +104,12 @@ cerrar lo pendiente en `docs/plans/2026-10-16-plan-unificado.md`.
   `varn-compiler/src/ssa/emit/mod.rs`). Posible pérdida de la migración
   HIR→TIR, como la promoción de módulo (`5e652ef0`): verificar antes de
   diseñar.
-- **Primer paso.** Confirmar si la inferencia existió y dónde se cortó;
-  después, que la deduzca el checker a partir de los imports
-  `runtime:*`.
+- **Hallazgo (2026-10-16).** El checker ya propaga `@capability`
+  estáticamente: anotar un contrato con `@capability("ui")` exige que todo
+  llamador lo declare. Los contratos usan `@permission` (solo runtime,
+  `9394b438`) para no activar esa propagación todavía.
+- **Primer paso.** Decidir si los contratos pasan a `@capability` y cómo
+  se cierra la propagación en la frontera de paquete (por dependencia).
 - **Puerta.** Paquete de prueba que pide red sin declararla y debe ser
   rechazado; suite canónica.
 
