@@ -139,7 +139,7 @@ impl<'r> Checker<'r> {
         if let Some(sid) = scope.resolve(name, &bind.scopes) {
             self.warn_if_deprecated(sid, name_str, range, bind);
         }
-        if scope.resolve(name, &bind.scopes).is_none() && !self.is_assignment_target {
+        if scope.resolve(name, &bind.scopes).is_none() {
             let mut diag = Diagnostic::error(
                 ErrorCode::UnknownSymbol,
                 format!("undefined variable: {name_str}"),

@@ -1,0 +1,7 @@
+// expect: error[VN3002]
+function f(): void {
+    try {
+        undeclared = 1
+    } finally {
+    }
+}
