@@ -268,6 +268,5 @@ varn_contract! {
     impl ChannelImpl {}
 
     class: "ChannelClosed",
-    extends: "Error",
     impl ChannelClosedImpl {}
 }

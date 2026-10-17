@@ -17,8 +17,13 @@ pub(crate) enum LookupFailure {
     NoFunctions,
 }
 
+pub(crate) struct ContractSection {
+    pub(crate) members: Vec<Member>,
+    pub(crate) extends: Option<String>,
+}
+
 struct Contract {
-    classes: BTreeMap<String, Vec<Member>>,
+    classes: BTreeMap<String, ContractSection>,
     functions: Vec<Member>,
 }
 
@@ -26,7 +31,7 @@ pub(crate) fn lookup(
     source: &str,
     name: &str,
     class: Option<&str>,
-) -> Result<Vec<Member>, LookupFailure> {
+) -> Result<ContractSection, LookupFailure> {
     let mut contract = parse(source, name)?;
     match class {
         Some(class) => contract
@@ -34,7 +39,10 @@ pub(crate) fn lookup(
             .remove(class)
             .ok_or(LookupFailure::ClassNotFound),
         None if contract.functions.is_empty() => Err(LookupFailure::NoFunctions),
-        None => Ok(contract.functions),
+        None => Ok(ContractSection {
+            members: contract.functions,
+            extends: None,
+        }),
     }
 }
 
@@ -52,9 +60,19 @@ fn parse(source: &str, name: &str) -> Result<Contract, LookupFailure> {
         match unwrap_export(decl) {
             Decl::Class(c) => {
                 if let Some(id) = c.id {
+                    let extends = c.super_class.and_then(|e| {
+                        if let ExprKind::Identifier { name } = &arena.expr(e).kind {
+                            Some(interner.resolve(*name).to_string())
+                        } else {
+                            None
+                        }
+                    });
                     classes.insert(
                         interner.resolve(id).to_string(),
-                        class_members(c, &arena, &interner)?,
+                        ContractSection {
+                            members: class_members(c, &arena, &interner)?,
+                            extends,
+                        },
                     );
                 }
             }

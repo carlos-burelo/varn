@@ -9,7 +9,6 @@ pub(super) struct ContractInput {
 
 pub(super) struct Section {
     pub(super) class: Option<String>,
-    pub(super) extends: Option<String>,
     pub(super) self_ty: syn::Type,
     pub(super) fns: Vec<syn::ImplItemFn>,
 }
@@ -21,7 +20,6 @@ impl Parse for ContractInput {
         let mut sections = Vec::new();
         while !input.is_empty() {
             let mut class = None;
-            let mut extends = None;
             while !input.peek(Token![impl]) {
                 let key: Ident = input.parse()?;
                 input.parse::<Token![:]>()?;
@@ -30,7 +28,6 @@ impl Parse for ContractInput {
                     "module" => &mut module,
                     "contract" => &mut contract,
                     "class" => &mut class,
-                    "extends" => &mut extends,
                     other => {
                         return Err(syn::Error::new(
                             key.span(),
@@ -60,7 +57,6 @@ impl Parse for ContractInput {
                 .collect();
             sections.push(Section {
                 class,
-                extends,
                 self_ty: (*imp.self_ty).clone(),
                 fns,
             });

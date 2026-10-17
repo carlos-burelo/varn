@@ -62,9 +62,9 @@ fn expand_section(
     source: &str,
     abs_path_str: &str,
 ) -> Result<(proc_macro2::TokenStream, Vec<syn::Ident>), String> {
-    let members =
+    let contract =
         match crate::contract_parse::lookup(source, &input.contract, section.class.as_deref()) {
-            Ok(members) => members,
+            Ok(contract) => contract,
             Err(LookupFailure::Unparsable(reason)) | Err(LookupFailure::BadCapability(reason)) => {
                 return Err(reason)
             }
@@ -103,7 +103,7 @@ fn expand_section(
         class_name: &class_name_str,
     };
     let mut generated = member::Generated::default();
-    for m in &members {
+    for m in &contract.members {
         member::generate(&cx, m, &mut generated);
     }
     let member::Generated {
@@ -119,7 +119,7 @@ fn expand_section(
         let builder_ident = format_ident!("__varn_build_{}", sanitize(class));
         let entry_ident = format_ident!("__VARN_OP_{}", sanitize(class).to_uppercase());
         generated_entry_idents.push(entry_ident.clone());
-        let superclass_setup = if let Some(parent) = &section.extends {
+        let superclass_setup = if let Some(parent) = &contract.extends {
             quote! {
                 if let Some(parent) = ctx.get_class(#parent) {
                     *cls.superclass.borrow_mut() = Some(parent.clone());

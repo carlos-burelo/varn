@@ -53,7 +53,6 @@ varn_contract! {
     }
 
     class: "TypeError",
-    extends: "Error",
     impl TypeErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "TypeError");
@@ -62,7 +61,6 @@ varn_contract! {
     }
 
     class: "RangeError",
-    extends: "Error",
     impl RangeErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "RangeError");
@@ -71,7 +69,6 @@ varn_contract! {
     }
 
     class: "IntegerOverflow",
-    extends: "Error",
     impl IntegerOverflowClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "IntegerOverflow");
@@ -80,7 +77,6 @@ varn_contract! {
     }
 
     class: "DivisionByZero",
-    extends: "Error",
     impl DivisionByZeroClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "DivisionByZero");
@@ -89,7 +85,6 @@ varn_contract! {
     }
 
     class: "MatchError",
-    extends: "Error",
     impl MatchErrorClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
             init_error(ctx, this, message, "MatchError");
