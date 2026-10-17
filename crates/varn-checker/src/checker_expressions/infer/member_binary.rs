@@ -3,7 +3,7 @@ use crate::checker::Checker;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
-use varn_sem::types::{CheckerTyTable, Type};
+use varn_sem::types::Type;
 
 use super::super::expr_labels::base_type;
 
@@ -92,25 +92,6 @@ pub(super) fn infer_member_type(
     )
 }
 
-pub(crate) fn normalize_for_binary(
-    ty: &Type,
-    table: &CheckerTyTable,
-    interner: &varn_core::AtomInterner,
-) -> Type {
-    let ty = &ty.apparent(table);
-    if let TypeKind::Named(name, _) = table.get(ty.0) {
-        match interner.try_resolve(name).unwrap_or_default() {
-            n if n == varn_core::LangPrimitive::Str.name() => return Type::Str,
-            n if n == varn_core::LangPrimitive::Int.name() => return Type::Int,
-            n if n == varn_core::LangPrimitive::Float.name() => return Type::Float,
-            n if n == varn_core::LangPrimitive::Bool.name() => return Type::Bool,
-            n if n == varn_core::LangPrimitive::Decimal.name() => return Type::Decimal,
-            _ => {}
-        }
-    }
-    *ty
-}
-
 pub(super) fn infer_binary_type(
     checker: &mut Checker<'_>,
     rec: &mut Recorder,
@@ -144,8 +125,8 @@ pub(super) fn infer_binary_type(
         | BinaryOp::UShr => {
             let l_raw = base_type(&checker.infer_type(rec, left, bind));
             let r_raw = base_type(&checker.infer_type(rec, right, bind));
-            let l = normalize_for_binary(&l_raw, &checker.ty_table, &bind.interner);
-            let r = normalize_for_binary(&r_raw, &checker.ty_table, &bind.interner);
+            let l = l_raw.apparent(&checker.ty_table);
+            let r = r_raw.apparent(&checker.ty_table);
             if l_raw.is_error() || r_raw.is_error() {
                 return Type::Error;
             }

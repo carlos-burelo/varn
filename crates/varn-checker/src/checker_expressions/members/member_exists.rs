@@ -141,12 +141,6 @@ impl<'r> Checker<'r> {
                     }
                 }
 
-                if name.as_ref() == varn_core::LangPrimitive::Str.name()
-                    && key == varn_core::MemberKey::Length.as_str()
-                {
-                    return true;
-                }
-
                 if let Some(owner) = self.foreign_owner(bind, &name, origin.as_deref()) {
                     return self.member_exists(ty, key, &owner);
                 }

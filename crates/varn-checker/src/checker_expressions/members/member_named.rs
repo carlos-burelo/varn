@@ -66,12 +66,6 @@ impl<'r> Checker<'r> {
             return None;
         }
 
-        if name.as_ref() == varn_core::LangPrimitive::Str.name()
-            && key == varn_core::MemberKey::Length.as_str()
-        {
-            return Some((Type::Int, None));
-        }
-
         if let Some(owner) = self.foreign_owner(bind, &name, origin.as_deref()) {
             return self
                 .find_member_info_uncached(ty, key, &owner)

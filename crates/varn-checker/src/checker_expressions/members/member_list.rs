@@ -161,13 +161,20 @@ pub fn get_members_of_type(
                 false,
                 true,
             );
-            let str_ty = Type::named(varn_core::RuntimeKind::Str.name().to_owned(), table);
-            return get_members_of_type(resolver, &str_ty, bind, table);
+            list_primitive(
+                resolver,
+                bind,
+                table,
+                varn_core::LangPrimitive::Str,
+                &mut results,
+                &mut seen,
+            );
         }
-        kind @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => {
-            let name = kind.lang_name().unwrap_or_default();
-            let named_ty = Type::named(name.to_owned(), table);
-            return get_members_of_type(resolver, &named_ty, bind, table);
+        TypeKind::Primitive(p) => {
+            list_primitive(resolver, bind, table, p, &mut results, &mut seen);
+        }
+        TypeKind::Literal(l) => {
+            list_primitive(resolver, bind, table, l.base(), &mut results, &mut seen);
         }
         TypeKind::Union(list) | TypeKind::Intersection(list) => {
             let variants: Vec<Type> = table
@@ -316,5 +323,28 @@ fn add_declared(
             is_async: m.is_async,
             is_generator: m.is_generator,
         });
+    }
+}
+
+fn list_primitive(
+    resolver: &dyn varn_sem::resolver::ImportResolver,
+    bind: &BindResult,
+    table: &mut CheckerTyTable,
+    primitive: varn_core::LangPrimitive,
+    results: &mut Vec<varn_sem::semantic_info::ResolvedMemberSummary>,
+    seen: &mut rustc_hash::FxHashSet<Arc<str>>,
+) {
+    if let Some(module) = primitive.core_module() {
+        let name = Arc::from(primitive.name());
+        list_nominal(
+            resolver,
+            bind,
+            table,
+            name,
+            Some(Arc::from(module)),
+            &[],
+            results,
+            seen,
+        );
     }
 }

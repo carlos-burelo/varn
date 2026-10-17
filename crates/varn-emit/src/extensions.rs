@@ -2,7 +2,6 @@ use super::body::FnEmitter;
 use super::free_functions::param_name;
 use super::functions::fresh_sig;
 use super::module_ctx::MCtx;
-use super::ty::NameResolver;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, Decl, Program, StmtId, StmtKind};
@@ -53,7 +52,7 @@ pub(super) fn extension_target_label(
         TypeKind::Named(n, _) => Some(Arc::from(interner.resolve(*n))),
         TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(*n))),
         k @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => k.lang_name().map(Arc::from),
-        TypeKind::Array(_) => Some(Arc::from("Array")),
+        TypeKind::Array(_) => Some(Arc::from(varn_core::BuiltinType::Array.name())),
         TypeKind::This
         | TypeKind::Union(_)
         | TypeKind::Intersection(_)
@@ -92,18 +91,13 @@ pub(super) fn emit_extensions(
         let Some(label) = extension_target_label(&ext.target, ctx.interner) else {
             continue;
         };
-        let recv_ty = match label.as_ref() {
-            "str" => BackendTy::Str,
-            "int" => BackendTy::Int,
-            "float" => BackendTy::Float,
-            "bool" => BackendTy::Bool,
-            "char" => BackendTy::Char,
-            other => ctx
-                .names
-                .class_id(other)
-                .map(BackendTy::Class)
-                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported)),
-        };
+        let recv_ty = ctx
+            .annotation_types
+            .get(&ext.target.id)
+            .map(|target| {
+                super::ty::lower_type(target, ctx.checker_table, ctx.interner, types, ctx.names)
+            })
+            .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
         let this_cid = match recv_ty {
             BackendTy::Class(cid) => Some(cid),
             BackendTy::Int

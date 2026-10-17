@@ -2,7 +2,6 @@ use super::arrays::array_arms;
 use super::generics::generic_arms;
 use super::nominal::nominal_arms;
 use super::objects::object_arm;
-use super::resolve::resolve_atom;
 use super::scalar::{is_simple_type, simple_types_compatible, t};
 use super::unions::union_arms;
 use crate::bind::{BindResult, BindView};
@@ -126,16 +125,6 @@ pub(super) fn types_compatible_impl(
         }
         (TypeKind::Primitive(varn_core::LangPrimitive::Str), TypeKind::TemplateLiteral(_)) => true,
         (TypeKind::TemplateLiteral(a), TypeKind::TemplateLiteral(b)) => a == b,
-
-        (lang @ TypeKind::Primitive(_), TypeKind::Named(name, _))
-        | (TypeKind::Named(name, _), lang @ TypeKind::Primitive(_))
-            if resolve_atom(bind, name)
-                .as_deref()
-                .and_then(TypeKind::of_primitive_name)
-                .is_some_and(|k| k == lang) =>
-        {
-            true
-        }
 
         (TypeKind::Tuple(decl_elems), TypeKind::Tuple(inf_elems)) => {
             let decl_ids = table.get_list(decl_elems).to_vec();

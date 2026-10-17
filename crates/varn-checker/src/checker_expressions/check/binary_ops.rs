@@ -1,11 +1,10 @@
 use super::super::expr_labels::{base_type, op_str};
-use super::super::infer::member_binary::normalize_for_binary;
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::ExprId;
 use varn_core::source::SourceRange;
-use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
@@ -37,19 +36,15 @@ impl<'r> Checker<'r> {
 
         let l_base_raw = base_type(&l_ty);
         let r_base_raw = base_type(&r_ty);
-        let l_base = normalize_for_binary(&l_base_raw, &self.ty_table, &bind.interner);
-        let r_base = normalize_for_binary(&r_base_raw, &self.ty_table, &bind.interner);
+        let l_base = l_base_raw.apparent(&self.ty_table);
+        let r_base = r_base_raw.apparent(&self.ty_table);
         let is_type_param_b = |t: &Type, checker: &Checker| matches!(checker.ty_table.get(t.0), varn_core::TypeKind::Named(n, _) if checker.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()));
         if !l_base.is_dynamic()
             && !r_base.is_dynamic()
             && !is_type_param_b(&l_base, self)
             && !is_type_param_b(&r_base, self)
         {
-            let is_numeric = |t: &Type, checker: &Checker| {
-                t.is_numeric()
-                    || matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _) if bind.interner.try_resolve(n).unwrap_or_default() == varn_core::LangPrimitive::Decimal.name())
-            };
-            let both_numeric = is_numeric(&l_base, self) && is_numeric(&r_base, self);
+            let both_numeric = l_base.is_numeric() && r_base.is_numeric();
             let (l_eff, r_eff) = varn_binder::type_inference::adopt_literal_operands(
                 self.ast_arena,
                 left,
