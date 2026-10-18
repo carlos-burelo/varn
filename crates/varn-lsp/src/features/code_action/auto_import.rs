@@ -4,40 +4,12 @@ use tower_lsp_f::lsp_types::{
 
 use crate::document::DocumentState;
 use crate::index::ProjectIndex;
-
-const STDLIB_COMMON_EXPORTS: &[(&str, &str)] = &[
-    ("File", "std:fs"),
-    ("Path", "std:path"),
-    ("readTextFile", "std:fs"),
-    ("writeTextFile", "std:fs"),
-    ("JSON", "std:json"),
-    ("HttpClient", "std:http"),
-    ("HttpServer", "std:http"),
-    ("Isolate", "std:isolate"),
-    ("Channel", "std:channel"),
-    ("Timer", "std:time"),
-    ("sleep", "std:time"),
-    ("Duration", "std:time"),
-    ("Instant", "std:time"),
-    ("Process", "std:process"),
-    ("env", "std:env"),
-    ("Regex", "std:regex"),
-    ("Crypto", "std:crypto"),
-    ("HashMap", "std:collections"),
-    ("HashSet", "std:collections"),
-    ("sin", "std:math"),
-    ("cos", "std:math"),
-    ("tan", "std:math"),
-    ("sqrt", "std:math"),
-    ("PI", "std:math"),
-    ("E", "std:math"),
-    ("expect", "std:test"),
-    ("assertEqual", "std:test"),
-];
+use varn_sem::resolver::ImportResolver;
 
 pub fn generate_auto_imports_action(
     state: &DocumentState,
     index: Option<&ProjectIndex>,
+    resolver: &varn_resolver::DiskResolver,
     uri: &tower_lsp_f::lsp_types::Uri,
     diag: &Diagnostic,
 ) -> Vec<CodeActionResponse> {
@@ -53,8 +25,8 @@ pub fn generate_auto_imports_action(
         return actions;
     }
 
-    for &(exp, module) in STDLIB_COMMON_EXPORTS {
-        if exp == sym_name
+    for module in varn_modules::std_module_ids() {
+        if resolver.stdlib_exports(module).contains_key(sym_name)
             && let Some(action) = create_import_action(uri, diag, sym_name, module)
         {
             actions.push(action);

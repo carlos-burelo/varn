@@ -111,7 +111,12 @@ pub(crate) async fn code_action(
         .query("code_action", move |an| {
             let state = an.workspace.get(&uri);
             let index = an.workspace.index.read().ok();
-            build_code_action(params, state.as_deref(), index.as_deref())
+            build_code_action(
+                params,
+                state.as_deref(),
+                index.as_deref(),
+                an.workspace.resolver(),
+            )
         })
         .await)
 }

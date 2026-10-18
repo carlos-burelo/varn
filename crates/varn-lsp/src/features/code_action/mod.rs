@@ -17,6 +17,7 @@ pub fn build_code_action(
     params: CodeActionParams,
     state: Option<&DocumentState>,
     index: Option<&ProjectIndex>,
+    resolver: &varn_resolver::DiskResolver,
 ) -> Option<Vec<CodeActionResponse>> {
     let mut actions = Vec::new();
     let uri = &params.text_document.uri;
@@ -98,7 +99,8 @@ pub fn build_code_action(
         }
 
         if let Some(st) = state {
-            let auto_imports = auto_import::generate_auto_imports_action(st, index, uri, diag);
+            let auto_imports =
+                auto_import::generate_auto_imports_action(st, index, resolver, uri, diag);
             actions.extend(auto_imports);
         }
     }
