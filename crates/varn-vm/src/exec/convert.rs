@@ -4,7 +4,7 @@ use crate::value::VmValue;
 use bigdecimal::{BigDecimal, RoundingMode};
 use num_bigint::BigInt;
 use num_traits::{FromPrimitive, ToPrimitive};
-use varn_core::ValueConv;
+use varn_core::{LangPrimitive, ValueConv};
 
 #[cold]
 #[inline(never)]
@@ -123,9 +123,11 @@ fn to_decimal(n: Numeric, heap: &mut Heap) -> VmResult<VmValue> {
 
 #[cold]
 #[inline(never)]
-fn not_a(expected: &str, v: VmValue, heap: &Heap) -> RuntimeError {
+fn not_a(expected: LangPrimitive, nullable: bool, v: VmValue, heap: &Heap) -> RuntimeError {
+    let optional = if nullable { "?" } else { "" };
     RuntimeError::type_error(format!(
-        "type mismatch: expected '{expected}', got '{}'",
+        "type mismatch: expected '{}{optional}', got '{}'",
+        expected.name(),
         crate::exec::advanced::typeof_val(v, heap)
     ))
 }
@@ -137,7 +139,7 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
             return if heap.is_string(v) || (nullable && v.is_null()) {
                 Ok(v)
             } else {
-                Err(not_a(if nullable { "str?" } else { "str" }, v, heap))
+                Err(not_a(LangPrimitive::Str, nullable, v, heap))
             };
         }
         ValueConv::ExpectBool | ValueConv::ExpectBoolOrNull => {
@@ -145,7 +147,7 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
             return if v.is_bool() || (nullable && v.is_null()) {
                 Ok(v)
             } else {
-                Err(not_a(if nullable { "bool?" } else { "bool" }, v, heap))
+                Err(not_a(LangPrimitive::Bool, nullable, v, heap))
             };
         }
         ValueConv::ExpectInt | ValueConv::ExpectIntOrNull => {
@@ -153,7 +155,7 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
             return if heap.is_int(v) || (nullable && v.is_null()) {
                 Ok(v)
             } else {
-                Err(not_a(if nullable { "int?" } else { "int" }, v, heap))
+                Err(not_a(LangPrimitive::Int, nullable, v, heap))
             };
         }
         ValueConv::ExpectFloat | ValueConv::ExpectFloatOrNull => {
@@ -163,7 +165,7 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
             } else if heap.is_int(v) {
                 Ok(VmValue::from_f64(heap.as_int(v) as f64))
             } else {
-                Err(not_a(if nullable { "float?" } else { "float" }, v, heap))
+                Err(not_a(LangPrimitive::Float, nullable, v, heap))
             };
         }
         ValueConv::IntToFloat

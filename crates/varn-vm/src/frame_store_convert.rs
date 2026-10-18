@@ -4,15 +4,16 @@ use crate::value::VmValue;
 use varn_types::register_meta::SlotClass;
 
 pub(crate) fn value_kind_name(v: VmValue) -> &'static str {
+    use varn_core::RuntimeKind as K;
     use varn_types::vm_value::*;
     match v.kind() {
-        KIND_NULL => "null",
-        KIND_BOOL => "bool",
-        KIND_INT => "int",
-        KIND_FLOAT => "float",
-        KIND_HEAP => "object",
-        KIND_SSO => "str",
-        KIND_SYMBOL => "symbol",
+        KIND_NULL => K::Null.name(),
+        KIND_BOOL => K::Bool.name(),
+        KIND_INT => K::Int.name(),
+        KIND_FLOAT => K::Float.name(),
+        KIND_HEAP => K::Object.name(),
+        KIND_SSO => K::Str.name(),
+        KIND_SYMBOL => K::Symbol.name(),
         _ => varn_core::LangPrimitive::Dynamic.name(),
     }
 }
@@ -94,7 +95,7 @@ impl FrameStore {
         match class {
             SlotClass::Gpr => {
                 if !v.is_int() {
-                    return Err(rejected("int", v));
+                    return Err(rejected(varn_core::RuntimeKind::Int.name(), v));
                 }
                 self.gpr[i] = v.as_int();
             }
@@ -104,7 +105,7 @@ impl FrameStore {
                 } else if v.is_int() {
                     self.fpr[i] = v.as_int() as f64;
                 } else {
-                    return Err(rejected("float", v));
+                    return Err(rejected(varn_core::RuntimeKind::Float.name(), v));
                 }
             }
             SlotClass::Ref => {
@@ -113,7 +114,7 @@ impl FrameStore {
                 } else if v.is_heap() {
                     self.refs[i] = Some(v.as_heap());
                 } else {
-                    return Err(rejected("object", v));
+                    return Err(rejected(varn_core::RuntimeKind::Object.name(), v));
                 }
             }
             SlotClass::Dyn => self.dyn_[i] = v,
