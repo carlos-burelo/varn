@@ -175,7 +175,6 @@ impl fmt::Display for TypeDisplay<'_> {
                             params,
                             return_type,
                             optional,
-                            is_arrow: _,
                             ..
                         } => {
                             write!(f, "{}{}(", name, if *optional { "?" } else { "" })?;

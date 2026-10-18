@@ -182,9 +182,10 @@ fn type_satisfies_extends(check: &Type, extends: &Type, table: &CheckerTyTable) 
         return true;
     }
 
-    match (table.get(check.0), table.get(extends.0)) {
-        (TypeKind::Primitive(p1), TypeKind::Primitive(p2)) => return p1 == p2,
-        _ => {}
+    if let (TypeKind::Primitive(p1), TypeKind::Primitive(p2)) =
+        (table.get(check.0), table.get(extends.0))
+    {
+        return p1 == p2;
     }
 
     match (table.get(check.0), table.get(extends.0)) {

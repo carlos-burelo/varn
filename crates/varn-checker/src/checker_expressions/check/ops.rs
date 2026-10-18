@@ -192,7 +192,7 @@ impl<'r> Checker<'r> {
         let view = varn_sem::bind::BindView::new(bind, self.resolver);
         if let ExprKind::New { type_args, .. } = &arena.expr(expr).kind
             && !type_args.is_empty()
-            && let Some(class) = cls_name.as_deref()
+            && let Some(class) = cls_name
         {
             let expected = crate::checker_expressions::members::member_util::class_type_params(
                 self.resolver,

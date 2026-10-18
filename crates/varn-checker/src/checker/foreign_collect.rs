@@ -118,10 +118,7 @@ impl Checker<'_> {
         let owner = self
             .resolver
             .module_bind(origin)
-            .or_else(|| self.resolver.stdlib_bind(origin));
-        let Some(owner) = owner else {
-            return None;
-        };
+            .or_else(|| self.resolver.stdlib_bind(origin))?;
         use varn_sem::bind::DeclKind;
         if !matches!(owner.classify_decl(name.as_ref()), Some(DeclKind::Class)) {
             return None;

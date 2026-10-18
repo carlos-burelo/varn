@@ -62,18 +62,13 @@ impl<'r> Checker<'r> {
         );
         if is_eq == is_true_branch {
             if let Some(current) = self.narrowing_base(id, bind.arena.get(id).ty) {
-                match self.ty_table.get(current.0) {
-                    varn_core::TypeKind::Tuple(_)
-                        if value == varn_core::RuntimeKind::Tuple.name() =>
-                    {
-                        return
-                    }
-                    varn_core::TypeKind::Array(_)
-                        if value == varn_core::RuntimeKind::Array.name() =>
-                    {
-                        return
-                    }
-                    _ => {}
+                let kind = self.ty_table.get(current.0);
+                let already = (matches!(kind, varn_core::TypeKind::Tuple(_))
+                    && value == varn_core::RuntimeKind::Tuple.name())
+                    || (matches!(kind, varn_core::TypeKind::Array(_))
+                        && value == varn_core::RuntimeKind::Array.name());
+                if already {
+                    return;
                 }
             }
             out.push((id, named));
