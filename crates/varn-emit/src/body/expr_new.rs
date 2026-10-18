@@ -130,26 +130,4 @@ impl<'a> FnEmitter<'a> {
             },
         }
     }
-
-    pub(super) fn enum_variant(
-        &self,
-        object: ExprId,
-        variant: &str,
-    ) -> Option<(varn_tir::EnumId, u16)> {
-        let ExprKind::Identifier { name } = &self.ast_arena.expr(object).kind else {
-            return None;
-        };
-        let name = self.m.interner.resolve(*name);
-        let at = self.m.enums.iter().position(|info| {
-            info.binding.as_deref() == Some(name)
-                && info
-                    .variant_global(variant)
-                    .is_some_and(|global| self.m.globals.contains_key(&global))
-        })?;
-        let v = self.m.enums[at]
-            .variants
-            .iter()
-            .find(|v| v.name.as_ref() == variant)?;
-        Some((varn_tir::EnumId(at as u32), v.tag))
-    }
 }

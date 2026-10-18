@@ -5,6 +5,7 @@ use varn_tir::{BackendTy, DynReason, Resolution, TirExpr, TirExprKind};
 mod call_args;
 mod call_contract;
 mod context;
+mod enum_variant;
 mod expr_assign;
 mod expr_async;
 mod expr_binary;
@@ -12,6 +13,7 @@ mod expr_call;
 mod expr_closure;
 mod expr_collection;
 mod expr_convert;
+mod expr_ident;
 mod expr_member;
 mod expr_method;
 mod expr_misc;
@@ -55,15 +57,7 @@ impl<'a> FnEmitter<'a> {
             ExprKind::CharLiteral { value } => Some(TirExprKind::CharLit(*value)),
             ExprKind::NullLiteral => Some(TirExprKind::NullLit),
 
-            ExprKind::Identifier { name } => {
-                let name_str = self.m.interner.resolve(*name);
-                return TirExpr {
-                    kind: TirExprKind::Var,
-                    ty,
-                    res: self.resolve_name(name_str),
-                    span,
-                };
-            }
+            ExprKind::Identifier { name } => return self.lower_identifier(e, *name, ty, span),
 
             ExprKind::Paren { expression } => return self.lower_expr(*expression),
 

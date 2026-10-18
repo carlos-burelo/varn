@@ -60,6 +60,9 @@ impl<'a> FnEmitter<'a> {
             }
         }
 
+        if let Some(variant) = self.bare_variant_call(call_id, callee, args, span) {
+            return variant;
+        }
         if let ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind {
             let c = self.lower_expr(callee);
             let targs = self.lower_call_args(call_id, args);
@@ -212,12 +215,7 @@ impl<'a> FnEmitter<'a> {
 
         if let Some((enum_id, tag)) = self.enum_variant(object, &name) {
             let vargs = self.lower_call_args(call_id, args);
-            return TirExpr {
-                kind: TirExprKind::MakeVariant { args: vargs },
-                ty: BackendTy::Enum(enum_id),
-                res: Resolution::EnumVariant { enum_id, tag },
-                span,
-            };
+            return super::enum_variant::make_variant(enum_id, tag, vargs, span);
         }
 
         let recv = self.lower_expr(object);
