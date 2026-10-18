@@ -5,6 +5,11 @@ edition.workspace = true
 
 [features]
 runtime = [
+    "dep:varn-macros",
+    "dep:varn-gpu",
+    "dep:varn-text",
+    "dep:varn-ui",
+    "dep:parking_lot",
     "dep:bigdecimal",
     "dep:num-bigint",
     "dep:num-traits",
@@ -32,10 +37,10 @@ runtime = [
 varn-core      = { path = "../varn-core" }
 varn-types     = { path = "../varn-types" }
 varn-modules   = { path = "../varn-modules" }
-varn-macros      = { path = "../varn-macros" }
-varn-gpu       = { path = "../varn-gpu" }
-varn-text      = { path = "../varn-text" }
-varn-ui        = { path = "../varn-ui" }
+varn-macros    = { path = "../varn-macros", optional = true }
+varn-gpu       = { path = "../varn-gpu", optional = true }
+varn-text      = { path = "../varn-text", optional = true }
+varn-ui        = { path = "../varn-ui", optional = true }
 
 bigdecimal   = { workspace = true, optional = true }
 num-bigint   = { workspace = true, optional = true }
@@ -59,7 +64,7 @@ mio          = { workspace = true, optional = true }
 socket2      = { workspace = true, optional = true }
 httparse     = { workspace = true, optional = true }
 rustc-hash   = { workspace = true }
-parking_lot  = { workspace = true }
+parking_lot  = { workspace = true, optional = true }
 
 [build-dependencies]
 varn-core   = { path = "../varn-core" }
