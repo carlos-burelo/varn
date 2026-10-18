@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 use crate::register_meta::{SlotClass, SlotKind};
 
 mod op;
+mod operands;
 mod operators;
 
-pub use op::{SsaObjectSpreadPart, SsaOp, SsaSpread, SsaUpvalue, UPVALUE_LOCAL};
+pub use op::SsaOp;
+pub use operands::{SsaObjectSpreadPart, SsaSpread, SsaUpvalue, UPVALUE_LOCAL};
 pub use operators::{DynBinOp, DynUnOp, SsaBinOp, SsaUnOp};
 
 pub type SsaTy = SlotKind;

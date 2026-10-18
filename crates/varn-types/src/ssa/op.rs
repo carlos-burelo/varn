@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use super::operands::{SsaObjectSpreadPart, SsaSpread, SsaUpvalue};
 use super::operators::{SsaBinOp, SsaUnOp};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -391,24 +392,3 @@ pub enum SsaOp {
         cs: u16,
     },
 }
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SsaSpread {
-    pub value: u32,
-    pub spread: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SsaObjectSpreadPart {
-    pub key: Option<Box<str>>,
-    pub value: u32,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SsaUpvalue {
-    Captured(u32),
-
-    Inherited(u32),
-}
-
-pub const UPVALUE_LOCAL: u64 = 1 << 32;

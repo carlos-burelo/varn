@@ -17,6 +17,6 @@ impl ExecCtx {
         export_name: &str,
         args: Vec<varn_types::value::SendValue>,
     ) -> Result<varn_types::HostPromise, String> {
-        isolates::spawn_isolate(self, module_path, export_name, args)
+        isolate_spawn::spawn_isolate(self, module_path, export_name, args)
     }
 }

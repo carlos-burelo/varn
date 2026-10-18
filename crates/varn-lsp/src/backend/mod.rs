@@ -1,6 +1,7 @@
 pub mod capabilities;
 pub mod edit;
 pub mod insight;
+mod insight_tokens;
 pub mod lifecycle;
 pub mod mem;
 pub mod navigate;
