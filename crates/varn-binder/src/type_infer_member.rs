@@ -176,14 +176,23 @@ pub(crate) fn infer_member(
                         return Type::union(found_tys, table);
                     }
                 }
-                if let Some(members) = ctx
-                    .get_class_members(&name_str, origin_str.as_deref())
-                    .or_else(|| ctx.get_interface_members(&name_str, origin_str.as_deref()))
-                    .or_else(|| ctx.get_namespace_members(&name_str, origin_str.as_deref()))
-                    .or_else(|| ctx.get_enum_members(&name_str, origin_str.as_deref()))
-                    && let Some(m) = members.iter().find(|m| m.name.as_ref() == prop_name)
-                {
-                    return reintern_member_type(Some(ctx), origin_str.as_deref(), m.ty, table);
+                let origin = origin_str.as_deref();
+                let found = [
+                    ctx.get_class_members(&name_str, origin),
+                    ctx.get_interface_members(&name_str, origin),
+                    ctx.get_namespace_members(&name_str, origin),
+                    ctx.get_enum_members(&name_str, origin),
+                ]
+                .into_iter()
+                .flatten()
+                .find_map(|members| {
+                    members
+                        .into_iter()
+                        .find(|m| m.name.as_ref() == prop_name)
+                        .map(|m| m.ty)
+                });
+                if let Some(ty) = found {
+                    return reintern_member_type(Some(ctx), origin, ty, table);
                 }
             }
             TypeKind::Object(mid) => {

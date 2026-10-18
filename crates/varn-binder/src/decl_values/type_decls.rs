@@ -58,6 +58,12 @@ impl<'r> super::super::Binder<'r> {
         );
 
         let mut variants_info = Vec::new();
+        let type_param_names: Vec<Arc<str>> = e
+            .type_params
+            .iter()
+            .map(|t| Arc::from(self.interner.resolve(t.name)))
+            .collect();
+        let origin: Arc<str> = Arc::from(self.source_file.as_ref());
 
         for member in e.members.iter() {
             let member_id_rc: Arc<str> = Arc::from(self.interner.resolve(member.id));
@@ -75,15 +81,18 @@ impl<'r> super::super::Binder<'r> {
             self.sum_variant_fields
                 .insert(member_id_rc.clone(), fields.clone());
 
-            let variant_sym_id = if member.payload_fields.is_empty() {
-                let variant_ty = Type::named_with_origin(
-                    id_rc.clone(),
-                    Some(Arc::from(self.source_file.as_ref())),
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                );
+            let constant_instance = member.payload_fields.iter().all(|f| f.init.is_some());
+            let (variant_sym_id, variant_value_ty) = if constant_instance {
+                let table = &mut *std::sync::Arc::make_mut(&mut self.ty_table);
+                let variant_ty = if type_param_names.is_empty() {
+                    Type::named_with_origin(id_rc.clone(), Some(origin.clone()), table)
+                } else {
+                    let unknown = vec![Type::Dynamic; type_param_names.len()];
+                    Type::generic_with_origin(id_rc.clone(), unknown, Some(origin.clone()), table)
+                };
                 let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
                     .with_type(variant_ty);
-                self.define(member.id, v_sym)
+                (self.define(member.id, v_sym), variant_ty)
             } else {
                 let params: Vec<varn_sem::types::FunctionParam> = fields
                     .iter()
@@ -94,23 +103,28 @@ impl<'r> super::super::Binder<'r> {
                         is_rest: false,
                     })
                     .collect();
-                let ret_ty = Type::named_with_origin(
-                    id_rc.clone(),
-                    Some(Arc::from(self.source_file.as_ref())),
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                );
+                let table = &mut *std::sync::Arc::make_mut(&mut self.ty_table);
+                let ret_ty = if type_param_names.is_empty() {
+                    Type::named_with_origin(id_rc.clone(), Some(origin.clone()), table)
+                } else {
+                    let params: Vec<Type> = type_param_names
+                        .iter()
+                        .map(|tp| Type::named(tp.clone(), table))
+                        .collect();
+                    Type::generic_with_origin(id_rc.clone(), params, Some(origin.clone()), table)
+                };
                 let fn_ty = Type::fn_(
                     varn_sem::types::FunctionType {
                         params,
                         return_type: ret_ty.0,
                         is_arrow: false,
-                        type_params: vec![],
+                        type_params: type_param_names.clone(),
                     },
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
                     .with_type(fn_ty);
-                self.define(member.id, v_sym)
+                (self.define(member.id, v_sym), fn_ty)
             };
 
             variants_info.push(ClassMemberInfo {
@@ -123,11 +137,7 @@ impl<'r> super::super::Binder<'r> {
                 line: member.range.start.line.saturating_sub(1),
                 col: member.range.start.column,
                 offset: member.range.start.offset,
-                ty: Type::named_with_origin(
-                    id_rc.clone(),
-                    Some(Arc::from(self.source_file.as_ref())),
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                ),
+                ty: variant_value_ty,
                 members: Vec::new(),
                 visibility: None,
                 is_abstract: false,
