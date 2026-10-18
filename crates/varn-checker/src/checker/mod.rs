@@ -5,6 +5,7 @@ mod decl_class_decorators;
 mod decl_class_members;
 mod decl_enum;
 mod decl_fn;
+mod decl_fn_builtins;
 mod decl_misc;
 mod decl_var;
 mod decls;
