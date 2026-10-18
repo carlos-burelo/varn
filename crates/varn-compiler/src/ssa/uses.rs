@@ -2,382 +2,243 @@ use rustc_hash::FxHashMap;
 
 use super::ir::{InstKind, SsaFunc, Terminator, Value};
 
-pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
-    use InstKind::*;
-    match kind {
-        ConstInt(_)
-        | ConstFloat(_)
-        | ConstBool(_)
-        | ConstStr(_)
-        | ConstChar(_)
-        | ConstDecimal(_)
-        | ConstBigInt(_)
-        | ConstNull
-        | LoadGlobal(_)
-        | LoadGlobalIdx(_)
-        | LoadNativeGlobalIdx(_)
-        | LoadUpvalue(_)
-        | LoadCaptured { .. }
-        | MakeClosure { .. }
-        | MakeEnumVariant { .. }
-        | Try { .. }
-        | PopTry
-        | CloseUpvalues { .. }
-        | Dispose { .. }
-        | LoadModule { .. }
-        | This
-        | GetSuper { .. } => {}
+macro_rules! by_value {
+    ($f:ident, $v:expr) => {
+        $f(*$v)
+    };
+}
 
-        Unary { operand, .. }
-        | IsNull { operand }
-        | Cast { operand, .. }
-        | Convert { operand, .. }
-        | ToString { operand }
-        | AssertNotNull { operand }
-        | GetEnumTag { operand }
-        | IsArray { operand }
-        | StrLength { operand }
-        | ArrayLength { operand }
-        | BytesLength { operand }
-        | ObjectKeys { operand }
-        | Await { operand }
-        | Spawn { operand }
-        | Yield { operand } => f(*operand),
+macro_rules! by_ref {
+    ($f:ident, $v:expr) => {
+        $f($v)
+    };
+}
 
-        GetProperty { object, .. }
-        | ObjectRest { object, .. }
-        | GetFixedField { object, .. }
-        | GetPropertyMaybe { object, .. }
-        | ModuleSlot { object, .. }
-        | GetSymbol { object, .. } => f(*object),
+macro_rules! shared {
+    ($c:expr) => {
+        $c.iter()
+    };
+}
 
-        StoreGlobal { value, .. }
-        | StoreGlobalIdx { value, .. }
-        | StoreUpvalue { value, .. }
-        | StoreCaptured { value, .. }
-        | StoreModuleSlot { value, .. } => f(*value),
+macro_rules! exclusive {
+    ($c:expr) => {
+        $c.iter_mut()
+    };
+}
 
-        DeclareLayout { class, .. } => f(*class),
-        CatchParam { try_val } => f(*try_val),
-        MakeClass { super_class, .. } => {
-            if let Some(sc) = super_class {
-                f(*sc);
+macro_rules! inst_uses {
+    ($kind:expr, $f:ident, $use:ident, $iter:ident) => {{
+        use InstKind::*;
+        match $kind {
+            ConstInt(_)
+            | ConstFloat(_)
+            | ConstBool(_)
+            | ConstStr(_)
+            | ConstChar(_)
+            | ConstDecimal(_)
+            | ConstBigInt(_)
+            | ConstNull
+            | LoadGlobal(_)
+            | LoadGlobalIdx(_)
+            | LoadNativeGlobalIdx(_)
+            | LoadUpvalue(_)
+            | LoadCaptured { .. }
+            | MakeClosure { .. }
+            | MakeEnumVariant { .. }
+            | Try { .. }
+            | PopTry
+            | CloseUpvalues { .. }
+            | Dispose { .. }
+            | LoadModule { .. }
+            | This
+            | GetSuper { .. } => {}
+
+            Unary { operand, .. }
+            | IsNull { operand }
+            | Cast { operand, .. }
+            | Convert { operand, .. }
+            | ToString { operand }
+            | AssertNotNull { operand }
+            | GetEnumTag { operand }
+            | IsArray { operand }
+            | StrLength { operand }
+            | ArrayLength { operand }
+            | BytesLength { operand }
+            | ObjectKeys { operand }
+            | Await { operand }
+            | Spawn { operand }
+            | Yield { operand } => $use!($f, operand),
+
+            GetProperty { object, .. }
+            | ObjectRest { object, .. }
+            | GetFixedField { object, .. }
+            | GetPropertyMaybe { object, .. }
+            | ModuleSlot { object, .. }
+            | GetSymbol { object, .. } => $use!($f, object),
+
+            StoreGlobal { value, .. }
+            | StoreGlobalIdx { value, .. }
+            | StoreUpvalue { value, .. }
+            | StoreCaptured { value, .. }
+            | StoreModuleSlot { value, .. } => $use!($f, value),
+
+            DeclareLayout { class, .. } => $use!($f, class),
+            CatchParam { try_val } => $use!($f, try_val),
+            MakeClass { super_class, .. } => {
+                if let Some(sc) = super_class {
+                    $use!($f, sc);
+                }
+            }
+
+            Binary { lhs, rhs, .. } => {
+                $use!($f, lhs);
+                $use!($f, rhs);
+            }
+            GetIndex { object, index }
+            | ArrayGetIndex { object, index }
+            | BytesGetIndex { object, index }
+            | MapGetIndex { object, index } => {
+                $use!($f, object);
+                $use!($f, index);
+            }
+            SetProperty { object, value, .. } | SetFixedField { object, value, .. } => {
+                $use!($f, object);
+                $use!($f, value);
+            }
+            ObjectMerge { target, source } => {
+                $use!($f, target);
+                $use!($f, source);
+            }
+            ArrayPush { array, value } => {
+                $use!($f, array);
+                $use!($f, value);
+            }
+            Range { start, end, .. } => {
+                $use!($f, start);
+                $use!($f, end);
+            }
+            IterCall { callee, recv } => {
+                $use!($f, callee);
+                $use!($f, recv);
+            }
+            DefineStatic { class, value, .. } => {
+                $use!($f, class);
+                $use!($f, value);
+            }
+            DefineMethod { class, method, .. } => {
+                $use!($f, class);
+                $use!($f, method);
+            }
+            DefineAccessor {
+                class, accessor, ..
+            } => {
+                $use!($f, class);
+                $use!($f, accessor);
+            }
+
+            SetIndex {
+                object,
+                index,
+                value,
+            }
+            | ArraySetIndex {
+                object,
+                index,
+                value,
+            }
+            | BytesSetIndex {
+                object,
+                index,
+                value,
+            }
+            | MapSetIndex {
+                object,
+                index,
+                value,
+            } => {
+                $use!($f, object);
+                $use!($f, index);
+                $use!($f, value);
+            }
+
+            SelfCall { args } | SuperCall { args } | SuperMethodCall { args, .. } => {
+                $iter!(args).for_each(|v| $use!($f, v))
+            }
+            Call { callee, args } => {
+                $use!($f, callee);
+                $iter!(args).for_each(|v| $use!($f, v));
+            }
+            AllocInstance { class, .. } => $use!($f, class),
+            MethodCall { recv, args, .. } | ExtensionCall { recv, args, .. } => {
+                $use!($f, recv);
+                $iter!(args).for_each(|v| $use!($f, v));
+            }
+            IntrinsicCall { object, args, .. } | CallNativeOp { object, args, .. } => {
+                $use!($f, object);
+                $iter!(args).for_each(|v| $use!($f, v));
+            }
+            BuildArray { elements, .. }
+            | BuildTuple { elements }
+            | BuildStr { parts: elements } => $iter!(elements).for_each(|v| $use!($f, v)),
+            BuildObject { pairs } | BuildRecord { pairs } => {
+                $iter!(pairs).for_each(|(_, v)| $use!($f, v))
+            }
+            BuildMap { pairs } => $iter!(pairs).for_each(|(k, v)| {
+                $use!($f, k);
+                $use!($f, v);
+            }),
+            CallSpread { callee, args } => {
+                $use!($f, callee);
+                $iter!(args).for_each(|(a, _)| $use!($f, a));
+            }
+            BuildArraySpread { elements } => $iter!(elements).for_each(|(e, _)| $use!($f, e)),
+            BuildObjectSpread { parts } => $iter!(parts).for_each(|(_, v)| $use!($f, v)),
+        }
+    }};
+}
+
+macro_rules! term_uses {
+    ($term:expr, $f:ident, $use:ident, $iter:ident) => {
+        match $term {
+            Terminator::Return(Some(v)) | Terminator::Throw(v) => $use!($f, v),
+            Terminator::Return(None) | Terminator::Unreachable => {}
+            Terminator::Jump { args, .. } => {
+                for a in $iter!(args) {
+                    $use!($f, a);
+                }
+            }
+            Terminator::Branch {
+                cond,
+                then_args,
+                else_args,
+                ..
+            } => {
+                $use!($f, cond);
+                for a in $iter!(then_args) {
+                    $use!($f, a);
+                }
+                for a in $iter!(else_args) {
+                    $use!($f, a);
+                }
             }
         }
+    };
+}
 
-        Binary { lhs, rhs, .. } => {
-            f(*lhs);
-            f(*rhs);
-        }
-        GetIndex { object, index }
-        | ArrayGetIndex { object, index }
-        | BytesGetIndex { object, index }
-        | MapGetIndex { object, index } => {
-            f(*object);
-            f(*index);
-        }
-        SetProperty { object, value, .. } | SetFixedField { object, value, .. } => {
-            f(*object);
-            f(*value);
-        }
-        ObjectMerge { target, source } => {
-            f(*target);
-            f(*source);
-        }
-        ArrayPush { array, value } => {
-            f(*array);
-            f(*value);
-        }
-        Range { start, end, .. } => {
-            f(*start);
-            f(*end);
-        }
-        IterCall { callee, recv } => {
-            f(*callee);
-            f(*recv);
-        }
-        DefineStatic { class, value, .. } => {
-            f(*class);
-            f(*value);
-        }
-        DefineMethod { class, method, .. } => {
-            f(*class);
-            f(*method);
-        }
-        DefineAccessor {
-            class, accessor, ..
-        } => {
-            f(*class);
-            f(*accessor);
-        }
-
-        SetIndex {
-            object,
-            index,
-            value,
-        }
-        | ArraySetIndex {
-            object,
-            index,
-            value,
-        }
-        | BytesSetIndex {
-            object,
-            index,
-            value,
-        }
-        | MapSetIndex {
-            object,
-            index,
-            value,
-        } => {
-            f(*object);
-            f(*index);
-            f(*value);
-        }
-
-        SelfCall { args } | SuperCall { args } | SuperMethodCall { args, .. } => {
-            args.iter().for_each(|a| f(*a))
-        }
-        Call { callee, args } => {
-            f(*callee);
-            args.iter().for_each(|a| f(*a));
-        }
-        AllocInstance { class, .. } => f(*class),
-        MethodCall { recv, args, .. } | ExtensionCall { recv, args, .. } => {
-            f(*recv);
-            args.iter().for_each(|a| f(*a));
-        }
-        IntrinsicCall { object, args, .. } | CallNativeOp { object, args, .. } => {
-            f(*object);
-            args.iter().for_each(|a| f(*a));
-        }
-        BuildArray { elements, .. } | BuildTuple { elements } | BuildStr { parts: elements } => {
-            elements.iter().for_each(|e| f(*e))
-        }
-        BuildObject { pairs } | BuildRecord { pairs } => pairs.iter().for_each(|(_, v)| f(*v)),
-        BuildMap { pairs } => pairs.iter().for_each(|(k, v)| {
-            f(*k);
-            f(*v);
-        }),
-        CallSpread { callee, args } => {
-            f(*callee);
-            args.iter().for_each(|(a, _)| f(*a));
-        }
-        BuildArraySpread { elements } => elements.iter().for_each(|(e, _)| f(*e)),
-        BuildObjectSpread { parts } => parts.iter().for_each(|(_, v)| f(*v)),
-    }
+pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
+    inst_uses!(kind, f, by_value, shared)
 }
 
 pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
-    use InstKind::*;
-    match kind {
-        ConstInt(_)
-        | ConstFloat(_)
-        | ConstBool(_)
-        | ConstStr(_)
-        | ConstChar(_)
-        | ConstDecimal(_)
-        | ConstBigInt(_)
-        | ConstNull
-        | LoadGlobal(_)
-        | LoadGlobalIdx(_)
-        | LoadNativeGlobalIdx(_)
-        | LoadUpvalue(_)
-        | LoadCaptured { .. }
-        | MakeClosure { .. }
-        | MakeEnumVariant { .. }
-        | Try { .. }
-        | PopTry
-        | CloseUpvalues { .. }
-        | Dispose { .. }
-        | LoadModule { .. }
-        | This
-        | GetSuper { .. } => {}
-
-        Unary { operand, .. }
-        | IsNull { operand }
-        | Cast { operand, .. }
-        | Convert { operand, .. }
-        | ToString { operand }
-        | AssertNotNull { operand }
-        | GetEnumTag { operand }
-        | IsArray { operand }
-        | StrLength { operand }
-        | ArrayLength { operand }
-        | BytesLength { operand }
-        | ObjectKeys { operand }
-        | Await { operand }
-        | Spawn { operand }
-        | Yield { operand } => f(operand),
-
-        GetProperty { object, .. }
-        | ObjectRest { object, .. }
-        | GetFixedField { object, .. }
-        | GetPropertyMaybe { object, .. }
-        | ModuleSlot { object, .. }
-        | GetSymbol { object, .. } => f(object),
-
-        StoreGlobal { value, .. }
-        | StoreGlobalIdx { value, .. }
-        | StoreUpvalue { value, .. }
-        | StoreCaptured { value, .. }
-        | StoreModuleSlot { value, .. } => f(value),
-
-        DeclareLayout { class, .. } => f(class),
-        CatchParam { try_val } => f(try_val),
-        MakeClass { super_class, .. } => {
-            if let Some(sc) = super_class {
-                f(sc);
-            }
-        }
-
-        Binary { lhs, rhs, .. } => {
-            f(lhs);
-            f(rhs);
-        }
-        GetIndex { object, index }
-        | ArrayGetIndex { object, index }
-        | BytesGetIndex { object, index }
-        | MapGetIndex { object, index } => {
-            f(object);
-            f(index);
-        }
-        SetProperty { object, value, .. } | SetFixedField { object, value, .. } => {
-            f(object);
-            f(value);
-        }
-        ObjectMerge { target, source } => {
-            f(target);
-            f(source);
-        }
-        ArrayPush { array, value } => {
-            f(array);
-            f(value);
-        }
-        Range { start, end, .. } => {
-            f(start);
-            f(end);
-        }
-        IterCall { callee, recv } => {
-            f(callee);
-            f(recv);
-        }
-        DefineStatic { class, value, .. } => {
-            f(class);
-            f(value);
-        }
-        DefineMethod { class, method, .. } => {
-            f(class);
-            f(method);
-        }
-        DefineAccessor {
-            class, accessor, ..
-        } => {
-            f(class);
-            f(accessor);
-        }
-
-        SetIndex {
-            object,
-            index,
-            value,
-        }
-        | ArraySetIndex {
-            object,
-            index,
-            value,
-        }
-        | BytesSetIndex {
-            object,
-            index,
-            value,
-        }
-        | MapSetIndex {
-            object,
-            index,
-            value,
-        } => {
-            f(object);
-            f(index);
-            f(value);
-        }
-
-        SelfCall { args } | SuperCall { args } | SuperMethodCall { args, .. } => {
-            args.iter_mut().for_each(f)
-        }
-        Call { callee, args } => {
-            f(callee);
-            args.iter_mut().for_each(f);
-        }
-        AllocInstance { class, .. } => f(class),
-        MethodCall { recv, args, .. } | ExtensionCall { recv, args, .. } => {
-            f(recv);
-            args.iter_mut().for_each(f);
-        }
-        IntrinsicCall { object, args, .. } | CallNativeOp { object, args, .. } => {
-            f(object);
-            args.iter_mut().for_each(f);
-        }
-        BuildArray { elements, .. } | BuildTuple { elements } | BuildStr { parts: elements } => {
-            elements.iter_mut().for_each(f)
-        }
-        BuildObject { pairs } | BuildRecord { pairs } => pairs.iter_mut().for_each(|(_, v)| f(v)),
-        BuildMap { pairs } => pairs.iter_mut().for_each(|(k, v)| {
-            f(k);
-            f(v);
-        }),
-        CallSpread { callee, args } => {
-            f(callee);
-            args.iter_mut().for_each(|(a, _)| f(a));
-        }
-        BuildArraySpread { elements } => elements.iter_mut().for_each(|(e, _)| f(e)),
-        BuildObjectSpread { parts } => parts.iter_mut().for_each(|(_, v)| f(v)),
-    }
+    inst_uses!(kind, f, by_ref, exclusive)
 }
 
 pub fn visit_term_uses(term: &Terminator, f: &mut impl FnMut(Value)) {
-    match term {
-        Terminator::Return(Some(v)) | Terminator::Throw(v) => f(*v),
-        Terminator::Return(None) | Terminator::Unreachable => {}
-        Terminator::Jump { args, .. } => args.iter().for_each(|a| f(*a)),
-        Terminator::Branch {
-            cond,
-            then_args,
-            else_args,
-            ..
-        } => {
-            f(*cond);
-            then_args.iter().for_each(|a| f(*a));
-            else_args.iter().for_each(|a| f(*a));
-        }
-    }
+    term_uses!(term, f, by_value, shared)
 }
 
 pub fn visit_term_uses_mut(term: &mut Terminator, mut f: impl FnMut(&mut Value)) {
-    match term {
-        Terminator::Return(Some(v)) | Terminator::Throw(v) => f(v),
-        Terminator::Return(None) | Terminator::Unreachable => {}
-        Terminator::Jump { args, .. } => {
-            for a in args {
-                f(a);
-            }
-        }
-        Terminator::Branch {
-            cond,
-            then_args,
-            else_args,
-            ..
-        } => {
-            f(cond);
-            for a in then_args {
-                f(a);
-            }
-            for a in else_args {
-                f(a);
-            }
-        }
-    }
+    term_uses!(term, f, by_ref, exclusive)
 }
 
 pub fn replace_uses_with_map(func: &mut SsaFunc, map: &FxHashMap<Value, Value>) -> bool {
