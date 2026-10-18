@@ -48,13 +48,15 @@ pub fn parse_export_decl(
         let decl = match s.kind() {
             TokenKind::Function | TokenKind::Async => {
                 let is_async = s.eat(TokenKind::Async);
+                let doc = s.current_doc();
                 let mut fn_decl = parse_function_decl(s, decorators.clone(), is_async, is_declare)?;
-                fn_decl.doc = s.current_doc();
+                fn_decl.doc = doc;
                 ExportDefaultDecl::Function(fn_decl)
             }
             TokenKind::Class | TokenKind::Abstract => {
+                let doc = s.current_doc();
                 let mut cls = parse_class_decl(s, decorators.clone(), is_declare)?;
-                cls.doc = s.current_doc();
+                cls.doc = doc;
                 ExportDefaultDecl::Class(cls)
             }
             TokenKind::EOF
