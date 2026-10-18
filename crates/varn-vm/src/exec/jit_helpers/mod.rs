@@ -15,6 +15,7 @@ pub(crate) mod natives;
 pub(crate) mod objects;
 pub(crate) mod props;
 pub(crate) mod safepoint;
+pub(crate) mod str_search;
 pub(crate) mod strings;
 pub(crate) mod suspend;
 pub(crate) mod types;
