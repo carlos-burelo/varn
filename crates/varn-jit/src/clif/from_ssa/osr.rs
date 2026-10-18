@@ -32,7 +32,7 @@ pub(super) fn carried(
 pub(super) fn versioned(
     b: &mut FunctionBuilder,
     ssa: &SsaProto,
-    plans: &[super::ranges::VersionPlan],
+    plans: &[super::range_versioning::VersionPlan],
     preds: &[Vec<usize>],
     rpo_pos: &[usize],
     reached: &[bool],

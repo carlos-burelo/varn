@@ -7,7 +7,7 @@ use varn_types::ssa::{SsaProto, SsaTerm};
 
 use super::super::native_abi::NativeShape;
 use super::block::lower_block;
-use super::ranges::VersionPlan;
+use super::range_versioning::VersionPlan;
 use super::{arrays, cfg, setup, store, Ctx};
 
 pub(super) struct VersionClones {

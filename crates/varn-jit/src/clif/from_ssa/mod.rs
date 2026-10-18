@@ -25,6 +25,8 @@ mod osr;
 mod pinned;
 mod pool;
 mod props;
+mod range_math;
+mod range_versioning;
 mod ranges;
 mod scalar;
 mod scalar_ops;

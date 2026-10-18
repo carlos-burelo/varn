@@ -3,8 +3,6 @@ use std::collections::BTreeMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use varn_types::ssa::SsaProto;
 
-use super::ranges;
-
 pub(super) fn global_sources(ssa: &SsaProto) -> BTreeMap<u32, u32> {
     let mut global_src: BTreeMap<u32, u32> = Default::default();
     for blk in &ssa.blocks {
@@ -137,7 +135,7 @@ pub(super) fn plan_hoists(
                     | varn_types::ssa::SsaOp::Spawn { .. }
                     | varn_types::ssa::SsaOp::Yield { .. }
                     | varn_types::ssa::SsaOp::Dispose { .. }) => {
-                        if !ranges::version_op_ok(ssa, op) {
+                        if !super::range_versioning::version_op_ok(ssa, op) {
                             pure = false;
                         }
                     }
