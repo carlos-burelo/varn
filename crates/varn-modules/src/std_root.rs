@@ -153,7 +153,7 @@ pub fn tree_modules(root: &Path) -> Vec<TreeModule> {
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map_or(0, |d| d.as_nanos());
             out.push(TreeModule {
-                id: format!("{}{stem}", crate::spec::STD_PREFIX),
+                id: format!("{}{stem}", varn_core::ModuleKind::Stdlib.prefix()),
                 path: rel.clone(),
                 len: meta.len(),
                 modified_nanos,

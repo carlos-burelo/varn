@@ -1,5 +1,5 @@
 pub const STDLIB_LINE_MARKER: u32 = u32::MAX;
-pub use varn_modules::spec::STD_PREFIX;
+pub const STD_PREFIX: &str = varn_core::ModuleKind::Stdlib.prefix();
 
 pub const SORT_LOCAL: &str = "0_";
 pub const SORT_PARAM: &str = "1_";

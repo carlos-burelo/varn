@@ -1,5 +1,7 @@
 use crate::Atom;
 
+pub const TYPE_ALIASES_MODULE: &str = "core:types/aliases";
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]

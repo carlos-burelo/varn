@@ -94,9 +94,8 @@ impl<'a> SymbolView<'a> {
         self.fn_shape().is_some_and(|f| f.is_arrow)
     }
     pub fn is_from_stdlib(&self) -> bool {
-        self.origin().is_some_and(|m| {
-            m.starts_with("std:") || m.starts_with("core:") || m.starts_with("runtime:")
-        })
+        self.origin()
+            .is_some_and(|m| varn_core::ModuleKind::of(m).is_some())
     }
 
     pub fn type_str(&self) -> String {

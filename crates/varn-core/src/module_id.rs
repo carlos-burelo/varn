@@ -15,6 +15,33 @@ pub enum ModuleScheme {
     Package,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ModuleKind {
+    Core,
+    Stdlib,
+    Runtime,
+}
+
+impl ModuleKind {
+    pub const ALL: [Self; 3] = [Self::Core, Self::Stdlib, Self::Runtime];
+
+    pub const fn prefix(self) -> &'static str {
+        match self {
+            Self::Core => "core:",
+            Self::Stdlib => "std:",
+            Self::Runtime => "runtime:",
+        }
+    }
+
+    pub fn of(spec: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|k| spec.starts_with(k.prefix()))
+    }
+
+    pub fn owns(self, spec: &str) -> bool {
+        spec.starts_with(self.prefix())
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ModuleId {
     Core(Arc<str>),
@@ -45,12 +72,10 @@ impl ModuleId {
     }
 
     pub fn stdlib(spec: &str) -> Self {
-        if spec.starts_with("core:") {
-            Self::Core(Arc::from(spec))
-        } else if spec.starts_with("runtime:") {
-            Self::Runtime(Arc::from(spec))
-        } else {
-            Self::Std(Arc::from(spec))
+        match ModuleKind::of(spec) {
+            Some(ModuleKind::Core) => Self::Core(Arc::from(spec)),
+            Some(ModuleKind::Runtime) => Self::Runtime(Arc::from(spec)),
+            Some(ModuleKind::Stdlib) | None => Self::Std(Arc::from(spec)),
         }
     }
 
@@ -75,14 +100,11 @@ impl ModuleId {
     }
 
     pub fn from_canonical_str(s: &str) -> Self {
-        if s.starts_with("core:") {
-            Self::Core(Arc::from(s))
-        } else if s.starts_with("std:") {
-            Self::Std(Arc::from(s))
-        } else if s.starts_with("runtime:") {
-            Self::Runtime(Arc::from(s))
-        } else {
-            Self::Local(normalize_local_path(s))
+        match ModuleKind::of(s) {
+            Some(ModuleKind::Core) => Self::Core(Arc::from(s)),
+            Some(ModuleKind::Stdlib) => Self::Std(Arc::from(s)),
+            Some(ModuleKind::Runtime) => Self::Runtime(Arc::from(s)),
+            None => Self::Local(normalize_local_path(s)),
         }
     }
 
@@ -159,15 +181,13 @@ pub enum ImportSpecifier {
 impl ImportSpecifier {
     pub fn parse(raw: &str) -> Self {
         if is_file_specifier(raw) {
-            Self::Relative(PathBuf::from(raw))
-        } else if raw.starts_with("runtime:") {
-            Self::Runtime(Arc::from(raw))
-        } else if raw.starts_with("core:") {
-            Self::Core(Arc::from(raw))
-        } else if raw.starts_with("std:") {
-            Self::Stdlib(Arc::from(raw))
-        } else {
-            Self::Package(Arc::from(raw))
+            return Self::Relative(PathBuf::from(raw));
+        }
+        match ModuleKind::of(raw) {
+            Some(ModuleKind::Runtime) => Self::Runtime(Arc::from(raw)),
+            Some(ModuleKind::Core) => Self::Core(Arc::from(raw)),
+            Some(ModuleKind::Stdlib) => Self::Stdlib(Arc::from(raw)),
+            None => Self::Package(Arc::from(raw)),
         }
     }
 }

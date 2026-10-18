@@ -75,7 +75,7 @@ fn load_image(
     let specs: Vec<ModuleSpec> = image
         .modules()
         .iter()
-        .filter(|m| m.id.starts_with(varn_modules::spec::STD_PREFIX))
+        .filter(|m| varn_core::ModuleKind::Stdlib.owns(m.id))
         .map(|m| ModuleSpec::stdlib(m.id, m.path, m.pure))
         .collect();
     Ok(ActiveStd {
@@ -136,7 +136,7 @@ fn combined_specs() -> &'static [ModuleSpec] {
 
 impl StdlibProvider for BuiltinsProvider {
     fn spec_for(&self, specifier: &str) -> Option<&'static ModuleSpec> {
-        if specifier.starts_with("std:") {
+        if varn_core::ModuleKind::Stdlib.owns(specifier) {
             std_spec(specifier)
         } else {
             std_spec(specifier).or_else(|| spec_for(specifier))
@@ -151,7 +151,7 @@ impl StdlibProvider for BuiltinsProvider {
                 bytecode: Some(m.bytecode),
             });
         }
-        if specifier.starts_with("std:") || std_spec(specifier).is_some() {
+        if varn_core::ModuleKind::Stdlib.owns(specifier) || std_spec(specifier).is_some() {
             return None;
         }
         Some(varn_modules::provider::ProvidedModule {

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use varn_core::AtomInterner;
 
 pub fn has_portable_interface(module_id: &str) -> bool {
-    module_id != "core:types/aliases"
+    module_id != varn_core::TYPE_ALIASES_MODULE
 }
 
 pub fn serialize_module_interface(

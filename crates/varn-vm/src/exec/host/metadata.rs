@@ -7,8 +7,7 @@ impl ExecCtx {
     pub(super) fn host_current_source_file(&self) -> Option<String> {
         for frame in self.frames.iter().rev() {
             let src = &frame.closure().proto.chunk.source_file;
-            if !src.starts_with("std:") && !src.starts_with("runtime:") && !src.starts_with("core:")
-            {
+            if varn_core::ModuleKind::of(src).is_none() {
                 return Some(src.to_string());
             }
         }

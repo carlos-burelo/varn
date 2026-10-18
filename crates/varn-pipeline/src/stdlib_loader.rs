@@ -131,12 +131,11 @@ fn compile_source_inner(
         return Err(format!("type errors in stdlib module:{msg}"));
     }
     let resolver = session.resolver();
-    let exports =
-        if path.starts_with("std:") || path.starts_with("core:") || path.starts_with("runtime:") {
-            resolver.stdlib_exports(path)
-        } else {
-            resolver.module_exports(path, &mut vec![])
-        };
+    let exports = if varn_core::ModuleKind::of(path).is_some() {
+        resolver.stdlib_exports(path)
+    } else {
+        resolver.module_exports(path, &mut vec![])
+    };
     let export_names = crate::compile::sorted_export_names(&exports);
     crate::compile::report_export_collisions(&exports, path)?;
     let mut tir = crate::compile::emit_tir(&program, &arena, &check);
@@ -161,7 +160,7 @@ fn std_imports_are_pure(id: &str, source: &str) -> Result<bool, String> {
     for spec in crate::import_collector::collect_imports(&program, &arena, &interner) {
         varn_modules::layer::check_import(varn_modules::layer::Layer::Std, &spec)
             .map_err(|message| format!("{id}: {message}"))?;
-        pure &= !spec.starts_with(varn_modules::RUNTIME_PREFIX);
+        pure &= !varn_core::ModuleKind::Runtime.owns(&spec);
     }
     Ok(pure)
 }

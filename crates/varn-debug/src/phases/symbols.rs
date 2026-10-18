@@ -31,10 +31,10 @@ pub fn collect(check_result: &CheckResult) -> Report {
             .map(|a| check_result.bind.interner.resolve(a))
             .unwrap_or("");
 
-        let is_core = origin.starts_with("core:")
+        let is_core = varn_core::ModuleKind::Core.owns(origin)
             || origin.starts_with("builtin:")
             || (origin.is_empty() && sym.full_range.start.line == 0);
-        let is_std = !is_core && origin.starts_with("std:");
+        let is_std = !is_core && varn_core::ModuleKind::Stdlib.owns(origin);
         let tag = if is_core {
             "[core]"
         } else if is_std {

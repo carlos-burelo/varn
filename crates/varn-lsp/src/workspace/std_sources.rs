@@ -64,7 +64,7 @@ pub fn specifier_from_path(path: &str) -> Option<String> {
     {
         return Some(format!(
             "{}{}",
-            varn_modules::spec::STD_PREFIX,
+            varn_core::ModuleKind::Stdlib.prefix(),
             rest.strip_suffix(".vn")?
         ));
     }

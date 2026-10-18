@@ -218,10 +218,7 @@ pub fn build_module_graph(
         crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)
             .map_err(|e| e.message)?;
         let resolver = session.resolver();
-        let exports = if program.filename.starts_with("std:")
-            || program.filename.starts_with("core:")
-            || program.filename.starts_with("runtime:")
-        {
+        let exports = if varn_core::ModuleKind::of(&program.filename).is_some() {
             resolver.stdlib_exports(&program.filename)
         } else {
             resolver.module_exports(&program.filename, &mut vec![])

@@ -1,11 +1,10 @@
 use std::sync::Arc;
-use varn_modules::spec::CORE_PREFIX;
 use varn_sem::bind::BindResult;
 use varn_sem::cores::{CoreExports, CoreMembers};
 use varn_sem::resolver::ImportResolver;
 
 pub fn is_core_file(filename: &str) -> bool {
-    filename.contains("varn-builtins") || filename.starts_with(CORE_PREFIX)
+    filename.contains("varn-builtins") || varn_core::ModuleKind::Core.owns(filename)
 }
 
 const CORE_BASE: &str = varn_core::RuntimeErrorKind::MODULE;

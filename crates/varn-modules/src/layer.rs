@@ -11,16 +11,12 @@ pub enum Layer {
 
 impl Layer {
     pub fn of_module(module: &str) -> Layer {
-        if module.starts_with(crate::spec::CORE_PREFIX) {
-            Layer::Core
-        } else if module.starts_with(crate::RUNTIME_PREFIX) {
-            Layer::Runtime
-        } else if module.starts_with(crate::spec::STD_PREFIX)
-            || crate::std_root::in_source_tree(module)
-        {
-            Layer::Std
-        } else {
-            Layer::User
+        match varn_core::ModuleKind::of(module) {
+            Some(varn_core::ModuleKind::Core) => Layer::Core,
+            Some(varn_core::ModuleKind::Runtime) => Layer::Runtime,
+            Some(varn_core::ModuleKind::Stdlib) => Layer::Std,
+            None if crate::std_root::in_source_tree(module) => Layer::Std,
+            None => Layer::User,
         }
     }
 }

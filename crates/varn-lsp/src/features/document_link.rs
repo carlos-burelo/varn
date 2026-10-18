@@ -49,7 +49,7 @@ pub fn build_document_links(state: &DocumentState) -> Vec<DocumentLink> {
 }
 
 fn resolve_specifier(state: &DocumentState, spec: &str) -> Option<Uri> {
-    if spec.starts_with("std:") {
+    if varn_core::ModuleKind::Stdlib.owns(spec) {
         let path = crate::workspace::std_sources::resolve_module_file(spec)?;
         return Uri::from_file_path(path).ok();
     }

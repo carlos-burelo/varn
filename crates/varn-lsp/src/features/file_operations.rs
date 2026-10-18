@@ -73,7 +73,7 @@ fn quoted_specs(line: &str) -> Vec<(u32, u32, String)> {
 }
 
 fn resolves_to(doc_uri: &str, spec: &str, target_uri: &str) -> bool {
-    if spec.starts_with("std:") || spec.starts_with("core:") || spec.starts_with("runtime:") {
+    if varn_core::ModuleKind::of(spec).is_some() {
         return false;
     }
     if !(spec.starts_with("./") || spec.starts_with("../") || spec.starts_with('/')) {

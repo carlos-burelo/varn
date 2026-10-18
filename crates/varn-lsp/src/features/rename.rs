@@ -20,10 +20,7 @@ pub fn build_prepare_rename(
             }
         }
         SymbolTarget::Global { origin, .. } => {
-            if origin.starts_with("std:")
-                || origin.starts_with("core:")
-                || origin.starts_with("runtime:")
-            {
+            if varn_core::ModuleKind::of(origin).is_some() {
                 return None;
             }
         }

@@ -14,8 +14,7 @@ pub mod uri;
 
 pub use ids::{
     DEFAULT_PACKAGE_VERSION, ENV_DIR_NAME, MODULES_DIR_NAME, PACKAGE_MANIFEST_FILE,
-    PACKAGE_MANIFEST_FILE_VN, PKG_PREFIX, RELATIVE_EXPORT_PREFIX, RUNTIME_PREFIX,
-    VARN_FILE_EXTENSION,
+    PACKAGE_MANIFEST_FILE_VN, PKG_PREFIX, RELATIVE_EXPORT_PREFIX, VARN_FILE_EXTENSION,
 };
 pub use package::{
     canonical_or_original, is_pkg_specifier, normalize_path_string, resolve_pkg_specifier,

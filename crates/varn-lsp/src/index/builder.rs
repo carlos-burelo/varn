@@ -162,9 +162,7 @@ fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) 
 }
 
 fn is_stable_specifier(specifier: &str) -> bool {
-    specifier.starts_with("std:")
-        || specifier.starts_with("core:")
-        || specifier.starts_with("runtime:")
+    varn_core::ModuleKind::of(specifier).is_some()
 }
 
 fn is_indexable(kind: SymbolKind, line: u32) -> bool {

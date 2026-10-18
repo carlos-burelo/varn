@@ -240,9 +240,7 @@ impl DocumentState {
                 .map(|a| self.name(a).to_owned())
                 .unwrap_or_else(|| name.clone());
             let origin_uri = if origin_mod.starts_with("file://")
-                || origin_mod.starts_with("std:")
-                || origin_mod.starts_with("core:")
-                || origin_mod.starts_with("runtime:")
+                || varn_core::ModuleKind::of(origin_mod).is_some()
             {
                 origin_mod.to_string()
             } else {
@@ -262,15 +260,12 @@ impl DocumentState {
             .bindings
             .values()
             .any(|&sid| sid == id);
-        let norm_uri = if self.uri.starts_with("file://")
-            || self.uri.starts_with("std:")
-            || self.uri.starts_with("core:")
-            || self.uri.starts_with("runtime:")
-        {
-            self.uri.clone()
-        } else {
-            varn_modules::resolver::path_to_uri(&self.uri)
-        };
+        let norm_uri =
+            if self.uri.starts_with("file://") || varn_core::ModuleKind::of(&self.uri).is_some() {
+                self.uri.clone()
+            } else {
+                varn_modules::resolver::path_to_uri(&self.uri)
+            };
 
         if is_global {
             Some(SymbolTarget::Global {

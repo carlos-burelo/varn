@@ -40,12 +40,12 @@ pub use diagnostics::{
 };
 pub use kinds::TypeKind;
 pub use kinds::TypeLiteral;
-pub use lang_type::{is_lang_type, BuiltinType, CoreSum, LangPrimitive};
+pub use lang_type::{is_lang_type, BuiltinType, CoreSum, LangPrimitive, TYPE_ALIASES_MODULE};
 pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 
 pub use intrinsics::MemberKey;
-pub use module_id::{ImportSpecifier, ModuleId};
+pub use module_id::{ImportSpecifier, ModuleId, ModuleKind};
 pub use numeric::{
     add_int, binary_operand_kind, ceil_div_int, checked_int, div_int, floor_div_int, mod_int,
     mul_int, neg_int, pow_int, rem_int, sub_int, IntDivFault, NumericOperand, INT_MAX, INT_MIN,

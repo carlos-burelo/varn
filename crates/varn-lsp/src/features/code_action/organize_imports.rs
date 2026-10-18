@@ -22,7 +22,8 @@ pub fn generate_organize_imports_action(
     let mut other_imports: Vec<String> = Vec::new();
 
     for imp in &imports {
-        if imp.contains("\"std:") || imp.contains("'std:") {
+        let std_prefix = varn_core::ModuleKind::Stdlib.prefix();
+        if imp.contains(&format!("\"{std_prefix}")) || imp.contains(&format!("'{std_prefix}")) {
             std_imports.push(imp.clone());
         } else {
             other_imports.push(imp.clone());

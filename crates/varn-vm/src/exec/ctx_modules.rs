@@ -7,29 +7,16 @@ use varn_types::ModuleObj;
 use super::ctx::ExecCtx;
 
 fn canonical_id_str(id: &ModuleId) -> String {
-    match id {
-        ModuleId::Core(s) => {
-            if s.starts_with("core:") {
-                s.to_string()
-            } else {
-                format!("core:{s}")
-            }
-        }
-        ModuleId::Std(s) => {
-            if s.starts_with("std:") {
-                s.to_string()
-            } else {
-                format!("std:{s}")
-            }
-        }
-        ModuleId::Runtime(s) => {
-            if s.starts_with("runtime:") {
-                s.to_string()
-            } else {
-                format!("runtime:{s}")
-            }
-        }
-        ModuleId::Local(_) | ModuleId::Package { .. } => id.as_str(),
+    let (kind, s) = match id {
+        ModuleId::Core(s) => (varn_core::ModuleKind::Core, s),
+        ModuleId::Std(s) => (varn_core::ModuleKind::Stdlib, s),
+        ModuleId::Runtime(s) => (varn_core::ModuleKind::Runtime, s),
+        ModuleId::Local(_) | ModuleId::Package { .. } => return id.as_str(),
+    };
+    if kind.owns(s) {
+        s.to_string()
+    } else {
+        format!("{}{s}", kind.prefix())
     }
 }
 

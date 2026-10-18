@@ -6,5 +6,3 @@ pub const PACKAGE_MANIFEST_FILE_VN: &str = "vn.toml";
 pub const VARN_FILE_EXTENSION: &str = "vn";
 pub const DEFAULT_PACKAGE_VERSION: &str = "0.0.0";
 pub const RELATIVE_EXPORT_PREFIX: &str = "./";
-
-pub const RUNTIME_PREFIX: &str = "runtime:";

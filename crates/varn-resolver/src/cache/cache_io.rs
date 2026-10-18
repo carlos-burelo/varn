@@ -16,10 +16,7 @@ pub(super) fn get_cache_dir(resolver: &super::super::resolver_disk::DiskResolver
 }
 
 pub(super) fn cache_module_id(virtual_id: &str) -> varn_core::ModuleId {
-    if virtual_id.starts_with("std:")
-        || virtual_id.starts_with("core:")
-        || virtual_id.starts_with("runtime:")
-    {
+    if varn_core::ModuleKind::of(virtual_id).is_some() {
         varn_core::ModuleId::stdlib(virtual_id)
     } else {
         varn_core::ModuleId::local_str(virtual_id)
