@@ -154,6 +154,14 @@ pub(crate) fn emit_function_meta(
         chunk.code[pos + 1] = (off & 0xFFFF) as u16;
     }
 
+    if chunk.constants_overflowed {
+        return Err(OptError::Internal(format!(
+            "ssa-emit: '{}' needs more than {} constants",
+            f.name,
+            varn_types::chunk::MAX_CONSTANTS
+        )));
+    }
+
     let emitted = super::portable::Emitted {
         reg: &reg,
         register_count,

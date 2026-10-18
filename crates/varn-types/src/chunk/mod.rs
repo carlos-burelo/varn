@@ -38,7 +38,12 @@ pub struct Chunk {
 
     #[serde(skip)]
     pub module_id: Option<varn_core::ModuleId>,
+
+    #[serde(skip)]
+    pub constants_overflowed: bool,
 }
+
+pub const MAX_CONSTANTS: usize = (u16::MAX - 1) as usize;
 
 impl PartialEq for Chunk {
     fn eq(&self, other: &Self) -> bool {
@@ -65,6 +70,7 @@ impl Default for Chunk {
             constants_map: rustc_hash::FxHashMap::default(),
             source_file: Arc::from(""),
             module_id: None,
+            constants_overflowed: false,
         }
     }
 }
@@ -314,7 +320,8 @@ impl Chunk {
             return idx;
         }
         let idx = self.constants.len();
-        if idx >= (u16::MAX - 1) as usize {
+        if idx >= MAX_CONSTANTS {
+            self.constants_overflowed = true;
             return 0xFFFF;
         }
         let idx_u16 = idx as u16;
