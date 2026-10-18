@@ -15,6 +15,7 @@ struct CodeRange {
 
 static CODE: RwLock<BTreeMap<usize, CodeRange>> = RwLock::new(BTreeMap::new());
 
+#[cfg(feature = "clif")]
 pub(crate) fn register(start: usize, len: usize, mut sites: Vec<SafepointMap>) {
     sites.sort_by_key(|s| s.return_offset);
     CODE.write().expect("stack roots registry").insert(
@@ -26,6 +27,7 @@ pub(crate) fn register(start: usize, len: usize, mut sites: Vec<SafepointMap>) {
     );
 }
 
+#[cfg(feature = "clif")]
 pub(crate) fn unregister(start: usize) {
     CODE.write().expect("stack roots registry").remove(&start);
 }

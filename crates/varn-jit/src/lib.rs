@@ -41,8 +41,6 @@ pub mod clif {
 
         use crate::JitHelpers;
 
-        use super::lower::ClifLinker;
-
         #[derive(Debug, Default, Clone)]
         pub struct KindReport {
             pub nregs: usize,
@@ -154,6 +152,7 @@ use stats::record;
 
 pub const SIZE_GATE_WORDS: usize = 8192;
 
+#[cfg(feature = "clif")]
 fn fn_name(proto: &FunctionProto) -> String {
     proto.name.as_deref().unwrap_or("<module>").to_owned()
 }
@@ -164,11 +163,6 @@ pub struct Compiled {
     pub native_sig: u64,
     pub code: Rc<dyn Any>,
 }
-
-pub(crate) const PAIR_MIGRATION_PENDING: bool = false;
-
-pub(crate) const PAIR_MIGRATION_BAIL: &str =
-    "clif: disabled while `VmValue` moves to a (tag, payload) pair; the lowering still models every register as one machine word";
 
 #[cfg(feature = "clif")]
 pub use clif::lower::CodeImage;

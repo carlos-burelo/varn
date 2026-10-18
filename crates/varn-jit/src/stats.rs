@@ -190,6 +190,7 @@ pub fn take_records() -> Vec<CompileRecord> {
         .unwrap_or_default()
 }
 
+#[cfg(feature = "clif")]
 pub(crate) fn record(make: impl FnOnce() -> CompileRecord) {
     if !RECORDING.load(Ordering::Relaxed) {
         return;

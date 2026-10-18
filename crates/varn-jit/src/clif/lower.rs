@@ -103,10 +103,6 @@ pub fn try_compile(
     osr_req: Option<varn_types::ssa::OsrRequest>,
     mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<CodeImage, String> {
-    if crate::PAIR_MIGRATION_PENDING {
-        return Err(crate::PAIR_MIGRATION_BAIL.to_owned());
-    }
-
     super::emit::reset_disabled_helper_hit();
     super::reloc::reset_pinned_address();
     super::reloc::bind_helpers(helpers);
