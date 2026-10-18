@@ -32,12 +32,10 @@ pub(super) fn core_method_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str
                 && !m.is_static
                 && !m.is_async
                 && !m.is_generator
-            {
-                if let Some(id) =
+                && let Some(id) =
                     provider.native_op_id(varn_core::op_id::CORE_MODULE, cname, &m.name)
-                {
-                    out.insert((Arc::from(cname), m.name.clone()), id);
-                }
+            {
+                out.insert((Arc::from(cname), m.name.clone()), id);
             }
         }
     }

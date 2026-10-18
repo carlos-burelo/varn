@@ -76,7 +76,7 @@ pub(super) fn promote(
     let mut promoted: FxHashMap<u32, LocalId> = FxHashMap::default();
     for slot in candidates.into_iter().filter(|s| !escaping.contains(s)) {
         promoted.insert(slot, LocalId(top.locals.len() as u32));
-        top.locals.push(tir.globals[slot as usize].clone());
+        top.locals.push(tir.globals[slot as usize]);
     }
     walk::function_exprs_mut(top, &mut |e| {
         if let Resolution::GlobalSlot(slot) = e.res

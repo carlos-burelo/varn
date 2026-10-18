@@ -116,11 +116,12 @@ impl<'a> FnEmitter<'a> {
                 }
             }
             Pattern::Array { elements, rest, .. } => {
-                let tuple_elems = match src.ty.non_nullable(self.tt) {
-                    BackendTy::Tuple(slots) if self.tt.contains_list(slots) => {
-                        Some(self.tt.get_list(slots).to_vec())
-                    }
-                    _ => None,
+                let tuple_elems = if let BackendTy::Tuple(slots) = src.ty.non_nullable(self.tt)
+                    && self.tt.contains_list(slots)
+                {
+                    Some(self.tt.get_list(slots).to_vec())
+                } else {
+                    None
                 };
                 let elem_ty = match src.ty.non_nullable(self.tt) {
                     BackendTy::Array(e) => self.tt.get(e),
