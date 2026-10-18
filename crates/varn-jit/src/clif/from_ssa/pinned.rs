@@ -60,7 +60,7 @@ pub(super) fn compute(
                     break;
                 }
                 for inst in &blk.insts {
-                    if !super::views::keeps_views(ssa, &inst.op) {
+                    if !super::view_invalidation::keeps_views(ssa, &inst.op) {
                         ok = false;
                         break;
                     }

@@ -1,3 +1,4 @@
+mod alloc_instance;
 mod arrays;
 mod block;
 mod boxed;
@@ -26,11 +27,14 @@ mod pool;
 mod props;
 mod ranges;
 mod scalar;
+mod scalar_ops;
 mod setup;
 mod stack_exit;
 mod store;
 mod term;
+mod try_stacks;
 mod versions;
+mod view_invalidation;
 mod views;
 
 use super::abi::Activation;

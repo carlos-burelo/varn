@@ -6,7 +6,7 @@ use varn_types::ssa::SsaProto;
 use super::super::abi::Activation;
 use super::super::native_abi::{NativeClass, NativeShape};
 use super::frame_policy::may_push_frame;
-use super::{arrays, cfg, exceptions, globals, heap, scalar, setup, store, term, views, Ctx};
+use super::{arrays, cfg, exceptions, globals, heap, scalar, setup, store, term, Ctx};
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn lower_block(
@@ -250,14 +250,14 @@ pub(super) fn lower_block(
             | varn_types::ssa::SsaOp::Spawn { .. }
             | varn_types::ssa::SsaOp::Yield { .. }
             | varn_types::ssa::SsaOp::Dispose { .. } => {
-                if !views::keeps_views(ssa, &inst.op) {
+                if !super::view_invalidation::keeps_views(ssa, &inst.op) {
                     fwd.clear();
                     ctx.views.clear_instances(b);
                     hoisted.clear();
                 }
             }
         }
-        if !views::keeps_views(ssa, &inst.op) {
+        if !super::view_invalidation::keeps_views(ssa, &inst.op) {
             ctx.views.clear(b);
         }
         if may_push_frame(ctx, &inst.op) {

@@ -500,7 +500,7 @@ fn step_contrib(
 }
 
 pub(super) fn version_op_ok(ssa: &SsaProto, op: &SsaOp) -> bool {
-    if super::views::keeps_views(ssa, op) {
+    if super::view_invalidation::keeps_views(ssa, op) {
         return true;
     }
     matches!(

@@ -161,7 +161,7 @@ pub(super) fn reachability(ssa: &SsaProto, start: usize, with_full: bool) -> Res
     for &blk in &full_rpo {
         full_reached[blk] = true;
     }
-    let full_entry_stacks = super::cfg::try_entry_stacks(ssa, &full_rpo, &full_reached)
+    let full_entry_stacks = super::try_stacks::try_entry_stacks(ssa, &full_rpo, &full_reached)
         .ok_or_else(|| "from_ssa: inconsistent try stacks".to_owned())?;
     Ok(Reach {
         rpo,
