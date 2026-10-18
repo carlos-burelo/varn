@@ -2,6 +2,7 @@ use std::sync::Arc;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_tir::{BackendTy, DynReason, Resolution, TirExpr, TirExprKind};
 
+mod call_args;
 mod call_contract;
 mod context;
 mod expr_assign;
@@ -15,6 +16,7 @@ mod expr_member;
 mod expr_method;
 mod expr_misc;
 mod expr_new;
+mod expr_pipeline;
 mod expr_special;
 mod expr_template;
 mod expr_try;
