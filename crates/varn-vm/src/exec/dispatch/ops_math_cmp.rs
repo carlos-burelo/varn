@@ -1,5 +1,6 @@
 mod arith_float;
 mod arith_generic;
+mod arith_imm;
 mod arith_int;
 mod cmp_float;
 mod cmp_generic_str;
