@@ -1,3 +1,6 @@
+/**
+ * Hash map from keys `K` to values `V`.
+ */
 export declare class Map<K, V> {
     constructor();
     @fallible get(key: K): V?;

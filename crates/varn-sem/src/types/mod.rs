@@ -138,6 +138,7 @@ pub struct ClassMemberInfo {
     pub is_override: bool,
     pub is_builtin_or_intrinsic: bool,
     pub symbol_id: Option<usize>,
+    pub doc: Option<Arc<str>>,
 }
 
 pub use context::TypeContext;

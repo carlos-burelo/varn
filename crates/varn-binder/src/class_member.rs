@@ -15,6 +15,20 @@ impl<'r> Binder<'r> {
         _methods: &mut FxHashMap<Arc<str>, Type>,
         members: &mut Vec<ClassMemberInfo>,
     ) {
+        let first = members.len();
+        self.collect_member_entries(member, members);
+        if let Some(doc) = member_doc(member)
+            && let Some(entry) = members.get_mut(first)
+        {
+            entry.doc = Some(Arc::from(doc));
+            if let Some(id) = entry.symbol_id {
+                let atom = self.intern_local(doc);
+                self.arena.get_mut(id).doc = Some(atom);
+            }
+        }
+    }
+
+    fn collect_member_entries(&mut self, member: &ClassMember, members: &mut Vec<ClassMemberInfo>) {
         match member {
             ClassMember::Constructor {
                 params,
@@ -301,5 +315,16 @@ impl<'r> Binder<'r> {
             }
             ClassMember::Destructor { .. } | ClassMember::StaticBlock { .. } => {}
         }
+    }
+}
+
+fn member_doc(member: &ClassMember) -> Option<&str> {
+    match member {
+        ClassMember::Constructor { doc, .. }
+        | ClassMember::Method { doc, .. }
+        | ClassMember::Property { doc, .. }
+        | ClassMember::Getter { doc, .. }
+        | ClassMember::Setter { doc, .. } => doc.as_deref(),
+        ClassMember::Destructor { .. } | ClassMember::StaticBlock { .. } => None,
     }
 }

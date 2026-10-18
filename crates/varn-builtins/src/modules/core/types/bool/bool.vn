@@ -1,3 +1,6 @@
+/**
+ * Logical truth value: `true` or `false`.
+ */
 export declare class bool {
     toString(): str;
     valueOf(): bool;

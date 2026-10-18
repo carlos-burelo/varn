@@ -1,3 +1,6 @@
+/**
+ * Immutable UTF-8 text.
+ */
 export declare class str {
     static EMPTY: str;
     static fromCharCode(...codes: int[]): str;

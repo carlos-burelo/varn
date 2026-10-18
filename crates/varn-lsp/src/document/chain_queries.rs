@@ -18,6 +18,7 @@ fn summary_from_resolution(
         def_col: res.def_range.map(|r| r.start.column).unwrap_or(0),
         is_async: false,
         is_generator: false,
+        doc: None,
     }
 }
 
@@ -48,6 +49,7 @@ fn summary_from_class_member(
         def_col: m.col,
         is_async: m.is_async,
         is_generator: m.is_generator,
+        doc: m.doc.clone(),
     }
 }
 
@@ -69,6 +71,7 @@ fn summary_of(
         def_col: col,
         is_async: false,
         is_generator: false,
+        doc: None,
     }
 }
 

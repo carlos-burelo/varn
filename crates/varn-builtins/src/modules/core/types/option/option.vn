@@ -1,5 +1,7 @@
-// A value that may be absent, as a closed sum: absence is matched, never
-// compared against a sentinel.
+/**
+ * A value that may be absent, as a closed sum: absence is matched, never
+ * compared against a sentinel.
+ */
 export enum Option<T> {
     Some(value: T),
     None;

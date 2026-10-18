@@ -1,10 +1,8 @@
 use tower_lsp_f::lsp_types::{Contents, Hover, MarkupContent, MarkupKind};
 use varn_core::TokenKind;
 
-use crate::document::{DocumentState, TokenRecord};
-
-pub fn intrinsic_or_keyword_hover(state: &DocumentState, tok: &TokenRecord) -> Option<Hover> {
-    match tok.kind {
+pub fn keyword_hover(kind: TokenKind) -> Option<Hover> {
+    match kind {
         TokenKind::True => Some(make_doc_hover(
             "true: bool",
             "Literal booleano que representa el valor de verdad lógico.",
@@ -41,78 +39,12 @@ pub fn intrinsic_or_keyword_hover(state: &DocumentState, tok: &TokenRecord) -> O
             "super",
             "Referencia a la clase base inmediata para invocar constructores o métodos heredados.",
         )),
-        TokenKind::Identifier => match state.lexeme(tok) {
-            "int" => Some(make_doc_hover(
-                "type int",
-                "Entero de 64 bits con operaciones aritméticas nativas de hardware y desbordamiento controlado.",
-            )),
-            "float" => Some(make_doc_hover(
-                "type float",
-                "Número de punto flotante de doble precisión (IEEE 754 de 64 bits).",
-            )),
-            "decimal" => Some(make_doc_hover(
-                "type decimal",
-                "Número de coma fija de 128 bits para cálculos monetarios y operaciones financieras exactas.",
-            )),
-            "bigint" => Some(make_doc_hover(
-                "type bigint",
-                "Entero de precisión arbitraria sin límite de desbordamiento en memoria heap.",
-            )),
-            "str" => Some(make_doc_hover(
-                "type str",
-                "Secuencia inmutable de texto UTF-8 optimizada mediante Small String Optimization (SSO).",
-            )),
-            "char" => Some(make_doc_hover(
-                "type char",
-                "Punto de código escalar Unicode individual de 32 bits.",
-            )),
-            "bool" => Some(make_doc_hover(
-                "type bool",
-                "Tipo de dato lógico primitivo (`true` o `false`).",
-            )),
-            "never" => Some(make_doc_hover(
-                "type never",
-                "Tipo fondo que representa el retorno de funciones que divergen, entran en bucle infinito o lanzan excepciones incondicionalmente.",
-            )),
-            "Task" => Some(make_doc_hover(
-                "type Task<T>",
-                "Representación de un cómputo asíncrono gestionado por el runtime de isolates de Varn.",
-            )),
-            "Generator" => Some(make_doc_hover(
-                "type Generator<T>",
-                "Iterador perezoso que emite valores secuenciales mediante `yield`.",
-            )),
-            "AsyncGenerator" => Some(make_doc_hover(
-                "type AsyncGenerator<T>",
-                "Flujo de datos asíncrono que emite elementos mediante `yield await`.",
-            )),
-            "Array" => Some(make_doc_hover(
-                "type Array<T>",
-                "Lista secuencial contigua indexada de elementos homogéneos.",
-            )),
-            "Map" => Some(make_doc_hover(
-                "type Map<K, V>",
-                "Estructura asociativa clave-valor indexada por tabla hash.",
-            )),
-            "Set" => Some(make_doc_hover(
-                "type Set<T>",
-                "Colección no ordenada de elementos únicos sin duplicados.",
-            )),
-            "Option" => Some(make_doc_hover(
-                "enum Option<T> { None, Some(T) }",
-                "Tipo algebraico canónico para encapsular la presencia (`Some`) o ausencia (`None`) de un valor.",
-            )),
-            "Result" => Some(make_doc_hover(
-                "enum Result<T, E> { Ok(T), Err(E) }",
-                "Tipo algebraico canónico para manejo seguro de operaciones exitosas (`Ok`) o fallidas (`Err`).",
-            )),
-            _ => None,
-        },
         TokenKind::At => Some(make_doc_hover(
             "@decorator",
             "Prefijo de anotación de decorador para enriquecer clases, métodos y funciones con metadatos de compilación.",
         )),
-        TokenKind::EOF
+        TokenKind::Identifier
+        | TokenKind::EOF
         | TokenKind::IntegerLiteral
         | TokenKind::FloatLiteral
         | TokenKind::BinaryLiteral

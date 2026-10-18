@@ -1,3 +1,7 @@
+/**
+ * Arbitrary-precision decimal number, exact for money and other base-10
+ * quantities.
+ */
 export declare class decimal {
     toString(): str;
     toFixed(digits?: int): str;

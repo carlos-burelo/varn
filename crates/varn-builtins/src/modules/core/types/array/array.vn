@@ -1,3 +1,6 @@
+/**
+ * Contiguous, indexable, growable sequence of `T`.
+ */
 export declare class Array<T> {
     readonly length: int;
     push(item: T): void;

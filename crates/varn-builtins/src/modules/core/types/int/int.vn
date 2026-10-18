@@ -1,3 +1,7 @@
+/**
+ * Native 64-bit two's-complement integer. Leaving the range raises
+ * `integer overflow`; it never wraps, saturates or promotes to float.
+ */
 export declare class int {
     static MAX_VALUE: int;
     static MIN_VALUE: int;

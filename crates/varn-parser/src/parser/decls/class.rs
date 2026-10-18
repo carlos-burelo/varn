@@ -59,13 +59,11 @@ pub fn parse_class_decl(
     let mut body = vec![];
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
         while s.eat(TokenKind::Semicolon) {}
-        while s.check(TokenKind::DocComment) {
-            s.advance();
-        }
+        let doc = super::class_member::member_doc(s);
         if s.check(TokenKind::RBrace) {
             break;
         }
-        body.push(parse_class_member(s, is_declare)?);
+        body.push(parse_class_member(s, is_declare, doc)?);
     }
     s.expect(TokenKind::RBrace)?;
 

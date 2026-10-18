@@ -33,6 +33,7 @@ pub fn get_members_of_type(
                 def_col: 0,
                 is_async: false,
                 is_generator: false,
+                doc: None,
             });
         }
     };
@@ -322,6 +323,7 @@ fn add_declared(
             def_col: m.col,
             is_async: m.is_async,
             is_generator: m.is_generator,
+            doc: m.doc.clone(),
         });
     }
 }

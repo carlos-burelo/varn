@@ -1,3 +1,6 @@
+/**
+ * A single Unicode scalar value.
+ */
 export declare class char {
     static fromCode(code: int): char;
 

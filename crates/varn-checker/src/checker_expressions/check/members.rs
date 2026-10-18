@@ -234,7 +234,6 @@ impl<'r> Checker<'r> {
                     member_ty: final_mem_ty,
                     origin_module,
                     def_range: None,
-                    doc: None,
                 },
             );
         }

@@ -1,5 +1,7 @@
-// The outcome of an operation that can fail, as a closed sum: `try` unwraps
-// an `Ok` or returns the `Err` to the caller.
+/**
+ * The outcome of an operation that can fail, as a closed sum: `try` unwraps
+ * an `Ok` or returns the `Err` to the caller.
+ */
 export enum Result<T, E> {
     Ok(value: T),
     Err(error: E);

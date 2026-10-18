@@ -1,13 +1,18 @@
+/**
+ * Lazy sequence produced by a `function*`, advanced with `next()`.
+ */
 export declare class Generator<T> {
     @fallible next(value?: dynamic): { value: T; done: bool; };
     return(value?: T): { value: T; done: bool; };
 }
 
-// What `async function*` produces. Same shape as `Generator<T>` on purpose:
-// the driver settles the body's awaits inside `next()` before returning, so
-// the caller gets a settled `{ value, done }` rather than a task to await.
-// `await` on a non-task is the identity, which is what makes `for await` work
-// over one of these and over a plain `Generator<T>` alike.
+/**
+ * What `async function*` produces. Same shape as `Generator<T>` on purpose:
+ * the driver settles the body's awaits inside `next()` before returning, so
+ * the caller gets a settled `{ value, done }` rather than a task to await.
+ * `await` on a non-task is the identity, which is what makes `for await` work
+ * over one of these and over a plain `Generator<T>` alike.
+ */
 export declare class AsyncGenerator<T> {
     @fallible next(value?: dynamic): { value: T; done: bool; };
     return(value?: T): { value: T; done: bool; };
@@ -21,11 +26,18 @@ export interface AsyncIterator<T> {
     next(): Task<{ value: T; done: bool; }>;
 }
 
+/**
+ * Handle to a spawned task: poll it, await it or cancel it.
+ */
 export interface TaskHandle<T = dynamic> {
     isCompleted(): bool;
     await(): T;
     cancel(): void;
 }
 
+/**
+ * An asynchronous computation that settles with a `T`; `await` suspends
+ * until it does, without blocking the scheduler.
+ */
 export interface Task<T> {
 }

@@ -1,3 +1,6 @@
+/**
+ * IEEE 754 binary64 floating-point number.
+ */
 export declare class float {
     static MAX_VALUE: float;
     static MIN_VALUE: float;

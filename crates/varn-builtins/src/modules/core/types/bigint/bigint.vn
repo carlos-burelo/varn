@@ -1,3 +1,6 @@
+/**
+ * Arbitrary-precision integer; it grows instead of overflowing.
+ */
 export declare class bigint {
     toString(): str;
     toStr(): str;

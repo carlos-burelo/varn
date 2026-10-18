@@ -65,7 +65,6 @@ pub struct MemberResolution {
     pub member_ty: Type,
     pub origin_module: Option<Arc<str>>,
     pub def_range: Option<SourceRange>,
-    pub doc: Option<Arc<str>>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -102,4 +101,5 @@ pub struct ResolvedMemberSummary {
     pub def_col: u32,
     pub is_async: bool,
     pub is_generator: bool,
+    pub doc: Option<Arc<str>>,
 }

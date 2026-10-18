@@ -123,6 +123,7 @@ pub enum ClassMember {
         params: Vec<Param>,
         body: StmtId,
         decorators: Vec<Decorator>,
+        doc: Option<String>,
         range: SourceRange,
     },
     Destructor {
@@ -137,6 +138,7 @@ pub enum ClassMember {
         body: Option<StmtId>,
         modifiers: Modifiers,
         decorators: Vec<Decorator>,
+        doc: Option<String>,
         range: SourceRange,
     },
     Property {
@@ -145,6 +147,7 @@ pub enum ClassMember {
         init: Option<ExprId>,
         modifiers: Modifiers,
         decorators: Vec<Decorator>,
+        doc: Option<String>,
         range: SourceRange,
     },
     Getter {
@@ -153,6 +156,7 @@ pub enum ClassMember {
         body: Option<StmtId>,
         modifiers: Modifiers,
         decorators: Vec<Decorator>,
+        doc: Option<String>,
         range: SourceRange,
     },
     Setter {
@@ -161,6 +165,7 @@ pub enum ClassMember {
         body: Option<StmtId>,
         modifiers: Modifiers,
         decorators: Vec<Decorator>,
+        doc: Option<String>,
         range: SourceRange,
     },
     StaticBlock {

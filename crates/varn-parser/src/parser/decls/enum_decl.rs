@@ -297,13 +297,11 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
 
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
         while s.eat(TokenKind::Semicolon) {}
-        while s.check(TokenKind::DocComment) {
-            s.advance();
-        }
+        let doc = super::class_member::member_doc(s);
         if s.check(TokenKind::RBrace) {
             break;
         }
-        body.push(super::class_member::parse_class_member(s, false)?);
+        body.push(super::class_member::parse_class_member(s, false, doc)?);
     }
 
     s.expect(TokenKind::RBrace)?;

@@ -5,9 +5,19 @@ use crate::types::{parse_type, parse_type_params};
 use varn_core::ast::ClassMember;
 use varn_core::TokenKind;
 
+pub fn member_doc(s: &mut TokenStream) -> Option<String> {
+    let mut doc = None;
+    while s.check(TokenKind::DocComment) {
+        doc = Some(s.lexeme().to_owned());
+        s.advance();
+    }
+    doc
+}
+
 pub fn parse_class_member(
     s: &mut TokenStream,
     class_is_declare: bool,
+    doc: Option<String>,
 ) -> Result<ClassMember, String> {
     let range = s.range();
     let decorators = super::super::patterns::parse_decorator_list(s)?;
@@ -54,6 +64,7 @@ pub fn parse_class_member(
             params,
             body,
             decorators,
+            doc,
             range: full_range,
         });
     }
@@ -113,6 +124,7 @@ pub fn parse_class_member(
             body,
             modifiers: mods,
             decorators,
+            doc,
             range: full_range,
         });
     }
@@ -138,6 +150,7 @@ pub fn parse_class_member(
             body,
             modifiers: mods,
             decorators,
+            doc,
             range: full_range,
         });
     }
@@ -174,6 +187,7 @@ pub fn parse_class_member(
             body,
             modifiers: mods,
             decorators,
+            doc,
             range: full_range,
         });
     }
@@ -199,6 +213,7 @@ pub fn parse_class_member(
         init,
         modifiers: mods,
         decorators,
+        doc,
         range: full_range,
     })
 }

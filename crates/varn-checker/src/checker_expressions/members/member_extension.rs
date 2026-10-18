@@ -67,6 +67,10 @@ pub(super) fn collect_extension_members(
                 def_col: sym.col,
                 is_async: sym.is_async,
                 is_generator: sym.is_generator,
+                doc: sym
+                    .doc
+                    .and_then(|d| bind.interner.try_resolve(d))
+                    .map(std::sync::Arc::from),
             });
         }
     };

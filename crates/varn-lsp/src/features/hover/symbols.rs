@@ -13,14 +13,7 @@ pub fn symbol_hover(state: &DocumentState, sym: SymbolView<'_>) -> Hover {
         value.push_str("\n*(from standard library)*");
     }
 
-    if let Some(raw) = &sym.doc() {
-        let parsed = varn_core::DocComment::parse(raw);
-        let md = parsed.to_markdown();
-        if !md.is_empty() {
-            value.push_str("\n***\n");
-            value.push_str(&md);
-        }
-    }
+    push_doc(&mut value, sym.doc());
 
     Hover {
         contents: Contents::MarkupContent(MarkupContent {
@@ -28,5 +21,16 @@ pub fn symbol_hover(state: &DocumentState, sym: SymbolView<'_>) -> Hover {
             value,
         }),
         range: None,
+    }
+}
+
+pub(super) fn push_doc(value: &mut String, raw: Option<&str>) {
+    let Some(raw) = raw else {
+        return;
+    };
+    let md = varn_core::DocComment::parse(raw).to_markdown();
+    if !md.is_empty() {
+        value.push_str("\n***\n");
+        value.push_str(&md);
     }
 }
