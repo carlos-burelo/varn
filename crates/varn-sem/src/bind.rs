@@ -102,6 +102,8 @@ pub struct BindResult {
     pub type_param_variance: FxHashMap<Arc<str>, Vec<crate::compat::variance::Variance>>,
     pub source_file: Arc<str>,
     #[serde(serialize_with = "crate::portable::canonical::sorted")]
+    pub decl_kinds: FxHashMap<Arc<str>, DeclKind>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,
     #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub sum_variant_parent: FxHashMap<Arc<str>, Arc<str>>,
@@ -131,7 +133,9 @@ pub struct NamespaceImport {
     pub members: Vec<Arc<str>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum DeclKind {
     SumType,
     Enum,
@@ -142,33 +146,7 @@ pub enum DeclKind {
 
 impl BindResult {
     pub fn classify_decl(&self, name: &str) -> Option<DeclKind> {
-        let mut found = None;
-        let mut set = |kind| {
-            debug_assert!(
-                found.is_none(),
-                "type '{name}' registered as multiple decl kinds in '{}'",
-                self.source_file
-            );
-            if found.is_none() {
-                found = Some(kind);
-            }
-        };
-        if self.sum_type_variants.contains_key(name) {
-            set(DeclKind::SumType);
-        }
-        if self.type_members.enums.contains_key(name) {
-            set(DeclKind::Enum);
-        }
-        if self.type_members.classes.contains_key(name) {
-            set(DeclKind::Class);
-        }
-        if self.type_members.interfaces.contains_key(name) {
-            set(DeclKind::Interface);
-        }
-        if self.type_members.namespaces.contains_key(name) {
-            set(DeclKind::Namespace);
-        }
-        found
+        self.decl_kinds.get(name).copied()
     }
 
     pub fn declares_type(&self, name: &str) -> bool {

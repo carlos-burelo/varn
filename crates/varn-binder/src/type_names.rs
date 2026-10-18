@@ -28,6 +28,13 @@ impl super::Binder<'_> {
             .unwrap_or_else(|| Arc::from(self.interner.resolve(id)))
     }
 
+    pub(crate) fn declare_kind(&mut self, name: Arc<str>, kind: varn_sem::bind::DeclKind) {
+        self.decl_kinds
+            .entry(name)
+            .and_modify(|held| *held = (*held).min(kind))
+            .or_insert(kind);
+    }
+
     pub(crate) fn note_type_decl(&mut self, name: &Arc<str>, scope: ScopeId, range: SourceRange) {
         let Some(&(first_scope, first)) = self.type_decls.get(name) else {
             self.type_decls.insert(name.clone(), (scope, range));

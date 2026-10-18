@@ -61,6 +61,7 @@ pub struct Binder<'r> {
     pub(crate) match_arm_scopes: FxHashMap<varn_core::ast::AstId, Vec<ScopeId>>,
     pub(crate) ty_table: std::sync::Arc<varn_sem::types::CheckerTyTable>,
     pub(crate) source_file: Arc<str>,
+    pub(crate) decl_kinds: FxHashMap<Arc<str>, varn_sem::bind::DeclKind>,
     pub(crate) sum_type_variants: FxHashMap<Arc<str>, Vec<Arc<str>>>,
     pub(crate) sum_variant_parent: FxHashMap<Arc<str>, Arc<str>>,
     pub(crate) sum_variant_fields: FxHashMap<Arc<str>, Vec<(Arc<str>, Type)>>,

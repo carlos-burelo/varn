@@ -240,6 +240,7 @@ impl<'r> super::super::Binder<'r> {
             }
         }
 
+        self.declare_kind(id_rc.clone(), varn_sem::bind::DeclKind::SumType);
         self.sum_type_variants.insert(id_rc, variant_names);
     }
 }

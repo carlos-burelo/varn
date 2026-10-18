@@ -73,6 +73,7 @@ impl<'r> super::super::Binder<'r> {
             symbol_id: None,
             ..Default::default()
         };
+        self.declare_kind(id_rc.clone(), varn_sem::bind::DeclKind::Class);
         self.type_members.classes.insert(id_rc, struct_info);
     }
 }

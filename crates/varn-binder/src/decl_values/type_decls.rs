@@ -48,6 +48,7 @@ impl<'r> super::super::Binder<'r> {
             .collect();
         self.define(e.id, sym);
 
+        self.declare_kind(id_rc.clone(), varn_sem::bind::DeclKind::Enum);
         self.sum_type_variants.insert(
             id_rc.clone(),
             e.members

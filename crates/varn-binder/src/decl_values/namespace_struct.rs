@@ -30,6 +30,7 @@ impl<'r> super::super::Binder<'r> {
         }
         self.namespace_path.pop();
 
+        self.declare_kind(id_rc.clone(), varn_sem::bind::DeclKind::Namespace);
         let members = self.collect_namespace_members(&exported_decls(&n.body));
         if !members.is_empty() {
             self.type_members.namespaces.insert(id_rc, members);
