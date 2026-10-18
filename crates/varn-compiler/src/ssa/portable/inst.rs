@@ -1,5 +1,7 @@
 mod calls;
 mod composite;
+mod composite_class;
+mod composite_object;
 mod consts;
 mod control;
 

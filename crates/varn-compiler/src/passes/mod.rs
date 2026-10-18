@@ -2,6 +2,7 @@ pub mod algebraic;
 pub mod cfg;
 pub mod cfg_dom;
 pub mod const_fold;
+mod const_fold_values;
 pub mod cse;
 pub mod dce;
 pub mod escape;
