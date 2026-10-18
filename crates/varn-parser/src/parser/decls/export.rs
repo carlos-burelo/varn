@@ -2,8 +2,8 @@ use super::class::parse_class_decl;
 use super::parse_function_decl;
 use crate::expressions::parse_expr;
 use crate::stream::TokenStream;
-use varn_core::ast::decl::{ExportDefaultDecl, ExportSpecifier};
 use varn_core::ast::{Decorator, ExportDecl, StmtKind};
+use varn_core::ast::{ExportDefaultDecl, ExportSpecifier};
 use varn_core::TokenKind;
 
 pub fn parse_export_decl(

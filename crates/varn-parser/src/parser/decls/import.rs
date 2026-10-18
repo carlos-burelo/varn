@@ -1,6 +1,6 @@
 use crate::stream::TokenStream;
-use varn_core::ast::decl::ImportSpecifier;
 use varn_core::ast::ImportDecl;
+use varn_core::ast::ImportSpecifier;
 use varn_core::TokenKind;
 
 pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {

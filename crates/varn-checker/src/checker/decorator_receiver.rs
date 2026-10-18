@@ -1,10 +1,10 @@
 use varn_core::ast::arena::{AstArena, ExprId, StmtId};
-use varn_core::ast::decl::{Decl, ExportDecl};
 use varn_core::ast::expr::{
     Arg, ArrayEl, ArrowBody, ExprKind, MatchBody, MatchCase, ObjectProp, PropKey, TemplatePart,
 };
 use varn_core::ast::pattern::{MatchPattern, Param, Pattern};
 use varn_core::ast::stmt::{ForInit, StmtKind};
+use varn_core::ast::{Decl, ExportDecl};
 
 pub fn method_uses_receiver(arena: &AstArena, params: &[Param], body: StmtId) -> bool {
     params.iter().any(|p| {
