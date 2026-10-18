@@ -4,6 +4,7 @@ use varn_tir::{BackendTy, DynReason, Resolution, TirExpr, TirExprKind};
 
 mod call_args;
 mod call_contract;
+mod call_verify;
 mod context;
 mod enum_variant;
 mod expr_assign;
@@ -26,7 +27,9 @@ mod expr_update;
 mod finally_splice;
 mod loop_labels;
 mod match_pattern;
+mod name_resolution;
 mod namespace_access;
+mod nullable_access;
 mod pattern_bind;
 mod scope;
 mod small_utils;
