@@ -51,7 +51,7 @@ pub struct Checker<'r> {
     pub(crate) expected_return_type: Option<Type>,
     pub(crate) narrowed_types: FxHashMap<SymbolId, Vec<Type>>,
     pub(crate) member_narrowed: FxHashMap<stmts::reassignment::MemberKey, Vec<Type>>,
-    pub(crate) closure_effects: FxHashMap<SymbolId, stmts::reassignment::ClosureEffects>,
+    pub(crate) closure_effects: FxHashMap<SymbolId, stmts::closure_effects::ClosureEffects>,
     pub(crate) narrowings_cache:
         FxHashMap<(u32, bool, varn_sem::scope::ScopeId), Vec<(SymbolId, Type)>>,
     pub(crate) child_indices: FxHashMap<ScopeId, usize>,

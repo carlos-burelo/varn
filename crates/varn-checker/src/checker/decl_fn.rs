@@ -62,7 +62,7 @@ impl<'r> Checker<'r> {
         self.check_param_defaults(rec, &f.params, bind);
         if !f.modifiers.is_declare && !f.modifiers.is_native {
             let effects = self.closure_assigned_symbols(
-                super::stmts::reassignment::ClosureBodyRef::Stmt(f.body),
+                super::stmts::closure_effects::ClosureBodyRef::Stmt(f.body),
                 bind,
             );
             if let Some(id) = bind
