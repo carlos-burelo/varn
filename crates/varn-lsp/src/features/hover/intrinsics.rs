@@ -70,17 +70,9 @@ pub fn intrinsic_or_keyword_hover(state: &DocumentState, tok: &TokenRecord) -> O
                 "type bool",
                 "Tipo de dato lógico primitivo (`true` o `false`).",
             )),
-            "symbol" => Some(make_doc_hover(
-                "type symbol",
-                "Identificador opaco, único e inmutable a nivel de proceso.",
-            )),
             "never" => Some(make_doc_hover(
                 "type never",
                 "Tipo fondo que representa el retorno de funciones que divergen, entran en bucle infinito o lanzan excepciones incondicionalmente.",
-            )),
-            "unknown" => Some(make_doc_hover(
-                "type unknown",
-                "Tipo seguro de entrada que requiere comprobación o estrechamiento previo antes de operar sobre él.",
             )),
             "Task" => Some(make_doc_hover(
                 "type Task<T>",
