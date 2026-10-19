@@ -1,6 +1,6 @@
 use crate::stream::TokenStream;
 use varn_core::ast::{TypeNode, TypeParam};
-use varn_core::{TokenKind, TypeKind};
+use varn_core::{ContextualKeyword, TokenKind, TypeKind};
 
 pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     let range = s.range();
@@ -11,14 +11,16 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
         }
 
         TokenKind::Identifier => {
-            if s.lexeme() == "keyof" {
+            if ContextualKeyword::of(s.lexeme()) == Some(ContextualKeyword::Keyof) {
                 s.advance();
                 let inner = super::suffixes::parse_array_type(s)?;
                 let full_range = s.span_from(range);
                 return Ok(s.type_node(full_range, TypeKind::KeyOf(Box::new(inner))));
             }
 
-            if s.lexeme() == "infer" && s.peek_kind(1) == TokenKind::Identifier {
+            if ContextualKeyword::of(s.lexeme()) == Some(ContextualKeyword::Infer)
+                && s.peek_kind(1) == TokenKind::Identifier
+            {
                 s.advance();
                 let name = s.consume_lexeme();
                 let full_range = s.span_from(range);

@@ -21,7 +21,7 @@ use crate::types::parse_type;
 use arrow_lookahead::could_be_arrow;
 use arrow_parse::try_parse_arrow;
 use varn_core::ast::{ExprId, ExprKind};
-use varn_core::TokenKind;
+use varn_core::{ContextualKeyword, TokenKind};
 use yield_expr::parse_yield_expr;
 
 pub fn parse_expr(s: &mut TokenStream) -> Result<ExprId, String> {
@@ -152,7 +152,8 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
 
         if kind == TokenKind::As
             || kind == TokenKind::Is
-            || (kind == TokenKind::Identifier && s.lexeme() == "satisfies")
+            || (kind == TokenKind::Identifier
+                && ContextualKeyword::of(s.lexeme()) == Some(ContextualKeyword::Satisfies))
         {
             s.advance();
             let ty = parse_type(s)?;

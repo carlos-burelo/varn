@@ -288,7 +288,6 @@ pub enum MetaProperty {
 
 impl MetaProperty {
     pub const ALL: [Self; 1] = [Self::Main];
-    pub const OBJECT: &'static str = "meta";
 
     pub const fn name(self) -> &'static str {
         match self {
