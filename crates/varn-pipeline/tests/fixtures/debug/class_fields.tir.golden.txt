@@ -563,6 +563,7 @@ TirModule {
         },
     ],
     globals: [
+        Bool,
         Class(
             ClassId(
                 0,
@@ -575,6 +576,7 @@ TirModule {
         ),
     ],
     global_names: [
+        "import.meta.main",
         "Temperature",
         "t",
     ],
@@ -644,7 +646,13 @@ TirModule {
         ),
         params: [],
         return_ty: Void,
-        locals: [],
+        locals: [
+            Class(
+                ClassId(
+                    0,
+                ),
+            ),
+        ],
         body: [
             BuildClass(
                 0,
@@ -659,8 +667,10 @@ TirModule {
                                     0,
                                 ),
                             ),
-                            res: GlobalSlot(
-                                1,
+                            res: Local(
+                                LocalId(
+                                    0,
+                                ),
                             ),
                             span: Span {
                                 start: 0,
@@ -721,8 +731,10 @@ TirModule {
                                             0,
                                         ),
                                     ),
-                                    res: GlobalSlot(
-                                        1,
+                                    res: Local(
+                                        LocalId(
+                                            0,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 352,
@@ -837,8 +849,10 @@ TirModule {
                                             0,
                                         ),
                                     ),
-                                    res: GlobalSlot(
-                                        1,
+                                    res: Local(
+                                        LocalId(
+                                            0,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 409,
@@ -952,8 +966,10 @@ TirModule {
                                             0,
                                         ),
                                     ),
-                                    res: GlobalSlot(
-                                        1,
+                                    res: Local(
+                                        LocalId(
+                                            0,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 466,
@@ -1005,8 +1021,10 @@ TirModule {
                                             0,
                                         ),
                                     ),
-                                    res: GlobalSlot(
-                                        1,
+                                    res: Local(
+                                        LocalId(
+                                            0,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 486,

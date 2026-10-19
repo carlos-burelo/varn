@@ -2,7 +2,7 @@
   [1mtiers[0m [2m──────────────────────────────────────────── <module> · 5/5 ruteadas[0m
   [2mfunción    [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                 [0m
   ────────────┼───────┼──────┼───────────────────────
-  <module>    │   134 │ clif │  (native: alloc+boxed)
+  <module>    │   122 │ clif │  (native: alloc+boxed)
   makeAdder   │     9 │ clif │  (framed: alloc+boxed)
   <closure>   │     9 │ clif │  (native: alloc)      
   makeCounter │    12 │ clif │  (framed: alloc+boxed)

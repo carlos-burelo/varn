@@ -23,7 +23,7 @@
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mSetterContext       [0m │ [33mSetterContext[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mReturnType          [0m │ [33mdynamic[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mExtract             [0m │ [33mdynamic[0m
-  [2m1:0     [0m │ const           │ [2m[core][0m [1mNone                [0m │ [33mdynamic[0m
+  [2m1:0     [0m │ const           │ [2m[core][0m [1mNone                [0m │ [33mOption<dynamic>[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mPropertyContext     [0m │ [33mPropertyContext[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mAsyncIterator       [0m │ [33mAsyncIterator[0m
   [2m1:0     [0m │ enum            │ [2m[core][0m [1mOption              [0m │ [33mOption[0m
@@ -60,7 +60,6 @@
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mRem                 [0m │ [33mRem[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mMatchError          [0m │ [33mMatchError[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mDivisionByZero      [0m │ [33mDivisionByZero[0m
-  [2m1:0     [0m │ const           │ [2m[core][0m [1misIsolate           [0m │ [33mbool[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mRequired            [0m │ [33mdynamic[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mMap                 [0m │ [33mMap[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1mErr                 [0m │ [33m(error: E) => Result<T, E>[0m

@@ -3,14 +3,14 @@
   [2mmétrica                 [0m │ [2m              valor[0m
   ─────────────────────────┼────────────────────
   funciones                │                   5
-  bytecode (words)         │                 197
+  bytecode (words)         │                 186
   constantes               │                  19
   exports                  │                   0
   fuera de clif por tamaño │ 0 (gate 8192 words)
 [top] 10 por tamaño
   [2mfunción                   [0m │ [2m    words[0m │ [2mgate[0m
   ───────────────────────────┼───────────┼─────
-  <module>                   │ 143 words │     
+  <module>                   │ 132 words │     
   Temperature.get fahrenheit │  19 words │     
   Temperature.constructor    │  12 words │     
   Temperature.set celsius    │  12 words │     

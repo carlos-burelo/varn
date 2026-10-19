@@ -3,14 +3,14 @@
   [2mmétrica                 [0m │ [2m              valor[0m
   ─────────────────────────┼────────────────────
   funciones                │                   3
-  bytecode (words)         │                  72
-  constantes               │                   4
+  bytecode (words)         │                  46
+  constantes               │                   3
   exports                  │                   0
   fuera de clif por tamaño │ 0 (gate 8192 words)
 [top] 10 por tamaño
   [2mfunción [0m │ [2m   words[0m │ [2mgate[0m
   ─────────┼──────────┼─────
-  <module> │ 54 words │     
+  <module> │ 28 words │     
   scale    │ 11 words │     
   add      │  7 words │     
   [2m── end: summary ──[0m

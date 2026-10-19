@@ -2,15 +2,15 @@
   [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
   [1m<module>[0m[2m (native)[0m
     [2mkinds (13 regs):[0m
-  [2mblock  [0m │ [2mkinds                                                                                  [0m
-  ────────┼────────────────────────────────────────────────────────────────────────────────────────
-  block@0 │ v0:Ref, v1:Ref, v2:Ref, v3:Int, v4:Dynamic, v5:Dynamic, v6:Int, v7:Int, v8:Int, v9:Bool
-  block@1 │ v10:Ref, v11:Str, v12:Dynamic, v13:Ref                                                 
-  block@2 │ v14:Ref, v15:Dynamic, v16:Dynamic, v17:Int, v18:Int, v19:Bool                          
-  block@3 │ v20:Ref, v21:Str, v22:Dynamic, v23:Ref                                                 
-  block@4 │ v24:Dynamic, v25:Int, v26:Int, v27:Bool                                                
-  block@5 │ v28:Ref, v29:Str, v30:Dynamic, v31:Ref                                                 
-  block@6 │ v32:Ref, v33:Str, v34:Dynamic, v35:Dynamic                                             
+  [2mblock  [0m │ [2mkinds                                                                      [0m
+  ────────┼────────────────────────────────────────────────────────────────────────────
+  block@0 │ v0:Ref, v1:Ref, v2:Ref, v3:Int, v4:Dynamic, v5:Int, v6:Int, v7:Int, v8:Bool
+  block@1 │ v9:Ref, v10:Str, v11:Dynamic, v12:Ref                                      
+  block@2 │ v13:Ref, v14:Dynamic, v15:Int, v16:Int, v17:Bool                           
+  block@3 │ v18:Ref, v19:Str, v20:Dynamic, v21:Ref                                     
+  block@4 │ v22:Int, v23:Int, v24:Bool                                                 
+  block@5 │ v25:Ref, v26:Str, v27:Dynamic, v28:Ref                                     
+  block@6 │ v29:Ref, v30:Str, v31:Dynamic, v32:Dynamic                                 
   [1mmakeAdder[0m[2m (framed)[0m
     [2mkinds (4 regs):[0m
   [2mblock  [0m │ [2mkinds         [0m

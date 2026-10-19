@@ -665,6 +665,7 @@ TirModule {
         },
     ],
     globals: [
+        Bool,
         Class(
             ClassId(
                 0,
@@ -685,6 +686,7 @@ TirModule {
         ),
     ],
     global_names: [
+        "import.meta.main",
         "Box",
         "identity",
         "intBox",
@@ -746,7 +748,18 @@ TirModule {
         ),
         params: [],
         return_ty: Void,
-        locals: [],
+        locals: [
+            Class(
+                ClassId(
+                    0,
+                ),
+            ),
+            Class(
+                ClassId(
+                    0,
+                ),
+            ),
+        ],
         body: [
             BuildClass(
                 0,
@@ -761,8 +774,10 @@ TirModule {
                                     0,
                                 ),
                             ),
-                            res: GlobalSlot(
-                                2,
+                            res: Local(
+                                LocalId(
+                                    0,
+                                ),
                             ),
                             span: Span {
                                 start: 0,
@@ -823,8 +838,10 @@ TirModule {
                                             0,
                                         ),
                                     ),
-                                    res: GlobalSlot(
-                                        2,
+                                    res: Local(
+                                        LocalId(
+                                            0,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 299,
@@ -938,7 +955,7 @@ TirModule {
                                         Callable,
                                     ),
                                     res: GlobalSlot(
-                                        1,
+                                        2,
                                     ),
                                     span: Span {
                                         start: 356,
@@ -1065,8 +1082,10 @@ TirModule {
                                     0,
                                 ),
                             ),
-                            res: GlobalSlot(
-                                3,
+                            res: Local(
+                                LocalId(
+                                    1,
+                                ),
                             ),
                             span: Span {
                                 start: 0,
@@ -1082,8 +1101,10 @@ TirModule {
                                             0,
                                         ),
                                     ),
-                                    res: GlobalSlot(
-                                        2,
+                                    res: Local(
+                                        LocalId(
+                                            0,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 434,
@@ -1147,8 +1168,10 @@ TirModule {
                                             0,
                                         ),
                                     ),
-                                    res: GlobalSlot(
-                                        3,
+                                    res: Local(
+                                        LocalId(
+                                            1,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 470,

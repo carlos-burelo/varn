@@ -466,6 +466,7 @@ TirModule {
         },
     ],
     globals: [
+        Bool,
         Dynamic(
             Callable,
         ),
@@ -480,6 +481,7 @@ TirModule {
         ),
     ],
     global_names: [
+        "import.meta.main",
         "makeAdder",
         "makeCounter",
         "add5",
@@ -493,7 +495,14 @@ TirModule {
         ),
         params: [],
         return_ty: Void,
-        locals: [],
+        locals: [
+            Dynamic(
+                Callable,
+            ),
+            Dynamic(
+                Callable,
+            ),
+        ],
         body: [
             Expr(
                 TirExpr {
@@ -503,8 +512,10 @@ TirModule {
                             ty: Dynamic(
                                 Callable,
                             ),
-                            res: GlobalSlot(
-                                2,
+                            res: Local(
+                                LocalId(
+                                    0,
+                                ),
                             ),
                             span: Span {
                                 start: 0,
@@ -519,7 +530,7 @@ TirModule {
                                         Callable,
                                     ),
                                     res: GlobalSlot(
-                                        0,
+                                        1,
                                     ),
                                     span: Span {
                                         start: 204,
@@ -575,8 +586,10 @@ TirModule {
                                     ty: Dynamic(
                                         Callable,
                                     ),
-                                    res: GlobalSlot(
-                                        2,
+                                    res: Local(
+                                        LocalId(
+                                            0,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 221,
@@ -697,8 +710,10 @@ TirModule {
                             ty: Dynamic(
                                 Callable,
                             ),
-                            res: GlobalSlot(
-                                3,
+                            res: Local(
+                                LocalId(
+                                    1,
+                                ),
                             ),
                             span: Span {
                                 start: 0,
@@ -713,7 +728,7 @@ TirModule {
                                         Callable,
                                     ),
                                     res: GlobalSlot(
-                                        1,
+                                        2,
                                     ),
                                     span: Span {
                                         start: 284,
@@ -755,8 +770,10 @@ TirModule {
                                     ty: Dynamic(
                                         Callable,
                                     ),
-                                    res: GlobalSlot(
-                                        3,
+                                    res: Local(
+                                        LocalId(
+                                            1,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 302,
@@ -866,8 +883,10 @@ TirModule {
                                     ty: Dynamic(
                                         Callable,
                                     ),
-                                    res: GlobalSlot(
-                                        3,
+                                    res: Local(
+                                        LocalId(
+                                            1,
+                                        ),
                                     ),
                                     span: Span {
                                         start: 360,
