@@ -80,11 +80,7 @@ pub fn build_module_graph(
             .map_err(|e| format!("cannot read module '{module_path}': {e}"))?;
         source_hashes.insert(module_path.clone(), fingerprint(source.as_bytes()));
 
-        let (program, arena, interner) = crate::quiet_parse::parse_module(
-            &source,
-            &module_path,
-            &format!("parse error in '{module_path}'"),
-        )?;
+        let (program, arena, interner) = crate::quiet_parse::parse_module(&source, &module_path)?;
 
         let module_dir = Path::new(&module_path)
             .parent()

@@ -118,7 +118,7 @@ fn compile_source_inner(
     reject_type_errors: bool,
     session: &crate::resolver::Session,
 ) -> Result<FunctionProto, String> {
-    let (program, arena, interner) = crate::quiet_parse::parse_module(source, path, "")?;
+    let (program, arena, interner) = crate::quiet_parse::parse_module(source, path)?;
     let check = varn_checker::Checker::check(&program, &arena, interner, session.resolver());
     if reject_type_errors && check.diagnostics.has_errors() {
         let mut msg = String::new();
@@ -155,7 +155,7 @@ fn compile_source_inner(
 }
 
 fn std_imports_are_pure(id: &str, source: &str) -> Result<bool, String> {
-    let (program, arena, interner) = crate::quiet_parse::parse_module(source, id, "")?;
+    let (program, arena, interner) = crate::quiet_parse::parse_module(source, id)?;
     let mut pure = true;
     for spec in crate::import_collector::collect_imports(&program, &arena, &interner) {
         varn_modules::layer::check_import(varn_modules::layer::Layer::Std, &spec)
