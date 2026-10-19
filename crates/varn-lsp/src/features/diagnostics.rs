@@ -79,18 +79,13 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
                 Some(serde_json::json!({ "suggestions": json_suggestions }))
             };
 
-            let mut tags = Vec::new();
-            let lower_msg = d.message.to_lowercase();
-            if lower_msg.contains("unused")
-                || lower_msg.contains("never read")
-                || lower_msg.contains("never used")
-            {
-                tags.push(DiagnosticTag::Unnecessary);
-            }
-            if lower_msg.contains("deprecated") {
-                tags.push(DiagnosticTag::Deprecated);
-            }
-            let tags = if tags.is_empty() { None } else { Some(tags) };
+            let tags = if d.code == Some(varn_core::ErrorCode::DeprecatedUse) {
+                Some(vec![DiagnosticTag::Deprecated])
+            } else if d.code == Some(varn_core::ErrorCode::UnreachableCode) {
+                Some(vec![DiagnosticTag::Unnecessary])
+            } else {
+                None
+            };
             let code = d
                 .code
                 .map(|c| tower_lsp_f::lsp_types::Code::String(c.to_string()));
