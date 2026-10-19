@@ -36,9 +36,13 @@ pub(super) fn spawn_isolate(
                 machine = machine.with_loader(ld);
             }
 
-            if let Err(e) = machine.ctx.load_module("std:task") {
+            if let Err(e) = machine
+                .ctx
+                .load_module(varn_types::value::ChannelEndpoint::MODULE)
+            {
                 done_t.reject(worker_error(&format!(
-                    "isolate worker: failed to load std:task: {:?}",
+                    "isolate worker: failed to load {}: {:?}",
+                    varn_types::value::ChannelEndpoint::MODULE,
                     e
                 )));
                 return;

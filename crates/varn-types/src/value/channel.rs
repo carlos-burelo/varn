@@ -13,6 +13,7 @@ pub enum ChannelEndpoint {
 
 impl ChannelEndpoint {
     const ALL: [Self; 2] = [Self::Sender, Self::Receiver];
+    pub const MODULE: &'static str = "std:task";
 
     pub const fn class_name(self) -> &'static str {
         match self {
