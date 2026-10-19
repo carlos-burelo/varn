@@ -10,19 +10,11 @@ import {
     clear$,
     present$,
     commands$,
-    real$
+    real$,
+    UiEvent
 } from "runtime:ui";
 
-export type UiEvent = {
-    kind: str,
-    key: int,
-    pressed: bool,
-    x: int,
-    y: int,
-    button: int,
-    w: int,
-    h: int
-};
+export { UiEvent };
 
 export class UiWindow {
     id: int;
