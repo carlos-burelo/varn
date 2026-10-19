@@ -1,18 +1,24 @@
 use varn_types::{NativeCtx, VmValue};
 
-pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<VmValue, String> {
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/net/net_runtime.vn",
+    interface: "HttpRequestHead",
+    struct HttpRequestHead;
+}
+
+pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<Option<VmValue>, String> {
     let mut headers = [httparse::EMPTY_HEADER; 64];
     let mut req = httparse::Request::new(&mut headers);
     let bytes = raw.as_bytes();
 
     let status = match req.parse(bytes) {
         Ok(s) => s,
-        Err(_) => return Ok(ctx.null_val()),
+        Err(_) => return Ok(None),
     };
 
     let header_len = match status {
         httparse::Status::Complete(len) => len,
-        httparse::Status::Partial => return Ok(ctx.null_val()),
+        httparse::Status::Partial => return Ok(None),
     };
 
     let method = req.method.unwrap_or("");
@@ -31,15 +37,16 @@ pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<VmValue,
         ctx.set_field(headers_obj, &name, val_nv);
     }
 
-    let result_obj = ctx.alloc_object();
-    let method_nv = ctx.alloc_str(method);
-    let path_nv = ctx.alloc_str(path);
-    let body_nv = ctx.alloc_str(body);
-
-    ctx.set_field(result_obj, "method", method_nv);
-    ctx.set_field(result_obj, "path", path_nv);
-    ctx.set_field(result_obj, "headers", headers_obj);
-    ctx.set_field(result_obj, "body", body_nv);
-
-    Ok(result_obj)
+    let method = ctx.alloc_str(method);
+    let path = ctx.alloc_str(path);
+    let body = ctx.alloc_str(body);
+    Ok(Some(
+        HttpRequestHead {
+            method,
+            path,
+            headers: headers_obj,
+            body,
+        }
+        .alloc(ctx),
+    ))
 }

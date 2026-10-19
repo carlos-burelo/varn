@@ -80,7 +80,7 @@ varn_contract! {
             Ok(())
         }
 
-        fn parseHttpRequest(ctx: &mut dyn NativeCtx, raw: &str) -> Result<VmValue, String> {
+        fn parseHttpRequest(ctx: &mut dyn NativeCtx, raw: &str) -> Result<Option<VmValue>, String> {
             http_parser::parse_http_request(ctx, raw)
         }
 

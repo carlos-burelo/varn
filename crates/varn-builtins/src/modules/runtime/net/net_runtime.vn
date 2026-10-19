@@ -1,5 +1,12 @@
 // runtime:net — low-level host network operations.
 
+export interface HttpRequestHead {
+    method: str;
+    path: str;
+    headers: { [key: str]: str };
+    body: str;
+}
+
 export declare function isIP$(s: str): bool;
 export declare function isIPv4$(s: str): bool;
 export declare function isIPv6$(s: str): bool;
@@ -13,8 +20,8 @@ export declare function tcpRead$(connId: int, len: int): Task<Bytes?>;
 export declare function tcpWrite$(connId: int, data: Bytes | str): Task<int>;
 export declare function tcpClose$(connId: int): void;
 export declare function tcpCloseListener$(listenerId: int): void;
-export declare function parseHttpRequest$(raw: str): dynamic;
-export declare function sendHttpResponse$(connId: int, status: int, statusText: str, headers: dynamic, body: str, cookies: str[]): Task<int>;
+export declare function parseHttpRequest$(raw: str): HttpRequestHead?;
+export declare function sendHttpResponse$(connId: int, status: int, statusText: str, headers: { [key: str]: str }, body: str, cookies: str[]): Task<int>;
 
 export declare function udpBind$(host: str, port: int): int;
 export declare function udpSendTo$(socketId: int, host: str, port: int, data: Bytes | str): int;

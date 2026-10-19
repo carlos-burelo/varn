@@ -10,7 +10,7 @@ export class RawRequest {
 }
 
 export function parseRawRequest(raw: str): RawRequest? {
-    let parsed: dynamic = parseHttpRequest$(raw);
+    let parsed = parseHttpRequest$(raw);
     if (parsed === null) return null;
 
     let req = new RawRequest();
