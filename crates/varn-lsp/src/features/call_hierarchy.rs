@@ -203,6 +203,7 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing
         | ExprKind::This
+        | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
@@ -263,6 +264,7 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
             | ExprKind::Identifier { .. }
             | ExprKind::Missing
             | ExprKind::This
+            | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }

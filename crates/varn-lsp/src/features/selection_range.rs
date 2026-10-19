@@ -204,6 +204,7 @@ fn collect_in_expr(a: &AstArena, expr: ExprId, line: u32, col: u32, ranges: &mut
         | ExprKind::Identifier { .. }
         | ExprKind::Missing
         | ExprKind::This
+        | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }

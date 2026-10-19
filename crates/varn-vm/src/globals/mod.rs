@@ -54,12 +54,16 @@ impl GlobalStore {
         }
     }
 
-    pub(crate) fn reserve_region(&mut self, count: u32) -> u32 {
+    pub(crate) fn reserve_module_region(&mut self, count: u32, is_main: bool) -> u32 {
         let base = self.values.len() as u32;
         let empty: Arc<str> = Arc::from("");
         for _ in 0..count {
             self.values.push(VmValue::null());
             self.idx_to_name.push(empty.clone());
+        }
+        let main_slot = varn_core::ast::MetaProperty::Main.slot();
+        if main_slot < count {
+            self.values[(base + main_slot) as usize] = VmValue::from_bool(is_main);
         }
         base
     }

@@ -1,0 +1,23 @@
+import { describe, it, expect } from "std:test";
+import { channel, spawnIsolate } from "std:task";
+import { reportMain } from "./helpers/isolate-workers.vn";
+
+const atLoad = import.meta.main
+
+function readInside(): bool {
+    return import.meta.main
+}
+
+await describe("228 import.meta.main", async () => {
+    await it("an imported module is not the entry", async () => {
+        expect(atLoad).toBe(false)
+        expect(readInside()).toBe(false)
+    });
+
+    await it("a module loaded by an isolate is not the entry", async () => {
+        const ch = channel<bool>(1)
+        const handle = await spawnIsolate(reportMain, [ch.tx])
+        expect(await ch.rx.receive()).toBe(false)
+        await handle.join()
+    });
+});

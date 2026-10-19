@@ -38,6 +38,7 @@ impl<'a> CallTypeCtx<'a> {
             ExprKind::FloatLiteral { .. } => Some(Type::Float),
             ExprKind::StrLiteral { .. } => Some(Type::Str),
             ExprKind::BoolLiteral { .. } => Some(Type::Bool),
+            ExprKind::ImportMeta(varn_core::ast::MetaProperty::Main) => Some(Type::Bool),
             ExprKind::This => {
                 let current = self.current_class;
                 let origin = self.ctx.and_then(|c| c.source_file());

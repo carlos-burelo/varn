@@ -192,6 +192,7 @@ impl<'r> Checker<'r> {
                 | varn_core::ast::ExprKind::TaggedTemplate { .. }
                 | varn_core::ast::ExprKind::Missing
                 | varn_core::ast::ExprKind::This
+                | varn_core::ast::ExprKind::ImportMeta(_)
                 | varn_core::ast::ExprKind::Super
                 | varn_core::ast::ExprKind::Array { .. }
                 | varn_core::ast::ExprKind::Object { .. }
@@ -255,6 +256,7 @@ impl<'r> Checker<'r> {
                 | varn_core::ast::ExprKind::TaggedTemplate { .. }
                 | varn_core::ast::ExprKind::Missing
                 | varn_core::ast::ExprKind::This
+                | varn_core::ast::ExprKind::ImportMeta(_)
                 | varn_core::ast::ExprKind::Super
                 | varn_core::ast::ExprKind::Array { .. }
                 | varn_core::ast::ExprKind::Object { .. }

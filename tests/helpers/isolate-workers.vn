@@ -55,3 +55,8 @@ export async function echoShape(shape: { __chanEndpoint: str, __chanId: int }, t
     await tx.send(shape.__chanEndpoint + shape.__chanId)
     tx.close()
 }
+
+export async function reportMain(tx: Sender<bool>) {
+    await tx.send(import.meta.main)
+    tx.close()
+}

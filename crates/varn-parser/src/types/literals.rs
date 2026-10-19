@@ -31,6 +31,7 @@ pub(crate) fn parse_literal_type(
             | ExprKind::Missing
             | ExprKind::This
             | ExprKind::Super
+            | ExprKind::ImportMeta(_)
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
@@ -81,6 +82,7 @@ pub(crate) fn parse_literal_type(
         | ExprKind::Missing
         | ExprKind::This
         | ExprKind::Super
+        | ExprKind::ImportMeta(_)
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }

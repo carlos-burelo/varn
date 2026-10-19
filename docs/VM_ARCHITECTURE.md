@@ -95,6 +95,7 @@ otro código = `panic`. El `setjmp`/`longjmp` vive en `varn-vm/src/arch/`
   (`make_iter_result`). Con código JIT, `generator_entry` entra directo (OSR en
   modo `Resume` si `ip != 0`).
 - Isolates: un thread OS por isolate (`exec/host/isolates.rs`,
-  `thread::Builder` con `VM_STACK_BYTES`, `Vm` nuevo, `isIsolate = true`).
+  `thread::Builder` con `VM_STACK_BYTES`, `Vm` nuevo; el módulo que carga tiene
+  `import.meta.main = false`).
   `TaskGroup` vive en la std (`std/task/group.vn`), no en Rust. No existe crate `varn-runtime`
   (el runtime auxiliar es `varn-rt`).

@@ -147,6 +147,7 @@ fn get_literal_value_key(expr: ExprId, arena: &AstArena) -> Option<String> {
         | varn_core::ast::ExprKind::Identifier { .. }
         | varn_core::ast::ExprKind::Missing
         | varn_core::ast::ExprKind::This
+        | varn_core::ast::ExprKind::ImportMeta(_)
         | varn_core::ast::ExprKind::Super
         | varn_core::ast::ExprKind::Array { .. }
         | varn_core::ast::ExprKind::Object { .. }

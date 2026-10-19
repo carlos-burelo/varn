@@ -44,7 +44,10 @@ impl Vm {
                 Rc::new(constants),
                 self.ctx.settings,
             );
-            entry.module_base = self.ctx.globals_mut().reserve_region(proto.global_count);
+            entry.module_base = self
+                .ctx
+                .globals_mut()
+                .reserve_module_region(proto.global_count, true);
             self.ctx.push_frame(Rc::new(entry))?;
         }
 

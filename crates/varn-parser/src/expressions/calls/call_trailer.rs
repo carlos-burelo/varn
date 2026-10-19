@@ -88,6 +88,7 @@ pub(super) fn parse_call_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                     | ExprKind::Missing
                     | ExprKind::This
                     | ExprKind::Super
+                    | ExprKind::ImportMeta(_)
                     | ExprKind::Array { .. }
                     | ExprKind::Object { .. }
                     | ExprKind::Tuple { .. }

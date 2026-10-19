@@ -35,6 +35,7 @@ impl<'r> Checker<'r> {
                     .resolve_symbol(name_str)
                     .unwrap_or(Type::Dynamic)
             }
+            ExprKind::ImportMeta(varn_core::ast::MetaProperty::Main) => Type::Bool,
             ExprKind::This => self
                 .extension_self
                 .or_else(|| {

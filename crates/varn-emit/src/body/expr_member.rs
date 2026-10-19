@@ -26,6 +26,7 @@ impl<'a> FnEmitter<'a> {
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing
             | ExprKind::This
+            | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }

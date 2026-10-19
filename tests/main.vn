@@ -143,7 +143,7 @@ import "./149-jit-numeric.vn"
 import "./150-jit-arrays.vn"
 import "./151-jit-osr.vn"
 import "./152-jit-optional-chains.vn"
-import { summary } from "std:test";
+import { summary, describe, it, expect } from "std:test";
 import "./153-local-types.vn"
 import "./154-task-gc-roots.vn"
 import "./155-array-remembered-prefix.vn"
@@ -219,6 +219,13 @@ import "./224-async-resume-values.vn"
 import "./225-generators-as-frames.vn"
 import "./226-builtin-names-shadowed.vn"
 import "./227-channel-endpoints-nested.vn"
+import "./228-import-meta-main.vn"
+
+await describe("main.vn import.meta.main", async () => {
+    await it("the entry module is main", async () => {
+        expect(import.meta.main).toBe(true)
+    });
+});
 
 summary()
 

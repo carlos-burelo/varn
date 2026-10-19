@@ -163,8 +163,8 @@ Contrato estructural sin implementación. Los campos opcionales se marcan con `?
 **`is`**  
 Operador de verificación de tipo (type assertion). Ejemplo: `v is decimal`.
 
-**`isIsolate`**  
-Variable booleana global del runtime. `true` cuando el módulo corre dentro de un isolate hijo.
+**`import.meta.main`**  
+Expresión `bool`: `true` solo en el módulo de entrada del proceso; `false` en módulos importados y en los que carga un isolate.
 
 ---
 

@@ -64,6 +64,7 @@ impl<'r> Checker<'r> {
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing
             | ExprKind::This
+            | ExprKind::ImportMeta(_)
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }

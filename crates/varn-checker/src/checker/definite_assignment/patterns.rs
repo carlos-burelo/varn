@@ -165,6 +165,7 @@ pub(crate) fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(
         | ExprKind::Identifier { .. }
         | ExprKind::Missing
         | ExprKind::This
+        | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Assign { .. }
         | ExprKind::Function { .. }

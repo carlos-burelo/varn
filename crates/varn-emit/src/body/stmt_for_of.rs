@@ -32,6 +32,7 @@ impl<'a> FnEmitter<'a> {
             | ExprKind::Identifier { .. }
             | ExprKind::Missing
             | ExprKind::This
+            | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }

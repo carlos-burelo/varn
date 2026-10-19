@@ -86,6 +86,14 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::This => return self.this_var(span),
+            ExprKind::ImportMeta(property) => {
+                return TirExpr {
+                    kind: TirExprKind::Var,
+                    ty,
+                    res: Resolution::GlobalSlot(property.slot()),
+                    span,
+                }
+            }
 
             ExprKind::Member {
                 object,

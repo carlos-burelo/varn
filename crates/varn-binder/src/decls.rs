@@ -322,6 +322,7 @@ impl<'r> super::Binder<'r> {
             | ExprKind::BoolLiteral { .. }
             | ExprKind::RegexLiteral { .. }
             | ExprKind::NullLiteral
+            | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::This => {}
         }

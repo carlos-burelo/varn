@@ -136,6 +136,7 @@ fn expr_uses_receiver(arena: &AstArena, id: ExprId) -> bool {
         | ExprKind::NullLiteral
         | ExprKind::RegexLiteral { .. }
         | ExprKind::Identifier { .. }
+        | ExprKind::ImportMeta(_)
         | ExprKind::Missing => false,
         ExprKind::This => true,
         ExprKind::Super => true,

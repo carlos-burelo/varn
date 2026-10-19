@@ -89,6 +89,7 @@ impl<'r> Checker<'r> {
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing
             | ExprKind::This
+            | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }

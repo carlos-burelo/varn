@@ -27,6 +27,7 @@ pub(super) fn infer_member(c: &mut CallTypeCtx, object: ExprId, property: ExprId
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing
         | ExprKind::This
+        | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }

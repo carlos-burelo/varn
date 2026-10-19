@@ -170,6 +170,7 @@ pub(super) fn collect_expr(a: &AstArena, id: &ExprId, out: &mut Vec<SpatialEntry
         | ExprKind::Identifier { .. }
         | ExprKind::Missing
         | ExprKind::This
+        | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Yield { .. } => {}
     }

@@ -48,6 +48,7 @@ pub enum ExprKind {
     Missing,
     This,
     Super,
+    ImportMeta(MetaProperty),
     Array {
         elements: Vec<ArrayEl>,
     },
@@ -278,4 +279,36 @@ pub struct MatchCase {
 pub enum MatchBody {
     Block(StmtId),
     Expr(ExprId),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetaProperty {
+    Main,
+}
+
+impl MetaProperty {
+    pub const ALL: [Self; 1] = [Self::Main];
+    pub const OBJECT: &'static str = "meta";
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Main => "main",
+        }
+    }
+
+    pub const fn slot(self) -> u32 {
+        match self {
+            Self::Main => 0,
+        }
+    }
+
+    pub const fn source_text(self) -> &'static str {
+        match self {
+            Self::Main => "import.meta.main",
+        }
+    }
+
+    pub fn of(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.name() == name)
+    }
 }

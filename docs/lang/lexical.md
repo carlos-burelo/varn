@@ -35,7 +35,7 @@ override  readonly  declare  native  extends  implements
 get  set  constructor  destructor  match
 ```
 
-NO son keywords: `record`, `spawn`, `parallel`, `dynamic`, `isIsolate`.
+NO son keywords: `record`, `spawn`, `parallel`, `dynamic`, `meta` (en `import.meta`).
 
 ---
 

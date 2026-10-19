@@ -33,6 +33,7 @@ pub fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
         | ExprKind::Identifier { .. }
         | ExprKind::Missing
         | ExprKind::This
+        | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }

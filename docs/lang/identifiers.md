@@ -49,7 +49,7 @@ match
 
 `_` es token `Placeholder`, no identificador. NO son keywords:
 `record`, `spawn`, `parallel` (imports de `std:task`), `dynamic` (nombre
-de tipo contextual), `isIsolate` (global del runtime, `tests/47-isolates-multithread.vn`).
+de tipo contextual).
 
 ---
 

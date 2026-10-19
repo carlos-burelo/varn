@@ -2,7 +2,7 @@ use super::inference_utils::{build_fn_type, widen_literal};
 use super::type_infer_member::infer_member;
 use super::type_infer_ops::{infer_binary, infer_new, infer_object};
 use varn_core::ast::operators::{LogicalOp, UnaryOp};
-use varn_core::ast::{ArrayEl, ArrowBody, AstArena, ExprId, ExprKind, MatchBody};
+use varn_core::ast::{ArrayEl, ArrowBody, AstArena, ExprId, ExprKind, MatchBody, MetaProperty};
 use varn_core::TypeKind;
 use varn_sem::types::{CheckerTyTable, Type};
 
@@ -20,6 +20,7 @@ pub fn infer_expr_type(
         ExprKind::StrLiteral { .. } => Type::Str,
         ExprKind::CharLiteral { .. } => Type::Char,
         ExprKind::BoolLiteral { .. } => Type::Bool,
+        ExprKind::ImportMeta(MetaProperty::Main) => Type::Bool,
         ExprKind::NullLiteral => Type::Null,
         ExprKind::Template { .. } => Type::Str,
         ExprKind::Paren { expression } => infer_expr_type(*expression, arena, ctx, table),

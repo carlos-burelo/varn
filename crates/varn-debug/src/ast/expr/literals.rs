@@ -95,6 +95,13 @@ pub(super) fn try_print(
             terminal::log(format!("{indent}{marker}{}", chalk("super").cyan()));
             true
         }
+        ExprKind::ImportMeta(property) => {
+            terminal::log(format!(
+                "{indent}{marker}{}",
+                chalk(property.source_text()).cyan()
+            ));
+            true
+        }
         ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing

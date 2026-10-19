@@ -197,12 +197,17 @@ export async function workerArgs(tx: Sender<str>, num: int, text: str, arr: Arra
 await spawnIsolate(workerArgs, [out2.tx, 42, "hello", [1, 2, 3], { x: "nested" }])
 ```
 
-### Guardián `isIsolate`
+### Módulo del worker e `import.meta.main`
+
+El hijo carga el módulo que exporta el worker y ejecuta su top-level. El worker
+vive en un módulo sin efectos de top-level (`tests/helpers/isolate-workers.vn`),
+así el hijo no re-ejecuta la suite. `import.meta.main` es `true` solo en el
+módulo de entrada del proceso; en módulos importados y en los que carga un
+isolate es `false` (`tests/228-import-meta-main.vn`).
 
 ```varn
-// Evita re-ejecutar la suite en el módulo hijo
-if (!isIsolate) {
-    await testIsolates()
+if (import.meta.main) {
+    await run()
 }
 ```
 
@@ -335,8 +340,6 @@ Varn soporta `await` a nivel de módulo:
 ```varn
 await runAsync()          // tests/21-async.vn
 await runAsyncGenerators()   // tests/77-async-generators.vn
-if (!isIsolate) {
-    await testIsolates()
-}
+await testIsolates()         // tests/47-isolates-multithread.vn
 ```
 

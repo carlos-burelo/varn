@@ -33,6 +33,7 @@ pub(super) fn infer_invoke(
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing
             | ExprKind::This
+            | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
@@ -80,6 +81,7 @@ pub(super) fn infer_invoke(
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing
         | ExprKind::This
+        | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }

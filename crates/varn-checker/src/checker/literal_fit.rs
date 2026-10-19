@@ -56,6 +56,7 @@ impl Checker<'_> {
             | ExprKind::Identifier { .. }
             | ExprKind::Missing
             | ExprKind::This
+            | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }

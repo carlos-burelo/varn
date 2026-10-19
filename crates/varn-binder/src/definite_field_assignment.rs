@@ -40,6 +40,7 @@ fn this_field_target(e: ExprId, arena: &AstArena, interner: &AtomInterner) -> Op
                 | ExprKind::TaggedTemplate { .. }
                 | ExprKind::Missing
                 | ExprKind::This
+                | ExprKind::ImportMeta(_)
                 | ExprKind::Super
                 | ExprKind::Array { .. }
                 | ExprKind::Object { .. }
@@ -89,6 +90,7 @@ fn this_field_target(e: ExprId, arena: &AstArena, interner: &AtomInterner) -> Op
         | ExprKind::Identifier { .. }
         | ExprKind::Missing
         | ExprKind::This
+        | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }

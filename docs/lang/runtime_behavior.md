@@ -14,8 +14,9 @@ No duplicarlos aquí.
   (`tests/47-isolates-multithread.vn`).
 - Top-level `await` en módulo (`tests/21-async.vn`,
   `tests/77-async-generators.vn`).
-- `isIsolate`: `true` dentro del isolate hijo; guarda `if (!isIsolate)`
-  para no re-ejecutar (`tests/47-isolates-multithread.vn`).
+- `import.meta.main`: `true` solo en el módulo de entrada; `false` en módulos
+  importados y en los que carga un isolate. Vive en el slot 0 de la región de
+  globales de cada módulo y lo escribe el loader (`tests/228-import-meta-main.vn`).
 - `int` 64 bits con `IntegerOverflow`, sin wrap
   (`tests/120-int-division.vn`); `int / int` = `int` truncado
   (`tests/120-int-division.vn`).

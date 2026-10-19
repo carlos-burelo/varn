@@ -274,6 +274,7 @@ impl<'r> Checker<'r> {
             | ExprKind::BoolLiteral { .. }
             | ExprKind::RegexLiteral { .. }
             | ExprKind::NullLiteral
+            | ExprKind::ImportMeta(_)
             | ExprKind::This => {}
             ExprKind::Super => {
                 if !self.super_reachable {

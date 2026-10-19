@@ -196,7 +196,9 @@ impl ExecCtx {
                     resolved.as_str()
                 )));
         }
-        let module_base = self.globals_mut().reserve_region(proto.global_count);
+        let module_base = self
+            .globals_mut()
+            .reserve_module_region(proto.global_count, false);
 
         if !proto.export_names.windows(2).all(|w| w[0] <= w[1]) {
             return Err(crate::error::RuntimeError::new(format!(

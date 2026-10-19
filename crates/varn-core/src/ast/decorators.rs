@@ -36,6 +36,7 @@ pub fn decorator_head(arena: &AstArena, interner: &AtomInterner, d: &Decorator) 
             | ExprKind::Missing
             | ExprKind::This
             | ExprKind::Super
+            | ExprKind::ImportMeta(_)
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
@@ -83,6 +84,7 @@ pub fn decorator_head(arena: &AstArena, interner: &AtomInterner, d: &Decorator) 
         | ExprKind::Missing
         | ExprKind::This
         | ExprKind::Super
+        | ExprKind::ImportMeta(_)
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
@@ -153,6 +155,7 @@ fn str_arg(arena: &AstArena, id: ExprId) -> Option<String> {
         | ExprKind::Missing
         | ExprKind::This
         | ExprKind::Super
+        | ExprKind::ImportMeta(_)
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
@@ -224,6 +227,7 @@ pub fn match_builtin(
                 | ExprKind::Missing
                 | ExprKind::This
                 | ExprKind::Super
+                | ExprKind::ImportMeta(_)
                 | ExprKind::Array { .. }
                 | ExprKind::Object { .. }
                 | ExprKind::Tuple { .. }
@@ -277,6 +281,7 @@ pub fn match_builtin(
             | ExprKind::Missing
             | ExprKind::This
             | ExprKind::Super
+            | ExprKind::ImportMeta(_)
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }

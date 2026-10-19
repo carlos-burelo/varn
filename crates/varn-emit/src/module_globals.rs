@@ -7,7 +7,7 @@ use super::tables::NameIndex;
 use super::ty::lower_type;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
-use varn_core::ast::{AstArena, Program, StmtKind};
+use varn_core::ast::{AstArena, MetaProperty, Program, StmtKind};
 use varn_core::AtomInterner;
 use varn_sem::bind::BindResult;
 use varn_tir::{BackendTy, DynReason, EnumId, EnumInfo, TyTable};
@@ -77,6 +77,11 @@ pub(super) fn assign_global_slots(
     let interner = &bind.interner;
     let mut global_slots: FxHashMap<Arc<str>, u32> = FxHashMap::default();
     let mut globals: Vec<BackendTy> = Vec::new();
+    for property in MetaProperty::ALL {
+        debug_assert_eq!(property.slot() as usize, globals.len());
+        globals.push(BackendTy::Bool);
+        global_slots.insert(Arc::from(property.source_text()), property.slot());
+    }
     for sym in bind.global_symbols() {
         if !is_value_symbol(sym.kind) {
             continue;

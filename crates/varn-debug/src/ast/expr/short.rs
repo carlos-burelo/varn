@@ -8,6 +8,7 @@ pub(crate) fn format_expr_short(
 ) -> String {
     match &arena.expr(expr_id).kind {
         ExprKind::Identifier { name } => interner.resolve(*name).to_owned(),
+        ExprKind::ImportMeta(property) => property.source_text().to_owned(),
         ExprKind::IntLiteral { value, .. } => value.to_string(),
         ExprKind::FloatLiteral { value, .. } => value.to_string(),
         ExprKind::StrLiteral { value } => format!("{value:?}"),

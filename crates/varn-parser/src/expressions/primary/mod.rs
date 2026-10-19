@@ -1,6 +1,7 @@
 mod array_expr;
 mod class_expr;
 mod function_expr;
+mod import_meta;
 mod match_expr;
 mod new_expr;
 mod object;
@@ -12,6 +13,7 @@ use crate::stream::TokenStream;
 use array_expr::parse_array_expr;
 use class_expr::parse_class_expr;
 use function_expr::{parse_function_expr, parse_function_expr_inner_with_start};
+use import_meta::parse_import_meta;
 use new_expr::parse_new_expr;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::ParsedNumber;
@@ -113,6 +115,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             s.advance();
             Ok(s.expr(range, ExprKind::Super))
         }
+        TokenKind::Import => parse_import_meta(s),
 
         TokenKind::LBracket => parse_array_expr(s),
         TokenKind::LBrace => parse_object_expr(s),
@@ -268,7 +271,6 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
         | TokenKind::Finally
         | TokenKind::Using
         | TokenKind::With
-        | TokenKind::Import
         | TokenKind::Export
         | TokenKind::From
         | TokenKind::As

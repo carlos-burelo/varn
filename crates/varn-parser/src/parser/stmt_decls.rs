@@ -153,6 +153,7 @@ pub(super) fn try_parse_decl_stmt_mode(
             let range = decl.range;
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Variable(decl)))))
         }
+        TokenKind::Import if next_kind == TokenKind::Dot => return None,
         TokenKind::Import => {
             if !decorators.is_empty() {
                 return Some(Err("decorators are not supported on imports".to_owned()));
