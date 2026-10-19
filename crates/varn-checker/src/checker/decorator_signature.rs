@@ -1,6 +1,7 @@
 use super::recorder::Recorder;
 use super::Checker;
-use varn_core::ast::decorators::{match_builtin, BuiltinDecorator};
+use varn_core::ast::decorator_kind::BuiltinDecoratorKind;
+use varn_core::ast::decorators::match_builtin;
 use varn_core::ast::Decorator;
 use varn_core::diagnostics::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
@@ -197,35 +198,33 @@ impl<'r> Checker<'r> {
         self.emit(Diagnostic::warning(ErrorCode::DeprecatedUse, text).with_range(range));
     }
 
-    fn builtin_kind(b: &varn_core::ast::decorators::BuiltinMatch) -> Option<BuiltinKind> {
+    fn builtin_kind(b: &varn_core::ast::decorators::BuiltinMatch) -> Option<BuiltinDecoratorKind> {
         match &b.result {
-            Some(Ok(BuiltinDecorator::Deprecated { .. })) => Some(BuiltinKind::Deprecated),
-            Some(Ok(BuiltinDecorator::Pure)) => Some(BuiltinKind::Pure),
-            Some(Ok(BuiltinDecorator::Inline)) => Some(BuiltinKind::Inline),
-            Some(Ok(BuiltinDecorator::Capability { .. })) => Some(BuiltinKind::Capability),
-            Some(Ok(BuiltinDecorator::Test)) => Some(BuiltinKind::Test),
+            Some(Ok(decorator)) => Some(decorator.kind()),
             Some(Err(_)) | None => None,
         }
     }
 
     fn check_builtin_placement(
         &mut self,
-        kind: &BuiltinKind,
+        kind: &BuiltinDecoratorKind,
         target: &DecoratorTarget,
         target_name: &str,
         range: varn_core::SourceRange,
     ) {
         let target_kind = target.kind_str();
         let ok = match kind {
-            BuiltinKind::Deprecated => true,
-            BuiltinKind::Pure | BuiltinKind::Capability => matches!(
+            BuiltinDecoratorKind::Deprecated => true,
+            BuiltinDecoratorKind::Pure | BuiltinDecoratorKind::Capability => matches!(
                 target,
                 DecoratorTarget::Function
                     | DecoratorTarget::Method
                     | DecoratorTarget::Getter
                     | DecoratorTarget::Setter
             ),
-            BuiltinKind::Inline | BuiltinKind::Test => matches!(target, DecoratorTarget::Function),
+            BuiltinDecoratorKind::Inline | BuiltinDecoratorKind::Test => {
+                matches!(target, DecoratorTarget::Function)
+            }
         };
         if !ok {
             self.emit(
@@ -302,26 +301,6 @@ impl<'r> Checker<'r> {
             | TypeKind::Conditional { .. }
             | TypeKind::Infer(_)
             | TypeKind::TypePredicate { .. } => false,
-        }
-    }
-}
-
-enum BuiltinKind {
-    Deprecated,
-    Pure,
-    Inline,
-    Capability,
-    Test,
-}
-
-impl BuiltinKind {
-    fn name(&self) -> &'static str {
-        match self {
-            BuiltinKind::Deprecated => "deprecated",
-            BuiltinKind::Pure => "pure",
-            BuiltinKind::Inline => "inline",
-            BuiltinKind::Capability => "capability",
-            BuiltinKind::Test => "test",
         }
     }
 }

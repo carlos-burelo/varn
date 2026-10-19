@@ -198,28 +198,28 @@ pub fn keyword_hover(kind: TokenKind) -> Option<Hover> {
 }
 
 pub fn decorator_hover(name: &str) -> Option<Hover> {
-    match name {
-        "inline" => Some(make_doc_hover(
+    use varn_core::ast::decorator_kind::BuiltinDecoratorKind as K;
+    match K::of(name)? {
+        K::Inline => Some(make_doc_hover(
             "@inline",
             "Garantiza la expansión del cuerpo en el sitio de llamada o falla la compilación. Solo funciones libres con un único `return`; nada de async, generadores, rest ni recursión.",
         )),
-        "deprecated" => Some(make_doc_hover(
+        K::Deprecated => Some(make_doc_hover(
             "@deprecated(reason?: str)",
             "Marca el símbolo como obsoleto. El compilador emite advertencia `deprecated-use` en cada uso.",
         )),
-        "test" => Some(make_doc_hover(
+        K::Test => Some(make_doc_hover(
             "@test",
             "Registra la función sin parámetros como caso de prueba: `vn test` la ejecuta aislada con estado de módulo fresco.",
         )),
-        "pure" => Some(make_doc_hover(
+        K::Pure => Some(make_doc_hover(
             "@pure",
             "Declara la función pura. El compilador rechaza throw, await/spawn/yield, `new`, mutación no local y llamadas a funciones no marcadas `@pure`.",
         )),
-        "capability" => Some(make_doc_hover(
+        K::Capability => Some(make_doc_hover(
             "@capability(domain: str, ...)",
             "Declara la capacidad de host que la función requiere. Quien la llame debe declararla también para propagar; el toplevel tiene autoridad ambiental.",
         )),
-        _ => None,
     }
 }
 

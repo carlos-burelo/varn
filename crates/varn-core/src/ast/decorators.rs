@@ -117,10 +117,7 @@ pub fn decorator_head(arena: &AstArena, interner: &AtomInterner, d: &Decorator) 
         | ExprKind::With { .. }
         | ExprKind::MetaAccess { .. } => return None,
     };
-    match interner.resolve(head) {
-        "deprecated" | "pure" | "inline" | "capability" | "test" => Some(head),
-        _ => None,
-    }
+    super::decorator_kind::BuiltinDecoratorKind::of(interner.resolve(head)).map(|_| head)
 }
 
 pub fn is_builtin(arena: &AstArena, interner: &AtomInterner, d: &Decorator) -> bool {
@@ -320,8 +317,16 @@ pub fn match_builtin(
                 continue;
             }
         };
-        let result = match head {
-            "deprecated" => match args {
+        let Some(kind) = super::decorator_kind::BuiltinDecoratorKind::of(head) else {
+            out.push(BuiltinMatch {
+                range: d.range,
+                result: None,
+            });
+            continue;
+        };
+        use super::decorator_kind::BuiltinDecoratorKind as K;
+        let result = match kind {
+            K::Deprecated => match args {
                 None | Some([]) => Ok(BuiltinDecorator::Deprecated { message: None }),
                 Some([single]) => match single {
                     Arg::Positional(e) => match str_arg(arena, *e) {
@@ -334,32 +339,25 @@ pub fn match_builtin(
                 },
                 Some(_) => Err("`@deprecated` takes an optional string message"),
             },
-            "pure" => match args {
+            K::Pure => match args {
                 None | Some([]) => Ok(BuiltinDecorator::Pure),
                 Some(_) => Err("`@pure` takes no arguments"),
             },
-            "inline" => match args {
+            K::Inline => match args {
                 None | Some([]) => Ok(BuiltinDecorator::Inline),
                 Some(_) => Err("`@inline` takes no arguments"),
             },
-            "capability" => match args {
+            K::Capability => match args {
                 Some(a) if !a.is_empty() => match positional_strs(arena, a) {
                     Some(domains) => Ok(BuiltinDecorator::Capability { domains }),
                     None => Err("`@capability` takes one or more string domains"),
                 },
                 Some(_) | None => Err("`@capability` takes one or more string domains"),
             },
-            "test" => match args {
+            K::Test => match args {
                 None | Some([]) => Ok(BuiltinDecorator::Test),
                 Some(_) => Err("`@test` takes no arguments"),
             },
-            _ => {
-                out.push(BuiltinMatch {
-                    range: d.range,
-                    result: None,
-                });
-                continue;
-            }
         };
         out.push(BuiltinMatch {
             range: d.range,

@@ -6,7 +6,7 @@ impl<'r> Checker<'r> {
         &self,
         decorators: &[varn_core::ast::Decorator],
         bind: &BindResult,
-        want: &str,
+        want: varn_core::ast::decorator_kind::BuiltinDecoratorKind,
     ) -> bool {
         decorators.iter().any(|d| {
             if bind.user_decorators.contains(&d.range.start.offset) {
@@ -114,7 +114,10 @@ impl<'r> Checker<'r> {
                 | varn_core::ast::ExprKind::With { .. }
                 | varn_core::ast::ExprKind::MetaAccess { .. } => None,
             };
-            head.is_some_and(|h| bind.interner.resolve(h) == want)
+            head.is_some_and(|h| {
+                varn_core::ast::decorator_kind::BuiltinDecoratorKind::of(bind.interner.resolve(h))
+                    == Some(want)
+            })
         })
     }
 

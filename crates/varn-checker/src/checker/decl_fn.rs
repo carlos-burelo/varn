@@ -165,7 +165,11 @@ impl<'r> Checker<'r> {
                     .with_range(f.range),
                 );
             }
-            if self.has_builtin(&f.decorators, bind, "inline") {
+            if self.has_builtin(
+                &f.decorators,
+                bind,
+                varn_core::ast::decorator_kind::BuiltinDecoratorKind::Inline,
+            ) {
                 self.check_inline_shape(f, name);
             }
         }
