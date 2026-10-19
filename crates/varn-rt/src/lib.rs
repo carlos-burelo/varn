@@ -12,14 +12,35 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     code as i32
 }
 
+fn print_line(text: &[u8]) {
+    let mut out = std::io::stdout();
+    let _ = out.write_all(text);
+    let _ = out.write_all(b"\n");
+    let _ = out.flush();
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn varn_rt_print(ptr: *const u8, len: usize) {
-    if !ptr.is_null() && len > 0 {
-        let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
-        let _ = std::io::stdout().write_all(slice);
+    if ptr.is_null() || len == 0 {
+        print_line(b"");
+    } else {
+        print_line(unsafe { std::slice::from_raw_parts(ptr, len) });
     }
-    let _ = std::io::stdout().write_all(b"\n");
-    let _ = std::io::stdout().flush();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn varn_rt_print_int(value: i64) {
+    print_line(value.to_string().as_bytes());
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn varn_rt_print_bool(value: i64) {
+    print_line(if value != 0 { b"true" } else { b"false" });
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn varn_rt_print_null() {
+    print_line(b"null");
 }
 
 #[repr(C)]
@@ -34,7 +55,8 @@ pub unsafe extern "C" fn varn_rt_str_concat(
     a_len: usize,
     b_ptr: *const u8,
     b_len: usize,
-) -> StrResult {
+    out: *mut StrResult,
+) {
     let mut vec = Vec::with_capacity(a_len + b_len);
     if !a_ptr.is_null() && a_len > 0 {
         vec.extend_from_slice(unsafe { std::slice::from_raw_parts(a_ptr, a_len) });
@@ -44,7 +66,7 @@ pub unsafe extern "C" fn varn_rt_str_concat(
     }
     let len = vec.len();
     let ptr = Box::into_raw(vec.into_boxed_slice()) as *const u8;
-    StrResult { ptr, len }
+    unsafe { out.write(StrResult { ptr, len }) };
 }
 
 #[unsafe(no_mangle)]
