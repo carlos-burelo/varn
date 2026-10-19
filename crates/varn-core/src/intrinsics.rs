@@ -71,7 +71,6 @@ member_keys! {
     CharCode => "charCode",
     Message => "message",
     Stack => "stack",
-    Kind => "kind",
     IsStatic => "isStatic",
     IsPrivate => "isPrivate",
     Inclusive => "inclusive",

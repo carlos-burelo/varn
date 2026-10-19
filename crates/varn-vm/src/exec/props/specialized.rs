@@ -125,7 +125,6 @@ fn enum_variant_property(
             | MemberKey::LastIndexOf
             | MemberKey::Message
             | MemberKey::Stack
-            | MemberKey::Kind
             | MemberKey::IsStatic
             | MemberKey::IsPrivate
             | MemberKey::Inclusive

@@ -73,27 +73,27 @@ let shadowLog: str[] = [];
 let ctxLog: str[] = [];
 
 function ctxMethod(fn: FunctionRef, ctx: MethodContext): FunctionRef {
-    ctxLog.push("method:" + ctx.name + ":" + ctx.kind + ":static=" + ctx.isStatic);
+    ctxLog.push("method:" + ctx.name + ":static=" + ctx.isStatic);
     return fn;
 }
 
 function ctxGetter(fn: FunctionRef, ctx: GetterContext): FunctionRef {
-    ctxLog.push("getter:" + ctx.name + ":" + ctx.kind);
+    ctxLog.push("getter:" + ctx.name);
     return fn;
 }
 
 function ctxSetter(fn: FunctionRef, ctx: SetterContext): FunctionRef {
-    ctxLog.push("setter:" + ctx.name + ":" + ctx.kind);
+    ctxLog.push("setter:" + ctx.name);
     return fn;
 }
 
 function ctxCtor(fn: FunctionRef, ctx: ConstructorContext): FunctionRef {
-    ctxLog.push("ctor:" + ctx.name + ":" + ctx.kind);
+    ctxLog.push("ctor:" + ctx.name);
     return fn;
 }
 
 function ctxProp(target: dynamic, ctx: PropertyContext): void {
-    ctxLog.push("prop:" + ctx.name + ":" + ctx.kind + ":static=" + ctx.isStatic);
+    ctxLog.push("prop:" + ctx.name + ":static=" + ctx.isStatic);
 }
 
 class WithCtx {
@@ -175,11 +175,11 @@ await describe("116 decorator builtins", async () => {
         expect(w.field).toBe(3);
         expect(WithCtx.sf).toBe(4);
         expect(ctxLog.length).toBe(6);
-        expect(ctxLog[0]).toBe("ctor:constructor:constructor");
-        expect(ctxLog[1]).toBe("method:m:method:static=false");
-        expect(ctxLog[2]).toBe("getter:v:getter");
-        expect(ctxLog[3]).toBe("setter:v:setter");
-        expect(ctxLog[4]).toBe("prop:field:property:static=false");
-        expect(ctxLog[5]).toBe("prop:sf:property:static=true");
+        expect(ctxLog[0]).toBe("ctor:constructor");
+        expect(ctxLog[1]).toBe("method:m:static=false");
+        expect(ctxLog[2]).toBe("getter:v");
+        expect(ctxLog[3]).toBe("setter:v");
+        expect(ctxLog[4]).toBe("prop:field:static=false");
+        expect(ctxLog[5]).toBe("prop:sf:static=true");
     });
 });

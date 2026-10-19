@@ -2,7 +2,6 @@ use super::context::{Builder, Result};
 use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
-use varn_core::ast::decorator_kind::DecoratorTarget;
 use varn_tir::TirClassDef;
 
 impl<'m> Builder<'m> {
@@ -11,20 +10,17 @@ impl<'m> Builder<'m> {
         mv: Value,
         deco: &varn_tir::TirExpr,
         key: &Arc<str>,
-        kind: &str,
         is_static: bool,
         is_private: bool,
     ) -> Result<Value> {
         let deco_v = self.lower_expr(deco)?;
         let n = self.emit(InstKind::ConstStr(key.clone()), HirType::Str);
-        let k = self.emit(InstKind::ConstStr(Arc::from(kind)), HirType::Str);
         let st = self.emit(InstKind::ConstBool(is_static), HirType::Bool);
         let pv = self.emit(InstKind::ConstBool(is_private), HirType::Bool);
         let ctx = self.emit(
             InstKind::BuildObject {
                 pairs: vec![
                     (Arc::from(varn_core::MemberKey::Name.as_str()), n),
-                    (Arc::from(varn_core::MemberKey::Kind.as_str()), k),
                     (Arc::from(varn_core::MemberKey::IsStatic.as_str()), st),
                     (Arc::from(varn_core::MemberKey::IsPrivate.as_str()), pv),
                 ],
@@ -51,14 +47,8 @@ impl<'m> Builder<'m> {
                 },
                 HirType::Ref,
             );
-            let kind = if m.key.as_ref() == varn_core::TokenKind::Constructor.as_str() {
-                DecoratorTarget::Constructor.name()
-            } else {
-                DecoratorTarget::Method.name()
-            };
             for deco in m.decorators.iter().rev() {
-                mv =
-                    self.apply_member_decorator(mv, deco, &m.key, kind, m.is_static, m.is_private)?;
+                mv = self.apply_member_decorator(mv, deco, &m.key, m.is_static, m.is_private)?;
             }
             self.emit_effect(InstKind::DefineMethod {
                 class: class_v,
@@ -104,13 +94,8 @@ impl<'m> Builder<'m> {
                 },
                 HirType::Ref,
             );
-            let kind = if a.is_getter {
-                DecoratorTarget::Getter.name()
-            } else {
-                DecoratorTarget::Setter.name()
-            };
             for deco in a.decorators.iter().rev() {
-                av = self.apply_member_decorator(av, deco, &a.key, kind, a.is_static, false)?;
+                av = self.apply_member_decorator(av, deco, &a.key, a.is_static, false)?;
             }
             self.emit_effect(InstKind::DefineAccessor {
                 class: class_v,
@@ -132,17 +117,12 @@ impl<'m> Builder<'m> {
             for deco in prop.decorators.iter().rev() {
                 let deco_v = self.lower_expr(deco)?;
                 let n = self.emit(InstKind::ConstStr(prop.key.clone()), HirType::Str);
-                let k = self.emit(
-                    InstKind::ConstStr(Arc::from(DecoratorTarget::Property.name())),
-                    HirType::Str,
-                );
                 let st = self.emit(InstKind::ConstBool(prop.is_static), HirType::Bool);
                 let pv = self.emit(InstKind::ConstBool(false), HirType::Bool);
                 let ctx = self.emit(
                     InstKind::BuildObject {
                         pairs: vec![
                             (Arc::from(varn_core::MemberKey::Name.as_str()), n),
-                            (Arc::from(varn_core::MemberKey::Kind.as_str()), k),
                             (Arc::from(varn_core::MemberKey::IsStatic.as_str()), st),
                             (Arc::from(varn_core::MemberKey::IsPrivate.as_str()), pv),
                         ],
