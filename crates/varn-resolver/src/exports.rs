@@ -107,16 +107,6 @@ pub(super) fn collect_exports(
                         }
                     }
                 }
-                if let Decl::Enum(e) = declaration.as_ref() {
-                    for member in &e.members {
-                        let member_name = bind.interner.resolve(member.id);
-                        if let Some(sym) = lookup_global(bind, member_name) {
-                            let mut s = sym.clone();
-                            s.origin_module = Some(intern_origin(out, abs_path));
-                            out.insert(member_name.to_string(), s);
-                        }
-                    }
-                }
             }
             ExportDecl::Named {
                 specifiers,
