@@ -4,14 +4,11 @@ import {
     exec$,
     findAll$,
     replace$,
-    split$
+    split$,
+    RegexMatch
 } from "runtime:regex";
 
-export interface RegexMatch {
-    match: str;
-    index: int;
-    groups: str[];
-}
+export { RegexMatch };
 
 export class Regex {
     private handle: int;
@@ -33,11 +30,11 @@ export class Regex {
     }
 
     exec(text: str): RegexMatch? {
-        return exec$(this.handle, text) as RegexMatch?;
+        return exec$(this.handle, text);
     }
 
     findAll(text: str): RegexMatch[] {
-        return findAll$(this.handle, text) as RegexMatch[];
+        return findAll$(this.handle, text);
     }
 
     replace(text: str, replacement: str): str {
@@ -45,6 +42,6 @@ export class Regex {
     }
 
     split(text: str): str[] {
-        return split$(this.handle, text) as str[];
+        return split$(this.handle, text);
     }
 }

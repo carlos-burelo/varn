@@ -6,6 +6,29 @@ static REGEX_POOL: RwLock<Vec<regex::Regex>> = RwLock::new(Vec::new());
 
 pub struct RegexRuntime;
 
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/regex/regex_runtime.vn",
+    interface: "RegexMatch",
+    struct RegexMatch;
+}
+
+fn match_record(ctx: &mut dyn NativeCtx, caps: &regex::Captures<'_>) -> VmValue {
+    let whole = caps.get(0).expect("a capture set always holds the whole match");
+    let groups: Vec<VmValue> = caps
+        .iter()
+        .skip(1)
+        .map(|g| g.map_or(VmValue::null(), |grp| ctx.alloc_str(grp.as_str())))
+        .collect();
+    let matched = ctx.alloc_str(whole.as_str());
+    let groups = ctx.alloc_array(groups);
+    RegexMatch {
+        r#match: matched,
+        index: whole.start() as i64,
+        groups,
+    }
+    .alloc(ctx)
+}
+
 fn get_regex(handle: i64) -> Result<regex::Regex, String> {
     if handle < 0 {
         return Err("Invalid regex handle".to_string());
@@ -47,72 +70,17 @@ varn_contract! {
             Ok(re.is_match(text))
         }
 
-        fn exec(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<VmValue, String> {
+        fn exec(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Option<VmValue>, String> {
             let re = get_regex(handle)?;
-            if let Some(caps) = re.captures(text) {
-                let m = caps.get(0).unwrap();
-                let obj = ctx.alloc_object();
-
-                let match_str = ctx.alloc_str(m.as_str());
-                ctx.set_field(obj, "match", match_str);
-
-                let index_val = VmValue::from_int(m.start() as i64);
-                ctx.set_field(obj, "index", index_val);
-
-                let groups_vec: Vec<VmValue> = caps
-                    .iter()
-                    .skip(1)
-                    .map(|g| {
-                        if let Some(grp) = g {
-                            ctx.alloc_str(grp.as_str())
-                        } else {
-                            VmValue::null()
-                        }
-                    })
-                    .collect();
-
-                let groups_nv = ctx.alloc_array(groups_vec);
-                ctx.set_field(obj, "groups", groups_nv);
-
-                Ok(obj)
-            } else {
-                Ok(VmValue::null())
-            }
+            Ok(re.captures(text).map(|caps| match_record(ctx, &caps)))
         }
 
-        fn findAll(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<VmValue, String> {
+        fn findAll(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Vec<VmValue>, String> {
             let re = get_regex(handle)?;
-            let mut results = Vec::new();
-
-            for caps in re.captures_iter(text) {
-                let m = caps.get(0).unwrap();
-                let obj = ctx.alloc_object();
-
-                let match_str = ctx.alloc_str(m.as_str());
-                ctx.set_field(obj, "match", match_str);
-
-                let index_val = VmValue::from_int(m.start() as i64);
-                ctx.set_field(obj, "index", index_val);
-
-                let groups_vec: Vec<VmValue> = caps
-                    .iter()
-                    .skip(1)
-                    .map(|g| {
-                        if let Some(grp) = g {
-                            ctx.alloc_str(grp.as_str())
-                        } else {
-                            VmValue::null()
-                        }
-                    })
-                    .collect();
-
-                let groups_nv = ctx.alloc_array(groups_vec);
-                ctx.set_field(obj, "groups", groups_nv);
-
-                results.push(obj);
-            }
-
-            Ok(ctx.alloc_array(results))
+            Ok(re
+                .captures_iter(text)
+                .map(|caps| match_record(ctx, &caps))
+                .collect())
         }
 
         fn replace(_ctx: &mut dyn NativeCtx, handle: i64, text: &str, replacement: &str) -> Result<String, String> {
@@ -120,13 +88,9 @@ varn_contract! {
             Ok(re.replace_all(text, replacement).into_owned())
         }
 
-        fn split(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<VmValue, String> {
+        fn split(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Vec<VmValue>, String> {
             let re = get_regex(handle)?;
-            let parts: Vec<VmValue> = re
-                .split(text)
-                .map(|p| ctx.alloc_str(p))
-                .collect();
-            Ok(ctx.alloc_array(parts))
+            Ok(re.split(text).map(|p| ctx.alloc_str(p)).collect())
         }
     }
 }
