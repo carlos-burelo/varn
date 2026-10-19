@@ -7,6 +7,18 @@ static PROCESS_POOL: RwLock<Vec<Option<Child>>> = RwLock::new(Vec::new());
 
 pub struct ProcessRuntime;
 
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/process/process_runtime.vn",
+    interface: "ProcessOutput",
+    struct ProcessOutput;
+}
+
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/process/process_runtime.vn",
+    interface: "ProcessStatus",
+    struct ProcessStatus;
+}
+
 varn_contract! {
     module: "runtime:process",
     contract: "src/modules/runtime/process/process_runtime.vn",
@@ -29,17 +41,15 @@ varn_contract! {
             let stdout_str = String::from_utf8_lossy(&output.stdout).into_owned();
             let stderr_str = String::from_utf8_lossy(&output.stderr).into_owned();
 
-            let obj = ctx.alloc_object();
-            ctx.set_field(obj, "exitCode", VmValue::from_int(exit_code));
-            ctx.set_field(obj, "success", VmValue::from_bool(success));
-
-            let out_nv = ctx.alloc_str_owned(stdout_str);
-            ctx.set_field(obj, "stdout", out_nv);
-
-            let err_nv = ctx.alloc_str_owned(stderr_str);
-            ctx.set_field(obj, "stderr", err_nv);
-
-            Ok(obj)
+            let stdout = ctx.alloc_str_owned(stdout_str);
+            let stderr = ctx.alloc_str_owned(stderr_str);
+            Ok(ProcessOutput {
+                exit_code,
+                stdout,
+                stderr,
+                success,
+            }
+            .alloc(ctx))
         }
 
         fn spawnProcess(ctx: &mut dyn NativeCtx, command: &str, args: VnArray) -> Result<i64, String> {
@@ -78,10 +88,7 @@ varn_contract! {
             let exit_code = status.code().unwrap_or(-1) as i64;
             let success = status.success();
 
-            let obj = ctx.alloc_object();
-            ctx.set_field(obj, "exitCode", VmValue::from_int(exit_code));
-            ctx.set_field(obj, "success", VmValue::from_bool(success));
-            Ok(obj)
+            Ok(ProcessStatus { exit_code, success }.alloc(ctx))
         }
 
         fn currentExe(ctx: &mut dyn NativeCtx) -> Result<VmValue, String> {

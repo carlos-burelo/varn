@@ -1,9 +1,21 @@
 // runtime:process — low-level host process execution operations.
 
+export interface ProcessOutput {
+    exitCode: int;
+    stdout: str;
+    stderr: str;
+    success: bool;
+}
+
+export interface ProcessStatus {
+    exitCode: int;
+    success: bool;
+}
+
 @permission("sys.exec")
-export declare function exec$(command: str): dynamic;
+export declare function exec$(command: str): ProcessOutput;
 export declare function currentExe$(): str;
 @permission("sys.exec")
 export declare function spawnProcess$(command: str, args: str[]): int;
-export declare function waitProcess$(pid: int): dynamic;
+export declare function waitProcess$(pid: int): ProcessStatus;
 export declare function killProcess$(pid: int): bool;

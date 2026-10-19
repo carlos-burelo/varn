@@ -3,15 +3,12 @@ import {
     currentExe$,
     spawnProcess$,
     waitProcess$,
-    killProcess$
+    killProcess$,
+    ProcessOutput,
+    ProcessStatus
 } from "runtime:process";
 
-export interface ProcessResult {
-    exitCode: int;
-    stdout: str;
-    stderr: str;
-    success: bool;
-}
+export type ProcessResult = ProcessOutput;
 
 export class ChildProcess {
     pid: int;
@@ -20,7 +17,7 @@ export class ChildProcess {
         this.pid = pid;
     }
 
-    wait(): { exitCode: int, success: bool } {
+    wait(): ProcessStatus {
         return waitProcess$(this.pid);
     }
 
