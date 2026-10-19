@@ -29,7 +29,7 @@ impl<'r> Binder<'r> {
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
 
-        let ctor_atom = self.intern_local("constructor");
+        let ctor_atom = self.intern_local(varn_core::TokenKind::Constructor.as_str());
         let mut sym =
             Symbol::new(SymbolKind::Method, ctor_atom, c.range.start.line).with_type(fn_ty);
         sym.col = c.range.start.column;
@@ -37,7 +37,7 @@ impl<'r> Binder<'r> {
         let symbol_id = self.arena.push(sym);
 
         members.push(ClassMemberInfo {
-            name: Arc::from("constructor"),
+            name: Arc::from(varn_core::TokenKind::Constructor.as_str()),
             kind: ClassMemberKind::Constructor,
             is_async: false,
             is_generator: false,

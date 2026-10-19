@@ -242,10 +242,17 @@ pub(super) fn emit_class(
         out,
     );
 
-    let has_ctor = def.methods.iter().any(|m| m.key.as_ref() == "constructor");
+    let has_ctor = def
+        .methods
+        .iter()
+        .any(|m| m.key.as_ref() == varn_core::TokenKind::Constructor.as_str());
 
     if !field_defaults.is_empty() || (!primary.is_empty() && !has_ctor) {
-        match def.methods.iter().find(|m| m.key.as_ref() == "constructor") {
+        match def
+            .methods
+            .iter()
+            .find(|m| m.key.as_ref() == varn_core::TokenKind::Constructor.as_str())
+        {
             Some(ctor) => {
                 let body = &mut out[ctor.func.0 as usize].body;
                 let mut new = field_defaults;
@@ -327,7 +334,7 @@ pub(super) fn emit_class(
                 new.extend(std::mem::take(body));
                 *body = new;
                 def.methods.push(varn_tir::TirClassMember {
-                    key: Arc::from("constructor"),
+                    key: Arc::from(varn_core::TokenKind::Constructor.as_str()),
                     func: id,
                     is_static: false,
                     is_private: false,

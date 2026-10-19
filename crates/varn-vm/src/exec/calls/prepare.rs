@@ -185,7 +185,9 @@ pub(crate) fn prepare_call(
                             let _ = full_arg_count;
                             let mut frame = materialize_frame(store, &nc, &window)?;
                             frame.current_class = owner_class;
-                            if nc.proto.name.as_deref() == Some("constructor") {
+                            if nc.proto.name.as_deref()
+                                == Some(varn_core::TokenKind::Constructor.as_str())
+                            {
                                 return Ok(PreparedCall::Constructor(frame, recv_nv));
                             }
                             return Ok(PreparedCall::Frame(frame));

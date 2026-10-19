@@ -280,7 +280,9 @@ fn parse_variant_tuple_pattern(
         if s.check(TokenKind::Placeholder) {
             s.advance();
             bindings.push(MatchBinding {
-                name: s.interner.intern("_"),
+                name: s
+                    .interner
+                    .intern(varn_core::TokenKind::Placeholder.as_str()),
                 range,
             });
         } else if s.check(TokenKind::Identifier) {

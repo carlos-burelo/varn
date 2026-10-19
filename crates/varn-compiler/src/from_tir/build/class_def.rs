@@ -109,7 +109,7 @@ impl<'m> Builder<'m> {
             self.emit(
                 InstKind::MethodCall {
                     recv,
-                    name: Arc::from("constructor"),
+                    name: Arc::from(varn_core::TokenKind::Constructor.as_str()),
                     args,
                 },
                 HirType::Dynamic,

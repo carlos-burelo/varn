@@ -169,7 +169,7 @@ pub fn infer_expr_type(
             .and_then(|(c, i)| c.resolve_symbol(i.resolve(*name)))
             .unwrap_or(Type::Dynamic),
         ExprKind::This => ctx
-            .and_then(|c| c.resolve_symbol("this"))
+            .and_then(|c| c.resolve_symbol(varn_core::TokenKind::This.as_str()))
             .unwrap_or(Type::This),
         ExprKind::Arrow {
             params,

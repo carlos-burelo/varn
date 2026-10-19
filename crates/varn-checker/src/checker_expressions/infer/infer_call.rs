@@ -196,7 +196,7 @@ impl<'r> Checker<'r> {
             self.current_scope = scope_id;
             for (p, fp) in params.iter().zip(ps.iter()) {
                 let name = varn_binder::pattern_lead_name(&p.pattern, &bind.interner);
-                if name.is_empty() || name == "_" {
+                if name.is_empty() || name == varn_core::TokenKind::Placeholder.as_str() {
                     continue;
                 }
                 if let Some(sym_id) = bind

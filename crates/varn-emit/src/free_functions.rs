@@ -9,7 +9,7 @@ pub(super) fn param_name(p: &Param, interner: &AtomInterner) -> Arc<str> {
         Pattern::Array { .. }
         | Pattern::Object { .. }
         | Pattern::Assignment { .. }
-        | Pattern::Rest { .. } => Arc::from("_"),
+        | Pattern::Rest { .. } => Arc::from(varn_core::TokenKind::Placeholder.as_str()),
     }
 }
 

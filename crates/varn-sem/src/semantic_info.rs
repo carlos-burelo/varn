@@ -39,7 +39,7 @@ impl ResolvedMemberKind {
             ResolvedMemberKind::StaticProperty => "static property",
             ResolvedMemberKind::ExtensionMethod => "extension method",
             ResolvedMemberKind::ExtensionProperty => "extension property",
-            ResolvedMemberKind::Constructor => "constructor",
+            ResolvedMemberKind::Constructor => varn_core::TokenKind::Constructor.as_str(),
             ResolvedMemberKind::NestedType(k) => k.label(),
         }
     }

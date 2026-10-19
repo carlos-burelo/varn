@@ -50,8 +50,8 @@ impl<'m> Builder<'m> {
                 },
                 HirType::Ref,
             );
-            let kind = if m.key.as_ref() == "constructor" {
-                "constructor"
+            let kind = if m.key.as_ref() == varn_core::TokenKind::Constructor.as_str() {
+                varn_core::TokenKind::Constructor.as_str()
             } else {
                 "method"
             };

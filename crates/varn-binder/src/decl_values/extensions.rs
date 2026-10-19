@@ -27,7 +27,7 @@ impl<'r> super::super::Binder<'r> {
                         format!("__ext_{}_{}", type_name, self.interner.resolve(method.id));
                     let mut param_types: Vec<varn_sem::types::FunctionParam> =
                         vec![varn_sem::types::FunctionParam {
-                            name: Some(Arc::from("this")),
+                            name: Some(Arc::from(varn_core::TokenKind::This.as_str())),
                             ty: receiver_ty.0,
                             optional: false,
                             is_rest: false,
@@ -111,7 +111,7 @@ impl<'r> super::super::Binder<'r> {
                     let fn_type = Type::fn_(
                         varn_sem::types::FunctionType {
                             params: vec![varn_sem::types::FunctionParam {
-                                name: Some(Arc::from("this")),
+                                name: Some(Arc::from(varn_core::TokenKind::This.as_str())),
                                 ty: receiver_ty.0,
                                 optional: false,
                                 is_rest: false,
@@ -150,7 +150,7 @@ impl<'r> super::super::Binder<'r> {
                         varn_sem::types::FunctionType {
                             params: vec![
                                 varn_sem::types::FunctionParam {
-                                    name: Some(Arc::from("this")),
+                                    name: Some(Arc::from(varn_core::TokenKind::This.as_str())),
                                     ty: receiver_ty.0,
                                     optional: false,
                                     is_rest: false,
@@ -208,7 +208,7 @@ impl<'r> super::super::Binder<'r> {
         let saved = self.current;
         self.current = child;
 
-        let this_atom = self.intern_local("this");
+        let this_atom = self.intern_local(varn_core::TokenKind::This.as_str());
         let this_sym = Symbol::new(SymbolKind::Parameter, this_atom, line).with_type(receiver_ty);
         self.define(this_atom, this_sym);
 

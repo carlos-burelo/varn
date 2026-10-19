@@ -5,7 +5,7 @@ use crate::OptError;
 use std::sync::Arc;
 use varn_tir::{ClassId, FnId, Resolution, TirArg, TirClassDef, TirExpr, TirExprKind, TirStmt};
 
-const CONSTRUCTOR: &str = "constructor";
+const CONSTRUCTOR: &str = varn_core::TokenKind::Constructor.as_str();
 
 impl<'m> Builder<'m> {
     pub(super) fn lower_new_expr(

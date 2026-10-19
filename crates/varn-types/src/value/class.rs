@@ -323,7 +323,7 @@ impl ClassObj {
         {
             return *ctor;
         }
-        let ctor = self.find_method("constructor");
+        let ctor = self.find_method(varn_core::TokenKind::Constructor.as_str());
         *self.ctor_cache.borrow_mut() = Some((ver, ctor));
         ctor
     }

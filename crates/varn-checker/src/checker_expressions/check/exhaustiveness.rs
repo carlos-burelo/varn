@@ -40,7 +40,13 @@ impl<'r> Checker<'r> {
         if !catch_all {
             let ty = subject_ty.display(&self.ty_table, &bind.interner);
             let message = format!("non-exhaustive match: a match on '{ty}' needs a `_` arm");
-            self.report_gap(rec, expr, vec!["_".to_owned()], message, range);
+            self.report_gap(
+                rec,
+                expr,
+                vec![varn_core::TokenKind::Placeholder.as_str().to_owned()],
+                message,
+                range,
+            );
         }
     }
 
@@ -82,7 +88,7 @@ impl<'r> Checker<'r> {
                     .map(text)
                     .collect();
                 if missing.len() < uncovered.len() {
-                    missing.push("_".to_owned());
+                    missing.push(varn_core::TokenKind::Placeholder.as_str().to_owned());
                 }
                 let message = format!(
                     "non-exhaustive match: missing cases for {}",
@@ -162,7 +168,11 @@ impl<'r> Checker<'r> {
                     .iter()
                     .map(|v| match owner.sum_variant_fields.get(v.as_str()) {
                         Some(fields) if !fields.is_empty() => {
-                            format!("{v}({})", vec!["_"; fields.len()].join(", "))
+                            format!(
+                                "{v}({})",
+                                vec![varn_core::TokenKind::Placeholder.as_str(); fields.len()]
+                                    .join(", ")
+                            )
                         }
                         None | Some(_) => v.clone(),
                     })

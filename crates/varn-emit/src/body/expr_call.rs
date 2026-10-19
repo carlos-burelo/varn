@@ -14,7 +14,12 @@ impl<'a> FnEmitter<'a> {
     ) -> TirExpr {
         if matches!(self.ast_arena.expr(callee).kind, ExprKind::Super) {
             let targs = self.lower_call_args(call_id, args);
-            let targs = self.settle_super_args(call_id, "constructor", targs, span);
+            let targs = self.settle_super_args(
+                call_id,
+                varn_core::TokenKind::Constructor.as_str(),
+                targs,
+                span,
+            );
             return TirExpr {
                 kind: TirExprKind::SuperCall { args: targs },
                 ty,

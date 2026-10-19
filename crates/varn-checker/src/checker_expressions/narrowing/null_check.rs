@@ -46,7 +46,9 @@ impl<'r> Checker<'r> {
                     }
                 } else {
                     let name_str = bind.interner.resolve(name);
-                    if name_str != "_" && name_str != varn_core::MemberKey::Variant.as_str() {
+                    if name_str != varn_core::TokenKind::Placeholder.as_str()
+                        && name_str != varn_core::MemberKey::Variant.as_str()
+                    {
                         out.push((id, Type::Null));
                     }
                 }

@@ -198,8 +198,11 @@ pub(crate) fn op_get_super(
         .clone();
     let method = match super_cls.find_method(name) {
         Some(method) => method,
-        None if name == "constructor" => {
-            return Ok(heap.alloc_native_fn(default_constructor, "constructor"));
+        None if name == varn_core::TokenKind::Constructor.as_str() => {
+            return Ok(heap.alloc_native_fn(
+                default_constructor,
+                varn_core::TokenKind::Constructor.as_str(),
+            ));
         }
         None => {
             return Err(RuntimeError::new(format!(

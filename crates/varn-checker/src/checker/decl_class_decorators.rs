@@ -89,7 +89,7 @@ impl<'r> Checker<'r> {
                         rec,
                         decorators,
                         super::decorator_signature::DecoratorTarget::Constructor,
-                        "constructor",
+                        varn_core::TokenKind::Constructor.as_str(),
                         bind,
                     );
                     if super::decorator_receiver::method_uses_receiver(

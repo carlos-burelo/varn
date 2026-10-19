@@ -40,9 +40,9 @@ impl<'r> Checker<'r> {
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => None,
         };
-        let saved_class = self
-            .current_class
-            .replace(ext_class_name.unwrap_or_else(|| Arc::from("_")));
+        let saved_class = self.current_class.replace(
+            ext_class_name.unwrap_or_else(|| Arc::from(varn_core::TokenKind::Placeholder.as_str())),
+        );
         let saved_self = self.extension_self.replace(ext_self_ty);
 
         for member in &ext.members {

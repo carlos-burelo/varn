@@ -114,7 +114,7 @@ pub(super) fn bind_match_pattern_vars(b: &mut Binder, pattern: &MatchPattern) {
                 .get(b.interner.resolve(*variant_name))
                 .cloned();
             for (i, binding) in bindings.iter().enumerate() {
-                if b.interner.resolve(binding.name) != "_" {
+                if b.interner.resolve(binding.name) != varn_core::TokenKind::Placeholder.as_str() {
                     let ty = field_types
                         .as_ref()
                         .and_then(|fields| fields.get(i))
@@ -131,7 +131,7 @@ pub(super) fn bind_match_pattern_vars(b: &mut Binder, pattern: &MatchPattern) {
         }
 
         MatchPattern::Identifier(name) => {
-            if b.interner.resolve(*name) != "_" {
+            if b.interner.resolve(*name) != varn_core::TokenKind::Placeholder.as_str() {
                 let sym = Symbol::new(SymbolKind::Let, *name, 0).with_type(Type::Dynamic);
                 b.define(*name, sym);
             }
@@ -158,7 +158,9 @@ pub(super) fn bind_match_pattern_vars(b: &mut Binder, pattern: &MatchPattern) {
                         Some(MatchPattern::Identifier(n)) => *n,
                         _ => *field_key,
                     };
-                    if b.interner.resolve(binding_name) == "_" {
+                    if b.interner.resolve(binding_name)
+                        == varn_core::TokenKind::Placeholder.as_str()
+                    {
                         continue;
                     }
 
@@ -183,7 +185,9 @@ pub(super) fn bind_match_pattern_vars(b: &mut Binder, pattern: &MatchPattern) {
                         Some(MatchPattern::Identifier(n)) => *n,
                         _ => *field_name,
                     };
-                    if b.interner.resolve(binding_name) != "_" {
+                    if b.interner.resolve(binding_name)
+                        != varn_core::TokenKind::Placeholder.as_str()
+                    {
                         let sym =
                             Symbol::new(SymbolKind::Let, binding_name, 0).with_type(Type::Dynamic);
                         b.define(binding_name, sym);

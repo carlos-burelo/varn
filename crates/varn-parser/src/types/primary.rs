@@ -113,7 +113,9 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
                     .map(|ty| {
                         let ty_range = *ty.range();
                         TypeParam {
-                            name: s.interner.intern("_"),
+                            name: s
+                                .interner
+                                .intern(varn_core::TokenKind::Placeholder.as_str()),
                             constraint: Some(ty),
                             default: None,
                             range: ty_range,
@@ -128,7 +130,9 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
                 let ret = super::entry::parse_type(s)?;
                 let full_range = s.span_from(range);
                 let first_range = *first.range();
-                let underscore = s.interner.intern("_");
+                let underscore = s
+                    .interner
+                    .intern(varn_core::TokenKind::Placeholder.as_str());
                 return Ok(s.type_node(
                     full_range,
                     TypeKind::Fn((

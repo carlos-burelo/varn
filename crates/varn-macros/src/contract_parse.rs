@@ -289,7 +289,7 @@ fn class_members(
                 capability: None,
             }),
             ClassMember::Constructor { params: ps, .. } => out.push(Member {
-                symbol: "constructor".to_string(),
+                symbol: ::varn_core::TokenKind::Constructor.as_str().to_string(),
                 kind: Kind::Constructor,
                 params: params(ps, interner),
                 ret: Mapped::Dynamic,

@@ -47,7 +47,9 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         }
 
         if tok.kind == TokenKind::This {
-            if let Some((_, ty)) = state.db.resolve_at("this", tok.offset)
+            if let Some((_, ty)) = state
+                .db
+                .resolve_at(varn_core::TokenKind::This.as_str(), tok.offset)
                 && !state.db.is_dynamic(&ty)
             {
                 return Some(make_lang_hover(
@@ -55,7 +57,10 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                     token_range,
                 ));
             }
-            return Some(make_lang_hover("this".to_owned(), token_range));
+            return Some(make_lang_hover(
+                varn_core::TokenKind::This.as_str().to_owned(),
+                token_range,
+            ));
         }
 
         let prev_is_at = idx

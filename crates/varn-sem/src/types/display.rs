@@ -52,7 +52,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 varn_core::TypeLiteral::Bool(v) => write!(f, "{v}"),
                 varn_core::TypeLiteral::Char(v) => write!(f, "{v:?}"),
             },
-            TypeKind::This => write!(f, "this"),
+            TypeKind::This => f.write_str(varn_core::TokenKind::This.as_str()),
             TypeKind::Array(t) => match table.get(t) {
                 TypeKind::Union(_)
                 | TypeKind::Intersection(_)

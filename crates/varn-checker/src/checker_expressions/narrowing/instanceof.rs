@@ -37,7 +37,11 @@ impl<'r> Checker<'r> {
                         origin,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
-                    if bind.interner.get("_") == Some(name) {
+                    if bind
+                        .interner
+                        .get(varn_core::TokenKind::Placeholder.as_str())
+                        == Some(name)
+                    {
                         out.push((id, narrowed));
                     }
                 }

@@ -224,7 +224,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
             Kind::StaticMethod => quote!(cls.add_static(#sym, #native);),
             Kind::StaticGetter => quote!(cls.add_static_getter(#sym, #native);),
             Kind::Constructor => {
-                quote!(cls.add_method("constructor", ctx.alloc_fn(#wrap_ident::<#self_ty>, "constructor"));)
+                quote!(cls.add_method(::varn_core::TokenKind::Constructor.as_str(), ctx.alloc_fn(#wrap_ident::<#self_ty>, ::varn_core::TokenKind::Constructor.as_str()));)
             }
             Kind::Function | Kind::Property => unreachable!(),
         };

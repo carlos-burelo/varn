@@ -114,7 +114,9 @@ impl<'a> SymbolView<'a> {
                 .map(|p| {
                     format!(
                         "{}: {}{}",
-                        p.name.as_deref().unwrap_or("_"),
+                        p.name
+                            .as_deref()
+                            .unwrap_or(varn_core::TokenKind::Placeholder.as_str()),
                         self.db.ty_text(&Type::resolved(p.ty)),
                         if p.optional { "?" } else { "" }
                     )

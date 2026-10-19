@@ -93,7 +93,7 @@ pub(super) fn extension_method_type(
     let params: Vec<varn_sem::types::FunctionParam> = ft
         .params
         .iter()
-        .skip_while(|p| p.name.as_deref() == Some("this"))
+        .skip_while(|p| p.name.as_deref() == Some(varn_core::TokenKind::This.as_str()))
         .cloned()
         .collect();
 

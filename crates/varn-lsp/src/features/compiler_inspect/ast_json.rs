@@ -189,7 +189,7 @@ impl AstJson<'_> {
                             body.iter().map(|&b| self.stmt(b)).collect(),
                         )),
                         ClassMember::Constructor { range, body, .. } => Some(node(
-                            "constructor".to_string(),
+                            varn_core::TokenKind::Constructor.as_str().to_string(),
                             "method",
                             range.start.line,
                             vec![self.stmt(*body)],

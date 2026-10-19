@@ -146,7 +146,7 @@ pub(super) fn emit_enum(
                     out,
                 );
                 def.methods.push(varn_tir::TirClassMember {
-                    key: Arc::from("constructor"),
+                    key: Arc::from(varn_core::TokenKind::Constructor.as_str()),
                     func: id,
                     is_static: false,
                     is_private: false,

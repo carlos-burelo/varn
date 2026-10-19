@@ -173,7 +173,7 @@ impl ExecCtx {
             "false",
             "toString",
             "valueOf",
-            "constructor",
+            varn_core::TokenKind::Constructor.as_str(),
         ];
         for s in COMMON_STRINGS {
             self.heap.alloc_str_interned(s);

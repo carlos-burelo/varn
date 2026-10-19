@@ -3,7 +3,7 @@ use std::sync::Arc;
 use varn_core::ast::ExprId;
 use varn_tir::{BackendTy, DynReason, Resolution, SigId, Span, TirArg, TirExpr, TirExprKind};
 
-const CONSTRUCTOR: &str = "constructor";
+const CONSTRUCTOR: &str = varn_core::TokenKind::Constructor.as_str();
 
 pub(super) enum Callee {
     Value(TirExpr),

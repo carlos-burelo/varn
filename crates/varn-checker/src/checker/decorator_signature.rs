@@ -34,7 +34,7 @@ impl DecoratorTarget {
             DecoratorTarget::Class => "class",
             DecoratorTarget::Getter => "getter",
             DecoratorTarget::Setter => "setter",
-            DecoratorTarget::Constructor => "constructor",
+            DecoratorTarget::Constructor => varn_core::TokenKind::Constructor.as_str(),
             DecoratorTarget::Property => "property",
         }
     }

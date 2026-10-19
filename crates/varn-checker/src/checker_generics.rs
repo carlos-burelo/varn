@@ -248,7 +248,7 @@ fn infer_arrow_with_context(
         checker.current_scope = scope_id;
         for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
             let name = pattern_lead_name(&ap.pattern, &bind.interner);
-            if !name.is_empty() && name != "_" {
+            if !name.is_empty() && name != varn_core::TokenKind::Placeholder.as_str() {
                 let scope = bind.scopes.get(scope_id);
                 if let Some(sym_id) = bind
                     .interner
@@ -296,7 +296,7 @@ pub(crate) fn find_arrow_scope(
     let param_names: Vec<&str> = params
         .iter()
         .map(|p| pattern_lead_name(&p.pattern, &bind.interner))
-        .filter(|name| !name.is_empty() && *name != "_")
+        .filter(|name| !name.is_empty() && *name != varn_core::TokenKind::Placeholder.as_str())
         .collect();
 
     if param_names.is_empty() {

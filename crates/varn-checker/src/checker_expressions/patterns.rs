@@ -20,7 +20,7 @@ impl<'r> Checker<'r> {
         use varn_core::ast::Pattern;
         match pattern {
             Pattern::Identifier { name, range, .. } => {
-                if bind.interner.resolve(*name) == "_" {
+                if bind.interner.resolve(*name) == varn_core::TokenKind::Placeholder.as_str() {
                     return;
                 }
                 let scope = bind.scopes.get(self.current_scope);
@@ -120,7 +120,7 @@ impl<'r> Checker<'r> {
         use varn_core::ast::MatchPattern;
         match pattern {
             MatchPattern::Identifier(name) => {
-                if bind.interner.resolve(*name) == "_" {
+                if bind.interner.resolve(*name) == varn_core::TokenKind::Placeholder.as_str() {
                     return;
                 }
                 let scope = bind.scopes.get(self.current_scope);
@@ -153,7 +153,9 @@ impl<'r> Checker<'r> {
                     );
                 }
                 for (i, binding) in bindings.iter().enumerate() {
-                    if bind.interner.resolve(binding.name) == "_" {
+                    if bind.interner.resolve(binding.name)
+                        == varn_core::TokenKind::Placeholder.as_str()
+                    {
                         continue;
                     }
                     if let Some((_, field_ty)) = fields.get(i) {
@@ -185,7 +187,9 @@ impl<'r> Checker<'r> {
                         .unwrap_or(Type::Dynamic);
                     if let Some(sub) = sub_pat {
                         self.check_pattern_match(rec, sub, &member_ty, bind);
-                    } else if key_str != "_" && key_str != varn_core::MemberKey::Variant.as_str() {
+                    } else if key_str != varn_core::TokenKind::Placeholder.as_str()
+                        && key_str != varn_core::MemberKey::Variant.as_str()
+                    {
                         let scope = bind.scopes.get(self.current_scope);
                         if let Some(id) = scope.resolve(*key, &bind.scopes) {
                             self.record_type_with_symbol(rec, 0, member_ty, id);

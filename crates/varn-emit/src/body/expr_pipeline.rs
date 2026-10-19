@@ -18,7 +18,7 @@ impl<'a> FnEmitter<'a> {
                 matches!(
                     a,
                     Arg::Positional(e) | Arg::Named { value: e, .. }
-                        if matches!(&self.ast_arena.expr(*e).kind, ExprKind::Identifier { name } if interner.resolve(*name) == "_")
+                        if matches!(&self.ast_arena.expr(*e).kind, ExprKind::Identifier { name } if interner.resolve(*name) == varn_core::TokenKind::Placeholder.as_str())
                 )
             });
             if has_placeholder {
@@ -30,7 +30,7 @@ impl<'a> FnEmitter<'a> {
                     .map(|a| match a {
                         Arg::Positional(e)
                         | Arg::Named { value: e, .. }
-                            if matches!(&self.ast_arena.expr(*e).kind, ExprKind::Identifier { name } if interner.resolve(*name) == "_") =>
+                            if matches!(&self.ast_arena.expr(*e).kind, ExprKind::Identifier { name } if interner.resolve(*name) == varn_core::TokenKind::Placeholder.as_str()) =>
                         {
                             TirArg::Expr(piped.clone())
                         }

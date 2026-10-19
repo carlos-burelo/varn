@@ -17,7 +17,9 @@ pub(super) fn collect_extension_members(
 
     let strip_this = |ft: &varn_sem::types::FunctionType| {
         let mut params = ft.params.clone();
-        if params.first().and_then(|p| p.name.as_deref()) == Some("this") {
+        if params.first().and_then(|p| p.name.as_deref())
+            == Some(varn_core::TokenKind::This.as_str())
+        {
             params.remove(0);
         }
         varn_sem::types::FunctionType {

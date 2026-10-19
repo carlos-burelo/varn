@@ -19,7 +19,7 @@ impl<'r> Checker<'r> {
             ExprKind::Identifier { name } => {
                 let name_str = bind.interner.resolve(*name);
 
-                if name_str == "_" && self.in_pipeline_rhs {
+                if name_str == varn_core::TokenKind::Placeholder.as_str() && self.in_pipeline_rhs {
                     return self.pipeline_value_type.unwrap_or(Type::Dynamic);
                 }
                 let scope = bind.scopes.get(self.current_scope);

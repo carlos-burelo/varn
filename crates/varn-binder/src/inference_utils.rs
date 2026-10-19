@@ -93,7 +93,7 @@ pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>
     match p {
         Pattern::Identifier { name, .. } => match interner {
             Some(i) => Arc::from(i.resolve(*name)),
-            None => Arc::from("_"),
+            None => Arc::from(varn_core::TokenKind::Placeholder.as_str()),
         },
         Pattern::Array { elements, rest, .. } => {
             let mut s = "[".to_owned();
@@ -125,7 +125,7 @@ pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>
                 }
                 let key_str = match interner {
                     Some(intr) => intr.resolve(p.key).to_owned(),
-                    None => "_".to_owned(),
+                    None => varn_core::TokenKind::Placeholder.as_str().to_owned(),
                 };
                 if p.shorthand {
                     s.push_str(&key_str);

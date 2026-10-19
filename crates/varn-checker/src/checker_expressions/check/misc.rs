@@ -118,7 +118,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         let name_str = bind.interner.resolve(name);
-        if name_str == "_" {
+        if name_str == varn_core::TokenKind::Placeholder.as_str() {
             if !self.is_assignment_target && !self.in_pipeline_rhs {
                 self.emit(
                     Diagnostic::error(

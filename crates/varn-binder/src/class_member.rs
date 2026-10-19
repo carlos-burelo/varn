@@ -51,7 +51,7 @@ impl<'r> Binder<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
 
-                let ctor_atom = self.intern_local("constructor");
+                let ctor_atom = self.intern_local(varn_core::TokenKind::Constructor.as_str());
                 let mut sym =
                     Symbol::new(SymbolKind::Method, ctor_atom, range.start.line).with_type(fn_ty);
                 sym.col = range.start.column;
@@ -61,7 +61,7 @@ impl<'r> Binder<'r> {
                 crate::decorator_attrs::record_decorators(self, symbol_id, decorators);
 
                 members.push(ClassMemberInfo {
-                    name: Arc::from("constructor"),
+                    name: Arc::from(varn_core::TokenKind::Constructor.as_str()),
                     kind: ClassMemberKind::Constructor,
                     is_async: false,
                     is_generator: false,

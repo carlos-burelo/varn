@@ -28,7 +28,8 @@ pub(super) fn super_call(
     args: &[u32],
 ) -> Result<Option<Option<Out>>, String> {
     frame(ctx)?;
-    let ctor = super::super::classops::emit_get_super(b, ctx, "constructor")?;
+    let ctor =
+        super::super::classops::emit_get_super(b, ctx, varn_core::TokenKind::Constructor.as_str())?;
     let r = emit_super_call(b, ctx, values, ctor, args)?;
     Ok(Some(Some(Out::Boxed(r))))
 }

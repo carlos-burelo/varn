@@ -21,7 +21,9 @@ pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
             s.advance();
             let full_range = s.span_from(range);
             Ok(Pattern::Identifier {
-                name: s.interner.intern("_"),
+                name: s
+                    .interner
+                    .intern(varn_core::TokenKind::Placeholder.as_str()),
                 range: full_range,
             })
         }

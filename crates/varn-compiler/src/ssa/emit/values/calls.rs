@@ -94,7 +94,7 @@ pub(super) fn emit_super_call(
     call_base: u8,
     line: u32,
 ) {
-    let ctor_idx = chunk.add_str("constructor");
+    let ctor_idx = chunk.add_str(varn_core::TokenKind::Constructor.as_str());
     chunk.emit_rc(OpCode::GetSuper, call_base, ctor_idx, line);
     chunk.emit_rr(OpCode::Move, call_base + 1, 0, line);
     for (i, a) in args.iter().enumerate() {

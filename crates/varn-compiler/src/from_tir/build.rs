@@ -165,7 +165,7 @@ impl<'m> Builder<'m> {
             {
                 let ctor = self.emit(
                     InstKind::GetSuper {
-                        name: Arc::from("constructor"),
+                        name: Arc::from(varn_core::TokenKind::Constructor.as_str()),
                     },
                     HirType::Ref,
                 );
