@@ -65,9 +65,11 @@ fn interface_fields(
             )),
             InterfaceMember::Method { .. }
             | InterfaceMember::Index { .. }
-            | InterfaceMember::Callable { .. } => return Err(format!(
+            | InterfaceMember::Callable { .. } => {
+                return Err(format!(
                 "interface `{name}` declares a non-field member; a native record holds fields only"
-            )),
+            ))
+            }
         }
     }
     Ok(fields)
