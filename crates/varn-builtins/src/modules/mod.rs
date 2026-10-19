@@ -18,7 +18,7 @@ native_modules! {
     csv = "runtime/csv/csv.rs" => [csv::NATIVE_ENTRIES];
     errors = "core/errors/errors.rs" => [errors::NATIVE_ENTRIES];
     ffi = "runtime/ffi/ffi.rs" => [ffi::NATIVE_ENTRIES];
-    fs = "runtime/fs/fs.rs" => [fs::NATIVE_ENTRIES];
+    fs = "runtime/fs/fs.rs" => [fs::NATIVE_ENTRIES, fs::FILEMODE_ENTRIES, fs::SEEKORIGIN_ENTRIES];
     globals = "core/globals/globals.rs" => [globals::NATIVE_ENTRIES];
     gpu = "runtime/gpu/gpu.rs" => [gpu::NATIVE_ENTRIES];
     io = "runtime/io/io.rs" => [io::NATIVE_ENTRIES];

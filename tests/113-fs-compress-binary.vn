@@ -1,4 +1,4 @@
-import { File, readBytes, writeBytes, remove, FileStream } from "std:fs";
+import { File, readBytes, writeBytes, remove, FileStream, FileMode } from "std:fs";
 import { Compress } from "std:compress";
 import { Stream } from "std:io";
 import { describe, it, expect } from "std:test";
@@ -66,8 +66,8 @@ for (let i = 0; i < 1024; i = i + 1) {
 payload.setByte(i, i & 0xFF);
 }
 writeBytes(srcPath, payload);
-let srcStream = new FileStream(srcPath, "r");
-let dstStream = new FileStream(dstPath, "w");
+let srcStream = new FileStream(srcPath, FileMode.Read);
+let dstStream = new FileStream(dstPath, FileMode.Write);
 let piped = await Stream.pipe(srcStream, dstStream);
 expect(piped).toBe(1024);
 srcStream.close();

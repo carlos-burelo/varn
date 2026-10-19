@@ -1,5 +1,5 @@
 import { describe, it, expect, summary } from "std:test";
-import { writeText, readText, appendText, exists, stat, mkdirAll, readDir, remove, removeAll, rename, copy, readLines, glob, tempDir, File } from "std:fs";
+import { writeText, readText, appendText, exists, stat, mkdirAll, readDir, remove, removeAll, rename, copy, readLines, glob, tempDir, File, FileMode } from "std:fs";
 import { join } from "std:path";
 
 function clean(path: str): void {
@@ -60,7 +60,7 @@ await describe("example std:fs", async () => {
         let lines = readLines(file);
         expect(lines.length).toBe(3);
         expect(lines[1]).toBe("two");
-        let handle = new File(file, "r");
+        let handle = new File(file, FileMode.Read);
         expect(handle.readAll()).toBe("one\ntwo\nthree\n");
         handle.close();
         clean(base);

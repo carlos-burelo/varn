@@ -42,27 +42,38 @@ varn_macros::varn_record! {
     struct RawStats;
 }
 
+varn_macros::varn_enum! {
+    module: MODULE_ID,
+    contract: "src/modules/runtime/fs/fs_runtime.vn",
+    pub enum FileMode;
+}
+
+varn_macros::varn_enum! {
+    module: MODULE_ID,
+    contract: "src/modules/runtime/fs/fs_runtime.vn",
+    pub enum SeekOrigin;
+}
+
 varn_contract! {
     module: "runtime:fs",
     contract: "src/modules/runtime/fs/fs_runtime.vn",
     impl FsRuntime {
-        fn open(ctx: &mut dyn NativeCtx, path: &str, mode: &str) -> Result<i64, String> {
+        fn open(ctx: &mut dyn NativeCtx, path: &str, mode: VmValue) -> Result<i64, String> {
             use std::fs::OpenOptions;
-            if mode == "r" {
-                if !ctx.check_fs_read(path) {
-                    return Err(denied("fs.read", path));
-                }
-            } else {
-                if !ctx.check_fs_write(path) {
-                    return Err(denied("fs.write", path));
-                }
+            let mode = FileMode::from_value(ctx, mode)
+                .ok_or_else(|| coded("E_FS_BAD_ARG", "expected a FileMode"))?;
+            let (allowed, capability) = match mode {
+                FileMode::Read => (ctx.check_fs_read(path), "fs.read"),
+                FileMode::Write | FileMode::Append => (ctx.check_fs_write(path), "fs.write"),
+            };
+            if !allowed {
+                return Err(denied(capability, path));
             }
 
             let file = match mode {
-                "r" => OpenOptions::new().read(true).open(path),
-                "w" => OpenOptions::new().write(true).create(true).truncate(true).open(path),
-                "a" => OpenOptions::new().create(true).append(true).open(path),
-                _ => OpenOptions::new().read(true).open(path),
+                FileMode::Read => OpenOptions::new().read(true).open(path),
+                FileMode::Write => OpenOptions::new().write(true).create(true).truncate(true).open(path),
+                FileMode::Append => OpenOptions::new().create(true).append(true).open(path),
             }.map_err(fs_io_err)?;
 
             let fd = NEXT_FD.fetch_add(1, Ordering::Relaxed);
@@ -139,7 +150,9 @@ varn_contract! {
             fs::write(path, bytes).map_err(fs_io_err)
         }
 
-        fn seek(_ctx: &mut dyn NativeCtx, fd: i64, offset: i64, whence: i64) -> Result<i64, String> {
+        fn seek(ctx: &mut dyn NativeCtx, fd: i64, offset: i64, origin: VmValue) -> Result<i64, String> {
+            let origin = SeekOrigin::from_value(ctx, origin)
+                .ok_or_else(|| coded("E_FS_BAD_ARG", "expected a SeekOrigin"))?;
             let file_arc = {
                 let map = FILES.read().unwrap_or_else(|e| e.into_inner());
                 map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
@@ -147,11 +160,10 @@ varn_contract! {
             let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
 
             use std::io::{Seek, SeekFrom};
-            let seek_from = match whence {
-                0 => SeekFrom::Start(offset as u64),
-                1 => SeekFrom::Current(offset),
-                2 => SeekFrom::End(offset),
-                _ => return Err(coded("E_FS_BAD_ARG", format!("invalid seek whence {whence}"))),
+            let seek_from = match origin {
+                SeekOrigin::Start => SeekFrom::Start(offset as u64),
+                SeekOrigin::Current => SeekFrom::Current(offset),
+                SeekOrigin::End => SeekFrom::End(offset),
             };
             let pos = file.seek(seek_from).map_err(fs_io_err)?;
             Ok(pos as i64)

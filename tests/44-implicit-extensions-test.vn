@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { File, exists as fsExists, remove as fsRemove } from "std:fs";
+import { File, exists as fsExists, remove as fsRemove, FileMode } from "std:fs";
 import { Reader, Writer } from "std:io";
 
 
@@ -9,7 +9,7 @@ function runTest(): void {
 
     // 1. Escribir a un archivo usando el Stream Writer
     {
-        using file = File.open(testFile, "w");
+        using file = File.open(testFile, FileMode.Write);
         file.write("Maestría de Greenfield en Varn!");
     }
 
@@ -19,7 +19,7 @@ function runTest(): void {
     // 2. Leer del archivo usando el método de extensión implícito .readAll()
     let content = "";
     {
-        using file: Reader = File.open(testFile, "r");
+        using file: Reader = File.open(testFile, FileMode.Read);
         // .readAll() es un método de extensión en std:io sobre Reader.
         // ¡Se autopropaga y funciona sin imports manuales de extensiones!
         content = file.readAll();
@@ -28,8 +28,8 @@ function runTest(): void {
 
     // 3. Copiar archivo usando el método de extensión implícito .pipeTo()
     {
-        using src: Reader = File.open(testFile, "r");
-        using dst: Writer = File.open(backupFile, "w");
+        using src: Reader = File.open(testFile, FileMode.Read);
+        using dst: Writer = File.open(backupFile, FileMode.Write);
         // .pipeTo() es otro método de extensión en std:io sobre Reader.
         src.pipeTo(dst);
     }
@@ -37,7 +37,7 @@ function runTest(): void {
     // Verificar que el backup contiene lo mismo
     let backupContent = "";
     {
-        using file: Reader = File.open(backupFile, "r");
+        using file: Reader = File.open(backupFile, FileMode.Read);
         backupContent = file.readAll();
     }
     expect(backupContent).toBe("Maestría de Greenfield en Varn!");

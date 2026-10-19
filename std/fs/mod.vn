@@ -1,6 +1,7 @@
 
 export { Stats } from "std:fs/stats";
 export { File, FileStream } from "std:fs/file";
+export { FileMode, SeekOrigin } from "runtime:fs";
 export { glob } from "std:fs/glob";
 export {
     readText,

@@ -1,6 +1,6 @@
 import { describe, it, expect, summary } from "std:test";
 import { writeln, Stream } from "std:io";
-import { FileStream } from "std:fs";
+import { FileStream, FileMode } from "std:fs";
 import { join } from "std:path";
 import { tempDir } from "std:fs";
 import { mkdirAll, removeAll, readText, exists } from "std:fs";
@@ -21,11 +21,11 @@ await describe("example std:io", async () => {
         let base = join(tempDir(), "ex-io");
         clean(base);
         mkdirAll(base);
-        let src = new FileStream(join(base, "in.bin"), "w");
+        let src = new FileStream(join(base, "in.bin"), FileMode.Write);
         await src.write(Bytes.fromString("stream-payload"));
         src.close();
-        let reader = new FileStream(join(base, "in.bin"), "r");
-        let writer = new FileStream(join(base, "out.bin"), "w");
+        let reader = new FileStream(join(base, "in.bin"), FileMode.Read);
+        let writer = new FileStream(join(base, "out.bin"), FileMode.Write);
         let bytes = await Stream.pipe(reader, writer, 8192);
         expect(bytes).toBe(14);
         reader.close();

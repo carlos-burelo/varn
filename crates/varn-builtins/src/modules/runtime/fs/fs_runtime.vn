@@ -1,3 +1,15 @@
+export declare enum FileMode {
+    Read,
+    Write,
+    Append
+}
+
+export declare enum SeekOrigin {
+    Start,
+    Current,
+    End
+}
+
 export interface RawStats {
     size: int;
     isDir: bool;
@@ -5,7 +17,7 @@ export interface RawStats {
     mtime: int;
 }
 
-export declare function open$(path: str, mode: str): int;
+export declare function open$(path: str, mode: FileMode): int;
 export declare function readFd$(fd: int, len: int): str;
 export declare function readFdBytes$(fd: int, len: int): Bytes;
 export declare function writeFd$(fd: int, data: str): int;
@@ -19,7 +31,7 @@ export declare function copyFile$(from: str, to: str): void;
 export declare function readLines$(path: str): str[];
 export declare function readFdAll$(fd: int): str;
 export declare function readFdAllBytes$(fd: int): Bytes;
-export declare function seek$(fd: int, offset: int, whence: int): int;
+export declare function seek$(fd: int, offset: int, origin: SeekOrigin): int;
 export declare function close$(fd: int): void;
 export declare function exists$(path: str): bool;
 export declare function stat$(path: str): RawStats;

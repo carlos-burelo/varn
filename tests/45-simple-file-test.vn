@@ -1,16 +1,16 @@
 import { describe, it, expect } from "std:test";
-import { File, tempDir, remove } from "std:fs";
+import { File, tempDir, remove, FileMode } from "std:fs";
 import { join } from "std:path";
 
 await describe("45 simple file test", async () => {
     await it("tests", async () => {
         let path = join(tempDir(), "varn-45-simple-file.txt");
         {
-            using file = File.open(path, "w");
+            using file = File.open(path, FileMode.Write);
             file.write("Hello simple using!");
         }
         {
-            using file = File.open(path, "r");
+            using file = File.open(path, FileMode.Read);
             let contenido = file.readAll();
             expect(contenido).toBe("Hello simple using!");
         }

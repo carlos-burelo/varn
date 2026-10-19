@@ -7,7 +7,9 @@ import {
     writeFd$,
     writeFdBytes$,
     seek$,
-    close$
+    close$,
+    FileMode,
+    SeekOrigin
 } from "runtime:fs";
 
 import { Writer, AsyncReader, AsyncWriter, BulkPump } from "std:io";
@@ -16,9 +18,9 @@ import { toStdError, E_FS_IO } from "std:error";
 export class File {
     private _fd: int = -1;
     private _path: str;
-    private _mode: str;
+    private _mode: FileMode;
 
-    constructor(path: str, mode: str = "r") {
+    constructor(path: str, mode: FileMode = FileMode.Read) {
         this._path = path;
         this._mode = mode;
         try {
@@ -28,7 +30,7 @@ export class File {
         }
     }
 
-    static open(path: str, mode: str): File {
+    static open(path: str, mode: FileMode): File {
         return new File(path, mode);
     }
 
@@ -50,7 +52,7 @@ export class File {
 
     append(content: str): int {
         try {
-            let fd = open$(this._path, "a");
+            let fd = open$(this._path, FileMode.Append);
             let written = writeFd$(fd, content);
             close$(fd);
             return written;
@@ -61,7 +63,7 @@ export class File {
 
     appendBytes(data: Bytes): int {
         try {
-            let fd = open$(this._path, "a");
+            let fd = open$(this._path, FileMode.Append);
             let written = writeFdBytes$(fd, data);
             close$(fd);
             return written;
@@ -104,9 +106,9 @@ export class File {
         }
     }
 
-    seek(offset: int, whence: int): int {
+    seek(offset: int, origin: SeekOrigin): int {
         try {
-            return seek$(this._fd, offset, whence);
+            return seek$(this._fd, offset, origin);
         } catch (e) {
             throw toStdError(e as Error, E_FS_IO);
         }
@@ -140,9 +142,9 @@ export class File {
 export class FileStream implements AsyncReader, AsyncWriter, BulkPump {
     private _fd: int = -1;
     private _path: str;
-    private _mode: str;
+    private _mode: FileMode;
 
-    constructor(path: str, mode: str = "r") {
+    constructor(path: str, mode: FileMode = FileMode.Read) {
         this._path = path;
         this._mode = mode;
         try {
@@ -152,7 +154,7 @@ export class FileStream implements AsyncReader, AsyncWriter, BulkPump {
         }
     }
 
-    static open(path: str, mode: str): FileStream {
+    static open(path: str, mode: FileMode): FileStream {
         return new FileStream(path, mode);
     }
 
