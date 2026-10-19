@@ -159,19 +159,6 @@ fn find_lld_link() -> Option<PathBuf> {
 }
 
 fn find_varn_rt_lib() -> Result<PathBuf, CliError> {
-    let candidates = [
-        PathBuf::from("target/debug/varn_rt.lib"),
-        PathBuf::from("target/release/varn_rt.lib"),
-        PathBuf::from("../target/debug/varn_rt.lib"),
-        PathBuf::from("../target/release/varn_rt.lib"),
-    ];
-
-    for c in &candidates {
-        if c.exists() {
-            return Ok(c.canonicalize().unwrap_or_else(|_| c.clone()));
-        }
-    }
-
     if let Ok(exe) = std::env::current_exe()
         && let Some(dir) = exe.parent()
     {
