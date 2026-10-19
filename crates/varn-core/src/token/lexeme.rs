@@ -2,7 +2,7 @@ use super::kind::TokenKind;
 use crate::source::SourceRange;
 
 impl TokenKind {
-    pub fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             TokenKind::EOF => "",
             TokenKind::Identifier => "identifier",
@@ -66,71 +66,76 @@ impl TokenKind {
             TokenKind::GtEq => ">=",
             TokenKind::Arrow => "->",
             TokenKind::FatArrow => "=>",
-            TokenKind::Let => "let",
-            TokenKind::Const => "const",
-            TokenKind::Var => "var",
-            TokenKind::Function => "function",
-            TokenKind::Class => "class",
-            TokenKind::Struct => "struct",
-            TokenKind::Interface => "interface",
-            TokenKind::Type => "type",
-            TokenKind::Enum => "enum",
-            TokenKind::Namespace => "namespace",
-            TokenKind::Module => "module",
-            TokenKind::Extension => "extension",
-            TokenKind::If => "if",
-            TokenKind::Else => "else",
-            TokenKind::Switch => "switch",
-            TokenKind::Case => "case",
-            TokenKind::Default => "default",
-            TokenKind::While => "while",
-            TokenKind::For => "for",
-            TokenKind::Do => "do",
-            TokenKind::Break => "break",
-            TokenKind::Continue => "continue",
-            TokenKind::Return => "return",
-            TokenKind::Throw => "throw",
-            TokenKind::Try => "try",
-            TokenKind::Catch => "catch",
-            TokenKind::Finally => "finally",
-            TokenKind::Using => "using",
-            TokenKind::With => "with",
-            TokenKind::Import => "import",
-            TokenKind::Export => "export",
-            TokenKind::From => "from",
-            TokenKind::As => "as",
-            TokenKind::Async => "async",
-            TokenKind::Await => "await",
-            TokenKind::Yield => "yield",
-            TokenKind::New => "new",
-            TokenKind::This => "this",
-            TokenKind::Super => "super",
-            TokenKind::Delete => "delete",
-            TokenKind::Typeof => "typeof",
-            TokenKind::Instanceof => "instanceof",
-            TokenKind::In => "in",
-            TokenKind::Of => "of",
-            TokenKind::Void => "void",
-            TokenKind::Is => "is",
-            TokenKind::True => "true",
-            TokenKind::False => "false",
-            TokenKind::Null => "null",
-            TokenKind::Public => "public",
-            TokenKind::Private => "private",
-            TokenKind::Protected => "protected",
-            TokenKind::Static => "static",
-            TokenKind::Abstract => "abstract",
-            TokenKind::Override => "override",
-            TokenKind::Readonly => "readonly",
-            TokenKind::Declare => "declare",
-            TokenKind::Native => "native",
-            TokenKind::Extends => "extends",
-            TokenKind::Implements => "implements",
-            TokenKind::Get => "get",
-            TokenKind::Set => "set",
-            TokenKind::Constructor => "constructor",
-            TokenKind::Destructor => "destructor",
-            TokenKind::Match => "match",
+            TokenKind::Let
+            | TokenKind::Const
+            | TokenKind::Var
+            | TokenKind::Function
+            | TokenKind::Class
+            | TokenKind::Struct
+            | TokenKind::Interface
+            | TokenKind::Type
+            | TokenKind::Enum
+            | TokenKind::Namespace
+            | TokenKind::Module
+            | TokenKind::Extension
+            | TokenKind::On
+            | TokenKind::If
+            | TokenKind::Else
+            | TokenKind::Switch
+            | TokenKind::Case
+            | TokenKind::Default
+            | TokenKind::While
+            | TokenKind::For
+            | TokenKind::Do
+            | TokenKind::Break
+            | TokenKind::Continue
+            | TokenKind::Return
+            | TokenKind::Throw
+            | TokenKind::Try
+            | TokenKind::Catch
+            | TokenKind::Finally
+            | TokenKind::Using
+            | TokenKind::With
+            | TokenKind::Import
+            | TokenKind::Export
+            | TokenKind::From
+            | TokenKind::As
+            | TokenKind::Async
+            | TokenKind::Await
+            | TokenKind::Yield
+            | TokenKind::New
+            | TokenKind::This
+            | TokenKind::Super
+            | TokenKind::Delete
+            | TokenKind::Typeof
+            | TokenKind::Instanceof
+            | TokenKind::In
+            | TokenKind::Of
+            | TokenKind::Void
+            | TokenKind::Is
+            | TokenKind::True
+            | TokenKind::False
+            | TokenKind::Null
+            | TokenKind::Public
+            | TokenKind::Private
+            | TokenKind::Protected
+            | TokenKind::Static
+            | TokenKind::Abstract
+            | TokenKind::Override
+            | TokenKind::Readonly
+            | TokenKind::Declare
+            | TokenKind::Native
+            | TokenKind::Extends
+            | TokenKind::Implements
+            | TokenKind::Get
+            | TokenKind::Set
+            | TokenKind::Constructor
+            | TokenKind::Destructor
+            | TokenKind::Match
+            | TokenKind::Placeholder => match self.keyword_text() {
+                Some(text) => text,
+                None => crate::UNKNOWN,
+            },
             TokenKind::At => "@",
             TokenKind::RawStr => "string",
             TokenKind::Dynamic
@@ -153,7 +158,6 @@ impl TokenKind {
             | TokenKind::GtGtEq
             | TokenKind::GtGtGt
             | TokenKind::GtGtGtEq
-            | TokenKind::On
             | TokenKind::Hash
             | TokenKind::Backslash
             | TokenKind::Dollar
@@ -161,7 +165,6 @@ impl TokenKind {
             | TokenKind::Newline
             | TokenKind::Whitespace
             | TokenKind::DocComment
-            | TokenKind::Placeholder
             | TokenKind::Spawn
             | TokenKind::Parallel
             | TokenKind::Start => crate::UNKNOWN,
