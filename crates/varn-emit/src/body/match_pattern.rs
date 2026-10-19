@@ -218,7 +218,11 @@ impl<'a> FnEmitter<'a> {
         let cond = TirExpr {
             kind: TirExprKind::Binary {
                 op: TirBinOp::Eq,
-                lhs: Box::new(field(s.clone(), "__variant_name__", BackendTy::Str)),
+                lhs: Box::new(field(
+                    s.clone(),
+                    varn_core::MemberKey::VariantName.as_str(),
+                    BackendTy::Str,
+                )),
                 rhs: Box::new(TirExpr {
                     kind: TirExprKind::StrLit(Arc::from(variant_name)),
                     ty: BackendTy::Str,

@@ -229,7 +229,7 @@ impl<'a> FnEmitter<'a> {
 
         let len = self.field_access(
             arr.clone(),
-            Arc::from("length"),
+            Arc::from(varn_core::MemberKey::Length.as_str()),
             BackendTy::Int,
             Span::EMPTY,
         );
@@ -356,11 +356,11 @@ impl<'a> FnEmitter<'a> {
         let mut next_call = TirExpr {
             kind: TirExprKind::MethodCall {
                 recv: Box::new(it_var()),
-                name: Arc::from("next"),
+                name: Arc::from(varn_core::MemberKey::IterNext.as_str()),
                 args: vec![],
             },
             ty: dyn_ty,
-            res: by_name("next"),
+            res: by_name(varn_core::MemberKey::IterNext.as_str()),
             span: Span::EMPTY,
         };
         if is_await {
@@ -380,12 +380,12 @@ impl<'a> FnEmitter<'a> {
                 init: Some(next_call),
             },
             TirStmt::If {
-                cond: field(step_var(), "done"),
+                cond: field(step_var(), varn_core::MemberKey::IterDone.as_str()),
                 then_body: vec![TirStmt::Break],
                 else_body: vec![],
             },
         ];
-        let value = field(step_var(), "value");
+        let value = field(step_var(), varn_core::MemberKey::IterValue.as_str());
         self.bind_pattern(left, value, &mut loop_body);
         loop_body.extend(self.lower_stmt_as_block(body));
 

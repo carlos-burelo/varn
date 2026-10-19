@@ -109,7 +109,7 @@ pub fn get_members_of_type(
             add_member(
                 &mut results,
                 &mut seen,
-                Arc::from("length"),
+                Arc::from(varn_core::MemberKey::Length.as_str()),
                 Type::Int,
                 varn_sem::semantic_info::ResolvedMemberKind::Property,
                 false,

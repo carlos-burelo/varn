@@ -122,7 +122,7 @@ pub fn root_shape() -> Rc<Shape> {
 }
 
 thread_local! {
-    static ITER_RESULT_SHAPE: Rc<Shape> = root_shape().transition_str("value").transition_str("done");
+    static ITER_RESULT_SHAPE: Rc<Shape> = root_shape().transition_str(varn_core::MemberKey::IterValue.as_str()).transition_str(varn_core::MemberKey::IterDone.as_str());
 }
 
 pub fn iter_result_shape() -> Rc<Shape> {

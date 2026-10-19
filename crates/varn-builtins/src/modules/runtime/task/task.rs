@@ -14,7 +14,7 @@ pub struct ChannelClosedImpl;
 fn reject_with_message(ctx: &mut dyn NativeCtx, message: &str) -> VmValue {
     let message_nv = ctx.alloc_str(message);
     let obj = ctx.alloc_object();
-    ctx.set_field(obj, "message", message_nv);
+    ctx.set_field(obj, varn_core::MemberKey::Message.as_str(), message_nv);
     ctx.task_rejected(obj)
 }
 

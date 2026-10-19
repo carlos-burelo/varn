@@ -144,6 +144,16 @@ fn enum_variant_property(
             | MemberKey::Substr
             | MemberKey::At
             | MemberKey::LastIndexOf
+            | MemberKey::Message
+            | MemberKey::Stack
+            | MemberKey::Kind
+            | MemberKey::IsStatic
+            | MemberKey::IsPrivate
+            | MemberKey::Inclusive
+            | MemberKey::IterArray
+            | MemberKey::IterIndex
+            | MemberKey::IterResult
+            | MemberKey::IterRange
             | MemberKey::CharCode,
         )
         | None => None,

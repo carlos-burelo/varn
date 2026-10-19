@@ -131,12 +131,12 @@ impl<'a> FnEmitter<'a> {
                 return TirExpr {
                     kind: TirExprKind::MethodCall {
                         recv: Box::new(obj),
-                        name: Arc::from("slice"),
+                        name: Arc::from(varn_core::MemberKey::Slice.as_str()),
                         args: vec![TirArg::Expr(s), TirArg::Expr(e)],
                     },
                     ty,
                     res: Resolution::ByName {
-                        name: Arc::from("slice"),
+                        name: Arc::from(varn_core::MemberKey::Slice.as_str()),
                         why: DynReason::NotYetSupported,
                     },
                     span,

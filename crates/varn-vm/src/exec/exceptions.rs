@@ -56,7 +56,7 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
         {
             let layout = cls.layout();
             let message = layout
-                .get_field("message")
+                .get_field(varn_core::MemberKey::Message.as_str())
                 .and_then(|f| inst.read_field(f))
                 .map(|nv| heap.str_repr(nv));
             return match message {
@@ -68,10 +68,10 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
         if let Some(HeapObj::Object(obj_ref)) = heap.get(val.as_heap()) {
             let obj = obj_ref.borrow();
 
-            if let Some(msg_nv) = obj.get_field("message") {
+            if let Some(msg_nv) = obj.get_field(varn_core::MemberKey::Message.as_str()) {
                 let msg = heap.str_repr(msg_nv);
 
-                if let Some(name_nv) = obj.get_field("name") {
+                if let Some(name_nv) = obj.get_field(varn_core::MemberKey::Name.as_str()) {
                     let name = heap.str_repr(name_nv);
                     if !name.is_empty()
                         && name != varn_core::RuntimeErrorKind::Error.class_name()
@@ -126,9 +126,18 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
     let (shape, n) = cls.instance_shape();
     let err_obj = heap.alloc_object_cell(false, shape, n, &[]);
     if let Some(HeapObj::Object(oref)) = heap.get(err_obj.as_heap()) {
-        oref.set_field(std::sync::Arc::from("message"), msg);
-        oref.set_field(std::sync::Arc::from("name"), name);
-        oref.set_field(std::sync::Arc::from("stack"), stack);
+        oref.set_field(
+            std::sync::Arc::from(varn_core::MemberKey::Message.as_str()),
+            msg,
+        );
+        oref.set_field(
+            std::sync::Arc::from(varn_core::MemberKey::Name.as_str()),
+            name,
+        );
+        oref.set_field(
+            std::sync::Arc::from(varn_core::MemberKey::Stack.as_str()),
+            stack,
+        );
     }
     err_obj
 }

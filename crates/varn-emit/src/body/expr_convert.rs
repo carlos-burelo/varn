@@ -12,7 +12,12 @@ impl<'a> FnEmitter<'a> {
     ) -> TirExpr {
         let inner = self.lower_expr(expression);
         if matches!(inner.ty, BackendTy::Enum(_)) && matches!(ty, BackendTy::Int) {
-            return self.field_access(inner, Arc::from("rawValue"), ty, span);
+            return self.field_access(
+                inner,
+                Arc::from(varn_core::MemberKey::RawValue.as_str()),
+                ty,
+                span,
+            );
         }
         self.assert_type(inner, ty)
     }

@@ -39,13 +39,19 @@ impl ExecCtx {
                 arr.push_vm(val);
                 self.heap.write_barrier(this_val.as_heap(), val);
                 self.record_ic_hit_callmethod();
-                self.record_call_native(|_, _| Ok(VmValue::null()), Some("push"));
+                self.record_call_native(
+                    |_, _| Ok(VmValue::null()),
+                    Some(varn_core::MemberKey::Push.as_str()),
+                );
                 return Some(VmValue::null());
             }
             if name == MemberKey::Pop.as_str() && arg_count == 0 {
                 let val = arr.pop_vm().unwrap_or(VmValue::null());
                 self.record_ic_hit_callmethod();
-                self.record_call_native(|_, _| Ok(VmValue::null()), Some("pop"));
+                self.record_call_native(
+                    |_, _| Ok(VmValue::null()),
+                    Some(varn_core::MemberKey::Pop.as_str()),
+                );
                 return Some(val);
             }
             return None;

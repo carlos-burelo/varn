@@ -23,10 +23,10 @@ impl<'m> Builder<'m> {
         let ctx = self.emit(
             InstKind::BuildObject {
                 pairs: vec![
-                    (Arc::from("name"), n),
-                    (Arc::from("kind"), k),
-                    (Arc::from("isStatic"), st),
-                    (Arc::from("isPrivate"), pv),
+                    (Arc::from(varn_core::MemberKey::Name.as_str()), n),
+                    (Arc::from(varn_core::MemberKey::Kind.as_str()), k),
+                    (Arc::from(varn_core::MemberKey::IsStatic.as_str()), st),
+                    (Arc::from(varn_core::MemberKey::IsPrivate.as_str()), pv),
                 ],
             },
             HirType::Ref,
@@ -141,10 +141,10 @@ impl<'m> Builder<'m> {
                 let ctx = self.emit(
                     InstKind::BuildObject {
                         pairs: vec![
-                            (Arc::from("name"), n),
-                            (Arc::from("kind"), k),
-                            (Arc::from("isStatic"), st),
-                            (Arc::from("isPrivate"), pv),
+                            (Arc::from(varn_core::MemberKey::Name.as_str()), n),
+                            (Arc::from(varn_core::MemberKey::Kind.as_str()), k),
+                            (Arc::from(varn_core::MemberKey::IsStatic.as_str()), st),
+                            (Arc::from(varn_core::MemberKey::IsPrivate.as_str()), pv),
                         ],
                     },
                     HirType::Ref,

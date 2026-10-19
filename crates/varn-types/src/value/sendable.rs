@@ -44,9 +44,9 @@ impl SendValue {
                 let message_nv = ctx.alloc_str(message);
                 match ctx.alloc_instance(class) {
                     Some(inst) => {
-                        ctx.set_field(inst, "message", message_nv);
+                        ctx.set_field(inst, varn_core::MemberKey::Message.as_str(), message_nv);
                         let name_nv = ctx.alloc_str(class);
-                        ctx.set_field(inst, "name", name_nv);
+                        ctx.set_field(inst, varn_core::MemberKey::Name.as_str(), name_nv);
                         inst
                     }
                     None => message_nv,

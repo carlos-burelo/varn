@@ -243,6 +243,16 @@ pub(crate) fn resolve_meta_property(
                 | MemberKey::Substr
                 | MemberKey::At
                 | MemberKey::LastIndexOf
+                | MemberKey::Message
+                | MemberKey::Stack
+                | MemberKey::Kind
+                | MemberKey::IsStatic
+                | MemberKey::IsPrivate
+                | MemberKey::Inclusive
+                | MemberKey::IterArray
+                | MemberKey::IterIndex
+                | MemberKey::IterResult
+                | MemberKey::IterRange
                 | MemberKey::CharCode => meta_has_own_native,
             };
             let receiver = match (&cls, is_instance, is_class) {
@@ -287,6 +297,16 @@ pub(crate) fn resolve_meta_property(
         | MemberKey::Substr
         | MemberKey::At
         | MemberKey::LastIndexOf
+        | MemberKey::Message
+        | MemberKey::Stack
+        | MemberKey::Kind
+        | MemberKey::IsStatic
+        | MemberKey::IsPrivate
+        | MemberKey::Inclusive
+        | MemberKey::IterArray
+        | MemberKey::IterIndex
+        | MemberKey::IterResult
+        | MemberKey::IterRange
         | MemberKey::CharCode => Ok(VmValue::null()),
     }
 }

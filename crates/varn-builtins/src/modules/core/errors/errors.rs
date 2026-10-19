@@ -7,11 +7,11 @@ fn init_error(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>, cla
         Some(m) => ctx.alloc_str(m),
         None => VmValue::null(),
     };
-    ctx.set_field(this, "message", msg);
+    ctx.set_field(this, varn_core::MemberKey::Message.as_str(), msg);
     let name = ctx.alloc_str(class_name);
-    ctx.set_field(this, "name", name);
+    ctx.set_field(this, varn_core::MemberKey::Name.as_str(), name);
     let stack = ctx.alloc_str("");
-    ctx.set_field(this, "stack", stack);
+    ctx.set_field(this, varn_core::MemberKey::Stack.as_str(), stack);
 }
 
 pub struct ErrorClass;
@@ -38,11 +38,11 @@ varn_contract! {
 
         fn toString(ctx: &mut dyn NativeCtx, this: VmValue) -> String {
             let name = ctx
-                .get_field(this, "name")
+                .get_field(this, varn_core::MemberKey::Name.as_str())
                 .and_then(|v| ctx.str_owned(v))
                 .unwrap_or_else(|| RuntimeErrorKind::Error.class_name().to_owned());
             let message = ctx
-                .get_field(this, "message")
+                .get_field(this, varn_core::MemberKey::Message.as_str())
                 .and_then(|v| ctx.str_owned(v))
                 .unwrap_or_default();
             if message.is_empty() {

@@ -148,12 +148,20 @@ fn snapshot(obj: VmValue, heap: &mut Heap) -> Option<Vec<VmValue>> {
 fn array_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
     let arr_nv = args.first().copied().unwrap_or(VmValue::null());
     let iter_nv = ctx.alloc_object();
-    ctx.set_field(iter_nv, "__arr", arr_nv);
-    ctx.set_field(iter_nv, "__idx", VmValue::from_int(0));
+    ctx.set_field(iter_nv, varn_core::MemberKey::IterArray.as_str(), arr_nv);
+    ctx.set_field(
+        iter_nv,
+        varn_core::MemberKey::IterIndex.as_str(),
+        VmValue::from_int(0),
+    );
     let res_nv = ctx.alloc_object();
-    ctx.set_field(iter_nv, "__res", res_nv);
-    let next_nv = ctx.alloc_bound_native(iter_nv, array_iter_next, "next");
-    ctx.set_field(iter_nv, "next", next_nv);
+    ctx.set_field(iter_nv, varn_core::MemberKey::IterResult.as_str(), res_nv);
+    let next_nv = ctx.alloc_bound_native(
+        iter_nv,
+        array_iter_next,
+        varn_core::MemberKey::IterNext.as_str(),
+    );
+    ctx.set_field(iter_nv, varn_core::MemberKey::IterNext.as_str(), next_nv);
     Ok(iter_nv)
 }
 
@@ -162,24 +170,41 @@ fn array_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::Nat
         .first()
         .copied()
         .ok_or("array_iter_next: missing receiver")?;
-    let arr_nv = ctx.get_field(obj_nv, "__arr").unwrap_or(VmValue::null());
-    let idx = ctx.as_int(ctx.get_field(obj_nv, "__idx").unwrap_or(VmValue::null()));
+    let arr_nv = ctx
+        .get_field(obj_nv, varn_core::MemberKey::IterArray.as_str())
+        .unwrap_or(VmValue::null());
+    let idx = ctx.as_int(
+        ctx.get_field(obj_nv, varn_core::MemberKey::IterIndex.as_str())
+            .unwrap_or(VmValue::null()),
+    );
     let arr_len = ctx.array_len(arr_nv);
     let result_nv = ctx
-        .get_field(obj_nv, "__res")
+        .get_field(obj_nv, varn_core::MemberKey::IterResult.as_str())
         .unwrap_or_else(|| ctx.alloc_object());
     if idx as usize >= arr_len {
-        ctx.set_field(result_nv, "value", VmValue::null());
-        ctx.set_field(result_nv, "done", VmValue::from_bool(true));
+        ctx.set_field(
+            result_nv,
+            varn_core::MemberKey::IterValue.as_str(),
+            VmValue::null(),
+        );
+        ctx.set_field(
+            result_nv,
+            varn_core::MemberKey::IterDone.as_str(),
+            VmValue::from_bool(true),
+        );
         return Ok(result_nv);
     }
     let item = ctx
         .array_get(arr_nv, idx as usize)
         .unwrap_or(VmValue::null());
     let idx_val = ctx.int_val(idx + 1);
-    ctx.set_field(obj_nv, "__idx", idx_val);
-    ctx.set_field(result_nv, "value", item);
-    ctx.set_field(result_nv, "done", VmValue::from_bool(false));
+    ctx.set_field(obj_nv, varn_core::MemberKey::IterIndex.as_str(), idx_val);
+    ctx.set_field(result_nv, varn_core::MemberKey::IterValue.as_str(), item);
+    ctx.set_field(
+        result_nv,
+        varn_core::MemberKey::IterDone.as_str(),
+        VmValue::from_bool(false),
+    );
     Ok(result_nv)
 }
 
@@ -192,12 +217,20 @@ fn range_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_type
         return Err("range_symbol_iterator: invalid receiver".into());
     }
     let iter_nv = ctx.alloc_object();
-    ctx.set_field(iter_nv, "__range", range_nv);
-    ctx.set_field(iter_nv, "__idx", VmValue::from_int(0));
+    ctx.set_field(iter_nv, varn_core::MemberKey::IterRange.as_str(), range_nv);
+    ctx.set_field(
+        iter_nv,
+        varn_core::MemberKey::IterIndex.as_str(),
+        VmValue::from_int(0),
+    );
     let res_nv = ctx.alloc_object();
-    ctx.set_field(iter_nv, "__res", res_nv);
-    let next_nv = ctx.alloc_bound_native(iter_nv, range_iter_next, "next");
-    ctx.set_field(iter_nv, "next", next_nv);
+    ctx.set_field(iter_nv, varn_core::MemberKey::IterResult.as_str(), res_nv);
+    let next_nv = ctx.alloc_bound_native(
+        iter_nv,
+        range_iter_next,
+        varn_core::MemberKey::IterNext.as_str(),
+    );
+    ctx.set_field(iter_nv, varn_core::MemberKey::IterNext.as_str(), next_nv);
     Ok(iter_nv)
 }
 
@@ -206,24 +239,41 @@ fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::Nat
         .first()
         .copied()
         .ok_or("range_iter_next: missing receiver")?;
-    let range_nv = ctx.get_field(obj_nv, "__range").unwrap_or(VmValue::null());
+    let range_nv = ctx
+        .get_field(obj_nv, varn_core::MemberKey::IterRange.as_str())
+        .unwrap_or(VmValue::null());
     let Some(range) = ctx.as_range(range_nv) else {
         return Err("range_iter_next: invalid range".into());
     };
-    let idx = ctx.as_int(ctx.get_field(obj_nv, "__idx").unwrap_or(VmValue::null()));
+    let idx = ctx.as_int(
+        ctx.get_field(obj_nv, varn_core::MemberKey::IterIndex.as_str())
+            .unwrap_or(VmValue::null()),
+    );
     let result_nv = ctx
-        .get_field(obj_nv, "__res")
+        .get_field(obj_nv, varn_core::MemberKey::IterResult.as_str())
         .unwrap_or_else(|| ctx.alloc_object());
     let Some(raw) = range.nth(idx) else {
-        ctx.set_field(result_nv, "value", VmValue::null());
-        ctx.set_field(result_nv, "done", VmValue::from_bool(true));
+        ctx.set_field(
+            result_nv,
+            varn_core::MemberKey::IterValue.as_str(),
+            VmValue::null(),
+        );
+        ctx.set_field(
+            result_nv,
+            varn_core::MemberKey::IterDone.as_str(),
+            VmValue::from_bool(true),
+        );
         return Ok(result_nv);
     };
     let next_idx = ctx.int_val(idx + 1);
-    ctx.set_field(obj_nv, "__idx", next_idx);
+    ctx.set_field(obj_nv, varn_core::MemberKey::IterIndex.as_str(), next_idx);
     let item = ctx.range_element(&range, raw);
-    ctx.set_field(result_nv, "value", item);
-    ctx.set_field(result_nv, "done", VmValue::from_bool(false));
+    ctx.set_field(result_nv, varn_core::MemberKey::IterValue.as_str(), item);
+    ctx.set_field(
+        result_nv,
+        varn_core::MemberKey::IterDone.as_str(),
+        VmValue::from_bool(false),
+    );
     Ok(result_nv)
 }
 

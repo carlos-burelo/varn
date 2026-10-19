@@ -40,18 +40,18 @@ impl KnownOp {
 
     pub fn names(self) -> (RuntimeKind, &'static str) {
         match self {
-            KnownOp::ArrayPush => (RuntimeKind::Array, "push"),
-            KnownOp::IntToString => (RuntimeKind::Int, "toString"),
-            KnownOp::StrStartsWith => (RuntimeKind::Str, "startsWith"),
-            KnownOp::StrEndsWith => (RuntimeKind::Str, "endsWith"),
-            KnownOp::StrSlice => (RuntimeKind::Str, "slice"),
-            KnownOp::StrIndexOf => (RuntimeKind::Str, "indexOf"),
-            KnownOp::StrIncludes => (RuntimeKind::Str, "includes"),
-            KnownOp::StrSplit => (RuntimeKind::Str, "split"),
-            KnownOp::StrSubstring => (RuntimeKind::Str, "substring"),
-            KnownOp::StrCharCodeAt => (RuntimeKind::Str, "charCodeAt"),
-            KnownOp::StrCodePointAt => (RuntimeKind::Str, "codePointAt"),
-            KnownOp::GeneratorNext => (RuntimeKind::Generator, "next"),
+            KnownOp::ArrayPush => (RuntimeKind::Array, crate::MemberKey::Push.as_str()),
+            KnownOp::IntToString => (RuntimeKind::Int, crate::MemberKey::ToString.as_str()),
+            KnownOp::StrStartsWith => (RuntimeKind::Str, crate::MemberKey::StartsWith.as_str()),
+            KnownOp::StrEndsWith => (RuntimeKind::Str, crate::MemberKey::EndsWith.as_str()),
+            KnownOp::StrSlice => (RuntimeKind::Str, crate::MemberKey::Slice.as_str()),
+            KnownOp::StrIndexOf => (RuntimeKind::Str, crate::MemberKey::IndexOf.as_str()),
+            KnownOp::StrIncludes => (RuntimeKind::Str, crate::MemberKey::Includes.as_str()),
+            KnownOp::StrSplit => (RuntimeKind::Str, crate::MemberKey::Split.as_str()),
+            KnownOp::StrSubstring => (RuntimeKind::Str, crate::MemberKey::Substring.as_str()),
+            KnownOp::StrCharCodeAt => (RuntimeKind::Str, crate::MemberKey::CharCodeAt.as_str()),
+            KnownOp::StrCodePointAt => (RuntimeKind::Str, crate::MemberKey::CodePointAt.as_str()),
+            KnownOp::GeneratorNext => (RuntimeKind::Generator, crate::MemberKey::IterNext.as_str()),
         }
     }
 

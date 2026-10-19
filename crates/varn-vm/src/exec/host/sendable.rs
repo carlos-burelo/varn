@@ -91,12 +91,15 @@ pub(super) fn to_sendable(
             Some(HeapObj::Range(r)) => {
                 let mut fields = rustc_hash::FxHashMap::default();
                 fields.insert(
-                    "start".to_string(),
+                    varn_core::MemberKey::Start.as_str().to_string(),
                     varn_types::value::SendValue::Int(r.start),
                 );
-                fields.insert("end".to_string(), varn_types::value::SendValue::Int(r.end));
                 fields.insert(
-                    "inclusive".to_string(),
+                    varn_core::MemberKey::End.as_str().to_string(),
+                    varn_types::value::SendValue::Int(r.end),
+                );
+                fields.insert(
+                    varn_core::MemberKey::Inclusive.as_str().to_string(),
                     varn_types::value::SendValue::Bool(r.inclusive),
                 );
                 fields.insert(

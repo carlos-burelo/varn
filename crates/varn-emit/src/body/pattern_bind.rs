@@ -173,12 +173,12 @@ impl<'a> FnEmitter<'a> {
                     let tail = TirExpr {
                         kind: TirExprKind::MethodCall {
                             recv: Box::new(src.clone()),
-                            name: Arc::from("slice"),
+                            name: Arc::from(varn_core::MemberKey::Slice.as_str()),
                             args: vec![TirArg::Expr(int_lit(elements.len() as i64))],
                         },
                         ty: src.ty,
                         res: Resolution::ByName {
-                            name: Arc::from("slice"),
+                            name: Arc::from(varn_core::MemberKey::Slice.as_str()),
                             why: DynReason::NotYetSupported,
                         },
                         span: src.span,
@@ -243,7 +243,12 @@ impl<'a> FnEmitter<'a> {
             | t @ BackendTy::Void
             | t @ BackendTy::Never => BackendTy::Nullable(self.tt.intern(t)),
         };
-        let len = self.field_access(arr, Arc::from("length"), BackendTy::Int, span);
+        let len = self.field_access(
+            arr,
+            Arc::from(varn_core::MemberKey::Length.as_str()),
+            BackendTy::Int,
+            span,
+        );
         let present = TirExpr {
             kind: TirExprKind::Binary {
                 op: TirBinOp::Lt,
