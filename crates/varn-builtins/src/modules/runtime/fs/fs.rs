@@ -36,6 +36,12 @@ fn denied(action: &str, path: &str) -> String {
 
 pub struct FsRuntime;
 
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/fs/fs_runtime.vn",
+    interface: "RawStats",
+    struct RawStats;
+}
+
 varn_contract! {
     module: "runtime:fs",
     contract: "src/modules/runtime/fs/fs_runtime.vn",
@@ -177,16 +183,13 @@ varn_contract! {
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_millis() as i64)
                 .unwrap_or(0);
-            let obj = ctx.alloc_object();
-            let size_nv = VmValue::from_int(meta.len() as i64);
-            let is_dir_nv = VmValue::from_bool(meta.is_dir());
-            let is_file_nv = VmValue::from_bool(meta.is_file());
-            let mtime_nv = VmValue::from_int(mtime);
-            ctx.set_field(obj, "size", size_nv);
-            ctx.set_field(obj, "isDir", is_dir_nv);
-            ctx.set_field(obj, "isFile", is_file_nv);
-            ctx.set_field(obj, "mtime", mtime_nv);
-            Ok(obj)
+            Ok(RawStats {
+                size: meta.len() as i64,
+                is_dir: meta.is_dir(),
+                is_file: meta.is_file(),
+                mtime,
+            }
+            .alloc(ctx))
         }
 
         fn mkdir(ctx: &mut dyn NativeCtx, path: &str) -> Result<(), String> {
