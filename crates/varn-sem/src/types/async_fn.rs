@@ -8,6 +8,19 @@ pub fn async_fn_return(ret: Type, is_async: bool, table: &mut CheckerTyTable) ->
     Type::builtin(BuiltinType::Task, vec![ret], table)
 }
 
+pub fn callable_return(
+    declared: Option<Type>,
+    is_async: bool,
+    is_generator: bool,
+    table: &mut CheckerTyTable,
+) -> Type {
+    if is_generator {
+        declared_generator(declared.unwrap_or(Type::Dynamic), is_async, table)
+    } else {
+        async_fn_return(declared.unwrap_or(Type::Void), is_async, table)
+    }
+}
+
 pub fn yielded_by(declared: Type, table: &CheckerTyTable) -> Type {
     match declared.builtin_of(table) {
         Some(BuiltinType::Generator | BuiltinType::AsyncGenerator) => {

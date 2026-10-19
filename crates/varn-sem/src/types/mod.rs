@@ -10,7 +10,8 @@ mod type_algebra;
 mod type_impl;
 
 pub use async_fn::{
-    async_fn_return, awaited, declared_generator, generator_of, is_awaitable, yielded_by,
+    async_fn_return, awaited, callable_return, declared_generator, generator_of, is_awaitable,
+    yielded_by,
 };
 pub use interned::{
     CheckerTyId, CheckerTyTable, FunctionTypeId, InternedTypeKind, ObjectMembersId, TyListId,

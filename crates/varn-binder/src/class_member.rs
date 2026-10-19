@@ -170,13 +170,11 @@ impl<'r> Binder<'r> {
                 ..
             } => {
                 let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
-                let declared_ret = return_type
-                    .as_ref()
-                    .map(|ann| self.resolve_type(ann))
-                    .unwrap_or(Type::Void);
-                let ret = varn_sem::types::async_fn_return(
+                let declared_ret = return_type.as_ref().map(|ann| self.resolve_type(ann));
+                let ret = varn_sem::types::callable_return(
                     declared_ret,
                     modifiers.is_async,
+                    modifiers.is_generator,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
 

@@ -97,19 +97,12 @@ impl<'r> super::super::Binder<'r> {
 
         let declared_ret = f.return_type.as_ref().map(|ann| self.resolve_type(ann));
 
-        let ret = if f.modifiers.is_generator {
-            varn_sem::types::declared_generator(
-                declared_ret.unwrap_or(Type::Dynamic),
-                f.modifiers.is_async,
-                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-            )
-        } else {
-            varn_sem::types::async_fn_return(
-                declared_ret.unwrap_or(Type::Void),
-                f.modifiers.is_async,
-                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-            )
-        };
+        let ret = varn_sem::types::callable_return(
+            declared_ret,
+            f.modifiers.is_async,
+            f.modifiers.is_generator,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        );
         let fn_type = Type::fn_(
             FunctionType {
                 params: params.clone(),
