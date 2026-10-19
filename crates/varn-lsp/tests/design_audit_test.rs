@@ -152,9 +152,9 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
     assert!(e > 0, "indexar debe memoizar exports");
 
     let evicted = workspace.resolver().evict_heavy();
-    assert_eq!(evicted, (b, p, a), "evict_heavy reporta lo que suelta");
     let (b2, p2, a2, e2) = workspace.resolver().graph_stats();
-    assert_eq!((b2, p2, a2), (0, 0, 0), "artefactos evictados");
+    assert_eq!(evicted, (b - b2, p, a), "evict_heavy reporta lo que suelta");
+    assert_eq!((p2, a2), (0, 0), "programas y arenas evictados");
     assert_eq!(e2, e, "exports sobreviven a la evicción");
 
     {
@@ -169,7 +169,7 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
     let (b3, p3, a3, e3) = workspace.resolver().graph_stats();
     assert_eq!(
         (b3, p3, a3),
-        (0, 0, 0),
+        (b2, 0, 0),
         "re-analizar exports conocidos no debe re-bindear"
     );
     assert!(e3 >= e2, "los exports siguen acumulándose");
@@ -200,7 +200,12 @@ fn h10b_module_bind_rederives_after_evict() {
 
     let evicted = resolver.evict_heavy();
     assert!(evicted.0 > 0, "debía haber binds que soltar");
-    assert_eq!(resolver.graph_stats().0, 0);
+    let resident = resolver.graph_stats().0;
+    assert_eq!(
+        resident,
+        b - evicted.0,
+        "solo quedan los binds de la imagen core/std"
+    );
 
     let second = resolver.module_bind(&key);
     assert!(
@@ -208,7 +213,7 @@ fn h10b_module_bind_rederives_after_evict() {
         "tras evictar, module_bind re-deriva desde fuente/caché"
     );
     assert!(
-        resolver.graph_stats().0 > 0,
+        resolver.graph_stats().0 > resident,
         "lo re-derivado vuelve a memoizarse"
     );
     let _ = std::fs::remove_dir_all(&dir);

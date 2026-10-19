@@ -5,6 +5,10 @@ use varn_core::ModuleId;
 use varn_sem::bind::BindResult;
 use varn_sem::exports::ExportMap;
 
+fn is_image_module(key: &str) -> bool {
+    varn_core::ModuleKind::Core.owns(key) || varn_core::ModuleKind::Stdlib.owns(key)
+}
+
 #[derive(Default)]
 pub struct ModuleGraph {
     binds: FxHashMap<String, Arc<BindResult>>,
@@ -106,8 +110,13 @@ impl ModuleGraph {
     }
 
     pub fn evict_heavy(&mut self) -> (usize, usize, usize) {
-        let counts = (self.binds.len(), self.programs.len(), self.arenas.len());
-        self.binds.clear();
+        let binds_before = self.binds.len();
+        self.binds.retain(|key, _| is_image_module(key));
+        let counts = (
+            binds_before - self.binds.len(),
+            self.programs.len(),
+            self.arenas.len(),
+        );
         self.programs.clear();
         self.arenas.clear();
         counts
