@@ -2,23 +2,14 @@ use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-use std::sync::Arc;
 use varn_core::OpCode;
-
-pub(crate) struct EnumVariantTemplate {
-    pub enum_class_id: Option<u32>,
-    pub enum_name: Arc<str>,
-    pub variant_name: Arc<str>,
-    pub variant_tag: i64,
-    pub fields: Vec<Arc<str>>,
-}
 
 impl ExecCtx {
     pub(crate) fn enum_variant_template(
         &self,
         receiver: VmValue,
         name: &str,
-    ) -> Option<EnumVariantTemplate> {
+    ) -> Option<varn_types::value::EnumVariantData> {
         if !receiver.is_heap() {
             return None;
         }
@@ -32,68 +23,28 @@ impl ExecCtx {
         let Some(crate::heap::HeapObj::EnumVariant(t)) = self.heap.get(template.as_heap()) else {
             return None;
         };
-        Some(EnumVariantTemplate {
-            enum_class_id: t.enum_class_id,
-            enum_name: t.enum_name.clone(),
-            variant_name: t.variant_name.clone(),
-            variant_tag: t.variant_tag,
-            fields: t.fields.clone(),
-        })
+        Some((**t).clone())
     }
 
     pub(crate) fn construct_enum_variant(
         &mut self,
-        template: &EnumVariantTemplate,
+        template: &varn_types::value::EnumVariantData,
         args: crate::exec::method_args::MethodArgs<'_>,
     ) -> Option<VmValue> {
         let arg_count = args.len();
-        if template.fields.is_empty() && arg_count == 0 {
+        if template.def.fields.is_empty() && arg_count == 0 {
             return None;
         }
-
-        let payload = if !template.fields.is_empty() {
-            let fields: Vec<(varn_types::RuntimeString, VmValue)> = template
-                .fields
-                .iter()
-                .enumerate()
-                .map(|(idx, field_name)| {
-                    let nv = if idx < arg_count {
-                        args.get(&self.stack, idx)
-                    } else {
-                        VmValue::null()
-                    };
-                    (field_name.clone(), nv)
-                })
-                .collect();
-            self.heap.alloc_object_pairs(fields)
-        } else if arg_count == 1 {
-            args.get(&self.stack, 0)
-        } else if arg_count > 1 {
-            let items: Vec<VmValue> = (0..arg_count).map(|i| args.get(&self.stack, i)).collect();
-            self.heap.alloc_array_vm(items)
-        } else {
-            VmValue::null()
-        };
-
-        let data = varn_types::value::EnumVariantData {
-            enum_class_id: template.enum_class_id,
-            enum_name: template.enum_name.clone(),
-            variant_name: template.variant_name.clone(),
-            variant_tag: template.variant_tag,
-            fields: template.fields.clone(),
-            payload,
-        };
-        Some(VmValue::from_heap(
-            self.heap
-                .alloc(crate::heap::HeapObj::EnumVariant(Box::new(data))),
-        ))
+        let values: Vec<VmValue> = (0..arg_count).map(|i| args.get(&self.stack, i)).collect();
+        let instance = template.instantiate(&values);
+        Some(VmValue::from_heap(self.heap.alloc(
+            crate::heap::HeapObj::EnumVariant(Box::new(instance)),
+        )))
     }
 
     pub(in crate::exec::dispatch) fn exec_get_enum_tag(&mut self, v: VmValue) -> VmResult<VmValue> {
         match v.is_heap().then(|| self.heap.get(v.as_heap())).flatten() {
-            Some(crate::heap::HeapObj::EnumVariant(ev)) => {
-                Ok(VmValue::from_i32(ev.variant_tag as i32))
-            }
+            Some(crate::heap::HeapObj::EnumVariant(ev)) => Ok(VmValue::from_i32(ev.tag() as i32)),
             Some(
                 crate::heap::HeapObj::Str(_)
                 | crate::heap::HeapObj::Array(_)

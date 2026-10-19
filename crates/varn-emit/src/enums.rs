@@ -28,6 +28,22 @@ pub(super) fn emit_enum(
         ..Default::default()
     };
 
+    let shared_fields: Vec<&str> = en
+        .body
+        .iter()
+        .filter_map(|member| match member {
+            ClassMember::Property { key, modifiers, .. } if !modifiers.is_static => {
+                Some(ctx.interner.resolve(*key))
+            }
+            ClassMember::Property { .. }
+            | ClassMember::Constructor { .. }
+            | ClassMember::Destructor { .. }
+            | ClassMember::Method { .. }
+            | ClassMember::Getter { .. }
+            | ClassMember::Setter { .. }
+            | ClassMember::StaticBlock { .. } => None,
+        })
+        .collect();
     let mut tag = 0i64;
     for m in &en.members {
         if let Some(init) = m.init
@@ -40,6 +56,7 @@ pub(super) fn emit_enum(
             .payload_fields
             .iter()
             .map(|f| ctx.interner.resolve(f.name))
+            .chain(shared_fields.iter().copied())
             .collect::<Vec<&str>>()
             .join(",");
         let meta = if fields_str.is_empty() {

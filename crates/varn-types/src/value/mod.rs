@@ -142,14 +142,62 @@ impl std::fmt::Display for RuntimeSymbol {
     }
 }
 
+#[derive(Debug)]
+pub struct VariantDef {
+    pub enum_name: Arc<str>,
+    pub variant_name: Arc<str>,
+    pub tag: i64,
+    pub fields: Vec<Arc<str>>,
+}
+
+impl VariantDef {
+    pub fn field_index(&self, name: &str) -> Option<usize> {
+        self.fields.iter().position(|f| f.as_ref() == name)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct EnumVariantData {
     pub enum_class_id: Option<u32>,
-    pub enum_name: Arc<str>,
-    pub variant_name: Arc<str>,
-    pub variant_tag: i64,
-    pub fields: Vec<Arc<str>>,
-    pub payload: crate::vm_value::VmValue,
+    pub def: Arc<VariantDef>,
+    pub slots: Vec<crate::vm_value::VmValue>,
+}
+
+impl EnumVariantData {
+    pub fn unit(def: Arc<VariantDef>) -> Self {
+        let slots = vec![crate::vm_value::VmValue::null(); def.fields.len()];
+        Self {
+            enum_class_id: None,
+            def,
+            slots,
+        }
+    }
+
+    pub fn instantiate(&self, args: &[crate::vm_value::VmValue]) -> Self {
+        let arity = self.def.fields.len();
+        let slots = (0..arity)
+            .map(|i| {
+                args.get(i)
+                    .copied()
+                    .unwrap_or(crate::vm_value::VmValue::null())
+            })
+            .collect();
+        Self {
+            enum_class_id: self.enum_class_id,
+            def: Arc::clone(&self.def),
+            slots,
+        }
+    }
+
+    pub fn tag(&self) -> i64 {
+        self.def.tag
+    }
+
+    pub fn field(&self, name: &str) -> Option<crate::vm_value::VmValue> {
+        self.def
+            .field_index(name)
+            .and_then(|i| self.slots.get(i).copied())
+    }
 }
 
 #[derive(Clone, Debug)]

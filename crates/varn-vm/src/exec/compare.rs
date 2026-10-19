@@ -205,25 +205,15 @@ fn variant_eq(
     let same_enum = match (a.enum_class_id, b.enum_class_id) {
         (Some(x), Some(y)) => x == y,
 
-        _ => a.enum_name == b.enum_name,
+        _ => a.def.enum_name == b.def.enum_name,
     };
-    same_enum && a.variant_tag == b.variant_tag && payload_eq(a.payload, b.payload, heap)
-}
-
-fn payload_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    if a.is_heap()
-        && b.is_heap()
-        && let (Some(HeapObj::Object(x)), Some(HeapObj::Object(y))) =
-            (heap.get(a.as_heap()), heap.get(b.as_heap()))
-    {
-        let keys: Vec<_> = x.keys().collect();
-        return keys.len() == y.keys().count()
-            && keys.iter().all(|k| match (x.get(k), y.get(k)) {
-                (Some(p), Some(q)) => member_eq(p, q, heap),
-                _ => false,
-            });
-    }
-    member_eq(a, b, heap)
+    same_enum
+        && a.tag() == b.tag()
+        && a.slots.len() == b.slots.len()
+        && a.slots
+            .iter()
+            .zip(b.slots.iter())
+            .all(|(x, y)| member_eq(*x, *y, heap))
 }
 
 #[inline(always)]

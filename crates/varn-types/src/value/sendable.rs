@@ -28,7 +28,7 @@ pub struct SendEnumVariant {
     pub variant_name: String,
     pub variant_tag: i64,
     pub fields: Vec<String>,
-    pub payload: SendValue,
+    pub slots: Vec<SendValue>,
 }
 
 impl SendValue {
@@ -88,14 +88,17 @@ impl SendValue {
             }
             SendValue::Endpoint(end, id) => end.alloc(ctx, *id).unwrap_or(VmValue::null()),
             SendValue::EnumVariant(ev) => {
-                let payload = ev.payload.to_value_ctx(ctx);
-                ctx.alloc_enum_variant(crate::value::EnumVariantData {
-                    enum_class_id: None,
+                let slots = ev.slots.iter().map(|s| s.to_value_ctx(ctx)).collect();
+                let def = Arc::new(crate::value::VariantDef {
                     enum_name: Arc::from(ev.enum_name.as_str()),
                     variant_name: Arc::from(ev.variant_name.as_str()),
-                    variant_tag: ev.variant_tag,
+                    tag: ev.variant_tag,
                     fields: ev.fields.iter().map(|f| Arc::from(f.as_str())).collect(),
-                    payload,
+                });
+                ctx.alloc_enum_variant(crate::value::EnumVariantData {
+                    enum_class_id: None,
+                    def,
+                    slots,
                 })
             }
         }

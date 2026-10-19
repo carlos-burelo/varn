@@ -77,14 +77,19 @@ pub(super) fn to_sendable(
             Some(HeapObj::Decimal(d)) => Ok(varn_types::value::SendValue::Decimal((**d).clone())),
             Some(HeapObj::Char(c)) => Ok(varn_types::value::SendValue::Char(*c)),
             Some(HeapObj::EnumVariant(d)) => {
-                let payload = ctx.to_sendable(d.payload)?;
+                let d = d.clone();
+                let slots = d
+                    .slots
+                    .iter()
+                    .map(|s| ctx.to_sendable(*s))
+                    .collect::<Result<Vec<_>, _>>()?;
                 Ok(varn_types::value::SendValue::EnumVariant(Box::new(
                     varn_types::value::SendEnumVariant {
-                        enum_name: d.enum_name.to_string(),
-                        variant_name: d.variant_name.to_string(),
-                        variant_tag: d.variant_tag,
-                        fields: d.fields.iter().map(|f| f.to_string()).collect(),
-                        payload,
+                        enum_name: d.def.enum_name.to_string(),
+                        variant_name: d.def.variant_name.to_string(),
+                        variant_tag: d.tag(),
+                        fields: d.def.fields.iter().map(|f| f.to_string()).collect(),
+                        slots,
                     },
                 )))
             }

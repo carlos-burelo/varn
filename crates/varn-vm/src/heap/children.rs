@@ -103,7 +103,11 @@ fn for_each_heap_child(
             }
         }
         HeapObj::Spread(v) => value(*v),
-        HeapObj::EnumVariant(ev) => value(ev.payload),
+        HeapObj::EnumVariant(ev) => {
+            for slot in &ev.slots {
+                value(*slot);
+            }
+        }
         HeapObj::Task(task) => task.trace_cells(&mut |c| value(c.get())),
         HeapObj::TaskHandle(cell) => cell.trace_cells(&mut |c| value(c.get())),
         HeapObj::Generator(generator) => generator.trace(&mut value),

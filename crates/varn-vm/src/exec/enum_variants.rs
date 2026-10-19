@@ -17,15 +17,13 @@ impl ExecCtx {
         } else {
             fields_part.split(',').map(Arc::from).collect()
         };
-        let payload = self.heap.alloc_object();
+        let def = Arc::new(varn_types::value::VariantDef {
+            enum_name: Arc::from(enum_name),
+            variant_name: Arc::from(variant_name),
+            tag,
+            fields,
+        });
         self.heap
-            .alloc_enum_variant_vm(varn_types::value::EnumVariantData {
-                enum_class_id: None,
-                enum_name: Arc::from(enum_name),
-                variant_name: Arc::from(variant_name),
-                variant_tag: tag,
-                fields,
-                payload,
-            })
+            .alloc_enum_variant_vm(varn_types::value::EnumVariantData::unit(def))
     }
 }

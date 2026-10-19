@@ -207,7 +207,7 @@ fn fit_in(cx: &Cx, v: VmValue, desc: &TypeDesc, scope: Option<&Scope>) -> Option
             };
             let class = *witnesses.get(*witness as usize)?;
             if class.is_null() {
-                return exact(data.enum_name.as_ref() == name.as_str());
+                return exact(data.def.enum_name.as_ref() == name.as_str());
             }
             exact(instanceof(v, class, heap))
         }

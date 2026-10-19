@@ -1,6 +1,5 @@
 use varn_core::MemberKey;
 
-use super::get_set::payload_object;
 use crate::heap::{Heap, HeapInner, HeapObj};
 use crate::value::VmValue;
 
@@ -78,31 +77,14 @@ fn enum_variant_property(
     key: &str,
     heap: &mut Heap,
 ) -> Option<Result<VmValue, String>> {
-    let payload = payload_object(heap, ev.payload);
-    if let Some(f) = payload.as_ref().and_then(|o| o.get(key)) {
+    if let Some(f) = ev.field(key) {
         return Some(Ok(f));
     }
-    if key.starts_with("value")
-        && key.len() > 5
-        && let Ok(idx) = key[5..].parse::<usize>()
-    {
-        if !ev.fields.is_empty() {
-            if idx < ev.fields.len() {
-                let field = payload.as_ref().and_then(|o| o.get(&ev.fields[idx]));
-                return Some(Ok(field.unwrap_or(VmValue::null())));
-            }
-        } else if idx == 0 {
-            return Some(Ok(ev.payload));
-        }
-    }
     match MemberKey::from_str(key) {
-        Some(MemberKey::Tag) | Some(MemberKey::RawValue) => {
-            Some(Ok(VmValue::from_int(ev.variant_tag)))
-        }
+        Some(MemberKey::Tag) | Some(MemberKey::RawValue) => Some(Ok(VmValue::from_int(ev.tag()))),
         Some(MemberKey::VariantName) | Some(MemberKey::Name) => {
-            Some(Ok(HeapInner::alloc_str(heap, &*ev.variant_name)))
+            Some(Ok(HeapInner::alloc_str(heap, &*ev.def.variant_name)))
         }
-        Some(MemberKey::Value0) if ev.fields.is_empty() => Some(Ok(ev.payload)),
         Some(
             MemberKey::Value0
             | MemberKey::Length

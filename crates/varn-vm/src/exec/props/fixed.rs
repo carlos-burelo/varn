@@ -2,7 +2,6 @@ use std::rc::Rc;
 
 use varn_types::value::{ClassObj, InstanceRef, ObjRef};
 
-use super::payload_object;
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
@@ -53,9 +52,7 @@ pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmR
         }
         let found = match heap.get(obj.as_heap()) {
             Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.field_at(slot),
-            Some(HeapObj::EnumVariant(ev)) => {
-                payload_object(heap, ev.payload).and_then(|o| o.field_at(slot))
-            }
+            Some(HeapObj::EnumVariant(ev)) => ev.slots.get(slot).copied(),
             Some(HeapObj::Class(cls)) => {
                 let fields = cls.static_fields.borrow();
                 fields
@@ -124,15 +121,14 @@ pub(crate) fn set_fixed_field(
             Instance(InstanceRef),
             Obj(ObjRef, varn_types::HeapRef),
             Class(Rc<ClassObj>),
+            Variant,
         }
 
         let target = match heap.instance(heap_idx) {
             Some(inst) => Some(Target::Instance(inst)),
             None => match heap.get(heap_idx) {
                 Some(HeapObj::Object(o)) => Some(Target::Obj(*o, heap_idx)),
-                Some(HeapObj::EnumVariant(ev)) => {
-                    payload_object(heap, ev.payload).map(|o| Target::Obj(o, ev.payload.as_heap()))
-                }
+                Some(HeapObj::EnumVariant(_)) => Some(Target::Variant),
                 Some(HeapObj::Class(cls)) => Some(Target::Class(cls.clone())),
                 Some(
                     HeapObj::Str(_)
@@ -171,6 +167,17 @@ pub(crate) fn set_fixed_field(
             Some(Target::Obj(o, owner_idx)) => {
                 if o.set_field_at(slot, val) {
                     heap.write_barrier(owner_idx, val);
+                    return Ok(());
+                }
+            }
+            Some(Target::Variant) => {
+                let stored = if let Some(HeapObj::EnumVariant(ev)) = heap.get_mut(heap_idx) {
+                    ev.slots.get_mut(slot).map(|s| *s = val)
+                } else {
+                    None
+                };
+                if stored.is_some() {
+                    heap.write_barrier(heap_idx, val);
                     return Ok(());
                 }
             }

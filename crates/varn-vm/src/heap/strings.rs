@@ -247,11 +247,11 @@ impl HeapInner {
                 Some(HeapObj::Class(c)) => format!("[class {}]", c.name),
                 Some(HeapObj::BigInt(n)) => n.to_string(),
                 Some(HeapObj::Decimal(d)) => d.to_plain_string(),
-                Some(HeapObj::EnumVariant(v)) if v.fields.is_empty() => {
-                    format!("{}.{}", v.enum_name, v.variant_name)
+                Some(HeapObj::EnumVariant(v)) if v.def.fields.is_empty() => {
+                    format!("{}.{}", v.def.enum_name, v.def.variant_name)
                 }
                 Some(HeapObj::EnumVariant(v)) => {
-                    format!("{}.{}(..)", v.enum_name, v.variant_name)
+                    format!("{}.{}(..)", v.def.enum_name, v.def.variant_name)
                 }
                 Some(
                     HeapObj::Record(_)

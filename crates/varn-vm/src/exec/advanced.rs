@@ -194,7 +194,7 @@ pub(crate) fn get_enum_tag(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     if val.is_heap()
         && let Some(HeapObj::EnumVariant(e)) = heap.get(val.as_heap())
     {
-        return Ok(VmValue::from_i32(e.variant_tag as i32));
+        return Ok(VmValue::from_i32(e.tag() as i32));
     }
     Err(RuntimeError::new("OpGetEnumTag: not an enum variant"))
 }

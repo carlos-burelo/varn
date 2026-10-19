@@ -80,7 +80,7 @@ pub(crate) fn type_name(obj: VmValue, heap: &Heap) -> String {
         Some(HeapObj::Object(_) | HeapObj::Record(_)) => {
             class_of(obj, heap).map_or_else(|| "Object".into(), |c| c.name.as_str().into())
         }
-        Some(HeapObj::EnumVariant(ev)) => ev.enum_name.to_string(),
+        Some(HeapObj::EnumVariant(ev)) => ev.def.enum_name.to_string(),
         Some(other) => other.tag().name().into(),
         None => varn_core::LangPrimitive::Dynamic.name().into(),
     }
@@ -136,7 +136,7 @@ pub(crate) fn resolve_meta_property(
             }
             let name: Option<String> =
                 match obj.is_heap().then(|| heap.get(obj.as_heap())).flatten() {
-                    Some(HeapObj::EnumVariant(ev)) => Some(ev.variant_name.to_string()),
+                    Some(HeapObj::EnumVariant(ev)) => Some(ev.def.variant_name.to_string()),
                     Some(HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Class(_)) => Some(
                         cls.as_ref()
                             .map_or_else(|| "Object".into(), |c| c.name.as_str().into()),

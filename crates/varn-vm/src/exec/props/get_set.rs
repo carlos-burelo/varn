@@ -1,5 +1,5 @@
 use varn_core::MemberKey;
-use varn_types::value::{ClassObj, ObjRef};
+use varn_types::value::ClassObj;
 
 use super::intrinsic::{get_class, resolve_intrinsic_method_property};
 use super::meta::resolve_meta_property;
@@ -75,40 +75,6 @@ pub(crate) fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValu
             | HeapObj::Spread(_),
         )
         | None => get_class(obj, heap)?.find_setter(key),
-    }
-}
-
-pub(crate) fn payload_object(heap: &Heap, payload: VmValue) -> Option<ObjRef> {
-    if !payload.is_heap() {
-        return None;
-    }
-    match heap.get(payload.as_heap()) {
-        Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(*o),
-        Some(
-            HeapObj::Str(_)
-            | HeapObj::Array(_)
-            | HeapObj::Tuple(_)
-            | HeapObj::Buffer(_)
-            | HeapObj::Module(_)
-            | HeapObj::FrozenModule(_)
-            | HeapObj::VmClosure(_)
-            | HeapObj::Class(_)
-            | HeapObj::NativeFn(..)
-            | HeapObj::BoundMethod(_)
-            | HeapObj::Map(_)
-            | HeapObj::Set(_)
-            | HeapObj::Task(_)
-            | HeapObj::TaskHandle(_)
-            | HeapObj::Range(_)
-            | HeapObj::Symbol(_)
-            | HeapObj::EnumVariant(_)
-            | HeapObj::BigInt(_)
-            | HeapObj::Decimal(_)
-            | HeapObj::Char(_)
-            | HeapObj::Generator(_)
-            | HeapObj::Spread(_),
-        )
-        | None => None,
     }
 }
 
@@ -189,9 +155,13 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
             Ok(())
         }
         Some(HeapObj::EnumVariant(ev)) => {
-            if let Some(o) = payload_object(heap, ev.payload) {
-                o.set_field_str(key, val);
-                heap.write_barrier(ev.payload.as_heap(), val);
+            if let Some(slot) = ev.def.field_index(key) {
+                if let Some(HeapObj::EnumVariant(target)) = heap.get_mut(idx)
+                    && let Some(stored) = target.slots.get_mut(slot)
+                {
+                    *stored = val;
+                }
+                heap.write_barrier(idx, val);
             }
             Ok(())
         }

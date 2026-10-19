@@ -232,29 +232,12 @@ pub(crate) fn prepare_call(
                     args.remove(0);
                 }
 
-                if data.fields.is_empty() && args.is_empty() {
+                if data.def.fields.is_empty() && args.is_empty() {
                     return Ok(PreparedCall::PushValue(callee_nv));
                 }
-
-                let payload = if !data.fields.is_empty() {
-                    heap.alloc_object_pairs(data.fields.iter().enumerate().map(
-                        |(idx, field_name)| {
-                            let nv = args.get(idx).copied().unwrap_or(VmValue::null());
-                            (field_name.clone(), nv)
-                        },
-                    ))
-                } else if args.len() == 1 {
-                    args[0]
-                } else if args.len() > 1 {
-                    heap.alloc_array_vm(args)
-                } else {
-                    VmValue::null()
-                };
-
-                let mut new_data = *data;
-                new_data.payload = payload;
+                let instance = data.instantiate(&args);
                 return Ok(PreparedCall::PushValue(VmValue::from_heap(
-                    heap.alloc(HeapObj::EnumVariant(Box::new(new_data))),
+                    heap.alloc(HeapObj::EnumVariant(Box::new(instance))),
                 )));
             }
             HeapObj::Str(_)
