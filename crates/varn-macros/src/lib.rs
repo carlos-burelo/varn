@@ -1,8 +1,10 @@
 mod contract_members;
 mod contract_parse;
+mod contract_records;
 mod jit_helper_table;
 mod jit_slow;
 mod varn_contract;
+mod varn_record;
 
 use proc_macro::TokenStream;
 
@@ -19,4 +21,9 @@ pub fn jit_slow(attr: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn jit_helper_table(input: TokenStream) -> TokenStream {
     jit_helper_table::expand(input)
+}
+
+#[proc_macro]
+pub fn varn_record(input: TokenStream) -> TokenStream {
+    varn_record::expand(input)
 }

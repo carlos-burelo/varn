@@ -93,7 +93,7 @@ fn parse(source: &str, name: &str) -> Result<Contract, LookupFailure> {
     Ok(Contract { classes, functions })
 }
 
-fn unwrap_export(decl: &Decl) -> &Decl {
+pub(crate) fn unwrap_export(decl: &Decl) -> &Decl {
     match decl {
         Decl::Export(ExportDecl::Decl { declaration, .. }) => unwrap_export(declaration),
         Decl::Variable(_)
@@ -127,7 +127,7 @@ fn scalar(p: LangPrimitive) -> Mapped {
     }
 }
 
-fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
+pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
     match &t.kind {
         TypeKind::Named(n, _) => LangPrimitive::from_str(interner.resolve(*n))
             .map(scalar)
