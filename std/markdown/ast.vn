@@ -1,3 +1,30 @@
+export enum MarkdownNodeKind {
+    Root,
+    Heading,
+    Paragraph,
+    CodeBlock,
+    Blockquote,
+    List,
+    ListItem,
+    Table,
+    TableRow,
+    TableCell,
+    ThematicBreak,
+    Text,
+    InlineCode,
+    Bold,
+    Italic,
+    Strikethrough,
+    Link,
+    Image
+}
+
+export enum TableAlign {
+    None,
+    Left,
+    Center,
+    Right
+}
 
 export interface MarkdownOptions {
     gfm?: bool;
@@ -20,7 +47,7 @@ export interface MarkdownLink {
 }
 
 export class MarkdownNode {
-    type: str;
+    kind: MarkdownNodeKind;
     text: str;
     level: int;
     lang: str;
@@ -29,11 +56,11 @@ export class MarkdownNode {
     checked: bool?;
     url: str;
     title: str;
-    align: str[];
+    align: TableAlign[];
     children: MarkdownNode[];
 
-    constructor(type: str, text: str = "") {
-        this.type = type;
+    constructor(kind: MarkdownNodeKind, text: str = "") {
+        this.kind = kind;
         this.text = text;
         this.level = 0;
         this.lang = "";

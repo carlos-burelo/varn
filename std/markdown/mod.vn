@@ -3,7 +3,9 @@ export {
     MarkdownOptions,
     MarkdownHeading,
     MarkdownLink,
-    MarkdownNode
+    MarkdownNode,
+    MarkdownNodeKind,
+    TableAlign
 } from "std:markdown/ast";
 
 export {
@@ -32,7 +34,7 @@ export {
     extractLinks
 } from "std:markdown/renderer";
 
-import { MarkdownOptions, MarkdownNode, MarkdownHeading, MarkdownLink } from "std:markdown/ast";
+import { MarkdownOptions, MarkdownNode, MarkdownHeading, MarkdownLink, MarkdownNodeKind } from "std:markdown/ast";
 import { escapeHtmlStr, isWhitespaceChar, slugify as slugifyUtil } from "std:markdown/utils";
 import { isThematicBreak, isHeadingLine, isListItemLine, isTableSeparator, parseTableAlignments, splitTableRow, parseInlineTokens, isParagraphEnd } from "std:markdown/parser";
 import { renderAst as renderAstImpl, toPlainText as toPlainTextImpl, extractHeadings as extractHeadingsImpl, extractLinks as extractLinksImpl } from "std:markdown/renderer";
@@ -46,7 +48,7 @@ export namespace Markdown {
         let optGfm = options?.gfm ?? true;
         let optEscape = options?.escapeHtml ?? true;
 
-        let root = new MarkdownNode("root");
+        let root = new MarkdownNode(MarkdownNodeKind.Root);
         let rawLines = source.split("\n");
         let lines: str[] = [];
         for (let l of rawLines) {
@@ -83,7 +85,7 @@ export namespace Markdown {
                     codeLines.push(curLine);
                     idx = idx + 1;
                 }
-                let codeNode = new MarkdownNode("code_block", codeLines.join("\n"));
+                let codeNode = new MarkdownNode(MarkdownNodeKind.CodeBlock, codeLines.join("\n"));
                 codeNode.lang = lang;
                 root.addChild(codeNode);
                 continue;
@@ -108,7 +110,7 @@ export namespace Markdown {
                         break;
                     }
                 }
-                let codeNode = new MarkdownNode("code_block", codeLines.join("\n"));
+                let codeNode = new MarkdownNode(MarkdownNodeKind.CodeBlock, codeLines.join("\n"));
                 root.addChild(codeNode);
                 continue;
             }
@@ -124,7 +126,7 @@ export namespace Markdown {
                     }
                     headingText = headingText.slice(0, endIdx + 1).trim();
                 }
-                let headingNode = new MarkdownNode("heading", headingText);
+                let headingNode = new MarkdownNode(MarkdownNodeKind.Heading, headingText);
                 headingNode.level = headingLevel;
                 let inlines = parseInlineTokens(headingText, optEscape);
                 for (let c of inlines) {
@@ -136,7 +138,7 @@ export namespace Markdown {
             }
 
             if (isThematicBreak(line)) {
-                root.addChild(new MarkdownNode("thematic_break"));
+                root.addChild(new MarkdownNode(MarkdownNodeKind.ThematicBreak));
                 idx = idx + 1;
                 continue;
             }
@@ -158,7 +160,7 @@ export namespace Markdown {
                     idx = idx + 1;
                 }
                 let quoteContent = quoteLines.join("\n");
-                let blockNode = new MarkdownNode("blockquote");
+                let blockNode = new MarkdownNode(MarkdownNodeKind.Blockquote);
                 let innerAst = parse(quoteContent, options);
                 for (let c of innerAst.children) {
                     blockNode.addChild(c);
@@ -170,12 +172,12 @@ export namespace Markdown {
             if (optGfm && idx + 1 < total && isTableSeparator(lines[idx + 1])) {
                 let headerRow = splitTableRow(lines[idx]);
                 let alignments = parseTableAlignments(lines[idx + 1]);
-                let tableNode = new MarkdownNode("table");
+                let tableNode = new MarkdownNode(MarkdownNodeKind.Table);
                 tableNode.align = alignments;
 
-                let headRowNode = new MarkdownNode("table_row");
+                let headRowNode = new MarkdownNode(MarkdownNodeKind.TableRow);
                 for (let cell of headerRow) {
-                    let cellNode = new MarkdownNode("table_cell", cell);
+                    let cellNode = new MarkdownNode(MarkdownNodeKind.TableCell, cell);
                     let inlines = parseInlineTokens(cell, optEscape);
                     for (let c of inlines) {
                         cellNode.addChild(c);
@@ -191,9 +193,9 @@ export namespace Markdown {
                         break;
                     }
                     let rowCells = splitTableRow(cur);
-                    let rowNode = new MarkdownNode("table_row");
+                    let rowNode = new MarkdownNode(MarkdownNodeKind.TableRow);
                     for (let cell of rowCells) {
-                        let cellNode = new MarkdownNode("table_cell", cell);
+                        let cellNode = new MarkdownNode(MarkdownNodeKind.TableCell, cell);
                         let inlines = parseInlineTokens(cell, optEscape);
                         for (let c of inlines) {
                             cellNode.addChild(c);
@@ -221,7 +223,7 @@ export namespace Markdown {
                     }
                 }
 
-                let listNode = new MarkdownNode("list");
+                let listNode = new MarkdownNode(MarkdownNodeKind.List);
                 listNode.ordered = isOrdered;
                 listNode.start = listStart;
 
@@ -257,7 +259,7 @@ export namespace Markdown {
                         }
                     }
 
-                    let itemNode = new MarkdownNode("list_item");
+                    let itemNode = new MarkdownNode(MarkdownNodeKind.ListItem);
                     if (optGfm && (content.startsWith("[ ] ") || content.startsWith("[x] ") || content.startsWith("[X] "))) {
                         let isChecked = content.startsWith("[x] ") || content.startsWith("[X] ");
                         itemNode.checked = isChecked;
@@ -292,7 +294,7 @@ export namespace Markdown {
             }
 
             let pText = pLines.join("\n");
-            let pNode = new MarkdownNode("paragraph", pText);
+            let pNode = new MarkdownNode(MarkdownNodeKind.Paragraph, pText);
             let inlines = parseInlineTokens(pText, optEscape);
             for (let c of inlines) {
                 pNode.addChild(c);

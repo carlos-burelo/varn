@@ -1,4 +1,4 @@
-import { MarkdownNode } from "std:markdown/ast";
+import { MarkdownNode, MarkdownNodeKind } from "std:markdown/ast";
 import { findFrom, startsWithAt } from "std:markdown/utils";
 
 export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
@@ -8,7 +8,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
 
     function flushBuf(): void {
         if (buf.length > 0) {
-            nodes.push(new MarkdownNode("text", buf));
+            nodes.push(new MarkdownNode(MarkdownNodeKind.Text, buf));
             buf = "";
         }
     }
@@ -25,7 +25,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
             if (endBacktick !== -1) {
                 flushBuf();
                 let codeContent = text.slice(i + 1, endBacktick);
-                nodes.push(new MarkdownNode("inline_code", codeContent));
+                nodes.push(new MarkdownNode(MarkdownNodeKind.InlineCode, codeContent));
                 i = endBacktick + 1;
                 continue;
             }
@@ -49,7 +49,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
                             title = urlAndTitle.slice(quoteIdx + 1, endQuote);
                         }
                     }
-                    let imgNode = new MarkdownNode("image", altText);
+                    let imgNode = new MarkdownNode(MarkdownNodeKind.Image, altText);
                     imgNode.url = url;
                     imgNode.title = title;
                     nodes.push(imgNode);
@@ -77,7 +77,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
                             title = urlAndTitle.slice(quoteIdx + 1, endQuote);
                         }
                     }
-                    let linkNode = new MarkdownNode("link", linkText);
+                    let linkNode = new MarkdownNode(MarkdownNodeKind.Link, linkText);
                     linkNode.url = url;
                     linkNode.title = title;
                     let innerTokens = parseInlineTokens(linkText, escapeHtml);
@@ -97,9 +97,9 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
                 let linkContent = text.slice(i + 1, closeAngle);
                 if (linkContent.startsWith("http://") || linkContent.startsWith("https://") || linkContent.startsWith("mailto:")) {
                     flushBuf();
-                    let linkNode = new MarkdownNode("link", linkContent);
+                    let linkNode = new MarkdownNode(MarkdownNodeKind.Link, linkContent);
                     linkNode.url = linkContent;
-                    linkNode.addChild(new MarkdownNode("text", linkContent));
+                    linkNode.addChild(new MarkdownNode(MarkdownNodeKind.Text, linkContent));
                     nodes.push(linkNode);
                     i = closeAngle + 1;
                     continue;
@@ -112,7 +112,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
             if (endStrike !== -1) {
                 flushBuf();
                 let strikeContent = text.slice(i + 2, endStrike);
-                let strikeNode = new MarkdownNode("strikethrough");
+                let strikeNode = new MarkdownNode(MarkdownNodeKind.Strikethrough);
                 let inner = parseInlineTokens(strikeContent, escapeHtml);
                 for (let c of inner) {
                     strikeNode.addChild(c);
@@ -129,8 +129,8 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
             if (endIdx !== -1) {
                 flushBuf();
                 let content = text.slice(i + 3, endIdx);
-                let boldNode = new MarkdownNode("bold");
-                let italicNode = new MarkdownNode("italic");
+                let boldNode = new MarkdownNode(MarkdownNodeKind.Bold);
+                let italicNode = new MarkdownNode(MarkdownNodeKind.Italic);
                 let inner = parseInlineTokens(content, escapeHtml);
                 for (let c of inner) {
                     italicNode.addChild(c);
@@ -148,7 +148,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
             if (endIdx !== -1) {
                 flushBuf();
                 let content = text.slice(i + 2, endIdx);
-                let boldNode = new MarkdownNode("bold");
+                let boldNode = new MarkdownNode(MarkdownNodeKind.Bold);
                 let inner = parseInlineTokens(content, escapeHtml);
                 for (let c of inner) {
                     boldNode.addChild(c);
@@ -165,7 +165,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
             if (endIdx !== -1 && endIdx > i + 1) {
                 flushBuf();
                 let content = text.slice(i + 1, endIdx);
-                let italicNode = new MarkdownNode("italic");
+                let italicNode = new MarkdownNode(MarkdownNodeKind.Italic);
                 let inner = parseInlineTokens(content, escapeHtml);
                 for (let c of inner) {
                     italicNode.addChild(c);

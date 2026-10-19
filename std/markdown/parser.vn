@@ -1,5 +1,5 @@
 
-import { MarkdownOptions, MarkdownNode } from "std:markdown/ast";
+import { MarkdownOptions, MarkdownNode, TableAlign } from "std:markdown/ast";
 import { escapeHtmlStr, isWhitespaceChar, findFrom, startsWithAt } from "std:markdown/utils";
 
 export function isThematicBreak(line: str): bool {
@@ -88,22 +88,22 @@ export function isTableSeparator(line: str): bool {
     return validCols > 0;
 }
 
-export function parseTableAlignments(sepLine: str): str[] {
+export function parseTableAlignments(sepLine: str): TableAlign[] {
     let parts = sepLine.trim().split("|");
-    let aligns: str[] = [];
+    let aligns: TableAlign[] = [];
     for (let p of parts) {
         let col = p.trim();
         if (col.length === 0) continue;
         let left = col.startsWith(":");
         let right = col.endsWith(":");
         if (left && right) {
-            aligns.push("center");
+            aligns.push(TableAlign.Center);
         } else if (right) {
-            aligns.push("right");
+            aligns.push(TableAlign.Right);
         } else if (left) {
-            aligns.push("left");
+            aligns.push(TableAlign.Left);
         } else {
-            aligns.push("none");
+            aligns.push(TableAlign.None);
         }
     }
     return aligns;

@@ -1,4 +1,4 @@
-import { Markdown, MarkdownNode, MarkdownOptions } from "std:markdown";
+import { Markdown, MarkdownNode, MarkdownNodeKind, MarkdownOptions } from "std:markdown";
 import { describe, it, expect } from "std:test";
 
 
@@ -71,7 +71,7 @@ let htmlBreaks = Markdown.render(mdBreaks, { breaks: true });
 await describe("95 stdlib markdown", async () => {
         await it("group 1 part 1", async () => {
         expect(headingsAst.children.length).toBe(4);
-        expect(headingsAst.children[0].type).toBe("heading");
+        expect(headingsAst.children[0].kind).toBe(MarkdownNodeKind.Heading);
         expect(headingsAst.children[0].level).toBe(1);
         expect(headingsAst.children[0].text).toBe("Main Title");
         expect(headingsAst.children[1].level).toBe(2);
