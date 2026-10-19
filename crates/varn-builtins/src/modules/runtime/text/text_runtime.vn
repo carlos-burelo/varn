@@ -1,10 +1,27 @@
 // runtime:text — font discovery + shaping (fontdb + swash).
 // Glyph IDs vary per machine/font: tests assert structure, never IDs.
 
+export interface ShapedRun {
+    glyphs: int[];
+    advances: float[];
+    clusters: int[];
+    width: float;
+    count: int;
+}
+
+export interface RasterGlyph {
+    w: int;
+    h: int;
+    bx: int;
+    by: int;
+    advance: float;
+    bitmap: Bytes;
+}
+
 export declare function fontCount$(): int;
 export declare function fonts$(): str[];
-export declare function shape$(text: str, size: float): dynamic;
-export declare function rasterGlyph$(ch: str, size: float): dynamic;
+export declare function shape$(text: str, size: float): ShapedRun;
+export declare function rasterGlyph$(ch: str, size: float): RasterGlyph;
 export declare function glyphCacheSize$(): int;
 export declare function ascent$(size: float): float;
 export declare function descent$(size: float): float;

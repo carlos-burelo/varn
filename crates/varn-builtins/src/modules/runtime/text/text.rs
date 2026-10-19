@@ -3,6 +3,18 @@ use varn_types::{NativeCtx, VmValue};
 
 pub struct TextRuntime;
 
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/text/text_runtime.vn",
+    interface: "ShapedRun",
+    struct ShapedRun;
+}
+
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/text/text_runtime.vn",
+    interface: "RasterGlyph",
+    struct RasterGlyph;
+}
+
 varn_contract! {
     module: "runtime:text",
     contract: "src/modules/runtime/text/text_runtime.vn",
@@ -32,18 +44,17 @@ varn_contract! {
                 .iter()
                 .map(|g| VmValue::from_int(g.cluster as i64))
                 .collect();
-            let ids_v = ctx.alloc_array(ids);
-            let adv_v = ctx.alloc_array(adv);
-            let clusters_v = ctx.alloc_array(clusters);
-            let width_v = VmValue::from_f64(run.width as f64);
-            let count_v = VmValue::from_int(run.glyphs.len() as i64);
-            let o = ctx.alloc_object();
-            ctx.set_field(o, "glyphs", ids_v);
-            ctx.set_field(o, "advances", adv_v);
-            ctx.set_field(o, "clusters", clusters_v);
-            ctx.set_field(o, "width", width_v);
-            ctx.set_field(o, "count", count_v);
-            Ok(o)
+            let glyphs = ctx.alloc_array(ids);
+            let advances = ctx.alloc_array(adv);
+            let clusters = ctx.alloc_array(clusters);
+            Ok(ShapedRun {
+                glyphs,
+                advances,
+                clusters,
+                width: run.width as f64,
+                count: run.glyphs.len() as i64,
+            }
+            .alloc(ctx))
         }
         fn rasterGlyph(ctx: &mut dyn NativeCtx, ch: &str, size: f64) -> Result<VmValue, String> {
             let c = ch.chars().next().ok_or_else(|| "text.raster: empty string".to_string())?;
@@ -54,20 +65,16 @@ varn_contract! {
                 .first()
                 .ok_or_else(|| "text.raster: no glyph".to_string())?;
             let g = varn_text::raster_glyph(first.id, first.advance, size as f32)?;
-            let bitmap_v = ctx.alloc_buffer_from_bytes(&g.bitmap);
-            let w_v = VmValue::from_int(g.w as i64);
-            let h_v = VmValue::from_int(g.h as i64);
-            let bx_v = VmValue::from_int(g.bx as i64);
-            let by_v = VmValue::from_int(g.by as i64);
-            let adv_v = VmValue::from_f64(g.advance as f64);
-            let o = ctx.alloc_object();
-            ctx.set_field(o, "w", w_v);
-            ctx.set_field(o, "h", h_v);
-            ctx.set_field(o, "bx", bx_v);
-            ctx.set_field(o, "by", by_v);
-            ctx.set_field(o, "advance", adv_v);
-            ctx.set_field(o, "bitmap", bitmap_v);
-            Ok(o)
+            let bitmap = ctx.alloc_buffer_from_bytes(&g.bitmap);
+            Ok(RasterGlyph {
+                w: g.w as i64,
+                h: g.h as i64,
+                bx: g.bx as i64,
+                by: g.by as i64,
+                advance: g.advance as f64,
+                bitmap,
+            }
+            .alloc(ctx))
         }
         fn glyphCacheSize(_ctx: &mut dyn NativeCtx) -> Result<i64, String> {
             Ok(varn_text::cache_size() as i64)

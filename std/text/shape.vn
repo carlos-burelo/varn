@@ -6,8 +6,12 @@ import {
     glyphCacheSize$,
     ascent$,
     descent$,
-    wrap$
+    wrap$,
+    ShapedRun,
+    RasterGlyph
 } from "runtime:text";
+
+export { ShapedRun, RasterGlyph };
 
 export function fontCount(): int {
     return fontCount$();
@@ -17,14 +21,6 @@ export function fonts(): str[] {
     return fonts$();
 }
 
-export type ShapedRun = {
-    glyphs: int[],
-    advances: float[],
-    clusters: int[],
-    width: float,
-    count: int
-};
-
 export function shape(text: str, size: float): ShapedRun {
     return shape$(text, size);
 }
@@ -32,15 +28,6 @@ export function shape(text: str, size: float): ShapedRun {
 export function measure(text: str, size: float): float {
     return shape$(text, size).width;
 }
-
-export type RasterGlyph = {
-    w: int,
-    h: int,
-    bx: int,
-    by: int,
-    advance: float,
-    bitmap: Bytes
-};
 
 export function rasterGlyph(ch: str, size: float): RasterGlyph {
     return rasterGlyph$(ch, size);
