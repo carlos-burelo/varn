@@ -155,7 +155,7 @@ fn compile_source_inner(
 }
 
 fn std_imports_are_pure(id: &str, source: &str) -> Result<bool, String> {
-    let (program, arena, interner) = crate::quiet_parse::parse_only(source, id, "")?;
+    let (program, arena, interner) = crate::quiet_parse::parse_module(source, id, "")?;
     let mut pure = true;
     for spec in crate::import_collector::collect_imports(&program, &arena, &interner) {
         varn_modules::layer::check_import(varn_modules::layer::Layer::Std, &spec)
