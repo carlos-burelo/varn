@@ -15,7 +15,7 @@ use crate::document::{ChainResult, DocumentState};
 use crate::query;
 
 pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> {
-    if let Some(ctx) = query::import_path_at(&state.source, line, col) {
+    if let Some(ctx) = query::import_path_at(&state.source, &state.tokens, line, col) {
         return imports::import_path_hover(&ctx.specifier, &state.uri);
     }
 

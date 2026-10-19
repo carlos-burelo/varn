@@ -43,7 +43,7 @@ pub fn build_completion_response(
     let prefix = get_word_prefix(&state.source, line, col).unwrap_or_default();
     let trig = compact_trigger(trigger_char, &trigger_kind);
     let lc = format!("{}:{}", line + 1, col + 1);
-    if let Some(ctx) = import_path_at(&state.source, line, col) {
+    if let Some(ctx) = import_path_at(&state.source, &state.tokens, line, col) {
         let mut items = build_import_completions(&ctx.prefix, &state.uri);
         let is_relative = ctx.prefix.starts_with('.') || ctx.specifier.starts_with('.');
         for item in &mut items {
@@ -91,8 +91,8 @@ pub fn build_completion_response(
         return (Some(resp), Some(log));
     }
 
-    if let Some(module_path) = named_import_module_at(&state.source, line, col) {
-        let already_imported = named_imported_names_at(&state.source, line, col);
+    if let Some(module_path) = named_import_module_at(&state.source, &state.tokens, line, col) {
+        let already_imported = named_imported_names_at(&state.source, &state.tokens, line, col);
         let doc_uri = state.uri.clone();
         let all = build_module_export_completions(resolver, &module_path, &doc_uri);
         let total = all.len();

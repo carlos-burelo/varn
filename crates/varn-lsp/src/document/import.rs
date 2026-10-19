@@ -1,126 +1,118 @@
 use rustc_hash::FxHashSet;
+use varn_core::TokenKind;
 
-use super::ImportPathContext;
+use super::{token_lexeme, ImportPathContext, TokenRecord};
 
 pub use varn_modules::resolver::{
     normalize_display_path, path_to_uri, percent_decode, relative_import_path, uri_to_path,
 };
 
-fn is_import_line(line: &str) -> bool {
-    let t = line.trim_start();
-    t.starts_with("import") || t.starts_with("export") || line.contains(" from ")
+fn before(tok: &TokenRecord, line: u32, col: u32) -> bool {
+    tok.line < line || (tok.line == line && tok.col < col)
 }
 
-pub fn import_path_at(source: &str, line: u32, col: u32) -> Option<ImportPathContext> {
-    let src_line = source.lines().nth(line as usize)?;
-
-    if !is_import_line(src_line) {
+pub fn import_path_at(
+    source: &str,
+    tokens: &[TokenRecord],
+    line: u32,
+    col: u32,
+) -> Option<ImportPathContext> {
+    let idx = tokens.iter().position(|t| {
+        t.kind == TokenKind::Str && t.line == line && t.col < col && col <= t.col + t.length
+    })?;
+    let leads = idx
+        .checked_sub(1)
+        .is_some_and(|i| matches!(tokens[i].kind, TokenKind::From | TokenKind::Import));
+    if !leads {
         return None;
     }
-
-    let mut quote_char = None;
-    let mut start_idx = None;
-    let mut end_idx = None;
-
-    for (i, c) in src_line.chars().enumerate() {
-        if c == '\'' || c == '"' {
-            if let Some(q) = quote_char {
-                if q == c {
-                    end_idx = Some(i);
-                    if i >= col as usize && start_idx.unwrap_or(0) <= col as usize {
-                        break;
-                    }
-                    quote_char = None;
-                    start_idx = None;
-                    end_idx = None;
-                }
-            } else {
-                quote_char = Some(c);
-                start_idx = Some(i);
-            }
-        }
-    }
-
-    if let (Some(start), Some(end)) = (start_idx, end_idx)
-        && col as usize > start
-        && col as usize <= end
-    {
-        let full_specifier = &src_line[start + 1..end];
-        let prefix = &src_line[start + 1..col as usize];
-        return Some(ImportPathContext {
-            prefix: prefix.to_owned(),
-            specifier: full_specifier.to_owned(),
-            content_start_col: (start + 1) as u32,
-        });
-    }
-
-    if let Some(start) = start_idx
-        && end_idx.is_none()
-        && col as usize > start
-    {
-        let end = (col as usize).min(src_line.len());
-        let prefix = &src_line[start + 1..end];
-        return Some(ImportPathContext {
-            prefix: prefix.to_owned(),
-            specifier: prefix.to_owned(),
-            content_start_col: (start + 1) as u32,
-        });
-    }
-    None
-}
-
-pub fn named_import_module_at(source: &str, line: u32, col: u32) -> Option<String> {
-    let src_line = source.lines().nth(line as usize)?;
-    if col as usize > src_line.len() {
+    let tok = &tokens[idx];
+    let text = token_lexeme(source, tok);
+    let quote = text.chars().next()?;
+    let closed = text.len() >= 2 && text.ends_with(quote);
+    if closed && col >= tok.col + tok.length {
         return None;
     }
-    let before = &src_line[..col as usize];
-    if !before.contains('{') {
-        return None;
-    }
-    let after = &src_line[col as usize..];
-    let full = {
-        let close_idx = after.find('}')?;
-        format!("{}{}", before, &after[..=close_idx])
+    let content = if closed {
+        &text[1..text.len() - 1]
+    } else {
+        &text[1..]
     };
-
-    if !full.contains("import") && !full.contains("export") {
-        return None;
-    }
-
-    source.lines().skip(line as usize).find_map(|l| {
-        if let Some(idx) = l.find("from") {
-            let rest = l[idx + 4..].trim().trim_end_matches(';').trim();
-            if (rest.starts_with('\'') && rest.ends_with('\''))
-                || (rest.starts_with('"') && rest.ends_with('"'))
-            {
-                return Some(rest[1..rest.len() - 1].to_owned());
-            }
-        }
-        None
+    let typed = ((col - tok.col - 1) as usize).min(content.len());
+    let prefix = &content[..typed];
+    Some(ImportPathContext {
+        prefix: prefix.to_owned(),
+        specifier: if closed { content } else { prefix }.to_owned(),
+        content_start_col: tok.col + 1,
     })
 }
 
-pub fn named_imported_names_at(source: &str, line: u32, _col: u32) -> FxHashSet<String> {
-    let mut names = FxHashSet::default();
-    let src_line = match source.lines().nth(line as usize) {
-        Some(l) => l,
-        None => return names,
-    };
-    let open_idx = match src_line.find('{') {
-        Some(i) => i,
-        None => return names,
-    };
-    let close_idx = match src_line.find('}') {
-        Some(i) => i,
-        None => return names,
-    };
-    let inner = &src_line[open_idx + 1..close_idx];
-    for part in inner.split(',') {
-        let name = part.trim();
-        if !name.is_empty() && name != "import" && name != "export" {
-            names.insert(name.to_owned());
+fn open_brace_of_import(tokens: &[TokenRecord], line: u32, col: u32) -> Option<usize> {
+    let cursor = tokens.iter().rposition(|t| before(t, line, col))?;
+    let mut i = cursor;
+    loop {
+        let kind = tokens[i].kind;
+        if kind == TokenKind::RBrace || kind == TokenKind::Semicolon {
+            return None;
         }
+        if kind == TokenKind::LBrace {
+            break;
+        }
+        i = i.checked_sub(1)?;
+    }
+    let opens_import = tokens[..i]
+        .iter()
+        .rev()
+        .take_while(|t| t.kind != TokenKind::Semicolon && t.kind != TokenKind::RBrace)
+        .any(|t| matches!(t.kind, TokenKind::Import | TokenKind::Export));
+    opens_import.then_some(i)
+}
+
+pub fn named_import_module_at(
+    source: &str,
+    tokens: &[TokenRecord],
+    line: u32,
+    col: u32,
+) -> Option<String> {
+    let open = open_brace_of_import(tokens, line, col)?;
+    let close = open
+        + tokens[open..]
+            .iter()
+            .position(|t| t.kind == TokenKind::RBrace)?;
+    let from = tokens
+        .get(close + 1)
+        .filter(|t| t.kind == TokenKind::From)?;
+    let spec = tokens
+        .get(close + 2)
+        .filter(|t| t.kind == TokenKind::Str && t.line >= from.line)?;
+    let text = token_lexeme(source, spec);
+    let quote = text.chars().next()?;
+    (text.len() >= 2 && text.ends_with(quote)).then(|| text[1..text.len() - 1].to_owned())
+}
+
+pub fn named_imported_names_at(
+    source: &str,
+    tokens: &[TokenRecord],
+    line: u32,
+    col: u32,
+) -> FxHashSet<String> {
+    let mut names = FxHashSet::default();
+    let Some(open) = open_brace_of_import(tokens, line, col) else {
+        return names;
+    };
+    let mut element_start = true;
+    for tok in &tokens[open + 1..] {
+        if tok.kind == TokenKind::RBrace {
+            break;
+        }
+        if tok.kind == TokenKind::Comma {
+            element_start = true;
+            continue;
+        }
+        if element_start && tok.kind == TokenKind::Identifier {
+            names.insert(token_lexeme(source, tok).to_owned());
+        }
+        element_start = false;
     }
     names
 }
