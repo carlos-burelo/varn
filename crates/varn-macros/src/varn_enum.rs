@@ -104,6 +104,10 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 Self::ALL.into_iter().find(|v| v.name() == name)
             }
 
+            pub fn of_tag(tag: i64) -> ::core::option::Option<Self> {
+                Self::ALL.into_iter().find(|v| v.tag() == tag)
+            }
+
             pub fn to_value(
                 self,
                 ctx: &mut dyn ::varn_types::NativeCtx,
