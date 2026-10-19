@@ -10,7 +10,7 @@ pub(crate) mod conform;
 pub(crate) mod contract;
 mod contract_natives;
 pub(crate) mod convert;
-pub(crate) mod core_option;
+pub(crate) mod enum_values;
 pub(crate) mod ctx;
 pub(crate) mod ctx_csv;
 pub(crate) mod ctx_frames;

@@ -102,10 +102,17 @@ impl ExecCtx {
         specifier: &str,
         source_file: &str,
     ) -> VmResult<VmValue> {
-        use crate::exec::modules;
+        let resolved = crate::exec::modules::resolve_specifier_from_path(specifier, source_file)?;
+        self.load_resolved(resolved, specifier)
+    }
 
-        let resolved = modules::resolve_specifier_from_path(specifier, source_file)?;
+    pub(crate) fn load_host_module(&mut self, specifier: &str) -> VmResult<VmValue> {
+        let resolved = varn_modules::resolver::resolve(specifier, &ModuleId::local_str("."))
+            .map_err(RuntimeError::new)?;
+        self.load_resolved(resolved, specifier)
+    }
 
+    fn load_resolved(&mut self, resolved: ModuleId, specifier: &str) -> VmResult<VmValue> {
         if let Some(cached) = self.linker.cached(&resolved) {
             return Ok(cached);
         }

@@ -168,6 +168,27 @@ impl NativeCtx for ExecCtx {
         self.make_option(value).map_err(|e| e.to_string())
     }
 
+    fn enum_variant(
+        &mut self,
+        module: &'static str,
+        enum_name: &'static str,
+        variant: &'static str,
+        payload: &[VmValue],
+    ) -> Result<VmValue, String> {
+        ExecCtx::enum_variant(self, module, enum_name, variant, payload).map_err(|e| e.to_string())
+    }
+
+    fn enum_variant_name(&self, value: VmValue) -> Option<std::sync::Arc<str>> {
+        if !value.is_heap() {
+            return None;
+        }
+        if let Some(crate::heap::HeapObj::EnumVariant(ev)) = self.heap.get(value.as_heap()) {
+            Some(ev.def.variant_name.clone())
+        } else {
+            None
+        }
+    }
+
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
         self.heap.alloc_range(start, end, inclusive)
     }

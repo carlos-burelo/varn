@@ -67,6 +67,18 @@ pub trait NativeCtx: crate::Buffers {
     fn option(&mut self, _value: Option<VmValue>) -> Result<VmValue, String> {
         Err("this context cannot build core Option values".to_string())
     }
+    fn enum_variant(
+        &mut self,
+        _module: &'static str,
+        _enum_name: &'static str,
+        _variant: &'static str,
+        _payload: &[VmValue],
+    ) -> Result<VmValue, String> {
+        Err("this context cannot build enum values".to_string())
+    }
+    fn enum_variant_name(&self, _value: VmValue) -> Option<std::sync::Arc<str>> {
+        None
+    }
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue;
     fn alloc_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue;
     fn alloc_class(&mut self, class: Rc<ClassObj>) -> VmValue;
