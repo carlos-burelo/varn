@@ -13,12 +13,13 @@
   [2m1:0     [0m │ type            │ [2m[core][0m [1mMutable             [0m │ [33mdynamic[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mNonNullable         [0m │ [33mdynamic[0m
   [2m1:0     [0m │ const           │ [2m[core][0m [1mNaN                 [0m │ [33mfloat[0m
-  [2m1:0     [0m │ class           │ [2m[core][0m [1mint                 [0m │ [33mint[0m
+  [2m1:0     [0m │ type            │ [2m[core][0m [1mUnit                [0m │ [33m()[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mAdd                 [0m │ [33mAdd[0m
   [2m1:0     [0m │ fn              │ [2m[core][0m [1mprint               [0m │ [33m(...args: dynamic[]) => void[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mEquatable           [0m │ [33mEquatable[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mGetterContext       [0m │ [33mGetterContext[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mbigint              [0m │ [33mbigint[0m
+  [2m1:0     [0m │ class           │ [2m[core][0m [1mint                 [0m │ [33mint[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mSet                 [0m │ [33mSet[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mSetterContext       [0m │ [33mSetterContext[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mReturnType          [0m │ [33mdynamic[0m
