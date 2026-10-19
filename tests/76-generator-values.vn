@@ -69,21 +69,21 @@ function* returnsAHeapValue() {
 }
 await describe("76 generator values", async () => {
     await it("tests", async () => {
-        expect(callsAGlobal().next().value).toBe(25)
+        expect(callsAGlobal().next().unwrap()).toBe(25)
         const counted = touchesModuleState()
-        expect(counted.next().value).toBe(1)
-        expect(counted.next().value).toBe(2)
-        expect(yieldsStrings().next().value).toBe("a string")
-        const yieldedArray = yieldsArrays().next().value
+        expect(counted.next().unwrap()).toBe(1)
+        expect(counted.next().unwrap()).toBe(2)
+        expect(yieldsStrings().next().unwrap()).toBe("a string")
+        const yieldedArray = yieldsArrays().next().unwrap()
         expect(yieldedArray.length === 3 && yieldedArray[1] === 2).toBeTruthy()
-        const yieldedObject = yieldsObjects().next().value
+        const yieldedObject = yieldsObjects().next().unwrap()
         expect(yieldedObject.a === 1 && yieldedObject.b === 2).toBeTruthy()
-        const nested = yieldsAGenerator().next().value
-        expect(nested.next().value).toBe(41)
+        const nested = yieldsAGenerator().next().unwrap()
+        expect(nested.next().unwrap()).toBe(41)
         const returning = returnsAHeapValue()
         returning.next()
         const finalResult = returning.next()
-        expect(finalResult.done && finalResult.value[0] === 9).toBeTruthy()
+        expect(finalResult.isNone()).toBeTruthy()
         
         
     });

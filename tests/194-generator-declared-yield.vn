@@ -32,7 +32,7 @@ await describe("194 generator declared yield", async () => {
     })
 
     await it("a generator can still yield generators", () => {
-        const nested = outer().next().value
-        expect(nested.next().value).toBe(41)
+        const nested = outer().next().unwrap()
+        expect(nested.next().unwrap()).toBe(41)
     })
 })

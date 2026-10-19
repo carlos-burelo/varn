@@ -8,13 +8,6 @@ use crate::exec::{ExecCtx, VmSuspend};
 use crate::frame::CallFrame;
 use crate::value::VmValue;
 
-fn make_iter_result(heap: &mut crate::heap::Heap, value: VmValue, done: bool) -> VmValue {
-    heap.alloc_object_with_shape_slice(
-        &varn_types::iter_result_shape(),
-        &[value, VmValue::from_bool(done)],
-    )
-}
-
 enum Phase {
     Fresh {
         closure: Rc<VmClosure>,
@@ -107,11 +100,7 @@ impl ExecCtx {
         match phase {
             Phase::Done => {
                 *generator.phase.borrow_mut() = Phase::Done;
-                Ok(Entry::Done(make_iter_result(
-                    &mut self.heap,
-                    VmValue::null(),
-                    true,
-                )))
+                Ok(Entry::Done(self.make_option(None)?))
             }
             Phase::Running => Err(RuntimeError::new("generator is already running")),
             Phase::Fresh {
@@ -152,13 +141,10 @@ impl ExecCtx {
             let outer = std::mem::replace(&mut self.jit_suspend_buf, std::ptr::null_mut());
             let ran = self.run_until(depth);
             self.jit_suspend_buf = outer;
-            let returned = match ran {
-                Ok(v) => v,
-                Err(e) => {
-                    self.abandon_generator(generator, depth);
-                    return Err(e);
-                }
-            };
+            if let Err(e) = ran {
+                self.abandon_generator(generator, depth);
+                return Err(e);
+            }
             match self.vm_suspend.take() {
                 Some(VmSuspend::Yield { value, dest_reg }) => {
                     return self.park_generator(generator, depth, value, dest_reg);
@@ -178,7 +164,7 @@ impl ExecCtx {
                 Some(VmSuspend::DebugBreak) => {}
                 None => {
                     *generator.phase.borrow_mut() = Phase::Done;
-                    return Ok(make_iter_result(&mut self.heap, returned, true));
+                    return self.make_option(None);
                 }
             }
         }
@@ -207,7 +193,6 @@ impl ExecCtx {
         &mut self,
         generator: &Rc<GenState>,
         depth: usize,
-        returned: VmValue,
     ) -> VmResult<VmValue> {
         match self.vm_suspend.take() {
             Some(VmSuspend::Yield { value, dest_reg }) => {
@@ -215,7 +200,7 @@ impl ExecCtx {
             }
             Some(VmSuspend::Await { .. }) | Some(VmSuspend::DebugBreak) | None => {
                 self.abandon_generator(generator, depth);
-                Ok(make_iter_result(&mut self.heap, returned, true))
+                self.make_option(None)
             }
         }
     }
@@ -232,7 +217,7 @@ impl ExecCtx {
         self.frames.pop();
         self.stack.pop_frame();
         *generator.phase.borrow_mut() = Phase::Suspended { frame, dest_reg };
-        Ok(make_iter_result(&mut self.heap, value, false))
+        self.make_option(Some(value))
     }
 
     pub(crate) fn abandon_generator(&mut self, generator: &GenState, depth: usize) {

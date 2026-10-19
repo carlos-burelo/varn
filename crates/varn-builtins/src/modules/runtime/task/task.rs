@@ -1,6 +1,6 @@
 use varn_macros::varn_contract;
 use varn_types::value::{endpoint_id, ChannelEndpoint, SendValue};
-use varn_types::{HostOpen, NativeCtx, VmValue};
+use varn_types::{HostOpen, NativeCtx, NativeError, VmValue};
 
 pub struct TaskRuntime;
 
@@ -25,13 +25,6 @@ fn reject_closed(ctx: &mut dyn NativeCtx) -> VmValue {
     }
     .to_value_ctx(ctx);
     ctx.task_rejected(error)
-}
-
-fn next_result(ctx: &mut dyn NativeCtx, value_nv: VmValue, done: bool) -> VmValue {
-    ctx.alloc_object_with_shape(
-        &varn_types::iter_result_shape(),
-        vec![value_nv, VmValue::from_bool(done)],
-    )
 }
 
 varn_macros::varn_record! {
@@ -170,11 +163,10 @@ varn_contract! {
 
     class: "Receiver",
     impl ReceiverImpl {
-        fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+        fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, NativeError> {
             let finished = |ctx: &mut dyn NativeCtx| {
-                let null = ctx.null_val();
-                let result = next_result(ctx, null, true);
-                ctx.task_resolved(result)
+                let none = ctx.option(None).map_err(NativeError::from)?;
+                Ok(ctx.task_resolved(none))
             };
             let Some(id) = endpoint_id(ctx, this) else {
                 return finished(ctx);
@@ -182,12 +174,12 @@ varn_contract! {
             match crate::runtime::channel::try_receive(id) {
                 crate::runtime::channel::RecvOutcome::Item(item) => {
                     let value = item.to_value_ctx(ctx);
-                    let result = next_result(ctx, value, false);
-                    ctx.task_resolved(result)
+                    let some = ctx.option(Some(value)).map_err(NativeError::from)?;
+                    Ok(ctx.task_resolved(some))
                 }
                 crate::runtime::channel::RecvOutcome::Closed => finished(ctx),
                 crate::runtime::channel::RecvOutcome::Parked(promise) => {
-                    ctx.task_from_host(promise, HostOpen::ReceiveNext)
+                    Ok(ctx.task_from_host(promise, HostOpen::ReceiveNext))
                 }
             }
         }

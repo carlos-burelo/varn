@@ -77,10 +77,14 @@ impl<'r> Checker<'r> {
             }
 
             StmtKind::ForOf {
-                left, right, body, ..
+                left,
+                right,
+                body,
+                is_await,
+                ..
             } => {
                 self.forget_loop_assignments(rec, stmt, bind);
-                self.check_for_of_stmt(rec, left.clone(), *right, *body, range, bind);
+                self.check_for_of_stmt(rec, left.clone(), *right, *body, *is_await, range, bind);
             }
 
             StmtKind::ForIn {

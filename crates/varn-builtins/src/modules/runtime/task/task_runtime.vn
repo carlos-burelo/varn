@@ -23,7 +23,7 @@ export declare class Sender<T = dynamic> {
 
 export declare class Receiver<T = dynamic> {
     receive(): Task<T>;
-    next(): Task<{ value: T?, done: bool }>;
+    @fallible next(): Task<Option<T>>;
     dispose(): void;
 }
 

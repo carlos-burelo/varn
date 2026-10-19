@@ -240,13 +240,12 @@ fn emit_generator_next(
         .icmp_imm_u(cranelift_codegen::ir::condcodes::IntCC::NotEqual, entry, 0);
     b.ins().brif(taken, entered, &[], merge, &[]);
     b.switch_to_block(entered);
-    let (returned, _) = super::direct::call_entry(b, ctx, entry, out)?;
-    let (ret_tag, ret_payload) = b.ins().isplit(returned);
+    super::direct::call_entry(b, ctx, entry, out)?;
     super::super::super::emit::call_helper_void(
         b,
         ctx.cc,
         ctx.helpers.generator_leave,
-        &[exec_ctx, ret_tag, ret_payload],
+        &[exec_ctx],
     );
     b.ins().jump(merge, &[]);
     b.switch_to_block(merge);

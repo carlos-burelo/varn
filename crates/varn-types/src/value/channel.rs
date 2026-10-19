@@ -1,6 +1,5 @@
 use super::class::ClassObj;
-use super::RuntimeSymbol;
-use crate::{NativeCtx, NativeFnResult, VmValue};
+use crate::{NativeCtx, VmValue};
 
 pub const CHANNEL_CLOSED_CLASS: &str = "ChannelClosed";
 pub const ENDPOINT_ID_FIELD: &str = "_chan";
@@ -35,14 +34,6 @@ impl ChannelEndpoint {
             .alloc_instance(class)
             .ok_or_else(|| format!("channel: {class} class not registered"))?;
         ctx.set_field(endpoint, ENDPOINT_ID_FIELD, VmValue::from_int(id as i64));
-        if self == Self::Receiver {
-            let iter = ctx.alloc_bound_native(
-                endpoint,
-                itself,
-                RuntimeSymbol::AsyncIterator.method_name(),
-            );
-            ctx.set_field(endpoint, RuntimeSymbol::AsyncIterator.name(), iter);
-        }
         Ok(endpoint)
     }
 }
@@ -50,10 +41,4 @@ impl ChannelEndpoint {
 pub fn endpoint_id(ctx: &mut dyn NativeCtx, endpoint: VmValue) -> Option<u64> {
     let id = ctx.get_field(endpoint, ENDPOINT_ID_FIELD)?;
     id.is_int().then(|| id.as_int() as u64)
-}
-
-fn itself(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    args.first()
-        .copied()
-        .ok_or_else(|| "receiver iterator: missing self".into())
 }

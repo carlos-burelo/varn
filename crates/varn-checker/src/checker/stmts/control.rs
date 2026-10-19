@@ -1,7 +1,7 @@
 use super::super::Checker;
 use crate::checker::recorder::Recorder;
 use varn_core::ast::{ExprId, ForInit, Pattern, StmtId, VarDeclarator};
-use varn_core::{Diagnostic, ErrorCode, SourceRange, TypeKind};
+use varn_core::{Diagnostic, ErrorCode, SourceRange};
 use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
@@ -97,50 +97,30 @@ impl<'r> Checker<'r> {
         left: Pattern,
         right: ExprId,
         body: StmtId,
+        is_await: bool,
         range: SourceRange,
         bind: &BindResult,
     ) {
         self.check_expr(rec, right, bind);
         let right_ty = self.infer_type(rec, right, bind);
-        let right_kind = self.ty_table.get(right_ty.0);
-        let builtin = right_ty.builtin_of(&self.ty_table);
-        let elem_ty = match right_kind {
-            TypeKind::Array(inner) => Type::resolved(inner),
-            TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::TemplateLiteral(_) => {
-                Type::Char
+        let elem_ty = match self.for_of_element(right_ty, is_await, bind) {
+            Some((plan, elem)) => {
+                rec.desugar.for_of_plans.insert(right.index(), plan);
+                elem
             }
-            TypeKind::Generic(_, args, _)
-                if builtin == Some(varn_core::BuiltinType::Map)
-                    && self.ty_table.get_list(args).len() == 2 =>
-            {
-                let arg_ids = self.ty_table.get_list(args).to_vec();
-                let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&arg_ids);
-                Type::resolved(
-                    std::sync::Arc::make_mut(&mut self.ty_table).intern(TypeKind::Tuple(list)),
-                )
+            None => {
+                let shown = right_ty.display(&self.ty_table, &bind.interner);
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::NotIterable,
+                        format!(
+                            "'{shown}' is not iterable: for-of needs an array, str, Map, Set, Range or a type whose next() returns Option<T>"
+                        ),
+                    )
+                    .with_range(self.ast_arena.expr(right).range),
+                );
+                Type::Dynamic
             }
-            TypeKind::Generic(_name, args, _) if self.ty_table.get_list(args).len() == 1 => {
-                Type::resolved(self.ty_table.get_list(args)[0])
-            }
-            TypeKind::Named(..) if builtin == Some(varn_core::BuiltinType::Range) => Type::Int,
-            TypeKind::Primitive(_)
-            | TypeKind::Literal(_)
-            | TypeKind::This
-            | TypeKind::Union(_)
-            | TypeKind::Intersection(_)
-            | TypeKind::Tuple(_)
-            | TypeKind::Named(..)
-            | TypeKind::Generic(..)
-            | TypeKind::Fn(_)
-            | TypeKind::Object(_)
-            | TypeKind::Typeof(_)
-            | TypeKind::KeyOf(_)
-            | TypeKind::IndexedAccess { .. }
-            | TypeKind::Mapped { .. }
-            | TypeKind::Conditional { .. }
-            | TypeKind::Infer(_)
-            | TypeKind::EnumVariant { .. }
-            | TypeKind::TypePredicate { .. } => Type::Dynamic,
         };
         self.loop_depth += 1;
         self.with_next_child_scope_span(

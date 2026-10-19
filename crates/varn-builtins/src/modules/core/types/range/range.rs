@@ -46,6 +46,9 @@ varn_contract! {
         fn length(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
             get_range(ctx, this).map(|r| r.len()).unwrap_or(0)
         }
+        fn stride(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
+            get_range(ctx, this).map(|r| r.step).unwrap_or(1)
+        }
         fn toString(ctx: &mut dyn NativeCtx, this: VmValue) -> String {
             get_range(ctx, this).map(|r| r.to_string()).unwrap_or_default()
         }

@@ -136,6 +136,10 @@ fn enum_variant_property(
             | MemberKey::IterIndex
             | MemberKey::IterResult
             | MemberKey::IterRange
+            | MemberKey::Iter
+            | MemberKey::Chars
+            | MemberKey::ToArray
+            | MemberKey::Stride
             | MemberKey::CharCode,
         )
         | None => None,

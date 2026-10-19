@@ -1,29 +1,44 @@
+import { Option } from "core:types/option";
+
 /**
- * Lazy sequence produced by a `function*`, advanced with `next()`.
+ * Lazy sequence produced by a `function*`: each `next()` resumes the body up
+ * to its next `yield` and returns `Some(value)`, or `None` once it finishes.
  */
 export declare class Generator<T> {
-    @fallible next(value?: dynamic): { value: T; done: bool; };
-    return(value?: T): { value: T; done: bool; };
+    @fallible next(): Option<T>;
+    close(): void;
 }
 
 /**
  * What `async function*` produces. Same shape as `Generator<T>` on purpose:
  * the driver settles the body's awaits inside `next()` before returning, so
- * the caller gets a settled `{ value, done }` rather than a task to await.
- * `await` on a non-task is the identity, which is what makes `for await` work
- * over one of these and over a plain `Generator<T>` alike.
+ * the caller gets a settled `Option<T>` rather than a task to await.
  */
 export declare class AsyncGenerator<T> {
-    @fallible next(value?: dynamic): { value: T; done: bool; };
-    return(value?: T): { value: T; done: bool; };
+    @fallible next(): Option<T>;
+    close(): void;
 }
 
+/**
+ * A source of values pulled one at a time: `Some(value)` until it is
+ * exhausted, then `None`.
+ */
 export interface Iterator<T> {
-    next(): { value: T; done: bool; };
+    next(): Option<T>;
 }
 
+/**
+ * Something `for-of` can walk: it hands out a fresh `Iterator<T>`.
+ */
+export interface Iterable<T> {
+    iter(): Iterator<T>;
+}
+
+/**
+ * An `Iterator<T>` whose next value may take time to arrive.
+ */
 export interface AsyncIterator<T> {
-    next(): Task<{ value: T; done: bool; }>;
+    next(): Task<Option<T>>;
 }
 
 /**

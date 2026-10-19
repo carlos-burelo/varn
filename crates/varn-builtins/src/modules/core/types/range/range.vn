@@ -3,6 +3,7 @@ export declare class Range<T> {
     readonly end: T;
     readonly inclusive: bool;
     readonly length: int;
+    readonly stride: int;
 
     toString(): str;
     contains(val: T): bool;

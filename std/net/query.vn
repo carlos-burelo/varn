@@ -115,7 +115,7 @@ export class Query {
     values(): str[] {
         let res: str[] = [];
         for (const key in this.buckets) {
-            const bucket = this.buckets[key];
+            const bucket = this.buckets[key]!;
             for (const val of bucket) {
                 res.push(val);
             }
@@ -126,7 +126,7 @@ export class Query {
     entries(): [str, str][] {
         let res: [str, str][] = [];
         for (const key in this.buckets) {
-            const bucket = this.buckets[key];
+            const bucket = this.buckets[key]!;
             for (const val of bucket) {
                 res.push(#[key, val]);
             }
@@ -142,7 +142,7 @@ export class Query {
         const parts: str[] = [];
         for (const key in this.buckets) {
             const encodedKey = encodeURIComponent$(key);
-            const bucket = this.buckets[key];
+            const bucket = this.buckets[key]!;
             for (const value of bucket) {
                 parts.push(encodedKey + "=" + encodeURIComponent$(value));
             }

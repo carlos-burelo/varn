@@ -50,7 +50,7 @@ pub(crate) extern "C" fn jit_generator_enter(
 }
 
 #[varn_macros::jit_slow(field = "generator_leave")]
-pub(crate) extern "C" fn jit_generator_leave(ctx: *mut ExecCtx, ret_tag: u64, ret_payload: u64) {
+pub(crate) extern "C" fn jit_generator_leave(ctx: *mut ExecCtx) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let state = ctx_ref
@@ -63,8 +63,7 @@ pub(crate) extern "C" fn jit_generator_leave(ctx: *mut ExecCtx, ret_tag: u64, re
             ctx_ref.abandon_generator(&state, depth);
             return;
         }
-        let returned = VmValue::from_raw_parts(ret_tag, ret_payload);
-        match ctx_ref.leave_generator(&state, depth, returned) {
+        match ctx_ref.leave_generator(&state, depth) {
             Ok(v) => ctx_ref.jit_native_result = v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }

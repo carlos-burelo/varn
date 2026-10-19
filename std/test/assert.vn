@@ -79,7 +79,7 @@ export function deepEq(a: dynamic, b: dynamic): bool {
         if (a.size != b.size) {
             return false;
         }
-        for (const key of a.keys()) {
+        for (const key of (a as Map<dynamic, dynamic>).keys()) {
             if (!b.has(key) || !deepEq(a.get(key), b.get(key))) {
                 return false;
             }
@@ -90,7 +90,7 @@ export function deepEq(a: dynamic, b: dynamic): bool {
         if (a.size != b.size) {
             return false;
         }
-        for (const item of a) {
+        for (const item of a as Set<dynamic>) {
             if (!b.has(item)) {
                 return false;
             }

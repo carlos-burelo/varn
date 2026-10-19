@@ -192,11 +192,7 @@ impl<'a> FnEmitter<'a> {
         };
         let keys = self.hoist(keys);
         out.extend(std::mem::take(&mut self.pending));
-        let Pattern::Identifier { name, .. } = left else {
-            return self.lower_for_of_protocol(left, keys, out, body, false);
-        };
-        let name: Arc<str> = Arc::from(self.m.interner.resolve(*name));
-        out.extend(self.for_of_over_array(&name, keys, BackendTy::Str, body));
+        out.extend(self.for_of_over_array(left, keys, BackendTy::Str, body));
         out
     }
 }

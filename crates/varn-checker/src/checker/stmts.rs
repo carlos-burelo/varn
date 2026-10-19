@@ -4,6 +4,7 @@ mod completion;
 mod control;
 mod dispatch;
 mod exception;
+mod iteration;
 mod jumps;
 pub(crate) mod reassignment;
 mod resource;

@@ -59,6 +59,7 @@ pub enum ErrorCode {
     ImpureOperation = 3026,
     ConditionNeverFalse = 3027,
     NeverNull = 3028,
+    NotIterable = 3029,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -270,6 +271,7 @@ impl ErrorCode {
             ErrorCode::ImpureOperation => "impure-operation",
             ErrorCode::ConditionNeverFalse => "condition-never-false",
             ErrorCode::NeverNull => "never-null",
+            ErrorCode::NotIterable => "not-iterable",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }

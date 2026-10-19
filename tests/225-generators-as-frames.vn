@@ -50,8 +50,8 @@ async function* slowCount() {
 function collect(g: Generator<int>): int[] {
     let out: int[] = []
     let r = g.next()
-    while (!r.done) {
-        out.push(r.value)
+    while (r.isSome()) {
+        out.push(r.unwrap())
         r = g.next()
     }
     return out
@@ -66,7 +66,7 @@ await describe("225 generators as frames", async () => {
             seen = collect(fresh)
         }
         expect(seen.join(",")).toBe("1,2,3,30")
-        expect(g.next().value).toBe(1)
+        expect(g.next().unwrap()).toBe(1)
     })
 
     await it("a try region spans a yield", async () => {
@@ -74,7 +74,7 @@ await describe("225 generators as frames", async () => {
         for (let i = 0; i < 200; i = i + 1) {
             const g = guarded()
             g.next()
-            last = g.next().value
+            last = g.next().unwrap()
         }
         expect(last).toBe("inside")
     })
@@ -90,7 +90,7 @@ await describe("225 generators as frames", async () => {
             } catch (e) {
                 msg = e.message
             }
-            after = g.next().done
+            after = g.next().isNone()
         }
         expect(msg).toBe("boom")
         expect(after).toBe(true)
@@ -106,10 +106,10 @@ await describe("225 generators as frames", async () => {
 
     await it("a generator created in one task is resumed in another", async () => {
         const g = inner(0)
-        expect(g.next().value).toBe(1)
-        const second = await spawn((async () => g.next().value)())
+        expect(g.next().unwrap()).toBe(1)
+        const second = await spawn((async () => g.next().unwrap())())
         expect(second).toBe(2)
-        expect(g.next().done).toBe(true)
+        expect(g.next().isNone()).toBe(true)
     })
 
     await it("an async generator settles its awaits inside next", async () => {

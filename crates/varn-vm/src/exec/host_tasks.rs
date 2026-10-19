@@ -30,11 +30,14 @@ fn closed_error(ctx: &mut ExecCtx) -> VmValue {
     .to_value_ctx(ctx)
 }
 
-fn iter_result(ctx: &mut ExecCtx, value: VmValue, done: bool) -> VmValue {
-    ctx.heap.alloc_object_with_shape_slice(
-        &varn_types::iter_result_shape(),
-        &[value, VmValue::from_bool(done)],
-    )
+fn option_outcome(ctx: &mut ExecCtx, value: Option<VmValue>) -> Outcome {
+    ctx.make_option(value).map_err(|e| {
+        SendValue::Error {
+            class: varn_core::RuntimeErrorKind::Error.class_name().to_string(),
+            message: e.to_string(),
+        }
+        .to_value_ctx(ctx)
+    })
 }
 
 fn materialize(ctx: &mut ExecCtx, done: Completion, open: HostOpen) -> Outcome {
@@ -43,12 +46,9 @@ fn materialize(ctx: &mut ExecCtx, done: Completion, open: HostOpen) -> Outcome {
         (HostOpen::Plain, Err(sv)) => Err(sv.to_value_ctx(ctx)),
         (HostOpen::ReceiveNext, Ok(sv)) => {
             let value = open_value(ctx, &sv);
-            Ok(iter_result(ctx, value, false))
+            option_outcome(ctx, Some(value))
         }
-        (HostOpen::ReceiveNext, Err(_)) => {
-            let null = VmValue::null();
-            Ok(iter_result(ctx, null, true))
-        }
+        (HostOpen::ReceiveNext, Err(_)) => option_outcome(ctx, None),
         (HostOpen::Receive, Ok(sv)) => Ok(open_value(ctx, &sv)),
         (HostOpen::Receive, Err(_)) => Err(closed_error(ctx)),
         (HostOpen::SendAck, Ok(SendValue::Bool(true))) => Ok(VmValue::null()),

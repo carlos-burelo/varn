@@ -191,6 +191,10 @@ varn_contract! {
             }
             this.replace(from, to)
         }
+        fn chars(ctx: &mut dyn NativeCtx, this: &VnStr) -> Vec<VmValue> {
+            this.as_str().chars().map(|c| ctx.alloc_char(c)).collect()
+        }
+
         fn split(ctx: &mut dyn NativeCtx, this: &VnStr, separator: Option<&str>) -> Vec<VmValue> {
             let s = this.as_str();
             let base = s.as_ptr() as usize;

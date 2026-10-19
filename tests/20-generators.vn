@@ -22,23 +22,23 @@ await describe("20 Generators", async () => {
     await it("range generator", () => {
         const gen = range_gen(0, 5);
         const g0 = gen.next();
-        expect(g0.value).toBe(0);
-        expect(!g0.done).toBeTruthy();
+        expect(g0.unwrap()).toBe(0);
+        expect(g0.isSome()).toBeTruthy();
         gen.next();
         gen.next();
         const g3 = gen.next();
-        expect(g3.value).toBe(3);
+        expect(g3.unwrap()).toBe(3);
         const g4 = gen.next();
-        expect(g4.value).toBe(4);
+        expect(g4.unwrap()).toBe(4);
         const gend = gen.next();
-        expect(gend.done).toBeTruthy();
+        expect(gend.isNone()).toBeTruthy();
     });
 
     await it("fibonacci generator", () => {
         const fib2 = fib_gen();
         const fibs: int[] = [];
         for (let i = 0; i < 8; i = i + 1) {
-            fibs.push(fib2.next().value);
+            fibs.push(fib2.next().unwrap());
         }
         expect(fibs[0]).toBe(0);
         expect(fibs[1]).toBe(1);

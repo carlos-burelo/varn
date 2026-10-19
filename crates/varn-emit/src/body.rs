@@ -37,6 +37,7 @@ mod stmt_block;
 mod stmt_decl;
 mod stmt_for;
 mod stmt_for_of;
+mod stmt_for_of_protocol;
 mod stmt_match;
 mod stmt_switch;
 mod stmt_try;

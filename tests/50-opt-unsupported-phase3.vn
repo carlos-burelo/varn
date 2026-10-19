@@ -9,22 +9,23 @@ class AsyncCounter {
     constructor() {
         this.i = 0;
     }
-    async next() {
+    async next(): Option<int> {
         if (this.i < 3) {
             let val = this.i;
             this.i = this.i + 1;
-            return { value: val, done: false };
-        } else {
-            return { value: null, done: true };
+            return Some(val);
         }
+        return None;
     }
 }
 
-const myAsyncIterable = {
-    "Symbol.asyncIterator": function() {
+class AsyncCounterSource {
+    iter(): AsyncCounter {
         return new AsyncCounter();
     }
-};
+}
+
+const myAsyncIterable = new AsyncCounterSource();
 
 async function testForAwait(): int {
     let sum = 0;

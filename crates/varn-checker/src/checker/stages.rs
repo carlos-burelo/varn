@@ -83,8 +83,15 @@ pub(super) fn run_pass(
 
     rec.desugar.foreign_classes =
         checker.collect_foreign_classes(bind, rec.expr_table.values().map(|entry| &entry.ty));
-    rec.desugar.foreign_enums =
-        checker.collect_foreign_enums(bind, rec.expr_table.values().map(|entry| &entry.ty));
+    rec.desugar.foreign_enums = checker.collect_foreign_enums(
+        bind,
+        rec.expr_table.values().map(|entry| &entry.ty).chain(
+            rec.desugar
+                .for_of_plans
+                .values()
+                .filter_map(|plan| plan.step()),
+        ),
+    );
 }
 
 pub(super) fn assemble(

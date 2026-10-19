@@ -75,6 +75,33 @@ pub struct Desugarings {
     pub foreign_classes: Vec<ForeignClass>,
     pub foreign_inherited_fields: std::collections::BTreeMap<Arc<str>, Vec<InheritedField>>,
     pub match_arm_subjects: FxHashMap<varn_core::ast::AstId, Vec<Type>>,
+    pub for_of_plans: FxHashMap<varn_core::ast::AstId, ForOfPlan>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ForOfPlan {
+    Collection {
+        method: Option<varn_core::MemberKey>,
+        elem: Type,
+    },
+    IntRange,
+    Dict {
+        value: Type,
+    },
+    Protocol {
+        iterator: Option<Type>,
+        next: Type,
+        step: Type,
+    },
+}
+
+impl ForOfPlan {
+    pub fn step(&self) -> Option<&Type> {
+        match self {
+            Self::Protocol { step, .. } => Some(step),
+            Self::Collection { .. } | Self::IntRange | Self::Dict { .. } => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

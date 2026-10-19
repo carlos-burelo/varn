@@ -1,20 +1,6 @@
 import { describe, it, expect } from "std:test";
 import { sleep } from "std:task"
 
-// `async function*` — a generator whose body may `await`.
-//
-// Everything on the consumer side was already built: `for await (… of …)`
-// lowers to `Symbol.asyncIterator` plus an `await` on each `next()`, the
-// runtime has `Symbol.asyncIterator`, and `GeneratorDriver` carried an
-// `is_async()` hook with no implementation behind it. What was missing was the
-// producer: a driver that settles the body's awaits instead of refusing them.
-//
-// Varn settles inside `next()`, so `AsyncGenerator<T>.next()` hands back a
-// settled `{ value, done }` rather than a task. `await` on a non-task is the
-// identity, which is why `for await` reads the same over an async generator
-// and over a plain one.
-
-
 async function tenTimes(n: int): int {
     return n * 10
 }
@@ -59,15 +45,15 @@ async function runAsyncGenerators() {
     // Manual driving: each `next()` runs the body up to the next `yield`,
     // settling every `await` on the way.
     const manual = awaitsThenYields()
-    expect(manual.next().value).toBe(10)
-    expect(manual.next().value).toBe(20)
-    expect(manual.next().value).toBe(30)
-    expect(manual.next().done).toBeTruthy()
+    expect(manual.next().unwrap()).toBe(10)
+    expect(manual.next().unwrap()).toBe(20)
+    expect(manual.next().unwrap()).toBe(30)
+    expect(manual.next().isNone()).toBeTruthy()
 
     // More than one await between two yields.
     const between = awaitsBetweenYields()
-    expect(between.next().value).toBe(40)
-    expect(between.next().value).toBe(50)
+    expect(between.next().unwrap()).toBe(40)
+    expect(between.next().unwrap()).toBe(50)
 
     let total = 0
     for await (const v of awaitsThenYields()) {
@@ -82,7 +68,7 @@ async function runAsyncGenerators() {
     }
     expect(plain).toBe(60)
 
-    const heaps = yieldsHeapValues().next().value
+    const heaps = yieldsHeapValues().next().unwrap()
     expect(heaps.length === 2 && heaps[1] === 20).toBeTruthy()
 
     // A generator can await a real suspension, not just an already-settled task.
@@ -90,18 +76,18 @@ async function runAsyncGenerators() {
         await sleep(1)
         yield 7
     }
-    expect(awaitsSleep().next().value).toBe(7)
+    expect(awaitsSleep().next().unwrap()).toBe(7)
 
     // A rejected `await` unwinds to a `try` inside the generator body, exactly
     // as it does inside an async function.
-    expect(catchesItsOwnRejection().next().value).toBe(99)
+    expect(catchesItsOwnRejection().next().unwrap()).toBe(99)
 
     // Not covered here: a `throw` that escapes the body. It is not catchable at
     // the `next()` call site for a plain `function*` either — the driver
     // surfaces it as a runtime error rather than a Varn throw — so it is a
     // generator gap, not an async one.
     const throwing = throwsAfterAYield()
-    expect(throwing.next().value).toBe(1)
+    expect(throwing.next().unwrap()).toBe(1)
 }
 await describe("77 async generators", async () => {
     await it("tests", async () => {

@@ -4,16 +4,8 @@ use varn_types::{NativeCtx, NativeError, VmValue};
 pub struct GeneratorImpl;
 pub struct AsyncGeneratorImpl;
 
-fn resume(ctx: &mut dyn NativeCtx, this: VmValue, input: Option<VmValue>) -> Result<VmValue, NativeError> {
-    ctx.resume_generator(this, input.unwrap_or(VmValue::null()))
-}
-
-fn close(ctx: &mut dyn NativeCtx, this: VmValue, value: Option<VmValue>) -> VmValue {
-    ctx.close_generator(this);
-    ctx.alloc_object_with_shape(
-        &varn_types::iter_result_shape(),
-        vec![value.unwrap_or(VmValue::null()), VmValue::from_bool(true)],
-    )
+fn resume(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, NativeError> {
+    ctx.resume_generator(this, VmValue::null())
 }
 
 varn_contract! {
@@ -21,20 +13,20 @@ varn_contract! {
     contract: "src/modules/core/types/iteration/iteration.vn",
     class: "Generator",
     impl GeneratorImpl {
-        fn next(ctx: &mut dyn NativeCtx, this: VmValue, value: Option<VmValue>) -> Result<VmValue, NativeError> {
-            resume(ctx, this, value)
+        fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, NativeError> {
+            resume(ctx, this)
         }
-        fn r#return(ctx: &mut dyn NativeCtx, this: VmValue, value: Option<VmValue>) -> VmValue {
-            close(ctx, this, value)
+        fn close(ctx: &mut dyn NativeCtx, this: VmValue) {
+            ctx.close_generator(this);
         }
     }
     class: "AsyncGenerator",
     impl AsyncGeneratorImpl {
-        fn next(ctx: &mut dyn NativeCtx, this: VmValue, value: Option<VmValue>) -> Result<VmValue, NativeError> {
-            resume(ctx, this, value)
+        fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, NativeError> {
+            resume(ctx, this)
         }
-        fn r#return(ctx: &mut dyn NativeCtx, this: VmValue, value: Option<VmValue>) -> VmValue {
-            close(ctx, this, value)
+        fn close(ctx: &mut dyn NativeCtx, this: VmValue) {
+            ctx.close_generator(this);
         }
     }
 }
