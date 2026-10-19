@@ -220,43 +220,78 @@ fn parse_typed_body(body: &str) -> (Option<String>, String) {
     (type_str, desc)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DocTag {
+    Param,
+    Returns,
+    Throws,
+    Example,
+    Deprecated,
+    Since,
+    See,
+}
+
+const DOC_TAGS: [(&str, DocTag); 11] = [
+    ("param", DocTag::Param),
+    ("arg", DocTag::Param),
+    ("argument", DocTag::Param),
+    ("returns", DocTag::Returns),
+    ("return", DocTag::Returns),
+    ("throws", DocTag::Throws),
+    ("exception", DocTag::Throws),
+    ("example", DocTag::Example),
+    ("deprecated", DocTag::Deprecated),
+    ("since", DocTag::Since),
+    ("see", DocTag::See),
+];
+
+fn doc_tag(name: &str) -> Option<DocTag> {
+    DOC_TAGS
+        .iter()
+        .find(|(text, _)| *text == name)
+        .map(|(_, tag)| *tag)
+}
+
 fn flush_tag(doc: &mut DocComment, tag: Option<String>, body: &str) {
     let body = body.trim();
-    match tag.as_deref() {
-        None => {}
-        Some("param" | "arg" | "argument") => {
+    let Some(name) = tag.as_deref() else {
+        return;
+    };
+    let Some(known) = doc_tag(name) else {
+        doc.tags.push((name.to_owned(), body.to_owned()));
+        return;
+    };
+    match known {
+        DocTag::Param => {
             doc.params.push(parse_param_body(body));
         }
-        Some("returns" | "return") => {
+        DocTag::Returns => {
             let (type_str, description) = parse_typed_body(body);
             doc.returns = Some(DocReturn {
                 type_str,
                 description,
             });
         }
-        Some("throws" | "exception") => {
+        DocTag::Throws => {
             let (type_str, description) = parse_typed_body(body);
             doc.throws.push(DocThrows {
                 type_str,
                 description,
             });
         }
-        Some("example") => {
+        DocTag::Example => {
             doc.example = Some(body.to_owned());
         }
-        Some("deprecated") => {
+        DocTag::Deprecated => {
             doc.deprecated = Some(body.to_owned());
         }
-        Some("since") => {
+        DocTag::Since => {
             doc.since = Some(body.to_owned());
         }
-        Some("see") => {
+        DocTag::See => {
             if !body.is_empty() {
                 doc.see.push(body.to_owned());
             }
-        }
-        Some(other) => {
-            doc.tags.push((other.to_owned(), body.to_owned()));
         }
     }
 }
