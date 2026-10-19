@@ -1,23 +1,23 @@
-import { HttpServer, Request, Response, json, HttpStatus, fetch } from "std:http";
+import { HttpServer, Request, Response, json, HttpStatus, fetch, HttpMethod } from "std:http";
 import { describe, it, expect } from "std:test";
 import { delay } from "std:task";
 
 
 // 1. Request Cookies parsing
-let reqWithCookies = new Request("http://localhost:3000/api", "GET", {
+let reqWithCookies = new Request("http://localhost:3000/api", { method: HttpMethod.GET, headers: {
     "cookie": "session_id=xyz789; theme=dark; logged_in=true"
-});
+} });
 
 // 2. Request.json and Request.formData
-let reqJson = new Request("http://localhost:3000/api", "POST", {
+let reqJson = new Request("http://localhost:3000/api", { method: HttpMethod.POST, headers: {
     "content-type": "application/json"
-}, "{\"name\":\"Varn\",\"version\":1}");
+}, body: "{\"name\":\"Varn\",\"version\":1}" });
 
 let parsedJson: dynamic = reqJson.json();
 
-let reqForm = new Request("http://localhost:3000/api", "POST", {
+let reqForm = new Request("http://localhost:3000/api", { method: HttpMethod.POST, headers: {
     "content-type": "application/x-www-form-urlencoded"
-}, "user=alice&action=login");
+}, body: "user=alice&action=login" });
 
 let parsedForm = reqForm.formData();
 
@@ -48,7 +48,7 @@ await describe("100 stdlib http enrichments", async () => {
         middlewareLog.push("mw2_after");
         return res;
         });
-        server.get("/test", (req: Request) => {
+        server.get("/test", async (req: Request) => {
         middlewareLog.push("handler");
         return json({ ok: true });
         });

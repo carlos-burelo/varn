@@ -1,5 +1,11 @@
 use varn_types::{NativeCtx, VmValue};
 
+varn_macros::varn_enum! {
+    module: super::MODULE_ID,
+    contract: "src/modules/runtime/net/net_runtime.vn",
+    pub enum HttpMethod;
+}
+
 varn_macros::varn_record! {
     contract: "src/modules/runtime/net/net_runtime.vn",
     interface: "HttpRequestHead",
@@ -21,7 +27,6 @@ pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<Option<V
         httparse::Status::Partial => return Ok(None),
     };
 
-    let method = req.method.unwrap_or("");
     let path = req.path.unwrap_or("");
     let body = if header_len < raw.len() {
         &raw[header_len..]
@@ -37,7 +42,10 @@ pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<Option<V
         ctx.set_field(headers_obj, &name, val_nv);
     }
 
-    let method = ctx.alloc_str(method);
+    let method = match req.method.and_then(HttpMethod::of) {
+        Some(m) => m.to_value(ctx)?,
+        None => VmValue::null(),
+    };
     let path = ctx.alloc_str(path);
     let body = ctx.alloc_str(body);
     Ok(Some(

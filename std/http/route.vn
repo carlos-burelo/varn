@@ -1,14 +1,24 @@
-export class DynamicRoute {
-    method: str;
+import { HttpMethod } from "runtime:net";
+import { Request } from "std:http/request";
+import { Response } from "std:http/response";
+
+export type Handler = (req: Request) => Task<Response>;
+export type Next = () => Task<Response?>;
+export type Middleware = (req: Request, next: Next) => Task<Response?>;
+
+export class Route {
+    method: HttpMethod?;
     segments: str[];
     paramNames: { [key: int]: str };
     isWildcard: bool;
-    handler: (req: Request) => dynamic;
+    isStatic: bool;
+    handler: Handler;
 
-    constructor(method: str, pattern: str, handler: (req: Request) => dynamic) {
-        this.method = method.toUpperCase();
+    constructor(method: HttpMethod?, pattern: str, handler: Handler) {
+        this.method = method;
         this.handler = handler;
         this.isWildcard = pattern === "*";
+        this.isStatic = !this.isWildcard && pattern.indexOf(":") < 0;
         this.segments = [];
         this.paramNames = {};
 
@@ -26,8 +36,12 @@ export class DynamicRoute {
         }
     }
 
-    match(method: str, pathSegments: str[]): { [key: str]: str }? {
-        if (this.method !== "*" && this.method !== method) {
+    accepts(method: HttpMethod): bool {
+        return this.method === null || this.method === method;
+    }
+
+    match(method: HttpMethod, pathSegments: str[]): { [key: str]: str }? {
+        if (!this.accepts(method)) {
             return null;
         }
 

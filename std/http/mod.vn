@@ -1,5 +1,5 @@
 
-export { HttpStatus, Headers, Request, Response, json, redirect, error } from "std:http/core";
+export { HttpMethod, HttpStatus, Headers, Request, RequestInit, Response, Handler, Middleware, Next, json, redirect, error } from "std:http/core";
 export { HttpServer, serve } from "std:http/server";
 export { fetch, get, post, put, patch, del } from "std:http/client";
 export { Mime } from "std:http/mime";

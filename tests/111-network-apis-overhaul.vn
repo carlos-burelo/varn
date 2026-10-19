@@ -37,21 +37,21 @@ function testHttpServerAndClientApis(): void {
 
     // 2. HttpServer Routing & CORS
     let app = new HttpServer();
-    app.cors("*", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
+    app.cors("*");
 
-    app.get("/api/items", (req: Request) => {
+    app.get("/api/items", async (req: Request) => {
         return json([{ id: 1, name: "Item1" }]);
     });
 
-    app.post("/api/items", (req: Request) => {
+    app.post("/api/items", async (req: Request) => {
         return json({ created: true });
     });
 
-    app.patch("/api/items/:id", (req: Request) => {
+    app.patch("/api/items/:id", async (req: Request) => {
         return json({ updated: req.params["id"] });
     });
 
-    app.delete("/api/items/:id", (req: Request) => {
+    app.delete("/api/items/:id", async (req: Request) => {
         return json({ deleted: req.params["id"] });
     });
 

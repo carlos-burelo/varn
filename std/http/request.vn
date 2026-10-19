@@ -1,9 +1,15 @@
-import { tcpRead$, parseHttpRequest$ } from "runtime:net";
+import { tcpRead$, parseHttpRequest$, HttpMethod } from "runtime:net";
 import { Headers } from "std:http/headers";
 import { Json, JsonValue } from "std:encoding";
 
+export interface RequestInit {
+    method?: HttpMethod;
+    headers?: { [key: str]: str };
+    body?: str;
+}
+
 export class RawRequest {
-    method: str = "";
+    method: HttpMethod? = null;
     path: str = "";
     headers: { [key: str]: str } = {};
     body: str = "";
@@ -62,7 +68,7 @@ export async function readHttpRequest(connId: int, maxContentLength: int = 10485
 
 export class Request {
     url: str = "";
-    method: str = "GET";
+    method: HttpMethod = HttpMethod.GET;
     headers: Headers = new Headers({});
     body: str = "";
     path: str = "";
@@ -70,38 +76,15 @@ export class Request {
     params: { [key: str]: str } = {};
     cookies: { [key: str]: str } = {};
 
-    // Compat: acepta `method` posicional ("GET") o init estilo Web
-    // (`{method, headers, body}`). La forma init la usa la suite y el
-    // estándar Web; la posicional, el resto del std.
-    constructor(url: str = "", methodOrInit: dynamic = "GET", headers: { [key: str]: str } = {}, body: str = "") {
+    constructor(url: str = "", init: RequestInit = {}) {
         this.url = url;
         this.path = url;
         this.query = {};
         this.params = {};
         this.cookies = {};
-        if (typeof methodOrInit === "object" && methodOrInit !== null) {
-            let m = methodOrInit["method"];
-            if (m !== null) {
-                this.method = m;
-            } else {
-                this.method = "GET";
-            }
-            this.headers = new Headers(methodOrInit["headers"]);
-            let b = methodOrInit["body"];
-            if (b !== null) {
-                this.body = b;
-            } else {
-                this.body = "";
-            }
-        } else {
-            if (typeof methodOrInit === "str") {
-                this.method = methodOrInit;
-            } else {
-                this.method = "GET";
-            }
-            this.headers = new Headers(headers);
-            this.body = body;
-        }
+        this.method = init.method ?? HttpMethod.GET;
+        this.headers = new Headers(init.headers ?? {});
+        this.body = init.body ?? "";
 
         let cookieHdr = this.headers.get("cookie");
         if (cookieHdr !== null) {

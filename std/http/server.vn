@@ -1,32 +1,42 @@
-import { tcpListen$, tcpAccept$, tcpConnect$, tcpRead$, tcpWrite$, tcpClose$, tcpCloseListener$, parseHttpRequest$, sendHttpResponse$ } from "runtime:net";
-import { Url } from "std:net";
-import { Json } from "std:encoding";
+import { tcpListen$, tcpAccept$, tcpWrite$, tcpClose$, tcpCloseListener$, sendHttpResponse$, httpMethodName$, HttpMethod } from "runtime:net";
 import { spawn } from "std:task";
 
-import { HttpStatus, Headers, Request, Response, json, redirect, error, RawRequest, parseRawRequest, readHttpRequest, RawResponse, parseRawResponse, readHttpResponse, DynamicRoute } from "std:http/core";
+import { Request, Response, RawRequest, readHttpRequest, Route, Handler, Middleware } from "std:http/core";
 import { AsyncReader } from "std:io";
+
+const ALL_METHODS: HttpMethod[] = [
+    HttpMethod.GET,
+    HttpMethod.HEAD,
+    HttpMethod.POST,
+    HttpMethod.PUT,
+    HttpMethod.DELETE,
+    HttpMethod.PATCH,
+    HttpMethod.OPTIONS,
+    HttpMethod.CONNECT,
+    HttpMethod.TRACE
+];
+
+type Matched = { handler: Handler, params: { [key: str]: str } };
 
 export class HttpServer {
     private _port: int = 0;
     private _listenerId: int = -1;
     private _isListening: bool = false;
-    private _staticRoutes: { [key: str]: dynamic } = {};
-    private _dynamicRoutes: DynamicRoute[] = [];
-    private _middlewares: Array<dynamic> = [];
-    private _fetchHandler: dynamic = null;
+    private _staticRoutes: { [key: str]: Route[] } = {};
+    private _dynamicRoutes: Route[] = [];
+    private _middlewares: Middleware[] = [];
+    private _fetchHandler: Handler? = null;
     private _maxContentLength: int = 10485760;
 
-    constructor(fetchHandler?: dynamic) {
+    constructor(fetchHandler?: Handler) {
         this._staticRoutes = {};
         this._dynamicRoutes = [];
         this._middlewares = [];
         this._maxContentLength = 10485760;
-        if (fetchHandler !== null) {
-            this._fetchHandler = fetchHandler;
-        }
+        this._fetchHandler = fetchHandler;
     }
 
-    use(middleware: dynamic): HttpServer {
+    use(middleware: Middleware): HttpServer {
         this._middlewares.push(middleware);
         return this;
     }
@@ -36,64 +46,64 @@ export class HttpServer {
         return this;
     }
 
-    private _registerRoute(method: str, pattern: str, handler: dynamic): HttpServer {
-        let m = method.toUpperCase();
-        if (pattern === "*" || pattern.indexOf(":") >= 0) {
-            this._dynamicRoutes.push(new DynamicRoute(m, pattern, handler));
+    route(method: HttpMethod?, pattern: str, handler: Handler): HttpServer {
+        let route = new Route(method, pattern, handler);
+        if (route.isStatic) {
+            let bucket = this._staticRoutes[pattern];
+            if (bucket === null) {
+                this._staticRoutes[pattern] = [route];
+            } else {
+                bucket.push(route);
+            }
         } else {
-            this._staticRoutes[m + ":" + pattern] = handler;
+            this._dynamicRoutes.push(route);
         }
         return this;
     }
 
-    get(pattern: str, handler: dynamic): HttpServer {
-        return this._registerRoute("GET", pattern, handler);
+    get(pattern: str, handler: Handler): HttpServer {
+        return this.route(HttpMethod.GET, pattern, handler);
     }
 
-    post(pattern: str, handler: dynamic): HttpServer {
-        return this._registerRoute("POST", pattern, handler);
+    post(pattern: str, handler: Handler): HttpServer {
+        return this.route(HttpMethod.POST, pattern, handler);
     }
 
-    put(pattern: str, handler: dynamic): HttpServer {
-        return this._registerRoute("PUT", pattern, handler);
+    put(pattern: str, handler: Handler): HttpServer {
+        return this.route(HttpMethod.PUT, pattern, handler);
     }
 
-    delete(pattern: str, handler: dynamic): HttpServer {
-        return this._registerRoute("DELETE", pattern, handler);
+    delete(pattern: str, handler: Handler): HttpServer {
+        return this.route(HttpMethod.DELETE, pattern, handler);
     }
 
-    patch(pattern: str, handler: dynamic): HttpServer {
-        return this._registerRoute("PATCH", pattern, handler);
+    patch(pattern: str, handler: Handler): HttpServer {
+        return this.route(HttpMethod.PATCH, pattern, handler);
     }
 
-    options(pattern: str, handler: dynamic): HttpServer {
-        return this._registerRoute("OPTIONS", pattern, handler);
+    options(pattern: str, handler: Handler): HttpServer {
+        return this.route(HttpMethod.OPTIONS, pattern, handler);
     }
 
-    route(method: str, pattern: str, handler: dynamic): HttpServer {
-        return this._registerRoute(method, pattern, handler);
+    all(pattern: str, handler: Handler): HttpServer {
+        return this.route(null, pattern, handler);
     }
 
-    all(pattern: str, handler: dynamic): HttpServer {
-        return this._registerRoute("*", pattern, handler);
-    }
-
-    cors(origin: str = "*", methods: str = "GET,POST,PUT,DELETE,PATCH,OPTIONS", headers: str = "*"): HttpServer {
+    cors(origin: str = "*", methods: HttpMethod[] = ALL_METHODS, headers: str = "*"): HttpServer {
+        let allowed = methods.map((m: HttpMethod): str => httpMethodName$(m)).join(",");
         this.use(async (req: Request, next: () => Task<Response?>): Task<Response?> => {
-            if (req.method.toUpperCase() === "OPTIONS") {
+            if (req.method === HttpMethod.OPTIONS) {
                 let res = new Response("", 204);
                 res.headers.set("Access-Control-Allow-Origin", origin);
-                res.headers.set("Access-Control-Allow-Methods", methods);
+                res.headers.set("Access-Control-Allow-Methods", allowed);
                 res.headers.set("Access-Control-Allow-Headers", headers);
                 return res;
             }
             let res = await next();
             if (res !== null) {
-                let r = res as Response;
-                r.headers.set("Access-Control-Allow-Origin", origin);
-                r.headers.set("Access-Control-Allow-Methods", methods);
-                r.headers.set("Access-Control-Allow-Headers", headers);
-                return r;
+                res.headers.set("Access-Control-Allow-Origin", origin);
+                res.headers.set("Access-Control-Allow-Methods", allowed);
+                res.headers.set("Access-Control-Allow-Headers", headers);
             }
             return res;
         });
@@ -144,7 +154,7 @@ export class HttpServer {
     private async _sendWebResponse(connId: int, responseObj: Response): Task<void> {
         let stream = responseObj.bodyStream;
         if (stream !== null) {
-            await this._sendChunked(connId, responseObj, stream as AsyncReader);
+            await this._sendChunked(connId, responseObj, stream);
             return;
         }
         let hdrs = responseObj.headers.toObject();
@@ -179,6 +189,87 @@ export class HttpServer {
         await tcpWrite$(connId, "0\r\n\r\n");
     }
 
+    private _match(method: HttpMethod, pathOnly: str): Matched? {
+        let bucket = this._staticRoutes[pathOnly];
+        if (bucket !== null) {
+            for (let route of bucket) {
+                if (route.accepts(method)) {
+                    return { handler: route.handler, params: {} };
+                }
+            }
+        }
+        if (this._dynamicRoutes.length > 0) {
+            let pathSegments = pathOnly.split("/");
+            for (let route of this._dynamicRoutes) {
+                let params = route.match(method, pathSegments);
+                if (params !== null) {
+                    return { handler: route.handler, params: params };
+                }
+            }
+        }
+        let fallback = this._fetchHandler;
+        if (fallback !== null) {
+            return { handler: fallback, params: {} };
+        }
+        return null;
+    }
+
+    private async _respond(connId: int, rawReq: RawRequest, method: HttpMethod): Task<void> {
+        let pathOnly = rawReq.path;
+        let queryStr = "";
+        let qIdx = rawReq.path.indexOf("?");
+        if (qIdx >= 0) {
+            pathOnly = rawReq.path.slice(0, qIdx);
+            queryStr = rawReq.path.slice(qIdx + 1);
+        }
+
+        let matched = this._match(method, pathOnly);
+
+        let reqObj = new Request(rawReq.path, { method: method, headers: rawReq.headers, body: rawReq.body });
+        reqObj.path = pathOnly;
+
+        let queryObj: { [key: str]: str } = {};
+        if (queryStr.length > 0) {
+            let pairs = queryStr.split("&");
+            for (let i = 0; i < pairs.length; i = i + 1) {
+                let pair = pairs[i];
+                let eqIdx = pair.indexOf("=");
+                if (eqIdx > 0) {
+                    queryObj[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
+                } else {
+                    queryObj[pair] = "true";
+                }
+            }
+        }
+        reqObj.query = queryObj;
+        if (matched !== null) {
+            reqObj.params = matched.params;
+        }
+
+        let self = this;
+        let runPipeline = async (idx: int): Task<Response?> => {
+            if (idx < self._middlewares.length) {
+                let mw = self._middlewares[idx];
+                let next = async (): Task<Response?> => {
+                    return await runPipeline(idx + 1);
+                };
+                return await mw(reqObj, next);
+            }
+            if (matched !== null) {
+                return await matched.handler(reqObj);
+            }
+            return null;
+        };
+
+        let finalResp = await runPipeline(0);
+        if (finalResp !== null) {
+            await self._sendWebResponse(connId, finalResp);
+        } else {
+            let notFoundHeaders: { [key: str]: str } = { "Content-Type": "text/plain" };
+            await sendHttpResponse$(connId, 404, "Not Found", notFoundHeaders, "Not Found", []);
+        }
+    }
+
     private async _handleConnection(connId: int): Task<void> {
         let keepAlive = true;
         while (keepAlive) {
@@ -188,125 +279,32 @@ export class HttpServer {
             } catch (err) {
                 let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
                 await sendHttpResponse$(connId, 413, "Payload Too Large", errHeaders, "Payload Too Large", []);
-                keepAlive = false;
                 break;
             }
-
-            if (rawReq !== null) {
-                let connHdr = rawReq.headers["connection"];
-                if (connHdr !== null && connHdr.toLowerCase() === "close") {
-                    keepAlive = false;
-                }
-
-                let matchedHandler: dynamic = null;
-                let matchedParams: { [key: str]: str } = {};
-
-                let pathOnly = rawReq.path;
-                let queryStr = "";
-                let qIdx = rawReq.path.indexOf("?");
-                if (qIdx >= 0) {
-                    pathOnly = rawReq.path.slice(0, qIdx);
-                    queryStr = rawReq.path.slice(qIdx + 1);
-                }
-
-                let reqMethod = rawReq.method.toUpperCase();
-
-                let staticKey = reqMethod + ":" + pathOnly;
-                let staticHandler = this._staticRoutes[staticKey];
-                if (staticHandler === null) {
-                    staticHandler = this._staticRoutes["*:" + pathOnly];
-                }
-
-                if (staticHandler !== null) {
-                    matchedHandler = staticHandler;
-                    matchedParams = {};
-                } else if (this._dynamicRoutes.length > 0) {
-                    let pathSegments = pathOnly.split("/");
-                    for (let route of this._dynamicRoutes) {
-                        let params = route.match(reqMethod, pathSegments);
-                        if (params !== null) {
-                            matchedHandler = route.handler;
-                            matchedParams = params;
-                            break;
-                        }
-                    }
-                }
-
-                if (matchedHandler === null && this._fetchHandler !== null) {
-                    matchedHandler = this._fetchHandler;
-                }
-
-                let reqObj = new Request(rawReq.path, rawReq.method, rawReq.headers, rawReq.body);
-                reqObj.path = pathOnly;
-                
-                let queryObj: { [key: str]: str } = {};
-                if (queryStr.length > 0) {
-                    let pairs = queryStr.split("&");
-                    for (let i = 0; i < pairs.length; i = i + 1) {
-                        let pair = pairs[i];
-                        let eqIdx = pair.indexOf("=");
-                        if (eqIdx > 0) {
-                            let k = pair.slice(0, eqIdx);
-                            let v = pair.slice(eqIdx + 1);
-                            queryObj[k] = v;
-                        } else {
-                            queryObj[pair] = "true";
-                        }
-                    }
-                }
-                reqObj.query = queryObj;
-                reqObj.params = matchedParams;
-                
-                let self = this;
-                let runPipeline = async (idx: int): Task<Response?> => {
-                    if (idx < self._middlewares.length) {
-                        let mw = self._middlewares[idx];
-                        let next = async (): Task<Response?> => {
-                            return await runPipeline(idx + 1);
-                        };
-                        return await mw(reqObj, next);
-                    } else if (matchedHandler !== null) {
-                        let result = await matchedHandler(reqObj);
-                        if (result !== null && typeof result === "object") {
-                            return result as Response;
-                        }
-                        if (result !== null) {
-                            return error(500, "Handler must return a Response");
-                        }
-                        return null;
-                    } else {
-                        return null;
-                    }
-                };
-
-                let finalResp = await runPipeline(0);
-                if (finalResp !== null) {
-                    await self._sendWebResponse(connId, finalResp as Response);
-                } else {
-                    let notFoundHeaders: { [key: str]: str } = { "Content-Type": "text/plain" };
-                    await sendHttpResponse$(connId, 404, "Not Found", notFoundHeaders, "Not Found", []);
-                }
-            } else {
+            if (rawReq === null) {
+                break;
+            }
+            let connHdr = rawReq.headers["connection"];
+            if (connHdr !== null && connHdr.toLowerCase() === "close") {
                 keepAlive = false;
             }
+            let method = rawReq.method;
+            if (method === null) {
+                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                await sendHttpResponse$(connId, 501, "Not Implemented", errHeaders, "Not Implemented", []);
+                break;
+            }
+            await this._respond(connId, rawReq, method);
         }
         tcpClose$(connId);
     }
 }
 
-export function serve(handlerOrOptions?: dynamic, port: int = 3000): HttpServer {
+export function serve(handler?: Handler, port: int = 3000): HttpServer {
     let server = new HttpServer();
-    if (typeof handlerOrOptions === "function") {
-        server.all("*", handlerOrOptions);
+    if (handler !== null) {
+        server.all("*", handler);
         server.listen(port);
-    } else if (typeof handlerOrOptions === "object") {
-        let targetPort = port;
-        if (handlerOrOptions["port"] !== null) {
-            targetPort = handlerOrOptions["port"];
-        }
-        let fetchFn = handlerOrOptions["fetch"];
-        server.all("*", fetchFn);
-        server.listen(targetPort);
     }
     return server;
 }

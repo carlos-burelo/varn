@@ -84,6 +84,12 @@ varn_contract! {
             http_parser::parse_http_request(ctx, raw)
         }
 
+        fn httpMethodName(ctx: &mut dyn NativeCtx, method: VmValue) -> Result<String, String> {
+            http_parser::HttpMethod::from_value(ctx, method)
+                .map(|m| m.name().to_owned())
+                .ok_or_else(|| "expected an HttpMethod".to_owned())
+        }
+
         fn sendHttpResponse(
             ctx: &mut dyn NativeCtx,
             conn_id: i64,

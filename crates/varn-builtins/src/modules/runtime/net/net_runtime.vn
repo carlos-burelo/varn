@@ -1,7 +1,19 @@
 // runtime:net — low-level host network operations.
 
+export declare enum HttpMethod {
+    GET,
+    HEAD,
+    POST,
+    PUT,
+    DELETE,
+    PATCH,
+    OPTIONS,
+    CONNECT,
+    TRACE
+}
+
 export interface HttpRequestHead {
-    method: str;
+    method: HttpMethod?;
     path: str;
     headers: { [key: str]: str };
     body: str;
@@ -21,6 +33,7 @@ export declare function tcpWrite$(connId: int, data: Bytes | str): Task<int>;
 export declare function tcpClose$(connId: int): void;
 export declare function tcpCloseListener$(listenerId: int): void;
 export declare function parseHttpRequest$(raw: str): HttpRequestHead?;
+export declare function httpMethodName$(method: HttpMethod): str;
 export declare function sendHttpResponse$(connId: int, status: int, statusText: str, headers: { [key: str]: str }, body: str, cookies: str[]): Task<int>;
 
 export declare function udpBind$(host: str, port: int): int;

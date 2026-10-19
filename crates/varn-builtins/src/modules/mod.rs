@@ -24,7 +24,7 @@ native_modules! {
     io = "runtime/io/io.rs" => [io::NATIVE_ENTRIES];
     json = "runtime/json/json.rs" => [json::NATIVE_ENTRIES];
     math = "runtime/math/math.rs" => [math::NATIVE_ENTRIES];
-    net = "runtime/net/net.rs" => [net::NATIVE_ENTRIES];
+    net = "runtime/net/net.rs" => [net::NATIVE_ENTRIES, net::http_parser::HTTPMETHOD_ENTRIES];
     path = "runtime/path/path.rs" => [path::NATIVE_ENTRIES];
     process = "runtime/process/process.rs" => [process::NATIVE_ENTRIES];
     reflect = "runtime/reflect/reflect.rs" => [reflect::NATIVE_ENTRIES];
