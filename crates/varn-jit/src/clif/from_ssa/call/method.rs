@@ -36,6 +36,36 @@ pub(in crate::clif::from_ssa) fn emit_is_str(
     b.ins().brif(is_str, yes, &[], no, &[]);
 }
 
+#[derive(Clone, Copy)]
+enum StrProbe {
+    StartsWith,
+    EndsWith,
+    Includes,
+    IndexOf,
+}
+
+impl StrProbe {
+    const ALL: [Self; 4] = [
+        Self::StartsWith,
+        Self::EndsWith,
+        Self::Includes,
+        Self::IndexOf,
+    ];
+
+    const fn key(self) -> varn_core::MemberKey {
+        match self {
+            Self::StartsWith => varn_core::MemberKey::StartsWith,
+            Self::EndsWith => varn_core::MemberKey::EndsWith,
+            Self::Includes => varn_core::MemberKey::Includes,
+            Self::IndexOf => varn_core::MemberKey::IndexOf,
+        }
+    }
+
+    fn of(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.key().as_str() == name)
+    }
+}
+
 pub(crate) fn emit_method_call(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
@@ -69,9 +99,7 @@ pub(crate) fn emit_method_call(
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let ectx = frame.exec_ctx;
 
-    if args.len() == 1
-        && (name == "startsWith" || name == "endsWith" || name == "indexOf" || name == "includes")
-    {
+    if let Some(probe) = StrProbe::of(name).filter(|_| args.len() == 1) {
         let arg0 = b.ins().load(types::I128, m, window, 16);
         let (at, ap) = b.ins().isplit(arg0);
         let (rt0, rp0) = b.ins().isplit(receiver);
@@ -89,14 +117,11 @@ pub(crate) fn emit_method_call(
         b.switch_to_block(arg_check);
         emit_is_str(b, &ctx.helpers.array_layout, at, ap, str_go, inst_entry);
         b.switch_to_block(str_go);
-        let helper = if name == "startsWith" {
-            ctx.helpers.str_starts_with
-        } else if name == "endsWith" {
-            ctx.helpers.str_ends_with
-        } else if name == "includes" {
-            ctx.helpers.str_includes
-        } else {
-            ctx.helpers.str_index_of
+        let helper = match probe {
+            StrProbe::StartsWith => ctx.helpers.str_starts_with,
+            StrProbe::EndsWith => ctx.helpers.str_ends_with,
+            StrProbe::Includes => ctx.helpers.str_includes,
+            StrProbe::IndexOf => ctx.helpers.str_index_of,
         };
         let r = crate::clif::from_ssa::exceptions::call_checked_value(
             b,
@@ -104,10 +129,9 @@ pub(crate) fn emit_method_call(
             helper,
             &[ectx, rt0, rp0, at, ap],
         )?;
-        let boxed = if name == "indexOf" {
-            box_int(b, r)
-        } else {
-            box_bool(b, r)
+        let boxed = match probe {
+            StrProbe::IndexOf => box_int(b, r),
+            StrProbe::StartsWith | StrProbe::EndsWith | StrProbe::Includes => box_bool(b, r),
         };
         b.ins().jump(merge, &[boxed.into()]);
         b.switch_to_block(inst_entry);
