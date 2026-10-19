@@ -20,9 +20,8 @@ await describe("97 stdlib task combinators", async () => {
         let errTask = (async () => { throw new Error("failure"); })();
         let settled = await Task.allSettled([okTask, errTask]);
         expect(settled.length).toBe(2);
-        expect(settled[0].status).toBe("fulfilled");
-        expect(settled[0].value).toBe("success");
-        expect(settled[1].status).toBe("rejected");
+        expect(settled[0].unwrap()).toBe("success");
+        expect(settled[1].isErr()).toBe(true);
     });
 
     await it("3. Task.race", async () => {

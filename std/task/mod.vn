@@ -14,7 +14,6 @@ export {
 } from "std:task/group";
 
 export {
-    TaskSettledResult,
     parallel,
     spawn,
     sleep,

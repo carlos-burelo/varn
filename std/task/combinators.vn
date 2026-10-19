@@ -1,11 +1,5 @@
 import { spawn$, sleep$, parallel$, cancelTask$, yieldTask$, channel$, Channel } from "runtime:task";
 
-export type TaskSettledResult<T> = {
-    status: str,
-    value?: T,
-    reason?: str
-};
-
 export function parallel<T>(tasks: Array<Task<T>>): Task<Array<T>> {
     return parallel$(tasks);
 }
@@ -22,21 +16,19 @@ export function cancel<T>(handle: TaskHandle<T>): void {
     cancelTask$(handle);
 }
 
-async function wrapSettledOne<T>(task: Task<T>): Task<TaskSettledResult<T>> {
+async function wrapSettledOne<T>(task: Task<T>): Task<Result<T, Error>> {
     try {
-        let val = await task;
-        return { status: "fulfilled", value: val };
+        return Result.Ok(await task);
     } catch (err) {
-        return { status: "rejected", reason: err.message };
+        return Result.Err(err as Error);
     }
 }
 
-async function raceOneHandle<T>(handle: TaskHandle<T>, ch: Channel<TaskSettledResult<T>>): Task<void> {
+async function raceOneHandle<T>(handle: TaskHandle<T>, ch: Channel<Result<T, Error>>): Task<void> {
     try {
-        let res = await handle;
-        await ch.tx.send({ status: "fulfilled", value: res });
+        await ch.tx.send(Result.Ok(await handle));
     } catch (err) {
-        await ch.tx.send({ status: "rejected", reason: err.message });
+        await ch.tx.send(Result.Err(err as Error));
     }
 }
 
@@ -49,8 +41,8 @@ export namespace Task {
         return await parallel$(tasks);
     }
 
-    export async function allSettled<T>(tasks: Array<Task<T>>): Task<Array<TaskSettledResult<T>>> {
-        let wrappedTasks: Array<Task<TaskSettledResult<T>>> = [];
+    export async function allSettled<T>(tasks: Array<Task<T>>): Task<Array<Result<T, Error>>> {
+        let wrappedTasks: Array<Task<Result<T, Error>>> = [];
         for (let i = 0; i < tasks.length; i = i + 1) {
             wrappedTasks.push(wrapSettledOne(tasks[i]));
         }
@@ -61,7 +53,7 @@ export namespace Task {
         if (tasks.length === 0) {
             throw new Error("Task.race requires at least one task");
         }
-        let ch = channel$<TaskSettledResult<T>>(tasks.length);
+        let ch = channel$<Result<T, Error>>(tasks.length);
         let handles: Array<TaskHandle<T>> = [];
         for (let i = 0; i < tasks.length; i = i + 1) {
             handles.push(spawn(tasks[i]));
@@ -73,10 +65,12 @@ export namespace Task {
         for (let i = 0; i < handles.length; i = i + 1) {
             cancel(handles[i]);
         }
-        if (first.status === "rejected") {
-            throw new Error(first.reason ?? "Task.race rejected");
-        }
-        return first.value as T;
+        return match (first) {
+            Ok(value) => value,
+            Err(error) => {
+                throw error;
+            }
+        };
     }
 }
 
