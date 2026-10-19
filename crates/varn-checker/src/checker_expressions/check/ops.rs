@@ -242,12 +242,14 @@ impl<'r> Checker<'r> {
             Some(varn_core::TypeKind::Fn(fid)) => self.ty_table.get_function(fid).params.clone(),
             Some(_) | None => Vec::new(),
         };
-        self.check_call_args_with_context(rec, args, &ctor_params, bind);
-        if instantiated.is_some() {
-            self.validate_call_arguments(rec, args, &ctor_params, &range, expr.index(), bind);
-        } else if declared.is_none()
-            && let Some(params) = self.synthesized_ctor_params(rec, expr, bind)
-        {
+        let synthesized = match declared {
+            Some(_) => None,
+            None => self.synthesized_ctor_params(rec, expr, bind),
+        };
+        let validate = instantiated.is_some() || synthesized.is_some();
+        let params = synthesized.unwrap_or(ctor_params);
+        self.check_call_args_with_context(rec, args, &params, bind);
+        if validate {
             self.validate_call_arguments(rec, args, &params, &range, expr.index(), bind);
         }
         self.forget_closure_args(rec, args, bind);
