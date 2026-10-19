@@ -98,8 +98,6 @@ pub(super) fn try_project(kind: &InstKind, site: &Site) -> Option<SsaOp> {
         | InstKind::This
         | InstKind::Range { .. }
         | InstKind::ObjectKeys { .. }
-        | InstKind::GetSymbol { .. }
-        | InstKind::IterCall { .. }
         | InstKind::GetSuper { .. }
         | InstKind::SuperCall { .. }
         | InstKind::SuperMethodCall { .. }

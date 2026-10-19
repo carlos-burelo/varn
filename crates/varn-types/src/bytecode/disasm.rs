@@ -141,7 +141,6 @@ pub fn constant_text(entry: &PoolEntry) -> String {
             Literal::BigInt(n) => format!("{n}n"),
             Literal::Decimal(d) => format!("{d}d"),
             Literal::Char(c) => format!("{c:?}"),
-            Literal::Symbol(s) => format!("Symbol.{}", s.name()),
         },
         PoolEntry::Function(f) => format!("fn {}", f.name.as_deref().unwrap_or("<anonymous>")),
         PoolEntry::Shape(keys) => format!("shape {{{}}}", keys.join(", ")),

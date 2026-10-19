@@ -18,7 +18,7 @@ pub use instance::{InstanceData, InstanceRef, INST_CLASS_ID_OFF, INST_PAYLOAD_OF
 pub use module::{FrozenExport, FrozenModuleObj, ModuleObj};
 pub use object::{ObjData, OBJ_INLINE_LEN_OFF, OBJ_SHAPE_OFF, OBJ_VALUES_OFF};
 pub use sendable::{SendEnumVariant, SendValue};
-pub use shape::{iter_result_shape, root_shape, Shape, SHAPE_ID_OFF};
+pub use shape::{root_shape, Shape, SHAPE_ID_OFF};
 use std::rc::Rc;
 use std::sync::Arc;
 pub use varn_core::RuntimeKind;
@@ -111,34 +111,6 @@ impl std::fmt::Display for RangeData {
             write!(f, " step {}", self.step)?;
         }
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum RuntimeSymbol {
-    Iterator,
-    AsyncIterator,
-}
-
-impl RuntimeSymbol {
-    pub fn name(&self) -> &'static str {
-        match self {
-            RuntimeSymbol::Iterator => "Symbol.iterator",
-            RuntimeSymbol::AsyncIterator => "Symbol.asyncIterator",
-        }
-    }
-
-    pub fn method_name(&self) -> &'static str {
-        match self {
-            RuntimeSymbol::Iterator => "[Symbol.iterator]",
-            RuntimeSymbol::AsyncIterator => "[Symbol.asyncIterator]",
-        }
-    }
-}
-
-impl std::fmt::Display for RuntimeSymbol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name())
     }
 }
 

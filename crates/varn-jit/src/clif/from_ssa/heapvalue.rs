@@ -126,8 +126,6 @@ pub(super) fn emit(
         | SsaOp::ArrayExtend { .. }
         | SsaOp::WrapSpread { .. }
         | SsaOp::Range { .. }
-        | SsaOp::GetSymbol { .. }
-        | SsaOp::IterCall { .. }
         | SsaOp::SuperCall { .. }
         | SsaOp::SuperMethodCall { .. }
         | SsaOp::ExtensionCall { .. }
@@ -356,8 +354,6 @@ pub(super) fn emit(
         | SsaOp::ArrayExtend { .. }
         | SsaOp::WrapSpread { .. }
         | SsaOp::Range { .. }
-        | SsaOp::GetSymbol { .. }
-        | SsaOp::IterCall { .. }
         | SsaOp::SuperCall { .. }
         | SsaOp::SuperMethodCall { .. }
         | SsaOp::ExtensionCall { .. }

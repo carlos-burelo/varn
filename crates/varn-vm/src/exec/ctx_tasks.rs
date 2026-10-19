@@ -52,7 +52,6 @@ impl ExecCtx {
                 | HeapObj::Map(_)
                 | HeapObj::Set(_)
                 | HeapObj::Range(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::EnumVariant(_)
                 | HeapObj::BigInt(_)
                 | HeapObj::Decimal(_)

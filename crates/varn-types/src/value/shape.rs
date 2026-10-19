@@ -120,11 +120,3 @@ thread_local! {
 pub fn root_shape() -> Rc<Shape> {
     ROOT_SHAPE.with(Rc::clone)
 }
-
-thread_local! {
-    static ITER_RESULT_SHAPE: Rc<Shape> = root_shape().transition_str(varn_core::MemberKey::IterValue.as_str()).transition_str(varn_core::MemberKey::IterDone.as_str());
-}
-
-pub fn iter_result_shape() -> Rc<Shape> {
-    ITER_RESULT_SHAPE.with(Rc::clone)
-}

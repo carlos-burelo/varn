@@ -37,7 +37,6 @@ pub(crate) mod normalize;
 pub(crate) mod props;
 pub mod scheduler;
 pub(crate) mod strings;
-pub(crate) mod symbol_iterator;
 use crate::value::VmValue;
 pub use ctx::ExecCtx;
 

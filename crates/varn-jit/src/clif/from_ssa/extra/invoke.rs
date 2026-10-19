@@ -6,21 +6,6 @@ use super::extra_shared::{frame, native, stage};
 use cranelift_codegen::ir::{types, InstBuilder, MemFlagsData, Value};
 use cranelift_frontend::FunctionBuilder;
 
-pub(super) fn iter_call(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    values: &mut [Option<Value>],
-    callee: u32,
-    recv: u32,
-) -> Result<Option<Option<Out>>, String> {
-    frame(ctx)?;
-    let c = load_value(b, ctx, values, callee)?;
-    let (ct, cp) = b.ins().isplit(c);
-    let w = super::super::call::boxed_window(b, ctx, values, c, &[recv])?;
-    let r = super::super::call::emit_invoke(b, ctx, w, (ct, cp), 2)?;
-    Ok(Some(Some(Out::Boxed(r))))
-}
-
 pub(super) fn super_call(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,

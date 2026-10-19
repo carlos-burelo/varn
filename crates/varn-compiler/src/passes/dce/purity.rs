@@ -88,11 +88,7 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
             }
         },
 
-        GetProperty { .. }
-        | GetPropertyMaybe { .. }
-        | GetIndex { .. }
-        | GetSuper { .. }
-        | GetSymbol { .. } => false,
+        GetProperty { .. } | GetPropertyMaybe { .. } | GetIndex { .. } | GetSuper { .. } => false,
 
         ToString { .. } | BuildStr { .. } => false,
 
@@ -107,7 +103,6 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | SuperCall { .. }
         | SuperMethodCall { .. }
         | ExtensionCall { .. }
-        | IterCall { .. }
         | IntrinsicCall { .. }
         | CallNativeOp { .. }
         | ArrayPush { .. } => false,

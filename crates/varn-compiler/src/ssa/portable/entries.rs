@@ -210,8 +210,6 @@ fn is_suspend_site(kind: &InstKind) -> bool {
         | InstKind::This
         | InstKind::Range { .. }
         | InstKind::ObjectKeys { .. }
-        | InstKind::GetSymbol { .. }
-        | InstKind::IterCall { .. }
         | InstKind::GetSuper { .. }
         | InstKind::SuperCall { .. }
         | InstKind::SuperMethodCall { .. }

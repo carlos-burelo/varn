@@ -62,7 +62,6 @@ impl ExecCtx {
                         | varn_types::chunk::Literal::Str(_)
                         | varn_types::chunk::Literal::BigInt(_)
                         | varn_types::chunk::Literal::Decimal(_)
-                        | varn_types::chunk::Literal::Symbol(_)
                         | varn_types::chunk::Literal::Char(_),
                     ))
                     | Some(varn_types::chunk::PoolEntry::Function(_))
@@ -153,7 +152,6 @@ impl ExecCtx {
             | OpCode::GetFixedField
             | OpCode::SetFixedField
             | OpCode::GetSuper
-            | OpCode::GetSymbol
             | OpCode::MakeClosure
             | OpCode::MakeClass
             | OpCode::Inherit

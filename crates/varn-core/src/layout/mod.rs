@@ -63,7 +63,6 @@ impl TypeLayout {
                 | RuntimeKind::Char
                 | RuntimeKind::BigInt
                 | RuntimeKind::Decimal
-                | RuntimeKind::Symbol
                 | RuntimeKind::Tuple
                 | RuntimeKind::Range
                 | RuntimeKind::Enum

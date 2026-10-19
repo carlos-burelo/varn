@@ -71,21 +71,6 @@ pub(super) fn emit_method_call(
     Ok(())
 }
 
-pub(super) fn emit_iter_call(
-    chunk: &mut Chunk,
-    d: u8,
-    callee: Value,
-    recv: Value,
-    reg: &[u8],
-    call_base: u8,
-    line: u32,
-) {
-    chunk.emit_rr(OpCode::Move, call_base, reg[recv.0 as usize], line);
-    chunk.emit(OpCode::Call, line);
-    chunk.write(Chunk::pack(d, reg[callee.0 as usize]), line);
-    chunk.write(Chunk::pack(1, call_base), line);
-}
-
 pub(super) fn emit_super_call(
     chunk: &mut Chunk,
     d: u8,

@@ -31,7 +31,6 @@ pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
                 | HeapObj::Task(_)
                 | HeapObj::TaskHandle(_)
                 | HeapObj::Range(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::EnumVariant(_)
                 | HeapObj::BigInt(_)
                 | HeapObj::Decimal(_)

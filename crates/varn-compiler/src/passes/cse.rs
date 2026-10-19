@@ -229,8 +229,6 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
         | InstKind::This
         | InstKind::Range { .. }
         | InstKind::ObjectKeys { .. }
-        | InstKind::GetSymbol { .. }
-        | InstKind::IterCall { .. }
         | InstKind::GetSuper { .. }
         | InstKind::SuperCall { .. }
         | InstKind::SuperMethodCall { .. }

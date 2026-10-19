@@ -244,7 +244,6 @@ pub(super) fn emit_module_body(
             | OpCode::GetFixedField
             | OpCode::SetFixedField
             | OpCode::GetSuper
-            | OpCode::GetSymbol
             | OpCode::MakeClosure
             | OpCode::MakeClass
             | OpCode::Inherit

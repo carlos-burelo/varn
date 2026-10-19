@@ -168,7 +168,6 @@ impl Chunk {
             | OpCode::GetFixedField
             | OpCode::SetFixedField
             | OpCode::GetSuper
-            | OpCode::GetSymbol
             | OpCode::MakeClosure
             | OpCode::MakeClass
             | OpCode::Inherit
@@ -348,10 +347,6 @@ impl Chunk {
 
     pub fn add_int(&mut self, n: i64) -> u16 {
         self.add_constant(PoolEntry::Literal(Literal::Int(n)))
-    }
-
-    pub fn add_symbol(&mut self, s: crate::value::RuntimeSymbol) -> u16 {
-        self.add_constant(PoolEntry::Literal(Literal::Symbol(s)))
     }
 
     pub fn emit_load_int(&mut self, dest: u8, n: i64, line: u32) {

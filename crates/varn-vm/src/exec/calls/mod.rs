@@ -23,7 +23,6 @@ pub(crate) fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<V
                 Literal::Str(s) => heap.alloc_str_interned(s.as_ref()),
                 Literal::BigInt(n) => heap.alloc_bigint(n.clone()),
                 Literal::Decimal(d) => heap.alloc_decimal(d.clone()),
-                Literal::Symbol(s) => heap.alloc_symbol(s.clone()),
                 Literal::Char(c) => heap.alloc_char(*c),
             },
             PoolEntry::Function(_) => VmValue::null(),

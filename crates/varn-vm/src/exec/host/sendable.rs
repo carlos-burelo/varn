@@ -125,7 +125,6 @@ pub(super) fn to_sendable(
                 | HeapObj::BoundMethod(_)
                 | HeapObj::Task(_)
                 | HeapObj::TaskHandle(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::Generator(_)
                 | HeapObj::Spread(_),
             )

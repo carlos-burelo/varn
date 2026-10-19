@@ -164,7 +164,6 @@ impl ExecCtx {
             "FAILED",
             "error",
             varn_core::MemberKey::Message.as_str(),
-            varn_core::MemberKey::IterValue.as_str(),
             "result",
             varn_core::MemberKey::Length.as_str(),
             varn_core::MemberKey::Name.as_str(),
@@ -236,7 +235,6 @@ impl ExecCtx {
                     | crate::heap::HeapObj::Task(_)
                     | crate::heap::HeapObj::TaskHandle(_)
                     | crate::heap::HeapObj::Range(_)
-                    | crate::heap::HeapObj::Symbol(_)
                     | crate::heap::HeapObj::EnumVariant(_)
                     | crate::heap::HeapObj::BigInt(_)
                     | crate::heap::HeapObj::Decimal(_)

@@ -7,7 +7,6 @@ pub(super) fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
         SsaOp::Call { .. }
         | SsaOp::CallNativeOp { .. }
         | SsaOp::MethodCall { .. }
-        | SsaOp::IterCall { .. }
         | SsaOp::SuperCall { .. }
         | SsaOp::SuperMethodCall { .. }
         | SsaOp::ExtensionCall { .. }
@@ -18,7 +17,6 @@ pub(super) fn may_push_frame(ctx: &Ctx<'_>, op: &SsaOp) -> bool {
         | SsaOp::GetIndex { .. }
         | SsaOp::SetIndex { .. }
         | SsaOp::GetPropertyMaybe { .. }
-        | SsaOp::GetSymbol { .. }
         | SsaOp::BuildObjectSpread { .. }
         | SsaOp::Spawn { .. }
         | SsaOp::LoadModule { .. }
@@ -131,8 +129,6 @@ pub(super) fn needs_frame(ssa: &SsaProto, op: &SsaOp) -> bool {
             | SsaOp::ArrayExtend { .. }
             | SsaOp::WrapSpread { .. }
             | SsaOp::Range { .. }
-            | SsaOp::GetSymbol { .. }
-            | SsaOp::IterCall { .. }
             | SsaOp::SuperCall { .. }
             | SsaOp::SuperMethodCall { .. }
             | SsaOp::ExtensionCall { .. }

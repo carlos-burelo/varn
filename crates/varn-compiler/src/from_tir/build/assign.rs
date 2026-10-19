@@ -148,7 +148,6 @@ impl<'m> Builder<'m> {
             | TirExprKind::Select { .. }
             | TirExprKind::Seq { .. }
             | TirExprKind::ObjectKeys { .. }
-            | TirExprKind::IterInit { .. }
             | TirExprKind::SuperCall { .. }
             | TirExprKind::SuperMethodCall { .. }
             | TirExprKind::DecimalLit(_)

@@ -205,13 +205,6 @@ pub(super) fn emit_value(
         InstKind::ObjectKeys { operand } => {
             scalars::emit_object_keys(chunk, d, *operand, reg, line);
         }
-        InstKind::GetSymbol { object, is_async } => {
-            scalars::emit_get_symbol(chunk, d, *object, reg, *is_async, line);
-        }
-
-        InstKind::IterCall { callee, recv } => {
-            calls::emit_iter_call(chunk, d, *callee, *recv, reg, call_base, line);
-        }
 
         InstKind::GetSuper { name } => {
             access::emit_get_super(chunk, d, name, line);

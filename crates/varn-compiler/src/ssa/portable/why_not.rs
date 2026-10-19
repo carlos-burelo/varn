@@ -90,8 +90,6 @@ pub(super) fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
         | other @ InstKind::This
         | other @ InstKind::Range { .. }
         | other @ InstKind::ObjectKeys { .. }
-        | other @ InstKind::GetSymbol { .. }
-        | other @ InstKind::IterCall { .. }
         | other @ InstKind::GetSuper { .. }
         | other @ InstKind::SuperCall { .. }
         | other @ InstKind::SuperMethodCall { .. }

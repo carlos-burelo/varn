@@ -5,8 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use varn_types::{
     value::{
-        BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData,
-        RuntimeSymbol, SetRef,
+        BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData, SetRef,
     },
     ClassObj, NativeFn, VmArray,
 };
@@ -33,7 +32,6 @@ pub enum HeapObj {
     Task(Rc<crate::task::LazyTask>),
     TaskHandle(Rc<crate::task::TaskCell>),
     Range(RangeData),
-    Symbol(RuntimeSymbol),
     EnumVariant(Box<EnumVariantData>),
     BigInt(Box<num_bigint::BigInt>),
     Decimal(Box<bigdecimal::BigDecimal>),
@@ -62,7 +60,6 @@ impl HeapObj {
             HeapObj::Task(_) => RuntimeKind::Task,
             HeapObj::TaskHandle(_) => RuntimeKind::TaskHandle,
             HeapObj::Range(_) => RuntimeKind::Range,
-            HeapObj::Symbol(_) => RuntimeKind::Symbol,
             HeapObj::EnumVariant(_) => RuntimeKind::Enum,
             HeapObj::BigInt(_) => RuntimeKind::BigInt,
             HeapObj::Decimal(_) => RuntimeKind::Decimal,

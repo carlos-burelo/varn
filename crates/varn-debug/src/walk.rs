@@ -13,7 +13,6 @@ pub fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
             PoolEntry::Literal(Literal::Str(_))
             | PoolEntry::Literal(Literal::BigInt(_))
             | PoolEntry::Literal(Literal::Decimal(_))
-            | PoolEntry::Literal(Literal::Symbol(_))
             | PoolEntry::Literal(Literal::Char(_))
             | PoolEntry::Function(_)
             | PoolEntry::Shape(_)

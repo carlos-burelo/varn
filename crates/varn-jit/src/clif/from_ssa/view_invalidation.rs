@@ -114,8 +114,6 @@ pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
         | SsaOp::ArrayExtend { .. }
         | SsaOp::WrapSpread { .. }
         | SsaOp::Range { .. }
-        | SsaOp::GetSymbol { .. }
-        | SsaOp::IterCall { .. }
         | SsaOp::SuperCall { .. }
         | SsaOp::SuperMethodCall { .. }
         | SsaOp::ExtensionCall { .. }

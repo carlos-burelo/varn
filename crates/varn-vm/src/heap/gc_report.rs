@@ -30,7 +30,6 @@ impl Heap {
 
         let interners = InternerSizes {
             strings: inner.string_interner.len(),
-            symbols: inner.symbol_interner.len(),
             bigints: inner.bigint_interner.len(),
             decimals: inner.decimal_interner.len(),
             chars: inner.char_interner.len(),

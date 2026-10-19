@@ -137,8 +137,6 @@ pub(super) fn try_project(kind: &InstKind, value_tys: &[HirType], site: &Site) -
         | InstKind::This
         | InstKind::Range { .. }
         | InstKind::ObjectKeys { .. }
-        | InstKind::GetSymbol { .. }
-        | InstKind::IterCall { .. }
         | InstKind::GetSuper { .. }
         | InstKind::SuperCall { .. }
         | InstKind::SuperMethodCall { .. }
@@ -285,8 +283,6 @@ fn project_indexed(kind: &InstKind, value_tys: &[HirType]) -> Option<SsaOp> {
         | InstKind::This
         | InstKind::Range { .. }
         | InstKind::ObjectKeys { .. }
-        | InstKind::GetSymbol { .. }
-        | InstKind::IterCall { .. }
         | InstKind::GetSuper { .. }
         | InstKind::SuperCall { .. }
         | InstKind::SuperMethodCall { .. }

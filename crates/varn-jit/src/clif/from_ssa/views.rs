@@ -116,8 +116,6 @@ impl Views {
                 | SsaOp::ArrayExtend { .. }
                 | SsaOp::WrapSpread { .. }
                 | SsaOp::Range { .. }
-                | SsaOp::GetSymbol { .. }
-                | SsaOp::IterCall { .. }
                 | SsaOp::SuperCall { .. }
                 | SsaOp::SuperMethodCall { .. }
                 | SsaOp::ExtensionCall { .. }
@@ -206,8 +204,6 @@ impl Views {
                 | SsaOp::ArrayExtend { .. }
                 | SsaOp::WrapSpread { .. }
                 | SsaOp::Range { .. }
-                | SsaOp::GetSymbol { .. }
-                | SsaOp::IterCall { .. }
                 | SsaOp::SuperCall { .. }
                 | SsaOp::SuperMethodCall { .. }
                 | SsaOp::ExtensionCall { .. }

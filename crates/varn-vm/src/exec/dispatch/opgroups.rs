@@ -99,7 +99,6 @@ macro_rules! object_ops {
             | OpCode::GetFixedField
             | OpCode::SetFixedField
             | OpCode::GetSuper
-            | OpCode::GetSymbol
             | OpCode::AssertNotNull
             | OpCode::DeclareLayout
             | OpCode::AllocInstance

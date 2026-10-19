@@ -121,7 +121,6 @@ impl CellSpace {
             | HeapObj::Task(_)
             | HeapObj::TaskHandle(_)
             | HeapObj::Range(_)
-            | HeapObj::Symbol(_)
             | HeapObj::EnumVariant(_)
             | HeapObj::BigInt(_)
             | HeapObj::Decimal(_)

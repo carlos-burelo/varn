@@ -63,7 +63,6 @@ impl ExecCtx {
                 | crate::heap::HeapObj::Task(_)
                 | crate::heap::HeapObj::TaskHandle(_)
                 | crate::heap::HeapObj::Range(_)
-                | crate::heap::HeapObj::Symbol(_)
                 | crate::heap::HeapObj::BigInt(_)
                 | crate::heap::HeapObj::Decimal(_)
                 | crate::heap::HeapObj::Char(_)
@@ -158,7 +157,6 @@ impl ExecCtx {
             | OpCode::GetFixedField
             | OpCode::SetFixedField
             | OpCode::GetSuper
-            | OpCode::GetSymbol
             | OpCode::MakeClosure
             | OpCode::MakeClass
             | OpCode::Inherit

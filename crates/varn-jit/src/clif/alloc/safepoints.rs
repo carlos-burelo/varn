@@ -67,7 +67,6 @@ pub(crate) fn has_alloc_scan(
                     | OpCode::ToString
                     | OpCode::Typeof
                     | OpCode::Negate
-                    | OpCode::GetSymbol
                     | OpCode::StrSlice
                     | OpCode::Intrinsic
                     | OpCode::MakeClosure

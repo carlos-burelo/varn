@@ -178,8 +178,6 @@ pub(crate) fn project(
                     | InstKind::This
                     | InstKind::Range { .. }
                     | InstKind::ObjectKeys { .. }
-                    | InstKind::GetSymbol { .. }
-                    | InstKind::IterCall { .. }
                     | InstKind::GetSuper { .. }
                     | InstKind::SuperCall { .. }
                     | InstKind::SuperMethodCall { .. }
@@ -274,8 +272,6 @@ pub(crate) fn project(
                     | InstKind::This
                     | InstKind::Range { .. }
                     | InstKind::ObjectKeys { .. }
-                    | InstKind::GetSymbol { .. }
-                    | InstKind::IterCall { .. }
                     | InstKind::GetSuper { .. }
                     | InstKind::SuperCall { .. }
                     | InstKind::SuperMethodCall { .. }

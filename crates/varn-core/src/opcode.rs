@@ -62,7 +62,6 @@ pub enum OpCode {
     GetFixedField,
     SetFixedField,
     GetSuper,
-    GetSymbol,
 
     MakeClosure,
 

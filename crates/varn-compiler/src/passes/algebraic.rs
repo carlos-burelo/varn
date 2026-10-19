@@ -239,8 +239,6 @@ fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
         | InstKind::This
         | InstKind::Range { .. }
         | InstKind::ObjectKeys { .. }
-        | InstKind::GetSymbol { .. }
-        | InstKind::IterCall { .. }
         | InstKind::GetSuper { .. }
         | InstKind::SuperCall { .. }
         | InstKind::SuperMethodCall { .. }

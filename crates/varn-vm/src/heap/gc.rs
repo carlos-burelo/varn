@@ -43,7 +43,6 @@ impl HeapInner {
         let cells = &self.cells;
         let live = |r: &mut HeapRef| cells.state(*r) != SlotState::Free;
         self.string_interner.retain(|_, idx| live(idx));
-        self.symbol_interner.retain(|_, idx| live(idx));
         self.char_interner.retain(|_, idx| live(idx));
         self.bigint_interner.retain(|_, idx| live(idx));
         self.decimal_interner.retain(|_, idx| live(idx));

@@ -33,11 +33,11 @@ fn op_color(op: OpCode) -> &'static str {
         LoadNull | LoadTrue | LoadFalse | Move | CloseUpvalue | Negate | Not | ToString
         | BuildTuple | BuildRecord | GetIndex | SetIndex | ObjectRest | ObjectKeys
         | ObjectMerge | GetProperty | GetPropertyMaybe | SetProperty | GetFixedField
-        | SetFixedField | GetSuper | GetSymbol | AllocInstance | Typeof | IsNull | IsArray
-        | AssertNotNull | StrLength | ArrayLength | ArrayPush | ArrayPop | ArrayExtend
-        | WrapSpread | GetEnumTag | Await | Yield | InvokeRuntimeStatic | Intrinsic | Nop
-        | ArrayGetIndex | ArraySetIndex | BytesGetIndex | BytesSetIndex | CallNativeOp
-        | IntrinsicDirect | BuildMap | MapGetIndex | MapSetIndex | Convert | BytesLength => "",
+        | SetFixedField | GetSuper | AllocInstance | Typeof | IsNull | IsArray | AssertNotNull
+        | StrLength | ArrayLength | ArrayPush | ArrayPop | ArrayExtend | WrapSpread
+        | GetEnumTag | Await | Yield | InvokeRuntimeStatic | Intrinsic | Nop | ArrayGetIndex
+        | ArraySetIndex | BytesGetIndex | BytesSetIndex | CallNativeOp | IntrinsicDirect
+        | BuildMap | MapGetIndex | MapSetIndex | Convert | BytesLength => "",
     }
 }
 
@@ -70,7 +70,6 @@ fn const_hint(entry: &PoolEntry) -> String {
             Literal::BigInt(n) => format!("{GREEN}{n}n{R}"),
             Literal::Decimal(d) => format!("{GREEN}{d}d{R}"),
             Literal::Char(c) => format!("{GREEN}'{c}'{R}"),
-            Literal::Symbol(s) => format!("{DIM}Symbol({s:?}){R}"),
         },
         PoolEntry::Function(f) => {
             let fname = f.name.as_deref().unwrap_or("<anon>");

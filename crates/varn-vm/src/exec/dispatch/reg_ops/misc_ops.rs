@@ -63,21 +63,6 @@ impl ExecCtx {
         crate::exec::class::op_get_super(cls, &name, this_val, &mut self.heap)
     }
 
-    pub(in crate::exec::dispatch) fn exec_get_symbol(
-        &mut self,
-        obj: VmValue,
-        sym_idx: usize,
-        closure: &VmClosure,
-    ) -> VmResult<VmValue> {
-        let sym_nv = closure.constants[sym_idx];
-        match self.heap.symbol_of(sym_nv) {
-            Some(s) => crate::exec::symbol_iterator::get_symbol_property(obj, s, &mut self.heap),
-            None => Err(crate::error::RuntimeError::new(
-                "GetSymbol: non-symbol constant",
-            )),
-        }
-    }
-
     pub(in crate::exec::dispatch) fn exec_assert_not_null(&self, v: VmValue) -> VmResult<()> {
         crate::exec::advanced::assert_not_null(v)
     }

@@ -73,8 +73,7 @@ macro_rules! inst_uses {
             | ObjectRest { object, .. }
             | GetFixedField { object, .. }
             | GetPropertyMaybe { object, .. }
-            | ModuleSlot { object, .. }
-            | GetSymbol { object, .. } => $use!($f, object),
+            | ModuleSlot { object, .. } => $use!($f, object),
 
             StoreGlobal { value, .. }
             | StoreGlobalIdx { value, .. }
@@ -116,10 +115,6 @@ macro_rules! inst_uses {
             Range { start, end, .. } => {
                 $use!($f, start);
                 $use!($f, end);
-            }
-            IterCall { callee, recv } => {
-                $use!($f, callee);
-                $use!($f, recv);
             }
             DefineStatic { class, value, .. } => {
                 $use!($f, class);

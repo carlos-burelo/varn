@@ -36,8 +36,6 @@ member_keys! {
     ValueOf => "valueOf",
     Iter => "iter",
     IterNext => "next",
-    IterDone => "done",
-    IterValue => "value",
     Push => "push",
     Pop => "pop",
     Shift => "shift",
@@ -78,8 +76,4 @@ member_keys! {
     IsPrivate => "isPrivate",
     Inclusive => "inclusive",
     Stride => "stride",
-    IterArray => "__arr",
-    IterIndex => "__idx",
-    IterResult => "__res",
-    IterRange => "__range",
 }

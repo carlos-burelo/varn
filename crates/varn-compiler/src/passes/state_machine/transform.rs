@@ -143,8 +143,6 @@ fn find_suspend_inst(func: &SsaFunc, operand: Value) -> Option<(BlockId, usize)>
                 | InstKind::This
                 | InstKind::Range { .. }
                 | InstKind::ObjectKeys { .. }
-                | InstKind::GetSymbol { .. }
-                | InstKind::IterCall { .. }
                 | InstKind::GetSuper { .. }
                 | InstKind::SuperCall { .. }
                 | InstKind::SuperMethodCall { .. }

@@ -107,7 +107,6 @@ pub(super) fn project_bin(
         | OpCode::GetFixedField
         | OpCode::SetFixedField
         | OpCode::GetSuper
-        | OpCode::GetSymbol
         | OpCode::MakeClosure
         | OpCode::MakeClass
         | OpCode::Inherit

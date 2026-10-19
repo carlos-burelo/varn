@@ -43,7 +43,6 @@ pub struct OldGenReport {
 #[derive(Default)]
 pub struct InternerSizes {
     pub strings: usize,
-    pub symbols: usize,
     pub bigints: usize,
     pub decimals: usize,
     pub chars: usize,
@@ -105,8 +104,8 @@ impl std::fmt::Display for GcReport {
         let i = &self.interners;
         writeln!(
             f,
-            "interners  str={} sym={} bigint={} decimal={} char={}",
-            i.strings, i.symbols, i.bigints, i.decimals, i.chars
+            "interners  str={} bigint={} decimal={} char={}",
+            i.strings, i.bigints, i.decimals, i.chars
         )?;
 
         writeln!(f, "live objects by type (young / old-gen / total)")?;

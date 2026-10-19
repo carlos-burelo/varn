@@ -263,7 +263,6 @@ impl HeapInner {
                     | HeapObj::Task(_)
                     | HeapObj::TaskHandle(_)
                     | HeapObj::Range(_)
-                    | HeapObj::Symbol(_)
                     | HeapObj::Generator(_)
                     | HeapObj::Spread(_),
                 )

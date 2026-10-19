@@ -138,8 +138,6 @@ pub(super) fn project_class(kind: &InstKind) -> Option<SsaOp> {
         | InstKind::This
         | InstKind::Range { .. }
         | InstKind::ObjectKeys { .. }
-        | InstKind::GetSymbol { .. }
-        | InstKind::IterCall { .. }
         | InstKind::SuperCall { .. }
         | InstKind::SuperMethodCall { .. }
         | InstKind::ExtensionCall { .. }

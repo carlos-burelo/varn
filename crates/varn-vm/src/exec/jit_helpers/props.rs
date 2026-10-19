@@ -159,29 +159,6 @@ pub(crate) extern "C" fn jit_get_property_maybe(
     }
 }
 
-#[varn_macros::jit_slow(field = "get_symbol")]
-pub(crate) extern "C" fn jit_get_symbol(
-    ctx: *mut ExecCtx,
-    obj_tag: u64,
-    obj_payload: u64,
-    sym_idx: usize,
-) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let obj = VmValue::from_raw_parts(obj_tag, obj_payload);
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = ctx_ref.frames[frame_idx].closure();
-        let sym_nv = closure_ref.constants[sym_idx];
-        let Some(s) = ctx_ref.heap.symbol_of(sym_nv) else {
-            panic!("GetSymbol: non-symbol constant");
-        };
-        match crate::exec::symbol_iterator::get_symbol_property(obj, s, &mut ctx_ref.heap) {
-            Ok(v) => ctx_ref.jit_native_result = v,
-            Err(e) => jit_propagate_error(ctx_ref, e),
-        }
-    }
-}
-
 #[varn_macros::jit_slow(field = "bind_method")]
 pub(crate) extern "C" fn jit_bind_method(
     ctx: *mut ExecCtx,

@@ -1,24 +1,14 @@
-use super::cells::SlotState;
 use super::obj::HeapObj;
 use super::structs::HeapInner;
 use crate::closure::VmClosure;
 use crate::value::VmValue;
-use std::collections::hash_map::Entry;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_types::value::{FrozenModuleObj, ModuleObj, RangeData, RuntimeSymbol};
+use varn_types::value::{FrozenModuleObj, ModuleObj, RangeData};
 
 impl HeapInner {
     pub(crate) fn alloc_vm_buffer(&mut self, buf: varn_types::VmBuffer) -> VmValue {
         let idx = self.alloc(HeapObj::Buffer(buf));
-        VmValue::from_heap(idx)
-    }
-
-    pub(crate) fn alloc_symbol(&mut self, s: RuntimeSymbol) -> VmValue {
-        let idx = match self.symbol_interner.entry(s.clone()) {
-            Entry::Occupied(e) => *e.get(),
-            Entry::Vacant(e) => *e.insert(self.cells.alloc(HeapObj::Symbol(s), SlotState::Old)),
-        };
         VmValue::from_heap(idx)
     }
 

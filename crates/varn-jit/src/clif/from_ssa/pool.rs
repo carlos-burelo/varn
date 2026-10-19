@@ -31,12 +31,10 @@ pub(super) fn literal(
 }
 
 fn payload_is_value(v: VmValue) -> bool {
-    use varn_types::vm_value::{
-        KIND_BOOL, KIND_FLOAT, KIND_HEAP, KIND_INT, KIND_NULL, KIND_SSO, KIND_SYMBOL,
-    };
+    use varn_types::vm_value::{KIND_BOOL, KIND_FLOAT, KIND_HEAP, KIND_INT, KIND_NULL, KIND_SSO};
     match v.kind() {
         KIND_NULL | KIND_BOOL | KIND_INT | KIND_FLOAT | KIND_SSO => true,
-        KIND_HEAP | KIND_SYMBOL => false,
+        KIND_HEAP => false,
         _ => false,
     }
 }

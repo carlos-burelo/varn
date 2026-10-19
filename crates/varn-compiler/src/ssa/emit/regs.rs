@@ -65,8 +65,6 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
                 InstKind::CallNativeOp { args, .. } => args.len() as u32 + 1,
 
-                InstKind::IterCall { .. } => 1,
-
                 InstKind::SuperCall { args } => args.len() as u32 + 2,
                 InstKind::SuperMethodCall { args, .. } => args.len() as u32 + 1,
 
@@ -142,7 +140,6 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 | InstKind::This
                 | InstKind::Range { .. }
                 | InstKind::ObjectKeys { .. }
-                | InstKind::GetSymbol { .. }
                 | InstKind::GetSuper { .. }
                 | InstKind::BuildObjectSpread { .. } => 0,
             };

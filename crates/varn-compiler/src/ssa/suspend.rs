@@ -92,8 +92,6 @@ pub fn analyze(ssa: &SsaFunc) -> Vec<SuspendPoint> {
                 | InstKind::This
                 | InstKind::Range { .. }
                 | InstKind::ObjectKeys { .. }
-                | InstKind::GetSymbol { .. }
-                | InstKind::IterCall { .. }
                 | InstKind::GetSuper { .. }
                 | InstKind::SuperCall { .. }
                 | InstKind::SuperMethodCall { .. }
@@ -201,8 +199,6 @@ pub fn suspend_live_regs(
                 | InstKind::This
                 | InstKind::Range { .. }
                 | InstKind::ObjectKeys { .. }
-                | InstKind::GetSymbol { .. }
-                | InstKind::IterCall { .. }
                 | InstKind::GetSuper { .. }
                 | InstKind::SuperCall { .. }
                 | InstKind::SuperMethodCall { .. }
@@ -356,8 +352,6 @@ fn captured_home_regs(ssa: &SsaFunc, nparams: usize) -> Vec<u16> {
                 | InstKind::This
                 | InstKind::Range { .. }
                 | InstKind::ObjectKeys { .. }
-                | InstKind::GetSymbol { .. }
-                | InstKind::IterCall { .. }
                 | InstKind::GetSuper { .. }
                 | InstKind::SuperCall { .. }
                 | InstKind::SuperMethodCall { .. }

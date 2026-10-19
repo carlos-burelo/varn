@@ -90,8 +90,6 @@ pub(super) fn project_object(kind: &InstKind) -> Option<SsaOp> {
         | InstKind::IsArray { .. }
         | InstKind::Range { .. }
         | InstKind::ObjectKeys { .. }
-        | InstKind::GetSymbol { .. }
-        | InstKind::IterCall { .. }
         | InstKind::GetSuper { .. }
         | InstKind::SuperCall { .. }
         | InstKind::SuperMethodCall { .. }

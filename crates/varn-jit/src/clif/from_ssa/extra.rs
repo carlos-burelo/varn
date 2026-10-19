@@ -48,10 +48,6 @@ pub(super) fn try_emit(
             end,
             inclusive,
         } => props::range(b, ctx, values, *start, *end, *inclusive),
-        SsaOp::GetSymbol { object, is_async } => {
-            props::get_symbol(b, ctx, values, *object, *is_async)
-        }
-        SsaOp::IterCall { callee, recv } => invoke::iter_call(b, ctx, values, *callee, *recv),
         SsaOp::SuperCall { args } => invoke::super_call(b, ctx, values, args),
         SsaOp::SuperMethodCall { name, args } => {
             invoke::super_method_call(b, ctx, values, name, args)

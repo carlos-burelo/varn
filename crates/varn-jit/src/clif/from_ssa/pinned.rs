@@ -143,8 +143,6 @@ pub(super) fn compute(
                         | SsaOp::BindMethod { .. }
                         | SsaOp::WrapSpread { .. }
                         | SsaOp::Range { .. }
-                        | SsaOp::GetSymbol { .. }
-                        | SsaOp::IterCall { .. }
                         | SsaOp::SuperCall { .. }
                         | SsaOp::SuperMethodCall { .. }
                         | SsaOp::ExtensionCall { .. }

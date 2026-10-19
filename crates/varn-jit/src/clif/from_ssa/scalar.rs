@@ -257,8 +257,6 @@ pub(super) fn emit_inst(
         | SsaOp::ArrayExtend { .. }
         | SsaOp::WrapSpread { .. }
         | SsaOp::Range { .. }
-        | SsaOp::GetSymbol { .. }
-        | SsaOp::IterCall { .. }
         | SsaOp::SuperCall { .. }
         | SsaOp::SuperMethodCall { .. }
         | SsaOp::ExtensionCall { .. }

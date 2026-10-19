@@ -190,7 +190,6 @@ mod minor_gc_tests {
             | crate::heap::HeapObj::Task(_)
             | crate::heap::HeapObj::TaskHandle(_)
             | crate::heap::HeapObj::Range(_)
-            | crate::heap::HeapObj::Symbol(_)
             | crate::heap::HeapObj::EnumVariant(_)
             | crate::heap::HeapObj::BigInt(_)
             | crate::heap::HeapObj::Decimal(_)

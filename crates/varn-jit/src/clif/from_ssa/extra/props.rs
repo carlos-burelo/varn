@@ -114,33 +114,3 @@ pub(super) fn range(
     crate::clif::from_ssa::exceptions::call_checked(b, ctx, h.range, &[ectx, at, ap, ct, cp, f])?;
     Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
 }
-
-pub(super) fn get_symbol(
-    b: &mut FunctionBuilder,
-    ctx: &Ctx<'_>,
-    values: &mut [Option<Value>],
-    object: u32,
-    is_async: bool,
-) -> Result<Option<Option<Out>>, String> {
-    let ectx = exec_ctx(ctx);
-    let h = ctx.helpers;
-    let o = boxed_value(b, ctx, values, object)?;
-    let (ot, op_) = b.ins().isplit(o);
-    let want = if is_async {
-        varn_types::value::RuntimeSymbol::AsyncIterator
-    } else {
-        varn_types::value::RuntimeSymbol::Iterator
-    };
-    let idx = ctx
-        .proto
-        .chunk
-        .constants
-        .iter()
-        .position(|e| {
-            matches!(e, varn_types::PoolEntry::Literal(varn_types::Literal::Symbol(s)) if *s == want)
-        })
-        .ok_or("from_ssa: iterator symbol not in pool")? as i64;
-    let siv = b.ins().iconst(types::I64, idx);
-    crate::clif::from_ssa::exceptions::call_checked(b, ctx, h.get_symbol, &[ectx, ot, op_, siv])?;
-    Ok(Some(Some(Out::Boxed(native(b, ectx, h)))))
-}

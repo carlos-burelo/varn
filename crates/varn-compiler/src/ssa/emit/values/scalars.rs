@@ -5,7 +5,6 @@ use crate::OptError;
 use std::sync::Arc;
 use varn_core::OpCode;
 use varn_types::chunk::{Chunk, Literal, PoolEntry};
-use varn_types::value::RuntimeSymbol;
 
 type Result<T> = std::result::Result<T, OptError>;
 
@@ -151,23 +150,6 @@ pub(super) fn emit_bytes_length(chunk: &mut Chunk, d: u8, operand: Value, reg: &
 
 pub(super) fn emit_object_keys(chunk: &mut Chunk, d: u8, operand: Value, reg: &[u8], line: u32) {
     chunk.emit_rr(OpCode::ObjectKeys, d, reg[operand.0 as usize], line);
-}
-
-pub(super) fn emit_get_symbol(
-    chunk: &mut Chunk,
-    d: u8,
-    object: Value,
-    reg: &[u8],
-    is_async: bool,
-    line: u32,
-) {
-    let sym = if is_async {
-        RuntimeSymbol::AsyncIterator
-    } else {
-        RuntimeSymbol::Iterator
-    };
-    let idx = chunk.add_symbol(sym);
-    chunk.emit_rrc(OpCode::GetSymbol, d, reg[object.0 as usize], idx, line);
 }
 
 pub(super) fn emit_this(chunk: &mut Chunk, d: u8, line: u32) {

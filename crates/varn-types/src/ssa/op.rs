@@ -322,16 +322,6 @@ pub enum SsaOp {
         inclusive: bool,
     },
 
-    GetSymbol {
-        object: u32,
-        is_async: bool,
-    },
-
-    IterCall {
-        callee: u32,
-        recv: u32,
-    },
-
     SuperCall {
         args: Vec<u32>,
     },

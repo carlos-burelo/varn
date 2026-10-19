@@ -328,16 +328,6 @@ pub enum InstKind {
         operand: Value,
     },
 
-    GetSymbol {
-        object: Value,
-        is_async: bool,
-    },
-
-    IterCall {
-        callee: Value,
-        recv: Value,
-    },
-
     GetSuper {
         name: Arc<str>,
     },

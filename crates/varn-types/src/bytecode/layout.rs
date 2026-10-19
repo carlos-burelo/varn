@@ -247,7 +247,6 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
             vec![w(hi(0)), r(hi(1)), k(2, K::Name), imm(lo(1), I::CallSite)],
         ),
         O::GetPropertyMaybe => (3, vec![w(hi(0)), r(hi(1)), k(2, K::Name)]),
-        O::GetSymbol => (3, vec![w(hi(0)), r(hi(1)), k(2, K::Symbol)]),
 
         O::SetProperty => (
             3,

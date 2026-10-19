@@ -34,9 +34,9 @@ pub use native_error::NativeError;
 pub use resource::ResourceStore;
 pub use task::{Completion, HostOpen, HostPromise};
 pub use value::{
-    find_method_with_owner, iter_result_shape, root_shape, ClassObj, ModuleObj, ObjData,
-    RuntimeString, Shape, VmBuffer, INST_CLASS_ID_OFF, INST_PAYLOAD_OFF, OBJ_INLINE_LEN_OFF,
-    OBJ_SHAPE_OFF, OBJ_VALUES_OFF, SHAPE_ID_OFF,
+    find_method_with_owner, root_shape, ClassObj, ModuleObj, ObjData, RuntimeString, Shape,
+    VmBuffer, INST_CLASS_ID_OFF, INST_PAYLOAD_OFF, OBJ_INLINE_LEN_OFF, OBJ_SHAPE_OFF,
+    OBJ_VALUES_OFF, SHAPE_ID_OFF,
 };
 pub use value::{InstanceData, InstanceRef};
 pub use vm_value::{ArrayRepr, BoxedElems, HeapRef, VmArray, VmValue};

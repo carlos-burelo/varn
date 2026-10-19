@@ -208,11 +208,6 @@ pub enum TirExprKind {
         operand: Box<TirExpr>,
     },
 
-    IterInit {
-        source: Box<TirExpr>,
-        is_async: bool,
-    },
-
     SuperCall {
         args: Vec<TirArg>,
     },

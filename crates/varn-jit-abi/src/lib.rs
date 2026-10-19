@@ -178,7 +178,6 @@ pub struct JitHelpers {
     pub get_property_flat: usize,
     pub get_property_maybe: usize,
     pub get_super: usize,
-    pub get_symbol: usize,
     pub gt: usize,
     pub gte: usize,
     pub inherit: usize,

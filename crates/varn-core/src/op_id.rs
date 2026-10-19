@@ -65,7 +65,7 @@ impl KnownOp {
 
 pub const FIRST_REGISTRY_ID: u64 = crate::runtime_ops::COUNT + KnownOp::ALL.len() as u64;
 
-pub const CORE_CLASSES: [RuntimeKind; 14] = [
+pub const CORE_CLASSES: [RuntimeKind; 13] = [
     RuntimeKind::Array,
     RuntimeKind::Str,
     RuntimeKind::Bytes,
@@ -73,7 +73,6 @@ pub const CORE_CLASSES: [RuntimeKind; 14] = [
     RuntimeKind::Set,
     RuntimeKind::Range,
     RuntimeKind::Generator,
-    RuntimeKind::Symbol,
     RuntimeKind::Int,
     RuntimeKind::Float,
     RuntimeKind::Bool,

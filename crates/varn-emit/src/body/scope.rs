@@ -161,7 +161,6 @@ impl<'a> FnEmitter<'a> {
             | TirExprKind::Select { .. }
             | TirExprKind::Seq { .. }
             | TirExprKind::ObjectKeys { .. }
-            | TirExprKind::IterInit { .. }
             | TirExprKind::SuperCall { .. }
             | TirExprKind::SuperMethodCall { .. }
             | TirExprKind::DecimalLit(_)
@@ -217,7 +216,6 @@ impl<'a> FnEmitter<'a> {
             | other @ TirExprKind::Select { .. }
             | other @ TirExprKind::Seq { .. }
             | other @ TirExprKind::ObjectKeys { .. }
-            | other @ TirExprKind::IterInit { .. }
             | other @ TirExprKind::SuperCall { .. }
             | other @ TirExprKind::SuperMethodCall { .. }
             | other @ TirExprKind::DecimalLit(_)

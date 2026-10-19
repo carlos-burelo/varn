@@ -127,8 +127,6 @@ pub(super) fn try_project(
         | InstKind::ArrayLength { .. }
         | InstKind::BytesLength { .. }
         | InstKind::This
-        | InstKind::GetSymbol { .. }
-        | InstKind::IterCall { .. }
         | InstKind::GetSuper { .. }
         | InstKind::SuperCall { .. }
         | InstKind::SuperMethodCall { .. }

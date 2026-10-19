@@ -40,7 +40,6 @@ pub(crate) fn scratch_max(ssa: &SsaProto) -> usize {
                 | SsaOp::SuperMethodCall { args, .. }
                 | SsaOp::ExtensionCall { args, .. } => args.len() + 1,
                 SsaOp::CallSpread { args, .. } => args.len(),
-                SsaOp::IterCall { .. } => 2,
                 SsaOp::Dispose { .. } => 1,
                 SsaOp::IntrinsicCall { args, .. } => args.len() + 1,
                 SsaOp::BuildStr { parts } | SsaOp::BuildTuple { elements: parts } => parts.len(),
@@ -110,7 +109,6 @@ pub(crate) fn scratch_max(ssa: &SsaProto) -> usize {
                 | SsaOp::ArrayExtend { .. }
                 | SsaOp::WrapSpread { .. }
                 | SsaOp::Range { .. }
-                | SsaOp::GetSymbol { .. }
                 | SsaOp::LoadModule { .. }
                 | SsaOp::ModuleSlot { .. }
                 | SsaOp::StoreModuleSlot { .. }

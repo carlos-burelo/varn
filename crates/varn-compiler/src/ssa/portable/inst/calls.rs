@@ -35,14 +35,6 @@ pub(super) fn try_project(kind: &InstKind, site: &Site, captured: &mut Captured)
             args: args.iter().map(|v| v.0).collect(),
             wire: *wire_byte,
         }),
-        InstKind::IterCall { callee, recv } => Some(SsaOp::IterCall {
-            callee: callee.0,
-            recv: recv.0,
-        }),
-        InstKind::GetSymbol { object, is_async } => Some(SsaOp::GetSymbol {
-            object: object.0,
-            is_async: *is_async,
-        }),
         InstKind::SuperCall { args } => Some(SsaOp::SuperCall {
             args: args.iter().map(|v| v.0).collect(),
         }),

@@ -129,16 +129,6 @@ impl ExecCtx {
                 *ip = self.frames[frame_idx2].ip;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
-            OpCode::GetSymbol => {
-                let obj_reg = hi(code[*ip]);
-                *ip += 1;
-                let sym_idx = code[*ip] as usize;
-                *ip += 1;
-                let obj = self.stack.box_reg(base, obj_reg);
-                let r = self.exec_get_symbol(obj, sym_idx, closure)?;
-                self.stack.unbox_into_reg(base, first_reg, r)?;
-                Ok(Some(ObjectFlow::ContinueInstruction))
-            }
             OpCode::AssertNotNull => {
                 let w1 = code[*ip];
                 *ip += 1;

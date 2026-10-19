@@ -66,7 +66,6 @@ pub(super) fn infix(op: OpCode) -> Option<&'static str> {
         | O::GetFixedField
         | O::SetFixedField
         | O::GetSuper
-        | O::GetSymbol
         | O::MakeClosure
         | O::MakeClass
         | O::Inherit

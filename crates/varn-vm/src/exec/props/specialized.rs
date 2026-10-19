@@ -61,7 +61,6 @@ pub(super) fn resolve_specialized_property(
             | HeapObj::Task(_)
             | HeapObj::TaskHandle(_)
             | HeapObj::Range(_)
-            | HeapObj::Symbol(_)
             | HeapObj::BigInt(_)
             | HeapObj::Decimal(_)
             | HeapObj::Char(_)
@@ -94,8 +93,6 @@ fn enum_variant_property(
             | MemberKey::ToString
             | MemberKey::ValueOf
             | MemberKey::IterNext
-            | MemberKey::IterDone
-            | MemberKey::IterValue
             | MemberKey::Push
             | MemberKey::Pop
             | MemberKey::Shift
@@ -132,10 +129,6 @@ fn enum_variant_property(
             | MemberKey::IsStatic
             | MemberKey::IsPrivate
             | MemberKey::Inclusive
-            | MemberKey::IterArray
-            | MemberKey::IterIndex
-            | MemberKey::IterResult
-            | MemberKey::IterRange
             | MemberKey::Iter
             | MemberKey::Chars
             | MemberKey::ToArray

@@ -46,7 +46,6 @@ fn class_of(obj: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
         | HeapObj::Task(_)
         | HeapObj::TaskHandle(_)
         | HeapObj::Range(_)
-        | HeapObj::Symbol(_)
         | HeapObj::EnumVariant(_)
         | HeapObj::BigInt(_)
         | HeapObj::Decimal(_)
@@ -156,7 +155,6 @@ pub(crate) fn resolve_meta_property(
                         | HeapObj::Task(_)
                         | HeapObj::TaskHandle(_)
                         | HeapObj::Range(_)
-                        | HeapObj::Symbol(_)
                         | HeapObj::BigInt(_)
                         | HeapObj::Decimal(_)
                         | HeapObj::Char(_)
@@ -214,8 +212,6 @@ pub(crate) fn resolve_meta_property(
                 | MemberKey::ToString
                 | MemberKey::ValueOf
                 | MemberKey::IterNext
-                | MemberKey::IterDone
-                | MemberKey::IterValue
                 | MemberKey::Push
                 | MemberKey::Pop
                 | MemberKey::Shift
@@ -249,10 +245,6 @@ pub(crate) fn resolve_meta_property(
                 | MemberKey::IsStatic
                 | MemberKey::IsPrivate
                 | MemberKey::Inclusive
-                | MemberKey::IterArray
-                | MemberKey::IterIndex
-                | MemberKey::IterResult
-                | MemberKey::IterRange
                 | MemberKey::Iter
                 | MemberKey::Chars
                 | MemberKey::ToArray
@@ -277,8 +269,6 @@ pub(crate) fn resolve_meta_property(
         | MemberKey::ToString
         | MemberKey::ValueOf
         | MemberKey::IterNext
-        | MemberKey::IterDone
-        | MemberKey::IterValue
         | MemberKey::Push
         | MemberKey::Pop
         | MemberKey::Shift
@@ -307,10 +297,6 @@ pub(crate) fn resolve_meta_property(
         | MemberKey::IsStatic
         | MemberKey::IsPrivate
         | MemberKey::Inclusive
-        | MemberKey::IterArray
-        | MemberKey::IterIndex
-        | MemberKey::IterResult
-        | MemberKey::IterRange
         | MemberKey::Iter
         | MemberKey::Chars
         | MemberKey::ToArray

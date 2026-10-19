@@ -140,24 +140,6 @@ impl<'m> Builder<'m> {
                 Ok(self.emit(InstKind::ObjectKeys { operand: o }, ty))
             }
 
-            TirExprKind::IterInit { source, is_async } => {
-                let src = self.lower_expr(source)?;
-                let sym = self.emit(
-                    InstKind::GetSymbol {
-                        object: src,
-                        is_async: *is_async,
-                    },
-                    HirType::Ref,
-                );
-                Ok(self.emit(
-                    InstKind::IterCall {
-                        callee: sym,
-                        recv: src,
-                    },
-                    ty,
-                ))
-            }
-
             TirExprKind::SuperCall { args }
                 if args
                     .iter()

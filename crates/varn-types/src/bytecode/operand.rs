@@ -73,7 +73,6 @@ pub enum ConstKind {
     Module,
 
     NativeOp,
-    Symbol,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -59,7 +59,6 @@ impl HeapInner {
                 | HeapObj::Task(_)
                 | HeapObj::TaskHandle(_)
                 | HeapObj::Range(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::EnumVariant(_)
                 | HeapObj::Generator(_)
                 | HeapObj::Spread(_),
@@ -109,7 +108,6 @@ impl HeapInner {
                 | HeapObj::Task(_)
                 | HeapObj::TaskHandle(_)
                 | HeapObj::Range(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::EnumVariant(_)
                 | HeapObj::BigInt(_)
                 | HeapObj::Decimal(_)
@@ -161,7 +159,6 @@ impl HeapInner {
                 | HeapObj::Task(_)
                 | HeapObj::TaskHandle(_)
                 | HeapObj::Range(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::EnumVariant(_)
                 | HeapObj::Generator(_)
                 | HeapObj::Spread(_),

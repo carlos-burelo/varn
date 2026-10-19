@@ -166,7 +166,6 @@ pub fn expr_mut(expr: &mut TirExpr, f: &mut impl FnMut(&mut TirExpr)) {
             stmts_mut(stmts, f);
             expr_mut(value, f);
         }
-        TirExprKind::IterInit { source, .. } => expr_mut(source, f),
         TirExprKind::RangeLit { start, end, .. } => {
             expr_mut(start, f);
             expr_mut(end, f);

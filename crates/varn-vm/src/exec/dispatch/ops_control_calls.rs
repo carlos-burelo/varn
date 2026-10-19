@@ -266,7 +266,6 @@ impl ExecCtx {
             | OpCode::GetFixedField
             | OpCode::SetFixedField
             | OpCode::GetSuper
-            | OpCode::GetSymbol
             | OpCode::MakeClosure
             | OpCode::MakeClass
             | OpCode::Inherit

@@ -7,7 +7,7 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 use varn_types::HeapRef;
-use varn_types::{value::RuntimeSymbol, ClassObj, RuntimeString};
+use varn_types::{ClassObj, RuntimeString};
 
 pub struct HeapInner {
     pub jit_epoch: u64,
@@ -19,7 +19,6 @@ pub struct HeapInner {
     pub(crate) young: YoungGen,
     pub(crate) cells: CellSpace,
     pub(super) string_interner: FxHashMap<RuntimeString, HeapRef>,
-    pub(super) symbol_interner: FxHashMap<RuntimeSymbol, HeapRef>,
     pub(crate) young_cells: Vec<Rc<crate::task::TaskCell>>,
     pub(crate) young_lazies: Vec<Rc<crate::task::LazyTask>>,
     pub(super) bigint_interner: FxHashMap<num_bigint::BigInt, HeapRef>,
@@ -45,7 +44,6 @@ impl HeapInner {
             intrinsic_classes: FxHashMap::default(),
             kind_classes: Default::default(),
             string_interner: FxHashMap::default(),
-            symbol_interner: FxHashMap::default(),
             young_cells: Vec::new(),
             young_lazies: Vec::new(),
             bigint_interner: FxHashMap::default(),
@@ -83,7 +81,6 @@ impl HeapInner {
             | HeapObj::Task(_)
             | HeapObj::TaskHandle(_)
             | HeapObj::Range(_)
-            | HeapObj::Symbol(_)
             | HeapObj::EnumVariant(_)
             | HeapObj::BigInt(_)
             | HeapObj::Decimal(_)

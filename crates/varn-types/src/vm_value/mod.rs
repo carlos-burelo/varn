@@ -15,7 +15,6 @@ pub const KIND_FLOAT: u64 = 3;
 pub const KIND_HEAP: u64 = 4;
 
 pub const KIND_SSO: u64 = 5;
-pub const KIND_SYMBOL: u64 = 6;
 
 const SSO_LEN_SHIFT: u32 = 8;
 

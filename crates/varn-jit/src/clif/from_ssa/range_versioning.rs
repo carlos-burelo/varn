@@ -276,8 +276,6 @@ pub(super) fn version_plans(
                     | SsaOp::ArrayExtend { .. }
                     | SsaOp::WrapSpread { .. }
                     | SsaOp::Range { .. }
-                    | SsaOp::GetSymbol { .. }
-                    | SsaOp::IterCall { .. }
                     | SsaOp::SuperCall { .. }
                     | SsaOp::SuperMethodCall { .. }
                     | SsaOp::ExtensionCall { .. }

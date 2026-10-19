@@ -131,7 +131,6 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 | HeapObj::Task(_)
                 | HeapObj::TaskHandle(_)
                 | HeapObj::Range(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::Char(_)
                 | HeapObj::Generator(_)
                 | HeapObj::Spread(_),
@@ -168,7 +167,6 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 | HeapObj::Task(_)
                 | HeapObj::TaskHandle(_)
                 | HeapObj::Range(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::Char(_)
                 | HeapObj::Generator(_)
                 | HeapObj::Spread(_),
@@ -255,7 +253,6 @@ fn text_bytes<'a>(
             | HeapObj::Task(_)
             | HeapObj::TaskHandle(_)
             | HeapObj::Range(_)
-            | HeapObj::Symbol(_)
             | HeapObj::Generator(_)
             | HeapObj::Spread(_)
             | HeapObj::BigInt(_)

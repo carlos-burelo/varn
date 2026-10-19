@@ -351,8 +351,6 @@ fn emit_inst(
             | InstKind::This
             | InstKind::Range { .. }
             | InstKind::ObjectKeys { .. }
-            | InstKind::GetSymbol { .. }
-            | InstKind::IterCall { .. }
             | InstKind::GetSuper { .. }
             | InstKind::SuperCall { .. }
             | InstKind::SuperMethodCall { .. }

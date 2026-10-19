@@ -242,8 +242,6 @@ pub(super) fn lower_block(
             | varn_types::ssa::SsaOp::ArrayExtend { .. }
             | varn_types::ssa::SsaOp::WrapSpread { .. }
             | varn_types::ssa::SsaOp::Range { .. }
-            | varn_types::ssa::SsaOp::GetSymbol { .. }
-            | varn_types::ssa::SsaOp::IterCall { .. }
             | varn_types::ssa::SsaOp::SuperCall { .. }
             | varn_types::ssa::SsaOp::SuperMethodCall { .. }
             | varn_types::ssa::SsaOp::ExtensionCall { .. }

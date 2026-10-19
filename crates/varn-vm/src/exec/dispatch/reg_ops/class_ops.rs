@@ -227,7 +227,6 @@ impl ExecCtx {
             | OpCode::GetFixedField
             | OpCode::SetFixedField
             | OpCode::GetSuper
-            | OpCode::GetSymbol
             | OpCode::MakeClosure
             | OpCode::DeclareLayout
             | OpCode::AllocInstance

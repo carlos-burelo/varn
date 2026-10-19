@@ -44,7 +44,6 @@ fn bytecode_sites(proto: &FunctionProto) -> Sites {
                     | Literal::Float(_)
                     | Literal::BigInt(_)
                     | Literal::Decimal(_)
-                    | Literal::Symbol(_)
                     | Literal::Char(_),
                 )
                 | PoolEntry::Function(_)
@@ -154,8 +153,6 @@ fn index_order_slots(proto: &FunctionProto) -> Vec<u16> {
             | SsaOp::ArrayExtend { .. }
             | SsaOp::WrapSpread { .. }
             | SsaOp::Range { .. }
-            | SsaOp::GetSymbol { .. }
-            | SsaOp::IterCall { .. }
             | SsaOp::SuperCall { .. }
             | SsaOp::SuperMethodCall { .. }
             | SsaOp::ExtensionCall { .. }

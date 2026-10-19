@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-static LITERAL_VARIANTS: [&str; 9] = [
+static LITERAL_VARIANTS: [&str; 8] = [
     varn_core::RuntimeKind::Null.name(),
     varn_core::RuntimeKind::Bool.name(),
     varn_core::RuntimeKind::Int.name(),
@@ -8,7 +8,6 @@ static LITERAL_VARIANTS: [&str; 9] = [
     varn_core::RuntimeKind::Str.name(),
     varn_core::RuntimeKind::BigInt.name(),
     varn_core::RuntimeKind::Decimal.name(),
-    varn_core::RuntimeKind::Symbol.name(),
     varn_core::RuntimeKind::Char.name(),
 ];
 
@@ -46,7 +45,6 @@ pub enum Literal {
     Str(Arc<str>),
     BigInt(num_bigint::BigInt),
     Decimal(bigdecimal::BigDecimal),
-    Symbol(crate::value::RuntimeSymbol),
     Char(char),
 }
 
@@ -64,7 +62,6 @@ impl PartialEq for Literal {
             (Self::Decimal(a), Self::Decimal(b)) => {
                 a.as_bigint_and_scale() == b.as_bigint_and_scale()
             }
-            (Self::Symbol(a), Self::Symbol(b)) => a == b,
             (Self::Char(a), Self::Char(b)) => a == b,
             _ => false,
         }
@@ -94,10 +91,7 @@ impl serde::Serialize for Literal {
                 LITERAL_VARIANTS[6],
                 &d.to_plain_string(),
             ),
-            Literal::Symbol(s) => {
-                ser.serialize_newtype_variant("Literal", 7, LITERAL_VARIANTS[7], s)
-            }
-            Literal::Char(c) => ser.serialize_newtype_variant("Literal", 8, LITERAL_VARIANTS[8], c),
+            Literal::Char(c) => ser.serialize_newtype_variant("Literal", 7, LITERAL_VARIANTS[7], c),
         }
     }
 }
@@ -134,11 +128,10 @@ impl<'de> serde::Deserialize<'de> for Literal {
                             .map(Literal::Decimal)
                             .map_err(|_| de::Error::custom("malformed decimal literal"))
                     }
-                    7 => Ok(Literal::Symbol(variant.newtype_variant()?)),
-                    8 => Ok(Literal::Char(variant.newtype_variant()?)),
+                    7 => Ok(Literal::Char(variant.newtype_variant()?)),
                     _ => Err(de::Error::unknown_variant(
                         &idx.to_string(),
-                        &["0", "1", "2", "3", "4", "5", "6", "7", "8"],
+                        &["0", "1", "2", "3", "4", "5", "6", "7"],
                     )),
                 }
             }
@@ -159,7 +152,6 @@ impl std::hash::Hash for Literal {
             Self::Str(s) => s.hash(state),
             Self::BigInt(b) => b.hash(state),
             Self::Decimal(d) => d.as_bigint_and_scale().hash(state),
-            Self::Symbol(s) => s.hash(state),
             Self::Char(c) => c.hash(state),
         }
     }

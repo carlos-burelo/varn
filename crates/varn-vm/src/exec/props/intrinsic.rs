@@ -14,7 +14,6 @@ pub(super) fn class_for_property(val: VmValue, heap: &Heap) -> Option<Rc<ClassOb
         return None;
     }
     let kind = match heap.get(val.as_heap())? {
-        HeapObj::Symbol(_) => varn_core::RuntimeKind::Symbol,
         HeapObj::BigInt(_) => varn_core::RuntimeKind::BigInt,
         HeapObj::Decimal(_) => varn_core::RuntimeKind::Decimal,
         HeapObj::Char(_) => varn_core::RuntimeKind::Char,
@@ -68,7 +67,6 @@ pub(super) fn resolve_intrinsic_method_property(
                 | HeapObj::Task(_)
                 | HeapObj::TaskHandle(_)
                 | HeapObj::Range(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::EnumVariant(_)
                 | HeapObj::BigInt(_)
                 | HeapObj::Decimal(_)
@@ -114,7 +112,6 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
                 | HeapObj::BoundMethod(_)
                 | HeapObj::Task(_)
                 | HeapObj::TaskHandle(_)
-                | HeapObj::Symbol(_)
                 | HeapObj::BigInt(_)
                 | HeapObj::Decimal(_)
                 | HeapObj::Char(_)
@@ -170,7 +167,6 @@ pub(crate) fn bind_method_to_receiver(
             | HeapObj::Task(_)
             | HeapObj::TaskHandle(_)
             | HeapObj::Range(_)
-            | HeapObj::Symbol(_)
             | HeapObj::EnumVariant(_)
             | HeapObj::BigInt(_)
             | HeapObj::Decimal(_)

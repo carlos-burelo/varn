@@ -41,7 +41,6 @@ fn bigint_of(v: VmValue, heap: &Heap) -> Option<BigInt> {
             | HeapObj::Task(_)
             | HeapObj::TaskHandle(_)
             | HeapObj::Range(_)
-            | HeapObj::Symbol(_)
             | HeapObj::EnumVariant(_)
             | HeapObj::Decimal(_)
             | HeapObj::Char(_)
