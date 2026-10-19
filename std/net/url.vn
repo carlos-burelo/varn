@@ -81,7 +81,7 @@ export class Url {
     }
 
     static resolve(base: str | Url, relative: str): Url {
-        let baseObj: Url = typeof base === "str" ? Url.parse(base as str) : (base as Url);
+        let baseObj: Url = base is str ? Url.parse(base) : base as Url;
         if (relative.includes("://")) {
             return Url.parse(relative);
         }

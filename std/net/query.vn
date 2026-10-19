@@ -15,19 +15,18 @@ export class Query {
 
     constructor(init?: str | { [key: str]: str | str[] }) {
         this.buckets = {};
-        if (init !== null) {
-            if (typeof init === "str") {
-                this._parse(init as str);
-            } else if (typeof init === "object") {
-                for (const key in (init as { [key: str]: str | str[] })) {
-                    const value = (init as dynamic)[key];
-                    if (Array.isArray(value)) {
-                        for (const item of value) {
-                            this.append(key, "" + item);
-                        }
-                    } else {
-                        this.append(key, "" + value);
+        if (init is str) {
+            this._parse(init);
+        } else if (init !== null) {
+            const pairs = init as { [key: str]: str | str[] };
+            for (const key in pairs) {
+                const value = pairs[key]!;
+                if (value is str[]) {
+                    for (const item of value) {
+                        this.append(key, item);
                     }
+                } else {
+                    this.append(key, value as str);
                 }
             }
         }

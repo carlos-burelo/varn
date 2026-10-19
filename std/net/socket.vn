@@ -99,7 +99,7 @@ export class TcpStream implements AsyncReader, AsyncWriter {
         if (!this._isOpen) {
             throw new Error("TcpWriteError: Socket is closed");
         }
-        let b: Bytes = typeof data === "str" ? Bytes.fromString(data as str) : (data as Bytes);
+        let b: Bytes = data is str ? Bytes.fromString(data) : data as Bytes;
         let written = await tcpWrite$(this._connId, b);
         if (written < 0) {
             this.close();
@@ -109,7 +109,7 @@ export class TcpStream implements AsyncReader, AsyncWriter {
     }
 
     async writeAll(data: Bytes | str): Task<void> {
-        let b: Bytes = typeof data === "str" ? Bytes.fromString(data as str) : (data as Bytes);
+        let b: Bytes = data is str ? Bytes.fromString(data) : data as Bytes;
         let offset = 0;
         while (offset < b.length) {
             let chunk = b.slice(offset, b.length);
