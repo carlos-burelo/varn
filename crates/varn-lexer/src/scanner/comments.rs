@@ -10,14 +10,20 @@ impl super::Scanner<'_> {
     }
 
     pub(super) fn skip_block_comment(&mut self) {
+        let start = self.pos - 2;
         while !self.is_eof() {
             if self.peek(0) == b'*' && self.peek(1) == b'/' {
                 self.cur_col += 2;
                 self.pos += 2;
-                break;
+                return;
             }
             self.advance_byte();
         }
+        self.report_unterminated(
+            varn_core::ErrorCode::UnterminatedBlockComment,
+            "unterminated block comment",
+            start,
+        );
     }
 
     pub(super) fn scan_doc_comment(
@@ -41,7 +47,13 @@ impl super::Scanner<'_> {
             self.advance_byte();
         }
         let content_end = self.pos;
-        if !self.is_eof() {
+        if self.is_eof() {
+            self.report_unterminated(
+                varn_core::ErrorCode::UnterminatedBlockComment,
+                "unterminated block comment",
+                tok_start,
+            );
+        } else {
             self.cur_col += 2;
             self.pos += 2;
         }

@@ -214,7 +214,13 @@ impl super::Scanner<'_> {
                 }
             }
             let content_end = self.pos;
-            if !self.is_eof() {
+            if self.is_eof() {
+                self.report_unterminated(
+                    varn_core::ErrorCode::UnterminatedString,
+                    "unterminated string literal",
+                    start,
+                );
+            } else {
                 self.cur_col += 3;
                 self.pos += 3;
             }
@@ -252,7 +258,13 @@ impl super::Scanner<'_> {
             }
         }
         let content_end = self.pos;
-        if !self.is_eof() {
+        if self.is_eof() {
+            self.report_unterminated(
+                varn_core::ErrorCode::UnterminatedString,
+                "unterminated string literal",
+                start,
+            );
+        } else {
             self.cur_col += 1;
             self.pos += 1;
         }

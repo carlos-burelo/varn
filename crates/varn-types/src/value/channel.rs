@@ -36,7 +36,11 @@ impl ChannelEndpoint {
             .ok_or_else(|| format!("channel: {class} class not registered"))?;
         ctx.set_field(endpoint, ENDPOINT_ID_FIELD, VmValue::from_int(id as i64));
         if self == Self::Receiver {
-            let iter = ctx.alloc_bound_native(endpoint, itself, RuntimeSymbol::AsyncIterator.method_name());
+            let iter = ctx.alloc_bound_native(
+                endpoint,
+                itself,
+                RuntimeSymbol::AsyncIterator.method_name(),
+            );
             ctx.set_field(endpoint, RuntimeSymbol::AsyncIterator.name(), iter);
         }
         Ok(endpoint)

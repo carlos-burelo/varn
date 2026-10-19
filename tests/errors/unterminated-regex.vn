@@ -1,0 +1,3 @@
+// expect: error[VN1005]
+let r = /ab
+print(1)

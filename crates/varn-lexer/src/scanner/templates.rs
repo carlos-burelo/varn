@@ -13,7 +13,7 @@ impl super::Scanner<'_> {
         self.cur_col += 1;
         self.pos += 1;
 
-        let kind = self.scan_template_chunk(false);
+        let kind = self.scan_template_chunk(false, start);
         let (el, ec) = self.location();
         push_token(
             tokens,
@@ -44,7 +44,7 @@ impl super::Scanner<'_> {
     ) {
         let (sl, sc) = self.location_at(rbrace_pos);
 
-        let kind = self.scan_template_chunk(true);
+        let kind = self.scan_template_chunk(true, rbrace_pos);
         let (el, ec) = self.location();
 
         push_token(
@@ -68,9 +68,14 @@ impl super::Scanner<'_> {
         }
     }
 
-    pub(super) fn scan_template_chunk(&mut self, continuation: bool) -> u32 {
+    pub(super) fn scan_template_chunk(&mut self, continuation: bool, start: usize) -> u32 {
         loop {
             if self.is_eof() {
+                self.report_unterminated(
+                    varn_core::ErrorCode::UnterminatedTemplate,
+                    "unterminated template literal",
+                    start,
+                );
                 return if continuation {
                     TEMPLATE_TAIL
                 } else {
@@ -122,6 +127,11 @@ impl super::Scanner<'_> {
 
         loop {
             if self.is_eof() {
+                self.report_unterminated(
+                    varn_core::ErrorCode::UnterminatedRegex,
+                    "unterminated regular expression",
+                    start,
+                );
                 break;
             }
             let c = self.peek(0);
@@ -152,7 +162,14 @@ impl super::Scanner<'_> {
                     self.pos += 1;
                     break;
                 }
-                b'\n' => break,
+                b'\n' => {
+                    self.report_unterminated(
+                        varn_core::ErrorCode::UnterminatedRegex,
+                        "unterminated regular expression",
+                        start,
+                    );
+                    break;
+                }
                 _ => {
                     self.cur_col += 1;
                     self.pos += 1;

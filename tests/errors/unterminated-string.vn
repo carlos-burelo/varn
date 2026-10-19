@@ -1,0 +1,3 @@
+// expect: error[VN1001]
+let s = "abc
+print(s)

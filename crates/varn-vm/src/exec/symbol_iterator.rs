@@ -12,7 +12,11 @@ pub(crate) fn get_symbol_property(
     let iterating = symbol == RuntimeSymbol::Iterator;
     if iterating && let Some(items) = snapshot(obj, heap) {
         let frozen = heap.alloc_array_vm(items);
-        return Ok(heap.alloc_bound_native(frozen, array_symbol_iterator, RuntimeSymbol::Iterator.method_name()));
+        return Ok(heap.alloc_bound_native(
+            frozen,
+            array_symbol_iterator,
+            RuntimeSymbol::Iterator.method_name(),
+        ));
     }
     let sym_str = symbol.to_string();
     let kind = obj
@@ -47,16 +51,22 @@ pub(crate) fn get_symbol_property(
         })
         .unwrap_or(0);
     let result = match (kind, symbol) {
-        (1, RuntimeSymbol::Iterator) => {
-            heap.alloc_bound_native(obj, array_symbol_iterator, RuntimeSymbol::Iterator.method_name())
-        }
-        (2, RuntimeSymbol::Iterator) => {
-            heap.alloc_bound_native(obj, range_symbol_iterator, RuntimeSymbol::Iterator.method_name())
-        }
+        (1, RuntimeSymbol::Iterator) => heap.alloc_bound_native(
+            obj,
+            array_symbol_iterator,
+            RuntimeSymbol::Iterator.method_name(),
+        ),
+        (2, RuntimeSymbol::Iterator) => heap.alloc_bound_native(
+            obj,
+            range_symbol_iterator,
+            RuntimeSymbol::Iterator.method_name(),
+        ),
 
-        (3, RuntimeSymbol::Iterator | RuntimeSymbol::AsyncIterator) => {
-            heap.alloc_bound_native(obj, generator_symbol_iterator, RuntimeSymbol::Iterator.method_name())
-        }
+        (3, RuntimeSymbol::Iterator | RuntimeSymbol::AsyncIterator) => heap.alloc_bound_native(
+            obj,
+            generator_symbol_iterator,
+            RuntimeSymbol::Iterator.method_name(),
+        ),
         (4, _) => match heap.get(obj.as_heap()) {
             Some(HeapObj::Object(o)) => o.get(sym_str.as_str()).unwrap_or(VmValue::null()),
             Some(
@@ -100,7 +110,11 @@ pub(crate) fn get_symbol_property(
             })
             .collect();
         let frozen = heap.alloc_array_vm(pairs);
-        return Ok(heap.alloc_bound_native(frozen, array_symbol_iterator, RuntimeSymbol::Iterator.method_name()));
+        return Ok(heap.alloc_bound_native(
+            frozen,
+            array_symbol_iterator,
+            RuntimeSymbol::Iterator.method_name(),
+        ));
     }
     Ok(result)
 }
