@@ -12,6 +12,8 @@ use crate::features::folding::build_folding_ranges;
 use crate::features::hover::build_hover;
 use crate::features::inlay_hints::build_inlay_hints;
 use crate::features::selection_range::build_selection_ranges;
+
+const EMPTY_RESULT_ID: &str = "empty";
 use crate::features::signature_help::build_signature_help;
 
 pub(crate) async fn hover(backend: &Backend, params: HoverParams) -> LspResult<Option<Hover>> {
@@ -187,7 +189,7 @@ pub(crate) async fn workspace_diagnostic(
                 };
                 let diags = convert_diagnostics(entry.value());
                 if let Some(prev) = previous.get(&uri_str)
-                    && prev == "empty" && diags.is_empty() {
+                    && prev == EMPTY_RESULT_ID && diags.is_empty() {
                         out.push(
                             WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
                                 WorkspaceUnchangedDocumentDiagnosticReport {
@@ -195,7 +197,7 @@ pub(crate) async fn workspace_diagnostic(
                                     version: None,
                                     unchanged_document_diagnostic_report:
                                         UnchangedDocumentDiagnosticReport {
-                                            result_id: "empty".to_string(),
+                                            result_id: EMPTY_RESULT_ID.to_string(),
                                         },
                                 },
                             ),
@@ -203,7 +205,7 @@ pub(crate) async fn workspace_diagnostic(
                         continue;
                     }
                 let result_id = if diags.is_empty() {
-                    "empty".to_string()
+                    EMPTY_RESULT_ID.to_string()
                 } else {
                     an.workspace.revision().to_string()
                 };
