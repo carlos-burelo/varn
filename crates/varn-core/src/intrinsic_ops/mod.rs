@@ -1,4 +1,8 @@
-pub mod map;
 pub mod math;
 
-pub use map::lookup as intrinsic_lookup;
+pub fn intrinsic_lookup(module: &str, name: &str) -> Option<u8> {
+    (module == math::MathOp::MODULE)
+        .then(|| math::MathOp::of(name))
+        .flatten()
+        .map(math::MathOp::wire)
+}

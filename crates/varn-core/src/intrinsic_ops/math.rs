@@ -17,8 +17,48 @@ pub enum MathOp {
 }
 
 impl MathOp {
+    pub const MODULE: &'static str = "std:math";
+
+    const ALL: [Self; 13] = [
+        Self::Abs,
+        Self::Sqrt,
+        Self::Floor,
+        Self::Ceil,
+        Self::Round,
+        Self::Sin,
+        Self::Cos,
+        Self::Tan,
+        Self::Log,
+        Self::Exp,
+        Self::Pow,
+        Self::Min,
+        Self::Max,
+    ];
+
     pub const fn wire(self) -> u8 {
         self as u8
+    }
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Abs => "abs",
+            Self::Sqrt => "sqrt",
+            Self::Floor => "floor",
+            Self::Ceil => "ceil",
+            Self::Round => "round",
+            Self::Sin => "sin",
+            Self::Cos => "cos",
+            Self::Tan => "tan",
+            Self::Log => "log",
+            Self::Exp => "exp",
+            Self::Pow => "pow",
+            Self::Min => "min",
+            Self::Max => "max",
+        }
+    }
+
+    pub fn of(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|op| op.name() == name)
     }
 }
 
@@ -29,19 +69,3 @@ pub fn is_unary_math(wire_byte: u8) -> bool {
         || op == MathOp::Floor as u8
         || op == MathOp::Ceil as u8
 }
-
-pub const MAP_ENTRIES: &[(&str, u8)] = &[
-    ("std:math/abs", MathOp::Abs.wire()),
-    ("std:math/sqrt", MathOp::Sqrt.wire()),
-    ("std:math/floor", MathOp::Floor.wire()),
-    ("std:math/ceil", MathOp::Ceil.wire()),
-    ("std:math/round", MathOp::Round.wire()),
-    ("std:math/sin", MathOp::Sin.wire()),
-    ("std:math/cos", MathOp::Cos.wire()),
-    ("std:math/tan", MathOp::Tan.wire()),
-    ("std:math/log", MathOp::Log.wire()),
-    ("std:math/exp", MathOp::Exp.wire()),
-    ("std:math/pow", MathOp::Pow.wire()),
-    ("std:math/min", MathOp::Min.wire()),
-    ("std:math/max", MathOp::Max.wire()),
-];

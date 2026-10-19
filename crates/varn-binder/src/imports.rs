@@ -156,9 +156,8 @@ impl<'r> super::Binder<'r> {
                             }
 
                             if let Some(mp) = &module_path {
-                                s.intrinsic_wire = varn_core::intrinsic_ops::intrinsic_lookup(
-                                    &format!("{}/{}", mp, imported),
-                                );
+                                s.intrinsic_wire =
+                                    varn_core::intrinsic_ops::intrinsic_lookup(mp, &imported);
                             }
                             s
                         }

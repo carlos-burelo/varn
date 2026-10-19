@@ -161,9 +161,7 @@ pub(super) fn math_intrinsic_imports(
         let Decl::Import(imp) = d.as_ref() else {
             continue;
         };
-        if interner.resolve(imp.source) != "std:math" {
-            continue;
-        }
+        let source = interner.resolve(imp.source);
         for spec in &imp.specifiers {
             let ImportSpecifier::Named {
                 local, imported, ..
@@ -171,10 +169,9 @@ pub(super) fn math_intrinsic_imports(
             else {
                 continue;
             };
-            if let Some(wire) = varn_core::intrinsic_ops::intrinsic_lookup(&format!(
-                "std:math/{}",
-                interner.resolve(*imported)
-            )) {
+            if let Some(wire) =
+                varn_core::intrinsic_ops::intrinsic_lookup(source, interner.resolve(*imported))
+            {
                 out.insert(*local, wire);
             }
         }
