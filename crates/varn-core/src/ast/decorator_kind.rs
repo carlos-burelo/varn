@@ -65,3 +65,39 @@ impl ContractDecorator {
         Self::ALL.into_iter().find(|k| k.name() == name)
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DecoratorTarget {
+    Function,
+    Method,
+    Class,
+    Getter,
+    Setter,
+    Constructor,
+    Property,
+}
+
+impl DecoratorTarget {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Function => crate::TokenKind::Function.as_str(),
+            Self::Method => "method",
+            Self::Class => crate::TokenKind::Class.as_str(),
+            Self::Getter => "getter",
+            Self::Setter => "setter",
+            Self::Constructor => crate::TokenKind::Constructor.as_str(),
+            Self::Property => "property",
+        }
+    }
+
+    pub const fn arity(self) -> usize {
+        match self {
+            Self::Function | Self::Class => 1,
+            Self::Method | Self::Getter | Self::Setter | Self::Constructor | Self::Property => 2,
+        }
+    }
+
+    pub const fn returns_value(self) -> bool {
+        !matches!(self, Self::Property)
+    }
+}

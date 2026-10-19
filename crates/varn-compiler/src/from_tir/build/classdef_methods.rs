@@ -2,6 +2,7 @@ use super::context::{Builder, Result};
 use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
+use varn_core::ast::decorator_kind::DecoratorTarget;
 use varn_tir::TirClassDef;
 
 impl<'m> Builder<'m> {
@@ -51,9 +52,9 @@ impl<'m> Builder<'m> {
                 HirType::Ref,
             );
             let kind = if m.key.as_ref() == varn_core::TokenKind::Constructor.as_str() {
-                varn_core::TokenKind::Constructor.as_str()
+                DecoratorTarget::Constructor.name()
             } else {
-                "method"
+                DecoratorTarget::Method.name()
             };
             for deco in m.decorators.iter().rev() {
                 mv =
@@ -103,7 +104,11 @@ impl<'m> Builder<'m> {
                 },
                 HirType::Ref,
             );
-            let kind = if a.is_getter { "getter" } else { "setter" };
+            let kind = if a.is_getter {
+                DecoratorTarget::Getter.name()
+            } else {
+                DecoratorTarget::Setter.name()
+            };
             for deco in a.decorators.iter().rev() {
                 av = self.apply_member_decorator(av, deco, &a.key, kind, a.is_static, false)?;
             }
@@ -127,7 +132,10 @@ impl<'m> Builder<'m> {
             for deco in prop.decorators.iter().rev() {
                 let deco_v = self.lower_expr(deco)?;
                 let n = self.emit(InstKind::ConstStr(prop.key.clone()), HirType::Str);
-                let k = self.emit(InstKind::ConstStr(Arc::from("property")), HirType::Str);
+                let k = self.emit(
+                    InstKind::ConstStr(Arc::from(DecoratorTarget::Property.name())),
+                    HirType::Str,
+                );
                 let st = self.emit(InstKind::ConstBool(prop.is_static), HirType::Bool);
                 let pv = self.emit(InstKind::ConstBool(false), HirType::Bool);
                 let ctx = self.emit(

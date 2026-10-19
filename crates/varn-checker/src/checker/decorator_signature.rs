@@ -6,44 +6,7 @@ use varn_core::ast::Decorator;
 use varn_core::diagnostics::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
 
-pub(super) enum DecoratorTarget {
-    Function,
-    Method,
-    Class,
-    Getter,
-    Setter,
-    Constructor,
-    Property,
-}
-
-impl DecoratorTarget {
-    fn arity(&self) -> usize {
-        match self {
-            DecoratorTarget::Function | DecoratorTarget::Class => 1,
-            DecoratorTarget::Method
-            | DecoratorTarget::Getter
-            | DecoratorTarget::Setter
-            | DecoratorTarget::Constructor
-            | DecoratorTarget::Property => 2,
-        }
-    }
-
-    fn kind_str(&self) -> &'static str {
-        match self {
-            DecoratorTarget::Function => "function",
-            DecoratorTarget::Method => "method",
-            DecoratorTarget::Class => "class",
-            DecoratorTarget::Getter => "getter",
-            DecoratorTarget::Setter => "setter",
-            DecoratorTarget::Constructor => varn_core::TokenKind::Constructor.as_str(),
-            DecoratorTarget::Property => "property",
-        }
-    }
-
-    fn check_return(&self) -> bool {
-        !matches!(self, DecoratorTarget::Property)
-    }
-}
+pub(super) use varn_core::ast::decorator_kind::DecoratorTarget;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_decorator_signatures(
@@ -55,8 +18,8 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         let expected_arity = target.arity();
-        let target_kind = target.kind_str();
-        let check_return = target.check_return();
+        let target_kind = target.name();
+        let check_return = target.returns_value();
         let builtins = match_builtin(self.ast_arena, &bind.interner, decorators);
         for (d, b) in decorators.iter().zip(builtins.iter()) {
             if bind.user_decorators.contains(&d.range.start.offset) {
@@ -212,7 +175,7 @@ impl<'r> Checker<'r> {
         target_name: &str,
         range: varn_core::SourceRange,
     ) {
-        let target_kind = target.kind_str();
+        let target_kind = target.name();
         let ok = match kind {
             BuiltinDecoratorKind::Deprecated => true,
             BuiltinDecoratorKind::Pure | BuiltinDecoratorKind::Capability => matches!(
