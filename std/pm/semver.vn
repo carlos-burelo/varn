@@ -62,6 +62,16 @@ function isNumIdent(s: str): bool {
     return true;
 }
 
+enum Comparator {
+    Eq,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+    Caret,
+    Tilde
+}
+
 export namespace Semver {
     export function parse(text: str): SemVer {
         let v = text.trim();
@@ -117,42 +127,28 @@ export namespace Semver {
         return cmpPre(a.pre, b.pre);
     }
 
-    function testOp(v: SemVer, op: str, ref: SemVer): bool {
+    function testOp(v: SemVer, op: Comparator, ref: SemVer): bool {
         let c = compare(v, ref);
-        if (op === "=" || op === "") {
-            return c === 0;
-        }
-        if (op === ">") {
-            return c > 0;
-        }
-        if (op === ">=") {
-            return c >= 0;
-        }
-        if (op === "<") {
-            return c < 0;
-        }
-        if (op === "<=") {
-            return c <= 0;
-        }
-        if (op === "^") {
-            if (c < 0) {
-                return false;
-            }
-            if (ref.major > 0) {
-                return v.major === ref.major;
-            }
-            if (ref.minor > 0) {
-                return v.minor === ref.minor;
-            }
-            return v.patch === ref.patch;
-        }
-        if (op === "~") {
-            if (c < 0) {
-                return false;
-            }
-            return v.major === ref.major && v.minor === ref.minor;
-        }
-        throw new Error("Semver: bad operator '" + op + "'");
+        return match (op) {
+            Eq => c === 0,
+            Gt => c > 0,
+            Ge => c >= 0,
+            Lt => c < 0,
+            Le => c <= 0,
+            Caret => c >= 0 && (ref.major > 0 ? v.major === ref.major : ref.minor > 0 ? v.minor === ref.minor : v.patch === ref.patch),
+            Tilde => c >= 0 && v.major === ref.major && v.minor === ref.minor
+        };
+    }
+
+    function comparatorOf(part: str): [Comparator, int] {
+        if (part.startsWith(">=")) return #[Comparator.Ge, 2];
+        if (part.startsWith("<=")) return #[Comparator.Le, 2];
+        if (part.startsWith(">")) return #[Comparator.Gt, 1];
+        if (part.startsWith("<")) return #[Comparator.Lt, 1];
+        if (part.startsWith("^")) return #[Comparator.Caret, 1];
+        if (part.startsWith("~")) return #[Comparator.Tilde, 1];
+        if (part.startsWith("=")) return #[Comparator.Eq, 1];
+        return #[Comparator.Eq, 0];
     }
 
     function satisfiesAnd(v: SemVer, group: str): bool {
@@ -161,16 +157,8 @@ export namespace Semver {
             if (part.length === 0) {
                 continue;
             }
-            let op = "";
-            let rest = part;
-            if (part.startsWith(">=") || part.startsWith("<=")) {
-                op = part.slice(0, 2);
-                rest = part.slice(2);
-            } else if (part.startsWith(">") || part.startsWith("<") || part.startsWith("=") || part.startsWith("^") || part.startsWith("~")) {
-                op = part.slice(0, 1);
-                rest = part.slice(1);
-            }
-            if (!testOp(v, op, parse(rest))) {
+            let [op, width] = comparatorOf(part);
+            if (!testOp(v, op, parse(part.slice(width)))) {
                 return false;
             }
         }
