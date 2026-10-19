@@ -10,6 +10,7 @@ pub enum PoolEntry {
     Function(std::rc::Rc<FunctionProto>),
     Shape(Vec<std::sync::Arc<str>>),
     Layout(Rc<varn_core::layout::ClassLayout>),
+    Variant(Arc<crate::value::VariantDef>),
 }
 
 impl std::fmt::Debug for PoolEntry {
@@ -23,6 +24,7 @@ impl std::fmt::Debug for PoolEntry {
                 .finish_non_exhaustive(),
             Self::Shape(keys) => f.debug_tuple("Shape").field(keys).finish(),
             Self::Layout(layout) => f.debug_tuple("Layout").field(layout).finish(),
+            Self::Variant(def) => f.debug_tuple("Variant").field(def).finish(),
         }
     }
 }
@@ -43,6 +45,7 @@ impl std::hash::Hash for PoolEntry {
                     field.offset.hash(state);
                 }
             }
+            Self::Variant(def) => def.hash(state),
         }
     }
 }
@@ -54,6 +57,7 @@ impl PartialEq for PoolEntry {
             (Self::Shape(k1), Self::Shape(k2)) => k1 == k2,
             (Self::Layout(l1), Self::Layout(l2)) => l1 == l2,
             (Self::Function(f1), Self::Function(f2)) => std::rc::Rc::ptr_eq(f1, f2),
+            (Self::Variant(d1), Self::Variant(d2)) => d1 == d2,
             _ => false,
         }
     }
@@ -74,6 +78,9 @@ impl serde::Serialize for PoolEntry {
             }
             PoolEntry::Layout(layout) => {
                 ser.serialize_newtype_variant("PoolEntry", 3, "Layout", layout.as_ref())
+            }
+            PoolEntry::Variant(def) => {
+                ser.serialize_newtype_variant("PoolEntry", 4, "Variant", def.as_ref())
             }
         }
     }
@@ -105,9 +112,12 @@ impl<'de> serde::Deserialize<'de> for PoolEntry {
                     3 => Ok(PoolEntry::Layout(Rc::new(
                         variant.newtype_variant::<varn_core::layout::ClassLayout>()?,
                     ))),
+                    4 => Ok(PoolEntry::Variant(Arc::new(
+                        variant.newtype_variant::<crate::value::VariantDef>()?,
+                    ))),
                     _ => Err(de::Error::unknown_variant(
                         &idx.to_string(),
-                        &["0", "1", "2", "3"],
+                        &["0", "1", "2", "3", "4"],
                     )),
                 }
             }
@@ -115,7 +125,7 @@ impl<'de> serde::Deserialize<'de> for PoolEntry {
 
         de.deserialize_enum(
             "PoolEntry",
-            &["Literal", "Function", "Shape", "Layout"],
+            &["Literal", "Function", "Shape", "Layout", "Variant"],
             PoolEntryVisitor,
         )
     }

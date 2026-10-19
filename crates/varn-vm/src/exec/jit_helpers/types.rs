@@ -68,14 +68,11 @@ pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usi
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = ctx_ref.frames[frame_idx].closure();
-        let base = ctx_ref.frames[frame_idx].base;
-        let code = &closure_ref.proto.chunk.code;
-        let tag_reg = (code[ip_before] & 0xFF) as usize;
-        let name_nv = closure_ref.constants[code[ip_before + 1] as usize];
-        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
-        let tag = ctx_ref.stack.box_reg(base, tag_reg).as_int();
-        ctx_ref.jit_native_result = ctx_ref.make_enum_variant(tag, name.as_ref());
+        let proto = std::rc::Rc::clone(&ctx_ref.frames[frame_idx].closure().proto);
+        let def_idx = proto.chunk.code[ip_before + 1] as usize;
+        ctx_ref.jit_native_result = ctx_ref
+            .make_enum_variant(&proto.chunk.constants, def_idx)
+            .expect("MakeEnumVariant constant is a variant");
     }
 }
 
@@ -83,15 +80,14 @@ pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usi
 pub(crate) extern "C" fn jit_make_enum_variant_const(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
-    tag: i64,
-    meta_idx: usize,
+    def_idx: usize,
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let closure_ref = &*closure;
-        let name_nv = closure_ref.constants[meta_idx];
-        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
-        ctx_ref.jit_native_result = ctx_ref.make_enum_variant(tag, name.as_ref());
+        let proto = std::rc::Rc::clone(&(*closure).proto);
+        ctx_ref.jit_native_result = ctx_ref
+            .make_enum_variant(&proto.chunk.constants, def_idx)
+            .expect("MakeEnumVariant constant is a variant");
     }
 }
 

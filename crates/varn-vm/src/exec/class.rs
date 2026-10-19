@@ -107,7 +107,8 @@ pub(crate) fn pool_layout(
         Some(
             varn_types::PoolEntry::Literal(_)
             | varn_types::PoolEntry::Function(_)
-            | varn_types::PoolEntry::Shape(_),
+            | varn_types::PoolEntry::Shape(_)
+            | varn_types::PoolEntry::Variant(_),
         )
         | None => Err(RuntimeError::new("DeclareLayout: not a layout constant")),
     }

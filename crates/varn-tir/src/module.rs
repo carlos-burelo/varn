@@ -80,7 +80,7 @@ pub struct TirPropertyDecorator {
 pub struct TirVariantDef {
     pub name: Arc<str>,
     pub tag: i64,
-    pub meta: Arc<str>,
+    pub fields: Vec<Arc<str>>,
     pub const_args: Vec<TirExpr>,
 }
 

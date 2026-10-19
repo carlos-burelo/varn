@@ -154,6 +154,12 @@ pub fn constant_text(entry: &PoolEntry) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        PoolEntry::Variant(def) => format!(
+            "variant {}.{}({})",
+            def.enum_name,
+            def.variant_name,
+            def.fields.join(", ")
+        ),
     }
 }
 

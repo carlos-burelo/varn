@@ -26,8 +26,12 @@ impl<'m> Builder<'m> {
         for v in &def.variants {
             let variant_v = self.emit(
                 InstKind::MakeEnumVariant {
-                    tag: v.tag,
-                    meta: v.meta.clone(),
+                    def: Arc::new(varn_types::value::VariantDef {
+                        enum_name: def.name.clone(),
+                        variant_name: v.name.clone(),
+                        tag: v.tag,
+                        fields: v.fields.clone(),
+                    }),
                 },
                 HirType::Ref,
             );

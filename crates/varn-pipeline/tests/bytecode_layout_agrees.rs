@@ -49,6 +49,7 @@ fn const_matches(kind: ConstKind, entry: &PoolEntry) -> bool {
             | (ConstKind::Function, PoolEntry::Function(_))
             | (ConstKind::Shape, PoolEntry::Shape(_))
             | (ConstKind::Layout, PoolEntry::Layout(_))
+            | (ConstKind::Variant, PoolEntry::Variant(_))
     )
 }
 

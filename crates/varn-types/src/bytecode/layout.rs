@@ -287,7 +287,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         O::DeclareLayout => (3, vec![r(hi(1)), k(2, K::Layout)]),
         O::AllocInstance => (2, vec![w(hi(0)), r(hi(1))]),
 
-        O::MakeEnumVariant => (3, vec![w(hi(1)), k(2, K::Name), r(lo(1))]),
+        O::MakeEnumVariant => (3, vec![w(hi(1)), k(2, K::Variant)]),
 
         O::MakeClosure => {
             let captures = byte(lo(1));
@@ -322,7 +322,12 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         O::BuildObjectWithShape | O::BuildRecord => {
             let fields = match constants.get(word(2)) {
                 Some(PoolEntry::Shape(keys)) => keys.len(),
-                Some(PoolEntry::Literal(_) | PoolEntry::Function(_) | PoolEntry::Layout(_))
+                Some(
+                    PoolEntry::Literal(_)
+                    | PoolEntry::Function(_)
+                    | PoolEntry::Layout(_)
+                    | PoolEntry::Variant(_),
+                )
                 | None => 0,
             };
             (

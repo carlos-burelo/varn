@@ -66,16 +66,13 @@ pub(super) fn emit_make_class(
 pub(super) fn emit_make_enum_variant(
     chunk: &mut Chunk,
     d: u8,
-    tag: i64,
-    meta: &Arc<str>,
-    scratch: u8,
+    def: &Arc<varn_types::value::VariantDef>,
     line: u32,
 ) {
-    let meta_idx = chunk.add_str(meta);
-    chunk.emit_load_int(scratch, tag, line);
+    let def_idx = chunk.add_variant(Arc::clone(def));
     chunk.emit(OpCode::MakeEnumVariant, line);
-    chunk.write(Chunk::pack(d, scratch), line);
-    chunk.write(meta_idx, line);
+    chunk.write(Chunk::pack(d, 0), line);
+    chunk.write(def_idx, line);
 }
 
 pub(super) fn emit_try(

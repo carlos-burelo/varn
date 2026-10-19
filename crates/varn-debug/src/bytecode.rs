@@ -78,6 +78,9 @@ fn const_hint(entry: &PoolEntry) -> String {
         }
         PoolEntry::Shape(keys) => format!("{DIM}shape[{}]{R}", keys.len()),
         PoolEntry::Layout(layout) => format!("{DIM}layout[{}]{R}", layout.fields.len()),
+        PoolEntry::Variant(def) => {
+            format!("{DIM}variant {}.{}{R}", def.enum_name, def.variant_name)
+        }
     }
 }
 

@@ -303,7 +303,10 @@ pub fn inst_kind(kind: &InstKind) -> String {
             val(*class),
             val(*accessor)
         ),
-        InstKind::MakeEnumVariant { tag, meta } => format!("makeenumvariant tag={tag} meta={meta}"),
+        InstKind::MakeEnumVariant { def } => format!(
+            "makeenumvariant {}.{} tag={}",
+            def.enum_name, def.variant_name, def.tag
+        ),
         InstKind::Try { handler } => format!("try b{}", handler.0),
         InstKind::PopTry => "poptry".to_owned(),
         InstKind::CatchParam { try_val } => format!("catchparam {}", val(*try_val)),

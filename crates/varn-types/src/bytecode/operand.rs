@@ -68,6 +68,7 @@ pub enum ConstKind {
     Function,
     Shape,
     Layout,
+    Variant,
 
     Module,
 

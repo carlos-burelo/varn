@@ -175,8 +175,8 @@ pub(super) fn emit(
             "decimal",
             |l| matches!(l, Literal::Decimal(d) if d.to_string() == text.as_ref()),
         )?),
-        SsaOp::MakeEnumVariant { tag, meta } => {
-            Out::Boxed(classops::emit_make_enum_variant(b, ctx, *tag, meta)?)
+        SsaOp::MakeEnumVariant { def } => {
+            Out::Boxed(classops::emit_make_enum_variant(b, ctx, def)?)
         }
         SsaOp::LoadGlobalIdx(slot) => {
             let boxed = globals::emit_load(b, ctx, *slot, globals::Region::Module)?;

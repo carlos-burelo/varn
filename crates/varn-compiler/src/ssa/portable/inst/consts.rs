@@ -12,10 +12,7 @@ pub(super) fn try_project(kind: &InstKind, site: &Site) -> Option<SsaOp> {
         InstKind::ConstChar(c) => Some(SsaOp::ConstChar(*c)),
         InstKind::ConstBigInt(digits) => Some(SsaOp::ConstBigInt(digits.as_ref().into())),
         InstKind::ConstDecimal(d) => Some(SsaOp::ConstDecimal(d.to_string().into())),
-        InstKind::MakeEnumVariant { tag, meta } => Some(SsaOp::MakeEnumVariant {
-            tag: *tag,
-            meta: meta.as_ref().into(),
-        }),
+        InstKind::MakeEnumVariant { def } => Some(SsaOp::MakeEnumVariant { def: def.clone() }),
         InstKind::LoadGlobalIdx(slot) => Some(SsaOp::LoadGlobalIdx(*slot)),
         InstKind::LoadNativeGlobalIdx(slot) => Some(SsaOp::LoadNativeGlobalIdx(*slot)),
         InstKind::StoreGlobalIdx { slot, value } => Some(SsaOp::StoreGlobalIdx {

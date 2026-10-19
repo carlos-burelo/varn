@@ -68,6 +68,7 @@ impl ExecCtx {
                     | Some(varn_types::chunk::PoolEntry::Function(_))
                     | Some(varn_types::chunk::PoolEntry::Shape(_))
                     | Some(varn_types::chunk::PoolEntry::Layout(_))
+                    | Some(varn_types::chunk::PoolEntry::Variant(_))
                     | None => {
                         return Err(crate::error::RuntimeError::new(format!(
                             "CallNativeOp: const {cidx} is not an op-id"

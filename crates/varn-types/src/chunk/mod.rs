@@ -342,6 +342,10 @@ impl Chunk {
         self.add_constant(PoolEntry::Layout(layout))
     }
 
+    pub fn add_variant(&mut self, def: Arc<crate::value::VariantDef>) -> u16 {
+        self.add_constant(PoolEntry::Variant(def))
+    }
+
     pub fn add_int(&mut self, n: i64) -> u16 {
         self.add_constant(PoolEntry::Literal(Literal::Int(n)))
     }

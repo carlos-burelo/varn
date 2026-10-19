@@ -17,7 +17,8 @@ pub fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
             | PoolEntry::Literal(Literal::Char(_))
             | PoolEntry::Function(_)
             | PoolEntry::Shape(_)
-            | PoolEntry::Layout(_) => VmValue::null(),
+            | PoolEntry::Layout(_)
+            | PoolEntry::Variant(_) => VmValue::null(),
         })
         .collect()
 }

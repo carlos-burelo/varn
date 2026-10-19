@@ -52,18 +52,13 @@ pub(super) fn emit_enum(
             tag = *value;
         }
         let member_name = ctx.interner.resolve(m.id);
-        let fields_str = m
+        let fields: Vec<Arc<str>> = m
             .payload_fields
             .iter()
             .map(|f| ctx.interner.resolve(f.name))
             .chain(shared_fields.iter().copied())
-            .collect::<Vec<&str>>()
-            .join(",");
-        let meta = if fields_str.is_empty() {
-            format!("{name}.{member_name}")
-        } else {
-            format!("{name}.{member_name}:{fields_str}")
-        };
+            .map(Arc::from)
+            .collect();
         let mut const_args = Vec::new();
         for f in &m.payload_fields {
             if let Some(init) = f.init {
@@ -86,7 +81,7 @@ pub(super) fn emit_enum(
         def.variants.push(varn_tir::TirVariantDef {
             name: Arc::from(member_name),
             tag,
-            meta: Arc::from(meta.as_str()),
+            fields,
             const_args,
         });
         tag += 1;

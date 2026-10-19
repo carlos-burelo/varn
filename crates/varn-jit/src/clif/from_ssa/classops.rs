@@ -144,20 +144,25 @@ pub(super) fn emit_get_super(
 pub(super) fn emit_make_enum_variant(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
-    tag: i64,
-    meta: &str,
+    def: &varn_types::value::VariantDef,
 ) -> Result<cranelift_codegen::ir::Value, String> {
     let frame = ctx
         .frame
         .as_ref()
         .ok_or("from_ssa: MakeEnumVariant without a frame")?;
-    let meta_v = b.ins().iconst(types::I64, str_idx(ctx, meta)? as i64);
-    let tag_v = b.ins().iconst(types::I64, tag);
+    let def_idx = ctx
+        .proto
+        .chunk
+        .constants
+        .iter()
+        .position(|e| matches!(e, varn_types::PoolEntry::Variant(d) if d.as_ref() == def))
+        .ok_or("from_ssa: MakeEnumVariant definition missing from the pool")?;
+    let def_v = b.ins().iconst(types::I64, def_idx as i64);
     crate::clif::from_ssa::exceptions::call_checked(
         b,
         ctx,
         ctx.helpers.make_enum_variant_const,
-        &[frame.exec_ctx, frame.closure, tag_v, meta_v],
+        &[frame.exec_ctx, frame.closure, def_v],
     )?;
     Ok(b.ins().load(
         types::I128,

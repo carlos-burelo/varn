@@ -26,7 +26,8 @@ pub(super) fn emit_build_object(
             }
             varn_types::PoolEntry::Literal(_)
             | varn_types::PoolEntry::Function(_)
-            | varn_types::PoolEntry::Layout(_) => false,
+            | varn_types::PoolEntry::Layout(_)
+            | varn_types::PoolEntry::Variant(_) => false,
         })
         .ok_or("from_ssa: object shape not in pool")?;
     ctx.proto
@@ -270,7 +271,8 @@ fn emit_build_object_slow(
             }
             varn_types::PoolEntry::Literal(_)
             | varn_types::PoolEntry::Function(_)
-            | varn_types::PoolEntry::Layout(_) => false,
+            | varn_types::PoolEntry::Layout(_)
+            | varn_types::PoolEntry::Variant(_) => false,
         })
         .ok_or("from_ssa: object shape not in pool")?;
     ctx.proto

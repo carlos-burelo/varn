@@ -59,7 +59,8 @@ impl ExecCtx {
             Some(
                 varn_types::PoolEntry::Literal(_)
                 | varn_types::PoolEntry::Shape(_)
-                | varn_types::PoolEntry::Layout(_),
+                | varn_types::PoolEntry::Layout(_)
+                | varn_types::PoolEntry::Variant(_),
             )
             | None => {
                 return Err(RuntimeError::new(format!(

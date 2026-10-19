@@ -28,7 +28,7 @@ pub(crate) fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<V
             },
             PoolEntry::Function(_) => VmValue::null(),
             PoolEntry::Shape(_) => VmValue::null(),
-            PoolEntry::Layout(_) => VmValue::null(),
+            PoolEntry::Layout(_) | PoolEntry::Variant(_) => VmValue::null(),
         })
         .collect()
 }

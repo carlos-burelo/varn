@@ -49,7 +49,8 @@ fn bytecode_sites(proto: &FunctionProto) -> Sites {
                 )
                 | PoolEntry::Function(_)
                 | PoolEntry::Shape(_)
-                | PoolEntry::Layout(_)) => {
+                | PoolEntry::Layout(_)
+                | PoolEntry::Variant(_)) => {
                     panic!("property name is not a string constant: {other:?}")
                 }
             };
@@ -176,7 +177,10 @@ fn find<'a>(proto: &'a FunctionProto, name: &str) -> Option<&'a FunctionProto> {
     }
     proto.chunk.constants.iter().find_map(|c| match c {
         PoolEntry::Function(f) => find(f, name),
-        PoolEntry::Literal(_) | PoolEntry::Shape(_) | PoolEntry::Layout(_) => None,
+        PoolEntry::Literal(_)
+        | PoolEntry::Shape(_)
+        | PoolEntry::Layout(_)
+        | PoolEntry::Variant(_) => None,
     })
 }
 

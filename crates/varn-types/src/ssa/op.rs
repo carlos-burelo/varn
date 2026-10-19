@@ -67,8 +67,7 @@ pub enum SsaOp {
     ConstDecimal(Box<str>),
 
     MakeEnumVariant {
-        tag: i64,
-        meta: Box<str>,
+        def: std::sync::Arc<crate::value::VariantDef>,
     },
 
     IntrinsicCall {

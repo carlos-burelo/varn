@@ -320,16 +320,10 @@ impl ExecCtx {
     ) -> VmResult<()> {
         let w1 = code[*ip];
         *ip += 1;
-        let name_idx = code[*ip] as usize;
+        let def_idx = code[*ip] as usize;
         *ip += 1;
-        let (dest, tag_reg) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-        let name_nv = closure.constants[name_idx];
-        let name = self
-            .heap
-            .str_val(name_nv)
-            .ok_or_else(|| RuntimeError::new("MakeEnumVariant: non-string const"))?;
-        let tag = self.stack.box_reg(base, tag_reg).as_int();
-        let iv = self.make_enum_variant(tag, name.as_ref());
+        let dest = (w1 >> 8) as usize;
+        let iv = self.make_enum_variant(&closure.proto.chunk.constants, def_idx)?;
         self.stack.unbox_into_reg(base, dest, iv)?;
         self.frames[frame_idx].ip = *ip;
         Ok(())

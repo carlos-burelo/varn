@@ -254,8 +254,8 @@ pub(super) fn emit_value(
         InstKind::MakeClass { name, super_class } => {
             closure::emit_make_class(chunk, d, name, *super_class, reg, line);
         }
-        InstKind::MakeEnumVariant { tag, meta } => {
-            closure::emit_make_enum_variant(chunk, d, *tag, meta, scratch, line);
+        InstKind::MakeEnumVariant { def } => {
+            closure::emit_make_enum_variant(chunk, d, def, line);
         }
         InstKind::Try { handler } => {
             closure::emit_try(chunk, d, *handler, fixups, line);

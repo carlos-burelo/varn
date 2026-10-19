@@ -237,8 +237,7 @@ pub enum InstKind {
         is_static: bool,
     },
     MakeEnumVariant {
-        tag: i64,
-        meta: Arc<str>,
+        def: Arc<varn_types::value::VariantDef>,
     },
     Try {
         handler: BlockId,

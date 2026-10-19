@@ -142,7 +142,7 @@ impl std::fmt::Display for RuntimeSymbol {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct VariantDef {
     pub enum_name: Arc<str>,
     pub variant_name: Arc<str>,
