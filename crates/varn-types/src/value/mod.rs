@@ -129,6 +129,13 @@ impl RuntimeSymbol {
             RuntimeSymbol::AsyncIterator => "Symbol.asyncIterator",
         }
     }
+
+    pub fn method_name(&self) -> &'static str {
+        match self {
+            RuntimeSymbol::Iterator => "[Symbol.iterator]",
+            RuntimeSymbol::AsyncIterator => "[Symbol.asyncIterator]",
+        }
+    }
 }
 
 impl std::fmt::Display for RuntimeSymbol {
