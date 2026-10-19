@@ -44,3 +44,24 @@ impl BuiltinDecorator {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ContractDecorator {
+    Fallible,
+    Permission,
+}
+
+impl ContractDecorator {
+    const ALL: [Self; 2] = [Self::Fallible, Self::Permission];
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Fallible => "fallible",
+            Self::Permission => "permission",
+        }
+    }
+
+    pub fn of(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|k| k.name() == name)
+    }
+}

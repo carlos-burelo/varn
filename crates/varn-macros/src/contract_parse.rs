@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use varn_core::ast::decorator_kind::ContractDecorator;
 
 use varn_core::ast::{
     AstArena, ClassDecl, ClassMember, Decl, ExportDecl, ExprKind, FunctionDecl, Param, Pattern,
@@ -190,7 +191,7 @@ fn is_fallible(
     interner: &AtomInterner,
 ) -> bool {
     decorators.iter().any(|d| {
-        matches!(&arena.expr(d.expression).kind, ExprKind::Identifier { name } if interner.resolve(*name) == "fallible")
+        matches!(&arena.expr(d.expression).kind, ExprKind::Identifier { name } if ContractDecorator::of(interner.resolve(*name)) == Some(ContractDecorator::Fallible))
     })
 }
 
@@ -210,7 +211,7 @@ fn capability(
         let ExprKind::Identifier { name } = &arena.expr(*callee).kind else {
             continue;
         };
-        if interner.resolve(*name) != "permission" {
+        if ContractDecorator::of(interner.resolve(*name)) != Some(ContractDecorator::Permission) {
             continue;
         }
         let [Arg::Positional(arg)] = args.as_slice() else {
