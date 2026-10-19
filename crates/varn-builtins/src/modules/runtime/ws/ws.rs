@@ -29,6 +29,12 @@ fn header_value(head: &str, name: &str) -> Option<String> {
     None
 }
 
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/ws/ws_runtime.vn",
+    interface: "WsFrame",
+    struct WsFrame;
+}
+
 varn_contract! {
     module: "runtime:ws",
     contract: "src/modules/runtime/ws/ws_runtime.vn",
@@ -87,12 +93,12 @@ varn_contract! {
             Ok(ctx.alloc_buffer_from_bytes(&out))
         }
 
-        fn wsParseFrame(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<VmValue, String> {
+        fn wsParseFrame(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<Option<VmValue>, String> {
             let bytes = ctx
                 .buffer_to_bytes(data)
                 .ok_or_else(|| coded("E_WS_BAD_ARG", "expected Bytes"))?;
             if bytes.len() < 2 {
-                return Ok(VmValue::null());
+                return Ok(None);
             }
             let fin = bytes[0] & 0x80 != 0;
             let opcode = bytes[0] & 0x0F;
@@ -101,13 +107,13 @@ varn_contract! {
             let mut len = (bytes[1] & 0x7F) as usize;
             if len == 126 {
                 if bytes.len() < 4 {
-                    return Ok(VmValue::null());
+                    return Ok(None);
                 }
                 len = u16::from_be_bytes([bytes[2], bytes[3]]) as usize;
                 pos = 4;
             } else if len == 127 {
                 if bytes.len() < 10 {
-                    return Ok(VmValue::null());
+                    return Ok(None);
                 }
                 let wide = u64::from_be_bytes([
                     bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8],
@@ -122,7 +128,7 @@ varn_contract! {
             let mut mask = [0u8; 4];
             if masked {
                 if bytes.len() < pos + 4 {
-                    return Ok(VmValue::null());
+                    return Ok(None);
                 }
                 mask = [bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]];
                 pos += 4;
@@ -132,7 +138,7 @@ varn_contract! {
                 return Err(coded("E_WS_PROTOCOL", "bad control frame"));
             }
             if bytes.len() < pos + len {
-                return Ok(VmValue::null());
+                return Ok(None);
             }
             let mut payload = bytes[pos..pos + len].to_vec();
             if masked {
@@ -149,16 +155,18 @@ varn_contract! {
                 10 => "pong",
                 _ => return Err(coded("E_WS_PROTOCOL", format!("bad opcode {opcode}"))),
             };
-            let obj = ctx.alloc_object();
-            let kind_nv = ctx.alloc_str(kind);
-            ctx.set_field(obj, "kind", kind_nv);
-            ctx.set_field(obj, "opcode", VmValue::from_int(opcode as i64));
-            ctx.set_field(obj, "fin", VmValue::from_bool(fin));
-            let payload_nv = ctx.alloc_buffer_from_bytes(&payload);
-            ctx.set_field(obj, "payload", payload_nv);
-            let consumed_nv = VmValue::from_int((pos + len) as i64);
-            ctx.set_field(obj, "consumed", consumed_nv);
-            Ok(obj)
+            let kind = ctx.alloc_str(kind);
+            let payload = ctx.alloc_buffer_from_bytes(&payload);
+            Ok(Some(
+                WsFrame {
+                    kind,
+                    opcode: opcode as i64,
+                    fin,
+                    payload,
+                    consumed: (pos + len) as i64,
+                }
+                .alloc(ctx),
+            ))
         }
     }
 }

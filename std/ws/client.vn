@@ -230,10 +230,9 @@ export class WebSocket implements AsyncReader, AsyncWriter {
                 this._recvBuf = bytesConcat(this._recvBuf, chunk as Bytes);
                 continue;
             }
-            let f = frame as dynamic;
-            this._recvBuf = this._recvBuf.slice(f.consumed as int);
-            let kind = f.kind as str;
-            let payload = f.payload as Bytes;
+            this._recvBuf = this._recvBuf.slice(frame.consumed);
+            let kind = frame.kind;
+            let payload = frame.payload;
             if (kind === "ping" || kind === "close") {
                 try {
                     await this._pumpControl(kind, payload);
@@ -255,7 +254,7 @@ export class WebSocket implements AsyncReader, AsyncWriter {
                     continue;
                 }
                 this._fragBuf = bytesConcat(this._fragBuf as Bytes, payload);
-                if (f.fin as bool) {
+                if (frame.fin) {
                     let done = this._fragBuf as Bytes;
                     let op = this._fragOp;
                     this._fragBuf = null;
@@ -264,11 +263,11 @@ export class WebSocket implements AsyncReader, AsyncWriter {
                 }
                 continue;
             }
-            if (f.fin as bool) {
-                return this._deliver(f.opcode as int, payload);
+            if (frame.fin) {
+                return this._deliver(frame.opcode, payload);
             }
             this._fragBuf = payload;
-            this._fragOp = f.opcode as int;
+            this._fragOp = frame.opcode;
         }
     }
 
