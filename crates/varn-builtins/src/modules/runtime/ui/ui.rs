@@ -10,63 +10,20 @@ use ui_draw::DrawCmd;
 
 pub struct UiRuntime;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum EventKind {
-    Key,
-    Mouse,
-    Resize,
-    Close,
+varn_macros::varn_enum! {
+    module: MODULE_ID,
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    pub enum UiEventKind;
 }
 
-impl EventKind {
-    const fn name(self) -> &'static str {
-        match self {
-            Self::Key => "key",
-            Self::Mouse => "mouse",
-            Self::Resize => "resize",
-            Self::Close => "close",
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-enum InjectKind {
-    Key,
-    Mouse,
-    MouseDown,
-    MouseUp,
-    Resize,
-    Close,
-}
-
-impl InjectKind {
-    const ALL: [Self; 6] = [
-        Self::Key,
-        Self::Mouse,
-        Self::MouseDown,
-        Self::MouseUp,
-        Self::Resize,
-        Self::Close,
-    ];
-
-    const fn name(self) -> &'static str {
-        match self {
-            Self::Key => EventKind::Key.name(),
-            Self::Mouse => EventKind::Mouse.name(),
-            Self::MouseDown => "mouseDown",
-            Self::MouseUp => "mouseUp",
-            Self::Resize => EventKind::Resize.name(),
-            Self::Close => EventKind::Close.name(),
-        }
-    }
-
-    fn of(name: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|k| k.name() == name)
-    }
+varn_macros::varn_enum! {
+    module: MODULE_ID,
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    pub enum UiInjectKind;
 }
 
 struct Event {
-    kind: EventKind,
+    kind: UiEventKind,
     key: i64,
     pressed: bool,
     x: i64,
@@ -94,7 +51,7 @@ fn real_poll(id: u64) -> Vec<Event> {
     for e in evs {
         out.push(match e {
             varn_ui::RealEvent::Key { key, pressed } => Event {
-                kind: EventKind::Key,
+                kind: UiEventKind::Key,
                 key,
                 pressed,
                 x: 0,
@@ -109,7 +66,7 @@ fn real_poll(id: u64) -> Vec<Event> {
                 button,
                 pressed,
             } => Event {
-                kind: EventKind::Mouse,
+                kind: UiEventKind::Mouse,
                 key: 0,
                 pressed,
                 x,
@@ -119,7 +76,7 @@ fn real_poll(id: u64) -> Vec<Event> {
                 h: 0,
             },
             varn_ui::RealEvent::Resize { w, h } => Event {
-                kind: EventKind::Resize,
+                kind: UiEventKind::Resize,
                 key: 0,
                 pressed: false,
                 x: 0,
@@ -129,7 +86,7 @@ fn real_poll(id: u64) -> Vec<Event> {
                 h,
             },
             varn_ui::RealEvent::Close => Event {
-                kind: EventKind::Close,
+                kind: UiEventKind::Close,
                 key: 0,
                 pressed: false,
                 x: 0,
@@ -162,9 +119,9 @@ fn with_win<T>(id: i64, f: impl FnOnce(&mut Window) -> Result<T, String>) -> Res
     f(w)
 }
 
-fn event_obj(ctx: &mut dyn NativeCtx, e: &Event) -> VmValue {
-    let kind = ctx.alloc_str(e.kind.name());
-    UiEvent {
+fn event_obj(ctx: &mut dyn NativeCtx, e: &Event) -> Result<VmValue, String> {
+    let kind = e.kind.to_value(ctx)?;
+    Ok(UiEvent {
         kind,
         key: e.key,
         pressed: e.pressed,
@@ -174,7 +131,7 @@ fn event_obj(ctx: &mut dyn NativeCtx, e: &Event) -> VmValue {
         w: e.w,
         h: e.h,
     }
-    .alloc(ctx)
+    .alloc(ctx))
 }
 
 varn_macros::varn_record! {
@@ -236,24 +193,23 @@ varn_contract! {
                 Ok(vec![VmValue::from_int(w.w), VmValue::from_int(w.h)])
             })
         }
-        fn inject(_ctx: &mut dyn NativeCtx, id: i64, kind: &str, a: i64, b: i64, c: i64) -> Result<(), String> {
+        fn inject(ctx: &mut dyn NativeCtx, id: i64, kind: VmValue, a: i64, b: i64, c: i64) -> Result<(), String> {
+            let inject = UiInjectKind::from_value(ctx, kind)
+                .ok_or_else(|| "ui.inject: kind is not a UiInjectKind".to_string())?;
             with_win(id, |w| {
-                let Some(inject) = InjectKind::of(kind) else {
-                    return Err(format!("ui.inject: unknown kind '{kind}'"));
-                };
                 let e = match inject {
-                    InjectKind::Key => Event { kind: EventKind::Key, key: a, pressed: b != 0, x: 0, y: 0, button: 0, w: 0, h: 0 },
-                    InjectKind::Mouse => Event { kind: EventKind::Mouse, key: 0, pressed: false, x: a, y: b, button: c, w: 0, h: 0 },
-                    InjectKind::MouseDown => Event { kind: EventKind::Mouse, key: 0, pressed: true, x: a, y: b, button: c, w: 0, h: 0 },
-                    InjectKind::MouseUp => Event { kind: EventKind::Mouse, key: 0, pressed: false, x: a, y: b, button: c, w: 0, h: 0 },
-                    InjectKind::Resize => {
+                    UiInjectKind::Key => Event { kind: UiEventKind::Key, key: a, pressed: b != 0, x: 0, y: 0, button: 0, w: 0, h: 0 },
+                    UiInjectKind::Mouse => Event { kind: UiEventKind::Mouse, key: 0, pressed: false, x: a, y: b, button: c, w: 0, h: 0 },
+                    UiInjectKind::MouseDown => Event { kind: UiEventKind::Mouse, key: 0, pressed: true, x: a, y: b, button: c, w: 0, h: 0 },
+                    UiInjectKind::MouseUp => Event { kind: UiEventKind::Mouse, key: 0, pressed: false, x: a, y: b, button: c, w: 0, h: 0 },
+                    UiInjectKind::Resize => {
                         w.w = a;
                         w.h = b;
-                        Event { kind: EventKind::Resize, key: 0, pressed: false, x: 0, y: 0, button: 0, w: a, h: b }
+                        Event { kind: UiEventKind::Resize, key: 0, pressed: false, x: 0, y: 0, button: 0, w: a, h: b }
                     }
-                    InjectKind::Close => {
+                    UiInjectKind::Close => {
                         w.closed = true;
-                        Event { kind: EventKind::Close, key: 0, pressed: false, x: 0, y: 0, button: 0, w: 0, h: 0 }
+                        Event { kind: UiEventKind::Close, key: 0, pressed: false, x: 0, y: 0, button: 0, w: 0, h: 0 }
                     }
                 };
                 w.events.push_back(e);
@@ -265,8 +221,8 @@ varn_contract! {
             if let Some(h) = real {
                 let _ = varn_ui::pump(h);
                 for e in real_poll(h) {
-                    let is_close = e.kind == EventKind::Close;
-                    let is_resize = e.kind == EventKind::Resize;
+                    let is_close = e.kind == UiEventKind::Close;
+                    let is_resize = e.kind == UiEventKind::Resize;
                     let (rw, rh) = (e.w, e.h);
                     with_win(id, |w| {
                         if is_close {
@@ -284,7 +240,7 @@ varn_contract! {
             let drained = with_win(id, |w| Ok(std::mem::take(&mut w.events)))?;
             let mut out = Vec::with_capacity(drained.len());
             for e in &drained {
-                out.push(event_obj(ctx, e));
+                out.push(event_obj(ctx, e)?);
             }
             Ok(out)
         }

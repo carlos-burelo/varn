@@ -1,4 +1,4 @@
-import { UiWindow } from "std:ui/window";
+import { UiWindow, UiEventKind } from "std:ui/window";
 import { hit, MOUSE_LEFT } from "std:ui/keys";
 
 export class UiFrame {
@@ -43,7 +43,7 @@ export class UiFrame {
         const evs = win.poll();
         for (let i = 0; i < evs.length; i = i + 1) {
             const e = evs[i];
-            if (e.kind == "mouse") {
+            if (e.kind == UiEventKind.Mouse) {
                 this.mouseX = e.x;
                 this.mouseY = e.y;
                 if (e.button == MOUSE_LEFT) {
@@ -57,7 +57,7 @@ export class UiFrame {
                         this.leftReleased = true;
                     }
                 }
-            } else if (e.kind == "key") {
+            } else if (e.kind == UiEventKind.Key) {
                 if (e.pressed) {
                     if (!UiFrame.contains(this.keys, e.key)) {
                         this.keys.push(e.key);
@@ -68,11 +68,11 @@ export class UiFrame {
                 } else {
                     UiFrame.drop(this.keys, e.key);
                 }
-            } else if (e.kind == "resize") {
+            } else if (e.kind == UiEventKind.Resize) {
                 this.resized = true;
                 this.w = e.w;
                 this.h = e.h;
-            } else if (e.kind == "close") {
+            } else if (e.kind == UiEventKind.Close) {
                 this.closed = true;
             }
         }

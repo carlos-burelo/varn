@@ -2,8 +2,24 @@
 // Single event queue + command log per window. Real backend feeds the same
 // queue and draws instead of logging. Same API, no dual paths.
 
+export declare enum UiEventKind {
+    Key,
+    Mouse,
+    Resize,
+    Close
+}
+
+export declare enum UiInjectKind {
+    Key,
+    Mouse,
+    MouseDown,
+    MouseUp,
+    Resize,
+    Close
+}
+
 export interface UiEvent {
-    kind: str;
+    kind: UiEventKind;
     key: int;
     pressed: bool;
     x: int;
@@ -22,7 +38,7 @@ export declare function shouldClose$(id: int): bool;
 @permission("ui")
 export declare function size$(id: int): int[];
 @permission("ui")
-export declare function inject$(id: int, kind: str, a: int, b: int, c: int): void;
+export declare function inject$(id: int, kind: UiInjectKind, a: int, b: int, c: int): void;
 @permission("ui")
 export declare function poll$(id: int): UiEvent[];
 @permission("ui")

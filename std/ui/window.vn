@@ -11,10 +11,12 @@ import {
     present$,
     commands$,
     real$,
-    UiEvent
+    UiEvent,
+    UiEventKind,
+    UiInjectKind
 } from "runtime:ui";
 
-export { UiEvent };
+export { UiEvent, UiEventKind, UiInjectKind };
 
 export class UiWindow {
     id: int;
@@ -43,7 +45,7 @@ export class UiWindow {
         return size$(this.id);
     }
 
-    inject(kind: str, a: int, b: int, c: int): void {
+    inject(kind: UiInjectKind, a: int, b: int, c: int): void {
         inject$(this.id, kind, a, b, c);
     }
 

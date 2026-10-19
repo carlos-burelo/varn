@@ -8,26 +8,27 @@ import {
     KEY_BACKSPACE, KEY_TAB, KEY_ENTER, KEY_ESCAPE, KEY_SPACE, KEY_DELETE,
     KEY_ARROW_LEFT, KEY_ARROW_UP, KEY_ARROW_RIGHT, KEY_ARROW_DOWN,
     MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE,
-    keyCode, isNamedKey, hit
+    keyCode, isNamedKey, hit,
+    UiEventKind, UiInjectKind
 } from "std:ui";
 import { measure, ascent, descent } from "std:text";
 
 function tapKey(win: UiWindow, fr: UiFrame, focus: Focus, ed: TextEdit, code: int): void {
-    win.inject("key", code, 1, 0);
+    win.inject(UiInjectKind.Key, code, 1, 0);
     fr.update(win);
     ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
-    win.inject("key", code, 0, 0);
+    win.inject(UiInjectKind.Key, code, 0, 0);
     fr.update(win);
     ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
 }
 
 function holdKey(win: UiWindow, fr: UiFrame, focus: Focus, ed: TextEdit, code: int, times: int): void {
     for (let i = 0; i < times; i = i + 1) {
-        win.inject("key", code, 1, 0);
+        win.inject(UiInjectKind.Key, code, 1, 0);
         fr.update(win);
         ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
     }
-    win.inject("key", code, 0, 0);
+    win.inject(UiInjectKind.Key, code, 0, 0);
     fr.update(win);
     ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
 }
@@ -50,31 +51,20 @@ await describe("215 ui headless", async () => {    await it("open reports size",
 
     await it("events round trip", () => {
         using win = UiWindow.open("t", 800, 600);
-        win.inject("key", 65, 1, 0);
-        win.inject("mouse", 10, 20, 1);
-        win.inject("resize", 1024, 768, 0);
+        win.inject(UiInjectKind.Key, 65, 1, 0);
+        win.inject(UiInjectKind.Mouse, 10, 20, 1);
+        win.inject(UiInjectKind.Resize, 1024, 768, 0);
         const evs = win.poll();
         expect(evs.length).toBe(3);
-        expect(evs[0].kind).toBe("key");
+        expect(evs[0].kind).toBe(UiEventKind.Key);
         expect(evs[0].key).toBe(65);
         expect(evs[0].pressed).toBe(true);
-        expect(evs[1].kind).toBe("mouse");
+        expect(evs[1].kind).toBe(UiEventKind.Mouse);
         expect(evs[1].x).toBe(10);
         expect(evs[1].button).toBe(1);
-        expect(evs[2].kind).toBe("resize");
+        expect(evs[2].kind).toBe(UiEventKind.Resize);
         expect(win.size()).toEqual([1024, 768]);
         expect(win.poll().length).toBe(0);
-    });
-
-    await it("unknown inject kind throws", () => {
-        using win = UiWindow.open("t", 800, 600);
-        let failed = false;
-        try {
-            win.inject("nope", 0, 0, 0);
-        } catch (e) {
-            failed = true;
-        }
-        expect(failed).toBe(true);
     });
 
     await it("draw log and present drains", () => {
@@ -92,9 +82,9 @@ await describe("215 ui headless", async () => {    await it("open reports size",
 
     await it("close event and destroyed handle", () => {
         const win = UiWindow.open("t", 800, 600);
-        win.inject("close", 0, 0, 0);
+        win.inject(UiInjectKind.Close, 0, 0, 0);
         expect(win.shouldClose()).toBe(true);
-        expect(win.poll()[0].kind).toBe("close");
+        expect(win.poll()[0].kind).toBe(UiEventKind.Close);
         win.dispose();
         let failed = false;
         try {
@@ -135,8 +125,8 @@ await describe("215 ui headless", async () => {    await it("open reports size",
 
     await it("key events carry codes end to end", () => {
         using win = UiWindow.open("t", 800, 600);
-        win.inject("key", keyCode("escape"), 1, 0);
-        win.inject("key", keyCode("left"), 1, 0);
+        win.inject(UiInjectKind.Key, keyCode("escape"), 1, 0);
+        win.inject(UiInjectKind.Key, keyCode("left"), 1, 0);
         const evs = win.poll();
         expect(evs.length).toBe(2);
         expect(evs[0].key).toBe(KEY_ESCAPE);
@@ -156,17 +146,17 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     await it("frame aggregates key edges", () => {
         using win = UiWindow.open("t", 800, 600);
         const fr = new UiFrame(800, 600);
-        win.inject("key", KEY_ESCAPE, 1, 0);
+        win.inject(UiInjectKind.Key, KEY_ESCAPE, 1, 0);
         fr.update(win);
         expect(fr.held(KEY_ESCAPE)).toBe(true);
         expect(fr.pressed).toEqual([KEY_ESCAPE]);
         fr.update(win);
         expect(fr.held(KEY_ESCAPE)).toBe(true);
         expect(fr.pressed).toEqual([]);
-        win.inject("key", KEY_ESCAPE, 1, 0);
+        win.inject(UiInjectKind.Key, KEY_ESCAPE, 1, 0);
         fr.update(win);
         expect(fr.pressed).toEqual([]);
-        win.inject("key", KEY_ESCAPE, 0, 0);
+        win.inject(UiInjectKind.Key, KEY_ESCAPE, 0, 0);
         fr.update(win);
         expect(fr.held(KEY_ESCAPE)).toBe(false);
     });
@@ -174,17 +164,17 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     await it("frame clicks need down and up inside", () => {
         using win = UiWindow.open("t", 800, 600);
         const fr = new UiFrame(800, 600);
-        win.inject("mouse", 30, 40, -1);
+        win.inject(UiInjectKind.Mouse, 30, 40, -1);
         fr.update(win);
         expect(fr.mouseX).toBe(30);
         expect(fr.mouseY).toBe(40);
         expect(fr.leftPressed).toBe(false);
-        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
         fr.update(win);
         expect(fr.left).toBe(true);
         expect(fr.leftPressed).toBe(true);
         expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
-        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
         fr.update(win);
         expect(fr.left).toBe(false);
         expect(fr.leftReleased).toBe(true);
@@ -197,14 +187,14 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     await it("frame rejects partial clicks", () => {
         using win = UiWindow.open("t", 800, 600);
         const fr = new UiFrame(800, 600);
-        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 500, 500, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 500, 500, MOUSE_LEFT);
         fr.update(win);
         expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
-        win.inject("mouseDown", 500, 500, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 500, 500, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
         fr.update(win);
         expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
     });
@@ -212,14 +202,14 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     await it("frame tracks resize and close", () => {
         using win = UiWindow.open("t", 800, 600);
         const fr = new UiFrame(800, 600);
-        win.inject("resize", 1024, 768, 0);
+        win.inject(UiInjectKind.Resize, 1024, 768, 0);
         fr.update(win);
         expect(fr.resized).toBe(true);
         expect(fr.w).toBe(1024);
         expect(fr.h).toBe(768);
         fr.update(win);
         expect(fr.resized).toBe(false);
-        win.inject("close", 0, 0, 0);
+        win.inject(UiInjectKind.Close, 0, 0, 0);
         fr.update(win);
         expect(fr.closed).toBe(true);
         expect(win.shouldClose()).toBe(true);
@@ -305,16 +295,16 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     await it("frame separates press edge from repeat", () => {
         using win = UiWindow.open("t", 800, 600);
         const fr = new UiFrame(800, 600);
-        win.inject("key", 65, 1, 0);
+        win.inject(UiInjectKind.Key, 65, 1, 0);
         fr.update(win);
         expect(fr.pressed).toEqual([65]);
         expect(fr.repeated).toEqual([]);
-        win.inject("key", 65, 1, 0);
+        win.inject(UiInjectKind.Key, 65, 1, 0);
         fr.update(win);
         expect(fr.pressed).toEqual([]);
         expect(fr.repeated).toEqual([65]);
         expect(fr.held(65)).toBe(true);
-        win.inject("key", 65, 0, 0);
+        win.inject(UiInjectKind.Key, 65, 0, 0);
         fr.update(win);
         expect(fr.held(65)).toBe(false);
         expect(fr.repeated).toEqual([]);
@@ -325,9 +315,9 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const ed = new TextEdit();
-        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
         fr.update(win);
         ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
         holdKey(win, fr, focus, ed, 97, 3);
@@ -341,9 +331,9 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const ed = new TextEdit();
-        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
         fr.update(win);
         ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
         tapKey(win, fr, focus, ed, 97);
@@ -368,9 +358,9 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const ed = new TextEdit();
-        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
         fr.update(win);
         ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
         expect(ed.focused).toBe(true);
@@ -402,23 +392,23 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const ed = new TextEdit();
-        win.inject("key", 65, 1, 0);
+        win.inject(UiInjectKind.Key, 65, 1, 0);
         fr.update(win);
         ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
         expect(ed.text).toBe("");
         expect(ed.focused).toBe(false);
-        win.inject("mouseDown", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 30, 40, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
         fr.update(win);
         ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
         expect(ed.focused).toBe(true);
-        win.inject("mouseDown", 500, 500, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 500, 500, MOUSE_LEFT);
         fr.update(win);
         ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
         expect(ed.focused).toBe(false);
         expect(focus.current()).toBe(-1);
-        win.inject("key", 66, 1, 0);
+        win.inject(UiInjectKind.Key, 66, 1, 0);
         fr.update(win);
         ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
         expect(ed.text).toBe("");

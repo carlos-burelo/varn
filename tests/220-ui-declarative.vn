@@ -5,7 +5,7 @@ import {
     TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Curve, Colors, Theme,
     textSizeFor, textColorFor, run
 } from "std:ui";
-import { MOUSE_LEFT } from "std:ui";
+import { MOUSE_LEFT, UiInjectKind } from "std:ui";
 
 type Todo = {
     id: int,
@@ -229,10 +229,10 @@ await describe("220 ui declarative", async () => {
             ui.button(text: "no", onPress: () => { hits.push(true); }, enabled: false)
         ]);
         renderTree(win, fr, focus, tree);
-        win.inject("mouseDown", 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 400, 22, MOUSE_LEFT);
         fr.update(win);
         renderTree(win, fr, focus, tree);
-        win.inject("mouseUp", 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 400, 22, MOUSE_LEFT);
         fr.update(win);
         renderTree(win, fr, focus, tree);
         expect(hits.length).toBe(0);
@@ -243,10 +243,10 @@ await describe("220 ui declarative", async () => {
         const fr2 = new UiFrame(800, 600);
         const focus2 = new Focus();
         renderTree(win, fr2, focus2, tree2);
-        win.inject("mouseDown", 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 400, 22, MOUSE_LEFT);
         fr2.update(win);
         renderTree(win, fr2, focus2, tree2);
-        win.inject("mouseUp", 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 400, 22, MOUSE_LEFT);
         fr2.update(win);
         renderTree(win, fr2, focus2, tree2);
         expect(hits2.length).toBe(1);
@@ -263,15 +263,15 @@ await describe("220 ui declarative", async () => {
             placeholder: "Name"
         );
         renderTree(win, fr, focus, build());
-        win.inject("mouseDown", 30, 30, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 30, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 30, 30, MOUSE_LEFT);
-        fr.update(win);
-        renderTree(win, fr, focus, build());
-        win.inject("key", 72, 1, 0);
+        win.inject(UiInjectKind.MouseUp, 30, 30, MOUSE_LEFT);
         fr.update(win);
         renderTree(win, fr, focus, build());
-        win.inject("key", 72, 0, 0);
+        win.inject(UiInjectKind.Key, 72, 1, 0);
+        fr.update(win);
+        renderTree(win, fr, focus, build());
+        win.inject(UiInjectKind.Key, 72, 0, 0);
         fr.update(win);
         renderTree(win, fr, focus, build());
         expect(name()).toBe("H");

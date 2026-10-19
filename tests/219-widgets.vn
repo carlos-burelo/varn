@@ -3,15 +3,15 @@ import {
     UiWindow, UiFrame, Focus, TextEdit, Widget,
     Label, Box, Column, Row, Button, Field, render, run,
     Checkbox, List, Spacer, Divider,
-    MOUSE_LEFT
+    MOUSE_LEFT, UiInjectKind
 } from "std:ui";
 import { measure, ascent, descent } from "std:text";
 
 function tapEnter(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
-    win.inject("key", 13, 1, 0);
+    win.inject(UiInjectKind.Key, 13, 1, 0);
     fr.update(win);
     render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
-    win.inject("key", 13, 0, 0);
+    win.inject(UiInjectKind.Key, 13, 0, 0);
     fr.update(win);
     render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
 }
@@ -44,10 +44,10 @@ await describe("219 widgets", async () => {
         const tree = Column([Button("ok", onPress: () => { hits.push(true); })]);
         render(win, fr, focus, tree, 0.0, 0.0, 800.0, 600.0);
         expect(hits.length).toBe(0);
-        win.inject("mouseDown", 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 400, 22, MOUSE_LEFT);
         fr.update(win);
         render(win, fr, focus, tree, 0.0, 0.0, 800.0, 600.0);
-        win.inject("mouseUp", 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 400, 22, MOUSE_LEFT);
         fr.update(win);
         render(win, fr, focus, tree, 0.0, 0.0, 800.0, 600.0);
         expect(hits.length).toBe(1);
@@ -61,17 +61,17 @@ await describe("219 widgets", async () => {
         const tree = Field(edit: ed);
         render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
         expect(ed.focused).toBe(false);
-        win.inject("mouseDown", 30, 30, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 30, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 30, 30, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 30, 30, MOUSE_LEFT);
         fr.update(win);
         render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
         expect(ed.focused).toBe(true);
-        win.inject("key", 65, 1, 0);
+        win.inject(UiInjectKind.Key, 65, 1, 0);
         fr.update(win);
         render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
         expect(ed.text).toBe("A");
-        win.inject("key", 65, 0, 0);
+        win.inject(UiInjectKind.Key, 65, 0, 0);
         fr.update(win);
     });
 
@@ -86,9 +86,9 @@ await describe("219 widgets", async () => {
             Button("r", onPress: () => { right.push(true); })
         ], h: 60.0);
         render(win, fr, focus, tree, 0.0, 0.0, 800.0, 60.0);
-        win.inject("mouseDown", 50, 30, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 50, 30, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 50, 30, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 50, 30, MOUSE_LEFT);
         fr.update(win);
         render(win, fr, focus, tree, 0.0, 0.0, 800.0, 60.0);
         expect(left.length).toBe(1);
@@ -102,9 +102,9 @@ await describe("219 widgets", async () => {
         const state = { on: false };
         const tree = Checkbox(state.on, onToggle: () => { state.on = !state.on; });
         render(win, fr, focus, tree, 10.0, 10.0, 30.0, 30.0);
-        win.inject("mouseDown", 25, 25, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 25, 25, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 25, 25, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 25, 25, MOUSE_LEFT);
         fr.update(win);
         const tree2 = Checkbox(state.on, onToggle: () => { state.on = !state.on; });
         render(win, fr, focus, tree2, 10.0, 10.0, 30.0, 30.0);
@@ -144,15 +144,15 @@ await describe("219 widgets", async () => {
         const got: str[] = [];
         const tree = Field(hint: "type", onSubmit: (t: str) => { got.push(t); });
         render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
-        win.inject("mouseDown", 30, 30, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 30, MOUSE_LEFT);
         fr.update(win);
-        win.inject("mouseUp", 30, 30, MOUSE_LEFT);
-        fr.update(win);
-        render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
-        win.inject("key", 65, 1, 0);
+        win.inject(UiInjectKind.MouseUp, 30, 30, MOUSE_LEFT);
         fr.update(win);
         render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
-        win.inject("key", 65, 0, 0);
+        win.inject(UiInjectKind.Key, 65, 1, 0);
+        fr.update(win);
+        render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
+        win.inject(UiInjectKind.Key, 65, 0, 0);
         fr.update(win);
         render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
         expect(got.length).toBe(0);
