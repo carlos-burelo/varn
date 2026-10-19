@@ -258,6 +258,15 @@ impl Views {
         self.by_value.get(&object).copied()
     }
 
+    pub(super) fn forget(&self, b: &mut FunctionBuilder, value: u32) {
+        if let Some(view) = self.by_value.get(&value) {
+            let zero = b.ins().iconst(types::I64, 0);
+            b.def_var(view.data, zero);
+            b.def_var(view.len, zero);
+            b.def_var(view.disc, zero);
+        }
+    }
+
     pub(super) fn clear(&self, b: &mut FunctionBuilder) {
         if self.by_value.is_empty() {
             return;

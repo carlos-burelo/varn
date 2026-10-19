@@ -75,6 +75,7 @@ pub(super) fn lower_block(
             params[k]
         };
         store::define(b, ctx, values, p, pv);
+        ctx.views.forget(b, p);
     }
     if landing_live.contains_key(&ssa_idx) {
         let err_val = ctx
@@ -102,6 +103,7 @@ pub(super) fn lower_block(
                 && ctx.ssa.value_ty(d) == ctx.ssa.value_ty(src)
             {
                 let v = store::load_value(b, ctx, values, src)?;
+                ctx.views.forget(b, d);
                 store::define(b, ctx, values, d, v);
                 continue;
             }
@@ -132,6 +134,9 @@ pub(super) fn lower_block(
             && ctx.fused_awaits.contains_key(&d)
         {
             continue;
+        }
+        if let Some(d) = inst.dest {
+            ctx.views.forget(b, d);
         }
         match scalar::emit_inst(b, ctx, values, &inst.op, inst.dest)? {
             Some(out) => store::land(b, ctx, values, inst.dest, out)?,
