@@ -97,6 +97,7 @@ pub(super) fn try_parse_decl_stmt_mode(
                 Err(err) => return Some(Err(err)),
             };
             decl.doc = doc;
+            decl.is_declare = is_declare;
             let range = decl.range;
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Enum(decl)))))
         }

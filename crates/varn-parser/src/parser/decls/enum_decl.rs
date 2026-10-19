@@ -314,6 +314,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
         members,
         body,
         doc: None,
+        is_declare: false,
         range: full_range,
     })
 }

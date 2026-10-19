@@ -237,6 +237,7 @@ pub struct EnumDecl {
     pub members: Vec<EnumMember>,
     pub body: Vec<ClassMember>,
     pub doc: Option<String>,
+    pub is_declare: bool,
     pub range: SourceRange,
 }
 
