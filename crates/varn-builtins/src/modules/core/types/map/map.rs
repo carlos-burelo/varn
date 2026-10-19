@@ -78,7 +78,7 @@ varn_contract! {
                         m.read().iter().map(|(k, v)| (k.0, *v)).collect();
                     pairs
                         .into_iter()
-                        .map(|(k, v)| ctx.alloc_array(vec![k, v]))
+                        .map(|(k, v)| ctx.alloc_tuple(vec![k, v]))
                         .collect()
                 }
                 None => Vec::new(),

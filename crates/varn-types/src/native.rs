@@ -174,6 +174,9 @@ impl NativeCtx for DummyCtx {
     fn alloc_array(&mut self, _items: Vec<VmValue>) -> VmValue {
         VmValue::null()
     }
+    fn alloc_tuple(&mut self, _items: Vec<VmValue>) -> VmValue {
+        VmValue::null()
+    }
     fn array_len(&self, _arr: VmValue) -> usize {
         0
     }
@@ -284,6 +287,9 @@ impl NativeCtx for StaticInitCtx {
         false
     }
     fn alloc_array(&mut self, _items: Vec<VmValue>) -> VmValue {
+        VmValue::null()
+    }
+    fn alloc_tuple(&mut self, _items: Vec<VmValue>) -> VmValue {
         VmValue::null()
     }
     fn array_len(&self, _arr: VmValue) -> usize {

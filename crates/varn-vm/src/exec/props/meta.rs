@@ -253,6 +253,10 @@ pub(crate) fn resolve_meta_property(
                 | MemberKey::IterIndex
                 | MemberKey::IterResult
                 | MemberKey::IterRange
+                | MemberKey::Iter
+                | MemberKey::Chars
+                | MemberKey::ToArray
+                | MemberKey::Stride
                 | MemberKey::CharCode => meta_has_own_native,
             };
             let receiver = match (&cls, is_instance, is_class) {
@@ -307,6 +311,10 @@ pub(crate) fn resolve_meta_property(
         | MemberKey::IterIndex
         | MemberKey::IterResult
         | MemberKey::IterRange
+        | MemberKey::Iter
+        | MemberKey::Chars
+        | MemberKey::ToArray
+        | MemberKey::Stride
         | MemberKey::CharCode => Ok(VmValue::null()),
     }
 }
@@ -363,7 +371,7 @@ fn meta_entries_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types:
             Some(n) => ctx.alloc_str_owned(n),
             None => key,
         };
-        entries.push(ctx.alloc_array(vec![key, value]));
+        entries.push(ctx.alloc_tuple(vec![key, value]));
     }
     Ok(ctx.alloc_array(entries))
 }

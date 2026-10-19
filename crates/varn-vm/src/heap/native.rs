@@ -65,6 +65,10 @@ impl NativeCtx for Heap {
         self.alloc_array_vm(items)
     }
 
+    fn alloc_tuple(&mut self, items: Vec<VmValue>) -> VmValue {
+        self.alloc_tuple_vm(items)
+    }
+
     fn alloc_object(&mut self) -> VmValue {
         self.deref_mut().alloc_object()
     }

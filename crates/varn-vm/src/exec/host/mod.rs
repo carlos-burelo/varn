@@ -92,6 +92,10 @@ impl NativeCtx for ExecCtx {
         self.heap.alloc_array_vm(items)
     }
 
+    fn alloc_tuple(&mut self, items: Vec<VmValue>) -> VmValue {
+        self.heap.alloc_tuple_vm(items)
+    }
+
     fn array_len(&self, arr: VmValue) -> usize {
         crate::heap_array::array_len(&self.heap, arr)
     }
@@ -158,6 +162,10 @@ impl NativeCtx for ExecCtx {
 
     fn alloc_class(&mut self, class: std::rc::Rc<ClassObj>) -> VmValue {
         self.heap.alloc_class_vm(class)
+    }
+
+    fn option(&mut self, value: Option<VmValue>) -> Result<VmValue, String> {
+        self.make_option(value).map_err(|e| e.to_string())
     }
 
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {

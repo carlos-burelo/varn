@@ -41,6 +41,9 @@ impl varn_types::NativeCtx for DevNullModuleCtx {
     fn alloc_array(&mut self, _items: Vec<VmValue>) -> VmValue {
         VmValue::null()
     }
+    fn alloc_tuple(&mut self, _items: Vec<VmValue>) -> VmValue {
+        VmValue::null()
+    }
     fn alloc_object(&mut self) -> VmValue {
         VmValue::null()
     }

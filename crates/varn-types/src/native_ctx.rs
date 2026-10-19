@@ -43,6 +43,7 @@ pub trait NativeCtx: crate::Buffers {
     fn alloc_str(&mut self, s: &str) -> VmValue;
     fn alloc_str_owned(&mut self, s: String) -> VmValue;
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue;
+    fn alloc_tuple(&mut self, items: Vec<VmValue>) -> VmValue;
     fn alloc_object(&mut self) -> VmValue;
     fn alloc_bigint(&mut self, value: num_bigint::BigInt) -> VmValue;
     fn alloc_decimal(&mut self, value: bigdecimal::BigDecimal) -> VmValue;
@@ -62,6 +63,9 @@ pub trait NativeCtx: crate::Buffers {
         _values: Vec<VmValue>,
     ) -> VmValue {
         self.alloc_object()
+    }
+    fn option(&mut self, _value: Option<VmValue>) -> Result<VmValue, String> {
+        Err("this context cannot build core Option values".to_string())
     }
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue;
     fn alloc_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue;
