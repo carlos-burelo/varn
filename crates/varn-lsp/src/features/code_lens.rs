@@ -73,6 +73,29 @@ pub fn build_code_lenses(
         data: None,
     });
 
+    for range in entry_guards(analysis) {
+        lenses.push(CodeLens {
+            range,
+            command: Some(Command {
+                title: "▶ Run as Entry".to_string(),
+                tooltip: None,
+                command: "varn.runMain".to_string(),
+                arguments: Some(vec![uri_arg()]),
+            }),
+            data: None,
+        });
+        lenses.push(CodeLens {
+            range,
+            command: Some(Command {
+                title: "⏱️ Benchmark".to_string(),
+                tooltip: None,
+                command: "varn.runBenchmark".to_string(),
+                arguments: Some(vec![uri_arg()]),
+            }),
+            data: None,
+        });
+    }
+
     for sym in analysis.symbols() {
         if sym.line() == u32::MAX || sym.is_from_stdlib() {
             continue;
@@ -89,48 +112,13 @@ pub fn build_code_lenses(
             },
         };
 
-        if sym.name() == "main" {
-            lenses.push(CodeLens {
-                range: sym_range,
-                command: Some(Command {
-                    title: "▶ Run Main".to_string(),
-                    tooltip: None,
-                    command: "varn.runMain".to_string(),
-                    arguments: Some(vec![uri_arg()]),
-                }),
-                data: None,
-            });
-            lenses.push(CodeLens {
-                range: sym_range,
-                command: Some(Command {
-                    title: "⏱️ Benchmark".to_string(),
-                    tooltip: None,
-                    command: "varn.runBenchmark".to_string(),
-                    arguments: Some(vec![uri_arg()]),
-                }),
-                data: None,
-            });
-        } else if sym.name().starts_with("test_") {
+        if sym.is_test() {
             lenses.push(CodeLens {
                 range: sym_range,
                 command: Some(Command {
                     title: "▶ Run Test".to_string(),
                     tooltip: None,
                     command: "varn.runTest".to_string(),
-                    arguments: Some(vec![
-                        uri_arg(),
-                        serde_json::Value::String(sym.name().to_owned()),
-                    ]),
-                }),
-                data: None,
-            });
-        } else if sym.name().starts_with("bench_") {
-            lenses.push(CodeLens {
-                range: sym_range,
-                command: Some(Command {
-                    title: "⏱️ Benchmark".to_string(),
-                    tooltip: None,
-                    command: "varn.runBenchmark".to_string(),
                     arguments: Some(vec![
                         uri_arg(),
                         serde_json::Value::String(sym.name().to_owned()),
@@ -177,4 +165,32 @@ fn count_references(state: &DocumentState, workspace: &Workspace, line: u32, col
     crate::features::references::build_references(state, workspace, line, col)
         .map(|locs| locs.len())
         .unwrap_or(0)
+}
+
+fn entry_guards(state: &DocumentState) -> Vec<Range> {
+    use varn_core::ast::MetaProperty;
+    use varn_core::{ContextualKeyword, TokenKind};
+    let tokens = &state.tokens;
+    let text = |i: usize| crate::document::token_lexeme(&state.source, &tokens[i]);
+    tokens
+        .windows(5)
+        .enumerate()
+        .filter(|(i, w)| {
+            w[0].kind == TokenKind::Import
+                && w[1].kind == TokenKind::Dot
+                && ContextualKeyword::of(text(i + 2)) == Some(ContextualKeyword::Meta)
+                && w[3].kind == TokenKind::Dot
+                && MetaProperty::of(text(i + 4)) == Some(MetaProperty::Main)
+        })
+        .map(|(_, w)| Range {
+            start: Position {
+                line: w[0].line,
+                character: w[0].col,
+            },
+            end: Position {
+                line: w[4].line,
+                character: w[4].col + w[4].length,
+            },
+        })
+        .collect()
 }

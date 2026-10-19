@@ -76,6 +76,9 @@ impl<'a> SymbolView<'a> {
     pub fn is_generator(&self) -> bool {
         self.sym.is_generator
     }
+    pub fn is_test(&self) -> bool {
+        self.sym.is_test
+    }
     pub fn has_explicit_type(&self) -> bool {
         self.sym.has_explicit_type
     }
