@@ -2,7 +2,8 @@ import {
     wsKey$,
     wsValidateResponse$,
     wsFrameBytes$,
-    wsParseFrame$
+    wsParseFrame$,
+    WsOpcode
 } from "runtime:ws";
 
 import {
@@ -68,7 +69,7 @@ export class WebSocket implements AsyncReader, AsyncWriter {
     private _readyState: WebSocketReadyState = WebSocketReadyState.Connecting;
     private _recvBuf: Bytes = Bytes.alloc(0);
     private _fragBuf: Bytes? = null;
-    private _fragOp: int = -1;
+    private _fragOp: WsOpcode? = null;
     private _onOpenListeners: Array<() => void> = [];
     private _onMessageListeners: Array<(data: str) => void> = [];
     private _onBytesListeners: Array<(data: Bytes) => void> = [];
@@ -182,13 +183,13 @@ export class WebSocket implements AsyncReader, AsyncWriter {
         }
         try {
             let data: Bytes;
-            let opcode: int;
-            if (typeof message === "str") {
-                data = Bytes.fromString(message as str);
-                opcode = 1;
+            let opcode: WsOpcode;
+            if (message is str) {
+                data = Bytes.fromString(message);
+                opcode = WsOpcode.Text;
             } else {
                 data = message as Bytes;
-                opcode = 2;
+                opcode = WsOpcode.Binary;
             }
             await tcpWrite$(this._conn, wsFrameBytes$(data, opcode));
             return data.length;
@@ -199,11 +200,11 @@ export class WebSocket implements AsyncReader, AsyncWriter {
         }
     }
 
-    private async _pumpControl(kind: str, payload: Bytes): Task<void> {
-        if (kind === "ping") {
-            await tcpWrite$(this._conn, wsFrameBytes$(payload, 10));
-        } else if (kind === "close") {
-            await tcpWrite$(this._conn, wsFrameBytes$(payload.slice(0, 0), 8));
+    private async _pumpControl(opcode: WsOpcode, payload: Bytes): Task<void> {
+        if (opcode == WsOpcode.Ping) {
+            await tcpWrite$(this._conn, wsFrameBytes$(payload, WsOpcode.Pong));
+        } else if (opcode == WsOpcode.Close) {
+            await tcpWrite$(this._conn, wsFrameBytes$(payload.slice(0, 0), WsOpcode.Close));
             this.close();
         }
     }
@@ -231,11 +232,11 @@ export class WebSocket implements AsyncReader, AsyncWriter {
                 continue;
             }
             this._recvBuf = this._recvBuf.slice(frame.consumed);
-            let kind = frame.kind;
+            let opcode = frame.opcode;
             let payload = frame.payload;
-            if (kind === "ping" || kind === "close") {
+            if (opcode == WsOpcode.Ping || opcode == WsOpcode.Close) {
                 try {
-                    await this._pumpControl(kind, payload);
+                    await this._pumpControl(opcode, payload);
                 } catch (e) {
                     let err = toStdError(e as Error, E_WS_IO);
                     this._notifyError(err.message);
@@ -246,33 +247,33 @@ export class WebSocket implements AsyncReader, AsyncWriter {
                 }
                 continue;
             }
-            if (kind === "pong") {
+            if (opcode == WsOpcode.Pong) {
                 continue;
             }
-            if (kind === "continuation") {
+            if (opcode == WsOpcode.Continuation) {
                 if (this._fragBuf === null) {
                     continue;
                 }
                 this._fragBuf = bytesConcat(this._fragBuf as Bytes, payload);
                 if (frame.fin) {
                     let done = this._fragBuf as Bytes;
-                    let op = this._fragOp;
+                    let op = this._fragOp as WsOpcode;
                     this._fragBuf = null;
-                    this._fragOp = -1;
+                    this._fragOp = null;
                     return this._deliver(op, done);
                 }
                 continue;
             }
             if (frame.fin) {
-                return this._deliver(frame.opcode, payload);
+                return this._deliver(opcode, payload);
             }
             this._fragBuf = payload;
-            this._fragOp = frame.opcode;
+            this._fragOp = opcode;
         }
     }
 
-    private _deliver(opcode: int, payload: Bytes): Bytes {
-        if (opcode === 1) {
+    private _deliver(opcode: WsOpcode, payload: Bytes): Bytes {
+        if (opcode == WsOpcode.Text) {
             this._dispatchText(payload.toString());
         } else {
             this._dispatchBytes(payload);
@@ -311,7 +312,7 @@ export class WebSocket implements AsyncReader, AsyncWriter {
     async closeGracefully(): Task<void> {
         if (this._readyState !== WebSocketReadyState.Closed) {
             try {
-                await tcpWrite$(this._conn, wsFrameBytes$(Bytes.alloc(0), 8));
+                await tcpWrite$(this._conn, wsFrameBytes$(Bytes.alloc(0), WsOpcode.Close));
             } catch (e) {}
             this.close();
         }

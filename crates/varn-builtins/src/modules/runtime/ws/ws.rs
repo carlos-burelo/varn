@@ -29,6 +29,12 @@ fn header_value(head: &str, name: &str) -> Option<String> {
     None
 }
 
+varn_macros::varn_enum! {
+    module: MODULE_ID,
+    contract: "src/modules/runtime/ws/ws_runtime.vn",
+    pub enum WsOpcode;
+}
+
 varn_macros::varn_record! {
     contract: "src/modules/runtime/ws/ws_runtime.vn",
     interface: "WsFrame",
@@ -66,10 +72,13 @@ varn_contract! {
             }
         }
 
-        fn wsFrameBytes(ctx: &mut dyn NativeCtx, payload: VmValue, opcode: i64) -> Result<VmValue, String> {
-            if ![1, 2, 8, 9, 10].contains(&opcode) {
-                return Err(coded("E_WS_BAD_ARG", format!("bad opcode {opcode}")));
-            }
+        fn wsFrameBytes(ctx: &mut dyn NativeCtx, payload: VmValue, opcode: VmValue) -> Result<VmValue, String> {
+            let opcode = match WsOpcode::from_value(ctx, opcode) {
+                Some(WsOpcode::Continuation) | None => {
+                    return Err(coded("E_WS_BAD_ARG", "expected a sendable WsOpcode"));
+                }
+                Some(op @ (WsOpcode::Text | WsOpcode::Binary | WsOpcode::Close | WsOpcode::Ping | WsOpcode::Pong)) => op.tag(),
+            };
             let data = ctx
                 .buffer_to_bytes(payload)
                 .ok_or_else(|| coded("E_WS_BAD_ARG", "expected Bytes"))?;
@@ -146,21 +155,13 @@ varn_contract! {
                     *b ^= mask[i % 4];
                 }
             }
-            let kind = match opcode {
-                0 => "continuation",
-                1 => "text",
-                2 => "binary",
-                8 => "close",
-                9 => "ping",
-                10 => "pong",
-                _ => return Err(coded("E_WS_PROTOCOL", format!("bad opcode {opcode}"))),
-            };
-            let kind = ctx.alloc_str(kind);
+            let opcode = WsOpcode::of_tag(opcode as i64)
+                .ok_or_else(|| coded("E_WS_PROTOCOL", format!("bad opcode {opcode}")))?
+                .to_value(ctx)?;
             let payload = ctx.alloc_buffer_from_bytes(&payload);
             Ok(Some(
                 WsFrame {
-                    kind,
-                    opcode: opcode as i64,
+                    opcode,
                     fin,
                     payload,
                     consumed: (pos + len) as i64,

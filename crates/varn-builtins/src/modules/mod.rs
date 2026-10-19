@@ -51,7 +51,7 @@ native_modules! {
         types::string::NATIVE_ENTRIES,
     ];
     ui = "runtime/ui/ui.rs" => [ui::NATIVE_ENTRIES, ui::UIEVENTKIND_ENTRIES, ui::UIINJECTKIND_ENTRIES];
-    ws = "runtime/ws/ws.rs" => [ws::NATIVE_ENTRIES];
+    ws = "runtime/ws/ws.rs" => [ws::NATIVE_ENTRIES, ws::WSOPCODE_ENTRIES];
 }
 
 pub fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue> {
