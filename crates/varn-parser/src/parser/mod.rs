@@ -86,8 +86,11 @@ impl Parser {
             match self.parse_stmt_or_decl() {
                 Ok(stmt) => body.push(stmt),
                 Err(msg) => {
-                    self.diagnostics
-                        .error(ErrorCode::InvalidStatement, msg, self.stream.range());
+                    self.diagnostics.push(
+                        varn_core::Diagnostic::error(ErrorCode::InvalidStatement, msg)
+                            .with_range(self.stream.range())
+                            .with_file(self.stream.filename.clone()),
+                    );
                     self.recover(stmt_start);
 
                     if self.stream.pos() == loop_entry && !self.stream.is_eof() {

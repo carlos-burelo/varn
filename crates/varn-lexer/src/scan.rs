@@ -230,7 +230,7 @@ pub fn scan_with_config(
 
 fn scan_inner(
     source: &str,
-    _filename: &str,
+    filename: &str,
     config: crate::scanner::LexerConfig,
 ) -> (
     Vec<varn_core::Token>,
@@ -244,7 +244,13 @@ fn scan_inner(
 
     let mut scanner = Scanner::with_config(src_bytes, config);
     let (records, lexeme_buf) = scanner.scan_all();
-    let diagnostics = scanner.diagnostics.take();
+    let file: std::sync::Arc<str> = std::sync::Arc::from(filename);
+    let diagnostics: Vec<varn_core::Diagnostic> = scanner
+        .diagnostics
+        .take()
+        .into_iter()
+        .map(|d| d.with_file(file.clone()))
+        .collect();
     let trivia = std::mem::take(&mut scanner.trivia);
 
     let tokens: Vec<varn_core::Token> = records
