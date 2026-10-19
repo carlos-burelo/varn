@@ -5,7 +5,6 @@ export declare function input(prompt?: str): str;
 
 export declare const NaN: float;
 export declare const Infinity: float;
-export declare const isIsolate: bool;
 
 export declare namespace console {
     declare function log(...args: dynamic[]): void

@@ -73,9 +73,7 @@ async function runHttpVerification() {
 await describe("43 server client http", async () => {
     await it("tests", async () => {
         
-        if (!isIsolate) {
-            await runHttpVerification();
-        }
+        await runHttpVerification();
         
     });
 });

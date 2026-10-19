@@ -208,28 +208,24 @@ function reprRoundTrip(): str {
 }
 await describe("55 array element inference", async () => {
     await it("tests", async () => {
-        
-        if (!isIsolate) {
-            expect(evolvePushInt()).toBe(6)
-            expect(evolveIndexWrite()).toBe(20)
-            expect(evolveMixedStaysPermissive()).toBe("1-two")
-            expect(annotatedUnchanged()).toBe(30)
-            expect(evolveEscapeStaysPermissive()).toBe(6)
-            expect(evolveMatmulShape()).toBe(690)
-            expect(staleB()).toBe(6.0)
-            expect(staleC()).toBe(6.0)
-            expect(genericSpelling()).toBe(suffixSpelling())
-            expect(genericSpelling()).toBe(37)
-            expect(genericSpellingParam([1.5, 2.5])).toBe(4.0)
-            expect(reprRoundTrip()).toBe("7-3s941.25")
-        
-            // Compile the Rule-4 regression shapes without executing them (see above).
-            if (false) {
-                rule4ArgPosition()
-                rule4ReturnPosition()
-                rule4MemberExists()
-            }
-        
+        expect(evolvePushInt()).toBe(6)
+        expect(evolveIndexWrite()).toBe(20)
+        expect(evolveMixedStaysPermissive()).toBe("1-two")
+        expect(annotatedUnchanged()).toBe(30)
+        expect(evolveEscapeStaysPermissive()).toBe(6)
+        expect(evolveMatmulShape()).toBe(690)
+        expect(staleB()).toBe(6.0)
+        expect(staleC()).toBe(6.0)
+        expect(genericSpelling()).toBe(suffixSpelling())
+        expect(genericSpelling()).toBe(37)
+        expect(genericSpellingParam([1.5, 2.5])).toBe(4.0)
+        expect(reprRoundTrip()).toBe("7-3s941.25")
+    
+        // Compile the Rule-4 regression shapes without executing them (see above).
+        if (false) {
+            rule4ArgPosition()
+            rule4ReturnPosition()
+            rule4MemberExists()
         }
         
     });

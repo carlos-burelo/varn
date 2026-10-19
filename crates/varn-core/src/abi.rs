@@ -70,7 +70,6 @@ pub enum NativeValue {
     Function,
     Class,
     Float,
-    Bool,
 }
 
 pub struct NativeGlobal {
@@ -84,7 +83,7 @@ const fn native(name: &'static str, value: NativeValue) -> NativeGlobal {
 
 pub const NATIVE_GLOBALS: &[NativeGlobal] = {
     use crate::{BuiltinType as B, LangPrimitive as P, RuntimeErrorKind as E};
-    use NativeValue::{Bool, Class, Float, Function};
+    use NativeValue::{Class, Float, Function};
     &[
         native("print", Function),
         native(B::Array.name(), Class),
@@ -109,7 +108,6 @@ pub const NATIVE_GLOBALS: &[NativeGlobal] = {
         native(P::Float.name(), Class),
         native("input", Function),
         native(P::Int.name(), Class),
-        native("isIsolate", Bool),
         native(P::Str.name(), Class),
     ]
 };

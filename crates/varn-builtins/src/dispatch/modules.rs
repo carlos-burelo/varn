@@ -79,7 +79,6 @@ const FLOAT_CONSTANTS: &[(&str, f64)] = &[("Infinity", f64::INFINITY), ("NaN", f
 
 pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Arc<str>, VmValue> {
     let mut out = rustc_hash::FxHashMap::default();
-    out.insert(Arc::from("isIsolate"), VmValue::from_bool(false));
     for (name, value) in FLOAT_CONSTANTS {
         out.insert(Arc::from(*name), VmValue::from_f64(*value));
     }

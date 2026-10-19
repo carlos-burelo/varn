@@ -1,0 +1,57 @@
+import { expect } from "std:test";
+import { sleep, Sender, Receiver } from "std:task";
+
+export enum Msg { Val(int), Exit }
+
+export type ValueMsg = { value: int }
+
+export async function workerMain(rx: Receiver<ValueMsg>, tx: Sender<int>) {
+    const data = await rx.receive();
+    expect(data.value).toBe(10);
+    await tx.send(data.value * 2);
+}
+
+export async function workerArgs(tx: Sender<str>, num: int, text: str, arr: Array<int>, obj: { x: str }) {
+    expect(num).toBe(42);
+    expect(text).toBe("hello");
+    expect(arr.length).toBe(3);
+    expect(arr[1]).toBe(2);
+    expect(obj.x).toBe("nested");
+    await tx.send("args_ok");
+}
+
+export async function workerDialog(rx: Receiver<Msg>, tx: Sender<int>) {
+    let open = true
+    for await (const msg of rx) {
+        match (msg) {
+            Val(n) => await tx.send(n + 1),
+            Msg.Exit => open = false,
+        }
+        if (!open) {
+            break
+        }
+    }
+    tx.close()
+}
+
+export async function workerParallel(tx: Sender<int>, id: int, delayMs: int) {
+    await sleep(delayMs);
+    await tx.send(id * 10);
+}
+
+export async function echoWorker(rx: Receiver<int>, tx: Sender<int>) {
+    for await (const v of rx) {
+        await tx.send(v * 2)
+    }
+    tx.close()
+}
+
+export async function replyThroughBox(box: { reply: Sender<int> }) {
+    await box.reply.send(7)
+    box.reply.close()
+}
+
+export async function echoShape(shape: { __chanEndpoint: str, __chanId: int }, tx: Sender<str>) {
+    await tx.send(shape.__chanEndpoint + shape.__chanId)
+    tx.close()
+}

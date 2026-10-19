@@ -279,7 +279,6 @@ fn native_global_ty(index: u32) -> HirType {
     use varn_core::abi::{NativeValue, NATIVE_GLOBALS};
     match NATIVE_GLOBALS.get(index as usize).map(|g| g.value) {
         Some(NativeValue::Float) => HirType::Float,
-        Some(NativeValue::Bool) => HirType::Bool,
         Some(NativeValue::Class | NativeValue::Function) | None => HirType::Ref,
     }
 }
