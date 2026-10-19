@@ -53,3 +53,8 @@ export type Awaited<T> = T extends Task<infer U> ? U : T
  * Constructs a type by removing keys K from T. Uses Exclude<keyof T, K>.
  */
 export type Omit<T, K extends keyof T> = { [P in Exclude<keyof T, K>]: T[P] }
+
+/**
+ * The type with a single value, `()`: what a function returns when it has nothing to return.
+ */
+export type Unit = ()

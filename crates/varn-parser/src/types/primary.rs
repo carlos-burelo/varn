@@ -38,10 +38,6 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
                     break;
                 }
             }
-            if name_buf == "Unit" && !s.check(TokenKind::LAngle) {
-                let full_range = s.span_from(range);
-                return Ok(s.type_node(full_range, TypeKind::Tuple(vec![])));
-            }
             let name = s.interner.intern(&name_buf);
 
             let type_args = if s.check(TokenKind::LAngle) {

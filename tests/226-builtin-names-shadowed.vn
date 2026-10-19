@@ -17,6 +17,10 @@ class Range {
     length: int = 42
 }
 
+class Unit {
+    tag: str = "user unit"
+}
+
 function userMapGet(m: Map<str, int>): str {
     return m.get("a")
 }
@@ -31,6 +35,8 @@ await describe("226 builtin names shadowed", async () => {
         expect(new Array<int>().get(0)).toBe("user array")
         let r: Range = new Range()
         expect(r.length).toBe(42)
+        let u: Unit = new Unit()
+        expect(u.tag).toBe("user unit")
     });
 
     await it("the core builtins stay reachable through literals", async () => {
