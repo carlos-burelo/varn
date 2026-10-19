@@ -12,22 +12,31 @@ pub(crate) fn is_ternary_at(s: &TokenStream) -> bool {
     if next == TokenKind::Colon {
         return false;
     }
+    let mut depth = 0usize;
     loop {
         if s.peek_line(off) != start_line {
             return false;
         }
         let kind = s.peek_kind(off);
-        if kind == TokenKind::Colon {
+        let opens = matches!(
+            kind,
+            TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace
+        );
+        let closes = matches!(
+            kind,
+            TokenKind::RParen | TokenKind::RBracket | TokenKind::RBrace
+        );
+        if opens {
+            depth += 1;
+        } else if closes && depth > 0 {
+            depth -= 1;
+        } else if kind == TokenKind::Colon && depth == 0 {
             return true;
-        }
-        if kind == TokenKind::Semicolon
-            || kind == TokenKind::Comma
-            || kind == TokenKind::RParen
-            || kind == TokenKind::RBracket
-            || kind == TokenKind::RBrace
+        } else if closes
+            || kind == TokenKind::Semicolon
             || kind == TokenKind::EOF
-            || kind == TokenKind::Question
             || kind == TokenKind::Eq
+            || (depth == 0 && (kind == TokenKind::Comma || kind == TokenKind::Question))
             || kind.starts_statement()
         {
             return false;

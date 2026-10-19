@@ -12,6 +12,7 @@ function successor(x: int?): int { return x != null ? x + 1 : 0 }
 function nonEmpty(s: str?): bool { return s != null && s.length > 0 }
 function blank(s: str?): bool { return s == null || s.length == 0 }
 function depth(step: Step?): int { return step == null ? 0 : 1 + depth(step.next) }
+function widthOf(v: str | int[]): int { return v is str ? v.slice(0, 1).length : v.length }
 function heavy(step: Step?): bool { return step != null && step.weight > 0 && step.next == null }
 
 await describe("181 narrowing in expressions", async () => {
@@ -26,6 +27,11 @@ await describe("181 narrowing in expressions", async () => {
         expect(lengthOrZero(null)).toBe(0)
         expect(successor(1)).toBe(2)
         expect(successor(null)).toBe(0)
+    })
+
+    await it("an is test opens a conditional whose branch holds a call", () => {
+        expect(widthOf("abc")).toBe(1)
+        expect(widthOf([1, 2, 3])).toBe(3)
     })
 
     await it("&& narrows its right side when the left holds", () => {
