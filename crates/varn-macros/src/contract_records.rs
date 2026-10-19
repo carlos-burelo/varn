@@ -95,3 +95,44 @@ fn class_fields(c: &ClassDecl, interner: &AtomInterner) -> Fields {
         })
         .collect()
 }
+
+pub(crate) fn declared_enum_variants(
+    source: &str,
+    path: &str,
+    name: &str,
+) -> Result<Vec<(String, i64)>, String> {
+    let (tokens, lexeme_buf, _) = varn_lexer::scan(source, path);
+    let (program, interner, arena) =
+        varn_parser::parse(tokens, lexeme_buf, path, AtomInterner::new())
+            .map_err(|_| format!("cannot parse contract `{path}`"))?;
+    for &stmt in &program.body {
+        let StmtKind::Decl(decl) = &arena.stmt(stmt).kind else {
+            continue;
+        };
+        let Decl::Enum(e) = unwrap_export(decl) else {
+            continue;
+        };
+        if interner.resolve(e.id) != name {
+            continue;
+        }
+        if !e.is_declare {
+            return Err(format!("enum `{name}` must be `declare enum` to cross the native boundary"));
+        }
+        let mut variants = Vec::new();
+        let mut tag = 0i64;
+        for member in &e.members {
+            if !member.payload_fields.is_empty() {
+                return Err(format!("native enum `{name}` only supports unit variants"));
+            }
+            if let Some(init) = member.init
+                && let varn_core::ast::ExprKind::IntLiteral { value, .. } = &arena.expr(init).kind
+            {
+                tag = *value;
+            }
+            variants.push((interner.resolve(member.id).to_string(), tag));
+            tag += 1;
+        }
+        return Ok(variants);
+    }
+    Err(format!("enum `{name}` not found in contract `{path}`"))
+}

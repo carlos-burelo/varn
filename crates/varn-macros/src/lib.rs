@@ -4,6 +4,7 @@ mod contract_records;
 mod jit_helper_table;
 mod jit_slow;
 mod varn_contract;
+mod varn_enum;
 mod varn_record;
 
 use proc_macro::TokenStream;
@@ -26,4 +27,9 @@ pub fn jit_helper_table(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn varn_record(input: TokenStream) -> TokenStream {
     varn_record::expand(input)
+}
+
+#[proc_macro]
+pub fn varn_enum(input: TokenStream) -> TokenStream {
+    varn_enum::expand(input)
 }

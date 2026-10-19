@@ -44,8 +44,11 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     }
 
     let abs_lit = LitStr::new(&abs_path_str, proc_macro2::Span::call_site());
+    let module_id = LitStr::new(&input.module, proc_macro2::Span::call_site());
     quote! {
         const _: &[u8] = include_bytes!(#abs_lit);
+
+        pub const MODULE_ID: &str = #module_id;
 
         #(#sections)*
 
