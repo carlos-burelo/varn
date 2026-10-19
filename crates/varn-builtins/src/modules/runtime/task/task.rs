@@ -34,6 +34,18 @@ fn next_result(ctx: &mut dyn NativeCtx, value_nv: VmValue, done: bool) -> VmValu
     )
 }
 
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/task/task_runtime.vn",
+    class: "IsolateHandle",
+    struct IsolateHandleRecord;
+}
+
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/task/task_runtime.vn",
+    class: "Channel",
+    struct ChannelRecord;
+}
+
 varn_contract! {
     module: "runtime:task",
     contract: "src/modules/runtime/task/task_runtime.vn",
@@ -95,12 +107,8 @@ varn_contract! {
             }
 
             let done = ctx.spawn_isolate(&resolved_path, &export_name, worker_args)?;
-            let handle_nv = ctx
-                .alloc_instance("IsolateHandle")
-                .ok_or("spawnIsolate: IsolateHandle class not registered")?;
-            let done_nv = ctx.task_from_host(done, HostOpen::Plain);
-            ctx.set_field(handle_nv, "_done", done_nv);
-            Ok(handle_nv)
+            let done = ctx.task_from_host(done, HostOpen::Plain);
+            IsolateHandleRecord { done }.alloc(ctx)
         }
 
         fn channel(ctx: &mut dyn NativeCtx, capacity: i64) -> Result<VmValue, String> {
@@ -108,14 +116,9 @@ varn_contract! {
                 return Err("channel: capacity must be >= 1".to_string());
             }
             let id = crate::runtime::channel::create(capacity as usize);
-            let ch_nv = ctx
-                .alloc_instance(varn_types::value::CHANNEL_CLASS)
-                .ok_or("channel: Channel class not registered")?;
-            let tx_nv = ChannelEndpoint::Sender.alloc(ctx, id)?;
-            let rx_nv = ChannelEndpoint::Receiver.alloc(ctx, id)?;
-            ctx.set_field(ch_nv, "tx", tx_nv);
-            ctx.set_field(ch_nv, "rx", rx_nv);
-            Ok(ch_nv)
+            let tx = ChannelEndpoint::Sender.alloc(ctx, id)?;
+            let rx = ChannelEndpoint::Receiver.alloc(ctx, id)?;
+            ChannelRecord { tx, rx }.alloc(ctx)
         }
     }
 
@@ -125,7 +128,8 @@ varn_contract! {
 
 
         fn join(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
-            ctx.get_field(this, "_done").unwrap_or(VmValue::null())
+            ctx.get_field(this, IsolateHandleRecord::DONE)
+                .unwrap_or(VmValue::null())
         }
     }
 

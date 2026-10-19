@@ -2,7 +2,6 @@ use super::class::ClassObj;
 use super::RuntimeSymbol;
 use crate::{NativeCtx, NativeFnResult, VmValue};
 
-pub const CHANNEL_CLASS: &str = "Channel";
 pub const CHANNEL_CLOSED_CLASS: &str = "ChannelClosed";
 pub const ENDPOINT_ID_FIELD: &str = "_chan";
 

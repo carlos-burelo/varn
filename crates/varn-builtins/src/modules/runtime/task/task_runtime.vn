@@ -7,6 +7,7 @@ export declare function cancelTask$<T>(handle: TaskHandle<T>): void;
 export declare function yieldTask$(): TaskHandle<void>;
 
 export declare class IsolateHandle {
+    private done: Task<void>;
     join(): Task<void>;
 }
 
