@@ -1,6 +1,7 @@
 import { UiWindow } from "std:ui/window";
 import { UiFrame } from "std:ui/frame";
 import { Focus } from "std:ui/focus";
+import { Alignment } from "std:ui/style";
 
 export class PaintContext {
     win: UiWindow;
@@ -20,24 +21,26 @@ export class PaintContext {
     }
 }
 
+export class Size {
+    w: float;
+    h: float;
+
+    constructor(w: float, h: float) {
+        this.w = w;
+        this.h = h;
+    }
+}
+
 export abstract class Widget {
     w: float = -1.0;
     h: float = -1.0;
+    flex: float = 0.0;
 
+    abstract measure(maxW: float, maxH: float): Size;
     abstract paint(cx: PaintContext, x: float, y: float, w: float, h: float): void;
 
-    flexW(): float {
-        if (this.w >= 0.0) {
-            return 0.0 - this.w;
-        }
-        return 1.0;
-    }
-
-    flexH(): float {
-        if (this.h >= 0.0) {
-            return 0.0 - this.h;
-        }
-        return 1.0;
+    fit(natural: Size): Size {
+        return new Size(this.w >= 0.0 ? this.w : natural.w, this.h >= 0.0 ? this.h : natural.h);
     }
 }
 
@@ -45,4 +48,31 @@ export function paintChild(child: Widget?, cx: PaintContext, x: float, y: float,
     if (child !== null) {
         child.paint(cx, x, y, w, h);
     }
+}
+
+export function measureChild(child: Widget?, maxW: float, maxH: float): Size {
+    if (child === null) {
+        return new Size(0.0, 0.0);
+    }
+    return child.measure(maxW, maxH);
+}
+
+export function alignedX(alignment: Alignment, room: float): float {
+    if (alignment == Alignment.topLeft || alignment == Alignment.centerLeft || alignment == Alignment.bottomLeft) {
+        return 0.0;
+    }
+    if (alignment == Alignment.topRight || alignment == Alignment.centerRight || alignment == Alignment.bottomRight) {
+        return room;
+    }
+    return room / 2.0;
+}
+
+export function alignedY(alignment: Alignment, room: float): float {
+    if (alignment == Alignment.topLeft || alignment == Alignment.topCenter || alignment == Alignment.topRight) {
+        return 0.0;
+    }
+    if (alignment == Alignment.bottomLeft || alignment == Alignment.bottomCenter || alignment == Alignment.bottomRight) {
+        return room;
+    }
+    return room / 2.0;
 }

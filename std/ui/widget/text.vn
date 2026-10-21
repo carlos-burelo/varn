@@ -1,4 +1,4 @@
-import { Widget, PaintContext } from "std:ui/widget/base";
+import { Widget, Size, PaintContext } from "std:ui/widget/base";
 import { TextStyle } from "std:ui/style";
 import { textX, textY, ellipsize } from "std:ui/layout";
 import { measure, ascent, descent } from "std:text";
@@ -27,8 +27,9 @@ export class LabelNode extends Widget {
         this.maxLines = maxLines;
     }
 
-    override flexH(): float {
-        return 0.0 - (ascent(this.size) + descent(this.size));
+    override measure(maxW: float, maxH: float): Size {
+        const width = measure(this.text, this.size);
+        return this.fit(new Size(width < maxW ? width : maxW, ascent(this.size) + descent(this.size)));
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
@@ -43,6 +44,6 @@ export class LabelNode extends Widget {
     }
 }
 
-export function Label(text: str, size: float = 20.0, color: int = 4294967295, align: TextAlign = TextAlign.left, style: TextStyle = TextStyle.body, maxLines: int = 0): Widget {
+export function Label(text: str, size: float = 18.0, color: int = 4293454573, align: TextAlign = TextAlign.left, style: TextStyle = TextStyle.body, maxLines: int = 0): Widget {
     return new LabelNode(text, size, color, align, style, maxLines);
 }

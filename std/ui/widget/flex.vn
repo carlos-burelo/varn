@@ -1,61 +1,9 @@
-import { Widget, PaintContext } from "std:ui/widget/base";
-import { row, col } from "std:ui/layout";
+import { Widget, Size, PaintContext } from "std:ui/widget/base";
 import { MainAxis, CrossAxis } from "std:ui/style";
 
 export enum Axis {
     horizontal,
     vertical
-}
-
-function mainShift(rs: float[][], total: float, horizontal: bool, main: MainAxis): float[][] {
-    const count = rs.length;
-    if (count == 0) {
-        return rs;
-    }
-    let first = horizontal ? rs[0][0] : rs[0][1];
-    let lastEnd = first;
-    for (let i = 0; i < count; i = i + 1) {
-        const s = horizontal ? rs[i][0] : rs[i][1];
-        const len = horizontal ? rs[i][2] : rs[i][3];
-        if (s < first) {
-            first = s;
-        }
-        if (s + len > lastEnd) {
-            lastEnd = s + len;
-        }
-    }
-    const base = horizontal ? rs[0][0] : rs[0][1];
-    const leftover = total - (lastEnd - first);
-    if (leftover <= 0.0) {
-        return rs;
-    }
-    const idx = horizontal ? 0 : 1;
-    if (main == MainAxis.center) {
-        const off = leftover / 2.0;
-        for (let i = 0; i < count; i = i + 1) {
-            rs[i][idx] = rs[i][idx] + off;
-        }
-    } else if (main == MainAxis.end) {
-        for (let i = 0; i < count; i = i + 1) {
-            rs[i][idx] = rs[i][idx] + leftover;
-        }
-    } else if (main == MainAxis.spaceBetween && count > 1) {
-        const step = leftover / ((count - 1) as float);
-        for (let i = 0; i < count; i = i + 1) {
-            rs[i][idx] = rs[i][idx] + step * (i as float);
-        }
-    } else if (main == MainAxis.spaceAround) {
-        const step = leftover / (count as float);
-        for (let i = 0; i < count; i = i + 1) {
-            rs[i][idx] = rs[i][idx] + step * ((i as float) + 0.5) - (base - first);
-        }
-    } else if (main == MainAxis.spaceEvenly) {
-        const step = leftover / ((count + 1) as float);
-        for (let i = 0; i < count; i = i + 1) {
-            rs[i][idx] = rs[i][idx] + step * ((i + 1) as float);
-        }
-    }
-    return rs;
 }
 
 export class FlexNode extends Widget {
@@ -78,49 +26,116 @@ export class FlexNode extends Widget {
         this.crossAxis = crossAxis;
     }
 
+    private mainOf(size: Size): float {
+        return this.axis == Axis.horizontal ? size.w : size.h;
+    }
+
+    private crossOf(size: Size): float {
+        return this.axis == Axis.horizontal ? size.h : size.w;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        const innerW = maxW - 2.0 * this.pad;
+        const innerH = maxH - 2.0 * this.pad;
+        let main = 0.0;
+        let cross = 0.0;
+        for (let child of this.children) {
+            const size = child.measure(innerW, innerH);
+            main = main + this.mainOf(size);
+            const across = this.crossOf(size);
+            cross = across > cross ? across : cross;
+        }
+        if (this.children.length > 1) {
+            main = main + this.gap * ((this.children.length - 1) as float);
+        }
+        const natural = this.axis == Axis.horizontal
+            ? new Size(main + 2.0 * this.pad, cross + 2.0 * this.pad)
+            : new Size(cross + 2.0 * this.pad, main + 2.0 * this.pad);
+        return this.fit(natural);
+    }
+
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         const horizontal = this.axis == Axis.horizontal;
-        const ix = x + this.pad;
-        const iy = y + this.pad;
-        const iw = w - 2.0 * this.pad;
-        const ih = h - 2.0 * this.pad;
-        const weights: float[] = [];
+        const innerX = x + this.pad;
+        const innerY = y + this.pad;
+        const innerW = w - 2.0 * this.pad;
+        const innerH = h - 2.0 * this.pad;
+        const room = horizontal ? innerW : innerH;
+        const across = horizontal ? innerH : innerW;
+        const count = this.children.length;
+
+        const sizes: Size[] = [];
+        let fixed = 0.0;
+        let flexTotal = 0.0;
         for (let child of this.children) {
-            weights.push(horizontal ? child.flexW() : child.flexH());
-        }
-        const rs = horizontal
-            ? mainShift(row(ix, iy, iw, ih, weights, this.gap), iw, true, this.mainAxis)
-            : mainShift(col(ix, iy, iw, ih, weights, this.gap), ih, false, this.mainAxis);
-        for (let i = 0; i < this.children.length; i = i + 1) {
-            const child = this.children[i];
-            let cx0 = rs[i][0];
-            let cy0 = rs[i][1];
-            let cw = rs[i][2];
-            let ch = rs[i][3];
-            if (horizontal && this.crossAxis != CrossAxis.stretch && child.h >= 0.0 && child.h < ch) {
-                if (this.crossAxis == CrossAxis.center) {
-                    cy0 = cy0 + (ch - child.h) / 2.0;
-                } else if (this.crossAxis == CrossAxis.end) {
-                    cy0 = cy0 + ch - child.h;
-                }
-                ch = child.h;
-            } else if (!horizontal && this.crossAxis != CrossAxis.stretch && child.w >= 0.0 && child.w < cw) {
-                if (this.crossAxis == CrossAxis.center) {
-                    cx0 = cx0 + (cw - child.w) / 2.0;
-                } else if (this.crossAxis == CrossAxis.end) {
-                    cx0 = cx0 + cw - child.w;
-                }
-                cw = child.w;
+            const size = child.measure(innerW, innerH);
+            sizes.push(size);
+            if (child.flex > 0.0) {
+                flexTotal = flexTotal + child.flex;
+            } else {
+                fixed = fixed + this.mainOf(size);
             }
-            child.paint(cx, cx0, cy0, cw, ch);
+        }
+        const gaps = count > 1 ? this.gap * ((count - 1) as float) : 0.0;
+        let leftover = room - fixed - gaps;
+        if (leftover < 0.0) {
+            leftover = 0.0;
+        }
+
+        let offset = 0.0;
+        let spacing = this.gap;
+        if (flexTotal == 0.0) {
+            if (this.mainAxis == MainAxis.center) {
+                offset = leftover / 2.0;
+            } else if (this.mainAxis == MainAxis.end) {
+                offset = leftover;
+            } else if (this.mainAxis == MainAxis.spaceBetween && count > 1) {
+                spacing = this.gap + leftover / ((count - 1) as float);
+            } else if (this.mainAxis == MainAxis.spaceAround && count > 0) {
+                const unit = leftover / (count as float);
+                offset = unit / 2.0;
+                spacing = this.gap + unit;
+            } else if (this.mainAxis == MainAxis.spaceEvenly && count > 0) {
+                const unit = leftover / ((count + 1) as float);
+                offset = unit;
+                spacing = this.gap + unit;
+            }
+        }
+
+        let cursor = offset;
+        for (let i = 0; i < count; i = i + 1) {
+            const child = this.children[i];
+            const size = sizes[i];
+            let span = this.mainOf(size);
+            if (child.flex > 0.0) {
+                span = leftover * child.flex / flexTotal;
+            }
+            let thick = this.crossOf(size);
+            let shift = 0.0;
+            if (this.crossAxis == CrossAxis.stretch) {
+                thick = across;
+            } else {
+                thick = thick < across ? thick : across;
+                if (this.crossAxis == CrossAxis.center) {
+                    shift = (across - thick) / 2.0;
+                } else if (this.crossAxis == CrossAxis.end) {
+                    shift = across - thick;
+                }
+            }
+            if (horizontal) {
+                child.paint(cx, innerX + cursor, innerY + shift, span, thick);
+            } else {
+                child.paint(cx, innerX + shift, innerY + cursor, thick, span);
+            }
+            cursor = cursor + span + spacing;
         }
     }
 }
 
-export function Column(children: Widget[], gap: float = 8.0, pad: float = 0.0, w: float = -1.0, h: float = -1.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.stretch): Widget {
+export function Column(children: Widget[], gap: float = 8.0, pad: float = 0.0, w: float = -1.0, h: float = -1.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.start): Widget {
     return new FlexNode(Axis.vertical, children, gap, pad, w, h, mainAxis, crossAxis);
 }
 
-export function Row(children: Widget[], gap: float = 8.0, pad: float = 0.0, w: float = -1.0, h: float = -1.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.stretch): Widget {
+export function Row(children: Widget[], gap: float = 8.0, pad: float = 0.0, w: float = -1.0, h: float = -1.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.center): Widget {
     return new FlexNode(Axis.horizontal, children, gap, pad, w, h, mainAxis, crossAxis);
 }

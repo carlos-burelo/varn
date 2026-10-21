@@ -11,7 +11,12 @@ Module: `std:ui`
 > `paint()` cuyos nodos (`FlexNode`, `LabelNode`, `BoxNode`…) viven en
 > `widget/*.vn`, y el catálogo de primitivas de §8–§10 más `container`,
 > `animated`, `when`, `each` (`catalog.vn`); estilos y temas (`style.vn`).
-> Puerta: `tests/220-ui-declarative.vn`.
+> Layout de dos pasos: cada `Widget` implementa `measure(maxW, maxH): Size` (tamaño
+> intrínseco) y `paint(cx, x, y, w, h)`; `Column`/`Row` reparten el eje principal
+> entre hijos intrínsecos y `Expanded`/`Spacer` (`flex`), y alinean con `MainAxis`
+> y `CrossAxis` (por defecto `start` en columna y `center` en fila). Colores y
+> tamaños salen de `Theme`.
+> Puertas: `tests/220-ui-declarative.vn`, `tests/232-ui-layout.vn`.
 > Pendiente: el decorador `pure` (§12) y la UI IR y su pipeline de compilación
 > (§16–§17); hoy el árbol se construye y se resuelve en tiempo de ejecución.
 

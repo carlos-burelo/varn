@@ -1,6 +1,6 @@
 import {
     ui, signal, computed, effect, component, run,
-    Widget, TextStyle, MainAxis, CrossAxis, Alignment, Theme, Colors,
+    Widget, TextStyle, MainAxis, CrossAxis, Alignment, Theme,
     UiFrame, Focus
 } from "std:ui";
 import { Env } from "std:env";
@@ -13,20 +13,32 @@ function Counter(start: int = 0): Widget {
     const doubled = computed(() => count.value * 2);
     effect(() => print(`count is now ${count.value}`));
 
-    return ui.column(gap: 8.0, children: [
-        ui.text("Counter", style: TextStyle.headline),
-        ui.text(`Count: ${count.value}  (x2 = ${doubled.value})`),
-        ui.row(gap: 8.0, children: [
-            ui.button(text: "-1", onPress: () => { count.value = count.value - 1; }),
-            ui.button(text: "+1", onPress: () => { count.value = count.value + 1; }),
-            ui.button(text: "reset", enabled: count.value != start, onPress: () => { count.value = start; })
+    return ui.card(
+        padding: 20.0,
+        child: ui.column(gap: 14.0, crossAxis: CrossAxis.stretch, children: [
+            ui.text("Counter", style: TextStyle.title),
+            ui.row(mainAxis: MainAxis.spaceBetween, children: [
+                ui.text(`${count.value}`, size: 40.0),
+                ui.text(`x2 = ${doubled.value}`, style: TextStyle.caption)
+            ]),
+            ui.row(gap: 10.0, children: [
+                ui.button(text: "-1", onPress: () => { count.value = count.value - 1; }),
+                ui.button(text: "+1", onPress: () => { count.value = count.value + 1; }),
+                ui.spacer(),
+                ui.button(
+                    text: "reset",
+                    enabled: count.value != start,
+                    color: Theme.colors.outline,
+                    onPress: () => { count.value = start; }
+                )
+            ])
         ])
-    ]);
+    );
 }
 
 function TodoRow(todo: Todo, onToggle: () => void): Widget {
-    return ui.row(gap: 12.0, crossAxis: CrossAxis.center, children: [
-        ui.button(text: todo.done ? "x" : " ", w: 36.0, h: 36.0, onPress: onToggle),
+    return ui.row(gap: 12.0, children: [
+        ui.checkbox(todo.done, onToggle),
         ui.text(todo.title, color: todo.done ? Theme.colors.muted : Theme.colors.onSurface)
     ]);
 }
@@ -44,31 +56,34 @@ function TodoList(): Widget {
         todos.value = todos.value.map((t: Todo): Todo => t.id == id ? { id: t.id, title: t.title, done: !t.done } : t);
     };
 
-    return ui.column(gap: 8.0, children: [
-        ui.text("Todos", style: TextStyle.headline),
-        ui.text(`${remaining.value} left`, style: TextStyle.caption),
-        ui.each(todos.value,
-            key: (t: Todo) => t.id,
-            render: (t: Todo) => TodoRow(t, () => toggle(t.id))
-        )
-    ]);
+    return ui.card(
+        padding: 20.0,
+        child: ui.column(gap: 12.0, crossAxis: CrossAxis.stretch, children: [
+            ui.row(mainAxis: MainAxis.spaceBetween, children: [
+                ui.text("Todos", style: TextStyle.title),
+                ui.text(`${remaining.value} left`, style: TextStyle.caption)
+            ]),
+            ui.divider(),
+            ui.each(todos.value,
+                key: (t: Todo) => t.id,
+                render: (t: Todo) => TodoRow(t, () => toggle(t.id)),
+                gap: 10.0
+            )
+        ])
+    );
 }
 
 @component
 function Dashboard(): Widget {
     return ui.container(
         padding: 24.0,
-        background: Theme.colors.surface,
-        child: ui.column(gap: 24.0, mainAxis: MainAxis.start, children: [
+        child: ui.column(gap: 16.0, crossAxis: CrossAxis.stretch, children: [
             ui.row(mainAxis: MainAxis.spaceBetween, children: [
-                ui.text("Dashboard", style: TextStyle.title),
+                ui.text("Dashboard", style: TextStyle.headline),
                 ui.text("varn ui", style: TextStyle.caption)
             ]),
             Counter(start: 10),
-            ui.stack(alignment: Alignment.center, children: [
-                ui.progressIndicator(value: 0.4, h: 12.0),
-                ui.text("40%", size: 12.0, color: Colors.white)
-            ]),
+            ui.progressIndicator(value: 0.4),
             TodoList()
         ])
     );
@@ -78,5 +93,5 @@ const real = Env.get("VARN_UI_REAL") == "1";
 if (!real) {
     print("headless: 5 frames. Run with VARN_UI_REAL=1 to open a window (Esc closes).");
 }
-run("varn declarative ui", build: (fr: UiFrame, focus: Focus): Widget => Dashboard(), w: 640, h: 640, maxFrames: real ? 0 : 5);
+run("varn declarative ui", build: (fr: UiFrame, focus: Focus): Widget => Dashboard(), w: 560, h: 640, maxFrames: real ? 0 : 5);
 print("declarative demo done");

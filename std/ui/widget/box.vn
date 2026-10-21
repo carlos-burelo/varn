@@ -1,6 +1,6 @@
-import { Widget, PaintContext, paintChild } from "std:ui/widget/base";
-import { LabelNode, TextAlign, Label } from "std:ui/widget/text";
-import { TextStyle, Alignment, BoxFit, Curve, Colors } from "std:ui/style";
+import { Widget, Size, PaintContext, paintChild, measureChild, alignedX, alignedY } from "std:ui/widget/base";
+import { LabelNode, TextAlign } from "std:ui/widget/text";
+import { TextStyle, Alignment, BoxFit, Curve, Colors, Theme } from "std:ui/style";
 import { now } from "std:time";
 
 export class BoxNode extends Widget {
@@ -21,8 +21,15 @@ export class BoxNode extends Widget {
         this.child = child;
     }
 
+    override measure(maxW: float, maxH: float): Size {
+        const inner = measureChild(this.child, maxW - 2.0 * this.pad, maxH - 2.0 * this.pad);
+        return this.fit(new Size(inner.w + 2.0 * this.pad, inner.h + 2.0 * this.pad));
+    }
+
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        cx.win.rect(x, y, w, h, this.color, this.radius);
+        if (this.color != Colors.transparent) {
+            cx.win.rect(x, y, w, h, this.color, this.radius);
+        }
         const click = this.onClick;
         if (click !== null && cx.fr.clicked(x, y, w, h)) {
             click();
@@ -41,9 +48,23 @@ export class StackNode extends Widget {
         this.alignment = alignment;
     }
 
+    override measure(maxW: float, maxH: float): Size {
+        let width = 0.0;
+        let height = 0.0;
+        for (let child of this.children) {
+            const size = child.measure(maxW, maxH);
+            width = size.w > width ? size.w : width;
+            height = size.h > height ? size.h : height;
+        }
+        return this.fit(new Size(width, height));
+    }
+
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         for (let child of this.children) {
-            child.paint(cx, x, y, w, h);
+            const size = child.measure(w, h);
+            const cw = size.w < w ? size.w : w;
+            const ch = size.h < h ? size.h : h;
+            child.paint(cx, x + alignedX(this.alignment, w - cw), y + alignedY(this.alignment, h - ch), cw, ch);
         }
     }
 }
@@ -64,6 +85,11 @@ export class PaddingNode extends Widget {
         this.bottom = bottom;
     }
 
+    override measure(maxW: float, maxH: float): Size {
+        const inner = measureChild(this.child, maxW - this.left - this.right, maxH - this.top - this.bottom);
+        return this.fit(new Size(inner.w + this.left + this.right, inner.h + this.top + this.bottom));
+    }
+
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         const cw = w - this.left - this.right;
         const ch = h - this.top - this.bottom;
@@ -81,8 +107,60 @@ export class SizedBoxNode extends Widget {
         this.h = height;
     }
 
+    override measure(maxW: float, maxH: float): Size {
+        return this.fit(measureChild(this.child, maxW, maxH));
+    }
+
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         paintChild(this.child, cx, x, y, w, h);
+    }
+}
+
+export class ExpandedNode extends Widget {
+    child: Widget;
+
+    constructor(child: Widget, flex: float) {
+        super();
+        this.child = child;
+        this.flex = flex;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return this.child.measure(maxW, maxH);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        this.child.paint(cx, x, y, w, h);
+    }
+}
+
+export class SpacerNode extends Widget {
+    constructor(flex: float) {
+        super();
+        this.flex = flex;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return new Size(0.0, 0.0);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {}
+}
+
+export class DividerNode extends Widget {
+    color: int;
+
+    constructor(color: int) {
+        super();
+        this.color = color;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return new Size(maxW, 1.0);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        cx.win.rect(x, y, w, 1.0, this.color);
     }
 }
 
@@ -100,6 +178,10 @@ export class AnimatedNode extends Widget {
         this.curve = curve;
     }
 
+    override measure(maxW: float, maxH: float): Size {
+        return this.fit(measureChild(this.child, maxW, maxH));
+    }
+
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         paintChild(this.child, cx, x, y, w, h);
     }
@@ -107,19 +189,23 @@ export class AnimatedNode extends Widget {
 
 export class ImageNode extends Widget {
     source: str;
-    fit: BoxFit;
+    boxFit: BoxFit;
 
-    constructor(source: str, width: float, height: float, fit: BoxFit) {
+    constructor(source: str, width: float, height: float, boxFit: BoxFit) {
         super();
         this.source = source;
         this.w = width;
         this.h = height;
-        this.fit = fit;
+        this.boxFit = boxFit;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return this.fit(new Size(maxW, 120.0));
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        cx.win.rect(x, y, w, h, Colors.gray, 8.0);
-        new LabelNode(this.source, 14.0, Colors.white, TextAlign.center, TextStyle.body, 0).paint(cx, x + 8.0, y, w - 16.0, h);
+        cx.win.rect(x, y, w, h, Theme.colors.outline, 8.0);
+        new LabelNode(this.source, 14.0, Theme.colors.muted, TextAlign.center, TextStyle.caption, 0).paint(cx, x + 8.0, y, w - 16.0, h);
     }
 }
 
@@ -136,6 +222,10 @@ export class ProgressNode extends Widget {
         this.h = height;
     }
 
+    override measure(maxW: float, maxH: float): Size {
+        return this.fit(new Size(maxW, this.h));
+    }
+
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         cx.win.rect(x, y, w, h, this.track, h / 2.0);
         if (this.value < 0.0) {
@@ -144,27 +234,59 @@ export class ProgressNode extends Widget {
             cx.win.rect(x + (w - pw) * t, y, pw, h, this.color, h / 2.0);
         } else {
             const frac = this.value > 1.0 ? 1.0 : this.value;
-            cx.win.rect(x, y, w * frac, h, this.color, h / 2.0);
+            if (frac > 0.0) {
+                cx.win.rect(x, y, w * frac, h, this.color, h / 2.0);
+            }
         }
     }
 }
 
-export function Box(w: float = -1.0, h: float = -1.0, color: int = 4278190080, radius: float = 0.0, pad: float = 0.0, onClick: (() => void)? = null, child: Widget? = null): Widget {
+export class CheckboxNode extends Widget {
+    checked: bool;
+    onToggle: () => void;
+    color: int;
+
+    constructor(checked: bool, onToggle: () => void, size: float, color: int) {
+        super();
+        this.checked = checked;
+        this.onToggle = onToggle;
+        this.w = size;
+        this.h = size;
+        this.color = color;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return new Size(this.w, this.h);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        cx.win.rect(x, y, w, h, this.checked ? this.color : Theme.colors.outline, 6.0);
+        if (this.checked) {
+            const inset = w * 0.28;
+            cx.win.rect(x + inset, y + inset, w - 2.0 * inset, h - 2.0 * inset, Theme.colors.onPrimary, 3.0);
+        }
+        if (cx.fr.clicked(x, y, w, h)) {
+            this.onToggle();
+        }
+    }
+}
+
+export function Box(w: float = -1.0, h: float = -1.0, color: int = 0, radius: float = 0.0, pad: float = 0.0, onClick: (() => void)? = null, child: Widget? = null): Widget {
     return new BoxNode(w, h, color, radius, pad, onClick, child);
 }
 
-export function Spacer(): Widget {
-    return Box();
+export function Spacer(flex: float = 1.0): Widget {
+    return new SpacerNode(flex);
 }
 
-export function Divider(color: int = 4287137928): Widget {
-    return Box(h: 1.0, color: color);
+export function Expanded(child: Widget, flex: float = 1.0): Widget {
+    return new ExpandedNode(child, flex);
 }
 
-export function Checkbox(checked: bool, onToggle: () => void, size: float = 30.0, color: int = 4278255360, check: int = 4278190080): Widget {
-    return Box(
-        w: size, h: size, color: checked ? color : 4287137928, radius: 8.0,
-        child: checked ? Label("x", size: size * 0.66, color: check, align: TextAlign.center) : null,
-        onClick: onToggle
-    );
+export function Divider(color: int = 4281612870): Widget {
+    return new DividerNode(color);
+}
+
+export function Checkbox(checked: bool, onToggle: () => void, size: float = 26.0, color: int = 4283207167): Widget {
+    return new CheckboxNode(checked, onToggle, size, color);
 }

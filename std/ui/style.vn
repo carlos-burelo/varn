@@ -50,28 +50,32 @@ export enum Curve {
 }
 
 export const Colors = {
-    black: 4278190080,
-    white: 4294967295,
-    red: 4294901760,
-    green: 4278255360,
-    blue: 4280391411,
-    gray: 4287137928,
-    transparent: 0
+    black: 0xFF000000,
+    white: 0xFFFFFFFF,
+    red: 0xFFFF0000,
+    green: 0xFF00FF00,
+    blue: 0xFF2196F3,
+    gray: 0xFF888888,
+    transparent: 0x00000000
 };
 
 export const Theme = {
     colors: {
-        surface: 4278190080,
-        onSurface: 4294967295,
-        primary: 4280391411,
-        muted: 4287137928,
-        danger: 4294901760,
-        success: 4278255360
+        background: 0xFF14161A,
+        surface: 0xFF1E2128,
+        outline: 0xFF343A46,
+        primary: 0xFF4C8DFF,
+        onPrimary: 0xFFFFFFFF,
+        onSurface: 0xFFE8EAED,
+        muted: 0xFF9AA0AA,
+        danger: 0xFFFF5C5C,
+        success: 0xFF3DDC84,
+        disabled: 0xFF3A3F4A
     },
     text: {
         titleSize: 24.0,
-        bodySize: 20.0,
-        headlineSize: 32.0,
+        bodySize: 18.0,
+        headlineSize: 30.0,
         captionSize: 14.0
     }
 };

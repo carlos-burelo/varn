@@ -246,10 +246,10 @@ await describe("220 ui declarative", async () => {
             ui.button(text: "no", onPress: () => { hits.push(true); }, enabled: false)
         ]);
         renderTree(win, fr, focus, tree);
-        win.inject(UiInjectKind.MouseDown, 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 20, MOUSE_LEFT);
         fr.update(win);
         renderTree(win, fr, focus, tree);
-        win.inject(UiInjectKind.MouseUp, 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 30, 20, MOUSE_LEFT);
         fr.update(win);
         renderTree(win, fr, focus, tree);
         expect(hits.length).toBe(0);
@@ -260,10 +260,10 @@ await describe("220 ui declarative", async () => {
         const fr2 = new UiFrame(800, 600);
         const focus2 = new Focus();
         renderTree(win, fr2, focus2, tree2);
-        win.inject(UiInjectKind.MouseDown, 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseDown, 30, 20, MOUSE_LEFT);
         fr2.update(win);
         renderTree(win, fr2, focus2, tree2);
-        win.inject(UiInjectKind.MouseUp, 400, 22, MOUSE_LEFT);
+        win.inject(UiInjectKind.MouseUp, 30, 20, MOUSE_LEFT);
         fr2.update(win);
         renderTree(win, fr2, focus2, tree2);
         expect(hits2.length).toBe(1);
@@ -320,7 +320,7 @@ await describe("220 ui declarative", async () => {
         expect(textSizeFor(TextStyle.body)).toBe(Theme.text.bodySize);
         expect(textColorFor(TextStyle.caption)).toBe(Theme.colors.muted);
         expect(textColorFor(TextStyle.body)).toBe(Theme.colors.onSurface);
-        expect(Theme.colors.surface).toBe(Colors.black);
+        expect(Theme.colors.surface).toBe(0xFF1E2128);
         expect(label(ui.text("x")).size).toBe(Theme.text.bodySize);
         expect(label(ui.text("x", style: TextStyle.title)).size).toBe(Theme.text.titleSize);
         expect(CrossAxis.stretch == CrossAxis.stretch).toBe(true);

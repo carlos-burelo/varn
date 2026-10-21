@@ -1,10 +1,13 @@
-import { Widget, PaintContext } from "std:ui/widget/base";
-import { FlexNode, Row, Column } from "std:ui/widget/flex";
+import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { Row, Column } from "std:ui/widget/flex";
+import { Theme } from "std:ui/style";
 import { TextEdit } from "std:ui/edit";
 import { KEY_ENTER } from "std:ui/keys";
 import { textX, textY } from "std:ui/layout";
-import { measure } from "std:text";
+import { measure, ascent, descent } from "std:text";
 import { now } from "std:time";
+
+const BUTTON_PAD = 20.0;
 
 const fieldEdits = new Map<int, TextEdit>();
 
@@ -17,18 +20,18 @@ function pressShade(color: int): int {
 }
 
 function paintField(cx: PaintContext, x: float, y: float, w: float, h: float, ed: TextEdit, hint: str, size: float): void {
-    cx.win.rect(x, y, w, h, ed.focused ? 4294967295 : 4287137928, 10.0);
-    cx.win.rect(x + 2.0, y + 2.0, w - 4.0, h - 4.0, 4278190080, 8.0);
+    cx.win.rect(x, y, w, h, ed.focused ? Theme.colors.primary : Theme.colors.outline, 10.0);
+    cx.win.rect(x + 2.0, y + 2.0, w - 4.0, h - 4.0, Theme.colors.surface, 8.0);
     const line = ed.text.split("\n")[0];
     if (line == "" && !ed.focused) {
-        cx.win.text(x + 12.0, textY(y, h, size), hint, size, 4287137928);
+        cx.win.text(x + 12.0, textY(y, h, size), hint, size, Theme.colors.muted);
     } else {
-        cx.win.text(x + 12.0, textY(y, h, size), line, size, 4294967295);
+        cx.win.text(x + 12.0, textY(y, h, size), line, size, Theme.colors.onSurface);
     }
     if (ed.focused && ((now() / 500) % 2 == 0)) {
         const upto = ed.cursor < line.length ? ed.cursor : line.length;
         const caret = x + 12.0 + measure(line.slice(0, upto), size);
-        cx.win.rect(caret, y + 8.0, 2.0, h - 16.0, 4294967295);
+        cx.win.rect(caret, y + 8.0, 2.0, h - 16.0, Theme.colors.onSurface);
     }
 }
 
@@ -51,6 +54,11 @@ export class ButtonNode extends Widget {
     radius: float;
     enabled: bool;
 
+    override measure(maxW: float, maxH: float): Size {
+        const width = measure(this.label, this.size) + 2.0 * BUTTON_PAD;
+        return this.fit(new Size(width < maxW ? width : maxW, this.h));
+    }
+
     constructor(label: str, onPress: () => void, w: float, h: float, color: int, fg: int, size: float, radius: float, enabled: bool) {
         super();
         this.label = label;
@@ -67,8 +75,8 @@ export class ButtonNode extends Widget {
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         const fr = cx.fr;
         const held = this.enabled && fr.left && (fr.downX as float) >= x && (fr.downX as float) < x + w && (fr.downY as float) >= y && (fr.downY as float) < y + h;
-        cx.win.rect(x, y, w, h, this.enabled ? (held ? pressShade(this.color) : this.color) : 4287137928, this.radius);
-        cx.win.text(textX(x, w, this.label, this.size), textY(y, h, this.size), this.label, this.size, this.enabled ? this.fg : 4278190080);
+        cx.win.rect(x, y, w, h, this.enabled ? (held ? pressShade(this.color) : this.color) : Theme.colors.disabled, this.radius);
+        cx.win.text(textX(x, w, this.label, this.size), textY(y, h, this.size), this.label, this.size, this.enabled ? this.fg : Theme.colors.muted);
         if (this.enabled && fr.clicked(x, y, w, h)) {
             this.onPress();
         }
@@ -88,6 +96,10 @@ export class FieldNode extends Widget {
         this.h = h;
         this.size = size;
         this.onSubmit = onSubmit;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return this.fit(new Size(maxW, this.h));
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
@@ -122,6 +134,10 @@ export class InputNode extends Widget {
         this.size = size;
     }
 
+    override measure(maxW: float, maxH: float): Size {
+        return this.fit(new Size(maxW, this.h));
+    }
+
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         const slot = cx.nextSlot();
         const ed = ownedEdit(slot);
@@ -137,11 +153,11 @@ export class InputNode extends Widget {
     }
 }
 
-export function Button(label: str, onPress: () => void, w: float = -1.0, h: float = 44.0, color: int = 4278255360, fg: int = 4278190080, size: float = 20.0, radius: float = 10.0, enabled: bool = true): Widget {
+export function Button(label: str, onPress: () => void, w: float = -1.0, h: float = 40.0, color: int = 0xFF4C8DFF, fg: int = 0xFFFFFFFF, size: float = 17.0, radius: float = 8.0, enabled: bool = true): Widget {
     return new ButtonNode(label, onPress, w, h, color, fg, size, radius, enabled);
 }
 
-export function Field(edit: TextEdit? = null, hint: str = "", h: float = 44.0, size: float = 20.0, onSubmit: ((text: str) => void)? = null): Widget {
+export function Field(edit: TextEdit? = null, hint: str = "", h: float = 44.0, size: float = 18.0, onSubmit: ((text: str) => void)? = null): Widget {
     return new FieldNode(edit, hint, h, size, onSubmit);
 }
 

@@ -9,7 +9,7 @@ export function render(win: UiWindow, fr: UiFrame, focus: Focus, root: Widget, x
     root.paint(new PaintContext(win, fr, focus), x, y, w, h);
 }
 
-export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w: int = 800, h: int = 600, bg: int = 4278190080, maxFrames: int = 0): void {
+export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w: int = 800, h: int = 600, bg: int = 0xFF14161A, maxFrames: int = 0): void {
     using win = UiWindow.open(title, w, h);
     const fr = new UiFrame(w, h);
     const focus = new Focus();
