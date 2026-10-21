@@ -140,8 +140,14 @@ impl<'a> FnEmitter<'a> {
             (body, catch_body)
         } else {
             (
-                finally_splice::splice_finally_before_exits(body, &fin),
-                finally_splice::splice_finally_before_exits_and_throw(catch_body, &fin),
+                finally_splice::splice_finally_before_exits(body, &fin, &mut |ty| {
+                    self.fresh_local(ty)
+                }),
+                finally_splice::splice_finally_before_exits_and_throw(
+                    catch_body,
+                    &fin,
+                    &mut |ty| self.fresh_local(ty),
+                ),
             )
         };
         let mut out = vec![TirStmt::Try {

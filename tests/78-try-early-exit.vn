@@ -153,6 +153,26 @@ function retornaFueraDeBucle(): int {
     } catch (e) { }
     return -1;
 }
+let depth: int[] = []
+function depthNow(): int { return depth.length }
+function returnReadsBeforeFinally(): int {
+    depth.push(1)
+    try {
+        return depthNow()
+    } finally {
+        depth.pop()
+    }
+}
+function returnInCatchReadsBeforeFinally(): int {
+    depth.push(1)
+    try {
+        throw new Error("x")
+    } catch (e) {
+        return depthNow()
+    } finally {
+        depth.pop()
+    }
+}
 await describe("78 try early exit", async () => {
     await it("tests", async () => {
         
@@ -171,6 +191,10 @@ await describe("78 try early exit", async () => {
         expect(vacioConContinue()).toBe(2)
         
         expect(retornaFueraDeBucle()).toBe(42)
+
+        expect(returnReadsBeforeFinally()).toBe(1)
+        expect(returnInCatchReadsBeforeFinally()).toBe(1)
+        expect(depth.length).toBe(0)
         
     });
 });
