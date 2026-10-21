@@ -1,47 +1,77 @@
-import { ui, signal, computed, component, Widget, TextStyle, MainAxis, Theme, run } from "std:ui";
-import { UiFrame, Focus } from "std:ui";
+import {
+    ui, signal, computed, effect, component, run,
+    Widget, TextStyle, MainAxis, CrossAxis, Alignment, Theme, Colors,
+    UiFrame, Focus
+} from "std:ui";
+
+type Todo = { id: int, title: str, done: bool };
 
 @component
-function Counter(): Widget {
-    const count = signal(0);
+function Counter(start: int = 0): Widget {
+    const count = signal(start);
     const doubled = computed(() => count.value * 2);
-    return ui.column(
-        gap: 8.0,
-        padding: 16.0,
-        children: [
-            ui.text("Counter", style: TextStyle.title),
-            ui.text(`Count: ${count.value}`),
-            ui.text(`Doubled: ${doubled.value}`),
-            ui.button(text: "Increment", onPress: () => { count.value = count.value + 1; })
-        ]
-    );
+    effect(() => print(`count is now ${count.value}`));
+
+    return ui.column(gap: 8.0, children: [
+        ui.text("Counter", style: TextStyle.headline),
+        ui.text(`Count: ${count.value}  (x2 = ${doubled.value})`),
+        ui.row(gap: 8.0, children: [
+            ui.button(text: "-1", onPress: () => { count.value = count.value - 1; }),
+            ui.button(text: "+1", onPress: () => { count.value = count.value + 1; }),
+            ui.button(text: "reset", enabled: count.value != start, onPress: () => { count.value = start; })
+        ])
+    ]);
+}
+
+function TodoRow(todo: Todo, onToggle: () => void): Widget {
+    return ui.row(gap: 12.0, crossAxis: CrossAxis.center, children: [
+        ui.button(text: todo.done ? "x" : " ", w: 36.0, h: 36.0, onPress: onToggle),
+        ui.text(todo.title, color: todo.done ? Theme.colors.muted : Theme.colors.onSurface)
+    ]);
+}
+
+@component
+function TodoList(): Widget {
+    const todos = signal<Todo[]>([
+        { id: 1, title: "write a component", done: true },
+        { id: 2, title: "keep its state between frames", done: false },
+        { id: 3, title: "ship it", done: false }
+    ]);
+    const remaining = computed(() => todos.value.filter((t: Todo) => !t.done).length);
+
+    const toggle = (id: int): void => {
+        todos.value = todos.value.map((t: Todo): Todo => t.id == id ? { id: t.id, title: t.title, done: !t.done } : t);
+    };
+
+    return ui.column(gap: 8.0, children: [
+        ui.text("Todos", style: TextStyle.headline),
+        ui.text(`${remaining.value} left`, style: TextStyle.caption),
+        ui.each(todos.value,
+            key: (t: Todo) => t.id,
+            render: (t: Todo) => TodoRow(t, () => toggle(t.id))
+        )
+    ]);
 }
 
 @component
 function Dashboard(): Widget {
-    return ui.column(
-        gap: 16.0,
+    return ui.container(
         padding: 24.0,
-        children: [
-            ui.text("Dashboard", style: TextStyle.title),
-            ui.row(
-                gap: 12.0,
-                mainAxis: MainAxis.spaceBetween,
-                children: [
-                    ui.text("Revenue"),
-                    ui.text("$24,500")
-                ]
-            ),
-            ui.container(
-                padding: 16.0,
-                background: Theme.colors.surface,
-                radius: 12.0,
-                child: ui.text("Card", color: Theme.colors.onSurface)
-            )
-        ]
+        background: Theme.colors.surface,
+        child: ui.column(gap: 24.0, mainAxis: MainAxis.start, children: [
+            ui.row(mainAxis: MainAxis.spaceBetween, children: [
+                ui.text("Dashboard", style: TextStyle.title),
+                ui.text("varn ui", style: TextStyle.caption)
+            ]),
+            Counter(start: 10),
+            ui.stack(alignment: Alignment.center, children: [
+                ui.progressIndicator(value: 0.4, h: 12.0),
+                ui.text("40%", size: 12.0, color: Colors.white)
+            ]),
+            TodoList()
+        ])
     );
 }
 
-run("declarative demo", build: (fr: UiFrame, focus: Focus): Widget => Dashboard(), w: 800, h: 600, maxFrames: 5);
-run("counter demo", build: (fr: UiFrame, focus: Focus): Widget => Counter(), w: 800, h: 600, maxFrames: 5);
+run("varn declarative ui", build: (fr: UiFrame, focus: Focus): Widget => Dashboard(), w: 640, h: 640, maxFrames: 5);
 print("declarative demo done");

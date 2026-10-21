@@ -3,11 +3,14 @@
 Version: 1.0-draft
 Module: `std:ui`
 
-> **Estado de implementación (2026-10-17, verificado en `std/ui/`).**
-> Hecho, en Varn sobre `runtime:ui`: señales `signal`, `computed`, `effect`,
-> `batch`, `untracked` (`signal.vn`); decoradores `component` y `memo`
-> (`component.vn`); `VNode` y el catálogo de primitivas de §8–§10 más
-> `container`, `animated`, `when`, `each` (`catalog.vn`); estilos y temas (`style.vn`).
+> **Estado de implementación (2026-10-21, verificado en `std/ui/`).**
+> Hecho, en Varn sobre `runtime:ui`: `Signal<T>` y `Computed<T>` con `.value`,
+> `effect`, `batch`, `untracked` (`signal.vn`); el decorador `@component`, que
+> conserva `signal`, `computed` y `effect` de su cuerpo entre fotogramas por
+> orden de llamada (`component.vn`, `state.vn`); `Widget`, una clase abstracta con
+> `paint()` cuyos nodos (`FlexNode`, `LabelNode`, `BoxNode`…) viven en
+> `widget/*.vn`, y el catálogo de primitivas de §8–§10 más `container`,
+> `animated`, `when`, `each` (`catalog.vn`); estilos y temas (`style.vn`).
 > Puerta: `tests/220-ui-declarative.vn`.
 > Pendiente: el decorador `pure` (§12) y la UI IR y su pipeline de compilación
 > (§16–§17); hoy el árbol se construye y se resuelve en tiempo de ejecución.
@@ -111,15 +114,15 @@ El estado reactivo se declara mediante funciones explícitas.
 ```ts
 const count = signal(0)
 
-count()
-count(10)
+count.value
+count.value = 10
 ```
 
 Contrato:
 
 - `signal<T>(initialValue: T)` crea una celda reactiva.
-- Invocar `count()` sin argumentos lee el valor actual.
-- Invocar `count(value)` escribe un nuevo valor.
+- Leer `count.value` devuelve el valor actual.
+- Asignar `count.value = x` escribe un nuevo valor.
 - La lectura dentro de una evaluación reactiva registra una dependencia.
 - La escritura invalida los consumidores dependientes.
 - El tipo de la señal permanece estático.
@@ -127,16 +130,16 @@ Contrato:
 - La igualdad determina si una escritura produce una notificación.
 - Las escrituras deben respetar el orden de observación definido por el runtime.
 
-La forma de invocación es conceptual; el lenguaje debe admitir una API tipada que distinga de forma inequívoca lectura y escritura.
+`Signal<T>` es una clase; lectura y escritura son el getter y el setter de `value`.
 
 ### 5.2 computed
 
 ```ts
 const count = signal(0)
 
-const doubled = computed(() => count() * 2)
+const doubled = computed(() => count.value * 2)
 
-doubled()
+doubled.value
 ```
 
 Contrato:
@@ -154,10 +157,10 @@ Contrato:
 const count = signal(0)
 
 const dispose = effect(() => {
-    console.log(count())
+    console.log(count.value)
 })
 
-count(1)
+count.value = 1
 dispose()
 ```
 
@@ -178,8 +181,8 @@ const first = signal(0)
 const second = signal(0)
 
 batch(() => {
-    first(1)
-    second(2)
+    first.value = 1
+    second.value = 2
 })
 ```
 
@@ -191,7 +194,7 @@ batch(() => {
 const count = signal(0)
 
 effect(() => {
-    const current = count()
+    const current = count.value
     const snapshot = untracked(() => readOtherState())
 })
 ```
@@ -408,7 +411,7 @@ function ConnectionStatus() {
     return ui.column(
         children: [
             ui.when(
-                condition: connected(),
+                condition: connected.value,
                 then: () => ui.text("Connected"),
                 otherwise: () => ui.text("Disconnected")
             )
@@ -470,17 +473,17 @@ function Counter() {
     const count = signal(0)
 
     const doubled = computed(
-        () => count() * 2
+        () => count.value * 2
     )
 
     return ui.column(
         gap: 8,
         children: [
-            ui.text(`Count: ${count()}`),
-            ui.text(`Doubled: ${doubled()}`),
+            ui.text(`Count: ${count.value}`),
+            ui.text(`Doubled: ${doubled.value}`),
             ui.button(
                 text: "Increment",
-                onPress: () => count(count() + 1)
+                onPress: () => { count.value = count.value + 1 }
             )
         ]
     )
@@ -552,12 +555,12 @@ function SaveButton() {
     async function save() {
         if (saving()) return
 
-        saving(true)
+        saving.value = true
 
         try {
             await persist()
         } finally {
-            saving(false)
+            saving.value = false
         }
     }
 
