@@ -1,0 +1,22 @@
+import { describe, it, expect } from "std:test";
+import { Marker, Lone, Concrete, Grandchild } from "./helpers/imported-ctorless-lib.vn";
+
+const shared = new Marker();
+
+await describe("234 an imported class without a constructor", async () => {
+    await it("is constructed by the importer", () => {
+        expect(shared instanceof Marker).toBe(true)
+        expect(new Lone().peek()).toBe(4)
+    })
+    await it("keeps working when it inherits from a generic base", () => {
+        expect(new Concrete().take()).toBe(3)
+        expect(new Grandchild().take()).toBe(3)
+    })
+    await it("is constructed repeatedly", () => {
+        let sum = 0
+        for (let i = 0; i < 50; i = i + 1) {
+            sum = sum + new Lone().peek()
+        }
+        expect(sum).toBe(200)
+    })
+})

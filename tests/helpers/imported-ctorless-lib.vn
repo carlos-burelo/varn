@@ -1,0 +1,19 @@
+export class Marker {}
+
+export class Lone {
+    peek(): int {
+        return 4;
+    }
+}
+
+export abstract class Base<T> {
+    abstract take(): T;
+}
+
+export class Concrete extends Base<int> {
+    override take(): int {
+        return 3;
+    }
+}
+
+export class Grandchild extends Concrete {}

@@ -225,6 +225,7 @@ import "./230-foreign-class-chain.vn"
 import "./231-alias-of-imported-class.vn"
 import "./232-ui-layout.vn"
 import "./233-generic-heritage.vn"
+import "./234-imported-class-without-constructor.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

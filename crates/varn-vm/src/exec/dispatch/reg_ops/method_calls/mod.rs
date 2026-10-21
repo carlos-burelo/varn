@@ -101,6 +101,13 @@ impl ExecCtx {
         let receiver_class = receiver_class.as_ref();
         let method_nv = crate::exec::props::get_property(this_val, name, &mut self.heap)?;
 
+        if method_nv.is_null()
+            && receiver_class.is_some()
+            && name == varn_core::TokenKind::Constructor.as_str()
+        {
+            return Ok(MethodOutcome::Value(VmValue::null()));
+        }
+
         if method_nv.is_heap()
             && let Some(HeapObj::BoundMethod(bm)) = self.heap.get(method_nv.as_heap())
         {
