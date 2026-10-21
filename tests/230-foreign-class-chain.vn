@@ -1,0 +1,22 @@
+import { describe, it, expect } from "std:test";
+import { Shape } from "./helpers/foreign-child.vn";
+import { Square, makeSquare } from "./helpers/foreign-grandchild.vn";
+
+type AnyShape = Shape;
+
+function asShape(): Shape { return makeSquare() }
+function asAlias(): AnyShape { return makeSquare() }
+function describeAll(shapes: Shape[]): str[] {
+    const out: str[] = []
+    for (const shape of shapes) { out.push(shape.describe()) }
+    return out
+}
+
+await describe("230 a foreign class keeps its whole ancestry", async () => {
+    await it("a grandchild of an imported class is an instance of the root", () => {
+        expect(asShape().describe()).toBe("square")
+        expect(asAlias().sides).toBe(4)
+        expect(makeSquare() instanceof Shape).toBe(true)
+        expect(describeAll([new Square(), asShape()]).length).toBe(2)
+    })
+})

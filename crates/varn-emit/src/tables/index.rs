@@ -195,6 +195,11 @@ pub fn build(
         &mut signatures,
     );
     classes.extend(foreign_parent_infos);
+    for (i, f) in foreign_classes_sorted.iter().enumerate() {
+        if let Some((name, origin)) = &f.parent {
+            classes[class_names.len() + i].parent = names.foreign_class_id(name, origin);
+        }
+    }
     let mut class_origins: Vec<Option<Arc<str>>> = vec![None; class_names.len()];
     class_origins.extend(
         foreign_classes_sorted

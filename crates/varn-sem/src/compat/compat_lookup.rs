@@ -69,13 +69,17 @@ pub(super) fn compatible_named(
         if bind.get_class_members(inferred, origin_inf).is_none() {
             return false;
         }
-        let mut current = inferred;
+        let mut current = inferred.to_owned();
+        let mut current_origin = origin_inf.map(str::to_owned);
         loop {
             if current == declared {
                 return true;
             }
-            match bind.bind.get_class_parent(current) {
-                Some(parent) => current = parent.name.as_ref(),
+            match bind.class_parent(&current, current_origin.as_deref()) {
+                Some(parent) => {
+                    current = parent.name.to_string();
+                    current_origin = parent.origin.map(|o| o.to_string());
+                }
                 None => return false,
             }
         }

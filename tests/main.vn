@@ -221,6 +221,7 @@ import "./226-builtin-names-shadowed.vn"
 import "./227-channel-endpoints-nested.vn"
 import "./228-import-meta-main.vn"
 import "./229-jit-loop-variant-views.vn"
+import "./230-foreign-class-chain.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

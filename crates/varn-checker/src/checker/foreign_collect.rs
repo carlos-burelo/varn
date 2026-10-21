@@ -15,18 +15,21 @@ impl Checker<'_> {
     ) -> Vec<ForeignClass> {
         let mut found: BTreeMap<(Arc<str>, Arc<str>), ForeignClass> = BTreeMap::new();
         let mut seeds: Vec<Type> = types.copied().collect();
-        while let Some(ty) = seeds.pop() {
-            for key in self.foreign_refs_in(bind, ty) {
-                if found.contains_key(&key) {
-                    continue;
-                }
-                let Some((entry, field_tys)) = self.build_foreign_entry(bind, &key.0, &key.1)
-                else {
-                    continue;
-                };
-                seeds.extend(field_tys);
-                found.insert(key, entry);
+        let mut keys: Vec<(Arc<str>, Arc<str>)> = Vec::new();
+        loop {
+            while let Some(ty) = seeds.pop() {
+                keys.extend(self.foreign_refs_in(bind, ty));
             }
+            let Some(key) = keys.pop() else { break };
+            if found.contains_key(&key) {
+                continue;
+            }
+            let Some((entry, field_tys)) = self.build_foreign_entry(bind, &key.0, &key.1) else {
+                continue;
+            };
+            seeds.extend(field_tys);
+            keys.extend(entry.parent.clone());
+            found.insert(key, entry);
         }
         found.into_values().collect()
     }
@@ -185,6 +188,12 @@ impl Checker<'_> {
                         .is_some_and(|n| self.resolve_bind_atom(bind, n) == *name)
             })
             .map(|s| self.resolve_bind_atom(bind, s.name));
+        let parent = owner.get_class_parent(name.as_ref()).map(|p| {
+            (
+                p.name.clone(),
+                p.origin.clone().unwrap_or_else(|| origin.clone()),
+            )
+        });
         let field_tys = fields.iter().map(|f| f.ty).collect();
         Some((
             ForeignClass {
@@ -194,6 +203,7 @@ impl Checker<'_> {
                 methods,
                 constructor,
                 import_binding,
+                parent,
             },
             field_tys,
         ))

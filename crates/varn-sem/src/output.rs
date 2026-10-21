@@ -60,6 +60,7 @@ pub struct ForeignClass {
     pub methods: Vec<Arc<str>>,
     pub constructor: Option<Type>,
     pub import_binding: Option<Arc<str>>,
+    pub parent: Option<(Arc<str>, Arc<str>)>,
 }
 
 #[derive(Clone, Debug, Default)]

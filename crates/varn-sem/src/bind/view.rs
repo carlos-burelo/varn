@@ -25,6 +25,13 @@ impl<'r> BindView<'r> {
         self
     }
 
+    pub fn class_parent(&self, name: &str, origin: Option<&str>) -> Option<super::ClassParent> {
+        match self.foreign(origin) {
+            Some(rb) => rb.get_class_parent(name).cloned(),
+            None => self.bind.get_class_parent(name).cloned(),
+        }
+    }
+
     fn foreign(&self, origin: Option<&str>) -> Option<Arc<BindResult>> {
         let origin = origin?;
         if origin == self.bind.source_file.as_ref() {

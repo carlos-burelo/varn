@@ -1,3 +1,4 @@
+use super::foreign_classes::OwnerRef;
 use super::recorder::Recorder;
 use super::Checker;
 use std::sync::Arc;
@@ -29,14 +30,19 @@ impl<'r> Checker<'r> {
         }
 
         let mut superclass_members = Vec::new();
-        let mut parent =
-            c.id.as_ref()
-                .and_then(|cls_id| bind.class_parents.get(bind.interner.resolve(*cls_id)));
-        while let Some(p) = parent {
-            if let Some(m) = bind.get_class_entry(&p.name).map(|e| e.members.clone()) {
-                superclass_members.extend(m);
+        if let Some(cls_id) = c.id.as_ref() {
+            let class_name = bind.interner.resolve(*cls_id);
+            let chain = self.foreign_chain(class_name, OwnerRef::Current(bind));
+            for level in chain.iter().skip(1) {
+                let Some(entry) = level.owner.get().get_class_entry(&level.name) else {
+                    continue;
+                };
+                for member in &entry.members {
+                    let mut member = member.clone();
+                    member.ty = self.reintern_foreign_ty(level.owner.get(), member.ty);
+                    superclass_members.push(member);
+                }
             }
-            parent = bind.class_parents.get(&p.name);
         }
 
         self.check_class_type_names(c, bind);
