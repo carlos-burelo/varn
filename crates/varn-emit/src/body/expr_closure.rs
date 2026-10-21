@@ -55,6 +55,10 @@ impl<'a> FnEmitter<'a> {
             outer_names.extend(scope.keys().cloned());
         }
         outer_names.extend(self.params.iter().cloned());
+        let lexical_this = self.has_own_this() || self.lexical_this;
+        if lexical_this {
+            outer_names.insert(Arc::from(varn_core::TokenKind::This.as_str()));
+        }
 
         let mut sub = FnEmitter::new(
             self.ast_arena,
@@ -67,6 +71,9 @@ impl<'a> FnEmitter<'a> {
             param_names,
         );
         sub.outer_names = outer_names;
+        sub.lexical_this = lexical_this;
+        sub.this_class = self.this_class;
+        sub.this_enum = self.this_enum;
         sub.home_class = self.home_class;
         sub.namespace = self.namespace.clone();
         sub.expect_results(declared, is_async, is_generator);
@@ -98,6 +105,21 @@ impl<'a> FnEmitter<'a> {
             has_rest: params.last().is_some_and(|p| p.is_rest),
             force_inline: false,
         };
+
+        let this_name = varn_core::TokenKind::This.as_str();
+        if self.has_own_this()
+            && captures.iter().any(|c| c.as_ref() == this_name)
+            && !matches!(self.resolve_name(this_name), Resolution::Local(_))
+        {
+            let receiver = self.this_var(span);
+            let ty = receiver.ty;
+            let local = self.bind_local(Arc::from(this_name), ty);
+            self.pending.push(TirStmt::Let {
+                local,
+                ty,
+                init: Some(receiver),
+            });
+        }
 
         let upvalues: Vec<varn_tir::TirUpvalue> = captures
             .iter()

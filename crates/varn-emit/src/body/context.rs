@@ -60,6 +60,8 @@ pub(crate) struct FnEmitter<'a> {
 
     pub(super) this_enum: Option<EnumId>,
 
+    pub(super) lexical_this: bool,
+
     pub(super) home_class: Option<ClassId>,
 
     pub namespace: Option<Arc<str>>,

@@ -1,0 +1,109 @@
+import { describe, it, expect } from "std:test";
+
+class Counter {
+    count: int = 0;
+    onTick: () => void;
+
+    constructor(step: int) {
+        this.onTick = () => { this.count = this.count + step };
+    }
+
+    bump(): () => int {
+        return () => {
+            this.count = this.count + 1;
+            return this.count;
+        };
+    }
+
+    nested(): () => () => int {
+        return () => () => this.count;
+    }
+
+    each(items: int[]): int {
+        let total = 0;
+        items.forEach((n: int) => { total = total + n + this.count });
+        return total;
+    }
+
+    async later(): Task<int> {
+        const read = () => this.count;
+        return read();
+    }
+}
+
+class Base {
+    name(): str { return "base" }
+}
+
+class Derived extends Base {
+    override name(): str { return "derived" }
+    viaArrow(): () => str {
+        return () => super.name() + "/" + this.name();
+    }
+}
+
+class Cell<T> {
+    held: T;
+    constructor(held: T) { this.held = held }
+    reader(): () => T { return () => this.held }
+}
+
+enum Level {
+    low,
+    high;
+    label(): () => str {
+        return () => this === Level.low ? "low" : "high";
+    }
+}
+
+await describe("237 lexical this", async () => {
+    await it("an arrow keeps the receiver of the method that created it", () => {
+        const counter = new Counter(5);
+        const bump = counter.bump();
+        expect(bump()).toBe(1);
+        expect(bump()).toBe(2);
+        expect(counter.count).toBe(2);
+    });
+
+    await it("an arrow assigned in a constructor mutates its own instance", () => {
+        const a = new Counter(2);
+        const b = new Counter(10);
+        a.onTick();
+        a.onTick();
+        b.onTick();
+        expect(a.count).toBe(4);
+        expect(b.count).toBe(10);
+    });
+
+    await it("nested arrows and callbacks see the same receiver", () => {
+        const counter = new Counter(1);
+        counter.onTick();
+        expect(counter.nested()()()).toBe(1);
+        expect(counter.each([1, 2, 3])).toBe(9);
+    });
+
+    await it("generic and enum receivers work", () => {
+        expect(new Cell<str>("x").reader()()).toBe("x");
+        expect(Level.high.label()()).toBe("high");
+    });
+
+    await it("an async method can use an arrow over this", async () => {
+        const counter = new Counter(1);
+        counter.onTick();
+        expect(await counter.later()).toBe(1);
+    });
+
+    await it("super calls inside an arrow reach the parent", () => {
+        expect(new Derived().viaArrow()()).toBe("base/derived");
+    });
+
+    await it("a hot arrow keeps its receiver", () => {
+        const counter = new Counter(1);
+        const bump = counter.bump();
+        let last = 0;
+        for (let i = 0; i < 20000; i = i + 1) {
+            last = bump();
+        }
+        expect(last).toBe(20000);
+    });
+});

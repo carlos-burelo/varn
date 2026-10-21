@@ -33,6 +33,7 @@ impl<'a> FnEmitter<'a> {
             params,
             this_class: None,
             this_enum: None,
+            lexical_this: false,
             home_class: None,
             namespace: None,
             not_yet_bound: FxHashSet::default(),
@@ -249,16 +250,25 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    pub(super) fn this_var(&self, span: Span) -> TirExpr {
+    pub(super) fn has_own_this(&self) -> bool {
+        !self.lexical_this && (self.this_enum.is_some() || self.this_class.is_some())
+    }
+
+    pub(super) fn this_var(&mut self, span: Span) -> TirExpr {
         let ty = self
             .this_enum
             .map(BackendTy::Enum)
             .or_else(|| self.this_class.map(BackendTy::Class))
             .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+        let res = if self.lexical_this {
+            self.resolve_name(varn_core::TokenKind::This.as_str())
+        } else {
+            Resolution::None
+        };
         TirExpr {
             kind: TirExprKind::Var,
             ty,
-            res: Resolution::None,
+            res,
             span,
         }
     }

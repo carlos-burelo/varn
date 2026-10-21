@@ -41,9 +41,10 @@ impl<'a> FnEmitter<'a> {
             {
                 let targs = self.lower_call_args(call_id, args);
                 let targs = self.settle_super_args(call_id, &name, targs, span);
-                let reached = match self.this_class {
-                    Some(_) => None,
-                    None => self.inherited_member(&name, false, span),
+                let reached = if self.has_own_this() {
+                    None
+                } else {
+                    self.inherited_member(&name, false, span)
                 };
                 if let Some(callee) = reached {
                     return TirExpr {
