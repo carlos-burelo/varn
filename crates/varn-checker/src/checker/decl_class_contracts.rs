@@ -38,7 +38,11 @@ impl<'r> Checker<'r> {
                 inherited
             }
         };
-        if self.types_compatible_cached(&inherited, &own, Some(bind)) {
+        let by_position = (
+            self.by_type_param_position(inherited),
+            self.by_type_param_position(own),
+        );
+        if self.types_compatible_cached(&by_position.0, &by_position.1, Some(bind)) {
             return;
         }
         let own_s = own.display(&self.ty_table, &bind.interner);
@@ -52,6 +56,26 @@ impl<'r> Checker<'r> {
             )
             .with_range(range),
         );
+    }
+
+    fn by_type_param_position(&mut self, ty: varn_sem::types::Type) -> varn_sem::types::Type {
+        let varn_core::TypeKind::Fn(id) = self.ty_table.get(ty.0) else {
+            return ty;
+        };
+        let declared = self.ty_table.get_function(id).type_params.clone();
+        if declared.is_empty() {
+            return ty;
+        }
+        let table = std::sync::Arc::make_mut(&mut self.ty_table);
+        let mapping: rustc_hash::FxHashMap<varn_core::Atom, varn_sem::types::Type> = declared
+            .iter()
+            .enumerate()
+            .map(|(at, name)| {
+                let slot = varn_sem::types::Type::named(format!("<type parameter {at}>"), table);
+                (varn_core::Atom::of(name), slot)
+            })
+            .collect();
+        ty.map_generics(&mapping, table)
     }
 
     fn substitute_chain(

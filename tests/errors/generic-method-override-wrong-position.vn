@@ -1,0 +1,8 @@
+// expect: error[VN4116]
+import { Host } from "./../helpers/generic-override-lib.vn"
+
+class Swapped extends Host {
+    override adopt<T>(make: () => T): T { return make() }
+    override same<T>(x: T): T { return x }
+    override pair<A, B>(a: A, b: B): B { return b }
+}

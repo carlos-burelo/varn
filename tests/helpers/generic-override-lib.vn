@@ -1,0 +1,5 @@
+export abstract class Host {
+    abstract adopt<T>(make: () => T): T;
+    abstract same<T>(x: T): T;
+    abstract pair<A, B>(a: A, b: B): A;
+}

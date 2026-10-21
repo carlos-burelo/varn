@@ -1,0 +1,17 @@
+import { describe, it, expect } from "std:test";
+import { Host } from "./helpers/generic-override-lib.vn";
+
+class Local extends Host {
+    override adopt<U>(make: () => U): U { return make() }
+    override same<T>(x: T): T { return x }
+    override pair<X, Y>(a: X, b: Y): X { return a }
+}
+
+await describe("236 a generic method overrides an imported generic method", async () => {
+    await it("keeps its own type parameter names", () => {
+        const host: Host = new Local()
+        expect(host.adopt<int>(() => 4)).toBe(4)
+        expect(host.same<str>("s")).toBe("s")
+        expect(host.pair<int, str>(1, "x")).toBe(1)
+    })
+})

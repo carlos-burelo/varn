@@ -226,6 +226,7 @@ import "./231-alias-of-imported-class.vn"
 import "./232-ui-layout.vn"
 import "./233-generic-heritage.vn"
 import "./234-imported-class-without-constructor.vn"
+import "./236-generic-method-override-across-modules.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {
