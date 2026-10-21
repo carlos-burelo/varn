@@ -3,16 +3,20 @@ export { UiFrame } from "std:ui/frame";
 export { Focus } from "std:ui/focus";
 export { TextEdit } from "std:ui/edit";
 export { Widget, PaintContext, Size } from "std:ui/widget/base";
-export { Label, LabelNode, TextAlign } from "std:ui/widget/text";
-export { Box, BoxNode, PaddingNode, Spacer, Expanded, Divider, Checkbox } from "std:ui/widget/box";
+export { Text, Title, Headline, Caption, TextNode, TextAlign } from "std:ui/widget/text";
+export { Box, Card, Stack, Padding, SizedBox, Spacer, Expanded, Divider, BoxNode, StackNode, PaddingNode, SizedBoxNode } from "std:ui/widget/box";
 export { Column, Row, FlexNode, Axis } from "std:ui/widget/flex";
-export { Button, Field, List } from "std:ui/widget/controls";
+export { Button, Field, Input } from "std:ui/widget/controls";
+export { Checkbox, Switch } from "std:ui/widget/toggles";
+export { Slider } from "std:ui/widget/slider";
+export { Image, Progress } from "std:ui/widget/media";
+export { Segmented, Tabs } from "std:ui/widget/choice";
+export { Each, Grid, Table } from "std:ui/widget/data";
+export { Navigator, navigator } from "std:ui/navigation";
 export { render, run } from "std:ui/render";
-export { pad, row, col, textX, textY, ellipsize } from "std:ui/layout";
 export { Readable, Signal, Computed, Effect, signal, computed, effect, batch, untracked, onCleanup } from "std:signals";
-export { TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Curve, Colors, Theme, textSizeFor, textColorFor } from "std:ui/style";
+export { TextStyle, ButtonKind, MainAxis, CrossAxis, Alignment, BoxFit, Colors, Theme, textSizeFor, textColorFor } from "std:ui/style";
 export { component } from "std:ui/component";
-export { ui } from "std:ui/catalog";
 export {
     KEY_BACKSPACE,
     KEY_TAB,

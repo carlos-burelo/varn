@@ -1,0 +1,43 @@
+import { Widget } from "std:ui/widget/base";
+import { Column, Row } from "std:ui/widget/flex";
+import { Expanded, Divider, Spacer } from "std:ui/widget/box";
+import { Text, Caption } from "std:ui/widget/text";
+import { CrossAxis } from "std:ui/style";
+
+export function Each<T>(items: T[], render: (item: T, index: int) => Widget, gap: float = 4.0): Widget {
+    const rows: Widget[] = [];
+    for (let at = 0; at < items.length; at = at + 1) {
+        rows.push(render(items[at], at));
+    }
+    return Column(rows, gap: gap);
+}
+
+export function Grid(children: Widget[], columns: int, gap: float = 8.0): Widget {
+    const lines: Widget[] = [];
+    let at = 0;
+    while (at < children.length) {
+        const cells: Widget[] = [];
+        for (let column = 0; column < columns; column = column + 1) {
+            cells.push(Expanded(at + column < children.length ? children[at + column] : Spacer(0.0)));
+        }
+        lines.push(Row(cells, gap: gap, crossAxis: CrossAxis.start));
+        at = at + columns;
+    }
+    return Column(lines, gap: gap);
+}
+
+export function Table(headers: str[], rows: str[][], gap: float = 8.0): Widget {
+    const head: Widget[] = [];
+    for (let title of headers) {
+        head.push(Expanded(Caption(title)));
+    }
+    const lines: Widget[] = [Row(head, gap: gap), Divider()];
+    for (let record of rows) {
+        const cells: Widget[] = [];
+        for (let cell of record) {
+            cells.push(Expanded(Text(cell)));
+        }
+        lines.push(Row(cells, gap: gap));
+    }
+    return Column(lines, gap: gap);
+}

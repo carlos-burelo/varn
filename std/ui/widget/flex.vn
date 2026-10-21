@@ -48,6 +48,16 @@ export class FlexNode extends Widget {
         if (this.children.length > 1) {
             main = main + this.gap * ((this.children.length - 1) as float);
         }
+        let flexible = false;
+        for (let child of this.children) {
+            if (child.flex > 0.0) {
+                flexible = true;
+            }
+        }
+        if (flexible || this.mainAxis != MainAxis.start) {
+            const room = (this.axis == Axis.horizontal ? innerW : innerH);
+            main = main > room ? main : room;
+        }
         const natural = this.axis == Axis.horizontal
             ? new Size(main + 2.0 * this.pad, cross + 2.0 * this.pad)
             : new Size(cross + 2.0 * this.pad, main + 2.0 * this.pad);
@@ -112,7 +122,7 @@ export class FlexNode extends Widget {
             }
             let thick = this.crossOf(size);
             let shift = 0.0;
-            if (this.crossAxis == CrossAxis.stretch) {
+            if (this.crossAxis == CrossAxis.stretch || child.fills) {
                 thick = across;
             } else {
                 thick = thick < across ? thick : across;

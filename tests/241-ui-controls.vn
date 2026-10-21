@@ -1,0 +1,157 @@
+import { describe, it, expect } from "std:test";
+import {
+    UiWindow, UiFrame, Focus, Widget, FlexNode, TextNode, BoxNode, render,
+    Column, Row, Text, Title, Headline, Caption, Card, Button, Checkbox, Switch, Slider, Input,
+    Segmented, Tabs, Grid, Table, Each, Box, Spacer, navigator, signal,
+    ButtonKind, TextStyle, Theme, MOUSE_LEFT, UiInjectKind
+} from "std:ui";
+
+function flex(w: Widget): FlexNode { return w as FlexNode }
+function text(w: Widget): TextNode { return w as TextNode }
+
+function tap(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, x: int, y: int, w: float, h: float): void {
+    win.inject(UiInjectKind.MouseDown, x, y, MOUSE_LEFT);
+    fr.update(win);
+    render(win, fr, focus, tree, 0.0, 0.0, w, h);
+    win.inject(UiInjectKind.MouseUp, x, y, MOUSE_LEFT);
+    fr.update(win);
+    render(win, fr, focus, tree, 0.0, 0.0, w, h);
+}
+
+await describe("241 ui controls", async () => {
+    await it("text shortcuts pick the style", () => {
+        expect(text(Title("t")).style).toBe(TextStyle.title);
+        expect(text(Headline("h")).style).toBe(TextStyle.headline);
+        expect(text(Caption("c")).style).toBe(TextStyle.caption);
+        expect(text(Text("x")).size).toBe(Theme.text.bodySize);
+        expect(text(Text("x", size: 40.0)).size).toBe(40.0);
+    });
+
+    await it("a card puts its title first", () => {
+        const card = Card([Text("body")], title: "Heading");
+        expect(card is BoxNode).toBe(true);
+        const inner = flex((card as BoxNode).child as Widget);
+        expect(inner.children.length).toBe(2);
+        expect(text(inner.children[0]).text).toBe("Heading");
+        expect(text(inner.children[1]).text).toBe("body");
+    });
+
+    await it("a switch flips the signal it is bound to", () => {
+        using win = UiWindow.open("t", 400, 200);
+        const fr = new UiFrame(400, 200);
+        const focus = new Focus();
+        const on = signal(false);
+        const tree = Switch(on);
+        render(win, fr, focus, tree, 0.0, 0.0, 46.0, 26.0);
+        tap(win, fr, focus, tree, 20, 12, 46.0, 26.0);
+        expect(on.value).toBe(true);
+    });
+
+    await it("a checkbox calls its callback when it holds a plain value", () => {
+        using win = UiWindow.open("t", 400, 200);
+        const fr = new UiFrame(400, 200);
+        const focus = new Focus();
+        const seen: bool[] = [];
+        const tree = Checkbox(false, onChange: (next: bool) => { seen.push(next) });
+        render(win, fr, focus, tree, 0.0, 0.0, 26.0, 26.0);
+        tap(win, fr, focus, tree, 10, 10, 26.0, 26.0);
+        expect(seen).toEqual([true]);
+    });
+
+    await it("a plain value without a callback is rejected", () => {
+        let failed = false;
+        try {
+            Switch(true);
+        } catch (e) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+    });
+
+    await it("a slider follows the pointer", () => {
+        using win = UiWindow.open("t", 400, 200);
+        const fr = new UiFrame(400, 200);
+        const focus = new Focus();
+        const level = signal(0.0);
+        const tree = Slider(level);
+        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 24.0);
+        win.inject(UiInjectKind.MouseDown, 100, 12, MOUSE_LEFT);
+        fr.update(win);
+        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 24.0);
+        expect(level.value).toBe(0.5);
+        const ranged = signal(0.0);
+        const scaled = Slider(ranged, low: 10.0, high: 20.0);
+        render(win, fr, focus, scaled, 0.0, 0.0, 200.0, 24.0);
+        expect(ranged.value).toBe(15.0);
+    });
+
+    await it("segmented picks the option that was clicked", () => {
+        using win = UiWindow.open("t", 400, 200);
+        const fr = new UiFrame(400, 200);
+        const focus = new Focus();
+        const choice = signal(0);
+        const tree = Segmented(["a", "b"], choice);
+        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 36.0);
+        tap(win, fr, focus, tree, 150, 18, 200.0, 36.0);
+        expect(choice.value).toBe(1);
+    });
+
+    await it("tabs show the selected page", () => {
+        const at = signal(1);
+        const tree = flex(Tabs(["one", "two"], [Text("first"), Text("second")], at));
+        expect(tree.children.length).toBe(3);
+        expect(text(tree.children[2]).text).toBe("second");
+        at.value = 0;
+        expect(text(flex(Tabs(["one", "two"], [Text("first"), Text("second")], at)).children[2]).text).toBe("first");
+    });
+
+    await it("an input edits the signal it is bound to", () => {
+        const name = signal("ada");
+        const tree = Input(name, hint: "name");
+        expect(tree is Widget).toBe(true);
+        expect(name.value).toBe("ada");
+    });
+
+    await it("grid wraps children into rows and table lists records", () => {
+        const grid = flex(Grid([Text("1"), Text("2"), Text("3"), Text("4"), Text("5")], 2));
+        expect(grid.children.length).toBe(3);
+        expect(flex(grid.children[0]).children.length).toBe(2);
+        expect(flex(grid.children[2]).children.length).toBe(2);
+        const table = flex(Table(["name", "age"], [["ada", "36"], ["alan", "41"]]));
+        expect(table.children.length).toBe(4);
+        expect(flex(table.children[3]).children.length).toBe(2);
+    });
+
+    await it("each builds one widget per item with its index", () => {
+        const seen: int[] = [];
+        const list = flex(Each(["x", "y", "z"], (item: str, at: int) => { seen.push(at); return Text(item) }));
+        expect(list.children.length).toBe(3);
+        expect(seen).toEqual([0, 1, 2]);
+    });
+
+    await it("a navigator keeps a stack of pages", () => {
+        const nav = navigator("home");
+        expect(nav.page).toBe("home");
+        expect(nav.canGoBack).toBe(false);
+        nav.push("settings");
+        nav.push("about");
+        expect(nav.page).toBe("about");
+        expect(nav.depth).toBe(3);
+        nav.pop();
+        expect(nav.page).toBe("settings");
+        nav.replace("profile");
+        expect(nav.page).toBe("profile");
+        nav.reset("home");
+        nav.pop();
+        expect(nav.page).toBe("home");
+    });
+
+    await it("a button kind picks its colors", () => {
+        using win = UiWindow.open("t", 400, 200);
+        const fr = new UiFrame(400, 200);
+        const focus = new Focus();
+        win.clear(0);
+        render(win, fr, focus, Button("go", onPress: () => {}, kind: ButtonKind.danger), 0.0, 0.0, 100.0, 40.0);
+        expect(win.commands()[1]).toBe("rect 0 0 100 40 4294925404 8");
+    });
+});

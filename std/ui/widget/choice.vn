@@ -1,0 +1,33 @@
+import { Widget } from "std:ui/widget/base";
+import { Column, Row } from "std:ui/widget/flex";
+import { Box, Expanded, Divider } from "std:ui/widget/box";
+import { Text } from "std:ui/widget/text";
+import { TextAlign } from "std:ui/widget/text";
+import { Theme } from "std:ui/style";
+import { current, writer } from "std:ui/widget/bound";
+import { Signal } from "std:signals";
+
+export function Segmented(options: str[], selected: int | Signal<int>, onSelect: ((next: int) => void)? = null, h: float = 36.0): Widget {
+    const write = writer<int>(selected, onSelect);
+    const at = current<int>(selected);
+    const cells: Widget[] = [];
+    for (let index = 0; index < options.length; index = index + 1) {
+        const chosen = index == at;
+        const pick = index;
+        cells.push(Expanded(Box(
+            Text(options[index], color: chosen ? Theme.colors.onPrimary : Theme.colors.onSurface, align: TextAlign.center),
+            color: chosen ? Theme.colors.primary : Theme.colors.outline,
+            radius: 8.0,
+            pad: 8.0,
+            h: h,
+            onClick: () => write(pick)
+        )));
+    }
+    return Row(cells, gap: 4.0);
+}
+
+export function Tabs(labels: str[], pages: Widget[], selected: int | Signal<int>, onSelect: ((next: int) => void)? = null): Widget {
+    const at = current<int>(selected);
+    const page = at >= 0 && at < pages.length ? pages[at] : Box();
+    return Column([Segmented(labels, selected, onSelect), Divider(), page], gap: 12.0);
+}

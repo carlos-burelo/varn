@@ -1,7 +1,6 @@
 import {
-    ui, signal, computed, effect, component, run,
-    Widget, TextStyle, MainAxis, CrossAxis, Alignment, Theme,
-    UiFrame, Focus
+    Column, Row, Text, Title, Headline, Caption, Card, Button, ButtonKind, Checkbox, Each, Progress, Divider, Spacer,
+    signal, computed, effect, component, run, Widget, MainAxis, Theme, UiFrame, Focus
 } from "std:ui";
 import { Env } from "std:env";
 
@@ -10,37 +9,17 @@ type Todo = { id: int, title: str, done: bool };
 @component
 function Counter(start: int = 0): Widget {
     const count = signal(start);
-    const doubled = computed(() => count.value * 2);
     effect(() => print(`count is now ${count.value}`));
 
-    return ui.card(
-        padding: 20.0,
-        child: ui.column(gap: 14.0, crossAxis: CrossAxis.stretch, children: [
-            ui.text("Counter", style: TextStyle.title),
-            ui.row(mainAxis: MainAxis.spaceBetween, children: [
-                ui.text(`${count.value}`, size: 40.0),
-                ui.text(`x2 = ${doubled.value}`, style: TextStyle.caption)
-            ]),
-            ui.row(gap: 10.0, children: [
-                ui.button(text: "-1", onPress: () => { count.value = count.value - 1; }),
-                ui.button(text: "+1", onPress: () => { count.value = count.value + 1; }),
-                ui.spacer(),
-                ui.button(
-                    text: "reset",
-                    enabled: count.value != start,
-                    color: Theme.colors.outline,
-                    onPress: () => { count.value = start; }
-                )
-            ])
+    return Card([
+        Row([Text(`${count.value}`, size: 40.0), Caption(`x2 = ${count.value * 2}`)], mainAxis: MainAxis.spaceBetween),
+        Row([
+            Button("-1", () => count.update((n: int): int => n - 1)),
+            Button("+1", () => count.update((n: int): int => n + 1)),
+            Spacer(),
+            Button("reset", () => count.set(start), kind: ButtonKind.subtle, enabled: count.value != start)
         ])
-    );
-}
-
-function TodoRow(todo: Todo, onToggle: () => void): Widget {
-    return ui.row(gap: 12.0, children: [
-        ui.checkbox(todo.done, onToggle),
-        ui.text(todo.title, color: todo.done ? Theme.colors.muted : Theme.colors.onSurface)
-    ]);
+    ], title: "Counter");
 }
 
 @component
@@ -52,41 +31,28 @@ function TodoList(): Widget {
     ]);
     const remaining = computed(() => todos.value.filter((t: Todo) => !t.done).length);
 
-    const toggle = (id: int): void => {
-        todos.value = todos.value.map((t: Todo): Todo => t.id == id ? { id: t.id, title: t.title, done: !t.done } : t);
-    };
-
-    return ui.card(
-        padding: 20.0,
-        child: ui.column(gap: 12.0, crossAxis: CrossAxis.stretch, children: [
-            ui.row(mainAxis: MainAxis.spaceBetween, children: [
-                ui.text("Todos", style: TextStyle.title),
-                ui.text(`${remaining.value} left`, style: TextStyle.caption)
-            ]),
-            ui.divider(),
-            ui.each(todos.value,
-                key: (t: Todo) => t.id,
-                render: (t: Todo) => TodoRow(t, () => toggle(t.id)),
-                gap: 10.0
-            )
-        ])
+    const toggle = (id: int): void => todos.update((all: Todo[]): Todo[] =>
+        all.map((t: Todo): Todo => t.id == id ? { id: t.id, title: t.title, done: !t.done } : t)
     );
+
+    return Card([
+        Row([Title("Todos"), Caption(`${remaining.value} left`)], mainAxis: MainAxis.spaceBetween),
+        Divider(),
+        Each(todos.value, (t: Todo, at: int) => Row([
+            Checkbox(t.done, onChange: (next: bool) => toggle(t.id)),
+            Text(t.title, color: t.done ? Theme.colors.muted : Theme.colors.onSurface)
+        ]), gap: 10.0)
+    ]);
 }
 
 @component
 function Dashboard(): Widget {
-    return ui.container(
-        padding: 24.0,
-        child: ui.column(gap: 16.0, crossAxis: CrossAxis.stretch, children: [
-            ui.row(mainAxis: MainAxis.spaceBetween, children: [
-                ui.text("Dashboard", style: TextStyle.headline),
-                ui.text("varn ui", style: TextStyle.caption)
-            ]),
-            Counter(start: 10),
-            ui.progressIndicator(value: 0.4),
-            TodoList()
-        ])
-    );
+    return Column([
+        Row([Headline("Dashboard"), Caption("varn ui")], mainAxis: MainAxis.spaceBetween),
+        Counter(start: 10),
+        Progress(0.4),
+        TodoList()
+    ], pad: 24.0, gap: 16.0);
 }
 
 const real = Env.get("VARN_UI_REAL") == "1";

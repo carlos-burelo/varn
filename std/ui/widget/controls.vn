@@ -1,6 +1,6 @@
 import { Widget, Size, PaintContext } from "std:ui/widget/base";
-import { Row, Column } from "std:ui/widget/flex";
-import { Theme } from "std:ui/style";
+import { Theme, ButtonKind, buttonColorFor, buttonTextColorFor } from "std:ui/style";
+import { Signal } from "std:signals";
 import { TextEdit } from "std:ui/edit";
 import { KEY_ENTER } from "std:ui/keys";
 import { textX, textY } from "std:ui/layout";
@@ -124,14 +124,16 @@ export class InputNode extends Widget {
     onChange: (value: str) => void;
     hint: str;
     size: float;
+    onSubmit: ((value: str) => void)?;
 
-    constructor(value: str, onChange: (value: str) => void, hint: str, h: float, size: float) {
+    constructor(value: str, onChange: (value: str) => void, hint: str, h: float, size: float, onSubmit: ((value: str) => void)?) {
         super();
         this.value = value;
         this.onChange = onChange;
         this.hint = hint;
         this.h = h;
         this.size = size;
+        this.onSubmit = onSubmit;
     }
 
     override measure(maxW: float, maxH: float): Size {
@@ -149,22 +151,26 @@ export class InputNode extends Widget {
         if (ed.text != this.value) {
             this.onChange(ed.text);
         }
+        const submit = this.onSubmit;
+        if (ed.focused && submit !== null) {
+            for (let key of cx.fr.pressed) {
+                if (key == KEY_ENTER) {
+                    submit(ed.text);
+                }
+            }
+        }
         paintField(cx, x, y, w, h, ed, this.hint, this.size);
     }
 }
 
-export function Button(label: str, onPress: () => void, w: float = -1.0, h: float = 40.0, color: int = 0xFF4C8DFF, fg: int = 0xFFFFFFFF, size: float = 17.0, radius: float = 8.0, enabled: bool = true): Widget {
-    return new ButtonNode(label, onPress, w, h, color, fg, size, radius, enabled);
+export function Button(text: str, onPress: () => void, kind: ButtonKind = ButtonKind.primary, enabled: bool = true, w: float = -1.0, h: float = 40.0, size: float = 17.0, radius: float = 8.0): Widget {
+    return new ButtonNode(text, onPress, w, h, buttonColorFor(kind), buttonTextColorFor(kind), size, radius, enabled);
 }
 
 export function Field(edit: TextEdit? = null, hint: str = "", h: float = 44.0, size: float = 18.0, onSubmit: ((text: str) => void)? = null): Widget {
     return new FieldNode(edit, hint, h, size, onSubmit);
 }
 
-export function List<T>(items: T[], build: (item: T, index: int) => Widget[], rowH: float = 34.0, gap: float = 4.0): Widget {
-    const rows: Widget[] = [];
-    for (let i = 0; i < items.length; i = i + 1) {
-        rows.push(Row(h: rowH, gap: 8.0, children: build(items[i], i)));
-    }
-    return Column(gap: gap, children: rows);
+export function Input(bind: Signal<str>, hint: str = "", onSubmit: ((value: str) => void)? = null, h: float = 44.0, size: float = 18.0): Widget {
+    return new InputNode(bind.value, (next: str) => bind.set(next), hint, h, size, onSubmit);
 }

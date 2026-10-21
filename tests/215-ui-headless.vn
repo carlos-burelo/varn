@@ -4,13 +4,13 @@ import {
     UiFrame,
     Focus,
     TextEdit,
-    pad, row, col, textX, textY, ellipsize,
     KEY_BACKSPACE, KEY_TAB, KEY_ENTER, KEY_ESCAPE, KEY_SPACE, KEY_DELETE,
     KEY_ARROW_LEFT, KEY_ARROW_UP, KEY_ARROW_RIGHT, KEY_ARROW_DOWN,
     MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE,
     keyCode, isNamedKey, hit,
     UiEventKind, UiInjectKind
 } from "std:ui";
+import { pad, row, col, textX, textY, ellipsize } from "std:ui/layout";
 import { measure, ascent, descent } from "std:text";
 
 function tapKey(win: UiWindow, fr: UiFrame, focus: Focus, ed: TextEdit, code: int): void {

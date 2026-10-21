@@ -232,6 +232,7 @@ import "./237-lexical-this.vn"
 import "./239-top-level-for-await.vn"
 import "./238-signals-tasks.vn"
 import "./240-is-type-tests.vn"
+import "./241-ui-controls.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

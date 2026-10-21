@@ -1,83 +1,58 @@
 import {
-    UiFrame, Focus, TextEdit, Widget,
-    Label, TextAlign, Box, Column, Row, Button, Field, Checkbox, List, Spacer, run
+    Column, Row, Text, Title, Caption, Button, ButtonKind, Checkbox, Input, Each, Expanded, Spacer,
+    signal, effect, component, run, Widget, Theme, UiFrame, Focus
 } from "std:ui";
 import { readText, writeText, exists } from "std:fs";
 import { Json } from "std:encoding";
 
 const FILE = "examples/todos.json";
-const BG = 4278190080;
-const WHITE = 4294967295;
-const GRAY = 4287137928;
-const GREEN = 4278255360;
-const RED = 4294901760;
-const MAX_ROWS = 12;
 
 type Todo = { text: str, done: bool };
 
 function loadTodos(): Todo[] {
-    const out: Todo[] = [];
     if (!exists(FILE)) {
-        return out;
+        return [];
     }
     try {
-        const data = Json.parse<Todo[]>(readText(FILE));
-        for (let t of data) {
-            out.push({ text: t.text, done: t.done == true });
-        }
+        return Json.parse<Todo[]>(readText(FILE)).map((t: Todo): Todo => ({ text: t.text, done: t.done == true }));
     } catch (e) {
-    }
-    return out;
-}
-
-const todos = loadTodos();
-const ed = new TextEdit();
-const acts = { toggle: -1, del: -1 };
-
-function addTodo(title: str): void {
-    const clean = title.trim();
-    if (clean != "") {
-        todos.push({ text: clean, done: false });
-        writeText(FILE, Json.stringify(todos));
+        return [];
     }
 }
 
-run("tareas",
-    build: (fr: UiFrame, focus: Focus) => {
-        if (acts.toggle >= 0 && acts.toggle < todos.length) {
-            todos[acts.toggle].done = !todos[acts.toggle].done;
-            writeText(FILE, Json.stringify(todos));
-            acts.toggle = -1;
+const todos = signal<Todo[]>(loadTodos());
+effect(() => writeText(FILE, Json.stringify(todos.value)));
+
+@component
+function App(): Widget {
+    const draft = signal("");
+
+    const add = (): void => {
+        const clean = draft.value.trim();
+        if (clean != "") {
+            todos.update((all: Todo[]): Todo[] => [...all, { text: clean, done: false }]);
+            draft.set("");
         }
-        if (acts.del >= 0 && acts.del < todos.length) {
-            todos.splice(acts.del, 1);
-            writeText(FILE, Json.stringify(todos));
-            acts.del = -1;
-        }
-        const items: Todo[] = [];
-        for (let i = 0; i < todos.length && i < MAX_ROWS; i = i + 1) {
-            items.push(todos[i]);
-        }
-        const tree: Widget = Column(pad: 20.0, gap: 12.0, children: [
-            Label(`tareas (${todos.length})`, size: 28.0),
-            Row(h: 44.0, gap: 12.0, children: [
-                Field(ed, hint: "nueva tarea, Enter añade", onSubmit: (t: str) => { addTodo(t); }),
-                Button("Añadir", w: 120.0, color: GREEN, fg: BG, onPress: () => { addTodo(ed.text); ed.clear(); })
-            ]),
-            List(items, rowH: 30.0, gap: 4.0, build: (t: Todo, i: int) => {
-                const idx = i;
-                return [
-                    Checkbox(t.done == true, onToggle: () => { acts.toggle = idx; }),
-                    Label(t.text, size: 20.0, color: t.done == true ? GRAY : WHITE),
-                    Box(w: 36.0, h: 30.0, color: RED, radius: 8.0,
-                        child: Label("-", size: 20.0, color: WHITE, align: TextAlign.center),
-                        onClick: () => { acts.del = idx; })
-                ];
-            }),
-            Spacer(),
-            Label("click edita · Enter añade · Esc sale · guarda en examples/todos.json", size: 18.0, color: GRAY)
-        ]);
-        return tree;
-    },
-    w: 800, h: 640, bg: BG);
-print(`tareas: ${todos.length} en ${FILE}`);
+    };
+    const toggle = (at: int): void => todos.update((all: Todo[]): Todo[] =>
+        all.map((t: Todo, i: int): Todo => i == at ? { text: t.text, done: !t.done } : t)
+    );
+    const remove = (at: int): void => todos.update((all: Todo[]): Todo[] =>
+        all.filter((t: Todo, i: int): bool => i != at)
+    );
+
+    return Column([
+        Title(`tareas (${todos.value.length})`),
+        Row([Expanded(Input(draft, hint: "nueva tarea, Enter añade", onSubmit: (v: str) => add())), Button("Añadir", add)]),
+        Each(todos.value, (t: Todo, at: int) => Row([
+            Checkbox(t.done, onChange: (next: bool) => toggle(at)),
+            Expanded(Text(t.text, color: t.done ? Theme.colors.muted : Theme.colors.onSurface)),
+            Button("-", () => remove(at), kind: ButtonKind.danger, w: 36.0, h: 30.0)
+        ])),
+        Spacer(),
+        Caption(`click edita · Enter añade · Esc sale · guarda en ${FILE}`)
+    ], pad: 20.0, gap: 12.0);
+}
+
+run("tareas", build: (fr: UiFrame, focus: Focus): Widget => App(), w: 800, h: 640);
+print(`tareas: ${todos.value.length} en ${FILE}`);

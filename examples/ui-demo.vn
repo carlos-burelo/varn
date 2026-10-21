@@ -1,9 +1,9 @@
 import { now } from "std:time";
 import {
     UiWindow, UiFrame, Focus, TextEdit,
-    KEY_ESCAPE,
-    row
+    KEY_ESCAPE
 } from "std:ui";
+import { row } from "std:ui/layout";
 import { wrap as wrapText, measure } from "std:text";
 
 const W = 800;

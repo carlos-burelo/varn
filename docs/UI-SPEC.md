@@ -3,22 +3,29 @@
 Version: 1.0-draft
 Module: `std:ui`
 
-> **Estado de implementación (2026-10-21, verificado en `std/ui/`).**
-> Hecho, en Varn sobre `runtime:ui`: `Signal<T>` y `Computed<T>` con `.value`,
-> `effect`, `batch`, `untracked` (`signal.vn`); el decorador `@component`, que
-> conserva `signal`, `computed` y `effect` de su cuerpo entre fotogramas por
-> orden de llamada (`component.vn`, `state.vn`); `Widget`, una clase abstracta con
-> `paint()` cuyos nodos (`FlexNode`, `LabelNode`, `BoxNode`…) viven en
-> `widget/*.vn`, y el catálogo de primitivas de §8–§10 más `container`,
-> `animated`, `when`, `each` (`catalog.vn`); estilos y temas (`style.vn`).
-> Layout de dos pasos: cada `Widget` implementa `measure(maxW, maxH): Size` (tamaño
-> intrínseco) y `paint(cx, x, y, w, h)`; `Column`/`Row` reparten el eje principal
-> entre hijos intrínsecos y `Expanded`/`Spacer` (`flex`), y alinean con `MainAxis`
-> y `CrossAxis` (por defecto `start` en columna y `center` en fila). Colores y
-> tamaños salen de `Theme`.
-> Puertas: `tests/220-ui-declarative.vn`, `tests/232-ui-layout.vn`.
-> Pendiente: el decorador `pure` (§12) y la UI IR y su pipeline de compilación
-> (§16–§17); hoy el árbol se construye y se resuelve en tiempo de ejecución.
+> **Estado de implementación (2026-10-21, verificado en `std/ui/` y `std/signals/`).**
+> El grafo reactivo vive en `std:signals`, independiente de la UI: `Readable<T>`
+> (`Signal<T>`, `Computed<T>`), `effect`, `batch`, `untracked`, `onCleanup`, `Scope`,
+> `Scheduler`, `until`, `next`, `changes`, `resource`. `std:ui` lo reexporta y solo
+> aporta el `Owner` de componente (`state.vn`): el decorador `@component` conserva
+> `signal`, `computed` y `effect` de su cuerpo entre fotogramas por orden de
+> llamada, y crear estado en otro orden que en el fotograma anterior es un error.
+> Catálogo público (`widget/*.vn`, sin prefijo): `Text`/`Title`/`Headline`/`Caption`,
+> `Column`, `Row`, `Stack`, `Box`, `Card(children, title:)`, `Padding`, `SizedBox`,
+> `Spacer`, `Expanded`, `Divider`, `Button(kind: ButtonKind)`, `Input(bind:)`, `Field`,
+> `Checkbox`, `Switch`, `Slider`, `Segmented`, `Tabs`, `Grid`, `Table`, `Each`,
+> `Image`, `Progress` y `navigator<T>()`. Los controles de valor aceptan
+> `T | Signal<T>`: con una `Signal` se enlazan solos; con un valor simple exigen su
+> callback de cambio.
+> Layout de dos pasos: `measure(maxW, maxH): Size` y `paint(cx, x, y, w, h)`.
+> `Column`/`Row` reparten el eje principal entre hijos intrínsecos y flexibles
+> (`Expanded`/`Spacer`); un contenedor con hijos flexibles o con `mainAxis` distinto
+> de `start` ocupa su eje principal, y un widget con `fills` (`Card`) ocupa el eje
+> cruzado. Por defecto `start` en columna y `center` en fila.
+> Puertas: `tests/220-ui-declarative.vn`, `tests/232-ui-layout.vn`,
+> `tests/241-ui-controls.vn`, `tests/235-signals.vn`, `tests/238-signals-tasks.vn`.
+> Pendiente: `Scroll`, `Dialog`, `Select` y `Toast` (necesitan recorte, rueda y capas
+> en `runtime:ui`), el decorador `pure` (§12) y la UI IR (§16–§17).
 
 ## 1. Objetivo
 
@@ -47,10 +54,10 @@ Los ejemplos definen la API objetivo. Los tipos y primitivas nativas son contrat
 El módulo principal es `std:ui`.
 
 ```ts
-import { ui, signal, computed, effect } from "std:ui"
+import { Column, Row, Text, Button, signal, computed, effect } from "std:ui"
 ```
 
-Las primitivas visuales se exponen bajo `ui` para evitar colisiones con funciones y tipos de aplicación.
+Las primitivas visuales son funciones públicas con nombre en PascalCase (`Column`, `Row`, `Text`, `Card`, `Button`…), sin prefijo ni espacio de nombres: los componentes del usuario (`@component function Counter()`) se leen igual que los nativos y no chocan con variables como `text` o `list`.
 
 Las funciones de estado se exportan directamente para que su semántica sea independiente de la composición visual.
 
@@ -59,13 +66,13 @@ Las funciones de estado se exportan directamente para que su semántica sea inde
 Todo componente visual declarado por el usuario debe utilizar `@component`.
 
 ```ts
-import { ui } from "std:ui"
+import { Column, Text } from "std:ui"
 
 @component
 function Counter() {
-    return ui.column(
+    return Column(
         children: [
-            ui.text("Counter")
+            Text("Counter")
         ]
     )
 }
@@ -87,11 +94,11 @@ Reglas:
 Las llamadas a componentes y primitivas admiten argumentos nombrados.
 
 ```ts
-ui.column(
+Column(
     gap: 12,
     padding: 16,
     children: [
-        ui.text("Dashboard")
+        Text("Dashboard")
     ]
 )
 ```
@@ -227,20 +234,20 @@ La composición se realiza mediante llamadas a funciones y listas explícitas de
 ```ts
 @component
 function Dashboard() {
-    return ui.column(
+    return Column(
         gap: 16,
         padding: 24,
         children: [
-            ui.text(
+            Text(
                 "Dashboard",
                 style: .title
             ),
-            ui.row(
+            Row(
                 gap: 12,
                 mainAxis: .spaceBetween,
                 children: [
-                    ui.text("Revenue"),
-                    ui.text("$24,500")
+                    Text("Revenue"),
+                    Text("$24,500")
                 ]
             )
         ]
@@ -264,14 +271,14 @@ Reglas:
 ### 8.1 Column
 
 ```ts
-ui.column(
+Column(
     gap: 12,
     padding: 16,
     mainAxis: .start,
     crossAxis: .stretch,
     children: [
-        ui.text("Title"),
-        ui.text("Description")
+        Text("Title"),
+        Text("Description")
     ]
 )
 ```
@@ -281,13 +288,13 @@ Organiza los hijos en el eje vertical.
 ### 8.2 Row
 
 ```ts
-ui.row(
+Row(
     gap: 8,
     mainAxis: .spaceBetween,
     crossAxis: .center,
     children: [
-        ui.text("Label"),
-        ui.text("Value")
+        Text("Label"),
+        Text("Value")
     ]
 )
 ```
@@ -297,11 +304,11 @@ Organiza los hijos en el eje horizontal.
 ### 8.3 Stack
 
 ```ts
-ui.stack(
+Stack(
     alignment: .center,
     children: [
         ui.rectangle(color: .blue),
-        ui.text("Overlay")
+        Text("Overlay")
     ]
 )
 ```
@@ -311,9 +318,9 @@ Superpone los hijos dentro de una región común.
 ### 8.4 Padding
 
 ```ts
-ui.padding(
+Padding(
     all: 16,
-    child: ui.text("Content")
+    child: Text("Content")
 )
 ```
 
@@ -322,10 +329,10 @@ Añade espacio interno alrededor de un único hijo.
 ### 8.5 SizedBox
 
 ```ts
-ui.sizedBox(
+SizedBox(
     width: 120,
     height: 48,
-    child: ui.text("Fixed region")
+    child: Text("Fixed region")
 )
 ```
 
@@ -334,11 +341,11 @@ Define restricciones dimensionales.
 ### 8.6 Spacer
 
 ```ts
-ui.row(
+Row(
     children: [
-        ui.text("Left"),
-        ui.spacer(),
-        ui.text("Right")
+        Text("Left"),
+        Spacer(),
+        Text("Right")
     ]
 )
 ```
@@ -350,7 +357,7 @@ Consume espacio flexible dentro del layout.
 ### Text
 
 ```ts
-ui.text(
+Text(
     "Hello",
     style: .body,
     color: .primary,
@@ -361,7 +368,7 @@ ui.text(
 ### Button
 
 ```ts
-ui.button(
+Button(
     text: "Save",
     enabled: true,
     onPress: save
@@ -373,7 +380,7 @@ ui.button(
 ```ts
 const name = signal("")
 
-ui.input(
+Input(
     value: name(),
     onChange: value => name(value),
     placeholder: "Name"
@@ -383,7 +390,7 @@ ui.input(
 ### Image
 
 ```ts
-ui.image(
+Image(
     source: avatarUrl,
     width: 64,
     height: 64,
@@ -394,7 +401,7 @@ ui.image(
 ### ProgressIndicator
 
 ```ts
-ui.progressIndicator(
+Progress(
     value: progress(),
     indeterminate: false
 )
@@ -413,12 +420,12 @@ Los valores visuales deben usar tipos dedicados cuando corresponda, en lugar de 
 function ConnectionStatus() {
     const connected = signal(false)
 
-    return ui.column(
+    return Column(
         children: [
             ui.when(
                 condition: connected.value,
-                then: () => ui.text("Connected"),
-                otherwise: () => ui.text("Disconnected")
+                then: () => Text("Connected"),
+                otherwise: () => Text("Disconnected")
             )
         ]
     )
@@ -441,9 +448,9 @@ type Todo = {
 function TodoList() {
     const todos = signal<Todo[]>([])
 
-    return ui.column(
+    return Column(
         children: [
-            ui.each(
+            Each(
                 items: todos(),
                 key: todo => todo.id,
                 render: todo => TodoRow(
@@ -456,7 +463,7 @@ function TodoList() {
 
 @component
 function TodoRow(todo: Todo) {
-    return ui.text(todo.title)
+    return Text(todo.title)
 }
 ```
 
@@ -481,12 +488,12 @@ function Counter() {
         () => count.value * 2
     )
 
-    return ui.column(
+    return Column(
         gap: 8,
         children: [
-            ui.text(`Count: ${count.value}`),
-            ui.text(`Doubled: ${doubled.value}`),
-            ui.button(
+            Text(`Count: ${count.value}`),
+            Text(`Doubled: ${doubled.value}`),
+            Button(
                 text: "Increment",
                 onPress: () => { count.value = count.value + 1 }
             )
@@ -516,7 +523,7 @@ Obligatorio para componentes visuales de usuario.
 ```ts
 @component
 function Profile(name: str) {
-    return ui.text(name)
+    return Text(name)
 }
 ```
 
@@ -528,7 +535,7 @@ Opcional; permite declarar que una unidad visual puede memorizarse bajo una pol�
 @component
 @memo
 function PriceLabel(price: float) {
-    return ui.text(formatCurrency(price))
+    return Text(formatCurrency(price))
 }
 ```
 
@@ -540,7 +547,7 @@ function PriceLabel(price: float) {
 @component
 @pure
 function StaticLabel(value: str) {
-    return ui.text(value)
+    return Text(value)
 }
 ```
 
@@ -569,7 +576,7 @@ function SaveButton() {
         }
     }
 
-    return ui.button(
+    return Button(
         text: "Save",
         enabled: !saving(),
         onPress: save
@@ -591,11 +598,11 @@ Reglas:
 Los estilos utilizan propiedades tipadas y valores estructurados.
 
 ```ts
-ui.container(
+Box(
     padding: 16,
     background: Theme.colors.surface,
     radius: 12,
-    child: ui.text(
+    child: Text(
         "Card",
         color: Theme.colors.onSurface
     )
@@ -622,9 +629,9 @@ Los estilos deben normalizarse durante la compilación cuando sean estáticos.
 function ExpandablePanel() {
     const expanded = signal(false)
 
-    return ui.column(
+    return Column(
         children: [
-            ui.button(
+            Button(
                 text: "Toggle",
                 onPress: () => expanded(!expanded())
             ),
@@ -634,8 +641,8 @@ function ExpandablePanel() {
                 curve: .easeInOut,
                 child: ui.when(
                     condition: expanded(),
-                    then: () => ui.text("Details"),
-                    otherwise: () => ui.sizedBox(
+                    then: () => Text("Details"),
+                    otherwise: () => SizedBox(
                         width: 0,
                         height: 0
                     )
@@ -811,9 +818,9 @@ La versión inicial se considera funcional cuando:
 La API pública de Varn Native UI se basa en:
 
 - `@component` para declarar componentes.
-- `ui.column(...)`, `ui.row(...)` y otras primitivas para composición.
+- `Column(...)`, `Row(...)` y otras primitivas para composición.
 - `children: [...]` para árboles estáticos.
-- `ui.when(...)` y `ui.each(...)` para regiones dinámicas.
+- `ui.when(...)` y `Each(...)` para regiones dinámicas.
 - `signal(...)`, `computed(...)`, `effect(...)` y `batch(...)` para reactividad.
 - Argumentos nombrados tipados.
 - UI IR para optimización.

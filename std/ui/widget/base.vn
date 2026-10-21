@@ -35,6 +35,7 @@ export abstract class Widget {
     w: float = -1.0;
     h: float = -1.0;
     flex: float = 0.0;
+    fills: bool = false;
 
     abstract measure(maxW: float, maxH: float): Size;
     abstract paint(cx: PaintContext, x: float, y: float, w: float, h: float): void;

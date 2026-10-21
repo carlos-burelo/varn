@@ -1,0 +1,51 @@
+import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { current, writer } from "std:ui/widget/bound";
+import { hit } from "std:ui/keys";
+import { Theme } from "std:ui/style";
+import { Signal } from "std:signals";
+
+export class SliderNode extends Widget {
+    value: float;
+    low: float;
+    high: float;
+    onChange: (next: float) => void;
+
+    constructor(value: float, low: float, high: float, onChange: (next: float) => void, h: float) {
+        super();
+        this.value = value;
+        this.low = low;
+        this.high = high;
+        this.onChange = onChange;
+        this.h = h;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return this.fit(new Size(maxW, this.h));
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        const span = this.high - this.low;
+        const knob = h;
+        const travel = w - knob;
+        const frac = span > 0.0 ? (this.value - this.low) / span : 0.0;
+        const clamped = frac < 0.0 ? 0.0 : (frac > 1.0 ? 1.0 : frac);
+        const trackY = y + h / 2.0 - 3.0;
+        cx.win.rect(x, trackY, w, 6.0, Theme.colors.outline, 3.0);
+        cx.win.rect(x, trackY, knob / 2.0 + travel * clamped, 6.0, Theme.colors.primary, 3.0);
+        cx.win.rect(x + travel * clamped, y, knob, knob, Theme.colors.onPrimary, knob / 2.0);
+        const fr = cx.fr;
+        const dragging = fr.left && hit(fr.downX as float, fr.downY as float, x, y, w, h);
+        if (dragging && travel > 0.0) {
+            const t = ((fr.mouseX as float) - x - knob / 2.0) / travel;
+            const bounded = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+            const next = this.low + span * bounded;
+            if (next != this.value) {
+                this.onChange(next);
+            }
+        }
+    }
+}
+
+export function Slider(value: float | Signal<float>, onChange: ((next: float) => void)? = null, low: float = 0.0, high: float = 1.0, h: float = 24.0): Widget {
+    return new SliderNode(current<float>(value), low, high, writer<float>(value, onChange), h);
+}

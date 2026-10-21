@@ -1,0 +1,44 @@
+import { Readable, Signal, signal } from "std:signals";
+
+export class Navigator<T> {
+    private _pages: Signal<T[]>;
+
+    constructor(pages: Signal<T[]>) {
+        this._pages = pages;
+    }
+
+    get page(): T {
+        const pages = this._pages.value;
+        return pages[pages.length - 1];
+    }
+
+    get depth(): int {
+        return this._pages.value.length;
+    }
+
+    get canGoBack(): bool {
+        return this._pages.value.length > 1;
+    }
+
+    push(page: T): void {
+        this._pages.update((pages: T[]): T[] => [...pages, page]);
+    }
+
+    replace(page: T): void {
+        this._pages.update((pages: T[]): T[] => [...pages.slice(0, pages.length - 1), page]);
+    }
+
+    pop(): void {
+        if (this.canGoBack) {
+            this._pages.update((pages: T[]): T[] => pages.slice(0, pages.length - 1));
+        }
+    }
+
+    reset(page: T): void {
+        this._pages.set([page]);
+    }
+}
+
+export function navigator<T>(root: T): Navigator<T> {
+    return new Navigator<T>(signal<T[]>([root]));
+}

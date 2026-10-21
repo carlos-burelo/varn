@@ -1,5 +1,5 @@
 import { Widget, Size, PaintContext } from "std:ui/widget/base";
-import { TextStyle } from "std:ui/style";
+import { TextStyle, textSizeFor, textColorFor } from "std:ui/style";
 import { textX, textY, ellipsize } from "std:ui/layout";
 import { measure, ascent, descent } from "std:text";
 
@@ -9,7 +9,7 @@ export enum TextAlign {
     right
 }
 
-export class LabelNode extends Widget {
+export class TextNode extends Widget {
     text: str;
     size: float;
     color: int;
@@ -44,6 +44,25 @@ export class LabelNode extends Widget {
     }
 }
 
-export function Label(text: str, size: float = 18.0, color: int = 4293454573, align: TextAlign = TextAlign.left, style: TextStyle = TextStyle.body, maxLines: int = 0): Widget {
-    return new LabelNode(text, size, color, align, style, maxLines);
+export function Text(value: str, style: TextStyle = TextStyle.body, color: int = -1, size: float = 0.0, align: TextAlign = TextAlign.left, maxLines: int = 0): Widget {
+    return new TextNode(
+        value,
+        size > 0.0 ? size : textSizeFor(style),
+        color >= 0 ? color : textColorFor(style),
+        align,
+        style,
+        maxLines
+    );
+}
+
+export function Title(value: str, color: int = -1, align: TextAlign = TextAlign.left): Widget {
+    return Text(value, style: TextStyle.title, color: color, align: align);
+}
+
+export function Headline(value: str, color: int = -1, align: TextAlign = TextAlign.left): Widget {
+    return Text(value, style: TextStyle.headline, color: color, align: align);
+}
+
+export function Caption(value: str, color: int = -1, align: TextAlign = TextAlign.left): Widget {
+    return Text(value, style: TextStyle.caption, color: color, align: align);
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 import {
     UiWindow, UiFrame, Focus, Widget, Size, PaintContext,
-    ui, Row, Column, Button, Spacer, Expanded, Label, Box, Divider,
+    Row, Column, Button, Spacer, Expanded, Text, Box, Card, Stack, Divider,
     MainAxis, CrossAxis, Alignment, render
 } from "std:ui";
 
@@ -77,9 +77,9 @@ await describe("232 ui layout", async () => {
         expect(stretched[0][2]).toBe(300.0);
     });
 
-    await it("a card wraps its content and pads it", () => {
-        const drawn = paintAt(ui.column(children: [
-            ui.card(padding: 10.0, child: Box(w: 80.0, h: 30.0, color: 0xFFFFFFFF))
+    await it("a box wraps its content and pads it", () => {
+        const drawn = paintAt(Column([
+            Box(Box(w: 80.0, h: 30.0, color: 0xFFFFFFFF), pad: 10.0, color: 0xFF202020)
         ]), 800.0, 600.0);
         expect(drawn[0][2]).toBe(100.0);
         expect(drawn[0][3]).toBe(50.0);
@@ -87,8 +87,25 @@ await describe("232 ui layout", async () => {
         expect(drawn[1][1]).toBe(10.0);
     });
 
+    await it("a card fills the width of its column", () => {
+        const drawn = paintAt(Column([
+            Card([Box(w: 80.0, h: 30.0, color: 0xFFFFFFFF)], pad: 10.0)
+        ]), 800.0, 600.0);
+        expect(drawn[0][2]).toBe(800.0);
+        expect(drawn[0][3]).toBe(50.0);
+        expect(drawn[1][0]).toBe(10.0);
+    });
+
+    await it("a row with a spacer fills the width of its parent", () => {
+        const drawn = paintAt(Column([
+            Row([Box(w: 50.0, h: 20.0, color: 0xFFFFFFFF), Spacer(), Box(w: 50.0, h: 20.0, color: 0xFF000000)])
+        ]), 800.0, 600.0);
+        expect(drawn[0][0]).toBe(0.0);
+        expect(drawn[1][0]).toBe(750.0);
+    });
+
     await it("a stack aligns children inside its box", () => {
-        const drawn = paintAt(ui.stack(alignment: Alignment.bottomRight, children: [
+        const drawn = paintAt(Stack(alignment: Alignment.bottomRight, children: [
             Box(w: 200.0, h: 100.0, color: 0xFFFFFFFF),
             Box(w: 20.0, h: 20.0, color: 0xFF000000)
         ]), 200.0, 100.0);

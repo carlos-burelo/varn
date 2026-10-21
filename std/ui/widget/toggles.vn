@@ -1,0 +1,73 @@
+import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { current, writer } from "std:ui/widget/bound";
+import { Theme } from "std:ui/style";
+import { Signal } from "std:signals";
+
+export class CheckboxNode extends Widget {
+    checked: bool;
+    onToggle: () => void;
+    color: int;
+
+    constructor(checked: bool, onToggle: () => void, size: float, color: int) {
+        super();
+        this.checked = checked;
+        this.onToggle = onToggle;
+        this.w = size;
+        this.h = size;
+        this.color = color;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return new Size(this.w, this.h);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        cx.win.rect(x, y, w, h, this.checked ? this.color : Theme.colors.outline, 6.0);
+        if (this.checked) {
+            const inset = w * 0.28;
+            cx.win.rect(x + inset, y + inset, w - 2.0 * inset, h - 2.0 * inset, Theme.colors.onPrimary, 3.0);
+        }
+        if (cx.fr.clicked(x, y, w, h)) {
+            this.onToggle();
+        }
+    }
+}
+
+export class SwitchNode extends Widget {
+    on: bool;
+    onToggle: () => void;
+
+    constructor(on: bool, onToggle: () => void, w: float, h: float) {
+        super();
+        this.on = on;
+        this.onToggle = onToggle;
+        this.w = w;
+        this.h = h;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return new Size(this.w, this.h);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        cx.win.rect(x, y, w, h, this.on ? Theme.colors.primary : Theme.colors.outline, h / 2.0);
+        const knob = h - 6.0;
+        const knobX = this.on ? x + w - knob - 3.0 : x + 3.0;
+        cx.win.rect(knobX, y + 3.0, knob, knob, Theme.colors.onPrimary, knob / 2.0);
+        if (cx.fr.clicked(x, y, w, h)) {
+            this.onToggle();
+        }
+    }
+}
+
+export function Checkbox(value: bool | Signal<bool>, onChange: ((next: bool) => void)? = null, size: float = 26.0): Widget {
+    const write = writer<bool>(value, onChange);
+    const checked = current<bool>(value);
+    return new CheckboxNode(checked, () => write(!checked), size, Theme.colors.primary);
+}
+
+export function Switch(value: bool | Signal<bool>, onChange: ((next: bool) => void)? = null, w: float = 46.0, h: float = 26.0): Widget {
+    const write = writer<bool>(value, onChange);
+    const on = current<bool>(value);
+    return new SwitchNode(on, () => write(!on), w, h);
+}

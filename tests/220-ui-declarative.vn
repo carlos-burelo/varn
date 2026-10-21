@@ -1,8 +1,9 @@
 import { describe, it, expect } from "std:test";
 import {
-    UiWindow, UiFrame, Focus, Widget, render, FlexNode, LabelNode, BoxNode, PaddingNode, Axis, TextAlign,
-    ui, signal, computed, effect, batch, untracked, component,
-    TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Curve, Colors, Theme,
+    UiWindow, UiFrame, Focus, Widget, render, FlexNode, TextNode, BoxNode, PaddingNode, Axis, TextAlign,
+    Column, Row, Text, Box, Padding, Stack, SizedBox, Spacer, Button, Input, Each,
+    signal, computed, effect, component,
+    TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Colors, Theme,
     textSizeFor, textColorFor, run
 } from "std:ui";
 import { MOUSE_LEFT, UiInjectKind } from "std:ui";
@@ -15,14 +16,14 @@ function Clicker(): Widget {
     const clicks = signal(0);
     const label = computed(() => `clicks: ${clicks.value}`);
     effect(() => { boots = boots + 1; });
-    return ui.column(children: [
-        ui.text(label.value),
-        ui.button(text: "more", onPress: () => { clicks.value = clicks.value + 1; })
+    return Column(children: [
+        Text(label.value),
+        Button(text: "more", onPress: () => { clicks.value = clicks.value + 1; })
     ]);
 }
 
 function flex(w: Widget): FlexNode { return w as FlexNode; }
-function label(w: Widget): LabelNode { return w as LabelNode; }
+function label(w: Widget): TextNode { return w as TextNode; }
 
 let reorder = false;
 
@@ -32,14 +33,14 @@ function Reordering(): Widget {
         computed(() => 1);
     }
     const kept = signal(0);
-    return ui.text(`${kept.value}`);
+    return Text(`${kept.value}`);
 }
 
 @component
 function Stable(): Widget {
     const kept = signal(0);
     kept.value = kept.value + 1;
-    return ui.text(`${kept.value}`);
+    return Text(`${kept.value}`);
 }
 
 type Todo = {
@@ -49,29 +50,29 @@ type Todo = {
 
 @component
 function Counter(): Widget {
-    return ui.column(
+    return Column(
         children: [
-            ui.text("Counter")
+            Text("Counter")
         ]
     );
 }
 
 @component
 function Dashboard(): Widget {
-    return ui.column(
+    return Column(
         gap: 16.0,
-        padding: 24.0,
+        pad: 24.0,
         children: [
-            ui.text(
+            Text(
                 "Dashboard",
                 style: TextStyle.title
             ),
-            ui.row(
+            Row(
                 gap: 12.0,
                 mainAxis: MainAxis.spaceBetween,
                 children: [
-                    ui.text("Revenue"),
-                    ui.text("$24,500")
+                    Text("Revenue"),
+                    Text("$24,500")
                 ]
             )
         ]
@@ -81,26 +82,22 @@ function Dashboard(): Widget {
 @component
 function ConnectionStatus(): Widget {
     const connected = signal(false);
-    return ui.column(
+    return Column(
         children: [
-            ui.when(
-                condition: connected.value,
-                then: () => ui.text("Connected"),
-                otherwise: () => ui.text("Disconnected")
-            )
+            Text(connected.value ? "Connected" : "Disconnected")
         ]
     );
 }
 
 @component
 function TodoRow(todo: Todo): Widget {
-    return ui.text(todo.title);
+    return Text(todo.title);
 }
 
 @component
 @component
 function PriceLabel(price: float): Widget {
-    return ui.text(price.toString(), style: TextStyle.title);
+    return Text(price.toString(), style: TextStyle.title);
 }
 
 await describe("220 ui declarative", async () => {
@@ -109,7 +106,7 @@ await describe("220 ui declarative", async () => {
         expect(tree is FlexNode).toBe(true);
         expect(flex(tree).axis).toBe(Axis.vertical);
         expect(flex(tree).children.length).toBe(1);
-        expect(flex(tree).children[0] is LabelNode).toBe(true);
+        expect(flex(tree).children[0] is TextNode).toBe(true);
         expect(label(flex(tree).children[0]).text).toBe("Counter");
     });
 
@@ -129,13 +126,9 @@ await describe("220 ui declarative", async () => {
 
     await it("connection status flips on signal", () => {
         const connected = signal(false);
-        const build = (): Widget => ui.column(
+        const build = (): Widget => Column(
             children: [
-                ui.when(
-                    condition: connected.value,
-                    then: () => ui.text("Connected"),
-                    otherwise: () => ui.text("Disconnected")
-                )
+                Text(connected.value ? "Connected" : "Disconnected")
             ]
         );
         expect(label(flex(build()).children[0]).text).toBe("Disconnected");
@@ -146,10 +139,7 @@ await describe("220 ui declarative", async () => {
 
     await it("each keeps stable order with keys", () => {
         const todos: Todo[] = [{ id: 1, title: "a" }, { id: 2, title: "b" }];
-        const list = ui.each(todos,
-            key: t => t.id,
-            render: t => TodoRow(todo: t)
-        );
+        const list = Each(todos, (t: Todo, index: int) => TodoRow(todo: t));
         expect(list is FlexNode).toBe(true);
         expect(flex(list).children.length).toBe(2);
         expect(label(flex(list).children[0]).text).toBe("a");
@@ -162,8 +152,8 @@ await describe("220 ui declarative", async () => {
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const hits: bool[] = [];
-        const tree = ui.column(children: [
-            ui.button(text: "no", onPress: () => { hits.push(true); }, enabled: false)
+        const tree = Column(children: [
+            Button(text: "no", onPress: () => { hits.push(true); }, enabled: false)
         ]);
         renderTree(win, fr, focus, tree);
         win.inject(UiInjectKind.MouseDown, 30, 20, MOUSE_LEFT);
@@ -174,8 +164,8 @@ await describe("220 ui declarative", async () => {
         renderTree(win, fr, focus, tree);
         expect(hits.length).toBe(0);
         const hits2: bool[] = [];
-        const tree2 = ui.column(children: [
-            ui.button(text: "yes", onPress: () => { hits2.push(true); })
+        const tree2 = Column(children: [
+            Button(text: "yes", onPress: () => { hits2.push(true); })
         ]);
         const fr2 = new UiFrame(800, 600);
         const focus2 = new Focus();
@@ -194,11 +184,7 @@ await describe("220 ui declarative", async () => {
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const name = signal("");
-        const build = (): Widget => ui.input(
-            value: name.value,
-            onChange: (v: str) => { name.value = v; },
-            placeholder: "Name"
-        );
+        const build = (): Widget => Input(bind: name, hint: "Name");
         renderTree(win, fr, focus, build());
         win.inject(UiInjectKind.MouseDown, 30, 30, MOUSE_LEFT);
         fr.update(win);
@@ -241,26 +227,25 @@ await describe("220 ui declarative", async () => {
         expect(textColorFor(TextStyle.caption)).toBe(Theme.colors.muted);
         expect(textColorFor(TextStyle.body)).toBe(Theme.colors.onSurface);
         expect(Theme.colors.surface).toBe(0xFF1E2128);
-        expect(label(ui.text("x")).size).toBe(Theme.text.bodySize);
-        expect(label(ui.text("x", style: TextStyle.title)).size).toBe(Theme.text.titleSize);
+        expect(label(Text("x")).size).toBe(Theme.text.bodySize);
+        expect(label(Text("x", style: TextStyle.title)).size).toBe(Theme.text.titleSize);
         expect(CrossAxis.stretch == CrossAxis.stretch).toBe(true);
         expect(Alignment.center == Alignment.center).toBe(true);
         expect(BoxFit.cover == BoxFit.cover).toBe(true);
-        expect(Curve.easeInOut == Curve.easeInOut).toBe(true);
     });
 
     await it("layout primitives nest", () => {
-        const tree = ui.container(
-            padding: 16.0,
-            background: Theme.colors.surface,
+        const tree = Box(
+            pad: 16.0,
+            color: Theme.colors.surface,
             radius: 12.0,
-            child: ui.padding(
+            child: Padding(
                 all: 8.0,
-                child: ui.stack(
+                child: Stack(
                     alignment: Alignment.center,
                     children: [
-                        ui.sizedBox(width: 120.0, height: 48.0, child: ui.text("Fixed")),
-                        ui.spacer()
+                        SizedBox(w: 120.0, h: 48.0, child: Text("Fixed")),
+                        Spacer()
                     ]
                 )
             )
