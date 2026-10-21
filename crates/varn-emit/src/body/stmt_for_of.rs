@@ -48,6 +48,9 @@ impl<'a> FnEmitter<'a> {
         body: StmtId,
         is_await: bool,
     ) -> Vec<TirStmt> {
+        if is_await && self.top_level {
+            self.saw_await = true;
+        }
         if !is_await
             && let ExprKind::Range {
                 start,

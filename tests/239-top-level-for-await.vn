@@ -1,0 +1,19 @@
+import { describe, it, expect } from "std:test";
+import { sleep } from "std:task";
+
+async function* ticks() {
+    yield 1
+    await sleep(2)
+    yield 2
+}
+
+const seen: int[] = []
+for await (const v of ticks()) {
+    seen.push(v)
+}
+
+await describe("239 for await at module level", async () => {
+    await it("drives an async generator without an enclosing function", () => {
+        expect(seen).toEqual([1, 2])
+    })
+})
