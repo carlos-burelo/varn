@@ -12,6 +12,21 @@ import {
 import { FfiType } from "std:ffi/types";
 import { Pointer } from "std:ffi/pointer";
 
+export type FfiScalar = int | float | str | bool | null;
+export type FfiValue = FfiScalar | Pointer;
+
+function marshal(args: FfiValue[]): FfiScalar[] {
+    let out: FfiScalar[] = [];
+    for (let arg of args) {
+        if (arg is Pointer) {
+            out.push(arg.address);
+        } else {
+            out.push(arg);
+        }
+    }
+    return out;
+}
+
 export class FfiFunction {
     fnPtr: int;
     returnType: FfiType;
@@ -23,21 +38,11 @@ export class FfiFunction {
         this.paramTypes = paramTypes;
     }
 
-    invoke(args: dynamic[] = []): dynamic {
-        let marshaledArgs: dynamic[] = [];
-        for (let i = 0; i < args.length; i = i + 1) {
-            let arg = args[i];
-            if (arg is Pointer) {
-                marshaledArgs.push((arg as Pointer).address);
-            } else {
-                marshaledArgs.push(arg);
-            }
-        }
-        let retTypeVal = (this.returnType is int) ? (this.returnType as int) : ((this.returnType as dynamic).rawValue as int);
-        return call$(this.fnPtr, retTypeVal, marshaledArgs);
+    invoke(args: FfiValue[] = []): FfiScalar {
+        return call$(this.fnPtr, this.returnType as int, marshal(args));
     }
 
-    call(...args: dynamic[]): dynamic {
+    call(...args: FfiValue[]): FfiScalar {
         return this.invoke(args);
     }
 }
@@ -95,19 +100,9 @@ export class Ffi {
         return readCString$(ptr as int, offset);
     }
 
-    static call(fnPtr: Pointer | int, returnType: FfiType, args: dynamic[] = []): dynamic {
-        let addr = (fnPtr is Pointer) ? (fnPtr as Pointer).address : (fnPtr as int);
-        let marshaledArgs: dynamic[] = [];
-        for (let i = 0; i < args.length; i = i + 1) {
-            let arg = args[i];
-            if (arg is Pointer) {
-                marshaledArgs.push((arg as Pointer).address);
-            } else {
-                marshaledArgs.push(arg);
-            }
-        }
-        let retTypeVal = (returnType is int) ? (returnType as int) : ((returnType as dynamic).rawValue as int);
-        return call$(addr, retTypeVal, marshaledArgs);
+    static call(fnPtr: Pointer | int, returnType: FfiType, args: FfiValue[] = []): FfiScalar {
+        let addr = fnPtr is Pointer ? fnPtr.address : fnPtr;
+        return call$(addr, returnType as int, marshal(args));
     }
 
     static callInt(fnPtr: Pointer | int, a1: int, a2: int): int {

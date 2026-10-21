@@ -7,7 +7,7 @@ export declare function dlclose$(libHandle: int): bool;
 @permission("sys.ffi")
 export declare function dlsym$(libHandle: int, symbol: str): int;
 @permission("sys.ffi")
-export declare function call$(fnPtr: int, retType: int, args: dynamic[]): dynamic;
+export declare function call$(fnPtr: int, retType: int, args: (int | float | str | bool | null)[]): int | float | str | bool | null;
 @permission("sys.ffi")
 export declare function alloc$(size: int): int;
 @permission("sys.ffi")
