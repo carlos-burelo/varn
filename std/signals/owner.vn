@@ -1,0 +1,69 @@
+export class SlotKind {}
+
+export abstract class Owner {
+    abstract adopt<T>(kind: SlotKind, make: () => T): T;
+    abstract onDispose(fn: () => void): void;
+}
+
+let _owner: Owner? = null;
+
+export function currentOwner(): Owner? {
+    return _owner;
+}
+
+export function withOwner<T>(owner: Owner?, body: () => T): T {
+    const saved = _owner;
+    _owner = owner;
+    try {
+        return body();
+    } finally {
+        _owner = saved;
+    }
+}
+
+export class Scope extends Owner {
+    private _cleanups: (() => void)[] = [];
+    private _alive: bool = true;
+
+    get alive(): bool {
+        return this._alive;
+    }
+
+    override adopt<T>(kind: SlotKind, make: () => T): T {
+        return make();
+    }
+
+    override onDispose(fn: () => void): void {
+        if (!this._alive) {
+            fn();
+            return;
+        }
+        this._cleanups.push(fn);
+    }
+
+    run<T>(body: () => T): T {
+        return withOwner(this, body);
+    }
+
+    dispose(): void {
+        if (!this._alive) {
+            return;
+        }
+        this._alive = false;
+        const pending = this._cleanups;
+        this._cleanups = [];
+        for (let at = pending.length - 1; at >= 0; at = at - 1) {
+            pending[at]();
+        }
+    }
+}
+
+export function scope(body: () => void): Scope {
+    const parent = _owner;
+    const created = new Scope();
+    created.run(body);
+    if (parent !== null) {
+        parent.onDispose(() => created.dispose());
+    }
+    return created;
+}

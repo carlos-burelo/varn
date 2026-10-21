@@ -1,0 +1,162 @@
+import { Observer, Source, changed, invalidate, notifyObservers, runTracked, track, unlink, untracked } from "std:signals/graph";
+import { Owner, SlotKind, currentOwner } from "std:signals/owner";
+import { Effect, effect } from "std:signals/effect";
+
+const SIGNAL = new SlotKind();
+const COMPUTED = new SlotKind();
+
+export abstract class Readable<T> {
+    abstract get value(): T;
+    abstract peek(): T;
+
+    map<U>(fn: (v: T) => U): Readable<U> {
+        return computed<U>(() => fn(this.value));
+    }
+
+    subscribe(fn: (v: T) => void, immediate: bool = false): Effect {
+        let skip = !immediate;
+        return effect(() => {
+            const current = this.value;
+            if (skip) {
+                skip = false;
+                return;
+            }
+            untracked(() => fn(current));
+        });
+    }
+}
+
+export class Signal<T> extends Readable<T> {
+    private _value: T;
+    private _source: Source = new Source();
+    private _equals: ((a: T, b: T) => bool)?;
+
+    constructor(initial: T, equals: ((a: T, b: T) => bool)? = null) {
+        super();
+        this._value = initial;
+        this._equals = equals;
+    }
+
+    override get value(): T {
+        track(this._source);
+        return this._value;
+    }
+
+    override set value(next: T) {
+        this.set(next);
+    }
+
+    override peek(): T {
+        return this._value;
+    }
+
+    set(next: T): void {
+        const equals = this._equals;
+        const same = equals === null ? next == this._value : equals(this._value, next);
+        if (same) {
+            return;
+        }
+        this._value = next;
+        invalidate(this._source);
+    }
+
+    update(fn: (current: T) => T): void {
+        this.set(fn(this._value));
+    }
+}
+
+export class Computed<T> extends Readable<T> implements Observer {
+    sources: Source[] = [];
+    seen: int[] = [];
+    alive: bool = true;
+    cleanups: (() => void)[] = [];
+    private _derive: () => T;
+    private _equals: ((a: T, b: T) => bool)?;
+    private _source: Source = new Source();
+    private _cached: T? = null;
+    private _stale: bool = true;
+    private _computed: bool = false;
+    private _computing: bool = false;
+
+    constructor(derive: () => T, equals: ((a: T, b: T) => bool)? = null) {
+        super();
+        this._derive = derive;
+        this._equals = equals;
+        this._source.refresher = () => this.settle();
+    }
+
+    notify(): void {
+        if (!this.alive || this._stale) {
+            return;
+        }
+        this._stale = true;
+        notifyObservers(this._source);
+    }
+
+    run(): void {}
+
+    override get value(): T {
+        this.settle();
+        track(this._source);
+        return this._cached as T;
+    }
+
+    override peek(): T {
+        this.settle();
+        return this._cached as T;
+    }
+
+    dispose(): void {
+        this.alive = false;
+        unlink(this);
+    }
+
+    private settle(): void {
+        if (!this._stale || !this.alive) {
+            return;
+        }
+        if (this._computed && !changed(this)) {
+            this._stale = false;
+            return;
+        }
+        if (this._computing) {
+            throw new Error("signals: a computed reads itself");
+        }
+        this._computing = true;
+        try {
+            unlink(this);
+            const next = runTracked(this, this._derive);
+            const equals = this._equals;
+            const unchanged = this._computed && (equals === null ? next == this._cached : equals(this._cached as T, next));
+            this._cached = next;
+            this._computed = true;
+            this._stale = false;
+            if (!unchanged) {
+                this._source.version = this._source.version + 1;
+            }
+        } finally {
+            this._computing = false;
+        }
+    }
+}
+
+export function signal<T>(initial: T, equals: ((a: T, b: T) => bool)? = null): Signal<T> {
+    const owner = currentOwner();
+    if (owner === null) {
+        return new Signal<T>(initial, equals);
+    }
+    return owner.adopt<Signal<T>>(SIGNAL, () => new Signal<T>(initial, equals));
+}
+
+export function computed<T>(derive: () => T, equals: ((a: T, b: T) => bool)? = null): Computed<T> {
+    const owner = currentOwner();
+    if (owner === null) {
+        return new Computed<T>(derive, equals);
+    }
+    const host: Owner = owner;
+    return host.adopt<Computed<T>>(COMPUTED, () => {
+        const made = new Computed<T>(derive, equals);
+        host.onDispose(() => made.dispose());
+        return made;
+    });
+}

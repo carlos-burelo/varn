@@ -226,6 +226,7 @@ import "./231-alias-of-imported-class.vn"
 import "./232-ui-layout.vn"
 import "./233-generic-heritage.vn"
 import "./234-imported-class-without-constructor.vn"
+import "./235-signals.vn"
 import "./236-generic-method-override-across-modules.vn"
 import "./237-lexical-this.vn"
 

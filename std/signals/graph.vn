@@ -1,0 +1,176 @@
+export class Source {
+    observers: Observer[] = [];
+    version: int = 0;
+    refresher: (() => void)? = null;
+
+    refresh(): void {
+        const refresher = this.refresher;
+        if (refresher !== null) {
+            refresher();
+        }
+    }
+}
+
+export interface Observer {
+    sources: Source[];
+    seen: int[];
+    alive: bool;
+    cleanups: (() => void)[];
+    notify(): void;
+    run(): void;
+}
+
+const MAX_FLUSH_ROUNDS = 1000;
+
+let _running: Observer[] = [];
+let _paused = 0;
+let _depth = 0;
+let _flushing = false;
+let _queue: Observer[] = [];
+
+export function currentObserver(): Observer? {
+    if (_running.length == 0) {
+        return null;
+    }
+    return _running[_running.length - 1];
+}
+
+export function track(source: Source): void {
+    if (_paused > 0) {
+        return;
+    }
+    const ob = currentObserver();
+    if (ob === null || source.observers.includes(ob)) {
+        return;
+    }
+    source.observers.push(ob);
+    ob.sources.push(source);
+    ob.seen.push(source.version);
+}
+
+export function unlink(ob: Observer): void {
+    for (let source of ob.sources) {
+        for (let at = source.observers.length - 1; at >= 0; at = at - 1) {
+            if (source.observers[at] == ob) {
+                source.observers.splice(at, 1);
+            }
+        }
+    }
+    ob.sources = [];
+    ob.seen = [];
+}
+
+export function changed(ob: Observer): bool {
+    for (let at = 0; at < ob.sources.length; at = at + 1) {
+        const source = ob.sources[at];
+        source.refresh();
+        if (source.version != ob.seen[at]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+export function runTracked<T>(ob: Observer, body: () => T): T {
+    const paused = _paused;
+    _paused = 0;
+    _running.push(ob);
+    try {
+        return body();
+    } finally {
+        _running.pop();
+        _paused = paused;
+    }
+}
+
+export function untracked<T>(body: () => T): T {
+    _paused = _paused + 1;
+    try {
+        return body();
+    } finally {
+        _paused = _paused - 1;
+    }
+}
+
+export function runCleanups(ob: Observer): void {
+    const pending = ob.cleanups;
+    ob.cleanups = [];
+    for (let at = pending.length - 1; at >= 0; at = at - 1) {
+        pending[at]();
+    }
+}
+
+export function notifyObservers(source: Source): void {
+    const writer = currentObserver();
+    const snapshot = source.observers.slice(0, source.observers.length);
+    for (let ob of snapshot) {
+        if (ob.alive && ob != writer) {
+            ob.notify();
+        }
+    }
+}
+
+export function invalidate(source: Source): void {
+    source.version = source.version + 1;
+    _depth = _depth + 1;
+    try {
+        notifyObservers(source);
+    } finally {
+        _depth = _depth - 1;
+    }
+    if (_depth == 0) {
+        flush();
+    }
+}
+
+export function batch(body: () => void): void {
+    _depth = _depth + 1;
+    try {
+        body();
+    } finally {
+        _depth = _depth - 1;
+        if (_depth == 0) {
+            flush();
+        }
+    }
+}
+
+export function enqueue(ob: Observer): void {
+    if (!_queue.includes(ob)) {
+        _queue.push(ob);
+    }
+}
+
+function flush(): void {
+    if (_flushing) {
+        return;
+    }
+    _flushing = true;
+    let failure: Error? = null;
+    try {
+        let rounds = 0;
+        while (_queue.length > 0) {
+            rounds = rounds + 1;
+            if (rounds > MAX_FLUSH_ROUNDS) {
+                _queue = [];
+                throw new Error("signals: effects keep re-triggering each other");
+            }
+            const due = _queue;
+            _queue = [];
+            for (let ob of due) {
+                try {
+                    ob.run();
+                } catch (e) {
+                    if (failure === null) {
+                        failure = e as Error;
+                    }
+                }
+            }
+        }
+    } finally {
+        _flushing = false;
+    }
+    if (failure !== null) {
+        throw failure;
+    }
+}

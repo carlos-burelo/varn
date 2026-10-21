@@ -1,0 +1,273 @@
+import { describe, it, expect } from "std:test";
+import {
+    Readable, Signal, Computed, Effect, signal, computed, effect, batch, untracked, onCleanup,
+    Owner, Scope, SlotKind, scope, withOwner, ManualScheduler
+} from "std:signals";
+
+function twice(source: Readable<int>): int { return source.value * 2 }
+
+class Held {}
+
+class Boxed<T> extends Held {
+    value: T;
+    constructor(value: T) {
+        super();
+        this.value = value;
+    }
+}
+
+class Slots extends Owner {
+    kept: Held[] = [];
+    cursor: int = 0;
+    cleanups: (() => void)[] = [];
+    override adopt<T>(kind: SlotKind, make: () => T): T {
+        if (this.cursor < this.kept.length) {
+            const held = this.kept[this.cursor] as Boxed<T>;
+            this.cursor = this.cursor + 1;
+            return held.value;
+        }
+        const created = make();
+        this.kept.push(new Boxed<T>(created));
+        this.cursor = this.cursor + 1;
+        return created;
+    }
+    override onDispose(fn: () => void): void { this.cleanups.push(fn) }
+}
+
+await describe("235 signals", async () => {
+    await it("a signal holds, updates and peeks", () => {
+        const count = signal(1)
+        expect(count.value).toBe(1)
+        count.value = 2
+        expect(count.peek()).toBe(2)
+        count.set(5)
+        count.update((n: int): int => n + 1)
+        expect(count.value).toBe(6)
+    })
+
+    await it("a signal and a computed are both readable", () => {
+        const base = signal(3)
+        const doubled = computed(() => base.value * 2)
+        expect(twice(base)).toBe(6)
+        expect(twice(doubled)).toBe(12)
+        const mapped: Readable<str> = base.map((n: int): str => `n${n}`)
+        expect(mapped.value).toBe("n3")
+        base.value = 4
+        expect(mapped.value).toBe("n4")
+    })
+
+    await it("a computed is lazy and cached", () => {
+        const source = signal(1)
+        let runs = 0
+        const derived = computed(() => { runs = runs + 1; return source.value + 1 })
+        expect(runs).toBe(0)
+        expect(derived.value).toBe(2)
+        expect(derived.value).toBe(2)
+        expect(runs).toBe(1)
+        source.value = 10
+        expect(runs).toBe(1)
+        expect(derived.value).toBe(11)
+        expect(runs).toBe(2)
+    })
+
+    await it("a diamond never shows a half updated state", () => {
+        const a = signal(1)
+        const left = computed(() => a.value + 1)
+        const right = computed(() => a.value * 10)
+        const seen: str[] = []
+        effect(() => { seen.push(`${left.value}/${right.value}`) })
+        a.value = 2
+        a.value = 3
+        expect(seen).toEqual(["2/10", "3/20", "4/30"])
+    })
+
+    await it("an unchanged computed does not wake its effects", () => {
+        const n = signal(1)
+        const parity = computed(() => n.value % 2)
+        let runs = 0
+        effect(() => { runs = runs + 1; parity.value })
+        n.value = 3
+        n.value = 5
+        expect(runs).toBe(1)
+        n.value = 6
+        expect(runs).toBe(2)
+    })
+
+    await it("equal writes are ignored and equality can be replaced", () => {
+        const plain = signal(1)
+        let plainRuns = 0
+        effect(() => { plainRuns = plainRuns + 1; plain.value })
+        plain.value = 1
+        expect(plainRuns).toBe(1)
+
+        const always = signal(1, equals: (a: int, b: int): bool => false)
+        let alwaysRuns = 0
+        effect(() => { alwaysRuns = alwaysRuns + 1; always.value })
+        always.value = 1
+        expect(alwaysRuns).toBe(2)
+    })
+
+    await it("batch coalesces effects", () => {
+        const a = signal(1)
+        const b = signal(1)
+        const seen: int[] = []
+        effect(() => { seen.push(a.value + b.value) })
+        batch(() => {
+            a.value = 10
+            b.value = 20
+        })
+        expect(seen).toEqual([2, 30])
+    })
+
+    await it("dependencies are discovered on every run", () => {
+        const flag = signal(true)
+        const left = signal("l")
+        const right = signal("r")
+        const seen: str[] = []
+        effect(() => { seen.push(flag.value ? left.value : right.value) })
+        right.value = "r2"
+        expect(seen).toEqual(["l"])
+        flag.value = false
+        expect(seen).toEqual(["l", "r2"])
+        left.value = "l2"
+        expect(seen).toEqual(["l", "r2"])
+    })
+
+    await it("untracked reads do not subscribe", () => {
+        const watched = signal(1)
+        const hidden = signal(1)
+        let runs = 0
+        effect(() => { runs = runs + 1; watched.value; untracked(() => hidden.value) })
+        hidden.value = 2
+        expect(runs).toBe(1)
+        watched.value = 2
+        expect(runs).toBe(2)
+    })
+
+    await it("effects clean up before running again and when disposed", () => {
+        const tick = signal(0)
+        const log: str[] = []
+        const fx = effect(() => {
+            const at = tick.value
+            log.push(`run${at}`)
+            onCleanup(() => log.push(`clean${at}`))
+        })
+        tick.value = 1
+        fx.dispose()
+        tick.value = 2
+        expect(log).toEqual(["run0", "clean0", "run1", "clean1"])
+    })
+
+    await it("subscribe skips the current value unless asked", () => {
+        const level = signal(1)
+        const quiet: int[] = []
+        const loud: int[] = []
+        const a = level.subscribe((v: int) => { quiet.push(v) })
+        const b = level.subscribe((v: int) => { loud.push(v) }, immediate: true)
+        level.value = 2
+        a.dispose()
+        level.value = 3
+        expect(quiet).toEqual([2])
+        expect(loud).toEqual([1, 2, 3])
+        b.dispose()
+    })
+
+    await it("a scope disposes what was created inside it", () => {
+        const source = signal(0)
+        const seen: int[] = []
+        const inner = scope(() => {
+            effect(() => { seen.push(source.value) })
+            onCleanup(() => seen.push(-1))
+        })
+        source.value = 1
+        inner.dispose()
+        source.value = 2
+        expect(seen).toEqual([0, 1, -1])
+        expect(inner.alive).toBe(false)
+    })
+
+    await it("nested scopes die with their parent", () => {
+        const source = signal(0)
+        let runs = 0
+        const outer = scope(() => {
+            scope(() => { effect(() => { runs = runs + 1; source.value }) })
+        })
+        source.value = 1
+        outer.dispose()
+        source.value = 2
+        expect(runs).toBe(2)
+    })
+
+    await it("an owner decides what outlives a rebuild", () => {
+        const slots = new Slots()
+        const build = (): Signal<int> => withOwner(slots, () => signal(7))
+        const first = build()
+        first.value = 8
+        slots.cursor = 0
+        const second = build()
+        expect(second.value).toBe(8)
+        expect(second === first).toBe(true)
+    })
+
+    await it("a scheduler defers effect runs", () => {
+        const manual = new ManualScheduler()
+        const source = signal(1)
+        const seen: int[] = []
+        effect(() => { seen.push(source.value) }, scheduler: manual)
+        source.value = 2
+        source.value = 3
+        expect(seen).toEqual([1])
+        expect(manual.pending).toBe(1)
+        manual.flush()
+        expect(seen).toEqual([1, 3])
+    })
+
+    await it("an effect does not retrigger itself while it runs", () => {
+        const own = signal(0)
+        let runs = 0
+        effect(() => { runs = runs + 1; own.value = own.value + 1 })
+        expect(runs).toBe(1)
+        expect(own.peek()).toBe(1)
+    })
+
+    await it("effects that feed each other are stopped", () => {
+        const left = signal(0)
+        const right = signal(0)
+        effect(() => { right.value = left.value + 1 })
+        let failed = false
+        try {
+            effect(() => { left.value = right.value + 1 })
+        } catch (e) {
+            failed = true
+        }
+        expect(failed).toBe(true)
+    })
+
+    await it("a computed that reads itself is reported", () => {
+        const holder: Computed<int>[] = []
+        const selfish = computed(() => holder[0].value + 1)
+        holder.push(selfish)
+        let failed = false
+        try {
+            selfish.value
+        } catch (e) {
+            failed = true
+        }
+        expect(failed).toBe(true)
+    })
+
+    await it("a failing effect does not hide the others", () => {
+        const source = signal(0)
+        const seen: int[] = []
+        effect(() => { if (source.value == 1) { throw new Error("boom") } })
+        effect(() => { seen.push(source.value) })
+        let failed = false
+        try {
+            source.value = 1
+        } catch (e) {
+            failed = true
+        }
+        expect(failed).toBe(true)
+        expect(seen).toEqual([0, 1])
+    })
+})

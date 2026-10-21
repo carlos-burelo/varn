@@ -1,0 +1,103 @@
+import { Observer, Source, batch, changed, currentObserver, enqueue, runCleanups, runTracked, unlink } from "std:signals/graph";
+import { Owner, SlotKind, currentOwner } from "std:signals/owner";
+import { Scheduler } from "std:signals/scheduler";
+
+const EFFECT = new SlotKind();
+
+export class Effect implements Observer {
+    sources: Source[] = [];
+    seen: int[] = [];
+    alive: bool = true;
+    cleanups: (() => void)[] = [];
+    private _body: () => void;
+    private _scheduler: Scheduler?;
+    private _queued: bool = false;
+    private _running: bool = false;
+    private _again: bool = false;
+    private _ran: bool = false;
+
+    constructor(body: () => void, scheduler: Scheduler? = null) {
+        this._body = body;
+        this._scheduler = scheduler;
+    }
+
+    notify(): void {
+        if (!this.alive || this._queued) {
+            return;
+        }
+        this._queued = true;
+        const scheduler = this._scheduler;
+        if (scheduler === null) {
+            enqueue(this);
+        } else {
+            scheduler.schedule(() => this.run());
+        }
+    }
+
+    run(): void {
+        this._queued = false;
+        if (!this.alive) {
+            return;
+        }
+        if (this._running) {
+            this._again = true;
+            return;
+        }
+        if (this._ran && !changed(this)) {
+            return;
+        }
+        this._ran = true;
+        this._running = true;
+        try {
+            runCleanups(this);
+            unlink(this);
+            runTracked(this, this._body);
+        } finally {
+            this._running = false;
+        }
+        if (this._again) {
+            this._again = false;
+            batch(() => this.notify());
+        }
+    }
+
+    dispose(): void {
+        if (!this.alive) {
+            return;
+        }
+        this.alive = false;
+        runCleanups(this);
+        unlink(this);
+    }
+}
+
+export function effect(body: () => void, scheduler: Scheduler? = null): Effect {
+    const owner = currentOwner();
+    const start = (): Effect => {
+        const fx = new Effect(body, scheduler);
+        fx.run();
+        return fx;
+    };
+    if (owner === null) {
+        return start();
+    }
+    const host: Owner = owner;
+    return host.adopt<Effect>(EFFECT, () => {
+        const fx = start();
+        host.onDispose(() => fx.dispose());
+        return fx;
+    });
+}
+
+export function onCleanup(fn: () => void): void {
+    const ob = currentObserver();
+    if (ob !== null) {
+        ob.cleanups.push(fn);
+        return;
+    }
+    const owner = currentOwner();
+    if (owner === null) {
+        throw new Error("signals: onCleanup needs a running effect, computed or scope");
+    }
+    owner.onDispose(fn);
+}

@@ -1,0 +1,25 @@
+export interface Scheduler {
+    schedule(job: () => void): void;
+}
+
+export class ManualScheduler implements Scheduler {
+    private _jobs: (() => void)[] = [];
+
+    get pending(): int {
+        return this._jobs.length;
+    }
+
+    schedule(job: () => void): void {
+        this._jobs.push(job);
+    }
+
+    flush(): void {
+        while (this._jobs.length > 0) {
+            const due = this._jobs;
+            this._jobs = [];
+            for (let job of due) {
+                job();
+            }
+        }
+    }
+}
