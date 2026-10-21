@@ -1,5 +1,5 @@
 use varn_macros::varn_contract;
-use varn_types::{NativeCtx, NativeError, VmValue};
+use varn_types::{NativeCtx, NativeError};
 
 pub struct Int;
 
@@ -22,9 +22,6 @@ varn_contract! {
         }
         fn tryParse(_ctx: &mut dyn NativeCtx, s: &str) -> Option<i64> {
             s.trim().parse::<i64>().ok()
-        }
-        fn isInteger(_ctx: &mut dyn NativeCtx, val: VmValue) -> bool {
-            val.is_int()
         }
         fn isSafeInteger(_ctx: &mut dyn NativeCtx, val: i64) -> bool {
             (INT_MIN..=INT_MAX).contains(&val)

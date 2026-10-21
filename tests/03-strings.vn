@@ -50,8 +50,8 @@ await describe("03 Strings", async () => {
         expect("hello".capitalize()).toBe("Hello");
         expect("a\nb\nc".lines().length).toBe(3);
         expect("  foo bar  ".words().length).toBe(2);
-        expect(str.from(42)).toBe("42");
-        expect(str.from(true)).toBe("true");
+        expect((42).toString()).toBe("42");
+        expect(true.toString()).toBe("true");
         expect(str.EMPTY).toBe("");
         expect(str.fromCharCode(72, 105)).toBe("Hi");
         expect(str.join(["a", "b", "c"], "-")).toBe("a-b-c");

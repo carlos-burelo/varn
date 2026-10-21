@@ -6,9 +6,9 @@ export declare class float {
     static MIN_VALUE: float;
     static EPSILON: float;
     static parse(s: str): float;
-    static isNaN(val: dynamic): bool;
-    static isFinite(val: dynamic): bool;
-    static isInfinite(val: dynamic): bool;
+    isNaN(): bool;
+    isFinite(): bool;
+    isInfinite(): bool;
 
     toString(): str;
     valueOf(): float;

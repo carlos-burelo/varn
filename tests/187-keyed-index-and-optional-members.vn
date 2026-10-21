@@ -18,14 +18,14 @@ function tagOf(p: Part): str { return p.tag ?? "none" }
 function size(s: str): int { return s.length }
 function describeValue(value: str | str[] | null): int {
     if (value == null) { return -1 }
-    if (Array.isArray(value)) { return value.length } else { return size(value) }
+    if (value is str[]) { return value.length } else { return size(value) }
 }
 function afterContinue(q: { [key: str]: str | str[] }): int {
     let n = 0
     for (const key in q) {
         const value = q[key]
         if (value == null) { continue }
-        if (Array.isArray(value)) {
+        if (value is str[]) {
             for (const item of value) { n = n + size(item) }
         } else {
             n = n + size(value)

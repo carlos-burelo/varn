@@ -33,8 +33,6 @@ varn_contract! {
             res
         }
 
-        fn from(ctx: &mut dyn NativeCtx, val: VmValue) -> String { ctx.str_repr(val) }
-        fn parse(ctx: &mut dyn NativeCtx, val: VmValue) -> String { ctx.str_repr(val) }
 
         fn join(ctx: &mut dyn NativeCtx, arr: ::varn_types::VnArray, sep: Option<&str>) -> String {
             let sep = sep.unwrap_or("");

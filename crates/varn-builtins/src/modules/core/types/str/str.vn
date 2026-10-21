@@ -4,8 +4,6 @@
 export declare class str {
     static EMPTY: str;
     static fromCharCode(...codes: int[]): str;
-    static from(val: dynamic): str;
-    static parse(val: dynamic): str;
     static join(arr: str[], sep?: str): str;
 
     readonly length: int;

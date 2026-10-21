@@ -1,13 +1,13 @@
 // runtime:buffer — native host zero-copy byte buffer operations.
 
-export declare function alloc$(size: int): dynamic;
-export declare function fromBytes$(bytes: int[]): dynamic;
-export declare function fromString$(s: str): dynamic;
-export declare function len$(buf: dynamic): int;
-export declare function getByte$(buf: dynamic, index: int): int;
-export declare function setByte$(buf: dynamic, index: int, value: int): void;
-export declare function slice$(buf: dynamic, start: int, end: int): dynamic;
-export declare function toString$(buf: dynamic): str;
-export declare function toHex$(buf: dynamic): str;
-export declare function toBase64$(buf: dynamic): str;
-export declare function fill$(buf: dynamic, value: int): void;
+export declare function alloc$(size: int): Bytes;
+export declare function fromBytes$(bytes: int[]): Bytes;
+export declare function fromString$(s: str): Bytes;
+export declare function len$(buf: Bytes): int;
+export declare function getByte$(buf: Bytes, index: int): int;
+export declare function setByte$(buf: Bytes, index: int, value: int): void;
+export declare function slice$(buf: Bytes, start: int, end: int): Bytes;
+export declare function toString$(buf: Bytes): str;
+export declare function toHex$(buf: Bytes): str;
+export declare function toBase64$(buf: Bytes): str;
+export declare function fill$(buf: Bytes, value: int): void;

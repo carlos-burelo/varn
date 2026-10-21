@@ -359,21 +359,5 @@ varn_contract! {
         }
 
 
-        fn isArray(ctx: &mut dyn NativeCtx, obj: VmValue) -> bool {
-            ctx.is_array(obj)
-        }
-        fn from(ctx: &mut dyn NativeCtx, value: VmValue) -> Vec<VmValue> {
-            if ctx.is_array(value) {
-                let len = ctx.array_len(value);
-                return (0..len)
-                    .map(|i| ctx.array_get(value, i).unwrap_or_else(VmValue::null))
-                    .collect();
-            }
-            if ctx.is_string(value)
-                && let Some(s) = ctx.str_owned(value) {
-                    return s.chars().map(|c| ctx.alloc_str_owned(c.to_string())).collect();
-                }
-            Vec::new()
-        }
     }
 }

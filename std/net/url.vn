@@ -181,7 +181,7 @@ export function appendQuery(url: str, q: { [key: str]: str | str[] }): str {
         if (value == null) {
             continue;
         }
-        if (Array.isArray(value)) {
+        if (value is str[]) {
             for (const item of value) {
                 parsed.query.append(key, item);
             }

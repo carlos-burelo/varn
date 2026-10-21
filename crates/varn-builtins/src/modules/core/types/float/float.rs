@@ -16,15 +16,9 @@ varn_contract! {
         fn parse(_ctx: &mut dyn NativeCtx, s: &str) -> f64 {
             s.trim().parse::<f64>().unwrap_or(f64::NAN)
         }
-        fn isNaN(_ctx: &mut dyn NativeCtx, val: VmValue) -> bool {
-            val.is_f64() && val.as_f64().is_nan()
-        }
-        fn isFinite(_ctx: &mut dyn NativeCtx, val: VmValue) -> bool {
-            if val.is_f64() { val.as_f64().is_finite() } else { val.is_int() }
-        }
-        fn isInfinite(_ctx: &mut dyn NativeCtx, val: VmValue) -> bool {
-            val.is_f64() && val.as_f64().is_infinite()
-        }
+        fn isNaN(_ctx: &mut dyn NativeCtx, this: f64) -> bool { this.is_nan() }
+        fn isFinite(_ctx: &mut dyn NativeCtx, this: f64) -> bool { this.is_finite() }
+        fn isInfinite(_ctx: &mut dyn NativeCtx, this: f64) -> bool { this.is_infinite() }
 
 
         fn toString(_ctx: &mut dyn NativeCtx, this: f64) -> String { this.to_string() }

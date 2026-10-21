@@ -15,7 +15,7 @@ function btDynamic(v: dynamic): int {
 // A method answering a `dynamic` `bool`, branched on directly.
 function btMethod(v: dynamic): int {
     let n = 10
-    if (Array.isArray(v)) { n = 100 }
+    if (v is int[]) { n = 100 }
     return n
 }
 
