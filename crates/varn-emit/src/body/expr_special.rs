@@ -44,34 +44,26 @@ impl<'a> FnEmitter<'a> {
         span: Span,
     ) -> TirExpr {
         let v = self.lower_expr(expression);
-        let bool_ty = BackendTy::Bool;
-
-        if let varn_core::TypeKind::Named(n, _) = &type_ann.kind
-            && let Some(class) = self.class_named(self.m.interner.resolve(*n))
-        {
-            return TirExpr {
-                kind: TirExprKind::TypeTest {
-                    value: Box::new(v),
-                    class,
-                },
-                ty: bool_ty,
-                res: Resolution::None,
-                span,
-            };
+        let v = self.pin(v);
+        match self.type_test(&v, type_ann, span) {
+            Some(test) => test,
+            None => self.cast_to(v, BackendTy::Bool),
         }
+    }
 
-        let table = self.m.checker_table;
-        let tag_name: Option<&'static str> =
-            self.m.annotation_types.get(&type_ann.id).and_then(|ty| {
-                ty.builtin_of(table)
-                    .map(|b| b.runtime_kind().name())
-                    .or_else(|| table.get(ty.0).lang_name())
-            });
-        if let Some(name) = tag_name {
+    fn type_test(
+        &mut self,
+        v: &TirExpr,
+        type_ann: &varn_core::ast::TypeNode,
+        span: Span,
+    ) -> Option<TirExpr> {
+        use varn_core::RuntimeKind;
+        let bool_ty = BackendTy::Bool;
+        let tag = |name: &'static str| {
             let got = TirExpr {
                 kind: TirExprKind::Unary {
                     op: TirUnOp::Typeof,
-                    operand: Box::new(v),
+                    operand: Box::new(v.clone()),
                 },
                 ty: BackendTy::Str,
                 res: Resolution::None,
@@ -83,18 +75,80 @@ impl<'a> FnEmitter<'a> {
                 res: Resolution::None,
                 span,
             };
-            return TirExpr {
+            TirExpr {
                 kind: TirExprKind::Binary {
                     op: TirBinOp::Eq,
                     lhs: Box::new(got),
                     rhs: Box::new(want),
                 },
-                ty: bool_ty,
+                ty: BackendTy::Bool,
                 res: Resolution::None,
                 span,
-            };
+            }
+        };
+        match &type_ann.kind {
+            varn_core::TypeKind::Named(n, _) | varn_core::TypeKind::Generic(n, _, _)
+                if self.class_named(self.m.interner.resolve(*n)).is_some() =>
+            {
+                let class = self.class_named(self.m.interner.resolve(*n))?;
+                Some(TirExpr {
+                    kind: TirExprKind::TypeTest {
+                        value: Box::new(v.clone()),
+                        class,
+                    },
+                    ty: bool_ty,
+                    res: Resolution::None,
+                    span,
+                })
+            }
+            varn_core::TypeKind::Union(members) => {
+                let mut any = TirExpr {
+                    kind: TirExprKind::BoolLit(false),
+                    ty: bool_ty,
+                    res: Resolution::None,
+                    span,
+                };
+                for member in members {
+                    let test = self.type_test(v, member, span)?;
+                    any = TirExpr {
+                        kind: TirExprKind::Select {
+                            cond: Box::new(any),
+                            then_val: Box::new(TirExpr {
+                                kind: TirExprKind::BoolLit(true),
+                                ty: bool_ty,
+                                res: Resolution::None,
+                                span,
+                            }),
+                            else_val: Box::new(test),
+                        },
+                        ty: bool_ty,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
+                Some(any)
+            }
+            varn_core::TypeKind::Array(_) => Some(tag(RuntimeKind::Array.name())),
+            varn_core::TypeKind::Tuple(_) => Some(tag(RuntimeKind::Tuple.name())),
+            varn_core::TypeKind::Fn(_) => Some(tag(RuntimeKind::Function.name())),
+            other => {
+                if let Some(name) = other.lang_name() {
+                    return Some(tag(name));
+                }
+                if let varn_core::TypeKind::Named(n, _) = other
+                    && let Some(primitive) =
+                        varn_core::LangPrimitive::from_str(self.m.interner.resolve(*n))
+                {
+                    return Some(tag(primitive.name()));
+                }
+                let table = self.m.checker_table;
+                let name = self.m.annotation_types.get(&type_ann.id).and_then(|ty| {
+                    ty.builtin_of(table)
+                        .map(|b| b.runtime_kind().name())
+                        .or_else(|| table.get(ty.0).lang_name())
+                })?;
+                Some(tag(name))
+            }
         }
-
-        self.cast_to(v, bool_ty)
     }
 }

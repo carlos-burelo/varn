@@ -1,0 +1,47 @@
+import { describe, it, expect } from "std:test";
+
+class Sig<T> {
+    v: T;
+    constructor(v: T) { this.v = v }
+}
+
+class Plain {
+    n: int = 1;
+}
+
+function generic(x: bool | Sig<bool>): str { return x is Sig<bool> ? "sig" : "plain" }
+function klass(x: bool | Plain): str { return x is Plain ? "class" : "bool" }
+function viaInt(x: int | Sig<int>): str { return x is Sig<int> ? "sig" : "int" }
+function array(x: int | int[]): str { return x is int[] ? "array" : "int" }
+function union(x: int | str | bool): str { return x is (int | str) ? "int-or-str" : "bool" }
+function fn(x: int | (() => int)): str { return x is () => int ? "fn" : "int" }
+function nullable(x: int?): str { return x is int ? "int" : "null" }
+function text(x: int | str): str { return x is str ? "str" : "other" }
+
+await describe("240 is type tests", async () => {
+    await it("a generic class is tested by its class", () => {
+        expect(generic(true)).toBe("plain")
+        expect(generic(new Sig<bool>(false))).toBe("sig")
+        expect(viaInt(3)).toBe("int")
+        expect(viaInt(new Sig<int>(1))).toBe("sig")
+        expect(klass(true)).toBe("bool")
+        expect(klass(new Plain())).toBe("class")
+    })
+
+    await it("builtin shapes are tested by their runtime kind", () => {
+        expect(array(3)).toBe("int")
+        expect(array([1])).toBe("array")
+        expect(fn(3)).toBe("int")
+        expect(fn(() => 1)).toBe("fn")
+        expect(nullable(3)).toBe("int")
+        expect(nullable(null)).toBe("null")
+        expect(text(3)).toBe("other")
+        expect(text("a")).toBe("str")
+    })
+
+    await it("a union tests every member", () => {
+        expect(union(3)).toBe("int-or-str")
+        expect(union("s")).toBe("int-or-str")
+        expect(union(true)).toBe("bool")
+    })
+})
