@@ -1,0 +1,76 @@
+import { describe, it, expect } from "std:test";
+import { signal, computed, until, next, changes, resource } from "std:signals";
+import { sleep, spawn } from "std:task";
+
+await describe("238 signals meet tasks", async () => {
+    await it("until resolves as soon as the predicate holds", async () => {
+        const level = signal(0)
+        const already = until(level, (v: int): bool => v >= 0)
+        expect(await already).toBe(0)
+        const waiter = until(level, (v: int): bool => v >= 3)
+        level.value = 1
+        level.value = 3
+        expect(await waiter).toBe(3)
+    })
+
+    await it("until watches a computed", async () => {
+        const base = signal(1)
+        const doubled = computed(() => base.value * 2)
+        const waiter = until(doubled, (v: int): bool => v > 10)
+        base.value = 6
+        expect(await waiter).toBe(12)
+    })
+
+    await it("next waits for the following change only", async () => {
+        const level = signal(5)
+        const upcoming = next(level)
+        level.value = 9
+        level.value = 10
+        expect(await upcoming).toBe(9)
+    })
+
+    await it("changes streams every change to an async consumer", async () => {
+        const level = signal(0)
+        const gather = async (): Task<int[]> => {
+            using stream = changes(level)
+            const seen: int[] = []
+            for await (const v of stream) {
+                seen.push(v)
+                if (seen.length == 3) { break }
+            }
+            return seen
+        }
+        const gathering = spawn(gather())
+        await sleep(5)
+        level.value = 10
+        level.value = 11
+        level.value = 12
+        expect(await gathering).toEqual([10, 11, 12])
+    })
+
+    await it("a resource refetches when its source changes and drops stale answers", async () => {
+        const id = signal(1)
+        const user = resource(() => id.value, async (who: int): Task<str> => {
+            await sleep(who == 1 ? 30 : 2)
+            return `user${who}`
+        })
+        expect(user.loading.value).toBe(true)
+        id.value = 2
+        await sleep(60)
+        expect(user.value.value).toBe("user2")
+        expect(user.loading.value).toBe(false)
+        user.dispose()
+    })
+
+    await it("a failing fetch lands in error", async () => {
+        const trigger = signal(0)
+        const broken = resource(() => trigger.value, async (n: int): Task<int> => {
+            await sleep(1)
+            throw new Error("nope")
+        })
+        await sleep(20)
+        expect(broken.error.value === null).toBe(false)
+        expect(broken.loading.value).toBe(false)
+        broken.dispose()
+    })
+})

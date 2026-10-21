@@ -1,0 +1,139 @@
+import { channel, spawn, Channel } from "std:task";
+import { Readable, Signal, signal } from "std:signals/reactive";
+import { Effect, effect } from "std:signals/effect";
+import { withOwner } from "std:signals/owner";
+import { batch, untracked } from "std:signals/graph";
+
+const CHANGES_BUFFER = 64;
+
+function detached(start: () => Effect): Effect {
+    return withOwner(null, start);
+}
+
+async function arrival<T>(arrived: Channel<T>, watcher: Effect): Task<T> {
+    try {
+        return await arrived.rx.receive();
+    } finally {
+        watcher.dispose();
+    }
+}
+
+export function until<T>(source: Readable<T>, predicate: (v: T) => bool): Task<T> {
+    const arrived = channel<T>(1);
+    let settled = false;
+    const watcher = detached(() => effect(() => {
+        const current = source.value;
+        if (!settled && untracked(() => predicate(current))) {
+            settled = true;
+            arrived.tx.send(current);
+        }
+    }));
+    return arrival(arrived, watcher);
+}
+
+export function next<T>(source: Readable<T>): Task<T> {
+    const arrived = channel<T>(1);
+    let settled = false;
+    const watcher = detached(() => source.subscribe((v: T) => {
+        if (!settled) {
+            settled = true;
+            arrived.tx.send(v);
+        }
+    }));
+    return arrival(arrived, watcher);
+}
+
+export class Changes<T> {
+    private _queue: Channel<T>;
+    private _watcher: Effect;
+
+    constructor(queue: Channel<T>, watcher: Effect) {
+        this._queue = queue;
+        this._watcher = watcher;
+    }
+
+    next(): Task<Option<T>> {
+        return this._queue.rx.next();
+    }
+
+    dispose(): void {
+        this._watcher.dispose();
+        this._queue.tx.close();
+    }
+}
+
+export function changes<T>(source: Readable<T>): Changes<T> {
+    const queue = channel<T>(CHANGES_BUFFER);
+    const watcher = detached(() => source.subscribe((v: T) => {
+        queue.tx.send(v);
+    }));
+    return new Changes<T>(queue, watcher);
+}
+
+export class Resource<S, T> {
+    private _value: Signal<T?> = signal<T?>(null);
+    private _error: Signal<Error?> = signal<Error?>(null);
+    private _loading: Signal<bool> = signal<bool>(false);
+    private _watcher: Effect;
+    private _generation: int = 0;
+    private _source: () => S;
+    private _fetch: (given: S) => Task<T>;
+
+    constructor(source: () => S, fetch: (given: S) => Task<T>) {
+        this._source = source;
+        this._fetch = fetch;
+        this._watcher = detached(() => effect(() => this.start(this._source())));
+    }
+
+    get value(): Readable<T?> {
+        return this._value;
+    }
+
+    get error(): Readable<Error?> {
+        return this._error;
+    }
+
+    get loading(): Readable<bool> {
+        return this._loading;
+    }
+
+    reload(): void {
+        this.start(untracked(() => this._source()));
+    }
+
+    dispose(): void {
+        this._generation = this._generation + 1;
+        this._watcher.dispose();
+    }
+
+    private start(given: S): void {
+        this._generation = this._generation + 1;
+        const mine = this._generation;
+        untracked(() => this._loading.set(true));
+        spawn(this.settle(this._fetch(given), mine));
+    }
+
+    private async settle(call: Task<T>, mine: int): Task<void> {
+        try {
+            const result = await call;
+            if (mine == this._generation) {
+                batch(() => {
+                    this._value.set(result);
+                    this._error.set(null);
+                    this._loading.set(false);
+                });
+            }
+        } catch (e) {
+            if (mine == this._generation) {
+                batch(() => {
+                    this._error.set(e as Error);
+                    this._loading.set(false);
+                });
+            }
+        }
+    }
+}
+
+export function resource<S, T>(source: () => S, fetch: (given: S) => Task<T>): Resource<S, T> {
+    return new Resource<S, T>(source, fetch);
+}

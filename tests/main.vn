@@ -230,6 +230,7 @@ import "./235-signals.vn"
 import "./236-generic-method-override-across-modules.vn"
 import "./237-lexical-this.vn"
 import "./239-top-level-for-await.vn"
+import "./238-signals-tasks.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

@@ -3,3 +3,4 @@ export { Effect, effect, onCleanup } from "std:signals/effect";
 export { batch, untracked } from "std:signals/graph";
 export { Owner, Scope, SlotKind, scope, currentOwner, withOwner } from "std:signals/owner";
 export { Scheduler, ManualScheduler } from "std:signals/scheduler";
+export { until, next, changes, Changes, Resource, resource } from "std:signals/task";
