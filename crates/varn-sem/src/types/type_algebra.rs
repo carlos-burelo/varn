@@ -284,11 +284,14 @@ impl Type {
 
     pub fn with_origin(self, origin: varn_core::Atom, table: &mut CheckerTyTable) -> Self {
         match table.get(self.0) {
-            TypeKind::Named(n, _) => Type(table.intern(TypeKind::Named(n, Some(origin))), self.1),
-            TypeKind::Generic(n, args, _) => Type(
+            TypeKind::Named(n, None) => {
+                Type(table.intern(TypeKind::Named(n, Some(origin))), self.1)
+            }
+            TypeKind::Generic(n, args, None) => Type(
                 table.intern(TypeKind::Generic(n, args, Some(origin))),
                 self.1,
             ),
+            TypeKind::Named(_, Some(_)) | TypeKind::Generic(_, _, Some(_)) => self,
             TypeKind::Primitive(_)
             | TypeKind::Literal(_)
             | TypeKind::This

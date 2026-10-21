@@ -1,0 +1,10 @@
+import { Root } from "./alias-root.vn";
+
+export type Node = Root;
+export type Maybe = Root | null;
+
+export class Leaf extends Root {
+    override draw(at: float): str { return "leaf"; }
+}
+
+export function leaf(): Node { return new Leaf(); }

@@ -1,0 +1,18 @@
+import { describe, it, expect } from "std:test";
+import { Root } from "./helpers/alias-root.vn";
+import { Node, Maybe, Leaf, leaf } from "./helpers/alias-mid.vn";
+
+function make(): Node { return new Leaf() }
+function viaHelper(): Node { return leaf() }
+function maybe(flag: bool): Maybe { return flag ? new Leaf() : null }
+function asRoot(n: Node): Root { return n }
+
+await describe("231 an alias keeps the origin of the class it names", async () => {
+    await it("an alias declared in another module is the same type as the class", () => {
+        expect(make().draw(0.0)).toBe("leaf")
+        expect(viaHelper().size).toBe(-1.0)
+        expect(maybe(true) !== null).toBe(true)
+        expect(maybe(false) === null).toBe(true)
+        expect(asRoot(make()) instanceof Leaf).toBe(true)
+    })
+})

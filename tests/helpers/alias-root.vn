@@ -1,0 +1,4 @@
+export abstract class Root {
+    size: float = -1.0;
+    abstract draw(at: float): str;
+}
