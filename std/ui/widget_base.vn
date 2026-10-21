@@ -1,0 +1,48 @@
+import { UiWindow } from "std:ui/window";
+import { UiFrame } from "std:ui/frame";
+import { Focus } from "std:ui/focus";
+
+export class PaintContext {
+    win: UiWindow;
+    fr: UiFrame;
+    focus: Focus;
+    private _slot: int = 1000;
+
+    constructor(win: UiWindow, fr: UiFrame, focus: Focus) {
+        this.win = win;
+        this.fr = fr;
+        this.focus = focus;
+    }
+
+    nextSlot(): int {
+        this._slot = this._slot + 1;
+        return this._slot;
+    }
+}
+
+export abstract class Widget {
+    w: float = -1.0;
+    h: float = -1.0;
+
+    abstract paint(cx: PaintContext, x: float, y: float, w: float, h: float): void;
+
+    flexW(): float {
+        if (this.w >= 0.0) {
+            return 0.0 - this.w;
+        }
+        return 1.0;
+    }
+
+    flexH(): float {
+        if (this.h >= 0.0) {
+            return 0.0 - this.h;
+        }
+        return 1.0;
+    }
+}
+
+export function paintChild(child: Widget?, cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    if (child !== null) {
+        child.paint(cx, x, y, w, h);
+    }
+}

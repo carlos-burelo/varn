@@ -1,11 +1,27 @@
 import { describe, it, expect } from "std:test";
 import {
-    UiWindow, UiFrame, Focus, VNode, render,
-    ui, signal, computed, effect, batch, untracked, component, memo,
+    UiWindow, UiFrame, Focus, Widget, render, FlexNode, LabelNode, BoxNode, PaddingNode, Axis, TextAlign,
+    ui, signal, computed, effect, batch, untracked, component,
     TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Curve, Colors, Theme,
     textSizeFor, textColorFor, run
 } from "std:ui";
 import { MOUSE_LEFT, UiInjectKind } from "std:ui";
+
+let boots = 0;
+
+@component
+function Clicker(): Widget {
+    const clicks = signal(0);
+    const label = computed(() => `clicks: ${clicks.value}`);
+    effect(() => { boots = boots + 1; });
+    return ui.column(children: [
+        ui.text(label.value),
+        ui.button(text: "more", onPress: () => { clicks.value = clicks.value + 1; })
+    ]);
+}
+
+function flex(w: Widget): FlexNode { return w as FlexNode; }
+function label(w: Widget): LabelNode { return w as LabelNode; }
 
 type Todo = {
     id: int,
@@ -13,7 +29,7 @@ type Todo = {
 };
 
 @component
-function Counter(): VNode {
+function Counter(): Widget {
     return ui.column(
         children: [
             ui.text("Counter")
@@ -22,7 +38,7 @@ function Counter(): VNode {
 }
 
 @component
-function Dashboard(): VNode {
+function Dashboard(): Widget {
     return ui.column(
         gap: 16.0,
         padding: 24.0,
@@ -44,12 +60,12 @@ function Dashboard(): VNode {
 }
 
 @component
-function ConnectionStatus(): VNode {
+function ConnectionStatus(): Widget {
     const connected = signal(false);
     return ui.column(
         children: [
             ui.when(
-                condition: connected(),
+                condition: connected.value,
                 then: () => ui.text("Connected"),
                 otherwise: () => ui.text("Disconnected")
             )
@@ -58,67 +74,68 @@ function ConnectionStatus(): VNode {
 }
 
 @component
-function TodoRow(todo: Todo): VNode {
+function TodoRow(todo: Todo): Widget {
     return ui.text(todo.title);
 }
 
 @component
-@memo
-function PriceLabel(price: float): VNode {
+@component
+function PriceLabel(price: float): Widget {
     return ui.text(price.toString(), style: TextStyle.title);
 }
 
 await describe("220 ui declarative", async () => {
     await it("counter builds a column with one text", () => {
         const tree = Counter();
-        expect(tree.kind).toBe("column");
-        expect(tree.children.length).toBe(1);
-        expect(tree.children[0].kind).toBe("label");
-        expect(tree.children[0].text).toBe("Counter");
+        expect(tree is FlexNode).toBe(true);
+        expect(flex(tree).axis).toBe(Axis.vertical);
+        expect(flex(tree).children.length).toBe(1);
+        expect(flex(tree).children[0] is LabelNode).toBe(true);
+        expect(label(flex(tree).children[0]).text).toBe("Counter");
     });
 
     await it("dashboard composes title and revenue row", () => {
         const tree = Dashboard();
-        expect(tree.kind).toBe("column");
-        expect(tree.gap).toBe(16.0);
-        expect(tree.children.length).toBe(2);
-        expect(tree.children[0].style).toBe(TextStyle.title);
-        const rowNode = tree.children[1];
-        expect(rowNode.kind).toBe("row");
+        expect(flex(tree).axis).toBe(Axis.vertical);
+        expect(flex(tree).gap).toBe(16.0);
+        expect(flex(tree).children.length).toBe(2);
+        expect(label(flex(tree).children[0]).style).toBe(TextStyle.title);
+        const rowNode = flex(flex(tree).children[1]);
+        expect(rowNode.axis).toBe(Axis.horizontal);
         expect(rowNode.mainAxis).toBe(MainAxis.spaceBetween);
         expect(rowNode.children.length).toBe(2);
-        expect(rowNode.children[0].text).toBe("Revenue");
-        expect(rowNode.children[1].text).toBe("$24,500");
+        expect(label(rowNode.children[0]).text).toBe("Revenue");
+        expect(label(rowNode.children[1]).text).toBe("$24,500");
     });
 
     await it("connection status flips on signal", () => {
         const connected = signal(false);
-        const build = (): VNode => ui.column(
+        const build = (): Widget => ui.column(
             children: [
                 ui.when(
-                    condition: connected(),
+                    condition: connected.value,
                     then: () => ui.text("Connected"),
                     otherwise: () => ui.text("Disconnected")
                 )
             ]
         );
-        expect(build().children[0].text).toBe("Disconnected");
-        connected(true);
-        expect(build().children[0].text).toBe("Connected");
-        expect(ConnectionStatus().kind).toBe("column");
+        expect(label(flex(build()).children[0]).text).toBe("Disconnected");
+        connected.value = true;
+        expect(label(flex(build()).children[0]).text).toBe("Connected");
+        expect(ConnectionStatus() is FlexNode).toBe(true);
     });
 
     await it("equal writes skip notification", () => {
         const count = signal(0);
         let runs = 0;
         effect(() => {
-            count();
+            count.value;
             runs = runs + 1;
         });
         expect(runs).toBe(1);
-        count(0);
+        count.value = 0;
         expect(runs).toBe(1);
-        count(1);
+        count.value = 1;
         expect(runs).toBe(2);
     });
 
@@ -127,32 +144,32 @@ await describe("220 ui declarative", async () => {
         let derives = 0;
         const doubled = computed(() => {
             derives = derives + 1;
-            return count() * 2;
+            return count.value * 2;
         });
-        expect(doubled()).toBe(2);
-        expect(doubled()).toBe(2);
+        expect(doubled.value).toBe(2);
+        expect(doubled.value).toBe(2);
         expect(derives).toBe(1);
-        count(2);
-        expect(doubled()).toBe(4);
+        count.value = 2;
+        expect(doubled.value).toBe(4);
         expect(derives).toBe(2);
     });
 
     await it("diamond batch notifies once", () => {
         const base = signal(1);
-        const dbl = computed(() => base() * 2);
-        const quad = computed(() => dbl() * 2);
-        expect(quad()).toBe(4);
+        const dbl = computed(() => base.value * 2);
+        const quad = computed(() => dbl.value * 2);
+        expect(quad.value).toBe(4);
         let runs = 0;
         effect(() => {
-            dbl();
-            quad();
+            dbl.value;
+            quad.value;
             runs = runs + 1;
         });
         expect(runs).toBe(1);
         batch(() => {
-            base(2);
+            base.value = 2;
         });
-        expect(quad()).toBe(8);
+        expect(quad.value).toBe(8);
         expect(runs).toBe(2);
     });
 
@@ -160,14 +177,14 @@ await describe("220 ui declarative", async () => {
         const s = signal([1]);
         let runs = 0;
         effect(() => {
-            s();
+            s.value;
             runs = runs + 1;
         });
         expect(runs).toBe(1);
-        s([1]);
+        s.value = [1];
         expect(runs).toBe(2);
-        const same = s();
-        s(same);
+        const same = s.value;
+        s.value = same;
         expect(runs).toBe(2);
     });
 
@@ -176,18 +193,18 @@ await describe("220 ui declarative", async () => {
         const second = signal(0);
         let runs = 0;
         const dispose = effect(() => {
-            first();
-            second();
+            first.value;
+            second.value;
             runs = runs + 1;
         });
         expect(runs).toBe(1);
         batch(() => {
-            first(1);
-            second(2);
+            first.value = 1;
+            second.value = 2;
         });
         expect(runs).toBe(2);
         dispose();
-        first(10);
+        first.value = 10;
         expect(runs).toBe(2);
     });
 
@@ -196,14 +213,14 @@ await describe("220 ui declarative", async () => {
         const skipped = signal(0);
         let runs = 0;
         effect(() => {
-            tracked();
-            untracked(() => skipped());
+            tracked.value;
+            untracked(() => skipped.value);
             runs = runs + 1;
         });
         expect(runs).toBe(1);
-        skipped(1);
+        skipped.value = 1;
         expect(runs).toBe(1);
-        tracked(1);
+        tracked.value = 1;
         expect(runs).toBe(2);
     });
 
@@ -213,11 +230,11 @@ await describe("220 ui declarative", async () => {
             key: t => t.id,
             render: t => TodoRow(todo: t)
         );
-        expect(list.kind).toBe("column");
-        expect(list.children.length).toBe(2);
-        expect(list.children[0].text).toBe("a");
-        expect(list.children[1].text).toBe("b");
-        expect(PriceLabel(9.5).text).toBe("9.5");
+        expect(list is FlexNode).toBe(true);
+        expect(flex(list).children.length).toBe(2);
+        expect(label(flex(list).children[0]).text).toBe("a");
+        expect(label(flex(list).children[1]).text).toBe("b");
+        expect(label(PriceLabel(9.5)).text).toBe("9.5");
     });
 
     await it("disabled button ignores clicks", () => {
@@ -257,9 +274,9 @@ await describe("220 ui declarative", async () => {
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const name = signal("");
-        const build = (): VNode => ui.input(
-            value: name(),
-            onChange: (v: str) => { name(v); },
+        const build = (): Widget => ui.input(
+            value: name.value,
+            onChange: (v: str) => { name.value = v; },
             placeholder: "Name"
         );
         renderTree(win, fr, focus, build());
@@ -274,12 +291,24 @@ await describe("220 ui declarative", async () => {
         win.inject(UiInjectKind.Key, 72, 0, 0);
         fr.update(win);
         renderTree(win, fr, focus, build());
-        expect(name()).toBe("H");
+        expect(name.value).toBe("H");
+    });
+
+    await it("a component keeps its signals between frames", () => {
+        const seen: str[] = [];
+        run("t", build: (fr: UiFrame, focus: Focus): Widget => {
+            const tree = Clicker();
+            seen.push(label(flex(tree).children[0]).text);
+            return tree;
+        }, w: 400, h: 200, maxFrames: 4);
+        expect(seen[0]).toBe("clicks: 0");
+        expect(seen.length).toBe(4);
+        expect(boots).toBe(1);
     });
 
     await it("run loop renders declarative trees headless", () => {
         const builds: int[] = [];
-        run("t", build: (fr: UiFrame, focus: Focus): VNode => {
+        run("t", build: (fr: UiFrame, focus: Focus): Widget => {
             builds.push(1);
             return Counter();
         }, w: 200, h: 100, maxFrames: 3);
@@ -292,8 +321,8 @@ await describe("220 ui declarative", async () => {
         expect(textColorFor(TextStyle.caption)).toBe(Theme.colors.muted);
         expect(textColorFor(TextStyle.body)).toBe(Theme.colors.onSurface);
         expect(Theme.colors.surface).toBe(Colors.black);
-        expect(ui.text("x").size).toBe(Theme.text.bodySize);
-        expect(ui.text("x", style: TextStyle.title).size).toBe(Theme.text.titleSize);
+        expect(label(ui.text("x")).size).toBe(Theme.text.bodySize);
+        expect(label(ui.text("x", style: TextStyle.title)).size).toBe(Theme.text.titleSize);
         expect(CrossAxis.stretch == CrossAxis.stretch).toBe(true);
         expect(Alignment.center == Alignment.center).toBe(true);
         expect(BoxFit.cover == BoxFit.cover).toBe(true);
@@ -316,8 +345,8 @@ await describe("220 ui declarative", async () => {
                 )
             )
         );
-        expect(tree.kind).toBe("box");
-        expect(tree.child.kind).toBe("padding");
+        expect(tree is BoxNode).toBe(true);
+        expect((tree as BoxNode).child is PaddingNode).toBe(true);
         using win = UiWindow.open("t", 800, 600);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
@@ -328,6 +357,6 @@ await describe("220 ui declarative", async () => {
     });
 });
 
-function renderTree(win: UiWindow, fr: UiFrame, focus: Focus, tree: VNode): void {
+function renderTree(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
     render(win, fr, focus, tree, 0.0, 0.0, 800.0, 600.0);
 }

@@ -1,72 +1,69 @@
-export type Signal<T> = dynamic;
+import { StateSlot, activeScope } from "std:ui/state";
 
-let _stack: dynamic[] = [];
+export class Subscribers {
+    list: Observer[] = [];
+}
+
+export abstract class Observer {
+    deps: Subscribers[] = [];
+    alive: bool = true;
+
+    abstract fire(): void;
+    abstract rerun(): void;
+
+    deferred(): bool {
+        return false;
+    }
+}
+
+let _stack: Observer[] = [];
 let _depth = 0;
-let _pending: dynamic[] = [];
+let _pending: Observer[] = [];
 
-function _top(): dynamic {
+function _top(): Observer? {
     if (_stack.length == 0) {
         return null;
     }
     return _stack[_stack.length - 1];
 }
 
-function _links(subs: dynamic[]): void {
-    const ob: dynamic = _top();
-    if (ob == null) {
+function _links(subs: Subscribers): void {
+    const ob = _top();
+    if (ob === null) {
         return;
     }
-    let found = false;
-    for (let i = 0; i < subs.length; i = i + 1) {
-        if (subs[i] == ob) {
-            found = true;
-        }
+    if (!subs.list.includes(ob)) {
+        subs.list.push(ob);
     }
-    if (!found) {
-        subs.push(ob);
-    }
-    const deps: dynamic[] = ob.deps;
-    let back = false;
-    for (let i = 0; i < deps.length; i = i + 1) {
-        if (deps[i] == subs) {
-            back = true;
-        }
-    }
-    if (!back) {
-        deps.push(subs);
+    if (!ob.deps.includes(subs)) {
+        ob.deps.push(subs);
     }
 }
 
-function _unlink(ob: dynamic): void {
-    const deps: dynamic[] = ob.deps;
-    for (let i = 0; i < deps.length; i = i + 1) {
-        const subs: dynamic[] = deps[i];
-        for (let j = subs.length - 1; j >= 0; j = j - 1) {
-            if (subs[j] == ob) {
-                subs.splice(j, 1);
+function _unlink(ob: Observer): void {
+    for (let subs of ob.deps) {
+        for (let j = subs.list.length - 1; j >= 0; j = j - 1) {
+            if (subs.list[j] == ob) {
+                subs.list.splice(j, 1);
             }
         }
     }
     ob.deps = [];
 }
 
-function _queue(ob: dynamic): void {
-    for (let i = 0; i < _pending.length; i = i + 1) {
-        if (_pending[i] == ob) {
-            return;
-        }
+function _queue(ob: Observer): void {
+    if (!_pending.includes(ob)) {
+        _pending.push(ob);
     }
-    _pending.push(ob);
 }
 
-function _fire(subs: dynamic[]): void {
-    const snap = subs.slice(0, subs.length);
-    for (let i = 0; i < snap.length; i = i + 1) {
-        const ob: dynamic = snap[i];
+function _fire(subs: Subscribers): void {
+    const snap = subs.list.slice(0, subs.list.length);
+    for (let ob of snap) {
         if (!ob.alive) {
             continue;
         }
-        if (_depth > 0 && ob.kind == "effect") {
+        if (_depth > 0 && ob.deferred()) {
             _queue(ob);
         } else {
             ob.fire();
@@ -74,136 +71,233 @@ function _fire(subs: dynamic[]): void {
     }
 }
 
-export function signal<T>(init: T): Signal<T> {
-    let cur: T = init;
-    const subs: dynamic[] = [];
-    const f = (...v: T[]): T => {
-        if (v.length == 0) {
-            _links(subs);
-            return cur;
-        }
-        if (v[0] == cur) {
-            return cur;
-        }
-        cur = v[0];
-        _fire(subs);
-        return cur;
-    };
-    return f;
-}
+export class Signal<T> {
+    private _value: T;
+    private _subs: Subscribers = new Subscribers();
 
-export function computed<T>(derive: () => T): () => T {
-    const subs: dynamic[] = [];
-    const ob: dynamic = { kind: "computed", deps: [], dirty: true, cached: null, alive: true };
-    ob.fire = () => {
-        if (!ob.alive || ob.dirty) {
+    constructor(initial: T) {
+        this._value = initial;
+    }
+
+    get value(): T {
+        _links(this._subs);
+        return this._value;
+    }
+
+    set value(next: T) {
+        if (next == this._value) {
             return;
         }
-        ob.dirty = true;
-        _fire(subs);
-    };
-    const read = (): T => {
-        if (ob.dirty) {
-            _unlink(ob);
-            _stack.push(ob);
-            let next: T;
-            try {
-                next = derive();
-            } finally {
-                _stack.pop();
-            }
-            const changed = next != ob.cached;
-            ob.cached = next;
-            ob.dirty = false;
-            _links(subs);
-            if (changed) {
-                _fire(subs);
-            }
-            return next;
-        }
-        _links(subs);
-        return ob.cached;
-    };
-    ob.run = read;
-    return read;
+        this._value = next;
+        _fire(this._subs);
+    }
 }
 
-export function effect(fn: () => void): () => void {
-    const ob: dynamic = { kind: "effect", deps: [], alive: true, running: false };
-    const run = (): void => {
-        if (!ob.alive || ob.running) {
+export class Computed<T> extends Observer {
+    private _derive: () => T;
+    private _subs: Subscribers = new Subscribers();
+    private _cached: T? = null;
+    private _dirty: bool = true;
+
+    constructor(derive: () => T) {
+        super();
+        this._derive = derive;
+    }
+
+    override fire(): void {
+        if (!this.alive || this._dirty) {
             return;
         }
-        ob.running = true;
-        _unlink(ob);
-        _stack.push(ob);
+        this._dirty = true;
+        _fire(this._subs);
+    }
+
+    override rerun(): void {
+        this.recompute();
+    }
+
+    private evaluate(): T {
+        _stack.push(this);
         try {
-            fn();
+            return this._derive();
         } finally {
             _stack.pop();
-            ob.running = false;
         }
-    };
-    ob.run = run;
-    ob.fire = () => {
-        if (!ob.alive || ob.running) {
+    }
+
+    private recompute(): T {
+        _unlink(this);
+        const next = this.evaluate();
+        const changed = next != this._cached;
+        this._cached = next;
+        this._dirty = false;
+        _links(this._subs);
+        if (changed) {
+            _fire(this._subs);
+        }
+        return next;
+    }
+
+    get value(): T {
+        if (this._dirty) {
+            return this.recompute();
+        }
+        _links(this._subs);
+        return this._cached as T;
+    }
+}
+
+class Effect extends Observer {
+    private _body: () => void;
+    private _running: bool = false;
+
+    constructor(body: () => void) {
+        super();
+        this._body = body;
+    }
+
+    override deferred(): bool {
+        return true;
+    }
+
+    override fire(): void {
+        if (!this.alive || this._running) {
             return;
         }
         if (_depth > 0) {
-            _queue(ob);
+            _queue(this);
         } else {
-            run();
+            this.rerun();
         }
-    };
-    run();
-    return () => {
-        ob.alive = false;
-        _unlink(ob);
-    };
+    }
+
+    override rerun(): void {
+        if (!this.alive || this._running) {
+            return;
+        }
+        this._running = true;
+        _unlink(this);
+        _stack.push(this);
+        try {
+            this._body();
+        } finally {
+            _stack.pop();
+            this._running = false;
+        }
+    }
+
+    dispose(): void {
+        this.alive = false;
+        _unlink(this);
+    }
 }
 
-export function batch(fn: () => void): void {
+class SignalSlot<T> extends StateSlot {
+    signal: Signal<T>;
+
+    constructor(signal: Signal<T>) {
+        super();
+        this.signal = signal;
+    }
+}
+
+class ComputedSlot<T> extends StateSlot {
+    computed: Computed<T>;
+
+    constructor(computed: Computed<T>) {
+        super();
+        this.computed = computed;
+    }
+
+    override dispose(): void {
+        this.computed.alive = false;
+    }
+}
+
+class EffectSlot extends StateSlot {
+    stop: () => void;
+
+    constructor(stop: () => void) {
+        super();
+        this.stop = stop;
+    }
+
+    override dispose(): void {
+        this.stop();
+    }
+}
+
+export function signal<T>(initial: T): Signal<T> {
+    const scope = activeScope();
+    if (scope === null) {
+        return new Signal<T>(initial);
+    }
+    const kept = scope.take();
+    if (kept !== null) {
+        return (kept as SignalSlot<T>).signal;
+    }
+    const created = new Signal<T>(initial);
+    scope.keep(new SignalSlot<T>(created));
+    return created;
+}
+
+export function computed<T>(derive: () => T): Computed<T> {
+    const scope = activeScope();
+    if (scope === null) {
+        return new Computed<T>(derive);
+    }
+    const kept = scope.take();
+    if (kept !== null) {
+        return (kept as ComputedSlot<T>).computed;
+    }
+    const created = new Computed<T>(derive);
+    scope.keep(new ComputedSlot<T>(created));
+    return created;
+}
+
+export function effect(body: () => void): () => void {
+    const scope = activeScope();
+    if (scope !== null) {
+        const kept = scope.take();
+        if (kept !== null) {
+            return (kept as EffectSlot).stop;
+        }
+    }
+    const fx = new Effect(body);
+    fx.rerun();
+    const stop = () => fx.dispose();
+    if (scope !== null) {
+        scope.keep(new EffectSlot(stop));
+    }
+    return stop;
+}
+
+export function batch(body: () => void): void {
     _depth = _depth + 1;
     try {
-        fn();
+        body();
     } finally {
         _depth = _depth - 1;
     }
     if (_depth == 0) {
         while (_pending.length > 0) {
-            const q = _pending.slice(0, _pending.length);
-            while (_pending.length > 0) {
-                _pending.pop();
-            }
-            for (let i = 0; i < q.length; i = i + 1) {
-                const ob: dynamic = q[i];
+            const queued = _pending.slice(0, _pending.length);
+            _pending = [];
+            for (let ob of queued) {
                 if (ob.alive) {
-                    ob.run();
+                    ob.rerun();
                 }
             }
         }
     }
 }
 
-function _restore(saved: dynamic[]): void {
-    while (_stack.length > 0) {
-        _stack.pop();
-    }
-    for (let i = 0; i < saved.length; i = i + 1) {
-        _stack.push(saved[i]);
-    }
-}
-
-export function untracked<T>(fn: () => T): T {
-    const saved = _stack.slice(0, _stack.length);
-    while (_stack.length > 0) {
-        _stack.pop();
-    }
+export function untracked<T>(body: () => T): T {
+    const saved = _stack;
+    _stack = [];
     try {
-        const out = fn();
-        _restore(saved);
-        return out;
+        return body();
     } finally {
-        _restore(saved);
+        _stack = saved;
     }
 }

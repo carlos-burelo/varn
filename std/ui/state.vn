@@ -1,0 +1,99 @@
+export abstract class StateSlot {
+    dispose(): void {}
+}
+
+export class ComponentScope {
+    private _slots: StateSlot[] = [];
+    private _cursor: int = 0;
+
+    take(): StateSlot? {
+        if (this._cursor < this._slots.length) {
+            const slot = this._slots[this._cursor];
+            this._cursor = this._cursor + 1;
+            return slot;
+        }
+        return null;
+    }
+
+    keep(slot: StateSlot): void {
+        this._slots.push(slot);
+        this._cursor = this._cursor + 1;
+    }
+
+    rewind(): void {
+        this._cursor = 0;
+    }
+
+    dispose(): void {
+        for (let slot of this._slots) {
+            slot.dispose();
+        }
+        this._slots = [];
+    }
+}
+
+const SCOPE_STRIDE = 65536;
+
+const scopes = new Map<int, ComponentScope>();
+let calls = new Map<int, int>();
+let touched = new Set<int>();
+let frameOpen = false;
+let nextComponentId = 1;
+let active: ComponentScope? = null;
+
+export function activeScope(): ComponentScope? {
+    return active;
+}
+
+export function newComponentId(): int {
+    const id = nextComponentId;
+    nextComponentId = nextComponentId + 1;
+    return id;
+}
+
+export function beginFrame(): void {
+    calls = new Map<int, int>();
+    touched = new Set<int>();
+    frameOpen = true;
+}
+
+export function endFrame(): void {
+    frameOpen = false;
+    const keys: int[] = [];
+    for (let key of scopes.keys()) {
+        keys.push(key);
+    }
+    for (let key of keys) {
+        if (!touched.has(key)) {
+            const gone = scopes.get(key);
+            if (gone !== null) {
+                gone.dispose();
+            }
+            scopes.delete(key);
+        }
+    }
+}
+
+export function enterComponent(id: int): ComponentScope? {
+    const previous = active;
+    if (!frameOpen) {
+        active = new ComponentScope();
+        return previous;
+    }
+    const seen = calls.get(id) ?? 0;
+    calls.set(id, seen + 1);
+    const key = id * SCOPE_STRIDE + seen;
+    touched.add(key);
+    const existing = scopes.get(key);
+    const scope = existing ?? new ComponentScope();
+    if (existing === null) {
+        scopes.set(key, scope);
+    }
+    scope.rewind();
+    active = scope;
+    return previous;
+}
+
+export function leaveComponent(previous: ComponentScope?): void {
+    active = previous;
+}

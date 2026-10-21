@@ -1,24 +1,24 @@
-import { ui, signal, computed, component, TextStyle, MainAxis, Theme, run } from "std:ui";
+import { ui, signal, computed, component, Widget, TextStyle, MainAxis, Theme, run } from "std:ui";
 import { UiFrame, Focus } from "std:ui";
 
 @component
-function Counter(): dynamic {
+function Counter(): Widget {
     const count = signal(0);
-    const doubled = computed(() => count() * 2);
+    const doubled = computed(() => count.value * 2);
     return ui.column(
         gap: 8.0,
         padding: 16.0,
         children: [
             ui.text("Counter", style: TextStyle.title),
-            ui.text(`Count: ${count()}`),
-            ui.text(`Doubled: ${doubled()}`),
-            ui.button(text: "Increment", onPress: () => count(count() + 1))
+            ui.text(`Count: ${count.value}`),
+            ui.text(`Doubled: ${doubled.value}`),
+            ui.button(text: "Increment", onPress: () => { count.value = count.value + 1; })
         ]
     );
 }
 
 @component
-function Dashboard(): dynamic {
+function Dashboard(): Widget {
     return ui.column(
         gap: 16.0,
         padding: 24.0,
@@ -42,6 +42,6 @@ function Dashboard(): dynamic {
     );
 }
 
-run("declarative demo", build: (fr: UiFrame, focus: Focus): dynamic => Dashboard(), w: 800, h: 600, maxFrames: 5);
-run("counter demo", build: (fr: UiFrame, focus: Focus): dynamic => Counter(), w: 800, h: 600, maxFrames: 5);
+run("declarative demo", build: (fr: UiFrame, focus: Focus): Widget => Dashboard(), w: 800, h: 600, maxFrames: 5);
+run("counter demo", build: (fr: UiFrame, focus: Focus): Widget => Counter(), w: 800, h: 600, maxFrames: 5);
 print("declarative demo done");

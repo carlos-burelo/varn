@@ -1,0 +1,33 @@
+import { UiWindow } from "std:ui/window";
+import { UiFrame } from "std:ui/frame";
+import { Focus } from "std:ui/focus";
+import { Widget, PaintContext } from "std:ui/widget_base";
+import { KEY_ESCAPE } from "std:ui/keys";
+import { beginFrame, endFrame } from "std:ui/state";
+
+export function render(win: UiWindow, fr: UiFrame, focus: Focus, root: Widget, x: float, y: float, w: float, h: float): void {
+    root.paint(new PaintContext(win, fr, focus), x, y, w, h);
+}
+
+export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w: int = 800, h: int = 600, bg: int = 4278190080, maxFrames: int = 0): void {
+    using win = UiWindow.open(title, w, h);
+    const fr = new UiFrame(w, h);
+    const focus = new Focus();
+    let frames = 0;
+    while (!fr.closed) {
+        fr.update(win);
+        if (fr.held(KEY_ESCAPE)) {
+            break;
+        }
+        win.clear(bg);
+        beginFrame();
+        const root = build(fr, focus);
+        render(win, fr, focus, root, 0.0, 0.0, w as float, h as float);
+        endFrame();
+        win.present();
+        frames = frames + 1;
+        if (maxFrames > 0 && frames >= maxFrames) {
+            break;
+        }
+    }
+}

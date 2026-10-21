@@ -1,0 +1,126 @@
+import { Widget, PaintContext } from "std:ui/widget_base";
+import { row, col } from "std:ui/layout";
+import { MainAxis, CrossAxis } from "std:ui/style";
+
+export enum Axis {
+    horizontal,
+    vertical
+}
+
+function mainShift(rs: float[][], total: float, horizontal: bool, main: MainAxis): float[][] {
+    const count = rs.length;
+    if (count == 0) {
+        return rs;
+    }
+    let first = horizontal ? rs[0][0] : rs[0][1];
+    let lastEnd = first;
+    for (let i = 0; i < count; i = i + 1) {
+        const s = horizontal ? rs[i][0] : rs[i][1];
+        const len = horizontal ? rs[i][2] : rs[i][3];
+        if (s < first) {
+            first = s;
+        }
+        if (s + len > lastEnd) {
+            lastEnd = s + len;
+        }
+    }
+    const base = horizontal ? rs[0][0] : rs[0][1];
+    const leftover = total - (lastEnd - first);
+    if (leftover <= 0.0) {
+        return rs;
+    }
+    const idx = horizontal ? 0 : 1;
+    if (main == MainAxis.center) {
+        const off = leftover / 2.0;
+        for (let i = 0; i < count; i = i + 1) {
+            rs[i][idx] = rs[i][idx] + off;
+        }
+    } else if (main == MainAxis.end) {
+        for (let i = 0; i < count; i = i + 1) {
+            rs[i][idx] = rs[i][idx] + leftover;
+        }
+    } else if (main == MainAxis.spaceBetween && count > 1) {
+        const step = leftover / ((count - 1) as float);
+        for (let i = 0; i < count; i = i + 1) {
+            rs[i][idx] = rs[i][idx] + step * (i as float);
+        }
+    } else if (main == MainAxis.spaceAround) {
+        const step = leftover / (count as float);
+        for (let i = 0; i < count; i = i + 1) {
+            rs[i][idx] = rs[i][idx] + step * ((i as float) + 0.5) - (base - first);
+        }
+    } else if (main == MainAxis.spaceEvenly) {
+        const step = leftover / ((count + 1) as float);
+        for (let i = 0; i < count; i = i + 1) {
+            rs[i][idx] = rs[i][idx] + step * ((i + 1) as float);
+        }
+    }
+    return rs;
+}
+
+export class FlexNode extends Widget {
+    axis: Axis;
+    children: Widget[];
+    gap: float;
+    pad: float;
+    mainAxis: MainAxis;
+    crossAxis: CrossAxis;
+
+    constructor(axis: Axis, children: Widget[], gap: float, pad: float, w: float, h: float, mainAxis: MainAxis, crossAxis: CrossAxis) {
+        super();
+        this.axis = axis;
+        this.children = children;
+        this.gap = gap;
+        this.pad = pad;
+        this.w = w;
+        this.h = h;
+        this.mainAxis = mainAxis;
+        this.crossAxis = crossAxis;
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        const horizontal = this.axis == Axis.horizontal;
+        const ix = x + this.pad;
+        const iy = y + this.pad;
+        const iw = w - 2.0 * this.pad;
+        const ih = h - 2.0 * this.pad;
+        const weights: float[] = [];
+        for (let child of this.children) {
+            weights.push(horizontal ? child.flexW() : child.flexH());
+        }
+        const rs = horizontal
+            ? mainShift(row(ix, iy, iw, ih, weights, this.gap), iw, true, this.mainAxis)
+            : mainShift(col(ix, iy, iw, ih, weights, this.gap), ih, false, this.mainAxis);
+        for (let i = 0; i < this.children.length; i = i + 1) {
+            const child = this.children[i];
+            let cx0 = rs[i][0];
+            let cy0 = rs[i][1];
+            let cw = rs[i][2];
+            let ch = rs[i][3];
+            if (horizontal && this.crossAxis != CrossAxis.stretch && child.h >= 0.0 && child.h < ch) {
+                if (this.crossAxis == CrossAxis.center) {
+                    cy0 = cy0 + (ch - child.h) / 2.0;
+                } else if (this.crossAxis == CrossAxis.end) {
+                    cy0 = cy0 + ch - child.h;
+                }
+                ch = child.h;
+            } else if (!horizontal && this.crossAxis != CrossAxis.stretch && child.w >= 0.0 && child.w < cw) {
+                if (this.crossAxis == CrossAxis.center) {
+                    cx0 = cx0 + (cw - child.w) / 2.0;
+                } else if (this.crossAxis == CrossAxis.end) {
+                    cx0 = cx0 + cw - child.w;
+                }
+                cw = child.w;
+            }
+            child.paint(cx, cx0, cy0, cw, ch);
+        }
+    }
+}
+
+export function Column(children: Widget[], gap: float = 8.0, pad: float = 0.0, w: float = -1.0, h: float = -1.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.stretch): Widget {
+    return new FlexNode(Axis.vertical, children, gap, pad, w, h, mainAxis, crossAxis);
+}
+
+export function Row(children: Widget[], gap: float = 8.0, pad: float = 0.0, w: float = -1.0, h: float = -1.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.stretch): Widget {
+    return new FlexNode(Axis.horizontal, children, gap, pad, w, h, mainAxis, crossAxis);
+}

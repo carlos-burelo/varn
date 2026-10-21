@@ -1,6 +1,6 @@
 import {
     UiFrame, Focus, TextEdit, Widget,
-    Label, Box, Column, Row, Button, Field, Checkbox, List, Spacer, run
+    Label, TextAlign, Box, Column, Row, Button, Field, Checkbox, List, Spacer, run
 } from "std:ui";
 import { readText, writeText, exists } from "std:fs";
 import { Json } from "std:encoding";
@@ -21,10 +21,9 @@ function loadTodos(): Todo[] {
         return out;
     }
     try {
-        const data = Json.parse(readText(FILE)) as dynamic[];
-        for (let i = 0; i < data.length; i = i + 1) {
-            const t: dynamic = data[i];
-            out.push({ text: t.text as str, done: t.done == true });
+        const data = Json.parse<Todo[]>(readText(FILE));
+        for (let t of data) {
+            out.push({ text: t.text, done: t.done == true });
         }
     } catch (e) {
     }
@@ -55,7 +54,7 @@ run("tareas",
             writeText(FILE, Json.stringify(todos));
             acts.del = -1;
         }
-        const items: dynamic[] = [];
+        const items: Todo[] = [];
         for (let i = 0; i < todos.length && i < MAX_ROWS; i = i + 1) {
             items.push(todos[i]);
         }
@@ -65,13 +64,13 @@ run("tareas",
                 Field(ed, hint: "nueva tarea, Enter añade", onSubmit: (t: str) => { addTodo(t); }),
                 Button("Añadir", w: 120.0, color: GREEN, fg: BG, onPress: () => { addTodo(ed.text); ed.clear(); })
             ]),
-            List(items, rowH: 30.0, gap: 4.0, build: (t: dynamic, i: int) => {
+            List(items, rowH: 30.0, gap: 4.0, build: (t: Todo, i: int) => {
                 const idx = i;
                 return [
                     Checkbox(t.done == true, onToggle: () => { acts.toggle = idx; }),
-                    Label(t.text as str, size: 20.0, color: t.done == true ? GRAY : WHITE),
+                    Label(t.text, size: 20.0, color: t.done == true ? GRAY : WHITE),
                     Box(w: 36.0, h: 30.0, color: RED, radius: 8.0,
-                        child: Label("-", size: 20.0, color: WHITE, align: "center"),
+                        child: Label("-", size: 20.0, color: WHITE, align: TextAlign.center),
                         onClick: () => { acts.del = idx; })
                 ];
             }),

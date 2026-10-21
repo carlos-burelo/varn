@@ -1,9 +1,14 @@
 import { FunctionRef } from "std:reflect";
+import { newComponentId, enterComponent, leaveComponent } from "std:ui/state";
 
 export function component(fn: FunctionRef): FunctionRef {
-    return fn;
-}
-
-export function memo(fn: FunctionRef): FunctionRef {
-    return fn;
+    const id = newComponentId();
+    return (...args: int[]) => {
+        const previous = enterComponent(id);
+        try {
+            return fn(...args);
+        } finally {
+            leaveComponent(previous);
+        }
+    };
 }

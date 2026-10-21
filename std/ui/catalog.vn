@@ -1,34 +1,42 @@
-import { Column, Row, Label, Button, Box, Spacer, Widget } from "std:ui/widgets";
+import { Widget } from "std:ui/widget_base";
+import { Label, TextAlign } from "std:ui/widget_text";
+import { Box, Spacer, StackNode, PaddingNode, SizedBoxNode, AnimatedNode, ImageNode, ProgressNode } from "std:ui/widget_box";
+import { Column, Row } from "std:ui/widget_flex";
+import { Button, InputNode } from "std:ui/widget_controls";
 import { TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Curve, Colors, Theme, textSizeFor, textColorFor } from "std:ui/style";
 
-export type VNode = dynamic;
-
 export namespace ui {
-    export function column(children: VNode[] = [], gap: float = 8.0, padding: float = 0.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.stretch, w: float = -1.0, h: float = -1.0): VNode {
+    export function column(children: Widget[] = [], gap: float = 8.0, padding: float = 0.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.stretch, w: float = -1.0, h: float = -1.0): Widget {
         return Column(children: children, gap: gap, pad: padding, w: w, h: h, mainAxis: mainAxis, crossAxis: crossAxis);
     }
 
-    export function row(children: VNode[] = [], gap: float = 8.0, padding: float = 0.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.stretch, w: float = -1.0, h: float = -1.0): VNode {
+    export function row(children: Widget[] = [], gap: float = 8.0, padding: float = 0.0, mainAxis: MainAxis = MainAxis.start, crossAxis: CrossAxis = CrossAxis.stretch, w: float = -1.0, h: float = -1.0): Widget {
         return Row(children: children, gap: gap, pad: padding, w: w, h: h, mainAxis: mainAxis, crossAxis: crossAxis);
     }
 
-    export function stack(children: VNode[] = [], alignment: Alignment = Alignment.center): VNode {
-        return { kind: "stack", w: -1.0, h: -1.0, children: children, alignment: alignment };
+    export function stack(children: Widget[] = [], alignment: Alignment = Alignment.center): Widget {
+        return new StackNode(children, alignment);
     }
 
-    export function padding(child: VNode = null, all: float = 0.0, left: float = -1.0, top: float = -1.0, right: float = -1.0, bottom: float = -1.0): VNode {
-        return { kind: "padding", w: -1.0, h: -1.0, child: child, all: all, left: left, top: top, right: right, bottom: bottom };
+    export function padding(child: Widget? = null, all: float = 0.0, left: float = -1.0, top: float = -1.0, right: float = -1.0, bottom: float = -1.0): Widget {
+        return new PaddingNode(
+            child,
+            left < 0.0 ? all : left,
+            top < 0.0 ? all : top,
+            right < 0.0 ? all : right,
+            bottom < 0.0 ? all : bottom
+        );
     }
 
-    export function sizedBox(child: VNode = null, width: float = -1.0, height: float = -1.0): VNode {
-        return { kind: "sizedBox", w: width, h: height, child: child };
+    export function sizedBox(child: Widget? = null, width: float = -1.0, height: float = -1.0): Widget {
+        return new SizedBoxNode(child, width, height);
     }
 
-    export function spacer(): VNode {
+    export function spacer(): Widget {
         return Spacer();
     }
 
-    export function text(value: str, style: TextStyle = TextStyle.body, color: int = -1, size: float = 0.0, align: str = "left", maxLines: int = 0): VNode {
+    export function text(value: str, style: TextStyle = TextStyle.body, color: int = -1, size: float = 0.0, align: TextAlign = TextAlign.left, maxLines: int = 0): Widget {
         let s = size;
         if (s <= 0.0) {
             s = textSizeFor(style);
@@ -40,39 +48,39 @@ export namespace ui {
         return Label(text: value, size: s, color: c, align: align, style: style, maxLines: maxLines);
     }
 
-    export function button(text: str, onPress: () => void, enabled: bool = true, w: float = -1.0, h: float = 44.0, color: int = 4278255360, fg: int = 4278190080, size: float = 20.0, radius: float = 10.0): VNode {
+    export function button(text: str, onPress: () => void, enabled: bool = true, w: float = -1.0, h: float = 44.0, color: int = 4278255360, fg: int = 4278190080, size: float = 20.0, radius: float = 10.0): Widget {
         return Button(label: text, onPress: onPress, w: w, h: h, color: color, fg: fg, size: size, radius: radius, enabled: enabled);
     }
 
-    export function input(value: str, onChange: (v: str) => void, placeholder: str = "", h: float = 44.0, size: float = 20.0): VNode {
-        return { kind: "input", w: -1.0, h: h, value: value, onChange: onChange, hint: placeholder, size: size };
+    export function input(value: str, onChange: (v: str) => void, placeholder: str = "", h: float = 44.0, size: float = 20.0): Widget {
+        return new InputNode(value, onChange, placeholder, h, size);
     }
 
-    export function image(source: str, width: float = -1.0, height: float = -1.0, fit: BoxFit = BoxFit.cover): VNode {
-        return { kind: "image", w: width, h: height, source: source, fit: fit, bg: Colors.gray, fg: Colors.white };
+    export function image(source: str, width: float = -1.0, height: float = -1.0, fit: BoxFit = BoxFit.cover): Widget {
+        return new ImageNode(source, width, height, fit);
     }
 
-    export function progressIndicator(value: float = -1.0, color: int = 4280391411, track: int = 4287137928, h: float = 8.0): VNode {
-        return { kind: "progress", w: -1.0, h: h, value: value, color: color, track: track };
+    export function progressIndicator(value: float = -1.0, color: int = 4280391411, track: int = 4287137928, h: float = 8.0): Widget {
+        return new ProgressNode(value, color, track, h);
     }
 
-    export function container(child: VNode = null, padding: float = 0.0, background: int = 4278190080, radius: float = 0.0, w: float = -1.0, h: float = -1.0): VNode {
+    export function container(child: Widget? = null, padding: float = 0.0, background: int = 4278190080, radius: float = 0.0, w: float = -1.0, h: float = -1.0): Widget {
         return Box(w: w, h: h, color: background, radius: radius, pad: padding, child: child);
     }
 
-    export function animated(child: VNode = null, value: bool = false, duration: int = 200, curve: Curve = Curve.easeInOut): VNode {
-        return { kind: "animated", w: -1.0, h: -1.0, child: child, value: value, duration: duration, curve: curve };
+    export function animated(child: Widget? = null, value: bool = false, duration: int = 200, curve: Curve = Curve.easeInOut): Widget {
+        return new AnimatedNode(child, value, duration, curve);
     }
 
-    export function when(condition: bool, then: () => VNode, otherwise: () => VNode): VNode {
+    export function when(condition: bool, then: () => Widget, otherwise: () => Widget): Widget {
         if (condition) {
             return then();
         }
         return otherwise();
     }
 
-    export function each<T>(items: T[], key: (v: T) => dynamic, render: (v: T) => VNode, gap: float = 4.0): VNode {
-        const out: VNode[] = [];
+    export function each<T>(items: T[], key: (v: T) => str | int, render: (v: T) => Widget, gap: float = 4.0): Widget {
+        const out: Widget[] = [];
         for (let i = 0; i < items.length; i = i + 1) {
             out.push(render(items[i]));
         }

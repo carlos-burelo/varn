@@ -1,0 +1,48 @@
+import { Widget, PaintContext } from "std:ui/widget_base";
+import { TextStyle } from "std:ui/style";
+import { textX, textY, ellipsize } from "std:ui/layout";
+import { measure, ascent, descent } from "std:text";
+
+export enum TextAlign {
+    left,
+    center,
+    right
+}
+
+export class LabelNode extends Widget {
+    text: str;
+    size: float;
+    color: int;
+    align: TextAlign;
+    style: TextStyle;
+    maxLines: int;
+
+    constructor(text: str, size: float, color: int, align: TextAlign, style: TextStyle, maxLines: int) {
+        super();
+        this.text = text;
+        this.size = size;
+        this.color = color;
+        this.align = align;
+        this.style = style;
+        this.maxLines = maxLines;
+    }
+
+    override flexH(): float {
+        return 0.0 - (ascent(this.size) + descent(this.size));
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        const ty = textY(y, h, this.size);
+        if (this.align == TextAlign.center) {
+            cx.win.text(textX(x, w, this.text, this.size), ty, this.text, this.size, this.color);
+        } else if (this.align == TextAlign.right) {
+            cx.win.text(x + w - measure(this.text, this.size), ty, this.text, this.size, this.color);
+        } else {
+            cx.win.text(x, ty, ellipsize(this.text, this.size, w), this.size, this.color);
+        }
+    }
+}
+
+export function Label(text: str, size: float = 20.0, color: int = 4294967295, align: TextAlign = TextAlign.left, style: TextStyle = TextStyle.body, maxLines: int = 0): Widget {
+    return new LabelNode(text, size, color, align, style, maxLines);
+}

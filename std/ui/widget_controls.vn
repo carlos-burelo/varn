@@ -1,0 +1,154 @@
+import { Widget, PaintContext } from "std:ui/widget_base";
+import { FlexNode, Row, Column } from "std:ui/widget_flex";
+import { TextEdit } from "std:ui/edit";
+import { KEY_ENTER } from "std:ui/keys";
+import { textX, textY } from "std:ui/layout";
+import { measure } from "std:text";
+import { now } from "std:time";
+
+const fieldEdits = new Map<int, TextEdit>();
+
+function pressShade(color: int): int {
+    const a = (color / 16777216) % 256;
+    const r = ((color / 65536) % 256) * 8 / 10;
+    const g = ((color / 256) % 256) * 8 / 10;
+    const b = (color % 256) * 8 / 10;
+    return a * 16777216 + r * 65536 + g * 256 + b;
+}
+
+function paintField(cx: PaintContext, x: float, y: float, w: float, h: float, ed: TextEdit, hint: str, size: float): void {
+    cx.win.rect(x, y, w, h, ed.focused ? 4294967295 : 4287137928, 10.0);
+    cx.win.rect(x + 2.0, y + 2.0, w - 4.0, h - 4.0, 4278190080, 8.0);
+    const line = ed.text.split("\n")[0];
+    if (line == "" && !ed.focused) {
+        cx.win.text(x + 12.0, textY(y, h, size), hint, size, 4287137928);
+    } else {
+        cx.win.text(x + 12.0, textY(y, h, size), line, size, 4294967295);
+    }
+    if (ed.focused && ((now() / 500) % 2 == 0)) {
+        const upto = ed.cursor < line.length ? ed.cursor : line.length;
+        const caret = x + 12.0 + measure(line.slice(0, upto), size);
+        cx.win.rect(caret, y + 8.0, 2.0, h - 16.0, 4294967295);
+    }
+}
+
+function ownedEdit(slot: int): TextEdit {
+    const existing = fieldEdits.get(slot);
+    if (existing !== null) {
+        return existing;
+    }
+    const fresh = new TextEdit();
+    fieldEdits.set(slot, fresh);
+    return fresh;
+}
+
+export class ButtonNode extends Widget {
+    label: str;
+    onPress: () => void;
+    color: int;
+    fg: int;
+    size: float;
+    radius: float;
+    enabled: bool;
+
+    constructor(label: str, onPress: () => void, w: float, h: float, color: int, fg: int, size: float, radius: float, enabled: bool) {
+        super();
+        this.label = label;
+        this.onPress = onPress;
+        this.w = w;
+        this.h = h;
+        this.color = color;
+        this.fg = fg;
+        this.size = size;
+        this.radius = radius;
+        this.enabled = enabled;
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        const fr = cx.fr;
+        const held = this.enabled && fr.left && (fr.downX as float) >= x && (fr.downX as float) < x + w && (fr.downY as float) >= y && (fr.downY as float) < y + h;
+        cx.win.rect(x, y, w, h, this.enabled ? (held ? pressShade(this.color) : this.color) : 4287137928, this.radius);
+        cx.win.text(textX(x, w, this.label, this.size), textY(y, h, this.size), this.label, this.size, this.enabled ? this.fg : 4278190080);
+        if (this.enabled && fr.clicked(x, y, w, h)) {
+            this.onPress();
+        }
+    }
+}
+
+export class FieldNode extends Widget {
+    edit: TextEdit?;
+    hint: str;
+    size: float;
+    onSubmit: ((text: str) => void)?;
+
+    constructor(edit: TextEdit?, hint: str, h: float, size: float, onSubmit: ((text: str) => void)?) {
+        super();
+        this.edit = edit;
+        this.hint = hint;
+        this.h = h;
+        this.size = size;
+        this.onSubmit = onSubmit;
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        const slot = cx.nextSlot();
+        const ed = this.edit ?? ownedEdit(slot);
+        ed.update(cx.fr, cx.focus, slot, x, y, w, h);
+        const submit = this.onSubmit;
+        if (ed.focused && submit !== null) {
+            for (let key of cx.fr.pressed) {
+                if (key == KEY_ENTER) {
+                    submit(ed.text.split("\n")[0]);
+                    ed.clear();
+                }
+            }
+        }
+        paintField(cx, x, y, w, h, ed, this.hint, this.size);
+    }
+}
+
+export class InputNode extends Widget {
+    value: str;
+    onChange: (value: str) => void;
+    hint: str;
+    size: float;
+
+    constructor(value: str, onChange: (value: str) => void, hint: str, h: float, size: float) {
+        super();
+        this.value = value;
+        this.onChange = onChange;
+        this.hint = hint;
+        this.h = h;
+        this.size = size;
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        const slot = cx.nextSlot();
+        const ed = ownedEdit(slot);
+        if (ed.text != this.value) {
+            ed.text = this.value;
+            ed.cursor = this.value.length;
+        }
+        ed.update(cx.fr, cx.focus, slot, x, y, w, h);
+        if (ed.text != this.value) {
+            this.onChange(ed.text);
+        }
+        paintField(cx, x, y, w, h, ed, this.hint, this.size);
+    }
+}
+
+export function Button(label: str, onPress: () => void, w: float = -1.0, h: float = 44.0, color: int = 4278255360, fg: int = 4278190080, size: float = 20.0, radius: float = 10.0, enabled: bool = true): Widget {
+    return new ButtonNode(label, onPress, w, h, color, fg, size, radius, enabled);
+}
+
+export function Field(edit: TextEdit? = null, hint: str = "", h: float = 44.0, size: float = 20.0, onSubmit: ((text: str) => void)? = null): Widget {
+    return new FieldNode(edit, hint, h, size, onSubmit);
+}
+
+export function List<T>(items: T[], build: (item: T, index: int) => Widget[], rowH: float = 34.0, gap: float = 4.0): Widget {
+    const rows: Widget[] = [];
+    for (let i = 0; i < items.length; i = i + 1) {
+        rows.push(Row(h: rowH, gap: 8.0, children: build(items[i], i)));
+    }
+    return Column(gap: gap, children: rows);
+}
