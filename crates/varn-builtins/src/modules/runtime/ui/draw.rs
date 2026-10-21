@@ -100,8 +100,8 @@ pub fn assemble(cmds: &[DrawCmd]) -> Result<Scene, String> {
             let mut pen = *x as f32;
             for g in &run.glyphs {
                 let r = varn_text::raster_glyph(g.id, g.advance, *size as f32)?;
-                let gx = pen + g.offset_x + r.bx as f32;
-                let gy = baseline - r.by as f32;
+                let gx = (pen + g.offset_x + r.bx as f32).round();
+                let gy = (baseline - r.by as f32).round();
                 if r.w > 0 && r.h > 0 {
                     quads.push((gx, gy, r.w as f32, r.h as f32, items.len(), *color));
                     items.push((r.w, r.h, r.bitmap));
