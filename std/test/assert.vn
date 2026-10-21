@@ -178,7 +178,7 @@ export class Expectation<T> {
         let found = false;
         if (typeof container === "str" && typeof item === "str") {
             found = (container as str).includes(item as str);
-        } else if (Array.isArray(container)) {
+        } else if (container is dynamic[]) {
             for (let elem of (container as dynamic[])) {
                 if (isEq(elem, item)) {
                     found = true;
@@ -340,7 +340,7 @@ export function assertContains(container: dynamic, item: dynamic, msg?: str): vo
     let found = false;
     if (typeof container === "str" && typeof item === "str") {
         found = (container as str).includes(item as str);
-    } else if (Array.isArray(container)) {
+    } else if (container is dynamic[]) {
         for (let elem of (container as dynamic[])) {
             if (isEq(elem, item)) {
                 found = true;

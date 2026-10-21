@@ -103,21 +103,21 @@ class ByteReader {
     }
 }
 
-function encodeValue(w: ByteWriter, val: dynamic): void {
+export type MsgPackValue = int | str | bool | null | Bytes | MsgPackValue[] | { [key: str]: MsgPackValue };
+
+function encodeValue(w: ByteWriter, val: MsgPackValue): void {
     if (val === null) {
         w.writeU8(0xC0);
         return;
     }
 
-    let t = typeof val;
-
-    if (t === "bool") {
-        w.writeU8((val as bool) ? 0xC3 : 0xC2);
+    if (val is bool) {
+        w.writeU8(val ? 0xC3 : 0xC2);
         return;
     }
 
-    if (t === "int") {
-        let n = val as int;
+    if (val is int) {
+        let n = val;
         if (n >= 0 && n <= 127) {
             w.writeU8(n);
         } else if (n < 0 && n >= -32) {
@@ -147,8 +147,8 @@ function encodeValue(w: ByteWriter, val: dynamic): void {
         return;
     }
 
-    if (t === "str") {
-        let raw = Bytes.fromString(val as str);
+    if (val is str) {
+        let raw = Bytes.fromString(val);
         let len = raw.length;
         if (len <= 31) {
             w.writeU8(0xA0 | len);
@@ -166,8 +166,8 @@ function encodeValue(w: ByteWriter, val: dynamic): void {
         return;
     }
 
-    if (t === "Bytes") {
-        let b = val as Bytes;
+    if (val is Bytes) {
+        let b = val;
         let len = b.length;
         if (len <= 255) {
             w.writeU8(0xC4);
@@ -183,8 +183,8 @@ function encodeValue(w: ByteWriter, val: dynamic): void {
         return;
     }
 
-    if (t === "Array" || Array.isArray(val)) {
-        let arr = val as dynamic[];
+    if (val is MsgPackValue[]) {
+        let arr = val;
         let len = arr.length;
         if (len <= 15) {
             w.writeU8(0x90 | len);
@@ -201,8 +201,8 @@ function encodeValue(w: ByteWriter, val: dynamic): void {
         return;
     }
 
-    if (t === "object" || t === "record") {
-        let obj = val as { [key: str]: dynamic };
+    {
+        let obj = val as { [key: str]: MsgPackValue };
         let keys: str[] = [];
         for (let k in obj) {
             keys.push(k);
@@ -223,11 +223,9 @@ function encodeValue(w: ByteWriter, val: dynamic): void {
         }
         return;
     }
-
-    throw new Error(`MsgPack: unsupported type '${t}'`);
 }
 
-function decodeValue(r: ByteReader): dynamic {
+function decodeValue(r: ByteReader): MsgPackValue {
     let tag = r.readU8();
 
     // Positive fixint (0x00 - 0x7f)
@@ -243,7 +241,7 @@ function decodeValue(r: ByteReader): dynamic {
     // Fixmap (0x80 - 0x8f)
     if ((tag & 0xF0) === 0x80) {
         let len = tag & 0x0F;
-        let map: { [key: str]: dynamic } = {};
+        let map: { [key: str]: MsgPackValue } = {};
         for (let i = 0; i < len; i = i + 1) {
             let k = decodeValue(r) as str;
             let v = decodeValue(r);
@@ -255,7 +253,7 @@ function decodeValue(r: ByteReader): dynamic {
     // Fixarray (0x90 - 0x9f)
     if ((tag & 0xF0) === 0x90) {
         let len = tag & 0x0F;
-        let arr: dynamic[] = [];
+        let arr: MsgPackValue[] = [];
         for (let i = 0; i < len; i = i + 1) {
             arr.push(decodeValue(r));
         }
@@ -332,7 +330,7 @@ function decodeValue(r: ByteReader): dynamic {
     // Array 16, 32
     if (tag === 0xDC) {
         let len = r.readU16();
-        let arr: dynamic[] = [];
+        let arr: MsgPackValue[] = [];
         for (let i = 0; i < len; i = i + 1) {
             arr.push(decodeValue(r));
         }
@@ -340,7 +338,7 @@ function decodeValue(r: ByteReader): dynamic {
     }
     if (tag === 0xDD) {
         let len = r.readU32();
-        let arr: dynamic[] = [];
+        let arr: MsgPackValue[] = [];
         for (let i = 0; i < len; i = i + 1) {
             arr.push(decodeValue(r));
         }
@@ -350,7 +348,7 @@ function decodeValue(r: ByteReader): dynamic {
     // Map 16, 32
     if (tag === 0xDE) {
         let len = r.readU16();
-        let map: { [key: str]: dynamic } = {};
+        let map: { [key: str]: MsgPackValue } = {};
         for (let i = 0; i < len; i = i + 1) {
             let k = decodeValue(r) as str;
             let v = decodeValue(r);
@@ -360,7 +358,7 @@ function decodeValue(r: ByteReader): dynamic {
     }
     if (tag === 0xDF) {
         let len = r.readU32();
-        let map: { [key: str]: dynamic } = {};
+        let map: { [key: str]: MsgPackValue } = {};
         for (let i = 0; i < len; i = i + 1) {
             let k = decodeValue(r) as str;
             let v = decodeValue(r);
@@ -373,14 +371,14 @@ function decodeValue(r: ByteReader): dynamic {
 }
 
 export namespace MsgPack {
-    export function encode(val: dynamic): Bytes {
+    export function encode(val: MsgPackValue): Bytes {
         let w = new ByteWriter();
         encodeValue(w, val);
         return w.toBytes();
     }
 
-    export function decode<T = dynamic>(buf: Bytes): T {
+    export function decode(buf: Bytes): MsgPackValue {
         let r = new ByteReader(buf);
-        return decodeValue(r) as T;
+        return decodeValue(r);
     }
 }

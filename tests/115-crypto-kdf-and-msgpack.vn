@@ -1,5 +1,5 @@
 import { randomBytes, pbkdf2, timingSafeEqual, hashPassword, verifyPassword } from "std:crypto";
-import { MsgPack } from "std:encoding";
+import { MsgPack, MsgPackValue } from "std:encoding";
 import { describe, it, expect } from "std:test";
 
 
@@ -73,7 +73,7 @@ function testMsgPackPrimitives(): void {
     rawBin.setByte(2, 30);
     rawBin.setByte(3, 40);
     let binEncoded = MsgPack.encode(rawBin);
-    let binDecoded: Bytes = MsgPack.decode(binEncoded);
+    let binDecoded = MsgPack.decode(binEncoded) as Bytes;
         expect(binDecoded.length).toBe(4);;
         expect(binDecoded.getByte(0)).toBe(10);;
         expect(binDecoded.getByte(3)).toBe(40);;
@@ -82,16 +82,16 @@ function testMsgPackPrimitives(): void {
 
 function testMsgPackStructured(): void {
     // Arrays
-    let list = [1, 2, 3, "four", true];
+    let list: MsgPackValue[] = [1, 2, 3, "four", true];
     let listEnc = MsgPack.encode(list);
-    let listDec: dynamic[] = MsgPack.decode(listEnc);
+    let listDec = MsgPack.decode(listEnc) as MsgPackValue[];
         expect(listDec.length).toBe(5);;
         expect(listDec[0]).toBe(1);;
         expect(listDec[3]).toBe("four");;
         expect(listDec[4]).toBe(true);;
 
     // Objects / Maps
-    let user = {
+    let user: MsgPackValue = {
         name: "Alice",
         age: 30,
         active: true,
@@ -102,14 +102,15 @@ function testMsgPackStructured(): void {
     };
 
     let userEnc = MsgPack.encode(user);
-    let userDec: dynamic = MsgPack.decode(userEnc);
+    let userDec = MsgPack.decode(userEnc) as { [key: str]: MsgPackValue };
         expect(userDec["name"]).toBe("Alice");;
         expect(userDec["age"]).toBe(30);;
         expect(userDec["active"]).toBe(true);;
-        expect(userDec["skills"].length).toBe(2);;
-        expect(userDec["skills"][0]).toBe("systems");;
-        expect(userDec["skills"][1]).toBe("compilers");;
-        expect(userDec["meta"]["tier"]).toBe(1);;
+        let skills = userDec["skills"] as str[];
+        expect(skills.length).toBe(2);;
+        expect(skills[0]).toBe("systems");;
+        expect(skills[1]).toBe("compilers");;
+        expect((userDec["meta"] as { [key: str]: int })["tier"]).toBe(1);;
 
 }
 await describe("115 crypto kdf and msgpack", async () => {
