@@ -1,0 +1,4 @@
+// expect: error[VN3003]
+class Counter { value: int = 0 }
+const counter = new Counter();
+counter(2);

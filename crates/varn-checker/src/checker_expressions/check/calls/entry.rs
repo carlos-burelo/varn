@@ -128,13 +128,8 @@ impl<'r> Checker<'r> {
         self.check_pure_callee(callee_sid, *range, bind);
         self.check_capability_callee(callee_sid, *range, bind);
 
-        if !matches!(
-            callee_kind,
-            TypeKind::Fn(_)
-                | TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)
-                | TypeKind::Named(_, _)
-                | TypeKind::Generic(_, _, _)
-        ) {
+        let holds_value = self.callee_is_value_binding(callee, bind);
+        if holds_value && !self.is_callable(callee_kind, bind) {
             self.emit(
                 Diagnostic::error(
                     ErrorCode::NotCallable,
@@ -295,5 +290,57 @@ impl<'r> Checker<'r> {
         self.check_type_arg_constraints(callee, type_args, range, bind);
         self.forget_called_closure(rec, callee, callee_sid, args, bind);
         self.forget_all_members();
+    }
+}
+
+impl Checker<'_> {
+    fn callee_is_value_binding(&self, callee: ExprId, bind: &BindResult) -> bool {
+        use varn_sem::symbol::SymbolKind;
+        let ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind else {
+            return false;
+        };
+        let scope = bind.scopes.get(self.current_scope);
+        scope.resolve(*name, &bind.scopes).is_some_and(|id| {
+            matches!(
+                bind.arena.get(id).kind,
+                SymbolKind::Var | SymbolKind::Let | SymbolKind::Const | SymbolKind::Parameter
+            )
+        })
+    }
+
+    fn is_callable(&mut self, kind: varn_sem::types::InternedTypeKind, bind: &BindResult) -> bool {
+        use varn_sem::types::TypeContext;
+        let (name, origin) = match kind {
+            TypeKind::Fn(_) | TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => {
+                return true;
+            }
+            TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => (name, origin),
+            TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Object(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => return false,
+        };
+        let name = self.resolve_bind_atom(bind, name);
+        let origin = origin.map(|o| self.resolve_bind_atom(bind, o));
+        let view = varn_sem::bind::BindView::new(bind, self.resolver);
+        match view.get_class_members(&name, origin.as_deref()) {
+            Some(members) => members
+                .iter()
+                .any(|m| m.name.as_ref() == varn_core::MemberKey::Callable.as_str()),
+            None => true,
+        }
     }
 }
