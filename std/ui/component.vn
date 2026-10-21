@@ -1,14 +1,8 @@
 import { FunctionRef } from "std:reflect";
-import { newComponentId, enterComponent, leaveComponent } from "std:ui/state";
+import { withOwner } from "std:signals";
+import { newComponentId, scopeFor } from "std:ui/state";
 
 export function component(fn: FunctionRef): FunctionRef {
     const id = newComponentId();
-    return (...args: int[]) => {
-        const previous = enterComponent(id);
-        try {
-            return fn(...args);
-        } finally {
-            leaveComponent(previous);
-        }
-    };
+    return (...args: int[]) => withOwner(scopeFor(id), () => fn(...args));
 }

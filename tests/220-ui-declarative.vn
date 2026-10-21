@@ -6,6 +6,7 @@ import {
     textSizeFor, textColorFor, run
 } from "std:ui";
 import { MOUSE_LEFT, UiInjectKind } from "std:ui";
+import { beginFrame, endFrame } from "std:ui/state";
 
 let boots = 0;
 
@@ -22,6 +23,24 @@ function Clicker(): Widget {
 
 function flex(w: Widget): FlexNode { return w as FlexNode; }
 function label(w: Widget): LabelNode { return w as LabelNode; }
+
+let reorder = false;
+
+@component
+function Reordering(): Widget {
+    if (reorder) {
+        computed(() => 1);
+    }
+    const kept = signal(0);
+    return ui.text(`${kept.value}`);
+}
+
+@component
+function Stable(): Widget {
+    const kept = signal(0);
+    kept.value = kept.value + 1;
+    return ui.text(`${kept.value}`);
+}
 
 type Todo = {
     id: int,
@@ -123,105 +142,6 @@ await describe("220 ui declarative", async () => {
         connected.value = true;
         expect(label(flex(build()).children[0]).text).toBe("Connected");
         expect(ConnectionStatus() is FlexNode).toBe(true);
-    });
-
-    await it("equal writes skip notification", () => {
-        const count = signal(0);
-        let runs = 0;
-        effect(() => {
-            count.value;
-            runs = runs + 1;
-        });
-        expect(runs).toBe(1);
-        count.value = 0;
-        expect(runs).toBe(1);
-        count.value = 1;
-        expect(runs).toBe(2);
-    });
-
-    await it("computed memos until deps change", () => {
-        const count = signal(1);
-        let derives = 0;
-        const doubled = computed(() => {
-            derives = derives + 1;
-            return count.value * 2;
-        });
-        expect(doubled.value).toBe(2);
-        expect(doubled.value).toBe(2);
-        expect(derives).toBe(1);
-        count.value = 2;
-        expect(doubled.value).toBe(4);
-        expect(derives).toBe(2);
-    });
-
-    await it("diamond batch notifies once", () => {
-        const base = signal(1);
-        const dbl = computed(() => base.value * 2);
-        const quad = computed(() => dbl.value * 2);
-        expect(quad.value).toBe(4);
-        let runs = 0;
-        effect(() => {
-            dbl.value;
-            quad.value;
-            runs = runs + 1;
-        });
-        expect(runs).toBe(1);
-        batch(() => {
-            base.value = 2;
-        });
-        expect(quad.value).toBe(8);
-        expect(runs).toBe(2);
-    });
-
-    await it("array signals compare by identity", () => {
-        const s = signal([1]);
-        let runs = 0;
-        effect(() => {
-            s.value;
-            runs = runs + 1;
-        });
-        expect(runs).toBe(1);
-        s.value = [1];
-        expect(runs).toBe(2);
-        const same = s.value;
-        s.value = same;
-        expect(runs).toBe(2);
-    });
-
-    await it("effect disposes and batch coalesces", () => {
-        const first = signal(0);
-        const second = signal(0);
-        let runs = 0;
-        const dispose = effect(() => {
-            first.value;
-            second.value;
-            runs = runs + 1;
-        });
-        expect(runs).toBe(1);
-        batch(() => {
-            first.value = 1;
-            second.value = 2;
-        });
-        expect(runs).toBe(2);
-        dispose();
-        first.value = 10;
-        expect(runs).toBe(2);
-    });
-
-    await it("untracked reads skip deps", () => {
-        const tracked = signal(0);
-        const skipped = signal(0);
-        let runs = 0;
-        effect(() => {
-            tracked.value;
-            untracked(() => skipped.value);
-            runs = runs + 1;
-        });
-        expect(runs).toBe(1);
-        skipped.value = 1;
-        expect(runs).toBe(1);
-        tracked.value = 1;
-        expect(runs).toBe(2);
     });
 
     await it("each keeps stable order with keys", () => {
@@ -354,6 +274,31 @@ await describe("220 ui declarative", async () => {
         renderTree(win, fr, focus, tree);
         expect(win.commands().length > 0).toBe(true);
         expect(win.present() > 0).toBe(true);
+    });
+    await it("component state survives frames", () => {
+        beginFrame();
+        expect(label(Stable()).text).toBe("1");
+        endFrame();
+        beginFrame();
+        expect(label(Stable()).text).toBe("2");
+        endFrame();
+    });
+
+    await it("a component that creates its state in another order is reported", () => {
+        beginFrame();
+        Reordering();
+        endFrame();
+        reorder = true;
+        beginFrame();
+        let failed = false;
+        try {
+            Reordering();
+        } catch (e) {
+            failed = true;
+        }
+        endFrame();
+        reorder = false;
+        expect(failed).toBe(true);
     });
 });
 

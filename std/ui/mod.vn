@@ -9,7 +9,7 @@ export { Column, Row, FlexNode, Axis } from "std:ui/widget/flex";
 export { Button, Field, List } from "std:ui/widget/controls";
 export { render, run } from "std:ui/render";
 export { pad, row, col, textX, textY, ellipsize } from "std:ui/layout";
-export { Signal, Computed, signal, computed, effect, batch, untracked } from "std:ui/signal";
+export { Readable, Signal, Computed, Effect, signal, computed, effect, batch, untracked, onCleanup } from "std:signals";
 export { TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Curve, Colors, Theme, textSizeFor, textColorFor } from "std:ui/style";
 export { component } from "std:ui/component";
 export { ui } from "std:ui/catalog";
