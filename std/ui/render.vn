@@ -1,7 +1,7 @@
 import { UiWindow } from "std:ui/window";
 import { UiFrame } from "std:ui/frame";
 import { Focus } from "std:ui/focus";
-import { Widget, PaintContext } from "std:ui/widget_base";
+import { Widget, PaintContext } from "std:ui/widget/base";
 import { KEY_ESCAPE } from "std:ui/keys";
 import { beginFrame, endFrame } from "std:ui/state";
 

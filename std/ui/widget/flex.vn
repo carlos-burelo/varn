@@ -1,4 +1,4 @@
-import { Widget, PaintContext } from "std:ui/widget_base";
+import { Widget, PaintContext } from "std:ui/widget/base";
 import { row, col } from "std:ui/layout";
 import { MainAxis, CrossAxis } from "std:ui/style";
 

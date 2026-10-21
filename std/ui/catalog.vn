@@ -1,8 +1,8 @@
-import { Widget } from "std:ui/widget_base";
-import { Label, TextAlign } from "std:ui/widget_text";
-import { Box, Spacer, StackNode, PaddingNode, SizedBoxNode, AnimatedNode, ImageNode, ProgressNode } from "std:ui/widget_box";
-import { Column, Row } from "std:ui/widget_flex";
-import { Button, InputNode } from "std:ui/widget_controls";
+import { Widget } from "std:ui/widget/base";
+import { Label, TextAlign } from "std:ui/widget/text";
+import { Box, Spacer, StackNode, PaddingNode, SizedBoxNode, AnimatedNode, ImageNode, ProgressNode } from "std:ui/widget/box";
+import { Column, Row } from "std:ui/widget/flex";
+import { Button, InputNode } from "std:ui/widget/controls";
 import { TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Curve, Colors, Theme, textSizeFor, textColorFor } from "std:ui/style";
 
 export namespace ui {

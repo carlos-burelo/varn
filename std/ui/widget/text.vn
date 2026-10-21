@@ -1,4 +1,4 @@
-import { Widget, PaintContext } from "std:ui/widget_base";
+import { Widget, PaintContext } from "std:ui/widget/base";
 import { TextStyle } from "std:ui/style";
 import { textX, textY, ellipsize } from "std:ui/layout";
 import { measure, ascent, descent } from "std:text";

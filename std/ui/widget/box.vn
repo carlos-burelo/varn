@@ -1,5 +1,5 @@
-import { Widget, PaintContext, paintChild } from "std:ui/widget_base";
-import { LabelNode, TextAlign, Label } from "std:ui/widget_text";
+import { Widget, PaintContext, paintChild } from "std:ui/widget/base";
+import { LabelNode, TextAlign, Label } from "std:ui/widget/text";
 import { TextStyle, Alignment, BoxFit, Curve, Colors } from "std:ui/style";
 import { now } from "std:time";
 

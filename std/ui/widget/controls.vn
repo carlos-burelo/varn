@@ -1,5 +1,5 @@
-import { Widget, PaintContext } from "std:ui/widget_base";
-import { FlexNode, Row, Column } from "std:ui/widget_flex";
+import { Widget, PaintContext } from "std:ui/widget/base";
+import { FlexNode, Row, Column } from "std:ui/widget/flex";
 import { TextEdit } from "std:ui/edit";
 import { KEY_ENTER } from "std:ui/keys";
 import { textX, textY } from "std:ui/layout";
