@@ -1,4 +1,5 @@
 use super::*;
+use varn_types::EntryKind;
 
 fn resolve_ns(
     root: VmValue,
@@ -62,11 +63,12 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
         };
 
         let val = match entry.entry_kind {
-            0x09 => ctx.call_static(entry.func()),
-            0x10 => (entry.func())(ctx, &[]).unwrap_or(VmValue::null()),
-
-            0x03 | 0x04 | 0x05 | 0x06 | 0x11 | 0x12 | 0x13 | 0x14 | 0x15 => continue,
-            _ => ctx.alloc_fn(entry.func(), symbol),
+            EntryKind::ClassDef => (entry.func())(ctx, &[]).unwrap_or(VmValue::null()),
+            EntryKind::InstanceMethod
+            | EntryKind::StaticMethod
+            | EntryKind::InstanceGetter
+            | EntryKind::StaticGetter => continue,
+            EntryKind::Function => ctx.alloc_fn(entry.func(), symbol),
         };
 
         ctx.set_field(target, symbol, val);

@@ -26,7 +26,7 @@ pub use chunk::{
 pub use marshal::{FromVm, IntoVm, VnArray, VnStr};
 pub use module_graph::{ModuleGraphArtifact, PackageNode};
 pub use native::{
-    call_static_with, ArgType, NativeFn, NativeOpEntry, NativeOpTarget, SignatureDescriptor,
+    call_static_with, ArgType, EntryKind, NativeFn, NativeOpEntry, NativeOpTarget, SignatureDescriptor,
 };
 pub use native_ctx::NativeCtx;
 pub use native_ctx::NativeFnResult;

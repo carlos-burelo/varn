@@ -211,7 +211,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
                 func_ptr: #wrap_ident::<#self_ty> as *const u8,
                 raw_func_ptr: #raw_func_val,
                 signature: #sig_val,
-                entry_kind: 0x01,
+                entry_kind: ::varn_types::EntryKind::Function,
                 flags: 0,
                 capability: #capability,
             };
@@ -230,14 +230,14 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
         };
         out.setup_calls.push(setup);
 
-        let mkind: u8 = match m.kind {
-            Kind::Method => 0x03,
-            Kind::StaticMethod => 0x04,
-            Kind::Getter => 0x05,
-            Kind::StaticGetter => 0x14,
-            Kind::Constructor | Kind::Property | Kind::Function => 0x00,
+        let mkind = match m.kind {
+            Kind::Method => Some(quote!(InstanceMethod)),
+            Kind::StaticMethod => Some(quote!(StaticMethod)),
+            Kind::Getter => Some(quote!(InstanceGetter)),
+            Kind::StaticGetter => Some(quote!(StaticGetter)),
+            Kind::Constructor | Kind::Property | Kind::Function => None,
         };
-        if mkind != 0x00 {
+        if let Some(mkind) = mkind {
             let mentry_ident = format_ident!(
                 "__VARN_OPM_{}_{}",
                 sanitize(&prefix).to_uppercase(),
@@ -252,7 +252,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
                     func_ptr: #wrap_ident::<#self_ty> as *const u8,
                     raw_func_ptr: #raw_func_val,
                     signature: #sig_val,
-                    entry_kind: #mkind,
+                    entry_kind: ::varn_types::EntryKind::#mkind,
                     flags: 0,
                     capability: #capability,
                 };

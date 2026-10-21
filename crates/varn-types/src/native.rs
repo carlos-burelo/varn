@@ -4,30 +4,14 @@ use crate::{native_ctx::NativeCtx, vm_value::VmValue};
 
 pub type NativeFn = fn(&mut dyn NativeCtx, &[VmValue]) -> crate::NativeFnResult;
 
-#[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EntryKind {
-    Function = 0x01,
-    ClassConstructor = 0x02,
-    InstanceMethod = 0x03,
-    StaticMethod = 0x04,
-    Getter = 0x05,
-    Setter = 0x06,
-    PrimitiveExt = 0x07,
-    EnumVariant = 0x08,
-    StaticValue = 0x09,
-    ClassDef = 0x10,
-    Constructor = 0x11,
-    InstanceGetter = 0x12,
-    InstanceSetter = 0x13,
-    StaticGetter = 0x14,
-    StaticSetter = 0x15,
-    ExtMethod = 0x16,
-    ExtGetter = 0x17,
-    EnumDef = 0x18,
-    ConstValue = 0x19,
-    AsyncFunction = 0x1A,
-    NamespaceDef = 0x1B,
+    Function,
+    ClassDef,
+    InstanceMethod,
+    StaticMethod,
+    InstanceGetter,
+    StaticGetter,
 }
 
 #[repr(u8)]
@@ -89,7 +73,7 @@ pub struct NativeOpEntry {
     pub raw_func_ptr: *const u8,
     pub signature: SignatureDescriptor,
 
-    pub entry_kind: u8,
+    pub entry_kind: EntryKind,
     pub flags: u32,
     pub capability: &'static str,
 }

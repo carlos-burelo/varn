@@ -153,7 +153,7 @@ fn expand_section(
                 func_ptr: #builder_ident as *const u8,
                 raw_func_ptr: ::core::ptr::null(),
                 signature: ::varn_types::SignatureDescriptor::empty(),
-                entry_kind: 0x10,
+                entry_kind: ::varn_types::EntryKind::ClassDef,
                 flags: 0,
                 capability: "",
             };
