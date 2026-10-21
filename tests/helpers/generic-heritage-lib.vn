@@ -1,0 +1,74 @@
+export abstract class Source<T> {
+    abstract get current(): T;
+    abstract peek(): T;
+}
+
+export interface Sink<T> {
+    push(v: T): void;
+}
+
+export interface Channel<T> extends Sink<T> {
+    drain(): T[];
+}
+
+export class Cell<T> extends Source<T> implements Channel<T> {
+    private held: T;
+    private log: T[] = [];
+
+    constructor(initial: T) {
+        super();
+        this.held = initial;
+    }
+
+    override get current(): T {
+        return this.held;
+    }
+
+    override peek(): T {
+        return this.held;
+    }
+
+    push(v: T): void {
+        this.held = v;
+        this.log.push(v);
+    }
+
+    drain(): T[] {
+        const out = this.log;
+        this.log = [];
+        return out;
+    }
+}
+
+export class Lifted<A, B> extends Source<B> {
+    private from: Source<A>;
+    private fn: (v: A) => B;
+
+    constructor(from: Source<A>, fn: (v: A) => B) {
+        super();
+        this.from = from;
+        this.fn = fn;
+    }
+
+    override get current(): B {
+        return this.fn(this.from.current);
+    }
+
+    override peek(): B {
+        return this.fn(this.from.peek());
+    }
+}
+
+export class Doubled extends Source<int> {
+    constructor() {
+        super();
+    }
+
+    override get current(): int {
+        return 2;
+    }
+
+    override peek(): int {
+        return 2;
+    }
+}

@@ -32,6 +32,34 @@ impl<'r> BindView<'r> {
         }
     }
 
+    pub fn heritage(&self, name: &str, origin: Option<&str>) -> Vec<super::ClassParent> {
+        let owner = self.foreign(origin);
+        let bind = owner.as_deref().unwrap_or(self.bind);
+        bind.get_class_parent(name)
+            .into_iter()
+            .chain(bind.get_class_interfaces(name))
+            .cloned()
+            .collect()
+    }
+
+    pub fn type_param_names(&self, name: &str, origin: Option<&str>) -> Option<Vec<Arc<str>>> {
+        let owner = self.foreign(origin);
+        let bind = owner.as_deref().unwrap_or(self.bind);
+        let atom = bind.interner.get(name)?;
+        let id = bind
+            .scopes
+            .get(bind.global_scope)
+            .resolve(atom, &bind.scopes)?;
+        Some(
+            bind.arena
+                .get(id)
+                .type_params
+                .iter()
+                .map(|p| Arc::from(bind.interner.resolve(*p)))
+                .collect(),
+        )
+    }
+
     fn foreign(&self, origin: Option<&str>) -> Option<Arc<BindResult>> {
         let origin = origin?;
         if origin == self.bind.source_file.as_ref() {

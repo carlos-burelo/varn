@@ -224,6 +224,7 @@ import "./229-jit-loop-variant-views.vn"
 import "./230-foreign-class-chain.vn"
 import "./231-alias-of-imported-class.vn"
 import "./232-ui-layout.vn"
+import "./233-generic-heritage.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

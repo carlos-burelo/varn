@@ -1,0 +1,32 @@
+import { describe, it, expect } from "std:test";
+import { Source, Sink, Channel, Cell, Lifted, Doubled } from "./helpers/generic-heritage-lib.vn";
+
+function read(s: Source<int>): int { return s.current }
+function feed(s: Sink<str>, v: str): void { s.push(v) }
+function drain(c: Channel<int>): int[] { return c.drain() }
+
+await describe("233 generic heritage", async () => {
+    await it("an instance is assignable to its generic base with the same arguments", () => {
+        const cell: Source<int> = new Cell<int>(7)
+        expect(read(cell)).toBe(7)
+        expect(read(new Cell<int>(3))).toBe(3)
+    })
+    await it("arguments are renamed along the chain", () => {
+        const lifted: Source<str> = new Lifted<int, str>(new Cell<int>(5), (v: int): str => `n${v}`)
+        expect(lifted.current).toBe("n5")
+        const twice = new Lifted<int, int>(new Cell<int>(2), (v: int): int => v * 2)
+        expect(read(twice)).toBe(4)
+    })
+    await it("a non generic class extending a closed generic base is accepted", () => {
+        expect(read(new Doubled())).toBe(2)
+    })
+    await it("implemented and extended generic interfaces are reachable", () => {
+        const cell = new Cell<str>("a")
+        feed(cell, "b")
+        expect(cell.current).toBe("b")
+        const numbers = new Cell<int>(0)
+        numbers.push(1)
+        numbers.push(2)
+        expect(drain(numbers)).toEqual([1, 2])
+    })
+})

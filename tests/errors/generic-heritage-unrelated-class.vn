@@ -1,0 +1,8 @@
+// expect: error[VN3001]
+import { Source } from "../helpers/generic-heritage-lib.vn"
+
+class Plain {
+    value: int = 1
+}
+
+const source: Source<int> = new Plain()

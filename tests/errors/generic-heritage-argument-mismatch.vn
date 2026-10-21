@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+import { Source, Cell } from "../helpers/generic-heritage-lib.vn"
+
+const cell: Source<str> = new Cell<int>(1)

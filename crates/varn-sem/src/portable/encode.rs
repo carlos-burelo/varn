@@ -68,6 +68,13 @@ impl Roots {
                 .extend(bind.scopes.get(id).bindings.keys().copied());
         }
         self.type_members(&bind.type_members);
+        for parent in bind
+            .class_parents
+            .values()
+            .chain(bind.class_interfaces.values().flatten())
+        {
+            self.types.extend(parent.args.iter().map(|t| t.0));
+        }
         for methods in bind.class_methods.values() {
             self.types.extend(methods.values().map(|t| t.0));
         }

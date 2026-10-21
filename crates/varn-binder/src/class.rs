@@ -128,6 +128,8 @@ impl<'r> super::Binder<'r> {
             }
         }
 
+        self.record_interfaces(&name, &c.implements);
+
         let class_info = ClassMemberInfo {
             name: name.clone(),
             kind: ClassMemberKind::Class,

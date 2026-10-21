@@ -48,6 +48,7 @@ impl<'r> super::Binder<'r> {
             self.collect_interface_member(member, &mut members);
         }
 
+        self.record_interfaces(&id_rc, &i.extends);
         self.declare_kind(id_rc.clone(), varn_sem::bind::DeclKind::Interface);
         if !members.is_empty() {
             self.type_members

@@ -25,6 +25,7 @@ mod decls_fn;
 pub(crate) mod decorator_attrs;
 mod definite_field_assignment;
 mod diagnostics;
+mod heritage;
 mod imports;
 mod inference_utils;
 mod interface;
@@ -54,6 +55,7 @@ pub struct Binder<'r> {
     pub(crate) class_methods: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Type>>,
     pub(crate) type_members: TypeMembers,
     pub(crate) class_parents: FxHashMap<Arc<str>, ClassParent>,
+    pub(crate) class_interfaces: FxHashMap<Arc<str>, Vec<ClassParent>>,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
     pub(crate) interner: varn_core::AtomInterner,
     pub(crate) deps: Vec<Arc<str>>,

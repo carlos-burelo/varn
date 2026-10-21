@@ -4,6 +4,7 @@ mod compat_lookup;
 mod core;
 mod expr_sat;
 mod generics;
+mod heritage;
 mod nominal;
 mod objects;
 mod resolve;

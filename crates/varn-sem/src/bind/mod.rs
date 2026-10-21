@@ -73,7 +73,6 @@ pub struct Extensions {
 pub struct ClassParent {
     pub name: Arc<str>,
     pub origin: Option<Arc<str>>,
-    #[serde(skip, default)]
     pub args: Vec<Type>,
 }
 
@@ -98,6 +97,8 @@ pub struct BindResult {
     pub type_members: TypeMembers,
     #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub class_parents: FxHashMap<Arc<str>, ClassParent>,
+    #[serde(serialize_with = "crate::portable::canonical::sorted")]
+    pub class_interfaces: FxHashMap<Arc<str>, Vec<ClassParent>>,
     #[serde(serialize_with = "crate::portable::canonical::sorted")]
     pub type_param_variance: FxHashMap<Arc<str>, Vec<crate::compat::variance::Variance>>,
     pub source_file: Arc<str>,
@@ -238,6 +239,12 @@ impl BindResult {
         self.class_parents
             .get(name)
             .or_else(|| self.core.as_ref().and_then(|b| b.class_parents.get(name)))
+    }
+
+    pub fn get_class_interfaces(&self, name: &str) -> &[ClassParent] {
+        self.class_interfaces
+            .get(name)
+            .map_or(&[][..], Vec::as_slice)
     }
 
     pub fn get_flattened_members(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {
