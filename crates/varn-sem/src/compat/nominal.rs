@@ -27,6 +27,9 @@ pub(super) fn nominal_arms(
             if dn == in_ && origin_d == origin_i {
                 return Some(true);
             }
+            if let Some(by_alias) = alias_side(declared, inferred, dn, origin_d, in_, origin_i, bind, cache, in_progress, table) {
+                return Some(by_alias);
+            }
             Some(match (resolve_atom(bind, dn), resolve_atom(bind, in_)) {
                 (Some(dn_s), Some(in_s)) => compatible_named(
                     &dn_s,
@@ -201,6 +204,45 @@ pub(super) fn nominal_arms(
         _ => None,
     }
 }
+fn is_alias_only(
+    bind: &BindView,
+    name: varn_core::Atom,
+    origin: Option<varn_core::Atom>,
+) -> bool {
+    let Some(name_s) = resolve_atom(Some(bind), name) else {
+        return false;
+    };
+    let origin_s = origin.and_then(|o| resolve_atom(Some(bind), o));
+    named_members(bind, &name_s, origin_s.as_deref()).is_none()
+        && named_alias(bind, &name_s, origin_s.as_deref()).is_some()
+}
+
+fn alias_side(
+    declared: &Type,
+    inferred: &Type,
+    dn: varn_core::Atom,
+    origin_d: Option<varn_core::Atom>,
+    in_: varn_core::Atom,
+    origin_i: Option<varn_core::Atom>,
+    bind: Option<&BindView>,
+    cache: &mut FxHashMap<(Type, Type, usize), bool>,
+    in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
+) -> Option<bool> {
+    let bind = bind?;
+    if is_alias_only(bind, dn, origin_d) {
+        return Some(named_fallback(
+            declared, inferred, dn, origin_d, Some(bind), cache, in_progress, table, true,
+        ));
+    }
+    if is_alias_only(bind, in_, origin_i) {
+        return Some(named_fallback(
+            declared, inferred, in_, origin_i, Some(bind), cache, in_progress, table, false,
+        ));
+    }
+    None
+}
+
 fn named_alias(bind: &BindView, name: &str, origin: Option<&str>) -> Option<Type> {
     use crate::types::TypeContext;
     bind.resolve_type_alias(name, origin)
