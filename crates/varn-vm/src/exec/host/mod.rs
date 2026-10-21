@@ -88,6 +88,10 @@ impl NativeCtx for ExecCtx {
             )
     }
 
+    fn is_tuple(&self, v: VmValue) -> bool {
+        v.is_heap() && matches!(self.heap.get(v.as_heap()), Some(HeapObj::Tuple(_)))
+    }
+
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue {
         self.heap.alloc_array_vm(items)
     }

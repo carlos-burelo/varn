@@ -8,7 +8,6 @@ export {
     assertNull,
     assertNotNull,
     assertNotEqual,
-    assertContains,
     assertCloseTo,
     assertThrows,
     fail,

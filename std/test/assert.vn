@@ -1,3 +1,5 @@
+import { deepEq$ } from "runtime:testing";
+
 let passedCount = 0;
 let failedCount = 0;
 
@@ -21,14 +23,12 @@ export function isEq<T>(a: T, b: T): bool {
     if (a === b || a == b) {
         return true;
     }
-    if (typeof a === "str" && typeof b === "str") {
-        let s1 = a as str;
-        let s2 = b as str;
-        if (s1.length != s2.length) {
+    if (a is str && b is str) {
+        if (a.length != b.length) {
             return false;
         }
-        for (let i = 0; i < s1.length; i = i + 1) {
-            if (s1.slice(i, i + 1) !== s2.slice(i, i + 1)) {
+        for (let i = 0; i < a.length; i = i + 1) {
+            if (a.slice(i, i + 1) !== b.slice(i, i + 1)) {
                 return false;
             }
         }
@@ -37,74 +37,15 @@ export function isEq<T>(a: T, b: T): bool {
     return false;
 }
 
-function sameItems(a: dynamic, b: dynamic): bool {
-    if (a.length != b.length) {
-        return false;
-    }
-    for (let i = 0; i < a.length; i = i + 1) {
-        if (!deepEq(a[i], b[i])) {
-            return false;
-        }
-    }
-    return true;
+export function deepEq<T>(a: T, b: T): bool {
+    return deepEq$(a, b);
 }
 
-function sameFields(a: dynamic, b: dynamic): bool {
-    let count = 0;
-    for (const key in a) {
-        if (!deepEq(a[key], b[key])) {
-            return false;
-        }
-        count = count + 1;
+function messageOf(e: Error | str | int | float | bool | null): str {
+    if (e is Error) {
+        return e.message;
     }
-    let other = 0;
-    for (const key in b) {
-        other = other + 1;
-    }
-    return count == other;
-}
-
-export function deepEq(a: dynamic, b: dynamic): bool {
-    if (isEq(a, b)) {
-        return true;
-    }
-    const kind = typeof a;
-    if (kind != typeof b) {
-        return false;
-    }
-    if (kind == "Array" || kind == "Tuple") {
-        return sameItems(a, b);
-    }
-    if (kind == "Map") {
-        if (a.size != b.size) {
-            return false;
-        }
-        for (const key of (a as Map<dynamic, dynamic>).keys()) {
-            if (!b.has(key) || !deepEq(a.get(key), b.get(key))) {
-                return false;
-            }
-        }
-        return true;
-    }
-    if (kind == "Set") {
-        if (a.size != b.size) {
-            return false;
-        }
-        for (const item of a as Set<dynamic>) {
-            if (!b.has(item)) {
-                return false;
-            }
-        }
-        return true;
-    }
-    if (kind == "object") {
-        try {
-            return sameFields(a, b);
-        } catch (e) {
-            return false;
-        }
-    }
-    return false;
+    return "" + e;
 }
 
 export class Expectation<T> {
@@ -173,13 +114,13 @@ export class Expectation<T> {
         passedCount = passedCount + 1;
     }
 
-    toContain(item: dynamic): void {
-        let container: dynamic = this.actual;
+    toContain<E>(item: E): void {
         let found = false;
-        if (typeof container === "str" && typeof item === "str") {
-            found = (container as str).includes(item as str);
-        } else if (container is dynamic[]) {
-            for (let elem of (container as dynamic[])) {
+        let actual = this.actual;
+        if (actual is str) {
+            found = item is str && actual.includes(item);
+        } else {
+            for (let elem of actual as E[]) {
                 if (isEq(elem, item)) {
                     found = true;
                     break;
@@ -194,23 +135,13 @@ export class Expectation<T> {
     }
 
     toThrow(expectedErr: str = ""): void {
-        let fn: dynamic = this.actual;
         let threw = false;
         let errMessage = "";
         try {
-            fn();
+            (this.actual as () => void)();
         } catch (e) {
             threw = true;
-            if (typeof e === "object") {
-                let dynE: dynamic = e;
-                if (dynE.message !== null) {
-                    errMessage = "" + dynE.message;
-                } else {
-                    errMessage = "" + e;
-                }
-            } else {
-                errMessage = "" + e;
-            }
+            errMessage = messageOf(e);
         }
         if (!threw) {
             failedCount = failedCount + 1;
@@ -230,31 +161,7 @@ export function expect<T>(val: T): Expectation<T> {
     return new Expectation<T>(val);
 }
 
-export function assertEqual(a: dynamic, b: dynamic, c?: dynamic): void {
-    let label: str = "assertEqual";
-    let actual: dynamic = a;
-    let expected: dynamic = b;
-
-    if (c != null) {
-        if (isEq(b, c)) {
-            label = a as str;
-            actual = b;
-            expected = c;
-        } else if (isEq(a, b)) {
-            label = c as str;
-            actual = a;
-            expected = b;
-        } else if (typeof a === "str" && typeof c !== "str") {
-            label = a as str;
-            actual = b;
-            expected = c;
-        } else if (typeof c === "str") {
-            label = c as str;
-            actual = a;
-            expected = b;
-        }
-    }
-
+export function assertEqual<T>(actual: T, expected: T, label: str = "assertEqual"): void {
     if (!isEq(actual, expected)) {
         failedCount = failedCount + 1;
         throw new Error("ASSERT FAIL: " + label + " (expected " + expected + " but got " + actual + ")");
@@ -262,24 +169,7 @@ export function assertEqual(a: dynamic, b: dynamic, c?: dynamic): void {
     passedCount = passedCount + 1;
 }
 
-export function assertTrue(a: dynamic, b?: dynamic): void {
-    let cond: bool = false;
-    let label: str = "assertTrue";
-
-    if (typeof a === "bool") {
-        cond = a as bool;
-        if (typeof b === "str") {
-            label = b as str;
-        }
-    } else if (typeof b === "bool") {
-        cond = b as bool;
-        if (typeof a === "str") {
-            label = a as str;
-        }
-    } else {
-        cond = a as bool;
-    }
-
+export function assertTrue(cond: bool, label: str = "assertTrue"): void {
     if (!cond) {
         failedCount = failedCount + 1;
         throw new Error("ASSERT FAIL: " + label);
@@ -287,24 +177,7 @@ export function assertTrue(a: dynamic, b?: dynamic): void {
     passedCount = passedCount + 1;
 }
 
-export function assertFalse(a: dynamic, b?: dynamic): void {
-    let cond: bool = true;
-    let label: str = "assertFalse";
-
-    if (typeof a === "bool") {
-        cond = a as bool;
-        if (typeof b === "str") {
-            label = b as str;
-        }
-    } else if (typeof b === "bool") {
-        cond = b as bool;
-        if (typeof a === "str") {
-            label = a as str;
-        }
-    } else {
-        cond = a as bool;
-    }
-
+export function assertFalse(cond: bool, label: str = "assertFalse"): void {
     if (cond) {
         failedCount = failedCount + 1;
         throw new Error("ASSERT FAIL: " + label + " (expected false but got true)");
@@ -332,25 +205,6 @@ export function assertNotEqual<T>(a: T, b: T, msg: str = "assertNotEqual"): void
     if (isEq(a, b)) {
         failedCount = failedCount + 1;
         throw new Error("ASSERT FAIL: " + msg + " (expected values to differ, got " + a + ")");
-    }
-    passedCount = passedCount + 1;
-}
-
-export function assertContains(container: dynamic, item: dynamic, msg?: str): void {
-    let found = false;
-    if (typeof container === "str" && typeof item === "str") {
-        found = (container as str).includes(item as str);
-    } else if (container is dynamic[]) {
-        for (let elem of (container as dynamic[])) {
-            if (isEq(elem, item)) {
-                found = true;
-                break;
-            }
-        }
-    }
-    if (!found) {
-        failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + (msg ?? "assertContains") + " (container does not contain item)");
     }
     passedCount = passedCount + 1;
 }
@@ -387,16 +241,7 @@ export function assertThrows(fn: () => void, expectedErr: str = "", msg: str = "
         fn();
     } catch (e) {
         threw = true;
-        if (typeof e === "object") {
-            let dynE: dynamic = e;
-            if (dynE.message !== null) {
-                errMessage = "" + dynE.message;
-            } else {
-                errMessage = "" + e;
-            }
-        } else {
-            errMessage = "" + e;
-        }
+        errMessage = messageOf(e);
     }
     if (!threw) {
         failedCount = failedCount + 1;

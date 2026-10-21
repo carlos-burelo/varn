@@ -97,6 +97,9 @@ pub trait NativeCtx: crate::Buffers {
 
     fn is_string(&self, v: VmValue) -> bool;
     fn is_array(&self, v: VmValue) -> bool;
+    fn is_tuple(&self, _v: VmValue) -> bool {
+        false
+    }
 
     fn is_object(&self, _v: VmValue) -> bool {
         false

@@ -4,28 +4,28 @@ function logLine(msg: str): void {
     write$(msg + "\n");
 }
 
-let beforeAllFns: Array<() => dynamic> = [];
-let afterAllFns: Array<() => dynamic> = [];
-let beforeEachFns: Array<() => dynamic> = [];
-let afterEachFns: Array<() => dynamic> = [];
+let beforeAllFns: Array<() => void> = [];
+let afterAllFns: Array<() => void> = [];
+let beforeEachFns: Array<() => void> = [];
+let afterEachFns: Array<() => void> = [];
 
-export function beforeAll(fn: () => dynamic): void {
+export function beforeAll(fn: () => void): void {
     beforeAllFns.push(fn);
 }
 
-export function afterAll(fn: () => dynamic): void {
+export function afterAll(fn: () => void): void {
     afterAllFns.push(fn);
 }
 
-export function beforeEach(fn: () => dynamic): void {
+export function beforeEach(fn: () => void): void {
     beforeEachFns.push(fn);
 }
 
-export function afterEach(fn: () => dynamic): void {
+export function afterEach(fn: () => void): void {
     afterEachFns.push(fn);
 }
 
-export async function describe(suiteName: str, body: () => dynamic): Task<void> {
+export async function describe(suiteName: str, body: () => void): Task<void> {
     logLine("=== Suite: " + suiteName + " ===");
     let prevBeforeAll = beforeAllFns;
     let prevAfterAll = afterAllFns;
@@ -49,11 +49,11 @@ export async function describe(suiteName: str, body: () => dynamic): Task<void> 
     }
 }
 
-export async function suite(suiteName: str, body: () => dynamic): Task<void> {
+export async function suite(suiteName: str, body: () => void): Task<void> {
     await describe(suiteName, body);
 }
 
-export async function test(testName: str, body: () => dynamic): Task<void> {
+export async function test(testName: str, body: () => void): Task<void> {
     try {
         for (let fn of beforeEachFns) await fn();
         await body();
@@ -64,6 +64,6 @@ export async function test(testName: str, body: () => dynamic): Task<void> {
     }
 }
 
-export async function it(testName: str, body: () => dynamic): Task<void> {
+export async function it(testName: str, body: () => void): Task<void> {
     await test(testName, body);
 }

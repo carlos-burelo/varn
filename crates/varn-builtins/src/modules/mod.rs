@@ -32,7 +32,7 @@ native_modules! {
     sqlite = "runtime/sqlite/sqlite.rs" => [sqlite::NATIVE_ENTRIES];
     sys = "runtime/sys/sys.rs" => [sys::NATIVE_ENTRIES];
     task = "runtime/task/task.rs" => [task::NATIVE_ENTRIES];
-    testing = "runtime/testing/testing.rs" => [];
+    testing = "runtime/testing/testing.rs" => [testing::NATIVE_ENTRIES];
     text = "runtime/text/text.rs" => [text::NATIVE_ENTRIES];
     time = "runtime/time/time.rs" => [time::NATIVE_ENTRIES];
     types = "core/types/mod.rs" => [
