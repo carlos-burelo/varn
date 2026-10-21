@@ -22,17 +22,8 @@ export interface AsyncWriter {
     close(): void;
 }
 
-export interface BulkPump {
-    pumpTo(writer: AsyncWriter): Task<int>;
-}
-
 export class Stream {
     static async pipe(reader: AsyncReader, writer: AsyncWriter, bufferSize: int = 8192): Task<int> {
-        let fast = reader as dynamic;
-        if (typeof fast.pumpTo === "function") {
-            let pumped = await fast.pumpTo(writer);
-            return pumped as int;
-        }
         let total = 0;
         while (true) {
             let chunk = await reader.read(bufferSize);

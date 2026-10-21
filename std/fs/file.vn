@@ -12,7 +12,7 @@ import {
     SeekOrigin
 } from "runtime:fs";
 
-import { Writer, AsyncReader, AsyncWriter, BulkPump } from "std:io";
+import { Writer, AsyncReader, AsyncWriter } from "std:io";
 import { toStdError, E_FS_IO } from "std:error";
 
 export class File {
@@ -139,7 +139,7 @@ export class File {
     }
 }
 
-export class FileStream implements AsyncReader, AsyncWriter, BulkPump {
+export class FileStream implements AsyncReader, AsyncWriter {
     private _fd: int = -1;
     private _path: str;
     private _mode: FileMode;

@@ -3,7 +3,6 @@ export {
     Writer,
     AsyncReader,
     AsyncWriter,
-    BulkPump,
     Stream,
     write,
     writeln,
