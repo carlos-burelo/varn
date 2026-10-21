@@ -116,7 +116,9 @@ pub(crate) fn declared_enum_variants(
             continue;
         }
         if !e.is_declare {
-            return Err(format!("enum `{name}` must be `declare enum` to cross the native boundary"));
+            return Err(format!(
+                "enum `{name}` must be `declare enum` to cross the native boundary"
+            ));
         }
         let mut variants = Vec::new();
         let mut tag = 0i64;

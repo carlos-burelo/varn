@@ -38,7 +38,8 @@ pub struct ExecCtx {
     pub settings: crate::settings::ExecSettings,
     pub open_upvalues: Vec<(crate::frame_store::SlotAddr, VmUpvalue)>,
     pub pending_constructors: Vec<(usize, VmValue)>,
-    pub enum_templates: rustc_hash::FxHashMap<(usize, usize, usize), varn_types::value::EnumVariantData>,
+    pub enum_templates:
+        rustc_hash::FxHashMap<(usize, usize, usize), varn_types::value::EnumVariantData>,
     pub pending_setters: Vec<(usize, VmValue)>,
     pub vm_suspend: Option<VmSuspend>,
     pub module_exports: FxHashMap<usize, VmValue>,

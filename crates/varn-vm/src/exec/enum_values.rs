@@ -6,7 +6,11 @@ use varn_types::NativeCtx;
 
 type TemplateKey = (usize, usize, usize);
 
-fn template_key(module: &'static str, enum_name: &'static str, variant: &'static str) -> TemplateKey {
+fn template_key(
+    module: &'static str,
+    enum_name: &'static str,
+    variant: &'static str,
+) -> TemplateKey {
     (
         module.as_ptr() as usize,
         enum_name.as_ptr() as usize,
@@ -25,11 +29,12 @@ impl ExecCtx {
         let key = template_key(module, enum_name, variant);
         if !self.enum_templates.contains_key(&key) {
             let owner = self.load_host_module(module)?;
-            let class = NativeCtx::get_field(self, owner, enum_name)
-                .ok_or_else(|| RuntimeError::new(format!("{module} does not export {enum_name}")))?;
-            let template = self
-                .enum_variant_template(class, variant)
-                .ok_or_else(|| RuntimeError::new(format!("{enum_name} has no variant {variant}")))?;
+            let class = NativeCtx::get_field(self, owner, enum_name).ok_or_else(|| {
+                RuntimeError::new(format!("{module} does not export {enum_name}"))
+            })?;
+            let template = self.enum_variant_template(class, variant).ok_or_else(|| {
+                RuntimeError::new(format!("{enum_name} has no variant {variant}"))
+            })?;
             self.enum_templates.insert(key, template);
         }
         let template = &self.enum_templates[&key];

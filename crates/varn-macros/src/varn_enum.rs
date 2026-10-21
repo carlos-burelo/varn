@@ -52,7 +52,9 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let abs_path = Path::new(&manifest_dir).join(input.contract.value());
     let abs_path_str = abs_path.to_string_lossy().replace('\\', "/");
     let fail = |msg: String| -> TokenStream {
-        syn::Error::new(input.name.span(), msg).to_compile_error().into()
+        syn::Error::new(input.name.span(), msg)
+            .to_compile_error()
+            .into()
     };
     let Ok(source) = std::fs::read_to_string(&abs_path) else {
         return fail(format!("cannot read contract `{abs_path_str}`"));
@@ -63,7 +65,10 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         Err(msg) => return fail(msg),
     };
 
-    let idents: Vec<Ident> = variants.iter().map(|(v, _)| format_ident!("{}", v)).collect();
+    let idents: Vec<Ident> = variants
+        .iter()
+        .map(|(v, _)| format_ident!("{}", v))
+        .collect();
     let names: Vec<&str> = variants.iter().map(|(v, _)| v.as_str()).collect();
     let tags: Vec<i64> = variants.iter().map(|(_, t)| *t).collect();
     let count = variants.len();

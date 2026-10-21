@@ -27,7 +27,18 @@ pub(super) fn nominal_arms(
             if dn == in_ && origin_d == origin_i {
                 return Some(true);
             }
-            if let Some(by_alias) = alias_side(declared, inferred, dn, origin_d, in_, origin_i, bind, cache, in_progress, table) {
+            if let Some(by_alias) = alias_side(
+                declared,
+                inferred,
+                dn,
+                origin_d,
+                in_,
+                origin_i,
+                bind,
+                cache,
+                in_progress,
+                table,
+            ) {
                 return Some(by_alias);
             }
             Some(match (resolve_atom(bind, dn), resolve_atom(bind, in_)) {
@@ -204,11 +215,7 @@ pub(super) fn nominal_arms(
         _ => None,
     }
 }
-fn is_alias_only(
-    bind: &BindView,
-    name: varn_core::Atom,
-    origin: Option<varn_core::Atom>,
-) -> bool {
+fn is_alias_only(bind: &BindView, name: varn_core::Atom, origin: Option<varn_core::Atom>) -> bool {
     let Some(name_s) = resolve_atom(Some(bind), name) else {
         return false;
     };
@@ -232,12 +239,28 @@ fn alias_side(
     let bind = bind?;
     if is_alias_only(bind, dn, origin_d) {
         return Some(named_fallback(
-            declared, inferred, dn, origin_d, Some(bind), cache, in_progress, table, true,
+            declared,
+            inferred,
+            dn,
+            origin_d,
+            Some(bind),
+            cache,
+            in_progress,
+            table,
+            true,
         ));
     }
     if is_alias_only(bind, in_, origin_i) {
         return Some(named_fallback(
-            declared, inferred, in_, origin_i, Some(bind), cache, in_progress, table, false,
+            declared,
+            inferred,
+            in_,
+            origin_i,
+            Some(bind),
+            cache,
+            in_progress,
+            table,
+            false,
         ));
     }
     None
