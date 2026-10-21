@@ -23,7 +23,7 @@ export namespace Csv {
         return parse$(text, delim, hasHeader, trim) as T[];
     }
 
-    export function stringify(rows: dynamic[], options?: CsvOptions): str {
+    export function stringify<T>(rows: T[], options?: CsvOptions): str {
         let delim = ",";
 
         if (options != null) {

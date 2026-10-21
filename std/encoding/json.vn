@@ -15,7 +15,7 @@ export namespace Json {
         }
     }
 
-    export function stringify(value: dynamic, space?: int): str {
+    export function stringify<T>(value: T, space?: int): str {
         return stringify$(value);
     }
 }

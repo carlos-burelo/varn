@@ -44,8 +44,8 @@ export namespace Jwt {
             return null;
         }
         try {
-            let header = Json.parse(Base64.decodeUrlBytes(parts[0]).toString()) as dynamic;
-            if (header.alg !== algo) {
+            let header = Json.parse(Base64.decodeUrlBytes(parts[0]).toString()) as { [key: str]: JsonValue };
+            if (header["alg"] !== algo) {
                 return null;
             }
             return Json.parse(Base64.decodeUrlBytes(parts[1]).toString());
