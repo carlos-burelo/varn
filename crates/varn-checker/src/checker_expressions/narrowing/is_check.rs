@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::{ExprId, ExprKind, TypeNode};
 use varn_sem::bind::BindResult;
@@ -7,6 +8,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_is(
         &mut self,
+        rec: &Recorder,
         expression: ExprId,
         type_ann: TypeNode,
         bind: &BindResult,
@@ -27,7 +29,7 @@ impl<'r> Checker<'r> {
                     );
                     out.push((id, narrowed_ty));
                 } else {
-                    if let Some(original_ty) = self.narrowing_base(id, bind.arena.get(id).ty) {
+                    if let Some(original_ty) = self.narrowing_base(rec, id, bind) {
                         let view = varn_sem::bind::BindView::new(bind, self.resolver);
                         let target_ty = varn_binder::resolve_type_node(
                             &type_ann,

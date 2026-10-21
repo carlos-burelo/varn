@@ -52,13 +52,7 @@ impl<'r> Checker<'r> {
                 {
                     let scope = bind.scopes.get(self.current_scope);
                     if let Some(id) = scope.resolve(*arg_name, &bind.scopes) {
-                        let original_ty = self.narrowing_base(
-                            id,
-                            rec.symbol_types
-                                .get(&id)
-                                .cloned()
-                                .or_else(|| bind.arena.get(id).ty),
-                        );
+                        let original_ty = self.narrowing_base(rec, id, bind);
                         if is_true_branch {
                             if let Some(orig) = original_ty {
                                 let orig_kind = self.ty_table.get(orig.0);

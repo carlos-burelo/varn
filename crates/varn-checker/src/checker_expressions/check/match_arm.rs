@@ -15,7 +15,7 @@ impl<'r> Checker<'r> {
     ) {
         let arena = self.ast_arena;
         self.check_expr(rec, subject, bind);
-        let disc_narrowings = self.collect_match_disc_narrowings(subject, bind);
+        let disc_narrowings = self.collect_match_disc_narrowings(rec, subject, bind);
         let base_subject_ty = self.infer_type(rec, subject, bind);
         let mut arm_subjects = Vec::with_capacity(cases.len());
         let mut null_handled = false;

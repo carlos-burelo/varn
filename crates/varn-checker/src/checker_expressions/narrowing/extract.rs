@@ -42,7 +42,7 @@ impl<'r> Checker<'r> {
 
             ExprKind::Binary { left, right, op } => {
                 let (left, right, op) = (*left, *right, *op);
-                self.narrow_typeof(left, right, op, bind, is_true_branch, &mut narrowings);
+                self.narrow_typeof(rec, left, right, op, bind, is_true_branch, &mut narrowings);
                 self.narrow_null_comparison(
                     rec,
                     left,
@@ -52,8 +52,8 @@ impl<'r> Checker<'r> {
                     is_true_branch,
                     &mut narrowings,
                 );
-                self.narrow_discriminant(left, right, op, bind, is_true_branch, &mut narrowings);
-                self.narrow_instanceof(left, right, op, bind, is_true_branch, &mut narrowings);
+                self.narrow_discriminant(rec, left, right, op, bind, is_true_branch, &mut narrowings);
+                self.narrow_instanceof(rec, left, right, op, bind, is_true_branch, &mut narrowings);
             }
 
             ExprKind::Logical {
@@ -77,7 +77,7 @@ impl<'r> Checker<'r> {
                 type_ann,
             } => {
                 let (expression, type_ann) = (*expression, type_ann.clone());
-                self.narrow_is(expression, type_ann, bind, is_true_branch, &mut narrowings);
+                self.narrow_is(rec, expression, type_ann, bind, is_true_branch, &mut narrowings);
             }
 
             ExprKind::Call { callee, args, .. } => {

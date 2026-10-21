@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::operators::{BinaryOp, UnaryOp};
 use varn_core::ast::{ExprId, ExprKind};
@@ -8,6 +9,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_typeof(
         &mut self,
+        rec: &Recorder,
         left: ExprId,
         right: ExprId,
         op: BinaryOp,
@@ -61,7 +63,7 @@ impl<'r> Checker<'r> {
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
         if is_eq == is_true_branch {
-            if let Some(current) = self.narrowing_base(id, bind.arena.get(id).ty) {
+            if let Some(current) = self.narrowing_base(rec, id, bind) {
                 let kind = self.ty_table.get(current.0);
                 let already = (matches!(kind, varn_core::TypeKind::Tuple(_))
                     && value == varn_core::RuntimeKind::Tuple.name())
@@ -74,7 +76,7 @@ impl<'r> Checker<'r> {
             out.push((id, named));
             return;
         }
-        let Some(current) = self.narrowing_base(id, bind.arena.get(id).ty) else {
+        let Some(current) = self.narrowing_base(rec, id, bind) else {
             return;
         };
         let varn_core::TypeKind::Union(members) = self.ty_table.get(current.0) else {

@@ -13,6 +13,13 @@ function nonEmpty(s: str?): bool { return s != null && s.length > 0 }
 function blank(s: str?): bool { return s == null || s.length == 0 }
 function depth(step: Step?): int { return step == null ? 0 : 1 + depth(step.next) }
 function widthOf(v: str | int[]): int { return v is str ? v.slice(0, 1).length : v.length }
+function widths(items: (str | int[])[]): int {
+    let n = 0
+    for (const item of items) {
+        if (item is str) { n = n + item.length } else { n = n + item.length + 100 }
+    }
+    return n
+}
 function heavy(step: Step?): bool { return step != null && step.weight > 0 && step.next == null }
 
 await describe("181 narrowing in expressions", async () => {
@@ -32,6 +39,10 @@ await describe("181 narrowing in expressions", async () => {
     await it("an is test opens a conditional whose branch holds a call", () => {
         expect(widthOf("abc")).toBe(1)
         expect(widthOf([1, 2, 3])).toBe(3)
+    })
+
+    await it("an is test narrows the variable of a for-of", () => {
+        expect(widths(["ab", [1, 2, 3]])).toBe(105)
     })
 
     await it("&& narrows its right side when the left holds", () => {

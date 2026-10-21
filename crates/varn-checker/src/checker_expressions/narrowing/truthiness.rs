@@ -6,11 +6,17 @@ use varn_sem::symbol::SymbolId;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    pub(crate) fn narrowing_base(&self, id: SymbolId, declared: Option<Type>) -> Option<Type> {
+    pub(crate) fn narrowing_base(
+        &self,
+        rec: &Recorder,
+        id: SymbolId,
+        bind: &BindResult,
+    ) -> Option<Type> {
         self.narrowed_types
             .get(&id)
             .and_then(|stack| stack.last().copied())
-            .or(declared)
+            .or_else(|| rec.symbol_types.get(&id).cloned())
+            .or_else(|| bind.arena.get(id).ty)
     }
 
     pub(crate) fn narrow_identifier(
@@ -23,13 +29,7 @@ impl<'r> Checker<'r> {
     ) {
         let scope = bind.scopes.get(self.current_scope);
         if let Some(id) = scope.resolve(name, &bind.scopes) {
-            let original_ty = self.narrowing_base(
-                id,
-                rec.symbol_types
-                    .get(&id)
-                    .cloned()
-                    .or_else(|| bind.arena.get(id).ty),
-            );
+            let original_ty = self.narrowing_base(rec, id, bind);
             if let Some(ty) = original_ty {
                 if is_true_branch {
                     let narrowed =

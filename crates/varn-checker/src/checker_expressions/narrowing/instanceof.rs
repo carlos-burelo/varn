@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{ExprId, ExprKind};
@@ -8,6 +9,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_instanceof(
         &mut self,
+        rec: &Recorder,
         left: ExprId,
         right: ExprId,
         op: BinaryOp,
@@ -31,7 +33,7 @@ impl<'r> Checker<'r> {
                 if is_true_branch {
                     let named = Type::named_with_origin_atom(class_name, origin, table);
                     out.push((id, named));
-                } else if let Some(ty) = self.narrowing_base(id, bind.arena.get(id).ty) {
+                } else if let Some(ty) = self.narrowing_base(rec, id, bind) {
                     let narrowed = ty.minus_nominal(
                         class_name,
                         origin,

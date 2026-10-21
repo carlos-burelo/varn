@@ -1,3 +1,4 @@
+use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{ExprId, ExprKind};
@@ -9,6 +10,7 @@ use varn_sem::types::{ObjectTypeMember, Type};
 impl<'r> Checker<'r> {
     pub(crate) fn narrow_discriminant(
         &mut self,
+        rec: &Recorder,
         left: ExprId,
         right: ExprId,
         op: BinaryOp,
@@ -88,7 +90,7 @@ impl<'r> Checker<'r> {
                     let prop_name_str = bind.interner.resolve(prop_name);
                     let scope = bind.scopes.get(self.current_scope);
                     if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
-                        let original_ty = self.narrowing_base(id, bind.arena.get(id).ty);
+                        let original_ty = self.narrowing_base(rec, id, bind);
                         let union_list = original_ty.and_then(|t| match self.ty_table.get(t.0) {
                             TypeKind::Union(list) => Some(list),
                             TypeKind::Primitive(_)
@@ -208,6 +210,7 @@ impl<'r> Checker<'r> {
 
     pub(crate) fn collect_match_disc_narrowings(
         &self,
+        rec: &Recorder,
         subject: ExprId,
         bind: &BindResult,
     ) -> Option<(SymbolId, Vec<Type>)> {
@@ -228,7 +231,7 @@ impl<'r> Checker<'r> {
                 let obj_name = *obj_name;
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(id) = scope.resolve(obj_name, &bind.scopes)
-                    && let Some(ty) = self.narrowing_base(id, bind.arena.get(id).ty)
+                    && let Some(ty) = self.narrowing_base(rec, id, bind)
                     && let TypeKind::Union(list) = self.ty_table.get(ty.0)
                 {
                     let members: Vec<Type> = self
