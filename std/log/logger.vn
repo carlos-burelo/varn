@@ -1,7 +1,7 @@
 import { LogLevel } from "std:log/level";
 import { writeln } from "std:io";
 import { now, toISOString } from "std:time";
-import { Json } from "std:encoding";
+import { Json, JsonValue } from "std:encoding";
 import { Color } from "std:cli/color";
 
 export class Logger {
@@ -54,7 +54,7 @@ export class Logger {
         return new Logger(childName, this._minLevel, this._jsonOutput, this._useColors, this._sink);
     }
 
-    log(level: LogLevel, message: str, meta?: { [key: str]: dynamic }): void {
+    log(level: LogLevel, message: str, meta?: { [key: str]: JsonValue }): void {
         if (this._levelPriority(level) < this._levelPriority(this._minLevel)) {
             return;
         }
@@ -64,7 +64,7 @@ export class Logger {
 
         let outputLine: str = "";
         if (this._jsonOutput) {
-            let record: { [key: str]: dynamic } = {
+            let record: { [key: str]: JsonValue } = {
                 "timestamp": timestampStr,
                 "level": levelTag,
                 "target": this._name,
@@ -94,23 +94,23 @@ export class Logger {
         }
     }
 
-    trace(message: str, meta?: { [key: str]: dynamic }): void {
+    trace(message: str, meta?: { [key: str]: JsonValue }): void {
         this.log(LogLevel.Trace, message, meta);
     }
 
-    debug(message: str, meta?: { [key: str]: dynamic }): void {
+    debug(message: str, meta?: { [key: str]: JsonValue }): void {
         this.log(LogLevel.Debug, message, meta);
     }
 
-    info(message: str, meta?: { [key: str]: dynamic }): void {
+    info(message: str, meta?: { [key: str]: JsonValue }): void {
         this.log(LogLevel.Info, message, meta);
     }
 
-    warn(message: str, meta?: { [key: str]: dynamic }): void {
+    warn(message: str, meta?: { [key: str]: JsonValue }): void {
         this.log(LogLevel.Warn, message, meta);
     }
 
-    error(message: str, meta?: { [key: str]: dynamic }): void {
+    error(message: str, meta?: { [key: str]: JsonValue }): void {
         this.log(LogLevel.Error, message, meta);
     }
 

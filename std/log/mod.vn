@@ -1,3 +1,4 @@
+import { JsonValue } from "std:encoding";
 import { LogLevel } from "std:log/level";
 import { Logger } from "std:log/logger";
 
@@ -10,22 +11,22 @@ export function getLogger(name: str = "app", level: LogLevel = LogLevel.Info): L
     return new Logger(name, level);
 }
 
-export function trace(message: str, meta?: { [key: str]: dynamic }): void {
+export function trace(message: str, meta?: { [key: str]: JsonValue }): void {
     logger.trace(message, meta);
 }
 
-export function debug(message: str, meta?: { [key: str]: dynamic }): void {
+export function debug(message: str, meta?: { [key: str]: JsonValue }): void {
     logger.debug(message, meta);
 }
 
-export function info(message: str, meta?: { [key: str]: dynamic }): void {
+export function info(message: str, meta?: { [key: str]: JsonValue }): void {
     logger.info(message, meta);
 }
 
-export function warn(message: str, meta?: { [key: str]: dynamic }): void {
+export function warn(message: str, meta?: { [key: str]: JsonValue }): void {
     logger.warn(message, meta);
 }
 
-export function error(message: str, meta?: { [key: str]: dynamic }): void {
+export function error(message: str, meta?: { [key: str]: JsonValue }): void {
     logger.error(message, meta);
 }
