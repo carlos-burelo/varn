@@ -52,7 +52,15 @@ impl<'r> Checker<'r> {
                     is_true_branch,
                     &mut narrowings,
                 );
-                self.narrow_discriminant(rec, left, right, op, bind, is_true_branch, &mut narrowings);
+                self.narrow_discriminant(
+                    rec,
+                    left,
+                    right,
+                    op,
+                    bind,
+                    is_true_branch,
+                    &mut narrowings,
+                );
                 self.narrow_instanceof(rec, left, right, op, bind, is_true_branch, &mut narrowings);
             }
 
@@ -77,7 +85,14 @@ impl<'r> Checker<'r> {
                 type_ann,
             } => {
                 let (expression, type_ann) = (*expression, type_ann.clone());
-                self.narrow_is(rec, expression, type_ann, bind, is_true_branch, &mut narrowings);
+                self.narrow_is(
+                    rec,
+                    expression,
+                    type_ann,
+                    bind,
+                    is_true_branch,
+                    &mut narrowings,
+                );
             }
 
             ExprKind::Call { callee, args, .. } => {
