@@ -33,7 +33,10 @@ pub enum DrawCmd {
         w: f64,
         h: f64,
         color: i64,
-        checked: bool,
+        flag: bool,
+        value: f64,
+        low: f64,
+        high: f64,
     },
 }
 
@@ -57,8 +60,8 @@ pub fn format(cmd: &DrawCmd) -> String {
         } => format!("text {x} {y} {size} {color} {s}"),
         DrawCmd::Clip { x, y, w, h } => format!("clip {x} {y} {w} {h}"),
         DrawCmd::Unclip => "unclip".to_string(),
-        DrawCmd::Control { id, kind, x, y, w, h, color, checked } => {
-            format!("control {id} {kind:?} {x} {y} {w} {h} {color} {checked}")
+        DrawCmd::Control { id, kind, x, y, w, h, color, flag, .. } => {
+            format!("control {id} {kind:?} {x} {y} {w} {h} {color} {flag}")
         }
     }
 }
@@ -163,7 +166,10 @@ pub fn assemble(cmds: &[DrawCmd]) -> Result<Scene, String> {
                 w,
                 h,
                 color,
-                checked,
+                flag,
+                value,
+                low,
+                high,
             } => {
                 items.push(Item::Control(
                     current,
@@ -175,7 +181,10 @@ pub fn assemble(cmds: &[DrawCmd]) -> Result<Scene, String> {
                         w: *w as f32,
                         h: *h as f32,
                         color: varn_ui::argb_to_float(*color),
-                        checked: *checked,
+                        flag: *flag,
+                        value: *value as f32,
+                        low: *low as f32,
+                        high: *high as f32,
                     },
                 ));
             }

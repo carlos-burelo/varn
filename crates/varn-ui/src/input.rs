@@ -47,7 +47,7 @@ pub fn push(e: &RealEvent, out: &mut Vec<Event>) {
             unit: MouseWheelUnit::Point,
             delta: Vec2::new(0.0, dy as f32),
             phase: TouchPhase::Move,
-            source: MouseWheelSource::Unknown,
+            source: MouseWheelSource::Wheel,
             modifiers: Modifiers::NONE,
         }),
         RealEvent::Key { key, pressed } => {

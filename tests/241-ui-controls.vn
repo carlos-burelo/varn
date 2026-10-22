@@ -79,14 +79,17 @@ await describe("241 ui controls", async () => {
         const focus = new Focus();
         const level = signal(0.0);
         const tree = Slider(level);
-        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 24.0);
+        drawFrame(win, fr, focus, tree, 200.0, 24.0);
         win.inject(UiInjectKind.MouseDown, 100, 12, MOUSE_LEFT);
-        fr.update(win);
-        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 24.0);
+        drawFrame(win, fr, focus, tree, 200.0, 24.0);
         expect(level.value).toBe(0.5);
         const ranged = signal(0.0);
         const scaled = Slider(ranged, low: 10.0, high: 20.0);
-        render(win, fr, focus, scaled, 0.0, 0.0, 200.0, 24.0);
+        drawFrame(win, fr, focus, scaled, 200.0, 24.0);
+        win.inject(UiInjectKind.MouseUp, 100, 12, MOUSE_LEFT);
+        drawFrame(win, fr, focus, scaled, 200.0, 24.0);
+        win.inject(UiInjectKind.MouseDown, 100, 12, MOUSE_LEFT);
+        drawFrame(win, fr, focus, scaled, 200.0, 24.0);
         expect(ranged.value).toBe(15.0);
     });
 

@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 
 use super::paint::pass;
-use super::quad::{Body, Run};
+use super::quad::{Activation, Body, Run};
 use super::render::{configure_surface, Shared};
 
 const PIXELS_PER_POINT: f32 = 1.0;
@@ -83,7 +83,7 @@ pub fn present_draw(
     clear: [f32; 4],
     runs: &[Run],
     atlas: Option<(&[u8], u32, u32)>,
-) -> (bool, Vec<u32>) {
+) -> (bool, Vec<Activation>) {
     let Some((_config, format)) = configure_surface(shared, surface, w, h, configured) else {
         return (false, Vec::new());
     };

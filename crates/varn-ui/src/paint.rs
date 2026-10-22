@@ -1,18 +1,18 @@
 use egui::{
     emath::{pos2, vec2},
     epaint::{ClippedPrimitive, TextureId, Vertex},
-    Button, Checkbox, Color32, Context, Event, Mesh, Rect as ERect, RawInput, Shape,
-    TexturesDelta, Ui,
+    Button, Checkbox, Color32, Context, Event, Mesh, Rect as ERect, RawInput, ScrollArea, Sense,
+    scroll_area::ScrollSource, Shape, Slider, TexturesDelta, Ui, UiBuilder,
 };
 
-use super::quad::{Body, Clip, Control, ControlKind, Glyph, Rect, Run};
+use super::quad::{Activation, Body, Clip, Control, ControlKind, Glyph, Rect, Run};
 
 const MAX_CORNER: f32 = 255.0;
 
 pub struct Pass {
     pub prims: Vec<ClippedPrimitive>,
     pub textures: TexturesDelta,
-    pub hits: Vec<u32>,
+    pub hits: Vec<Activation>,
 }
 
 pub fn pass(
@@ -94,9 +94,57 @@ fn glyph_mesh(texture: TextureId, glyphs: &[Glyph]) -> Mesh {
     mesh
 }
 
-fn paint_control(ui: &mut Ui, c: &Control, hits: &mut Vec<u32>) {
+fn paint_switch(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
+    let response = ui.interact(rect, ui.scope_id().with("switch"), Sense::click());
+    let track = if c.flag {
+        color(c.color)
+    } else {
+        Color32::from_gray(96)
+    };
+    let knob = rect.height() - 6.0;
+    let knob_x = if c.flag {
+        rect.right() - knob - 3.0
+    } else {
+        rect.left() + 3.0
+    };
+    let painter = ui.painter();
+    painter.rect_filled(rect, corner(rect.height() / 2.0), track);
+    painter.rect_filled(
+        ERect::from_min_size(pos2(knob_x, rect.top() + 3.0), vec2(knob, knob)),
+        corner(knob / 2.0),
+        Color32::WHITE,
+    );
+    response.clicked().then_some(Activation { id: c.id, value: 0.0 })
+}
+
+fn paint_scroll(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
+    let extent = c.high;
+    let out = ui
+        .scope_builder(UiBuilder::new().max_rect(rect), |ui| {
+            ScrollArea::vertical()
+                .id_salt(ui.scope_id().with("scroll"))
+                .auto_shrink([false, false])
+                .animated(false)
+                .scroll_source(ScrollSource {
+                    mouse_wheel: false,
+                    ..ScrollSource::ALL
+                })
+                .vertical_scroll_offset(c.value)
+                .show_viewport(ui, |ui, _viewport| {
+                    ui.allocate_space(vec2(c.w, extent));
+                })
+        })
+        .inner;
+    let offset = out.state.clamped_offset().y;
+    ((offset - c.value).abs() > 0.5).then_some(Activation {
+        id: c.id,
+        value: offset,
+    })
+}
+
+fn paint_control(ui: &mut Ui, c: &Control, hits: &mut Vec<Activation>) {
     let rect = ERect::from_min_size(pos2(c.x, c.y), vec2(c.w, c.h));
-    let clicked = ui
+    let outcome = ui
         .push_id(c.id, |ui| match c.kind {
             ControlKind::Button => ui
                 .put(
@@ -105,16 +153,33 @@ fn paint_control(ui: &mut Ui, c: &Control, hits: &mut Vec<u32>) {
                         .fill(color(c.color))
                         .min_size(vec2(c.w, c.h)),
                 )
-                .clicked(),
+                .clicked()
+                .then_some(Activation { id: c.id, value: 0.0 }),
             ControlKind::Checkbox => {
-                let mut on = c.checked;
-                ui.put(rect, Checkbox::without_text(&mut on)).clicked()
+                let mut on = c.flag;
+                ui.put(rect, Checkbox::without_text(&mut on))
+                    .clicked()
+                    .then_some(Activation { id: c.id, value: 0.0 })
             }
+            ControlKind::Switch => paint_switch(ui, rect, c),
+            ControlKind::Slider => {
+                let mut v = c.value;
+                ui.scope(|ui| {
+                    ui.spacing_mut().slider_width = c.w;
+                    ui.put(rect, Slider::new(&mut v, c.low..=c.high).show_value(false))
+                        .changed()
+                        .then_some(Activation { id: c.id, value: v })
+                })
+                .inner
+            }
+            ControlKind::Scroll => paint_scroll(ui, rect, c),
+            ControlKind::Surface => ui
+                .interact(rect, ui.scope_id().with("surface"), Sense::click())
+                .clicked()
+                .then_some(Activation { id: c.id, value: 0.0 }),
         })
         .inner;
-    if clicked {
-        hits.push(c.id);
-    }
+    hits.extend(outcome);
 }
 
 fn paint_runs(
@@ -123,7 +188,7 @@ fn paint_runs(
     vw: f32,
     vh: f32,
     glyph_tex: Option<TextureId>,
-    hits: &mut Vec<u32>,
+    hits: &mut Vec<Activation>,
 ) {
     for run in runs {
         let clip = clip_rect(run.clip, vw, vh);

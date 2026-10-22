@@ -12,7 +12,11 @@ export declare enum UiEventKind {
 
 export declare enum UiControlKind {
     Button,
-    Checkbox
+    Checkbox,
+    Switch,
+    Slider,
+    Scroll,
+    Surface
 }
 
 export declare enum UiInjectKind {
@@ -61,9 +65,9 @@ export declare function clear$(id: int, color: int): void;
 @permission("ui")
 export declare function present$(id: int): int;
 @permission("ui")
-export declare function control$(window: int, cid: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, checked: bool): void;
+export declare function control$(window: int, cid: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, flag: bool, value: float, low: float, high: float): void;
 @permission("ui")
-export declare function activated$(id: int): int[];
+export declare function activated$(id: int): float[];
 @permission("ui")
 export declare function commands$(id: int): str[];
 @permission("ui")

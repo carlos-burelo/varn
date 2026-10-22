@@ -21,7 +21,7 @@ export class UiFrame {
     modal: bool;
     overlayPass: bool;
     controlIds: int[];
-    controlFns: (() => void)[];
+    controlFns: ((value: float) => void)[];
     controlOverlay: bool[];
 
     constructor(w: int, h: int) {
@@ -105,17 +105,18 @@ export class UiFrame {
         this.controlOverlay = [];
     }
 
-    onActivate(id: int, fn: () => void): void {
+    onActivate(id: int, fn: (value: float) => void): void {
         this.controlIds.push(id);
         this.controlFns.push(fn);
         this.controlOverlay.push(this.overlayPass);
     }
 
-    fire(ids: int[]): void {
-        for (let i = 0; i < ids.length; i = i + 1) {
+    fire(pairs: float[]): void {
+        for (let i = 0; i + 1 < pairs.length; i = i + 2) {
+            const id = pairs[i] as int;
             for (let j = 0; j < this.controlIds.length; j = j + 1) {
-                if (this.controlIds[j] == ids[i] && (!this.modal || this.controlOverlay[j])) {
-                    this.controlFns[j]();
+                if (this.controlIds[j] == id && (!this.modal || this.controlOverlay[j])) {
+                    this.controlFns[j](pairs[i + 1]);
                 }
             }
         }

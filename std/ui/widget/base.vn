@@ -40,10 +40,14 @@ export class PaintContext {
         this.fr.popClip();
     }
 
-    control(kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, checked: bool, onActivate: () => void): void {
+    click(kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, flag: bool, onActivate: () => void): void {
+        this.valued(kind, x, y, w, h, color, flag, 0.0, 0.0, 0.0, (value: float) => { onActivate(); });
+    }
+
+    valued(kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, flag: bool, value: float, low: float, high: float, onChange: (value: float) => void): void {
         const id = this.nextSlot();
-        this.win.control(id, kind, x, y, w, h, color, checked);
-        this.fr.onActivate(id, onActivate);
+        this.win.control(id, kind, x, y, w, h, color, flag, value, low, high);
+        this.fr.onActivate(id, onChange);
     }
 
     nextSlot(): int {

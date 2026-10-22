@@ -12,6 +12,12 @@ const BUTTON_PAD = 20.0;
 
 const fieldEdits = new Map<int, TextEdit>();
 
+function claimFocus(cx: PaintContext, slot: int, x: float, y: float, w: float, h: float): void {
+    cx.click(UiControlKind.Surface, x, y, w, h, 0, false, () => {
+        cx.focus.claim(slot);
+    });
+}
+
 function paintField(cx: PaintContext, x: float, y: float, w: float, h: float, ed: TextEdit, hint: str, size: float): void {
     cx.win.rect(x, y, w, h, ed.focused ? Theme.colors.primary : Theme.colors.outline, 10.0);
     cx.win.rect(x + 2.0, y + 2.0, w - 4.0, h - 4.0, Theme.colors.surface, 8.0);
@@ -67,7 +73,7 @@ export class ButtonNode extends Widget {
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         if (this.enabled) {
-            cx.control(UiControlKind.Button, x, y, w, h, this.color, false, this.onPress);
+            cx.click(UiControlKind.Button, x, y, w, h, this.color, false, this.onPress);
         } else {
             cx.win.rect(x, y, w, h, Theme.colors.disabled, this.radius);
         }
@@ -97,7 +103,8 @@ export class FieldNode extends Widget {
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         const slot = cx.nextSlot();
         const ed = this.edit ?? ownedEdit(slot);
-        ed.update(cx.fr, cx.focus, slot, x, y, w, h);
+        ed.update(cx.fr, cx.focus, slot);
+        claimFocus(cx, slot, x, y, w, h);
         const submit = this.onSubmit;
         if (ed.focused && submit !== null) {
             for (let key of cx.fr.pressed) {
@@ -139,7 +146,8 @@ export class InputNode extends Widget {
             ed.text = this.value;
             ed.cursor = this.value.length;
         }
-        ed.update(cx.fr, cx.focus, slot, x, y, w, h);
+        ed.update(cx.fr, cx.focus, slot);
+        claimFocus(cx, slot, x, y, w, h);
         if (ed.text != this.value) {
             this.onChange(ed.text);
         }

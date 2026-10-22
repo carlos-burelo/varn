@@ -21,18 +21,8 @@ export class TextEdit {
         this.focused = false;
     }
 
-    update(
-        fr: UiFrame,
-        focus: Focus,
-        id: int,
-        rx: float,
-        ry: float,
-        rw: float,
-        rh: float
-    ): void {
-        if (fr.clicked(rx, ry, rw, rh)) {
-            focus.claim(id);
-        } else if (fr.leftPressed) {
+    update(fr: UiFrame, focus: Focus, id: int): void {
+        if (fr.leftPressed) {
             if (focus.current() == id) {
                 focus.clear();
             }

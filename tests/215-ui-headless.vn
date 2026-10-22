@@ -16,21 +16,21 @@ import { measure, ascent, descent } from "std:text";
 function tapKey(win: UiWindow, fr: UiFrame, focus: Focus, ed: TextEdit, code: int): void {
     win.inject(UiInjectKind.Key, code, 1, 0);
     fr.update(win);
-    ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+    ed.update(fr, focus, 1);
     win.inject(UiInjectKind.Key, code, 0, 0);
     fr.update(win);
-    ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+    ed.update(fr, focus, 1);
 }
 
 function holdKey(win: UiWindow, fr: UiFrame, focus: Focus, ed: TextEdit, code: int, times: int): void {
     for (let i = 0; i < times; i = i + 1) {
         win.inject(UiInjectKind.Key, code, 1, 0);
         fr.update(win);
-        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        ed.update(fr, focus, 1);
     }
     win.inject(UiInjectKind.Key, code, 0, 0);
     fr.update(win);
-    ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+    ed.update(fr, focus, 1);
 }
 
 await describe("215 ui headless", async () => {    await it("open reports size", () => {
@@ -315,11 +315,8 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const ed = new TextEdit();
-        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        focus.claim(1);
+        ed.update(fr, focus, 1);
         holdKey(win, fr, focus, ed, 97, 3);
         expect(ed.text).toBe("aaa");
         holdKey(win, fr, focus, ed, KEY_BACKSPACE, 2);
@@ -331,11 +328,8 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const ed = new TextEdit();
-        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        focus.claim(1);
+        ed.update(fr, focus, 1);
         tapKey(win, fr, focus, ed, 97);
         tapKey(win, fr, focus, ed, KEY_ENTER);
         tapKey(win, fr, focus, ed, 98);
@@ -358,11 +352,8 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const ed = new TextEdit();
-        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        focus.claim(1);
+        ed.update(fr, focus, 1);
         expect(ed.focused).toBe(true);
         expect(focus.current()).toBe(1);
         tapKey(win, fr, focus, ed, 72);
@@ -394,23 +385,21 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         const ed = new TextEdit();
         win.inject(UiInjectKind.Key, 65, 1, 0);
         fr.update(win);
-        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        ed.update(fr, focus, 1);
         expect(ed.text).toBe("");
         expect(ed.focused).toBe(false);
-        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
+        focus.claim(1);
         fr.update(win);
-        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        ed.update(fr, focus, 1);
         expect(ed.focused).toBe(true);
         win.inject(UiInjectKind.MouseDown, 500, 500, MOUSE_LEFT);
         fr.update(win);
-        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        ed.update(fr, focus, 1);
         expect(ed.focused).toBe(false);
         expect(focus.current()).toBe(-1);
         win.inject(UiInjectKind.Key, 66, 1, 0);
         fr.update(win);
-        ed.update(fr, focus, 1, 10.0, 10.0, 200.0, 40.0);
+        ed.update(fr, focus, 1);
         expect(ed.text).toBe("");
     });
 });

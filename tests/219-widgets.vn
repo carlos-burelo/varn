@@ -71,6 +71,8 @@ await describe("219 widgets", async () => {
         fr.update(win);
         render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
         present(win, fr);
+        render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
+        present(win, fr);
         expect(ed.focused).toBe(true);
         win.inject(UiInjectKind.Key, 65, 1, 0);
         fr.update(win);

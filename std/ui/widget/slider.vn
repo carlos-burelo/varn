@@ -1,8 +1,8 @@
 import { Widget, Size, PaintContext } from "std:ui/widget/base";
 import { current, writer } from "std:ui/widget/bound";
-import { hit } from "std:ui/keys";
 import { Theme } from "std:ui/style";
 import { Signal } from "std:signals";
+import { UiControlKind } from "std:ui/window";
 
 export class SliderNode extends Widget {
     value: float;
@@ -24,25 +24,11 @@ export class SliderNode extends Widget {
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        const span = this.high - this.low;
-        const knob = h;
-        const travel = w - knob;
-        const frac = span > 0.0 ? (this.value - this.low) / span : 0.0;
-        const clamped = frac < 0.0 ? 0.0 : (frac > 1.0 ? 1.0 : frac);
-        const trackY = y + h / 2.0 - 3.0;
-        cx.win.rect(x, trackY, w, 6.0, Theme.colors.outline, 3.0);
-        cx.win.rect(x, trackY, knob / 2.0 + travel * clamped, 6.0, Theme.colors.primary, 3.0);
-        cx.win.rect(x + travel * clamped, y, knob, knob, Theme.colors.onPrimary, knob / 2.0);
-        const fr = cx.fr;
-        const dragging = fr.left && hit(fr.downX as float, fr.downY as float, x, y, w, h);
-        if (dragging && travel > 0.0) {
-            const t = ((fr.mouseX as float) - x - knob / 2.0) / travel;
-            const bounded = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
-            const next = this.low + span * bounded;
+        cx.valued(UiControlKind.Slider, x, y, w, h, Theme.colors.primary, false, this.value, this.low, this.high, (next: float) => {
             if (next != this.value) {
                 this.onChange(next);
             }
-        }
+        });
     }
 }
 

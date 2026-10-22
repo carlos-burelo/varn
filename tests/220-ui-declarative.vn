@@ -192,17 +192,21 @@ await describe("220 ui declarative", async () => {
         const name = signal("");
         const build = (): Widget => Input(bind: name, hint: "Name");
         renderTree(win, fr, focus, build());
+        present(win, fr);
         win.inject(UiInjectKind.MouseDown, 30, 30, MOUSE_LEFT);
         fr.update(win);
         win.inject(UiInjectKind.MouseUp, 30, 30, MOUSE_LEFT);
         fr.update(win);
         renderTree(win, fr, focus, build());
+        present(win, fr);
         win.inject(UiInjectKind.Key, 72, 1, 0);
         fr.update(win);
         renderTree(win, fr, focus, build());
+        present(win, fr);
         win.inject(UiInjectKind.Key, 72, 0, 0);
         fr.update(win);
         renderTree(win, fr, focus, build());
+        present(win, fr);
         expect(name.value).toBe("H");
     });
 

@@ -2,6 +2,7 @@ import { Widget, Size, PaintContext, paintChild, measureChild, alignedX, aligned
 import { Column } from "std:ui/widget/flex";
 import { Title } from "std:ui/widget/text";
 import { Alignment, Colors, Theme } from "std:ui/style";
+import { UiControlKind } from "std:ui/window";
 
 export class BoxNode extends Widget {
     color: int;
@@ -31,8 +32,8 @@ export class BoxNode extends Widget {
             cx.win.rect(x, y, w, h, this.color, this.radius);
         }
         const click = this.onClick;
-        if (click !== null && cx.fr.clicked(x, y, w, h)) {
-            click();
+        if (click !== null) {
+            cx.click(UiControlKind.Surface, x, y, w, h, 0, false, click);
         }
         paintChild(this.child, cx, x + this.pad, y + this.pad, w - 2.0 * this.pad, h - 2.0 * this.pad);
     }

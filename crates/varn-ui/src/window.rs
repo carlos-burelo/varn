@@ -7,6 +7,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::platform::pump_events::{EventLoopExtPumpEvents, PumpStatus};
 use winit::window::{Window, WindowAttributes, WindowId};
 
+use super::quad::Activation;
 use super::events::{button_code, key_code, pressed, RealEvent};
 use super::render;
 
@@ -181,7 +182,7 @@ pub fn draw_now(
     clear: [f32; 4],
     runs: &[super::comp::Run],
     atlas: Option<(&[u8], u32, u32)>,
-) -> Result<Vec<u32>, String> {
+) -> Result<Vec<Activation>, String> {
     with_ui(|ui| {
         let st = ui
             .wins

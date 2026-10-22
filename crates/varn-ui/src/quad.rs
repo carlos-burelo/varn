@@ -52,6 +52,10 @@ pub fn argb_to_float(color: i64) -> [f32; 4] {
 pub enum ControlKind {
     Button,
     Checkbox,
+    Switch,
+    Slider,
+    Scroll,
+    Surface,
 }
 
 impl ControlKind {
@@ -59,6 +63,10 @@ impl ControlKind {
         match code {
             0 => Some(Self::Button),
             1 => Some(Self::Checkbox),
+            2 => Some(Self::Switch),
+            3 => Some(Self::Slider),
+            4 => Some(Self::Scroll),
+            5 => Some(Self::Surface),
             _ => None,
         }
     }
@@ -73,5 +81,14 @@ pub struct Control {
     pub w: f32,
     pub h: f32,
     pub color: [f32; 4],
-    pub checked: bool,
+    pub flag: bool,
+    pub value: f32,
+    pub low: f32,
+    pub high: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Activation {
+    pub id: u32,
+    pub value: f32,
 }

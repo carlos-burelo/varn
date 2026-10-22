@@ -3,7 +3,7 @@ use egui::Context;
 use super::events::RealEvent;
 use super::input;
 use super::paint::pass;
-use super::quad::Run;
+use super::quad::{Activation, Run};
 
 pub struct Canvas {
     ctx: Context,
@@ -12,8 +12,9 @@ pub struct Canvas {
 
 impl Canvas {
     pub fn new() -> Self {
+        let ctx = Context::default();
         Self {
-            ctx: Context::default(),
+            ctx,
             input: Vec::new(),
         }
     }
@@ -30,7 +31,7 @@ impl Canvas {
         std::mem::take(&mut self.input)
     }
 
-    pub fn interact(&mut self, w: u32, h: u32, runs: &[Run]) -> Vec<u32> {
+    pub fn interact(&mut self, w: u32, h: u32, runs: &[Run]) -> Vec<Activation> {
         let events = self.take_input();
         pass(&self.ctx, events, w, h, runs, None).hits
     }

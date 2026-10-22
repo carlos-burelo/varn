@@ -3,6 +3,7 @@ import { Card, Box } from "std:ui/widget/box";
 import { Text } from "std:ui/widget/text";
 import { hit } from "std:ui/keys";
 import { Theme } from "std:ui/style";
+import { UiControlKind } from "std:ui/window";
 import { Signal, signal } from "std:signals";
 import { now } from "std:time";
 
@@ -47,9 +48,11 @@ function paintDialog(cx: PaintContext, open: Signal<bool>, title: str, body: Wid
     const px = (vw - width) / 2.0;
     const py = (vh - size.h) / 2.0;
     cx.win.rect(0.0, 0.0, vw, vh, SCRIM, 0.0);
-    if (fr.clicked(0.0, 0.0, vw, vh) && !hit(fr.mouseX as float, fr.mouseY as float, px, py, width, size.h)) {
-        open.set(false);
-    }
+    cx.click(UiControlKind.Surface, 0.0, 0.0, vw, vh, 0, false, () => {
+        if (!hit(fr.mouseX as float, fr.mouseY as float, px, py, width, size.h)) {
+            open.set(false);
+        }
+    });
     panel.paint(cx, px, py, width, size.h);
 }
 
@@ -127,9 +130,9 @@ export class SelectNode extends Widget {
         const label = at >= 0 && at < this.options.length ? this.options[at] : "";
         cx.win.rect(x, y, w, anchor, Theme.colors.outline, 8.0);
         Text(label).paint(cx, x + 12.0, y, w - 24.0, anchor);
-        if (cx.fr.clicked(x, y, w, anchor)) {
+        cx.click(UiControlKind.Surface, x, y, w, anchor, 0, false, () => {
             this.open.set(!this.open.peek());
-        }
+        });
         if (this.open.peek()) {
             const options = this.options;
             const value = this.value;
@@ -137,6 +140,13 @@ export class SelectNode extends Widget {
             cx.overlay((layer: PaintContext) => paintOptions(layer, options, value, open, x, y, w, anchor), false);
         }
     }
+}
+
+function selectRow(cx: PaintContext, value: Signal<int>, open: Signal<bool>, index: int, ax: float, rowY: float, aw: float): void {
+    cx.click(UiControlKind.Surface, ax, rowY, aw, SELECT_ROW_H, 0, false, () => {
+        value.set(index);
+        open.set(false);
+    });
 }
 
 function paintOptions(cx: PaintContext, options: str[], value: Signal<int>, open: Signal<bool>, ax: float, ay: float, aw: float, ah: float): void {
@@ -150,10 +160,7 @@ function paintOptions(cx: PaintContext, options: str[], value: Signal<int>, open
             cx.win.rect(ax + 4.0, rowY + 2.0, aw - 8.0, SELECT_ROW_H - 4.0, Theme.colors.outline, 6.0);
         }
         Text(options[i]).paint(cx, ax + 12.0, rowY, aw - 24.0, SELECT_ROW_H);
-        if (fr.clicked(ax, rowY, aw, SELECT_ROW_H)) {
-            value.set(i);
-            open.set(false);
-        }
+        selectRow(cx, value, open, i, ax, rowY, aw);
     }
     const inside = hit(fr.mouseX as float, fr.mouseY as float, ax, top, aw, listH)
         || hit(fr.mouseX as float, fr.mouseY as float, ax, ay, aw, ah);

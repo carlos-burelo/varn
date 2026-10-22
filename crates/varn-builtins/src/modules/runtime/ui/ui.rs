@@ -48,7 +48,7 @@ struct Window {
     commands: Vec<DrawCmd>,
     real: Option<u64>,
     canvas: varn_ui::Canvas,
-    activated: Vec<i64>,
+    activated: Vec<varn_ui::Activation>,
 }
 
 fn real_poll(id: u64) -> Vec<Event> {
@@ -330,7 +330,7 @@ varn_contract! {
                         .unwrap_or_default(),
                     None => win.canvas.interact(win.w as u32, win.h as u32, &scene.runs),
                 };
-                win.activated.extend(hits.into_iter().map(i64::from));
+                win.activated.extend(hits);
                 Ok(n)
             })
         }
@@ -344,13 +344,20 @@ varn_contract! {
             w: f64,
             h: f64,
             color: i64,
-            checked: bool,
+            flag: bool,
+            value: f64,
+            low: f64,
+            high: f64,
         ) -> Result<(), String> {
             let kind = match UiControlKind::from_value(ctx, kind)
                 .ok_or_else(|| "ui.control: kind is not a UiControlKind".to_string())?
             {
                 UiControlKind::Button => varn_ui::ControlKind::Button,
                 UiControlKind::Checkbox => varn_ui::ControlKind::Checkbox,
+                UiControlKind::Switch => varn_ui::ControlKind::Switch,
+                UiControlKind::Slider => varn_ui::ControlKind::Slider,
+                UiControlKind::Scroll => varn_ui::ControlKind::Scroll,
+                UiControlKind::Surface => varn_ui::ControlKind::Surface,
             };
             let id = u32::try_from(cid).map_err(|_| "ui.control: bad control id".to_string())?;
             with_win(window, |win| {
@@ -362,14 +369,20 @@ varn_contract! {
                     w,
                     h,
                     color,
-                    checked,
+                    flag,
+                    value,
+                    low,
+                    high,
                 });
                 Ok(())
             })
         }
         fn activated(_ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, String> {
             let hits = with_win(id, |win| Ok(std::mem::take(&mut win.activated)))?;
-            Ok(hits.into_iter().map(VmValue::from_int).collect())
+            Ok(hits
+                .into_iter()
+                .flat_map(|a| [VmValue::from_f64(f64::from(a.id)), VmValue::from_f64(f64::from(a.value))])
+                .collect())
         }
         fn real(_ctx: &mut dyn NativeCtx, id: i64) -> Result<bool, String> {
             with_win(id, |w| Ok(w.real.is_some()))

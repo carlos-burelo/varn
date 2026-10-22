@@ -23,7 +23,7 @@ export class CheckboxNode extends Widget {
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        cx.control(UiControlKind.Checkbox, x, y, w, h, this.color, this.checked, this.onToggle);
+        cx.click(UiControlKind.Checkbox, x, y, w, h, this.color, this.checked, this.onToggle);
     }
 }
 
@@ -44,13 +44,7 @@ export class SwitchNode extends Widget {
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        cx.win.rect(x, y, w, h, this.on ? Theme.colors.primary : Theme.colors.outline, h / 2.0);
-        const knob = h - 6.0;
-        const knobX = this.on ? x + w - knob - 3.0 : x + 3.0;
-        cx.win.rect(knobX, y + 3.0, knob, knob, Theme.colors.onPrimary, knob / 2.0);
-        if (cx.fr.clicked(x, y, w, h)) {
-            this.onToggle();
-        }
+        cx.click(UiControlKind.Switch, x, y, w, h, Theme.colors.primary, this.on, this.onToggle);
     }
 }
 

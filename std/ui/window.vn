@@ -78,11 +78,11 @@ export class UiWindow {
         clear$(this.id, color);
     }
 
-    control(cid: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, checked: bool): void {
-        control$(this.id, cid, kind, x, y, w, h, color, checked);
+    control(cid: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, flag: bool, value: float, low: float, high: float): void {
+        control$(this.id, cid, kind, x, y, w, h, color, flag, value, low, high);
     }
 
-    activated(): int[] {
+    activated(): float[] {
         return activated$(this.id);
     }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { UiWindow, UiFrame, Focus, Column, Text, Scroll, Widget, render, signal, UiInjectKind, Box } from "std:ui";
+import { UiWindow, UiFrame, Focus, Column, Text, Scroll, Widget, render, present, signal, UiInjectKind, Box } from "std:ui";
 
 function rows(n: int): Widget[] {
     const out: Widget[] = [];
@@ -9,6 +9,13 @@ function rows(n: int): Widget[] {
     return out;
 }
 
+function frameAt(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
+    fr.update(win);
+    win.clear(0xFF000000);
+    render(win, fr, focus, tree, 0.0, 0.0, 200.0, 100.0);
+    present(win, fr);
+}
+
 await describe("245 ui scroll", async () => {
     await it("the wheel moves the content and clamps at the ends", () => {
         using win = UiWindow.open("t", 200, 100);
@@ -16,21 +23,20 @@ await describe("245 ui scroll", async () => {
         const focus = new Focus();
         const at = signal(0.0);
         const tree = Scroll(Column(rows(10), gap: 0.0), at, 100.0);
-        win.inject(UiInjectKind.MouseDown, 50, 50, 0);
+        frameAt(win, fr, focus, tree);
         win.inject(UiInjectKind.Mouse, 50, 50, 0);
-        fr.update(win);
-        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 100.0);
+        frameAt(win, fr, focus, tree);
         win.inject(UiInjectKind.Wheel, -40, 0, 0);
-        fr.update(win);
-        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 100.0);
+        frameAt(win, fr, focus, tree);
+        frameAt(win, fr, focus, tree);
         expect(at.value).toBe(40.0);
         win.inject(UiInjectKind.Wheel, -10000, 0, 0);
-        fr.update(win);
-        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 100.0);
-        expect(at.value).toBe(300.0 - 100.0 + 0.0);
+        frameAt(win, fr, focus, tree);
+        frameAt(win, fr, focus, tree);
+        expect(at.value).toBe(200.0);
         win.inject(UiInjectKind.Wheel, 10000, 0, 0);
-        fr.update(win);
-        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 100.0);
+        frameAt(win, fr, focus, tree);
+        frameAt(win, fr, focus, tree);
         expect(at.value).toBe(0.0);
     });
 
@@ -42,6 +48,6 @@ await describe("245 ui scroll", async () => {
         render(win, fr, focus, tree, 0.0, 0.0, 200.0, 100.0);
         const cmds = win.commands();
         expect(cmds.indexOf("clip 0 0 200 100") >= 0).toBe(true);
-        expect(cmds[cmds.length - 1].startsWith("rect ")).toBe(true);
+        expect(cmds[cmds.length - 1]).toBe("unclip");
     });
 });
