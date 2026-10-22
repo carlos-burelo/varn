@@ -59,10 +59,11 @@ pub fn push(e: &RealEvent, out: &mut Vec<Event>) {
                     repeat: false,
                     modifiers: Modifiers::NONE,
                 });
-            } else if pressed && key >= KEY_SPACE {
-                if let Some(c) = char::from_u32(key as u32) {
-                    out.push(Event::Text(c.to_string()));
-                }
+            } else if let Some(c) = (pressed && key >= KEY_SPACE)
+                .then(|| char::from_u32(key as u32))
+                .flatten()
+            {
+                out.push(Event::Text(c.to_string()));
             }
         }
         RealEvent::Resize { .. } | RealEvent::Close => {}
