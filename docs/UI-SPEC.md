@@ -24,6 +24,7 @@ Module: `std:ui`
 > cruzado. Por defecto `start` en columna y `center` en fila.
 > Puertas: `tests/220-ui-declarative.vn`, `tests/232-ui-layout.vn`,
 > `tests/241-ui-controls.vn`, `tests/235-signals.vn`, `tests/238-signals-tasks.vn`.
+> Stack de render: `varn-ui` pinta con egui-wgpu 0.37 (wgpu 30, la pareja más reciente) sobre epaint para teselar rectángulos; el texto se da forma y se parte en líneas con Parley 0.12 (`varn-text`), y los glifos se rasterizan con swash a pasos subpíxel. La superficie usa formato no sRGB, que es lo que egui-wgpu espera para mezclar en espacio gamma.
 > Overlays: `Dialog(open, title, body)` (modal, el velo cierra al pulsar fuera),
 > `Select(options, value)` (ancla y lista que se cierra al elegir o al pulsar
 > fuera) y `Toaster`/`Toasts` (no modal, expiran por tiempo). Un overlay modal
