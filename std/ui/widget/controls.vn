@@ -108,7 +108,7 @@ export class FieldNode extends Widget {
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        const slot = cx.nextSlot();
+        const slot = cx.idFor();
         const ed = this.edit ?? ownedEdit(slot);
         const kind = this.multiline ? UiControlKind.Area : UiControlKind.Field;
         paintText(cx, slot, x, y, w, h, ed, kind, this.hint, this.size, this.onSubmit, (text: str) => {});
@@ -137,7 +137,7 @@ export class InputNode extends Widget {
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        const slot = cx.nextSlot();
+        const slot = cx.idFor();
         const ed = ownedEdit(slot);
         ed.text = this.value;
         paintText(cx, slot, x, y, w, h, ed, UiControlKind.Field, this.hint, this.size, this.onSubmit, (text: str) => this.onChange(text));

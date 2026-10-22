@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Constraints, Placement } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement, KeyedNode, paintSlot } from "std:ui/widget/base";
 import { MainAxis, CrossAxis } from "std:ui/style";
 
 export enum Axis {
@@ -242,9 +242,9 @@ export class FlexNode extends Widget {
                 }
             }
             if (horizontal) {
-                child.paint(cx, innerX + cursor, innerY + shift, span, thick);
+                paintSlot(cx, child, `${i}`, () => child.paint(cx, innerX + cursor, innerY + shift, span, thick));
             } else {
-                child.paint(cx, innerX + shift, innerY + cursor, thick, span);
+                paintSlot(cx, child, `${i}`, () => child.paint(cx, innerX + shift, innerY + cursor, thick, span));
             }
             cursor = cursor + span + spacing;
         }

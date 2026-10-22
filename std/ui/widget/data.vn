@@ -1,13 +1,13 @@
-import { Widget } from "std:ui/widget/base";
+import { Widget, KeyedNode } from "std:ui/widget/base";
 import { Column, Row } from "std:ui/widget/flex";
 import { Expanded, Divider, Spacer } from "std:ui/widget/box";
 import { Text, Caption } from "std:ui/widget/text";
 import { CrossAxis } from "std:ui/style";
 
-export function Each<T>(items: T[], render: (item: T, index: int) => Widget, gap: float = 4.0): Widget {
+export function Each<T>(items: T[], key: (item: T) => str, render: (item: T, index: int) => Widget, gap: float = 4.0): Widget {
     const rows: Widget[] = [];
     for (let at = 0; at < items.length; at = at + 1) {
-        rows.push(render(items[at], at));
+        rows.push(new KeyedNode(key(items[at]), render(items[at], at)));
     }
     return Column(rows, gap: gap);
 }

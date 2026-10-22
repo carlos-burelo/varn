@@ -1,0 +1,35 @@
+import { describe, it, expect } from "std:test";
+import { UiWindow, UiFrame, Focus, Widget, Each, Field, TextEdit, render, present, signal, UiInjectKind, MOUSE_LEFT } from "std:ui";
+
+function drawFrame(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
+    fr.update(win);
+    win.clear(0xFF000000);
+    render(win, fr, focus, tree, 0.0, 0.0, 300.0, 200.0);
+    present(win, fr);
+}
+
+await describe("251 keyed each", async () => {
+    await it("focus follows the item key when the list is reordered", () => {
+        using win = UiWindow.open("t", 300, 200);
+        const fr = new UiFrame(300, 200);
+        const focus = new Focus();
+        const a = new TextEdit();
+        const b = new TextEdit();
+        const items = signal(["a", "b"]);
+        const editFor = (s: str): TextEdit => s == "a" ? a : b;
+        const build = (): Widget => Each(items.value, (s: str): str => s, (s: str, at: int): Widget => Field(edit: editFor(s), hint: s));
+        drawFrame(win, fr, focus, build());
+        win.inject(UiInjectKind.MouseDown, 60, 70, MOUSE_LEFT);
+        drawFrame(win, fr, focus, build());
+        win.inject(UiInjectKind.MouseUp, 60, 70, MOUSE_LEFT);
+        drawFrame(win, fr, focus, build());
+        drawFrame(win, fr, focus, build());
+        expect(b.focused).toBe(true);
+        expect(a.focused).toBe(false);
+        items.set(["b", "a"]);
+        drawFrame(win, fr, focus, build());
+        drawFrame(win, fr, focus, build());
+        expect(b.focused).toBe(true);
+        expect(a.focused).toBe(false);
+    });
+});

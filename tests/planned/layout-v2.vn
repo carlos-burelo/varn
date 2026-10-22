@@ -80,7 +80,7 @@ await describe("layout v2 (planned)", async () => {
         store.set("a", new TextEdit());
         store.set("b", new TextEdit());
         store.get("a")!.text = "first";
-        const build = (): Widget => Each(items.value, (s: str): str => s, (s: str): Widget => Field(edit: store.get(s)!, hint: s));
+        const build = (): Widget => Each(items.value, (s: str): str => s, (s: str, at: int): Widget => Field(edit: store.get(s)!, hint: s));
         frameAt(win, fr, focus, build(), 320.0);
         items.set(["b", "a"]);
         frameAt(win, fr, focus, build(), 320.0);

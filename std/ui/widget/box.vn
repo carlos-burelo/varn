@@ -53,7 +53,7 @@ export class BoxNode extends Widget {
         if (click !== null) {
             cx.click(UiControlKind.Surface, x, y, w, h, 0, false, click);
         }
-        paintChild(this.child, cx, x + this.pad, y + this.pad, w - 2.0 * this.pad, h - 2.0 * this.pad);
+        cx.keyed("child", () => paintChild(this.child, cx, x + this.pad, y + this.pad, w - 2.0 * this.pad, h - 2.0 * this.pad));
     }
 }
 
@@ -100,11 +100,12 @@ export class StackNode extends Widget {
         return new Placement(this, size, children);
     }
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        for (let child of this.children) {
+        for (let i = 0; i < this.children.length; i = i + 1) {
+            const child = this.children[i];
             const size = child.measure(w, h);
             const cw = size.w < w ? size.w : w;
             const ch = size.h < h ? size.h : h;
-            child.paint(cx, x + alignedX(this.alignment, w - cw), y + alignedY(this.alignment, h - ch), cw, ch);
+            cx.keyed(`${i}`, () => child.paint(cx, x + alignedX(this.alignment, w - cw), y + alignedY(this.alignment, h - ch), cw, ch));
         }
     }
 }
@@ -151,7 +152,7 @@ export class PaddingNode extends Widget {
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         const cw = w - this.left - this.right;
         const ch = h - this.top - this.bottom;
-        paintChild(this.child, cx, x + this.left, y + this.top, cw < 0.0 ? 0.0 : cw, ch < 0.0 ? 0.0 : ch);
+        cx.keyed("child", () => paintChild(this.child, cx, x + this.left, y + this.top, cw < 0.0 ? 0.0 : cw, ch < 0.0 ? 0.0 : ch));
     }
 }
 
@@ -182,7 +183,7 @@ export class SizedBoxNode extends Widget {
         return new Placement(this, size, children);
     }
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        paintChild(this.child, cx, x, y, w, h);
+        cx.keyed("child", () => paintChild(this.child, cx, x, y, w, h));
     }
 }
 
@@ -205,7 +206,7 @@ export class ExpandedNode extends Widget {
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        this.child.paint(cx, x, y, w, h);
+        cx.keyed("child", () => this.child.paint(cx, x, y, w, h));
     }
 }
 

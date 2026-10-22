@@ -76,7 +76,7 @@ function controls(): Widget {
 function tasksView(): Widget {
     return Card([
         Row([Title("Tasks"), Caption(`${remaining.value} left`)], mainAxis: MainAxis.spaceBetween),
-        Each(tasks.value, (t: Task, at: int): Widget => Row([
+        Each(tasks.value, (t: Task): str => `${t.id}`, (t: Task, at: int): Widget => Row([
             Checkbox(t.done, onChange: (next: bool) => toggleTask(t.id)),
             Text(t.title, color: t.done ? Theme.colors.muted : Theme.colors.onSurface)
         ]), gap: 8.0)

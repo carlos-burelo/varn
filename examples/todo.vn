@@ -44,7 +44,7 @@ function App(): Widget {
     return Column([
         Title(`tareas (${todos.value.length})`),
         Row([Expanded(Input(draft, hint: "nueva tarea, Enter añade", onSubmit: (v: str) => add())), Button("Añadir", add)]),
-        Each(todos.value, (t: Todo, at: int) => Row([
+        Each(todos.value, (t: Todo): str => t.text, (t: Todo, at: int) => Row([
             Checkbox(t.done, onChange: (next: bool) => toggle(at)),
             Expanded(Text(t.text, color: t.done ? Theme.colors.muted : Theme.colors.onSurface)),
             Button("-", () => remove(at), kind: ButtonKind.danger, w: 36.0, h: 30.0)

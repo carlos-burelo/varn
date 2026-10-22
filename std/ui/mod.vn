@@ -2,7 +2,7 @@ export { UiWindow, UiEvent, UiEventKind, UiInjectKind } from "std:ui/window";
 export { UiFrame } from "std:ui/frame";
 export { Focus } from "std:ui/focus";
 export { TextEdit } from "std:ui/edit";
-export { Widget, PaintContext, Size, Constraints, Placement } from "std:ui/widget/base";
+export { Widget, PaintContext, Size, Constraints, Placement, KeyedNode } from "std:ui/widget/base";
 export { Text, Title, Headline, Caption, TextNode, TextAlign } from "std:ui/widget/text";
 export { Box, Card, Stack, Padding, SizedBox, Spacer, Expanded, Divider, BoxNode, StackNode, PaddingNode, SizedBoxNode } from "std:ui/widget/box";
 export { Column, Row, FlexNode, Axis } from "std:ui/widget/flex";

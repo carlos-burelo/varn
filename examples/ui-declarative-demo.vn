@@ -37,7 +37,7 @@ function TodoList(): Widget {
     return Card([
         Row([Title("Todos"), Caption(`${remaining.value} left`)], mainAxis: MainAxis.spaceBetween),
         Divider(),
-        Each(todos.value, (t: Todo, at: int) => Row([
+        Each(todos.value, (t: Todo): str => `${t.id}`, (t: Todo, at: int) => Row([
             Checkbox(t.done, onChange: (next: bool) => toggle(t.id)),
             Text(t.title, color: t.done ? Theme.colors.muted : Theme.colors.onSurface)
         ]), gap: 10.0)

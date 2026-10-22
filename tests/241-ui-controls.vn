@@ -131,7 +131,7 @@ await describe("241 ui controls", async () => {
 
     await it("each builds one widget per item with its index", () => {
         const seen: int[] = [];
-        const list = flex(Each(["x", "y", "z"], (item: str, at: int) => { seen.push(at); return Text(item) }));
+        const list = flex(Each(["x", "y", "z"], (item: str): str => item, (item: str, at: int) => { seen.push(at); return Text(item) }));
         expect(list.children.length).toBe(3);
         expect(seen).toEqual([0, 1, 2]);
     });
@@ -159,6 +159,6 @@ await describe("241 ui controls", async () => {
         const focus = new Focus();
         win.clear(0);
         render(win, fr, focus, Button("go", onPress: () => {}, kind: ButtonKind.danger), 0.0, 0.0, 100.0, 40.0);
-        expect(win.commands()[1]).toBe("control 1001 Button 0 0 100 40 4294925404 false");
+        expect(win.commands()[1].endsWith(" Button 0 0 100 40 4294925404 false")).toBe(true);
     });
 });

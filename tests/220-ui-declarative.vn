@@ -139,7 +139,7 @@ await describe("220 ui declarative", async () => {
 
     await it("each keeps stable order with keys", () => {
         const todos: Todo[] = [{ id: 1, title: "a" }, { id: 2, title: "b" }];
-        const list = Each(todos, (t: Todo, index: int) => TodoRow(todo: t));
+        const list = Each(todos, (t: Todo): str => t.title, (t: Todo, index: int) => TodoRow(todo: t));
         expect(list is FlexNode).toBe(true);
         expect(flex(list).children.length).toBe(2);
         expect(label(flex(list).children[0]).text).toBe("a");

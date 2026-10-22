@@ -130,7 +130,7 @@ await describe("219 widgets", async () => {
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const seen: int[] = [];
-        const tree = Each(["a", "b", "c"], (t: str, i: int) => {
+        const tree = Each(["a", "b", "c"], (t: str): str => t, (t: str, i: int) => {
             seen.push(i);
             return Text(t);
         }, gap: 4.0);

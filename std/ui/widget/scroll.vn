@@ -42,7 +42,7 @@ export class ScrollNode extends Widget {
             this.offset.set(next);
         });
         cx.clip(x, y, w, h);
-        this.child.paint(cx, x, y - bounded, w - BAR_WIDTH, content);
+        cx.keyed("child", () => this.child.paint(cx, x, y - bounded, w - BAR_WIDTH, content));
         cx.unclip();
     }
 }

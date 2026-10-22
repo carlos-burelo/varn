@@ -13,12 +13,21 @@ export class Overlay {
     }
 }
 
+function hashKey(s: str): int {
+    let h = 5381;
+    for (let i = 0; i < s.length; i = i + 1) {
+        h = (h * 33 + s.charCodeAt(i)) % 2147483647;
+    }
+    return h + 1000;
+}
+
 export class PaintContext {
     win: UiWindow;
     fr: UiFrame;
     focus: Focus;
     overlays: Overlay[] = [];
-    private _slot: int = 1000;
+    keyPath: str = "";
+    keyCount: int = 0;
 
     constructor(win: UiWindow, fr: UiFrame, focus: Focus) {
         this.win = win;
@@ -45,7 +54,7 @@ export class PaintContext {
     }
 
     valued(kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, flag: bool, value: float, low: float, high: float, onChange: (value: float) => void): void {
-        const id = this.nextSlot();
+        const id = this.idFor();
         this.win.control(id, kind, x, y, w, h, color, flag, value, low, high);
         this.fr.onActivate(id, onChange);
     }
@@ -56,9 +65,19 @@ export class PaintContext {
         this.fr.onType(id, onType);
     }
 
-    nextSlot(): int {
-        this._slot = this._slot + 1;
-        return this._slot;
+    keyed(key: str, paint: () => void): void {
+        const savedPath = this.keyPath;
+        const savedCount = this.keyCount;
+        this.keyPath = savedPath + "/" + key;
+        this.keyCount = 0;
+        paint();
+        this.keyPath = savedPath;
+        this.keyCount = savedCount;
+    }
+
+    idFor(): int {
+        this.keyCount = this.keyCount + 1;
+        return hashKey(this.keyPath + "#" + this.keyCount);
     }
 }
 
@@ -166,6 +185,40 @@ export abstract class Widget {
 
     computeLayout(c: Constraints): Placement {
         return new Placement(this, c.fit(this.measure(c.maxW, c.maxH)), []);
+    }
+}
+
+export class KeyedNode extends Widget {
+    key: str;
+    child: Widget;
+
+    constructor(key: str, child: Widget) {
+        super();
+        this.key = key;
+        this.child = child;
+        this.flex = child.flex;
+        this.fills = child.fills;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return this.child.measure(maxW, maxH);
+    }
+
+    override computeLayout(c: Constraints): Placement {
+        const placed = this.child.layout(c);
+        return new Placement(this, placed.size, [placed]);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        cx.keyed(this.key, () => this.child.paint(cx, x, y, w, h));
+    }
+}
+
+export function paintSlot(cx: PaintContext, child: Widget, position: str, paint: () => void): void {
+    if (child is KeyedNode) {
+        paint();
+    } else {
+        cx.keyed(position, paint);
     }
 }
 
