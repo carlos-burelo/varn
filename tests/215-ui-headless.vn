@@ -3,7 +3,7 @@ import {
     UiWindow,
     UiFrame,
     Focus,
-    TextEdit, Field, Column, Widget, render, present, signal, UiInjectKind, MOUSE_LEFT, KEY_ENTER, KEY_BACKSPACE,
+    TextEdit, Field, Button, Column, Widget, render, present, signal, UiInjectKind, MOUSE_LEFT, KEY_ENTER, KEY_BACKSPACE,
     KEY_BACKSPACE, KEY_TAB, KEY_ENTER, KEY_ESCAPE, KEY_SPACE, KEY_DELETE,
     KEY_ARROW_LEFT, KEY_ARROW_UP, KEY_ARROW_RIGHT, KEY_ARROW_DOWN,
     MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE,
@@ -164,42 +164,20 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         expect(fr.held(KEY_ESCAPE)).toBe(false);
     });
 
-    await it("frame clicks need down and up inside", () => {
-        using win = UiWindow.open("t", 800, 600, true);
-        const fr = new UiFrame(800, 600);
-        win.inject(UiInjectKind.Mouse, 30, 40, -1);
-        fr.update(win);
-        expect(fr.mouseX).toBe(30);
-        expect(fr.mouseY).toBe(40);
-        expect(fr.leftPressed).toBe(false);
-        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        expect(fr.left).toBe(true);
-        expect(fr.leftPressed).toBe(true);
-        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
-        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        expect(fr.left).toBe(false);
-        expect(fr.leftReleased).toBe(true);
-        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(true);
-        fr.update(win);
-        expect(fr.leftReleased).toBe(false);
-        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
-    });
-
-    await it("frame rejects partial clicks", () => {
-        using win = UiWindow.open("t", 800, 600, true);
-        const fr = new UiFrame(800, 600);
-        win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        win.inject(UiInjectKind.MouseUp, 500, 500, MOUSE_LEFT);
-        fr.update(win);
-        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
-        win.inject(UiInjectKind.MouseDown, 500, 500, MOUSE_LEFT);
-        fr.update(win);
-        win.inject(UiInjectKind.MouseUp, 30, 40, MOUSE_LEFT);
-        fr.update(win);
-        expect(fr.clicked(10.0, 10.0, 100.0, 50.0)).toBe(false);
+    await it("button fires once when press and release both land on it", () => {
+        using win = UiWindow.open("t", 300, 120, true);
+        const fr = new UiFrame(300, 120);
+        const focus = new Focus();
+        const hits: bool[] = [];
+        const tree = Column([Button("ok", () => { hits.push(true); }, w: 100.0, h: 40.0)]);
+        clickAt(win, fr, focus, tree, 30, 20);
+        expect(hits.length).toBe(1);
+        win.inject(UiInjectKind.MouseDown, 30, 20, MOUSE_LEFT);
+        drawField(win, fr, focus, tree);
+        win.inject(UiInjectKind.MouseUp, 250, 100, MOUSE_LEFT);
+        drawField(win, fr, focus, tree);
+        drawField(win, fr, focus, tree);
+        expect(hits.length).toBe(1);
     });
 
     await it("frame tracks resize and close", () => {

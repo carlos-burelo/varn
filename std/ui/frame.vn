@@ -1,5 +1,5 @@
 import { UiWindow, UiEventKind, TypedText } from "std:ui/window";
-import { hit, MOUSE_LEFT } from "std:ui/keys";
+import { MOUSE_LEFT } from "std:ui/keys";
 
 export class UiFrame {
     mouseX: int;
@@ -17,7 +17,6 @@ export class UiFrame {
     wheel: int;
     w: int;
     h: int;
-    clips: float[][];
     modal: bool;
     overlayPass: bool;
     controlIds: int[];
@@ -41,7 +40,6 @@ export class UiFrame {
         this.closed = false;
         this.resized = false;
         this.wheel = 0;
-        this.clips = [];
         this.modal = false;
         this.overlayPass = false;
         this.controlIds = [];
@@ -145,34 +143,6 @@ export class UiFrame {
                 }
             }
         }
-    }
-
-    clicked(rx: float, ry: float, rw: float, rh: float): bool {
-        if (this.modal && !this.overlayPass) {
-            return false;
-        }
-        return this.leftReleased
-            && this.visible(this.mouseX as float, this.mouseY as float)
-            && this.visible(this.downX as float, this.downY as float)
-            && hit(this.mouseX as float, this.mouseY as float, rx, ry, rw, rh)
-            && hit(this.downX as float, this.downY as float, rx, ry, rw, rh);
-    }
-
-    pushClip(x: float, y: float, w: float, h: float): void {
-        this.clips.push([x, y, w, h]);
-    }
-
-    popClip(): void {
-        this.clips.pop();
-    }
-
-    visible(px: float, py: float): bool {
-        for (let clip of this.clips) {
-            if (!hit(px, py, clip[0], clip[1], clip[2], clip[3])) {
-                return false;
-            }
-        }
-        return true;
     }
 
     static contains(xs: int[], v: int): bool {

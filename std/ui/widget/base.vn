@@ -42,12 +42,10 @@ export class PaintContext {
 
     clip(x: float, y: float, w: float, h: float): void {
         this.win.clip(x, y, w, h);
-        this.fr.pushClip(x, y, w, h);
     }
 
     unclip(): void {
         this.win.unclip();
-        this.fr.popClip();
     }
 
     click(kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, flag: bool, onActivate: () => void): void {

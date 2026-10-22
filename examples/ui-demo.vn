@@ -2,11 +2,12 @@ import { args } from "std:sys/args";
 import { now } from "std:time";
 import {
     UiWindow, UiFrame, Focus,
+    Box, Padding,
     KEY_ESCAPE
 } from "std:ui";
 import { row } from "std:ui/layout";
 import { wrap as wrapText, measure } from "std:ui/text";
-import { present } from "std:ui/render";
+import { present, render } from "std:ui/render";
 
 const W = 800;
 const H = 600;
@@ -26,6 +27,9 @@ let by = 120.0;
 let dx = 4.0;
 let dy = 3.0;
 let boxColor = RED;
+const toggle = (): void => {
+    boxColor = boxColor == RED ? GREEN : RED;
+};
 let frames = 0;
 const t0 = now();
 const budgetMs = 25000;
@@ -42,12 +46,8 @@ while (!fr.closed) {
     if (by < 0.0 || by + 80.0 > (H as float)) {
         dy = 0.0 - dy;
     }
-    if (fr.clicked(bx, by, 120.0, 80.0)) {
-        boxColor = boxColor == RED ? GREEN : RED;
-    }
-
     win.clear(BG);
-    win.rect(bx, by, 120.0, 80.0, boxColor);
+    render(win, fr, focus, Padding(child: Box(color: boxColor, w: 120.0, h: 80.0, onClick: toggle), left: bx, top: by), 0.0, 0.0, W as float, H as float);
     win.rect(fr.mouseX as float - 5.0, fr.mouseY as float - 5.0, 10.0, 10.0, WHITE);
 
     const cells = row(20.0, 480.0, 760.0, 90.0, [1.0, 1.0, 1.0], 12.0);
