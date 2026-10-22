@@ -4,9 +4,6 @@ export {
     ShapedRun,
     shape,
     measure,
-    RasterGlyph,
-    rasterGlyph,
-    glyphCacheSize,
     ascent,
     descent,
     wrap

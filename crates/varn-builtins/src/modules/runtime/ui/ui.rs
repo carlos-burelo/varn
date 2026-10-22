@@ -324,9 +324,8 @@ varn_contract! {
                 let n = win.commands.len() as i64;
                 let cmds = std::mem::take(&mut win.commands);
                 let scene = ui_draw::assemble(&cmds)?;
-                let atlas = scene.atlas.as_ref().map(|(b, w, h)| (b.as_slice(), *w, *h));
                 let hits = match win.real {
-                    Some(h) => varn_ui::draw_now(h, &mut win.canvas, scene.clear, &scene.runs, atlas)
+                    Some(h) => varn_ui::draw_now(h, &mut win.canvas, scene.clear, &scene.runs)
                         .unwrap_or_default(),
                     None => win.canvas.interact(win.w as u32, win.h as u32, &scene.runs),
                 };

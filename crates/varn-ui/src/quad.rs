@@ -19,27 +19,23 @@ pub struct Clip {
 #[derive(Clone)]
 pub enum Body {
     Rects(Vec<Rect>),
-    Glyphs(Vec<Glyph>),
+    Text(TextRun),
     Control(Control),
+}
+
+#[derive(Clone)]
+pub struct TextRun {
+    pub x: f32,
+    pub y: f32,
+    pub size: f32,
+    pub color: [f32; 4],
+    pub text: String,
 }
 
 #[derive(Clone)]
 pub struct Run {
     pub clip: Option<Clip>,
     pub body: Body,
-}
-
-#[derive(Clone)]
-pub struct Glyph {
-    pub x: f32,
-    pub y: f32,
-    pub w: f32,
-    pub h: f32,
-    pub u: f32,
-    pub v: f32,
-    pub uw: f32,
-    pub vh: f32,
-    pub color: [f32; 4],
 }
 
 pub fn argb_to_float(color: i64) -> [f32; 4] {

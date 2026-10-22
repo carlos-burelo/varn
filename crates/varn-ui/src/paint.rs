@@ -1,11 +1,11 @@
 use egui::{
     emath::{pos2, vec2},
-    epaint::{ClippedPrimitive, TextureId, Vertex},
-    Button, Checkbox, Color32, Context, Event, Mesh, Rect as ERect, RawInput, ScrollArea, Sense,
-    scroll_area::ScrollSource, Shape, Slider, TexturesDelta, Ui, UiBuilder,
+    epaint::ClippedPrimitive,
+    Align2, Button, Checkbox, Color32, Context, Event, FontId, Rect as ERect, RawInput, ScrollArea, Sense,
+    scroll_area::State as ScrollState, Slider, TexturesDelta, Ui, UiBuilder,
 };
 
-use super::quad::{Activation, Body, Clip, Control, ControlKind, Glyph, Rect, Run};
+use super::quad::{Activation, Body, Clip, Control, ControlKind, Rect, Run};
 
 const MAX_CORNER: f32 = 255.0;
 
@@ -18,10 +18,10 @@ pub struct Pass {
 pub fn pass(
     ctx: &Context,
     events: Vec<Event>,
+    time: f64,
     w: u32,
     h: u32,
     runs: &[Run],
-    glyph_tex: Option<TextureId>,
 ) -> Pass {
     let input = RawInput {
         screen_rect: Some(ERect::from_min_size(
@@ -29,11 +29,12 @@ pub fn pass(
             vec2(w as f32, h as f32),
         )),
         events,
+        time: Some(time),
         ..Default::default()
     };
     let mut hits = Vec::new();
     let output = ctx.run_ui(input, |ui| {
-        paint_runs(ui, runs, w as f32, h as f32, glyph_tex, &mut hits);
+        paint_runs(ui, runs, w as f32, h as f32, &mut hits);
     });
     let prims = ctx.tessellate(output.shapes, output.pixels_per_point);
     Pass {
@@ -70,30 +71,6 @@ fn paint_rects(ui: &Ui, rects: &[Rect]) {
     }
 }
 
-fn glyph_mesh(texture: TextureId, glyphs: &[Glyph]) -> Mesh {
-    let mut mesh = Mesh::with_texture(texture);
-    for g in glyphs {
-        let base = mesh.vertices.len() as u32;
-        let tint = color(g.color);
-        let corners = [
-            (g.x, g.y, g.u, g.v),
-            (g.x + g.w, g.y, g.u + g.uw, g.v),
-            (g.x + g.w, g.y + g.h, g.u + g.uw, g.v + g.vh),
-            (g.x, g.y + g.h, g.u, g.v + g.vh),
-        ];
-        for (x, y, u, v) in corners {
-            mesh.vertices.push(Vertex {
-                pos: pos2(x, y),
-                uv: pos2(u, v),
-                color: tint,
-            });
-        }
-        mesh.add_triangle(base, base + 1, base + 2);
-        mesh.add_triangle(base, base + 2, base + 3);
-    }
-    mesh
-}
-
 fn paint_switch(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
     let response = ui.interact(rect, ui.scope_id().with("switch"), Sense::click());
     let track = if c.flag {
@@ -119,20 +96,20 @@ fn paint_switch(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
 
 fn paint_scroll(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
     let extent = c.high;
+    let salt = ("vn-scroll", c.id);
     let out = ui
         .scope_builder(UiBuilder::new().max_rect(rect), |ui| {
-            ScrollArea::vertical()
-                .id_salt(ui.scope_id().with("scroll"))
-                .auto_shrink([false, false])
-                .animated(false)
-                .scroll_source(ScrollSource {
-                    mouse_wheel: false,
-                    ..ScrollSource::ALL
-                })
-                .vertical_scroll_offset(c.value)
-                .show_viewport(ui, |ui, _viewport| {
-                    ui.allocate_space(vec2(c.w, extent));
-                })
+            let id = ui.make_persistent_id(salt);
+            let stored = ScrollState::load(ui.ctx(), id).map_or(0.0, |s| s.clamped_offset().y);
+            let mut area = ScrollArea::vertical()
+                .id_salt(salt)
+                .auto_shrink([false, false]);
+            if (stored - c.value).abs() > 0.5 {
+                area = area.vertical_scroll_offset(c.value);
+            }
+            area.show_viewport(ui, |ui, _viewport| {
+                ui.allocate_space(vec2(c.w, extent));
+            })
         })
         .inner;
     let offset = out.state.clamped_offset().y;
@@ -187,7 +164,6 @@ fn paint_runs(
     runs: &[Run],
     vw: f32,
     vh: f32,
-    glyph_tex: Option<TextureId>,
     hits: &mut Vec<Activation>,
 ) {
     for run in runs {
@@ -199,12 +175,14 @@ fn paint_runs(
                     paint_rects(ui, rects);
                 });
             }
-            Body::Glyphs(glyphs) => {
-                if let Some(tex) = glyph_tex {
-                    ui.painter()
-                        .with_clip_rect(clip)
-                        .add(Shape::mesh(glyph_mesh(tex, glyphs)));
-                }
+            Body::Text(t) => {
+                ui.painter().with_clip_rect(clip).text(
+                    pos2(t.x, t.y),
+                    Align2::LEFT_TOP,
+                    &t.text,
+                    FontId::proportional(t.size),
+                    color(t.color),
+                );
             }
             Body::Control(c) => {
                 ui.scope(|ui| {

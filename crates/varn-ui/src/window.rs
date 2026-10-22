@@ -36,7 +36,6 @@ impl WindowState {
 struct DrawnFrame {
     clear: [f32; 4],
     runs: Vec<super::comp::Run>,
-    atlas: Option<(Vec<u8>, u32, u32)>,
 }
 
 struct PendingCreate {
@@ -181,7 +180,6 @@ pub fn draw_now(
     canvas: &mut super::canvas::Canvas,
     clear: [f32; 4],
     runs: &[super::comp::Run],
-    atlas: Option<(&[u8], u32, u32)>,
 ) -> Result<Vec<Activation>, String> {
     with_ui(|ui| {
         let st = ui
@@ -197,17 +195,18 @@ pub fn draw_now(
         let mut configured = st.configured;
         let ctx = canvas.context().clone();
         let events = canvas.take_input();
+        let time = super::canvas::real_time();
         let (ok, hits) = super::comp::present_draw(
             &shared,
             surface,
             &ctx,
             events,
+            time,
             size.0,
             size.1,
             &mut configured,
             clear,
             runs,
-            atlas,
         );
         let st = ui
             .wins
@@ -221,7 +220,6 @@ pub fn draw_now(
             st.last_draw = Some(DrawnFrame {
                 clear,
                 runs: runs.to_vec(),
-                atlas: atlas.map(|(b, w, h)| (b.to_vec(), w, h)),
             });
         }
         Ok(hits)
@@ -356,7 +354,6 @@ impl ApplicationHandler for PumpApp {
                             let ptr = st.win_ptr;
                             st.surface = render::make_surface(&shared, unsafe { &*ptr });
                         }
-                        let atlas = frame.atlas.as_ref().map(|(b, w, h)| (b.as_slice(), *w, *h));
                         if let Some(ctx) = st.last_ctx.clone()
                             && st.surface.is_some()
                         {
@@ -368,12 +365,12 @@ impl ApplicationHandler for PumpApp {
                                     surface,
                                     &ctx,
                                     Vec::new(),
+                                    super::canvas::real_time(),
                                     size.0,
                                     size.1,
                                     configured,
                                     frame.clear,
                                     &frame.runs,
-                                    atlas,
                                 )
                                 .0;
                             }

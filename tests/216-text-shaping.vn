@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { fontCount, fonts, shape, measure, rasterGlyph, glyphCacheSize, ascent, descent, wrap } from "std:text";
+import { fontCount, fonts, shape, measure, ascent, descent, wrap } from "std:text";
 
 await describe("216 text shaping", async () => {
     await it("system fonts discovered", () => {
@@ -38,21 +38,6 @@ await describe("216 text shaping", async () => {
             failed = true;
         }
         expect(failed).toBe(true);
-    });
-
-    await it("raster is cached and deterministic", () => {
-        const a = rasterGlyph("A", 16.0);
-        expect(a.w > 0).toBe(true);
-        expect(a.h > 0).toBe(true);
-        expect(a.bitmap.length).toBe(a.w * a.h);
-        const b = rasterGlyph("A", 16.0);
-        expect(b.w).toBe(a.w);
-        expect(b.advance).toBe(a.advance);
-        const before = glyphCacheSize();
-        rasterGlyph("B", 16.0);
-        expect(glyphCacheSize()).toBe(before + 1);
-        rasterGlyph("B", 16.0);
-        expect(glyphCacheSize()).toBe(before + 1);
     });
 
     await it("metrics are positive and deterministic", () => {

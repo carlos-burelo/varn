@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 
 use super::paint::pass;
-use super::quad::{Activation, Body, Run};
+use super::quad::{Activation, Run};
 use super::render::{configure_surface, Shared};
 
 const PIXELS_PER_POINT: f32 = 1.0;
@@ -28,61 +28,17 @@ fn with_backend<T>(
     f(backend)
 }
 
-fn glyph_texture(
-    shared: &Shared,
-    backend: &mut Backend,
-    atlas: &[u8],
-    w: u32,
-    h: u32,
-) -> egui::TextureId {
-    let size = wgpu::Extent3d {
-        width: w.max(1),
-        height: h.max(1),
-        depth_or_array_layers: 1,
-    };
-    let texture = shared.device.create_texture(&wgpu::TextureDescriptor {
-        label: None,
-        size,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Unorm,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-    let rgba: Vec<u8> = atlas.iter().flat_map(|&c| [c, c, c, c]).collect();
-    shared.queue.write_texture(
-        wgpu::TexelCopyTextureInfo {
-            texture: &texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        &rgba,
-        wgpu::TexelCopyBufferLayout {
-            offset: 0,
-            bytes_per_row: Some(w.max(1) * 4),
-            rows_per_image: Some(h.max(1)),
-        },
-        size,
-    );
-    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    backend
-        .renderer
-        .register_native_texture(&shared.device, &view, wgpu::FilterMode::Nearest)
-}
-
 pub fn present_draw(
     shared: &Shared,
     surface: &wgpu::Surface,
     ctx: &Context,
     events: Vec<Event>,
+    time: f64,
     w: u32,
     h: u32,
     configured: &mut Option<(u32, u32)>,
     clear: [f32; 4],
     runs: &[Run],
-    atlas: Option<(&[u8], u32, u32)>,
 ) -> (bool, Vec<Activation>) {
     let Some((_config, format)) = configure_surface(shared, surface, w, h, configured) else {
         return (false, Vec::new());
@@ -142,17 +98,7 @@ pub fn present_draw(
         multiview_mask: None,
     };
 
-    let has_glyphs = runs
-        .iter()
-        .any(|r| matches!(&r.body, Body::Glyphs(g) if !g.is_empty()));
-    let glyph_tex = with_backend(shared, format, |backend| match atlas {
-        Some((bytes, aw, ah)) if has_glyphs => {
-            Some(glyph_texture(shared, backend, bytes, aw, ah))
-        }
-        _ => None,
-    });
-
-    let drawn = pass(ctx, events, w, h, runs, glyph_tex);
+    let drawn = pass(ctx, events, time, w, h, runs);
 
     with_backend(shared, format, |backend| {
         for (id, deltas) in &drawn.textures.set {
@@ -177,9 +123,6 @@ pub fn present_draw(
     with_backend(shared, format, |backend| {
         for id in &drawn.textures.free {
             backend.renderer.free_texture(id);
-        }
-        if let Some(id) = glyph_tex {
-            backend.renderer.free_texture(&id);
         }
     });
     (true, drawn.hits)

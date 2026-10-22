@@ -16,8 +16,14 @@ function frameAt(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
     present(win, fr);
 }
 
+function settle(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
+    for (let i = 0; i < 120; i = i + 1) {
+        frameAt(win, fr, focus, tree);
+    }
+}
+
 await describe("245 ui scroll", async () => {
-    await it("the wheel moves the content and clamps at the ends", () => {
+    await it("the wheel moves the content with momentum and clamps at the ends", () => {
         using win = UiWindow.open("t", 200, 100);
         const fr = new UiFrame(200, 100);
         const focus = new Focus();
@@ -28,15 +34,14 @@ await describe("245 ui scroll", async () => {
         frameAt(win, fr, focus, tree);
         win.inject(UiInjectKind.Wheel, -40, 0, 0);
         frameAt(win, fr, focus, tree);
-        frameAt(win, fr, focus, tree);
-        expect(at.value).toBe(40.0);
+        expect(at.value > 0.0).toBe(true);
+        settle(win, fr, focus, tree);
+        expect(at.value > 39.0 && at.value < 41.0).toBe(true);
         win.inject(UiInjectKind.Wheel, -10000, 0, 0);
-        frameAt(win, fr, focus, tree);
-        frameAt(win, fr, focus, tree);
+        settle(win, fr, focus, tree);
         expect(at.value).toBe(200.0);
         win.inject(UiInjectKind.Wheel, 10000, 0, 0);
-        frameAt(win, fr, focus, tree);
-        frameAt(win, fr, focus, tree);
+        settle(win, fr, focus, tree);
         expect(at.value).toBe(0.0);
     });
 

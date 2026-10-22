@@ -1,5 +1,4 @@
 import { Widget, Size, PaintContext } from "std:ui/widget/base";
-import { hit } from "std:ui/keys";
 import { Signal, signal } from "std:signals";
 import { UiControlKind } from "std:ui/window";
 
@@ -24,19 +23,13 @@ export class ScrollNode extends Widget {
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         const content = this.child.measure(w - BAR_WIDTH, CONTENT_UNBOUNDED).h;
         const overflow = content > h ? content - h : 0.0;
-        let at = this.offset.peek();
-        if (cx.fr.wheel != 0 && hit(cx.fr.mouseX as float, cx.fr.mouseY as float, x, y, w, h)) {
-            at = at - (cx.fr.wheel as float);
-        }
-        at = at < 0.0 ? 0.0 : (at > overflow ? overflow : at);
-        if (at != this.offset.peek()) {
-            this.offset.set(at);
-        }
-        cx.valued(UiControlKind.Scroll, x, y, w, h, 0, false, at, 0.0, content, (next: float) => {
+        const at = this.offset.peek();
+        const bounded = at < 0.0 ? 0.0 : (at > overflow ? overflow : at);
+        cx.valued(UiControlKind.Scroll, x, y, w, h, 0, false, bounded, 0.0, content, (next: float) => {
             this.offset.set(next);
         });
         cx.clip(x, y, w, h);
-        this.child.paint(cx, x, y - at, w - BAR_WIDTH, content);
+        this.child.paint(cx, x, y - bounded, w - BAR_WIDTH, content);
         cx.unclip();
     }
 }

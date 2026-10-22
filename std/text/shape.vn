@@ -2,16 +2,13 @@ import {
     fontCount$,
     fonts$,
     shape$,
-    rasterGlyph$,
-    glyphCacheSize$,
     ascent$,
     descent$,
     wrap$,
-    ShapedRun,
-    RasterGlyph
+    ShapedRun
 } from "runtime:text";
 
-export { ShapedRun, RasterGlyph };
+export { ShapedRun };
 
 export function fontCount(): int {
     return fontCount$();
@@ -27,14 +24,6 @@ export function shape(text: str, size: float): ShapedRun {
 
 export function measure(text: str, size: float): float {
     return shape$(text, size).width;
-}
-
-export function rasterGlyph(ch: str, size: float): RasterGlyph {
-    return rasterGlyph$(ch, size);
-}
-
-export function glyphCacheSize(): int {
-    return glyphCacheSize$();
 }
 
 export function ascent(size: float): float {
