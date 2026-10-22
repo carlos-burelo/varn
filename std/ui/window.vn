@@ -33,8 +33,8 @@ export class UiWindow {
         this.id = id;
     }
 
-    static open(title: str, w: int, h: int): UiWindow {
-        return new UiWindow(open$(title, w, h));
+    static open(title: str, w: int, h: int, headless: bool = true): UiWindow {
+        return new UiWindow(open$(title, w, h, headless));
     }
 
     close(): void {

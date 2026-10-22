@@ -188,12 +188,12 @@ varn_contract! {
     module: "runtime:ui",
     contract: "src/modules/runtime/ui/ui_runtime.vn",
     impl UiRuntime {
-        fn open(_ctx: &mut dyn NativeCtx, title: &str, w: i64, h: i64) -> Result<i64, String> {
+        fn open(_ctx: &mut dyn NativeCtx, title: &str, w: i64, h: i64, headless: bool) -> Result<i64, String> {
             if w <= 0 || h <= 0 {
                 return Err(format!("ui.open: bad size ({w}x{h})"));
             }
             let mut all = windows().lock();
-            let real = if w <= u32::MAX as i64 && h <= u32::MAX as i64 {
+            let real = if !headless && w <= u32::MAX as i64 && h <= u32::MAX as i64 {
                 drop(all);
                 let r = varn_ui::try_open(title, w as u32, h as u32);
                 all = windows().lock();

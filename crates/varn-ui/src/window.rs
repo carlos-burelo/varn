@@ -79,9 +79,6 @@ fn new_event_loop() -> Option<EventLoop<()>> {
 }
 
 pub fn try_open(title: &str, w: u32, h: u32) -> Option<u64> {
-    if std::env::var("VARN_UI_REAL").as_deref() != Ok("1") {
-        return None;
-    }
     if w == 0 || h == 0 {
         return None;
     }

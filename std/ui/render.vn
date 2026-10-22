@@ -4,6 +4,7 @@ import { Focus } from "std:ui/focus";
 import { Widget, PaintContext } from "std:ui/widget/base";
 import { KEY_ESCAPE } from "std:ui/keys";
 import { beginFrame, endFrame } from "std:ui/state";
+import { args } from "std:sys/args";
 
 export function present(win: UiWindow, fr: UiFrame): void {
     win.present();
@@ -25,8 +26,13 @@ export function render(win: UiWindow, fr: UiFrame, focus: Focus, root: Widget, x
     fr.modal = modal;
 }
 
+const HEADLESS_FRAMES: int = 5;
+const HEADLESS_FLAG: str = "--headless";
+
 export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w: int = 800, h: int = 600, bg: int = 0xFF14161A, maxFrames: int = 0): void {
-    using win = UiWindow.open(title, w, h);
+    const headless = args().indexOf(HEADLESS_FLAG) >= 0;
+    const limit = maxFrames > 0 ? maxFrames : (headless ? HEADLESS_FRAMES : 0);
+    using win = UiWindow.open(title, w, h, headless);
     const fr = new UiFrame(w, h);
     const focus = new Focus();
     let frames = 0;
@@ -42,7 +48,7 @@ export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w:
         endFrame();
         present(win, fr);
         frames = frames + 1;
-        if (maxFrames > 0 && frames >= maxFrames) {
+        if (limit > 0 && frames >= limit) {
             break;
         }
     }

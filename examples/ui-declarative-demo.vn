@@ -2,7 +2,6 @@ import {
     Column, Row, Text, Title, Headline, Caption, Card, Button, ButtonKind, Checkbox, Each, Progress, Divider, Spacer,
     signal, computed, effect, component, run, Widget, MainAxis, Theme, UiFrame, Focus
 } from "std:ui";
-import { Env } from "std:env";
 
 type Todo = { id: int, title: str, done: bool };
 
@@ -55,9 +54,5 @@ function Dashboard(): Widget {
     ], pad: 24.0, gap: 16.0);
 }
 
-const real = Env.get("VARN_UI_REAL") == "1";
-if (!real) {
-    print("headless: 5 frames. Run with VARN_UI_REAL=1 to open a window (Esc closes).");
-}
-run("varn declarative ui", build: (fr: UiFrame, focus: Focus): Widget => Dashboard(), w: 560, h: 640, maxFrames: real ? 0 : 5);
+run("varn declarative ui", build: (fr: UiFrame, focus: Focus): Widget => Dashboard(), w: 560, h: 640);
 print("declarative demo done");

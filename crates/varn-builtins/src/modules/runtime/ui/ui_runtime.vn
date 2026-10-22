@@ -43,7 +43,7 @@ export interface UiEvent {
 }
 
 @permission("ui")
-export declare function open$(title: str, w: int, h: int): int;
+export declare function open$(title: str, w: int, h: int, headless: bool): int;
 @permission("ui")
 export declare function close$(id: int): void;
 @permission("ui")

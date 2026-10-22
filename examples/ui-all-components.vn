@@ -1,0 +1,125 @@
+import {
+    Column, Row, Text, Title, Headline, Caption, Card, Box, Button, ButtonKind, Checkbox, Switch, Slider, Input,
+    Segmented, Tabs, Select, Dialog, Toaster, Toasts, Scroll, Each, Grid, Table, Progress, Divider, Spacer,
+    Padding, Stack, Expanded, MainAxis, Theme, Colors, UiFrame, Focus, Widget,
+    signal, computed, effect, component, run
+} from "std:ui";
+
+type Task = { id: int, title: str, done: bool };
+
+const name = signal("");
+const notes = signal("");
+const volume = signal(0.6);
+const dark = signal(true);
+const notify = signal(false);
+const choice = signal(0);
+const tab = signal(0);
+const pick = signal(0);
+const menuOpen = signal(false);
+const dialogOpen = signal(false);
+const scrollAt = signal(0.0);
+const count = signal(0);
+const toaster = new Toaster();
+const tasks = signal<Task[]>([
+    { id: 1, title: "wire the egui controls", done: true },
+    { id: 2, title: "port the text field", done: false },
+    { id: 3, title: "record the demo", done: false }
+]);
+const remaining = computed(() => tasks.value.filter((t: Task): bool => !t.done).length);
+
+function toggleTask(id: int): void {
+    tasks.update((all: Task[]): Task[] =>
+        all.map((t: Task): Task => t.id == id ? { id: t.id, title: t.title, done: !t.done } : t)
+    );
+}
+
+function rows(n: int): Widget[] {
+    const out: Widget[] = [];
+    for (let i = 0; i < n; i = i + 1) {
+        out.push(Box(color: i % 2 == 0 ? Colors.transparent : Theme.colors.outline, pad: 8.0, child: Text(`row ${i + 1}`)));
+    }
+    return out;
+}
+
+function basics(): Widget {
+    return Card([
+        Title("Typography and layout"),
+        Caption("Caption text sits under a title"),
+        Row([
+            Headline("Headline"),
+            Spacer(),
+            Text(`count ${count.value}`, color: Theme.colors.primary)
+        ], mainAxis: MainAxis.spaceBetween),
+        Divider(),
+        Row([
+            Button("minus", () => count.update((n: int): int => n - 1), kind: ButtonKind.subtle),
+            Button("plus", () => count.update((n: int): int => n + 1)),
+            Button("notify", () => toaster.show(`clicked ${count.value} times`), kind: ButtonKind.danger),
+            Button("dialog", () => dialogOpen.set(true), enabled: !dialogOpen.value)
+        ])
+    ], title: "Basics");
+}
+
+function controls(): Widget {
+    return Card([
+        Title("Form controls"),
+        Input(name, hint: "Your name"),
+        Row([Checkbox(notify), Text("Notify me")], gap: 10.0),
+        Row([Switch(dark), Text(dark.value ? "Dark" : "Light")], gap: 10.0),
+        Row([Slider(volume, low: 0.0, high: 1.0, h: 28.0), Text(`${volume.value}`)], gap: 12.0),
+        Progress(volume.value),
+        Segmented(["Small", "Medium", "Large"], choice),
+        Select(["red", "green", "blue"], pick, menuOpen, 40.0)
+    ], title: "Controls");
+}
+
+function tasksView(): Widget {
+    return Card([
+        Row([Title("Tasks"), Caption(`${remaining.value} left`)], mainAxis: MainAxis.spaceBetween),
+        Each(tasks.value, (t: Task, at: int): Widget => Row([
+            Checkbox(t.done, onChange: (next: bool) => toggleTask(t.id)),
+            Text(t.title, color: t.done ? Theme.colors.muted : Theme.colors.onSurface)
+        ]), gap: 8.0)
+    ], title: "Lists");
+}
+
+function dataView(): Widget {
+    return Card([
+        Title("Tables and grids"),
+        Table(["Name", "Role"], [["Ana", "design"], ["Luis", "compiler"], ["Mia", "runtime"]]),
+        Grid([Text("a"), Text("b"), Text("c"), Text("d")], 2),
+        Scroll(Column(rows(12), gap: 4.0), scrollAt, 120.0)
+    ], title: "Data");
+}
+
+function tabsView(): Widget {
+    return Card([
+        Tabs(["Overview", "Details"], [
+            Text("Tabs switch between pages."),
+            Text("Each page is a widget tree.")
+        ], tab)
+    ], title: "Navigation");
+}
+
+function overlays(): Widget {
+    return Stack([
+        Column([basics(), controls(), tasksView(), dataView(), tabsView()], gap: 16.0, pad: 16.0),
+        Dialog(dialogOpen, "Confirm", [
+            Text("This dialog is an egui-backed overlay."),
+            Row([
+                Button("close", () => dialogOpen.set(false), kind: ButtonKind.subtle),
+                Button("ok", () => { dialogOpen.set(false); toaster.show("confirmed"); })
+            ])
+        ]),
+        Toasts(toaster)
+    ]);
+}
+
+@component
+function Gallery(): Widget {
+    effect(() => print(`tasks left: ${remaining.value}`));
+    return Scroll(overlays(), signal(0.0));
+}
+
+run("varn all components", build: (fr: UiFrame, focus: Focus): Widget => Gallery(), w: 640, h: 800);
+print("all components demo done");
