@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { fontCount, fonts, shape, measure, ascent, descent, wrap } from "std:text";
+import { fontCount, fonts, shape, measure, ascent, descent, wrap } from "std:ui/text";
 
 await describe("216 text shaping", async () => {
     await it("system fonts discovered", () => {

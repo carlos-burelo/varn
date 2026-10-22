@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { measure } from "std:text";
+import { measure } from "std:ui/text";
 
 class Holder {
     overlayPass: bool = false;

@@ -1,4 +1,4 @@
-import { measure, ascent, descent } from "std:text";
+import { measure, ascent, descent } from "std:ui/text";
 
 export function pad(x: float, y: float, w: float, h: float, p: float): float[] {
     return [x + p, y + p, w - 2.0 * p, h - 2.0 * p];

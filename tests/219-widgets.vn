@@ -5,7 +5,7 @@ import {
     Checkbox, Each, Spacer, Divider,
     MOUSE_LEFT, UiInjectKind
 } from "std:ui";
-import { measure, ascent, descent } from "std:text";
+import { measure, ascent, descent } from "std:ui/text";
 
 function tapEnter(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
     win.inject(UiInjectKind.Key, 13, 1, 0);

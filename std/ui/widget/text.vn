@@ -1,7 +1,7 @@
 import { Widget, Size, PaintContext } from "std:ui/widget/base";
 import { TextStyle, textSizeFor, textColorFor } from "std:ui/style";
 import { textX, textY, ellipsize } from "std:ui/layout";
-import { measure, ascent, descent } from "std:text";
+import { measure, ascent, descent } from "std:ui/text";
 
 export enum TextAlign {
     left,

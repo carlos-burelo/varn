@@ -11,7 +11,7 @@ import {
     UiEventKind, UiInjectKind
 } from "std:ui";
 import { pad, row, col, textX, textY, ellipsize } from "std:ui/layout";
-import { measure, ascent, descent } from "std:text";
+import { measure, ascent, descent } from "std:ui/text";
 
 function drawField(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
     fr.update(win);

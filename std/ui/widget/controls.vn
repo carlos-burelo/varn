@@ -5,7 +5,7 @@ import { hit } from "std:ui/keys";
 import { Signal } from "std:signals";
 import { TextEdit } from "std:ui/edit";
 import { textX, textY } from "std:ui/layout";
-import { measure, ascent, descent } from "std:text";
+import { measure, ascent, descent } from "std:ui/text";
 import { now } from "std:time";
 
 const BUTTON_PAD = 20.0;
