@@ -28,23 +28,12 @@ varn_macros::varn_enum! {
     pub enum UiControlKind;
 }
 
-struct Event {
-    kind: UiEventKind,
-    key: i64,
-    pressed: bool,
-    x: i64,
-    y: i64,
-    button: i64,
-    w: i64,
-    h: i64,
-}
-
 struct Window {
     alive: bool,
     closed: bool,
     w: i64,
     h: i64,
-    events: VecDeque<Event>,
+    events: VecDeque<varn_ui::RealEvent>,
     commands: Vec<DrawCmd>,
     real: Option<u64>,
     canvas: varn_ui::Canvas,
@@ -52,95 +41,10 @@ struct Window {
     typed: Vec<varn_ui::TextChange>,
 }
 
-fn real_poll(id: u64) -> Vec<Event> {
-    let mut out = Vec::new();
-    let Ok(evs) = varn_ui::take_events(id) else {
-        return out;
-    };
-    for e in evs {
-        out.push(match e {
-            varn_ui::RealEvent::Key { key, pressed } => Event {
-                kind: UiEventKind::Key,
-                key,
-                pressed,
-                x: 0,
-                y: 0,
-                button: 0,
-                w: 0,
-                h: 0,
-            },
-            varn_ui::RealEvent::Mouse {
-                x,
-                y,
-                button,
-                pressed,
-            } => Event {
-                kind: UiEventKind::Mouse,
-                key: 0,
-                pressed,
-                x,
-                y,
-                button,
-                w: 0,
-                h: 0,
-            },
-            varn_ui::RealEvent::Resize { w, h } => Event {
-                kind: UiEventKind::Resize,
-                key: 0,
-                pressed: false,
-                x: 0,
-                y: 0,
-                button: 0,
-                w,
-                h,
-            },
-            varn_ui::RealEvent::Wheel { dy } => Event {
-                kind: UiEventKind::Wheel,
-                key: 0,
-                pressed: false,
-                x: 0,
-                y: dy,
-                button: 0,
-                w: 0,
-                h: 0,
-            },
-            varn_ui::RealEvent::Close => Event {
-                kind: UiEventKind::Close,
-                key: 0,
-                pressed: false,
-                x: 0,
-                y: 0,
-                button: 0,
-                w: 0,
-                h: 0,
-            },
-        });
-    }
-    out
-}
-
 static WINDOWS: OnceLock<Mutex<Vec<Option<Window>>>> = OnceLock::new();
 
 fn windows() -> &'static Mutex<Vec<Option<Window>>> {
     WINDOWS.get_or_init(|| Mutex::new(Vec::new()))
-}
-
-fn to_real(e: &Event) -> varn_ui::RealEvent {
-    match e.kind {
-        UiEventKind::Key => varn_ui::RealEvent::Key {
-            key: e.key,
-            pressed: e.pressed,
-        },
-        UiEventKind::Mouse => varn_ui::RealEvent::Mouse {
-            x: e.x,
-            y: e.y,
-            button: e.button,
-            pressed: e.pressed,
-        },
-        UiEventKind::Resize => varn_ui::RealEvent::Resize { w: e.w, h: e.h },
-        UiEventKind::Wheel => varn_ui::RealEvent::Wheel { dy: e.y },
-        UiEventKind::Close => varn_ui::RealEvent::Close,
-    }
 }
 
 fn with_win<T>(id: i64, f: impl FnOnce(&mut Window) -> Result<T, String>) -> Result<T, String> {
@@ -156,25 +60,32 @@ fn with_win<T>(id: i64, f: impl FnOnce(&mut Window) -> Result<T, String>) -> Res
     f(w)
 }
 
-fn event_obj(ctx: &mut dyn NativeCtx, e: &Event) -> Result<VmValue, String> {
-    let kind = e.kind.to_value(ctx)?;
-    Ok(UiEvent {
-        kind,
-        key: e.key,
-        pressed: e.pressed,
-        x: e.x,
-        y: e.y,
-        button: e.button,
-        w: e.w,
-        h: e.h,
-    }
-    .alloc(ctx))
+fn real_poll(id: u64) -> Vec<varn_ui::RealEvent> {
+    varn_ui::take_events(id).unwrap_or_default()
+}
+
+fn ui_event(ctx: &mut dyn NativeCtx, e: &varn_ui::RealEvent) -> Result<VmValue, String> {
+    let (kind, key, pressed, x, y, button, w, h) = match *e {
+        varn_ui::RealEvent::Key { key, pressed } => (UiEventKind::Key, key, pressed, 0, 0, 0, 0, 0),
+        varn_ui::RealEvent::Mouse { x, y, button, pressed } => (UiEventKind::Mouse, 0, pressed, x, y, button, 0, 0),
+        varn_ui::RealEvent::Resize { w, h } => (UiEventKind::Resize, 0, false, 0, 0, 0, w, h),
+        varn_ui::RealEvent::Wheel { dy } => (UiEventKind::Wheel, 0, false, 0, dy, 0, 0, 0),
+        varn_ui::RealEvent::Close => (UiEventKind::Close, 0, false, 0, 0, 0, 0, 0),
+    };
+    let kind = kind.to_value(ctx)?;
+    Ok(UiEvent { kind, key, pressed, x, y, button, w, h }.alloc(ctx))
 }
 
 varn_macros::varn_record! {
     contract: "src/modules/runtime/ui/ui_runtime.vn",
     interface: "TypedText",
     struct TypedText;
+}
+
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    interface: "DrawnItem",
+    struct DrawnItem;
 }
 
 varn_macros::varn_record! {
@@ -245,19 +156,19 @@ varn_contract! {
                 .ok_or_else(|| "ui.inject: kind is not a UiInjectKind".to_string())?;
             with_win(id, |w| {
                 let e = match inject {
-                    UiInjectKind::Key => Event { kind: UiEventKind::Key, key: a, pressed: b != 0, x: 0, y: 0, button: 0, w: 0, h: 0 },
-                    UiInjectKind::Mouse => Event { kind: UiEventKind::Mouse, key: 0, pressed: false, x: a, y: b, button: c, w: 0, h: 0 },
-                    UiInjectKind::MouseDown => Event { kind: UiEventKind::Mouse, key: 0, pressed: true, x: a, y: b, button: c, w: 0, h: 0 },
-                    UiInjectKind::MouseUp => Event { kind: UiEventKind::Mouse, key: 0, pressed: false, x: a, y: b, button: c, w: 0, h: 0 },
+                    UiInjectKind::Key => varn_ui::RealEvent::Key { key: a, pressed: b != 0 },
+                    UiInjectKind::Mouse => varn_ui::RealEvent::Mouse { x: a, y: b, button: c, pressed: false },
+                    UiInjectKind::MouseDown => varn_ui::RealEvent::Mouse { x: a, y: b, button: c, pressed: true },
+                    UiInjectKind::MouseUp => varn_ui::RealEvent::Mouse { x: a, y: b, button: c, pressed: false },
                     UiInjectKind::Resize => {
                         w.w = a;
                         w.h = b;
-                        Event { kind: UiEventKind::Resize, key: 0, pressed: false, x: 0, y: 0, button: 0, w: a, h: b }
+                        varn_ui::RealEvent::Resize { w: a, h: b }
                     }
-                    UiInjectKind::Wheel => Event { kind: UiEventKind::Wheel, key: 0, pressed: false, x: 0, y: a, button: 0, w: 0, h: 0 },
+                    UiInjectKind::Wheel => varn_ui::RealEvent::Wheel { dy: a },
                     UiInjectKind::Close => {
                         w.closed = true;
-                        Event { kind: UiEventKind::Close, key: 0, pressed: false, x: 0, y: 0, button: 0, w: 0, h: 0 }
+                        varn_ui::RealEvent::Close
                     }
                 };
                 w.events.push_back(e);
@@ -269,16 +180,16 @@ varn_contract! {
             if let Some(h) = real {
                 let _ = varn_ui::pump(h);
                 for e in real_poll(h) {
-                    let is_close = e.kind == UiEventKind::Close;
-                    let is_resize = e.kind == UiEventKind::Resize;
-                    let (rw, rh) = (e.w, e.h);
                     with_win(id, |w| {
-                        if is_close {
-                            w.closed = true;
-                        }
-                        if is_resize {
-                            w.w = rw;
-                            w.h = rh;
+                        match e {
+                            varn_ui::RealEvent::Close => w.closed = true,
+                            varn_ui::RealEvent::Resize { w: rw, h: rh } => {
+                                w.w = rw;
+                                w.h = rh;
+                            }
+                            varn_ui::RealEvent::Key { .. }
+                            | varn_ui::RealEvent::Mouse { .. }
+                            | varn_ui::RealEvent::Wheel { .. } => {}
                         }
                         w.events.push_back(e);
                         Ok(())
@@ -288,13 +199,13 @@ varn_contract! {
             let drained = with_win(id, |w| {
                 let drained = std::mem::take(&mut w.events);
                 for e in &drained {
-                    w.canvas.feed(&to_real(e));
+                    w.canvas.feed(e);
                 }
                 Ok(drained)
             })?;
             let mut out = Vec::with_capacity(drained.len());
             for e in &drained {
-                out.push(event_obj(ctx, e)?);
+                out.push(ui_event(ctx, e)?);
             }
             Ok(out)
         }
@@ -465,9 +376,26 @@ varn_contract! {
             varn_ui::named_key_code(name)
                 .ok_or_else(|| format!("ui.keyCode: unknown key '{name}'"))
         }
-        fn commands(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, String> {
+        fn drawn(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, String> {
             let cmds = with_win(id, |win| Ok(win.commands.clone()))?;
-            Ok(cmds.iter().map(|c| ctx.alloc_str_owned(ui_draw::format(c))).collect())
+            Ok(cmds
+                .iter()
+                .map(|c| {
+                    let d = ui_draw::describe(c);
+                    let kind = ctx.alloc_str(d.kind);
+                    let text = ctx.alloc_str_owned(d.text);
+                    DrawnItem {
+                        kind,
+                        x: d.x,
+                        y: d.y,
+                        w: d.w,
+                        h: d.h,
+                        color: d.color,
+                        text,
+                    }
+                    .alloc(ctx)
+                })
+                .collect())
         }
     }
 }

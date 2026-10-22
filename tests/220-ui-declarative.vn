@@ -267,7 +267,7 @@ await describe("220 ui declarative", async () => {
         const focus = new Focus();
         win.clear(Theme.colors.surface);
         renderTree(win, fr, focus, tree);
-        expect(win.commands().length > 0).toBe(true);
+        expect(win.drawn().length > 0).toBe(true);
         expect(win.present() > 0).toBe(true);
     });
     await it("component state survives frames", () => {

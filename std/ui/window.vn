@@ -15,16 +15,17 @@ import {
     field$,
     typed$,
     activated$,
-    commands$,
+    drawn$,
     real$,
     UiEvent,
     UiEventKind,
     UiInjectKind,
     UiControlKind,
-    TypedText
+    TypedText,
+    DrawnItem
 } from "runtime:ui";
 
-export { UiEvent, UiEventKind, UiInjectKind, UiControlKind, TypedText };
+export { UiEvent, UiEventKind, UiInjectKind, UiControlKind, TypedText, DrawnItem };
 
 export class UiWindow {
     id: int;
@@ -105,7 +106,7 @@ export class UiWindow {
         return real$(this.id);
     }
 
-    commands(): str[] {
-        return commands$(this.id);
+    drawn(): DrawnItem[] {
+        return drawn$(this.id);
     }
 }

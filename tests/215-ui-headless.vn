@@ -75,12 +75,12 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         win.clear(0);
         win.rect(10.0, 20.0, 100.0, 50.0, 4278190335);
         win.text(10.0, 80.0, "hola", 16.0, 4294967295);
-        const cmds = win.commands();
+        const cmds = win.drawn();
         expect(cmds.length).toBe(3);
-        expect(cmds[0]).toBe("clear 0");
-        expect(cmds[2]).toBe("text 10 80 16 4294967295 hola");
+        expect(cmds[0].kind).toBe("clear");
+        expect(cmds[2].kind == "text" && cmds[2].text == "hola" && cmds[2].x == 10.0 && cmds[2].y == 80.0).toBe(true);
         expect(win.present()).toBe(3);
-        expect(win.commands().length).toBe(0);
+        expect(win.drawn().length).toBe(0);
     });
 
     await it("close event and destroyed handle", () => {

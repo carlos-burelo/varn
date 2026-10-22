@@ -50,6 +50,6 @@ await describe("layout v2 (planned)", async () => {
         const focus = new Focus();
         const tree = Box(w: 1000.0, minW: 0.0, maxW: 200.0, child: Text("x"));
         render(win, fr, focus, tree, 0.0, 0.0, 960.0, 300.0);
-        expect(win.commands().some((c: str): bool => c.startsWith("rect 0 0 200"))).toBe(true);
+        expect(win.drawn().some((c: DrawnItem): bool => c.kind == "rect" && c.x == 0.0 && c.y == 0.0 && c.w == 200.0)).toBe(true);
     });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { UiWindow, UiFrame, Focus, Widget, render, present, signal, Button, Column, Box, Dialog, Toaster, Toasts, Select, UiInjectKind, MOUSE_LEFT } from "std:ui";
+import { UiWindow, UiFrame, Focus, Widget, render, present, signal, Button, Column, Box, Dialog, Toaster, Toasts, Select, UiInjectKind, MOUSE_LEFT, DrawnItem } from "std:ui";
 
 function drawFrame(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
     fr.update(win);
@@ -76,8 +76,8 @@ await describe("246 ui overlays", async () => {
         const tree = Toasts(toaster);
         render(win, fr, focus, tree, 0.0, 0.0, 400.0, 300.0);
         win.clear(0);
-        const texts = win.commands().filter((c: str): bool => c.indexOf("saved") >= 0);
+        const texts = win.drawn().filter((c: DrawnItem): bool => c.kind == "text" && c.text.indexOf("saved") >= 0);
         expect(texts.length).toBe(1);
-        expect(win.commands().filter((c: str): bool => c.indexOf("gone") >= 0).length).toBe(0);
+        expect(win.drawn().filter((c: DrawnItem): bool => c.kind == "text" && c.text.indexOf("gone") >= 0).length).toBe(0);
     });
 });

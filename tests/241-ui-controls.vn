@@ -159,6 +159,7 @@ await describe("241 ui controls", async () => {
         const focus = new Focus();
         win.clear(0);
         render(win, fr, focus, Button("go", onPress: () => {}, kind: ButtonKind.danger), 0.0, 0.0, 100.0, 40.0);
-        expect(win.commands()[1].endsWith(" Button 0 0 100 40 4294925404 false")).toBe(true);
+        const button = win.drawn()[1];
+        expect(button.kind == "control" && button.text == "Button" && button.x == 0.0 && button.w == 100.0 && button.h == 40.0 && button.color == 4294925404).toBe(true);
     });
 });

@@ -7,13 +7,12 @@ import {
 
 function rects(win: UiWindow): float[][] {
     const out: float[][] = [];
-    for (const cmd of win.commands()) {
-        const parts = cmd.split(" ");
-        if (parts[0] == "rect") {
-            out.push([float.parse(parts[1]), float.parse(parts[2]), float.parse(parts[3]), float.parse(parts[4])]);
+    for (const cmd of win.drawn()) {
+        if (cmd.kind == "rect") {
+            out.push([cmd.x, cmd.y, cmd.w, cmd.h]);
         }
-        if (parts[0] == "control") {
-            out.push([float.parse(parts[3]), float.parse(parts[4]), float.parse(parts[5]), float.parse(parts[6])]);
+        if (cmd.kind == "control") {
+            out.push([cmd.x, cmd.y, cmd.w, cmd.h]);
         }
     }
     return out;

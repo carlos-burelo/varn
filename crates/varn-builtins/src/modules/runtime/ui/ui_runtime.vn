@@ -71,11 +71,21 @@ export declare function control$(window: int, cid: int, kind: UiControlKind, x: 
 @permission("ui")
 export declare function activated$(id: int): float[];
 @permission("ui")
-export declare function commands$(id: int): str[];
+export declare function drawn$(id: int): DrawnItem[];
 @permission("ui")
 export declare function real$(id: int): bool;
 @permission("ui")
 export declare function keyCode$(name: str): int;
+
+export interface DrawnItem {
+    kind: str;
+    x: float;
+    y: float;
+    w: float;
+    h: float;
+    color: int;
+    text: str;
+}
 
 export interface TypedText {
     id: int;

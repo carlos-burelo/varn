@@ -43,29 +43,61 @@ pub enum DrawCmd {
     },
 }
 
-pub fn format(cmd: &DrawCmd) -> String {
+pub struct Described {
+    pub kind: &'static str,
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+    pub color: i64,
+    pub text: String,
+}
+
+pub fn describe(cmd: &DrawCmd) -> Described {
+    let blank = |kind: &'static str| Described {
+        kind,
+        x: 0.0,
+        y: 0.0,
+        w: 0.0,
+        h: 0.0,
+        color: 0,
+        text: String::new(),
+    };
     match cmd {
-        DrawCmd::Clear(c) => format!("clear {c}"),
-        DrawCmd::Rect {
-            x,
-            y,
-            w,
-            h,
-            color,
-            radius,
-        } => format!("rect {x} {y} {w} {h} {color} {radius}"),
-        DrawCmd::Text {
-            x,
-            y,
-            s,
-            size,
-            color,
-        } => format!("text {x} {y} {size} {color} {s}"),
-        DrawCmd::Clip { x, y, w, h } => format!("clip {x} {y} {w} {h}"),
-        DrawCmd::Unclip => "unclip".to_string(),
-        DrawCmd::Control { id, kind, x, y, w, h, color, flag, .. } => {
-            format!("control {id} {kind:?} {x} {y} {w} {h} {color} {flag}")
-        }
+        DrawCmd::Clear(c) => Described { color: *c, ..blank("clear") },
+        DrawCmd::Rect { x, y, w, h, color, .. } => Described {
+            x: *x,
+            y: *y,
+            w: *w,
+            h: *h,
+            color: *color,
+            ..blank("rect")
+        },
+        DrawCmd::Text { x, y, s, size, color } => Described {
+            x: *x,
+            y: *y,
+            h: *size,
+            color: *color,
+            text: s.clone(),
+            ..blank("text")
+        },
+        DrawCmd::Clip { x, y, w, h } => Described {
+            x: *x,
+            y: *y,
+            w: *w,
+            h: *h,
+            ..blank("clip")
+        },
+        DrawCmd::Unclip => blank("unclip"),
+        DrawCmd::Control { kind, x, y, w, h, color, .. } => Described {
+            x: *x,
+            y: *y,
+            w: *w,
+            h: *h,
+            color: *color,
+            text: format!("{kind:?}"),
+            ..blank("control")
+        },
     }
 }
 

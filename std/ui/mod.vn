@@ -1,4 +1,4 @@
-export { UiWindow, UiEvent, UiEventKind, UiInjectKind } from "std:ui/window";
+export { UiWindow, UiEvent, UiEventKind, UiInjectKind, DrawnItem } from "std:ui/window";
 export { UiFrame } from "std:ui/frame";
 export { Focus } from "std:ui/focus";
 export { TextEdit } from "std:ui/edit";
