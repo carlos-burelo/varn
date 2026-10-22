@@ -140,13 +140,13 @@ await describe("219 widgets", async () => {
         expect(n > 0).toBe(true);
     });
 
-    await it("spacer divider and run own the loop", () => {
+    await it("spacer divider and run own the loop, building once", () => {
         const builds: int[] = [];
         run("t", build: (fr: UiFrame, focus: Focus) => {
             builds.push(1);
             return Column([Spacer(), Divider(), Text("x")]);
         }, w: 200, h: 100, maxFrames: 3);
-        expect(builds.length).toBe(3);
+        expect(builds.length).toBe(1);
     });
 
     await it("field submits and clears on enter", () => {

@@ -6,6 +6,7 @@ import { Widget, PaintContext, paintAt, nextLayoutEpoch } from "std:ui/widget/ba
 import { KEY_ESCAPE } from "std:ui/keys";
 import { beginFrame, endFrame } from "std:ui/state";
 import { args } from "std:sys/args";
+import { computed } from "std:signals";
 
 export function present(win: UiWindow, fr: UiFrame): void {
     present$(win.id);
@@ -37,6 +38,7 @@ export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w:
     using win = UiWindow.open(title, w, h, headless);
     const fr = new UiFrame(w, h);
     const focus = new Focus();
+    const root = computed((): Widget => build(fr, focus));
     let frames = 0;
     while (!fr.closed) {
         fr.update(win);
@@ -45,8 +47,7 @@ export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w:
         }
         win.clear(bg);
         beginFrame();
-        const root = build(fr, focus);
-        render(win, fr, focus, root, 0.0, 0.0, w as float, h as float);
+        render(win, fr, focus, root.value, 0.0, 0.0, w as float, h as float);
         endFrame();
         present(win, fr);
         frames = frames + 1;

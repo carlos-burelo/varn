@@ -218,7 +218,7 @@ await describe("220 ui declarative", async () => {
             return tree;
         }, w: 400, h: 200, maxFrames: 4);
         expect(seen[0]).toBe("clicks: 0");
-        expect(seen.length).toBe(4);
+        expect(seen.length).toBe(1);
         expect(boots).toBe(1);
     });
 
@@ -228,7 +228,7 @@ await describe("220 ui declarative", async () => {
             builds.push(1);
             return Counter();
         }, w: 200, h: 100, maxFrames: 3);
-        expect(builds.length).toBe(3);
+        expect(builds.length).toBe(1);
     });
 
     await it("theme and style resolve", () => {

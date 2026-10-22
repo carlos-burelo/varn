@@ -1,0 +1,56 @@
+import { describe, it, expect } from "std:test";
+import { UiWindow, UiFrame, Focus, Widget, Text, TextNode, FlexNode, Column, render, component, expanded, signal, computed, Readable } from "std:ui";
+import { beginFrame, endFrame } from "std:ui/state";
+
+const name = signal("a");
+
+@component()
+function Greeting(): Widget {
+    return Text(name.value);
+}
+
+function paint(win: UiWindow, fr: UiFrame, focus: Focus, root: Readable<Widget>): void {
+    win.clear(0);
+    beginFrame();
+    render(win, fr, focus, root.value, 0.0, 0.0, 300.0, 200.0);
+    endFrame();
+}
+
+await describe("254 reactive layout", async () => {
+    await it("root rebuilds only when a signal its build read changes", () => {
+        using win = UiWindow.open("t", 300, 200, true);
+        const fr = new UiFrame(300, 200);
+        const focus = new Focus();
+        const read = signal(0);
+        const unread = signal(0);
+        const builds: int[] = [];
+        const root = computed((): Widget => {
+            builds.push(1);
+            return Text(`${read.value}`);
+        });
+        paint(win, fr, focus, root);
+        paint(win, fr, focus, root);
+        paint(win, fr, focus, root);
+        expect(builds.length).toBe(1);
+        unread.set(1);
+        paint(win, fr, focus, root);
+        expect(builds.length).toBe(1);
+        read.set(1);
+        paint(win, fr, focus, root);
+        expect(builds.length).toBe(2);
+        expect((root.value as TextNode).text).toBe("1");
+    });
+
+    await it("a component re-expands when a signal its body reads changes", () => {
+        using win = UiWindow.open("t", 300, 200, true);
+        const fr = new UiFrame(300, 200);
+        const focus = new Focus();
+        const tree = Column([Greeting()]);
+        const root = computed((): Widget => tree);
+        paint(win, fr, focus, root);
+        expect((expanded((tree as FlexNode).children[0]) as TextNode).text).toBe("a");
+        name.set("b");
+        paint(win, fr, focus, root);
+        expect((expanded((tree as FlexNode).children[0]) as TextNode).text).toBe("b");
+    });
+});

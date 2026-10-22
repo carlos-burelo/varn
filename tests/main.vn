@@ -244,6 +244,7 @@ import "./250-layout-parity.vn"
 import "./251-keyed-each.vn"
 import "./252-responsive.vn"
 import "./253-text-consistency.vn"
+import "./254-ui-reactive.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

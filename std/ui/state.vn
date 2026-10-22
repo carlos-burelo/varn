@@ -1,4 +1,4 @@
-import { Owner, SlotKind } from "std:signals";
+import { Computed, Owner, Signal, SlotKind, computed, withOwner } from "std:signals";
 
 class Held {
     kind: SlotKind;
@@ -99,10 +99,48 @@ export function scopeAtMount(definition: int): ComponentScope {
     touched.add(key);
     const existing = owners.get(key);
     if (existing !== null) {
-        existing.rewind();
         return existing;
     }
     const fresh = new ComponentScope();
     owners.set(key, fresh);
     return fresh;
+}
+
+export class View<T> {
+    private _scope: ComponentScope?;
+    private _body: Signal<(() => T)?>;
+    private _cell: Computed<T>? = null;
+
+    constructor(scope: ComponentScope?) {
+        this._scope = scope;
+        this._body = new Signal<(() => T)?>(null, null);
+    }
+
+    describe(body: () => T): T {
+        this._body.set(body);
+        const existing = this._cell;
+        if (existing !== null) {
+            return existing.value;
+        }
+        const fresh = computed((): T => this.produce());
+        this._cell = fresh;
+        return fresh.value;
+    }
+
+    dispose(): void {
+        const cell = this._cell;
+        if (cell !== null) {
+            cell.dispose();
+        }
+    }
+
+    private produce(): T {
+        const body = this._body.value as () => T;
+        const scope = this._scope;
+        if (scope === null) {
+            return body();
+        }
+        scope.rewind();
+        return withOwner(scope, body);
+    }
 }
