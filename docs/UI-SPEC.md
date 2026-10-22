@@ -24,8 +24,18 @@ Module: `std:ui`
 > cruzado. Por defecto `start` en columna y `center` en fila.
 > Puertas: `tests/220-ui-declarative.vn`, `tests/232-ui-layout.vn`,
 > `tests/241-ui-controls.vn`, `tests/235-signals.vn`, `tests/238-signals-tasks.vn`.
-> Pendiente: `Scroll`, `Dialog`, `Select` y `Toast` (necesitan recorte, rueda y capas
-> en `runtime:ui`), el decorador `pure` (§12) y la UI IR (§16–§17).
+> Overlays: `Dialog(open, title, body)` (modal, el velo cierra al pulsar fuera),
+> `Select(options, value)` (ancla y lista que se cierra al elegir o al pulsar
+> fuera) y `Toaster`/`Toasts` (no modal, expiran por tiempo). Un overlay modal
+> bloquea los clics del árbol en el fotograma siguiente a su apertura: decidir el
+> bloqueo antes de procesar los clics del árbol es el coste de hacerlo en pintado.
+> `Scroll(child, offset, h)`: rueda, desplazamiento acotado, recorte del contenido
+> y barra. El recorte es una sola operación (`PaintContext.clip`) que aplica el
+> recorte de GPU y el de los clics a la vez.
+> Puertas añadidas: `tests/243-ui-clip.vn`, `tests/244-ui-wheel.vn`,
+> `tests/245-ui-scroll.vn`, `tests/246-ui-overlays.vn`, `tests/247-top-level-using.vn`.
+> Pendiente: el pintado en GPU de runs con recorte no está verificado en pantalla
+> (solo compila; el suite es headless). El decorador `pure` (§12) y la UI IR (§16–§17).
 
 ## 1. Objetivo
 
