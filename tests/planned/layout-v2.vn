@@ -1,0 +1,98 @@
+import { describe, it, expect } from "std:test";
+import { UiWindow, UiFrame, Focus, Widget, Column, Row, Text, Box, Field, Responsive, Adaptive, WindowClass, Each, Expanded, TextEdit, render, present, signal, UiInjectKind, MOUSE_LEFT } from "std:ui";
+
+function frameAt(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, w: float): void {
+    fr.update(win);
+    win.clear(0xFF000000);
+    render(win, fr, focus, tree, 0.0, 0.0, w, 300.0);
+    present(win, fr);
+}
+
+await describe("layout v2 (planned)", async () => {
+    await it("Responsive picks the branch of the window class", () => {
+        using win = UiWindow.open("t", 960, 300);
+        const fr = new UiFrame(960, 300);
+        const focus = new Focus();
+        const tree = Responsive((cls: WindowClass, c: Constraints): Widget => match cls {
+            compact => Text("compact"),
+            medium => Text("medium"),
+            expanded => Text("expanded"),
+        });
+        frameAt(win, fr, focus, tree, 320.0);
+        expect(win.commands().some((c: str): bool => c.indexOf("compact") >= 0)).toBe(true);
+        frameAt(win, fr, focus, tree, 700.0);
+        expect(win.commands().some((c: str): bool => c.indexOf("medium") >= 0)).toBe(true);
+        frameAt(win, fr, focus, tree, 900.0);
+        expect(win.commands().some((c: str): bool => c.indexOf("expanded") >= 0)).toBe(true);
+    });
+
+    await it("the builder runs once per class, not once per width", () => {
+        using win = UiWindow.open("t", 960, 300);
+        const fr = new UiFrame(960, 300);
+        const focus = new Focus();
+        const builds = signal(0);
+        const tree = Responsive((cls: WindowClass, c: Constraints): Widget => {
+            builds.set(builds.peek() + 1);
+            return Text("x");
+        });
+        for (let w = 320; w < 600; w = w + 7) {
+            frameAt(win, fr, focus, tree, w as float);
+        }
+        expect(builds.value).toBe(1);
+    });
+
+    await it("Adaptive values change the layout without rebuilding children", () => {
+        using win = UiWindow.open("t", 960, 300);
+        const fr = new UiFrame(960, 300);
+        const focus = new Focus();
+        const tree = Column([Box(h: 10.0), Box(h: 10.0)], gap: Adaptive({ compact: 4.0, medium: 8.0, expanded: 16.0 }));
+        frameAt(win, fr, focus, tree, 320.0);
+        const compactGap = win.commands().length;
+        frameAt(win, fr, focus, tree, 900.0);
+        expect(win.commands().length).toBe(compactGap);
+    });
+
+    await it("a field outside Responsive keeps its text when the class changes", () => {
+        using win = UiWindow.open("t", 960, 300);
+        const fr = new UiFrame(960, 300);
+        const focus = new Focus();
+        const ed = new TextEdit();
+        ed.text = "kept";
+        const tree = Column([
+            Field(edit: ed, hint: "name"),
+            Responsive((cls: WindowClass, c: Constraints): Widget => match cls {
+                compact => Text("a"),
+                medium => Text("b"),
+                expanded => Column([Text("c"), Text("d")]),
+            })
+        ]);
+        frameAt(win, fr, focus, tree, 320.0);
+        frameAt(win, fr, focus, tree, 900.0);
+        expect(ed.text).toBe("kept");
+    });
+
+    await it("each keeps item state when the list is reordered", () => {
+        using win = UiWindow.open("t", 960, 300);
+        const fr = new UiFrame(960, 300);
+        const focus = new Focus();
+        const items = signal(["a", "b"]);
+        const store = new Map<str, TextEdit>();
+        store.set("a", new TextEdit());
+        store.set("b", new TextEdit());
+        store.get("a")!.text = "first";
+        const build = (): Widget => Each(items.value, (s: str): str => s, (s: str): Widget => Field(edit: store.get(s)!, hint: s));
+        frameAt(win, fr, focus, build(), 320.0);
+        items.set(["b", "a"]);
+        frameAt(win, fr, focus, build(), 320.0);
+        expect(store.get("a")!.text).toBe("first");
+    });
+
+    await it("box minW and maxW bound the child size", () => {
+        using win = UiWindow.open("t", 960, 300);
+        const fr = new UiFrame(960, 300);
+        const focus = new Focus();
+        const tree = Box(w: 1000.0, minW: 0.0, maxW: 200.0, child: Text("x"));
+        render(win, fr, focus, tree, 0.0, 0.0, 960.0, 300.0);
+        expect(win.commands().some((c: str): bool => c.startsWith("rect 0 0 200"))).toBe(true);
+    });
+});
