@@ -27,17 +27,17 @@ export class BoxNode extends Widget {
         return this.fit(new Size(inner.w + 2.0 * this.pad, inner.h + 2.0 * this.pad));
     }
 
-    override layout(c: Constraints): Placement {
+    override computeLayout(c: Constraints): Placement {
         const pad = this.pad;
         const child = this.child;
-        let inner = new Size(0.0, 0.0);
-        if (child !== null) {
-            inner = child.layout(Constraints.loose(c.maxW - 2.0 * pad, c.maxH - 2.0 * pad)).size;
-        }
+        const measured = child === null ? null : child.layout(Constraints.loose(c.maxW - 2.0 * pad, c.maxH - 2.0 * pad));
+        const inner = measured === null ? new Size(0.0, 0.0) : measured.size;
         const size = c.fit(this.fit(new Size(inner.w + 2.0 * pad, inner.h + 2.0 * pad)));
         const children: Placement[] = [];
         if (child !== null) {
-            const placed = child.layout(Constraints.tight(size.w - 2.0 * pad, size.h - 2.0 * pad));
+            const wantW = size.w - 2.0 * pad;
+            const wantH = size.h - 2.0 * pad;
+            const placed = (measured !== null && measured.size.w == wantW && measured.size.h == wantH) ? measured : child.layout(Constraints.tight(wantW, wantH));
             placed.x = pad;
             placed.y = pad;
             children.push(placed);
@@ -78,6 +78,27 @@ export class StackNode extends Widget {
         return this.fit(new Size(width, height));
     }
 
+    override computeLayout(c: Constraints): Placement {
+        let width = 0.0;
+        let height = 0.0;
+        for (let child of this.children) {
+            const size = child.layout(c).size;
+            width = size.w > width ? size.w : width;
+            height = size.h > height ? size.h : height;
+        }
+        const size = c.fit(this.fit(new Size(width, height)));
+        const children: Placement[] = [];
+        for (let child of this.children) {
+            const probe = child.layout(Constraints.loose(size.w, size.h));
+            const cw = probe.size.w < size.w ? probe.size.w : size.w;
+            const ch = probe.size.h < size.h ? probe.size.h : size.h;
+            const placed = (probe.size.w == cw && probe.size.h == ch) ? probe : child.layout(Constraints.tight(cw, ch));
+            placed.x = alignedX(this.alignment, size.w - cw);
+            placed.y = alignedY(this.alignment, size.h - ch);
+            children.push(placed);
+        }
+        return new Placement(this, size, children);
+    }
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         for (let child of this.children) {
             const size = child.measure(w, h);
@@ -109,6 +130,24 @@ export class PaddingNode extends Widget {
         return this.fit(new Size(inner.w + this.left + this.right, inner.h + this.top + this.bottom));
     }
 
+    override computeLayout(c: Constraints): Placement {
+        const horizontal = this.left + this.right;
+        const vertical = this.top + this.bottom;
+        const child = this.child;
+        const measured = child === null ? null : child.layout(Constraints.loose(c.maxW - horizontal, c.maxH - vertical));
+        const inner = measured === null ? new Size(0.0, 0.0) : measured.size;
+        const size = c.fit(this.fit(new Size(inner.w + horizontal, inner.h + vertical)));
+        const children: Placement[] = [];
+        if (child !== null) {
+            const wantW = size.w - horizontal < 0.0 ? 0.0 : size.w - horizontal;
+            const wantH = size.h - vertical < 0.0 ? 0.0 : size.h - vertical;
+            const placed = (measured !== null && measured.size.w == wantW && measured.size.h == wantH) ? measured : child.layout(Constraints.tight(wantW, wantH));
+            placed.x = this.left;
+            placed.y = this.top;
+            children.push(placed);
+        }
+        return new Placement(this, size, children);
+    }
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         const cw = w - this.left - this.right;
         const ch = h - this.top - this.bottom;
@@ -130,6 +169,18 @@ export class SizedBoxNode extends Widget {
         return this.fit(measureChild(this.child, maxW, maxH));
     }
 
+    override computeLayout(c: Constraints): Placement {
+        const child = this.child;
+        const measured = child === null ? null : child.layout(c);
+        const inner = measured === null ? new Size(0.0, 0.0) : measured.size;
+        const size = c.fit(this.fit(inner));
+        const children: Placement[] = [];
+        if (child !== null) {
+            const placed = (measured !== null && measured.size.w == size.w && measured.size.h == size.h) ? measured : child.layout(Constraints.tight(size.w, size.h));
+            children.push(placed);
+        }
+        return new Placement(this, size, children);
+    }
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
         paintChild(this.child, cx, x, y, w, h);
     }
@@ -144,7 +195,7 @@ export class ExpandedNode extends Widget {
         this.flex = flex;
     }
 
-    override layout(c: Constraints): Placement {
+    override computeLayout(c: Constraints): Placement {
         const placed = this.child.layout(c);
         return new Placement(this, placed.size, [placed]);
     }

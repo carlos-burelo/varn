@@ -64,7 +64,7 @@ export class FlexNode extends Widget {
         return this.fit(natural);
     }
 
-    override layout(c: Constraints): Placement {
+    override computeLayout(c: Constraints): Placement {
         const horizontal = this.axis == Axis.horizontal;
         const pad = this.pad;
         const inner = c.deflate(pad);

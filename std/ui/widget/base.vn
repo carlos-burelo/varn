@@ -125,7 +125,21 @@ export class Placement {
     }
 }
 
+function sameKey(a: float[], b: float[]): bool {
+    if (a.length != b.length) {
+        return false;
+    }
+    for (let i = 0; i < a.length; i = i + 1) {
+        if (a[i] != b[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 export abstract class Widget {
+    layoutKey: float[] = [];
+    layoutValue: Placement? = null;
     w: float = -1.0;
     h: float = -1.0;
     flex: float = 0.0;
@@ -139,6 +153,18 @@ export abstract class Widget {
     }
 
     layout(c: Constraints): Placement {
+        const key = [c.minW, c.maxW, c.minH, c.maxH];
+        const cached = this.layoutValue;
+        if (cached !== null && sameKey(this.layoutKey, key)) {
+            return cached;
+        }
+        const placed = this.computeLayout(c);
+        this.layoutKey = key;
+        this.layoutValue = placed;
+        return placed;
+    }
+
+    computeLayout(c: Constraints): Placement {
         return new Placement(this, c.fit(this.measure(c.maxW, c.maxH)), []);
     }
 }
