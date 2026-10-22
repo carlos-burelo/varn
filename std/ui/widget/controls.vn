@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Placement } from "std:ui/widget/base";
 import { Theme, ButtonKind, buttonColorFor, buttonTextColorFor } from "std:ui/style";
 import { UiControlKind } from "std:ui/window";
 import { hit } from "std:ui/keys";
@@ -75,7 +75,9 @@ export class ButtonNode extends Widget {
         this.enabled = enabled;
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
         if (this.enabled) {
             cx.click(UiControlKind.Button, x, y, w, h, this.color, false, this.onPress);
         } else {
@@ -107,7 +109,9 @@ export class FieldNode extends Widget {
         return this.fit(new Size(maxW, this.h));
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
         const slot = cx.idFor();
         const ed = this.edit ?? ownedEdit(slot);
         const kind = this.multiline ? UiControlKind.Area : UiControlKind.Field;
@@ -136,7 +140,9 @@ export class InputNode extends Widget {
         return this.fit(new Size(maxW, this.h));
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
         const slot = cx.idFor();
         const ed = ownedEdit(slot);
         ed.text = this.value;

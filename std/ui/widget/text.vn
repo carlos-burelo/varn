@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Placement } from "std:ui/widget/base";
 import { TextStyle, textSizeFor, textColorFor } from "std:ui/style";
 import { textX, textY, ellipsize } from "std:ui/layout";
 import { measure, ascent, descent } from "std:ui/text";
@@ -32,7 +32,9 @@ export class TextNode extends Widget {
         return this.fit(new Size(width < maxW ? width : maxW, ascent(this.size) + descent(this.size)));
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
         const ty = textY(y, h, this.size);
         if (this.align == TextAlign.center) {
             cx.win.text(textX(x, w, this.text, this.size), ty, this.text, this.size, this.color);

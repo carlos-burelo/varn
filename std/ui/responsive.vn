@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Constraints, Placement } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement, paintPlaced } from "std:ui/widget/base";
 import { Theme } from "std:ui/style";
 
 export enum WindowClass {
@@ -80,18 +80,14 @@ export class ResponsiveNode extends Widget {
         return fresh;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return this.childFor(windowClassOf(maxW)).measure(maxW, maxH);
-    }
 
     override computeLayout(c: Constraints): Placement {
         const placed = this.childFor(windowClassOf(c.maxW)).layout(c);
         return new Placement(this, placed.size, [placed]);
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        const cls = windowClassOf(w);
-        cx.keyed(classKey(cls), () => this.childFor(cls).paint(cx, x, y, w, h));
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        cx.keyed(classKey(this.cachedClass), () => paintPlaced(cx, p.children[0], x, y));
     }
 }
 

@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Constraints, Placement } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement, paintPlaced } from "std:ui/widget/base";
 import { Signal, signal } from "std:signals";
 import { UiControlKind } from "std:ui/window";
 
@@ -16,12 +16,9 @@ export class ScrollNode extends Widget {
         this.h = h;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return this.fit(new Size(maxW, maxH));
-    }
 
     override computeLayout(c: Constraints): Placement {
-        const size = c.fit(this.measure(c.maxW, c.maxH));
+        const size = c.fit(this.fit(new Size(c.maxW, c.maxH)));
         const child = this.child;
         const content = child.layout(Constraints.loose(size.w - BAR_WIDTH, CONTENT_UNBOUNDED)).size.h;
         const overflow = content > size.h ? content - size.h : 0.0;
@@ -30,19 +27,21 @@ export class ScrollNode extends Widget {
         const placed = child.layout(Constraints.tight(size.w - BAR_WIDTH, content));
         placed.x = 0.0;
         placed.y = 0.0 - bounded;
-        return new Placement(this, size, [placed]);
+        const out = new Placement(this, size, [placed]);
+        out.data = [bounded, content];
+        return out;
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        const content = this.child.measure(w - BAR_WIDTH, CONTENT_UNBOUNDED).h;
-        const overflow = content > h ? content - h : 0.0;
-        const at = this.offset.peek();
-        const bounded = at < 0.0 ? 0.0 : (at > overflow ? overflow : at);
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
+        const bounded = p.data[0];
+        const content = p.data[1];
         cx.valued(UiControlKind.Scroll, x, y, w, h, 0, false, bounded, 0.0, content, (next: float) => {
             this.offset.set(next);
         });
         cx.clip(x, y, w, h);
-        cx.keyed("child", () => this.child.paint(cx, x, y - bounded, w - BAR_WIDTH, content));
+        cx.keyed("child", () => paintPlaced(cx, p.children[0], x, y));
         cx.unclip();
     }
 }

@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Constraints, Placement } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement, paintAt } from "std:ui/widget/base";
 import { Card, Box } from "std:ui/widget/box";
 import { Text } from "std:ui/widget/text";
 import { hit } from "std:ui/keys";
@@ -35,7 +35,9 @@ export class DialogNode extends Widget {
         return new Size(0.0, 0.0);
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
         if (this.open.peek()) {
             cx.overlay((layer: PaintContext) => paintDialog(layer, this.open, this.title, this.body), true);
         }
@@ -48,7 +50,7 @@ function paintDialog(cx: PaintContext, open: Signal<bool>, title: str, body: Wid
     const vh = fr.h as float;
     const width = DIALOG_WIDTH < vw - 2.0 * DIALOG_MARGIN ? DIALOG_WIDTH : vw - 2.0 * DIALOG_MARGIN;
     const panel = Card(body, title: title, w: width);
-    const size = panel.measure(width, vh);
+    const size = panel.layout(Constraints.loose(width, vh)).size;
     const px = (vw - width) / 2.0;
     const py = (vh - size.h) / 2.0;
     cx.win.rect(0.0, 0.0, vw, vh, SCRIM, 0.0);
@@ -57,7 +59,7 @@ function paintDialog(cx: PaintContext, open: Signal<bool>, title: str, body: Wid
             open.set(false);
         }
     });
-    panel.paint(cx, px, py, width, size.h);
+    paintAt(panel, cx, px, py, width, size.h);
 }
 
 export function Dialog(open: Signal<bool>, title: str, body: Widget[]): Widget {
@@ -93,7 +95,9 @@ export class ToastsNode extends Widget {
         return new Size(0.0, 0.0);
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
         cx.overlay((layer: PaintContext) => paintToasts(layer, this.toaster), false);
     }
 }
@@ -105,8 +109,8 @@ function paintToasts(cx: PaintContext, toaster: Toaster): void {
     let bottom = (cx.fr.h as float) - TOAST_BOTTOM;
     for (let i = live.length - 1; i >= 0; i = i - 1) {
         const card = Box(Text(live[i].text), color: Theme.colors.surface, radius: 8.0, pad: 12.0, w: TOAST_W);
-        const size = card.measure(TOAST_W, bottom);
-        card.paint(cx, (vw - TOAST_W) / 2.0, bottom - size.h, TOAST_W, size.h);
+        const size = card.layout(Constraints.loose(TOAST_W, bottom)).size;
+        paintAt(card, cx, (vw - TOAST_W) / 2.0, bottom - size.h, TOAST_W, size.h);
         bottom = bottom - size.h - TOAST_GAP;
     }
 }
@@ -132,12 +136,14 @@ export class SelectNode extends Widget {
         return this.fit(new Size(maxW, this.h));
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
         const anchor = this.h;
         const at = this.value.peek();
         const label = at >= 0 && at < this.options.length ? this.options[at] : "";
         cx.win.rect(x, y, w, anchor, Theme.colors.outline, 8.0);
-        Text(label).paint(cx, x + 12.0, y, w - 24.0, anchor);
+        paintAt(Text(label), cx, x + 12.0, y, w - 24.0, anchor);
         cx.click(UiControlKind.Surface, x, y, w, anchor, 0, false, () => {
             this.open.set(!this.open.peek());
         });
@@ -167,7 +173,7 @@ function paintOptions(cx: PaintContext, options: str[], value: Signal<int>, open
         if (i == value.peek()) {
             cx.win.rect(ax + 4.0, rowY + 2.0, aw - 8.0, SELECT_ROW_H - 4.0, Theme.colors.outline, 6.0);
         }
-        Text(options[i]).paint(cx, ax + 12.0, rowY, aw - 24.0, SELECT_ROW_H);
+        paintAt(Text(options[i]), cx, ax + 12.0, rowY, aw - 24.0, SELECT_ROW_H);
         selectRow(cx, value, open, i, ax, rowY, aw);
     }
     const inside = hit(fr.mouseX as float, fr.mouseY as float, ax, top, aw, listH)

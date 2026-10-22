@@ -134,6 +134,7 @@ export class Placement {
     x: float;
     y: float;
     children: Placement[];
+    data: float[] = [];
 
     constructor(node: Widget, size: Size, children: Placement[]) {
         this.node = node;
@@ -142,6 +143,12 @@ export class Placement {
         this.y = 0.0;
         this.children = children;
     }
+}
+
+let layoutEpoch: float = 0.0;
+
+export function nextLayoutEpoch(): void {
+    layoutEpoch = layoutEpoch + 1.0;
 }
 
 function sameKey(a: float[], b: float[]): bool {
@@ -164,15 +171,17 @@ export abstract class Widget {
     flex: float = 0.0;
     fills: bool = false;
 
-    abstract measure(maxW: float, maxH: float): Size;
-    abstract paint(cx: PaintContext, x: float, y: float, w: float, h: float): void;
+    measure(maxW: float, maxH: float): Size {
+        return this.layout(Constraints.loose(maxW, maxH)).size;
+    }
+    abstract paint(cx: PaintContext, p: Placement, x: float, y: float): void;
 
     fit(natural: Size): Size {
         return new Size(this.w >= 0.0 ? this.w : natural.w, this.h >= 0.0 ? this.h : natural.h);
     }
 
     layout(c: Constraints): Placement {
-        const key = [c.minW, c.maxW, c.minH, c.maxH];
+        const key = [c.minW, c.maxW, c.minH, c.maxH, layoutEpoch];
         const cached = this.layoutValue;
         if (cached !== null && sameKey(this.layoutKey, key)) {
             return cached;
@@ -200,17 +209,14 @@ export class KeyedNode extends Widget {
         this.fills = child.fills;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return this.child.measure(maxW, maxH);
-    }
 
     override computeLayout(c: Constraints): Placement {
         const placed = this.child.layout(c);
         return new Placement(this, placed.size, [placed]);
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        cx.keyed(this.key, () => this.child.paint(cx, x, y, w, h));
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        cx.keyed(this.key, () => paintPlaced(cx, p.children[0], x, y));
     }
 }
 
@@ -222,18 +228,14 @@ export function paintSlot(cx: PaintContext, child: Widget, position: str, paint:
     }
 }
 
-export function paintChild(child: Widget?, cx: PaintContext, x: float, y: float, w: float, h: float): void {
-    if (child !== null) {
-        child.paint(cx, x, y, w, h);
-    }
+export function paintAt(child: Widget, cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    child.paint(cx, child.layout(Constraints.tight(w, h)), x, y);
 }
 
-export function measureChild(child: Widget?, maxW: float, maxH: float): Size {
-    if (child === null) {
-        return new Size(0.0, 0.0);
-    }
-    return child.measure(maxW, maxH);
+export function paintPlaced(cx: PaintContext, child: Placement, x: float, y: float): void {
+    child.node.paint(cx, child, x + child.x, y + child.y);
 }
+
 
 export function alignedX(alignment: Alignment, room: float): float {
     if (alignment == Alignment.topLeft || alignment == Alignment.centerLeft || alignment == Alignment.bottomLeft) {

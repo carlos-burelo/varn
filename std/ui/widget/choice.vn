@@ -1,4 +1,4 @@
-import { Widget } from "std:ui/widget/base";
+import { Widget, PaintContext, Placement } from "std:ui/widget/base";
 import { Column, Row } from "std:ui/widget/flex";
 import { Box, Expanded, Divider } from "std:ui/widget/box";
 import { Text } from "std:ui/widget/text";

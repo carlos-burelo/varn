@@ -4026,6 +4026,7 @@ dependencies = [
  "parking_lot",
  "pollster",
  "rustc-hash 1.1.0",
+ "varn-text",
  "wgpu",
  "winit",
 ]

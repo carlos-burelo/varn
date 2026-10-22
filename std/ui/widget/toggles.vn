@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Placement } from "std:ui/widget/base";
 import { current, writer } from "std:ui/widget/bound";
 import { Theme } from "std:ui/style";
 import { Signal } from "std:signals";
@@ -22,7 +22,9 @@ export class CheckboxNode extends Widget {
         return new Size(this.w, this.h);
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
         cx.click(UiControlKind.Checkbox, x, y, w, h, this.color, this.checked, this.onToggle);
     }
 }
@@ -43,7 +45,9 @@ export class SwitchNode extends Widget {
         return new Size(this.w, this.h);
     }
 
-    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        const w = p.size.w;
+        const h = p.size.h;
         cx.click(UiControlKind.Switch, x, y, w, h, Theme.colors.primary, this.on, this.onToggle);
     }
 }

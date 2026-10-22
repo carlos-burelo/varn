@@ -1,4 +1,4 @@
-import { Widget, KeyedNode } from "std:ui/widget/base";
+import { Widget, KeyedNode, Placement } from "std:ui/widget/base";
 import { Column, Row } from "std:ui/widget/flex";
 import { Expanded, Divider, Spacer } from "std:ui/widget/box";
 import { Text, Caption } from "std:ui/widget/text";
