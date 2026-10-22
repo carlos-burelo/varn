@@ -14,8 +14,10 @@ export class UiFrame {
     repeated: int[];
     closed: bool;
     resized: bool;
+    wheel: int;
     w: int;
     h: int;
+    clips: float[][];
 
     constructor(w: int, h: int) {
         this.mouseX = 0;
@@ -30,6 +32,8 @@ export class UiFrame {
         this.repeated = [];
         this.closed = false;
         this.resized = false;
+        this.wheel = 0;
+        this.clips = [];
         this.w = w;
         this.h = h;
     }
@@ -40,6 +44,7 @@ export class UiFrame {
         this.pressed = [];
         this.repeated = [];
         this.resized = false;
+        this.wheel = 0;
         const evs = win.poll();
         for (let i = 0; i < evs.length; i = i + 1) {
             const e = evs[i];
@@ -72,6 +77,8 @@ export class UiFrame {
                 this.resized = true;
                 this.w = e.w;
                 this.h = e.h;
+            } else if (e.kind == UiEventKind.Wheel) {
+                this.wheel = this.wheel + e.y;
             } else if (e.kind == UiEventKind.Close) {
                 this.closed = true;
             }
@@ -84,8 +91,27 @@ export class UiFrame {
 
     clicked(rx: float, ry: float, rw: float, rh: float): bool {
         return this.leftReleased
+            && this.visible(this.mouseX as float, this.mouseY as float)
+            && this.visible(this.downX as float, this.downY as float)
             && hit(this.mouseX as float, this.mouseY as float, rx, ry, rw, rh)
             && hit(this.downX as float, this.downY as float, rx, ry, rw, rh);
+    }
+
+    pushClip(x: float, y: float, w: float, h: float): void {
+        this.clips.push([x, y, w, h]);
+    }
+
+    popClip(): void {
+        this.clips.pop();
+    }
+
+    visible(px: float, py: float): bool {
+        for (let clip of this.clips) {
+            if (!hit(px, py, clip[0], clip[1], clip[2], clip[3])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static contains(xs: int[], v: int): bool {

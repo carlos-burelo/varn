@@ -85,6 +85,16 @@ fn real_poll(id: u64) -> Vec<Event> {
                 w,
                 h,
             },
+            varn_ui::RealEvent::Wheel { dy } => Event {
+                kind: UiEventKind::Wheel,
+                key: 0,
+                pressed: false,
+                x: 0,
+                y: dy,
+                button: 0,
+                w: 0,
+                h: 0,
+            },
             varn_ui::RealEvent::Close => Event {
                 kind: UiEventKind::Close,
                 key: 0,
@@ -207,6 +217,7 @@ varn_contract! {
                         w.h = b;
                         Event { kind: UiEventKind::Resize, key: 0, pressed: false, x: 0, y: 0, button: 0, w: a, h: b }
                     }
+                    UiInjectKind::Wheel => Event { kind: UiEventKind::Wheel, key: 0, pressed: false, x: 0, y: a, button: 0, w: 0, h: 0 },
                     UiInjectKind::Close => {
                         w.closed = true;
                         Event { kind: UiEventKind::Close, key: 0, pressed: false, x: 0, y: 0, button: 0, w: 0, h: 0 }

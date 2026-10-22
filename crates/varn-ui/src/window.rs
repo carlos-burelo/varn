@@ -10,6 +10,8 @@ use winit::window::{Window, WindowAttributes, WindowId};
 use super::events::{button_code, key_code, pressed, RealEvent};
 use super::render;
 
+const LINE_PX: f64 = 40.0;
+
 struct WindowState {
     win_ptr: *mut Window,
     surface: Option<wgpu::Surface<'static>>,
@@ -321,6 +323,15 @@ impl ApplicationHandler for PumpApp {
                         pressed: pressed(state),
                     });
                 }
+                WindowEvent::MouseWheel { delta, .. } => {
+                    let dy = match delta {
+                        winit::event::MouseScrollDelta::LineDelta(_, lines) => {
+                            (lines as f64 * LINE_PX) as i64
+                        }
+                        winit::event::MouseScrollDelta::PixelDelta(p) => p.y as i64,
+                    };
+                    st.queue.push(RealEvent::Wheel { dy });
+                }
                 WindowEvent::Resized(s) => {
                     st.size = (s.width, s.height);
                     st.queue.push(RealEvent::Resize {
@@ -366,7 +377,6 @@ impl ApplicationHandler for PumpApp {
                 | WindowEvent::Ime(_)
                 | WindowEvent::CursorEntered { .. }
                 | WindowEvent::CursorLeft { .. }
-                | WindowEvent::MouseWheel { .. }
                 | WindowEvent::PinchGesture { .. }
                 | WindowEvent::PanGesture { .. }
                 | WindowEvent::DoubleTapGesture { .. }

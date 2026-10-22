@@ -1,0 +1,15 @@
+import { describe, it, expect } from "std:test";
+import { UiWindow, UiFrame, UiInjectKind } from "std:ui";
+
+await describe("244 ui wheel", async () => {
+    await it("wheel events accumulate into the frame for one update", () => {
+        using win = UiWindow.open("t", 200, 100);
+        const fr = new UiFrame(200, 100);
+        win.inject(UiInjectKind.Wheel, -40, 0, 0);
+        win.inject(UiInjectKind.Wheel, -15, 0, 0);
+        fr.update(win);
+        expect(fr.wheel).toBe(-55);
+        fr.update(win);
+        expect(fr.wheel).toBe(0);
+    });
+});

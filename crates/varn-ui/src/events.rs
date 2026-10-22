@@ -16,6 +16,9 @@ pub enum RealEvent {
         w: i64,
         h: i64,
     },
+    Wheel {
+        dy: i64,
+    },
     Close,
 }
 
