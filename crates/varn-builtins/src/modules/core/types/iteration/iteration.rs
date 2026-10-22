@@ -22,8 +22,17 @@ varn_contract! {
     }
     class: "AsyncGenerator",
     impl AsyncGeneratorImpl {
-        fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, NativeError> {
-            resume(ctx, this)
+        fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+            match resume(ctx, this) {
+                Ok(task) => task,
+                Err(error) => {
+                    let thrown = match error.thrown {
+                        Some(value) => value,
+                        None => ctx.alloc_str_owned(error.message),
+                    };
+                    ctx.task_rejected(thrown)
+                }
+            }
         }
         fn close(ctx: &mut dyn NativeCtx, this: VmValue) {
             ctx.close_generator(this);

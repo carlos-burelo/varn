@@ -134,6 +134,7 @@ impl ExecCtx {
         self.queue().push_ready(super::scheduler::ReadyTask {
             start: super::scheduler::Start::Fresh(task),
             output: Rc::clone(&output),
+            step: None,
         });
         self.pump_until(&output);
         output

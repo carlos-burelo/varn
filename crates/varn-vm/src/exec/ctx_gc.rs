@@ -55,6 +55,9 @@ impl ExecCtx {
         for lazy in &scope.lazies {
             lazy.trace_cells(&mut |c| value(&mut roots, c.get()));
         }
+        for state in &scope.gens {
+            state.trace(&mut |v| value(&mut roots, v));
+        }
         for &frozen in &scope.frozen {
             let st: &super::scheduler::Frozen = unsafe { &*frozen };
             st.trace(&mut |v| value(&mut roots, v));

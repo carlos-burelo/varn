@@ -10,12 +10,12 @@ export declare class Generator<T> {
 }
 
 /**
- * What `async function*` produces. Same shape as `Generator<T>` on purpose:
- * the driver settles the body's awaits inside `next()` before returning, so
- * the caller gets a settled `Option<T>` rather than a task to await.
+ * What `async function*` produces. `next()` returns a task: the body runs on
+ * the scheduler until its next `yield`, and the caller awaits that result
+ * without blocking whatever it waits on.
  */
 export declare class AsyncGenerator<T> {
-    @fallible next(): Option<T>;
+    next(): Task<Option<T>>;
     close(): void;
 }
 

@@ -298,6 +298,9 @@ impl NativeCtx for ExecCtx {
             .heap
             .generator_of(generator)
             .ok_or_else(|| varn_types::NativeError::from("generator.next: invalid receiver"))?;
+        if state.is_async {
+            return Ok(self.step_generator_task(&state));
+        }
         self.resume_generator(&state, input)
             .map_err(varn_types::NativeError::from)
     }

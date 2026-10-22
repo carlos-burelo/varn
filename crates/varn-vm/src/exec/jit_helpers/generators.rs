@@ -24,7 +24,7 @@ pub(crate) extern "C" fn jit_generator_enter(
             return 0;
         };
         let result = if state.is_async {
-            ctx_ref.resume_generator(&state, input)
+            Ok(ctx_ref.step_generator_task(&state))
         } else {
             match ctx_ref.enter_generator(&state, input) {
                 Ok(Entry::Done(v)) => Ok(v),

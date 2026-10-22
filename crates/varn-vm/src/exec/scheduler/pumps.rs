@@ -112,6 +112,7 @@ pub(crate) struct GcScope {
     pub(crate) frozen: Vec<*mut Frozen>,
     pub(crate) cells: Vec<Rc<TaskCell>>,
     pub(crate) lazies: Vec<Rc<LazyTask>>,
+    pub(crate) gens: Vec<Rc<crate::generator::GenState>>,
 }
 
 pub(crate) fn gc_scope(me: &ExecCtx) -> GcScope {
@@ -138,12 +139,14 @@ pub(crate) fn gc_scope(me: &ExecCtx) -> GcScope {
         frozen: Vec::new(),
         cells: Vec::new(),
         lazies: Vec::new(),
+        gens: Vec::new(),
     };
     for queue in queues {
         let roots = unsafe { &*queue }.collect_roots();
         scope.frozen.extend(roots.frozen);
         scope.cells.extend(roots.cells);
         scope.lazies.extend(roots.lazies);
+        scope.gens.extend(roots.gens);
     }
     with_hosts(|hosts| {
         scope

@@ -7,6 +7,7 @@ use super::queue::{Delivery, ReadyTask, Start, TaskQueue};
 use super::suspend::{freeze, thaw};
 use crate::exec::ctx::ExecCtx;
 use crate::exec::VmSuspend;
+use crate::generator::Entry;
 use crate::task::{settle, Outcome, Status, TaskCell};
 use crate::value::VmValue;
 
@@ -57,7 +58,11 @@ pub(crate) fn request_osr(ctx: &mut ExecCtx, mode: varn_types::ssa::OsrMode) {
 }
 
 pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) {
-    let ReadyTask { start, output } = ready;
+    let ReadyTask {
+        start,
+        output,
+        mut step,
+    } = ready;
     if !output.is_pending() {
         return;
     }
@@ -76,6 +81,18 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
             thaw(&mut ctx, *frozen);
             delivery
         }
+        Start::Step(state) => match ctx.enter_generator(&state, VmValue::null()) {
+            Ok(Entry::Done(finished)) => return finish(queue, ctx, &output, Ok(finished)),
+            Ok(Entry::Mounted(_)) => {
+                request_osr(&mut ctx, varn_types::ssa::OsrMode::Resume);
+                step = Some(state);
+                Delivery::Nothing
+            }
+            Err(err) => {
+                let thrown = failure_value(&mut ctx, err);
+                return finish(queue, ctx, &output, Err(thrown));
+            }
+        },
     };
     if let Delivery::Settled(cell) = delivery {
         if matches!(cell.status(), Status::Resolved) {
@@ -89,13 +106,26 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
     let result = match ctx.run() {
         Ok(result) => result,
         Err(err) => {
+            if let Some(state) = &step {
+                state.close();
+            }
             let thrown = failure_value(&mut ctx, err);
             return finish(queue, ctx, &output, Err(thrown));
         }
     };
     let (handle, dest_reg) = match ctx.vm_suspend.take() {
         Some(VmSuspend::Await { cell, dest_reg }) => (cell, dest_reg),
-        None | Some(VmSuspend::Yield { .. }) | Some(VmSuspend::DebugBreak) => {
+        suspend => {
+            if let Some(state) = step {
+                return match ctx.finish_step(&state, suspend) {
+                    Ok(stepped) => finish(queue, ctx, &output, Ok(stepped)),
+                    Err(err) => {
+                        state.close();
+                        let thrown = failure_value(&mut ctx, err);
+                        finish(queue, ctx, &output, Err(thrown))
+                    }
+                };
+            }
             return finish(queue, ctx, &output, Ok(result));
         }
     };
@@ -120,9 +150,10 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
         queue.push_ready(ReadyTask {
             start: Start::Resume(frozen, Delivery::Nothing),
             output,
+            step,
         });
     } else {
-        queue.park(output, handle, frozen);
+        queue.park(output, handle, frozen, step);
     }
 }
 

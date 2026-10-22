@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use super::suspend::Frozen;
 use crate::exec::ctx::ExecCtx;
+use crate::generator::GenState;
 use crate::task::{Inbox, LazyTask, TaskCell};
 
 const SPARE_CTX_LIMIT: usize = 8;
@@ -17,17 +18,20 @@ pub(crate) enum Delivery {
 pub(crate) enum Start {
     Fresh(Rc<LazyTask>),
     Resume(Box<Frozen>, Delivery),
+    Step(Rc<GenState>),
 }
 
 pub(crate) struct ReadyTask {
     pub(crate) start: Start,
     pub(crate) output: Rc<TaskCell>,
+    pub(crate) step: Option<Rc<GenState>>,
 }
 
 struct ParkedTask {
     output: Rc<TaskCell>,
     waiting_on: Rc<TaskCell>,
     frozen: Box<Frozen>,
+    step: Option<Rc<GenState>>,
 }
 
 struct Cell {
@@ -125,6 +129,7 @@ pub(crate) struct QueueRoots {
     pub(crate) frozen: Vec<*mut Frozen>,
     pub(crate) cells: Vec<Rc<TaskCell>>,
     pub(crate) lazies: Vec<Rc<LazyTask>>,
+    pub(crate) gens: Vec<Rc<GenState>>,
 }
 
 impl TaskQueue {
@@ -158,11 +163,18 @@ impl TaskQueue {
         !self.inbox.borrow().is_empty()
     }
 
-    pub(crate) fn park(&self, output: Rc<TaskCell>, waiting_on: Rc<TaskCell>, frozen: Box<Frozen>) {
+    pub(crate) fn park(
+        &self,
+        output: Rc<TaskCell>,
+        waiting_on: Rc<TaskCell>,
+        frozen: Box<Frozen>,
+        step: Option<Rc<GenState>>,
+    ) {
         let (index, generation) = self.local.borrow_mut().parked.insert(ParkedTask {
             output,
             waiting_on: Rc::clone(&waiting_on),
             frozen,
+            step,
         });
         waiting_on.watch(&self.inbox, token(index, generation));
     }
@@ -181,12 +193,13 @@ impl TaskQueue {
                 continue;
             }
             if parked.waiting_on.is_pending() {
-                self.park(parked.output, parked.waiting_on, parked.frozen);
+                self.park(parked.output, parked.waiting_on, parked.frozen, parked.step);
                 continue;
             }
             self.push_ready(ReadyTask {
                 start: Start::Resume(parked.frozen, Delivery::Settled(parked.waiting_on)),
                 output: parked.output,
+                step: parked.step,
             });
         }
     }
@@ -198,11 +211,16 @@ impl TaskQueue {
             frozen: Vec::new(),
             cells: Vec::new(),
             lazies: Vec::new(),
+            gens: Vec::new(),
         };
         for ready in local.ready.iter_mut() {
             roots.cells.push(Rc::clone(&ready.output));
+            if let Some(step) = &ready.step {
+                roots.gens.push(Rc::clone(step));
+            }
             match &mut ready.start {
                 Start::Fresh(lazy) => roots.lazies.push(Rc::clone(lazy)),
+                Start::Step(state) => roots.gens.push(Rc::clone(state)),
                 Start::Resume(frozen, delivery) => {
                     roots.frozen.push(&mut **frozen as *mut Frozen);
                     if let Delivery::Settled(cell) = delivery {
@@ -216,6 +234,9 @@ impl TaskQueue {
                 roots.frozen.push(&mut *parked.frozen as *mut Frozen);
                 roots.cells.push(Rc::clone(&parked.output));
                 roots.cells.push(Rc::clone(&parked.waiting_on));
+                if let Some(step) = &parked.step {
+                    roots.gens.push(Rc::clone(step));
+                }
             }
         }
         roots

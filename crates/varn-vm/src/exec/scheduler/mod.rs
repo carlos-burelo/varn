@@ -18,5 +18,6 @@ pub(crate) fn enqueue_detached(
     queue_for(exec).push_ready(ReadyTask {
         start: Start::Fresh(task),
         output,
+        step: None,
     });
 }

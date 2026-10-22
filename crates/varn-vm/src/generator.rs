@@ -149,12 +149,6 @@ impl ExecCtx {
                 Some(VmSuspend::Yield { value, dest_reg }) => {
                     return self.park_generator(generator, depth, value, dest_reg);
                 }
-                Some(VmSuspend::Await { cell, dest_reg }) if generator.is_async => {
-                    match self.settle_awaited(&cell) {
-                        Ok(resolved) => self.resolve_awaiter(dest_reg, resolved),
-                        Err(thrown) => self.reject_awaiter(thrown),
-                    }
-                }
                 Some(VmSuspend::Await { .. }) => {
                     self.abandon_generator(generator, depth);
                     return Err(RuntimeError::new(
@@ -166,6 +160,32 @@ impl ExecCtx {
                     *generator.phase.borrow_mut() = Phase::Done;
                     return self.make_option(None);
                 }
+            }
+        }
+    }
+
+    pub(crate) fn step_generator_task(&mut self, generator: &Rc<GenState>) -> VmValue {
+        let output = crate::task::TaskCell::pending();
+        crate::exec::scheduler::queue_for(self).push_ready(crate::exec::scheduler::ReadyTask {
+            start: crate::exec::scheduler::Start::Step(Rc::clone(generator)),
+            output: Rc::clone(&output),
+            step: None,
+        });
+        crate::task::alloc_handle(&mut self.heap, output)
+    }
+
+    pub(crate) fn finish_step(
+        &mut self,
+        generator: &Rc<GenState>,
+        suspend: Option<VmSuspend>,
+    ) -> VmResult<VmValue> {
+        match suspend {
+            Some(VmSuspend::Yield { value, dest_reg }) => {
+                self.park_generator(generator, 0, value, dest_reg)
+            }
+            Some(VmSuspend::Await { .. }) | Some(VmSuspend::DebugBreak) | None => {
+                generator.close();
+                self.make_option(None)
             }
         }
     }
