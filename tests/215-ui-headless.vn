@@ -359,4 +359,19 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         typeKey(win, fr, focus, tree, 90);
         expect(name.value).toBe("Z");
     });
+
+    await it("a value written to the signal reaches the field and typing continues from it", () => {
+        using win = UiWindow.open("t", 300, 120, true);
+        const fr = new UiFrame(300, 120);
+        const focus = new Focus();
+        const name = signal("");
+        const tree = Column([Field(name, hint: "name")]);
+        clickAt(win, fr, focus, tree, 60, 22);
+        name.set("ab");
+        drawField(win, fr, focus, tree);
+        drawField(win, fr, focus, tree);
+        expect(name.value).toBe("ab");
+        typeKey(win, fr, focus, tree, 90);
+        expect(name.value).toBe("abZ");
+    });
 });

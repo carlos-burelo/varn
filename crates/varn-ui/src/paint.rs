@@ -2,6 +2,7 @@ use egui::{
     emath::{pos2, vec2},
     epaint::ClippedPrimitive,
     scroll_area::State as ScrollState,
+    text::{CCursor, CCursorRange},
     Align2, Button, Checkbox, Color32, Context, Event, FontId, Key, Rect as ERect, RawInput,
     ScrollArea, Sense, Slider, TexturesDelta, Ui, UiBuilder,
 };
@@ -14,6 +15,12 @@ const FIELD_PAD: f32 = 12.0;
 const FIELD_FOCUS_GAINED: f32 = 1.0;
 const FIELD_BLURRED: f32 = 0.0;
 const FIELD_SUBMITTED: f32 = 2.0;
+
+#[derive(Clone)]
+struct FieldText {
+    model: String,
+    text: String,
+}
 
 pub struct Pass {
     pub prims: Vec<ClippedPrimitive>,
@@ -103,15 +110,24 @@ fn paint_switch(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
 fn paint_scroll(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
     let extent = c.high;
     let salt = ("vn-scroll", c.id);
+    let memory = ui.make_persistent_id(("vn-scroll-sent", c.id));
+    let mut sent = ui.data(|d| d.get_temp::<f32>(memory)).unwrap_or(c.value);
+    if (sent - c.value).abs() > 0.5 {
+        sent = c.value;
+    }
+    let forced = sent;
     let out = ui
         .scope_builder(UiBuilder::new().max_rect(rect), |ui| {
-            let id = ui.make_persistent_id(salt);
-            let stored = ScrollState::load(ui.ctx(), id).map_or(0.0, |s| s.clamped_offset().y);
             let mut area = ScrollArea::vertical()
                 .id_salt(salt)
                 .auto_shrink([false, false]);
-            if (stored - c.value).abs() > 0.5 {
-                area = area.vertical_scroll_offset(c.value);
+            if (ScrollState::load(ui.ctx(), ui.make_persistent_id(salt))
+                .map_or(0.0, |s| s.clamped_offset().y)
+                - forced)
+                .abs()
+                > 0.5
+            {
+                area = area.vertical_scroll_offset(forced);
             }
             area.show_viewport(ui, |ui, _viewport| {
                 ui.allocate_space(vec2(c.w, extent));
@@ -119,10 +135,16 @@ fn paint_scroll(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
         })
         .inner;
     let offset = out.state.clamped_offset().y;
-    ((offset - c.value).abs() > 0.5).then_some(Activation {
-        id: c.id,
-        value: offset,
-    })
+    if (offset - sent).abs() > 0.5 {
+        ui.data_mut(|d| d.insert_temp(memory, offset));
+        Some(Activation {
+            id: c.id,
+            value: offset,
+        })
+    } else {
+        ui.data_mut(|d| d.insert_temp(memory, sent));
+        None
+    }
 }
 
 fn paint_field(ui: &mut Ui, rect: ERect, c: &Control, feedback: &mut Feedback) {
@@ -131,16 +153,33 @@ fn paint_field(ui: &mut Ui, rect: ERect, c: &Control, feedback: &mut Feedback) {
         pos2(rect.left() + FIELD_PAD, rect.top()),
         pos2(rect.right() - FIELD_PAD, rect.bottom()),
     );
-    let mut text = c.text.clone();
+    let memory = ui.make_persistent_id(("vn-field-text", c.id));
+    let mut state = ui
+        .data(|d| d.get_temp::<FieldText>(memory))
+        .unwrap_or_else(|| FieldText {
+            model: c.text.clone(),
+            text: c.text.clone(),
+        });
+    let edit_id = ui.make_persistent_id(("vn-field", c.id));
+    if state.model != c.text {
+        state.model = c.text.clone();
+        state.text = c.text.clone();
+        let mut edit_state = egui::text_edit::TextEditState::load(ui.ctx(), edit_id).unwrap_or_default();
+        let end = state.text.chars().count();
+        edit_state
+            .cursor
+            .set_char_range(Some(CCursorRange::one(CCursor::new(end))));
+        edit_state.store(ui.ctx(), edit_id);
+    }
     let edit = if multiline {
-        egui::TextEdit::multiline(&mut text)
+        egui::TextEdit::multiline(&mut state.text)
     } else {
-        egui::TextEdit::singleline(&mut text)
+        egui::TextEdit::singleline(&mut state.text)
     };
     let enter = !multiline && ui.input(|i| i.key_pressed(Key::Enter));
     let response = ui.put(
         inner,
-        edit.id_salt(("vn-field", c.id))
+        edit.id(edit_id)
             .font(FontId::proportional(c.size))
             .frame(egui::Frame::NONE)
             .text_color(color(c.color))
@@ -161,8 +200,13 @@ fn paint_field(ui: &mut Ui, rect: ERect, c: &Control, feedback: &mut Feedback) {
         });
     }
     if response.changed() {
-        feedback.texts.push(TextChange { id: c.id, text });
+        state.model = state.text.clone();
+        feedback.texts.push(TextChange {
+            id: c.id,
+            text: state.text.clone(),
+        });
     }
+    ui.data_mut(|d| d.insert_temp(memory, state));
     if enter && (response.has_focus() || response.lost_focus()) {
         feedback.activations.push(Activation {
             id: c.id,

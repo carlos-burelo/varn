@@ -45,6 +45,23 @@ await describe("245 ui scroll", async () => {
         expect(at.value).toBe(0.0);
     });
 
+    await it("an offset set from outside sticks, and the wheel moves on from it", () => {
+        using win = UiWindow.open("t", 200, 100, true);
+        const fr = new UiFrame(200, 100);
+        const focus = new Focus();
+        const at = signal(0.0);
+        const tree = Scroll(Column(rows(10), gap: 0.0), at, 100.0);
+        frameAt(win, fr, focus, tree);
+        at.set(60.0);
+        settle(win, fr, focus, tree);
+        expect(at.value).toBe(60.0);
+        win.inject(UiInjectKind.Mouse, 50, 50, 0);
+        frameAt(win, fr, focus, tree);
+        win.inject(UiInjectKind.Wheel, -40, 0, 0);
+        settle(win, fr, focus, tree);
+        expect(at.value > 99.0 && at.value < 101.0).toBe(true);
+    });
+
     await it("the content is clipped to the viewport", () => {
         using win = UiWindow.open("t", 200, 100, true);
         const fr = new UiFrame(200, 100);
