@@ -121,6 +121,10 @@ export class FlexNode extends Widget {
             let span = this.mainOf(measuredChild.size);
             if (child.flex > 0.0) {
                 span = leftover * child.flex / flexTotal;
+                const floor = horizontal ? child.minWidth() : child.minHeight();
+                if (span < floor) {
+                    span = floor;
+                }
             }
             let thick = this.crossOf(measuredChild.size);
             let shift = 0.0;

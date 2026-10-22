@@ -46,6 +46,22 @@ export class BoxNode extends Widget {
         return new Placement(this, size, children);
     }
 
+    override minWidth(): float {
+        if (this.w >= 0.0) {
+            return this.w;
+        }
+        const child = this.child;
+        return 2.0 * this.pad + (child === null ? 0.0 : child.minWidth());
+    }
+
+    override minHeight(): float {
+        if (this.h >= 0.0) {
+            return this.h;
+        }
+        const child = this.child;
+        return 2.0 * this.pad + (child === null ? 0.0 : child.minHeight());
+    }
+
     private bounds(c: Constraints): Constraints {
         const minW = this.minW > c.minW ? this.minW : c.minW;
         const minH = this.minH > c.minH ? this.minH : c.minH;
@@ -128,6 +144,16 @@ export class PaddingNode extends Widget {
         this.bottom = bottom;
     }
 
+    override minWidth(): float {
+        const child = this.child;
+        return this.left + this.right + (child === null ? 0.0 : child.minWidth());
+    }
+
+    override minHeight(): float {
+        const child = this.child;
+        return this.top + this.bottom + (child === null ? 0.0 : child.minHeight());
+    }
+
 
     override computeLayout(c: Constraints): Placement {
         const horizontal = this.left + this.right;
@@ -195,6 +221,14 @@ export class ExpandedNode extends Widget {
         super();
         this.child = child;
         this.flex = flex;
+    }
+
+    override minWidth(): float {
+        return this.child.minWidth();
+    }
+
+    override minHeight(): float {
+        return this.child.minHeight();
     }
 
     override computeLayout(c: Constraints): Placement {

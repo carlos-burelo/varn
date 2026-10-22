@@ -50,6 +50,10 @@ export class ButtonNode extends Widget {
         return new Placement(this, fixedSize(this, c, new Size(width, this.h)), []);
     }
 
+    override minWidth(): float {
+        return this.w >= 0.0 ? this.w : measure(this.label, this.size) + 2.0 * BUTTON_PAD;
+    }
+
     constructor(label: str, onPress: () => void, w: float, h: float, color: int, fg: int, size: float, radius: float, enabled: bool) {
         super();
         this.label = label;

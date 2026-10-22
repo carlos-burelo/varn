@@ -184,6 +184,14 @@ export abstract class Widget {
 
     abstract paint(cx: PaintContext, p: Placement, x: float, y: float): void;
 
+    minWidth(): float {
+        return this.w >= 0.0 ? this.w : 0.0;
+    }
+
+    minHeight(): float {
+        return this.h >= 0.0 ? this.h : 0.0;
+    }
+
     layout(c: Constraints): Placement {
         const key = [c.minW, c.maxW, c.minH, c.maxH, layoutEpoch];
         const cached = this.layoutValue;
@@ -213,6 +221,14 @@ export class KeyedNode extends Widget {
         this.child = child;
         this.flex = child.flex;
         this.fills = child.fills;
+    }
+
+    override minWidth(): float {
+        return this.child.minWidth();
+    }
+
+    override minHeight(): float {
+        return this.child.minHeight();
     }
 
 

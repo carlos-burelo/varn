@@ -1,5 +1,6 @@
 import { describe, it, expect } from "std:test";
-import { Widget, Constraints, Box, Row, Expanded, Wrap } from "std:ui";
+import { Widget, Constraints, Box, Row, Expanded, Wrap, Button } from "std:ui";
+import { measure } from "std:ui/text";
 
 function chips(): Widget[] {
     const out: Widget[] = [];
@@ -22,6 +23,13 @@ await describe("255 wrap, bounds and flex", async () => {
         expect(p.children[0].size.w).toBe(100.0);
         expect(p.children[1].size.w).toBe(200.0);
         expect(p.children[1].x).toBe(100.0);
+    });
+
+    await it("a flexible button never shrinks below its label", () => {
+        const label = "a long label here";
+        const row = Row([Expanded(Button(label, () => {}), 1.0), Expanded(Box(h: 10.0), 1.0)], gap: 0.0);
+        const p = row.layout(Constraints.loose(150.0, 50.0));
+        expect(p.children[0].size.w).toBe(measure(label, 17.0) + 40.0);
     });
 
     await it("wrap breaks lines at the available width", () => {
