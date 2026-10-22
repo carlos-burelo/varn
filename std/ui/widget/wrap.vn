@@ -1,0 +1,53 @@
+import { Widget, Size, PaintContext, Constraints, Placement, paintPlaced, layoutAt } from "std:ui/widget/base";
+
+export class WrapNode extends Widget {
+    children: Widget[];
+    gap: float;
+    runGap: float;
+    pad: float;
+
+    constructor(children: Widget[], gap: float, runGap: float, pad: float) {
+        super();
+        this.children = children;
+        this.gap = gap;
+        this.runGap = runGap;
+        this.pad = pad;
+    }
+
+    override computeLayout(c: Constraints): Placement {
+        const inner = c.deflate(this.pad);
+        const room = inner.maxW;
+        const children: Placement[] = [];
+        let x = 0.0;
+        let y = 0.0;
+        let lineH = 0.0;
+        let widest = 0.0;
+        for (let i = 0; i < this.children.length; i = i + 1) {
+            const placed = layoutAt(this.children[i], `${i}`, Constraints.loose(room, inner.maxH));
+            if (x > 0.0 && x + placed.size.w > room) {
+                y = y + lineH + this.runGap;
+                x = 0.0;
+                lineH = 0.0;
+            }
+            placed.x = this.pad + x;
+            placed.y = this.pad + y;
+            children.push(placed);
+            x = x + placed.size.w + this.gap;
+            lineH = placed.size.h > lineH ? placed.size.h : lineH;
+            widest = x - this.gap > widest ? x - this.gap : widest;
+        }
+        const natural = new Size(widest + 2.0 * this.pad, y + lineH + 2.0 * this.pad);
+        return new Placement(this, c.fit(this.fit(natural)), children);
+    }
+
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        for (let i = 0; i < p.children.length; i = i + 1) {
+            const placed = p.children[i];
+            cx.keyed(`${i}`, () => paintPlaced(cx, placed, x, y));
+        }
+    }
+}
+
+export function Wrap(children: Widget[], gap: float = 8.0, runGap: float = 8.0, pad: float = 0.0): Widget {
+    return new WrapNode(children, gap, runGap, pad);
+}
