@@ -1,45 +1,33 @@
-use std::sync::Arc;
-
-use egui_wgpu::{Renderer, RendererOptions, ScreenDescriptor};
-use epaint::{
+use egui::{
     emath::{pos2, vec2},
-    textures::TextureOptions,
-    ClippedPrimitive, Color32, ColorImage, ImageData, ImageDelta, Mesh, Primitive, Rect as ERect,
-    Shape, TessellationOptions, Tessellator, TextureId, Vertex,
+    epaint::{ClippedPrimitive, TextureId, Vertex},
+    Color32, Context, Mesh, Painter, Rect as ERect, RawInput, Shape,
 };
+use egui_wgpu::{Renderer, RendererOptions, ScreenDescriptor};
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 
 use super::quad::{Body, Clip, Glyph, Rect, Run};
 use super::render::{configure_surface, Shared};
 
-const WHITE_TEXTURE: TextureId = TextureId::Managed(0);
 const PIXELS_PER_POINT: f32 = 1.0;
 const MAX_CORNER: f32 = 255.0;
 
-struct Painter {
+struct Backend {
     renderer: Renderer,
 }
 
-static PAINTERS: Mutex<Option<FxHashMap<wgpu::TextureFormat, Painter>>> = Mutex::new(None);
+static PAINTERS: Mutex<Option<FxHashMap<wgpu::TextureFormat, Backend>>> = Mutex::new(None);
 
 fn with_painter<T>(
     shared: &Shared,
     format: wgpu::TextureFormat,
-    f: impl FnOnce(&mut Painter) -> T,
+    f: impl FnOnce(&mut Backend) -> T,
 ) -> T {
     let mut guard = PAINTERS.lock();
     let map = guard.get_or_insert_with(FxHashMap::default);
-    let painter = map.entry(format).or_insert_with(|| {
-        let mut renderer = Renderer::new(&shared.device, format, RendererOptions::default());
-        let white = ColorImage::new([1, 1], vec![Color32::WHITE]);
-        renderer.update_texture(
-            &shared.device,
-            &shared.queue,
-            WHITE_TEXTURE,
-            &ImageDelta::full(ImageData::Color(Arc::new(white)), TextureOptions::NEAREST),
-        );
-        Painter { renderer }
+    let painter = map.entry(format).or_insert_with(|| Backend {
+        renderer: Renderer::new(&shared.device, format, RendererOptions::default()),
     });
     f(painter)
 }
@@ -60,17 +48,14 @@ fn corner(radius: f32) -> u8 {
     radius.round().clamp(0.0, MAX_CORNER) as u8
 }
 
-fn rect_mesh(tess: &mut Tessellator, rects: &[Rect]) -> Mesh {
-    let mut mesh = Mesh::default();
+fn paint_rects(painter: &Painter, rects: &[Rect]) {
     for r in rects {
-        let shape = Shape::rect_filled(
+        painter.rect_filled(
             ERect::from_min_size(pos2(r.x, r.y), vec2(r.w, r.h)),
             corner(r.radius),
             color(r.color),
         );
-        tess.tessellate_shape(shape, &mut mesh);
     }
-    mesh
 }
 
 fn glyph_mesh(texture: TextureId, glyphs: &[Glyph]) -> Mesh {
@@ -99,7 +84,7 @@ fn glyph_mesh(texture: TextureId, glyphs: &[Glyph]) -> Mesh {
 
 fn glyph_texture(
     shared: &Shared,
-    painter: &mut Painter,
+    painter: &mut Backend,
     atlas: &[u8],
     w: u32,
     h: u32,
@@ -141,37 +126,24 @@ fn glyph_texture(
         .register_native_texture(&shared.device, &view, wgpu::FilterMode::Nearest)
 }
 
-fn primitives(
-    runs: &[Run],
-    vw: f32,
-    vh: f32,
-    tess: &mut Tessellator,
-    glyph_tex: Option<TextureId>,
-) -> Vec<ClippedPrimitive> {
-    let mut out = Vec::new();
+fn paint_runs(painter: &Painter, runs: &[Run], vw: f32, vh: f32, glyph_tex: Option<TextureId>) {
     for run in runs {
-        let clip = clip_rect(run.clip, vw, vh);
-        let mesh = match &run.body {
-            Body::Rects(rects) => rect_mesh(tess, rects),
-            Body::Glyphs(glyphs) => match glyph_tex {
-                Some(tex) => glyph_mesh(tex, glyphs),
-                None => continue,
-            },
-        };
-        if mesh.indices.is_empty() {
-            continue;
+        let clipped = painter.with_clip_rect(clip_rect(run.clip, vw, vh));
+        match &run.body {
+            Body::Rects(rects) => paint_rects(&clipped, rects),
+            Body::Glyphs(glyphs) => {
+                if let Some(tex) = glyph_tex {
+                    clipped.add(Shape::mesh(glyph_mesh(tex, glyphs)));
+                }
+            }
         }
-        out.push(ClippedPrimitive {
-            clip_rect: clip,
-            primitive: Primitive::Mesh(mesh),
-        });
     }
-    out
 }
 
 pub fn present_draw(
     shared: &Shared,
     surface: &wgpu::Surface,
+    ctx: &Context,
     w: u32,
     h: u32,
     configured: &mut Option<(u32, u32)>,
@@ -236,39 +208,57 @@ pub fn present_draw(
         occlusion_query_set: None,
         multiview_mask: None,
     };
-    let mut glyph_tex = None;
-    if runs.is_empty() {
-        let _ = enc.begin_render_pass(&pass_desc);
-    } else {
-        with_painter(shared, format, |painter| {
-            let has_glyphs = runs
-                .iter()
-                .any(|r| matches!(&r.body, Body::Glyphs(g) if !g.is_empty()));
-            if let (Some((bytes, aw, ah)), true) = (atlas, has_glyphs) {
-                glyph_tex = Some(glyph_texture(shared, painter, bytes, aw, ah));
+
+    let has_glyphs = runs
+        .iter()
+        .any(|r| matches!(&r.body, Body::Glyphs(g) if !g.is_empty()));
+    let glyph_tex = with_painter(shared, format, |painter| match atlas {
+        Some((bytes, aw, ah)) if has_glyphs => {
+            Some(glyph_texture(shared, painter, bytes, aw, ah))
+        }
+        _ => None,
+    });
+
+    let input = RawInput {
+        screen_rect: Some(ERect::from_min_size(
+            pos2(0.0, 0.0),
+            vec2(w as f32, h as f32),
+        )),
+        ..Default::default()
+    };
+    let output = ctx.run_ui(input, |ui| {
+        paint_runs(ui.painter(), runs, w as f32, h as f32, glyph_tex);
+    });
+    let prims: Vec<ClippedPrimitive> =
+        ctx.tessellate(output.shapes, output.pixels_per_point);
+
+    with_painter(shared, format, |painter| {
+        for (id, deltas) in &output.textures_delta.set {
+            for delta in deltas {
+                painter
+                    .renderer
+                    .update_texture(&shared.device, &shared.queue, *id, delta);
             }
-            let mut tess = Tessellator::new(
-                PIXELS_PER_POINT,
-                TessellationOptions::default(),
-                [1, 1],
-                Vec::new(),
-            );
-            let prims = primitives(runs, w as f32, h as f32, &mut tess, glyph_tex);
-            painter.renderer.update_buffers(
-                &shared.device,
-                &shared.queue,
-                &mut enc,
-                &prims,
-                &screen,
-            );
-            let mut pass = enc.begin_render_pass(&pass_desc).forget_lifetime();
-            painter.renderer.render(&mut pass, &prims, &screen);
-        });
-    }
+        }
+        painter.renderer.update_buffers(
+            &shared.device,
+            &shared.queue,
+            &mut enc,
+            &prims,
+            &screen,
+        );
+        let mut pass = enc.begin_render_pass(&pass_desc).forget_lifetime();
+        painter.renderer.render(&mut pass, &prims, &screen);
+    });
     shared.queue.submit(Some(enc.finish()));
     shared.queue.present(frame);
-    if let Some(id) = glyph_tex {
-        with_painter(shared, format, |painter| painter.renderer.free_texture(&id));
-    }
+    with_painter(shared, format, |painter| {
+        for id in &output.textures_delta.free {
+            painter.renderer.free_texture(id);
+        }
+        if let Some(id) = glyph_tex {
+            painter.renderer.free_texture(&id);
+        }
+    });
     true
 }

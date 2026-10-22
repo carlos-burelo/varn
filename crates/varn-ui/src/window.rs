@@ -22,6 +22,7 @@ struct WindowState {
     owner: std::thread::ThreadId,
     last_pos: (i64, i64),
     last_draw: Option<DrawnFrame>,
+    egui: egui::Context,
 }
 
 impl WindowState {
@@ -192,9 +193,11 @@ pub fn draw_now(
         let (size, surface) = (st.size, st.surface.as_ref());
         let surface = surface.ok_or_else(|| "ui: surface failed".to_string())?;
         let mut configured = st.configured;
+        let ctx = st.egui.clone();
         let ok = super::comp::present_draw(
             &shared,
             surface,
+            &ctx,
             size.0,
             size.1,
             &mut configured,
@@ -284,6 +287,7 @@ impl ApplicationHandler for PumpApp {
                     owner: std::thread::current().id(),
                     last_pos: (0, 0),
                     last_draw: None,
+                    egui: egui::Context::default(),
                 }));
             }
         });
@@ -355,6 +359,7 @@ impl ApplicationHandler for PumpApp {
                                 st.presented = super::comp::present_draw(
                                     &shared,
                                     surface,
+                                    &st.egui,
                                     size.0,
                                     size.1,
                                     configured,
