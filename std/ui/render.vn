@@ -43,7 +43,7 @@ export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w:
         }
         win.clear(bg);
         beginFrame();
-        render(win, fr, focus, root.value, 0.0, 0.0, w as float, h as float);
+        render(win, fr, focus, root.value, 0.0, 0.0, fr.w as float, fr.h as float);
         endFrame();
         present(win, fr);
         frames = frames + 1;
