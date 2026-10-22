@@ -1,18 +1,24 @@
 use egui::{
     emath::{pos2, vec2},
     epaint::ClippedPrimitive,
-    Align2, Button, Checkbox, Color32, Context, Event, FontId, Rect as ERect, RawInput, ScrollArea, Sense,
-    scroll_area::State as ScrollState, Slider, TexturesDelta, Ui, UiBuilder,
+    scroll_area::State as ScrollState,
+    Align2, Button, Checkbox, Color32, Context, Event, FontId, Key, Rect as ERect, RawInput,
+    ScrollArea, Sense, Slider, TexturesDelta, Ui, UiBuilder,
 };
 
-use super::quad::{Activation, Body, Clip, Control, ControlKind, Rect, Run};
+use super::quad::{Activation, Body, Clip, Control, ControlKind, Feedback, Rect, Run, TextChange};
 
 const MAX_CORNER: f32 = 255.0;
+const FIELD_PAD: f32 = 12.0;
+
+const FIELD_FOCUS_GAINED: f32 = 1.0;
+const FIELD_BLURRED: f32 = 0.0;
+const FIELD_SUBMITTED: f32 = 2.0;
 
 pub struct Pass {
     pub prims: Vec<ClippedPrimitive>,
     pub textures: TexturesDelta,
-    pub hits: Vec<Activation>,
+    pub feedback: Feedback,
 }
 
 pub fn pass(
@@ -32,15 +38,15 @@ pub fn pass(
         time: Some(time),
         ..Default::default()
     };
-    let mut hits = Vec::new();
+    let mut feedback = Feedback::default();
     let output = ctx.run_ui(input, |ui| {
-        paint_runs(ui, runs, w as f32, h as f32, &mut hits);
+        paint_runs(ui, runs, w as f32, h as f32, &mut feedback);
     });
     let prims = ctx.tessellate(output.shapes, output.pixels_per_point);
     Pass {
         prims,
         textures: output.textures_delta,
-        hits,
+        feedback,
     }
 }
 
@@ -119,8 +125,64 @@ fn paint_scroll(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
     })
 }
 
-fn paint_control(ui: &mut Ui, c: &Control, hits: &mut Vec<Activation>) {
+fn paint_field(ui: &mut Ui, rect: ERect, c: &Control, feedback: &mut Feedback) {
+    let multiline = c.kind == ControlKind::Area;
+    let inner = ERect::from_min_max(
+        pos2(rect.left() + FIELD_PAD, rect.top()),
+        pos2(rect.right() - FIELD_PAD, rect.bottom()),
+    );
+    let mut text = c.text.clone();
+    let edit = if multiline {
+        egui::TextEdit::multiline(&mut text)
+    } else {
+        egui::TextEdit::singleline(&mut text)
+    };
+    let enter = !multiline && ui.input(|i| i.key_pressed(Key::Enter));
+    let response = ui.put(
+        inner,
+        edit.id_salt(("vn-field", c.id))
+            .font(FontId::proportional(c.size))
+            .frame(egui::Frame::NONE)
+            .text_color(color(c.color))
+            .hint_text(c.hint.as_str())
+            .min_size(inner.size()),
+    );
+
+    if !c.flag && response.has_focus() && !response.gained_focus() {
+        response.surrender_focus();
+    }
+    if c.flag && !response.has_focus() {
+        response.request_focus();
+    }
+    if response.gained_focus() {
+        feedback.activations.push(Activation {
+            id: c.id,
+            value: FIELD_FOCUS_GAINED,
+        });
+    }
+    if response.changed() {
+        feedback.texts.push(TextChange { id: c.id, text });
+    }
+    if enter && (response.has_focus() || response.lost_focus()) {
+        feedback.activations.push(Activation {
+            id: c.id,
+            value: FIELD_SUBMITTED,
+        });
+    }
+    if response.lost_focus() {
+        feedback.activations.push(Activation {
+            id: c.id,
+            value: FIELD_BLURRED,
+        });
+    }
+}
+
+fn paint_control(ui: &mut Ui, c: &Control, feedback: &mut Feedback) {
     let rect = ERect::from_min_size(pos2(c.x, c.y), vec2(c.w, c.h));
+    if matches!(c.kind, ControlKind::Field | ControlKind::Area) {
+        ui.push_id(c.id, |ui| paint_field(ui, rect, c, feedback));
+        return;
+    }
     let outcome = ui
         .push_id(c.id, |ui| match c.kind {
             ControlKind::Button => ui
@@ -154,18 +216,13 @@ fn paint_control(ui: &mut Ui, c: &Control, hits: &mut Vec<Activation>) {
                 .interact(rect, ui.scope_id().with("surface"), Sense::click())
                 .clicked()
                 .then_some(Activation { id: c.id, value: 0.0 }),
+            ControlKind::Field | ControlKind::Area => None,
         })
         .inner;
-    hits.extend(outcome);
+    feedback.activations.extend(outcome);
 }
 
-fn paint_runs(
-    ui: &mut Ui,
-    runs: &[Run],
-    vw: f32,
-    vh: f32,
-    hits: &mut Vec<Activation>,
-) {
+fn paint_runs(ui: &mut Ui, runs: &[Run], vw: f32, vh: f32, feedback: &mut Feedback) {
     for run in runs {
         let clip = clip_rect(run.clip, vw, vh);
         match &run.body {
@@ -187,7 +244,7 @@ fn paint_runs(
             Body::Control(c) => {
                 ui.scope(|ui| {
                     ui.set_clip_rect(clip);
-                    paint_control(ui, c, hits);
+                    paint_control(ui, c, feedback);
                 });
             }
         }

@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 
 use super::paint::pass;
-use super::quad::{Activation, Run};
+use super::quad::{Feedback, Run};
 use super::render::{configure_surface, Shared};
 
 const PIXELS_PER_POINT: f32 = 1.0;
@@ -39,16 +39,16 @@ pub fn present_draw(
     configured: &mut Option<(u32, u32)>,
     clear: [f32; 4],
     runs: &[Run],
-) -> (bool, Vec<Activation>) {
+) -> (bool, Feedback) {
     let Some((_config, format)) = configure_surface(shared, surface, w, h, configured) else {
-        return (false, Vec::new());
+        return (false, Feedback::default());
     };
     let frame = match surface.get_current_texture() {
         wgpu::CurrentSurfaceTexture::Success(f) | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
         wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
             *configured = None;
             let Some((_config, _)) = configure_surface(shared, surface, w, h, configured) else {
-                return (false, Vec::new());
+                return (false, Feedback::default());
             };
             match surface.get_current_texture() {
                 wgpu::CurrentSurfaceTexture::Success(f)
@@ -57,12 +57,12 @@ pub fn present_draw(
                 | wgpu::CurrentSurfaceTexture::Occluded
                 | wgpu::CurrentSurfaceTexture::Outdated
                 | wgpu::CurrentSurfaceTexture::Lost
-                | wgpu::CurrentSurfaceTexture::Validation => return (false, Vec::new()),
+                | wgpu::CurrentSurfaceTexture::Validation => return (false, Feedback::default()),
             }
         }
         wgpu::CurrentSurfaceTexture::Timeout
         | wgpu::CurrentSurfaceTexture::Occluded
-        | wgpu::CurrentSurfaceTexture::Validation => return (false, Vec::new()),
+        | wgpu::CurrentSurfaceTexture::Validation => return (false, Feedback::default()),
     };
     let look = frame
         .texture
@@ -125,5 +125,5 @@ pub fn present_draw(
             backend.renderer.free_texture(id);
         }
     });
-    (true, drawn.hits)
+    (true, drawn.feedback)
 }

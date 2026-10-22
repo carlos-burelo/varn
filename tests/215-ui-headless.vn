@@ -3,7 +3,7 @@ import {
     UiWindow,
     UiFrame,
     Focus,
-    TextEdit,
+    TextEdit, TextArea, Field, Input, Column, Widget, render, present, signal, UiInjectKind, MOUSE_LEFT, KEY_ENTER, KEY_BACKSPACE,
     KEY_BACKSPACE, KEY_TAB, KEY_ENTER, KEY_ESCAPE, KEY_SPACE, KEY_DELETE,
     KEY_ARROW_LEFT, KEY_ARROW_UP, KEY_ARROW_RIGHT, KEY_ARROW_DOWN,
     MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE,
@@ -13,24 +13,27 @@ import {
 import { pad, row, col, textX, textY, ellipsize } from "std:ui/layout";
 import { measure, ascent, descent } from "std:text";
 
-function tapKey(win: UiWindow, fr: UiFrame, focus: Focus, ed: TextEdit, code: int): void {
-    win.inject(UiInjectKind.Key, code, 1, 0);
+function drawField(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
     fr.update(win);
-    ed.update(fr, focus, 1);
-    win.inject(UiInjectKind.Key, code, 0, 0);
-    fr.update(win);
-    ed.update(fr, focus, 1);
+    win.clear(0xFF000000);
+    render(win, fr, focus, tree, 0.0, 0.0, 300.0, 120.0);
+    present(win, fr);
 }
 
-function holdKey(win: UiWindow, fr: UiFrame, focus: Focus, ed: TextEdit, code: int, times: int): void {
-    for (let i = 0; i < times; i = i + 1) {
-        win.inject(UiInjectKind.Key, code, 1, 0);
-        fr.update(win);
-        ed.update(fr, focus, 1);
-    }
+function clickAt(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, x: int, y: int): void {
+    drawField(win, fr, focus, tree);
+    win.inject(UiInjectKind.MouseDown, x, y, MOUSE_LEFT);
+    drawField(win, fr, focus, tree);
+    win.inject(UiInjectKind.MouseUp, x, y, MOUSE_LEFT);
+    drawField(win, fr, focus, tree);
+    drawField(win, fr, focus, tree);
+}
+
+function typeKey(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, code: int): void {
+    win.inject(UiInjectKind.Key, code, 1, 0);
+    drawField(win, fr, focus, tree);
     win.inject(UiInjectKind.Key, code, 0, 0);
-    fr.update(win);
-    ed.update(fr, focus, 1);
+    drawField(win, fr, focus, tree);
 }
 
 await describe("215 ui headless", async () => {    await it("open reports size", () => {
@@ -310,96 +313,72 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         expect(fr.repeated).toEqual([]);
     });
 
-    await it("edit repeats held keys", () => {
-        using win = UiWindow.open("t", 800, 600);
-        const fr = new UiFrame(800, 600);
+    await it("a click focuses a field and typed keys fill its text", () => {
+        using win = UiWindow.open("t", 300, 120);
+        const fr = new UiFrame(300, 120);
         const focus = new Focus();
         const ed = new TextEdit();
-        focus.claim(1);
-        ed.update(fr, focus, 1);
-        holdKey(win, fr, focus, ed, 97, 3);
-        expect(ed.text).toBe("aaa");
-        holdKey(win, fr, focus, ed, KEY_BACKSPACE, 2);
-        expect(ed.text).toBe("a");
+        const tree = Column([Field(edit: ed, hint: "name")]);
+        clickAt(win, fr, focus, tree, 60, 22);
+        expect(ed.focused).toBe(true);
+        typeKey(win, fr, focus, tree, 72);
+        typeKey(win, fr, focus, tree, 105);
+        expect(ed.text).toBe("Hi");
+        typeKey(win, fr, focus, tree, KEY_BACKSPACE);
+        expect(ed.text).toBe("H");
     });
 
-    await it("edit enter splits lines", () => {
-        using win = UiWindow.open("t", 800, 600);
-        const fr = new UiFrame(800, 600);
+    await it("keys without focus are ignored and a click outside blurs", () => {
+        using win = UiWindow.open("t", 300, 120);
+        const fr = new UiFrame(300, 120);
         const focus = new Focus();
         const ed = new TextEdit();
-        focus.claim(1);
-        ed.update(fr, focus, 1);
-        tapKey(win, fr, focus, ed, 97);
-        tapKey(win, fr, focus, ed, KEY_ENTER);
-        tapKey(win, fr, focus, ed, 98);
+        const tree = Column([Field(edit: ed, hint: "name")]);
+        typeKey(win, fr, focus, tree, 65);
+        expect(ed.text).toBe("");
+        clickAt(win, fr, focus, tree, 60, 22);
+        expect(ed.focused).toBe(true);
+        clickAt(win, fr, focus, tree, 250, 100);
+        expect(ed.focused).toBe(false);
+        typeKey(win, fr, focus, tree, 66);
+        expect(ed.text).toBe("");
+    });
+
+    await it("enter in a single-line field submits its text", () => {
+        using win = UiWindow.open("t", 300, 120);
+        const fr = new UiFrame(300, 120);
+        const focus = new Focus();
+        const ed = new TextEdit();
+        const submitted: str[] = [];
+        const tree = Column([Field(edit: ed, hint: "name", onSubmit: (text: str) => { submitted.push(text) })]);
+        clickAt(win, fr, focus, tree, 60, 22);
+        typeKey(win, fr, focus, tree, 97);
+        typeKey(win, fr, focus, tree, KEY_ENTER);
+        expect(submitted).toEqual(["a"]);
+    });
+
+    await it("enter in a text area splits lines", () => {
+        using win = UiWindow.open("t", 300, 120);
+        const fr = new UiFrame(300, 120);
+        const focus = new Focus();
+        const ed = new TextEdit();
+        const tree = Column([TextArea(edit: ed, hint: "notes", h: 100.0)]);
+        clickAt(win, fr, focus, tree, 60, 22);
+        typeKey(win, fr, focus, tree, 97);
+        typeKey(win, fr, focus, tree, KEY_ENTER);
+        typeKey(win, fr, focus, tree, 98);
         expect(ed.text).toBe("a\nb");
-        expect(ed.cursor).toBe(3);
         expect(ed.lines()).toEqual(["a", "b"]);
-        expect(ed.caretLine()).toBe(1);
-        expect(ed.caretCol()).toBe(1);
-        tapKey(win, fr, focus, ed, KEY_ARROW_LEFT);
-        expect(ed.cursor).toBe(2);
-        tapKey(win, fr, focus, ed, KEY_BACKSPACE);
-        expect(ed.text).toBe("ab");
-        expect(ed.cursor).toBe(1);
-        expect(ed.caretLine()).toBe(0);
-        expect(ed.caretCol()).toBe(1);
     });
 
-    await it("edit types moves and erases", () => {
-        using win = UiWindow.open("t", 800, 600);
-        const fr = new UiFrame(800, 600);
+    await it("an input writes what is typed into its signal", () => {
+        using win = UiWindow.open("t", 300, 120);
+        const fr = new UiFrame(300, 120);
         const focus = new Focus();
-        const ed = new TextEdit();
-        focus.claim(1);
-        ed.update(fr, focus, 1);
-        expect(ed.focused).toBe(true);
-        expect(focus.current()).toBe(1);
-        tapKey(win, fr, focus, ed, 72);
-        tapKey(win, fr, focus, ed, 105);
-        expect(ed.text).toBe("Hi");
-        expect(ed.cursor).toBe(2);
-        tapKey(win, fr, focus, ed, KEY_ARROW_LEFT);
-        expect(ed.cursor).toBe(1);
-        tapKey(win, fr, focus, ed, 33);
-        expect(ed.text).toBe("H!i");
-        expect(ed.cursor).toBe(2);
-        tapKey(win, fr, focus, ed, KEY_BACKSPACE);
-        expect(ed.text).toBe("Hi");
-        expect(ed.cursor).toBe(1);
-        tapKey(win, fr, focus, ed, KEY_ARROW_LEFT);
-        tapKey(win, fr, focus, ed, KEY_ARROW_LEFT);
-        expect(ed.cursor).toBe(0);
-        tapKey(win, fr, focus, ed, KEY_BACKSPACE);
-        expect(ed.text).toBe("Hi");
-        tapKey(win, fr, focus, ed, KEY_DELETE);
-        expect(ed.text).toBe("i");
-        expect(ed.cursor).toBe(0);
-    });
-
-    await it("edit ignores keys without focus and blurs outside", () => {
-        using win = UiWindow.open("t", 800, 600);
-        const fr = new UiFrame(800, 600);
-        const focus = new Focus();
-        const ed = new TextEdit();
-        win.inject(UiInjectKind.Key, 65, 1, 0);
-        fr.update(win);
-        ed.update(fr, focus, 1);
-        expect(ed.text).toBe("");
-        expect(ed.focused).toBe(false);
-        focus.claim(1);
-        fr.update(win);
-        ed.update(fr, focus, 1);
-        expect(ed.focused).toBe(true);
-        win.inject(UiInjectKind.MouseDown, 500, 500, MOUSE_LEFT);
-        fr.update(win);
-        ed.update(fr, focus, 1);
-        expect(ed.focused).toBe(false);
-        expect(focus.current()).toBe(-1);
-        win.inject(UiInjectKind.Key, 66, 1, 0);
-        fr.update(win);
-        ed.update(fr, focus, 1);
-        expect(ed.text).toBe("");
+        const name = signal("");
+        const tree = Column([Input(name, hint: "name")]);
+        clickAt(win, fr, focus, tree, 60, 22);
+        typeKey(win, fr, focus, tree, 90);
+        expect(name.value).toBe("Z");
     });
 });

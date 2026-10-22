@@ -1,104 +1,13 @@
-import { UiFrame } from "std:ui/frame";
-import { Focus } from "std:ui/focus";
-import {
-    KEY_BACKSPACE,
-    KEY_DELETE,
-    KEY_ENTER,
-    KEY_SPACE,
-    KEY_ARROW_LEFT,
-    KEY_ARROW_RIGHT,
-    isNamedKey
-} from "std:ui/keys";
-
 export class TextEdit {
     text: str;
-    cursor: int;
     focused: bool;
 
     constructor() {
         this.text = "";
-        this.cursor = 0;
         this.focused = false;
-    }
-
-    update(fr: UiFrame, focus: Focus, id: int): void {
-        if (fr.leftPressed) {
-            if (focus.current() == id) {
-                focus.clear();
-            }
-        }
-        this.focused = focus.current() == id;
-        if (!this.focused) {
-            return;
-        }
-        for (let i = 0; i < fr.pressed.length; i = i + 1) {
-            this.applyKey(fr.pressed[i]);
-        }
-        for (let i = 0; i < fr.repeated.length; i = i + 1) {
-            this.applyKey(fr.repeated[i]);
-        }
     }
 
     lines(): str[] {
         return this.text.split("\n");
-    }
-
-    caretLine(): int {
-        let line = 0;
-        for (let i = 0; i < this.cursor; i = i + 1) {
-            if (this.text.charCodeAt(i) == 10) {
-                line = line + 1;
-            }
-        }
-        return line;
-    }
-
-    caretCol(): int {
-        let col = this.cursor;
-        for (let i = this.cursor - 1; i >= 0; i = i - 1) {
-            if (this.text.charCodeAt(i) == 10) {
-                col = this.cursor - i - 1;
-                break;
-            }
-        }
-        return col;
-    }
-
-    private applyKey(k: int): void {
-        if (k == KEY_BACKSPACE) {
-            if (this.cursor > 0) {
-                this.text = this.text.slice(0, this.cursor - 1) + this.text.slice(this.cursor);
-                this.cursor = this.cursor - 1;
-            }
-        } else if (k == KEY_DELETE) {
-            if (this.cursor < this.text.length) {
-                this.text = this.text.slice(0, this.cursor) + this.text.slice(this.cursor + 1);
-            }
-        } else if (k == KEY_ARROW_LEFT) {
-            if (this.cursor > 0) {
-                this.cursor = this.cursor - 1;
-            }
-        } else if (k == KEY_ARROW_RIGHT) {
-            if (this.cursor < this.text.length) {
-                this.cursor = this.cursor + 1;
-            }
-        } else if (k == KEY_ENTER) {
-            this.insert("\n");
-        } else if (k == KEY_SPACE || (k >= 33 && k != KEY_DELETE && !isNamedKey(k))) {
-            const ch = str.fromCharCode(k);
-            if (ch.length == 1) {
-                this.insert(ch);
-            }
-        }
-    }
-
-    private insert(s: str): void {
-        this.text = this.text.slice(0, this.cursor) + s + this.text.slice(this.cursor);
-        this.cursor = this.cursor + s.length;
-    }
-
-    clear(): void {
-        this.text = "";
-        this.cursor = 0;
     }
 }

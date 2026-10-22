@@ -1,6 +1,6 @@
 import { now } from "std:time";
 import {
-    UiWindow, UiFrame, Focus, TextEdit,
+    UiWindow, UiFrame, Focus,
     KEY_ESCAPE
 } from "std:ui";
 import { row } from "std:ui/layout";
@@ -19,7 +19,6 @@ print(`real window: ${win.real() ? "yes" : "no (headless, set VARN_UI_REAL=1)"}`
 
 const fr = new UiFrame(W, H);
 const focus = new Focus();
-const ed = new TextEdit();
 let bx = 100.0;
 let by = 120.0;
 let dx = 4.0;
@@ -64,28 +63,6 @@ while (!fr.closed) {
     }
     win.text(cells[1][0] + 8.0, cells[1][1] + 28.0, `box ${bx},${by}`, 18.0, WHITE);
     win.text(cells[2][0] + 8.0, cells[2][1] + 28.0, `mouse ${fr.mouseX},${fr.mouseY}`, 18.0, WHITE);
-
-    ed.update(fr, focus, 2, 20.0, 356.0, 760.0, 104.0);
-    win.rect(20.0, 356.0, 760.0, 104.0, ed.focused ? WHITE : GRAY);
-    win.rect(22.0, 358.0, 756.0, 100.0, BG);
-    const ls = ed.lines();
-    const show = ls.length;
-    const rows = show < 3 ? show : 3;
-    for (let i = 0; i < rows; i = i + 1) {
-        let line = ls[i];
-        let shade = WHITE;
-        if (line == "" && !ed.focused && i == 0) {
-            line = "click here and type, Enter splits lines";
-            shade = GRAY;
-        }
-        win.text(30.0, 388.0 + (i as float) * 30.0, line, 22.0, shade);
-    }
-    const cline = ed.caretLine();
-    if (ed.focused && cline < 3 && ((now() / 500) % 2 == 0)) {
-        const prefix = ls[cline].slice(0, ed.caretCol());
-        const caretX = 30.0 + measure(prefix, 22.0);
-        win.rect(caretX, 366.0 + (cline as float) * 30.0, 2.0, 26.0, WHITE);
-    }
 
     win.present();
     frames = frames + 1;

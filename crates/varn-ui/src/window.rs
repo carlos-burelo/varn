@@ -7,7 +7,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::platform::pump_events::{EventLoopExtPumpEvents, PumpStatus};
 use winit::window::{Window, WindowAttributes, WindowId};
 
-use super::quad::Activation;
+use super::quad::Feedback;
 use super::events::{button_code, key_code, pressed, RealEvent};
 use super::render;
 
@@ -180,7 +180,7 @@ pub fn draw_now(
     canvas: &mut super::canvas::Canvas,
     clear: [f32; 4],
     runs: &[super::comp::Run],
-) -> Result<Vec<Activation>, String> {
+) -> Result<Feedback, String> {
     with_ui(|ui| {
         let st = ui
             .wins

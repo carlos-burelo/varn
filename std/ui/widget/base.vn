@@ -50,6 +50,12 @@ export class PaintContext {
         this.fr.onActivate(id, onChange);
     }
 
+    field(id: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, focused: bool, text: str, hint: str, size: float, onActivate: (value: float) => void, onType: (text: str) => void): void {
+        this.win.field(id, kind, x, y, w, h, color, focused, text, hint, size);
+        this.fr.onActivate(id, onActivate);
+        this.fr.onType(id, onType);
+    }
+
     nextSlot(): int {
         this._slot = this._slot + 1;
         return this._slot;

@@ -52,6 +52,8 @@ pub enum ControlKind {
     Slider,
     Scroll,
     Surface,
+    Field,
+    Area,
 }
 
 impl ControlKind {
@@ -63,6 +65,8 @@ impl ControlKind {
             3 => Some(Self::Slider),
             4 => Some(Self::Scroll),
             5 => Some(Self::Surface),
+            6 => Some(Self::Field),
+            7 => Some(Self::Area),
             _ => None,
         }
     }
@@ -81,10 +85,25 @@ pub struct Control {
     pub value: f32,
     pub low: f32,
     pub high: f32,
+    pub text: String,
+    pub hint: String,
+    pub size: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Activation {
     pub id: u32,
     pub value: f32,
+}
+
+#[derive(Clone, Debug)]
+pub struct TextChange {
+    pub id: u32,
+    pub text: String,
+}
+
+#[derive(Clone, Default)]
+pub struct Feedback {
+    pub activations: Vec<Activation>,
+    pub texts: Vec<TextChange>,
 }

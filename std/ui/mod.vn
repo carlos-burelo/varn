@@ -6,7 +6,7 @@ export { Widget, PaintContext, Size } from "std:ui/widget/base";
 export { Text, Title, Headline, Caption, TextNode, TextAlign } from "std:ui/widget/text";
 export { Box, Card, Stack, Padding, SizedBox, Spacer, Expanded, Divider, BoxNode, StackNode, PaddingNode, SizedBoxNode } from "std:ui/widget/box";
 export { Column, Row, FlexNode, Axis } from "std:ui/widget/flex";
-export { Button, Field, Input } from "std:ui/widget/controls";
+export { Button, Field, Input, TextArea } from "std:ui/widget/controls";
 export { Checkbox, Switch } from "std:ui/widget/toggles";
 export { Slider } from "std:ui/widget/slider";
 export { Image, Progress } from "std:ui/widget/media";

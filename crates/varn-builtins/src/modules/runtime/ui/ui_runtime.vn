@@ -16,7 +16,9 @@ export declare enum UiControlKind {
     Switch,
     Slider,
     Scroll,
-    Surface
+    Surface,
+    Field,
+    Area
 }
 
 export declare enum UiInjectKind {
@@ -74,3 +76,13 @@ export declare function commands$(id: int): str[];
 export declare function real$(id: int): bool;
 @permission("ui")
 export declare function keyCode$(name: str): int;
+
+export interface TypedText {
+    id: int;
+    text: str;
+}
+
+@permission("ui")
+export declare function field$(window: int, cid: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, focused: bool, text: str, hint: str, size: float): void;
+@permission("ui")
+export declare function typed$(window: int): TypedText[];

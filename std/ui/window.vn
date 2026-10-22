@@ -12,16 +12,19 @@ import {
     unclip$,
     present$,
     control$,
+    field$,
+    typed$,
     activated$,
     commands$,
     real$,
     UiEvent,
     UiEventKind,
     UiInjectKind,
-    UiControlKind
+    UiControlKind,
+    TypedText
 } from "runtime:ui";
 
-export { UiEvent, UiEventKind, UiInjectKind, UiControlKind };
+export { UiEvent, UiEventKind, UiInjectKind, UiControlKind, TypedText };
 
 export class UiWindow {
     id: int;
@@ -80,6 +83,14 @@ export class UiWindow {
 
     control(cid: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, flag: bool, value: float, low: float, high: float): void {
         control$(this.id, cid, kind, x, y, w, h, color, flag, value, low, high);
+    }
+
+    field(cid: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, focused: bool, text: str, hint: str, size: float): void {
+        field$(this.id, cid, kind, x, y, w, h, color, focused, text, hint, size);
+    }
+
+    typed(): TypedText[] {
+        return typed$(this.id);
     }
 
     activated(): float[] {

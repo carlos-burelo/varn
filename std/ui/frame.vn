@@ -1,4 +1,4 @@
-import { UiWindow, UiEventKind } from "std:ui/window";
+import { UiWindow, UiEventKind, TypedText } from "std:ui/window";
 import { hit, MOUSE_LEFT } from "std:ui/keys";
 
 export class UiFrame {
@@ -23,6 +23,9 @@ export class UiFrame {
     controlIds: int[];
     controlFns: ((value: float) => void)[];
     controlOverlay: bool[];
+    textIds: int[];
+    textFns: ((text: str) => void)[];
+    textOverlay: bool[];
 
     constructor(w: int, h: int) {
         this.mouseX = 0;
@@ -44,6 +47,9 @@ export class UiFrame {
         this.controlIds = [];
         this.controlFns = [];
         this.controlOverlay = [];
+        this.textIds = [];
+        this.textFns = [];
+        this.textOverlay = [];
         this.w = w;
         this.h = h;
     }
@@ -103,12 +109,31 @@ export class UiFrame {
         this.controlIds = [];
         this.controlFns = [];
         this.controlOverlay = [];
+        this.textIds = [];
+        this.textFns = [];
+        this.textOverlay = [];
     }
 
     onActivate(id: int, fn: (value: float) => void): void {
         this.controlIds.push(id);
         this.controlFns.push(fn);
         this.controlOverlay.push(this.overlayPass);
+    }
+
+    onType(id: int, fn: (text: str) => void): void {
+        this.textIds.push(id);
+        this.textFns.push(fn);
+        this.textOverlay.push(this.overlayPass);
+    }
+
+    fireTyped(changes: TypedText[]): void {
+        for (let i = 0; i < changes.length; i = i + 1) {
+            for (let j = 0; j < this.textIds.length; j = j + 1) {
+                if (this.textIds[j] == changes[i].id && (!this.modal || this.textOverlay[j])) {
+                    this.textFns[j](changes[i].text);
+                }
+            }
+        }
     }
 
     fire(pairs: float[]): void {

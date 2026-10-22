@@ -6,7 +6,7 @@ use egui::Context;
 use super::events::RealEvent;
 use super::input;
 use super::paint::pass;
-use super::quad::{Activation, Run};
+use super::quad::{Feedback, Run};
 
 const HEADLESS_FRAME_SECS: f64 = 1.0 / 60.0;
 
@@ -43,11 +43,11 @@ impl Canvas {
         std::mem::take(&mut self.input)
     }
 
-    pub fn interact(&mut self, w: u32, h: u32, runs: &[Run]) -> Vec<Activation> {
+    pub fn interact(&mut self, w: u32, h: u32, runs: &[Run]) -> Feedback {
         let events = self.take_input();
         self.frames += 1;
         let time = self.frames as f64 * HEADLESS_FRAME_SECS;
-        pass(&self.ctx, events, time, w, h, runs).hits
+        pass(&self.ctx, events, time, w, h, runs).feedback
     }
 }
 

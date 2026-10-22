@@ -37,6 +37,9 @@ pub enum DrawCmd {
         value: f64,
         low: f64,
         high: f64,
+        text: String,
+        hint: String,
+        size: f64,
     },
 }
 
@@ -169,6 +172,9 @@ pub fn assemble(cmds: &[DrawCmd]) -> Result<Scene, String> {
                 value,
                 low,
                 high,
+                text,
+                hint,
+                size,
             } => {
                 items.push(Item::Control(
                     current,
@@ -184,6 +190,9 @@ pub fn assemble(cmds: &[DrawCmd]) -> Result<Scene, String> {
                         value: *value as f32,
                         low: *low as f32,
                         high: *high as f32,
+                        text: text.clone(),
+                        hint: hint.clone(),
+                        size: *size as f32,
                     },
                 ));
             }

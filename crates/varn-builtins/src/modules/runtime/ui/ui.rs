@@ -49,6 +49,7 @@ struct Window {
     real: Option<u64>,
     canvas: varn_ui::Canvas,
     activated: Vec<varn_ui::Activation>,
+    typed: Vec<varn_ui::TextChange>,
 }
 
 fn real_poll(id: u64) -> Vec<Event> {
@@ -172,9 +173,16 @@ fn event_obj(ctx: &mut dyn NativeCtx, e: &Event) -> Result<VmValue, String> {
 
 varn_macros::varn_record! {
     contract: "src/modules/runtime/ui/ui_runtime.vn",
+    interface: "TypedText",
+    struct TypedText;
+}
+
+varn_macros::varn_record! {
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
     interface: "UiEvent",
     struct UiEvent;
 }
+
 
 varn_contract! {
     module: "runtime:ui",
@@ -204,6 +212,7 @@ varn_contract! {
                 real,
                 canvas: varn_ui::Canvas::new(),
                 activated: Vec::new(),
+                typed: Vec::new(),
             }));
             Ok(id)
         }
@@ -329,7 +338,8 @@ varn_contract! {
                         .unwrap_or_default(),
                     None => win.canvas.interact(win.w as u32, win.h as u32, &scene.runs),
                 };
-                win.activated.extend(hits);
+                win.activated.extend(hits.activations);
+                win.typed.extend(hits.texts);
                 Ok(n)
             })
         }
@@ -357,6 +367,9 @@ varn_contract! {
                 UiControlKind::Slider => varn_ui::ControlKind::Slider,
                 UiControlKind::Scroll => varn_ui::ControlKind::Scroll,
                 UiControlKind::Surface => varn_ui::ControlKind::Surface,
+                UiControlKind::Field | UiControlKind::Area => {
+                    return Err("ui.control: use ui.field for text controls".to_string())
+                }
             };
             let id = u32::try_from(cid).map_err(|_| "ui.control: bad control id".to_string())?;
             with_win(window, |win| {
@@ -372,9 +385,71 @@ varn_contract! {
                     value,
                     low,
                     high,
+                    text: String::new(),
+                    hint: String::new(),
+                    size: 0.0,
                 });
                 Ok(())
             })
+        }
+        fn field(
+            ctx: &mut dyn NativeCtx,
+            window: i64,
+            cid: i64,
+            kind: VmValue,
+            x: f64,
+            y: f64,
+            w: f64,
+            h: f64,
+            color: i64,
+            focused: bool,
+            text: &str,
+            hint: &str,
+            size: f64,
+        ) -> Result<(), String> {
+            let kind = match UiControlKind::from_value(ctx, kind)
+                .ok_or_else(|| "ui.field: kind is not a UiControlKind".to_string())?
+            {
+                UiControlKind::Field => varn_ui::ControlKind::Field,
+                UiControlKind::Area => varn_ui::ControlKind::Area,
+                UiControlKind::Button | UiControlKind::Checkbox | UiControlKind::Switch | UiControlKind::Slider | UiControlKind::Scroll | UiControlKind::Surface => {
+                    return Err("ui.field: kind is not a text control".to_string())
+                }
+            };
+            let id = u32::try_from(cid).map_err(|_| "ui.field: bad control id".to_string())?;
+            with_win(window, |win| {
+                win.commands.push(DrawCmd::Control {
+                    id,
+                    kind,
+                    x,
+                    y,
+                    w,
+                    h,
+                    color,
+                    flag: focused,
+                    value: 0.0,
+                    low: 0.0,
+                    high: 0.0,
+                    text: text.to_string(),
+                    hint: hint.to_string(),
+                    size,
+                });
+                Ok(())
+            })
+        }
+        fn typed(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, String> {
+            let changes = with_win(id, |win| Ok(std::mem::take(&mut win.typed)))?;
+            Ok(changes
+                .into_iter()
+                .map(|c| {
+                    let text = ctx.alloc_str_owned(c.text);
+                    TypedText {
+                        id: i64::from(c.id),
+                        text,
+                    }
+                    .alloc(ctx)
+                })
+                .collect())
         }
         fn activated(_ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, String> {
             let hits = with_win(id, |win| Ok(std::mem::take(&mut win.activated)))?;

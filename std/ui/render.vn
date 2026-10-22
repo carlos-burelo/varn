@@ -7,6 +7,7 @@ import { beginFrame, endFrame } from "std:ui/state";
 
 export function present(win: UiWindow, fr: UiFrame): void {
     win.present();
+    fr.fireTyped(win.typed());
     fr.fire(win.activated());
 }
 
