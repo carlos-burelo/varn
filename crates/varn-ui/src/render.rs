@@ -69,7 +69,7 @@ pub fn configure_surface(
         .formats
         .iter()
         .copied()
-        .find(|f| f.is_srgb())
+        .find(|f| !f.is_srgb())
         .unwrap_or(caps.formats[0]);
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
