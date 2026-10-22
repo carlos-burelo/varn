@@ -4,10 +4,12 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-bytemuck = "1"
 parking_lot = { workspace = true }
 pollster = "0.3"
-wgpu = "22"
+egui-wgpu = "0.37"
+epaint = "0.37"
+rustc-hash = { workspace = true }
+wgpu = "30"
 winit = "0.30"
 
 [lints]

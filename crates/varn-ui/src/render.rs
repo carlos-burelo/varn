@@ -19,24 +19,24 @@ pub fn shared() -> Option<Arc<Shared>> {
 }
 
 fn init() -> Option<Shared> {
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::all(),
-        ..Default::default()
-    });
+    let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
+    desc.backends = wgpu::Backends::all();
+    let instance = wgpu::Instance::new(desc);
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
         force_fallback_adapter: false,
         compatible_surface: None,
-    }))?;
-    let (device, queue) = pollster::block_on(adapter.request_device(
-        &wgpu::DeviceDescriptor {
-            label: None,
-            required_features: wgpu::Features::empty(),
-            required_limits: wgpu::Limits::default(),
-            memory_hints: Default::default(),
-        },
-        None,
-    ))
+        apply_limit_buckets: false,
+    }))
+    .ok()?;
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        label: None,
+        required_features: wgpu::Features::empty(),
+        required_limits: wgpu::Limits::default(),
+        experimental_features: wgpu::ExperimentalFeatures::disabled(),
+        memory_hints: Default::default(),
+        trace: wgpu::Trace::Off,
+    }))
     .ok()?;
     Some(Shared {
         instance,
@@ -53,6 +53,7 @@ pub fn make_surface(
     let surface = shared.instance.create_surface(window).ok()?;
     Some(unsafe { std::mem::transmute::<wgpu::Surface<'_>, wgpu::Surface<'static>>(surface) })
 }
+
 pub fn configure_surface(
     shared: &Shared,
     surface: &wgpu::Surface,
@@ -73,6 +74,7 @@ pub fn configure_surface(
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format,
+        color_space: wgpu::SurfaceColorSpace::default(),
         width: w.max(1),
         height: h.max(1),
         present_mode: wgpu::PresentMode::AutoVsync,

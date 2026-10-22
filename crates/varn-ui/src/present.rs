@@ -1,42 +1,172 @@
-use super::pipes::get_pipes;
-use super::quad::{Body, Clip, Run};
-use super::render::{self, Shared};
+use std::sync::Arc;
 
-fn upload(device: &wgpu::Device, queue: &wgpu::Queue, data: &[f32]) -> wgpu::Buffer {
-    upload_with(
-        device,
-        queue,
-        data,
-        wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-    )
+use egui_wgpu::{Renderer, RendererOptions, ScreenDescriptor};
+use epaint::{
+    emath::{pos2, vec2},
+    textures::TextureOptions,
+    ClippedPrimitive, Color32, ColorImage, ImageData, ImageDelta, Mesh, Primitive, Rect as ERect,
+    Shape, TessellationOptions, Tessellator, TextureId, Vertex,
+};
+use parking_lot::Mutex;
+use rustc_hash::FxHashMap;
+
+use super::quad::{Body, Clip, Glyph, Rect, Run};
+use super::render::{configure_surface, Shared};
+
+const WHITE_TEXTURE: TextureId = TextureId::Managed(0);
+const PIXELS_PER_POINT: f32 = 1.0;
+const MAX_CORNER: f32 = 255.0;
+
+struct Painter {
+    renderer: Renderer,
 }
 
-fn upload_uniform(device: &wgpu::Device, queue: &wgpu::Queue, data: &[f32]) -> wgpu::Buffer {
-    upload_with(
-        device,
-        queue,
-        data,
-        wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-    )
-}
+static PAINTERS: Mutex<Option<FxHashMap<wgpu::TextureFormat, Painter>>> = Mutex::new(None);
 
-fn upload_with(
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    data: &[f32],
-    usage: wgpu::BufferUsages,
-) -> wgpu::Buffer {
-    let bytes: &[u8] = bytemuck::cast_slice(data);
-    let buf = device.create_buffer(&wgpu::BufferDescriptor {
-        label: None,
-        size: bytes.len().max(4) as u64,
-        usage,
-        mapped_at_creation: false,
+fn with_painter<T>(
+    shared: &Shared,
+    format: wgpu::TextureFormat,
+    f: impl FnOnce(&mut Painter) -> T,
+) -> T {
+    let mut guard = PAINTERS.lock();
+    let map = guard.get_or_insert_with(FxHashMap::default);
+    let painter = map.entry(format).or_insert_with(|| {
+        let mut renderer = Renderer::new(&shared.device, format, RendererOptions::default());
+        let white = ColorImage::new([1, 1], vec![Color32::WHITE]);
+        renderer.update_texture(
+            &shared.device,
+            &shared.queue,
+            WHITE_TEXTURE,
+            &ImageDelta::full(ImageData::Color(Arc::new(white)), TextureOptions::NEAREST),
+        );
+        Painter { renderer }
     });
-    if !data.is_empty() {
-        queue.write_buffer(&buf, 0, bytes);
+    f(painter)
+}
+
+fn color(rgba: [f32; 4]) -> Color32 {
+    let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+    Color32::from_rgba_unmultiplied(byte(rgba[0]), byte(rgba[1]), byte(rgba[2]), byte(rgba[3]))
+}
+
+fn clip_rect(clip: Option<Clip>, vw: f32, vh: f32) -> ERect {
+    match clip {
+        Some(c) => ERect::from_min_size(pos2(c.x, c.y), vec2(c.w, c.h)),
+        None => ERect::from_min_size(pos2(0.0, 0.0), vec2(vw, vh)),
     }
-    buf
+}
+
+fn corner(radius: f32) -> u8 {
+    radius.round().clamp(0.0, MAX_CORNER) as u8
+}
+
+fn rect_mesh(tess: &mut Tessellator, rects: &[Rect]) -> Mesh {
+    let mut mesh = Mesh::default();
+    for r in rects {
+        let shape = Shape::rect_filled(
+            ERect::from_min_size(pos2(r.x, r.y), vec2(r.w, r.h)),
+            corner(r.radius),
+            color(r.color),
+        );
+        tess.tessellate_shape(shape, &mut mesh);
+    }
+    mesh
+}
+
+fn glyph_mesh(texture: TextureId, glyphs: &[Glyph]) -> Mesh {
+    let mut mesh = Mesh::with_texture(texture);
+    for g in glyphs {
+        let base = mesh.vertices.len() as u32;
+        let tint = color(g.color);
+        let corners = [
+            (g.x, g.y, g.u, g.v),
+            (g.x + g.w, g.y, g.u + g.uw, g.v),
+            (g.x + g.w, g.y + g.h, g.u + g.uw, g.v + g.vh),
+            (g.x, g.y + g.h, g.u, g.v + g.vh),
+        ];
+        for (x, y, u, v) in corners {
+            mesh.vertices.push(Vertex {
+                pos: pos2(x, y),
+                uv: pos2(u, v),
+                color: tint,
+            });
+        }
+        mesh.add_triangle(base, base + 1, base + 2);
+        mesh.add_triangle(base, base + 2, base + 3);
+    }
+    mesh
+}
+
+fn glyph_texture(
+    shared: &Shared,
+    painter: &mut Painter,
+    atlas: &[u8],
+    w: u32,
+    h: u32,
+) -> TextureId {
+    let size = wgpu::Extent3d {
+        width: w.max(1),
+        height: h.max(1),
+        depth_or_array_layers: 1,
+    };
+    let texture = shared.device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    let rgba: Vec<u8> = atlas.iter().flat_map(|&c| [c, c, c, c]).collect();
+    shared.queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        &rgba,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(w.max(1) * 4),
+            rows_per_image: Some(h.max(1)),
+        },
+        size,
+    );
+    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    painter
+        .renderer
+        .register_native_texture(&shared.device, &view, wgpu::FilterMode::Nearest)
+}
+
+fn primitives(
+    runs: &[Run],
+    vw: f32,
+    vh: f32,
+    tess: &mut Tessellator,
+    glyph_tex: Option<TextureId>,
+) -> Vec<ClippedPrimitive> {
+    let mut out = Vec::new();
+    for run in runs {
+        let clip = clip_rect(run.clip, vw, vh);
+        let mesh = match &run.body {
+            Body::Rects(rects) => rect_mesh(tess, rects),
+            Body::Glyphs(glyphs) => match glyph_tex {
+                Some(tex) => glyph_mesh(tex, glyphs),
+                None => continue,
+            },
+        };
+        if mesh.indices.is_empty() {
+            continue;
+        }
+        out.push(ClippedPrimitive {
+            clip_rect: clip,
+            primitive: Primitive::Mesh(mesh),
+        });
+    }
+    out
 }
 
 pub fn present_draw(
@@ -49,24 +179,29 @@ pub fn present_draw(
     runs: &[Run],
     atlas: Option<(&[u8], u32, u32)>,
 ) -> bool {
-    let Some((_config, format)) = render::configure_surface(shared, surface, w, h, configured)
-    else {
+    let Some((_config, format)) = configure_surface(shared, surface, w, h, configured) else {
         return false;
     };
     let frame = match surface.get_current_texture() {
-        Ok(f) => f,
-        Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+        wgpu::CurrentSurfaceTexture::Success(f) | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
+        wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
             *configured = None;
-            let Some((_config, _)) = render::configure_surface(shared, surface, w, h, configured)
-            else {
+            let Some((_config, _)) = configure_surface(shared, surface, w, h, configured) else {
                 return false;
             };
             match surface.get_current_texture() {
-                Ok(f) => f,
-                Err(_) => return false,
+                wgpu::CurrentSurfaceTexture::Success(f)
+                | wgpu::CurrentSurfaceTexture::Suboptimal(f) => f,
+                wgpu::CurrentSurfaceTexture::Timeout
+                | wgpu::CurrentSurfaceTexture::Occluded
+                | wgpu::CurrentSurfaceTexture::Outdated
+                | wgpu::CurrentSurfaceTexture::Lost
+                | wgpu::CurrentSurfaceTexture::Validation => return false,
             }
         }
-        Err(_) => return false,
+        wgpu::CurrentSurfaceTexture::Timeout
+        | wgpu::CurrentSurfaceTexture::Occluded
+        | wgpu::CurrentSurfaceTexture::Validation => return false,
     };
     let look = frame
         .texture
@@ -74,205 +209,66 @@ pub fn present_draw(
     let mut enc = shared
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+    let screen = ScreenDescriptor {
+        size_in_pixels: [w, h],
+        pixels_per_point: PIXELS_PER_POINT,
+    };
+    let clear_color = wgpu::Color {
+        r: clear[0] as f64,
+        g: clear[1] as f64,
+        b: clear[2] as f64,
+        a: clear[3] as f64,
+    };
+    let attachments = [Some(wgpu::RenderPassColorAttachment {
+        view: &look,
+        depth_slice: None,
+        resolve_target: None,
+        ops: wgpu::Operations {
+            load: wgpu::LoadOp::Clear(clear_color),
+            store: wgpu::StoreOp::Store,
+        },
+    })];
+    let pass_desc = wgpu::RenderPassDescriptor {
+        label: None,
+        color_attachments: &attachments,
+        depth_stencil_attachment: None,
+        timestamp_writes: None,
+        occlusion_query_set: None,
+        multiview_mask: None,
+    };
+    let mut glyph_tex = None;
     if runs.is_empty() {
-        clear_only(&mut enc, &look, clear);
+        let _ = enc.begin_render_pass(&pass_desc);
     } else {
-        let tex = atlas.and_then(|(bytes, aw, ah)| {
-            if !runs
+        with_painter(shared, format, |painter| {
+            let has_glyphs = runs
                 .iter()
-                .any(|r| matches!(&r.body, Body::Glyphs(g) if !g.is_empty()))
-            {
-                return None;
+                .any(|r| matches!(&r.body, Body::Glyphs(g) if !g.is_empty()));
+            if let (Some((bytes, aw, ah)), true) = (atlas, has_glyphs) {
+                glyph_tex = Some(glyph_texture(shared, painter, bytes, aw, ah));
             }
-            let size = wgpu::Extent3d {
-                width: aw.max(1),
-                height: ah.max(1),
-                depth_or_array_layers: 1,
-            };
-            let t = shared.device.create_texture(&wgpu::TextureDescriptor {
-                label: None,
-                size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::R8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            });
-            shared.queue.write_texture(
-                wgpu::ImageCopyTexture {
-                    texture: &t,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                bytes,
-                wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(aw.max(1)),
-                    rows_per_image: Some(ah.max(1)),
-                },
-                size,
+            let mut tess = Tessellator::new(
+                PIXELS_PER_POINT,
+                TessellationOptions::default(),
+                [1, 1],
+                Vec::new(),
             );
-            let view = t.create_view(&wgpu::TextureViewDescriptor::default());
-            let sampler = shared.device.create_sampler(&wgpu::SamplerDescriptor {
-                label: None,
-                address_mode_u: wgpu::AddressMode::ClampToEdge,
-                address_mode_v: wgpu::AddressMode::ClampToEdge,
-                address_mode_w: wgpu::AddressMode::ClampToEdge,
-                mag_filter: wgpu::FilterMode::Nearest,
-                min_filter: wgpu::FilterMode::Nearest,
-                mipmap_filter: wgpu::FilterMode::Nearest,
-                ..Default::default()
-            });
-            Some((view, sampler))
+            let prims = primitives(runs, w as f32, h as f32, &mut tess, glyph_tex);
+            painter.renderer.update_buffers(
+                &shared.device,
+                &shared.queue,
+                &mut enc,
+                &prims,
+                &screen,
+            );
+            let mut pass = enc.begin_render_pass(&pass_desc).forget_lifetime();
+            painter.renderer.render(&mut pass, &prims, &screen);
         });
-        let tex_ref = tex.as_ref().map(|(v, s)| (v, s));
-        draw_scene(
-            shared, format, &look, &mut enc, w as f32, h as f32, clear, tex_ref, runs,
-        );
-        let _ = tex;
     }
     shared.queue.submit(Some(enc.finish()));
-    frame.present();
-    true
-}
-
-fn clear_only(enc: &mut wgpu::CommandEncoder, look: &wgpu::TextureView, clear: [f32; 4]) {
-    let _pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: None,
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view: look,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color {
-                    r: clear[0] as f64,
-                    g: clear[1] as f64,
-                    b: clear[2] as f64,
-                    a: clear[3] as f64,
-                }),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-    });
-}
-
-fn draw_scene(
-    shared: &Shared,
-    format: wgpu::TextureFormat,
-    view: &wgpu::TextureView,
-    enc: &mut wgpu::CommandEncoder,
-    vw: f32,
-    vh: f32,
-    clear: [f32; 4],
-    atlas: Option<(&wgpu::TextureView, &wgpu::Sampler)>,
-    runs: &[Run],
-) {
-    let (rect_pipe, text_pipe, rect_layout, text_layout) = get_pipes(&shared.device, format);
-    let uni = upload_uniform(&shared.device, &shared.queue, &[vw, vh]);
-    let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: None,
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            view,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color {
-                    r: clear[0] as f64,
-                    g: clear[1] as f64,
-                    b: clear[2] as f64,
-                    a: clear[3] as f64,
-                }),
-                store: wgpu::StoreOp::Store,
-            },
-        })],
-        depth_stencil_attachment: None,
-        timestamp_writes: None,
-        occlusion_query_set: None,
-    });
-    let mut buffers = Vec::with_capacity(runs.len());
-    for run in runs {
-        let (x, y, w, h) = scissor(run.clip, vw, vh);
-        if w == 0 || h == 0 {
-            continue;
-        }
-        pass.set_scissor_rect(x, y, w, h);
-        match &run.body {
-            Body::Rects(rects) => {
-                let mut data = Vec::with_capacity(rects.len() * 9);
-                for r in rects {
-                    data.extend_from_slice(&[
-                        r.x, r.y, r.w, r.h, r.color[0], r.color[1], r.color[2], r.color[3],
-                        r.radius,
-                    ]);
-                }
-                let buf = upload(&shared.device, &shared.queue, &data);
-                let group = shared.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: None,
-                    layout: &rect_layout,
-                    entries: &[wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: uni.as_entire_binding(),
-                    }],
-                });
-                pass.set_pipeline(&rect_pipe);
-                pass.set_bind_group(0, &group, &[]);
-                pass.set_vertex_buffer(0, buf.slice(..));
-                pass.draw(0..6, 0..rects.len() as u32);
-                buffers.push(buf);
-            }
-            Body::Glyphs(glyphs) => {
-                let Some((tex_view, sampler)) = atlas else {
-                    continue;
-                };
-                let mut data = Vec::with_capacity(glyphs.len() * 12);
-                for g in glyphs {
-                    data.extend_from_slice(&[
-                        g.x, g.y, g.w, g.h, g.color[0], g.color[1], g.color[2], g.color[3], g.u,
-                        g.v, g.uw, g.vh,
-                    ]);
-                }
-                let buf = upload(&shared.device, &shared.queue, &data);
-                let group = shared.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: None,
-                    layout: &text_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: uni.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::TextureView(tex_view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: wgpu::BindingResource::Sampler(sampler),
-                        },
-                    ],
-                });
-                pass.set_pipeline(&text_pipe);
-                pass.set_bind_group(0, &group, &[]);
-                pass.set_vertex_buffer(0, buf.slice(..));
-                pass.draw(0..6, 0..glyphs.len() as u32);
-                buffers.push(buf);
-            }
-        }
+    shared.queue.present(frame);
+    if let Some(id) = glyph_tex {
+        with_painter(shared, format, |painter| painter.renderer.free_texture(&id));
     }
-    drop(pass);
-    drop(buffers);
-}
-
-fn scissor(clip: Option<Clip>, vw: f32, vh: f32) -> (u32, u32, u32, u32) {
-    let full = (0, 0, vw.max(0.0) as u32, vh.max(0.0) as u32);
-    let Some(c) = clip else {
-        return full;
-    };
-    let x0 = c.x.floor().clamp(0.0, vw);
-    let y0 = c.y.floor().clamp(0.0, vh);
-    let x1 = (c.x + c.w).ceil().clamp(x0, vw);
-    let y1 = (c.y + c.h).ceil().clamp(y0, vh);
-    (x0 as u32, y0 as u32, (x1 - x0) as u32, (y1 - y0) as u32)
+    true
 }

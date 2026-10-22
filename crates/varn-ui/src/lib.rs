@@ -1,6 +1,5 @@
 mod comp;
 mod events;
-mod pipes;
 mod present;
 mod quad;
 mod render;
