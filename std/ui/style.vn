@@ -78,6 +78,7 @@ export const Theme = {
         success: 0xFF3DDC84,
         disabled: 0xFF3A3F4A
     },
+    breakpoints: [600.0, 840.0],
     text: {
         titleSize: 24.0,
         bodySize: 18.0,

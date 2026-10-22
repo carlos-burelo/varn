@@ -242,6 +242,7 @@ import "./247-top-level-using.vn"
 import "./248-fixed-bool-field-store.vn"
 import "./250-layout-parity.vn"
 import "./251-keyed-each.vn"
+import "./252-responsive.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

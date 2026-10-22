@@ -1,0 +1,100 @@
+import { Widget, Size, PaintContext, Constraints, Placement } from "std:ui/widget/base";
+import { Theme } from "std:ui/style";
+
+export enum WindowClass {
+    compact,
+    medium,
+    expanded
+}
+
+export function windowClassOf(width: float): WindowClass {
+    const breakpoints = Theme.breakpoints;
+    if (width < breakpoints[0]) {
+        return WindowClass.compact;
+    }
+    if (width < breakpoints[1]) {
+        return WindowClass.medium;
+    }
+    return WindowClass.expanded;
+}
+
+function classKey(cls: WindowClass): str {
+    if (cls == WindowClass.compact) {
+        return "compact";
+    }
+    if (cls == WindowClass.medium) {
+        return "medium";
+    }
+    return "expanded";
+}
+
+export class AdaptiveValue<T> {
+    compact: T;
+    medium: T;
+    expanded: T;
+
+    constructor(compact: T, medium: T, expanded: T) {
+        this.compact = compact;
+        this.medium = medium;
+        this.expanded = expanded;
+    }
+}
+
+export function Adaptive<T>(values: { compact: T, medium: T, expanded: T }): AdaptiveValue<T> {
+    return new AdaptiveValue<T>(values.compact, values.medium, values.expanded);
+}
+
+export function resolveFloat(value: float | AdaptiveValue<float>, width: float): float {
+    if (value is AdaptiveValue<float>) {
+        const picked = value as AdaptiveValue<float>;
+        const cls = windowClassOf(width);
+        if (cls == WindowClass.compact) {
+            return picked.compact;
+        }
+        if (cls == WindowClass.medium) {
+            return picked.medium;
+        }
+        return picked.expanded;
+    }
+    return value as float;
+}
+
+export class ResponsiveNode extends Widget {
+    build: (cls: WindowClass) => Widget;
+    cachedClass: WindowClass = WindowClass.compact;
+    cachedChild: Widget? = null;
+
+    constructor(build: (cls: WindowClass) => Widget) {
+        super();
+        this.build = build;
+    }
+
+    childFor(cls: WindowClass): Widget {
+        const existing = this.cachedChild;
+        if (existing !== null && this.cachedClass == cls) {
+            return existing;
+        }
+        const fresh = this.build(cls);
+        this.cachedChild = fresh;
+        this.cachedClass = cls;
+        return fresh;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return this.childFor(windowClassOf(maxW)).measure(maxW, maxH);
+    }
+
+    override computeLayout(c: Constraints): Placement {
+        const placed = this.childFor(windowClassOf(c.maxW)).layout(c);
+        return new Placement(this, placed.size, [placed]);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        const cls = windowClassOf(w);
+        cx.keyed(classKey(cls), () => this.childFor(cls).paint(cx, x, y, w, h));
+    }
+}
+
+export function Responsive(build: (cls: WindowClass) => Widget): Widget {
+    return new ResponsiveNode(build);
+}
