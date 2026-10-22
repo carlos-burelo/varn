@@ -1,0 +1,46 @@
+import { describe, it, expect } from "std:test";
+import { measure } from "std:text";
+
+class Holder {
+    overlayPass: bool = false;
+    modal: bool = false;
+}
+
+class Size2 {
+    w: float;
+    constructor(w: float) { this.w = w; }
+}
+
+class Wrapper {
+    tag: int = 0;
+    w: float = -1.0;
+    wrap(natural: Size2): Size2 { return new Size2(natural.w); }
+}
+
+class Txt2 extends Wrapper {
+    text: str;
+    constructor(text: str) {
+        super();
+        this.text = text;
+    }
+    m(): Size2 {
+        const width = measure(this.text, 18.0);
+        return this.wrap(new Size2(width));
+    }
+}
+
+await describe("248 bool field store on a long-lived instance", async () => {
+    await it("a bool field of an old-generation holder keeps its value across frames", () => {
+        const holder = new Holder();
+        for (let frame = 0; frame < 300; frame = frame + 1) {
+            for (let i = 0; i < 300; i = i + 1) {
+                new Txt2(`item ${i}`).m();
+            }
+            holder.overlayPass = true;
+            holder.overlayPass = false;
+        }
+        expect(holder.overlayPass).toBe(false);
+        holder.overlayPass = true;
+        expect(holder.overlayPass).toBe(true);
+    });
+});

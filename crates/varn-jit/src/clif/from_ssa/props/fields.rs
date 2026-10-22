@@ -178,7 +178,7 @@ pub(crate) fn emit_set_fixed_field(
             ivar,
             obj,
             raw,
-            matches!(vk, SlotKind::Float),
+            vk,
             offset,
             kind,
             slot as usize,

@@ -2,6 +2,7 @@ use cranelift_codegen::ir::{condcodes::IntCC, types, Block, InstBuilder, Value};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::layout::{ScalarRepr, TypeLayout, COMPACT_REF_NULL};
+use varn_types::register_meta::SlotKind;
 use varn_types::vm_value::{KIND_HEAP, KIND_NULL};
 
 use super::super::emit::{self, call_helper_void, unbox_f64_coerce};
@@ -157,7 +158,7 @@ pub(crate) fn store_compact_native(
     instance_var: Option<Variable>,
     obj: Value,
     native: Value,
-    value_is_float: bool,
+    value: SlotKind,
     offset: u32,
     tag: Option<varn_core::RuntimeKind>,
     slot: usize,
@@ -182,51 +183,37 @@ pub(crate) fn store_compact_native(
     match TypeLayout::of_field(tag).repr {
         ScalarRepr::Bool => {
             b.ins().istore8(m, native, data_base, off);
+            b.ins().jump(cont, &[]);
         }
         ScalarRepr::I64 => {
             b.ins().store(m, native, data_base, off);
+            b.ins().jump(cont, &[]);
         }
         ScalarRepr::F64 => {
-            let f = if value_is_float {
+            let f = if matches!(value, SlotKind::Float) {
                 native
             } else {
                 b.ins().fcvt_from_sint(types::F64, native)
             };
             b.ins().store(m, f, data_base, off);
+            b.ins().jump(cont, &[]);
         }
         ScalarRepr::Ref | ScalarRepr::Boxed => {
             b.ins().jump(slow, &[]);
-            b.switch_to_block(slow);
-            let slot_v = b.ins().iconst(types::I64, slot as i64);
-            let (vt, vp) = if value_is_float {
-                let boxed = emit::box_f64(b, native);
-                b.ins().isplit(boxed)
-            } else {
-                let boxed = emit::box_int(b, native);
-                b.ins().isplit(boxed)
-            };
-            call_checked_void(
-                b,
-                io,
-                io.helpers.set_fixed_field,
-                &[io.exec_ctx, obj_tag, obj_payload, slot_v, vt, vp],
-            );
-            b.ins().jump(cont, &[]);
-            b.switch_to_block(cont);
-            return;
         }
     }
-    b.ins().jump(cont, &[]);
 
     b.switch_to_block(slow);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
-    let (vt, vp) = if value_is_float {
-        let boxed = emit::box_f64(b, native);
-        b.ins().isplit(boxed)
-    } else {
-        let boxed = emit::box_int(b, native);
-        b.ins().isplit(boxed)
+    let boxed = match value {
+        SlotKind::Int => emit::box_int(b, native),
+        SlotKind::Bool => emit::box_bool(b, native),
+        SlotKind::Float => emit::box_f64(b, native),
+        SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => {
+            unreachable!("native field store only carries scalar values")
+        }
     };
+    let (vt, vp) = b.ins().isplit(boxed);
     call_checked_void(
         b,
         io,
