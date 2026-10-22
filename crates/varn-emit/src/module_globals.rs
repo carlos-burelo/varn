@@ -7,7 +7,7 @@ use super::tables::NameIndex;
 use super::ty::lower_type;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
-use varn_core::ast::{AstArena, MetaProperty, Program, StmtKind};
+use varn_core::ast::{AstArena, MetaProperty, Pattern, Program, StmtKind};
 use varn_core::AtomInterner;
 use varn_sem::bind::BindResult;
 use varn_tir::{BackendTy, DynReason, EnumId, EnumInfo, TyTable};
@@ -49,8 +49,16 @@ pub(super) fn collect_declared(
 ) -> FxHashSet<Arc<str>> {
     let mut declared: FxHashSet<Arc<str>> = FxHashSet::default();
     for &stmt in &program.body {
-        if let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind {
-            collect_decl_names(d, ast_arena, &mut declared, interner);
+        match &ast_arena.stmt(stmt).kind {
+            StmtKind::Decl(d) => collect_decl_names(d, ast_arena, &mut declared, interner),
+            StmtKind::Using { declarations, .. } => {
+                for d in declarations {
+                    if let Pattern::Identifier { name, .. } = &d.id {
+                        declared.insert(Arc::from(interner.resolve(*name)));
+                    }
+                }
+            }
+            _ => {}
         }
     }
     collect_extension_names(program, ast_arena, &mut declared, interner);

@@ -232,15 +232,45 @@ impl<'a> FnEmitter<'a> {
                     match &d.id {
                         Pattern::Identifier { name, .. } => {
                             let ty = init.as_ref().map(|e| e.ty).unwrap_or(dyn_ty);
-                            let local =
-                                self.bind_local(Arc::from(self.m.interner.resolve(*name)), ty);
+                            let name_str = self.m.interner.resolve(*name);
+                            let res = match self.m.globals.get(name_str) {
+                                Some(&slot) if self.top_level => Resolution::GlobalSlot(slot),
+                                _ => Resolution::Local(self.bind_local(Arc::from(name_str), ty)),
+                            };
                             out.extend(std::mem::take(&mut self.pending));
-                            out.push(TirStmt::Let { local, ty, init });
+                            match res {
+                                Resolution::GlobalSlot(_) => {
+                                    let value = init.unwrap_or(TirExpr {
+                                        kind: TirExprKind::NullLit,
+                                        ty,
+                                        res: Resolution::None,
+                                        span: Span::EMPTY,
+                                    });
+                                    out.push(TirStmt::Expr(TirExpr {
+                                        kind: TirExprKind::Assign {
+                                            target: Box::new(TirExpr {
+                                                kind: TirExprKind::Var,
+                                                ty,
+                                                res: res.clone(),
+                                                span: Span::EMPTY,
+                                            }),
+                                            value: Box::new(value),
+                                        },
+                                        ty: BackendTy::Void,
+                                        res: Resolution::None,
+                                        span: Span::EMPTY,
+                                    }));
+                                }
+                                Resolution::Local(local) => {
+                                    out.push(TirStmt::Let { local, ty, init });
+                                }
+                                _ => {}
+                            }
                             if let Some(frame) = self.disposables.last_mut() {
                                 frame.push(TirExpr {
                                     kind: TirExprKind::Var,
                                     ty,
-                                    res: Resolution::Local(local),
+                                    res,
                                     span: Span::EMPTY,
                                 });
                             }

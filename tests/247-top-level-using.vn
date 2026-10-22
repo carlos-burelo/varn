@@ -1,0 +1,24 @@
+import { describe, it, expect } from "std:test";
+
+class Resource {
+    value: int = 7;
+    dispose(): void {}
+}
+
+using held = new Resource();
+
+function readHeld(): int {
+    return held.value;
+}
+
+function bumpHeld(): void {
+    held.value = held.value + 1;
+}
+
+await describe("247 top-level using", async () => {
+    await it("a top-level using binding is visible to functions", () => {
+        expect(readHeld()).toBe(7);
+        bumpHeld();
+        expect(readHeld()).toBe(8);
+    });
+});
