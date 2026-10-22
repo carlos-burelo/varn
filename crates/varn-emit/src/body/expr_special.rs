@@ -150,7 +150,20 @@ impl<'a> FnEmitter<'a> {
             varn_core::TypeKind::Array(_) => Some(tag(RuntimeKind::Array.name())),
             varn_core::TypeKind::Tuple(_) => Some(tag(RuntimeKind::Tuple.name())),
             varn_core::TypeKind::Fn(_) => Some(tag(RuntimeKind::Function.name())),
-            _ => self.builtin_tag(type_ann).map(tag),
+            varn_core::TypeKind::Primitive(_)
+            | varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::This
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::EnumVariant { .. }
+            | varn_core::TypeKind::TypePredicate { .. } => self.builtin_tag(type_ann).map(tag),
         }
     }
 

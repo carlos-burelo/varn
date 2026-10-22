@@ -27,7 +27,19 @@ fn is_closed(
             .get_list(list)
             .iter()
             .all(|e| is_closed(*e, params, bind, table)),
-        _ => false,
+        TypeKind::This
+        | TypeKind::Intersection(_)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => false,
     }
 }
 

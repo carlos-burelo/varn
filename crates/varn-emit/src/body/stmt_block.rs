@@ -233,13 +233,13 @@ impl<'a> FnEmitter<'a> {
                         Pattern::Identifier { name, .. } => {
                             let ty = init.as_ref().map(|e| e.ty).unwrap_or(dyn_ty);
                             let name_str = self.m.interner.resolve(*name);
-                            let res = match self.m.globals.get(name_str) {
-                                Some(&slot) if self.top_level => Resolution::GlobalSlot(slot),
-                                _ => Resolution::Local(self.bind_local(Arc::from(name_str), ty)),
+                            let global = match self.m.globals.get(name_str) {
+                                Some(&slot) if self.top_level => Some(slot),
+                                Some(_) | None => None,
                             };
-                            out.extend(std::mem::take(&mut self.pending));
-                            match res {
-                                Resolution::GlobalSlot(_) => {
+                            let res = match global {
+                                Some(slot) => {
+                                    out.extend(std::mem::take(&mut self.pending));
                                     let value = init.unwrap_or(TirExpr {
                                         kind: TirExprKind::NullLit,
                                         ty,
@@ -251,7 +251,7 @@ impl<'a> FnEmitter<'a> {
                                             target: Box::new(TirExpr {
                                                 kind: TirExprKind::Var,
                                                 ty,
-                                                res: res.clone(),
+                                                res: Resolution::GlobalSlot(slot),
                                                 span: Span::EMPTY,
                                             }),
                                             value: Box::new(value),
@@ -260,12 +260,15 @@ impl<'a> FnEmitter<'a> {
                                         res: Resolution::None,
                                         span: Span::EMPTY,
                                     }));
+                                    Resolution::GlobalSlot(slot)
                                 }
-                                Resolution::Local(local) => {
+                                None => {
+                                    let local = self.bind_local(Arc::from(name_str), ty);
+                                    out.extend(std::mem::take(&mut self.pending));
                                     out.push(TirStmt::Let { local, ty, init });
+                                    Resolution::Local(local)
                                 }
-                                _ => {}
-                            }
+                            };
                             if let Some(frame) = self.disposables.last_mut() {
                                 frame.push(TirExpr {
                                     kind: TirExprKind::Var,

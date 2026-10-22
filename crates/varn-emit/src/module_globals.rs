@@ -49,16 +49,16 @@ pub(super) fn collect_declared(
 ) -> FxHashSet<Arc<str>> {
     let mut declared: FxHashSet<Arc<str>> = FxHashSet::default();
     for &stmt in &program.body {
-        match &ast_arena.stmt(stmt).kind {
-            StmtKind::Decl(d) => collect_decl_names(d, ast_arena, &mut declared, interner),
-            StmtKind::Using { declarations, .. } => {
-                for d in declarations {
-                    if let Pattern::Identifier { name, .. } = &d.id {
-                        declared.insert(Arc::from(interner.resolve(*name)));
-                    }
+        let kind = &ast_arena.stmt(stmt).kind;
+        if let StmtKind::Decl(d) = kind {
+            collect_decl_names(d, ast_arena, &mut declared, interner);
+        }
+        if let StmtKind::Using { declarations, .. } = kind {
+            for d in declarations {
+                if let Pattern::Identifier { name, .. } = &d.id {
+                    declared.insert(Arc::from(interner.resolve(*name)));
                 }
             }
-            _ => {}
         }
     }
     collect_extension_names(program, ast_arena, &mut declared, interner);
