@@ -19,29 +19,32 @@ fn backend_str(b: wgpu::Backend) -> &'static str {
         wgpu::Backend::Dx12 => "dx12",
         wgpu::Backend::Gl => "gl",
         wgpu::Backend::BrowserWebGpu => "webgpu",
-        wgpu::Backend::Empty => "empty",
+        wgpu::Backend::Noop => "noop",
     }
+}
+
+pub fn instance_desc() -> wgpu::InstanceDescriptor {
+    let mut desc = wgpu::InstanceDescriptor::new_without_display_handle();
+    desc.backends = wgpu::Backends::all();
+    desc
 }
 
 fn run_probe() -> Probe {
     let caught = std::panic::catch_unwind(|| {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            ..Default::default()
-        });
-        let mut adapters: Vec<AdapterDesc> = instance
-            .enumerate_adapters(wgpu::Backends::all())
-            .iter()
-            .map(|a| {
-                let info = a.get_info();
-                AdapterDesc {
-                    name: info.name,
-                    backend: backend_str(info.backend),
-                    discrete: matches!(info.device_type, wgpu::DeviceType::DiscreteGpu),
-                    integrated: matches!(info.device_type, wgpu::DeviceType::IntegratedGpu),
-                }
-            })
-            .collect();
+        let instance = wgpu::Instance::new(instance_desc());
+        let mut adapters: Vec<AdapterDesc> =
+            pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()))
+                .iter()
+                .map(|a| {
+                    let info = a.get_info();
+                    AdapterDesc {
+                        name: info.name,
+                        backend: backend_str(info.backend),
+                        discrete: matches!(info.device_type, wgpu::DeviceType::DiscreteGpu),
+                        integrated: matches!(info.device_type, wgpu::DeviceType::IntegratedGpu),
+                    }
+                })
+                .collect();
         adapters.sort_by_key(|a| {
             if a.discrete {
                 0u8

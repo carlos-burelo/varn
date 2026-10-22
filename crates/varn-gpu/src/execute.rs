@@ -105,14 +105,14 @@ fn pipe(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, src: &str) -> wgp
     });
     let pl = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
-        bind_group_layouts: &[layout],
-        push_constant_ranges: &[],
+        bind_group_layouts: &[Some(layout)],
+        immediate_size: 0,
     });
     device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
         label: None,
         layout: Some(&pl),
         module: &module,
-        entry_point: "main",
+        entry_point: Some("main"),
         compilation_options: Default::default(),
         cache: None,
     })
@@ -241,12 +241,17 @@ pub fn run(
         stage.slice(..).map_async(wgpu::MapMode::Read, move |r| {
             tx.send(r).ok();
         });
-        c.device.poll(wgpu::Maintain::Wait);
+        c.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .map_err(|e| format!("gpu: poll failed: {e:?}"))?;
         rx.recv()
             .map_err(|_| "gpu: map channel closed".to_string())?
             .map_err(|e| format!("gpu: map failed: {e:?}"))?;
         {
-            let view = stage.slice(..).get_mapped_range();
+            let view = stage
+                .slice(..)
+                .get_mapped_range()
+                .map_err(|e| format!("gpu: map range failed: {e:?}"))?;
             let vals: &[f32] = bytemuck::cast_slice(&view);
             result.insert(*h, vals.to_vec());
         }
@@ -266,24 +271,22 @@ pub fn ctx() -> Option<&'static Ctx> {
 }
 
 fn init() -> Option<Ctx> {
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::all(),
-        ..Default::default()
-    });
+    let instance = wgpu::Instance::new(super::backend::instance_desc());
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
         force_fallback_adapter: false,
         compatible_surface: None,
-    }))?;
-    let (device, queue) = pollster::block_on(adapter.request_device(
-        &wgpu::DeviceDescriptor {
-            label: None,
-            required_features: wgpu::Features::empty(),
-            required_limits: wgpu::Limits::default(),
-            memory_hints: Default::default(),
-        },
-        None,
-    ))
+        apply_limit_buckets: false,
+    }))
+    .ok()?;
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        label: None,
+        required_features: wgpu::Features::empty(),
+        required_limits: wgpu::Limits::default(),
+        experimental_features: wgpu::ExperimentalFeatures::disabled(),
+        memory_hints: Default::default(),
+        trace: wgpu::Trace::Off,
+    }))
     .ok()?;
     let layout3 = layout(&device, 3);
     let layout4 = layout(&device, 4);
