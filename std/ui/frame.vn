@@ -1,4 +1,5 @@
 import { UiWindow, UiEventKind, TypedText } from "std:ui/window";
+import { TextEdit } from "std:ui/edit";
 import { MOUSE_LEFT } from "std:ui/keys";
 
 export class Handler {
@@ -35,6 +36,9 @@ export class UiFrame {
     layer: int;
     modalFrom: int;
     handlers: Handler[];
+    ids: Map<str, int>;
+    lastId: int;
+    edits: Map<int, TextEdit>;
 
     constructor(w: int, h: int) {
         this.mouseX = 0;
@@ -54,6 +58,9 @@ export class UiFrame {
         this.layer = 0;
         this.modalFrom = -1;
         this.handlers = [];
+        this.ids = new Map<str, int>();
+        this.lastId = 0;
+        this.edits = new Map<int, TextEdit>();
         this.w = w;
         this.h = h;
     }
@@ -114,6 +121,26 @@ export class UiFrame {
         this.layer = 0;
         this.modalFrom = -1;
         this.modal = false;
+    }
+
+    idOf(path: str): int {
+        const known = this.ids.get(path);
+        if (known !== null) {
+            return known;
+        }
+        this.lastId = this.lastId + 1;
+        this.ids.set(path, this.lastId);
+        return this.lastId;
+    }
+
+    editFor(slot: int): TextEdit {
+        const known = this.edits.get(slot);
+        if (known !== null) {
+            return known;
+        }
+        const fresh = new TextEdit();
+        this.edits.set(slot, fresh);
+        return fresh;
     }
 
     enterLayer(modal: bool): void {

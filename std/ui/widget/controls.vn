@@ -13,18 +13,6 @@ const FOCUS_GAINED: float = 1.0;
 const FOCUS_LOST: float = 0.0;
 const SUBMITTED: float = 2.0;
 
-const fieldEdits = new Map<int, TextEdit>();
-
-function ownedEdit(slot: int): TextEdit {
-    const existing = fieldEdits.get(slot);
-    if (existing !== null) {
-        return existing;
-    }
-    const fresh = new TextEdit();
-    fieldEdits.set(slot, fresh);
-    return fresh;
-}
-
 function paintText(cx: PaintContext, slot: int, x: float, y: float, w: float, h: float, ed: TextEdit, kind: UiControlKind, hint: str, size: float, submit: ((text: str) => void)?, changed: (text: str) => void): void {
     if (cx.fr.leftPressed && !hit(cx.fr.mouseX as float, cx.fr.mouseY as float, x, y, w, h) && cx.focus.current() == slot) {
         cx.focus.clear();
@@ -115,7 +103,7 @@ export class FieldNode extends Widget {
         const w = p.size.w;
         const h = p.size.h;
         const slot = cx.idFor();
-        const ed = this.edit ?? ownedEdit(slot);
+        const ed = this.edit ?? cx.fr.editFor(slot);
         const bound = this.bound;
         if (bound !== null) {
             ed.text = bound.peek();
