@@ -1,0 +1,38 @@
+import { describe, it, expect } from "std:test";
+import { channel, sleep, spawn } from "std:task";
+
+const feed = channel<int>(8);
+
+async function* fromFeed() {
+    yield await feed.rx.receive();
+}
+
+async function firstFromFeed(): Task<int> {
+    for await (const v of fromFeed()) {
+        return v;
+    }
+    return -1;
+}
+
+async function* ticks() {
+    yield 1;
+    await sleep(2);
+    yield 2;
+}
+
+await describe("242 async generator next() is a task", async () => {
+    await it("a body waiting on a channel is resumed by the outer task", async () => {
+        const waiting = spawn(firstFromFeed());
+        await sleep(5);
+        feed.tx.send(7);
+        expect(await waiting).toBe(7);
+    });
+
+    await it("next() returns a task that settles with the option", async () => {
+        const gen = ticks();
+        const pending = gen.next();
+        expect((await pending).unwrap()).toBe(1);
+        expect((await gen.next()).unwrap()).toBe(2);
+        expect((await gen.next()).isNone()).toBeTruthy();
+    });
+});

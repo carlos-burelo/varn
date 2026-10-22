@@ -42,18 +42,18 @@ async function failing(): int {
 }
 
 async function runAsyncGenerators() {
-    // Manual driving: each `next()` runs the body up to the next `yield`,
-    // settling every `await` on the way.
+    // Manual driving: each `next()` returns a task that runs the body up to
+    // the next `yield`, settling every `await` on the way.
     const manual = awaitsThenYields()
-    expect(manual.next().unwrap()).toBe(10)
-    expect(manual.next().unwrap()).toBe(20)
-    expect(manual.next().unwrap()).toBe(30)
-    expect(manual.next().isNone()).toBeTruthy()
+    expect((await manual.next()).unwrap()).toBe(10)
+    expect((await manual.next()).unwrap()).toBe(20)
+    expect((await manual.next()).unwrap()).toBe(30)
+    expect((await manual.next()).isNone()).toBeTruthy()
 
     // More than one await between two yields.
     const between = awaitsBetweenYields()
-    expect(between.next().unwrap()).toBe(40)
-    expect(between.next().unwrap()).toBe(50)
+    expect((await between.next()).unwrap()).toBe(40)
+    expect((await between.next()).unwrap()).toBe(50)
 
     let total = 0
     for await (const v of awaitsThenYields()) {
@@ -61,14 +61,7 @@ async function runAsyncGenerators() {
     }
     expect(total).toBe(60)
 
-    // A plain `for..of` works too: the values are already settled.
-    let plain = 0
-    for (const v of awaitsThenYields()) {
-        plain = plain + v
-    }
-    expect(plain).toBe(60)
-
-    const heaps = yieldsHeapValues().next().unwrap()
+    const heaps = (await yieldsHeapValues().next()).unwrap()
     expect(heaps.length === 2 && heaps[1] === 20).toBeTruthy()
 
     // A generator can await a real suspension, not just an already-settled task.
@@ -76,18 +69,18 @@ async function runAsyncGenerators() {
         await sleep(1)
         yield 7
     }
-    expect(awaitsSleep().next().unwrap()).toBe(7)
+    expect((await awaitsSleep().next()).unwrap()).toBe(7)
 
     // A rejected `await` unwinds to a `try` inside the generator body, exactly
     // as it does inside an async function.
-    expect(catchesItsOwnRejection().next().unwrap()).toBe(99)
+    expect((await catchesItsOwnRejection().next()).unwrap()).toBe(99)
 
     // Not covered here: a `throw` that escapes the body. It is not catchable at
     // the `next()` call site for a plain `function*` either — the driver
     // surfaces it as a runtime error rather than a Varn throw — so it is a
     // generator gap, not an async one.
     const throwing = throwsAfterAYield()
-    expect(throwing.next().unwrap()).toBe(1)
+    expect((await throwing.next()).unwrap()).toBe(1)
 }
 await describe("77 async generators", async () => {
     await it("tests", async () => {
