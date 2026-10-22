@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Constraints, Placement, paintAt } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement, paintAt, fixedSize } from "std:ui/widget/base";
 import { mountChild } from "std:ui/state";
 import { Card, Box } from "std:ui/widget/box";
 import { Text } from "std:ui/widget/text";
@@ -29,11 +29,7 @@ export class DialogNode extends Widget {
     }
 
     override computeLayout(c: Constraints): Placement {
-        return new Placement(this, new Size(0.0, 0.0), []);
-    }
-
-    override measure(maxW: float, maxH: float): Size {
-        return new Size(0.0, 0.0);
+        return new Placement(this, fixedSize(this, c, new Size(0.0, 0.0)), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
@@ -89,11 +85,7 @@ export class ToastsNode extends Widget {
     }
 
     override computeLayout(c: Constraints): Placement {
-        return new Placement(this, new Size(0.0, 0.0), []);
-    }
-
-    override measure(maxW: float, maxH: float): Size {
-        return new Size(0.0, 0.0);
+        return new Placement(this, fixedSize(this, c, new Size(0.0, 0.0)), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
@@ -133,8 +125,8 @@ export class SelectNode extends Widget {
         this.h = h;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return this.fit(new Size(maxW, this.h));
+    override computeLayout(c: Constraints): Placement {
+        return new Placement(this, fixedSize(this, c, new Size(c.maxW, this.h)), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {

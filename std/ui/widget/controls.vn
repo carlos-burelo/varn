@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Placement } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Placement, fixedSize, Constraints } from "std:ui/widget/base";
 import { Theme, ButtonKind, buttonColorFor, buttonTextColorFor } from "std:ui/style";
 import { UiControlKind } from "std:ui/window";
 import { hit } from "std:ui/keys";
@@ -57,9 +57,9 @@ export class ButtonNode extends Widget {
     radius: float;
     enabled: bool;
 
-    override measure(maxW: float, maxH: float): Size {
+    override computeLayout(c: Constraints): Placement {
         const width = measure(this.label, this.size) + 2.0 * BUTTON_PAD;
-        return this.fit(new Size(width < maxW ? width : maxW, this.h));
+        return new Placement(this, fixedSize(this, c, new Size(width, this.h)), []);
     }
 
     constructor(label: str, onPress: () => void, w: float, h: float, color: int, fg: int, size: float, radius: float, enabled: bool) {
@@ -107,8 +107,8 @@ export class FieldNode extends Widget {
         this.onSubmit = onSubmit;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return this.fit(new Size(maxW, this.h));
+    override computeLayout(c: Constraints): Placement {
+        return new Placement(this, fixedSize(this, c, new Size(c.maxW, this.h)), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {

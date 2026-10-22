@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, paintAt, Placement } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, paintAt, Placement, fixedSize, Constraints } from "std:ui/widget/base";
 import { TextNode, TextAlign } from "std:ui/widget/text";
 import { TextStyle, BoxFit, Theme } from "std:ui/style";
 import { now } from "std:time";
@@ -15,8 +15,8 @@ export class ImageNode extends Widget {
         this.boxFit = boxFit;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return this.fit(new Size(maxW, 120.0));
+    override computeLayout(c: Constraints): Placement {
+        return new Placement(this, fixedSize(this, c, new Size(c.maxW, 120.0)), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
@@ -40,8 +40,8 @@ export class ProgressNode extends Widget {
         this.h = height;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return this.fit(new Size(maxW, this.h));
+    override computeLayout(c: Constraints): Placement {
+        return new Placement(this, fixedSize(this, c, new Size(c.maxW, this.h)), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {

@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Constraints, Placement, paintPlaced, layoutAt } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement, paintPlaced, layoutAt, fixedSize } from "std:ui/widget/base";
 
 export class WrapNode extends Widget {
     children: Widget[];
@@ -37,7 +37,7 @@ export class WrapNode extends Widget {
             widest = x - this.gap > widest ? x - this.gap : widest;
         }
         const natural = new Size(widest + 2.0 * this.pad, y + lineH + 2.0 * this.pad);
-        return new Placement(this, c.fit(this.fit(natural)), children);
+        return new Placement(this, fixedSize(this, c, natural), children);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {

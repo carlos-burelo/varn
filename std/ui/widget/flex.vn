@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Constraints, Placement, KeyedNode, paintSlot, paintPlaced, layoutAt } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement, KeyedNode, paintSlot, paintPlaced, layoutAt, fixedSize } from "std:ui/widget/base";
 import { resolveFloat, AdaptiveValue } from "std:ui/responsive";
 import { MainAxis, CrossAxis } from "std:ui/style";
 
@@ -69,7 +69,7 @@ export class FlexNode extends Widget {
         const natural = horizontal
             ? new Size(main + 2.0 * pad, cross + 2.0 * pad)
             : new Size(cross + 2.0 * pad, main + 2.0 * pad);
-        const size = c.fit(this.fit(natural));
+        const size = fixedSize(this, c, natural);
 
         const innerW = size.w - 2.0 * pad;
         const innerH = size.h - 2.0 * pad;

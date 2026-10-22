@@ -3,27 +3,32 @@
 Version: 1.0-draft
 Module: `std:ui`
 
-> **Estado de implementación (2026-10-21, verificado en `std/ui/` y `std/signals/`).**
+> **Estado de implementación (2026-10-22, verificado en `std/ui/` y `std/signals/`).**
 > El grafo reactivo vive en `std:signals`, independiente de la UI: `Readable<T>`
 > (`Signal<T>`, `Computed<T>`), `effect`, `batch`, `untracked`, `onCleanup`, `Scope`,
-> `Scheduler`, `until`, `next`, `changes`, `resource`. `std:ui` lo reexporta y solo
-> aporta el `Owner` de componente (`state.vn`): el decorador `@component` conserva
-> `signal`, `computed` y `effect` de su cuerpo entre fotogramas por orden de
-> llamada, y crear estado en otro orden que en el fotograma anterior es un error.
+> `Scheduler`, `until`, `next`, `changes`, `resource`. `std:ui` lo reexporta.
+> `@component()` (con paréntesis; sin ellos es error de compilación) monta su cuerpo
+> de forma perezosa, durante el layout. Su estado (`signal`, `computed`, `effect`)
+> pertenece al nodo montado, identificado por ruta de montaje y definición, y se libera
+> cuando un fotograma completo no lo monta. La raíz y cada componente se reconstruyen
+> solo cuando cambia una señal que leyeron (`View`, `std/ui/state.vn`).
 > Catálogo público (`widget/*.vn`, sin prefijo): `Text`/`Title`/`Headline`/`Caption`,
-> `Column`, `Row`, `Stack`, `Box`, `Card(children, title:)`, `Padding`, `SizedBox`,
-> `Spacer`, `Expanded`, `Divider`, `Button(kind: ButtonKind)`, `Input(bind:)`, `Field`,
-> `Checkbox`, `Switch`, `Slider`, `Segmented`, `Tabs`, `Grid`, `Table`, `Each`,
-> `Image`, `Progress` y `navigator<T>()`. Los controles de valor aceptan
-> `T | Signal<T>`: con una `Signal` se enlazan solos; con un valor simple exigen su
-> callback de cambio.
-> Layout de dos pasos: `measure(maxW, maxH): Size` y `paint(cx, x, y, w, h)`.
+> `Column`, `Row`, `Wrap`, `Stack`, `Box` (con `minW`/`maxW`/`minH`/`maxH`), `Card(children, title:)`,
+> `Padding`, `SizedBox`, `Spacer`, `Expanded`, `Divider`, `Button(label, onPress)`,
+> `Field(binding, multiline:)`, `Checkbox`, `Switch`, `Slider`, `Segmented`, `Tabs`, `Grid`,
+> `Table`, `Each`, `Image`, `Progress`, `Responsive` y `Adaptive`. `Field` acepta
+> `TextEdit | Signal<str>`: con una `Signal` se enlaza sola.
+> Protocolo de layout: `computeLayout(c: Constraints): Placement` por nodo, con caché por
+> constraints y época de layout, y `paint(cx, p: Placement, x, y)`. Las hojas usan
+> `fixedSize(node, c, natural)` para respetar `w`/`h` fijos.
 > `Column`/`Row` reparten el eje principal entre hijos intrínsecos y flexibles
-> (`Expanded`/`Spacer`); un contenedor con hijos flexibles o con `mainAxis` distinto
-> de `start` ocupa su eje principal, y un widget con `fills` (`Card`) ocupa el eje
-> cruzado. Por defecto `start` en columna y `center` en fila.
+> (`Expanded`/`Spacer`) de forma proporcional a `flex`. Los intrínsecos min/max no están
+> implementados.
+> Ventana: `UiWindow.open(title, w, h)` abre ventana por defecto; `headless: true` para
+> tests. `run(title, build, w, h)` y `present(win, fr)` son las entradas de bucle.
 > Puertas: `tests/220-ui-declarative.vn`, `tests/232-ui-layout.vn`,
-> `tests/241-ui-controls.vn`, `tests/235-signals.vn`, `tests/238-signals-tasks.vn`.
+> `tests/241-ui-controls.vn`, `tests/254-ui-reactive.vn`, `tests/255-ui-wrap-bounds.vn`,
+> `tests/235-signals.vn`, `tests/238-signals-tasks.vn`.
 > Stack de render: `varn-ui` pinta con egui-wgpu 0.37 (wgpu 30, la pareja más reciente) sobre epaint para teselar rectángulos; el texto se da forma y se parte en líneas con Parley 0.12 (`varn-text`), y los glifos se rasterizan con swash a pasos subpíxel. La superficie usa formato no sRGB, que es lo que egui-wgpu espera para mezclar en espacio gamma.
 > Overlays: `Dialog(open, title, body)` (modal, el velo cierra al pulsar fuera),
 > `Select(options, value)` (ancla y lista que se cierra al elegir o al pulsar
@@ -33,8 +38,6 @@ Module: `std:ui`
 > `Scroll(child, offset, h)`: rueda, desplazamiento acotado, recorte del contenido
 > y barra. El recorte es una sola operación (`PaintContext.clip`) que aplica el
 > recorte de GPU y el de los clics a la vez.
-> Puertas añadidas: `tests/243-ui-clip.vn`, `tests/244-ui-wheel.vn`,
-> `tests/245-ui-scroll.vn`, `tests/246-ui-overlays.vn`, `tests/247-top-level-using.vn`.
 > Pendiente: el pintado en GPU de runs con recorte no está verificado en pantalla
 > (solo compila; el suite es headless). El decorador `pure` (§12) y la UI IR (§16–§17).
 
@@ -380,22 +383,19 @@ Text(
 
 ```ts
 Button(
-    text: "Save",
+    label: "Save",
     enabled: true,
     onPress: save
 )
 ```
 
-### Input
+### Field
 
 ```ts
 const name = signal("")
 
-Input(
-    value: name(),
-    onChange: value => name(value),
-    placeholder: "Name"
-)
+Field(name, hint: "Name")
+Field(name, hint: "Notes", multiline: true)
 ```
 
 ### Image

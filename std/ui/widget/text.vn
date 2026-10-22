@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Placement } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Placement, fixedSize, Constraints } from "std:ui/widget/base";
 import { TextStyle, textSizeFor, textColorFor } from "std:ui/style";
 import { textX, textY, ellipsize } from "std:ui/layout";
 import { measure, ascent, descent } from "std:ui/text";
@@ -27,9 +27,9 @@ export class TextNode extends Widget {
         this.maxLines = maxLines;
     }
 
-    override measure(maxW: float, maxH: float): Size {
+    override computeLayout(c: Constraints): Placement {
         const width = measure(this.text, this.size);
-        return this.fit(new Size(width < maxW ? width : maxW, ascent(this.size) + descent(this.size)));
+        return new Placement(this, fixedSize(this, c, new Size(width, ascent(this.size) + descent(this.size))), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {

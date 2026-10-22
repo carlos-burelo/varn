@@ -172,14 +172,7 @@ export abstract class Widget {
     flex: float = 0.0;
     fills: bool = false;
 
-    measure(maxW: float, maxH: float): Size {
-        return this.layout(Constraints.loose(maxW, maxH)).size;
-    }
     abstract paint(cx: PaintContext, p: Placement, x: float, y: float): void;
-
-    fit(natural: Size): Size {
-        return new Size(this.w >= 0.0 ? this.w : natural.w, this.h >= 0.0 ? this.h : natural.h);
-    }
 
     layout(c: Constraints): Placement {
         const key = [c.minW, c.maxW, c.minH, c.maxH, layoutEpoch];
@@ -193,9 +186,11 @@ export abstract class Widget {
         return placed;
     }
 
-    computeLayout(c: Constraints): Placement {
-        return new Placement(this, c.fit(this.measure(c.maxW, c.maxH)), []);
-    }
+    abstract computeLayout(c: Constraints): Placement;
+}
+
+export function fixedSize(node: Widget, c: Constraints, natural: Size): Size {
+    return c.fit(new Size(node.w >= 0.0 ? node.w : natural.w, node.h >= 0.0 ? node.h : natural.h));
 }
 
 export class KeyedNode extends Widget {

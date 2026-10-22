@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, alignedX, alignedY, Constraints, Placement, paintPlaced, layoutAt } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, alignedX, alignedY, Constraints, Placement, paintPlaced, layoutAt, fixedSize } from "std:ui/widget/base";
 import { Column } from "std:ui/widget/flex";
 import { Title } from "std:ui/widget/text";
 import { Alignment, Colors, Theme } from "std:ui/style";
@@ -33,7 +33,7 @@ export class BoxNode extends Widget {
         const bounded = this.bounds(c);
         const measured = child === null ? null : layoutAt(child, "child", Constraints.loose(bounded.maxW - 2.0 * pad, bounded.maxH - 2.0 * pad));
         const inner = measured === null ? new Size(0.0, 0.0) : measured.size;
-        const size = bounded.fit(this.fit(new Size(inner.w + 2.0 * pad, inner.h + 2.0 * pad)));
+        const size = fixedSize(this, bounded, new Size(inner.w + 2.0 * pad, inner.h + 2.0 * pad));
         const children: Placement[] = [];
         if (child !== null) {
             const wantW = size.w - 2.0 * pad;
@@ -90,7 +90,7 @@ export class StackNode extends Widget {
             width = size.w > width ? size.w : width;
             height = size.h > height ? size.h : height;
         }
-        const size = c.fit(this.fit(new Size(width, height)));
+        const size = fixedSize(this, c, new Size(width, height));
         const children: Placement[] = [];
         for (let i = 0; i < this.children.length; i = i + 1) {
             const child = this.children[i];
@@ -135,7 +135,7 @@ export class PaddingNode extends Widget {
         const child = this.child;
         const measured = child === null ? null : layoutAt(child, "child", Constraints.loose(c.maxW - horizontal, c.maxH - vertical));
         const inner = measured === null ? new Size(0.0, 0.0) : measured.size;
-        const size = c.fit(this.fit(new Size(inner.w + horizontal, inner.h + vertical)));
+        const size = fixedSize(this, c, new Size(inner.w + horizontal, inner.h + vertical));
         const children: Placement[] = [];
         if (child !== null) {
             const wantW = size.w - horizontal < 0.0 ? 0.0 : size.w - horizontal;
@@ -171,7 +171,7 @@ export class SizedBoxNode extends Widget {
         const child = this.child;
         const measured = child === null ? null : layoutAt(child, "child", c);
         const inner = measured === null ? new Size(0.0, 0.0) : measured.size;
-        const size = c.fit(this.fit(inner));
+        const size = fixedSize(this, c, inner);
         const children: Placement[] = [];
         if (child !== null) {
             const placed = (measured !== null && measured.size.w == size.w && measured.size.h == size.h) ? measured : layoutAt(child, "child", Constraints.tight(size.w, size.h));
@@ -216,8 +216,8 @@ export class SpacerNode extends Widget {
         this.flex = flex;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return new Size(0.0, 0.0);
+    override computeLayout(c: Constraints): Placement {
+        return new Placement(this, fixedSize(this, c, new Size(0.0, 0.0)), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {}
@@ -231,8 +231,8 @@ export class DividerNode extends Widget {
         this.color = color;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return new Size(maxW, 1.0);
+    override computeLayout(c: Constraints): Placement {
+        return new Placement(this, fixedSize(this, c, new Size(c.maxW, 1.0)), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {

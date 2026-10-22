@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Placement } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Placement, fixedSize, Constraints } from "std:ui/widget/base";
 import { current, writer } from "std:ui/widget/bound";
 import { Theme } from "std:ui/style";
 import { Signal } from "std:signals";
@@ -19,8 +19,8 @@ export class SliderNode extends Widget {
         this.h = h;
     }
 
-    override measure(maxW: float, maxH: float): Size {
-        return this.fit(new Size(maxW, this.h));
+    override computeLayout(c: Constraints): Placement {
+        return new Placement(this, fixedSize(this, c, new Size(c.maxW, this.h)), []);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
