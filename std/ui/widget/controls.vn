@@ -90,14 +90,16 @@ export class ButtonNode extends Widget {
 
 export class FieldNode extends Widget {
     edit: TextEdit?;
+    bound: Signal<str>?;
     hint: str;
     size: float;
     multiline: bool;
     onSubmit: ((text: str) => void)?;
 
-    constructor(edit: TextEdit?, hint: str, h: float, size: float, multiline: bool, onSubmit: ((text: str) => void)?) {
+    constructor(edit: TextEdit?, bound: Signal<str>?, hint: str, h: float, size: float, multiline: bool, onSubmit: ((text: str) => void)?) {
         super();
         this.edit = edit;
+        this.bound = bound;
         this.hint = hint;
         this.h = h;
         this.size = size;
@@ -114,54 +116,27 @@ export class FieldNode extends Widget {
         const h = p.size.h;
         const slot = cx.idFor();
         const ed = this.edit ?? ownedEdit(slot);
+        const bound = this.bound;
+        if (bound !== null) {
+            ed.text = bound.peek();
+        }
         const kind = this.multiline ? UiControlKind.Area : UiControlKind.Field;
-        paintText(cx, slot, x, y, w, h, ed, kind, this.hint, this.size, this.onSubmit, (text: str) => {});
+        paintText(cx, slot, x, y, w, h, ed, kind, this.hint, this.size, this.onSubmit, (text: str) => {
+            if (bound !== null) {
+                bound.set(text);
+            }
+        });
     }
 }
 
-export class InputNode extends Widget {
-    value: str;
-    onChange: (value: str) => void;
-    hint: str;
-    size: float;
-    onSubmit: ((value: str) => void)?;
+export function Button(label: str, onPress: () => void, kind: ButtonKind = ButtonKind.primary, enabled: bool = true, w: float = -1.0, h: float = 40.0, size: float = 17.0, radius: float = 8.0): Widget {
+    return new ButtonNode(label, onPress, w, h, buttonColorFor(kind), buttonTextColorFor(kind), size, radius, enabled);
+}
 
-    constructor(value: str, onChange: (value: str) => void, hint: str, h: float, size: float, onSubmit: ((value: str) => void)?) {
-        super();
-        this.value = value;
-        this.onChange = onChange;
-        this.hint = hint;
-        this.h = h;
-        this.size = size;
-        this.onSubmit = onSubmit;
+export function Field(binding: TextEdit | Signal<str> | null = null, hint: str = "", multiline: bool = false, h: float = -1.0, size: float = 18.0, onSubmit: ((text: str) => void)? = null): Widget {
+    const height = h >= 0.0 ? h : (multiline ? 140.0 : 44.0);
+    if (binding is Signal<str>) {
+        return new FieldNode(null, binding as Signal<str>, hint, height, size, multiline, onSubmit);
     }
-
-    override measure(maxW: float, maxH: float): Size {
-        return this.fit(new Size(maxW, this.h));
-    }
-
-    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
-        const w = p.size.w;
-        const h = p.size.h;
-        const slot = cx.idFor();
-        const ed = ownedEdit(slot);
-        ed.text = this.value;
-        paintText(cx, slot, x, y, w, h, ed, UiControlKind.Field, this.hint, this.size, this.onSubmit, (text: str) => this.onChange(text));
-    }
-}
-
-export function Button(text: str, onPress: () => void, kind: ButtonKind = ButtonKind.primary, enabled: bool = true, w: float = -1.0, h: float = 40.0, size: float = 17.0, radius: float = 8.0): Widget {
-    return new ButtonNode(text, onPress, w, h, buttonColorFor(kind), buttonTextColorFor(kind), size, radius, enabled);
-}
-
-export function Field(edit: TextEdit? = null, hint: str = "", h: float = 44.0, size: float = 18.0, onSubmit: ((text: str) => void)? = null): Widget {
-    return new FieldNode(edit, hint, h, size, false, onSubmit);
-}
-
-export function TextArea(edit: TextEdit? = null, hint: str = "", h: float = 140.0, size: float = 18.0): Widget {
-    return new FieldNode(edit, hint, h, size, true, null);
-}
-
-export function Input(bind: Signal<str>, hint: str = "", onSubmit: ((value: str) => void)? = null, h: float = 44.0, size: float = 18.0): Widget {
-    return new InputNode(bind.value, (next: str) => bind.set(next), hint, h, size, onSubmit);
+    return new FieldNode(binding as TextEdit?, null, hint, height, size, multiline, onSubmit);
 }

@@ -1,5 +1,5 @@
 import {
-    Column, Row, Text, Title, Headline, Caption, Card, Box, Button, ButtonKind, Checkbox, Switch, Slider, Input,
+    Column, Row, Text, Title, Headline, Caption, Card, Box, Button, ButtonKind, Checkbox, Switch, Slider, Field,
     Segmented, Tabs, Select, Dialog, Toaster, Toasts, Scroll, Each, Grid, Table, Progress, Divider, Spacer,
     Padding, Stack, Expanded, MainAxis, Theme, Colors, UiFrame, Focus, Widget,
     signal, computed, effect, component, run
@@ -63,7 +63,7 @@ function basics(): Widget {
 function controls(): Widget {
     return Card([
         Title("Form controls"),
-        Input(name, hint: "Your name"),
+        Field(name, hint: "Your name"),
         Row([Checkbox(notify), Text("Notify me")], gap: 10.0),
         Row([Switch(dark), Text(dark.value ? "Dark" : "Light")], gap: 10.0),
         Row([Slider(volume, low: 0.0, high: 1.0, h: 28.0), Text(`${volume.value}`)], gap: 12.0),
@@ -115,7 +115,7 @@ function overlays(): Widget {
     ]);
 }
 
-@component
+@component()
 function Gallery(): Widget {
     effect(() => print(`tasks left: ${remaining.value}`));
     return Scroll(overlays(), signal(0.0));

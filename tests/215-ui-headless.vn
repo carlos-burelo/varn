@@ -3,7 +3,7 @@ import {
     UiWindow,
     UiFrame,
     Focus,
-    TextEdit, TextArea, Field, Input, Column, Widget, render, present, signal, UiInjectKind, MOUSE_LEFT, KEY_ENTER, KEY_BACKSPACE,
+    TextEdit, Field, Column, Widget, render, present, signal, UiInjectKind, MOUSE_LEFT, KEY_ENTER, KEY_BACKSPACE,
     KEY_BACKSPACE, KEY_TAB, KEY_ENTER, KEY_ESCAPE, KEY_SPACE, KEY_DELETE,
     KEY_ARROW_LEFT, KEY_ARROW_UP, KEY_ARROW_RIGHT, KEY_ARROW_DOWN,
     MOUSE_LEFT, MOUSE_RIGHT, MOUSE_MIDDLE,
@@ -37,7 +37,7 @@ function typeKey(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, code: i
 }
 
 await describe("215 ui headless", async () => {    await it("open reports size", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         expect(win.size()).toEqual([800, 600]);
         expect(win.shouldClose()).toBe(false);
     });
@@ -45,7 +45,7 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     await it("bad size throws", () => {
         let failed = false;
         try {
-            UiWindow.open("t", 0, 600);
+            UiWindow.open("t", 0, 600, true);
         } catch (e) {
             failed = true;
         }
@@ -53,7 +53,7 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("events round trip", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         win.inject(UiInjectKind.Key, 65, 1, 0);
         win.inject(UiInjectKind.Mouse, 10, 20, 1);
         win.inject(UiInjectKind.Resize, 1024, 768, 0);
@@ -71,7 +71,7 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("draw log and present drains", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         win.clear(0);
         win.rect(10.0, 20.0, 100.0, 50.0, 4278190335);
         win.text(10.0, 80.0, "hola", 16.0, 4294967295);
@@ -79,12 +79,12 @@ await describe("215 ui headless", async () => {    await it("open reports size",
         expect(cmds.length).toBe(3);
         expect(cmds[0].kind).toBe("clear");
         expect(cmds[2].kind == "text" && cmds[2].text == "hola" && cmds[2].x == 10.0 && cmds[2].y == 80.0).toBe(true);
-        expect(win.present()).toBe(3);
+        present(win, new UiFrame(800, 600));
         expect(win.drawn().length).toBe(0);
     });
 
     await it("close event and destroyed handle", () => {
-        const win = UiWindow.open("t", 800, 600);
+        const win = UiWindow.open("t", 800, 600, true);
         win.inject(UiInjectKind.Close, 0, 0, 0);
         expect(win.shouldClose()).toBe(true);
         expect(win.poll()[0].kind).toBe(UiEventKind.Close);
@@ -127,7 +127,7 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("key events carry codes end to end", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         win.inject(UiInjectKind.Key, keyCode("escape"), 1, 0);
         win.inject(UiInjectKind.Key, keyCode("left"), 1, 0);
         const evs = win.poll();
@@ -147,7 +147,7 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("frame aggregates key edges", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         win.inject(UiInjectKind.Key, KEY_ESCAPE, 1, 0);
         fr.update(win);
@@ -165,7 +165,7 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("frame clicks need down and up inside", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         win.inject(UiInjectKind.Mouse, 30, 40, -1);
         fr.update(win);
@@ -188,7 +188,7 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("frame rejects partial clicks", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         win.inject(UiInjectKind.MouseDown, 30, 40, MOUSE_LEFT);
         fr.update(win);
@@ -203,7 +203,7 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("frame tracks resize and close", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         win.inject(UiInjectKind.Resize, 1024, 768, 0);
         fr.update(win);
@@ -296,7 +296,7 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("frame separates press edge from repeat", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         win.inject(UiInjectKind.Key, 65, 1, 0);
         fr.update(win);
@@ -314,11 +314,11 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("a click focuses a field and typed keys fill its text", () => {
-        using win = UiWindow.open("t", 300, 120);
+        using win = UiWindow.open("t", 300, 120, true);
         const fr = new UiFrame(300, 120);
         const focus = new Focus();
         const ed = new TextEdit();
-        const tree = Column([Field(edit: ed, hint: "name")]);
+        const tree = Column([Field(ed, hint: "name")]);
         clickAt(win, fr, focus, tree, 60, 22);
         expect(ed.focused).toBe(true);
         typeKey(win, fr, focus, tree, 72);
@@ -329,11 +329,11 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("keys without focus are ignored and a click outside blurs", () => {
-        using win = UiWindow.open("t", 300, 120);
+        using win = UiWindow.open("t", 300, 120, true);
         const fr = new UiFrame(300, 120);
         const focus = new Focus();
         const ed = new TextEdit();
-        const tree = Column([Field(edit: ed, hint: "name")]);
+        const tree = Column([Field(ed, hint: "name")]);
         typeKey(win, fr, focus, tree, 65);
         expect(ed.text).toBe("");
         clickAt(win, fr, focus, tree, 60, 22);
@@ -345,12 +345,12 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("enter in a single-line field submits its text", () => {
-        using win = UiWindow.open("t", 300, 120);
+        using win = UiWindow.open("t", 300, 120, true);
         const fr = new UiFrame(300, 120);
         const focus = new Focus();
         const ed = new TextEdit();
         const submitted: str[] = [];
-        const tree = Column([Field(edit: ed, hint: "name", onSubmit: (text: str) => { submitted.push(text) })]);
+        const tree = Column([Field(ed, hint: "name", onSubmit: (text: str) => { submitted.push(text) })]);
         clickAt(win, fr, focus, tree, 60, 22);
         typeKey(win, fr, focus, tree, 97);
         typeKey(win, fr, focus, tree, KEY_ENTER);
@@ -358,11 +358,11 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("enter in a text area splits lines", () => {
-        using win = UiWindow.open("t", 300, 120);
+        using win = UiWindow.open("t", 300, 120, true);
         const fr = new UiFrame(300, 120);
         const focus = new Focus();
         const ed = new TextEdit();
-        const tree = Column([TextArea(edit: ed, hint: "notes", h: 100.0)]);
+        const tree = Column([Field(ed, hint: "notes", multiline: true, h: 100.0)]);
         clickAt(win, fr, focus, tree, 60, 22);
         typeKey(win, fr, focus, tree, 97);
         typeKey(win, fr, focus, tree, KEY_ENTER);
@@ -372,11 +372,11 @@ await describe("215 ui headless", async () => {    await it("open reports size",
     });
 
     await it("an input writes what is typed into its signal", () => {
-        using win = UiWindow.open("t", 300, 120);
+        using win = UiWindow.open("t", 300, 120, true);
         const fr = new UiFrame(300, 120);
         const focus = new Focus();
         const name = signal("");
-        const tree = Column([Input(name, hint: "name")]);
+        const tree = Column([Field(name, hint: "name")]);
         clickAt(win, fr, focus, tree, 60, 22);
         typeKey(win, fr, focus, tree, 90);
         expect(name.value).toBe("Z");

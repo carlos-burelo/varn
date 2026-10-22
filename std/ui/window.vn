@@ -10,7 +10,6 @@ import {
     clear$,
     clip$,
     unclip$,
-    present$,
     control$,
     field$,
     typed$,
@@ -35,7 +34,7 @@ export class UiWindow {
         this.id = id;
     }
 
-    static open(title: str, w: int, h: int, headless: bool = true): UiWindow {
+    static open(title: str, w: int, h: int, headless: bool = false): UiWindow {
         return new UiWindow(open$(title, w, h, headless));
     }
 
@@ -97,10 +96,6 @@ export class UiWindow {
 
     activated(): float[] {
         return activated$(this.id);
-    }
-
-    present(): int {
-        return present$(this.id);
     }
 
     real(): bool {

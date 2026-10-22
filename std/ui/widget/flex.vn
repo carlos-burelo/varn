@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, Constraints, Placement, KeyedNode, paintSlot, paintPlaced } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement, KeyedNode, paintSlot, paintPlaced, layoutAt } from "std:ui/widget/base";
 import { resolveFloat, AdaptiveValue } from "std:ui/responsive";
 import { MainAxis, CrossAxis } from "std:ui/style";
 
@@ -44,8 +44,9 @@ export class FlexNode extends Widget {
         const measured: Placement[] = [];
         let main = 0.0;
         let cross = 0.0;
-        for (let child of this.children) {
-            const placed = child.layout(Constraints.loose(inner.maxW, inner.maxH));
+        for (let i = 0; i < this.children.length; i = i + 1) {
+            const child = this.children[i];
+            const placed = layoutAt(child, `${i}`, Constraints.loose(inner.maxW, inner.maxH));
             measured.push(placed);
             main = main + this.mainOf(placed.size);
             const across = this.crossOf(placed.size);
@@ -55,7 +56,8 @@ export class FlexNode extends Widget {
             main = main + gap * ((this.children.length - 1) as float);
         }
         let flexible = false;
-        for (let child of this.children) {
+        for (let i = 0; i < this.children.length; i = i + 1) {
+            const child = this.children[i];
             if (child.flex > 0.0) {
                 flexible = true;
             }
@@ -136,7 +138,7 @@ export class FlexNode extends Widget {
             const wantH = horizontal ? thick : span;
             let placed = measuredChild;
             if (placed.size.w != wantW || placed.size.h != wantH) {
-                placed = child.layout(Constraints.tight(wantW, wantH));
+                placed = layoutAt(child, `${i}`, Constraints.tight(wantW, wantH));
             }
             placed.x = pad + (horizontal ? cursor : shift);
             placed.y = pad + (horizontal ? shift : cursor);

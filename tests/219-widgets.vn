@@ -20,7 +20,7 @@ function tapEnter(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void 
 
 await describe("219 widgets", async () => {
     await it("renders a tree headless", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const ed = new TextEdit();
@@ -28,18 +28,17 @@ await describe("219 widgets", async () => {
         const tree = Column([
             Text("hola"),
             Button("ok", onPress: () => { hits.push(true); }),
-            Field(edit: ed, hint: "type")
+            Field(ed, hint: "type")
         ]);
         win.clear(0);
         render(win, fr, focus, tree, 0.0, 0.0, 800.0, 600.0);
         const cmds = win.drawn();
         expect(cmds.length > 3).toBe(true);
         expect(cmds[0].kind).toBe("clear");
-        expect(win.present()).toBe(cmds.length);
     });
 
     await it("button fires onPress on click", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const hits: bool[] = [];
@@ -59,11 +58,11 @@ await describe("219 widgets", async () => {
     });
 
     await it("field types through render", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const ed = new TextEdit();
-        const tree = Field(edit: ed);
+        const tree = Field(ed);
         render(win, fr, focus, tree, 10.0, 10.0, 200.0, 44.0);
         present(win, fr);
         expect(ed.focused).toBe(false);
@@ -86,7 +85,7 @@ await describe("219 widgets", async () => {
     });
 
     await it("row distributes widget widths", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const left: bool[] = [];
@@ -108,7 +107,7 @@ await describe("219 widgets", async () => {
     });
 
     await it("checkbox toggles on click", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const state = { on: false };
@@ -126,7 +125,7 @@ await describe("219 widgets", async () => {
     });
 
     await it("each builds one row per item", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const seen: int[] = [];
@@ -139,7 +138,6 @@ await describe("219 widgets", async () => {
         expect(seen).toEqual([0, 1, 2]);
         const n = win.drawn().length;
         expect(n > 0).toBe(true);
-        expect(win.present()).toBe(n);
     });
 
     await it("spacer divider and run own the loop", () => {
@@ -152,7 +150,7 @@ await describe("219 widgets", async () => {
     });
 
     await it("field submits and clears on enter", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const got: str[] = [];

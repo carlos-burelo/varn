@@ -24,7 +24,7 @@ function settle(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void {
 
 await describe("245 ui scroll", async () => {
     await it("the wheel moves the content with momentum and clamps at the ends", () => {
-        using win = UiWindow.open("t", 200, 100);
+        using win = UiWindow.open("t", 200, 100, true);
         const fr = new UiFrame(200, 100);
         const focus = new Focus();
         const at = signal(0.0);
@@ -46,7 +46,7 @@ await describe("245 ui scroll", async () => {
     });
 
     await it("the content is clipped to the viewport", () => {
-        using win = UiWindow.open("t", 200, 100);
+        using win = UiWindow.open("t", 200, 100, true);
         const fr = new UiFrame(200, 100);
         const focus = new Focus();
         const tree = Scroll(Column(rows(10), gap: 0.0), signal(0.0), 100.0);

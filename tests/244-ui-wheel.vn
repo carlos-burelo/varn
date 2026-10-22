@@ -3,7 +3,7 @@ import { UiWindow, UiFrame, UiInjectKind } from "std:ui";
 
 await describe("244 ui wheel", async () => {
     await it("wheel events accumulate into the frame for one update", () => {
-        using win = UiWindow.open("t", 200, 100);
+        using win = UiWindow.open("t", 200, 100, true);
         const fr = new UiFrame(200, 100);
         win.inject(UiInjectKind.Wheel, -40, 0, 0);
         win.inject(UiInjectKind.Wheel, -15, 0, 0);

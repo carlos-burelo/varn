@@ -1,24 +1,24 @@
 import { describe, it, expect } from "std:test";
 import {
     UiWindow, UiFrame, Focus, Widget, render, present, FlexNode, TextNode, BoxNode, PaddingNode, Axis, TextAlign,
-    Column, Row, Text, Box, Padding, Stack, SizedBox, Spacer, Button, Input, Each,
+    Column, Row, Text, Box, Padding, Stack, SizedBox, Spacer, Button, Field, Each,
     signal, computed, effect, component,
     TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Colors, Theme,
     textSizeFor, textColorFor, run
 } from "std:ui";
-import { MOUSE_LEFT, UiInjectKind } from "std:ui";
+import { MOUSE_LEFT, UiInjectKind, expanded } from "std:ui";
 import { beginFrame, endFrame } from "std:ui/state";
 
 let boots = 0;
 
-@component
+@component()
 function Clicker(): Widget {
     const clicks = signal(0);
     const label = computed(() => `clicks: ${clicks.value}`);
     effect(() => { boots = boots + 1; });
     return Column(children: [
         Text(label.value),
-        Button(text: "more", onPress: () => { clicks.value = clicks.value + 1; })
+        Button(label: "more", onPress: () => { clicks.value = clicks.value + 1; })
     ]);
 }
 
@@ -27,7 +27,7 @@ function label(w: Widget): TextNode { return w as TextNode; }
 
 let reorder = false;
 
-@component
+@component()
 function Reordering(): Widget {
     if (reorder) {
         computed(() => 1);
@@ -36,7 +36,7 @@ function Reordering(): Widget {
     return Text(`${kept.value}`);
 }
 
-@component
+@component()
 function Stable(): Widget {
     const kept = signal(0);
     kept.value = kept.value + 1;
@@ -48,7 +48,7 @@ type Todo = {
     title: str
 };
 
-@component
+@component()
 function Counter(): Widget {
     return Column(
         children: [
@@ -57,7 +57,7 @@ function Counter(): Widget {
     );
 }
 
-@component
+@component()
 function Dashboard(): Widget {
     return Column(
         gap: 16.0,
@@ -79,7 +79,7 @@ function Dashboard(): Widget {
     );
 }
 
-@component
+@component()
 function ConnectionStatus(): Widget {
     const connected = signal(false);
     return Column(
@@ -89,33 +89,33 @@ function ConnectionStatus(): Widget {
     );
 }
 
-@component
+@component()
 function TodoRow(todo: Todo): Widget {
     return Text(todo.title);
 }
 
-@component
-@component
+@component()
+@component()
 function PriceLabel(price: float): Widget {
     return Text(price.toString(), style: TextStyle.title);
 }
 
 await describe("220 ui declarative", async () => {
     await it("counter builds a column with one text", () => {
-        const tree = Counter();
+        const tree = expanded(Counter());
         expect(tree is FlexNode).toBe(true);
         expect(flex(tree).axis).toBe(Axis.vertical);
         expect(flex(tree).children.length).toBe(1);
         expect(flex(tree).children[0] is TextNode).toBe(true);
-        expect(label(flex(tree).children[0]).text).toBe("Counter");
+        expect(label(expanded(flex(tree).children[0])).text).toBe("Counter");
     });
 
     await it("dashboard composes title and revenue row", () => {
-        const tree = Dashboard();
+        const tree = expanded(Dashboard());
         expect(flex(tree).axis).toBe(Axis.vertical);
         expect(flex(tree).gap).toBe(16.0);
         expect(flex(tree).children.length).toBe(2);
-        expect(label(flex(tree).children[0]).style).toBe(TextStyle.title);
+        expect(label(expanded(flex(tree).children[0])).style).toBe(TextStyle.title);
         const rowNode = flex(flex(tree).children[1]);
         expect(rowNode.axis).toBe(Axis.horizontal);
         expect(rowNode.mainAxis).toBe(MainAxis.spaceBetween);
@@ -131,10 +131,10 @@ await describe("220 ui declarative", async () => {
                 Text(connected.value ? "Connected" : "Disconnected")
             ]
         );
-        expect(label(flex(build()).children[0]).text).toBe("Disconnected");
+        expect(label(expanded(flex(build()).children[0])).text).toBe("Disconnected");
         connected.value = true;
-        expect(label(flex(build()).children[0]).text).toBe("Connected");
-        expect(ConnectionStatus() is FlexNode).toBe(true);
+        expect(label(expanded(flex(build()).children[0])).text).toBe("Connected");
+        expect(expanded(ConnectionStatus()) is FlexNode).toBe(true);
     });
 
     await it("each keeps stable order with keys", () => {
@@ -142,18 +142,18 @@ await describe("220 ui declarative", async () => {
         const list = Each(todos, (t: Todo): str => t.title, (t: Todo, index: int) => TodoRow(todo: t));
         expect(list is FlexNode).toBe(true);
         expect(flex(list).children.length).toBe(2);
-        expect(label(flex(list).children[0]).text).toBe("a");
-        expect(label(flex(list).children[1]).text).toBe("b");
-        expect(label(PriceLabel(9.5)).text).toBe("9.5");
+        expect(label(expanded(flex(list).children[0])).text).toBe("a");
+        expect(label(expanded(flex(list).children[1])).text).toBe("b");
+        expect(label(expanded(PriceLabel(9.5))).text).toBe("9.5");
     });
 
     await it("disabled button ignores clicks", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const hits: bool[] = [];
         const tree = Column(children: [
-            Button(text: "no", onPress: () => { hits.push(true); }, enabled: false)
+            Button(label: "no", onPress: () => { hits.push(true); }, enabled: false)
         ]);
         renderTree(win, fr, focus, tree);
         present(win, fr);
@@ -168,7 +168,7 @@ await describe("220 ui declarative", async () => {
         expect(hits.length).toBe(0);
         const hits2: bool[] = [];
         const tree2 = Column(children: [
-            Button(text: "yes", onPress: () => { hits2.push(true); })
+            Button(label: "yes", onPress: () => { hits2.push(true); })
         ]);
         const fr2 = new UiFrame(800, 600);
         const focus2 = new Focus();
@@ -186,11 +186,11 @@ await describe("220 ui declarative", async () => {
     });
 
     await it("input echoes typed text into signal", () => {
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         const name = signal("");
-        const build = (): Widget => Input(bind: name, hint: "Name");
+        const build = (): Widget => Field(name, hint: "Name");
         renderTree(win, fr, focus, build());
         present(win, fr);
         win.inject(UiInjectKind.MouseDown, 30, 30, MOUSE_LEFT);
@@ -213,8 +213,8 @@ await describe("220 ui declarative", async () => {
     await it("a component keeps its signals between frames", () => {
         const seen: str[] = [];
         run("t", build: (fr: UiFrame, focus: Focus): Widget => {
-            const tree = Clicker();
-            seen.push(label(flex(tree).children[0]).text);
+            const tree = expanded(Clicker());
+            seen.push(label(expanded(flex(tree).children[0])).text);
             return tree;
         }, w: 400, h: 200, maxFrames: 4);
         expect(seen[0]).toBe("clicks: 0");
@@ -262,32 +262,31 @@ await describe("220 ui declarative", async () => {
         );
         expect(tree is BoxNode).toBe(true);
         expect((tree as BoxNode).child is PaddingNode).toBe(true);
-        using win = UiWindow.open("t", 800, 600);
+        using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
         win.clear(Theme.colors.surface);
         renderTree(win, fr, focus, tree);
         expect(win.drawn().length > 0).toBe(true);
-        expect(win.present() > 0).toBe(true);
     });
     await it("component state survives frames", () => {
         beginFrame();
-        expect(label(Stable()).text).toBe("1");
+        expect(label(expanded(Stable())).text).toBe("1");
         endFrame();
         beginFrame();
-        expect(label(Stable()).text).toBe("2");
+        expect(label(expanded(Stable())).text).toBe("2");
         endFrame();
     });
 
     await it("a component that creates its state in another order is reported", () => {
         beginFrame();
-        Reordering();
+        expanded(Reordering());
         endFrame();
         reorder = true;
         beginFrame();
         let failed = false;
         try {
-            Reordering();
+            expanded(Reordering());
         } catch (e) {
             failed = true;
         }

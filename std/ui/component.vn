@@ -1,8 +1,53 @@
 import { FunctionRef } from "std:reflect";
 import { withOwner } from "std:signals";
-import { newComponentId, scopeFor } from "std:ui/state";
+import { scopeAtMount, newComponentDefinition } from "std:ui/state";
+import { Widget, Constraints, Placement, PaintContext, paintPlaced, KeyedNode } from "std:ui/widget/base";
 
-export function component(fn: FunctionRef): FunctionRef {
-    const id = newComponentId();
-    return (...args: int[]) => withOwner(scopeFor(id), () => fn(...args));
+export class ComponentNode extends Widget {
+    body: () => Widget;
+    expanded: Widget? = null;
+
+    definition: int;
+
+    constructor(definition: int, body: () => Widget) {
+        super();
+        this.definition = definition;
+        this.body = body;
+    }
+
+    expand(): Widget {
+        const cached = this.expanded;
+        if (cached !== null) {
+            return cached;
+        }
+        const built = withOwner(scopeAtMount(this.definition), this.body);
+        this.expanded = built;
+        return built;
+    }
+
+    override computeLayout(c: Constraints): Placement {
+        const placed = this.expand().layout(c);
+        return new Placement(this, placed.size, [placed]);
+    }
+
+    override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
+        paintPlaced(cx, p.children[0], x, y);
+    }
+}
+
+export function component(): (fn: FunctionRef) => (...args: int[]) => Widget {
+    return (fn: FunctionRef) => {
+        const definition = newComponentDefinition();
+        return (...args: int[]) => new ComponentNode(definition, () => fn(...args) as Widget);
+    };
+}
+
+export function expanded(w: Widget): Widget {
+    if (w is ComponentNode) {
+        return expanded((w as ComponentNode).expand());
+    }
+    if (w is KeyedNode) {
+        return expanded((w as KeyedNode).child);
+    }
+    return w;
 }

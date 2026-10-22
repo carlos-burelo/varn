@@ -10,13 +10,13 @@ function frameAt(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, w: floa
 
 await describe("layout v2 (planned)", async () => {
     await it("a field outside Responsive keeps its text when the class changes", () => {
-        using win = UiWindow.open("t", 960, 300);
+        using win = UiWindow.open("t", 960, 300, true);
         const fr = new UiFrame(960, 300);
         const focus = new Focus();
         const ed = new TextEdit();
         ed.text = "kept";
         const tree = Column([
-            Field(edit: ed, hint: "name"),
+            Field(ed, hint: "name"),
             Responsive((cls: WindowClass, c: Constraints): Widget => match cls {
                 compact => Text("a"),
                 medium => Text("b"),
@@ -29,7 +29,7 @@ await describe("layout v2 (planned)", async () => {
     });
 
     await it("each keeps item state when the list is reordered", () => {
-        using win = UiWindow.open("t", 960, 300);
+        using win = UiWindow.open("t", 960, 300, true);
         const fr = new UiFrame(960, 300);
         const focus = new Focus();
         const items = signal(["a", "b"]);
@@ -37,7 +37,7 @@ await describe("layout v2 (planned)", async () => {
         store.set("a", new TextEdit());
         store.set("b", new TextEdit());
         store.get("a")!.text = "first";
-        const build = (): Widget => Each(items.value, (s: str): str => s, (s: str, at: int): Widget => Field(edit: store.get(s)!, hint: s));
+        const build = (): Widget => Each(items.value, (s: str): str => s, (s: str, at: int): Widget => Field(store.get(s)!, hint: s));
         frameAt(win, fr, focus, build(), 320.0);
         items.set(["b", "a"]);
         frameAt(win, fr, focus, build(), 320.0);
@@ -45,7 +45,7 @@ await describe("layout v2 (planned)", async () => {
     });
 
     await it("box minW and maxW bound the child size", () => {
-        using win = UiWindow.open("t", 960, 300);
+        using win = UiWindow.open("t", 960, 300, true);
         const fr = new UiFrame(960, 300);
         const focus = new Focus();
         const tree = Box(w: 1000.0, minW: 0.0, maxW: 200.0, child: Text("x"));

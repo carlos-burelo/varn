@@ -1,4 +1,5 @@
 import { Widget, Size, PaintContext, Constraints, Placement, paintAt } from "std:ui/widget/base";
+import { mountChild } from "std:ui/state";
 import { Card, Box } from "std:ui/widget/box";
 import { Text } from "std:ui/widget/text";
 import { hit } from "std:ui/keys";
@@ -50,7 +51,7 @@ function paintDialog(cx: PaintContext, open: Signal<bool>, title: str, body: Wid
     const vh = fr.h as float;
     const width = DIALOG_WIDTH < vw - 2.0 * DIALOG_MARGIN ? DIALOG_WIDTH : vw - 2.0 * DIALOG_MARGIN;
     const panel = Card(body, title: title, w: width);
-    const size = panel.layout(Constraints.loose(width, vh)).size;
+    const size = mountChild("dialog", () => panel.layout(Constraints.loose(width, vh))).size;
     const px = (vw - width) / 2.0;
     const py = (vh - size.h) / 2.0;
     cx.win.rect(0.0, 0.0, vw, vh, SCRIM, 0.0);
@@ -59,7 +60,7 @@ function paintDialog(cx: PaintContext, open: Signal<bool>, title: str, body: Wid
             open.set(false);
         }
     });
-    paintAt(panel, cx, px, py, width, size.h);
+    cx.keyed("dialog", () => paintAt(panel, cx, px, py, width, size.h));
 }
 
 export function Dialog(open: Signal<bool>, title: str, body: Widget[]): Widget {
@@ -109,8 +110,8 @@ function paintToasts(cx: PaintContext, toaster: Toaster): void {
     let bottom = (cx.fr.h as float) - TOAST_BOTTOM;
     for (let i = live.length - 1; i >= 0; i = i - 1) {
         const card = Box(Text(live[i].text), color: Theme.colors.surface, radius: 8.0, pad: 12.0, w: TOAST_W);
-        const size = card.layout(Constraints.loose(TOAST_W, bottom)).size;
-        paintAt(card, cx, (vw - TOAST_W) / 2.0, bottom - size.h, TOAST_W, size.h);
+        const size = mountChild("toasts", () => card.layout(Constraints.loose(TOAST_W, bottom))).size;
+        cx.keyed("toasts", () => paintAt(card, cx, (vw - TOAST_W) / 2.0, bottom - size.h, TOAST_W, size.h));
         bottom = bottom - size.h - TOAST_GAP;
     }
 }

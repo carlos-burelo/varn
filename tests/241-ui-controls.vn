@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 import {
     UiWindow, UiFrame, Focus, Widget, FlexNode, TextNode, BoxNode, render, present,
-    Column, Row, Text, Title, Headline, Caption, Card, Button, Checkbox, Switch, Slider, Input,
+    Column, Row, Text, Title, Headline, Caption, Card, Button, Checkbox, Switch, Slider, Field,
     Segmented, Tabs, Grid, Table, Each, Box, Spacer, navigator, signal,
     ButtonKind, TextStyle, Theme, MOUSE_LEFT, UiInjectKind
 } from "std:ui";
@@ -44,7 +44,7 @@ await describe("241 ui controls", async () => {
     });
 
     await it("a switch flips the signal it is bound to", () => {
-        using win = UiWindow.open("t", 400, 200);
+        using win = UiWindow.open("t", 400, 200, true);
         const fr = new UiFrame(400, 200);
         const focus = new Focus();
         const on = signal(false);
@@ -54,7 +54,7 @@ await describe("241 ui controls", async () => {
     });
 
     await it("a checkbox calls its callback when it holds a plain value", () => {
-        using win = UiWindow.open("t", 400, 200);
+        using win = UiWindow.open("t", 400, 200, true);
         const fr = new UiFrame(400, 200);
         const focus = new Focus();
         const seen: bool[] = [];
@@ -74,7 +74,7 @@ await describe("241 ui controls", async () => {
     });
 
     await it("a slider follows the pointer", () => {
-        using win = UiWindow.open("t", 400, 200);
+        using win = UiWindow.open("t", 400, 200, true);
         const fr = new UiFrame(400, 200);
         const focus = new Focus();
         const level = signal(0.0);
@@ -94,7 +94,7 @@ await describe("241 ui controls", async () => {
     });
 
     await it("segmented picks the option that was clicked", () => {
-        using win = UiWindow.open("t", 400, 200);
+        using win = UiWindow.open("t", 400, 200, true);
         const fr = new UiFrame(400, 200);
         const focus = new Focus();
         const choice = signal(0);
@@ -114,7 +114,7 @@ await describe("241 ui controls", async () => {
 
     await it("an input edits the signal it is bound to", () => {
         const name = signal("ada");
-        const tree = Input(name, hint: "name");
+        const tree = Field(name, hint: "name");
         expect(tree is Widget).toBe(true);
         expect(name.value).toBe("ada");
     });
@@ -154,7 +154,7 @@ await describe("241 ui controls", async () => {
     });
 
     await it("a button kind picks its colors", () => {
-        using win = UiWindow.open("t", 400, 200);
+        using win = UiWindow.open("t", 400, 200, true);
         const fr = new UiFrame(400, 200);
         const focus = new Focus();
         win.clear(0);

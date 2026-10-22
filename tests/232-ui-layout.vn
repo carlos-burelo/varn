@@ -19,7 +19,7 @@ function rects(win: UiWindow): float[][] {
 }
 
 function paintAt(tree: Widget, w: float, h: float): float[][] {
-    using win = UiWindow.open("layout", 800, 600);
+    using win = UiWindow.open("layout", 800, 600, true);
     render(win, new UiFrame(800, 600), new Focus(), tree, 0.0, 0.0, w, h);
     return rects(win);
 }

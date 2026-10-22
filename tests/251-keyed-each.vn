@@ -10,14 +10,14 @@ function drawFrame(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void
 
 await describe("251 keyed each", async () => {
     await it("focus follows the item key when the list is reordered", () => {
-        using win = UiWindow.open("t", 300, 200);
+        using win = UiWindow.open("t", 300, 200, true);
         const fr = new UiFrame(300, 200);
         const focus = new Focus();
         const a = new TextEdit();
         const b = new TextEdit();
         const items = signal(["a", "b"]);
         const editFor = (s: str): TextEdit => s == "a" ? a : b;
-        const build = (): Widget => Each(items.value, (s: str): str => s, (s: str, at: int): Widget => Field(edit: editFor(s), hint: s));
+        const build = (): Widget => Each(items.value, (s: str): str => s, (s: str, at: int): Widget => Field(editFor(s), hint: s));
         drawFrame(win, fr, focus, build());
         win.inject(UiInjectKind.MouseDown, 60, 70, MOUSE_LEFT);
         drawFrame(win, fr, focus, build());

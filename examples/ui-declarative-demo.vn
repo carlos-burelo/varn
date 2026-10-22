@@ -5,7 +5,7 @@ import {
 
 type Todo = { id: int, title: str, done: bool };
 
-@component
+@component()
 function Counter(start: int = 0): Widget {
     const count = signal(start);
     effect(() => print(`count is now ${count.value}`));
@@ -21,7 +21,7 @@ function Counter(start: int = 0): Widget {
     ], title: "Counter");
 }
 
-@component
+@component()
 function TodoList(): Widget {
     const todos = signal<Todo[]>([
         { id: 1, title: "write a component", done: true },
@@ -44,7 +44,7 @@ function TodoList(): Widget {
     ]);
 }
 
-@component
+@component()
 function Dashboard(): Widget {
     return Column([
         Row([Headline("Dashboard"), Caption("varn ui")], mainAxis: MainAxis.spaceBetween),

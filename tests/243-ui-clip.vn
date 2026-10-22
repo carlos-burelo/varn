@@ -3,7 +3,7 @@ import { UiWindow } from "std:ui";
 
 await describe("243 ui clip commands", async () => {
     await it("clip and unclip are recorded in paint order", () => {
-        using win = UiWindow.open("t", 200, 100);
+        using win = UiWindow.open("t", 200, 100, true);
         win.clear(0xFF000000);
         win.clip(10.0, 20.0, 30.0, 40.0);
         win.rect(0.0, 0.0, 5.0, 5.0, 0xFFFFFFFF, 0.0);

@@ -55,56 +55,54 @@ export class ComponentScope extends Owner {
     }
 }
 
-const SCOPE_STRIDE = 65536;
-
-const scopes = new Map<int, ComponentScope>();
-let calls = new Map<int, int>();
-let touched = new Set<int>();
-let frameOpen = false;
-let nextComponentId = 1;
-
-export function newComponentId(): int {
-    const id = nextComponentId;
-    nextComponentId = nextComponentId + 1;
-    return id;
-}
+const owners = new Map<str, ComponentScope>();
+let touched = new Set<str>();
+let mountPath: str = "";
 
 export function beginFrame(): void {
-    calls = new Map<int, int>();
-    touched = new Set<int>();
-    frameOpen = true;
+    touched = new Set<str>();
 }
 
 export function endFrame(): void {
-    frameOpen = false;
-    const keys: int[] = [];
-    for (let key of scopes.keys()) {
+    const keys: str[] = [];
+    for (let key of owners.keys()) {
         keys.push(key);
     }
     for (let key of keys) {
         if (!touched.has(key)) {
-            const gone = scopes.get(key);
+            const gone = owners.get(key);
             if (gone !== null) {
                 gone.dispose();
             }
-            scopes.delete(key);
+            owners.delete(key);
         }
     }
 }
 
-export function scopeFor(id: int): ComponentScope {
-    if (!frameOpen) {
-        return new ComponentScope();
-    }
-    const seen = calls.get(id) ?? 0;
-    calls.set(id, seen + 1);
-    const key = id * SCOPE_STRIDE + seen;
+export function mountChild<T>(key: str, body: () => T): T {
+    const saved = mountPath;
+    mountPath = saved + "/" + key;
+    const result = body();
+    mountPath = saved;
+    return result;
+}
+
+let definitions = 0;
+
+export function newComponentDefinition(): int {
+    definitions = definitions + 1;
+    return definitions;
+}
+
+export function scopeAtMount(definition: int): ComponentScope {
+    const key = `${mountPath}@${definition}`;
     touched.add(key);
-    const existing = scopes.get(key);
-    const scope = existing ?? new ComponentScope();
-    if (existing === null) {
-        scopes.set(key, scope);
+    const existing = owners.get(key);
+    if (existing !== null) {
+        existing.rewind();
+        return existing;
     }
-    scope.rewind();
-    return scope;
+    const fresh = new ComponentScope();
+    owners.set(key, fresh);
+    return fresh;
 }

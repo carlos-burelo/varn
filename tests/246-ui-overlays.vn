@@ -19,7 +19,7 @@ function tap(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, x: int, y: 
 
 await describe("246 ui overlays", async () => {
     await it("an open dialog blocks clicks on the base tree and its scrim closes it", () => {
-        using win = UiWindow.open("t", 400, 300);
+        using win = UiWindow.open("t", 400, 300, true);
         const fr = new UiFrame(400, 300);
         const focus = new Focus();
         const open = signal(true);
@@ -37,7 +37,7 @@ await describe("246 ui overlays", async () => {
     });
 
     await it("a button inside an open dialog still works", () => {
-        using win = UiWindow.open("t", 400, 300);
+        using win = UiWindow.open("t", 400, 300, true);
         const fr = new UiFrame(400, 300);
         const focus = new Focus();
         const open = signal(true);
@@ -52,7 +52,7 @@ await describe("246 ui overlays", async () => {
     });
 
     await it("a select opens, and choosing an option sets the value and closes", () => {
-        using win = UiWindow.open("t", 400, 300);
+        using win = UiWindow.open("t", 400, 300, true);
         const fr = new UiFrame(400, 300);
         const focus = new Focus();
         const value = signal(0);
@@ -67,7 +67,7 @@ await describe("246 ui overlays", async () => {
     });
 
     await it("toasts show their text until they expire", () => {
-        using win = UiWindow.open("t", 400, 300);
+        using win = UiWindow.open("t", 400, 300, true);
         const fr = new UiFrame(400, 300);
         const focus = new Focus();
         const toaster = new Toaster();

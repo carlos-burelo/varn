@@ -6,6 +6,7 @@ import {
 } from "std:ui";
 import { row } from "std:ui/layout";
 import { wrap as wrapText, measure } from "std:ui/text";
+import { present } from "std:ui/render";
 
 const W = 800;
 const H = 600;
@@ -65,7 +66,7 @@ while (!fr.closed) {
     win.text(cells[1][0] + 8.0, cells[1][1] + 28.0, `box ${bx},${by}`, 18.0, WHITE);
     win.text(cells[2][0] + 8.0, cells[2][1] + 28.0, `mouse ${fr.mouseX},${fr.mouseY}`, 18.0, WHITE);
 
-    win.present();
+    present(win, fr);
     frames = frames + 1;
     if (frames >= 1500 || (now() - t0) > budgetMs) {
         break;

@@ -1,3 +1,4 @@
+import { mountChild } from "std:ui/state";
 import { UiWindow, UiControlKind } from "std:ui/window";
 import { UiFrame } from "std:ui/frame";
 import { Focus } from "std:ui/focus";
@@ -211,7 +212,7 @@ export class KeyedNode extends Widget {
 
 
     override computeLayout(c: Constraints): Placement {
-        const placed = this.child.layout(c);
+        const placed = mountChild(this.key, () => this.child.layout(c));
         return new Placement(this, placed.size, [placed]);
     }
 
@@ -255,4 +256,11 @@ export function alignedY(alignment: Alignment, room: float): float {
         return room;
     }
     return room / 2.0;
+}
+
+export function layoutAt(child: Widget, key: str, c: Constraints): Placement {
+    if (child is KeyedNode) {
+        return child.layout(c);
+    }
+    return mountChild(key, () => child.layout(c));
 }

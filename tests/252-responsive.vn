@@ -12,7 +12,7 @@ function frameAt(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, w: floa
 
 await describe("252 responsive", async () => {
     await it("the branch follows the window class", () => {
-        using win = UiWindow.open("t", 960, 300);
+        using win = UiWindow.open("t", 960, 300, true);
         const fr = new UiFrame(960, 300);
         const focus = new Focus();
         const tree = Responsive((cls: WindowClass): Widget => match (cls) {
@@ -29,7 +29,7 @@ await describe("252 responsive", async () => {
     });
 
     await it("the builder runs once per class, not once per width", () => {
-        using win = UiWindow.open("t", 960, 300);
+        using win = UiWindow.open("t", 960, 300, true);
         const fr = new UiFrame(960, 300);
         const focus = new Focus();
         let builds = 0;
@@ -44,7 +44,7 @@ await describe("252 responsive", async () => {
     });
 
     await it("an adaptive gap changes the spacing between siblings", () => {
-        using win = UiWindow.open("t", 960, 300);
+        using win = UiWindow.open("t", 960, 300, true);
         const fr = new UiFrame(960, 300);
         const focus = new Focus();
         const tree = Column([Box(h: 10.0, w: 20.0, color: 0xFFFF0000), Box(h: 10.0, w: 20.0, color: 0xFF00FF00)], gap: Adaptive({ compact: 4.0, medium: 8.0, expanded: 16.0 }));
