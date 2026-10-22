@@ -1,0 +1,48 @@
+import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { hit } from "std:ui/keys";
+import { Theme } from "std:ui/style";
+import { Signal, signal } from "std:signals";
+
+const CONTENT_UNBOUNDED = 1.0e9;
+const BAR_WIDTH = 6.0;
+
+export class ScrollNode extends Widget {
+    child: Widget;
+    offset: Signal<float>;
+
+    constructor(child: Widget, offset: Signal<float>, h: float) {
+        super();
+        this.child = child;
+        this.offset = offset;
+        this.h = h;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return this.fit(new Size(maxW, maxH));
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        const content = this.child.measure(w - BAR_WIDTH, CONTENT_UNBOUNDED).h;
+        const overflow = content > h ? content - h : 0.0;
+        let at = this.offset.peek();
+        if (cx.fr.wheel != 0 && hit(cx.fr.mouseX as float, cx.fr.mouseY as float, x, y, w, h)) {
+            at = at - (cx.fr.wheel as float);
+        }
+        at = at < 0.0 ? 0.0 : (at > overflow ? overflow : at);
+        if (at != this.offset.peek()) {
+            this.offset.set(at);
+        }
+        cx.clip(x, y, w, h);
+        this.child.paint(cx, x, y - at, w - BAR_WIDTH, content);
+        cx.unclip();
+        if (overflow > 0.0) {
+            const thumb = h * h / content;
+            const top = y + (h - thumb) * at / overflow;
+            cx.win.rect(x + w - BAR_WIDTH, top, BAR_WIDTH, thumb, Theme.colors.outline, BAR_WIDTH / 2.0);
+        }
+    }
+}
+
+export function Scroll(child: Widget, offset: Signal<float> = signal(0.0), h: float = -1.0): Widget {
+    return new ScrollNode(child, offset, h);
+}

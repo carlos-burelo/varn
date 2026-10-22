@@ -235,6 +235,8 @@ import "./240-is-type-tests.vn"
 import "./241-ui-controls.vn"
 import "./242-async-generator-next-is-task.vn"
 import "./243-ui-clip.vn"
+import "./244-ui-wheel.vn"
+import "./245-ui-scroll.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

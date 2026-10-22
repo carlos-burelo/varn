@@ -15,6 +15,16 @@ export class PaintContext {
         this.focus = focus;
     }
 
+    clip(x: float, y: float, w: float, h: float): void {
+        this.win.clip(x, y, w, h);
+        this.fr.pushClip(x, y, w, h);
+    }
+
+    unclip(): void {
+        this.win.unclip();
+        this.fr.popClip();
+    }
+
     nextSlot(): int {
         this._slot = this._slot + 1;
         return this._slot;

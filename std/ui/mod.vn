@@ -10,6 +10,7 @@ export { Button, Field, Input } from "std:ui/widget/controls";
 export { Checkbox, Switch } from "std:ui/widget/toggles";
 export { Slider } from "std:ui/widget/slider";
 export { Image, Progress } from "std:ui/widget/media";
+export { Scroll, ScrollNode } from "std:ui/widget/scroll";
 export { Segmented, Tabs } from "std:ui/widget/choice";
 export { Each, Grid, Table } from "std:ui/widget/data";
 export { Navigator, navigator } from "std:ui/navigation";
