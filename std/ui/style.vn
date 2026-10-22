@@ -123,3 +123,30 @@ export function buttonTextColorFor(kind: ButtonKind): int {
     }
     return Theme.colors.onPrimary;
 }
+
+export enum WindowClass {
+    compact,
+    medium,
+    expanded
+}
+
+export function windowClassOf(width: float): WindowClass {
+    const breakpoints = Theme.breakpoints;
+    if (width < breakpoints[0]) {
+        return WindowClass.compact;
+    }
+    if (width < breakpoints[1]) {
+        return WindowClass.medium;
+    }
+    return WindowClass.expanded;
+}
+
+function classKey(cls: WindowClass): str {
+    if (cls == WindowClass.compact) {
+        return "compact";
+    }
+    if (cls == WindowClass.medium) {
+        return "medium";
+    }
+    return "expanded";
+}

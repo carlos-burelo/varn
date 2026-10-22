@@ -20,11 +20,11 @@ export class ScrollNode extends Widget {
     override computeLayout(c: Constraints): Placement {
         const size = fixedSize(this, c, new Size(c.maxW, c.maxH));
         const child = this.child;
-        const content = layoutAt(child, "child", Constraints.loose(size.w - BAR_WIDTH, CONTENT_UNBOUNDED)).size.h;
+        const content = layoutAt(child, "child", c.looseChild(size.w - BAR_WIDTH, CONTENT_UNBOUNDED)).size.h;
         const overflow = content > size.h ? content - size.h : 0.0;
         const at = this.offset.peek();
         const bounded = at < 0.0 ? 0.0 : (at > overflow ? overflow : at);
-        const placed = layoutAt(child, "child", Constraints.tight(size.w - BAR_WIDTH, content));
+        const placed = layoutAt(child, "child", c.tightChild(size.w - BAR_WIDTH, content));
         placed.x = 0.0;
         placed.y = 0.0 - bounded;
         const out = new Placement(this, size, [placed]);

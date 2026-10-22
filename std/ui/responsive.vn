@@ -1,27 +1,10 @@
 import { Widget, Size, PaintContext, Constraints, Placement, paintPlaced, layoutAt } from "std:ui/widget/base";
-import { Theme } from "std:ui/style";
+import { WindowClass, windowClassOf } from "std:ui/style";
 import { Signal } from "std:signals";
 import { newComponentDefinition, scopeAtMount } from "std:ui/state";
 import { viewAt } from "std:ui/mount";
 
 const RESPONSIVE = newComponentDefinition();
-
-export enum WindowClass {
-    compact,
-    medium,
-    expanded
-}
-
-export function windowClassOf(width: float): WindowClass {
-    const breakpoints = Theme.breakpoints;
-    if (width < breakpoints[0]) {
-        return WindowClass.compact;
-    }
-    if (width < breakpoints[1]) {
-        return WindowClass.medium;
-    }
-    return WindowClass.expanded;
-}
 
 function classKey(cls: WindowClass): str {
     if (cls == WindowClass.compact) {
@@ -49,10 +32,9 @@ export function Adaptive<T>(values: { compact: T, medium: T, expanded: T }): Ada
     return new AdaptiveValue<T>(values.compact, values.medium, values.expanded);
 }
 
-export function resolveFloat(value: float | AdaptiveValue<float>, width: float): float {
+export function resolveFloat(value: float | AdaptiveValue<float>, cls: WindowClass): float {
     if (value is AdaptiveValue<float>) {
         const picked = value as AdaptiveValue<float>;
-        const cls = windowClassOf(width);
         if (cls == WindowClass.compact) {
             return picked.compact;
         }
@@ -75,7 +57,7 @@ export class ResponsiveNode extends Widget {
     }
 
     override computeLayout(c: Constraints): Placement {
-        const cls = windowClassOf(c.maxW);
+        const cls = c.windowClass;
         this.cls.set(cls);
         const placed = layoutAt(viewAt(scopeAtMount(RESPONSIVE)).describe(this.body), classKey(cls), c);
         return new Placement(this, placed.size, [placed]);

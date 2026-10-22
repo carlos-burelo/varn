@@ -2,7 +2,7 @@ import { mountChild } from "std:ui/state";
 import { UiWindow, UiControlKind } from "std:ui/window";
 import { UiFrame } from "std:ui/frame";
 import { Focus } from "std:ui/focus";
-import { Alignment } from "std:ui/style";
+import { Alignment, WindowClass, windowClassOf } from "std:ui/style";
 
 export class Overlay {
     paint: (cx: PaintContext) => void;
@@ -18,6 +18,7 @@ export class PaintContext {
     win: UiWindow;
     fr: UiFrame;
     focus: Focus;
+    windowClass: WindowClass;
     overlays: Overlay[] = [];
     keyPath: str = "";
     keyCount: int = 0;
@@ -26,6 +27,7 @@ export class PaintContext {
         this.win = win;
         this.fr = fr;
         this.focus = focus;
+        this.windowClass = windowClassOf(fr.w as float);
     }
 
     overlay(paint: (cx: PaintContext) => void, modal: bool = false): void {
@@ -87,20 +89,38 @@ export class Constraints {
     maxW: float;
     minH: float;
     maxH: float;
+    windowClass: WindowClass;
 
-    constructor(minW: float, maxW: float, minH: float, maxH: float) {
+    constructor(minW: float, maxW: float, minH: float, maxH: float, windowClass: WindowClass) {
         this.minW = minW;
         this.maxW = maxW;
         this.minH = minH;
         this.maxH = maxH;
+        this.windowClass = windowClass;
     }
 
     static loose(maxW: float, maxH: float): Constraints {
-        return new Constraints(0.0, maxW, 0.0, maxH);
+        return Constraints.looseIn(windowClassOf(maxW), maxW, maxH);
     }
 
     static tight(w: float, h: float): Constraints {
-        return new Constraints(w, w, h, h);
+        return Constraints.tightIn(windowClassOf(w), w, h);
+    }
+
+    static looseIn(windowClass: WindowClass, maxW: float, maxH: float): Constraints {
+        return new Constraints(0.0, maxW, 0.0, maxH, windowClass);
+    }
+
+    static tightIn(windowClass: WindowClass, w: float, h: float): Constraints {
+        return new Constraints(w, w, h, h, windowClass);
+    }
+
+    looseChild(maxW: float, maxH: float): Constraints {
+        return Constraints.looseIn(this.windowClass, maxW, maxH);
+    }
+
+    tightChild(w: float, h: float): Constraints {
+        return Constraints.tightIn(this.windowClass, w, h);
     }
 
     deflate(pad: float): Constraints {
@@ -109,7 +129,7 @@ export class Constraints {
         const minH = this.minH - dw > 0.0 ? this.minH - dw : 0.0;
         const maxW = this.maxW - dw > 0.0 ? this.maxW - dw : 0.0;
         const maxH = this.maxH - dw > 0.0 ? this.maxH - dw : 0.0;
-        return new Constraints(minW, maxW, minH, maxH);
+        return new Constraints(minW, maxW, minH, maxH, this.windowClass);
     }
 
     fit(s: Size): Size {
@@ -215,7 +235,7 @@ export function paintSlot(cx: PaintContext, child: Widget, position: str, paint:
 }
 
 export function paintAt(child: Widget, cx: PaintContext, x: float, y: float, w: float, h: float): void {
-    child.paint(cx, child.layout(Constraints.tight(w, h)), x, y);
+    child.paint(cx, child.layout(Constraints.tightIn(cx.windowClass, w, h)), x, y);
 }
 
 export function paintPlaced(cx: PaintContext, child: Placement, x: float, y: float): void {

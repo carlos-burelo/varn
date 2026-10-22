@@ -3,6 +3,7 @@ import { UiWindow, UiFrame, Focus, Widget, Column, Row, Text, Box, Responsive, A
 
 function frameAt(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, w: float): DrawnItem[] {
     fr.update(win);
+    fr.w = w as int;
     win.clear(0xFF000000);
     render(win, fr, focus, tree, 0.0, 0.0, w, 300.0);
     const cmds = win.drawn();
@@ -11,6 +12,19 @@ function frameAt(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, w: floa
 }
 
 await describe("252 responsive", async () => {
+    await it("a responsive inside a narrow box still reads the window class", () => {
+        using win = UiWindow.open("t", 960, 300, true);
+        const fr = new UiFrame(960, 300);
+        const focus = new Focus();
+        const tree = Box(Responsive((cls: WindowClass): Widget => match (cls) {
+            WindowClass.compact => Text("compact"),
+            WindowClass.medium => Text("medium"),
+            WindowClass.expanded => Text("expanded"),
+        }), w: 200.0, h: 100.0);
+        const cmds = frameAt(win, fr, focus, tree, 960.0);
+        expect(cmds.some((c: DrawnItem): bool => c.kind == "text" && c.text == "expanded")).toBe(true);
+    });
+
     await it("the branch follows the window class", () => {
         using win = UiWindow.open("t", 960, 300, true);
         const fr = new UiFrame(960, 300);

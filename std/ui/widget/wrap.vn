@@ -23,7 +23,7 @@ export class WrapNode extends Widget {
         let lineH = 0.0;
         let widest = 0.0;
         for (let i = 0; i < this.children.length; i = i + 1) {
-            const placed = layoutAt(this.children[i], `${i}`, Constraints.loose(room, inner.maxH));
+            const placed = layoutAt(this.children[i], `${i}`, c.looseChild(room, inner.maxH));
             if (x > 0.0 && x + placed.size.w > room) {
                 y = y + lineH + this.runGap;
                 x = 0.0;
