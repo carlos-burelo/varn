@@ -96,3 +96,5 @@ export interface TypedText {
 export declare function field$(window: int, cid: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, focused: bool, text: str, hint: str, size: float): void;
 @permission("ui")
 export declare function typed$(window: int): TypedText[];
+@permission("ui")
+export declare function textWidth$(window: int, text: str, size: float): float;

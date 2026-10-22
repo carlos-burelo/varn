@@ -193,6 +193,7 @@ pub fn draw_now(
         let ctx = canvas.context().clone();
         let events = canvas.take_input();
         let time = super::canvas::real_time();
+        let warm = canvas.take_warmup();
         let (ok, hits) = super::comp::present_draw(
             &shared,
             surface,
@@ -204,6 +205,7 @@ pub fn draw_now(
             &mut configured,
             clear,
             runs,
+            warm,
         );
         let st = ui
             .wins
@@ -368,6 +370,7 @@ impl ApplicationHandler for PumpApp {
                                     configured,
                                     frame.clear,
                                     &frame.runs,
+                                    None,
                                 )
                                 .0;
                             }

@@ -376,6 +376,9 @@ varn_contract! {
             varn_ui::named_key_code(name)
                 .ok_or_else(|| format!("ui.keyCode: unknown key '{name}'"))
         }
+        fn textWidth(_ctx: &mut dyn NativeCtx, id: i64, text: &str, size: f64) -> Result<f64, String> {
+            with_win(id, |win| Ok(f64::from(win.canvas.text_width(text, size as f32))))
+        }
         fn drawn(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, String> {
             let cmds = with_win(id, |win| Ok(win.commands.clone()))?;
             Ok(cmds

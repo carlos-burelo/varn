@@ -104,3 +104,13 @@ Es un cambio grande. Conviene hacerlo en este orden, con suite verde y commit en
 3. `UiWindow.open`: **ventana por defecto**, igual que `run`. Los tests pasan `headless: true` explícitamente, en un solo commit.
 
 Orden: (1) registro estructurado para tests y `UiEvent` único, sin cambio de comportamiento; (2) montaje lazy junto con los renombres de la API y la regla de ventana por defecto.
+
+## 6. Estado de la etapa 2 (un solo motor de texto)
+
+Hecho: H8 queda resuelto como "fuentes compartidas y comprobado". `varn_text::font_definitions()` es la única fuente de definiciones de fuentes. El contexto de medida y el de cada ventana las instalan. El test `tests/253-text-consistency.vn` mide con `std:ui/text` y pide el ancho a la ventana (que pinta con egui), y falla si divergen (comprobado con un mutante que vacía las fuentes de la ventana).
+
+Límite real: egui guarda memoria de UI (foco, ids, scroll) dentro de su `Context`, así que cada ventana necesita el suyo. Un único `Context` compartido por todas las ventanas no es correcto. Por eso H8 se resuelve con definiciones compartidas y una comprobación, no con un único objeto.
+
+Corrección de la auditoría: el texto de la sección 3.5 que dice "un único `Fonts`" debe leerse como "definiciones de fuentes únicas, con comprobación de consistencia".
+
+Efecto colateral corregido: el primer frame real subía un delta parcial de textura que la GPU no tenía. El calentamiento de `Canvas::new` ahora guarda su `textures_delta` y lo aplica en el primer `present`.

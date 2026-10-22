@@ -8,6 +8,7 @@ parking_lot = { workspace = true }
 pollster = "0.3"
 egui = { version = "0.37", features = ["default_fonts"] }
 egui-wgpu = "0.37"
+varn-text = { path = "../varn-text" }
 rustc-hash = { workspace = true }
 wgpu = "30"
 winit = "0.30"

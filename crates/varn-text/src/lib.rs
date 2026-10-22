@@ -1,6 +1,10 @@
 use std::sync::OnceLock;
 
-use egui::{Color32, Context, FontId, RawInput};
+use egui::{Color32, Context, FontDefinitions, FontId, RawInput};
+
+pub fn font_definitions() -> FontDefinitions {
+    FontDefinitions::default()
+}
 
 pub struct ShapedGlyph {
     pub ch: char,
@@ -18,6 +22,7 @@ static LAYOUT: OnceLock<Context> = OnceLock::new();
 fn layout_context() -> &'static Context {
     LAYOUT.get_or_init(|| {
         let ctx = Context::default();
+        ctx.set_fonts(font_definitions());
         let _ = ctx.run_ui(RawInput::default(), |_| {});
         ctx
     })

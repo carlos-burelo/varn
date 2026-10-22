@@ -1,0 +1,16 @@
+import { describe, it, expect } from "std:test";
+import { UiWindow } from "std:ui";
+import { measure } from "std:ui/text";
+
+await describe("253 text measure matches the window", async () => {
+    await it("layout widths agree with the window's own font system", () => {
+        using win = UiWindow.open("t", 200, 100, true);
+        const samples = ["hola", "varn ui rn rnm", "Mm Ww iiii", "Título con acentos"];
+        const sizes = [14.0, 18.0, 40.0];
+        for (const text of samples) {
+            for (const size of sizes) {
+                expect(win.textWidth(text, size)).toBe(measure(text, size));
+            }
+        }
+    });
+});

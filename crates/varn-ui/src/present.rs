@@ -39,6 +39,7 @@ pub fn present_draw(
     configured: &mut Option<(u32, u32)>,
     clear: [f32; 4],
     runs: &[Run],
+    warm: Option<egui::TexturesDelta>,
 ) -> (bool, Feedback) {
     let Some((_config, format)) = configure_surface(shared, surface, w, h, configured) else {
         return (false, Feedback::default());
@@ -101,6 +102,13 @@ pub fn present_draw(
     let drawn = pass(ctx, events, time, w, h, runs);
 
     with_backend(shared, format, |backend| {
+        if let Some(warm) = &warm {
+            for (id, deltas) in &warm.set {
+                for delta in deltas {
+                    backend.renderer.update_texture(&shared.device, &shared.queue, *id, delta);
+                }
+            }
+        }
         for (id, deltas) in &drawn.textures.set {
             for delta in deltas {
                 backend

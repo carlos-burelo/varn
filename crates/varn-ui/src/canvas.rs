@@ -20,15 +20,36 @@ pub struct Canvas {
     ctx: Context,
     input: Vec<egui::Event>,
     frames: u64,
+    warmup: Option<egui::TexturesDelta>,
 }
 
 impl Canvas {
     pub fn new() -> Self {
+        let ctx = Context::default();
+        ctx.set_fonts(varn_text::font_definitions());
+        let warm = ctx.run_ui(egui::RawInput::default(), |_| {});
         Self {
-            ctx: Context::default(),
+            ctx,
             input: Vec::new(),
             frames: 0,
+            warmup: Some(warm.textures_delta),
         }
+    }
+
+    pub fn text_width(&self, text: &str, size: f32) -> f32 {
+        let galley = self.ctx.fonts_mut(|f| {
+            f.layout_no_wrap(
+                text.to_string(),
+                egui::FontId::proportional(size),
+                egui::Color32::WHITE,
+            )
+        });
+        galley
+            .rows
+            .iter()
+            .flat_map(|row| row.glyphs.iter())
+            .map(|g| g.advance_width)
+            .sum()
     }
 
     pub fn feed(&mut self, e: &RealEvent) {
@@ -37,6 +58,10 @@ impl Canvas {
 
     pub fn context(&self) -> &Context {
         &self.ctx
+    }
+
+    pub fn take_warmup(&mut self) -> Option<egui::TexturesDelta> {
+        self.warmup.take()
     }
 
     pub fn take_input(&mut self) -> Vec<egui::Event> {

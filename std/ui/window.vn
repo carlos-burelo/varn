@@ -16,6 +16,7 @@ import {
     typed$,
     activated$,
     drawn$,
+    textWidth$,
     real$,
     UiEvent,
     UiEventKind,
@@ -104,6 +105,10 @@ export class UiWindow {
 
     real(): bool {
         return real$(this.id);
+    }
+
+    textWidth(text: str, size: float): float {
+        return textWidth$(this.id, text, size);
     }
 
     drawn(): DrawnItem[] {
