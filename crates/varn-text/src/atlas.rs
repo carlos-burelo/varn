@@ -7,12 +7,11 @@ pub struct RasterGlyph {
     pub h: u32,
     pub bx: i32,
     pub by: i32,
-    pub advance: f32,
     pub bitmap: Vec<u8>,
 }
 
 struct Cache {
-    entries: FxHashMap<(u16, u32), RasterGlyph>,
+    entries: FxHashMap<(u32, u16, u32, u8), RasterGlyph>,
     scaler: swash::scale::ScaleContext,
 }
 
@@ -77,11 +76,16 @@ pub fn pack_bitmaps(items: &[(u32, u32, Vec<u8>)], max_row_w: u32) -> PackedAtla
     }
 }
 
-pub fn raster_glyph(id: u16, advance: f32, size: f32) -> Result<RasterGlyph, String> {
+pub const SUBPIXEL_STEPS: u8 = 4;
+
+pub fn raster_glyph(font: u32, id: u16, size: f32, subpixel: u8) -> Result<RasterGlyph, String> {
     if size <= 0.0 || !size.is_finite() {
         return Err("text.raster: size must be positive".to_string());
     }
-    let key = (id, size.to_bits());
+    if subpixel >= SUBPIXEL_STEPS {
+        return Err("text.raster: subpixel step out of range".to_string());
+    }
+    let key = (font, id, size.to_bits(), subpixel);
     {
         let c = cache().lock();
         if let Some(g) = c.entries.get(&key) {
@@ -90,47 +94,47 @@ pub fn raster_glyph(id: u16, advance: f32, size: f32) -> Result<RasterGlyph, Str
                 h: g.h,
                 bx: g.bx,
                 by: g.by,
-                advance: g.advance,
                 bitmap: g.bitmap.clone(),
             });
         }
     }
-    let (data, index) = super::font::sans_bytes()?;
-    let font = swash::FontRef::from_index(&data, index as usize)
+    let data = {
+        let eng = super::engine::engine().lock();
+        eng.fonts
+            .get(font as usize)
+            .cloned()
+            .ok_or_else(|| "text.raster: unknown font".to_string())?
+    };
+    let face = swash::FontRef::from_index(data.data.as_ref(), data.index as usize)
         .ok_or_else(|| "text.raster: bad font".to_string())?;
     let mut c = cache().lock();
-    let mut scaler = c.scaler.builder(font).size(size).hint(true).build();
+    let mut scaler = c.scaler.builder(face).size(size).hint(false).build();
     let mut image = swash::scale::image::Image::new();
-    let ok = swash::scale::Render::new(&[swash::scale::Source::Outline]).render_into(
-        &mut scaler,
-        id,
-        &mut image,
-    );
-    let image: &swash::scale::image::Image = &image;
+    let shift = f32::from(subpixel) / f32::from(SUBPIXEL_STEPS);
+    let ok = swash::scale::Render::new(&[swash::scale::Source::Outline])
+        .offset(swash::zeno::Vector::new(shift, 0.0))
+        .render_into(&mut scaler, id, &mut image);
     let (w, h, bx, by, bitmap) = if ok {
         let p = image.placement;
         (p.width, p.height, p.left, p.top, image.data.clone())
     } else {
         (0, 0, 0, 0, Vec::new())
     };
-    let g = RasterGlyph {
+    c.entries.insert(
+        key,
+        RasterGlyph {
+            w,
+            h,
+            bx,
+            by,
+            bitmap: bitmap.clone(),
+        },
+    );
+    Ok(RasterGlyph {
         w,
         h,
         bx,
         by,
-        advance,
         bitmap,
-    };
-    c.entries.insert(
-        key,
-        RasterGlyph {
-            w: g.w,
-            h: g.h,
-            bx: g.bx,
-            by: g.by,
-            advance: g.advance,
-            bitmap: g.bitmap.clone(),
-        },
-    );
-    Ok(g)
+    })
 }

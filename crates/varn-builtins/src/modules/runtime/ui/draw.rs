@@ -212,17 +212,25 @@ fn shape(items: &[Item]) -> Result<(Vec<Vec<Glyph>>, Option<(Vec<u8>, u32, u32)>
         let ascent = varn_text::font_ascent(*size)?;
         let baseline = **y as f32 + ascent;
         let run = varn_text::shape_run(s, *size)?;
-        let mut pen = **x as f32;
+        let origin = **x as f32;
         let mut quads = Vec::new();
         for g in &run.glyphs {
-            let r = varn_text::raster_glyph(g.id, g.advance, *size)?;
-            let gx = (pen + g.offset_x + r.bx as f32).round();
+            let at = origin + g.x;
+            let whole = at.floor();
+            let steps = f32::from(varn_text::SUBPIXEL_STEPS);
+            let mut sub = ((at - whole) * steps).round();
+            let mut whole = whole;
+            if sub >= steps {
+                sub = 0.0;
+                whole += 1.0;
+            }
+            let r = varn_text::raster_glyph(g.font, g.id, *size, sub as u8)?;
+            let gx = whole + r.bx as f32;
             let gy = (baseline - r.by as f32).round();
             if r.w > 0 && r.h > 0 {
                 quads.push((gx, gy, r.w as f32, r.h as f32, bitmaps.len(), *color));
                 bitmaps.push((r.w, r.h, r.bitmap));
             }
-            pen += g.advance;
         }
         quad_sets.push(quads);
     }

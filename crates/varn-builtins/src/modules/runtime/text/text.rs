@@ -64,14 +64,14 @@ varn_contract! {
                 .glyphs
                 .first()
                 .ok_or_else(|| "text.raster: no glyph".to_string())?;
-            let g = varn_text::raster_glyph(first.id, first.advance, size as f32)?;
+            let g = varn_text::raster_glyph(first.font, first.id, size as f32, 0)?;
             let bitmap = ctx.alloc_buffer_from_bytes(&g.bitmap);
             Ok(RasterGlyph {
                 w: g.w as i64,
                 h: g.h as i64,
                 bx: g.bx as i64,
                 by: g.by as i64,
-                advance: g.advance as f64,
+                advance: first.advance as f64,
                 bitmap,
             }
             .alloc(ctx))
