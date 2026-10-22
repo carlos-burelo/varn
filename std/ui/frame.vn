@@ -1,6 +1,20 @@
 import { UiWindow, UiEventKind, TypedText } from "std:ui/window";
 import { MOUSE_LEFT } from "std:ui/keys";
 
+export class Handler {
+    id: int;
+    layer: int;
+    onValue: ((value: float) => void)?;
+    onText: ((text: str) => void)?;
+
+    constructor(id: int, layer: int, onValue: ((value: float) => void)?, onText: ((text: str) => void)?) {
+        this.id = id;
+        this.layer = layer;
+        this.onValue = onValue;
+        this.onText = onText;
+    }
+}
+
 export class UiFrame {
     mouseX: int;
     mouseY: int;
@@ -18,13 +32,9 @@ export class UiFrame {
     w: int;
     h: int;
     modal: bool;
-    overlayPass: bool;
-    controlIds: int[];
-    controlFns: ((value: float) => void)[];
-    controlOverlay: bool[];
-    textIds: int[];
-    textFns: ((text: str) => void)[];
-    textOverlay: bool[];
+    layer: int;
+    modalFrom: int;
+    handlers: Handler[];
 
     constructor(w: int, h: int) {
         this.mouseX = 0;
@@ -41,13 +51,9 @@ export class UiFrame {
         this.resized = false;
         this.wheel = 0;
         this.modal = false;
-        this.overlayPass = false;
-        this.controlIds = [];
-        this.controlFns = [];
-        this.controlOverlay = [];
-        this.textIds = [];
-        this.textFns = [];
-        this.textOverlay = [];
+        this.layer = 0;
+        this.modalFrom = -1;
+        this.handlers = [];
         this.w = w;
         this.h = h;
     }
@@ -104,31 +110,38 @@ export class UiFrame {
     }
 
     clearControls(): void {
-        this.controlIds = [];
-        this.controlFns = [];
-        this.controlOverlay = [];
-        this.textIds = [];
-        this.textFns = [];
-        this.textOverlay = [];
+        this.handlers = [];
+        this.layer = 0;
+        this.modalFrom = -1;
+        this.modal = false;
+    }
+
+    enterLayer(modal: bool): void {
+        this.layer = this.layer + 1;
+        if (modal) {
+            this.modal = true;
+            this.modalFrom = this.layer;
+        }
     }
 
     onActivate(id: int, fn: (value: float) => void): void {
-        this.controlIds.push(id);
-        this.controlFns.push(fn);
-        this.controlOverlay.push(this.overlayPass);
+        this.handlers.push(new Handler(id, this.layer, fn, null));
     }
 
     onType(id: int, fn: (text: str) => void): void {
-        this.textIds.push(id);
-        this.textFns.push(fn);
-        this.textOverlay.push(this.overlayPass);
+        this.handlers.push(new Handler(id, this.layer, null, fn));
+    }
+
+    reachable(h: Handler): bool {
+        return h.layer >= this.modalFrom;
     }
 
     fireTyped(changes: TypedText[]): void {
-        for (let i = 0; i < changes.length; i = i + 1) {
-            for (let j = 0; j < this.textIds.length; j = j + 1) {
-                if (this.textIds[j] == changes[i].id && (!this.modal || this.textOverlay[j])) {
-                    this.textFns[j](changes[i].text);
+        for (let change of changes) {
+            for (let h of this.handlers) {
+                const onText = h.onText;
+                if (h.id == change.id && onText !== null && this.reachable(h)) {
+                    onText(change.text);
                 }
             }
         }
@@ -137,9 +150,10 @@ export class UiFrame {
     fire(pairs: float[]): void {
         for (let i = 0; i + 1 < pairs.length; i = i + 2) {
             const id = pairs[i] as int;
-            for (let j = 0; j < this.controlIds.length; j = j + 1) {
-                if (this.controlIds[j] == id && (!this.modal || this.controlOverlay[j])) {
-                    this.controlFns[j](pairs[i + 1]);
+            for (let h of this.handlers) {
+                const onValue = h.onValue;
+                if (h.id == id && onValue !== null && this.reachable(h)) {
+                    onValue(pairs[i + 1]);
                 }
             }
         }

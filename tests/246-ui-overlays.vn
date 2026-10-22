@@ -66,6 +66,23 @@ await describe("246 ui overlays", async () => {
         expect(open.value).toBe(false);
     });
 
+    await it("a non-modal overlay leaves the base tree clickable", () => {
+        using win = UiWindow.open("t", 400, 300, true);
+        const fr = new UiFrame(400, 300);
+        const focus = new Focus();
+        const presses: int[] = [];
+        const toaster = new Toaster();
+        toaster.show("saved", 60000);
+        const tree = Column([
+            Button("base", onPress: () => { presses.push(1) }, w: 200.0, h: 40.0),
+            Toasts(toaster)
+        ]);
+        drawFrame(win, fr, focus, tree);
+        expect(fr.modal).toBe(false);
+        tap(win, fr, focus, tree, 20, 20);
+        expect(presses.length).toBe(1);
+    });
+
     await it("toasts show their text until they expire", () => {
         using win = UiWindow.open("t", 400, 300, true);
         const fr = new UiFrame(400, 300);

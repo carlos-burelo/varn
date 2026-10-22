@@ -19,14 +19,10 @@ export function render(win: UiWindow, fr: UiFrame, focus: Focus, root: Widget, x
     fr.clearControls();
     const cx = new PaintContext(win, fr, focus);
     paintAt(root, cx, x, y, w, h);
-    fr.overlayPass = true;
-    let modal = false;
     for (let layer of cx.overlays) {
+        fr.enterLayer(layer.modal);
         layer.paint(cx);
-        modal = modal || layer.modal;
     }
-    fr.overlayPass = false;
-    fr.modal = modal;
 }
 
 const HEADLESS_FRAMES: int = 5;
