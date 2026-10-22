@@ -1,0 +1,23 @@
+import { describe, it, expect } from "std:test";
+import { UiWindow } from "std:ui";
+
+await describe("243 ui clip commands", async () => {
+    await it("clip and unclip are recorded in paint order", () => {
+        using win = UiWindow.open("t", 200, 100);
+        win.clear(0xFF000000);
+        win.clip(10.0, 20.0, 30.0, 40.0);
+        win.rect(0.0, 0.0, 5.0, 5.0, 0xFFFFFFFF, 0.0);
+        win.clip(12.0, 22.0, 4.0, 4.0);
+        win.text(12.0, 22.0, "a", 12.0, 0xFFFFFFFF);
+        win.unclip();
+        win.unclip();
+        const cmds = win.commands();
+        expect(cmds[1]).toBe("clip 10 20 30 40");
+        expect(cmds[2].startsWith("rect ")).toBe(true);
+        expect(cmds[3]).toBe("clip 12 22 4 4");
+        expect(cmds[4].startsWith("text ")).toBe(true);
+        expect(cmds[5]).toBe("unclip");
+        expect(cmds[6]).toBe("unclip");
+        expect(cmds.length).toBe(7);
+    });
+});

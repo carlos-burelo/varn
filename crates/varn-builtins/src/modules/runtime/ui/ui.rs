@@ -256,6 +256,18 @@ varn_contract! {
                 Ok(())
             })
         }
+        fn clip(_ctx: &mut dyn NativeCtx, id: i64, x: f64, y: f64, w: f64, h: f64) -> Result<(), String> {
+            with_win(id, |win| {
+                win.commands.push(DrawCmd::Clip { x, y, w, h });
+                Ok(())
+            })
+        }
+        fn unclip(_ctx: &mut dyn NativeCtx, id: i64) -> Result<(), String> {
+            with_win(id, |win| {
+                win.commands.push(DrawCmd::Unclip);
+                Ok(())
+            })
+        }
         fn clear(_ctx: &mut dyn NativeCtx, id: i64, color: i64) -> Result<(), String> {
             with_win(id, |win| {
                 win.commands.push(DrawCmd::Clear(color));
@@ -271,7 +283,7 @@ varn_contract! {
             if let Some(h) = real {
                 let scene = ui_draw::assemble(&cmds)?;
                 let atlas = scene.atlas.as_ref().map(|(b, w, h)| (b.as_slice(), *w, *h));
-                let _ = varn_ui::draw_now(h, scene.clear, &scene.rects, &scene.glyphs, atlas);
+                let _ = varn_ui::draw_now(h, scene.clear, &scene.runs, atlas);
             }
             Ok(n)
         }

@@ -8,6 +8,26 @@ pub struct Rect {
     pub radius: f32,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub struct Clip {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+#[derive(Clone)]
+pub enum Body {
+    Rects(Vec<Rect>),
+    Glyphs(Vec<Glyph>),
+}
+
+#[derive(Clone)]
+pub struct Run {
+    pub clip: Option<Clip>,
+    pub body: Body,
+}
+
 #[derive(Clone)]
 pub struct Glyph {
     pub x: f32,

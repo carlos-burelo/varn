@@ -46,6 +46,10 @@ export declare function rect$(id: int, x: float, y: float, w: float, h: float, c
 @permission("ui")
 export declare function text$(id: int, x: float, y: float, s: str, size: float, color: int): void;
 @permission("ui")
+export declare function clip$(id: int, x: float, y: float, w: float, h: float): void;
+@permission("ui")
+export declare function unclip$(id: int): void;
+@permission("ui")
 export declare function clear$(id: int, color: int): void;
 @permission("ui")
 export declare function present$(id: int): int;

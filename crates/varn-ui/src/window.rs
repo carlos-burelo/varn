@@ -31,8 +31,7 @@ impl WindowState {
 #[derive(Clone)]
 struct DrawnFrame {
     clear: [f32; 4],
-    rects: Vec<super::comp::Rect>,
-    glyphs: Vec<super::comp::Glyph>,
+    runs: Vec<super::comp::Run>,
     atlas: Option<(Vec<u8>, u32, u32)>,
 }
 
@@ -176,8 +175,7 @@ fn ensure_surface(shared: &super::render::Shared, st: &mut WindowState) -> Resul
 pub fn draw_now(
     handle: u64,
     clear: [f32; 4],
-    rects: &[super::comp::Rect],
-    glyphs: &[super::comp::Glyph],
+    runs: &[super::comp::Run],
     atlas: Option<(&[u8], u32, u32)>,
 ) -> Result<bool, String> {
     with_ui(|ui| {
@@ -199,8 +197,7 @@ pub fn draw_now(
             size.1,
             &mut configured,
             clear,
-            rects,
-            glyphs,
+            runs,
             atlas,
         );
         let st = ui
@@ -213,8 +210,7 @@ pub fn draw_now(
         if ok {
             st.last_draw = Some(DrawnFrame {
                 clear,
-                rects: rects.to_vec(),
-                glyphs: glyphs.to_vec(),
+                runs: runs.to_vec(),
                 atlas: atlas.map(|(b, w, h)| (b.to_vec(), w, h)),
             });
         }
@@ -352,8 +348,7 @@ impl ApplicationHandler for PumpApp {
                                     size.1,
                                     configured,
                                     frame.clear,
-                                    &frame.rects,
-                                    &frame.glyphs,
+                                    &frame.runs,
                                     atlas,
                                 );
                             }

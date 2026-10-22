@@ -1,5 +1,5 @@
 use super::pipes::get_pipes;
-use super::quad::{Glyph, Rect};
+use super::quad::{Body, Clip, Run};
 use super::render::{self, Shared};
 
 fn upload(device: &wgpu::Device, queue: &wgpu::Queue, data: &[f32]) -> wgpu::Buffer {
@@ -46,8 +46,7 @@ pub fn present_draw(
     h: u32,
     configured: &mut Option<(u32, u32)>,
     clear: [f32; 4],
-    rects: &[Rect],
-    glyphs: &[Glyph],
+    runs: &[Run],
     atlas: Option<(&[u8], u32, u32)>,
 ) -> bool {
     let Some((_config, format)) = render::configure_surface(shared, surface, w, h, configured)
@@ -75,11 +74,14 @@ pub fn present_draw(
     let mut enc = shared
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-    if rects.is_empty() && glyphs.is_empty() {
+    if runs.is_empty() {
         clear_only(&mut enc, &look, clear);
     } else {
         let tex = atlas.and_then(|(bytes, aw, ah)| {
-            if glyphs.is_empty() {
+            if !runs
+                .iter()
+                .any(|r| matches!(&r.body, Body::Glyphs(g) if !g.is_empty()))
+            {
                 return None;
             }
             let size = wgpu::Extent3d {
@@ -127,7 +129,7 @@ pub fn present_draw(
         });
         let tex_ref = tex.as_ref().map(|(v, s)| (v, s));
         draw_scene(
-            shared, format, &look, &mut enc, w as f32, h as f32, clear, tex_ref, rects, glyphs,
+            shared, format, &look, &mut enc, w as f32, h as f32, clear, tex_ref, runs,
         );
         let _ = tex;
     }
@@ -167,8 +169,7 @@ fn draw_scene(
     vh: f32,
     clear: [f32; 4],
     atlas: Option<(&wgpu::TextureView, &wgpu::Sampler)>,
-    rects: &[Rect],
-    glyphs: &[Glyph],
+    runs: &[Run],
 ) {
     let (rect_pipe, text_pipe, rect_layout, text_layout) = get_pipes(&shared.device, format);
     let uni = upload_uniform(&shared.device, &shared.queue, &[vw, vh]);
@@ -191,60 +192,87 @@ fn draw_scene(
         timestamp_writes: None,
         occlusion_query_set: None,
     });
-    if !rects.is_empty() {
-        let mut data = Vec::with_capacity(rects.len() * 9);
-        for r in rects {
-            data.extend_from_slice(&[
-                r.x, r.y, r.w, r.h, r.color[0], r.color[1], r.color[2], r.color[3], r.radius,
-            ]);
+    let mut buffers = Vec::with_capacity(runs.len());
+    for run in runs {
+        let (x, y, w, h) = scissor(run.clip, vw, vh);
+        if w == 0 || h == 0 {
+            continue;
         }
-        let buf = upload(&shared.device, &shared.queue, &data);
-        let group = shared.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &rect_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uni.as_entire_binding(),
-            }],
-        });
-        pass.set_pipeline(&rect_pipe);
-        pass.set_bind_group(0, &group, &[]);
-        pass.set_vertex_buffer(0, buf.slice(..));
-        pass.draw(0..6, 0..rects.len() as u32);
-    }
-    if !glyphs.is_empty() {
-        let Some((tex_view, sampler)) = atlas else {
-            return;
-        };
-        let mut data = Vec::with_capacity(glyphs.len() * 12);
-        for g in glyphs {
-            data.extend_from_slice(&[
-                g.x, g.y, g.w, g.h, g.color[0], g.color[1], g.color[2], g.color[3], g.u, g.v, g.uw,
-                g.vh,
-            ]);
+        pass.set_scissor_rect(x, y, w, h);
+        match &run.body {
+            Body::Rects(rects) => {
+                let mut data = Vec::with_capacity(rects.len() * 9);
+                for r in rects {
+                    data.extend_from_slice(&[
+                        r.x, r.y, r.w, r.h, r.color[0], r.color[1], r.color[2], r.color[3],
+                        r.radius,
+                    ]);
+                }
+                let buf = upload(&shared.device, &shared.queue, &data);
+                let group = shared.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout: &rect_layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: uni.as_entire_binding(),
+                    }],
+                });
+                pass.set_pipeline(&rect_pipe);
+                pass.set_bind_group(0, &group, &[]);
+                pass.set_vertex_buffer(0, buf.slice(..));
+                pass.draw(0..6, 0..rects.len() as u32);
+                buffers.push(buf);
+            }
+            Body::Glyphs(glyphs) => {
+                let Some((tex_view, sampler)) = atlas else {
+                    continue;
+                };
+                let mut data = Vec::with_capacity(glyphs.len() * 12);
+                for g in glyphs {
+                    data.extend_from_slice(&[
+                        g.x, g.y, g.w, g.h, g.color[0], g.color[1], g.color[2], g.color[3], g.u,
+                        g.v, g.uw, g.vh,
+                    ]);
+                }
+                let buf = upload(&shared.device, &shared.queue, &data);
+                let group = shared.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout: &text_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: uni.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::TextureView(tex_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: wgpu::BindingResource::Sampler(sampler),
+                        },
+                    ],
+                });
+                pass.set_pipeline(&text_pipe);
+                pass.set_bind_group(0, &group, &[]);
+                pass.set_vertex_buffer(0, buf.slice(..));
+                pass.draw(0..6, 0..glyphs.len() as u32);
+                buffers.push(buf);
+            }
         }
-        let buf = upload(&shared.device, &shared.queue, &data);
-        let group = shared.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &text_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: uni.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(tex_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(sampler),
-                },
-            ],
-        });
-        pass.set_pipeline(&text_pipe);
-        pass.set_bind_group(0, &group, &[]);
-        pass.set_vertex_buffer(0, buf.slice(..));
-        pass.draw(0..6, 0..glyphs.len() as u32);
     }
+    drop(pass);
+    drop(buffers);
+}
+
+fn scissor(clip: Option<Clip>, vw: f32, vh: f32) -> (u32, u32, u32, u32) {
+    let full = (0, 0, vw.max(0.0) as u32, vh.max(0.0) as u32);
+    let Some(c) = clip else {
+        return full;
+    };
+    let x0 = c.x.floor().clamp(0.0, vw);
+    let y0 = c.y.floor().clamp(0.0, vh);
+    let x1 = (c.x + c.w).ceil().clamp(x0, vw);
+    let y1 = (c.y + c.h).ceil().clamp(y0, vh);
+    (x0 as u32, y0 as u32, (x1 - x0) as u32, (y1 - y0) as u32)
 }

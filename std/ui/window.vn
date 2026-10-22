@@ -8,6 +8,8 @@ import {
     rect$,
     text$,
     clear$,
+    clip$,
+    unclip$,
     present$,
     commands$,
     real$,
@@ -59,6 +61,14 @@ export class UiWindow {
 
     text(x: float, y: float, s: str, size: float, color: int): void {
         text$(this.id, x, y, s, size, color);
+    }
+
+    clip(x: float, y: float, w: float, h: float): void {
+        clip$(this.id, x, y, w, h);
+    }
+
+    unclip(): void {
+        unclip$(this.id);
     }
 
     clear(color: int): void {
