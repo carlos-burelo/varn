@@ -41,6 +41,7 @@ struct Window {
     events: VecDeque<Event>,
     commands: Vec<DrawCmd>,
     real: Option<u64>,
+    canvas: varn_ui::Canvas,
 }
 
 fn real_poll(id: u64) -> Vec<Event> {
@@ -116,6 +117,24 @@ fn windows() -> &'static Mutex<Vec<Option<Window>>> {
     WINDOWS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
+fn to_real(e: &Event) -> varn_ui::RealEvent {
+    match e.kind {
+        UiEventKind::Key => varn_ui::RealEvent::Key {
+            key: e.key,
+            pressed: e.pressed,
+        },
+        UiEventKind::Mouse => varn_ui::RealEvent::Mouse {
+            x: e.x,
+            y: e.y,
+            button: e.button,
+            pressed: e.pressed,
+        },
+        UiEventKind::Resize => varn_ui::RealEvent::Resize { w: e.w, h: e.h },
+        UiEventKind::Wheel => varn_ui::RealEvent::Wheel { dy: e.y },
+        UiEventKind::Close => varn_ui::RealEvent::Close,
+    }
+}
+
 fn with_win<T>(id: i64, f: impl FnOnce(&mut Window) -> Result<T, String>) -> Result<T, String> {
     if id < 0 {
         return Err("ui: bad window handle".to_string());
@@ -176,6 +195,7 @@ varn_contract! {
                 events: VecDeque::new(),
                 commands: Vec::new(),
                 real,
+                canvas: varn_ui::Canvas::new(),
             }));
             Ok(id)
         }
@@ -248,7 +268,13 @@ varn_contract! {
                     })?;
                 }
             }
-            let drained = with_win(id, |w| Ok(std::mem::take(&mut w.events)))?;
+            let drained = with_win(id, |w| {
+                let drained = std::mem::take(&mut w.events);
+                for e in &drained {
+                    w.canvas.feed(&to_real(e));
+                }
+                Ok(drained)
+            })?;
             let mut out = Vec::with_capacity(drained.len());
             for e in &drained {
                 out.push(event_obj(ctx, e)?);
@@ -286,17 +312,21 @@ varn_contract! {
             })
         }
         fn present(_ctx: &mut dyn NativeCtx, id: i64) -> Result<i64, String> {
-            let (n, real, cmds) = with_win(id, |win| {
+            with_win(id, |win| {
                 let n = win.commands.len() as i64;
                 let cmds = std::mem::take(&mut win.commands);
-                Ok((n, win.real, cmds))
-            })?;
-            if let Some(h) = real {
-                let scene = ui_draw::assemble(&cmds)?;
-                let atlas = scene.atlas.as_ref().map(|(b, w, h)| (b.as_slice(), *w, *h));
-                let _ = varn_ui::draw_now(h, scene.clear, &scene.runs, atlas);
-            }
-            Ok(n)
+                match win.real {
+                    Some(h) => {
+                        let scene = ui_draw::assemble(&cmds)?;
+                        let atlas = scene.atlas.as_ref().map(|(b, w, h)| (b.as_slice(), *w, *h));
+                        let _ = varn_ui::draw_now(h, &mut win.canvas, scene.clear, &scene.runs, atlas);
+                    }
+                    None => {
+                        let _ = win.canvas.take_input();
+                    }
+                }
+                Ok(n)
+            })
         }
         fn real(_ctx: &mut dyn NativeCtx, id: i64) -> Result<bool, String> {
             with_win(id, |w| Ok(w.real.is_some()))

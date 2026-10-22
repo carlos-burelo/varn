@@ -22,7 +22,7 @@ struct WindowState {
     owner: std::thread::ThreadId,
     last_pos: (i64, i64),
     last_draw: Option<DrawnFrame>,
-    egui: egui::Context,
+    last_ctx: Option<egui::Context>,
 }
 
 impl WindowState {
@@ -177,6 +177,7 @@ fn ensure_surface(shared: &super::render::Shared, st: &mut WindowState) -> Resul
 
 pub fn draw_now(
     handle: u64,
+    canvas: &mut super::canvas::Canvas,
     clear: [f32; 4],
     runs: &[super::comp::Run],
     atlas: Option<(&[u8], u32, u32)>,
@@ -193,11 +194,13 @@ pub fn draw_now(
         let (size, surface) = (st.size, st.surface.as_ref());
         let surface = surface.ok_or_else(|| "ui: surface failed".to_string())?;
         let mut configured = st.configured;
-        let ctx = st.egui.clone();
+        let ctx = canvas.context().clone();
+        let events = canvas.take_input();
         let ok = super::comp::present_draw(
             &shared,
             surface,
             &ctx,
+            events,
             size.0,
             size.1,
             &mut configured,
@@ -213,6 +216,7 @@ pub fn draw_now(
         st.configured = configured;
         st.presented = ok;
         if ok {
+            st.last_ctx = Some(ctx);
             st.last_draw = Some(DrawnFrame {
                 clear,
                 runs: runs.to_vec(),
@@ -287,7 +291,7 @@ impl ApplicationHandler for PumpApp {
                     owner: std::thread::current().id(),
                     last_pos: (0, 0),
                     last_draw: None,
-                    egui: egui::Context::default(),
+                    last_ctx: None,
                 }));
             }
         });
@@ -352,14 +356,17 @@ impl ApplicationHandler for PumpApp {
                             st.surface = render::make_surface(&shared, unsafe { &*ptr });
                         }
                         let atlas = frame.atlas.as_ref().map(|(b, w, h)| (b.as_slice(), *w, *h));
-                        if st.surface.is_some() {
+                        if let Some(ctx) = st.last_ctx.clone()
+                            && st.surface.is_some()
+                        {
                             let size = st.size;
                             let configured = &mut st.configured;
                             if let Some(surface) = st.surface.as_ref() {
                                 st.presented = super::comp::present_draw(
                                     &shared,
                                     surface,
-                                    &st.egui,
+                                    &ctx,
+                                    Vec::new(),
                                     size.0,
                                     size.1,
                                     configured,

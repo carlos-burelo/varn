@@ -144,6 +144,7 @@ pub fn present_draw(
     shared: &Shared,
     surface: &wgpu::Surface,
     ctx: &Context,
+    events: Vec<egui::Event>,
     w: u32,
     h: u32,
     configured: &mut Option<(u32, u32)>,
@@ -224,6 +225,7 @@ pub fn present_draw(
             pos2(0.0, 0.0),
             vec2(w as f32, h as f32),
         )),
+        events,
         ..Default::default()
     };
     let output = ctx.run_ui(input, |ui| {
