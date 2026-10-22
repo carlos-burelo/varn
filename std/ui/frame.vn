@@ -18,6 +18,8 @@ export class UiFrame {
     w: int;
     h: int;
     clips: float[][];
+    modal: bool;
+    overlayPass: bool;
 
     constructor(w: int, h: int) {
         this.mouseX = 0;
@@ -34,6 +36,8 @@ export class UiFrame {
         this.resized = false;
         this.wheel = 0;
         this.clips = [];
+        this.modal = false;
+        this.overlayPass = false;
         this.w = w;
         this.h = h;
     }
@@ -90,6 +94,9 @@ export class UiFrame {
     }
 
     clicked(rx: float, ry: float, rw: float, rh: float): bool {
+        if (this.modal && !this.overlayPass) {
+            return false;
+        }
         return this.leftReleased
             && this.visible(this.mouseX as float, this.mouseY as float)
             && this.visible(this.downX as float, this.downY as float)

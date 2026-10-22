@@ -1,0 +1,167 @@
+import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { Card, Box } from "std:ui/widget/box";
+import { Text } from "std:ui/widget/text";
+import { hit } from "std:ui/keys";
+import { Theme } from "std:ui/style";
+import { Signal, signal } from "std:signals";
+import { now } from "std:time";
+
+const DIALOG_WIDTH = 420.0;
+const DIALOG_MARGIN = 20.0;
+const SELECT_ROW_H = 36.0;
+const TOAST_W = 320.0;
+const TOAST_GAP = 8.0;
+const TOAST_BOTTOM = 24.0;
+const SCRIM = 0xAA000000;
+
+export class DialogNode extends Widget {
+    open: Signal<bool>;
+    title: str;
+    body: Widget[];
+
+    constructor(open: Signal<bool>, title: str, body: Widget[]) {
+        super();
+        this.open = open;
+        this.title = title;
+        this.body = body;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return new Size(0.0, 0.0);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        if (this.open.peek()) {
+            cx.overlay((layer: PaintContext) => paintDialog(layer, this.open, this.title, this.body), true);
+        }
+    }
+}
+
+function paintDialog(cx: PaintContext, open: Signal<bool>, title: str, body: Widget[]): void {
+    const fr = cx.fr;
+    const vw = fr.w as float;
+    const vh = fr.h as float;
+    const width = DIALOG_WIDTH < vw - 2.0 * DIALOG_MARGIN ? DIALOG_WIDTH : vw - 2.0 * DIALOG_MARGIN;
+    const panel = Card(body, title: title, w: width);
+    const size = panel.measure(width, vh);
+    const px = (vw - width) / 2.0;
+    const py = (vh - size.h) / 2.0;
+    cx.win.rect(0.0, 0.0, vw, vh, SCRIM, 0.0);
+    if (fr.clicked(0.0, 0.0, vw, vh) && !hit(fr.mouseX as float, fr.mouseY as float, px, py, width, size.h)) {
+        open.set(false);
+    }
+    panel.paint(cx, px, py, width, size.h);
+}
+
+export function Dialog(open: Signal<bool>, title: str, body: Widget[]): Widget {
+    return new DialogNode(open, title, body);
+}
+
+export type ToastItem = { text: str, until: int };
+
+export class Toaster {
+    items: Signal<ToastItem[]> = signal<ToastItem[]>([]);
+
+    show(text: str, ms: int = 2500): void {
+        const at = now();
+        this.items.update((all: ToastItem[]): ToastItem[] =>
+            [...all.filter((t: ToastItem): bool => t.until > at), { text: text, until: at + ms }]
+        );
+    }
+}
+
+export class ToastsNode extends Widget {
+    toaster: Toaster;
+
+    constructor(toaster: Toaster) {
+        super();
+        this.toaster = toaster;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return new Size(0.0, 0.0);
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        cx.overlay((layer: PaintContext) => paintToasts(layer, this.toaster), false);
+    }
+}
+
+function paintToasts(cx: PaintContext, toaster: Toaster): void {
+    const at = now();
+    const live = toaster.items.peek().filter((t: ToastItem): bool => t.until > at);
+    const vw = cx.fr.w as float;
+    let bottom = (cx.fr.h as float) - TOAST_BOTTOM;
+    for (let i = live.length - 1; i >= 0; i = i - 1) {
+        const card = Box(Text(live[i].text), color: Theme.colors.surface, radius: 8.0, pad: 12.0, w: TOAST_W);
+        const size = card.measure(TOAST_W, bottom);
+        card.paint(cx, (vw - TOAST_W) / 2.0, bottom - size.h, TOAST_W, size.h);
+        bottom = bottom - size.h - TOAST_GAP;
+    }
+}
+
+export function Toasts(toaster: Toaster): Widget {
+    return new ToastsNode(toaster);
+}
+
+export class SelectNode extends Widget {
+    options: str[];
+    value: Signal<int>;
+    open: Signal<bool>;
+
+    constructor(options: str[], value: Signal<int>, open: Signal<bool>, h: float) {
+        super();
+        this.options = options;
+        this.value = value;
+        this.open = open;
+        this.h = h;
+    }
+
+    override measure(maxW: float, maxH: float): Size {
+        return this.fit(new Size(maxW, this.h));
+    }
+
+    override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
+        const anchor = this.h;
+        const at = this.value.peek();
+        const label = at >= 0 && at < this.options.length ? this.options[at] : "";
+        cx.win.rect(x, y, w, anchor, Theme.colors.outline, 8.0);
+        Text(label).paint(cx, x + 12.0, y, w - 24.0, anchor);
+        if (cx.fr.clicked(x, y, w, anchor)) {
+            this.open.set(!this.open.peek());
+        }
+        if (this.open.peek()) {
+            const options = this.options;
+            const value = this.value;
+            const open = this.open;
+            cx.overlay((layer: PaintContext) => paintOptions(layer, options, value, open, x, y, w, anchor), false);
+        }
+    }
+}
+
+function paintOptions(cx: PaintContext, options: str[], value: Signal<int>, open: Signal<bool>, ax: float, ay: float, aw: float, ah: float): void {
+    const fr = cx.fr;
+    const top = ay + ah;
+    const listH = (options.length as float) * SELECT_ROW_H;
+    cx.win.rect(ax, top, aw, listH, Theme.colors.surface, 8.0);
+    for (let i = 0; i < options.length; i = i + 1) {
+        const rowY = top + (i as float) * SELECT_ROW_H;
+        if (i == value.peek()) {
+            cx.win.rect(ax + 4.0, rowY + 2.0, aw - 8.0, SELECT_ROW_H - 4.0, Theme.colors.outline, 6.0);
+        }
+        Text(options[i]).paint(cx, ax + 12.0, rowY, aw - 24.0, SELECT_ROW_H);
+        if (fr.clicked(ax, rowY, aw, SELECT_ROW_H)) {
+            value.set(i);
+            open.set(false);
+        }
+    }
+    const inside = hit(fr.mouseX as float, fr.mouseY as float, ax, top, aw, listH)
+        || hit(fr.mouseX as float, fr.mouseY as float, ax, ay, aw, ah);
+    if (fr.leftReleased && !inside) {
+        open.set(false);
+    }
+}
+
+export function Select(options: str[], value: Signal<int>, open: Signal<bool> = signal(false), h: float = 40.0): Widget {
+    return new SelectNode(options, value, open, h);
+}

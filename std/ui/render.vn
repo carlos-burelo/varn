@@ -6,7 +6,16 @@ import { KEY_ESCAPE } from "std:ui/keys";
 import { beginFrame, endFrame } from "std:ui/state";
 
 export function render(win: UiWindow, fr: UiFrame, focus: Focus, root: Widget, x: float, y: float, w: float, h: float): void {
-    root.paint(new PaintContext(win, fr, focus), x, y, w, h);
+    const cx = new PaintContext(win, fr, focus);
+    root.paint(cx, x, y, w, h);
+    fr.overlayPass = true;
+    let modal = false;
+    for (let layer of cx.overlays) {
+        layer.paint(cx);
+        modal = modal || layer.modal;
+    }
+    fr.overlayPass = false;
+    fr.modal = modal;
 }
 
 export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w: int = 800, h: int = 600, bg: int = 0xFF14161A, maxFrames: int = 0): void {

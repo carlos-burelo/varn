@@ -3,16 +3,31 @@ import { UiFrame } from "std:ui/frame";
 import { Focus } from "std:ui/focus";
 import { Alignment } from "std:ui/style";
 
+export class Overlay {
+    paint: (cx: PaintContext) => void;
+    modal: bool;
+
+    constructor(paint: (cx: PaintContext) => void, modal: bool) {
+        this.paint = paint;
+        this.modal = modal;
+    }
+}
+
 export class PaintContext {
     win: UiWindow;
     fr: UiFrame;
     focus: Focus;
+    overlays: Overlay[] = [];
     private _slot: int = 1000;
 
     constructor(win: UiWindow, fr: UiFrame, focus: Focus) {
         this.win = win;
         this.fr = fr;
         this.focus = focus;
+    }
+
+    overlay(paint: (cx: PaintContext) => void, modal: bool = false): void {
+        this.overlays.push(new Overlay(paint, modal));
     }
 
     clip(x: float, y: float, w: float, h: float): void {

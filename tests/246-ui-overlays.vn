@@ -1,0 +1,78 @@
+import { describe, it, expect } from "std:test";
+import { UiWindow, UiFrame, Focus, Widget, render, signal, Button, Column, Box, Dialog, Toaster, Toasts, Select, UiInjectKind, MOUSE_LEFT } from "std:ui";
+
+function tap(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget, x: int, y: int): void {
+    win.inject(UiInjectKind.MouseDown, x, y, MOUSE_LEFT);
+    fr.update(win);
+    render(win, fr, focus, tree, 0.0, 0.0, 400.0, 300.0);
+    win.inject(UiInjectKind.MouseUp, x, y, MOUSE_LEFT);
+    fr.update(win);
+    render(win, fr, focus, tree, 0.0, 0.0, 400.0, 300.0);
+}
+
+await describe("246 ui overlays", async () => {
+    await it("an open dialog blocks clicks on the base tree and its scrim closes it", () => {
+        using win = UiWindow.open("t", 400, 300);
+        const fr = new UiFrame(400, 300);
+        const focus = new Focus();
+        const open = signal(true);
+        const presses: int[] = [];
+        const tree = Column([
+            Button("base", onPress: () => { presses.push(1) }, w: 200.0, h: 40.0),
+            Dialog(open, "Sure?", [Button("ok", onPress: () => { open.set(false) }, w: 80.0, h: 36.0)])
+        ]);
+        render(win, fr, focus, tree, 0.0, 0.0, 400.0, 300.0);
+        expect(fr.modal).toBe(true);
+        tap(win, fr, focus, tree, 20, 20);
+        expect(presses.length).toBe(0);
+        expect(open.value).toBe(false);
+        render(win, fr, focus, tree, 0.0, 0.0, 400.0, 300.0);
+        expect(fr.modal).toBe(false);
+    });
+
+    await it("a button inside an open dialog still works", () => {
+        using win = UiWindow.open("t", 400, 300);
+        const fr = new UiFrame(400, 300);
+        const focus = new Focus();
+        const open = signal(true);
+        const presses: int[] = [];
+        const tree = Column([
+            Button("base", onPress: () => { presses.push(1) }, w: 200.0, h: 40.0),
+            Dialog(open, "Sure?", [Button("ok", onPress: () => { open.set(false) }, w: 80.0, h: 36.0)])
+        ]);
+        render(win, fr, focus, tree, 0.0, 0.0, 400.0, 300.0);
+        tap(win, fr, focus, tree, 60, 165);
+        expect(open.value).toBe(false);
+        expect(presses.length).toBe(0);
+    });
+
+    await it("a select opens, and choosing an option sets the value and closes", () => {
+        using win = UiWindow.open("t", 400, 300);
+        const fr = new UiFrame(400, 300);
+        const focus = new Focus();
+        const value = signal(0);
+        const open = signal(false);
+        const tree = Select(["red", "green", "blue"], value, open, 40.0);
+        render(win, fr, focus, tree, 0.0, 0.0, 200.0, 40.0);
+        tap(win, fr, focus, tree, 10, 10);
+        expect(open.value).toBe(true);
+        tap(win, fr, focus, tree, 10, 40 + 2 * 36 + 10);
+        expect(value.value).toBe(2);
+        expect(open.value).toBe(false);
+    });
+
+    await it("toasts show their text until they expire", () => {
+        using win = UiWindow.open("t", 400, 300);
+        const fr = new UiFrame(400, 300);
+        const focus = new Focus();
+        const toaster = new Toaster();
+        toaster.show("saved", 60000);
+        toaster.show("gone", -1);
+        const tree = Toasts(toaster);
+        win.clear(0);
+        render(win, fr, focus, tree, 0.0, 0.0, 400.0, 300.0);
+        const texts = win.commands().filter((c: str): bool => c.indexOf("saved") >= 0);
+        expect(texts.length).toBe(1);
+        expect(win.commands().filter((c: str): bool => c.indexOf("gone") >= 0).length).toBe(0);
+    });
+});
