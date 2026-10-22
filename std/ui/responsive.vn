@@ -1,7 +1,10 @@
 import { Widget, Size, PaintContext, Constraints, Placement, paintPlaced, layoutAt } from "std:ui/widget/base";
 import { Theme } from "std:ui/style";
 import { Signal } from "std:signals";
-import { View } from "std:ui/state";
+import { newComponentDefinition, scopeAtMount } from "std:ui/state";
+import { viewAt } from "std:ui/mount";
+
+const RESPONSIVE = newComponentDefinition();
 
 export enum WindowClass {
     compact,
@@ -63,20 +66,18 @@ export function resolveFloat(value: float | AdaptiveValue<float>, width: float):
 
 export class ResponsiveNode extends Widget {
     cls: Signal<WindowClass>;
-    view: View<Widget>;
     body: () => Widget;
 
     constructor(build: (cls: WindowClass) => Widget) {
         super();
         this.cls = new Signal<WindowClass>(WindowClass.compact, null);
-        this.view = new View<Widget>(null);
         this.body = () => build(this.cls.value);
     }
 
     override computeLayout(c: Constraints): Placement {
         const cls = windowClassOf(c.maxW);
         this.cls.set(cls);
-        const placed = layoutAt(this.view.describe(this.body), classKey(cls), c);
+        const placed = layoutAt(viewAt(scopeAtMount(RESPONSIVE)).describe(this.body), classKey(cls), c);
         return new Placement(this, placed.size, [placed]);
     }
 

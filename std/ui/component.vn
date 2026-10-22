@@ -1,22 +1,7 @@
 import { FunctionRef } from "std:reflect";
-import { ComponentScope, View, newComponentDefinition, scopeAtMount } from "std:ui/state";
+import { newComponentDefinition, scopeAtMount } from "std:ui/state";
+import { viewAt } from "std:ui/mount";
 import { Widget, Constraints, Placement, PaintContext, paintPlaced, KeyedNode } from "std:ui/widget/base";
-
-const views = new Map<ComponentScope, View<Widget>>();
-
-function viewOf(scope: ComponentScope): View<Widget> {
-    const existing = views.get(scope);
-    if (existing !== null) {
-        return existing;
-    }
-    const fresh = new View<Widget>(scope);
-    views.set(scope, fresh);
-    scope.onDispose(() => {
-        fresh.dispose();
-        views.delete(scope);
-    });
-    return fresh;
-}
 
 export class ComponentNode extends Widget {
     body: () => Widget;
@@ -30,7 +15,7 @@ export class ComponentNode extends Widget {
     }
 
     expand(): Widget {
-        return viewOf(scopeAtMount(this.definition)).describe(this.body);
+        return viewAt(scopeAtMount(this.definition)).describe(this.body);
     }
 
     override computeLayout(c: Constraints): Placement {
