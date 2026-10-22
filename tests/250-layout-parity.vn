@@ -1,0 +1,67 @@
+import { describe, it, expect } from "std:test";
+import {
+    UiWindow, UiFrame, Focus, Widget, Column, Row, Box, Button, Expanded, MainAxis, CrossAxis,
+    Constraints, Placement, render
+} from "std:ui";
+
+function paintedRects(win: UiWindow): float[][] {
+    const out: float[][] = [];
+    for (const cmd of win.commands()) {
+        const parts = cmd.split(" ");
+        if (parts[0] == "rect") {
+            out.push([float.parse(parts[1]), float.parse(parts[2]), float.parse(parts[3]), float.parse(parts[4])]);
+        }
+        if (parts[0] == "control") {
+            out.push([float.parse(parts[3]), float.parse(parts[4]), float.parse(parts[5]), float.parse(parts[6])]);
+        }
+    }
+    return out;
+}
+
+function leafRects(p: Placement, ox: float, oy: float, out: float[][]): void {
+    const x = ox + p.x;
+    const y = oy + p.y;
+    if (p.children.length == 0) {
+        out.push([x, y, p.size.w, p.size.h]);
+    }
+    for (const child of p.children) {
+        leafRects(child, x, y, out);
+    }
+}
+
+function assertParity(tree: Widget, w: float, h: float): void {
+    using win = UiWindow.open("parity", 800, 600);
+    const fr = new UiFrame(800, 600);
+    const focus = new Focus();
+    win.clear(0);
+    render(win, fr, focus, tree, 0.0, 0.0, w, h);
+    const expected = paintedRects(win);
+    const got: float[][] = [];
+    leafRects(tree.layout(Constraints.tight(w, h)), 0.0, 0.0, got);
+    expect(got.length).toBe(expected.length);
+    for (let i = 0; i < expected.length; i = i + 1) {
+        expect(got[i]).toEqual(expected[i]);
+    }
+}
+
+await describe("250 layout parity", async () => {
+    await it("a column stacks colored boxes with a gap", () => {
+        assertParity(Column([Box(w: 100.0, h: 40.0, color: 0xFFFF0000), Box(w: 200.0, h: 20.0, color: 0xFF00FF00)], gap: 4.0), 800.0, 600.0);
+    });
+
+    await it("a row with padding places boxes side by side", () => {
+        assertParity(Row([Box(w: 50.0, h: 30.0, color: 0xFFFF0000), Box(w: 60.0, h: 30.0, color: 0xFF00FF00)], gap: 10.0, pad: 8.0), 800.0, 600.0);
+    });
+
+    await it("an expanded child takes the remaining main size", () => {
+        assertParity(Row([Box(w: 100.0, h: 30.0, color: 0xFFFF0000), Expanded(Box(h: 30.0, color: 0xFF00FF00))]), 800.0, 600.0);
+    });
+
+    await it("centered main and cross axes center the content", () => {
+        assertParity(Column([Box(w: 60.0, h: 20.0, color: 0xFFFF0000), Box(w: 30.0, h: 20.0, color: 0xFF00FF00)], gap: 6.0, mainAxis: MainAxis.center, crossAxis: CrossAxis.center, w: 300.0, h: 200.0), 800.0, 600.0);
+    });
+
+    await it("buttons are sized by their labels in a column", () => {
+        assertParity(Column([Button("ok", () => {}), Button("cancel", () => {})], gap: 6.0), 800.0, 600.0);
+    });
+});

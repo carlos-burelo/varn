@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext, paintChild, measureChild, alignedX, alignedY } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, paintChild, measureChild, alignedX, alignedY, Constraints, Placement } from "std:ui/widget/base";
 import { Column } from "std:ui/widget/flex";
 import { Title } from "std:ui/widget/text";
 import { Alignment, Colors, Theme } from "std:ui/style";
@@ -25,6 +25,24 @@ export class BoxNode extends Widget {
     override measure(maxW: float, maxH: float): Size {
         const inner = measureChild(this.child, maxW - 2.0 * this.pad, maxH - 2.0 * this.pad);
         return this.fit(new Size(inner.w + 2.0 * this.pad, inner.h + 2.0 * this.pad));
+    }
+
+    override layout(c: Constraints): Placement {
+        const pad = this.pad;
+        const child = this.child;
+        let inner = new Size(0.0, 0.0);
+        if (child !== null) {
+            inner = child.layout(Constraints.loose(c.maxW - 2.0 * pad, c.maxH - 2.0 * pad)).size;
+        }
+        const size = c.fit(this.fit(new Size(inner.w + 2.0 * pad, inner.h + 2.0 * pad)));
+        const children: Placement[] = [];
+        if (child !== null) {
+            const placed = child.layout(Constraints.tight(size.w - 2.0 * pad, size.h - 2.0 * pad));
+            placed.x = pad;
+            placed.y = pad;
+            children.push(placed);
+        }
+        return new Placement(this, size, children);
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
@@ -124,6 +142,11 @@ export class ExpandedNode extends Widget {
         super();
         this.child = child;
         this.flex = flex;
+    }
+
+    override layout(c: Constraints): Placement {
+        const placed = this.child.layout(c);
+        return new Placement(this, placed.size, [placed]);
     }
 
     override measure(maxW: float, maxH: float): Size {

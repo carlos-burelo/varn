@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement } from "std:ui/widget/base";
 import { MainAxis, CrossAxis } from "std:ui/style";
 
 export enum Axis {
@@ -62,6 +62,115 @@ export class FlexNode extends Widget {
             ? new Size(main + 2.0 * this.pad, cross + 2.0 * this.pad)
             : new Size(cross + 2.0 * this.pad, main + 2.0 * this.pad);
         return this.fit(natural);
+    }
+
+    override layout(c: Constraints): Placement {
+        const horizontal = this.axis == Axis.horizontal;
+        const pad = this.pad;
+        const inner = c.deflate(pad);
+        const measured: Placement[] = [];
+        let main = 0.0;
+        let cross = 0.0;
+        for (let child of this.children) {
+            const placed = child.layout(Constraints.loose(inner.maxW, inner.maxH));
+            measured.push(placed);
+            main = main + this.mainOf(placed.size);
+            const across = this.crossOf(placed.size);
+            cross = across > cross ? across : cross;
+        }
+        if (this.children.length > 1) {
+            main = main + this.gap * ((this.children.length - 1) as float);
+        }
+        let flexible = false;
+        for (let child of this.children) {
+            if (child.flex > 0.0) {
+                flexible = true;
+            }
+        }
+        if (flexible || this.mainAxis != MainAxis.start) {
+            const room = horizontal ? inner.maxW : inner.maxH;
+            main = main > room ? main : room;
+        }
+        const natural = horizontal
+            ? new Size(main + 2.0 * pad, cross + 2.0 * pad)
+            : new Size(cross + 2.0 * pad, main + 2.0 * pad);
+        const size = c.fit(this.fit(natural));
+
+        const innerW = size.w - 2.0 * pad;
+        const innerH = size.h - 2.0 * pad;
+        const room = horizontal ? innerW : innerH;
+        const across = horizontal ? innerH : innerW;
+        const count = this.children.length;
+
+        let fixed = 0.0;
+        let flexTotal = 0.0;
+        for (let i = 0; i < count; i = i + 1) {
+            const child = this.children[i];
+            if (child.flex > 0.0) {
+                flexTotal = flexTotal + child.flex;
+            } else {
+                fixed = fixed + this.mainOf(measured[i].size);
+            }
+        }
+        const gaps = count > 1 ? this.gap * ((count - 1) as float) : 0.0;
+        let leftover = room - fixed - gaps;
+        if (leftover < 0.0) {
+            leftover = 0.0;
+        }
+
+        let offset = 0.0;
+        let spacing = this.gap;
+        if (flexTotal == 0.0) {
+            if (this.mainAxis == MainAxis.center) {
+                offset = leftover / 2.0;
+            } else if (this.mainAxis == MainAxis.end) {
+                offset = leftover;
+            } else if (this.mainAxis == MainAxis.spaceBetween && count > 1) {
+                spacing = this.gap + leftover / ((count - 1) as float);
+            } else if (this.mainAxis == MainAxis.spaceAround && count > 0) {
+                const unit = leftover / (count as float);
+                offset = unit / 2.0;
+                spacing = this.gap + unit;
+            } else if (this.mainAxis == MainAxis.spaceEvenly && count > 0) {
+                const unit = leftover / ((count + 1) as float);
+                offset = unit;
+                spacing = this.gap + unit;
+            }
+        }
+
+        const children: Placement[] = [];
+        let cursor = offset;
+        for (let i = 0; i < count; i = i + 1) {
+            const child = this.children[i];
+            const measuredChild = measured[i];
+            let span = this.mainOf(measuredChild.size);
+            if (child.flex > 0.0) {
+                span = leftover * child.flex / flexTotal;
+            }
+            let thick = this.crossOf(measuredChild.size);
+            let shift = 0.0;
+            if (this.crossAxis == CrossAxis.stretch || child.fills) {
+                thick = across;
+            } else {
+                thick = thick < across ? thick : across;
+                if (this.crossAxis == CrossAxis.center) {
+                    shift = (across - thick) / 2.0;
+                } else if (this.crossAxis == CrossAxis.end) {
+                    shift = across - thick;
+                }
+            }
+            const wantW = horizontal ? span : thick;
+            const wantH = horizontal ? thick : span;
+            let placed = measuredChild;
+            if (placed.size.w != wantW || placed.size.h != wantH) {
+                placed = child.layout(Constraints.tight(wantW, wantH));
+            }
+            placed.x = pad + (horizontal ? cursor : shift);
+            placed.y = pad + (horizontal ? shift : cursor);
+            children.push(placed);
+            cursor = cursor + span + spacing;
+        }
+        return new Placement(this, size, children);
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {

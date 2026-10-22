@@ -72,6 +72,59 @@ export class Size {
     }
 }
 
+export class Constraints {
+    minW: float;
+    maxW: float;
+    minH: float;
+    maxH: float;
+
+    constructor(minW: float, maxW: float, minH: float, maxH: float) {
+        this.minW = minW;
+        this.maxW = maxW;
+        this.minH = minH;
+        this.maxH = maxH;
+    }
+
+    static loose(maxW: float, maxH: float): Constraints {
+        return new Constraints(0.0, maxW, 0.0, maxH);
+    }
+
+    static tight(w: float, h: float): Constraints {
+        return new Constraints(w, w, h, h);
+    }
+
+    deflate(pad: float): Constraints {
+        const dw = 2.0 * pad;
+        const minW = this.minW - dw > 0.0 ? this.minW - dw : 0.0;
+        const minH = this.minH - dw > 0.0 ? this.minH - dw : 0.0;
+        const maxW = this.maxW - dw > 0.0 ? this.maxW - dw : 0.0;
+        const maxH = this.maxH - dw > 0.0 ? this.maxH - dw : 0.0;
+        return new Constraints(minW, maxW, minH, maxH);
+    }
+
+    fit(s: Size): Size {
+        const w = s.w < this.minW ? this.minW : (s.w > this.maxW ? this.maxW : s.w);
+        const h = s.h < this.minH ? this.minH : (s.h > this.maxH ? this.maxH : s.h);
+        return new Size(w, h);
+    }
+}
+
+export class Placement {
+    node: Widget;
+    size: Size;
+    x: float;
+    y: float;
+    children: Placement[];
+
+    constructor(node: Widget, size: Size, children: Placement[]) {
+        this.node = node;
+        this.size = size;
+        this.x = 0.0;
+        this.y = 0.0;
+        this.children = children;
+    }
+}
+
 export abstract class Widget {
     w: float = -1.0;
     h: float = -1.0;
@@ -83,6 +136,10 @@ export abstract class Widget {
 
     fit(natural: Size): Size {
         return new Size(this.w >= 0.0 ? this.w : natural.w, this.h >= 0.0 ? this.h : natural.h);
+    }
+
+    layout(c: Constraints): Placement {
+        return new Placement(this, c.fit(this.measure(c.maxW, c.maxH)), []);
     }
 }
 
