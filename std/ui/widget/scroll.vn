@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement } from "std:ui/widget/base";
 import { Signal, signal } from "std:signals";
 import { UiControlKind } from "std:ui/window";
 
@@ -18,6 +18,19 @@ export class ScrollNode extends Widget {
 
     override measure(maxW: float, maxH: float): Size {
         return this.fit(new Size(maxW, maxH));
+    }
+
+    override computeLayout(c: Constraints): Placement {
+        const size = c.fit(this.measure(c.maxW, c.maxH));
+        const child = this.child;
+        const content = child.layout(Constraints.loose(size.w - BAR_WIDTH, CONTENT_UNBOUNDED)).size.h;
+        const overflow = content > size.h ? content - size.h : 0.0;
+        const at = this.offset.peek();
+        const bounded = at < 0.0 ? 0.0 : (at > overflow ? overflow : at);
+        const placed = child.layout(Constraints.tight(size.w - BAR_WIDTH, content));
+        placed.x = 0.0;
+        placed.y = 0.0 - bounded;
+        return new Placement(this, size, [placed]);
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {

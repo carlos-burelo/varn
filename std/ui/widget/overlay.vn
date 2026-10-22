@@ -1,4 +1,4 @@
-import { Widget, Size, PaintContext } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Constraints, Placement } from "std:ui/widget/base";
 import { Card, Box } from "std:ui/widget/box";
 import { Text } from "std:ui/widget/text";
 import { hit } from "std:ui/keys";
@@ -25,6 +25,10 @@ export class DialogNode extends Widget {
         this.open = open;
         this.title = title;
         this.body = body;
+    }
+
+    override computeLayout(c: Constraints): Placement {
+        return new Placement(this, new Size(0.0, 0.0), []);
     }
 
     override measure(maxW: float, maxH: float): Size {
@@ -79,6 +83,10 @@ export class ToastsNode extends Widget {
     constructor(toaster: Toaster) {
         super();
         this.toaster = toaster;
+    }
+
+    override computeLayout(c: Constraints): Placement {
+        return new Placement(this, new Size(0.0, 0.0), []);
     }
 
     override measure(maxW: float, maxH: float): Size {

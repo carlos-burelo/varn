@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 import {
     UiWindow, UiFrame, Focus, Widget, Column, Row, Box, Button, Expanded, MainAxis, CrossAxis,
-    Constraints, Placement, render, Padding, SizedBox, Stack, Alignment
+    Constraints, Placement, render, Padding, SizedBox, Stack, Alignment, Scroll, signal
 } from "std:ui";
 
 function paintedRects(win: UiWindow): float[][] {
@@ -11,7 +11,7 @@ function paintedRects(win: UiWindow): float[][] {
         if (parts[0] == "rect") {
             out.push([float.parse(parts[1]), float.parse(parts[2]), float.parse(parts[3]), float.parse(parts[4])]);
         }
-        if (parts[0] == "control") {
+        if (parts[0] == "control" && parts[2] != "Scroll") {
             out.push([float.parse(parts[3]), float.parse(parts[4]), float.parse(parts[5]), float.parse(parts[6])]);
         }
     }
@@ -75,6 +75,10 @@ await describe("250 layout parity", async () => {
 
     await it("a sized box gives its child the declared size", () => {
         assertParity(SizedBox(child: Box(color: 0xFFFF0000), w: 120.0, h: 50.0), 800.0, 600.0);
+    });
+
+    await it("a scroll places its content at the current offset", () => {
+        assertParity(Scroll(Column([Box(w: 100.0, h: 30.0, color: 0xFFFF0000), Box(w: 100.0, h: 30.0, color: 0xFF00FF00), Box(w: 100.0, h: 30.0, color: 0xFF0000FF)]), signal(20.0), 40.0), 200.0, 40.0);
     });
 
     await it("the same constraints reuse the cached placement", () => {
