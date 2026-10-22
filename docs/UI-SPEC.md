@@ -22,8 +22,10 @@ Module: `std:ui`
 > constraints y época de layout, y `paint(cx, p: Placement, x, y)`. Las hojas usan
 > `fixedSize(node, c, natural)` para respetar `w`/`h` fijos.
 > `Column`/`Row` reparten el eje principal entre hijos intrínsecos y flexibles
-> (`Expanded`/`Spacer`) de forma proporcional a `flex`. Los intrínsecos min/max no están
-> implementados.
+> (`Expanded`/`Spacer`) de forma proporcional a `flex`, sin bajar del mínimo de cada hijo
+> (`minWidth`/`minHeight`: etiqueta de botón, relleno de `Box`). `Text` no tiene mínimo
+> porque se recorta con elipsis; un `Row`/`Column` anidado tampoco aporta mínimo todavía.
+> Un `Responsive` toma la clase de la ventana (`Constraints.windowClass`), no del ancho de su caja.
 > Ventana: `UiWindow.open(title, w, h)` abre ventana por defecto; `headless: true` para
 > tests. `run(title, build, w, h)` y `present(win, fr)` son las entradas de bucle.
 > Puertas: `tests/220-ui-declarative.vn`, `tests/232-ui-layout.vn`,
