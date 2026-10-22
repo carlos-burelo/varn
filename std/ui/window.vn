@@ -11,14 +11,17 @@ import {
     clip$,
     unclip$,
     present$,
+    control$,
+    activated$,
     commands$,
     real$,
     UiEvent,
     UiEventKind,
-    UiInjectKind
+    UiInjectKind,
+    UiControlKind
 } from "runtime:ui";
 
-export { UiEvent, UiEventKind, UiInjectKind };
+export { UiEvent, UiEventKind, UiInjectKind, UiControlKind };
 
 export class UiWindow {
     id: int;
@@ -73,6 +76,14 @@ export class UiWindow {
 
     clear(color: int): void {
         clear$(this.id, color);
+    }
+
+    control(cid: int, kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, checked: bool): void {
+        control$(this.id, cid, kind, x, y, w, h, color, checked);
+    }
+
+    activated(): int[] {
+        return activated$(this.id);
     }
 
     present(): int {

@@ -20,6 +20,9 @@ export class UiFrame {
     clips: float[][];
     modal: bool;
     overlayPass: bool;
+    controlIds: int[];
+    controlFns: (() => void)[];
+    controlOverlay: bool[];
 
     constructor(w: int, h: int) {
         this.mouseX = 0;
@@ -38,6 +41,9 @@ export class UiFrame {
         this.clips = [];
         this.modal = false;
         this.overlayPass = false;
+        this.controlIds = [];
+        this.controlFns = [];
+        this.controlOverlay = [];
         this.w = w;
         this.h = h;
     }
@@ -91,6 +97,28 @@ export class UiFrame {
 
     held(key: int): bool {
         return UiFrame.contains(this.keys, key);
+    }
+
+    clearControls(): void {
+        this.controlIds = [];
+        this.controlFns = [];
+        this.controlOverlay = [];
+    }
+
+    onActivate(id: int, fn: () => void): void {
+        this.controlIds.push(id);
+        this.controlFns.push(fn);
+        this.controlOverlay.push(this.overlayPass);
+    }
+
+    fire(ids: int[]): void {
+        for (let i = 0; i < ids.length; i = i + 1) {
+            for (let j = 0; j < this.controlIds.length; j = j + 1) {
+                if (this.controlIds[j] == ids[i] && (!this.modal || this.controlOverlay[j])) {
+                    this.controlFns[j]();
+                }
+            }
+        }
     }
 
     clicked(rx: float, ry: float, rw: float, rh: float): bool {

@@ -22,6 +22,12 @@ varn_macros::varn_enum! {
     pub enum UiInjectKind;
 }
 
+varn_macros::varn_enum! {
+    module: MODULE_ID,
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    pub enum UiControlKind;
+}
+
 struct Event {
     kind: UiEventKind,
     key: i64,
@@ -42,6 +48,7 @@ struct Window {
     commands: Vec<DrawCmd>,
     real: Option<u64>,
     canvas: varn_ui::Canvas,
+    activated: Vec<i64>,
 }
 
 fn real_poll(id: u64) -> Vec<Event> {
@@ -196,6 +203,7 @@ varn_contract! {
                 commands: Vec::new(),
                 real,
                 canvas: varn_ui::Canvas::new(),
+                activated: Vec::new(),
             }));
             Ok(id)
         }
@@ -315,18 +323,53 @@ varn_contract! {
             with_win(id, |win| {
                 let n = win.commands.len() as i64;
                 let cmds = std::mem::take(&mut win.commands);
-                match win.real {
-                    Some(h) => {
-                        let scene = ui_draw::assemble(&cmds)?;
-                        let atlas = scene.atlas.as_ref().map(|(b, w, h)| (b.as_slice(), *w, *h));
-                        let _ = varn_ui::draw_now(h, &mut win.canvas, scene.clear, &scene.runs, atlas);
-                    }
-                    None => {
-                        let _ = win.canvas.take_input();
-                    }
-                }
+                let scene = ui_draw::assemble(&cmds)?;
+                let atlas = scene.atlas.as_ref().map(|(b, w, h)| (b.as_slice(), *w, *h));
+                let hits = match win.real {
+                    Some(h) => varn_ui::draw_now(h, &mut win.canvas, scene.clear, &scene.runs, atlas)
+                        .unwrap_or_default(),
+                    None => win.canvas.interact(win.w as u32, win.h as u32, &scene.runs),
+                };
+                win.activated.extend(hits.into_iter().map(i64::from));
                 Ok(n)
             })
+        }
+        fn control(
+            ctx: &mut dyn NativeCtx,
+            window: i64,
+            cid: i64,
+            kind: VmValue,
+            x: f64,
+            y: f64,
+            w: f64,
+            h: f64,
+            color: i64,
+            checked: bool,
+        ) -> Result<(), String> {
+            let kind = match UiControlKind::from_value(ctx, kind)
+                .ok_or_else(|| "ui.control: kind is not a UiControlKind".to_string())?
+            {
+                UiControlKind::Button => varn_ui::ControlKind::Button,
+                UiControlKind::Checkbox => varn_ui::ControlKind::Checkbox,
+            };
+            let id = u32::try_from(cid).map_err(|_| "ui.control: bad control id".to_string())?;
+            with_win(window, |win| {
+                win.commands.push(DrawCmd::Control {
+                    id,
+                    kind,
+                    x,
+                    y,
+                    w,
+                    h,
+                    color,
+                    checked,
+                });
+                Ok(())
+            })
+        }
+        fn activated(_ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, String> {
+            let hits = with_win(id, |win| Ok(std::mem::take(&mut win.activated)))?;
+            Ok(hits.into_iter().map(VmValue::from_int).collect())
         }
         fn real(_ctx: &mut dyn NativeCtx, id: i64) -> Result<bool, String> {
             with_win(id, |w| Ok(w.real.is_some()))

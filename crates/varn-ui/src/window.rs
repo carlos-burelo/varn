@@ -181,7 +181,7 @@ pub fn draw_now(
     clear: [f32; 4],
     runs: &[super::comp::Run],
     atlas: Option<(&[u8], u32, u32)>,
-) -> Result<bool, String> {
+) -> Result<Vec<u32>, String> {
     with_ui(|ui| {
         let st = ui
             .wins
@@ -196,7 +196,7 @@ pub fn draw_now(
         let mut configured = st.configured;
         let ctx = canvas.context().clone();
         let events = canvas.take_input();
-        let ok = super::comp::present_draw(
+        let (ok, hits) = super::comp::present_draw(
             &shared,
             surface,
             &ctx,
@@ -223,7 +223,7 @@ pub fn draw_now(
                 atlas: atlas.map(|(b, w, h)| (b.to_vec(), w, h)),
             });
         }
-        Ok(ok)
+        Ok(hits)
     })
 }
 
@@ -373,7 +373,8 @@ impl ApplicationHandler for PumpApp {
                                     frame.clear,
                                     &frame.runs,
                                     atlas,
-                                );
+                                )
+                                .0;
                             }
                         }
                     }

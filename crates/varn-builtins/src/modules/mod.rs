@@ -50,7 +50,7 @@ native_modules! {
         types::set::NATIVE_ENTRIES,
         types::string::NATIVE_ENTRIES,
     ];
-    ui = "runtime/ui/ui.rs" => [ui::NATIVE_ENTRIES, ui::UIEVENTKIND_ENTRIES, ui::UIINJECTKIND_ENTRIES];
+    ui = "runtime/ui/ui.rs" => [ui::NATIVE_ENTRIES, ui::UIEVENTKIND_ENTRIES, ui::UIINJECTKIND_ENTRIES, ui::UICONTROLKIND_ENTRIES];
     ws = "runtime/ws/ws.rs" => [ws::NATIVE_ENTRIES, ws::WSOPCODE_ENTRIES];
 }
 

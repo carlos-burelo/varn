@@ -12,6 +12,9 @@ function rects(win: UiWindow): float[][] {
         if (parts[0] == "rect") {
             out.push([float.parse(parts[1]), float.parse(parts[2]), float.parse(parts[3]), float.parse(parts[4])]);
         }
+        if (parts[0] == "control") {
+            out.push([float.parse(parts[3]), float.parse(parts[4]), float.parse(parts[5]), float.parse(parts[6])]);
+        }
     }
     return out;
 }

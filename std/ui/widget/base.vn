@@ -1,4 +1,4 @@
-import { UiWindow } from "std:ui/window";
+import { UiWindow, UiControlKind } from "std:ui/window";
 import { UiFrame } from "std:ui/frame";
 import { Focus } from "std:ui/focus";
 import { Alignment } from "std:ui/style";
@@ -38,6 +38,12 @@ export class PaintContext {
     unclip(): void {
         this.win.unclip();
         this.fr.popClip();
+    }
+
+    control(kind: UiControlKind, x: float, y: float, w: float, h: float, color: int, checked: bool, onActivate: () => void): void {
+        const id = this.nextSlot();
+        this.win.control(id, kind, x, y, w, h, color, checked);
+        this.fr.onActivate(id, onActivate);
     }
 
     nextSlot(): int {

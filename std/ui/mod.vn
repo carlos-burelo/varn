@@ -15,7 +15,7 @@ export { Dialog, Toaster, Toasts, Select } from "std:ui/widget/overlay";
 export { Segmented, Tabs } from "std:ui/widget/choice";
 export { Each, Grid, Table } from "std:ui/widget/data";
 export { Navigator, navigator } from "std:ui/navigation";
-export { render, run } from "std:ui/render";
+export { present, render, run } from "std:ui/render";
 export { Readable, Signal, Computed, Effect, signal, computed, effect, batch, untracked, onCleanup } from "std:signals";
 export { TextStyle, ButtonKind, MainAxis, CrossAxis, Alignment, BoxFit, Colors, Theme, textSizeFor, textColorFor } from "std:ui/style";
 export { component } from "std:ui/component";

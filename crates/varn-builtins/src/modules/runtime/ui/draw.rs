@@ -1,4 +1,4 @@
-use varn_ui::{Body, Clip, Glyph, Rect, Run};
+use varn_ui::{Body, Clip, Control, ControlKind, Glyph, Rect, Run};
 
 #[derive(Clone)]
 pub enum DrawCmd {
@@ -25,6 +25,16 @@ pub enum DrawCmd {
         h: f64,
     },
     Unclip,
+    Control {
+        id: u32,
+        kind: ControlKind,
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        color: i64,
+        checked: bool,
+    },
 }
 
 pub fn format(cmd: &DrawCmd) -> String {
@@ -47,6 +57,9 @@ pub fn format(cmd: &DrawCmd) -> String {
         } => format!("text {x} {y} {size} {color} {s}"),
         DrawCmd::Clip { x, y, w, h } => format!("clip {x} {y} {w} {h}"),
         DrawCmd::Unclip => "unclip".to_string(),
+        DrawCmd::Control { id, kind, x, y, w, h, color, checked } => {
+            format!("control {id} {kind:?} {x} {y} {w} {h} {color} {checked}")
+        }
     }
 }
 
@@ -59,6 +72,7 @@ pub struct Scene {
 enum Item {
     Rect(Option<Clip>, Rect),
     Text(Option<Clip>, f64, f64, String, f32, [f32; 4]),
+    Control(Option<Clip>, Control),
 }
 
 fn intersect(outer: Option<Clip>, inner: Clip) -> Clip {
@@ -141,6 +155,30 @@ pub fn assemble(cmds: &[DrawCmd]) -> Result<Scene, String> {
             DrawCmd::Unclip => {
                 current = saved.pop().unwrap_or(None);
             }
+            DrawCmd::Control {
+                id,
+                kind,
+                x,
+                y,
+                w,
+                h,
+                color,
+                checked,
+            } => {
+                items.push(Item::Control(
+                    current,
+                    Control {
+                        id: *id,
+                        kind: *kind,
+                        x: *x as f32,
+                        y: *y as f32,
+                        w: *w as f32,
+                        h: *h as f32,
+                        color: varn_ui::argb_to_float(*color),
+                        checked: *checked,
+                    },
+                ));
+            }
         }
     }
     let (glyph_sets, atlas) = shape(&items)?;
@@ -149,6 +187,10 @@ pub fn assemble(cmds: &[DrawCmd]) -> Result<Scene, String> {
     for item in &items {
         match item {
             Item::Rect(clip, rect) => push_rect(&mut runs, *clip, rect.clone()),
+            Item::Control(clip, control) => runs.push(Run {
+                clip: *clip,
+                body: Body::Control(control.clone()),
+            }),
             Item::Text(clip, ..) => {
                 for glyph in &glyph_sets[text_ordinal] {
                     push_glyph(&mut runs, *clip, glyph.clone());
@@ -203,7 +245,7 @@ fn shape(items: &[Item]) -> Result<(Vec<Vec<Glyph>>, Option<(Vec<u8>, u32, u32)>
         .iter()
         .filter_map(|item| match item {
             Item::Text(_, x, y, s, size, color) => Some((x, y, s, *size, *color)),
-            Item::Rect(..) => None,
+            Item::Rect(..) | Item::Control(..) => None,
         })
         .collect();
     let mut quad_sets: Vec<Vec<Quad>> = Vec::with_capacity(texts.len());

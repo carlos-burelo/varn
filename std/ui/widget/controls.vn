@@ -1,5 +1,6 @@
 import { Widget, Size, PaintContext } from "std:ui/widget/base";
 import { Theme, ButtonKind, buttonColorFor, buttonTextColorFor } from "std:ui/style";
+import { UiControlKind } from "std:ui/window";
 import { Signal } from "std:signals";
 import { TextEdit } from "std:ui/edit";
 import { KEY_ENTER } from "std:ui/keys";
@@ -10,14 +11,6 @@ import { now } from "std:time";
 const BUTTON_PAD = 20.0;
 
 const fieldEdits = new Map<int, TextEdit>();
-
-function pressShade(color: int): int {
-    const a = (color / 16777216) % 256;
-    const r = ((color / 65536) % 256) * 8 / 10;
-    const g = ((color / 256) % 256) * 8 / 10;
-    const b = (color % 256) * 8 / 10;
-    return a * 16777216 + r * 65536 + g * 256 + b;
-}
 
 function paintField(cx: PaintContext, x: float, y: float, w: float, h: float, ed: TextEdit, hint: str, size: float): void {
     cx.win.rect(x, y, w, h, ed.focused ? Theme.colors.primary : Theme.colors.outline, 10.0);
@@ -73,13 +66,12 @@ export class ButtonNode extends Widget {
     }
 
     override paint(cx: PaintContext, x: float, y: float, w: float, h: float): void {
-        const fr = cx.fr;
-        const held = this.enabled && fr.left && (fr.downX as float) >= x && (fr.downX as float) < x + w && (fr.downY as float) >= y && (fr.downY as float) < y + h;
-        cx.win.rect(x, y, w, h, this.enabled ? (held ? pressShade(this.color) : this.color) : Theme.colors.disabled, this.radius);
-        cx.win.text(textX(x, w, this.label, this.size), textY(y, h, this.size), this.label, this.size, this.enabled ? this.fg : Theme.colors.muted);
-        if (this.enabled && fr.clicked(x, y, w, h)) {
-            this.onPress();
+        if (this.enabled) {
+            cx.control(UiControlKind.Button, x, y, w, h, this.color, false, this.onPress);
+        } else {
+            cx.win.rect(x, y, w, h, Theme.colors.disabled, this.radius);
         }
+        cx.win.text(textX(x, w, this.label, this.size), textY(y, h, this.size), this.label, this.size, this.enabled ? this.fg : Theme.colors.muted);
     }
 }
 

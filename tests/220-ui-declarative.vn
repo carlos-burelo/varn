@@ -1,6 +1,6 @@
 import { describe, it, expect } from "std:test";
 import {
-    UiWindow, UiFrame, Focus, Widget, render, FlexNode, TextNode, BoxNode, PaddingNode, Axis, TextAlign,
+    UiWindow, UiFrame, Focus, Widget, render, present, FlexNode, TextNode, BoxNode, PaddingNode, Axis, TextAlign,
     Column, Row, Text, Box, Padding, Stack, SizedBox, Spacer, Button, Input, Each,
     signal, computed, effect, component,
     TextStyle, MainAxis, CrossAxis, Alignment, BoxFit, Colors, Theme,
@@ -156,12 +156,15 @@ await describe("220 ui declarative", async () => {
             Button(text: "no", onPress: () => { hits.push(true); }, enabled: false)
         ]);
         renderTree(win, fr, focus, tree);
+        present(win, fr);
         win.inject(UiInjectKind.MouseDown, 30, 20, MOUSE_LEFT);
         fr.update(win);
         renderTree(win, fr, focus, tree);
+        present(win, fr);
         win.inject(UiInjectKind.MouseUp, 30, 20, MOUSE_LEFT);
         fr.update(win);
         renderTree(win, fr, focus, tree);
+        present(win, fr);
         expect(hits.length).toBe(0);
         const hits2: bool[] = [];
         const tree2 = Column(children: [
@@ -170,12 +173,15 @@ await describe("220 ui declarative", async () => {
         const fr2 = new UiFrame(800, 600);
         const focus2 = new Focus();
         renderTree(win, fr2, focus2, tree2);
+        present(win, fr2);
         win.inject(UiInjectKind.MouseDown, 30, 20, MOUSE_LEFT);
         fr2.update(win);
         renderTree(win, fr2, focus2, tree2);
+        present(win, fr2);
         win.inject(UiInjectKind.MouseUp, 30, 20, MOUSE_LEFT);
         fr2.update(win);
         renderTree(win, fr2, focus2, tree2);
+        present(win, fr2);
         expect(hits2.length).toBe(1);
     });
 

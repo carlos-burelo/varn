@@ -5,7 +5,13 @@ import { Widget, PaintContext } from "std:ui/widget/base";
 import { KEY_ESCAPE } from "std:ui/keys";
 import { beginFrame, endFrame } from "std:ui/state";
 
+export function present(win: UiWindow, fr: UiFrame): void {
+    win.present();
+    fr.fire(win.activated());
+}
+
 export function render(win: UiWindow, fr: UiFrame, focus: Focus, root: Widget, x: float, y: float, w: float, h: float): void {
+    fr.clearControls();
     const cx = new PaintContext(win, fr, focus);
     root.paint(cx, x, y, w, h);
     fr.overlayPass = true;
@@ -33,7 +39,7 @@ export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w:
         const root = build(fr, focus);
         render(win, fr, focus, root, 0.0, 0.0, w as float, h as float);
         endFrame();
-        win.present();
+        present(win, fr);
         frames = frames + 1;
         if (maxFrames > 0 && frames >= maxFrames) {
             break;
