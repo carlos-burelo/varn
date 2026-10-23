@@ -89,4 +89,6 @@ pub(crate) struct FnEmitter<'a> {
     pub(super) loops: Vec<super::loop_labels::LoopFrame>,
 
     pub(super) pending_label: Option<varn_core::Atom>,
+
+    pub(super) place_target: bool,
 }

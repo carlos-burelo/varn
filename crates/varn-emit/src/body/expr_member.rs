@@ -72,6 +72,7 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
+        let place = std::mem::take(&mut self.place_target);
         if let Some(read) = self.inherited_read(object, property, computed, ty, span) {
             return read;
         }
@@ -218,6 +219,9 @@ impl<'a> FnEmitter<'a> {
             };
         }
 
+        if place {
+            return self.field_place(obj, name, ty, span);
+        }
         self.field_access(obj, name, ty, span)
     }
 
@@ -260,6 +264,27 @@ impl<'a> FnEmitter<'a> {
         name: Arc<str>,
         ty: BackendTy,
         span: Span,
+    ) -> TirExpr {
+        self.member_access(obj, name, ty, span, true)
+    }
+
+    pub(super) fn field_place(
+        &mut self,
+        obj: TirExpr,
+        name: Arc<str>,
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        self.member_access(obj, name, ty, span, false)
+    }
+
+    fn member_access(
+        &mut self,
+        obj: TirExpr,
+        name: Arc<str>,
+        ty: BackendTy,
+        span: Span,
+        read: bool,
     ) -> TirExpr {
         if let Some(ci) = self.class_of(obj.ty) {
             if Self::is_class_ref(&obj, &ci.name, self.m.globals) {
@@ -306,6 +331,19 @@ impl<'a> FnEmitter<'a> {
                     },
                     ty,
                     res: Resolution::FieldSlot(field.slot),
+                    span,
+                };
+            }
+            let getter = varn_core::AccessorKind::Get.key(&name);
+            if read && let Some(slot) = ci.method_slot(&getter) {
+                return TirExpr {
+                    kind: TirExprKind::MethodCall {
+                        recv: Box::new(obj),
+                        name: Arc::from(getter),
+                        args: Vec::new(),
+                    },
+                    ty,
+                    res: Resolution::VtableSlot(slot),
                     span,
                 };
             }

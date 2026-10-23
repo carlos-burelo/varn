@@ -148,9 +148,10 @@ pub(super) fn emit_class_members(
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
-                let sig = fresh_sig(signatures, 0);
+                let accessor = varn_core::AccessorKind::Get.key(key_str);
+                let sig = class_info_sig(ctx, class_id, &accessor, 0, signatures);
                 let id = emit_member_fn(
-                    Arc::from(format!("{class_name}.get {key_str}")),
+                    Arc::from(format!("{class_name}.{accessor}")),
                     &[],
                     Some(*body),
                     ast_arena,
@@ -193,10 +194,11 @@ pub(super) fn emit_class_members(
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
-                let sig = fresh_sig(signatures, 1);
+                let accessor = varn_core::AccessorKind::Set.key(key_str);
+                let sig = class_info_sig(ctx, class_id, &accessor, 1, signatures);
                 let ps = std::slice::from_ref(param);
                 let id = emit_member_fn(
-                    Arc::from(format!("{class_name}.set {key_str}")),
+                    Arc::from(format!("{class_name}.{accessor}")),
                     ps,
                     Some(*body),
                     ast_arena,

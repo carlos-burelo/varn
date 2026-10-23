@@ -88,3 +88,26 @@ pub(crate) fn intern_signature(
     });
     varn_tir::SigId(id)
 }
+
+pub(crate) fn accessor_signature(
+    kind: varn_core::AccessorKind,
+    property: &Type,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &NameIndex,
+    signatures: &mut Vec<Signature>,
+) -> varn_tir::SigId {
+    let value = lower_type(property, table, interner, tt, names);
+    let (params, return_ty) = match kind {
+        varn_core::AccessorKind::Get => (vec![], value),
+        varn_core::AccessorKind::Set => (vec![value], BackendTy::Void),
+    };
+    let id = signatures.len() as u32;
+    signatures.push(Signature {
+        params,
+        return_ty,
+        has_rest: false,
+    });
+    varn_tir::SigId(id)
+}

@@ -1,4 +1,4 @@
-use super::signatures::intern_signature;
+use super::signatures::{accessor_signature, intern_signature};
 use super::NameIndex;
 use crate::ty::lower_type;
 use rustc_hash::FxHashMap;
@@ -222,12 +222,36 @@ fn build_one_class(
                 ));
             }
             ClassMemberKind::Getter => {
-                let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
-                push_method(Arc::from(format!("get {}", m.name)), sig, &mut method_names);
+                let sig = accessor_signature(
+                    varn_core::AccessorKind::Get,
+                    &m.ty,
+                    table,
+                    interner,
+                    tt,
+                    names,
+                    signatures,
+                );
+                push_method(
+                    Arc::from(varn_core::AccessorKind::Get.key(&m.name)),
+                    sig,
+                    &mut method_names,
+                );
             }
             ClassMemberKind::Setter => {
-                let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
-                push_method(Arc::from(format!("set {}", m.name)), sig, &mut method_names);
+                let sig = accessor_signature(
+                    varn_core::AccessorKind::Set,
+                    &m.ty,
+                    table,
+                    interner,
+                    tt,
+                    names,
+                    signatures,
+                );
+                push_method(
+                    Arc::from(varn_core::AccessorKind::Set.key(&m.name)),
+                    sig,
+                    &mut method_names,
+                );
             }
             ClassMemberKind::Class
             | ClassMemberKind::Interface

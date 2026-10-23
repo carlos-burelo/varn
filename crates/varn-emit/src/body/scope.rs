@@ -48,6 +48,7 @@ impl<'a> FnEmitter<'a> {
             disposables: Vec::new(),
             loops: Vec::new(),
             pending_label: None,
+            place_target: false,
         }
     }
 

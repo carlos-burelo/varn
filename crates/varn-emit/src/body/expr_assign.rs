@@ -10,7 +10,7 @@ use varn_tir::{
 impl<'a> FnEmitter<'a> {
     pub(crate) fn this_field_assign(&mut self, field: Arc<str>, value: TirExpr) -> TirStmt {
         let this = self.this_var(Span::EMPTY);
-        let target = self.field_access(
+        let target = self.field_place(
             this,
             field,
             BackendTy::Dynamic(DynReason::NotYetSupported),
@@ -206,7 +206,9 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
+        self.place_target = true;
         let t = self.lower_expr(target);
+        self.place_target = false;
         let t = match assign_bin_op(op) {
             Ok(None) => t,
             _ => self.pin_place(t),

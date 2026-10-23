@@ -105,7 +105,9 @@ impl<'a> FnEmitter<'a> {
         prefix: bool,
         span: Span,
     ) -> TirExpr {
+        self.place_target = true;
         let t = self.lower_expr(operand);
+        self.place_target = false;
         let t = self.pin_place(t);
         let bop = match op {
             UpdateOp::Increment => TirBinOp::Add,
