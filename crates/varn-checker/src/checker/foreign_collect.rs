@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
-use varn_sem::output::{ForeignClass, InheritedField};
+use varn_sem::output::{ForeignAccessor, ForeignClass, InheritedField};
 use varn_sem::types::{ClassMemberKind, Type};
 
 impl Checker<'_> {
@@ -129,6 +129,7 @@ impl Checker<'_> {
         let chain = self.foreign_chain(name.as_ref(), OwnerRef::Foreign(owner.clone()));
         let mut fields = Vec::new();
         let mut methods = Vec::new();
+        let mut accessors: Vec<ForeignAccessor> = Vec::new();
 
         for level in chain.iter().rev() {
             let Some(entry) = level.owner.get().get_class_entry(&level.name) else {
@@ -155,9 +156,26 @@ impl Checker<'_> {
                         }
                     }
                     ClassMemberKind::Constructor => {}
-                    ClassMemberKind::Getter
-                    | ClassMemberKind::Setter
-                    | ClassMemberKind::Class
+                    ClassMemberKind::Getter | ClassMemberKind::Setter => {
+                        let kind = if m.kind == ClassMemberKind::Getter {
+                            varn_core::AccessorKind::Get
+                        } else {
+                            varn_core::AccessorKind::Set
+                        };
+                        let accessor = ForeignAccessor {
+                            kind,
+                            name: m.name.clone(),
+                            ty: self.reintern_foreign_ty(level.owner.get(), m.ty),
+                        };
+                        match accessors
+                            .iter_mut()
+                            .find(|a| a.kind == kind && a.name == m.name)
+                        {
+                            Some(slot) => *slot = accessor,
+                            None => accessors.push(accessor),
+                        }
+                    }
+                    ClassMemberKind::Class
                     | ClassMemberKind::Interface
                     | ClassMemberKind::Namespace
                     | ClassMemberKind::Enum
@@ -194,13 +212,18 @@ impl Checker<'_> {
                 p.origin.clone().unwrap_or_else(|| origin.clone()),
             )
         });
-        let field_tys = fields.iter().map(|f| f.ty).collect();
+        let field_tys = fields
+            .iter()
+            .map(|f| f.ty)
+            .chain(accessors.iter().map(|a| a.ty))
+            .collect();
         Some((
             ForeignClass {
                 name: name.clone(),
                 origin: origin.clone(),
                 fields,
                 methods,
+                accessors,
                 constructor,
                 import_binding,
                 parent,

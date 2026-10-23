@@ -171,11 +171,27 @@ pub fn build(
             };
             fields.push((field.name.clone(), bt));
         }
+        let accessors: Vec<(Arc<str>, varn_tir::SigId)> = f
+            .accessors
+            .iter()
+            .map(|accessor| {
+                let sig = super::signatures::accessor_signature(
+                    accessor.kind,
+                    &accessor.ty,
+                    &bind.ty_table,
+                    &bind.interner,
+                    tt,
+                    &names,
+                    &mut signatures,
+                );
+                (Arc::from(accessor.kind.key(&accessor.name)), sig)
+            })
+            .collect();
         let mut info = ClassInfo::new_with_methods(
             f.name.clone(),
             varn_tir::Ancestry::Root,
             fields,
-            Vec::new(),
+            accessors,
             Vec::new(),
             tt,
         );

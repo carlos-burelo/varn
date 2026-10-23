@@ -53,11 +53,19 @@ pub struct InheritedField {
 }
 
 #[derive(Clone, Debug)]
+pub struct ForeignAccessor {
+    pub kind: varn_core::AccessorKind,
+    pub name: Arc<str>,
+    pub ty: Type,
+}
+
+#[derive(Clone, Debug)]
 pub struct ForeignClass {
     pub name: Arc<str>,
     pub origin: Arc<str>,
     pub fields: Vec<InheritedField>,
     pub methods: Vec<Arc<str>>,
+    pub accessors: Vec<ForeignAccessor>,
     pub constructor: Option<Type>,
     pub import_binding: Option<Arc<str>>,
     pub parent: Option<(Arc<str>, Arc<str>)>,
