@@ -45,7 +45,7 @@ impl<'r> Checker<'r> {
             && !is_type_param_b(&r_base, self)
         {
             let both_numeric = l_base.is_numeric() && r_base.is_numeric();
-            let (l_eff, r_eff) = varn_binder::type_inference::adopt_literal_operands(
+            let (l_eff, r_eff) = varn_sem::types::numeric_ops::adopt_literal_operands(
                 self.ast_arena,
                 left,
                 right,
@@ -54,7 +54,7 @@ impl<'r> Checker<'r> {
                 &self.ty_table,
             );
             let same_numeric = both_numeric
-                && varn_binder::type_inference::numeric_operands_compatible(
+                && varn_sem::types::numeric_ops::numeric_operands_compatible(
                     &l_eff,
                     &r_eff,
                     &self.ty_table,

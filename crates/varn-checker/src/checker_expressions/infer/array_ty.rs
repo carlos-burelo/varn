@@ -1,6 +1,5 @@
 use super::Checker;
 use crate::checker::recorder::Recorder;
-use varn_binder::widen_literal;
 use varn_core::ast::ExprId;
 use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
@@ -94,13 +93,11 @@ impl<'r> Checker<'r> {
         } else {
             let first = elem_tys[0];
             if elem_tys.iter().all(|t| t == &first) {
-                let widened = widen_literal(first);
-                Type::array(widened, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                Type::array(first, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
             } else {
                 let unioned =
                     Type::union(elem_tys, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                let widened = widen_literal(unioned);
-                Type::array(widened, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                Type::array(unioned, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
             }
         }
     }

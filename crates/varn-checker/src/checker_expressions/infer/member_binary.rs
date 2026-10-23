@@ -142,7 +142,7 @@ pub(super) fn infer_binary_type(
             } else {
                 Type::Error
             };
-            let (l, r) = varn_binder::type_inference::adopt_literal_operands(
+            let (l, r) = varn_sem::types::numeric_ops::adopt_literal_operands(
                 checker.ast_arena,
                 left,
                 right,
@@ -161,11 +161,11 @@ pub(super) fn infer_binary_type(
                     ) {
                         return Type::Str;
                     }
-                    varn_binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
+                    varn_sem::types::numeric_ops::numeric_binary_type(&l, &r, &checker.ty_table)
                         .unwrap_or(unresolved)
                 }
                 BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-                    varn_binder::type_inference::numeric_binary_type(&l, &r, &checker.ty_table)
+                    varn_sem::types::numeric_ops::numeric_binary_type(&l, &r, &checker.ty_table)
                         .unwrap_or(unresolved)
                 }
                 BinaryOp::BitAnd

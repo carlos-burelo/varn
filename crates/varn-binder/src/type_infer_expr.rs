@@ -1,4 +1,4 @@
-use super::inference_utils::{build_fn_type, widen_literal};
+use super::inference_utils::build_fn_type;
 use super::type_infer_member::infer_member;
 use super::type_infer_ops::{infer_binary, infer_new, infer_object};
 use varn_core::ast::operators::{LogicalOp, UnaryOp};
@@ -147,8 +147,7 @@ pub fn infer_expr_type(
                 if let ArrayEl::Expr(first) = el {
                     let elem_ty = infer_expr_type(*first, arena, ctx, table);
                     if !elem_ty.is_dynamic() {
-                        let widened = widen_literal(elem_ty);
-                        return Type::array(widened, table);
+                        return Type::array(elem_ty, table);
                     }
                 }
             }

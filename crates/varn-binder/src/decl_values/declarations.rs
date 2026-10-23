@@ -1,4 +1,3 @@
-use super::super::type_inference::widen_literal;
 use std::sync::Arc;
 use varn_core::ast::{ExprKind, FunctionDecl, Pattern, VarKind, VariableDecl};
 use varn_sem::bind::PendingEnrich;
@@ -19,15 +18,7 @@ impl<'r> super::super::Binder<'r> {
                 .type_ann
                 .as_ref()
                 .map(|ann| self.resolve_type(ann))
-                .or_else(|| {
-                    d.init.map(|e| self.infer_expr_type_self(e)).map(|t| {
-                        if sym_kind == SymbolKind::Let && !has_explicit_ann {
-                            widen_literal(t)
-                        } else {
-                            t
-                        }
-                    })
-                });
+                .or_else(|| d.init.map(|e| self.infer_expr_type_self(e)));
 
             let ty = if ty.is_none() {
                 self.report_missing_variable_annotation(d);

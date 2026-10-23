@@ -79,12 +79,7 @@ impl<'r> Checker<'r> {
                 } else {
                     let init_ty = self.infer_type(rec, init_expr, bind);
                     self.reject_void_value(&init_ty, *decl_range);
-                    let final_ty = if v.kind == varn_core::ast::VarKind::Let {
-                        varn_binder::widen_literal(init_ty)
-                    } else {
-                        init_ty
-                    };
-                    self.check_pattern(rec, &d.id, &final_ty, bind);
+                    self.check_pattern(rec, &d.id, &init_ty, bind);
                 }
             }
         }

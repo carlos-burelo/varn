@@ -156,10 +156,7 @@ impl<'r> Checker<'r> {
                             .filter(|t| !t.is_dynamic())
                     })
                     .or_else(|| {
-                        p.default.map(|d| {
-                            let t = self.infer_type(rec, d, bind);
-                            varn_binder::widen_literal(t)
-                        })
+                        p.default.map(|d| self.infer_type(rec, d, bind))
                     })
                     .unwrap_or_else(|| {
                         if dynamic_context {

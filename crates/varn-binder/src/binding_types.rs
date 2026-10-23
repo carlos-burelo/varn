@@ -1,4 +1,3 @@
-use super::type_inference::widen_literal;
 use super::Binder;
 use std::sync::Arc;
 use varn_core::ast::{Param, VarDeclarator};
@@ -14,7 +13,7 @@ impl<'r> Binder<'r> {
     pub(crate) fn param_type(&mut self, p: &Param, site: ParamSite) -> Type {
         let ty = match (&p.type_ann, p.default) {
             (Some(ann), _) => self.resolve_type(ann),
-            (None, Some(default)) => widen_literal(self.infer_expr_type_self(default)),
+            (None, Some(default)) => self.infer_expr_type_self(default),
             (None, None) => match site {
                 ParamSite::Declared => {
                     self.report_missing_param_annotation(p);

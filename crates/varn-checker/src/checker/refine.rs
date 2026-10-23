@@ -142,8 +142,8 @@ impl<'r> Checker<'r> {
 }
 
 fn numeric_result(l: &Type, r: &Type, table: &varn_sem::types::CheckerTyTable) -> Option<Type> {
-    use varn_binder::type_inference::numeric_operand;
     use varn_core::{binary_operand_kind, NumericOperand};
+    use varn_sem::types::numeric_ops::numeric_operand;
 
     let combined = binary_operand_kind(numeric_operand(l, table), numeric_operand(r, table))?;
     match combined {

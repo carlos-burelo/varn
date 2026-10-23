@@ -5,6 +5,7 @@ mod core_nominal;
 mod display;
 pub mod interned;
 pub mod numeric_literal;
+pub mod numeric_ops;
 mod object_member_impl;
 mod type_algebra;
 mod type_impl;

@@ -158,10 +158,6 @@ pub fn pattern_to_string(p: &Pattern, interner: Option<&varn_core::AtomInterner>
     pattern_to_rc_str(p, interner).to_string()
 }
 
-pub fn widen_literal(ty: Type) -> Type {
-    ty
-}
-
 pub fn pattern_lead_name<'a>(p: &Pattern, interner: &'a varn_core::AtomInterner) -> &'a str {
     match p {
         Pattern::Identifier { name, .. } => interner.resolve(*name),
