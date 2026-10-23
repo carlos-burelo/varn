@@ -44,6 +44,15 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   `expr_ty` sin entrada en `expr_table`, símbolos global sin `ty`, `this` fuera de clase,
   y defaults de `scope.rs` que luego se sobrescriben. Raíz: el checker no registra el
   tipo de toda expresión; arreglarlo ahí, no en emit (Ley 14).
+- Hecho (2026-10-23): funciones anidadas, closures prebound y resultados de
+  decoradores llevan su tipo; los bindings sin tipo de origen leen el tipo del símbolo
+  del checker (`declared_types`, indexado por offset de declaración). NYS 1438 -> 1321.
+- Hallazgo de raíz: las clases core (`Error`, `RangeError`, ...) no tienen
+  `BackendTy`: `resolve_type_ref` no las encuentra porque `collect_foreign_classes`
+  excluye builtins, así que `catch (e)` y todo valor `Error` caen en NYS. Siguiente
+  paso real de A2: representar las clases core en la tabla de clases de TIR.
+- Trampa medida: `guard_dynamic` sobre el valor de `for await (const msg of rx)`
+  cuelga `tests/47`; el binding tipado va sin guarda.
 - Aparte: `Dynamic(Callable)` aparece 9491 veces; un `Fn(SigId)` estático es el
   mayor candidato a ganancia de rendimiento tras A2.
 
