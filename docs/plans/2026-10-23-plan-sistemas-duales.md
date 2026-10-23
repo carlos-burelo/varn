@@ -61,6 +61,21 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 - Perfil de lo que queda (por nodo TIR): Var Local ~295 (bindings de payload de
   variantes, `match_pattern`), Var global/native ~147 (slots de funciones de namespace
   sin tipo: `Json::parse`, `Task::all`), Call/MethodCall ~160, Index 54, Yield 52.
+- Análisis de diseño (2026-10-23): `Fn(SigId)` en `lower_type` NO es el cimiento
+  correcto por ahora. Medido: 0 accesos por nombre vienen de `Dynamic(Callable)`; el
+  sitio de llamada ya obtiene la firma del checker, así que no hay doble derivación
+  que pague. Además `BackendTy` no tiene subtipado: `Fn(sig)` por igualdad de SigId
+  rompería asignaciones compatibles (variancia de parámetros) en el verificador.
+  Solo se justifica si un consumidor del backend usa la firma del valor.
+- Medido en cambio: 5807 resoluciones `ByName` en TIR (de 66061 nodos; 37% estático).
+  Por receptor: Array/Str/Bytes/Map ~900 (miembros core que el compilador baja a
+  ArrayLength/StrLength, el nombre es engañoso), `Dynamic(NYS)` 420, `Dynamic(Shape)`
+  277+44, `Class` 392 (casi todo getters/setters: `value`, `size`, `current`,
+  `doubled`, `celsius`; los accesores no tienen slot estático en `ClassInfo`),
+  `Enum` 234, `Dynamic(Declared)` 118.
+- Candidatos a cimiento, en orden: (1) accesores de clase (getter/setter) con slot
+  estático en la tabla de métodos; (2) formas (`Shape`) con layout fijo; (3) cola de
+  receptores NYS.
 - Cimiento mayor pendiente: `lower_kind` baja todo `TypeKind::Fn` a `Dynamic(Callable)`
   (9609 nodos) aunque `BackendTy::Fn(SigId)` existe; el sitio de llamada vuelve a
   derivar la firma (`callee_signature`) del checker. Requiere que el internador de
