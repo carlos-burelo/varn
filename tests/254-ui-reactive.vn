@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { UiWindow, UiFrame, Focus, Widget, Text, TextNode, FlexNode, Column, render, component, expanded, signal, computed, Readable } from "std:ui";
+import { UiWindow, UiFrame, Focus, Widget, Text, TextNode, FlexNode, Column, Box, BoxNode, Theme, render, component, expanded, signal, computed, Readable } from "std:ui";
 import { beginFrame, endFrame } from "std:ui/state";
 
 const name = signal("a");
@@ -52,5 +52,18 @@ await describe("254 reactive layout", async () => {
         name.set("b");
         paint(win, fr, focus, root);
         expect((expanded((tree as FlexNode).children[0]) as TextNode).text).toBe("b");
+    });
+    await it("switching the theme rebuilds the tree with the other palette", () => {
+        const builds: int[] = [];
+        const root = computed((): Widget => {
+            builds.push(1);
+            return Box(color: Theme.colors.surface, w: 10.0, h: 10.0);
+        });
+        expect((root.value as BoxNode).color).toBe(0xFF1E2128);
+        expect(builds.length).toBe(1);
+        Theme.dark.set(false);
+        expect((root.value as BoxNode).color).toBe(0xFFFFFFFF);
+        expect(builds.length).toBe(2);
+        Theme.dark.set(true);
     });
 });
