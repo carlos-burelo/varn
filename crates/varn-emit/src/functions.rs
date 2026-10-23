@@ -51,7 +51,7 @@ pub(super) fn emit_member_fn(
         if let Some(eid) = this_enum {
             em = em.with_this_enum(eid);
         }
-        let mut b = em.destructure_params(params);
+        let mut b = em.destructure_params(params, &sig_snapshot.params);
         for (i, p) in params.iter().enumerate() {
             if (p.modifiers.visibility.is_some() || p.modifiers.is_readonly)
                 && let Pattern::Identifier { name, .. } = &p.pattern
@@ -286,7 +286,7 @@ pub(super) fn emit_function(
         );
         em.namespace = ns.map(Arc::from);
         em.expect_results(return_ty, f.modifiers.is_async, f.modifiers.is_generator);
-        let mut b = em.destructure_params(&f.params);
+        let mut b = em.destructure_params(&f.params, &param_tys);
         b.extend(match &ast_arena.stmt(f.body).kind {
             StmtKind::Block { stmts } => em.lower_block(stmts),
             StmtKind::Empty

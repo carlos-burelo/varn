@@ -8,13 +8,17 @@ use varn_tir::{
 };
 
 impl<'a> FnEmitter<'a> {
-    pub fn destructure_params(&mut self, params: &[varn_core::ast::Param]) -> Vec<TirStmt> {
+    pub fn destructure_params(
+        &mut self,
+        params: &[varn_core::ast::Param],
+        param_tys: &[BackendTy],
+    ) -> Vec<TirStmt> {
         let mut out = Vec::new();
         for (i, p) in params.iter().enumerate() {
             if let Some(def) = p.default {
                 let pvar = || TirExpr {
                     kind: TirExprKind::Var,
-                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                    ty: param_tys[i],
                     res: Resolution::Param(i as u32),
                     span: Span::EMPTY,
                 };
@@ -67,7 +71,7 @@ impl<'a> FnEmitter<'a> {
             }
             let src = TirExpr {
                 kind: TirExprKind::Var,
-                ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                ty: param_tys[i],
                 res: Resolution::Param(i as u32),
                 span: Span::EMPTY,
             };

@@ -77,7 +77,7 @@ impl<'a> FnEmitter<'a> {
         sub.home_class = self.home_class;
         sub.namespace = self.namespace.clone();
         sub.expect_results(declared, is_async, is_generator);
-        let mut stmts = sub.destructure_params(params);
+        let mut stmts = sub.destructure_params(params, &param_tys);
         stmts.extend(match body {
             ClosureBody::Stmt(s) => sub.lower_stmt_as_block(s),
             ClosureBody::Expr(e) => {
