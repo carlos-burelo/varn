@@ -257,6 +257,12 @@ impl<'a> FnEmitter<'a> {
                         })
                         .or_else(|| init.as_ref().map(|e| e.ty))
                         .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+                    let ty = match ty {
+                        BackendTy::Dynamic(DynReason::NotYetSupported) => {
+                            self.declared_ty(d.id.range().start.offset).unwrap_or(ty)
+                        }
+                        _ => ty,
+                    };
                     let init = init.map(|e| self.guard_dynamic(e, ty));
                     out.extend(std::mem::take(&mut self.pending));
 

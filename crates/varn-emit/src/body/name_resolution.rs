@@ -69,6 +69,17 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    pub(super) fn declared_ty(&mut self, offset: u32) -> Option<BackendTy> {
+        let resolved = self.m.declared_types.get(&offset)?;
+        Some(crate::ty::lower_type(
+            resolved,
+            self.m.checker_table,
+            self.m.interner,
+            self.tt,
+            self.m.names,
+        ))
+    }
+
     pub(super) fn bind_local(&mut self, name: Arc<str>, ty: BackendTy) -> LocalId {
         let id = LocalId(self.locals.len() as u32);
         self.locals.push(ty);

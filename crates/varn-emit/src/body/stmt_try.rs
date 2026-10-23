@@ -86,13 +86,14 @@ impl<'a> FnEmitter<'a> {
         let lower_clause = |this: &mut Self, c: &varn_core::ast::CatchClause| -> Vec<TirStmt> {
             this.scopes.push(FxHashMap::default());
             let mut out = Vec::new();
-            if let Some(Pattern::Identifier { name, .. }) = &c.param
+            if let Some(Pattern::Identifier { name, range }) = &c.param
                 && this.m.interner.resolve(*name) != "<catch>"
             {
-                let alias = this.bind_local(Arc::from(this.m.interner.resolve(*name)), dyn_ty);
+                let ty = this.declared_ty(range.start.offset).unwrap_or(dyn_ty);
+                let alias = this.bind_local(Arc::from(this.m.interner.resolve(*name)), ty);
                 out.push(TirStmt::Let {
                     local: alias,
-                    ty: dyn_ty,
+                    ty,
                     init: Some(e_var(Span::EMPTY)),
                 });
             }
