@@ -120,6 +120,15 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   `dynamic`), (2) `const f = (n: int) => ... f(n-1)`: el tipo de la flecha recursiva
   (`fib` en tests/37), (3) campos de objetos literales en `ui-declarative`/`ui-reactive`.
   Esos tres son los consumidores reales que el checker debe cubrir antes de cortar.
+- Medido (paso b, 2026-10-23): el tipo provisional del binder gana al del checker:
+  `stages.rs` solo reemplaza `sym.ty` si el del binder es débil (`dynamic`). Invertir esa
+  precedencia no cambia nada observable (`check:types`/`typeloss` idénticos en 250 tests),
+  y recortar la inferencia del binder deja las mismas 6 diferencias de arriba: mientras el
+  checker revisa, los identificadores leen `sym.ty` del binder, así que el tipo del checker
+  llega tarde. Para cortar de verdad hace falta tipado de símbolos bajo demanda en el
+  checker (tipar la declaración al primer uso, con detección de ciclos para la flecha
+  recursiva `const fib = (n: int) => ... fib(n-1)`), y que `ModuleInterface` exporte el tipo
+  final (namespaces entre módulos, tests 202). Es un rediseño del checker, no un recorte.
 - HECHO (paso a, 7abf324d): resolución de tipos e inferencia de expresiones viven en
   `varn-sem` (`resolve/`, `infer/`); binder y checker los importan de la capa baja. Matriz
   quick 3798/0. Falta (b) y (c).
