@@ -1,3 +1,5 @@
+import { Signal } from "std:signals";
+
 export enum TextStyle {
     body,
     title,
@@ -65,27 +67,64 @@ export const Colors = {
     transparent: 0x00000000
 };
 
-export const Theme = {
-    colors: {
-        background: 0xFF14161A,
-        surface: 0xFF1E2128,
-        outline: 0xFF343A46,
-        primary: 0xFF4C8DFF,
-        onPrimary: 0xFFFFFFFF,
-        onSurface: 0xFFE8EAED,
-        muted: 0xFF9AA0AA,
-        danger: 0xFFFF5C5C,
-        success: 0xFF3DDC84,
-        disabled: 0xFF3A3F4A
-    },
-    breakpoints: [600.0, 840.0],
-    text: {
-        titleSize: 24.0,
-        bodySize: 18.0,
-        headlineSize: 30.0,
-        captionSize: 14.0
+export class Palette {
+    background: int;
+    surface: int;
+    outline: int;
+    primary: int;
+    onPrimary: int;
+    onSurface: int;
+    muted: int;
+    danger: int;
+    success: int;
+    disabled: int;
+
+    constructor(background: int, surface: int, outline: int, primary: int, onPrimary: int, onSurface: int, muted: int, danger: int, success: int, disabled: int) {
+        this.background = background;
+        this.surface = surface;
+        this.outline = outline;
+        this.primary = primary;
+        this.onPrimary = onPrimary;
+        this.onSurface = onSurface;
+        this.muted = muted;
+        this.danger = danger;
+        this.success = success;
+        this.disabled = disabled;
     }
-};
+}
+
+const DARK = new Palette(0xFF14161A, 0xFF1E2128, 0xFF343A46, 0xFF4C8DFF, 0xFFFFFFFF, 0xFFE8EAED, 0xFF9AA0AA, 0xFFFF5C5C, 0xFF3DDC84, 0xFF3A3F4A);
+const LIGHT = new Palette(0xFFF4F5F7, 0xFFFFFFFF, 0xFFD0D5DD, 0xFF2F6FE4, 0xFFFFFFFF, 0xFF1B1E24, 0xFF5D6470, 0xFFD93A3A, 0xFF1E9E5A, 0xFFD9DDE3);
+
+export class TextSizes {
+    titleSize: float;
+    bodySize: float;
+    headlineSize: float;
+    captionSize: float;
+
+    constructor(titleSize: float, bodySize: float, headlineSize: float, captionSize: float) {
+        this.titleSize = titleSize;
+        this.bodySize = bodySize;
+        this.headlineSize = headlineSize;
+        this.captionSize = captionSize;
+    }
+}
+
+export class ThemeState {
+    breakpoints: float[] = [600.0, 840.0];
+    text: TextSizes = new TextSizes(24.0, 18.0, 30.0, 14.0);
+    private _dark: Signal<bool> = new Signal<bool>(true, null);
+
+    get colors(): Palette {
+        return this._dark.value ? DARK : LIGHT;
+    }
+
+    get dark(): Signal<bool> {
+        return this._dark;
+    }
+}
+
+export const Theme = new ThemeState();
 
 export function textSizeFor(style: TextStyle): float {
     if (style == TextStyle.title) {

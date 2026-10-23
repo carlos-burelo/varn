@@ -1,6 +1,7 @@
 import {
     open$,
     close$,
+    setDark$,
     shouldClose$,
     size$,
     inject$,
@@ -40,6 +41,10 @@ export class UiWindow {
 
     close(): void {
         close$(this.id);
+    }
+
+    setDark(dark: bool): void {
+        setDark$(this.id, dark);
     }
 
     dispose(): void {

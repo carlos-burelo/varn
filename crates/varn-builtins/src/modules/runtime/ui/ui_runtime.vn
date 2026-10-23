@@ -45,6 +45,7 @@ export interface UiEvent {
 export declare function open$(title: str, w: int, h: int, headless: bool): int;
 @permission("ui")
 export declare function close$(id: int): void;
+export declare function setDark$(id: int, dark: bool): void;
 @permission("ui")
 export declare function shouldClose$(id: int): bool;
 @permission("ui")

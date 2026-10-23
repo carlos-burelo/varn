@@ -60,6 +60,14 @@ impl Canvas {
         &self.ctx
     }
 
+    pub fn set_dark(&mut self, dark: bool) {
+        self.ctx.set_visuals(if dark {
+            egui::Visuals::dark()
+        } else {
+            egui::Visuals::light()
+        });
+    }
+
     pub fn take_warmup(&mut self) -> Option<egui::TexturesDelta> {
         self.warmup.take()
     }

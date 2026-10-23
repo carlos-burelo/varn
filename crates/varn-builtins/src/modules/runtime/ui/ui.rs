@@ -37,6 +37,7 @@ struct Window {
     commands: Vec<DrawCmd>,
     real: Option<u64>,
     canvas: varn_ui::Canvas,
+    dark: bool,
     activated: Vec<varn_ui::Activation>,
     typed: Vec<varn_ui::TextChange>,
 }
@@ -122,6 +123,7 @@ varn_contract! {
                 commands: Vec::new(),
                 real,
                 canvas: varn_ui::Canvas::new(),
+                dark: true,
                 activated: Vec::new(),
                 typed: Vec::new(),
             }));
@@ -239,11 +241,18 @@ varn_contract! {
                 Ok(())
             })
         }
+        fn setDark(_ctx: &mut dyn NativeCtx, id: i64, dark: bool) -> Result<(), String> {
+            with_win(id, |win| {
+                win.dark = dark;
+                Ok(())
+            })
+        }
         fn present(_ctx: &mut dyn NativeCtx, id: i64) -> Result<i64, String> {
             with_win(id, |win| {
                 let n = win.commands.len() as i64;
                 let cmds = std::mem::take(&mut win.commands);
                 let scene = ui_draw::assemble(&cmds)?;
+                win.canvas.set_dark(win.dark);
                 let hits = match win.real {
                     Some(h) => varn_ui::draw_now(h, &mut win.canvas, scene.clear, &scene.runs)
                         .unwrap_or_default(),
