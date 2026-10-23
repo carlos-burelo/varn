@@ -169,9 +169,21 @@ pub struct EnumInfo {
     pub name: Arc<str>,
     pub binding: Option<Arc<str>>,
     pub variants: Vec<VariantInfo>,
+    pub members: Vec<VtableEntry>,
 }
 
 impl EnumInfo {
+    pub fn member_slot(&self, name: &str) -> Option<u16> {
+        self.members
+            .iter()
+            .position(|m| m.name.as_ref() == name)
+            .map(|slot| slot as u16)
+    }
+
+    pub fn member_at(&self, slot: u16) -> Option<&VtableEntry> {
+        self.members.get(slot as usize)
+    }
+
     pub fn variant_at(&self, tag: u16) -> Option<&VariantInfo> {
         self.variants.iter().find(|v| v.tag == tag)
     }

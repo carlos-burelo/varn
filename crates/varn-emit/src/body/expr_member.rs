@@ -286,6 +286,26 @@ impl<'a> FnEmitter<'a> {
         span: Span,
         read: bool,
     ) -> TirExpr {
+        if read && let BackendTy::Enum(id) = obj.ty.non_nullable(self.tt) {
+            let getter = varn_core::AccessorKind::Get.key(&name);
+            let slot = self
+                .m
+                .enums
+                .get(id.0 as usize)
+                .and_then(|info| info.member_slot(&getter));
+            if let Some(slot) = slot {
+                return TirExpr {
+                    kind: TirExprKind::MethodCall {
+                        recv: Box::new(obj),
+                        name: Arc::from(getter),
+                        args: Vec::new(),
+                    },
+                    ty,
+                    res: Resolution::VtableSlot(slot),
+                    span,
+                };
+            }
+        }
         if let Some(ci) = self.class_of(obj.ty) {
             if Self::is_class_ref(&obj, &ci.name, self.m.globals) {
                 if let Some(slot) = ci.static_slot(&name) {

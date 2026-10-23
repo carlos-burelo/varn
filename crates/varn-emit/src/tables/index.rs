@@ -238,11 +238,13 @@ pub fn build(
         tt,
         &names,
         &enum_names,
+        &mut signatures,
     );
     enums.extend(foreign.iter().map(|f| {
         EnumInfo {
             name: f.name.clone(),
             binding: f.binding.clone(),
+            members: Vec::new(),
             variants: f
                 .variants
                 .iter()

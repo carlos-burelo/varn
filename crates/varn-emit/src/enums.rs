@@ -99,7 +99,7 @@ pub(super) fn emit_enum(
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
-                let sig = fresh_sig(signatures, params.len());
+                let sig = enum_member_sig(ctx, enum_id, key_str, params.len(), signatures);
                 let id = emit_member_fn(
                     Arc::from(format!("{name}.{key_str}")),
                     params,
@@ -183,9 +183,10 @@ pub(super) fn emit_enum(
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
-                let sig = fresh_sig(signatures, 0);
+                let accessor = varn_core::AccessorKind::Get.key(key_str);
+                let sig = enum_member_sig(ctx, enum_id, &accessor, 0, signatures);
                 let id = emit_member_fn(
-                    Arc::from(format!("{name}.get {key_str}")),
+                    Arc::from(format!("{name}.{accessor}")),
                     &[],
                     Some(*body),
                     ast_arena,
@@ -227,9 +228,10 @@ pub(super) fn emit_enum(
                 ..
             } => {
                 let key_str = ctx.interner.resolve(*key);
-                let sig = fresh_sig(signatures, 1);
+                let accessor = varn_core::AccessorKind::Set.key(key_str);
+                let sig = enum_member_sig(ctx, enum_id, &accessor, 1, signatures);
                 let id = emit_member_fn(
-                    Arc::from(format!("{name}.set {key_str}")),
+                    Arc::from(format!("{name}.{accessor}")),
                     std::slice::from_ref(param),
                     Some(*body),
                     ast_arena,
@@ -338,4 +340,20 @@ pub(super) fn emit_enum(
         }
     }
     def
+}
+
+fn enum_member_sig(
+    ctx: &MCtx,
+    enum_id: Option<varn_tir::EnumId>,
+    key: &str,
+    arity: usize,
+    signatures: &mut Vec<varn_tir::Signature>,
+) -> varn_tir::SigId {
+    enum_id
+        .and_then(|id| ctx.enums.get(id.0 as usize))
+        .and_then(|info| {
+            let slot = info.member_slot(key)?;
+            Some(info.member_at(slot)?.sig)
+        })
+        .unwrap_or_else(|| fresh_sig(signatures, arity))
 }

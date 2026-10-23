@@ -146,6 +146,7 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
                 tag: 0,
                 payload: vec![BackendTy::Int],
             }],
+            members: vec![],
         }],
         signatures: vec![Signature {
             params: vec![],

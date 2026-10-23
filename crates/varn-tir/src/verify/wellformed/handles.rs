@@ -154,10 +154,23 @@ pub(super) fn check_res(
                             ));
                         }
                     }
-                    None => errors.push(VerifyError::new(
-                        format!("vtable slot {slot} on a receiver that is not a class"),
-                        e.span,
-                    )),
+                    None => {
+                        let ok = match recv.ty.non_nullable(&m.types) {
+                            BackendTy::Enum(en) => m
+                                .enum_info(en)
+                                .and_then(|info| info.member_at(*slot))
+                                .is_some(),
+                            _ => false,
+                        };
+                        if !ok {
+                            errors.push(VerifyError::new(
+                                format!(
+                                    "vtable slot {slot} on a receiver that is not a class or enum with that member"
+                                ),
+                                e.span,
+                            ));
+                        }
+                    }
                 }
             }
         }
