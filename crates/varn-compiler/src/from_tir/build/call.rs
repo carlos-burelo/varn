@@ -1,7 +1,7 @@
 use super::context::{Builder, InlineFrame, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use crate::OptError;
+use varn_tir::BackendTy;
 use varn_tir::TirStmt;
 
 impl<'m> Builder<'m> {
@@ -9,7 +9,7 @@ impl<'m> Builder<'m> {
         &mut self,
         callee: Value,
         args: &[varn_tir::TirArg],
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let mut vals: Vec<(Value, bool)> = Vec::with_capacity(args.len());
         let mut any_spread = false;
@@ -42,7 +42,7 @@ impl<'m> Builder<'m> {
     pub(super) fn try_lower_self_call(
         &mut self,
         args: &[varn_tir::TirArg],
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Option<Value>> {
         let Some(f) = self.self_fn else {
             return Ok(None);
@@ -68,7 +68,7 @@ impl<'m> Builder<'m> {
         &mut self,
         f: varn_tir::FnId,
         args: &[varn_tir::TirArg],
-        call_ty: HirType,
+        call_ty: BackendTy,
     ) -> Result<Option<Value>> {
         let force = self
             .tir

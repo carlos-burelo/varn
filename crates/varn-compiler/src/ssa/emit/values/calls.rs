@@ -1,8 +1,8 @@
-use crate::hir::HirType;
 use crate::ssa::ir::Value;
 use crate::OptError;
 use std::sync::Arc;
 use varn_core::OpCode;
+use varn_tir::BackendTy;
 use varn_types::chunk::Chunk;
 
 type Result<T> = std::result::Result<T, OptError>;
@@ -44,7 +44,7 @@ pub(super) fn emit_method_call(
     recv: Value,
     name: &Arc<str>,
     args: &[Value],
-    value_tys: &[HirType],
+    value_tys: &[BackendTy],
     reg: &[u8],
     call_base: u8,
     ic_slot: Option<u8>,
@@ -56,10 +56,7 @@ pub(super) fn emit_method_call(
     }
     let argc = args.len() as u8;
     let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
-    let op = if matches!(
-        value_tys.get(recv.0 as usize),
-        Some(crate::hir::HirType::Class(_))
-    ) {
+    let op = if matches!(value_tys.get(recv.0 as usize), Some(BackendTy::Class(_))) {
         OpCode::InvokeVirtual
     } else {
         OpCode::CallMethod

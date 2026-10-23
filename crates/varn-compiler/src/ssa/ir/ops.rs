@@ -1,7 +1,8 @@
 use super::ids::{BlockId, Value, VarId};
-use crate::hir::{HirBinOp, HirType, HirUnOp, HirUpvalueSrc, LocalId};
+use crate::hir::{HirBinOp, HirUnOp, HirUpvalueSrc, LocalId};
 use bigdecimal::BigDecimal as Decimal;
 use std::sync::Arc;
+use varn_tir::BackendTy;
 
 #[derive(Debug, Clone)]
 pub enum InstKind {
@@ -18,12 +19,12 @@ pub enum InstKind {
         op: HirBinOp,
         lhs: Value,
         rhs: Value,
-        ty: HirType,
+        ty: BackendTy,
     },
     Unary {
         op: HirUnOp,
         operand: Value,
-        ty: HirType,
+        ty: BackendTy,
     },
 
     LoadGlobal(Arc<str>),
@@ -158,7 +159,7 @@ pub enum InstKind {
 
     Cast {
         operand: Value,
-        ty: HirType,
+        ty: BackendTy,
     },
 
     Convert {

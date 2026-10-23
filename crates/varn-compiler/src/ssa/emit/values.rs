@@ -1,3 +1,4 @@
+use varn_tir::BackendTy;
 #[path = "values/access.rs"]
 mod access;
 #[path = "values/build.rs"]
@@ -18,7 +19,7 @@ pub(super) fn emit_value(
     chunk: &mut Chunk,
     inst: &Inst,
     d: u8,
-    value_tys: &[crate::hir::HirType],
+    value_tys: &[BackendTy],
     reg: &[u8],
     scratch: u8,
     call_base: u8,
@@ -144,10 +145,7 @@ pub(super) fn emit_value(
             wire_byte,
         } if args.len() == 1
             && varn_core::intrinsic_ops::math::is_unary_math(*wire_byte)
-            && matches!(
-                value_tys.get(args[0].0 as usize),
-                Some(crate::hir::HirType::Float)
-            ) =>
+            && matches!(value_tys.get(args[0].0 as usize), Some(BackendTy::Float)) =>
         {
             calls::emit_intrinsic_direct(chunk, d, args, *wire_byte, reg, line);
         }

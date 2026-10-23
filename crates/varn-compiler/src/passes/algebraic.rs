@@ -1,6 +1,7 @@
 use rustc_hash::FxHashMap;
+use varn_tir::{BackendTy, DynReason};
 
-use crate::hir::{HirBinOp, HirType};
+use crate::hir::HirBinOp;
 use crate::ssa::ir::{Inst, InstKind, SsaFunc, Value};
 use crate::ssa::uses::replace_uses_with_map;
 
@@ -69,7 +70,7 @@ fn simplify(
     let (l, r) = (*lhs, *rhs);
 
     match ty {
-        HirType::Int => {
+        BackendTy::Int => {
             let li = int_const.get(&l).copied();
             let ri = int_const.get(&r).copied();
             match op {
@@ -114,7 +115,7 @@ fn simplify(
                 | HirBinOp::In => None,
             }
         }
-        HirType::Float => {
+        BackendTy::Float => {
             let is_one = |v: Value| float_const.get(&v).copied() == Some(1.0);
             match op {
                 HirBinOp::Mul => {
@@ -147,28 +148,38 @@ fn simplify(
                 | HirBinOp::In => None,
             }
         }
-        HirType::Bool
-        | HirType::Str
-        | HirType::Ref
-        | HirType::Dynamic
-        | HirType::Array(_)
-        | HirType::Map(..)
-        | HirType::Set(_)
-        | HirType::Tuple
-        | HirType::Class(_)
-        | HirType::Nullable(_) => None,
+        BackendTy::Bool
+        | BackendTy::Str
+        | BackendTy::Char
+        | BackendTy::Bytes
+        | BackendTy::Enum(_)
+        | BackendTy::Fn(_)
+        | BackendTy::Dynamic(_)
+        | BackendTy::Decimal
+        | BackendTy::BigInt
+        | BackendTy::Void
+        | BackendTy::Never
+        | BackendTy::Array(_)
+        | BackendTy::Map(..)
+        | BackendTy::Dict(_)
+        | BackendTy::Set(_)
+        | BackendTy::Tuple(_)
+        | BackendTy::Class(_)
+        | BackendTy::Nullable(_) => None,
     }
 }
 
-fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
+fn const_inst_ty(kind: &InstKind) -> Option<BackendTy> {
     match kind {
-        InstKind::ConstInt(_) => Some(HirType::Int),
-        InstKind::ConstFloat(_) => Some(HirType::Float),
-        InstKind::ConstBool(_) => Some(HirType::Bool),
-        InstKind::ConstStr(_) => Some(HirType::Str),
-        InstKind::ConstChar(_) => Some(HirType::Ref),
-        InstKind::ConstDecimal(_) | InstKind::ConstBigInt(_) => Some(HirType::Dynamic),
-        InstKind::ConstNull => Some(HirType::Dynamic),
+        InstKind::ConstInt(_) => Some(BackendTy::Int),
+        InstKind::ConstFloat(_) => Some(BackendTy::Float),
+        InstKind::ConstBool(_) => Some(BackendTy::Bool),
+        InstKind::ConstStr(_) => Some(BackendTy::Str),
+        InstKind::ConstChar(_) => Some(BackendTy::Char),
+        InstKind::ConstDecimal(_) | InstKind::ConstBigInt(_) => {
+            Some(BackendTy::Dynamic(DynReason::Boxed))
+        }
+        InstKind::ConstNull => Some(BackendTy::Dynamic(DynReason::Boxed)),
         InstKind::Binary { .. }
         | InstKind::Unary { .. }
         | InstKind::LoadGlobal(_)

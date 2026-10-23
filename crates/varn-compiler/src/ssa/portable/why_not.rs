@@ -1,7 +1,7 @@
-use crate::hir::HirType;
 use crate::ssa::ir::InstKind;
+use varn_tir::BackendTy;
 
-pub(super) fn why_not(kind: &InstKind, value_tys: &[HirType]) -> String {
+pub(super) fn why_not(kind: &InstKind, value_tys: &[BackendTy]) -> String {
     let ty = |v: &crate::ssa::ir::Value| value_tys.get(v.0 as usize).copied();
     match kind {
         InstKind::Binary { op, lhs, rhs, .. } => {

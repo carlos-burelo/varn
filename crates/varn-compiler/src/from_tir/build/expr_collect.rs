@@ -1,14 +1,14 @@
 use super::context::{Builder, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
+use varn_tir::{BackendTy, DynReason};
 use varn_tir::{Resolution, TirExpr};
 
 impl<'m> Builder<'m> {
     pub(super) fn lower_array_lit(
         &mut self,
         els: &[varn_tir::TirArrayEl],
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let any_spread = els
             .iter()
@@ -20,7 +20,8 @@ impl<'m> Builder<'m> {
                     varn_tir::TirArrayEl::Expr(x) => vals.push((self.lower_expr(x)?, false)),
                     varn_tir::TirArrayEl::Spread(x) => vals.push((self.lower_expr(x)?, true)),
                     varn_tir::TirArrayEl::Hole => {
-                        let n = self.emit(InstKind::ConstNull, HirType::Dynamic);
+                        let n =
+                            self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Boxed));
                         vals.push((n, false));
                     }
                 }
@@ -32,7 +33,8 @@ impl<'m> Builder<'m> {
                 match el {
                     varn_tir::TirArrayEl::Expr(x) => vals.push(self.lower_expr(x)?),
                     varn_tir::TirArrayEl::Hole => {
-                        let n = self.emit(InstKind::ConstNull, HirType::Dynamic);
+                        let n =
+                            self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Boxed));
                         vals.push(n);
                     }
                     varn_tir::TirArrayEl::Spread(_) => unreachable!(),
@@ -42,7 +44,7 @@ impl<'m> Builder<'m> {
         }
     }
 
-    pub(super) fn lower_tuple_lit(&mut self, xs: &[TirExpr], ty: HirType) -> Result<Value> {
+    pub(super) fn lower_tuple_lit(&mut self, xs: &[TirExpr], ty: BackendTy) -> Result<Value> {
         let mut vals = Vec::with_capacity(xs.len());
         for x in xs {
             vals.push(self.lower_expr(x)?);
@@ -53,7 +55,7 @@ impl<'m> Builder<'m> {
     pub(super) fn lower_record_lit(
         &mut self,
         fields: &[(Arc<str>, TirExpr)],
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let mut pairs = Vec::with_capacity(fields.len());
         for (k, v) in fields {
@@ -66,14 +68,14 @@ impl<'m> Builder<'m> {
     pub(super) fn lower_object_lit(
         &mut self,
         entries: &[varn_tir::TirObjectEntry],
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
-        if matches!(ty, HirType::Map(_, _)) {
+        if matches!(ty, BackendTy::Map(..) | BackendTy::Dict(_)) {
             let mut pairs = Vec::with_capacity(entries.len());
             for entry in entries {
                 match entry {
                     varn_tir::TirObjectEntry::Field { name, value } => {
-                        let key_val = self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
+                        let key_val = self.emit(InstKind::ConstStr(name.clone()), BackendTy::Str);
                         let v = self.lower_expr(value)?;
                         pairs.push((key_val, v));
                     }

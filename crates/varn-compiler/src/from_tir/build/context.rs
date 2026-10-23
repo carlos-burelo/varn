@@ -1,5 +1,4 @@
-use super::super::ty::lower as lower_ty;
-use crate::hir::{HirType, LocalId};
+use crate::hir::LocalId;
 use crate::ssa::ir::{Block, BlockId, Value, ValueDef, VarId};
 use crate::OptError;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -18,7 +17,6 @@ pub(crate) struct Builder<'m> {
     pub(super) tir: &'m TirModule,
     pub(super) self_fn: Option<varn_tir::FnId>,
     pub(super) defaulted: Vec<Option<varn_tir::BackendTy>>,
-    pub(super) ssa_types: crate::hir::TyTable,
     pub(super) line_starts: Vec<u32>,
     pub(super) cur_line: u32,
 
@@ -27,7 +25,7 @@ pub(crate) struct Builder<'m> {
     pub(super) sealed: Vec<bool>,
     pub(super) terminated: Vec<bool>,
     pub(super) defs: FxHashMap<(VarId, BlockId), Value>,
-    pub(super) var_ty: FxHashMap<VarId, HirType>,
+    pub(super) var_ty: FxHashMap<VarId, BackendTy>,
     pub(super) incomplete_phis: FxHashMap<BlockId, Vec<(VarId, Value)>>,
     pub(super) loops: Vec<LoopCtx>,
     pub(super) try_depth: usize,
@@ -51,7 +49,6 @@ impl<'m> Builder<'m> {
             tir,
             self_fn: None,
             defaulted: Vec::new(),
-            ssa_types: crate::hir::TyTable::default(),
             line_starts: lines.to_vec(),
             cur_line: 1,
             blocks: Vec::new(),
@@ -74,10 +71,6 @@ impl<'m> Builder<'m> {
         b.sealed[entry.0 as usize] = true;
         b.current = entry;
         b
-    }
-
-    pub(super) fn ty(&mut self, bt: BackendTy) -> HirType {
-        lower_ty(bt, self.tir, &mut self.ssa_types)
     }
 
     pub(super) fn line_of(&self, offset: u32) -> u32 {

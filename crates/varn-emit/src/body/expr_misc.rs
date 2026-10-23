@@ -85,7 +85,9 @@ impl<'a> FnEmitter<'a> {
                 | varn_tir::DynReason::Declared
                 | varn_tir::DynReason::Awaitable(_)
                 | varn_tir::DynReason::Yields(_)
-                | varn_tir::DynReason::NotYetSupported,
+                | varn_tir::DynReason::NotYetSupported
+                | varn_tir::DynReason::Boxed
+                | varn_tir::DynReason::Runtime,
             )
             | BackendTy::Nullable(_)
             | BackendTy::Void
@@ -133,6 +135,8 @@ pub(super) fn untyped_reason(reason: varn_tir::DynReason) -> bool {
         | varn_tir::DynReason::Awaitable(_)
         | varn_tir::DynReason::Yields(_)
         | varn_tir::DynReason::Shape(_)
-        | varn_tir::DynReason::NotYetSupported => false,
+        | varn_tir::DynReason::NotYetSupported
+        | varn_tir::DynReason::Boxed
+        | varn_tir::DynReason::Runtime => false,
     }
 }

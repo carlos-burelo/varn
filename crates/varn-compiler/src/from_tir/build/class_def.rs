@@ -1,8 +1,8 @@
 use super::context::{Builder, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
 use varn_tir::TirClassDef;
+use varn_tir::{BackendTy, DynReason};
 
 impl<'m> Builder<'m> {
     pub(super) fn build_class_def(&mut self, def: &TirClassDef) -> Result<()> {
@@ -19,7 +19,7 @@ impl<'m> Builder<'m> {
                 name: def.name.clone(),
                 super_class: super_v,
             },
-            HirType::Ref,
+            BackendTy::Dynamic(DynReason::Runtime),
         );
 
         let enum_info = def.enum_id.and_then(|id| self.tir.enum_info(id));
@@ -33,7 +33,7 @@ impl<'m> Builder<'m> {
                         fields: v.fields.clone(),
                     }),
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
             self.emit_effect(InstKind::DefineStatic {
                 class: class_v,
@@ -61,7 +61,7 @@ impl<'m> Builder<'m> {
         for (sname, init) in &def.statics {
             let val = match init {
                 Some(e) => self.lower_expr(e)?,
-                None => self.emit(InstKind::ConstNull, HirType::Ref),
+                None => self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Runtime)),
             };
             self.emit_effect(InstKind::DefineStatic {
                 class: class_v,
@@ -84,14 +84,14 @@ impl<'m> Builder<'m> {
                     func: blk.0,
                     upvalues_src: vec![],
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
             self.emit(
                 InstKind::Call {
                     callee: fv,
                     args: vec![],
                 },
-                HirType::Dynamic,
+                BackendTy::Dynamic(DynReason::Boxed),
             );
         }
 
@@ -104,7 +104,7 @@ impl<'m> Builder<'m> {
                     object: class_v,
                     name: v.name.clone(),
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
             let mut args = Vec::with_capacity(v.const_args.len());
             for a in &v.const_args {
@@ -116,7 +116,7 @@ impl<'m> Builder<'m> {
                     name: Arc::from(varn_core::TokenKind::Constructor.as_str()),
                     args,
                 },
-                HirType::Dynamic,
+                BackendTy::Dynamic(DynReason::Boxed),
             );
         }
 
@@ -128,7 +128,7 @@ impl<'m> Builder<'m> {
         cond: Value,
         then_v: Value,
         else_v: Value,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let then_blk = self.new_block();
         let else_blk = self.new_block();

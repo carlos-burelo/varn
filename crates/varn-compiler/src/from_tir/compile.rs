@@ -1,15 +1,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use varn_tir::{BackendTy, TirFunction, TirModule};
+use varn_tir::{TirFunction, TirModule};
 use varn_types::chunk::FunctionProto;
 
-use crate::hir::{HirType, TyTable as SsaTyTable};
 use crate::ssa::emit::{emit_function_meta, slot_kind_of, FnMeta};
 use crate::OptError;
 
 use super::build::{build_function, build_top_level};
-use super::ty::lower as lower_ty;
 
 type Result<T> = std::result::Result<T, OptError>;
 
@@ -43,10 +41,7 @@ pub(crate) fn compile_closure(
     compile_one(scope, f, false, source_file, &[], Some(varn_tir::FnId(idx)))
 }
 
-fn fn_meta(tir: &TirModule, f: &TirFunction) -> FnMeta {
-    let mut tt = SsaTyTable::default();
-    let mut ty = |bt: BackendTy| -> HirType { lower_ty(bt, tir, &mut tt) };
-
+fn fn_meta(f: &TirFunction) -> FnMeta {
     let defaulted = super::build::defaulted_param_mask(&f.body, f.params.len());
     FnMeta {
         name: f.name.clone(),
@@ -60,11 +55,11 @@ fn fn_meta(tir: &TirModule, f: &TirFunction) -> FnMeta {
                 if defaulted[i] {
                     varn_types::register_meta::SlotKind::Dynamic
                 } else {
-                    slot_kind_of(ty(*p))
+                    slot_kind_of(*p)
                 }
             })
             .collect(),
-        return_kind: slot_kind_of(ty(f.return_ty)),
+        return_kind: slot_kind_of(f.return_ty),
         has_rest: f.has_rest,
         is_async: f.is_async,
         is_generator: f.is_generator,
@@ -97,7 +92,7 @@ fn compile_one(
             f.name, why
         )));
     }
-    let mut proto = emit_function_meta(ssa, &fn_meta(tir, f), source_file, scope)?;
+    let mut proto = emit_function_meta(ssa, &fn_meta(f), source_file, scope)?;
     proto.state_size = state_size;
     if !is_top_level {
         proto.param_contract = super::describe::param_contract(tir, f);

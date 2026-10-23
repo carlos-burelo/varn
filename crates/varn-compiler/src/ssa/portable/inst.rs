@@ -1,3 +1,4 @@
+use varn_tir::BackendTy;
 mod calls;
 mod composite;
 mod composite_class;
@@ -7,12 +8,11 @@ mod control;
 
 use super::super::ir::{Inst, InstKind};
 use super::{Captured, Site};
-use crate::hir::HirType;
 use varn_types::ssa::{SsaInst, SsaOp};
 
 pub(super) fn project_inst(
     inst: &Inst,
-    value_tys: &[HirType],
+    value_tys: &[BackendTy],
     site: Site,
     captured: &mut Captured,
 ) -> Option<SsaInst> {

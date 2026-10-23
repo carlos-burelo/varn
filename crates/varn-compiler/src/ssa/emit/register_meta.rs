@@ -1,4 +1,5 @@
 use super::super::ir::SsaFunc;
+use varn_tir::{BackendTy, DynReason};
 
 pub(super) fn derive_register_meta(
     ssa: &SsaFunc,
@@ -39,23 +40,31 @@ pub(super) fn derive_register_meta(
         .collect()
 }
 
-pub(crate) fn slot_kind_of(ty: crate::hir::HirType) -> varn_types::register_meta::SlotKind {
-    use crate::hir::HirType;
+pub(crate) fn slot_kind_of(ty: BackendTy) -> varn_types::register_meta::SlotKind {
     use varn_types::register_meta::SlotKind;
     match ty {
-        HirType::Int => SlotKind::Int,
-        HirType::Float => SlotKind::Float,
-        HirType::Bool => SlotKind::Bool,
-        HirType::Str => SlotKind::Str,
+        BackendTy::Int => SlotKind::Int,
+        BackendTy::Float => SlotKind::Float,
+        BackendTy::Bool => SlotKind::Bool,
+        BackendTy::Str => SlotKind::Str,
 
-        HirType::Class(_)
-        | HirType::Array(_)
-        | HirType::Ref
-        | HirType::Map(_, _)
-        | HirType::Set(_)
-        | HirType::Tuple => SlotKind::Ref,
+        BackendTy::Class(_)
+        | BackendTy::Array(_)
+        | BackendTy::Char
+        | BackendTy::Bytes
+        | BackendTy::Enum(_)
+        | BackendTy::Fn(_)
+        | BackendTy::Map(..)
+        | BackendTy::Dict(_)
+        | BackendTy::Set(_)
+        | BackendTy::Tuple(_)
+        | BackendTy::Dynamic(DynReason::Runtime) => SlotKind::Ref,
 
-        HirType::Nullable(_) => SlotKind::Dynamic,
-        HirType::Dynamic => SlotKind::Dynamic,
+        BackendTy::Nullable(_)
+        | BackendTy::Decimal
+        | BackendTy::BigInt
+        | BackendTy::Void
+        | BackendTy::Never
+        | BackendTy::Dynamic(_) => SlotKind::Dynamic,
     }
 }

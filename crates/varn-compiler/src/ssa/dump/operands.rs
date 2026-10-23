@@ -1,5 +1,6 @@
 use super::super::ir::Value;
-use crate::hir::{HirBinOp, HirType, HirUnOp};
+use crate::hir::{HirBinOp, HirUnOp};
+use varn_tir::{BackendTy, DynReason};
 
 pub(super) fn args_list(args: &[Value]) -> String {
     if args.is_empty() {
@@ -14,21 +15,29 @@ pub(super) fn val(v: Value) -> String {
     format!("v{}", v.0)
 }
 
-pub(super) fn ty(t: HirType) -> &'static str {
+pub(super) fn ty(t: BackendTy) -> &'static str {
     match t {
-        HirType::Int => varn_core::LangPrimitive::Int.name(),
-        HirType::Float => varn_core::LangPrimitive::Float.name(),
-        HirType::Bool => varn_core::LangPrimitive::Bool.name(),
-        HirType::Str => varn_core::LangPrimitive::Str.name(),
-        HirType::Ref => "ref",
-        HirType::Dynamic => "dyn",
+        BackendTy::Int => varn_core::LangPrimitive::Int.name(),
+        BackendTy::Float => varn_core::LangPrimitive::Float.name(),
+        BackendTy::Bool => varn_core::LangPrimitive::Bool.name(),
+        BackendTy::Str => varn_core::LangPrimitive::Str.name(),
+        BackendTy::Dynamic(DynReason::Runtime) => "ref",
+        BackendTy::Dynamic(_) => "dyn",
+        BackendTy::Char => "char",
+        BackendTy::Bytes => "bytes",
+        BackendTy::Decimal => "decimal",
+        BackendTy::BigInt => "bigint",
+        BackendTy::Enum(_) => "enum",
+        BackendTy::Fn(_) => "fn",
+        BackendTy::Void => "void",
+        BackendTy::Never => "never",
 
-        HirType::Array(_) => "array",
-        HirType::Map(_, _) => "map",
-        HirType::Set(_) => "set",
-        HirType::Tuple => "tuple",
-        HirType::Class(_) => "class",
-        HirType::Nullable(_) => "nullable",
+        BackendTy::Array(_) => "array",
+        BackendTy::Map(..) | BackendTy::Dict(_) => "map",
+        BackendTy::Set(_) => "set",
+        BackendTy::Tuple(_) => "tuple",
+        BackendTy::Class(_) => "class",
+        BackendTy::Nullable(_) => "nullable",
     }
 }
 

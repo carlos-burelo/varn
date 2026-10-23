@@ -1,5 +1,6 @@
-use crate::hir::{HirBinOp, HirType, HirUnOp};
+use crate::hir::{HirBinOp, HirUnOp};
 use crate::ssa::ir::InstKind;
+use varn_tir::BackendTy;
 
 pub(crate) fn dest_droppable(kind: &InstKind) -> bool {
     use InstKind::*;
@@ -56,9 +57,9 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | Range { .. } => true,
 
         Binary { op, ty, .. } => {
-            let typed = matches!(ty, HirType::Int | HirType::Float | HirType::Bool);
-            let int_can_overflow =
-                *ty == HirType::Int && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
+            let typed = matches!(ty, BackendTy::Int | BackendTy::Float | BackendTy::Bool);
+            let int_can_overflow = *ty == BackendTy::Int
+                && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
 
             let never_traps = matches!(
                 op,
@@ -82,9 +83,9 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         }
         Unary { op, ty, .. } => match op {
             HirUnOp::Typeof => true,
-            HirUnOp::Neg => matches!(ty, HirType::Float),
+            HirUnOp::Neg => matches!(ty, BackendTy::Float),
             HirUnOp::Not | HirUnOp::BitNot => {
-                matches!(ty, HirType::Int | HirType::Float | HirType::Bool)
+                matches!(ty, BackendTy::Int | BackendTy::Float | BackendTy::Bool)
             }
         },
 

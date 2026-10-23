@@ -1,4 +1,5 @@
 use super::super::ir::{InstKind, SsaFunc, Value};
+use varn_tir::BackendTy;
 
 pub(super) struct Immediates {
     pub(super) imm: Vec<Option<i8>>,
@@ -17,7 +18,7 @@ pub(super) fn immediate_operand(kind: &InstKind, imm: &[Option<i8>]) -> Option<(
         op,
         lhs,
         rhs,
-        ty: crate::hir::HirType::Int,
+        ty: BackendTy::Int,
     } = kind
     else {
         return None;

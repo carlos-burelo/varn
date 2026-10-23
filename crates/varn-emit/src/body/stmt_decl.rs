@@ -230,7 +230,9 @@ impl<'a> FnEmitter<'a> {
                                 | DynReason::IndexSignature
                                 | DynReason::Awaitable(_)
                                 | DynReason::Yields(_)
-                                | DynReason::NotYetSupported,
+                                | DynReason::NotYetSupported
+                                | DynReason::Boxed
+                                | DynReason::Runtime,
                             ) => false,
                             BackendTy::Int
                             | BackendTy::Float

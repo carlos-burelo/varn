@@ -51,6 +51,10 @@ pub enum DynReason {
     Shape(ShapeId),
 
     NotYetSupported,
+
+    Boxed,
+
+    Runtime,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -80,6 +84,17 @@ pub enum BackendTy {
 }
 
 impl BackendTy {
+    pub fn is_boxed(self) -> bool {
+        matches!(
+            self,
+            BackendTy::Decimal
+                | BackendTy::BigInt
+                | BackendTy::Void
+                | BackendTy::Never
+                | BackendTy::Dynamic(_)
+        )
+    }
+
     pub fn field_kind(self, types: &TyTable) -> Option<varn_core::RuntimeKind> {
         use varn_core::RuntimeKind as T;
         match self {

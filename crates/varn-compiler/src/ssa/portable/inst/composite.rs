@@ -1,11 +1,11 @@
 use super::super::Site;
 use super::composite_class::project_class;
 use super::composite_object::project_object;
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
+use varn_tir::BackendTy;
 use varn_types::ssa::SsaOp;
 
-pub(super) fn try_project(kind: &InstKind, value_tys: &[HirType], site: &Site) -> Option<SsaOp> {
+pub(super) fn try_project(kind: &InstKind, value_tys: &[BackendTy], site: &Site) -> Option<SsaOp> {
     match kind {
         InstKind::AllocInstance {
             class,
@@ -147,7 +147,7 @@ pub(super) fn try_project(kind: &InstKind, value_tys: &[HirType], site: &Site) -
     }
 }
 
-fn project_indexed(kind: &InstKind, value_tys: &[HirType]) -> Option<SsaOp> {
+fn project_indexed(kind: &InstKind, value_tys: &[BackendTy]) -> Option<SsaOp> {
     match kind {
         InstKind::ArrayGetIndex { object, index } if is_int(value_tys, *index) => {
             Some(SsaOp::ArrayGetIndex {
@@ -293,7 +293,7 @@ fn project_indexed(kind: &InstKind, value_tys: &[HirType]) -> Option<SsaOp> {
     }
 }
 
-fn is_int(value_tys: &[HirType], v: Value) -> bool {
+fn is_int(value_tys: &[BackendTy], v: Value) -> bool {
     value_tys.get(v.0 as usize).is_some_and(|t| {
         crate::ssa::emit::slot_kind_of(*t) == varn_types::register_meta::SlotKind::Int
     })

@@ -1,6 +1,6 @@
 use super::context::{Builder, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
+use varn_tir::BackendTy;
 use varn_tir::{Resolution, TirExpr};
 
 impl<'m> Builder<'m> {
@@ -9,7 +9,7 @@ impl<'m> Builder<'m> {
         object: &TirExpr,
         name: &std::sync::Arc<str>,
         res: &Resolution,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let obj = self.lower_expr(object)?;
         let kind = match res {
@@ -36,38 +36,36 @@ impl<'m> Builder<'m> {
                     object.ty.non_nullable(&self.tir.types),
                     varn_tir::BackendTy::Bytes
                 ) {
-                    return Ok(self.emit(InstKind::BytesLength { operand: obj }, HirType::Int));
+                    return Ok(self.emit(InstKind::BytesLength { operand: obj }, BackendTy::Int));
                 }
                 let inner = match self.value_ty(obj) {
-                    HirType::Nullable(id) => self.ssa_types.get(id),
-                    t @ HirType::Int
-                    | t @ HirType::Float
-                    | t @ HirType::Bool
-                    | t @ HirType::Str
-                    | t @ HirType::Ref
-                    | t @ HirType::Dynamic
-                    | t @ HirType::Array(_)
-                    | t @ HirType::Map(..)
-                    | t @ HirType::Set(_)
-                    | t @ HirType::Tuple
-                    | t @ HirType::Class(_) => t,
+                    BackendTy::Nullable(id) => self.tir.types.get(id),
+                    t => t,
                 };
                 match inner {
-                    HirType::Str => {
-                        return Ok(self.emit(InstKind::StrLength { operand: obj }, HirType::Int))
+                    BackendTy::Str => {
+                        return Ok(self.emit(InstKind::StrLength { operand: obj }, BackendTy::Int))
                     }
-                    HirType::Array(_) | HirType::Tuple => {
-                        return Ok(self.emit(InstKind::ArrayLength { operand: obj }, HirType::Int))
+                    BackendTy::Array(_) | BackendTy::Tuple(_) => {
+                        return Ok(self.emit(InstKind::ArrayLength { operand: obj }, BackendTy::Int))
                     }
-                    HirType::Int
-                    | HirType::Float
-                    | HirType::Bool
-                    | HirType::Ref
-                    | HirType::Dynamic
-                    | HirType::Map(..)
-                    | HirType::Set(_)
-                    | HirType::Class(_)
-                    | HirType::Nullable(_) => InstKind::GetProperty {
+                    BackendTy::Int
+                    | BackendTy::Float
+                    | BackendTy::Bool
+                    | BackendTy::Char
+                    | BackendTy::Bytes
+                    | BackendTy::Enum(_)
+                    | BackendTy::Fn(_)
+                    | BackendTy::Decimal
+                    | BackendTy::BigInt
+                    | BackendTy::Void
+                    | BackendTy::Never
+                    | BackendTy::Dynamic(_)
+                    | BackendTy::Map(..)
+                    | BackendTy::Dict(_)
+                    | BackendTy::Set(_)
+                    | BackendTy::Class(_)
+                    | BackendTy::Nullable(_) => InstKind::GetProperty {
                         object: obj,
                         name: name.clone(),
                     },
@@ -97,29 +95,32 @@ impl<'m> Builder<'m> {
         &mut self,
         object: &TirExpr,
         index: &TirExpr,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let obj = self.lower_expr(object)?;
         let idx = self.lower_expr(index)?;
-        let kind = if self.value_ty(obj) == HirType::Str && self.value_ty(idx) == HirType::Int {
+        let kind = if self.value_ty(obj) == BackendTy::Str && self.value_ty(idx) == BackendTy::Int {
             InstKind::CallNativeOp {
                 object: obj,
                 args: vec![idx],
                 op_id: varn_core::runtime_ops::op_id(varn_core::runtime_ops::STR_INDEX),
             }
         } else if matches!(object.ty, varn_tir::BackendTy::Bytes)
-            && matches!(self.value_ty(idx), HirType::Int | HirType::Dynamic)
+            && matches!(self.value_ty(idx), BackendTy::Int | BackendTy::Dynamic(_))
         {
             InstKind::BytesGetIndex {
                 object: obj,
                 index: idx,
             }
-        } else if matches!(self.value_ty(obj), HirType::Array(_) | HirType::Tuple) {
+        } else if matches!(
+            self.value_ty(obj),
+            BackendTy::Array(_) | BackendTy::Tuple(_)
+        ) {
             InstKind::ArrayGetIndex {
                 object: obj,
                 index: idx,
             }
-        } else if matches!(self.value_ty(obj), HirType::Map(_, _)) {
+        } else if matches!(self.value_ty(obj), BackendTy::Map(..) | BackendTy::Dict(_)) {
             InstKind::MapGetIndex {
                 object: obj,
                 index: idx,

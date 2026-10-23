@@ -1,7 +1,7 @@
 use super::context::{Builder, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use varn_tir::TirExpr;
+use varn_tir::{BackendTy, DynReason};
 
 impl<'m> Builder<'m> {
     pub(super) fn lower_range_lit(
@@ -18,7 +18,7 @@ impl<'m> Builder<'m> {
                 end: e2,
                 inclusive,
             },
-            HirType::Ref,
+            BackendTy::Dynamic(DynReason::Runtime),
         ))
     }
 
@@ -33,7 +33,7 @@ impl<'m> Builder<'m> {
                 object: o,
                 skip_keys: skip_keys.to_vec(),
             },
-            HirType::Ref,
+            BackendTy::Dynamic(DynReason::Runtime),
         ))
     }
 
@@ -42,7 +42,7 @@ impl<'m> Builder<'m> {
         func: &std::sync::Arc<str>,
         recv: &TirExpr,
         args: &[varn_tir::TirArg],
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let r = self.lower_expr(recv)?;
         let argv = self.lower_args(args)?;

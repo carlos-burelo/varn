@@ -1,7 +1,7 @@
 use super::context::{Builder, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use crate::OptError;
+use varn_tir::{BackendTy, DynReason};
 use varn_tir::{Resolution, TirExpr};
 
 impl<'m> Builder<'m> {
@@ -10,10 +10,10 @@ impl<'m> Builder<'m> {
         callee: &TirExpr,
         args: &[varn_tir::TirArg],
         res: &Resolution,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         if let Resolution::Intrinsic(wire) = res {
-            let object = self.emit(InstKind::ConstNull, HirType::Dynamic);
+            let object = self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Boxed));
             let argv = self.lower_args(args)?;
             return Ok(self.emit(
                 InstKind::IntrinsicCall {
@@ -41,11 +41,15 @@ impl<'m> Builder<'m> {
                     .function(*f)
                     .map(|tf| tf.name.clone())
                     .ok_or(OptError::Unsupported("from_tir: DirectFn out of range"))?;
-                self.emit(self.global_load(&name), HirType::Ref)
+                self.emit(
+                    self.global_load(&name),
+                    BackendTy::Dynamic(DynReason::Runtime),
+                )
             }
-            Resolution::NativeGlobal(n) => {
-                self.emit(InstKind::LoadNativeGlobalIdx(*n), HirType::Ref)
-            }
+            Resolution::NativeGlobal(n) => self.emit(
+                InstKind::LoadNativeGlobalIdx(*n),
+                BackendTy::Dynamic(DynReason::Runtime),
+            ),
             Resolution::None
             | Resolution::Local(_)
             | Resolution::Param(_)
@@ -69,7 +73,7 @@ impl<'m> Builder<'m> {
         name: &std::sync::Arc<str>,
         args: &[varn_tir::TirArg],
         res: &Resolution,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let r = self.lower_expr(recv)?;
         if args
@@ -81,7 +85,7 @@ impl<'m> Builder<'m> {
                     object: r,
                     name: name.clone(),
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
             return self.lower_call(bound, args, ty);
         }
@@ -117,7 +121,7 @@ impl<'m> Builder<'m> {
         &mut self,
         args: &[varn_tir::TirArg],
         res: &Resolution,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let (enum_id, tag) = match res {
             Resolution::EnumVariant { enum_id, tag } => (*enum_id, *tag),
@@ -152,7 +156,10 @@ impl<'m> Builder<'m> {
             .variant_global(&vname)
             .and_then(|global| self.gslot(&global))
             .ok_or(OptError::Unsupported("from_tir: variant without a slot"))?;
-        let variant = self.emit(InstKind::LoadGlobalIdx(slot), HirType::Ref);
+        let variant = self.emit(
+            InstKind::LoadGlobalIdx(slot),
+            BackendTy::Dynamic(DynReason::Runtime),
+        );
         if args.is_empty() {
             Ok(variant)
         } else {

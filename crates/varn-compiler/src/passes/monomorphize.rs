@@ -1,6 +1,6 @@
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, SsaFunc};
 use rustc_hash::FxHashSet;
+use varn_tir::BackendTy;
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;
@@ -8,9 +8,9 @@ pub fn run(func: &mut SsaFunc) -> bool {
     let mut map_values: FxHashSet<u32> = FxHashSet::default();
 
     for (i, vdef) in func.values.iter().enumerate() {
-        if matches!(vdef.ty, HirType::Array(_)) {
+        if matches!(vdef.ty, BackendTy::Array(_)) {
             array_values.insert(i as u32);
-        } else if matches!(vdef.ty, HirType::Map(_, _)) {
+        } else if matches!(vdef.ty, BackendTy::Map(..) | BackendTy::Dict(_)) {
             map_values.insert(i as u32);
         }
     }

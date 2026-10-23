@@ -1,8 +1,7 @@
 use super::context::Builder;
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
-use varn_tir::BackendTy;
+use varn_tir::{BackendTy, DynReason};
 
 impl<'m> Builder<'m> {
     pub(super) fn gname(&self, name: &str) -> Arc<str> {
@@ -66,20 +65,23 @@ impl<'m> Builder<'m> {
             | BackendTy::Never
             | BackendTy::Dynamic(_) => return v,
         };
-        self.emit(InstKind::Convert { operand: v, conv }, HirType::Dynamic)
+        self.emit(
+            InstKind::Convert { operand: v, conv },
+            BackendTy::Dynamic(DynReason::Boxed),
+        )
     }
 
-    pub(super) fn coerce(&mut self, v: Value, target: HirType) -> Value {
+    pub(super) fn coerce(&mut self, v: Value, target: BackendTy) -> Value {
         let from = self.value_ty(v);
-        if from == target {
+        if from == target || (from.is_boxed() && target.is_boxed()) {
             v
-        } else if from == HirType::Int && target == HirType::Float {
+        } else if from == BackendTy::Int && target == BackendTy::Float {
             self.emit(
                 InstKind::Convert {
                     operand: v,
                     conv: varn_core::ValueConv::IntToFloat,
                 },
-                HirType::Float,
+                BackendTy::Float,
             )
         } else {
             self.emit(

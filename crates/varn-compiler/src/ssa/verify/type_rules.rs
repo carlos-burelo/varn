@@ -1,12 +1,12 @@
 use super::structural::VerifyResult;
-use crate::hir::HirType;
 use crate::ssa::ir::{Inst, SsaFunc};
+use varn_tir::{BackendTy, DynReason};
 
 pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
     use crate::ssa::ir::InstKind;
     match &inst.kind {
         InstKind::Binary { op, lhs, rhs, ty } => {
-            if *ty != HirType::Dynamic {
+            if !ty.is_boxed() {
                 let lty = func.value_ty(*lhs);
                 let rty = func.value_ty(*rhs);
                 if lty != *ty {
@@ -25,8 +25,8 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
                     let dty = func.value_ty(dest);
                     let expected_res = crate::hir::binary_result_ty(*op, *ty);
                     let is_str_concat = matches!(op, crate::hir::HirBinOp::Add)
-                        && (lty == HirType::Str || rty == HirType::Str)
-                        && dty == HirType::Str;
+                        && (lty == BackendTy::Str || rty == BackendTy::Str)
+                        && dty == BackendTy::Str;
                     if dty != expected_res && !is_str_concat {
                         return Err(format!(
                             "typed binary {op:?}.{ty:?} defines v{}: {dty:?}, expected {expected_res:?}",
@@ -38,7 +38,7 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         }
         InstKind::Unary { op, operand, ty } => {
             if matches!(op, crate::hir::HirUnOp::Neg | crate::hir::HirUnOp::BitNot)
-                && *ty != HirType::Dynamic
+                && !ty.is_boxed()
             {
                 let oty = func.value_ty(*operand);
                 if oty != *ty {
@@ -51,11 +51,11 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
                 let expected = match op {
-                    crate::hir::HirUnOp::Not => HirType::Bool,
-                    crate::hir::HirUnOp::Typeof => HirType::Str,
+                    crate::hir::HirUnOp::Not => BackendTy::Bool,
+                    crate::hir::HirUnOp::Typeof => BackendTy::Str,
                     crate::hir::HirUnOp::Neg | crate::hir::HirUnOp::BitNot => *ty,
                 };
-                if dty != expected && expected != HirType::Dynamic {
+                if dty != expected && !expected.is_boxed() {
                     return Err(format!(
                         "typed unary {op:?}.{ty:?} defines v{}: {dty:?}, expected {expected:?}",
                         dest.0
@@ -66,7 +66,7 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         InstKind::ConstInt(_) => {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
-                if dty != HirType::Int {
+                if dty != BackendTy::Int {
                     return Err(format!(
                         "ConstInt defines v{}: {dty:?}, expected Int",
                         dest.0
@@ -77,7 +77,7 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         InstKind::ConstFloat(_) => {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
-                if dty != HirType::Float {
+                if dty != BackendTy::Float {
                     return Err(format!(
                         "ConstFloat defines v{}: {dty:?}, expected Float",
                         dest.0
@@ -88,7 +88,7 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         InstKind::ConstBool(_) => {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
-                if dty != HirType::Bool {
+                if dty != BackendTy::Bool {
                     return Err(format!(
                         "ConstBool defines v{}: {dty:?}, expected Bool",
                         dest.0
@@ -99,7 +99,7 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         InstKind::ConstStr(_) => {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
-                if dty != HirType::Str {
+                if dty != BackendTy::Str {
                     return Err(format!(
                         "ConstStr defines v{}: {dty:?}, expected Str",
                         dest.0
@@ -110,9 +110,9 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         InstKind::ConstChar(_) => {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
-                if dty != HirType::Ref {
+                if dty != BackendTy::Char {
                     return Err(format!(
-                        "ConstChar defines v{}: {dty:?}, expected Ref",
+                        "ConstChar defines v{}: {dty:?}, expected Char",
                         dest.0
                     ));
                 }
@@ -121,7 +121,7 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         InstKind::IsNull { .. } => {
             if let Some(dest) = inst.dest {
                 let dty = func.value_ty(dest);
-                if dty != HirType::Bool {
+                if dty != BackendTy::Bool {
                     return Err(format!(
                         "IsNull defines v{}: {dty:?}, expected Bool",
                         dest.0
@@ -166,7 +166,7 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
         | InstKind::BytesGetIndex { index, .. }
         | InstKind::BytesSetIndex { index, .. } => {
             let ity = func.value_ty(*index);
-            if ity != HirType::Int && ity != HirType::Dynamic {
+            if ity != BackendTy::Int && !ity.is_boxed() {
                 return Err(format!(
                     "Array index expects Int or Dynamic, got v{}: {ity:?}",
                     index.0
@@ -248,28 +248,28 @@ pub(super) fn check_inst_types(func: &SsaFunc, inst: &Inst) -> VerifyResult {
     Ok(())
 }
 
-pub(crate) fn convert_result_ty(conv: varn_core::ValueConv) -> HirType {
+pub(crate) fn convert_result_ty(conv: varn_core::ValueConv) -> BackendTy {
     use varn_core::ValueConv::*;
     match conv {
-        IntToFloat | DynToFloat | BigIntToFloat | DecimalToFloat => HirType::Float,
-        FloatToInt | BigIntToInt | DecimalToInt | DynToInt => HirType::Int,
+        IntToFloat | DynToFloat | BigIntToFloat | DecimalToFloat => BackendTy::Float,
+        FloatToInt | BigIntToInt | DecimalToInt | DynToInt => BackendTy::Int,
         IntToBigInt | IntToDecimal | FloatToBigInt | FloatToDecimal | BigIntToDecimal
-        | DecimalToBigInt => HirType::Dynamic,
-        ExpectStr => HirType::Str,
-        ExpectBool => HirType::Bool,
+        | DecimalToBigInt => BackendTy::Dynamic(DynReason::Boxed),
+        ExpectStr => BackendTy::Str,
+        ExpectBool => BackendTy::Bool,
         ExpectStrOrNull | ExpectBoolOrNull | ExpectIntOrNull | ExpectFloatOrNull => {
-            HirType::Dynamic
+            BackendTy::Dynamic(DynReason::Boxed)
         }
-        ExpectInt => HirType::Int,
-        ExpectFloat => HirType::Float,
+        ExpectInt => BackendTy::Int,
+        ExpectFloat => BackendTy::Float,
     }
 }
 
-fn convert_operand_ty(conv: varn_core::ValueConv) -> Option<HirType> {
+fn convert_operand_ty(conv: varn_core::ValueConv) -> Option<BackendTy> {
     use varn_core::ValueConv::*;
     match conv {
-        IntToFloat => Some(HirType::Int),
-        FloatToInt | FloatToBigInt | FloatToDecimal => Some(HirType::Float),
+        IntToFloat => Some(BackendTy::Int),
+        FloatToInt | FloatToBigInt | FloatToDecimal => Some(BackendTy::Float),
         IntToBigInt | IntToDecimal | BigIntToInt | DecimalToInt | DynToInt | DynToFloat
         | BigIntToFloat | DecimalToFloat | BigIntToDecimal | DecimalToBigInt | ExpectStr
         | ExpectBool | ExpectStrOrNull | ExpectBoolOrNull | ExpectInt | ExpectFloat

@@ -1,4 +1,5 @@
-use crate::hir::{HirType, LocalId};
+use crate::hir::LocalId;
+use varn_tir::BackendTy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VarId {
@@ -14,5 +15,5 @@ pub struct BlockId(pub u32);
 
 #[derive(Debug, Clone, Copy)]
 pub struct ValueDef {
-    pub ty: HirType,
+    pub ty: BackendTy,
 }

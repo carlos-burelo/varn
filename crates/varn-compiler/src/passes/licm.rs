@@ -1,6 +1,7 @@
 use super::cfg_dom::{dominates, dominators};
-use crate::hir::{HirBinOp, HirType, HirUnOp};
+use crate::hir::{HirBinOp, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator};
+use varn_tir::BackendTy;
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let n = func.blocks.len();
@@ -137,7 +138,7 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
         | InstKind::MapGetIndex { .. } => facts.memory_stable,
 
         InstKind::Binary { op, ty, .. } => {
-            let typed = matches!(ty, HirType::Int | HirType::Float);
+            let typed = matches!(ty, BackendTy::Int | BackendTy::Float);
             let safe_op = matches!(
                 op,
                 HirBinOp::Add
@@ -153,7 +154,7 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
             typed && safe_op
         }
         InstKind::Unary { op, ty, .. } => {
-            matches!(ty, HirType::Int | HirType::Float | HirType::Bool)
+            matches!(ty, BackendTy::Int | BackendTy::Float | BackendTy::Bool)
                 && matches!(op, HirUnOp::Neg | HirUnOp::Not)
         }
         InstKind::LoadGlobal(_) | InstKind::LoadGlobalIdx(_) | InstKind::LoadNativeGlobalIdx(_) => {

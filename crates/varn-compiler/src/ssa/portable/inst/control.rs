@@ -1,11 +1,11 @@
 use super::super::{Captured, Site};
-use crate::hir::HirType;
 use crate::ssa::ir::InstKind;
+use varn_tir::BackendTy;
 use varn_types::ssa::SsaOp;
 
 pub(super) fn try_project(
     kind: &InstKind,
-    value_tys: &[HirType],
+    value_tys: &[BackendTy],
     site: &Site,
     captured: &mut Captured,
 ) -> Option<SsaOp> {

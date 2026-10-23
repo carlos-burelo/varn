@@ -1,8 +1,9 @@
 use super::context::{Builder, LoopCtx, Result};
-use crate::hir::{HirType, LocalId};
+use crate::hir::LocalId;
 use crate::ssa::ir::{InstKind, Terminator, VarId};
 use crate::OptError;
 use varn_tir::TirStmt;
+use varn_tir::{BackendTy, DynReason};
 
 fn stmt_offset(s: &TirStmt) -> Option<u32> {
     match s {
@@ -67,7 +68,7 @@ impl<'m> Builder<'m> {
                 }
             }
             TirStmt::Let { local, ty, init } => {
-                let declared = self.ty(*ty);
+                let declared = *ty;
                 let var = VarId::Local(LocalId(local.0));
                 self.var_ty.insert(var, declared);
                 let value = match init {
@@ -77,18 +78,26 @@ impl<'m> Builder<'m> {
                         self.coerce(v, declared)
                     }
                     None => match declared {
-                        HirType::Int => self.emit(InstKind::ConstInt(0), declared),
-                        HirType::Float => self.emit(InstKind::ConstFloat(0.0), declared),
-                        HirType::Bool => self.emit(InstKind::ConstBool(false), declared),
-                        HirType::Str
-                        | HirType::Ref
-                        | HirType::Dynamic
-                        | HirType::Array(_)
-                        | HirType::Map(..)
-                        | HirType::Set(_)
-                        | HirType::Tuple
-                        | HirType::Class(_)
-                        | HirType::Nullable(_) => self.emit(InstKind::ConstNull, declared),
+                        BackendTy::Int => self.emit(InstKind::ConstInt(0), declared),
+                        BackendTy::Float => self.emit(InstKind::ConstFloat(0.0), declared),
+                        BackendTy::Bool => self.emit(InstKind::ConstBool(false), declared),
+                        BackendTy::Str
+                        | BackendTy::Char
+                        | BackendTy::Bytes
+                        | BackendTy::Enum(_)
+                        | BackendTy::Fn(_)
+                        | BackendTy::Dynamic(_)
+                        | BackendTy::Decimal
+                        | BackendTy::BigInt
+                        | BackendTy::Void
+                        | BackendTy::Never
+                        | BackendTy::Array(_)
+                        | BackendTy::Map(..)
+                        | BackendTy::Dict(_)
+                        | BackendTy::Set(_)
+                        | BackendTy::Tuple(_)
+                        | BackendTy::Class(_)
+                        | BackendTy::Nullable(_) => self.emit(InstKind::ConstNull, declared),
                     },
                 };
                 self.store_var(var, value);
@@ -256,7 +265,10 @@ impl<'m> Builder<'m> {
                 let landing = self.new_block();
                 let exit = self.new_block();
 
-                let try_val = self.emit(InstKind::Try { handler: landing }, HirType::Dynamic);
+                let try_val = self.emit(
+                    InstKind::Try { handler: landing },
+                    BackendTy::Dynamic(DynReason::Boxed),
+                );
 
                 self.try_depth += 1;
                 self.lower_block(body)?;
@@ -274,7 +286,10 @@ impl<'m> Builder<'m> {
                 self.add_pred(landing, try_entry);
                 self.seal_block(landing);
                 self.current = landing;
-                let err = self.emit(InstKind::CatchParam { try_val }, HirType::Dynamic);
+                let err = self.emit(
+                    InstKind::CatchParam { try_val },
+                    BackendTy::Dynamic(DynReason::Boxed),
+                );
                 self.store_var(VarId::Local(LocalId(catch_local.0)), err);
                 self.lower_block(catch_body)?;
                 if self.is_open() {

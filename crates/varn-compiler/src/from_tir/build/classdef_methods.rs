@@ -1,8 +1,8 @@
 use super::context::{Builder, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
 use varn_tir::TirClassDef;
+use varn_tir::{BackendTy, DynReason};
 
 impl<'m> Builder<'m> {
     fn apply_member_decorator(
@@ -14,9 +14,9 @@ impl<'m> Builder<'m> {
         is_private: bool,
     ) -> Result<Value> {
         let deco_v = self.lower_expr(deco)?;
-        let n = self.emit(InstKind::ConstStr(key.clone()), HirType::Str);
-        let st = self.emit(InstKind::ConstBool(is_static), HirType::Bool);
-        let pv = self.emit(InstKind::ConstBool(is_private), HirType::Bool);
+        let n = self.emit(InstKind::ConstStr(key.clone()), BackendTy::Str);
+        let st = self.emit(InstKind::ConstBool(is_static), BackendTy::Bool);
+        let pv = self.emit(InstKind::ConstBool(is_private), BackendTy::Bool);
         let ctx = self.emit(
             InstKind::BuildObject {
                 pairs: vec![
@@ -25,17 +25,17 @@ impl<'m> Builder<'m> {
                     (Arc::from(varn_core::MemberKey::IsPrivate.as_str()), pv),
                 ],
             },
-            HirType::Ref,
+            BackendTy::Dynamic(DynReason::Runtime),
         );
         let result = self.emit(
             InstKind::Call {
                 callee: deco_v,
                 args: vec![mv, ctx],
             },
-            HirType::Ref,
+            BackendTy::Dynamic(DynReason::Runtime),
         );
-        let isnull = self.emit(InstKind::IsNull { operand: result }, HirType::Bool);
-        self.select_value(isnull, mv, result, HirType::Ref)
+        let isnull = self.emit(InstKind::IsNull { operand: result }, BackendTy::Bool);
+        self.select_value(isnull, mv, result, BackendTy::Dynamic(DynReason::Runtime))
     }
 
     pub(super) fn build_class_methods(&mut self, def: &TirClassDef, class_v: Value) -> Result<()> {
@@ -45,7 +45,7 @@ impl<'m> Builder<'m> {
                     func: m.func.0,
                     upvalues_src: vec![],
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
             for deco in m.decorators.iter().rev() {
                 mv = self.apply_member_decorator(mv, deco, &m.key, m.is_static, m.is_private)?;
@@ -73,10 +73,15 @@ impl<'m> Builder<'m> {
                     callee: deco_v,
                     args: vec![class_v],
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
-            let isnull = self.emit(InstKind::IsNull { operand: result }, HirType::Bool);
-            class_v = self.select_value(isnull, class_v, result, HirType::Ref)?;
+            let isnull = self.emit(InstKind::IsNull { operand: result }, BackendTy::Bool);
+            class_v = self.select_value(
+                isnull,
+                class_v,
+                result,
+                BackendTy::Dynamic(DynReason::Runtime),
+            )?;
         }
         Ok(class_v)
     }
@@ -92,7 +97,7 @@ impl<'m> Builder<'m> {
                     func: a.func.0,
                     upvalues_src: vec![],
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
             for deco in a.decorators.iter().rev() {
                 av = self.apply_member_decorator(av, deco, &a.key, a.is_static, false)?;
@@ -116,9 +121,9 @@ impl<'m> Builder<'m> {
         for prop in &def.property_decorators {
             for deco in prop.decorators.iter().rev() {
                 let deco_v = self.lower_expr(deco)?;
-                let n = self.emit(InstKind::ConstStr(prop.key.clone()), HirType::Str);
-                let st = self.emit(InstKind::ConstBool(prop.is_static), HirType::Bool);
-                let pv = self.emit(InstKind::ConstBool(false), HirType::Bool);
+                let n = self.emit(InstKind::ConstStr(prop.key.clone()), BackendTy::Str);
+                let st = self.emit(InstKind::ConstBool(prop.is_static), BackendTy::Bool);
+                let pv = self.emit(InstKind::ConstBool(false), BackendTy::Bool);
                 let ctx = self.emit(
                     InstKind::BuildObject {
                         pairs: vec![
@@ -127,14 +132,14 @@ impl<'m> Builder<'m> {
                             (Arc::from(varn_core::MemberKey::IsPrivate.as_str()), pv),
                         ],
                     },
-                    HirType::Ref,
+                    BackendTy::Dynamic(DynReason::Runtime),
                 );
                 self.emit(
                     InstKind::Call {
                         callee: deco_v,
                         args: vec![class_v, ctx],
                     },
-                    HirType::Ref,
+                    BackendTy::Dynamic(DynReason::Runtime),
                 );
             }
         }

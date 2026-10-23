@@ -1,9 +1,10 @@
-use crate::hir::{HirBinOp, HirType, HirUnOp};
+use crate::hir::{HirBinOp, HirUnOp};
 use crate::lower::binary_opcode;
 use crate::ssa::ir::Value;
 use crate::OptError;
 use std::sync::Arc;
 use varn_core::OpCode;
+use varn_tir::BackendTy;
 use varn_types::chunk::{Chunk, Literal, PoolEntry};
 
 type Result<T> = std::result::Result<T, OptError>;
@@ -65,8 +66,8 @@ pub(super) fn emit_binary(
     op: HirBinOp,
     lhs: Value,
     rhs: Value,
-    ty: HirType,
-    value_tys: &[HirType],
+    ty: BackendTy,
+    value_tys: &[BackendTy],
     reg: &[u8],
     line: u32,
 ) {

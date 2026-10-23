@@ -1,6 +1,6 @@
 use std::sync::Arc;
+use varn_tir::BackendTy;
 
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, SsaFunc, Terminator, VarId};
 use crate::ssa::liveness::Liveness;
 use rustc_hash::FxHashSet;
@@ -61,7 +61,7 @@ pub(crate) fn project(
     has_this: bool,
     name: &Arc<str>,
 ) -> Result<SsaProto, String> {
-    let value_tys: Vec<HirType> = ssa.values.iter().map(|v| v.ty).collect();
+    let value_tys: Vec<BackendTy> = ssa.values.iter().map(|v| v.ty).collect();
 
     let lv = emitted.liveness;
     let handlers = crate::ssa::suspend::try_handlers(ssa);

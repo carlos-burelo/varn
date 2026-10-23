@@ -1,8 +1,8 @@
 use super::context::{Builder, InlineFrame, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
 use crate::OptError;
 use std::sync::Arc;
+use varn_tir::{BackendTy, DynReason};
 use varn_tir::{ClassId, FnId, Resolution, TirArg, TirClassDef, TirExpr, TirExprKind, TirStmt};
 
 const CONSTRUCTOR: &str = varn_core::TokenKind::Constructor.as_str();
@@ -12,7 +12,7 @@ impl<'m> Builder<'m> {
         &mut self,
         class: ClassId,
         args: &[TirArg],
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let (name, payload_size) = self
             .tir
@@ -25,7 +25,10 @@ impl<'m> Builder<'m> {
             .class(class)
             .and_then(|ci| ci.import_binding.clone());
         if let Some(binding) = imported {
-            let cv = self.emit(self.global_load(&binding), HirType::Ref);
+            let cv = self.emit(
+                self.global_load(&binding),
+                BackendTy::Dynamic(DynReason::Runtime),
+            );
             if spreads {
                 return self.lower_call(cv, args, ty);
             }
@@ -43,11 +46,14 @@ impl<'m> Builder<'m> {
                     name: Arc::from(CONSTRUCTOR),
                     args: argv,
                 },
-                HirType::Dynamic,
+                BackendTy::Dynamic(DynReason::Boxed),
             );
             return Ok(inst);
         }
-        let cv = self.emit(self.global_load(&name), HirType::Ref);
+        let cv = self.emit(
+            self.global_load(&name),
+            BackendTy::Dynamic(DynReason::Runtime),
+        );
         let static_def = self
             .class_def(class)
             .filter(|def| def.decorators.is_empty() && self.ancestry_is_local(def))
@@ -82,7 +88,7 @@ impl<'m> Builder<'m> {
                     name: Arc::from(CONSTRUCTOR),
                     args: argv,
                 },
-                HirType::Dynamic,
+                BackendTy::Dynamic(DynReason::Boxed),
             );
         }
         Ok(inst)

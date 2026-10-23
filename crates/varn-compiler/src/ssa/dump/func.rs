@@ -1,8 +1,8 @@
 use super::super::ir::{Block, SsaFunc, Terminator};
 use super::insts::inst_kind;
 use super::operands::{args_list, ty, val};
-use crate::hir::HirType;
 use std::fmt::Write;
+use varn_tir::{BackendTy, DynReason};
 
 pub fn dump(func: &SsaFunc) -> String {
     let mut out = String::new();
@@ -35,18 +35,13 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
     for inst in &block.insts {
         let lhs = match inst.dest {
             Some(v) => match func.value_ty(v) {
-                HirType::Dynamic => format!("{} = ", val(v)),
-                t @ HirType::Int
-                | t @ HirType::Float
-                | t @ HirType::Bool
-                | t @ HirType::Str
-                | t @ HirType::Ref
-                | t @ HirType::Array(_)
-                | t @ HirType::Map(..)
-                | t @ HirType::Set(_)
-                | t @ HirType::Tuple
-                | t @ HirType::Class(_)
-                | t @ HirType::Nullable(_) => format!("{}: {} = ", val(v), ty(t)),
+                BackendTy::Dynamic(DynReason::Runtime) => format!(
+                    "{}: {} = ",
+                    val(v),
+                    ty(BackendTy::Dynamic(DynReason::Runtime))
+                ),
+                BackendTy::Dynamic(_) => format!("{} = ", val(v)),
+                t => format!("{}: {} = ", val(v), ty(t)),
             },
             None => String::new(),
         };

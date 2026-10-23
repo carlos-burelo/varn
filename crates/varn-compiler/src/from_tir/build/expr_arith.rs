@@ -1,6 +1,6 @@
 use super::context::{Builder, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, Value};
+use varn_tir::{BackendTy, DynReason};
 use varn_tir::{TirBinOp, TirExpr, TirUnOp};
 
 impl<'m> Builder<'m> {
@@ -9,7 +9,7 @@ impl<'m> Builder<'m> {
         op: TirBinOp,
         lhs: &TirExpr,
         rhs: &TirExpr,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let mut l = self.lower_expr(lhs)?;
         let mut r = self.lower_expr(rhs)?;
@@ -17,7 +17,7 @@ impl<'m> Builder<'m> {
             op,
             TirBinOp::Eq | TirBinOp::Ne | TirBinOp::Lt | TirBinOp::Le | TirBinOp::Gt | TirBinOp::Ge
         );
-        if !is_cmp && matches!(ty, HirType::Int | HirType::Float | HirType::Str) {
+        if !is_cmp && matches!(ty, BackendTy::Int | BackendTy::Float | BackendTy::Str) {
             l = self.coerce(l, ty);
             r = self.coerce(r, ty);
         }
@@ -25,15 +25,15 @@ impl<'m> Builder<'m> {
         let op_ty = if lt == rt
             && matches!(
                 lt,
-                HirType::Int | HirType::Float | HirType::Bool | HirType::Str
+                BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Str
             ) {
             lt
         } else {
-            HirType::Dynamic
+            BackendTy::Dynamic(DynReason::Boxed)
         };
-        let result_ty = if is_cmp && op_ty != HirType::Dynamic {
-            HirType::Bool
-        } else if op_ty != HirType::Dynamic {
+        let result_ty = if is_cmp && op_ty != BackendTy::Dynamic(DynReason::Boxed) {
+            BackendTy::Bool
+        } else if op_ty != BackendTy::Dynamic(DynReason::Boxed) {
             op_ty
         } else {
             ty
@@ -53,24 +53,32 @@ impl<'m> Builder<'m> {
         &mut self,
         op: TirUnOp,
         operand: &TirExpr,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let v = self.lower_expr(operand)?;
         match op {
             TirUnOp::IsNull => match self.value_ty(v) {
-                HirType::Int | HirType::Float | HirType::Bool => {
-                    Ok(self.emit(InstKind::ConstBool(false), HirType::Bool))
+                BackendTy::Int | BackendTy::Float | BackendTy::Bool => {
+                    Ok(self.emit(InstKind::ConstBool(false), BackendTy::Bool))
                 }
-                HirType::Str
-                | HirType::Ref
-                | HirType::Dynamic
-                | HirType::Array(_)
-                | HirType::Map(..)
-                | HirType::Set(_)
-                | HirType::Tuple
-                | HirType::Class(_)
-                | HirType::Nullable(_) => {
-                    Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool))
+                BackendTy::Str
+                | BackendTy::Char
+                | BackendTy::Bytes
+                | BackendTy::Enum(_)
+                | BackendTy::Fn(_)
+                | BackendTy::Dynamic(_)
+                | BackendTy::Decimal
+                | BackendTy::BigInt
+                | BackendTy::Void
+                | BackendTy::Never
+                | BackendTy::Array(_)
+                | BackendTy::Map(..)
+                | BackendTy::Dict(_)
+                | BackendTy::Set(_)
+                | BackendTy::Tuple(_)
+                | BackendTy::Class(_)
+                | BackendTy::Nullable(_) => {
+                    Ok(self.emit(InstKind::IsNull { operand: v }, BackendTy::Bool))
                 }
             },
             TirUnOp::Present => {
@@ -80,9 +88,9 @@ impl<'m> Builder<'m> {
             TirUnOp::ToStr => Ok(self.emit(
                 InstKind::Cast {
                     operand: v,
-                    ty: HirType::Str,
+                    ty: BackendTy::Str,
                 },
-                HirType::Str,
+                BackendTy::Str,
             )),
             TirUnOp::Neg | TirUnOp::Not | TirUnOp::BitNot | TirUnOp::Typeof => {
                 let result = self.emit(
@@ -103,7 +111,7 @@ impl<'m> Builder<'m> {
         v: Value,
         class: varn_tir::ClassId,
         nullable: bool,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let name =
             self.tir
@@ -112,34 +120,37 @@ impl<'m> Builder<'m> {
                 .ok_or(crate::OptError::Unsupported(
                     "from_tir: Checked to an unknown class",
                 ))?;
-        let cls = self.emit(self.global_load(&name), HirType::Ref);
+        let cls = self.emit(
+            self.global_load(&name),
+            BackendTy::Dynamic(DynReason::Runtime),
+        );
         let is_instance = self.emit(
             InstKind::Binary {
                 op: crate::hir::HirBinOp::Instanceof,
                 lhs: v,
                 rhs: cls,
-                ty: HirType::Dynamic,
+                ty: BackendTy::Dynamic(DynReason::Boxed),
             },
-            HirType::Bool,
+            BackendTy::Bool,
         );
         let holds = if nullable {
-            let is_null = self.emit(InstKind::IsNull { operand: v }, HirType::Bool);
+            let is_null = self.emit(InstKind::IsNull { operand: v }, BackendTy::Bool);
             let not_null = self.emit(
                 InstKind::Unary {
                     op: crate::hir::HirUnOp::Not,
                     operand: is_null,
-                    ty: HirType::Bool,
+                    ty: BackendTy::Bool,
                 },
-                HirType::Bool,
+                BackendTy::Bool,
             );
             self.emit(
                 InstKind::Binary {
                     op: crate::hir::HirBinOp::Eq,
                     lhs: is_instance,
                     rhs: not_null,
-                    ty: HirType::Bool,
+                    ty: BackendTy::Bool,
                 },
-                HirType::Bool,
+                BackendTy::Bool,
             )
         } else {
             is_instance
@@ -173,17 +184,20 @@ impl<'m> Builder<'m> {
             InstKind::Unary {
                 op: crate::hir::HirUnOp::Typeof,
                 operand: v,
-                ty: HirType::Str,
+                ty: BackendTy::Str,
             },
-            HirType::Str,
+            BackendTy::Str,
         );
         let head = self.emit(
             InstKind::ConstStr(std::sync::Arc::from(format!(
                 "type mismatch: expected '{expected}', got '"
             ))),
-            HirType::Str,
+            BackendTy::Str,
         );
-        let tail = self.emit(InstKind::ConstStr(std::sync::Arc::from("'")), HirType::Str);
+        let tail = self.emit(
+            InstKind::ConstStr(std::sync::Arc::from("'")),
+            BackendTy::Str,
+        );
         let mut message = head;
         for part in [got, tail] {
             message = self.emit(
@@ -191,9 +205,9 @@ impl<'m> Builder<'m> {
                     op: crate::hir::HirBinOp::Add,
                     lhs: message,
                     rhs: part,
-                    ty: HirType::Str,
+                    ty: BackendTy::Str,
                 },
-                HirType::Str,
+                BackendTy::Str,
             );
         }
         let type_error = varn_core::abi::native_global_index(
@@ -202,13 +216,16 @@ impl<'m> Builder<'m> {
         .ok_or(crate::OptError::Unsupported(
             "from_tir: TypeError is not a native global",
         ))?;
-        let ctor = self.emit(InstKind::LoadNativeGlobalIdx(type_error), HirType::Ref);
+        let ctor = self.emit(
+            InstKind::LoadNativeGlobalIdx(type_error),
+            BackendTy::Dynamic(DynReason::Runtime),
+        );
         let error = self.emit(
             InstKind::Call {
                 callee: ctor,
                 args: vec![message],
             },
-            HirType::Ref,
+            BackendTy::Dynamic(DynReason::Runtime),
         );
         self.set_term(crate::ssa::ir::Terminator::Throw(error));
         self.current = join_blk;
@@ -219,7 +236,7 @@ impl<'m> Builder<'m> {
         &mut self,
         operand: &TirExpr,
         node_ty: varn_tir::BackendTy,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let v = self.lower_expr(operand)?;
         match node_ty {
@@ -265,34 +282,47 @@ impl<'m> Builder<'m> {
                 | varn_tir::DynReason::Declared
                 | varn_tir::DynReason::Awaitable(_)
                 | varn_tir::DynReason::Yields(_)
-                | varn_tir::DynReason::NotYetSupported,
+                | varn_tir::DynReason::NotYetSupported
+                | varn_tir::DynReason::Boxed
+                | varn_tir::DynReason::Runtime,
             ) => {}
         }
         let conv = match ty {
-            HirType::Str => varn_core::ValueConv::ExpectStr,
-            HirType::Bool => varn_core::ValueConv::ExpectBool,
-            HirType::Int => varn_core::ValueConv::ExpectInt,
-            HirType::Float => varn_core::ValueConv::ExpectFloat,
-            HirType::Nullable(inner) => {
-                let conv = match self.ssa_types.get(inner) {
-                    HirType::Str => varn_core::ValueConv::ExpectStrOrNull,
-                    HirType::Bool => varn_core::ValueConv::ExpectBoolOrNull,
-                    HirType::Int => varn_core::ValueConv::ExpectIntOrNull,
-                    HirType::Float => varn_core::ValueConv::ExpectFloatOrNull,
-                    HirType::Ref
-                    | HirType::Dynamic
-                    | HirType::Array(_)
-                    | HirType::Map(..)
-                    | HirType::Set(_)
-                    | HirType::Tuple
-                    | HirType::Class(_)
-                    | HirType::Nullable(_) => {
+            BackendTy::Str => varn_core::ValueConv::ExpectStr,
+            BackendTy::Bool => varn_core::ValueConv::ExpectBool,
+            BackendTy::Int => varn_core::ValueConv::ExpectInt,
+            BackendTy::Float => varn_core::ValueConv::ExpectFloat,
+            BackendTy::Nullable(inner) => {
+                let conv = match self.tir.types.get(inner) {
+                    BackendTy::Str => varn_core::ValueConv::ExpectStrOrNull,
+                    BackendTy::Bool => varn_core::ValueConv::ExpectBoolOrNull,
+                    BackendTy::Int => varn_core::ValueConv::ExpectIntOrNull,
+                    BackendTy::Float => varn_core::ValueConv::ExpectFloatOrNull,
+                    BackendTy::Dynamic(_)
+                    | BackendTy::Char
+                    | BackendTy::Bytes
+                    | BackendTy::Enum(_)
+                    | BackendTy::Fn(_)
+                    | BackendTy::Decimal
+                    | BackendTy::BigInt
+                    | BackendTy::Void
+                    | BackendTy::Never
+                    | BackendTy::Array(_)
+                    | BackendTy::Map(..)
+                    | BackendTy::Dict(_)
+                    | BackendTy::Set(_)
+                    | BackendTy::Tuple(_)
+                    | BackendTy::Class(_)
+                    | BackendTy::Nullable(_) => {
                         return Err(crate::OptError::Unsupported(
                             "from_tir: Checked to an unsupported nullable type",
                         ));
                     }
                 };
-                let checked = self.emit(InstKind::Convert { operand: v, conv }, HirType::Dynamic);
+                let checked = self.emit(
+                    InstKind::Convert { operand: v, conv },
+                    BackendTy::Dynamic(DynReason::Boxed),
+                );
                 return Ok(self.emit(
                     InstKind::Cast {
                         operand: checked,
@@ -301,13 +331,21 @@ impl<'m> Builder<'m> {
                     ty,
                 ));
             }
-            HirType::Ref
-            | HirType::Dynamic
-            | HirType::Array(_)
-            | HirType::Map(..)
-            | HirType::Set(_)
-            | HirType::Tuple
-            | HirType::Class(_) => {
+            BackendTy::Dynamic(_)
+            | BackendTy::Char
+            | BackendTy::Bytes
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_) => {
                 return Err(crate::OptError::Unsupported(
                     "from_tir: Checked to a non-scalar type",
                 ));
@@ -319,37 +357,57 @@ impl<'m> Builder<'m> {
 
     fn static_truthiness(&mut self, v: Value) -> Option<Value> {
         match self.value_ty(v) {
-            HirType::Bool => Some(v),
-            HirType::Int
-            | HirType::Float
-            | HirType::Str
-            | HirType::Array(_)
-            | HirType::Map(..)
-            | HirType::Set(_)
-            | HirType::Tuple
-            | HirType::Class(_) => Some(self.emit(InstKind::ConstBool(true), HirType::Bool)),
-            HirType::Nullable(inner) => match self.ssa_types.get(inner) {
-                HirType::Int
-                | HirType::Float
-                | HirType::Str
-                | HirType::Array(_)
-                | HirType::Map(..)
-                | HirType::Set(_)
-                | HirType::Tuple
-                | HirType::Class(_) => {
-                    let absent = self.emit(InstKind::IsNull { operand: v }, HirType::Bool);
+            BackendTy::Bool => Some(v),
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Str
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_) => Some(self.emit(InstKind::ConstBool(true), BackendTy::Bool)),
+            BackendTy::Nullable(inner) => match self.tir.types.get(inner) {
+                BackendTy::Int
+                | BackendTy::Float
+                | BackendTy::Str
+                | BackendTy::Array(_)
+                | BackendTy::Map(..)
+                | BackendTy::Dict(_)
+                | BackendTy::Set(_)
+                | BackendTy::Tuple(_)
+                | BackendTy::Class(_) => {
+                    let absent = self.emit(InstKind::IsNull { operand: v }, BackendTy::Bool);
                     Some(self.emit(
                         InstKind::Unary {
                             op: crate::hir::HirUnOp::Not,
                             operand: absent,
-                            ty: HirType::Bool,
+                            ty: BackendTy::Bool,
                         },
-                        HirType::Bool,
+                        BackendTy::Bool,
                     ))
                 }
-                HirType::Bool | HirType::Ref | HirType::Dynamic | HirType::Nullable(_) => None,
+                BackendTy::Bool
+                | BackendTy::Dynamic(_)
+                | BackendTy::Char
+                | BackendTy::Bytes
+                | BackendTy::Enum(_)
+                | BackendTy::Fn(_)
+                | BackendTy::Decimal
+                | BackendTy::BigInt
+                | BackendTy::Void
+                | BackendTy::Never
+                | BackendTy::Nullable(_) => None,
             },
-            HirType::Ref | HirType::Dynamic => None,
+            BackendTy::Dynamic(_)
+            | BackendTy::Char
+            | BackendTy::Bytes
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Void
+            | BackendTy::Never => None,
         }
     }
 
@@ -357,28 +415,36 @@ impl<'m> Builder<'m> {
         &mut self,
         operand: &TirExpr,
         node_ty: varn_tir::BackendTy,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         use varn_core::NumericDomain as D;
         let v = self.lower_expr(operand)?;
-        if ty == HirType::Bool
+        if ty == BackendTy::Bool
             && let Some(holds) = self.static_truthiness(v)
         {
             return Ok(holds);
         }
         let from = match self.value_ty(v) {
-            HirType::Int => Some(D::Int),
-            HirType::Float => Some(D::Float),
-            HirType::Bool
-            | HirType::Str
-            | HirType::Ref
-            | HirType::Dynamic
-            | HirType::Array(_)
-            | HirType::Map(..)
-            | HirType::Set(_)
-            | HirType::Tuple
-            | HirType::Class(_)
-            | HirType::Nullable(_) => super::ops::numeric_domain(operand.ty)
+            BackendTy::Int => Some(D::Int),
+            BackendTy::Float => Some(D::Float),
+            BackendTy::Bool
+            | BackendTy::Str
+            | BackendTy::Char
+            | BackendTy::Bytes
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Dynamic(_)
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Nullable(_) => super::ops::numeric_domain(operand.ty)
                 .filter(|d| matches!(d, D::BigInt | D::Decimal)),
         };
         let to = super::ops::numeric_domain(node_ty);

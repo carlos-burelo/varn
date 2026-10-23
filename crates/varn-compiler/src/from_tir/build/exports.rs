@@ -1,7 +1,8 @@
 use super::context::Builder;
-use crate::hir::{HirBinOp, HirType};
+use crate::hir::HirBinOp;
 use crate::ssa::ir::{InstKind, Terminator, Value};
 use std::sync::Arc;
+use varn_tir::{BackendTy, DynReason};
 
 impl<'m> Builder<'m> {
     pub(super) fn build_exports(&mut self, export_slots: &[Arc<str>]) {
@@ -11,13 +12,16 @@ impl<'m> Builder<'m> {
                 continue;
             };
             let value = match &exp.reexport_from {
-                None => self.emit(self.global_load(&exp.local), HirType::Dynamic),
+                None => self.emit(
+                    self.global_load(&exp.local),
+                    BackendTy::Dynamic(DynReason::Boxed),
+                ),
                 Some(src) => {
                     let m = self.emit(
                         InstKind::LoadModule {
                             source: src.clone(),
                         },
-                        HirType::Ref,
+                        BackendTy::Dynamic(DynReason::Runtime),
                     );
                     if exp.namespace {
                         m
@@ -27,7 +31,7 @@ impl<'m> Builder<'m> {
                                 object: m,
                                 name: exp.local.clone(),
                             },
-                            HirType::Dynamic,
+                            BackendTy::Dynamic(DynReason::Boxed),
                         )
                     }
                 }
@@ -48,7 +52,7 @@ impl<'m> Builder<'m> {
                 InstKind::LoadModule {
                     source: imp.source.clone(),
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
             for spec in &imp.specs {
                 let imported_name: Option<Arc<str>> = match &spec.kind {
@@ -63,14 +67,14 @@ impl<'m> Builder<'m> {
                                 object: mod_v,
                                 slot,
                             },
-                            HirType::Dynamic,
+                            BackendTy::Dynamic(DynReason::Boxed),
                         );
                         let name_v = self.emit(
                             InstKind::GetProperty {
                                 object: mod_v,
                                 name: name.clone(),
                             },
-                            HirType::Dynamic,
+                            BackendTy::Dynamic(DynReason::Boxed),
                         );
                         self.emit_slot_guard(&imp.source, &name, slot, slot_v, name_v);
                         slot_v
@@ -90,7 +94,7 @@ impl<'m> Builder<'m> {
                                 object: mod_v,
                                 name,
                             },
-                            HirType::Dynamic,
+                            BackendTy::Dynamic(DynReason::Boxed),
                         )
                     }
                 };
@@ -117,7 +121,7 @@ impl<'m> Builder<'m> {
         if slots.is_empty() {
             return;
         }
-        let absent = self.emit(InstKind::IsNull { operand: enum_v }, HirType::Bool);
+        let absent = self.emit(InstKind::IsNull { operand: enum_v }, BackendTy::Bool);
         let bind_blk = self.new_block();
         let join_blk = self.new_block();
         let from = self.current;
@@ -137,7 +141,7 @@ impl<'m> Builder<'m> {
                     object: enum_v,
                     name,
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
             self.emit_effect(InstKind::StoreGlobalIdx { slot, value });
         }
@@ -165,9 +169,9 @@ impl<'m> Builder<'m> {
                 op: HirBinOp::Eq,
                 lhs: slot_v,
                 rhs: name_v,
-                ty: HirType::Dynamic,
+                ty: BackendTy::Dynamic(DynReason::Boxed),
             },
-            HirType::Bool,
+            BackendTy::Bool,
         );
         let throw_blk = self.new_block();
         let join_blk = self.new_block();
@@ -188,7 +192,7 @@ impl<'m> Builder<'m> {
             InstKind::ConstStr(Arc::from(format!(
                 "E_SLOT_MISMATCH: '{name}' from '{source}' is not at slot {slot} anymore"
             ))),
-            HirType::Str,
+            BackendTy::Str,
         );
         self.set_term(Terminator::Throw(msg));
         self.current = join_blk;

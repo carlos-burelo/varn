@@ -1,7 +1,7 @@
 use super::context::{Builder, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, SsaFunc, Terminator, VarId};
 use std::sync::Arc;
+use varn_tir::DynReason;
 use varn_tir::{
     BackendTy, Resolution, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt, TirUnOp,
 };
@@ -80,9 +80,9 @@ fn build_inner(
         .collect();
     for (i, pty) in func.params.iter().enumerate() {
         let t = if defaulted[i] {
-            HirType::Dynamic
+            BackendTy::Dynamic(DynReason::Boxed)
         } else {
-            b.ty(*pty)
+            *pty
         };
         let v = b.new_value(t);
         b.block_mut(entry).params.push(v);
@@ -125,7 +125,7 @@ fn build_inner(
                     func: i as u32,
                     upvalues_src: vec![],
                 },
-                HirType::Ref,
+                BackendTy::Dynamic(DynReason::Runtime),
             );
             let store = b.global_store(&f.name, fv);
             b.emit_effect(store);
@@ -166,7 +166,7 @@ pub fn build_module(tir: &TirModule, lines: &[u32]) -> Result<Vec<SsaFunc>> {
 }
 
 impl<'m> Builder<'m> {
-    pub(super) fn filled_param_ty(&mut self, cond: &TirExpr) -> Result<Option<HirType>> {
+    pub(super) fn filled_param_ty(&mut self, cond: &TirExpr) -> Result<Option<BackendTy>> {
         let Some(i) = absent_param(cond) else {
             return Ok(None);
         };
@@ -180,7 +180,7 @@ impl<'m> Builder<'m> {
     pub(super) fn restore_supplied_param(
         &mut self,
         cond: &TirExpr,
-        filled: Option<HirType>,
+        filled: Option<BackendTy>,
     ) -> Result<()> {
         let Some(i) = absent_param(cond) else {
             return Ok(());
@@ -188,24 +188,33 @@ impl<'m> Builder<'m> {
         let Some(declared) = self.defaulted.get_mut(i as usize).and_then(Option::take) else {
             return Ok(());
         };
-        let ty = self.ty(declared.non_nullable(&self.tir.types));
+        let ty = declared.non_nullable(&self.tir.types);
         if filled != Some(ty) {
             return Ok(());
         }
         let var = VarId::Param(i);
         let supplied = self.read_var(var, self.current)?;
         let conv = match ty {
-            HirType::Int => Some(varn_core::ValueConv::ExpectInt),
-            HirType::Float => Some(varn_core::ValueConv::ExpectFloat),
-            HirType::Bool => Some(varn_core::ValueConv::ExpectBool),
-            HirType::Str => Some(varn_core::ValueConv::ExpectStr),
-            HirType::Dynamic | HirType::Nullable(_) => return Ok(()),
-            HirType::Ref
-            | HirType::Array(_)
-            | HirType::Map(..)
-            | HirType::Set(_)
-            | HirType::Tuple
-            | HirType::Class(_) => None,
+            BackendTy::Int => Some(varn_core::ValueConv::ExpectInt),
+            BackendTy::Float => Some(varn_core::ValueConv::ExpectFloat),
+            BackendTy::Bool => Some(varn_core::ValueConv::ExpectBool),
+            BackendTy::Str => Some(varn_core::ValueConv::ExpectStr),
+            BackendTy::Dynamic(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Void
+            | BackendTy::Never => return Ok(()),
+            BackendTy::Char
+            | BackendTy::Bytes
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_) => None,
         };
         let typed = match conv {
             Some(conv) => self.emit(

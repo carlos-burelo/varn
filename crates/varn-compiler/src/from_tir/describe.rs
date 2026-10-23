@@ -136,7 +136,9 @@ impl<'m> Describer<'m> {
                 | DynReason::Declared
                 | DynReason::Awaitable(_)
                 | DynReason::Yields(_)
-                | DynReason::NotYetSupported,
+                | DynReason::NotYetSupported
+                | DynReason::Boxed
+                | DynReason::Runtime,
             ) => TypeDesc::Any,
         }
     }

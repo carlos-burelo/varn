@@ -1,5 +1,4 @@
 use super::context::{Builder, Result};
-use crate::hir::HirType;
 use crate::ssa::ir::{Block, BlockId, Inst, InstKind, Terminator, Value, ValueDef, VarId};
 use varn_tir::BackendTy;
 
@@ -18,13 +17,13 @@ impl<'m> Builder<'m> {
         id
     }
 
-    pub(super) fn new_value(&mut self, ty: HirType) -> Value {
+    pub(super) fn new_value(&mut self, ty: BackendTy) -> Value {
         let v = Value(self.values.len() as u32);
         self.values.push(ValueDef { ty });
         v
     }
 
-    pub(super) fn value_ty(&self, v: Value) -> HirType {
+    pub(super) fn value_ty(&self, v: Value) -> BackendTy {
         self.values[v.0 as usize].ty
     }
 
@@ -64,7 +63,7 @@ impl<'m> Builder<'m> {
         self.block_mut(block).preds.push(pred);
     }
 
-    pub(super) fn emit(&mut self, kind: InstKind, ty: HirType) -> Value {
+    pub(super) fn emit(&mut self, kind: InstKind, ty: BackendTy) -> Value {
         let dest = self.new_value(ty);
         let line = self.cur_line;
         self.block_mut(self.current).insts.push(Inst {
@@ -122,7 +121,7 @@ impl<'m> Builder<'m> {
         Ok(val)
     }
 
-    pub(super) fn add_block_param(&mut self, block: BlockId, ty: HirType) -> Value {
+    pub(super) fn add_block_param(&mut self, block: BlockId, ty: BackendTy) -> Value {
         let v = self.new_value(ty);
         self.block_mut(block).params.push(v);
         v

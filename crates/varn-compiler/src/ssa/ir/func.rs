@@ -1,8 +1,8 @@
 use super::control::Terminator;
 use super::ids::{BlockId, Value};
 use super::ops::InstKind;
-use crate::hir::HirType;
 use std::sync::Arc;
+use varn_tir::BackendTy;
 
 #[derive(Debug)]
 pub struct SsaFunc {
@@ -42,7 +42,7 @@ impl SsaFunc {
         id
     }
 
-    pub fn value_ty(&self, v: Value) -> HirType {
+    pub fn value_ty(&self, v: Value) -> BackendTy {
         self.values[v.0 as usize].ty
     }
 

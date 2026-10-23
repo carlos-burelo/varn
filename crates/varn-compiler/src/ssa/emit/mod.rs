@@ -4,6 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
 use varn_core::OpCode;
+use varn_tir::BackendTy;
 use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, PolyICSlot};
 
 mod effects;
@@ -87,7 +88,7 @@ pub(crate) fn emit_function_meta(
 
     let imms = immediates::plan_immediates(&ssa);
 
-    let value_tys: Vec<crate::hir::HirType> = ssa.values.iter().map(|v| v.ty).collect();
+    let value_tys: Vec<BackendTy> = ssa.values.iter().map(|v| v.ty).collect();
 
     let mut pos_of = vec![usize::MAX; n];
     for (i, &b) in order.iter().enumerate() {
@@ -246,7 +247,7 @@ fn emit_inst(
     chunk: &mut Chunk,
     inst: &Inst,
 
-    value_tys: &[crate::hir::HirType],
+    value_tys: &[BackendTy],
     reg: &[u8],
     scratch: u8,
     call_base: u8,

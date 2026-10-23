@@ -1,7 +1,8 @@
 use super::const_fold::is_constant_kind;
-use crate::hir::{HirBinOp, HirType, HirUnOp};
+use crate::hir::{HirBinOp, HirUnOp};
 use crate::ssa::ir::InstKind;
 use varn_core::{add_int, mul_int, neg_int, pow_int, sub_int};
+use varn_tir::{BackendTy, DynReason};
 
 pub(super) fn fold_convert(conv: varn_core::ValueConv, operand: &InstKind) -> Option<InstKind> {
     use varn_core::ValueConv::*;
@@ -18,7 +19,7 @@ pub(super) fn fold_convert(conv: varn_core::ValueConv, operand: &InstKind) -> Op
     }
 }
 
-pub(super) fn fold_unary(op: HirUnOp, operand: &InstKind, _ty: HirType) -> Option<InstKind> {
+pub(super) fn fold_unary(op: HirUnOp, operand: &InstKind, _ty: BackendTy) -> Option<InstKind> {
     match (op, operand) {
         (HirUnOp::Neg, InstKind::ConstInt(x)) => neg_int(*x).map(InstKind::ConstInt),
         (HirUnOp::Neg, InstKind::ConstFloat(x)) => Some(InstKind::ConstFloat(-x)),
@@ -32,7 +33,7 @@ pub(super) fn fold_binary(
     op: HirBinOp,
     lhs: &InstKind,
     rhs: &InstKind,
-    _ty: HirType,
+    _ty: BackendTy,
 ) -> Option<InstKind> {
     use HirBinOp::*;
     match (lhs, rhs) {
@@ -139,16 +140,18 @@ pub(super) fn fold_binary(
     }
 }
 
-pub(super) fn const_inst_ty(kind: &InstKind) -> Option<HirType> {
+pub(super) fn const_inst_ty(kind: &InstKind) -> Option<BackendTy> {
     match kind {
-        InstKind::ConstInt(_) => Some(HirType::Int),
-        InstKind::ConstFloat(_) => Some(HirType::Float),
-        InstKind::ConstBool(_) => Some(HirType::Bool),
-        InstKind::ConstStr(_) => Some(HirType::Str),
+        InstKind::ConstInt(_) => Some(BackendTy::Int),
+        InstKind::ConstFloat(_) => Some(BackendTy::Float),
+        InstKind::ConstBool(_) => Some(BackendTy::Bool),
+        InstKind::ConstStr(_) => Some(BackendTy::Str),
 
-        InstKind::ConstChar(_) => Some(HirType::Ref),
-        InstKind::ConstDecimal(_) | InstKind::ConstBigInt(_) => Some(HirType::Dynamic),
-        InstKind::ConstNull => Some(HirType::Dynamic),
+        InstKind::ConstChar(_) => Some(BackendTy::Char),
+        InstKind::ConstDecimal(_) | InstKind::ConstBigInt(_) => {
+            Some(BackendTy::Dynamic(DynReason::Boxed))
+        }
+        InstKind::ConstNull => Some(BackendTy::Dynamic(DynReason::Boxed)),
         InstKind::Binary { .. }
         | InstKind::Unary { .. }
         | InstKind::LoadGlobal(_)

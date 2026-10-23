@@ -1,7 +1,8 @@
 use super::context::{Builder, Result};
-use crate::hir::{HirType, LocalId};
+use crate::hir::LocalId;
 use crate::ssa::ir::{InstKind, Terminator, Value, VarId};
 use crate::OptError;
+use varn_tir::{BackendTy, DynReason};
 use varn_tir::{Resolution, TirExpr, TirExprKind};
 
 impl<'m> Builder<'m> {
@@ -92,20 +93,20 @@ impl<'m> Builder<'m> {
                 let obj = self.lower_expr(object)?;
                 let idx = self.lower_expr(index)?;
                 let kind = if matches!(object.ty, varn_tir::BackendTy::Bytes)
-                    && matches!(self.value_ty(idx), HirType::Int | HirType::Dynamic)
+                    && matches!(self.value_ty(idx), BackendTy::Int | BackendTy::Dynamic(_))
                 {
                     InstKind::BytesSetIndex {
                         object: obj,
                         index: idx,
                         value,
                     }
-                } else if matches!(self.value_ty(obj), HirType::Array(_)) {
+                } else if matches!(self.value_ty(obj), BackendTy::Array(_)) {
                     InstKind::ArraySetIndex {
                         object: obj,
                         index: idx,
                         value,
                     }
-                } else if matches!(self.value_ty(obj), HirType::Map(_, _)) {
+                } else if matches!(self.value_ty(obj), BackendTy::Map(..) | BackendTy::Dict(_)) {
                     InstKind::MapSetIndex {
                         object: obj,
                         index: idx,
@@ -171,7 +172,7 @@ impl<'m> Builder<'m> {
         }
     }
 
-    pub(super) fn load_var(&mut self, var: VarId, ty: HirType) -> Result<Value> {
+    pub(super) fn load_var(&mut self, var: VarId, ty: BackendTy) -> Result<Value> {
         if self.pinned.contains(&var) {
             let ty = self.var_ty.get(&var).copied().unwrap_or(ty);
             Ok(self.emit(InstKind::LoadCaptured { var }, ty))
@@ -180,7 +181,7 @@ impl<'m> Builder<'m> {
         }
     }
 
-    pub(super) fn lower_var(&mut self, res: &Resolution, ty: HirType) -> Result<Value> {
+    pub(super) fn lower_var(&mut self, res: &Resolution, ty: BackendTy) -> Result<Value> {
         match res {
             Resolution::Local(id) => self.load_var(VarId::Local(LocalId(id.0)), ty),
             Resolution::Param(i) => {
@@ -228,7 +229,7 @@ impl<'m> Builder<'m> {
         cond: Value,
         then_val: &TirExpr,
         else_val: &TirExpr,
-        ty: HirType,
+        ty: BackendTy,
     ) -> Result<Value> {
         let then_blk = self.new_block();
         let else_blk = self.new_block();
@@ -274,10 +275,12 @@ impl<'m> Builder<'m> {
     }
 }
 
-fn native_global_ty(index: u32) -> HirType {
+fn native_global_ty(index: u32) -> BackendTy {
     use varn_core::abi::{NativeValue, NATIVE_GLOBALS};
     match NATIVE_GLOBALS.get(index as usize).map(|g| g.value) {
-        Some(NativeValue::Float) => HirType::Float,
-        Some(NativeValue::Class | NativeValue::Function) | None => HirType::Ref,
+        Some(NativeValue::Float) => BackendTy::Float,
+        Some(NativeValue::Class | NativeValue::Function) | None => {
+            BackendTy::Dynamic(DynReason::Runtime)
+        }
     }
 }
