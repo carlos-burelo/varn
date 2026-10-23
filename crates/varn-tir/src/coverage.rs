@@ -8,7 +8,7 @@ pub struct Coverage {
     pub nodes: u32,
 
     dynamics: [u32; 12],
-    by_name: [u32; 11],
+    by_name: [u32; 12],
     pub static_dispatch: u32,
     pub name_dispatch: u32,
 }
