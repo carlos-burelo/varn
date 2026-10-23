@@ -53,6 +53,18 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   paso real de A2: representar las clases core en la tabla de clases de TIR.
 - Trampa medida: `guard_dynamic` sobre el valor de `for await (const msg of rx)`
   cuelga `tests/47`; el binding tipado va sin guarda.
+- Hecho (2da tanda): `collect_foreign_classes/enums` se siembran con todo tipo
+  alcanzable (expr, símbolos, anotaciones), así `catch (e)` es `Class(Error)`;
+  parámetros con default/desestructurados llevan el tipo de la firma; el valor
+  capturado crudo es `Dynamic(Runtime)`; `null` y los argumentos ausentes usan
+  `NULL_TY = Nullable(Never)`. NYS en `tests/*.vn`: 1634 -> 863.
+- Perfil de lo que queda (por nodo TIR): Var Local ~295 (bindings de payload de
+  variantes, `match_pattern`), Var global/native ~147 (slots de funciones de namespace
+  sin tipo: `Json::parse`, `Task::all`), Call/MethodCall ~160, Index 54, Yield 52.
+- Cimiento mayor pendiente: `lower_kind` baja todo `TypeKind::Fn` a `Dynamic(Callable)`
+  (9609 nodos) aunque `BackendTy::Fn(SigId)` existe; el sitio de llamada vuelve a
+  derivar la firma (`callee_signature`) del checker. Requiere que el internador de
+  firmas viva en `TyTable` para que `lower_type` pueda producir `Fn(SigId)` (Ley 6).
 - Aparte: `Dynamic(Callable)` aparece 9491 veces; un `Fn(SigId)` estático es el
   mayor candidato a ganancia de rendimiento tras A2.
 
