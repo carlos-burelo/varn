@@ -27,6 +27,20 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   de `NotYetSupported` llega a 0 y la variante se borra.
 - Se borra: la variante y los sitios; cada sitio pasa a su tipo real o a una
   razón con nombre (`HostBoundary`, `Union`, …).
+- Línea base (2026-10-23, `vn debug -p tir:check` sobre `tests/*.vn`):
+  nodos dinámicos por razón: función 9491, `NotYetSupported` 1634, task 1327,
+  declared 1105, object 447, union 294, generator 89.
+- Sitios más calientes (llamadas a `NotYetSupported` por `vn check tests/*.vn`):
+  `ty/lower.rs:23` (`opaque()`), `body/scope.rs:46-47`, `module_globals.rs:109`,
+  `body/stmt_decl.rs:258`, `body/expr_closure.rs:28,37,167`, `functions.rs:216-217`.
+- Causas dentro de `opaque()`: parámetros de tipo genéricos (`T`,`A`,`B`: ~2200),
+  interfaces y alias no objeto (`HasId`, `Printable`, `Options`, `Profile`, `Link`),
+  y tipos de nivel de tipo sin resolver (`This`, `Intersection`, `TemplateLiteral`).
+- Orden: (1) razón propia para parámetros de tipo borrados; (2) alias/interfaces
+  no objeto se bajan por su destino con guarda de recursión; (3) defaults de
+  `scope.rs`/`closure` se sustituyen por el tipo del checker; (4) borrar la variante.
+- Aparte: `Dynamic(Callable)` aparece 9491 veces; un `Fn(SigId)` estático es el
+  mayor candidato a ganancia de rendimiento tras A2.
 
 ### A3. Inferencia solo en el checker
 - Hallazgo: binder (`type_infer_*`) y checker (`infer_*`) infieren expresiones.
