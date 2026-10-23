@@ -215,7 +215,6 @@ impl<'r> super::super::Binder<'r> {
                         });
                     }
 
-                    self.escape_all_open_array_candidates();
                     self.bind_stmt(body);
                 }
                 ClassMember::Setter {
@@ -231,7 +230,6 @@ impl<'r> super::super::Binder<'r> {
                         key: *key,
                         body,
                     });
-                    self.escape_all_open_array_candidates();
                     self.bind_stmt(body);
                     let ty = param.type_ann.as_ref().map(|ann| self.resolve_type(ann));
                     self.bind_pattern(

@@ -115,9 +115,6 @@ pub struct BindResult {
     pub core: Option<Arc<CoreMembers>>,
     #[serde(skip)]
     pub pending_enrich: Vec<PendingEnrich>,
-
-    #[serde(skip, default)]
-    pub evolved_array_types: FxHashMap<u32, Type>,
     #[serde(skip, default)]
     pub user_decorators: FxHashSet<u32>,
     #[serde(skip, default)]

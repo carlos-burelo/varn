@@ -79,8 +79,6 @@ impl<'r> Binder<'r> {
             pending_enrich: Vec::new(),
             reported_type_forms: Default::default(),
             reported_params: Default::default(),
-            array_watch: Vec::new(),
-            evolved_array_types: FxHashMap::default(),
             type_decls: FxHashMap::default(),
             pending_decorator_roles: Vec::new(),
             user_decorators: rustc_hash::FxHashSet::default(),
@@ -104,7 +102,6 @@ impl<'r> Binder<'r> {
         }
 
         b.bind_stmts(&program.body);
-        b.finalize_array_watch(global);
         b.resolve_decorator_roles();
         Arc::make_mut(&mut b.ty_table).absorb_names(&b.interner);
         let type_param_variance = super::variance::compute_type_param_variance(&b);
@@ -132,7 +129,6 @@ impl<'r> Binder<'r> {
             extensions: b.extensions,
             core: None,
             pending_enrich: b.pending_enrich,
-            evolved_array_types: b.evolved_array_types,
             user_decorators: b.user_decorators,
             namespace_imports: b.namespace_imports,
             declared_type_names: b.declared_type_names,

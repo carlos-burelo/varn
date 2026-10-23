@@ -16,8 +16,6 @@ impl<'r> Binder<'r> {
 
         let line = range.start.line;
 
-        self.escape_all_open_array_candidates();
-
         let child = self.scopes.child(ScopeKind::Function, self.current);
         let saved = self.current;
         self.current = child;
@@ -26,7 +24,6 @@ impl<'r> Binder<'r> {
         self.bind_function_params(params, line);
 
         self.bind_stmt(body);
-        self.finalize_array_watch(child);
         self.current = saved;
     }
 
@@ -38,14 +35,11 @@ impl<'r> Binder<'r> {
     ) {
         use varn_sem::scope::ScopeKind;
 
-        self.escape_all_open_array_candidates();
-
         let child = self.scopes.child(ScopeKind::Function, self.current);
         let saved = self.current;
         self.current = child;
         self.bind_function_params(params, range.start.line);
         self.bind_expr(body);
-        self.finalize_array_watch(child);
         self.current = saved;
     }
 

@@ -69,7 +69,6 @@ impl<'r> Binder<'r> {
                 let saved = self.current;
                 self.current = child;
                 self.bind_stmts(stmts);
-                self.finalize_array_watch(child);
                 self.current = saved;
             }
             StmtKind::If {
@@ -116,7 +115,6 @@ impl<'r> Binder<'r> {
                     self.bind_expr(*u);
                 }
                 self.bind_stmt(body);
-                self.finalize_array_watch(child);
                 self.current = saved;
             }
             StmtKind::ForIn {
@@ -133,7 +131,6 @@ impl<'r> Binder<'r> {
                 self.bind_pattern(left, SymbolKind::Let, line, None, None, false);
                 self.bind_expr(right);
                 self.bind_stmt(body);
-                self.finalize_array_watch(child);
                 self.current = saved;
             }
             StmtKind::Switch {
@@ -167,7 +164,6 @@ impl<'r> Binder<'r> {
                         self.bind_pattern(p, SymbolKind::Let, block_line, None, ty, explicit);
                     }
                     self.bind_stmt(clause.body);
-                    self.finalize_array_watch(child);
                     self.current = saved;
                 }
                 if let Some(fin) = finally {

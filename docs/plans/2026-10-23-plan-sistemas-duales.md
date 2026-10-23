@@ -108,22 +108,18 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   `varn-sem` (capa de tipos), de modo que el checker deje de depender del binder
   para ellos. Segundo: cortar la inferencia del binder a lo que es resolución de
   nombres (identificador/miembro para herencia) y que el checker infiera el resto.
-- Experimento 2 (2026-10-23): `infer_expr_type_self` restringido a `Identifier`/`Member`/
-  `Paren` pasa `tests/main.vn` (3798/0, quick+JIT) pero **degrada en silencio**: el binder
-  usa la inferencia para tres funciones que no son resolución de nombres y que el runtime
-  no distingue: (1) evolución de arrays (`let a = []` + `push(int)` → `Array<int>`,
-  `array_evolve.rs` + `decls_array.rs`, consumido por `checker/refine.rs:evolved_array_of`),
-  (2) `PendingEnrich` de variables sin tipo, (3) tipos provisionales de `const`/campos de
-  namespace/miembros de objeto. Con el recorte, toda escritura es `Dynamic` → conflicto →
-  el array queda sin tipo. La suite no lo ve (misma conducta en runtime): hay que medir
-  cobertura (`tir:check`/`Coverage::of`) antes y después de cualquier recorte.
-- Además el checker llama `varn_binder::infer_expr_type`, `infer_new` y `build_fn_type`
-  (`member_binary.rs`, `checker_call_types*`) y `typeof` en tipos usa el mismo motor: el
-  motor no es del binder, está en el crate equivocado. Segundo paso real: (a) mover el
-  motor a la capa del checker/sem, (b) mover evolución de arrays, enrich y tipos
-  provisionales al checker con un pre-pase por función (el checker necesita ver las
-  escrituras posteriores antes de fijar el tipo de la declaración), (c) dejar en el binder
-  solo `Identifier`/`Member` para herencia.
+- CORRECCIÓN (2026-10-23): la evolución de arrays que el "Experimento 2" creía perdida
+  estaba muerta de punta a punta: `TypeEntry.refined` (que `refine()` llenaba desde
+  `evolved_array_types`) no lo leía ningún consumidor. Borrada (`array_evolve.rs`,
+  `decls_array.rs`, `refine.rs`, `refined`, `evolved_array_types`): `check:types` y
+  `typeloss` idénticos en los 250 tests. Efecto real: `let a = []` + `push(1)` sigue
+  siendo `dynamic[]`; la inferencia de elemento de arrays vacíos NO existe y es deuda de
+  cimiento (Ley 14), a diseñar en el checker con flujo, no con un side-channel.
+- Lo que el recorte de la inferencia del binder sí cambia (medido con `check:types`,
+  6 tests): (1) miembros `const` de un namespace (`Rates.bonus` pasa de `int` a
+  `dynamic`), (2) `const f = (n: int) => ... f(n-1)`: el tipo de la flecha recursiva
+  (`fib` en tests/37), (3) campos de objetos literales en `ui-declarative`/`ui-reactive`.
+  Esos tres son los consumidores reales que el checker debe cubrir antes de cortar.
 - HECHO (paso a, 7abf324d): resolución de tipos e inferencia de expresiones viven en
   `varn-sem` (`resolve/`, `infer/`); binder y checker los importan de la capa baja. Matriz
   quick 3798/0. Falta (b) y (c).

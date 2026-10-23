@@ -43,19 +43,12 @@ impl<'r> Checker<'r> {
             _ => None,
         };
 
-        let refined = self.refine(rec, expr, bind);
-        debug_assert!(
-            refined.as_ref().is_none_or(|r| !r.is_dynamic()),
-            "a refinement must tell codegen MORE than the checked type, and              `dynamic` is the absence of information"
-        );
-
         let seq = rec.next_seq();
 
         rec.expr_table.insert(
             expr.index(),
             varn_sem::output::TypeEntry {
                 ty,
-                refined,
                 symbol_id,
                 start,
                 end,

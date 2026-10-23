@@ -148,19 +148,15 @@ impl<'r> super::Binder<'r> {
                 self.bind_expr(left);
                 self.bind_expr(right);
             }
-            ExprKind::Assign { op, target, value } => {
-                let (op, target, value) = (*op, *target, *value);
-                if !self.bind_array_index_write(op, target, value) {
-                    self.bind_expr(target);
-                    self.bind_expr(value);
-                }
+            ExprKind::Assign { target, value, .. } => {
+                let (target, value) = (*target, *value);
+                self.bind_expr(target);
+                self.bind_expr(value);
             }
             ExprKind::Call { callee, args, .. } => {
                 let callee = *callee;
-                if !self.bind_array_push_call(callee, args) {
-                    self.bind_expr(callee);
-                    self.bind_args(args);
-                }
+                self.bind_expr(callee);
+                self.bind_args(args);
             }
             ExprKind::New { callee, args, .. } => {
                 self.bind_expr(*callee);
@@ -183,11 +179,9 @@ impl<'r> super::Binder<'r> {
                 ..
             } => {
                 let (object, property, computed) = (*object, *property, *computed);
-                if !self.bind_array_whitelisted_member(object, property, computed) {
-                    self.bind_expr(object);
-                    if computed {
-                        self.bind_expr(property);
-                    }
+                self.bind_expr(object);
+                if computed {
+                    self.bind_expr(property);
                 }
             }
             ExprKind::Paren { expression } => self.bind_expr(*expression),
@@ -226,11 +220,9 @@ impl<'r> super::Binder<'r> {
                             );
                         }
                         ObjectProp::Getter { body, .. } => {
-                            self.escape_all_open_array_candidates();
                             self.bind_stmt(*body);
                         }
                         ObjectProp::Setter { body, .. } => {
-                            self.escape_all_open_array_candidates();
                             self.bind_stmt(*body);
                         }
                         ObjectProp::Spread { argument, .. } => self.bind_expr(*argument),
@@ -285,7 +277,6 @@ impl<'r> super::Binder<'r> {
                         MatchBody::Expr(e) => self.bind_expr(*e),
                         MatchBody::Block(stmt) => self.bind_stmt(*stmt),
                     }
-                    self.finalize_array_watch(child);
                     self.current = saved;
                 }
                 self.match_arm_scopes.insert(subject.index(), arm_scopes);
@@ -309,7 +300,6 @@ impl<'r> super::Binder<'r> {
             }
 
             ExprKind::Identifier { name } => {
-                self.escape_array_candidate(*name);
                 let range = arena.expr(id).range;
                 self.check_local_class_capture(*name, range);
             }

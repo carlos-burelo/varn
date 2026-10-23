@@ -6,7 +6,6 @@ use varn_sem::scope::{ScopeArena, ScopeId};
 use varn_sem::symbol::SymbolArena;
 use varn_sem::types::Type;
 
-mod array_evolve;
 mod binder_entry;
 mod binder_intern;
 mod binder_stmts;
@@ -20,7 +19,6 @@ mod context;
 pub mod core;
 mod decl_values;
 mod decls;
-mod decls_array;
 mod decls_fn;
 pub(crate) mod decorator_attrs;
 mod definite_field_assignment;
@@ -61,9 +59,6 @@ pub struct Binder<'r> {
     pub(crate) pending_enrich: Vec<PendingEnrich>,
     reported_type_forms: rustc_hash::FxHashSet<u32>,
     reported_params: rustc_hash::FxHashSet<u32>,
-    pub(crate) array_watch: Vec<array_evolve::ArrayCandidate>,
-
-    pub(crate) evolved_array_types: FxHashMap<u32, Type>,
 
     pub(crate) type_decls: FxHashMap<Arc<str>, (varn_sem::scope::ScopeId, varn_core::SourceRange)>,
 

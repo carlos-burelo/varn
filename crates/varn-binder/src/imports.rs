@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, ImportDecl, ImportSpecifier, Pattern};
+use varn_core::ast::{ExportDecl, ExportDefaultDecl, ImportDecl, ImportSpecifier};
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::symbol::{Symbol, SymbolKind};
 
@@ -191,28 +191,14 @@ impl<'r> super::Binder<'r> {
         match e {
             ExportDecl::Decl { declaration, .. } => {
                 self.bind_decl(declaration);
-
-                if let Decl::Variable(v) = declaration.as_ref() {
-                    for d in &v.declarators {
-                        if let Pattern::Identifier { name, .. } = &d.id {
-                            self.escape_array_candidate(*name);
-                        }
-                    }
-                }
             }
             ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
                 ExportDefaultDecl::Function(f) => self.bind_function(f),
                 ExportDefaultDecl::Class(c) => self.bind_class(c),
-
-                ExportDefaultDecl::Expr(_) => self.escape_all_open_array_candidates(),
+                ExportDefaultDecl::Expr(_) => {}
             },
 
-            ExportDecl::Named {
-                specifiers, source, ..
-            } => {
-                for s in specifiers {
-                    self.escape_array_candidate(s.local);
-                }
+            ExportDecl::Named { source, .. } => {
                 if let Some(source) = source
                     && self.check_reexport_layer(*source, e.range())
                 {

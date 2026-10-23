@@ -16,7 +16,6 @@ pub struct ExprInfo {
 #[derive(Clone, Debug)]
 pub struct TypeEntry {
     pub ty: Type,
-    pub refined: Option<Type>,
     pub start: u32,
     pub end: u32,
     pub seq: u32,

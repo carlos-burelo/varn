@@ -20,7 +20,6 @@ mod literal_fit;
 mod param_defaults;
 mod profile;
 pub(crate) mod recorder;
-mod refine;
 mod scope_records;
 mod setup;
 mod stages;
