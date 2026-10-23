@@ -3,8 +3,8 @@ use egui::{
     epaint::ClippedPrimitive,
     scroll_area::State as ScrollState,
     text::{CCursor, CCursorRange},
-    Align2, Button, Color32, Context, Event, FontId, Key, Rect as ERect, RawInput,
-    ScrollArea, Sense, Slider, TexturesDelta, Ui, UiBuilder,
+    Align2, Button, Color32, Context, Event, FontId, Key, RawInput, Rect as ERect, ScrollArea,
+    Sense, Slider, TexturesDelta, Ui, UiBuilder,
 };
 
 use super::quad::{Activation, Body, Clip, Control, ControlKind, Feedback, Rect, Run, TextChange};
@@ -28,14 +28,7 @@ pub struct Pass {
     pub feedback: Feedback,
 }
 
-pub fn pass(
-    ctx: &Context,
-    events: Vec<Event>,
-    time: f64,
-    w: u32,
-    h: u32,
-    runs: &[Run],
-) -> Pass {
+pub fn pass(ctx: &Context, events: Vec<Event>, time: f64, w: u32, h: u32, runs: &[Run]) -> Pass {
     let input = RawInput {
         screen_rect: Some(ERect::from_min_size(
             pos2(0.0, 0.0),
@@ -104,7 +97,10 @@ fn paint_switch(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
         corner(knob / 2.0),
         Color32::WHITE,
     );
-    response.clicked().then_some(Activation { id: c.id, value: 0.0 })
+    response.clicked().then_some(Activation {
+        id: c.id,
+        value: 0.0,
+    })
 }
 
 fn paint_scroll(ui: &mut Ui, rect: ERect, c: &Control) -> Option<Activation> {
@@ -164,7 +160,8 @@ fn paint_field(ui: &mut Ui, rect: ERect, c: &Control, feedback: &mut Feedback) {
     if state.model != c.text {
         state.model = c.text.clone();
         state.text = c.text.clone();
-        let mut edit_state = egui::text_edit::TextEditState::load(ui.ctx(), edit_id).unwrap_or_default();
+        let mut edit_state =
+            egui::text_edit::TextEditState::load(ui.ctx(), edit_id).unwrap_or_default();
         let end = state.text.chars().count();
         edit_state
             .cursor
@@ -237,7 +234,10 @@ fn paint_control(ui: &mut Ui, c: &Control, feedback: &mut Feedback) {
                         .min_size(vec2(c.w, c.h)),
                 )
                 .clicked()
-                .then_some(Activation { id: c.id, value: 0.0 }),
+                .then_some(Activation {
+                    id: c.id,
+                    value: 0.0,
+                }),
             ControlKind::Switch => paint_switch(ui, rect, c),
             ControlKind::Slider => {
                 let mut v = c.value;
@@ -253,7 +253,10 @@ fn paint_control(ui: &mut Ui, c: &Control, feedback: &mut Feedback) {
             ControlKind::Surface => ui
                 .interact(rect, ui.scope_id().with("surface"), Sense::click())
                 .clicked()
-                .then_some(Activation { id: c.id, value: 0.0 }),
+                .then_some(Activation {
+                    id: c.id,
+                    value: 0.0,
+                }),
             ControlKind::Field | ControlKind::Area => None,
         })
         .inner;

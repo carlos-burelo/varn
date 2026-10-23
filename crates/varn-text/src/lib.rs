@@ -52,9 +52,8 @@ pub fn fonts() -> Vec<String> {
 
 pub fn shape_run(text: &str, size: f32) -> Result<ShapedRun, String> {
     check_size(size, "shape")?;
-    let galley = layout_context().fonts_mut(|f| {
-        f.layout_no_wrap(text.to_string(), font(size), Color32::WHITE)
-    });
+    let galley = layout_context()
+        .fonts_mut(|f| f.layout_no_wrap(text.to_string(), font(size), Color32::WHITE));
     let mut glyphs = Vec::new();
     for row in &galley.rows {
         for g in &row.glyphs {
@@ -71,9 +70,8 @@ pub fn shape_run(text: &str, size: f32) -> Result<ShapedRun, String> {
 
 fn line_metrics(size: f32, op: &str) -> Result<(f32, f32), String> {
     check_size(size, op)?;
-    let galley = layout_context().fonts_mut(|f| {
-        f.layout_no_wrap("Hg".to_string(), font(size), Color32::WHITE)
-    });
+    let galley = layout_context()
+        .fonts_mut(|f| f.layout_no_wrap("Hg".to_string(), font(size), Color32::WHITE));
     let row = galley
         .rows
         .first()
@@ -98,9 +96,8 @@ pub fn wrap_lines(text: &str, size: f32, max_width: f32) -> Result<Vec<String>, 
     if text.is_empty() {
         return Ok(Vec::new());
     }
-    let galley = layout_context().fonts_mut(|f| {
-        f.layout(text.to_string(), font(size), Color32::WHITE, max_width)
-    });
+    let galley = layout_context()
+        .fonts_mut(|f| f.layout(text.to_string(), font(size), Color32::WHITE, max_width));
     Ok(galley
         .rows
         .iter()

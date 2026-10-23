@@ -105,7 +105,9 @@ pub fn present_draw(
         if let Some(warm) = &warm {
             for (id, deltas) in &warm.set {
                 for delta in deltas {
-                    backend.renderer.update_texture(&shared.device, &shared.queue, *id, delta);
+                    backend
+                        .renderer
+                        .update_texture(&shared.device, &shared.queue, *id, delta);
                 }
             }
         }

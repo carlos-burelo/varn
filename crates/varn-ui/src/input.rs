@@ -1,4 +1,6 @@
-use egui::{Event, Key, Modifiers, MouseWheelSource, MouseWheelUnit, PointerButton, Pos2, TouchPhase, Vec2};
+use egui::{
+    Event, Key, Modifiers, MouseWheelSource, MouseWheelUnit, PointerButton, Pos2, TouchPhase, Vec2,
+};
 
 use super::events::{
     RealEvent, KEY_ARROW_DOWN, KEY_ARROW_LEFT, KEY_ARROW_RIGHT, KEY_ARROW_UP, KEY_BACKSPACE,
@@ -31,7 +33,12 @@ fn button(code: i64) -> Option<PointerButton> {
 
 pub fn push(e: &RealEvent, out: &mut Vec<Event>) {
     match *e {
-        RealEvent::Mouse { x, y, button: code, pressed } => {
+        RealEvent::Mouse {
+            x,
+            y,
+            button: code,
+            pressed,
+        } => {
             let pos = Pos2::new(x as f32, y as f32);
             out.push(Event::PointerMoved(pos));
             if let Some(button) = button(code) {

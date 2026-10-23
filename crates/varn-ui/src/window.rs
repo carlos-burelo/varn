@@ -7,8 +7,8 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::platform::pump_events::{EventLoopExtPumpEvents, PumpStatus};
 use winit::window::{Window, WindowAttributes, WindowId};
 
-use super::quad::Feedback;
 use super::events::{button_code, key_code, pressed, RealEvent};
+use super::quad::Feedback;
 use super::render;
 
 const LINE_PX: f64 = 40.0;
@@ -362,7 +362,8 @@ impl ApplicationHandler for PumpApp {
                             let configured = &mut st.configured;
                             if let Some(surface) = st.surface.as_ref() {
                                 let stale = frame.size != size;
-                                let runs: &[super::comp::Run] = if stale { &[] } else { &frame.runs };
+                                let runs: &[super::comp::Run] =
+                                    if stale { &[] } else { &frame.runs };
                                 st.presented = super::comp::present_draw(
                                     &shared,
                                     surface,
