@@ -90,6 +90,15 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   ~7 ns de una clase (250 ms por 5M). Ampliar la comprobación de clase del helper JIT
   `jit_call_method_cached_window` a `EnumVariant` no cambió nada: el sitio no llega
   a la IC porque nunca registra entrada para receptores enum. Causa sin localizar.
+- Causa localizada (traza en `call_method`): la IC del intérprete SÍ acierta para
+  receptores enum (4 999 999 de 5 000 000), pero el guard inline del JIT
+  (`from_ssa/call/method.rs`) solo reconoce celdas planas `CELL_KIND_INSTANCE` y lee el
+  id de clase del layout de instancia; un `EnumVariantData` es un objeto de heap con
+  `Arc<VariantDef>` y `Vec` de slots, sin id de clase en la celda. Por eso todo
+  método de enum cae al `jit_call_method_window` genérico (decodifica nombre, plantilla
+  de variante, intrínsecos) y luego al IC del intérprete. Cerrarlo exige un layout plano
+  de variante de enum (celda tipo instancia con id de clase y slots inline); un helper
+  intermedio solo recortaría una parte de los ~50 ns.
 - Candidatos a cimiento, en orden: (1) accesores de clase (getter/setter) con slot
   estático en la tabla de métodos; (2) formas (`Shape`) con layout fijo; (3) cola de
   receptores NYS.
