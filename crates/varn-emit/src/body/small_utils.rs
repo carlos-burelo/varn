@@ -2,7 +2,7 @@ use std::sync::Arc;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{AstArena, ExprId, Pattern, PropKey, StmtId, StmtKind};
 use varn_core::AtomInterner;
-use varn_tir::{BackendTy, DynReason, Resolution, Span, TirBinOp, TirExpr, TirExprKind};
+use varn_tir::{BackendTy, Resolution, Span, TirBinOp, TirExpr, TirExprKind};
 
 pub(super) fn pattern_lead(p: &Pattern, interner: &AtomInterner) -> Arc<str> {
     match p {
@@ -22,10 +22,10 @@ pub(super) fn span_of(ast_arena: &AstArena, e: ExprId) -> Span {
     }
 }
 
-pub(super) fn placeholder(reason: DynReason) -> TirExpr {
+pub(super) fn placeholder() -> TirExpr {
     TirExpr {
         kind: TirExprKind::NullLit,
-        ty: BackendTy::Dynamic(reason),
+        ty: crate::ty::NULL_TY,
         res: Resolution::None,
         span: Span::EMPTY,
     }

@@ -3,7 +3,7 @@ use super::context::FnEmitter;
 use crate::NameResolver;
 use std::sync::Arc;
 use varn_core::ast::{Arg, AstId, ExprId, ExprKind};
-use varn_tir::{BackendTy, DynReason, Resolution, Span, TirArg, TirExpr, TirExprKind};
+use varn_tir::{BackendTy, Resolution, Span, TirArg, TirExpr, TirExprKind};
 
 impl FnEmitter<'_> {
     pub(super) fn namespace_path(&mut self, e: ExprId) -> Option<Arc<str>> {
@@ -90,7 +90,7 @@ impl FnEmitter<'_> {
             while targs.len() < arity as usize {
                 targs.push(TirArg::Expr(TirExpr {
                     kind: TirExprKind::NullLit,
-                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                    ty: crate::ty::NULL_TY,
                     res: Resolution::None,
                     span: Span::EMPTY,
                 }));

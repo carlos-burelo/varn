@@ -1,7 +1,7 @@
 use super::call_contract::Callee;
 use super::context::FnEmitter;
 use varn_core::ast::{Arg, AstId, ExprId, ExprKind};
-use varn_tir::{BackendTy, DynReason, Resolution, Span, TirArg, TirExpr, TirExprKind, TirUnOp};
+use varn_tir::{BackendTy, Resolution, Span, TirArg, TirExpr, TirExprKind, TirUnOp};
 
 impl<'a> FnEmitter<'a> {
     pub(super) fn lower_call(
@@ -93,7 +93,7 @@ impl<'a> FnEmitter<'a> {
                 while targs.len() < arity as usize {
                     targs.push(TirArg::Expr(TirExpr {
                         kind: TirExprKind::NullLit,
-                        ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                        ty: crate::ty::NULL_TY,
                         res: Resolution::None,
                         span: Span::EMPTY,
                     }));

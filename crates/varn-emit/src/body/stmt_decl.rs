@@ -305,7 +305,7 @@ impl<'a> FnEmitter<'a> {
                 | pat @ Pattern::Rest { .. } => {
                     let src = match d.init {
                         Some(init) => self.lower_expr(init),
-                        None => placeholder(DynReason::NotYetSupported),
+                        None => placeholder(),
                     };
                     out.extend(std::mem::take(&mut self.pending));
                     let src = self.hoist(src);

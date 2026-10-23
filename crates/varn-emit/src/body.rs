@@ -401,7 +401,7 @@ impl<'a> FnEmitter<'a> {
             },
             None => TirExpr {
                 kind: TirExprKind::NullLit,
-                ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                ty: crate::ty::NULL_TY,
                 res: Resolution::None,
                 span,
             },

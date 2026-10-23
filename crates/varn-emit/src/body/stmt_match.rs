@@ -85,7 +85,7 @@ impl<'a> FnEmitter<'a> {
                 then_body.extend(self.lower_stmt_as_block(*stmt));
                 TirExpr {
                     kind: TirExprKind::NullLit,
-                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                    ty: crate::ty::NULL_TY,
                     res: Resolution::None,
                     span: s.span,
                 }

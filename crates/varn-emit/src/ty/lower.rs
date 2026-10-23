@@ -6,6 +6,8 @@ use varn_tir::{BackendTy, DynReason, TyTable};
 
 pub(super) const NEVER_TY: varn_tir::TyId = varn_tir::TyId(0);
 
+pub const NULL_TY: BackendTy = BackendTy::Nullable(NEVER_TY);
+
 pub fn lower_type(
     ty: &Type,
     table: &CheckerTyTable,
@@ -232,7 +234,7 @@ fn lower_primitive(p: LangPrimitive) -> BackendTy {
         LangPrimitive::BigInt => BackendTy::BigInt,
         LangPrimitive::Void => BackendTy::Void,
         LangPrimitive::Never => BackendTy::Never,
-        LangPrimitive::Null => BackendTy::Nullable(NEVER_TY),
+        LangPrimitive::Null => NULL_TY,
         LangPrimitive::Dynamic => BackendTy::Dynamic(DynReason::Declared),
     }
 }

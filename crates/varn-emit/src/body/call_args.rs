@@ -2,7 +2,7 @@ use super::context::FnEmitter;
 use crate::ty::lower_type;
 use std::sync::Arc;
 use varn_core::ast::{Arg, AstId};
-use varn_tir::{BackendTy, DynReason, Resolution, Span, TirArg, TirExpr, TirExprKind};
+use varn_tir::{BackendTy, Resolution, Span, TirArg, TirExpr, TirExprKind};
 
 impl<'a> FnEmitter<'a> {
     pub(super) fn lower_arg(&mut self, a: &Arg) -> TirArg {
@@ -118,7 +118,7 @@ impl<'a> FnEmitter<'a> {
                         },
                         None => TirArg::Expr(TirExpr {
                             kind: TirExprKind::NullLit,
-                            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                            ty: crate::ty::NULL_TY,
                             res: Resolution::None,
                             span: Span::EMPTY,
                         }),
