@@ -67,4 +67,4 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 - Escribir 5 programas `.vn` reales; registrar fricciones; priorizar.
 
 ## Estado
-- [ ] D1  - [ ] A1  - [ ] A2  - [ ] A3  - [ ] B1  - [ ] C1  - [ ] D2  - [ ] D3  - [ ] D4
+- [x] D1  - [x] A1  - [ ] A2  - [ ] A3  - [ ] B1  - [ ] C1  - [ ] D2  - [ ] D3  - [ ] D4
