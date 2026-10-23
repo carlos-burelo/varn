@@ -43,7 +43,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         None => crate::pipeline::read_source_file(path)?,
     };
     let debug_flags = varn_debug::flags::DebugFlags::default();
-    let session = varn_pipeline::resolver::Session::new();
+    let session = varn_pipeline::ModuleResolver::new();
 
     let read_samples = time_n(runs, || {
         match eval {
@@ -118,7 +118,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         &program,
         &arena,
         interner,
-        session.resolver(),
+        &session,
         varn_sem::output::CheckOptions::compile(),
     );
 
@@ -129,7 +129,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             &mut tir,
             &exports_of(&program_ref.filename, &session),
         );
-        varn_pipeline::resolve_import_slots(&mut tir, session.resolver(), &program_ref.filename);
+        varn_pipeline::resolve_import_slots(&mut tir, &session, &program_ref.filename);
         let (res, opt_dur) = varn_pipeline::compile_tir(
             &tir,
             export_names_of(&program_ref.filename, &session),
@@ -150,7 +150,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
     let mut final_tir = varn_pipeline::emit_tir(&program, &arena, &check_result);
     varn_pipeline::inject_star_reexports(&mut final_tir, &exports_of(&program.filename, &session));
-    varn_pipeline::resolve_import_slots(&mut final_tir, session.resolver(), &program.filename);
+    varn_pipeline::resolve_import_slots(&mut final_tir, &session, &program.filename);
     let (final_result, _) = varn_pipeline::compile_tir(
         &final_tir,
         export_names_of(&program.filename, &session),

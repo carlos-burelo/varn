@@ -11,7 +11,7 @@ use varn_sem::symbol::SymbolKind;
 pub fn run_pipeline(
     source: String,
     uri: String,
-    resolver: std::sync::Arc<varn_resolver::DiskResolver>,
+    resolver: std::sync::Arc<varn_resolver::ModuleResolver>,
 ) -> DocumentAnalysis {
     varn_builtins::register_provider();
     let path = uri_to_path(&uri);

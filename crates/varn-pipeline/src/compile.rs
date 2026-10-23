@@ -164,16 +164,14 @@ pub fn compile(
     check_result: CheckResult,
     verbose: bool,
     debug: &DebugFlags,
-    session: &crate::resolver::Session,
+    session: &crate::ModuleResolver,
     sink: &dyn crate::debug_sink::DebugSink,
 ) -> PipelineResult<CompileOutput> {
     if verbose {
         varn_core::term::terminal::tagged("Varn", "generating bytecode...");
     }
 
-    let exports = session
-        .resolver()
-        .module_exports(&program.filename, &mut vec![]);
+    let exports = session.module_exports(&program.filename, &mut vec![]);
     crate::compile::report_export_collisions(&exports, &program.filename)
         .map_err(PipelineError::fatal)?;
     let export_names = sorted_export_names(&exports);
@@ -188,7 +186,7 @@ pub fn compile(
     )
     .map_err(PipelineError::fatal)?;
     inject_star_reexports(&mut tir, &exports);
-    resolve_import_slots(&mut tir, session.resolver(), &program.filename);
+    resolve_import_slots(&mut tir, session, &program.filename);
     let (proto_result, _) = compile_tir(&tir, export_names, source, false);
     let proto = proto_result.map_err(|e| {
         PipelineError::fatal(format!(

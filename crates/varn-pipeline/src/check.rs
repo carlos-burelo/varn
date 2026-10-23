@@ -51,12 +51,11 @@ pub fn check(
     interner: varn_core::AtomInterner,
     source: &str,
     debug: &DebugFlags,
-    session: &crate::resolver::Session,
+    session: &crate::ModuleResolver,
     sink: &dyn crate::debug_sink::DebugSink,
 ) -> PipelineResult<CheckResult> {
     let options = varn_sem::output::CheckOptions::compile();
-    let check_result =
-        Checker::check_with(program, ast_arena, interner, session.resolver(), options);
+    let check_result = Checker::check_with(program, ast_arena, interner, session, options);
     report_diagnostics(&check_result.diagnostics, &program.filename, source)?;
 
     sink.check(program, source, &check_result, debug);
@@ -69,7 +68,7 @@ pub fn check(
 pub fn collect_test_targets(
     path: &str,
     source: &str,
-    session: &crate::resolver::Session,
+    session: &crate::ModuleResolver,
 ) -> PipelineResult<Vec<(String, bool)>> {
     let debug = DebugFlags::default();
     let sink = crate::debug_sink::NullSink;
@@ -77,7 +76,7 @@ pub fn collect_test_targets(
     let (program, arena, interner) =
         crate::parse::parse(tokens, lexeme_buf, source, path, false, &debug, &sink)?;
     let options = varn_sem::output::CheckOptions::compile();
-    let checked = Checker::check_with(&program, &arena, interner, session.resolver(), options);
+    let checked = Checker::check_with(&program, &arena, interner, session, options);
     if checked.diagnostics.has_errors() {
         report_diagnostics(&checked.diagnostics, &program.filename, source)?;
     }

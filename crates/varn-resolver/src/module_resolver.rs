@@ -2,7 +2,7 @@ use super::graph::ModuleGraph;
 use std::sync::Arc;
 use varn_core::ModuleId;
 
-pub struct DiskResolver {
+pub struct ModuleResolver {
     pub(super) loader: varn_modules::loader::ModuleRegistry,
     pub(super) graph: parking_lot::Mutex<ModuleGraph>,
 
@@ -12,13 +12,13 @@ pub struct DiskResolver {
     pub(super) core_members: parking_lot::Mutex<Option<Arc<varn_sem::cores::CoreMembers>>>,
 }
 
-impl Default for DiskResolver {
+impl Default for ModuleResolver {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl DiskResolver {
+impl ModuleResolver {
     pub fn new() -> Self {
         Self::with_registry(varn_modules::loader::default_registry())
     }

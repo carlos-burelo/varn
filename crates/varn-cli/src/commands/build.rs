@@ -10,7 +10,7 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
     let source = std::fs::read_to_string(&args.file)
         .map_err(|e| CliError::fatal(format!("cannot read '{}': {e}", args.file)))?;
 
-    let session = pipeline::resolver::Session::new();
+    let session = pipeline::ModuleResolver::new();
     let compiled = pipeline::compile_source_for_build(
         &source,
         &args.file,

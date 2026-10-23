@@ -1,11 +1,11 @@
-use super::resolver_disk::DiskResolver;
+use super::module_resolver::ModuleResolver;
 use std::path::Path;
 use std::sync::Arc;
 use varn_core::ModuleId;
 use varn_sem::bind::BindResult;
 use varn_sem::exports::ExportMap;
 
-impl DiskResolver {
+impl ModuleResolver {
     pub(super) fn module_exports_uncached(
         &self,
         abs_path: &str,

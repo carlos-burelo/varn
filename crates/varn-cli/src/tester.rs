@@ -217,7 +217,7 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
 }
 
 fn test_units(path: &PathBuf, display_name: &str) -> Vec<(String, Option<String>)> {
-    let session = pipeline::resolver::Session::new();
+    let session = pipeline::ModuleResolver::new();
     let file_unit = vec![(display_name.to_owned(), None)];
     let source = match std::fs::read_to_string(path) {
         Ok(s) => s,

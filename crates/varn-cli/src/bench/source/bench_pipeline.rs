@@ -2,7 +2,7 @@ use super::*;
 
 pub(super) fn export_names_of(
     filename: &str,
-    session: &varn_pipeline::resolver::Session,
+    session: &varn_pipeline::ModuleResolver,
 ) -> Vec<Arc<str>> {
     let exports = exports_of(filename, session);
     let mut names: Vec<Arc<str>> = exports.keys().map(|k| Arc::from(k.as_str())).collect();
@@ -12,9 +12,9 @@ pub(super) fn export_names_of(
 
 pub(super) fn exports_of(
     filename: &str,
-    session: &varn_pipeline::resolver::Session,
+    session: &varn_pipeline::ModuleResolver,
 ) -> std::sync::Arc<varn_sem::exports::ExportMap> {
-    session.resolver().module_exports(filename, &mut vec![])
+    session.module_exports(filename, &mut vec![])
 }
 pub(super) fn verbose_sections(
     factory: &VmFactory,

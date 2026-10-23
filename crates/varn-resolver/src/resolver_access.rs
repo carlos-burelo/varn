@@ -1,9 +1,9 @@
-use super::resolver_disk::DiskResolver;
+use super::module_resolver::ModuleResolver;
 use std::sync::Arc;
 use varn_sem::bind::BindResult;
 use varn_sem::exports::ExportMap;
 
-impl DiskResolver {
+impl ModuleResolver {
     pub(super) fn cached_bind(&self, key: &str) -> Option<Arc<BindResult>> {
         self.graph.lock().bind(key)
     }

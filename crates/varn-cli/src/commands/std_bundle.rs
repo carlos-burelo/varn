@@ -10,7 +10,7 @@ pub fn execute(args: StdBundleArgs) -> Result<(), CliError> {
         std::fs::create_dir_all(parent)
             .map_err(|e| CliError::fatal(format!("cannot create '{}': {e}", parent.display())))?;
     }
-    let session = varn_pipeline::resolver::Session::new();
+    let session = varn_pipeline::ModuleResolver::new();
     let bytes = varn_pipeline::stdlib_loader::compile_stdlib_image(&std_dir, &session)
         .map_err(CliError::fatal)?;
     std::fs::write(&out, &bytes)

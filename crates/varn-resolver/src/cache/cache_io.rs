@@ -11,7 +11,7 @@ pub(crate) struct CachedModule {
     pub(crate) bind: BindResult,
 }
 
-pub(super) fn get_cache_dir(resolver: &super::super::resolver_disk::DiskResolver) -> PathBuf {
+pub(super) fn get_cache_dir(resolver: &super::super::module_resolver::ModuleResolver) -> PathBuf {
     resolver.types_cache_dir()
 }
 
@@ -49,7 +49,7 @@ fn current_dep_hashes(bind: &BindResult) -> Option<Vec<(String, u64)>> {
 }
 
 pub(crate) fn try_load_cache(
-    resolver: &super::super::resolver_disk::DiskResolver,
+    resolver: &super::super::module_resolver::ModuleResolver,
     virtual_id: &str,
     source: &str,
 ) -> Option<CachedModule> {
@@ -74,7 +74,7 @@ pub(crate) fn try_load_cache(
 }
 
 pub(crate) fn adopt_interface(
-    resolver: &super::super::resolver_disk::DiskResolver,
+    resolver: &super::super::module_resolver::ModuleResolver,
     virtual_id: &str,
     interface: &[u8],
 ) -> Option<CachedModule> {
@@ -93,7 +93,7 @@ pub(crate) fn adopt_interface(
 }
 
 fn adopt_dependencies(
-    resolver: &super::super::resolver_disk::DiskResolver,
+    resolver: &super::super::module_resolver::ModuleResolver,
     virtual_id: &str,
     bind: &mut BindResult,
 ) {
@@ -119,7 +119,7 @@ fn adopt_dependencies(
 }
 
 pub(crate) fn save_to_cache(
-    resolver: &super::super::resolver_disk::DiskResolver,
+    resolver: &super::super::module_resolver::ModuleResolver,
     virtual_id: &str,
     source: &str,
     exports: &ExportMap,

@@ -45,7 +45,7 @@ fn build_module_graph_resolves_named_reexport_origin_module_without_panicking() 
     let source = fs::read_to_string(&entry_path).expect("read entry.vn");
     let entry_str = entry_path.to_string_lossy().into_owned();
 
-    let session = varn_pipeline::resolver::Session::new();
+    let session = varn_pipeline::ModuleResolver::new();
     let compiled = varn_pipeline::compile_source_for_build(
         &source,
         &entry_str,

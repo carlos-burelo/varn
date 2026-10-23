@@ -9,7 +9,7 @@ use varn_sem::resolver::ImportResolver;
 pub fn generate_auto_imports_action(
     state: &DocumentState,
     index: Option<&ProjectIndex>,
-    resolver: &varn_resolver::DiskResolver,
+    resolver: &varn_resolver::ModuleResolver,
     uri: &tower_lsp_f::lsp_types::Uri,
     diag: &Diagnostic,
 ) -> Vec<CodeActionResponse> {

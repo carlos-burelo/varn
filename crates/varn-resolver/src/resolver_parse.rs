@@ -1,4 +1,4 @@
-use super::resolver_disk::DiskResolver;
+use super::module_resolver::ModuleResolver;
 use std::path::Path;
 use std::sync::Arc;
 use varn_sem::bind::BindResult;
@@ -11,7 +11,7 @@ pub(super) struct ParsedModule {
     pub(super) interner: varn_core::AtomInterner,
 }
 
-impl DiskResolver {
+impl ModuleResolver {
     pub(super) fn parse_and_cache(&self, source: &str, key: &str) -> Option<ParsedModule> {
         let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, key);
         let (program, interner, arena) =

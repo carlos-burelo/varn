@@ -183,7 +183,7 @@ fn find<'a>(proto: &'a FunctionProto, name: &str) -> Option<&'a FunctionProto> {
 
 #[test]
 fn portable_ssa_and_bytecode_share_cache_slots() {
-    let session = varn_pipeline::resolver::Session::new();
+    let session = varn_pipeline::ModuleResolver::new();
     let module =
         varn_pipeline::stdlib_loader::compile_source(SOURCE, "ic_slots_agree.vn", &session)
             .expect("compiles");

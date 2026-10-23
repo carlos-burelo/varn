@@ -39,7 +39,7 @@ impl Driver {
             .map_err(|e| format!("cannot resolve '{program}': {e}"))?;
         let source = std::fs::read_to_string(&canonical)
             .map_err(|e| format!("cannot read '{canonical}': {e}"))?;
-        let session = varn_pipeline::resolver::Session::new();
+        let session = varn_pipeline::ModuleResolver::new();
         let compiled = compile_source_for_build(
             &source,
             &canonical,

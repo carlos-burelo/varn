@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::path::PathBuf;
-use varn_resolver::DiskResolver;
+use varn_resolver::ModuleResolver;
 use varn_sem::resolver::ImportResolver;
 
 fn scratch_dir(tag: &str) -> PathBuf {
@@ -33,7 +33,7 @@ fn imported_symbol_origin_module_resolves_to_the_real_module_path() {
     )
     .expect("write main.vn");
 
-    let resolver = DiskResolver::new();
+    let resolver = ModuleResolver::new();
     let main_str = main_path.to_string_lossy().into_owned();
     let bind = resolver
         .module_bind(&main_str)

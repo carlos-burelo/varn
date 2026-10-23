@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::path::PathBuf;
-use varn_resolver::DiskResolver;
+use varn_resolver::ModuleResolver;
 use varn_sem::resolver::ImportResolver;
 
 fn scratch_dir(tag: &str) -> PathBuf {
@@ -29,7 +29,7 @@ fn symbol_names_survive_disk_cache_across_fresh_resolvers() {
     .expect("write greeter.vn");
     let lib_str = lib_path.to_string_lossy().into_owned();
 
-    let resolver1 = DiskResolver::new();
+    let resolver1 = ModuleResolver::new();
     let bind1 = resolver1
         .module_bind(&lib_str)
         .expect("greeter.vn must bind");
@@ -39,7 +39,7 @@ fn symbol_names_survive_disk_cache_across_fresh_resolvers() {
         bind1.diagnostics.errors().collect::<Vec<_>>()
     );
 
-    let resolver2 = DiskResolver::new();
+    let resolver2 = ModuleResolver::new();
     let bind2 = resolver2
         .module_bind(&lib_str)
         .expect("greeter.vn must bind from cache on a fresh resolver");
@@ -75,5 +75,5 @@ fn symbol_names_survive_disk_cache_across_fresh_resolvers() {
 #[test]
 fn disk_resolver_is_send_and_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<varn_resolver::DiskResolver>();
+    assert_send_sync::<varn_resolver::ModuleResolver>();
 }

@@ -11,7 +11,7 @@ use varn_vm::loader::{ModuleError, ModuleLoader};
 pub struct PipelineLoader {
     registry: varn_modules::loader::ModuleRegistry,
     protos: Mutex<ProtoBytesCache>,
-    session: crate::resolver::Session,
+    session: crate::ModuleResolver,
 }
 
 type ProtoBytesCache = FxHashMap<String, (u64, Arc<[u8]>)>;
@@ -21,7 +21,7 @@ impl PipelineLoader {
         Self {
             registry: varn_modules::loader::default_registry(),
             protos: Mutex::new(FxHashMap::default()),
-            session: crate::resolver::Session::new(),
+            session: crate::ModuleResolver::new(),
         }
     }
 
@@ -99,7 +99,7 @@ impl ModuleLoader for PipelineLoader {
 pub fn compile_source(
     source: &str,
     path: &str,
-    session: &crate::resolver::Session,
+    session: &crate::ModuleResolver,
 ) -> Result<FunctionProto, String> {
     compile_source_inner(source, path, false, session)
 }
@@ -107,7 +107,7 @@ pub fn compile_source(
 pub fn compile_source_checked(
     source: &str,
     path: &str,
-    session: &crate::resolver::Session,
+    session: &crate::ModuleResolver,
 ) -> Result<FunctionProto, String> {
     compile_source_inner(source, path, true, session)
 }
@@ -116,10 +116,10 @@ fn compile_source_inner(
     source: &str,
     path: &str,
     reject_type_errors: bool,
-    session: &crate::resolver::Session,
+    session: &crate::ModuleResolver,
 ) -> Result<FunctionProto, String> {
     let (program, arena, interner) = crate::quiet_parse::parse_module(source, path)?;
-    let check = varn_checker::Checker::check(&program, &arena, interner, session.resolver());
+    let check = varn_checker::Checker::check(&program, &arena, interner, session);
     if reject_type_errors && check.diagnostics.has_errors() {
         let mut msg = String::new();
         for d in check.diagnostics.errors() {
@@ -130,7 +130,7 @@ fn compile_source_inner(
         }
         return Err(format!("type errors in stdlib module:{msg}"));
     }
-    let resolver = session.resolver();
+    let resolver = session;
     let exports = if varn_core::ModuleKind::of(path).is_some() {
         resolver.stdlib_exports(path)
     } else {
@@ -149,7 +149,7 @@ fn compile_source_inner(
             .map(|s| s.as_ref()),
     )?;
     crate::compile::inject_star_reexports(&mut tir, &exports);
-    crate::compile::resolve_import_slots(&mut tir, session.resolver(), path);
+    crate::compile::resolve_import_slots(&mut tir, session, path);
     let (result, _) = crate::compile::compile_tir(&tir, export_names, source, false);
     result
 }
@@ -214,7 +214,7 @@ fn std_units(std_dir: &std::path::Path) -> Result<Vec<ImageUnit>, String> {
 
 pub fn compile_stdlib_image(
     std_dir: &std::path::Path,
-    session: &crate::resolver::Session,
+    session: &crate::ModuleResolver,
 ) -> Result<Vec<u8>, String> {
     struct Compiled {
         unit: ImageUnit,
@@ -241,7 +241,7 @@ pub fn compile_stdlib_image(
             },
         };
 
-        let resolver = session.resolver();
+        let resolver = session;
         let interface = if varn_sem::codec::has_portable_interface(id) {
             let exports = resolver.stdlib_exports(id);
             let Some(bind) = resolver.stdlib_bind(id) else {

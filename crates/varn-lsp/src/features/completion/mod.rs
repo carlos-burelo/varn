@@ -31,7 +31,7 @@ pub use reflection::build_reflection_completions;
 
 pub fn build_completion_response(
     state: &DocumentState,
-    resolver: &varn_resolver::DiskResolver,
+    resolver: &varn_resolver::ModuleResolver,
     line: u32,
     col: u32,
     trigger_char: Option<&str>,

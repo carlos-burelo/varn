@@ -6,8 +6,8 @@ use std::mem::size_of;
 use varn_lsp::pipeline::run_pipeline;
 use varn_sem::resolver::ImportResolver;
 
-fn test_resolver() -> std::sync::Arc<varn_resolver::DiskResolver> {
-    std::sync::Arc::new(varn_resolver::DiskResolver::new())
+fn test_resolver() -> std::sync::Arc<varn_resolver::ModuleResolver> {
+    std::sync::Arc::new(varn_resolver::ModuleResolver::new())
 }
 use varn_lsp::workspace::Workspace;
 
@@ -177,7 +177,7 @@ fn h10_evict_heavy_keeps_exports_drops_artifacts() {
 
 #[test]
 fn h10b_module_bind_rederives_after_evict() {
-    use varn_resolver::DiskResolver;
+    use varn_resolver::ModuleResolver;
     use varn_sem::resolver::ImportResolver;
 
     let dir = std::env::temp_dir().join(format!("varn-h10b-{}", std::process::id()));
@@ -189,7 +189,7 @@ fn h10b_module_bind_rederives_after_evict() {
         .to_string_lossy()
         .into_owned();
 
-    let resolver = DiskResolver::new();
+    let resolver = ModuleResolver::new();
     let first = resolver.module_bind(&key);
     assert!(
         first.is_some(),

@@ -14,7 +14,7 @@ fn suite() -> Vec<(String, FunctionProto)> {
         .filter(|p| p.extension().is_some_and(|x| x == "vn"))
         .collect();
     files.sort();
-    let session = varn_pipeline::resolver::Session::new();
+    let session = varn_pipeline::ModuleResolver::new();
     files
         .into_iter()
         .filter_map(|path| {

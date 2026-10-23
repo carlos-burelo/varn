@@ -9,7 +9,7 @@ use crate::pipeline::run_pipeline;
 use crate::query::exports::{ExportedSymbol, ModuleExports};
 use dashmap::DashMap;
 use std::sync::{Arc, RwLock};
-use varn_resolver::DiskResolver;
+use varn_resolver::ModuleResolver;
 
 pub use revision::{Cached, Revision};
 
@@ -19,7 +19,7 @@ pub struct Workspace {
     pub db: Arc<Database>,
     pub index: RwLock<ProjectIndex>,
     revision: RwLock<Revision>,
-    resolver: Arc<DiskResolver>,
+    resolver: Arc<ModuleResolver>,
 }
 
 impl Workspace {
@@ -30,15 +30,15 @@ impl Workspace {
             db: Arc::new(Database::new()),
             index: RwLock::new(ProjectIndex::new()),
             revision: RwLock::new(Revision::new()),
-            resolver: Arc::new(DiskResolver::new()),
+            resolver: Arc::new(ModuleResolver::new()),
         }
     }
 
-    pub fn resolver(&self) -> &DiskResolver {
+    pub fn resolver(&self) -> &ModuleResolver {
         &self.resolver
     }
 
-    pub fn resolver_handle(&self) -> Arc<DiskResolver> {
+    pub fn resolver_handle(&self) -> Arc<ModuleResolver> {
         Arc::clone(&self.resolver)
     }
 

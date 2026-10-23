@@ -111,7 +111,7 @@ pub struct DocumentState {
 
     pub db: SemanticDB,
 
-    pub resolver: std::sync::Arc<varn_resolver::DiskResolver>,
+    pub resolver: std::sync::Arc<varn_resolver::ModuleResolver>,
 
     pub import_paths: Vec<String>,
     pub spatial_index: crate::query::SpatialIndex,

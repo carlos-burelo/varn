@@ -12,7 +12,7 @@ mod opts;
 mod parse;
 pub mod portable;
 mod quiet_parse;
-pub mod resolver;
+pub use varn_resolver::ModuleResolver;
 pub mod stdlib_loader;
 
 mod class_link;
@@ -50,7 +50,7 @@ pub fn read_source_file(path: &str) -> PipelineResult<String> {
 }
 
 pub fn run(opts: &RunOpts, sink: &dyn debug_sink::DebugSink) -> PipelineResult<()> {
-    let session = resolver::Session::new();
+    let session = ModuleResolver::new();
     if portable::is_portable(&opts.file_path) {
         return run_portable(opts);
     }
@@ -123,7 +123,7 @@ pub fn compile_source_for_build(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
-    session: &resolver::Session,
+    session: &ModuleResolver,
     sink: &dyn debug_sink::DebugSink,
 ) -> PipelineResult<CompileOutput> {
     compile_source(source, path, verbose, debug, session, sink)
@@ -134,7 +134,7 @@ fn compile_source(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
-    session: &resolver::Session,
+    session: &ModuleResolver,
     sink: &dyn debug_sink::DebugSink,
 ) -> PipelineResult<CompileOutput> {
     let canonical_path = std::path::Path::new(path)
@@ -164,7 +164,7 @@ fn compile_source_cached(
     source: &str,
     path: &str,
     verbose: bool,
-    session: &resolver::Session,
+    session: &ModuleResolver,
     sink: &dyn debug_sink::DebugSink,
 ) -> PipelineResult<CompileOutput> {
     let cache_path = cache::compile_cache_path(path);

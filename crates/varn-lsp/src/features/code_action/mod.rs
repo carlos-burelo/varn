@@ -17,7 +17,7 @@ pub fn build_code_action(
     params: CodeActionParams,
     state: Option<&DocumentState>,
     index: Option<&ProjectIndex>,
-    resolver: &varn_resolver::DiskResolver,
+    resolver: &varn_resolver::ModuleResolver,
 ) -> Option<Vec<CodeActionResponse>> {
     let mut actions = Vec::new();
     let uri = &params.text_document.uri;

@@ -27,7 +27,7 @@ pub fn build_module_graph(
     entry_path: &str,
     entry_proto: &FunctionProto,
     entry_interner: &varn_core::AtomInterner,
-    session: &crate::resolver::Session,
+    session: &crate::ModuleResolver,
 ) -> Result<ModuleGraphBuild, String> {
     let canonical_entry = varn_modules::canonical_or_original(Path::new(entry_path));
 
@@ -207,13 +207,13 @@ pub fn build_module_graph(
             program,
             arena,
             interner.clone(),
-            session.resolver(),
+            session,
             varn_sem::output::CheckOptions::compile(),
         );
 
         crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)
             .map_err(|e| e.message)?;
-        let resolver = session.resolver();
+        let resolver = session;
         let exports = if varn_core::ModuleKind::of(&program.filename).is_some() {
             resolver.stdlib_exports(&program.filename)
         } else {
@@ -232,7 +232,7 @@ pub fn build_module_graph(
                 .map(|s| s.as_ref()),
         )?;
         crate::compile::inject_star_reexports(&mut tir, &exports);
-        crate::compile::resolve_import_slots(&mut tir, session.resolver(), &program.filename);
+        crate::compile::resolve_import_slots(&mut tir, session, &program.filename);
         class_tables.insert(
             module_path.clone(),
             crate::class_link::ModuleClasses {

@@ -1,4 +1,4 @@
-use super::resolver_disk::DiskResolver;
+use super::module_resolver::ModuleResolver;
 use std::path::Path;
 use std::sync::Arc;
 use varn_core::ModuleId;
@@ -6,7 +6,7 @@ use varn_sem::bind::BindResult;
 use varn_sem::exports::ExportMap;
 use varn_sem::resolver::ImportResolver;
 
-impl ImportResolver for DiskResolver {
+impl ImportResolver for ModuleResolver {
     fn evict_heavy(&self) -> (usize, usize, usize) {
         self.graph.lock().evict_heavy()
     }
