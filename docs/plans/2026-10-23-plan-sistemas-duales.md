@@ -81,9 +81,15 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   tipo de la propiedad. Medido (quick, JIT, 20M iteraciones): lectura de getter
   1880 ms -> 130 ms; escritura por setter 2064 ms -> 149 ms; método plano 130-160 ms.
   Antes el getter caía en un `invoke` reentrante del helper JIT (`get_property_value`).
-- Pendiente de esa línea: accesores de enums (`enums.rs` aún usa `fresh_sig`), accesores
-  heredados de clases foráneas (sin entrada `get x` en `ForeignClass`), y lectura de
-  getter bajo `?.`.
+- Cerrado también: accesores de clases foráneas (`ForeignClass.accessors`; get 143 ms,
+  set 220 ms por 20M, una subclase local de una foránea 131 ms), accesores y métodos de
+  enums (`EnumInfo.members`, firmas del checker, el verificador acepta ranura de vtable
+  en receptor enum; getter 733 -> 250 ms por 5M) y getter bajo `?.` (ya resolvía
+  estático).
+- Abierto, distinto de los accesores: llamar un método de enum cuesta ~50 ns frente a
+  ~7 ns de una clase (250 ms por 5M). Ampliar la comprobación de clase del helper JIT
+  `jit_call_method_cached_window` a `EnumVariant` no cambió nada: el sitio no llega
+  a la IC porque nunca registra entrada para receptores enum. Causa sin localizar.
 - Candidatos a cimiento, en orden: (1) accesores de clase (getter/setter) con slot
   estático en la tabla de métodos; (2) formas (`Shape`) con layout fijo; (3) cola de
   receptores NYS.
