@@ -104,4 +104,13 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 - Escribir 5 programas `.vn` reales; registrar fricciones; priorizar.
 
 ## Estado
-- [x] D1  - [x] A1  - [ ] A2  - [ ] A3  - [ ] B1  - [ ] C1  - [ ] D2  - [ ] D3  - [ ] D4
+- [x] D1  - [x] A1  - [~] A2 (Generic, callables, bindings; falta representar clases core)
+- [~] A3 (helpers movidos a varn-sem, widen_literal borrado; falta cortar la inferencia
+  del binder a resolución de nombres)
+- [x] B1 (Session borrado, DiskResolver -> ModuleResolver; los tres caminos de
+  parse/bind/collect comparten parse_and_cache/bind_and_cache/collect, no se funden más:
+  separar bind de exports evita recursión en ciclos de imports)
+- [~] C1 medido: GetProperty 5142, Eq 3512, CallMethod 420 genéricos en `tests/`;
+  nacen de objetos con forma (`Shape`), valores `Error` y uniones. No se pueden borrar
+  las rutas por nombre hasta que formas/uniones/clases core tengan tipo estático
+- [ ] D2 (decisión del dueño)  - [ ] D3 (decisión del dueño)  - [ ] D4
