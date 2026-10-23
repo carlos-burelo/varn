@@ -73,6 +73,17 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   277+44, `Class` 392 (casi todo getters/setters: `value`, `size`, `current`,
   `doubled`, `celsius`; los accesores no tienen slot estático en `ClassInfo`),
   `Enum` 234, `Dynamic(Declared)` 118.
+- HECHO (accesores): `ClassObj` tenía tres tripletas paralelas (método/getter/setter x
+  mapa/vtable/dueños); ahora hay una sola tabla de miembros con clave canónica
+  `AccessorKind::key` (varn-core). Las lecturas y escrituras de accesores de una clase
+  conocida se resuelven estáticamente como llamadas al accesor. Los accesores salían con
+  `fresh_sig` (firma toda NYS, retorno boxed): ahora usan la firma construida desde el
+  tipo de la propiedad. Medido (quick, JIT, 20M iteraciones): lectura de getter
+  1880 ms -> 130 ms; escritura por setter 2064 ms -> 149 ms; método plano 130-160 ms.
+  Antes el getter caía en un `invoke` reentrante del helper JIT (`get_property_value`).
+- Pendiente de esa línea: accesores de enums (`enums.rs` aún usa `fresh_sig`), accesores
+  heredados de clases foráneas (sin entrada `get x` en `ForeignClass`), y lectura de
+  getter bajo `?.`.
 - Candidatos a cimiento, en orden: (1) accesores de clase (getter/setter) con slot
   estático en la tabla de métodos; (2) formas (`Shape`) con layout fijo; (3) cola de
   receptores NYS.
