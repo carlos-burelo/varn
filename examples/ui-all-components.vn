@@ -10,7 +10,6 @@ type Task = { id: int, title: str, done: bool };
 const name = signal("");
 const notes = signal("");
 const volume = signal(0.6);
-const dark = signal(true);
 const notify = signal(false);
 const choice = signal(0);
 const tab = signal(0);
@@ -64,9 +63,9 @@ function controls(): Widget {
     return Card([
         Title("Form controls"),
         Field(name, hint: "Your name"),
-        Row([Checkbox(notify), Text("Notify me")], gap: 10.0),
-        Row([Switch(dark), Text(dark.value ? "Dark" : "Light")], gap: 10.0),
-        Row([Slider(volume, low: 0.0, high: 1.0, h: 28.0), Text(`${volume.value}`)], gap: 12.0),
+        Checkbox(notify, label: "Notify me"),
+        Row([Switch(Theme.dark, label: Theme.dark.value ? "Dark" : "Light")], gap: 10.0),
+        Row([Expanded(Slider(volume, low: 0.0, high: 1.0, h: 28.0)), Text(`${volume.value}`)], gap: 12.0),
         Progress(volume.value),
         Segmented(["Small", "Medium", "Large"], choice),
         Select(["red", "green", "blue"], pick, menuOpen, 40.0)
