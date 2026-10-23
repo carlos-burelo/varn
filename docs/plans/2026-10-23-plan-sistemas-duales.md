@@ -124,6 +124,9 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   provisionales al checker con un pre-pase por función (el checker necesita ver las
   escrituras posteriores antes de fijar el tipo de la declaración), (c) dejar en el binder
   solo `Identifier`/`Member` para herencia.
+- HECHO (paso a, 7abf324d): resolución de tipos e inferencia de expresiones viven en
+  `varn-sem` (`resolve/`, `infer/`); binder y checker los importan de la capa baja. Matriz
+  quick 3798/0. Falta (b) y (c).
 - Hallazgo: binder (`type_infer_*`) y checker (`infer_*`) infieren expresiones.
 - Ganancia: un motor; el binder deja de conocer tipos semánticos (AGENTS §3).
 - Verificación: suite 4 cuadrantes; diagnósticos del LSP sin regresión.
