@@ -57,6 +57,15 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   mayor candidato a ganancia de rendimiento tras A2.
 
 ### A3. Inferencia solo en el checker
+- Experimento (2026-10-23): anular `infer_expr_type_self` rompe la std en el primer
+  `extends` (`StdError` no resuelve a `Error`): el binder usa su inferencia como
+  resolución de nombre→tipo para herencia, tipos provisionales de `const`, arrays
+  evolutivos y namespaces. No es solo duplicación: el checker además reutiliza
+  `numeric_operand`, `adopt_literal_operands`, `widen_literal` del binder.
+- Paso seguro, a hacer primero: mover esos helpers puros de álgebra de tipos a
+  `varn-sem` (capa de tipos), de modo que el checker deje de depender del binder
+  para ellos. Segundo: cortar la inferencia del binder a lo que es resolución de
+  nombres (identificador/miembro para herencia) y que el checker infiera el resto.
 - Hallazgo: binder (`type_infer_*`) y checker (`infer_*`) infieren expresiones.
 - Ganancia: un motor; el binder deja de conocer tipos semánticos (AGENTS §3).
 - Verificación: suite 4 cuadrantes; diagnósticos del LSP sin regresión.
