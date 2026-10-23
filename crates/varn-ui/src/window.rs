@@ -36,6 +36,7 @@ impl WindowState {
 struct DrawnFrame {
     clear: [f32; 4],
     runs: Vec<super::comp::Run>,
+    size: (u32, u32),
 }
 
 struct PendingCreate {
@@ -219,6 +220,7 @@ pub fn draw_now(
             st.last_draw = Some(DrawnFrame {
                 clear,
                 runs: runs.to_vec(),
+                size,
             });
         }
         Ok(hits)
@@ -359,6 +361,8 @@ impl ApplicationHandler for PumpApp {
                             let size = st.size;
                             let configured = &mut st.configured;
                             if let Some(surface) = st.surface.as_ref() {
+                                let stale = frame.size != size;
+                                let runs: &[super::comp::Run] = if stale { &[] } else { &frame.runs };
                                 st.presented = super::comp::present_draw(
                                     &shared,
                                     surface,
@@ -369,7 +373,7 @@ impl ApplicationHandler for PumpApp {
                                     size.1,
                                     configured,
                                     frame.clear,
-                                    &frame.runs,
+                                    runs,
                                     None,
                                 )
                                 .0;
