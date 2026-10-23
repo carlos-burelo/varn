@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use varn_core::ast::NamespaceDecl;
 
-use crate::pattern_lead_name;
+use varn_sem::infer::pattern_lead_name;
 use varn_sem::scope::ScopeKind;
 use varn_sem::symbol::{Symbol, SymbolKind};
 use varn_sem::types::Type;

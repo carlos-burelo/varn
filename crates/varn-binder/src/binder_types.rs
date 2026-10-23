@@ -1,7 +1,7 @@
-use super::type_inference::infer_expr_type;
-use super::type_resolution::resolve_type_node;
 use super::Binder;
 use varn_core::ast::TypeNode;
+use varn_sem::infer::infer_expr_type;
+use varn_sem::resolve::resolve_type_node;
 use varn_sem::types::{Type, TypeContext};
 
 impl<'r> Binder<'r> {

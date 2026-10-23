@@ -1,8 +1,8 @@
-use super::type_inference::pattern_lead_name;
 use super::Binder;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::ast::ClassMember;
+use varn_sem::infer::pattern_lead_name;
 use varn_sem::symbol::{Symbol, SymbolKind};
 use varn_sem::types::{ClassMemberInfo, ClassMemberKind};
 use varn_sem::types::{FunctionParam, FunctionType, Type};

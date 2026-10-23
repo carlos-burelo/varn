@@ -1,5 +1,5 @@
+use crate::types::{CheckerTyTable, Type, TypeContext};
 use varn_core::ast::TypeNode;
-use varn_sem::types::{CheckerTyTable, Type, TypeContext};
 
 use super::resolve_type_node;
 

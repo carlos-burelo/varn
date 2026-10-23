@@ -29,7 +29,7 @@ impl<'r> Checker<'r> {
                 let view =
                     varn_sem::bind::BindView::new(bind, self.resolver).at(self.current_scope);
                 let table = std::sync::Arc::make_mut(&mut self.ty_table);
-                let origin = varn_binder::nominal_origin(&class_name_str, Some(&view), table);
+                let origin = varn_sem::resolve::nominal_origin(&class_name_str, Some(&view), table);
                 if is_true_branch {
                     let named = Type::named_with_origin_atom(class_name, origin, table);
                     out.push((id, named));

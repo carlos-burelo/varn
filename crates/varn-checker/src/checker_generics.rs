@@ -4,10 +4,10 @@ use crate::checker_type_inferences::collect_type_inferences;
 use crate::generic_substitution::map_generics_cached;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
-use varn_binder::pattern_lead_name;
 use varn_core::ast::{Arg, ExprId, ExprKind, Param, TypeNode};
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
+use varn_sem::infer::pattern_lead_name;
 use varn_sem::symbol::SymbolKind;
 use varn_sem::types::{FunctionParam, FunctionType, Type};
 

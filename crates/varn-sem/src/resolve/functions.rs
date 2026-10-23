@@ -1,5 +1,5 @@
+use crate::types::{CheckerTyTable, FunctionType, Type, TypeContext};
 use varn_core::ast::{TypeNode, TypeParam};
-use varn_sem::types::{CheckerTyTable, FunctionType, Type, TypeContext};
 
 use super::names::resolve_atom_name;
 use super::resolve_type_node;
@@ -19,7 +19,7 @@ pub(super) fn resolve_fn_type(
                 .as_ref()
                 .map(|m| resolve_type_node(m, ctx, table))
                 .unwrap_or(Type::Dynamic);
-            varn_sem::types::FunctionParam {
+            crate::types::FunctionParam {
                 name: Some(resolve_atom_name(p.name, ctx, interner)),
                 ty: ty.0,
                 optional: false,

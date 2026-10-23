@@ -1,19 +1,19 @@
-use super::inference_utils::infer_object_member_type;
-use super::type_infer_expr::infer_expr_type;
+use super::expr::infer_expr_type;
+use super::signature::infer_object_member_type;
+use crate::types::{CheckerTyTable, Type};
 use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprId};
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, Type};
 
 pub(crate) fn ctx_resolve_text(
-    ctx: Option<&dyn varn_sem::types::TypeContext>,
+    ctx: Option<&dyn crate::types::TypeContext>,
     atom: varn_core::Atom,
 ) -> Option<String> {
     ctx?.atom_text(atom)
 }
 
 pub(crate) fn reintern_member_type(
-    ctx: Option<&dyn varn_sem::types::TypeContext>,
+    ctx: Option<&dyn crate::types::TypeContext>,
     origin: Option<&str>,
     ty: Type,
     table: &mut CheckerTyTable,
@@ -38,7 +38,7 @@ pub(crate) fn reintern_member_type(
     if !b.ty_table.contains(ty.0) {
         return ty;
     }
-    varn_sem::rehome::rehome_ty_with_origin(ty, &b.ty_table, b.source_file.as_ref(), table)
+    crate::rehome::rehome_ty_with_origin(ty, &b.ty_table, b.source_file.as_ref(), table)
 }
 
 pub(crate) fn infer_member(
@@ -46,7 +46,7 @@ pub(crate) fn infer_member(
     property: ExprId,
     computed: bool,
     arena: &AstArena,
-    ctx: Option<&dyn varn_sem::types::TypeContext>,
+    ctx: Option<&dyn crate::types::TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
     let obj_ty = infer_expr_type(object, arena, ctx, table);
@@ -61,10 +61,10 @@ pub(crate) fn infer_member(
                 .get_object_members(mid)
                 .iter()
                 .find_map(|m| match m {
-                    varn_sem::types::ObjectTypeMember::Index { value_ty, .. } => Some(*value_ty),
-                    varn_sem::types::ObjectTypeMember::Property { .. }
-                    | varn_sem::types::ObjectTypeMember::Method { .. }
-                    | varn_sem::types::ObjectTypeMember::Callable { .. } => None,
+                    crate::types::ObjectTypeMember::Index { value_ty, .. } => Some(*value_ty),
+                    crate::types::ObjectTypeMember::Property { .. }
+                    | crate::types::ObjectTypeMember::Method { .. }
+                    | crate::types::ObjectTypeMember::Callable { .. } => None,
                 })
                 .map(Type::resolved)
                 .unwrap_or(Type::Dynamic),
@@ -209,8 +209,8 @@ pub(crate) fn infer_member(
                 }
                 if prop_name == varn_core::MemberKey::Push.as_str() {
                     return Type::fn_(
-                        varn_sem::types::FunctionType {
-                            params: vec![varn_sem::types::FunctionParam {
+                        crate::types::FunctionType {
+                            params: vec![crate::types::FunctionParam {
                                 name: Some(Arc::from("item")),
                                 ty: inner,
                                 optional: false,

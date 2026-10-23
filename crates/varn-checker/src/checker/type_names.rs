@@ -106,7 +106,7 @@ impl<'r> Checker<'r> {
             return true;
         }
         let table = std::sync::Arc::make_mut(&mut self.ty_table);
-        if varn_binder::qualified_type(&text, Some(&view), table).is_some() {
+        if varn_sem::resolve::qualified_type(&text, Some(&view), table).is_some() {
             return true;
         }
         self.emit(

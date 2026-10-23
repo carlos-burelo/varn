@@ -28,7 +28,7 @@ pub(super) fn infer_member_type(
     };
 
     let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
-        return varn_binder::infer_expr_type(
+        return varn_sem::infer::infer_expr_type(
             expr,
             arena,
             Some(&varn_sem::bind::BindView::new(bind, checker.resolver)),
@@ -84,7 +84,7 @@ pub(super) fn infer_member_type(
         }
     }
 
-    varn_binder::infer_expr_type(
+    varn_sem::infer::infer_expr_type(
         expr,
         arena,
         Some(&varn_sem::bind::BindView::new(bind, checker.resolver)),

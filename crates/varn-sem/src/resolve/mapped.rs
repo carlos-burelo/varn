@@ -1,7 +1,7 @@
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 use std::sync::Arc;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 
 use super::contexts::{is_member_optional, MappedContext};
 use super::keyed_access::collect_type_keys;

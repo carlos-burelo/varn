@@ -1,7 +1,7 @@
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 use rustc_hash::FxHashMap;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 
 pub(super) struct InferBindingContext<'a> {
     pub(super) inner: Option<&'a dyn TypeContext>,
@@ -15,7 +15,7 @@ impl InferBindingContext<'_> {
 }
 
 impl TypeContext for InferBindingContext<'_> {
-    fn resolver(&self) -> Option<&dyn varn_sem::resolver::ImportResolver> {
+    fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
     }
 
@@ -46,9 +46,9 @@ impl TypeContext for InferBindingContext<'_> {
         self.inner.and_then(|c| c.symbol_origin(name))
     }
 
-    fn symbol_kind(&self, name: &str) -> Option<varn_sem::symbol::SymbolKind> {
+    fn symbol_kind(&self, name: &str) -> Option<crate::symbol::SymbolKind> {
         if self.binds_type_param(name) {
-            return Some(varn_sem::symbol::SymbolKind::TypeParameter);
+            return Some(crate::symbol::SymbolKind::TypeParameter);
         }
         self.inner.and_then(|c| c.symbol_kind(name))
     }
@@ -57,7 +57,7 @@ impl TypeContext for InferBindingContext<'_> {
         &self,
         name: &str,
         origin: Option<&str>,
-    ) -> Option<Vec<varn_sem::types::ClassMemberInfo>> {
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.inner
             .and_then(|c| c.get_interface_members(name, origin))
     }
@@ -66,7 +66,7 @@ impl TypeContext for InferBindingContext<'_> {
         &self,
         name: &str,
         origin: Option<&str>,
-    ) -> Option<Vec<varn_sem::types::ClassMemberInfo>> {
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.inner.and_then(|c| c.get_class_members(name, origin))
     }
 
@@ -74,7 +74,7 @@ impl TypeContext for InferBindingContext<'_> {
         &self,
         name: &str,
         origin: Option<&str>,
-    ) -> Option<Vec<varn_sem::types::ClassMemberInfo>> {
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.inner
             .and_then(|c| c.get_namespace_members(name, origin))
     }
@@ -151,7 +151,7 @@ impl MappedContext<'_> {
 }
 
 impl TypeContext for MappedContext<'_> {
-    fn resolver(&self) -> Option<&dyn varn_sem::resolver::ImportResolver> {
+    fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
     }
 
@@ -182,9 +182,9 @@ impl TypeContext for MappedContext<'_> {
         self.inner.and_then(|c| c.symbol_origin(name))
     }
 
-    fn symbol_kind(&self, name: &str) -> Option<varn_sem::symbol::SymbolKind> {
+    fn symbol_kind(&self, name: &str) -> Option<crate::symbol::SymbolKind> {
         if self.binds_type_param(name) {
-            return Some(varn_sem::symbol::SymbolKind::TypeParameter);
+            return Some(crate::symbol::SymbolKind::TypeParameter);
         }
         self.inner.and_then(|c| c.symbol_kind(name))
     }
@@ -193,7 +193,7 @@ impl TypeContext for MappedContext<'_> {
         &self,
         name: &str,
         origin: Option<&str>,
-    ) -> Option<Vec<varn_sem::types::ClassMemberInfo>> {
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.inner
             .and_then(|c| c.get_interface_members(name, origin))
     }
@@ -202,7 +202,7 @@ impl TypeContext for MappedContext<'_> {
         &self,
         name: &str,
         origin: Option<&str>,
-    ) -> Option<Vec<varn_sem::types::ClassMemberInfo>> {
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.inner.and_then(|c| c.get_class_members(name, origin))
     }
 
@@ -210,7 +210,7 @@ impl TypeContext for MappedContext<'_> {
         &self,
         name: &str,
         origin: Option<&str>,
-    ) -> Option<Vec<varn_sem::types::ClassMemberInfo>> {
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.inner
             .and_then(|c| c.get_namespace_members(name, origin))
     }
@@ -233,7 +233,7 @@ impl AliasSubstitutionContext<'_> {
 }
 
 impl TypeContext for AliasSubstitutionContext<'_> {
-    fn resolver(&self) -> Option<&dyn varn_sem::resolver::ImportResolver> {
+    fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
     }
 
@@ -264,9 +264,9 @@ impl TypeContext for AliasSubstitutionContext<'_> {
         self.inner.and_then(|c| c.symbol_origin(name))
     }
 
-    fn symbol_kind(&self, name: &str) -> Option<varn_sem::symbol::SymbolKind> {
+    fn symbol_kind(&self, name: &str) -> Option<crate::symbol::SymbolKind> {
         if self.binds_type_param(name) {
-            return Some(varn_sem::symbol::SymbolKind::TypeParameter);
+            return Some(crate::symbol::SymbolKind::TypeParameter);
         }
         self.inner.and_then(|c| c.symbol_kind(name))
     }
@@ -275,7 +275,7 @@ impl TypeContext for AliasSubstitutionContext<'_> {
         &self,
         name: &str,
         origin: Option<&str>,
-    ) -> Option<Vec<varn_sem::types::ClassMemberInfo>> {
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.inner
             .and_then(|c| c.get_interface_members(name, origin))
     }
@@ -284,7 +284,7 @@ impl TypeContext for AliasSubstitutionContext<'_> {
         &self,
         name: &str,
         origin: Option<&str>,
-    ) -> Option<Vec<varn_sem::types::ClassMemberInfo>> {
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.inner.and_then(|c| c.get_class_members(name, origin))
     }
 
@@ -292,7 +292,7 @@ impl TypeContext for AliasSubstitutionContext<'_> {
         &self,
         name: &str,
         origin: Option<&str>,
-    ) -> Option<Vec<varn_sem::types::ClassMemberInfo>> {
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.inner
             .and_then(|c| c.get_namespace_members(name, origin))
     }

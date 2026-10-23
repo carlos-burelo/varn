@@ -1,6 +1,6 @@
+use crate::types::{CheckerTyTable, Type, TypeContext};
 use std::sync::Arc;
 use varn_core::ast::TypeNode;
-use varn_sem::types::{CheckerTyTable, Type, TypeContext};
 
 pub(super) fn collect_string_literals(_ty: &Type, _table: &CheckerTyTable) -> Vec<Arc<str>> {
     vec![]

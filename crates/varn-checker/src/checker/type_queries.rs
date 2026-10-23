@@ -207,7 +207,7 @@ impl<'r> Checker<'r> {
             return *cached;
         }
         let view = varn_sem::bind::BindView::new(bind, self.resolver).at(self.current_scope);
-        let resolved = varn_binder::resolve_type_node(
+        let resolved = varn_sem::resolve::resolve_type_node(
             node,
             Some(&view),
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),

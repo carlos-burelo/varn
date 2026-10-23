@@ -1,15 +1,15 @@
 use std::sync::Arc;
 use varn_core::ast::{Param, Pattern, TypeNode};
 
-use super::type_resolution::resolve_type_node;
+use crate::resolve::resolve_type_node;
+use crate::types::{CheckerTyTable, FunctionParam, FunctionType, ObjectTypeMember, Type};
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, FunctionParam, FunctionType, ObjectTypeMember, Type};
 
 pub fn build_fn_type(
     params: &[Param],
     return_type: &Option<TypeNode>,
     is_arrow: bool,
-    ctx: Option<&dyn varn_sem::types::TypeContext>,
+    ctx: Option<&dyn crate::types::TypeContext>,
     table: &mut CheckerTyTable,
     inferred_ret: Type,
 ) -> Type {
@@ -31,7 +31,7 @@ pub fn build_fn_type(
 
 pub fn build_method_params(
     params: &[Param],
-    ctx: Option<&dyn varn_sem::types::TypeContext>,
+    ctx: Option<&dyn crate::types::TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Vec<FunctionParam> {
     let interner = ctx.and_then(|c| c.interner());

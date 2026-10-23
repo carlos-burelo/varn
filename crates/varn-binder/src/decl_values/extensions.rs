@@ -36,7 +36,7 @@ impl<'r> super::super::Binder<'r> {
                         let ty = self.param_type(p, crate::ParamSite::Declared);
                         param_types.push(varn_sem::types::FunctionParam {
                             name: Some(Arc::from(
-                                super::super::type_inference::pattern_to_string(
+                                varn_sem::infer::pattern_to_string(
                                     &p.pattern,
                                     Some(&self.interner),
                                 )
@@ -157,7 +157,7 @@ impl<'r> super::super::Binder<'r> {
                                 },
                                 varn_sem::types::FunctionParam {
                                     name: Some(Arc::from(
-                                        super::super::type_inference::pattern_to_string(
+                                        varn_sem::infer::pattern_to_string(
                                             &param.pattern,
                                             Some(&self.interner),
                                         )

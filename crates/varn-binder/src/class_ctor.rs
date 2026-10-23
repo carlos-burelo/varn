@@ -1,7 +1,7 @@
-use super::type_inference::pattern_lead_name;
 use super::Binder;
 use std::sync::Arc;
 use varn_core::ast::ClassDecl;
+use varn_sem::infer::pattern_lead_name;
 use varn_sem::symbol::{Symbol, SymbolKind};
 use varn_sem::types::{ClassMemberInfo, ClassMemberKind, FunctionParam, FunctionType, Type};
 

@@ -1,18 +1,18 @@
-use super::type_infer_expr::infer_expr_type;
-use super::type_resolution::resolve_type_node;
+use super::expr::infer_expr_type;
+use crate::resolve::resolve_type_node;
+use crate::types::numeric_ops::{adopt_literal_operands, numeric_binary_type};
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type};
 use std::sync::Arc;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{AstArena, ExprId, ObjectProp, PropKey};
 use varn_core::TypeKind;
-use varn_sem::types::numeric_ops::{adopt_literal_operands, numeric_binary_type};
-use varn_sem::types::{CheckerTyTable, ObjectTypeMember, Type};
 
 pub(crate) fn infer_binary(
     op: &BinaryOp,
     left: ExprId,
     right: ExprId,
     arena: &AstArena,
-    ctx: Option<&dyn varn_sem::types::TypeContext>,
+    ctx: Option<&dyn crate::types::TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
     match op {
@@ -65,7 +65,7 @@ pub fn infer_new(
     callee: ExprId,
     type_args: &[varn_core::ast::TypeNode],
     arena: &AstArena,
-    ctx: Option<&dyn varn_sem::types::TypeContext>,
+    ctx: Option<&dyn crate::types::TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
     use varn_core::ast::ExprKind;
@@ -74,7 +74,7 @@ pub fn infer_new(
             .and_then(|c| c.interner())
             .map(|i| i.resolve(*name).to_owned())
             .unwrap_or_default();
-        let origin = super::type_resolution::nominal_origin(&name_str, ctx, table);
+        let origin = crate::resolve::nominal_origin(&name_str, ctx, table);
         if type_args.is_empty() {
             if varn_core::BuiltinType::identify(*name, origin) == Some(varn_core::BuiltinType::Map)
             {
@@ -130,10 +130,10 @@ pub fn infer_new(
 pub(crate) fn infer_object(
     properties: &[ObjectProp],
     arena: &AstArena,
-    ctx: Option<&dyn varn_sem::types::TypeContext>,
+    ctx: Option<&dyn crate::types::TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
-    use super::inference_utils::build_method_params;
+    use super::signature::build_method_params;
     let mut members = Vec::new();
     for p in properties {
         match p {

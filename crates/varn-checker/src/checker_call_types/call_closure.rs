@@ -11,7 +11,7 @@ pub(super) fn infer_closure(
 ) -> Option<Type> {
     let ctx = c.ctx;
     match body {
-        None => Some(varn_binder::build_fn_type(
+        None => Some(varn_sem::infer::build_fn_type(
             params,
             return_type,
             false,
@@ -19,7 +19,7 @@ pub(super) fn infer_closure(
             c.table,
             Type::Dynamic,
         )),
-        Some(ArrowBody::Block(_)) => Some(varn_binder::build_fn_type(
+        Some(ArrowBody::Block(_)) => Some(varn_sem::infer::build_fn_type(
             params,
             return_type,
             true,
@@ -29,7 +29,7 @@ pub(super) fn infer_closure(
         )),
         Some(ArrowBody::Expr(e)) => {
             let inferred_ret = c.infer(*e).unwrap_or(Type::Dynamic);
-            Some(varn_binder::build_fn_type(
+            Some(varn_sem::infer::build_fn_type(
                 params,
                 return_type,
                 true,

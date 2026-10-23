@@ -325,7 +325,7 @@ impl<'r> Checker<'r> {
                     }
                 }
                 varn_sem::types::FunctionParam {
-                    name: Some(Arc::from(varn_binder::pattern_lead_name(
+                    name: Some(Arc::from(varn_sem::infer::pattern_lead_name(
                         &p.pattern,
                         &bind.interner,
                     ))),

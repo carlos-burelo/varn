@@ -1,6 +1,6 @@
+use crate::types::{CheckerTyTable, Type, TypeContext};
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, Type, TypeContext};
 
 use super::aliases::try_stdlib_generic_alias;
 use super::contexts::AliasSubstitutionContext;

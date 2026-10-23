@@ -1,6 +1,6 @@
+use crate::types::{CheckerTyTable, ClassMemberKind, Type, TypeContext};
 use std::sync::Arc;
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, ClassMemberKind, Type, TypeContext};
 
 pub fn qualified_type(
     name: &str,

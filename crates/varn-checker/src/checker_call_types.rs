@@ -13,9 +13,9 @@ use call_invoke::infer_invoke;
 use call_member::infer_member;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
-use varn_binder::resolve_type_node;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
 use varn_core::AtomInterner;
+use varn_sem::resolve::resolve_type_node;
 use varn_sem::types::{CheckerTyTable, Type, TypeContext};
 
 pub(crate) struct CallTypeCtx<'a> {
@@ -62,7 +62,7 @@ impl<'a> CallTypeCtx<'a> {
             } => infer_invoke(self, callee, &type_args),
             ExprKind::New {
                 callee, type_args, ..
-            } => Some(varn_binder::infer_new(
+            } => Some(varn_sem::infer::infer_new(
                 callee,
                 &type_args,
                 self.ast_arena,

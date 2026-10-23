@@ -14,9 +14,9 @@ mod qualified;
 mod scalar;
 mod template;
 
+use crate::types::{CheckerTyTable, Type, TypeContext};
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, Type, TypeContext};
 
 use conditional::resolve_conditional;
 use keyed_access::{resolve_indexed_access, resolve_keyof};
@@ -60,7 +60,7 @@ pub fn resolve_type_node(
         TypeKind::Object(members) => objects::resolve_object_type(members, ctx, interner, table),
         TypeKind::TemplateLiteral(parts) => resolve_template_literal_type(parts, ctx, table),
         TypeKind::Typeof(expr) => match ctx.and_then(|c| c.ast_arena()) {
-            Some(arena) => crate::infer_expr_type(*expr, arena, ctx, table),
+            Some(arena) => crate::infer::infer_expr_type(*expr, arena, ctx, table),
             None => Type::Dynamic,
         },
         TypeKind::Intersection(members) => {

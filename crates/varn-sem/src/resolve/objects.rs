@@ -1,6 +1,6 @@
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 use std::sync::Arc;
 use varn_core::ast::InterfaceMember;
-use varn_sem::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 
 use super::names::resolve_atom_name;
 use super::resolve_type_node;
@@ -54,8 +54,10 @@ pub(super) fn resolve_object_type(
                         if p.is_rest && !matches!(table.get(ty.0), varn_core::TypeKind::Array(_)) {
                             ty = Type::array(ty, table);
                         }
-                        varn_sem::types::FunctionParam {
-                            name: Some(Arc::from(crate::pattern_lead_name(&p.pattern, interner))),
+                        crate::types::FunctionParam {
+                            name: Some(Arc::from(crate::infer::pattern_lead_name(
+                                &p.pattern, interner,
+                            ))),
                             ty: ty.0,
                             optional: p.is_optional || p.default.is_some(),
                             is_rest: p.is_rest,
@@ -67,7 +69,7 @@ pub(super) fn resolve_object_type(
                     .as_ref()
                     .map(|m| resolve_type_node(m, ctx, table))
                     .unwrap_or(Type::Dynamic);
-                let ret = varn_sem::types::async_fn_return(ret_resolved, *is_async, table);
+                let ret = crate::types::async_fn_return(ret_resolved, *is_async, table);
                 ObjectTypeMember::Method {
                     name: resolve_atom_name(*key, ctx, interner),
                     params: resolved_params,
@@ -90,7 +92,10 @@ pub(super) fn resolve_object_type(
                     .unwrap_or(Type::Str);
                 let value_ty = resolve_type_node(return_type, ctx, table);
                 ObjectTypeMember::Index {
-                    param_name: Arc::from(crate::pattern_lead_name(&param.pattern, interner)),
+                    param_name: Arc::from(crate::infer::pattern_lead_name(
+                        &param.pattern,
+                        interner,
+                    )),
                     key_ty: key_ty.0,
                     value_ty: value_ty.0,
                 }
@@ -111,8 +116,10 @@ pub(super) fn resolve_object_type(
                         if p.is_rest && !matches!(table.get(ty.0), varn_core::TypeKind::Array(_)) {
                             ty = Type::array(ty, table);
                         }
-                        varn_sem::types::FunctionParam {
-                            name: Some(Arc::from(crate::pattern_lead_name(&p.pattern, interner))),
+                        crate::types::FunctionParam {
+                            name: Some(Arc::from(crate::infer::pattern_lead_name(
+                                &p.pattern, interner,
+                            ))),
                             ty: ty.0,
                             optional: p.is_optional || p.default.is_some(),
                             is_rest: p.is_rest,

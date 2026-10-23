@@ -144,7 +144,7 @@ impl<'r> Checker<'r> {
             .iter()
             .enumerate()
             .map(|(i, p)| {
-                let name = varn_binder::pattern_lead_name(&p.pattern, &bind.interner);
+                let name = varn_sem::infer::pattern_lead_name(&p.pattern, &bind.interner);
                 let mut ty = p
                     .type_ann
                     .as_ref()
@@ -192,7 +192,7 @@ impl<'r> Checker<'r> {
         if let Some(scope_id) = arrow_scope {
             self.current_scope = scope_id;
             for (p, fp) in params.iter().zip(ps.iter()) {
-                let name = varn_binder::pattern_lead_name(&p.pattern, &bind.interner);
+                let name = varn_sem::infer::pattern_lead_name(&p.pattern, &bind.interner);
                 if name.is_empty() || name == varn_core::TokenKind::Placeholder.as_str() {
                     continue;
                 }

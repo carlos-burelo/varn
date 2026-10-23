@@ -57,7 +57,7 @@ impl<'r> Checker<'r> {
             return;
         };
         let view = varn_sem::bind::BindView::new(bind, self.resolver);
-        let named = varn_binder::resolve_primitive(
+        let named = varn_sem::resolve::resolve_primitive(
             &value,
             Some(&view),
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),

@@ -1,15 +1,15 @@
-use super::inference_utils::build_fn_type;
-use super::type_infer_member::infer_member;
-use super::type_infer_ops::{infer_binary, infer_new, infer_object};
+use super::member::infer_member;
+use super::ops::{infer_binary, infer_new, infer_object};
+use super::signature::build_fn_type;
+use crate::types::{CheckerTyTable, Type};
 use varn_core::ast::operators::{LogicalOp, UnaryOp};
 use varn_core::ast::{ArrayEl, ArrowBody, AstArena, ExprId, ExprKind, MatchBody, MetaProperty};
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, Type};
 
 pub fn infer_expr_type(
     id: ExprId,
     arena: &AstArena,
-    ctx: Option<&dyn varn_sem::types::TypeContext>,
+    ctx: Option<&dyn crate::types::TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
     match &arena.expr(id).kind {
@@ -24,9 +24,7 @@ pub fn infer_expr_type(
         ExprKind::NullLiteral => Type::Null,
         ExprKind::Template { .. } => Type::Str,
         ExprKind::Paren { expression } => infer_expr_type(*expression, arena, ctx, table),
-        ExprKind::As { type_ann, .. } => {
-            super::type_resolution::resolve_type_node(type_ann, ctx, table)
-        }
+        ExprKind::As { type_ann, .. } => crate::resolve::resolve_type_node(type_ann, ctx, table),
         ExprKind::Is { .. } => Type::Bool,
         ExprKind::Satisfies { expression, .. } => infer_expr_type(*expression, arena, ctx, table),
         ExprKind::Await { argument } => {
@@ -189,7 +187,7 @@ pub fn infer_expr_type(
             ..
         } => {
             let ret = if *is_generator {
-                varn_sem::types::generator_of(Type::Dynamic, false, table)
+                crate::types::generator_of(Type::Dynamic, false, table)
             } else {
                 Type::Dynamic
             };

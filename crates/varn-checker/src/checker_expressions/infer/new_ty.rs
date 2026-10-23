@@ -97,7 +97,7 @@ impl<'r> Checker<'r> {
                     let name_str = bind.interner.resolve(*name).to_string();
                     let view =
                         varn_sem::bind::BindView::new(bind, self.resolver).at(self.current_scope);
-                    let origin = varn_binder::nominal_origin(
+                    let origin = varn_sem::resolve::nominal_origin(
                         &name_str,
                         Some(&view),
                         std::sync::Arc::make_mut(&mut self.ty_table),

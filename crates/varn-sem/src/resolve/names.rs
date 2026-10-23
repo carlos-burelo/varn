@@ -1,5 +1,5 @@
+use crate::types::TypeContext;
 use std::sync::Arc;
-use varn_sem::types::TypeContext;
 
 pub(super) fn resolve_atom_name(
     atom: varn_core::Atom,

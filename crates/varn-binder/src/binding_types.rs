@@ -41,7 +41,7 @@ impl<'r> Binder<'r> {
     pub(crate) fn function_param(&mut self, p: &Param, site: ParamSite) -> FunctionParam {
         let ty = self.param_type(p, site);
         FunctionParam {
-            name: Some(Arc::from(super::pattern_lead_name(
+            name: Some(Arc::from(varn_sem::infer::pattern_lead_name(
                 &p.pattern,
                 &self.interner,
             ))),
@@ -55,7 +55,7 @@ impl<'r> Binder<'r> {
         if !self.reported_params.insert(p.range.start.offset) {
             return;
         }
-        let name = super::pattern_lead_name(&p.pattern, &self.interner).to_owned();
+        let name = varn_sem::infer::pattern_lead_name(&p.pattern, &self.interner).to_owned();
         self.emit(
             varn_core::Diagnostic::error(
                 varn_core::ErrorCode::TypeAnnotationRequired,
@@ -66,7 +66,7 @@ impl<'r> Binder<'r> {
     }
 
     pub(crate) fn report_missing_variable_annotation(&mut self, d: &VarDeclarator) {
-        let name = super::pattern_lead_name(&d.id, &self.interner).to_owned();
+        let name = varn_sem::infer::pattern_lead_name(&d.id, &self.interner).to_owned();
         self.emit(
             varn_core::Diagnostic::error(
                 varn_core::ErrorCode::TypeAnnotationRequired,

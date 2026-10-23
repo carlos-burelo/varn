@@ -1,5 +1,5 @@
+use crate::types::{CheckerTyTable, Type, TypeContext};
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, Type, TypeContext};
 
 use super::names::resolve_atom_name;
 

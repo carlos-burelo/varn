@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use varn_core::TypeKind;
-use varn_sem::types::{
+use crate::types::{
     CheckerTyId, CheckerTyTable, FunctionType, ObjectTypeMember, Type, TypeContext,
 };
+use std::sync::Arc;
+use varn_core::TypeKind;
 
 pub(super) fn resolve_keyof(
     ty: Type,
@@ -209,7 +209,7 @@ pub(super) fn resolve_indexed_access(
                 let value_from_index = members.iter().find_map(|m| match m {
                     ObjectTypeMember::Index {
                         key_ty, value_ty, ..
-                    } if varn_sem::compat::types_compatible(
+                    } if crate::compat::types_compatible(
                         &Type::resolved(*key_ty),
                         &index,
                         None,

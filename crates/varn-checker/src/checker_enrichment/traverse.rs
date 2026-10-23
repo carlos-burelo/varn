@@ -234,7 +234,7 @@ fn enrich_vars_recursive(
     match &ast_arena.stmt(stmt).kind {
         StmtKind::Decl(decl) => {
             if let Decl::Variable(v) = decl.as_ref() {
-                use varn_binder::pattern_lead_name;
+                use varn_sem::infer::pattern_lead_name;
                 for d in &v.declarators {
                     let name = pattern_lead_name(&d.id, &bind.interner).to_owned();
                     let scope = bind.scopes.get(bind.global_scope);

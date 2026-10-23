@@ -1,6 +1,6 @@
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
 
 use super::resolve_type_node;
 
@@ -67,7 +67,7 @@ pub(super) fn resolve_intersection_type(
     if let Some(parts) = parts_opt {
         return Type::object(merge_members(parts.into_iter().flatten(), table), table);
     }
-    let ids: Vec<varn_sem::types::CheckerTyId> = resolved.iter().map(|t| t.0).collect();
+    let ids: Vec<crate::types::CheckerTyId> = resolved.iter().map(|t| t.0).collect();
     let list = table.intern_list(&ids);
     Type::resolved(table.intern(TypeKind::Intersection(list)))
 }

@@ -22,7 +22,7 @@ impl<'r> Checker<'r> {
             if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
                 if is_true_branch {
                     let view = varn_sem::bind::BindView::new(bind, self.resolver);
-                    let narrowed_ty = varn_binder::resolve_type_node(
+                    let narrowed_ty = varn_sem::resolve::resolve_type_node(
                         &type_ann,
                         Some(&view),
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -31,7 +31,7 @@ impl<'r> Checker<'r> {
                 } else {
                     if let Some(original_ty) = self.narrowing_base(rec, id, bind) {
                         let view = varn_sem::bind::BindView::new(bind, self.resolver);
-                        let target_ty = varn_binder::resolve_type_node(
+                        let target_ty = varn_sem::resolve::resolve_type_node(
                             &type_ann,
                             Some(&view),
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),

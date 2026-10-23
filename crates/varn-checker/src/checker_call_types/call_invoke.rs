@@ -1,8 +1,8 @@
 use super::CallTypeCtx;
 use rustc_hash::FxHashMap;
-use varn_binder::resolve_type_node;
 use varn_core::ast::{ExprId, ExprKind, TypeNode};
 use varn_core::{Atom, TypeKind};
+use varn_sem::resolve::resolve_type_node;
 use varn_sem::types::Type;
 
 pub(super) fn infer_invoke(

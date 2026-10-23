@@ -1,9 +1,9 @@
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
-use varn_binder::pattern_lead_name;
 use varn_core::ast::{ArrayEl, ObjectProp, Param, PropKey};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 use varn_sem::bind::BindResult;
+use varn_sem::infer::pattern_lead_name;
 use varn_sem::types::{FunctionType, ObjectTypeMember, Type, TypeContext};
 
 impl<'r> Checker<'r> {

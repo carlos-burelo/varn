@@ -1,7 +1,7 @@
+use crate::types::{CheckerTyId, CheckerTyTable, Type, TypeContext};
 use rustc_hash::FxHashMap;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
-use varn_sem::types::{CheckerTyId, CheckerTyTable, Type, TypeContext};
 
 use super::contexts::{AliasSubstitutionContext, InferBindingContext};
 use super::resolve_type_node;
