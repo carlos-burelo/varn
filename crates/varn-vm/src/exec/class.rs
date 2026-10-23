@@ -55,14 +55,6 @@ pub(crate) fn op_inherit(
 
         sub.set_layout(superclass.layout());
 
-        *sub.getter_map.borrow_mut() = superclass.getter_map.borrow().clone();
-        *sub.getter_vtable.borrow_mut() = superclass.getter_vtable.borrow().clone();
-        *sub.getter_vtable_owners.borrow_mut() = superclass.getter_vtable_owners.borrow().clone();
-
-        *sub.setter_map.borrow_mut() = superclass.setter_map.borrow().clone();
-        *sub.setter_vtable.borrow_mut() = superclass.setter_vtable.borrow().clone();
-        *sub.setter_vtable_owners.borrow_mut() = superclass.setter_vtable_owners.borrow().clone();
-
         return Ok(());
     }
     Err(RuntimeError::new("OpInherit: not a class"))
@@ -121,7 +113,12 @@ pub(crate) fn op_define_getter(
     heap: &mut Heap,
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
-    cls.add_getter_with_owner(name, closure_nv, Some(cls.clone()));
+    cls.add_accessor_with_owner(
+        varn_core::AccessorKind::Get,
+        name,
+        closure_nv,
+        Some(cls.clone()),
+    );
     Ok(())
 }
 
@@ -132,7 +129,12 @@ pub(crate) fn op_define_setter(
     heap: &mut Heap,
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
-    cls.add_setter_with_owner(name, closure_nv, Some(cls.clone()));
+    cls.add_accessor_with_owner(
+        varn_core::AccessorKind::Set,
+        name,
+        closure_nv,
+        Some(cls.clone()),
+    );
     Ok(())
 }
 
@@ -169,16 +171,9 @@ pub(crate) fn home_class(
     };
     let mut class = receiver;
     while let Some(c) = class {
-        let tables = [
-            (&c.vtable, &c.vtable_owners),
-            (&c.getter_vtable, &c.getter_vtable_owners),
-            (&c.setter_vtable, &c.setter_vtable_owners),
-        ];
-        for (table, owners) in tables {
-            if let Some(at) = table.borrow().iter().position(runs) {
-                let owner = owners.borrow().get(at).cloned().flatten();
-                return owner.or(Some(c.clone()));
-            }
+        if let Some(at) = c.vtable.borrow().iter().position(runs) {
+            let owner = c.vtable_owners.borrow().get(at).cloned().flatten();
+            return owner.or(Some(c.clone()));
         }
         class = c.superclass.borrow().clone();
     }

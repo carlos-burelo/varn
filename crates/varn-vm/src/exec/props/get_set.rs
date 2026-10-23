@@ -10,10 +10,13 @@ use crate::value::VmValue;
 
 pub(crate) fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValue> {
     if !obj.is_heap() {
-        return get_class(obj, heap)?.find_getter(key);
+        return get_class(obj, heap)?.find_accessor(varn_core::AccessorKind::Get, key);
     }
     match heap.get(obj.as_heap()) {
-        Some(HeapObj::Object(o)) => o.borrow().class()?.find_getter(key),
+        Some(HeapObj::Object(o)) => o
+            .borrow()
+            .class()?
+            .find_accessor(varn_core::AccessorKind::Get, key),
         Some(HeapObj::Class(cls)) => cls.find_static_getter(key),
         Some(
             HeapObj::Str(_)
@@ -38,16 +41,19 @@ pub(crate) fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValu
             | HeapObj::Generator(_)
             | HeapObj::Spread(_),
         )
-        | None => get_class(obj, heap)?.find_getter(key),
+        | None => get_class(obj, heap)?.find_accessor(varn_core::AccessorKind::Get, key),
     }
 }
 
 pub(crate) fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValue> {
     if !obj.is_heap() {
-        return get_class(obj, heap)?.find_setter(key);
+        return get_class(obj, heap)?.find_accessor(varn_core::AccessorKind::Set, key);
     }
     match heap.get(obj.as_heap()) {
-        Some(HeapObj::Object(o)) => o.borrow().class()?.find_setter(key),
+        Some(HeapObj::Object(o)) => o
+            .borrow()
+            .class()?
+            .find_accessor(varn_core::AccessorKind::Set, key),
         Some(HeapObj::Class(cls)) => cls.find_static_setter(key),
         Some(
             HeapObj::Str(_)
@@ -72,7 +78,7 @@ pub(crate) fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValu
             | HeapObj::Generator(_)
             | HeapObj::Spread(_),
         )
-        | None => get_class(obj, heap)?.find_setter(key),
+        | None => get_class(obj, heap)?.find_accessor(varn_core::AccessorKind::Set, key),
     }
 }
 

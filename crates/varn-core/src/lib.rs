@@ -1,4 +1,5 @@
 pub mod abi;
+mod accessor;
 pub mod ast;
 pub mod atom;
 pub mod capability;
@@ -44,6 +45,7 @@ pub use lang_type::{is_lang_type, BuiltinType, CoreSum, LangPrimitive, TYPE_ALIA
 pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 
+pub use accessor::AccessorKind;
 pub use intrinsics::MemberKey;
 pub use module_id::{ImportSpecifier, ModuleId, ModuleKind};
 pub use numeric::{

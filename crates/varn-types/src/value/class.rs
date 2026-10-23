@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use varn_core::AccessorKind;
 
 static NEXT_CLASS_ID: AtomicU32 = AtomicU32::new(1);
 
@@ -26,12 +27,6 @@ pub struct ClassObj {
     pub static_fields: RefCell<Vec<RuntimeString>>,
     pub vtable_version: AtomicU32,
     pub root_shape: RefCell<Rc<super::shape::Shape>>,
-    pub getter_map: RefCell<HashMap<RuntimeString, usize>>,
-    pub getter_vtable: RefCell<Vec<VmValue>>,
-    pub getter_vtable_owners: RefCell<Vec<Option<Rc<ClassObj>>>>,
-    pub setter_map: RefCell<HashMap<RuntimeString, usize>>,
-    pub setter_vtable: RefCell<Vec<VmValue>>,
-    pub setter_vtable_owners: RefCell<Vec<Option<Rc<ClassObj>>>>,
     pub static_getter_map: RefCell<HashMap<RuntimeString, VmValue>>,
     pub static_setter_map: RefCell<HashMap<RuntimeString, VmValue>>,
 
@@ -59,12 +54,6 @@ impl ClassObj {
             statics: RefCell::new(HashMap::default()),
             static_fields: RefCell::new(Vec::new()),
             root_shape: RefCell::new(super::shape::root_shape()),
-            getter_map: RefCell::new(HashMap::default()),
-            getter_vtable: RefCell::new(Vec::new()),
-            getter_vtable_owners: RefCell::new(Vec::new()),
-            setter_map: RefCell::new(HashMap::default()),
-            setter_vtable: RefCell::new(Vec::new()),
-            setter_vtable_owners: RefCell::new(Vec::new()),
             static_getter_map: RefCell::new(HashMap::default()),
             static_setter_map: RefCell::new(HashMap::default()),
             ctor_cache: RefCell::new(None),
@@ -152,12 +141,6 @@ impl ClassObj {
         for v in self.vtable.borrow_mut().iter_mut() {
             f(v);
         }
-        for v in self.getter_vtable.borrow_mut().iter_mut() {
-            f(v);
-        }
-        for v in self.setter_vtable.borrow_mut().iter_mut() {
-            f(v);
-        }
         for v in self.statics.borrow_mut().values_mut() {
             f(v);
         }
@@ -197,54 +180,39 @@ impl ClassObj {
         self.vtable_version.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn add_getter(&self, name: impl Into<Arc<str>>, value: VmValue) {
-        self.add_getter_with_owner(name, value, None);
+    pub fn add_accessor(&self, kind: AccessorKind, name: &str, value: VmValue) {
+        self.add_accessor_with_owner(kind, name, value, None);
     }
 
-    pub fn add_getter_with_owner(
+    pub fn add_accessor_with_owner(
         &self,
-        name: impl Into<Arc<str>>,
+        kind: AccessorKind,
+        name: &str,
         value: VmValue,
         owner: Option<Rc<ClassObj>>,
     ) {
-        let name: Arc<str> = name.into();
-        let mut getter_map = self.getter_map.borrow_mut();
-        let mut getter_vtable = self.getter_vtable.borrow_mut();
-        let mut getter_vtable_owners = self.getter_vtable_owners.borrow_mut();
-        if let Some(&idx) = getter_map.get(&name) {
-            getter_vtable[idx] = value;
-            getter_vtable_owners[idx] = owner;
-        } else {
-            let idx = getter_vtable.len();
-            getter_vtable.push(value);
-            getter_vtable_owners.push(owner);
-            getter_map.insert(name, idx);
-        }
-        drop((getter_map, getter_vtable, getter_vtable_owners));
-        self.vtable_version.fetch_add(1, Ordering::Relaxed);
+        self.add_method_with_owner(kind.key(name), value, owner);
     }
 
-    pub fn add_setter_with_owner(
-        &self,
-        name: impl Into<Arc<str>>,
-        value: VmValue,
-        owner: Option<Rc<ClassObj>>,
-    ) {
-        let name: Arc<str> = name.into();
-        let mut setter_map = self.setter_map.borrow_mut();
-        let mut setter_vtable = self.setter_vtable.borrow_mut();
-        let mut setter_vtable_owners = self.setter_vtable_owners.borrow_mut();
-        if let Some(&idx) = setter_map.get(&name) {
-            setter_vtable[idx] = value;
-            setter_vtable_owners[idx] = owner;
-        } else {
-            let idx = setter_vtable.len();
-            setter_vtable.push(value);
-            setter_vtable_owners.push(owner);
-            setter_map.insert(name, idx);
-        }
-        drop((setter_map, setter_vtable, setter_vtable_owners));
-        self.vtable_version.fetch_add(1, Ordering::Relaxed);
+    pub fn add_getter(&self, name: &str, value: VmValue) {
+        self.add_accessor(AccessorKind::Get, name, value);
+    }
+
+    pub fn add_setter(&self, name: &str, value: VmValue) {
+        self.add_accessor(AccessorKind::Set, name, value);
+    }
+
+    pub fn accessor_slot(&self, kind: AccessorKind, name: &str) -> Option<usize> {
+        kind.with_key(name, |key| self.method_map.borrow().get(key).copied())
+    }
+
+    pub fn own_method_names(&self) -> Vec<RuntimeString> {
+        self.method_map
+            .borrow()
+            .keys()
+            .filter(|key| AccessorKind::of_key(key).is_none())
+            .cloned()
+            .collect()
     }
 
     pub fn add_static_getter(&self, name: impl Into<Arc<str>>, value: VmValue) {
@@ -278,18 +246,8 @@ impl ClassObj {
         self.statics.borrow().get(name).copied()
     }
 
-    pub fn find_getter(&self, name: &str) -> Option<VmValue> {
-        if let Some(&idx) = self.getter_map.borrow().get(name) {
-            return Some(self.getter_vtable.borrow()[idx]);
-        }
-        self.superclass.borrow().as_ref()?.find_getter(name)
-    }
-
-    pub fn find_setter(&self, name: &str) -> Option<VmValue> {
-        if let Some(&idx) = self.setter_map.borrow().get(name) {
-            return Some(self.setter_vtable.borrow()[idx]);
-        }
-        self.superclass.borrow().as_ref()?.find_setter(name)
+    pub fn find_accessor(&self, kind: AccessorKind, name: &str) -> Option<VmValue> {
+        kind.with_key(name, |key| self.find_method(key))
     }
 
     pub fn find_static_getter(&self, name: &str) -> Option<VmValue> {

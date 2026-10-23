@@ -20,7 +20,7 @@ fn class_field_names(cls: &ClassObj) -> Vec<Arc<str>> {
 }
 
 fn class_method_names(cls: &ClassObj) -> Vec<Arc<str>> {
-    cls.method_map.borrow().keys().cloned().collect()
+    cls.own_method_names()
 }
 
 fn class_of(obj: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {

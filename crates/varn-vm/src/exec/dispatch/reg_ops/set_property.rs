@@ -118,7 +118,7 @@ impl ExecCtx {
                         && entry.vtable_ver
                             == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
                     {
-                        let vtable = unsafe { &*cls.setter_vtable.as_ptr() };
+                        let vtable = unsafe { &*cls.vtable.as_ptr() };
                         if slot < vtable.len() {
                             found_setter = Some(vtable[slot]);
                             hit_found = true;
@@ -189,7 +189,7 @@ impl ExecCtx {
             if cs_idx < cache_len
                 && !is_megamorphic
                 && let Some(cls) = crate::exec::props::get_class(obj, &self.heap)
-                && let Some(&slot) = cls.setter_map.borrow().get(name.as_ref())
+                && let Some(slot) = cls.accessor_slot(varn_core::AccessorKind::Set, name.as_ref())
             {
                 let entry = varn_types::chunk::CacheEntry {
                     id: cls.id,

@@ -299,7 +299,7 @@ impl Boundary for ExecCtx {
         };
         let found = parent.as_ref().and_then(|class| {
             if accessor {
-                class.find_getter(name)
+                class.find_accessor(varn_core::AccessorKind::Get, name)
             } else {
                 class.find_method(name)
             }
