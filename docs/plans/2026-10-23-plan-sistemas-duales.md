@@ -39,6 +39,11 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 - Orden: (1) razón propia para parámetros de tipo borrados; (2) alias/interfaces
   no objeto se bajan por su destino con guarda de recursión; (3) defaults de
   `scope.rs`/`closure` se sustituyen por el tipo del checker; (4) borrar la variante.
+- Hecho: parámetros de tipo borrados llevan `DynReason::Generic` (NYS 1634 -> 1438;
+  type parameter 196). El resto de NYS son fallbacks por falta de dato del checker:
+  `expr_ty` sin entrada en `expr_table`, símbolos global sin `ty`, `this` fuera de clase,
+  y defaults de `scope.rs` que luego se sobrescriben. Raíz: el checker no registra el
+  tipo de toda expresión; arreglarlo ahí, no en emit (Ley 14).
 - Aparte: `Dynamic(Callable)` aparece 9491 veces; un `Fn(SigId)` estático es el
   mayor candidato a ganancia de rendimiento tras A2.
 
