@@ -52,6 +52,8 @@ pub enum DynReason {
 
     NotYetSupported,
 
+    Generic,
+
     Boxed,
 
     Runtime,

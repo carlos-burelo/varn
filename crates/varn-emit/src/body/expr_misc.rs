@@ -76,7 +76,11 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Decimal
             | BackendTy::BigInt
             | BackendTy::Dynamic(varn_tir::DynReason::Callable | varn_tir::DynReason::Shape(_)) => {
-                untyped || matches!(reason, varn_tir::DynReason::NotYetSupported)
+                untyped
+                    || matches!(
+                        reason,
+                        varn_tir::DynReason::NotYetSupported | varn_tir::DynReason::Generic
+                    )
             }
             BackendTy::Dynamic(
                 varn_tir::DynReason::HostBoundary
@@ -86,6 +90,7 @@ impl<'a> FnEmitter<'a> {
                 | varn_tir::DynReason::Awaitable(_)
                 | varn_tir::DynReason::Yields(_)
                 | varn_tir::DynReason::NotYetSupported
+                | varn_tir::DynReason::Generic
                 | varn_tir::DynReason::Boxed
                 | varn_tir::DynReason::Runtime,
             )
@@ -136,6 +141,7 @@ pub(super) fn untyped_reason(reason: varn_tir::DynReason) -> bool {
         | varn_tir::DynReason::Yields(_)
         | varn_tir::DynReason::Shape(_)
         | varn_tir::DynReason::NotYetSupported
+        | varn_tir::DynReason::Generic
         | varn_tir::DynReason::Boxed
         | varn_tir::DynReason::Runtime => false,
     }

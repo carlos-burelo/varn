@@ -61,6 +61,9 @@ fn lower_alias(
     if let Some(id) = tt.named_shape(name) {
         return BackendTy::Dynamic(DynReason::Shape(id));
     }
+    if names.is_type_param(name) {
+        return BackendTy::Dynamic(DynReason::Generic);
+    }
     let members = match names.alias(name).map(|target| table.get(target.0)) {
         Some(TypeKind::Object(members)) => table.get_object_members(members),
         Some(_) | None => return opaque(),

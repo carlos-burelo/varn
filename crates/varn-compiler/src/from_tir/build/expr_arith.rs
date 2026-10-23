@@ -283,6 +283,7 @@ impl<'m> Builder<'m> {
                 | varn_tir::DynReason::Awaitable(_)
                 | varn_tir::DynReason::Yields(_)
                 | varn_tir::DynReason::NotYetSupported
+                | varn_tir::DynReason::Generic
                 | varn_tir::DynReason::Boxed
                 | varn_tir::DynReason::Runtime,
             ) => {}

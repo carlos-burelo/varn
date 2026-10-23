@@ -16,6 +16,7 @@ pub struct NameIndex {
     foreign_enums: FxHashMap<(Arc<str>, Arc<str>), EnumId>,
     foreign_classes: FxHashMap<(Arc<str>, Arc<str>), ClassId>,
     aliases: FxHashMap<Arc<str>, varn_sem::types::Type>,
+    type_params: rustc_hash::FxHashSet<Arc<str>>,
 }
 
 impl NameResolver for NameIndex {
@@ -40,6 +41,9 @@ impl NameResolver for NameIndex {
     }
     fn alias(&self, name: &str) -> Option<varn_sem::types::Type> {
         self.aliases.get(name).copied()
+    }
+    fn is_type_param(&self, name: &str) -> bool {
+        self.type_params.contains(name)
     }
 }
 
@@ -115,6 +119,11 @@ pub fn build(
     };
     let global = bind.scopes.get(bind.global_scope);
     for symbol in bind.arena.all() {
+        if symbol.kind == varn_sem::symbol::SymbolKind::TypeParameter {
+            names
+                .type_params
+                .insert(Arc::from(bind.interner.resolve(symbol.name)));
+        }
         if symbol.kind != varn_sem::symbol::SymbolKind::TypeAlias || !symbol.type_params.is_empty()
         {
             continue;
