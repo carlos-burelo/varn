@@ -18,9 +18,6 @@ impl ExecCtx {
         if self.settings.no_jit {
             return false;
         }
-        if crate::jit::tiering::FRAME_LAYOUT_V2_JIT_BAIL {
-            return false;
-        }
         let proto = &closure.proto;
         let n = proto.backedge_count.get().wrapping_add(1);
         if n < VmClosure::osr_backedge_threshold() {

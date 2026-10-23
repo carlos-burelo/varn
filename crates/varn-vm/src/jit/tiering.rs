@@ -1,8 +1,6 @@
 use crate::closure::VmClosure;
 use varn_types::FunctionProto;
 
-pub(crate) const FRAME_LAYOUT_V2_JIT_BAIL: bool = false;
-
 impl VmClosure {
     const JIT_TIER_THRESHOLD: u32 = 1;
 
@@ -53,9 +51,6 @@ impl VmClosure {
     }
 
     pub(crate) fn hot_jit_fn(&self) -> Option<varn_jit::JitFn> {
-        if FRAME_LAYOUT_V2_JIT_BAIL {
-            return None;
-        }
         if let Some(f) = self.jit_fn() {
             varn_jit::JIT_STATS
                 .jit_cached
@@ -120,9 +115,6 @@ impl VmClosure {
     }
 
     pub(crate) fn osr_jit_fn(&self, req: varn_types::ssa::OsrRequest) -> Option<varn_jit::JitFn> {
-        if FRAME_LAYOUT_V2_JIT_BAIL {
-            return None;
-        }
         let proto = &self.proto;
         let epoch = crate::clif_link::current_epoch();
         if epoch == 0 {
