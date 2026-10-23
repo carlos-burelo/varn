@@ -81,11 +81,17 @@ pub(super) fn run_pass(
     std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&checker.ty_table);
     bind.interner.absorb(checker.ty_table.names());
 
-    rec.desugar.foreign_classes =
-        checker.collect_foreign_classes(bind, rec.expr_table.values().map(|entry| &entry.ty));
+    let reachable: Vec<varn_sem::types::Type> = rec
+        .expr_table
+        .values()
+        .map(|entry| entry.ty)
+        .chain(rec.symbol_types.values().copied())
+        .chain(bind.annotation_types.values().copied())
+        .collect();
+    rec.desugar.foreign_classes = checker.collect_foreign_classes(bind, reachable.iter());
     rec.desugar.foreign_enums = checker.collect_foreign_enums(
         bind,
-        rec.expr_table.values().map(|entry| &entry.ty).chain(
+        reachable.iter().chain(
             rec.desugar
                 .for_of_plans
                 .values()
