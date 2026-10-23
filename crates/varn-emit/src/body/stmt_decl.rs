@@ -27,7 +27,7 @@ impl<'a> FnEmitter<'a> {
         };
 
         if let Decl::Function(f) = unwrapped {
-            let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
+            let dyn_ty = BackendTy::Dynamic(DynReason::Callable);
             let local = self.bind_local(Arc::from(self.m.interner.resolve(f.id)), dyn_ty);
             let closure = self.lower_closure(
                 &f.params,
@@ -189,18 +189,18 @@ impl<'a> FnEmitter<'a> {
                     }
 
                     let prebound = {
-                        let is_closure = d.init.is_some_and(|e| {
+                        let closure = d.init.filter(|e| {
                             matches!(
-                                self.ast_arena.expr(e).kind,
+                                self.ast_arena.expr(*e).kind,
                                 ExprKind::Arrow { .. } | ExprKind::Function { .. }
                             )
                         });
                         let is_global = self.top_level && self.m.globals.contains_key(name_str);
-                        if is_closure && !is_global {
-                            Some(self.bind_local(
-                                Arc::from(name_str),
-                                BackendTy::Dynamic(DynReason::NotYetSupported),
-                            ))
+                        if let Some(closure) = closure
+                            && !is_global
+                        {
+                            let ty = self.expr_ty(closure);
+                            Some(self.bind_local(Arc::from(name_str), ty))
                         } else {
                             None
                         }
