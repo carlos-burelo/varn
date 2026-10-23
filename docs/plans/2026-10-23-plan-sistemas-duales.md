@@ -87,18 +87,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   en receptor enum; getter 733 -> 250 ms por 5M) y getter bajo `?.` (ya resolvía
   estático).
 - Abierto, distinto de los accesores: llamar un método de enum cuesta ~50 ns frente a
-  ~7 ns de una clase (250 ms por 5M). Ampliar la comprobación de clase del helper JIT
-  `jit_call_method_cached_window` a `EnumVariant` no cambió nada: el sitio no llega
-  a la IC porque nunca registra entrada para receptores enum. Causa sin localizar.
-- Causa localizada (traza en `call_method`): la IC del intérprete SÍ acierta para
-  receptores enum (4 999 999 de 5 000 000), pero el guard inline del JIT
-  (`from_ssa/call/method.rs`) solo reconoce celdas planas `CELL_KIND_INSTANCE` y lee el
-  id de clase del layout de instancia; un `EnumVariantData` es un objeto de heap con
-  `Arc<VariantDef>` y `Vec` de slots, sin id de clase en la celda. Por eso todo
-  método de enum cae al `jit_call_method_window` genérico (decodifica nombre, plantilla
-  de variante, intrínsecos) y luego al IC del intérprete. Cerrarlo exige un layout plano
-  de variante de enum (celda tipo instancia con id de clase y slots inline); un helper
-  intermedio solo recortaría una parte de los ~50 ns.
+  ~7 ns de una clase. Diferido; análisis completo en E1 (al final de este documento).
 - Candidatos a cimiento, en orden: (1) accesores de clase (getter/setter) con slot
   estático en la tabla de métodos; (2) formas (`Shape`) con layout fijo; (3) cola de
   receptores NYS.
@@ -167,3 +156,116 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   nacen de objetos con forma (`Shape`), valores `Error` y uniones. No se pueden borrar
   las rutas por nombre hasta que formas/uniones/clases core tengan tipo estático
 - [ ] D2 (decisión del dueño)  - [ ] D3 (decisión del dueño)  - [ ] D4
+- [ ] E1 (diferido por decisión del dueño, 2026-10-23): layout plano de variantes de enum
+
+## E1 — Layout plano de variantes de enum (DIFERIDO)
+
+Estado: **no se hará por ahora** (decisión del dueño, 2026-10-23). Este apartado deja el
+análisis completo para retomarlo sin repetir la investigación.
+
+### Síntoma
+Llamar un método de un enum cuesta unos 50 ns frente a unos 7 ns de un método de clase,
+y leer un getter de enum cuesta lo mismo que llamar un método de enum.
+
+Repro (modo `quick`, JIT, 5 000 000 iteraciones por bucle):
+
+```
+import { now } from "std:time";
+enum Color {
+  Red, Green;
+  get code(): int { return 7 }
+  twice(): int { return 14 }
+}
+function runGet(c: Color, n: int): int {
+  let s = 0
+  for (let i = 0; i < n; i++) { s += c.code }
+  return s
+}
+function runMethod(c: Color, n: int): int {
+  let s = 0
+  for (let i = 0; i < n; i++) { s += c.twice() }
+  return s
+}
+```
+
+| Medida | Resultado |
+|---|---|
+| getter de enum, 5M | 250–259 ms (≈ 50 ns por lectura) |
+| método de enum, 5M | 243–264 ms (≈ 50 ns por llamada) |
+| método de clase, 20M (referencia) | 130–160 ms (≈ 7 ns por llamada) |
+
+Los miembros de enum van tras `;` en la lista de variantes (`Red, Green; get code() ...`).
+
+### Causa (verificada con trazas, no supuesta)
+1. **La caché inline del intérprete acierta.** Una traza temporal en `call_method`
+   (`crates/varn-vm/src/exec/dispatch/reg_ops/method_calls/mod.rs`) mostró, para
+   receptores enum: clase resuelta (`get_class` usa `EnumVariantData.enum_class_id`), IC
+   usable y `probe` con acierto en 4 999 999 de 5 000 000 llamadas.
+2. **El JIT nunca llega a esa caché.** El guard inline que genera
+   `crates/varn-jit/src/clif/from_ssa/call/method.rs` comprueba que la celda del receptor
+   sea `CELL_KIND_INSTANCE` y lee el id de clase en
+   `INST_CELL_DATA_OFF + INST_CLASS_ID_OFF`. Cualquier otro tipo de celda salta
+   directamente al bloque `slow`.
+3. **Una variante de enum no es una celda plana.** Es `HeapObj::EnumVariant(EnumVariantData)`
+   (`crates/varn-types/src/value/mod.rs`) con `enum_class_id: Option<u32>`,
+   `def: Arc<VariantDef>` y `slots: Vec<VmValue>`: indirecciones y un `Vec`, sin id de
+   clase en una posición fija de la celda.
+4. **Resultado.** Cada llamada pasa por `jit_call_method_window` y de ahí por
+   `call_method`, que antes de consultar la IC decodifica el nombre del método, busca una
+   plantilla de variante (`enum_variant_template`) y prueba intrínsecos
+   (`intrinsic_method`). Esos ~43 ns extra son la diferencia con una clase.
+
+### Intento descartado
+Se amplió `jit_call_method_cached_window`
+(`crates/varn-vm/src/exec/jit_helpers/calls.rs`) para aceptar `EnumVariant` además de
+`instance`. No cambió nada (259/253 ms) y se revirtió: ese helper solo se alcanza después
+del guard inline, que ya había rechazado la celda. Un helper intermedio en el bloque
+`slow` recortaría una parte de los 43 ns pero no llegaría al nivel de una clase, y añadiría
+un tercer camino de llamada (Ley 8).
+
+### Diseño propuesto (no implementado)
+Dar a la variante de enum una celda plana con el mismo prefijo que una instancia:
+
+- Nuevo tipo de celda para variantes, con el id de clase del enum en el **mismo offset**
+  que `INST_CLASS_ID_OFF`, el tag de variante y los slots de payload inline.
+- El guard del JIT acepta ambos tipos de celda y lee el id de clase de la misma posición;
+  el resto de la rutina (búsqueda en IC, comparación de versión de vtable, llamada directa
+  por vtable) no cambia.
+- `EnumVariantData` deja de ser el formato canónico: el `Arc<VariantDef>` pasa a ser una
+  tabla por clase de enum, no por valor.
+
+Alternativa: representar la variante como una instancia de la clase del enum con un campo
+de tag. Reutiliza todo el camino de instancias, pero cambia la identidad y la igualdad de
+variantes y obliga a revisar la comparación estructural.
+
+### Ley 10 (ganancia, verificación, borrado)
+- **Ganancia esperada:** acercar la llamada a método de enum a la de clase (de ≈ 50 ns a
+  ≈ 7–10 ns) y, de paso, la lectura de getters de enum. Sin medir en cargas reales: el
+  coste es de 43 ns extra por llamada, y no hay todavía un benchmark de aplicación que
+  muestre enums en un bucle caliente.
+- **Verificación:** el repro de arriba debe quedar a menos de 1,5× el método de clase;
+  `tests/16-enums.vn`, `tests/136-enum-identity.vn`, `tests/175-enum-instanceof.vn` y
+  `tests/189-enum-variant-slots.vn` sin cambios; matriz completa de 4 cuadrantes más
+  `VARN_JIT_CACHE=verify`; comparación de tiers (`vn run --compare-tiers`).
+- **Se borraría (previsiblemente):** la rama de enum en `get_class`
+  (`crates/varn-vm/src/exec/props/intrinsic.rs`) que resuelve la clase por
+  `enum_class_id`, y el pre-chequeo `enum_variant_template` de `call_method` para nombres
+  que no son constructores de variante.
+
+### Superficie afectada (a revisar si se retoma)
+- Recorrido del GC y `for_each_value_mut` sobre los slots de variante.
+- Envío entre isolates: `crates/varn-types/src/value/sendable.rs` copia `enum_class_id`.
+- Congelado/descongelado de módulos (`module_freeze.rs`) y clases con identidad única.
+- Igualdad y comparación de variantes (`crates/varn-vm/src/exec/compare.rs`,
+  `same_enum`) y `instanceof` sobre enums (`exec/advanced.rs`).
+- Operaciones de payload y tag (`exec/dispatch/reg_ops/enum_ops.rs`, `GetEnumTag`,
+  `VariantPayload`) y su lowering en el JIT.
+- Serialización de enums en la std (JSON, formatos binarios).
+
+### Criterios para reabrirlo
+- Un benchmark o una aplicación real (máquinas de estado, UI, parsers) muestra llamadas a
+  métodos de enum en un bucle caliente.
+- Se emprende otro cambio de layout de instancias (punteros directos, etapa 3) y conviene
+  hacerlo a la vez para no migrar dos veces.
+- Se decide que `Option`/`Result`, que son enums, necesitan métodos baratos en la std.
+
