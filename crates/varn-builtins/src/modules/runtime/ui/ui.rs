@@ -273,7 +273,6 @@ varn_contract! {
                 .ok_or_else(|| "ui.control: kind is not a UiControlKind".to_string())?
             {
                 UiControlKind::Button => varn_ui::ControlKind::Button,
-                UiControlKind::Checkbox => varn_ui::ControlKind::Checkbox,
                 UiControlKind::Switch => varn_ui::ControlKind::Switch,
                 UiControlKind::Slider => varn_ui::ControlKind::Slider,
                 UiControlKind::Scroll => varn_ui::ControlKind::Scroll,
@@ -323,7 +322,7 @@ varn_contract! {
             {
                 UiControlKind::Field => varn_ui::ControlKind::Field,
                 UiControlKind::Area => varn_ui::ControlKind::Area,
-                UiControlKind::Button | UiControlKind::Checkbox | UiControlKind::Switch | UiControlKind::Slider | UiControlKind::Scroll | UiControlKind::Surface => {
+                UiControlKind::Button | UiControlKind::Switch | UiControlKind::Slider | UiControlKind::Scroll | UiControlKind::Surface => {
                     return Err("ui.field: kind is not a text control".to_string())
                 }
             };

@@ -1,65 +1,103 @@
-import { Widget, Size, PaintContext, Placement, fixedSize, Constraints } from "std:ui/widget/base";
+import { Widget, Size, PaintContext, Placement, fixedSize, Constraints, layoutAt, paintPlaced } from "std:ui/widget/base";
 import { current, writer } from "std:ui/widget/bound";
 import { Theme } from "std:ui/style";
+import { Text } from "std:ui/widget/text";
 import { Signal } from "std:signals";
 import { UiControlKind } from "std:ui/window";
+
+const TOGGLE_GAP = 10.0;
+const BOX_RADIUS = 6.0;
+const BOX_INSET = 2.0;
 
 export class CheckboxNode extends Widget {
     checked: bool;
     onToggle: () => void;
-    color: int;
+    size: float;
+    label: Widget?;
 
-    constructor(checked: bool, onToggle: () => void, size: float, color: int) {
+    constructor(checked: bool, onToggle: () => void, size: float, label: Widget?) {
         super();
         this.checked = checked;
         this.onToggle = onToggle;
-        this.w = size;
-        this.h = size;
-        this.color = color;
+        this.size = size;
+        this.label = label;
     }
 
     override computeLayout(c: Constraints): Placement {
-        return new Placement(this, fixedSize(this, c, new Size(this.w, this.h)), []);
+        const text = this.label;
+        if (text === null) {
+            return new Placement(this, fixedSize(this, c, new Size(this.size, this.size)), []);
+        }
+        const placed = layoutAt(text, "label", c.looseChild(c.maxW - this.size - TOGGLE_GAP, c.maxH));
+        const h = placed.size.h > this.size ? placed.size.h : this.size;
+        placed.x = this.size + TOGGLE_GAP;
+        placed.y = (h - placed.size.h) / 2.0;
+        return new Placement(this, fixedSize(this, c, new Size(this.size + TOGGLE_GAP + placed.size.w, h)), [placed]);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
-        const w = p.size.w;
-        const h = p.size.h;
-        cx.click(UiControlKind.Checkbox, x, y, w, h, this.color, this.checked, this.onToggle);
+        const top = y + (p.size.h - this.size) / 2.0;
+        const edge = this.checked ? Theme.colors.primary : Theme.colors.muted;
+        cx.win.rect(x, top, this.size, this.size, edge, BOX_RADIUS);
+        cx.win.rect(x + BOX_INSET, top + BOX_INSET, this.size - 2.0 * BOX_INSET, this.size - 2.0 * BOX_INSET, this.checked ? Theme.colors.primary : Theme.colors.surface, BOX_RADIUS - 1.0);
+        cx.click(UiControlKind.Surface, x, top, this.size, this.size, 0, false, this.onToggle);
+        for (const placed of p.children) {
+            cx.keyed("label", () => paintPlaced(cx, placed, x, y));
+            cx.click(UiControlKind.Surface, x + placed.x, y + placed.y, placed.size.w, placed.size.h, 0, false, this.onToggle);
+        }
     }
 }
 
 export class SwitchNode extends Widget {
     on: bool;
     onToggle: () => void;
+    trackW: float;
+    trackH: float;
+    label: Widget?;
 
-    constructor(on: bool, onToggle: () => void, w: float, h: float) {
+    constructor(on: bool, onToggle: () => void, w: float, h: float, label: Widget?) {
         super();
         this.on = on;
         this.onToggle = onToggle;
-        this.w = w;
-        this.h = h;
+        this.trackW = w;
+        this.trackH = h;
+        this.label = label;
     }
 
     override computeLayout(c: Constraints): Placement {
-        return new Placement(this, fixedSize(this, c, new Size(this.w, this.h)), []);
+        const text = this.label;
+        if (text === null) {
+            return new Placement(this, fixedSize(this, c, new Size(this.trackW, this.trackH)), []);
+        }
+        const placed = layoutAt(text, "label", c.looseChild(c.maxW - this.trackW - TOGGLE_GAP, c.maxH));
+        const h = placed.size.h > this.trackH ? placed.size.h : this.trackH;
+        placed.x = this.trackW + TOGGLE_GAP;
+        placed.y = (h - placed.size.h) / 2.0;
+        return new Placement(this, fixedSize(this, c, new Size(this.trackW + TOGGLE_GAP + placed.size.w, h)), [placed]);
     }
 
     override paint(cx: PaintContext, p: Placement, x: float, y: float): void {
-        const w = p.size.w;
-        const h = p.size.h;
-        cx.click(UiControlKind.Switch, x, y, w, h, Theme.colors.primary, this.on, this.onToggle);
+        const top = y + (p.size.h - this.trackH) / 2.0;
+        cx.click(UiControlKind.Switch, x, top, this.trackW, this.trackH, Theme.colors.primary, this.on, this.onToggle);
+        for (const placed of p.children) {
+            cx.keyed("label", () => paintPlaced(cx, placed, x, y));
+            cx.click(UiControlKind.Surface, x + placed.x, y + placed.y, placed.size.w, placed.size.h, 0, false, this.onToggle);
+        }
     }
 }
 
-export function Checkbox(value: bool | Signal<bool>, onChange: ((next: bool) => void)? = null, size: float = 26.0): Widget {
-    const write = writer<bool>(value, onChange);
-    const checked = current<bool>(value);
-    return new CheckboxNode(checked, () => write(!checked), size, Theme.colors.primary);
+function labelWidget(label: str): Widget? {
+    return label == "" ? null : Text(label);
 }
 
-export function Switch(value: bool | Signal<bool>, onChange: ((next: bool) => void)? = null, w: float = 46.0, h: float = 26.0): Widget {
+export function Checkbox(value: bool | Signal<bool>, onChange: ((next: bool) => void)? = null, label: str = "", size: float = 26.0): Widget {
+    const write = writer<bool>(value, onChange);
+    const checked = current<bool>(value);
+    return new CheckboxNode(checked, () => write(!checked), size, labelWidget(label));
+}
+
+export function Switch(value: bool | Signal<bool>, onChange: ((next: bool) => void)? = null, label: str = "", w: float = 46.0, h: float = 26.0): Widget {
     const write = writer<bool>(value, onChange);
     const on = current<bool>(value);
-    return new SwitchNode(on, () => write(!on), w, h);
+    return new SwitchNode(on, () => write(!on), w, h, labelWidget(label));
 }

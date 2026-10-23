@@ -47,7 +47,6 @@ pub fn argb_to_float(color: i64) -> [f32; 4] {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ControlKind {
     Button,
-    Checkbox,
     Switch,
     Slider,
     Scroll,
@@ -60,13 +59,12 @@ impl ControlKind {
     pub fn from_code(code: i64) -> Option<Self> {
         match code {
             0 => Some(Self::Button),
-            1 => Some(Self::Checkbox),
-            2 => Some(Self::Switch),
-            3 => Some(Self::Slider),
-            4 => Some(Self::Scroll),
-            5 => Some(Self::Surface),
-            6 => Some(Self::Field),
-            7 => Some(Self::Area),
+            1 => Some(Self::Switch),
+            2 => Some(Self::Slider),
+            3 => Some(Self::Scroll),
+            4 => Some(Self::Surface),
+            5 => Some(Self::Field),
+            6 => Some(Self::Area),
             _ => None,
         }
     }

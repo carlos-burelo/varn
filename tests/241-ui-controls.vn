@@ -63,6 +63,16 @@ await describe("241 ui controls", async () => {
         expect(seen).toEqual([true]);
     });
 
+    await it("a click on the checkbox label toggles it once", () => {
+        using win = UiWindow.open("t", 400, 200, true);
+        const fr = new UiFrame(400, 200);
+        const focus = new Focus();
+        const seen: bool[] = [];
+        const tree = Checkbox(false, onChange: (next: bool) => { seen.push(next) }, label: "Notify");
+        tap(win, fr, focus, tree, 50, 13, 300.0, 120.0);
+        expect(seen).toEqual([true]);
+    });
+
     await it("a plain value without a callback is rejected", () => {
         let failed = false;
         try {

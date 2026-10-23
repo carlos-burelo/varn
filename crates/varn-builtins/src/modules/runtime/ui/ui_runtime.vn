@@ -12,7 +12,6 @@ export declare enum UiEventKind {
 
 export declare enum UiControlKind {
     Button,
-    Checkbox,
     Switch,
     Slider,
     Scroll,

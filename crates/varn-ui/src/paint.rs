@@ -3,7 +3,7 @@ use egui::{
     epaint::ClippedPrimitive,
     scroll_area::State as ScrollState,
     text::{CCursor, CCursorRange},
-    Align2, Button, Checkbox, Color32, Context, Event, FontId, Key, Rect as ERect, RawInput,
+    Align2, Button, Color32, Context, Event, FontId, Key, Rect as ERect, RawInput,
     ScrollArea, Sense, Slider, TexturesDelta, Ui, UiBuilder,
 };
 
@@ -238,12 +238,6 @@ fn paint_control(ui: &mut Ui, c: &Control, feedback: &mut Feedback) {
                 )
                 .clicked()
                 .then_some(Activation { id: c.id, value: 0.0 }),
-            ControlKind::Checkbox => {
-                let mut on = c.flag;
-                ui.put(rect, Checkbox::without_text(&mut on))
-                    .clicked()
-                    .then_some(Activation { id: c.id, value: 0.0 })
-            }
             ControlKind::Switch => paint_switch(ui, rect, c),
             ControlKind::Slider => {
                 let mut v = c.value;
