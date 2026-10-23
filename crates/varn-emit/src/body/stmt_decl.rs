@@ -35,7 +35,7 @@ impl<'a> FnEmitter<'a> {
                 f.modifiers.is_async,
                 f.modifiers.is_generator,
                 dyn_ty,
-                None,
+                self.m.declared_types.get(&f.id_offset).copied(),
                 Span::EMPTY,
             );
             let mut stmts = vec![TirStmt::Let {
@@ -95,7 +95,7 @@ impl<'a> FnEmitter<'a> {
                         f.modifiers.is_async,
                         f.modifiers.is_generator,
                         dyn_ty,
-                        None,
+                        self.m.declared_types.get(&f.id_offset).copied(),
                         Span::EMPTY,
                     );
                     let mut value = closure;

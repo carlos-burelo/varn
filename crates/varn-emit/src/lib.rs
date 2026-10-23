@@ -84,6 +84,13 @@ pub fn emit_module(
         namespace_scope::declared_scope(program, ast_arena, interner);
     namespace_scope::add_imported_paths(&bind.namespace_imports, &mut namespace_scope);
 
+    let declared_types: rustc_hash::FxHashMap<u32, varn_sem::types::Type> = bind
+        .arena
+        .all()
+        .iter()
+        .filter_map(|symbol| symbol.ty.map(|ty| (symbol.offset, ty)))
+        .collect();
+
     let ctx = MCtx {
         names: &names,
         classes: &classes,
@@ -103,6 +110,7 @@ pub fn emit_module(
         type_names: &bind.declared_type_names,
         nested_types: &nested,
         shadowed: &bind.user_decorators,
+        declared_types: &declared_types,
     };
 
     let n_free = free_fns.len() as u32;

@@ -127,7 +127,7 @@ impl<'a> FnEmitter<'a> {
                     *is_async,
                     *is_generator,
                     ty,
-                    Some(e),
+                    self.expr_table.get(&e.index()).map(|entry| entry.ty),
                     span,
                 )
             }
@@ -141,7 +141,8 @@ impl<'a> FnEmitter<'a> {
                     varn_core::ast::ArrowBody::Expr(e) => ClosureBody::Expr(*e),
                     varn_core::ast::ArrowBody::Block(s) => ClosureBody::Stmt(*s),
                 };
-                return self.lower_closure(params, cb, *is_async, false, ty, Some(e), span);
+                let fn_ty = self.expr_table.get(&e.index()).map(|entry| entry.ty);
+                return self.lower_closure(params, cb, *is_async, false, ty, fn_ty, span);
             }
 
             ExprKind::Await { argument } => {

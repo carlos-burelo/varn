@@ -25,6 +25,7 @@ pub(super) struct MCtx<'a> {
     pub(super) type_names: &'a FxHashMap<AstId, Arc<str>>,
     pub(super) nested_types: &'a NestedTypes,
     pub(super) shadowed: &'a rustc_hash::FxHashSet<u32>,
+    pub(super) declared_types: &'a FxHashMap<u32, varn_sem::types::Type>,
 }
 
 impl<'a> MCtx<'a> {
@@ -48,6 +49,7 @@ impl<'a> MCtx<'a> {
             type_names: self.type_names,
             nested_types: self.nested_types,
             shadowed: self.shadowed,
+            declared_types: self.declared_types,
         }
     }
 }
