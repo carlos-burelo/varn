@@ -1,7 +1,7 @@
 use super::classes::build_classes;
 use super::enums::build_enums;
 use super::signatures::seed_signatures;
-use crate::ty::NameResolver;
+use crate::ty::{lower_type, NameResolver, ScopedTypeParams};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_sem::bind::BindResult;
@@ -241,6 +241,10 @@ pub fn build(
         &mut signatures,
     );
     enums.extend(foreign.iter().map(|f| {
+        let scoped = ScopedTypeParams {
+            inner: &names,
+            params: &f.type_params,
+        };
         EnumInfo {
             name: f.name.clone(),
             binding: f.binding.clone(),
@@ -252,10 +256,10 @@ pub fn build(
                 .map(|(tag, (name, fields))| VariantInfo {
                     name: name.clone(),
                     tag: tag as u16,
-                    payload: vec![
-                        BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported);
-                        *fields
-                    ],
+                    payload: fields
+                        .iter()
+                        .map(|ty| lower_type(ty, &bind.ty_table, &bind.interner, tt, &scoped))
+                        .collect(),
                 })
                 .collect(),
         }

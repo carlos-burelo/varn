@@ -41,7 +41,8 @@ pub struct ForeignEnum {
     pub name: Arc<str>,
     pub origin: Arc<str>,
     pub binding: Option<Arc<str>>,
-    pub variants: Vec<(Arc<str>, usize)>,
+    pub type_params: Vec<Arc<str>>,
+    pub variants: Vec<(Arc<str>, Vec<Type>)>,
 }
 
 #[derive(Clone, Debug)]

@@ -151,6 +151,9 @@ fn lower_kind(
                 .is_none_or(|o| names.is_local_origin(o));
             match resolve_type_ref(name, origin, interner, names) {
                 None if local => lower_alias(interner.resolve(name), table, interner, tt, names),
+                None if names.is_type_param(interner.resolve(name)) => {
+                    BackendTy::Dynamic(DynReason::Generic)
+                }
                 None => interface(),
                 Some(resolved) => resolved,
             }

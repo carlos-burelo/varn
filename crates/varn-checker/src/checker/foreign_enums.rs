@@ -24,7 +24,7 @@ impl Checker<'_> {
                 .resolver
                 .module_bind(&origin)
                 .or_else(|| self.resolver.stdlib_bind(&origin));
-            let Some(layout) = owner.as_deref().and_then(|b| {
+            let Some((owner, layout)) = owner.as_deref().and_then(|b| {
                 use varn_sem::bind::DeclKind;
                 if !matches!(
                     b.classify_decl(name.as_ref()),
@@ -32,14 +32,21 @@ impl Checker<'_> {
                 ) {
                     return None;
                 }
-                b.enum_layout(&name)
+                Some((b, b.enum_layout(&name)?))
             }) else {
                 continue;
             };
             let variants = layout
                 .into_iter()
-                .map(|(v, fields)| (v, fields.len()))
+                .map(|(variant, fields)| {
+                    let payload = fields
+                        .iter()
+                        .map(|(_, ty)| self.reintern_foreign_ty(owner, *ty))
+                        .collect();
+                    (variant, payload)
+                })
                 .collect();
+            let type_params = Self::declared_type_params(owner, &name);
             let binding = bind
                 .global_symbols()
                 .find(|s| {
@@ -55,10 +62,33 @@ impl Checker<'_> {
                     name,
                     origin,
                     binding,
+                    type_params,
                     variants,
                 },
             );
         }
         found.into_values().collect()
+    }
+
+    fn declared_type_params(owner: &BindResult, name: &str) -> Vec<Arc<str>> {
+        owner
+            .interner
+            .get(name)
+            .and_then(|atom| {
+                owner
+                    .scopes
+                    .get(owner.global_scope)
+                    .resolve(atom, &owner.scopes)
+            })
+            .map(|id| {
+                owner
+                    .arena
+                    .get(id)
+                    .type_params
+                    .iter()
+                    .map(|p| Arc::from(owner.interner.resolve(*p)))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 }
