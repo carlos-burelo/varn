@@ -118,6 +118,99 @@ impl<'r> Checker<'r> {
         self.expected_return_type = saved_expected;
     }
 
+    fn is_enum_type_of(&self, t: &Type, bind: &BindResult) -> bool {
+        let varn_core::TypeKind::Named(n, origin) = self.ty_table.get(t.0) else {
+            return false;
+        };
+        let name = self.resolve_bind_atom(bind, n);
+        let origin_modules: Vec<String> = origin
+            .map(|o| self.resolve_bind_atom(bind, o).to_string())
+            .into_iter()
+            .collect();
+        crate::checker_expressions::members::is_enum_type(
+            self.resolver,
+            bind,
+            &name,
+            &origin_modules,
+        )
+    }
+
+    fn cast_related(
+        &mut self,
+        rec: &mut Recorder,
+        source: &Type,
+        target: &Type,
+        expression: Option<ExprId>,
+        bind: &BindResult,
+    ) -> bool {
+        let source_base = source.apparent(&self.ty_table);
+        let target_base = target.apparent(&self.ty_table);
+        if source_base.is_dynamic()
+            || target_base.is_dynamic()
+            || (source_base.is_numeric() && target_base.is_numeric())
+            || (source_base.is_int() && self.is_enum_type_of(&target_base, bind))
+            || (target_base.is_int() && self.is_enum_type_of(&source_base, bind))
+            || self.value_fits(rec, target, source, expression, Some(bind))
+            || self.value_fits(rec, source, target, None, Some(bind))
+        {
+            return true;
+        }
+        let members_of = |checker: &Self, t: &Type| -> Option<Vec<Type>> {
+            match checker.ty_table.get(t.0) {
+                varn_core::TypeKind::Union(list) => Some(
+                    checker
+                        .ty_table
+                        .get_list(list)
+                        .iter()
+                        .map(|m| Type::resolved(*m))
+                        .collect(),
+                ),
+                _ => None,
+            }
+        };
+        if let Some(members) = members_of(self, &source_base) {
+            return members
+                .iter()
+                .any(|m| self.cast_related(rec, m, &target_base, None, bind));
+        }
+        if let Some(members) = members_of(self, &target_base) {
+            return members
+                .iter()
+                .any(|m| self.cast_related(rec, &source_base, m, None, bind));
+        }
+        if let (varn_core::TypeKind::Array(a), varn_core::TypeKind::Array(b)) = (
+            self.ty_table.get(source_base.0),
+            self.ty_table.get(target_base.0),
+        ) {
+            return self.cast_related(rec, &Type::resolved(a), &Type::resolved(b), None, bind);
+        }
+        false
+    }
+
+    pub(super) fn check_as_cast(
+        &mut self,
+        rec: &mut Recorder,
+        expression: ExprId,
+        type_ann: &varn_core::ast::TypeNode,
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        let target = self.resolve_type_node_cached(type_ann, bind);
+        let source = self.infer_type(rec, expression, bind);
+        if self.cast_related(rec, &source, &target, Some(expression), bind) {
+            return;
+        }
+        let source_s = source.display(&self.ty_table, &bind.interner);
+        let target_s = target.display(&self.ty_table, &bind.interner);
+        self.emit(
+            Diagnostic::error(
+                ErrorCode::InvalidAsCast,
+                format!("cannot convert '{source_s}' to '{target_s}' with 'as': the types are unrelated"),
+            )
+            .with_range(range),
+        );
+    }
+
     pub(super) fn check_satisfies(
         &mut self,
         rec: &mut Recorder,

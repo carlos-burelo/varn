@@ -91,7 +91,8 @@ impl<'r> Checker<'r> {
                 type_ann,
             } => {
                 self.check_type_names(type_ann, bind);
-                self.check_expr(rec, *expression, bind)
+                self.check_expr(rec, *expression, bind);
+                self.check_as_cast(rec, *expression, type_ann, range, bind)
             }
             ExprKind::Is { expression, .. } => self.check_expr(rec, *expression, bind),
             ExprKind::Satisfies {
