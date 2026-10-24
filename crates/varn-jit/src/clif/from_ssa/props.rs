@@ -1,6 +1,7 @@
 mod fields;
 mod get;
 mod index;
+mod instance_ic;
 mod lengths;
 mod set;
 mod shared;

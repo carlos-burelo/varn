@@ -199,6 +199,7 @@ impl ExecCtx {
                         },
                         vtable_ver: 0,
                         class: None,
+                        ..Default::default()
                     };
                     closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                     closure.feedback.borrow_mut().observe(cs_idx, cls.id);
@@ -219,6 +220,7 @@ impl ExecCtx {
                     is_class: ICKind::CLASS_GETTER,
                     vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
                     class: Some(cls.clone()),
+                    ..Default::default()
                 };
                 closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                 closure.feedback.borrow_mut().observe(cs_idx, cls.id);
@@ -240,12 +242,15 @@ impl ExecCtx {
                 {
                     let root = cls.root_shape.borrow();
                     if let Some(&slot) = root.property_names.get(name) {
+                        let (offset, access) = inst.field_placement(slot).unwrap_or((0, 0));
                         let entry = varn_types::chunk::CacheEntry {
                             id: inst.class_id,
                             slot: slot as u16,
                             is_class: ICKind::INSTANCE_FIELD,
                             vtable_ver: 0,
                             class: None,
+                            offset,
+                            access,
                         };
                         closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                         closure.feedback.borrow_mut().observe(cs_idx, inst.class_id);
@@ -265,6 +270,7 @@ impl ExecCtx {
                                 is_class: ICKind::SHAPE_PROP,
                                 vtable_ver: 0,
                                 class: None,
+                                ..Default::default()
                             };
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                             closure.feedback.borrow_mut().observe(cs_idx, shape_id);
@@ -306,6 +312,7 @@ impl ExecCtx {
                     is_class: ICKind::CLASS_METHOD,
                     vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
                     class: Some(cls.clone()),
+                    ..Default::default()
                 };
                 closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                 closure.feedback.borrow_mut().observe(cs_idx, cls.id);

@@ -51,8 +51,7 @@ pub(super) fn core_method_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str
                     _,
                 ) => continue,
             };
-            if let Some(id) = provider.native_op_id(varn_core::op_id::CORE_MODULE, cname, &m.name)
-            {
+            if let Some(id) = provider.native_op_id(varn_core::op_id::CORE_MODULE, cname, &m.name) {
                 out.insert((Arc::from(cname), key), id);
             }
         }

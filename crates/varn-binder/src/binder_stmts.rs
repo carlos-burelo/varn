@@ -27,8 +27,7 @@ impl<'r> Binder<'r> {
             let ty = declarator
                 .type_ann
                 .as_ref()
-                .map(|ann| self.resolve_type(ann))
-                ;
+                .map(|ann| self.resolve_type(ann));
 
             self.bind_pattern(
                 &declarator.id,

@@ -197,6 +197,7 @@ impl ExecCtx {
                     is_class: ICKind::CLASS_SETTER,
                     vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
                     class: Some(cls.clone()),
+                    ..Default::default()
                 };
                 closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                 closure.feedback.borrow_mut().observe(cs_idx, cls.id);
@@ -222,6 +223,7 @@ impl ExecCtx {
                             is_class: ICKind::INSTANCE_FIELD,
                             vtable_ver: 0,
                             class: None,
+                            ..Default::default()
                         };
                         closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                         closure.feedback.borrow_mut().observe(cs_idx, inst.class_id);
@@ -242,6 +244,7 @@ impl ExecCtx {
                         is_class: ICKind::SHAPE_PROP,
                         vtable_ver: 0,
                         class: None,
+                        ..Default::default()
                     };
                     o.set_field_at(slot, val);
                     self.heap.write_barrier(obj.as_heap(), val);
@@ -266,6 +269,7 @@ impl ExecCtx {
                         is_class: ICKind::SHAPE_TRANSITION,
                         vtable_ver: 0,
                         class: None,
+                        ..Default::default()
                     });
 
                     ic[cs_idx].find_or_insert(varn_types::chunk::CacheEntry {
@@ -274,6 +278,7 @@ impl ExecCtx {
                         is_class: ICKind::SHAPE_PROP,
                         vtable_ver: 0,
                         class: None,
+                        ..Default::default()
                     });
                     drop(ic);
                     closure.feedback.borrow_mut().observe(cs_idx, old_shape_id);

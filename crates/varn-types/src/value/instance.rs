@@ -95,6 +95,15 @@ impl InstanceData {
         self.layout().map(|l| l.field_count()).unwrap_or(0)
     }
 
+    pub fn field_placement(&self, slot: usize) -> Option<(u32, u8)> {
+        let layout = self.layout()?;
+        let field = layout.get_field_by_index(slot)?;
+        Some((
+            field.offset,
+            varn_core::FieldAccess::Compact(field.kind).encode(),
+        ))
+    }
+
     #[inline]
     pub fn field_at(&self, slot: usize) -> Option<VmValue> {
         let layout = self.layout()?;

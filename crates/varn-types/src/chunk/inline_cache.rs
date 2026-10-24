@@ -31,6 +31,9 @@ pub struct CacheEntry {
 
     #[serde(skip)]
     pub class: Option<std::rc::Rc<crate::value::ClassObj>>,
+
+    pub offset: u32,
+    pub access: u8,
 }
 
 impl CacheEntry {
@@ -50,7 +53,7 @@ pub struct PolyICSlot {
     last_hit: u8,
 }
 
-pub const POLY_IC_SLOT_SIZE: usize = 136;
+pub const POLY_IC_SLOT_SIZE: usize = 200;
 
 impl Default for PolyICSlot {
     fn default() -> Self {
@@ -67,6 +70,8 @@ impl PolyICSlot {
         const _: () = assert!(std::mem::offset_of!(CacheEntry, is_class) == 6);
         const _: () = assert!(std::mem::offset_of!(CacheEntry, vtable_ver) == 7);
         const _: () = assert!(std::mem::offset_of!(CacheEntry, class) == 8);
+        const _: () = assert!(std::mem::offset_of!(CacheEntry, offset) == 16);
+        const _: () = assert!(std::mem::offset_of!(CacheEntry, access) == 20);
         Self {
             entries: std::array::from_fn(|_| CacheEntry::default()),
             next: 0,
@@ -148,7 +153,7 @@ mod tests {
         assert_eq!(std::mem::offset_of!(CacheEntry, is_class), 6);
         assert_eq!(std::mem::offset_of!(CacheEntry, vtable_ver), 7);
         assert_eq!(std::mem::offset_of!(CacheEntry, class), 8);
-        assert_eq!(std::mem::size_of::<CacheEntry>(), 16);
+        assert_eq!(std::mem::size_of::<CacheEntry>(), 24);
         assert_eq!(std::mem::size_of::<PolyICSlot>(), POLY_IC_SLOT_SIZE);
 
         let cls = std::rc::Rc::new(crate::value::ClassObj::new("Probe"));
@@ -159,6 +164,7 @@ mod tests {
             is_class: ICKind::VM_VTABLE_METHOD,
             vtable_ver: 1,
             class: Some(cls.clone()),
+            ..Default::default()
         });
         slot.find_or_insert(CacheEntry {
             id: 99,
@@ -166,6 +172,7 @@ mod tests {
             is_class: ICKind::SHAPE_PROP,
             vtable_ver: 0,
             class: None,
+            ..Default::default()
         });
         let hit = slot
             .entries

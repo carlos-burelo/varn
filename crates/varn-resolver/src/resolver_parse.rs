@@ -51,7 +51,11 @@ impl ModuleResolver {
         self.in_flight.lock().insert(key.to_owned());
         let mut bind = match varn_binder::core::loader::module_globals(key, self) {
             Some(globals) => varn_binder::Binder::bind_with_global_refs(
-                program, ast_arena, interner.clone(), self, &globals,
+                program,
+                ast_arena,
+                interner.clone(),
+                self,
+                &globals,
             ),
             None => varn_binder::Binder::bind(program, ast_arena, interner.clone(), self),
         };

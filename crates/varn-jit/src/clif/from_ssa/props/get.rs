@@ -49,7 +49,10 @@ pub(crate) fn emit_get_property(
         .ins()
         .icmp_imm_u(IntCC::Equal, tagb, olay.object_tag as i64);
     let ok = b.create_block();
-    b.ins().brif(is_obj, ok, &[], slow, &[]);
+    let not_object = b.create_block();
+    b.ins().brif(is_obj, ok, &[], not_object, &[]);
+    b.switch_to_block(not_object);
+    super::instance_ic::emit_instance_hit(b, ctx, op, tagb, frame.closure, cs, merge, slow);
     b.switch_to_block(ok);
 
     let data_ptr = b
