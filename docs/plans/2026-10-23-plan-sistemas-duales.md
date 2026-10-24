@@ -281,6 +281,25 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   y diagnósticos suprimidos en la primera. Necesita decisión: duplica el chequeo de la
   función que contiene el array.
 
+### C1.4 Rendimiento contra Bun/Node (2026-10-24)
+- Método: `cargo run --release -p xtask -- compare --skip-python --compact` (el alias
+  `cargo xtask` no existe en este checkout). Perfil: compilar con
+  `CARGO_PROFILE_RELEASE_DEBUG=line-tables-only cargo build --release --bin vn --target-dir <tmp>`,
+  `samply record --save-only --unstable-presymbolicate -r 4000 <tmp>/release/vn.exe run X.vn` y
+  `python scripts/prof_report.py profile.json.gz <tmp>/release/vn.exe 30` (resuelve contra el PDB
+  con DbgHelp, porque samply no lo hace con el PDB de Rust). Con `VARN_STD=<repo>/std` si el
+  binario no está dentro de `target/`.
+- Hallazgos corregidos: `alloc_str_view_of` copiaba el string padre entero por parte en `split`
+  (12a6ece4, e6d78477); `Json.parse` descartaba su caché de formas en cada llamada y solo tenía
+  una entrada (6dfe3c17); la aritmética protegida por una rama no tenía rango en el JIT
+  (1bc5bdb0, `fib` 60 -> 37 ms, ahora 1.32x más rápido que Bun); la VM destruía el heap objeto
+  por objeto al salir (b6c71d39).
+- Estado: 7 victorias, 3 empates, 4 derrotas (matrix 1.05x, csv_pipeline 1.08x,
+  json_api_payloads 1.19x, http_routing 1.82x). `http_routing` es asignación: 1.35M objetos por
+  corrida, `Vec<VmValue>` por array con malloc/free propio, recorrido completo de celdas en cada
+  GC mayor (`CellSpace::refs`) y celdas por mapa/instancia. Siguiente palanca medida: un
+  almacenamiento inline de arrays pequeños en la celda y un barrido por bitmap de celdas libres.
+
 ## Fase D — higiene y release
 
 ### D1. Flag muerto `FRAME_LAYOUT_V2_JIT_BAIL`
