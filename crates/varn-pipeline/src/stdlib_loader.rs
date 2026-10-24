@@ -124,28 +124,15 @@ fn compile_source_inner(
         }
         return Err(format!("type errors in stdlib module:{msg}"));
     }
-    let resolver = session;
-    let exports = if varn_core::ModuleKind::of(path).is_some() {
-        resolver.stdlib_exports(path)
-    } else {
-        resolver.module_exports(path, &mut vec![])
-    };
-    let export_names = crate::compile::sorted_export_names(&exports);
-    crate::compile::report_export_collisions(&exports, path)?;
-    let mut tir = crate::compile::emit_tir(&program, &arena, &check);
-    crate::layer_link::verify_synthetic_imports(
-        path,
-        &program,
-        &arena,
-        &check.bind.interner,
-        crate::compile::tir_import_sources(&tir)
-            .iter()
-            .map(|s| s.as_ref()),
-    )?;
-    crate::compile::inject_star_reexports(&mut tir, &exports);
-    crate::compile::resolve_import_slots(&mut tir, session, path);
-    let (result, _) = crate::compile::compile_tir(&tir, export_names, source, false);
-    result
+    crate::lower::lower_module(crate::lower::LowerInput {
+        program: &program,
+        arena: &arena,
+        check: &check,
+        resolver: session,
+        source,
+    })
+    .map(|lowered| lowered.proto)
+    .map_err(|e| e.to_string())
 }
 
 fn std_imports_are_pure(id: &str, source: &str) -> Result<bool, String> {

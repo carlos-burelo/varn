@@ -2,7 +2,6 @@ use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::collections::VecDeque;
 use std::path::Path;
 use varn_core::fingerprint::fingerprint;
-use varn_sem::resolver::ImportResolver;
 
 use varn_compiler::FunctionProto;
 use varn_core::ast::{AstArena, Program};
@@ -212,44 +211,29 @@ pub fn build_module_graph(
         );
 
         crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)?;
-        let resolver = session;
-        let exports = if varn_core::ModuleKind::of(&program.filename).is_some() {
-            resolver.stdlib_exports(&program.filename)
-        } else {
-            resolver.module_exports(&program.filename, &mut vec![])
-        };
-        let export_names = crate::compile::sorted_export_names(&exports);
-        crate::compile::report_export_collisions(&exports, &program.filename)?;
-        let mut tir = crate::compile::emit_tir(program, arena, &check);
-        crate::layer_link::verify_synthetic_imports(
-            &program.filename,
+        let lowered = crate::lower::lower_module(crate::lower::LowerInput {
             program,
             arena,
-            interner,
-            crate::compile::tir_import_sources(&tir)
-                .iter()
-                .map(|s| s.as_ref()),
-        )?;
-        crate::compile::inject_star_reexports(&mut tir, &exports);
-        crate::compile::resolve_import_slots(&mut tir, session, &program.filename);
+            check: &check,
+            resolver: session,
+            source: module_source,
+        })
+        .map_err(|e| crate::Failure::internal(format!("compile error in '{module_path}': {e}")))?;
         class_tables.insert(
             module_path.clone(),
             crate::class_link::ModuleClasses {
-                classes: tir.classes.clone(),
-                origins: tir
+                classes: lowered.tir.classes.clone(),
+                origins: lowered
+                    .tir
                     .class_origins
                     .iter()
                     .map(|o| o.as_ref().map(|s| s.to_string()))
                     .collect(),
-                types: tir.types.clone(),
+                types: lowered.tir.types.clone(),
             },
         );
-        let (module_result, _) =
-            crate::compile::compile_tir(&tir, export_names, module_source, false);
-        let module_proto =
-            module_result.map_err(|e| format!("compile error (tir) in '{module_path}': {e:?}"))?;
 
-        modules.insert(module_path, module_proto);
+        modules.insert(module_path, lowered.proto);
     }
 
     Ok(ModuleGraphBuild {

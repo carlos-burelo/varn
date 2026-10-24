@@ -20,14 +20,15 @@ pub mod stdlib_loader;
 mod class_link;
 mod layer_link;
 mod lex;
+mod lower;
 
 pub use check::check as phase_check;
 pub use check::collect_test_targets;
 pub use class_link::verify_foreign_layouts;
 pub use compile::CompileOutput;
-pub use compile::{
-    compile_tir, emit_tir, inject_star_reexports, report_export_collisions, resolve_import_slots,
-    sorted_export_names, tir_import_sources,
+pub use lower::{
+    compile_tir, emit_tir, inject_star_reexports, lower_module, report_export_collisions,
+    resolve_import_slots, sorted_export_names, tir_import_sources, LowerInput, Lowered,
 };
 pub use core::core_protos_owned;
 pub use debug_sink::{DebugSink, NullSink};
