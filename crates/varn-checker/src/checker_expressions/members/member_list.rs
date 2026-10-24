@@ -296,6 +296,7 @@ fn list_nominal(
     if let Some(ext_bind) = resolver.find_bind_for_type(&cn, &origin_modules)
         && let Some(entry) = ext_bind.type_members.classes.get(&cn)
     {
+        table.absorb(&ext_bind.ty_table);
         for m in &entry.members {
             let kind = super::member_kind::map_class_member_kind(m.kind);
             let mapped = map_ty(&m.ty, table);

@@ -186,6 +186,11 @@ b = ["task a"]
     $r.Code -ne 0 -and $r.Out -match "task cycle"
 }
 
+Check "debug-all-phases-on-a-generic-program" {
+    $r = Vn debug (Join-Path $RootDir "crates/varn-pipeline/tests/fixtures/debug/generics.vn") -p all
+    $r.Code -eq 0 -and $r.Out -notmatch "panicked"
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null
