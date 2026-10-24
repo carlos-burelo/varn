@@ -68,6 +68,16 @@ await describe("93 match guards spread predicates", async () => {
         
     });
 
+    await it("a bare identifier guard is not read as an arrow parameter", async () => {
+        function gate(n: int, open: bool): str {
+            return match (n) {
+                x if open => "open",
+                _ => "closed"
+            };
+        }
+        expect(gate(1, true)).toBe("open");
+        expect(gate(1, false)).toBe("closed");
+    });
     await it("Match guard with multi-value patterns / Object spread merging and property ove", async () => {
         function describeHttpCode(code: int): str {
         return match (code) {

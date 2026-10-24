@@ -37,7 +37,7 @@ fn parse_match_case(s: &mut TokenStream) -> Result<Vec<MatchCase>, String> {
     }
 
     let guard = if s.eat(TokenKind::If) {
-        Some(super::super::parse_expr(s)?)
+        Some(super::super::parse_conditional_expr(s)?)
     } else {
         None
     };
