@@ -206,6 +206,10 @@ pub(super) fn assemble(
         }
     });
 
+    for members in bind.type_members.namespaces.values_mut() {
+        varn_sem::bind::settle_members(members, &rec.symbol_types);
+    }
+
     let (symbol_types, node_scopes, scope_spans) = profile::timed(&mut profile.cleanup, || {
         let symbol_types = rec.symbol_types.clone();
         let node_scopes = if rec.enabled {

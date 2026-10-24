@@ -31,7 +31,7 @@ pub(super) fn infer_member_type(
         return varn_sem::infer::infer_expr_type(
             expr,
             arena,
-            Some(&varn_sem::bind::BindView::new(bind, checker.resolver)),
+            Some(&varn_sem::bind::BindView::new(bind, checker.resolver).settled(&rec.symbol_types)),
             &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
         );
     };
@@ -87,7 +87,7 @@ pub(super) fn infer_member_type(
     varn_sem::infer::infer_expr_type(
         expr,
         arena,
-        Some(&varn_sem::bind::BindView::new(bind, checker.resolver)),
+        Some(&varn_sem::bind::BindView::new(bind, checker.resolver).settled(&rec.symbol_types)),
         &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
     )
 }

@@ -9,6 +9,7 @@ pub struct BindView<'r> {
     pub bind: &'r BindResult,
     pub resolver: &'r dyn crate::resolver::ImportResolver,
     pub scope: ScopeId,
+    settled: Option<&'r rustc_hash::FxHashMap<crate::symbol::SymbolId, Type>>,
 }
 
 impl<'r> BindView<'r> {
@@ -17,7 +18,16 @@ impl<'r> BindView<'r> {
             bind,
             resolver,
             scope: bind.global_scope,
+            settled: None,
         }
+    }
+
+    pub fn settled(
+        mut self,
+        symbol_types: &'r rustc_hash::FxHashMap<crate::symbol::SymbolId, Type>,
+    ) -> Self {
+        self.settled = Some(symbol_types);
+        self
     }
 
     pub fn at(mut self, scope: ScopeId) -> Self {
@@ -106,7 +116,11 @@ impl TypeContext for BindView<'_> {
         if let Some(rb) = self.foreign(origin) {
             return rb.get_namespace_members_local(name).cloned();
         }
-        self.bind.get_namespace_members_local(name).cloned()
+        let mut members = self.bind.get_namespace_members_local(name).cloned()?;
+        if let Some(settled) = self.settled {
+            super::settle_members(&mut members, settled);
+        }
+        Some(members)
     }
 
     fn get_enum_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {

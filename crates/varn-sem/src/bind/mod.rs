@@ -142,7 +142,9 @@ pub enum DeclKind {
     Namespace,
 }
 
+mod settle;
 mod view;
+pub use settle::settle_members;
 pub use view::BindView;
 
 impl BindResult {
