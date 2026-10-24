@@ -263,6 +263,24 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   salir de una constante compartida. Campos de clase mutados por `SetProperty` mientras hay
   entradas vivas: el offset es del layout de la clase, no del valor, así que no se invalida.
 
+### C1.3 Resultado (2026-10-24)
+- Hecho: guards de import (55a3a798), caché de instancia en el JIT para lecturas
+  (0f3b0d9a, ba1c03ae) y escrituras (3095c29f) de campos vía interfaz o receptor sin clase
+  estática. Medido (`quick`, JIT, 100M-200M operaciones): lectura int por interfaz 6.6 s ->
+  0.34 s; lectura `str` 8.0 s -> 0.30 s; lectura de objeto 3.4 s -> 0.29 s; escritura int
+  3.96 s -> 0.29 s. `tests/main.vn`: `GetProperty` 2313 -> 702, `Eq` 1704 -> 93, 11k líneas
+  de bytecode menos (el guard de slot por import pasó a una verificación por módulo,
+  `FunctionProto.import_layouts`).
+- Lo que queda genérico no es lento en runtime (los accesos por nombre ya pegan en el IC):
+  interfaces 198, tipos de objeto 161 (2.3 ns por lectura), `Declared` 107, miembros core 85.
+  Mover esos contadores exige layouts fijos para tipos estructurales; sin ganancia medible.
+- Deuda de cimiento que sí limita el tipado: la inferencia de elemento de `let a = []`
+  (`tests/55-array-element-inference.vn` la espera; hoy `dynamic[]`). Diseño pendiente:
+  análisis de usos del símbolo (solo `push`/`a[i] = e`/lecturas, cualquier otro uso o
+  conflicto de tipos deja `dynamic`) más una segunda pasada del cuerpo con el tipo refinado
+  y diagnósticos suprimidos en la primera. Necesita decisión: duplica el chequeo de la
+  función que contiene el array.
+
 ## Fase D — higiene y release
 
 ### D1. Flag muerto `FRAME_LAYOUT_V2_JIT_BAIL`
