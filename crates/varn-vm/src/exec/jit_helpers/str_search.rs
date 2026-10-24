@@ -253,13 +253,13 @@ pub(crate) extern "C" fn jit_str_split(
             return;
         };
 
-        let sep: Option<String> = if argc == 0 {
+        let mut sbuf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
+        let sep: Option<&str> = if argc == 0 {
             None
         } else {
             let sep_val = VmValue::from_raw_parts(sep_tag, sep_payload);
-            let mut sbuf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             match borrow_str_fast(sep_val, &ctx_ref.heap, &mut sbuf) {
-                Some(sep) => Some(sep.to_owned()),
+                Some(sep) => Some(sep),
                 None => {
                     jit_propagate_error(
                         ctx_ref,
@@ -271,7 +271,7 @@ pub(crate) extern "C" fn jit_str_split(
         };
         let mut out = Vec::new();
         let base = text.as_ptr() as usize;
-        match sep.as_deref() {
+        match sep {
             Some(sep) if sep.len() == 1 => {
                 let byte = sep.as_bytes()[0];
                 for p in text.split(byte as char) {
@@ -290,9 +290,9 @@ pub(crate) extern "C" fn jit_str_split(
             }
         }
         let mut vals = Vec::with_capacity(out.len());
-        for (off, len) in out {
-            vals.push(ctx_ref.heap.alloc_str_view_of(s_val, off, len));
-        }
+        ctx_ref
+            .heap
+            .str_views_of(s_val, &out, |part| vals.push(part));
         ctx_ref.jit_native_result = ctx_ref
             .heap
             .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(vals));
