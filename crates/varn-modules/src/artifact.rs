@@ -3,12 +3,9 @@ use std::path::{Path, PathBuf};
 use varn_core::fingerprint::fingerprint;
 use varn_core::ModuleId;
 
-pub const ENV_DIR_NAME: &str = ".vn";
 pub const CACHE_DIR_NAME: &str = "cache";
 pub const BYTECODE_DIR_NAME: &str = "bytecode";
 pub const TYPES_DIR_NAME: &str = "types";
-pub const PACKAGE_MANIFEST_FILE: &str = "varn.toml";
-pub const PACKAGE_MANIFEST_FILE_VN: &str = "vn.toml";
 
 include!(concat!(env!("OUT_DIR"), "/build_fingerprint.rs"));
 
@@ -187,16 +184,6 @@ impl std::fmt::Display for ArtifactError {
             Self::Corrupt => write!(f, "artefacto corrupto (checksum no coincide)"),
         }
     }
-}
-
-pub fn find_project_root(start_path: &Path) -> PathBuf {
-    start_path
-        .ancestors()
-        .find(|dir| {
-            dir.join(PACKAGE_MANIFEST_FILE).exists() || dir.join(PACKAGE_MANIFEST_FILE_VN).exists()
-        })
-        .unwrap_or(start_path)
-        .to_path_buf()
 }
 
 pub fn global_varn_dir() -> PathBuf {

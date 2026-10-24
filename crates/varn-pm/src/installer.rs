@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::{
     cache, fetcher,
     lockfile::{LockPackage, PmLockfile},
-    manifest::{DepOrigin, ProjectManifest},
+    origin::{parse_dependencies, DepOrigin},
     resolver,
 };
 
@@ -14,7 +14,7 @@ pub struct InstallResult {
 
 pub fn resolve_and_install(
     project_root: &Path,
-    deps: &rustc_hash::FxHashMap<String, DepOrigin>,
+    deps: &std::collections::BTreeMap<String, DepOrigin>,
     existing_lock: Option<&PmLockfile>,
     force_update: bool,
 ) -> Result<InstallResult, String> {
@@ -42,7 +42,7 @@ pub fn resolve_and_install(
 
 fn resolve_recursive(
     project_root: &Path,
-    deps: &rustc_hash::FxHashMap<String, DepOrigin>,
+    deps: &std::collections::BTreeMap<String, DepOrigin>,
     existing_lock: Option<&PmLockfile>,
     force_update: bool,
     packages: &mut Vec<LockPackage>,
@@ -106,10 +106,10 @@ fn resolve_recursive(
         });
 
         let installed_pkg_dir = cache::local_package_path(project_root, alias);
-        let child_manifest_path = installed_pkg_dir.join(varn_modules::PACKAGE_MANIFEST_FILE);
+        let child_manifest_path = installed_pkg_dir.join(varn_project::MANIFEST_FILE);
         if child_manifest_path.exists()
-            && let Ok(child_manifest) = ProjectManifest::load(&child_manifest_path)
-            && let Ok(child_deps) = child_manifest.parsed_deps()
+            && let Ok(child_manifest) = varn_project::Manifest::load(&child_manifest_path)
+            && let Ok(child_deps) = parse_dependencies(&child_manifest.dependencies)
         {
             resolve_recursive(
                 project_root,

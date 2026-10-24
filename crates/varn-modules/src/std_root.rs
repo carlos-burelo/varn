@@ -29,26 +29,7 @@ pub fn classify(path: &Path) -> Option<StdSource> {
 }
 
 pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
-    let manifest_path = if project_root
-        .join(crate::artifact::PACKAGE_MANIFEST_FILE)
-        .exists()
-    {
-        project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE)
-    } else if project_root
-        .join(crate::artifact::PACKAGE_MANIFEST_FILE_VN)
-        .exists()
-    {
-        project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE_VN)
-    } else {
-        return None;
-    };
-    let raw = std::fs::read_to_string(&manifest_path).ok()?;
-    #[derive(serde::Deserialize)]
-    struct StdKey {
-        std: Option<String>,
-    }
-    let parsed: StdKey = toml::from_str(&raw).ok()?;
-    let rel = parsed.std?;
+    let rel = varn_project::Manifest::load_in(project_root).ok()??.std?;
     let p = PathBuf::from(&rel);
     Some(if p.is_absolute() {
         p
@@ -64,7 +45,7 @@ pub fn resolve() -> (StdSource, StdProvenance) {
 
 fn resolve_uncached() -> (StdSource, StdProvenance) {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let project_root = crate::artifact::find_project_root(&cwd);
+    let project_root = varn_project::nearest(&cwd).dir;
     if let Some(p) = project_std_override(&project_root)
         && let Some(src) = classify(&p)
     {

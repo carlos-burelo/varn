@@ -12,13 +12,10 @@ pub mod std_image;
 pub mod std_root;
 pub mod uri;
 
-pub use ids::{
-    DEFAULT_PACKAGE_VERSION, ENV_DIR_NAME, MODULES_DIR_NAME, PACKAGE_MANIFEST_FILE,
-    PACKAGE_MANIFEST_FILE_VN, PKG_PREFIX, RELATIVE_EXPORT_PREFIX, VARN_FILE_EXTENSION,
-};
+pub use ids::{DEFAULT_PACKAGE_VERSION, PKG_PREFIX, RELATIVE_EXPORT_PREFIX, VARN_FILE_EXTENSION};
 pub use package::{
     canonical_or_original, is_pkg_specifier, normalize_path_string, resolve_pkg_specifier,
-    resolve_pkg_specifier_detailed, PackageManifest, PackageResolution,
+    resolve_pkg_specifier_detailed, PackageResolution,
 };
 pub use registry::{
     core_module_ids, is_known_stdlib_module, is_prelude_module, prelude_modules, std_module_ids,

@@ -1,29 +1,26 @@
 use crate::cli::AddArgs;
 use crate::error::CliError;
 use varn_core::term::terminal;
-use varn_pm::{
-    installer, lockfile,
-    manifest::{find_project_manifest, DepOrigin, ProjectManifest},
-};
+use varn_pm::{installer, lockfile, DepOrigin};
 
 pub fn execute(args: AddArgs) -> Result<(), CliError> {
     let cwd =
         std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
 
-    let manifest_path = find_project_manifest(&cwd)
+    let manifest_path = varn_project::project_manifest(&cwd)
         .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd).to_path_buf();
 
     DepOrigin::parse(&args.origin).map_err(CliError::fatal)?;
 
-    let mut manifest = ProjectManifest::load(&manifest_path).map_err(CliError::fatal)?;
+    let mut manifest = varn_project::Manifest::load(&manifest_path)?;
 
     manifest
         .dependencies
         .insert(args.alias.clone(), args.origin.clone());
-    manifest.save(&manifest_path).map_err(CliError::fatal)?;
+    manifest.save(&manifest_path)?;
 
-    let deps = manifest.parsed_deps().map_err(CliError::fatal)?;
+    let deps = varn_pm::parse_dependencies(&manifest.dependencies).map_err(CliError::fatal)?;
 
     let lock_path = lockfile::lock_path(&project_root);
     let existing_lock = if lock_path.exists() {

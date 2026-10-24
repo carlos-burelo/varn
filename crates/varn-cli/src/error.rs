@@ -1,6 +1,7 @@
 use crate::exit::ExitCode;
 use std::fmt;
 use varn_pipeline::Failure;
+use varn_project::ManifestError;
 
 pub enum CliError {
     Failure(Failure),
@@ -41,5 +42,11 @@ impl fmt::Display for CliError {
 impl From<Failure> for CliError {
     fn from(failure: Failure) -> Self {
         CliError::Failure(failure)
+    }
+}
+
+impl From<ManifestError> for CliError {
+    fn from(error: ManifestError) -> Self {
+        CliError::Fatal(error.to_string())
     }
 }

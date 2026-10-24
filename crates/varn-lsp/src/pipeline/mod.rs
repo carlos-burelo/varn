@@ -128,7 +128,7 @@ pub fn run_pipeline(
         diagnostics.insert(
             0,
             LspDiag {
-                message: "no standard library found for this workspace (checked varn.json \
+                message: "no standard library found for this workspace (checked varn.toml \
                     'std', VARN_STD, this checkout's std/ tree, and the stdlib compiled \
                     into this binary) — rebuild or reinstall the vn toolchain"
                     .to_string(),

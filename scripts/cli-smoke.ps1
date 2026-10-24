@@ -73,6 +73,14 @@ Check "eval-syntax-error-renders-with-code-3" {
     $r.Code -eq 3 -and $r.Out -match '\(eval\)' -and $r.Out -match 'could not compile'
 }
 
+Check "init-writes-a-manifest-pkg-reads" {
+    $dir = Join-Path $work "initproj"
+    $init = Vn init $dir
+    Push-Location $dir
+    try { $tree = Vn pkg tree } finally { Pop-Location }
+    $init.Code -eq 0 -and $tree.Code -eq 0
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null

@@ -84,7 +84,7 @@ impl ModuleGraph {
     pub fn project_root_or_init(&mut self) -> &PathBuf {
         self.project_root.get_or_insert_with(|| {
             let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            varn_modules::artifact::find_project_root(&cwd)
+            varn_project::nearest(&cwd).dir
         })
     }
 

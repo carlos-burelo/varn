@@ -2,7 +2,7 @@ use sha2::{Digest, Sha256};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use crate::manifest::DepOrigin;
+use crate::origin::DepOrigin;
 
 pub fn fetch_and_extract(
     origin: &DepOrigin,

@@ -1,20 +1,17 @@
 use crate::cli::RemoveArgs;
 use crate::error::CliError;
 use varn_core::term::terminal;
-use varn_pm::{
-    installer, lockfile,
-    manifest::{find_project_manifest, ProjectManifest},
-};
+use varn_pm::{installer, lockfile};
 
 pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
     let cwd =
         std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
 
-    let manifest_path = find_project_manifest(&cwd)
+    let manifest_path = varn_project::project_manifest(&cwd)
         .ok_or_else(|| CliError::fatal("no varn.toml found".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd).to_path_buf();
 
-    let mut manifest = ProjectManifest::load(&manifest_path).map_err(CliError::fatal)?;
+    let mut manifest = varn_project::Manifest::load(&manifest_path)?;
 
     if !manifest.dependencies.contains_key(&args.alias) {
         return Err(CliError::fatal(format!(
@@ -24,7 +21,7 @@ pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
     }
 
     manifest.dependencies.remove(&args.alias);
-    manifest.save(&manifest_path).map_err(CliError::fatal)?;
+    manifest.save(&manifest_path)?;
 
     let local_pkg = varn_pm::cache::local_package_path(&project_root, &args.alias);
     if local_pkg.exists() {
@@ -33,7 +30,7 @@ pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
     }
 
     let lock_path = lockfile::lock_path(&project_root);
-    let deps = manifest.parsed_deps().map_err(CliError::fatal)?;
+    let deps = varn_pm::parse_dependencies(&manifest.dependencies).map_err(CliError::fatal)?;
 
     if deps.is_empty() {
         if lock_path.exists() {

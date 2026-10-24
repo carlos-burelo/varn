@@ -3749,6 +3749,7 @@ dependencies = [
  "varn-parser",
  "varn-pipeline",
  "varn-pm",
+ "varn-project",
  "varn-resolver",
  "varn-sem",
  "varn-types",
@@ -3903,9 +3904,8 @@ version = "0.1.0"
 dependencies = [
  "rustc-hash 1.1.0",
  "semver",
- "serde",
- "toml",
  "varn-core",
+ "varn-project",
 ]
 
 [[package]]
@@ -3929,6 +3929,7 @@ dependencies = [
  "varn-lexer",
  "varn-modules",
  "varn-parser",
+ "varn-project",
  "varn-resolver",
  "varn-sem",
  "varn-tir",
@@ -3948,10 +3949,18 @@ dependencies = [
  "serde_json",
  "sha2",
  "tar",
- "toml",
  "ureq",
  "varn-core",
  "varn-modules",
+ "varn-project",
+]
+
+[[package]]
+name = "varn-project"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
 ]
 
 [[package]]
@@ -3968,6 +3977,7 @@ dependencies = [
  "varn-lexer",
  "varn-modules",
  "varn-parser",
+ "varn-project",
  "varn-sem",
 ]
 

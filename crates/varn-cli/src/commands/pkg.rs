@@ -16,13 +16,13 @@ pub fn execute(cmd: PkgCommands) -> Result<(), CliError> {
 fn execute_tree() -> Result<(), CliError> {
     let cwd =
         std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
-    let manifest_path = varn_pm::manifest::find_project_manifest(&cwd)
+    let manifest_path = varn_project::project_manifest(&cwd)
         .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd);
 
-    let manifest = varn_pm::ProjectManifest::load(&manifest_path).map_err(CliError::fatal)?;
-    let project_name = manifest.get_name().unwrap_or("project");
-    let version = manifest.get_version().unwrap_or("0.0.0");
+    let manifest = varn_project::Manifest::load(&manifest_path)?;
+    let project_name = manifest.name.as_deref().unwrap_or("project");
+    let version = manifest.version.as_deref().unwrap_or("0.0.0");
 
     terminal::log(format!(
         "{project_name}@{version} ({})",
@@ -45,7 +45,7 @@ fn execute_tree() -> Result<(), CliError> {
         return Ok(());
     }
 
-    let deps = manifest.parsed_deps().map_err(CliError::fatal)?;
+    let deps = varn_pm::parse_dependencies(&manifest.dependencies).map_err(CliError::fatal)?;
     let total = deps.len();
     for (idx, (alias, origin)) in deps.iter().enumerate() {
         let is_last = idx + 1 == total;
@@ -59,7 +59,7 @@ fn execute_tree() -> Result<(), CliError> {
 fn execute_doctor() -> Result<(), CliError> {
     let cwd =
         std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
-    let manifest_path = varn_pm::manifest::find_project_manifest(&cwd)
+    let manifest_path = varn_project::project_manifest(&cwd)
         .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd);
 

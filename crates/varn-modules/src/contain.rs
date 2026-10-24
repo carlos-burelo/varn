@@ -5,14 +5,8 @@ fn canonicalize(path: &Path) -> PathBuf {
 }
 
 fn find_root_from(base_canon: &Path) -> (PathBuf, bool) {
-    for dir in base_canon.ancestors() {
-        if dir.join(super::artifact::PACKAGE_MANIFEST_FILE).exists()
-            || dir.join(super::artifact::PACKAGE_MANIFEST_FILE_VN).exists()
-        {
-            return (canonicalize(dir), true);
-        }
-    }
-    (base_canon.to_path_buf(), false)
+    let located = varn_project::nearest(base_canon);
+    (canonicalize(&located.dir), located.manifest.is_some())
 }
 
 fn root_cache() -> &'static std::sync::Mutex<std::collections::HashMap<PathBuf, (PathBuf, bool)>> {

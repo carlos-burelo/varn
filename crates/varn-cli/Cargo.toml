@@ -40,6 +40,7 @@ varn-debug    = { path = "../varn-debug" }
 varn-lsp      = { path = "../varn-lsp", optional = true }
 varn-dap      = { path = "../varn-dap", optional = true }
 varn-pm       = { path = "../varn-pm", optional = true }
+varn-project  = { path = "../varn-project" }
 varn-modules  = { path = "../varn-modules" }
 varn-jit      = { path = "../varn-jit" }
 tower-lsp-f   = { workspace = true, optional = true }

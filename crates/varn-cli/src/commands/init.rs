@@ -17,8 +17,8 @@ pub fn execute(args: InitArgs) -> Result<(), CliError> {
     }
 
     let main_path = base.join("main.vn").to_string_lossy().to_string();
-    let manifest_path = base.join("varn.toml").to_string_lossy().to_string();
-    let wr_dir = base.join(".vn").to_string_lossy().to_string();
+    let manifest_path = base.join(varn_project::MANIFEST_FILE).to_string_lossy().to_string();
+    let wr_dir = base.join(varn_project::ENV_DIR_NAME).to_string_lossy().to_string();
 
     if Path::new(&main_path).exists() {
         return Err(CliError::fatal(format!("'{main_path}' ya existe")));
@@ -32,8 +32,7 @@ pub fn execute(args: InitArgs) -> Result<(), CliError> {
         .map_err(|e| CliError::fatal(format!("no se puede escribir '{main_path}': {e}")))?;
 
     let manifest_content = format!(
-        r#"[package]
-name = "{name}"
+        r#"name = "{name}"
 version = "0.1.0"
 main = "main.vn"
 

@@ -9,6 +9,7 @@ varn-binder  = { path = "../varn-binder" }
 varn-checker = { path = "../varn-checker" }
 varn-core    = { path = "../varn-core" }
 varn-modules = { path = "../varn-modules" }
+varn-project = { path = "../varn-project" }
 varn-lexer   = { path = "../varn-lexer" }
 varn-parser  = { path = "../varn-parser" }
 rustc-hash   = { workspace = true }

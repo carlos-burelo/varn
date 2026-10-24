@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
 
-pub fn load() {
+use crate::root::nearest;
+
+pub fn apply_from_cwd() {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let root = varn_modules::artifact::find_project_root(&cwd);
+    let root = nearest(&cwd).dir;
 
     let mut dirs: Vec<&Path> = vec![cwd.as_path()];
     if root != cwd {
@@ -10,14 +12,14 @@ pub fn load() {
     }
 
     for dir in &dirs {
-        load_file(&dir.join(".env.local"));
+        apply_file(&dir.join(".env.local"));
     }
     for dir in &dirs {
-        load_file(&dir.join(".env"));
+        apply_file(&dir.join(".env"));
     }
 }
 
-fn load_file(path: &Path) {
+fn apply_file(path: &Path) {
     let Ok(contents) = std::fs::read_to_string(path) else {
         return;
     };
@@ -31,17 +33,11 @@ fn load_file(path: &Path) {
             continue;
         };
         let key = key.trim();
-        if key.is_empty() {
+        if key.is_empty() || std::env::var_os(key).is_some() {
             continue;
         }
-
-        if std::env::var_os(key).is_some() {
-            continue;
-        }
-        let value = unquote(value.trim());
-
         unsafe {
-            std::env::set_var(key, value);
+            std::env::set_var(key, unquote(value.trim()));
         }
     }
 }

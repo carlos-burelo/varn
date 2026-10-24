@@ -11,7 +11,7 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     let path = Path::new(file_path);
     let file_dir = path.parent().unwrap_or_else(|| Path::new("."));
 
-    let project_root = varn_modules::artifact::find_project_root(file_dir);
+    let project_root = varn_project::nearest(file_dir).dir;
 
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let path_hash = varn_core::fingerprint::fingerprint(canonical.to_string_lossy().as_bytes());

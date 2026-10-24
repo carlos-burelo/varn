@@ -1,9 +1,7 @@
-use super::ids::{
-    DEFAULT_PACKAGE_VERSION, ENV_DIR_NAME, MODULES_DIR_NAME, PACKAGE_MANIFEST_FILE,
-    PACKAGE_MANIFEST_FILE_VN, PKG_PREFIX, RELATIVE_EXPORT_PREFIX,
-};
+use super::ids::{DEFAULT_PACKAGE_VERSION, PKG_PREFIX, RELATIVE_EXPORT_PREFIX};
 use semver::{Version, VersionReq};
 use std::path::{Path, PathBuf};
+use varn_project::{Manifest, ENV_DIR_NAME, MANIFEST_FILE, MODULES_DIR_NAME};
 
 pub fn is_pkg_specifier(specifier: &str) -> bool {
     specifier.starts_with(PKG_PREFIX)
@@ -104,7 +102,7 @@ pub fn resolve_pkg_specifier_detailed(
 
 fn resolve_export_target(
     package_root: &Path,
-    manifest: &PackageManifest,
+    manifest: &Manifest,
     package_name: &str,
     sub: &str,
 ) -> Result<PathBuf, String> {
@@ -198,95 +196,16 @@ fn find_package_root(base_dir: &Path, package_name: &str) -> Option<PathBuf> {
     None
 }
 
-#[derive(serde::Deserialize, Default)]
-struct PackageSection {
-    name: Option<String>,
-    version: Option<String>,
-    main: Option<String>,
-}
-
-#[derive(serde::Deserialize, Default)]
-struct RawManifest {
-    #[serde(default)]
-    package: Option<PackageSection>,
-    #[serde(default)]
-    project: Option<PackageSection>,
-
-    name: Option<String>,
-    version: Option<String>,
-    main: Option<String>,
-
-    #[serde(default)]
-    exports: rustc_hash::FxHashMap<String, String>,
-    #[serde(default)]
-    dependencies: rustc_hash::FxHashMap<String, String>,
-    #[serde(default, alias = "dev-dependencies", alias = "dev_dependencies")]
-    dev_dependencies: rustc_hash::FxHashMap<String, String>,
-    #[serde(default, alias = "peer-dependencies", alias = "peer_dependencies")]
-    peer_dependencies: rustc_hash::FxHashMap<String, String>,
-    #[serde(default)]
-    workspaces: Vec<String>,
-}
-
-#[derive(Clone, Debug)]
-pub struct PackageManifest {
-    pub name: Option<String>,
-    pub version: Option<String>,
-    pub main: Option<String>,
-    pub exports: rustc_hash::FxHashMap<String, String>,
-    pub dependencies: rustc_hash::FxHashMap<String, String>,
-    pub dev_dependencies: rustc_hash::FxHashMap<String, String>,
-    pub peer_dependencies: rustc_hash::FxHashMap<String, String>,
-    pub workspaces: Vec<String>,
-}
-
-fn load_package_manifest(package_root: &Path) -> Result<PackageManifest, String> {
-    let manifest_path = if package_root.join(PACKAGE_MANIFEST_FILE).exists() {
-        package_root.join(PACKAGE_MANIFEST_FILE)
-    } else if package_root.join(PACKAGE_MANIFEST_FILE_VN).exists() {
-        package_root.join(PACKAGE_MANIFEST_FILE_VN)
-    } else {
-        return Err(format!(
-            "missing {} in package root {}",
-            PACKAGE_MANIFEST_FILE,
-            package_root.display()
-        ));
-    };
-
-    let raw = std::fs::read_to_string(&manifest_path)
-        .map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
-    let parsed: RawManifest =
-        toml::from_str(&raw).map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
-
-    let name = parsed
-        .package
-        .as_ref()
-        .and_then(|p| p.name.clone())
-        .or_else(|| parsed.project.as_ref().and_then(|p| p.name.clone()))
-        .or(parsed.name);
-    let version = parsed
-        .package
-        .as_ref()
-        .and_then(|p| p.version.clone())
-        .or_else(|| parsed.project.as_ref().and_then(|p| p.version.clone()))
-        .or(parsed.version);
-    let main = parsed
-        .package
-        .as_ref()
-        .and_then(|p| p.main.clone())
-        .or_else(|| parsed.project.as_ref().and_then(|p| p.main.clone()))
-        .or(parsed.main);
-
-    Ok(PackageManifest {
-        name,
-        version,
-        main,
-        exports: parsed.exports,
-        dependencies: parsed.dependencies,
-        dev_dependencies: parsed.dev_dependencies,
-        peer_dependencies: parsed.peer_dependencies,
-        workspaces: parsed.workspaces,
-    })
+fn load_package_manifest(package_root: &Path) -> Result<Manifest, String> {
+    Manifest::load_in(package_root)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| {
+            format!(
+                "missing {} in package root {}",
+                MANIFEST_FILE,
+                package_root.display()
+            )
+        })
 }
 
 pub(crate) fn resolve_path_candidates(target: &Path) -> Option<String> {
@@ -360,7 +279,7 @@ fn enforce_dependency_constraint(
     Ok(())
 }
 
-fn nearest_owner_manifest(base_dir: &Path) -> Option<PackageManifest> {
+fn nearest_owner_manifest(base_dir: &Path) -> Option<Manifest> {
     for dir in base_dir.ancestors() {
         if dir.ends_with(Path::new(ENV_DIR_NAME).join(MODULES_DIR_NAME)) {
             continue;

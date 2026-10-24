@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
-use crate::manifest::DepOrigin;
+use crate::origin::DepOrigin;
 
 pub fn global_cache_root() -> PathBuf {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_else(|_| ".".to_owned());
     PathBuf::from(home)
-        .join(varn_modules::ENV_DIR_NAME)
+        .join(varn_project::ENV_DIR_NAME)
         .join("cache")
 }
 
@@ -26,8 +26,8 @@ pub fn cached_package_path(origin: &DepOrigin, version: &str) -> PathBuf {
 
 pub fn local_package_path(project_root: &std::path::Path, alias: &str) -> PathBuf {
     project_root
-        .join(varn_modules::ENV_DIR_NAME)
-        .join(varn_modules::MODULES_DIR_NAME)
+        .join(varn_project::ENV_DIR_NAME)
+        .join(varn_project::MODULES_DIR_NAME)
         .join(alias)
 }
 
