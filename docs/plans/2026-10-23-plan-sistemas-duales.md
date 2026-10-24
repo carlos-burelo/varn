@@ -300,6 +300,28 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   GC mayor (`CellSpace::refs`) y celdas por mapa/instancia. Siguiente palanca medida: un
   almacenamiento inline de arrays pequeños en la celda y un barrido por bitmap de celdas libres.
 
+### C1.5 Auditoría del código máquina (2026-10-24, `vn debug -p clif:asm` sobre los 25 benchmarks)
+- Global: ~55% de las instrucciones son `mov`, ~20% acceso a pila; cada helper cuesta
+  `mov [ctx+278h],0` antes y `mov/test/jne` después (protocolo de error); los bucles internos
+  miden 100-160 instrucciones con ~35% de pila.
+- E1 (mayor): las vistas de array (base, longitud, repr) son variables del JIT que el camino de
+  refresco redefine dentro del bucle y que `clear_all` anula tras el sondeo de GC; el bucle las
+  lleva como parámetros de bloque y el regalloc las derrama: `matrix` 12 movimientos de pila por
+  iteración del bucle interno, `array_ops` 7, más `test rdi,rdi` y el camino de refresco. Arreglo:
+  validar y fijar la vista en el preheader cuando el bucle no contiene ops que invaliden vistas
+  (el GC no mueve objetos), y no anularla tras el sondeo.
+- E2: guardas repetidas sobre el mismo valor: `class_fields` repite `and 0FF; cmp 4; byte [..]`
+  tres veces por sentencia sobre `pt`, cuyo tipo estático (`Point`, no nulo) ya lo garantiza.
+  Arreglo: deduplicar guardas por valor dentro del bloque/bucle y usar el tipo del TIR para
+  omitirlas cuando el valor viene tipado.
+- E3: despacho de representación de array (`I64` o boxed) en cada acceso: versionar el bucle por
+  repr una vez.
+- E4: suma/resta comprobadas salen como `add; seto; test; jne` en vez de `add; jo`
+  (la multiplicación sí se fusiona), 2 instrucciones por operación.
+- E5: bucle sin rotar (`cmp; jl` arriba y `jmp` abajo), constantes de máscara reconstruidas en el
+  bucle (`abs`), y el sondeo de GC en bucles sin asignación: arreglado para los intrínsecos
+  matemáticos inline (0978b0c4).
+
 ## Fase D — higiene y release
 
 ### D1. Flag muerto `FRAME_LAYOUT_V2_JIT_BAIL`
