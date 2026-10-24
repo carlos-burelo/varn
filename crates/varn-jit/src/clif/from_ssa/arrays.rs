@@ -87,9 +87,16 @@ pub(super) fn view(
     b.switch_to_block(miss);
     let obj = heap::boxed_value(b, ctx, values, object)?;
     let (d, l, di) = resolve(b, ctx, obj, slow);
-    b.def_var(v.data, d);
-    b.def_var(v.len, l);
-    b.def_var(v.disc, di);
+    let pinned_here = ctx
+        .pinned_bodies
+        .borrow()
+        .get(&object)
+        .is_some_and(|body| body.contains(&ctx.emitting_block.get()));
+    if !pinned_here {
+        b.def_var(v.data, d);
+        b.def_var(v.len, l);
+        b.def_var(v.disc, di);
+    }
 
     super::store::drop_home_addrs(ctx);
     b.ins().jump(ready, &[d.into(), l.into(), di.into()]);

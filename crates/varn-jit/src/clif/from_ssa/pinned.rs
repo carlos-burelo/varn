@@ -2,12 +2,17 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use varn_types::ssa::{SsaOp, SsaProto};
 
+pub(super) struct Pins {
+    pub prefill: BTreeMap<usize, Vec<u32>>,
+    pub bodies: BTreeMap<u32, BTreeSet<usize>>,
+}
+
 pub(super) fn compute(
     ssa: &SsaProto,
     preds: &[Vec<usize>],
     rpo_pos: &[usize],
     reached: &[bool],
-) -> BTreeMap<usize, Vec<u32>> {
+) -> Pins {
     let mut def_block: BTreeMap<u32, usize> = BTreeMap::new();
     for (b, blk) in ssa.blocks.iter().enumerate() {
         if !reached[b] {
@@ -45,7 +50,7 @@ pub(super) fn compute(
         let body = super::cfg::loop_body(preds, rpo_pos, reached, *h);
         bodies.insert(*h, body.into_iter().collect());
     }
-    let mut best: BTreeMap<u32, (usize, usize)> = BTreeMap::new();
+    let mut best: BTreeMap<u32, (usize, usize, usize)> = BTreeMap::new();
     for (object, uses) in &readers {
         for h in &headers {
             let body = &bodies[h];
@@ -179,20 +184,25 @@ pub(super) fn compute(
             let pre = outside[0];
             let size = body.len();
             match best.get(object) {
-                Some((_, s)) if *s >= size => {}
+                Some((_, s, _)) if *s >= size => {}
                 Some(_) | None => {
-                    best.insert(*object, (pre, size));
+                    best.insert(*object, (pre, size, *h));
                 }
             }
         }
     }
-    let mut pins: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
-    for (object, (pre, _)) in best {
-        pins.entry(pre).or_default().push(object);
+    let mut prefill: BTreeMap<usize, Vec<u32>> = BTreeMap::new();
+    let mut pinned_bodies: BTreeMap<u32, BTreeSet<usize>> = BTreeMap::new();
+    for (object, (pre, _, header)) in best {
+        prefill.entry(pre).or_default().push(object);
+        pinned_bodies.insert(object, bodies[&header].clone());
     }
-    for v in pins.values_mut() {
+    for v in prefill.values_mut() {
         v.sort_unstable();
         v.dedup();
     }
-    pins
+    Pins {
+        prefill,
+        bodies: pinned_bodies,
+    }
 }

@@ -47,6 +47,11 @@ pub(super) struct Ctx<'a> {
 
     pub elide: std::cell::Cell<bool>,
 
+    pub pinned_bodies:
+        std::cell::RefCell<std::collections::BTreeMap<u32, std::collections::BTreeSet<usize>>>,
+
+    pub emitting_block: std::cell::Cell<usize>,
+
     pub carried: FxHashMap<u32, cranelift_frontend::Variable>,
 
     pub try_live: FxHashSet<u32>,

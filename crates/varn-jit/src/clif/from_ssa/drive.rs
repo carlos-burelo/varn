@@ -143,6 +143,8 @@ pub(in crate::clif) fn try_lower(
         no_overflow,
         fast_bounds: rustc_hash::FxHashSet::default(),
         elide: std::cell::Cell::new(false),
+        pinned_bodies: Default::default(),
+        emitting_block: std::cell::Cell::new(usize::MAX),
         home_addrs: Default::default(),
         natives: Default::default(),
         scratch,
@@ -191,7 +193,11 @@ pub(in crate::clif) fn try_lower(
     }
     let pins = match osr {
         Some(_) => std::collections::BTreeMap::new(),
-        None => pinned::compute(ssa, &reach.preds, &reach.rpo_pos, &reach.reached),
+        None => {
+            let plan = pinned::compute(ssa, &reach.preds, &reach.rpo_pos, &reach.reached);
+            *ctx.pinned_bodies.borrow_mut() = plan.bodies;
+            plan.prefill
+        }
     };
     if super::super::trace() && !pins.is_empty() {
         let mut flat: Vec<String> = Vec::new();

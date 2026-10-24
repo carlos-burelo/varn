@@ -36,6 +36,7 @@ pub(super) fn lower_block(
 ) -> Result<(), String> {
     let blk = &ssa.blocks[ssa_idx];
     exceptions::set_block_stack(ctx, ssa_idx);
+    ctx.emitting_block.set(ssa_idx);
     let saved = if landing_live.contains_key(&ssa_idx) {
         Some(values.to_vec())
     } else {
