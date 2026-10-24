@@ -72,6 +72,21 @@ clausura libre. Los métodos que no usan `this` no cambian de comportamiento.
 - **Accesores como campos con clausura (dispatch por nombre en runtime).** Rechazada: lookup
   dinámico por nombre, Ley 17.
 
+## Hallazgos de implementación (paso 1)
+
+`ClassExpr` hoy no es una expresión de primera clase, solo la forma `const K = class {…}`:
+
+- El binder nombra toda clase anónima `<anon>` (`varn-binder/src/class.rs`); dos clases anónimas comparten nombre.
+- `emit` recoge las clases desde sentencias de nivel superior y tipos anidados (`classes.rs`, `module_top.rs`,
+  `nested_types.rs`, `decl_classify::anon_class_of`), solo cuando el inicializador de una variable es el `ClassExpr`.
+  En posición de expresión baja a `Var` con la resolución `"<anon>"` (`body.rs`).
+- El checker infiere `ClassExpr` como `Type::Dynamic` (`infer_impl.rs`).
+
+Por eso el paso 1 exige: identidad única por sitio (derivada de `ast_id`), registro de la clase en el binder bajo ese
+nombre, recolección en `emit` desde cualquier posición de expresión (con capturas del ámbito envolvente) y tipo
+nominal en el checker. Sintetizar el literal como declaración elevada antes del binder fue descartado: los campos
+necesitan tipo y el AST reescrito pierde fidelidad para el LSP y el formateador.
+
 ## Pasos de migración
 
 1. Tipar `ClassExpr` como su clase y arreglar `new class {…}()`.
