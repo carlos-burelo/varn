@@ -48,9 +48,7 @@ impl Checker<'_> {
                 .collect();
             let type_params = Self::declared_type_params(owner, &name);
             let members = owner
-                .type_members
-                .enums
-                .get(name.as_ref())
+                .get_enum_members_local(name.as_ref())
                 .map(|members| {
                     members
                         .iter()

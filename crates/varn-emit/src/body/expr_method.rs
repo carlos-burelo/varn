@@ -43,11 +43,37 @@ impl<'a> FnEmitter<'a> {
         arg_count: usize,
         all_positional: bool,
     ) -> Resolution {
-        self.class_of(recv_ty)
-            .and_then(|ci| ci.method_slot(name).map(|s| (s, ci)))
-            .and_then(|(slot, ci)| {
-                let entry = ci.method_at(slot)?;
-                let sig = self.signatures.get(entry.sig.0 as usize)?;
+        let slotted = match recv_ty.non_nullable(self.tt) {
+            BackendTy::Enum(id) => self.m.enums.get(id.0 as usize).and_then(|info| {
+                let slot = info.member_slot(name)?;
+                Some((slot, info.member_at(slot)?.sig))
+            }),
+            BackendTy::Class(_) => self.class_of(recv_ty).and_then(|ci| {
+                let slot = ci.method_slot(name)?;
+                Some((slot, ci.method_at(slot)?.sig))
+            }),
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => None,
+        };
+        slotted
+            .and_then(|(slot, sig)| {
+                let sig = self.signatures.get(sig.0 as usize)?;
                 (all_positional && sig.params.len() == arg_count)
                     .then_some(Resolution::VtableSlot(slot))
             })
