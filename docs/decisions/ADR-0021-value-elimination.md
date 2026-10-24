@@ -15,7 +15,7 @@ guardaba handles del heap de la VM sin regla de propiedad ni de enraizado.
 Un handle crudo almacenado en un `Value` sobrevivía a un GC menor sin
 reescribirse. Se midieron tres corrupciones silenciosas: argumentos de tarea,
 resultados de tarea resueltos y la recolección de `parallel`. La auditoría
-completa está en `docs/notes/2026-10-02-value-vmvalue-audit.md`.
+completa está en `docs/dev/notes/2026-10-02-value-vmvalue-audit.md`.
 
 ## Decisión
 Un solo mecanismo por frontera:

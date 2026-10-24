@@ -74,7 +74,7 @@ texto → tokens → AST → check → TIR tipado → SSA → pases → bytecode
 28 crates en un workspace (`varn-lexer`, `varn-parser`, `varn-checker`, `varn-emit`,
 `varn-compiler`, `varn-vm`, `varn-jit`, `varn-builtins`, `varn-lsp`…). Cada fase
 produce un artefacto inmutable que consume la siguiente, y las dependencias van en
-una sola dirección. Mapa completo: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+una sola dirección. Mapa completo: [`docs/internals/ARCHITECTURE.md`](docs/internals/ARCHITECTURE.md).
 
 ## Documentación
 
@@ -82,14 +82,13 @@ una sola dirección. Mapa completo: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.m
 |---|---|
 | Aprender el lenguaje | [`docs/lang/`](docs/lang/README.md) — cada rasgo citado con su test |
 | Usar el CLI | [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md), [`docs/CLI_INSPECT.md`](docs/CLI_INSPECT.md) |
-| La biblioteca estándar | [`docs/STDLIB_ARCHITECTURE.md`](docs/STDLIB_ARCHITECTURE.md), [`docs/lang/standard_library.md`](docs/lang/standard_library.md) |
-| Entender el compilador | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/COMPILER_ARCHITECTURE.md`](docs/COMPILER_ARCHITECTURE.md), [`docs/TIR_CONTRATO_TIPADO.md`](docs/TIR_CONTRATO_TIPADO.md) |
-| Entender el runtime | [`docs/VM_ARCHITECTURE.md`](docs/VM_ARCHITECTURE.md), [`docs/RUNTIME_ARCHITECTURE.md`](docs/RUNTIME_ARCHITECTURE.md), [`docs/JIT_ABI_V2_SPEC.md`](docs/JIT_ABI_V2_SPEC.md) |
-| Módulos, nativos y permisos | [`docs/MODULES_SYSTEM.md`](docs/MODULES_SYSTEM.md), [`docs/LBI_ARCHITECTURE.md`](docs/LBI_ARCHITECTURE.md), [`docs/HOST_BOUNDARY_SPEC.md`](docs/HOST_BOUNDARY_SPEC.md) |
-| Qué viene | [`docs/plans/2026-10-16-plan-unificado.md`](docs/plans/2026-10-16-plan-unificado.md) (plan vivo), [`docs/ROADMAP.md`](docs/ROADMAP.md) |
+| La biblioteca estándar | [`docs/lang/standard_library.md`](docs/lang/standard_library.md), [`docs/internals/STDLIB_ARCHITECTURE.md`](docs/internals/STDLIB_ARCHITECTURE.md) |
+| Entender el compilador y el runtime | [`docs/internals/`](docs/internals/README.md) |
+| Decisiones de diseño | [`docs/decisions/`](docs/decisions/) (ADRs) |
+| Qué viene | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
-`docs/decisions/` (ADRs), `docs/notes/` y los `docs/AUDIT_*` son registro
-histórico, no especificación. Si un documento contradice al código, manda el código.
+`docs/dev/` (auditorías, notas, planes de trabajo) es registro interno, no
+especificación. Si un documento contradice al código, manda el código.
 
 ## Contribuir
 

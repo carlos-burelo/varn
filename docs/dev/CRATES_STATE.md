@@ -2,7 +2,7 @@
 
 Matriz de estado y jerarquía de dependencias de los **29 members** declarados en `Cargo.toml` (raíz, `members`): `varn-core`, `varn-lexer`, `varn-parser`, `varn-checker`, `varn-emit`, `varn-types`, `varn-tir`, `varn-sem`, `varn-binder`, `varn-resolver`, `varn-macros`, `varn-modules`, `varn-builtins`, `varn-cli`, `varn-lsp`, `varn-vm`, `varn-debug`, `varn-pm`, `varn-jit`, `varn-jit-abi`, `varn-pipeline`, `varn-compiler`, `varn-gpu`, `varn-ui`, `varn-text`, `varn-rt`, `varn-shadow`, `varn-dap` y `xtask`. `default-members` excluye `varn-rt`, `varn-shadow` y `xtask`.
 
-Los conteos (líneas, tests, asserts) viven en el código y no se copian aquí: se desincronizan. La prueba canónica de integridad es `tests/main.vn` (200+ imports) bajo las cuatro combinaciones de procedencia de std y JIT (más el cuadrante 5 de caché JIT en `verify.ps1`) descritas en [CONTRIBUTING.md](../CONTRIBUTING.md).
+Los conteos (líneas, tests, asserts) viven en el código y no se copian aquí: se desincronizan. La prueba canónica de integridad es `tests/main.vn` (200+ imports) bajo las cuatro combinaciones de procedencia de std y JIT (más el cuadrante 5 de caché JIT en `verify.ps1`) descritas en [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ---
 

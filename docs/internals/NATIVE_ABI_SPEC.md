@@ -1,7 +1,7 @@
 # Especificación de la ABI JIT/Nativa
 
 Contrato vigente entre código generado (`varn-jit`, Cranelift) y VM (`varn-vm`).
-Detalle completo en `docs/JIT_ABI_V2_SPEC.md`; aquí el resumen normativo.
+Detalle completo en `docs/internals/JIT_ABI_V2_SPEC.md`; aquí el resumen normativo.
 
 ## 1. Versión
 
@@ -24,7 +24,7 @@ Windows). Se intenta `Native` y se cae a `Framed` con `NEEDS_ACTIVATION`
 `VmValue` = 16 B (`tag: u64, payload: u64`); kinds 0..6
 (NULL/BOOL/INT/FLOAT/HEAP/SSO/SYMBOL), SSO hasta 8 B. Los frames separan
 registros por clase: GPR `i64`, FPR `f64`, Refs `HeapRef`, Dyn `VmValue`
-(`docs/VM_ARCHITECTURE.md` §1-2). Las nativas Rust tienen tipo `NativeFn = fn(&mut dyn NativeCtx, &[VmValue]) -> NativeFnResult`
+(`docs/internals/VM_ARCHITECTURE.md` §1-2). Las nativas Rust tienen tipo `NativeFn = fn(&mut dyn NativeCtx, &[VmValue]) -> NativeFnResult`
 (`varn-types/src/native.rs`); se generan desde el contrato `.vn` con `varn_contract!`
 (ver `LBI_ARCHITECTURE.md`).
 

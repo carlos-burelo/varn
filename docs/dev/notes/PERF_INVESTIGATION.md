@@ -19,7 +19,7 @@ below are **measured on this machine** with the release binary
 ## Cross-cutting finding: integers are 48-bit
 
 `VmValue::from_int` masks the payload to 48 bits and `as_int` sign-extends from
-bit 47 — [`vm_value.rs:63`](../crates/varn-types/src/vm_value.rs#L63),
+bit 47 — [`vm_value.rs:63`](../../../crates/varn-types/src/vm_value.rs#L63),
 `MASK_INT48 = 0x0000_FFFF_FFFF_FFFF`.
 
 ```
@@ -49,7 +49,7 @@ inline range.
 
 Top-level `let`/`const` are compiled as **module globals**, not registers.
 HIR lowering keys the decision on scope:
-[`decl.rs:303`](../crates/varn-opt/src/hir/lower/decl.rs#L303)
+[`decl.rs:303`](../../../crates/varn-opt/src/hir/lower/decl.rs#L303)
 
 ```rust
 let is_global = scope.is_global();   // true at module top level
@@ -75,7 +75,7 @@ Disassembly of the loop body (`vn debug -p bytecode`):
 Two compounding problems:
 
 1. **Q1/Q2:** `sum` is a global (memory load/store via `GlobalStore.values[idx]`,
-   [`globals.rs`](../crates/varn-vm/src/globals.rs)); `i` is a register. Only
+   [`globals.rs`](../../../crates/varn-vm/src/globals.rs)); `i` is a register. Only
    `sum` generates the global traffic — confirmed by the profile showing one
    `LoadGlobalIdx`/`DefineGlobalIdx` pair per iteration.
 2. The accumulator uses **generic `Add`** (runtime type dispatch) while `i++`
@@ -167,7 +167,7 @@ Measured at 50M iterations × 3 properties = 150M `GetProperty`:
 
 ### Q1/Q2 — Where the time goes on an IC *hit*
 
-Path: [`get_property.rs`](../crates/varn-vm/src/exec/dispatch/reg_ops/get_property.rs).
+Path: [`get_property.rs`](../../../crates/varn-vm/src/exec/dispatch/reg_ops/get_property.rs).
 Even on a guaranteed hit, each access pays:
 
 1. `closure.feedback.borrow()` — a **RefCell borrow** to read the `megamorphic`
@@ -264,15 +264,15 @@ the per-call/per-global recording weighs more heavily on the direct path.
 
 * Frames are VM-managed: `frames: Vec<CallFrame>`, and the interpreter loop
   `run_until_inner_raw`
-  ([`dispatch/mod.rs:89`](../crates/varn-vm/src/exec/dispatch/mod.rs#L89)) is
+  ([`dispatch/mod.rs:89`](../../../crates/varn-vm/src/exec/dispatch/mod.rs#L89)) is
   iterative (`'frame_loop`). Pure-interpreter recursion is bounded by an
   explicit guard: `if self.frames.len() >= 10000 { Err("call depth exceeded
   10000") }` — present on every interpreter call path
-  ([`calls.rs:217,261,352`](../crates/varn-vm/src/exec/dispatch/reg_ops/calls.rs#L217)).
+  ([`calls.rs:217,261,352`](../../../crates/varn-vm/src/exec/dispatch/reg_ops/calls.rs#L217)).
 * **But `count` gets JIT-compiled** (it is a non-`<module>` function, so it is
   compiled on first call — Investigation 7). JIT'd code that calls back into the
   VM does so via `run_until_inner` recursively
-  ([`ctx_jit_runtime.rs:822`](../crates/varn-vm/src/exec/ctx_jit_runtime.rs#L822)),
+  ([`ctx_jit_runtime.rs:822`](../../../crates/varn-vm/src/exec/ctx_jit_runtime.rs#L822)),
   which consumes **Rust native stack per Varn frame and does not check the 10000
   guard**.
 
@@ -329,7 +329,7 @@ error in pure-interpreter mode, an unrecoverable abort once JIT'd.
 ### Root cause — two multiplicative O(n) costs per concat
 
 `s = s + "a"` lowers to `StrConcat`, implemented as
-[`strings.rs:17`](../crates/varn-vm/src/exec/strings.rs#L17):
+[`strings.rs:17`](../../../crates/varn-vm/src/exec/strings.rs#L17):
 
 ```rust
 pub fn str_concat(a, b, heap) -> VmValue {
@@ -339,7 +339,7 @@ pub fn str_concat(a, b, heap) -> VmValue {
 }
 ```
 
-and `alloc_str` [`heap.rs:463`](../crates/varn-vm/src/heap.rs#L463) **interns by
+and `alloc_str` [`heap.rs:463`](../../../crates/varn-vm/src/heap.rs#L463) **interns by
 content**:
 
 ```rust
@@ -386,7 +386,7 @@ GC cannot rescue this for two reasons:
 * The interner holds live `Rc` references, so the intermediate strings are
   **reachable** — not garbage.
 * `needs_gc()` / `needs_minor_gc()` are only checked at **frame push**
-  ([`frame_ctrl.rs:25`](../crates/varn-vm/src/exec/frame_ctrl.rs#L25)). The
+  ([`frame_ctrl.rs:25`](../../../crates/varn-vm/src/exec/frame_ctrl.rs#L25)). The
   concat loop makes no calls, so GC is never even consulted inside it.
 
 ### Q4 — Growth strategy
@@ -398,7 +398,7 @@ no `×2`, no in-place buffer.
 
 * **Do not intern `alloc_str` results.** Reserve interning for known-constant
   strings (`alloc_str_interned` already exists at
-  [`heap.rs:503`](../crates/varn-vm/src/heap.rs#L503)); dynamic concat output
+  [`heap.rs:503`](../../../crates/varn-vm/src/heap.rs#L503)); dynamic concat output
   must never enter the content-keyed interner.
 * Give `StrConcat` an in-place fast path: when the left operand is a uniquely
   referenced heap string (`Rc::get_mut`/refcount == 1), `push_str` into it with
@@ -416,8 +416,8 @@ no `×2`, no in-place buffer.
 The JIT is **eager and per-function**, not tiered/threshold-based:
 
 * `CallFrame::new`/`new_owned` call `compile_jit()` on **first frame creation**
-  ([`frame.rs:96,117`](../crates/varn-vm/src/frame.rs#L96)).
-* `compile_jit` [`frame.rs:121`](../crates/varn-vm/src/frame.rs#L121):
+  ([`frame.rs:96,117`](../../../crates/varn-vm/src/frame.rs#L96)).
+* `compile_jit` [`frame.rs:121`](../../../crates/varn-vm/src/frame.rs#L121):
   * **`<module>` is hard-excluded**: `if name == "<module>" { jit_failed = true;
     return }`.
   * If `proto.jit_entry` is already set → reuse cached native code (`jit_cached`).
@@ -426,7 +426,7 @@ The JIT is **eager and per-function**, not tiered/threshold-based:
     the interpreter permanently for that proto.
 * At frame entry the loop runs native code when `jit_entry.is_some()` and bumps
   `JIT_STATS.jit_runs` once per invocation
-  ([`dispatch/mod.rs:98`](../crates/varn-vm/src/exec/dispatch/mod.rs#L98)).
+  ([`dispatch/mod.rs:98`](../../../crates/varn-vm/src/exec/dispatch/mod.rs#L98)).
 
 So **"JIT runs" = number of JIT'd-function frame entries**, not a compile count.
 
@@ -445,7 +445,7 @@ entered 50M times. `vn bench inv4_direct.vn` → `add 50 000 000  jit 100%`.
 ### Q4 — Theoretical ceiling of the current design
 
 The JIT is a **call-threaded Cranelift compiler**: `JitHelpers`
-([`frame.rs:139`](../crates/varn-vm/src/frame.rs#L139)) maps essentially every
+([`frame.rs:139`](../../../crates/varn-vm/src/frame.rs#L139)) maps essentially every
 opcode — `jit_add`, `jit_lt`, `jit_get_property`, `jit_load_global_idx`, … — to a
 **Rust helper call**. The generated code mostly removes the bytecode
 dispatch/decode loop and register-array indirection, but arithmetic and property
@@ -530,13 +530,13 @@ failed**, no regression).
 
 ### Inv6 — string concatenation OOM → fixed
 
-* `Heap::alloc_str_dynamic` ([`heap.rs`](../crates/varn-vm/src/heap.rs)) — a
+* `Heap::alloc_str_dynamic` ([`heap.rs`](../../../crates/varn-vm/src/heap.rs)) — a
   non-interning allocation for dynamically produced strings. `str_concat`,
-  `to_string` and `str_slice` ([`strings.rs`](../crates/varn-vm/src/exec/strings.rs))
+  `to_string` and `str_slice` ([`strings.rs`](../../../crates/varn-vm/src/exec/strings.rs))
   now use it, so concatenation no longer hashes the full accumulator on every
   step nor retains every intermediate in the content interner.
 * GC on loop back-edges
-  ([`ops_control_calls.rs`](../crates/varn-vm/src/exec/dispatch/ops_control_calls.rs),
+  ([`ops_control_calls.rs`](../../../crates/varn-vm/src/exec/dispatch/ops_control_calls.rs),
   `OpCode::Loop`) — a long call-free allocating loop now reaches a GC check and
   reclaims dead intermediates instead of growing unbounded.
 
@@ -549,10 +549,10 @@ for true O(n) (see below).
 
 * Depth guard `jit_guard_call_depth` added to the unguarded JIT native-call
   helpers `jit_call`, `jit_prepare_call`, `jit_push_self_frame`
-  ([`ctx_jit_values.rs`](../crates/varn-vm/src/exec/ctx_jit_values.rs)).
+  ([`ctx_jit_values.rs`](../../../crates/varn-vm/src/exec/ctx_jit_values.rs)).
 * Removed the unguarded `is_pure` self-call fast path in the JIT and added an
   inline call-depth check that diverts to the guarded helper at the limit
-  ([`codegen/calls.rs`](../crates/varn-jit/src/codegen/calls.rs), `emit_call_self`).
+  ([`codegen/calls.rs`](../../../crates/varn-jit/src/codegen/calls.rs), `emit_call_self`).
 
 Result: `count(20000)` / `count(1_000_000)` now raise a catchable
 `runtime error: stack overflow: call depth exceeded 10000` (exit 1) instead of
@@ -562,7 +562,7 @@ aborting the host (`thread 'main' has overflowed its stack`, exit 127).
 ### Inv1 + Inv7 — top-level code never JIT'd → fixed
 
 * Removed the `<module>` exclusion in `compile_jit`
-  ([`frame.rs`](../crates/varn-vm/src/frame.rs)). Top-level code is now JIT
+  ([`frame.rs`](../../../crates/varn-vm/src/frame.rs)). Top-level code is now JIT
   compiled like any function (compilation failure still falls back to the
   interpreter, so it is safe).
 

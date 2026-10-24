@@ -416,7 +416,7 @@ Real-code: cualquier loop con cómputo entero.
 Ambos comparten prerequisito: **análisis de loops naturales en el JIT**
 (hoy solo existe en el backend). Implementarlo una vez, reusar en ambos.
 
-Relacionado: `docs/VM_ARCHITECTURE.md`, `docs/COMPILER_ARCHITECTURE.md`,
+Relacionado: `docs/internals/VM_ARCHITECTURE.md`, `docs/internals/COMPILER_ARCHITECTURE.md`,
 memorias [[varn-int-semantics-i48]] [[varn-jit-register-meta-contract]]
 [[varn-jit-inline-heap-layout]].
 

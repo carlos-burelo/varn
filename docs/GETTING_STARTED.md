@@ -93,4 +93,4 @@ vn test ruta/al/archivo.vn
 
 - [`CLI_REFERENCE.md`](CLI_REFERENCE.md) — todos los comandos y variables de entorno.
 - [`CLI_INSPECT.md`](CLI_INSPECT.md) — `vn debug -p …` para ver cada fase.
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — cómo está hecho el compilador.
+- [`ARCHITECTURE.md`](internals/ARCHITECTURE.md) — cómo está hecho el compilador.

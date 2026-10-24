@@ -1,7 +1,7 @@
 # Arquitectura de Varn
 
 Mapa del compilador y del runtime. Cada cita es un archivo o símbolo del repo; si
-contradice al código, manda el código. Contrato de diseño: [`AGENTS.md`](../AGENTS.md).
+contradice al código, manda el código. Contrato de diseño: [`AGENTS.md`](../../AGENTS.md).
 
 ## Pipeline
 
@@ -31,7 +31,7 @@ El TIR lo emite después `varn-emit` a partir de esos artefactos.
 ## Crates
 
 29 miembros del workspace (`Cargo.toml`): 28 crates + `xtask`. Grafo de dependencias
-real en [`CRATES_STATE.md`](CRATES_STATE.md).
+real en [`CRATES_STATE.md`](../dev/CRATES_STATE.md).
 
 | Capa | Crates |
 |---|---|

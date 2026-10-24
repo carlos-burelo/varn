@@ -2,7 +2,7 @@
 
 Propuestas de ergonomía y su estado, verificado contra el compilador el
 2026-10-17. Una propuesta pasa a «hecha» solo con un test en `tests/` que la
-ejercite. Para el resto, aplica el checklist de [`AGENTS.md`](../AGENTS.md)
+ejercite. Para el resto, aplica el checklist de [`AGENTS.md`](../../AGENTS.md)
 antes de implementarla.
 
 ## Objetivos

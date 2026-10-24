@@ -142,7 +142,7 @@ Runtime: Heap (nursery + old mark-sweep), HeapStr{Shared,Ext,Slice,Inline37}, Vm
 Crates (workspace `Cargo.toml:2-22`): `varn-core, varn-lexer, varn-parser, varn-checker, varn-types, varn-tir, varn-op-macros, varn-modules, varn-builtins, varn-runtime, varn-cli (bin vn), varn-lsp, varn-vm, varn-debug, varn-pm, varn-jit, varn-pipeline, varn-compiler, varn-rt, xtask`.
 
 Discrepancias docs vs código (prioridad al código):
-- `docs/VM_ARCHITECTURE.md:89`: diagrama `Nursery 4096 Slots` vs texto `NURSERY_CAPACITY=65536` en el mismo párrafo; código usa `is_full/FULL_THRESHOLD 75%` (`heap/gc.rs:19`, `nursery.rs`).
+- `docs/internals/VM_ARCHITECTURE.md:89`: diagrama `Nursery 4096 Slots` vs texto `NURSERY_CAPACITY=65536` en el mismo párrafo; código usa `is_full/FULL_THRESHOLD 75%` (`heap/gc.rs:19`, `nursery.rs`).
 - `VM_ARCHITECTURE.md:101-113`: dibuja `ObjData=[Header|Shape|fields]` contiguo; código es `shape:Rc + values:Cells + overflow:UnsafeCell<Box<Vec>>>` (`types/value/object.rs:170-181`).
 - `VM_ARCHITECTURE.md:8,19`: habla de crate `varn-jit`; el lado VM real es `varn-vm/src/jit/{mod,tiering}.rs` + `ic_entries` en closure.
 - `RUNTIME_ARCHITECTURE.md:28,52`: estado async en `ObjData`; código usa `InstanceData` + `VmBuffer/TaskHandle` (`exec/host/mod.rs:233-393`).

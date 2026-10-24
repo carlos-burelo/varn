@@ -11,7 +11,7 @@ Aceptada (2026-09-23). Reemplaza la sección 2 de ADR-0004.
 `docs/lang/SPEC_NUCLEO_Y_PLATAFORMA.md` fija cuatro tipos numéricos públicos
 y prohíbe conversiones implícitas con pérdida. El código aceptaba `int → float`
 implícito, `int / int → float`, ocho anchos angostos públicos, y tenía
-crashes y errores silenciosos (ver `docs/plans/2026-09-23-new-spec-roadmap.md` §2.1).
+crashes y errores silenciosos (ver `docs/dev/plans/2026-09-23-new-spec-roadmap.md` §2.1).
 
 ## Decisiones
 - D1 `for (const x of e)` se mantiene; `for x in e` del spec es ilustrativo.

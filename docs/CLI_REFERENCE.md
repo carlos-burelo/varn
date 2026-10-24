@@ -19,7 +19,7 @@ viva; esta página la resume.
 
 Sin ningún `--allow-*` el programa corre con todos los permisos. Con alguno, solo
 lo pedido. `--sandbox` lo niega todo. Detalle en
-[`HOST_BOUNDARY_SPEC.md`](HOST_BOUNDARY_SPEC.md).
+[`HOST_BOUNDARY_SPEC.md`](internals/HOST_BOUNDARY_SPEC.md).
 
 `-A/--allow-all`, `--allow-read[=PATHS]`, `--allow-write[=PATHS]`,
 `--allow-net[=HOSTS]`, `--allow-env[=VARS]`, `--allow-ffi`, `--allow-ui`,

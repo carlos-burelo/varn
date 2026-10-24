@@ -45,7 +45,7 @@ Evidencia base: `crates/varn-lsp/tests/design_audit_test.rs` (H1–H10).
 Registrado 2026-10-16. Eje común: el tipo estático se cumple de punta a
 punta (checker → TIR → JIT → caché → arranque), cosa que un runtime de JS
 no puede prometer. Orden sugerido: 1, 3, 2, 4. Ninguno empieza antes de
-cerrar lo pendiente en `docs/plans/2026-10-16-plan-unificado.md`.
+cerrar lo pendiente en `docs/dev/plans/2026-10-16-plan-unificado.md`.
 
 ### 1. Rendimiento garantizado por el compilador
 
