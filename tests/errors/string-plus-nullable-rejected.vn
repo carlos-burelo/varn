@@ -1,0 +1,3 @@
+// expect: error[VN3010]
+const s: str? = null
+const t = "a" + s

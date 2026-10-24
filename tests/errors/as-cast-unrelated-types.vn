@@ -1,0 +1,3 @@
+// expect: error[VN3014]
+const s: str = "x"
+const n = s as int

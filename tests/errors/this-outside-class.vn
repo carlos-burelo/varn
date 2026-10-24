@@ -1,0 +1,2 @@
+// expect: error[VN4115]
+const o = { n: 1, twice() { return this.n * 2 } }

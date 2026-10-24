@@ -1,0 +1,3 @@
+// expect: error[VN3010]
+const n: int = 1
+const s = "n=" + n
