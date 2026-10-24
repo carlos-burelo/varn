@@ -98,10 +98,10 @@ impl<'m> Builder<'m> {
             return Ok(None);
         }
         if !tf.locals.is_empty() || tf.body.len() != 1 {
-            return self.try_inline_body_call(f, args, call_ty, force);
+            return self.try_inline_body_call(f, args, call_ty, force, None);
         }
         let TirStmt::Return(Some(ref ret_expr)) = tf.body[0] else {
-            return self.try_inline_body_call(f, args, call_ty, force);
+            return self.try_inline_body_call(f, args, call_ty, force, None);
         };
         if args.len() != tf.params.len()
             || args

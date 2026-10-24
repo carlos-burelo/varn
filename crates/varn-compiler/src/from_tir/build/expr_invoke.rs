@@ -89,6 +89,11 @@ impl<'m> Builder<'m> {
             );
             return self.lower_call(bound, args, ty);
         }
+        if !matches!(res, Resolution::NativeOp(_))
+            && let Some(v) = self.try_inline_method_call(recv, r, name, args, ty)?
+        {
+            return Ok(v);
+        }
         let argv = self.lower_args(args)?;
         if let Resolution::NativeOp(op_id) = res {
             if *op_id == varn_core::op_id::KnownOp::ArrayPush.id() && argv.len() == 1 {

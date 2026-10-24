@@ -22,6 +22,7 @@ mod functions;
 mod globals;
 mod infra;
 mod inline_body;
+mod inline_method;
 mod ops;
 mod stmt;
 

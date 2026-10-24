@@ -5,7 +5,7 @@ use crate::ssa::ir::{InstKind, Terminator, Value, VarId};
 use crate::OptError;
 use varn_tir::{BackendTy, FnId, Resolution, TirArg, TirExpr, TirExprKind, TirFunction, TirStmt};
 
-const NODE_BUDGET: usize = 64;
+const NODE_BUDGET: usize = 96;
 const LOCAL_SPAN: u32 = 1024;
 const RESULT_SLOT: u32 = LOCAL_SPAN - 1;
 
@@ -101,7 +101,6 @@ fn body_inlinable(tf: &TirFunction, force: bool) -> bool {
     if tf.is_async
         || tf.is_generator
         || tf.has_rest
-        || tf.has_this
         || tf.locals.len() + tf.params.len() >= RESULT_SLOT as usize
     {
         return false;
@@ -145,13 +144,15 @@ impl<'m> Builder<'m> {
         args: &[TirArg],
         call_ty: BackendTy,
         force: bool,
+        this: Option<Value>,
     ) -> Result<Option<Value>> {
         let tir = self.tir;
         let Some(tf) = tir.function(f) else {
             return Ok(None);
         };
-        let plain_args =
-            args.len() == tf.params.len() && !args.iter().any(|a| matches!(a, TirArg::Spread(_)));
+        let plain_args = args.len() == tf.params.len()
+            && tf.has_this == this.is_some()
+            && !args.iter().any(|a| matches!(a, TirArg::Spread(_)));
         if !plain_args || !body_inlinable(tf, force) {
             if force {
                 return Err(OptError::Unsupported(
@@ -180,7 +181,7 @@ impl<'m> Builder<'m> {
         self.inlining.push(InlineFrame {
             func: f,
             params: argv,
-            this: None,
+            this,
             body: Some(InlineBody {
                 func: f,
                 base,
