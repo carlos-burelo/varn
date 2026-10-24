@@ -1,6 +1,6 @@
 # RFC 0001: accesores y `this` en literales de objeto
 
-- Estado: draft
+- Estado: draft (bloqueado: ver «Obstáculo»)
 - Fecha: 2026-10-24
 
 ## Resumen
@@ -86,6 +86,32 @@ Por eso el paso 1 exige: identidad única por sitio (derivada de `ast_id`), regi
 nombre, recolección en `emit` desde cualquier posición de expresión (con capturas del ámbito envolvente) y tipo
 nominal en el checker. Sintetizar el literal como declaración elevada antes del binder fue descartado: los campos
 necesitan tipo y el AST reescrito pierde fidelidad para el LSP y el formateador.
+
+## Obstáculo: las clases no capturan locales
+
+`check_local_class_capture` (`varn-binder/src/type_names.rs`) rechaza que una clase declarada dentro de una
+función use los locales de esa función: «a class or enum declared inside a function is one module-wide type».
+Una clase sintetizada desde un literal heredaría esa regla, y los métodos de literal sí capturan locales hoy:
+
+```vn
+function make(step: int) { return { n: 0, next() { return step } } }
+```
+
+Con el diseño de arriba ese literal pasaría a ser error. Hay tres salidas y hay que elegir una antes de
+escribir código:
+
+1. **Prohibir capturas en literales con accesores o `this`.** Mismo criterio que las clases locales. Rompe los
+   literales con métodos que capturan y usan `this`; los métodos sin `this` pueden seguir como campos con clausura.
+   Dos caminos de bajada para métodos (con y sin `this`): choca con Ley 8.
+2. **Conversión de clausuras.** Los locales capturados pasan a campos ocultos de la clase sintetizada (por valor;
+   los mutables en celdas compartidas). Un solo mecanismo y sin ruptura, pero exige análisis de capturas en el
+   checker y celdas en el backend: es el trabajo más grande.
+3. **Accesores como ranura marcada en el objeto** (`ObjectLit` con ranuras de accesor). Descartada: el tipo
+   `{ x: int }` no distingue dato de accesor, así que cada lectura necesitaría comprobar la ranura en runtime
+   (Ley 17) y tocaría la VM y el IC del JIT.
+
+Recomendación: 2, porque es la única que da un mecanismo único y estático sin romper código. Estado: bloqueado a
+la espera de esa decisión.
 
 ## Pasos de migración
 
