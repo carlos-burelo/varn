@@ -237,10 +237,12 @@ impl<'r> Checker<'r> {
         };
         for promised in &c.implements {
             let contract = self.resolve_type_node_cached(promised, bind);
-            if contract.is_dynamic()
-                || self.class_contract_satisfied(&contract, &instance, bind)
-                || self.types_compatible_cached(&contract, &instance, Some(bind))
-            {
+            let satisfied = contract.is_dynamic()
+                || match self.class_contract_satisfied(&contract, &instance, bind) {
+                    Some(verdict) => verdict,
+                    None => self.types_compatible_cached(&contract, &instance, Some(bind)),
+                };
+            if satisfied {
                 continue;
             }
             let contract_s = contract.display(&self.ty_table, &bind.interner);
@@ -259,14 +261,14 @@ impl<'r> Checker<'r> {
         contract: &varn_sem::types::Type,
         instance: &varn_sem::types::Type,
         bind: &BindResult,
-    ) -> bool {
+    ) -> Option<bool> {
         use crate::checker_expressions::members::member_util::generic_mapping;
         use varn_sem::bind::BindView;
         use varn_sem::types::TypeContext;
         let varn_core::TypeKind::Generic(name_atom, args_list, origin_atom) =
             self.ty_table.get(contract.0)
         else {
-            return false;
+            return None;
         };
         let name = self.resolve_bind_atom(bind, name_atom);
         let origin = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
@@ -274,11 +276,11 @@ impl<'r> Checker<'r> {
             .as_deref()
             .is_some_and(|o| o != bind.source_file.as_ref())
         {
-            return false;
+            return None;
         }
         let view = BindView::new(bind, self.resolver);
         let Some(members) = view.get_class_members(&name, origin.as_deref()) else {
-            return false;
+            return None;
         };
         let args: Vec<varn_sem::types::Type> = self
             .ty_table
@@ -288,7 +290,7 @@ impl<'r> Checker<'r> {
             .collect();
         let mapping = generic_mapping(self.resolver, &name, &args, origin.as_ref(), bind);
         if mapping.is_empty() {
-            return false;
+            return None;
         }
         let table = std::sync::Arc::make_mut(&mut self.ty_table);
         let object_members: Vec<_> = members
@@ -308,7 +310,7 @@ impl<'r> Checker<'r> {
             .map(|cm| cm.as_object_member(table).map_generics(&mapping, table))
             .collect();
         let object = varn_sem::types::Type::object(object_members, table);
-        self.types_compatible_cached(&object, instance, Some(bind))
+        Some(self.types_compatible_cached(&object, instance, Some(bind)))
     }
 
     fn lineage_is_generic(&self, class: &str, bind: &BindResult) -> bool {
