@@ -115,14 +115,8 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
         });
     }
 
-    let type_ann = if s.eat(TokenKind::Colon) {
-        parse_type(s)?
-    } else {
-        s.type_node(
-            s.range(),
-            varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Dynamic),
-        )
-    };
+    s.expect(TokenKind::Colon)?;
+    let type_ann = parse_type(s)?;
     s.eat_semicolon();
     let full_range = s.span_from(mem_range);
     Ok(InterfaceMember::Property {
