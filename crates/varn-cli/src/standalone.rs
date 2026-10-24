@@ -53,11 +53,12 @@ fn read_embedded() -> Result<Option<ModuleGraphArtifact>, String> {
     }
 
     let payload_len = u64::from_le_bytes(trailer[0..8].try_into().map_err(|_| "trailer")?);
-    if len < TRAILER_LEN + payload_len {
-        return Err("the trailer announces more bytes than the file has".to_owned());
-    }
+    let start = payload_len
+        .checked_add(TRAILER_LEN)
+        .and_then(|announced| len.checked_sub(announced))
+        .ok_or_else(|| "the trailer announces more bytes than the file has".to_owned())?;
     let mut envelope = vec![0u8; payload_len as usize];
-    file.seek(SeekFrom::Start(len - TRAILER_LEN - payload_len))
+    file.seek(SeekFrom::Start(start))
         .and_then(|_| file.read_exact(&mut envelope))
         .map_err(|e| e.to_string())?;
 
