@@ -335,8 +335,6 @@ RecordLiteral = "#" ObjectLiteral ;
 ObjectLiteral = "{" ObjectBody "}" ;
 ObjectBody    = { ObjectProp [ "," ] } ;
 ObjectProp    = "..." AssignExpr
-              | "get" PropKey "(" ")" [ ":" Type ] Block
-              | "set" PropKey "(" Param ")" Block
               | [ "async" ] [ "*" ] PropKey Params [ ":" Type ] Block        (* método *)
               | PropKey ":" AssignExpr
               | Identifier ;                                                  (* abreviada *)
@@ -439,9 +437,9 @@ el `?` de un ternario, no como sufijo nulable.
 
 ## 6. Lo que el parser acepta y el checker rechaza
 
-La gramática es más ancha que el lenguaje. El checker rechaza, entre otros, `get`/`set` en
-literales de objeto (se declara una clase o un método), `export` de un binding no
-constante y patrones de `match` que no pueden coincidir con el tipo del sujeto.
+La gramática es más ancha que el lenguaje. El checker rechaza, entre otros, `export` de un
+binding no constante, `this` fuera de una clase, enum o extensión, y patrones de `match` que
+no pueden coincidir con el tipo del sujeto.
 La autoridad sobre si un programa es válido es `vn check`.
 
 ---
@@ -455,6 +453,7 @@ La autoridad sobre si un programa es válido es `vn check`.
 | `void expr`, `delete x` | `_` descarta valores; `delete` no existe |
 | `extension for T { … }` | sintaxis antigua; ahora `extension [Nombre] on T { … }` |
 | `function` dentro de `extension` | los miembros usan sintaxis de método |
+| `get x() {}` / `set x(v) {}` en un literal de objeto | un literal no tiene receptor; declarar una clase (RFC 0001) |
 | huecos en destructuración de array | usar `_` |
 | decoradores con `<T>` | los decoradores no son genéricos |
 | decoradores sobre `interface`, `type`, `enum`, `namespace`, `struct`, `extension`, variables, `import` | solo `function`, `class` y sus `export` |
