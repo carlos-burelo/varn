@@ -18,7 +18,7 @@ impl<'r> super::super::Binder<'r> {
                 .type_ann
                 .as_ref()
                 .map(|ann| self.resolve_type(ann))
-                .or_else(|| d.init.map(|e| self.infer_expr_type_self(e)));
+                .or_else(|| d.init.map(|_| Type::Dynamic));
 
             let ty = if ty.is_none() {
                 self.report_missing_variable_annotation(d);
