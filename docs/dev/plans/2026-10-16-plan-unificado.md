@@ -104,8 +104,30 @@ Checker (2026-10-17, hallados al compilar los ejemplos de `docs/`): asignar a
 un nombre no declarado no daba error y llegaba al verificador TIR como
 `InvalidTir` (`1f274bea`); las sentencias inalcanzables solo avisaban y no se
 chequeaban, pero se emitían (`94f63b09`). Corpus `tests/errors` 206/0.
+Toolchain (2026-10-24, diseño y plan en `2026-10-24-toolchain-pipeline*.md`):
+`Failure` tipado y exit codes en el borde (`df849f7a`); `varn-project` con un
+solo `varn.toml` y una sola búsqueda de raíz (`bb302345`); `Session` dueña del
+`Project` y del resolver (`ad2234b7`); `Source` (`283499b7`); `lower_module`
+único (`682ce5ea`); `Session::compile` con `Compilation` por etapas, sin
+`DebugSink` ni `RunOpts` (`767f7430`); `Policy` y `PermissionArgs`
+(`52b456c0`); `main` delgado, features `lsp`/`dap`/`pm` fuera, `Target` y
+linker en `varn-jit` (`d7510dd7`, `cdd5a247`); `--target exe` (`7aeff0c1`);
+`vn task` (`0e338714`); bench sobre `Compilation` (`8426ff49`); `varn-inspect`
+(`a795e15c`); LSP sobre `Session` en modo `Tooling` (`0b68dc9b`). Hallados y
+corregidos en el camino: `implements` de clase genérica sin verificar
+(`3ac6f3b1`), pánico del hover con miembros de clase foránea (`003aa267`),
+`.vn/.env` que `vn init` creaba y nadie leía.
 
 ## 2. Pendiente, por orden
+
+### 2.0 Tests invocados por el runtime
+
+`vn test` ejecuta cada `@test` compilando el archivo con una llamada añadida
+(`Source::appended`). Sustituirlo por `Executable.tests` + `Runtime::run_test`
+exige `slot_idx` en `TestTarget`, una llamada pública del host en `Vm` que espere
+tareas y la conversión de un valor lanzado en `RuntimeError`; detalle y
+verificación en el diseño (`2026-10-24-toolchain-pipeline-design.md`, «Pendiente
+de diseño»).
 
 ### 2.1 Representación: un bloque por valor
 
