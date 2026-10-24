@@ -1,4 +1,3 @@
-import { FunctionRef } from "std:reflect";
 import { newComponentDefinition, scopeAtMount } from "std:ui/state";
 import { viewAt } from "std:ui/mount";
 import { Widget, Constraints, Placement, PaintContext, paintPlaced, KeyedNode } from "std:ui/widget/base";
@@ -28,10 +27,10 @@ export class ComponentNode extends Widget {
     }
 }
 
-export function component(): (fn: FunctionRef) => (...args: int[]) => Widget {
-    return (fn: FunctionRef) => {
+export function component(): (fn: (...args: int[]) => Widget) => (...args: int[]) => Widget {
+    return (fn: (...args: int[]) => Widget) => {
         const definition = newComponentDefinition();
-        return (...args: int[]) => new ComponentNode(definition, () => fn(...args) as Widget);
+        return (...args: int[]) => new ComponentNode(definition, () => fn(...args));
     };
 }
 

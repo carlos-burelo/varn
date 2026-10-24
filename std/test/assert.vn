@@ -104,7 +104,7 @@ export class Expectation<T> {
     }
 
     toBeCloseTo(expected: float, epsilon: float = 0.00001): void {
-        let a = this.actual as float;
+        let a = (this.actual as dynamic) as float;
         let diff = a - expected;
         if (diff < 0.0) diff = -diff;
         if (diff > epsilon) {
@@ -120,7 +120,7 @@ export class Expectation<T> {
         if (actual is str) {
             found = item is str && actual.includes(item);
         } else {
-            for (let elem of actual as E[]) {
+            for (let elem of (actual as dynamic) as E[]) {
                 if (isEq(elem, item)) {
                     found = true;
                     break;

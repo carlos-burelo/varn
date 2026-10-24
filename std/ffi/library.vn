@@ -39,7 +39,7 @@ export class FfiFunction {
     }
 
     invoke(args: FfiValue[] = []): FfiScalar {
-        return call$(this.fnPtr, this.returnType as int, marshal(args));
+        return call$(this.fnPtr, this.returnType.rawValue, marshal(args));
     }
 
     call(...args: FfiValue[]): FfiScalar {
@@ -102,7 +102,7 @@ export class Ffi {
 
     static call(fnPtr: Pointer | int, returnType: FfiType, args: FfiValue[] = []): FfiScalar {
         let addr = fnPtr is Pointer ? fnPtr.address : fnPtr;
-        return call$(addr, returnType as int, marshal(args));
+        return call$(addr, returnType.rawValue, marshal(args));
     }
 
     static callInt(fnPtr: Pointer | int, a1: int, a2: int): int {
