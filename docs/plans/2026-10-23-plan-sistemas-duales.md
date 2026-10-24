@@ -322,6 +322,26 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   bucle (`abs`), y el sondeo de GC en bucles sin asignación: arreglado para los intrínsecos
   matemáticos inline (0978b0c4).
 
+### C1.6 Segunda auditoría del código máquina (2026-10-24)
+- Mayor residuo: el protocolo de llamada a una función no inlineada (`step(acc, i & 3)`, 100M
+  llamadas: 530 ms contra 247 ms de Bun). Por llamada, antes del `call`: carga del closure desde
+  la tabla de globals (base del módulo + slot + 1, `shl 4`, dos cargas), comprobación de tag y de
+  clase de objeto (`and 0FF; cmp 4; byte [..+1] == 8`), tres cargas del prototipo
+  (`[+218h]`, `[+220h]`, `[+240h]`) combinadas con `setcc/and/test`, empuje de un registro de
+  frame de 48 bytes (6 stores, comprobación de profundidad), `Rc::clone` del closure; después del
+  retorno: pop del frame, `Rc::drop` con comprobación de liberación, republicar `rsp/rbp` en el
+  contexto y el protocolo de error. Un `function` declarado es inmutable, así que el destino es
+  conocido en compilación: la carga, los dos chequeos de tipo y el `Rc` sobran, y queda una
+  comprobación de que el prototipo ya tiene entrada nativa.
+- Protocolo de error: ~4.7% de todas las instrucciones (`mov [ctx+278h],0` antes de cada helper
+  y `mov/test/jne` después). Si el helper devolviera el estado en `rax`, desaparecen la
+  escritura y la carga.
+- Menores: `and r,0FFh; cmp r,k` para comparar tags (655 sitios, `cmp r8b,k` basta);
+  autocopias `mov r8d,r8d` (300); dos cargas seguidas del mismo slot de pila (220); copia tras
+  `lea` en la base cacheada (285); `sete/sete/or/test` para `x == 1 || x == 2` (94); `setcc` sin
+  fusionar con el salto (135).
+- No es basura: `mov rax,0; call rax` (202) es la relocalización aún sin parchear en el volcado.
+
 ## Fase D — higiene y release
 
 ### D1. Flag muerto `FRAME_LAYOUT_V2_JIT_BAIL`
