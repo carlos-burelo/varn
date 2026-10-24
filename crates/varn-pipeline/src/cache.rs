@@ -9,9 +9,6 @@ type PipelineResult<T> = Result<T, Failure>;
 
 pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     let path = Path::new(file_path);
-    let file_dir = path.parent().unwrap_or_else(|| Path::new("."));
-
-    let project_root = varn_project::nearest(file_dir).dir;
 
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let path_hash = varn_core::fingerprint::fingerprint(canonical.to_string_lossy().as_bytes());
@@ -19,7 +16,7 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     let stem = path.file_stem().unwrap_or_default().to_string_lossy();
 
     let std_identity = varn_modules::provider::get().map_or(0, |p| p.image_identity());
-    varn_modules::artifact::get_bytecode_cache_dir(&project_root).join(format!(
+    varn_modules::artifact::get_bytecode_cache_dir().join(format!(
         "{}.{:x}.{:016x}.vncache",
         stem,
         path_hash as u32,

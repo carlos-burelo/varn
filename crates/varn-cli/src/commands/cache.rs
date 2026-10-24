@@ -7,11 +7,7 @@ pub fn execute(cmd: CacheCommands) -> Result<(), CliError> {
 }
 
 fn clean() -> Result<(), CliError> {
-    let cwd = std::env::current_dir()
-        .map_err(|e| CliError::fatal(format!("error[cache]: cannot get cwd: {e}")))?;
-
-    let project_root = varn_project::nearest(&cwd).dir;
-    let cache_dir = varn_modules::artifact::get_cache_dir(&project_root);
+    let cache_dir = varn_modules::artifact::get_cache_dir();
 
     if !cache_dir.exists() {
         println!("Cache directory does not exist: {}", cache_dir.display());

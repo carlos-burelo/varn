@@ -49,7 +49,6 @@ impl ModuleResolver {
     }
 
     pub fn types_cache_dir(&self) -> std::path::PathBuf {
-        let root = self.graph.lock().project_root_or_init().clone();
-        varn_modules::artifact::get_types_cache_dir(&root)
+        varn_modules::artifact::get_types_cache_dir()
     }
 }

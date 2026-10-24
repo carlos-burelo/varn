@@ -63,7 +63,7 @@ fn tree_stamp(root: &Path) -> u64 {
 }
 
 fn image_for_tree(root: &Path) -> Result<&'static [u8], String> {
-    let dir = varn_modules::artifact::get_cache_dir(root).join("std");
+    let dir = varn_modules::artifact::get_cache_dir().join("std");
     let path = dir.join(format!("std.{:016x}.vnb", tree_stamp(root)));
     if let Some(bytes) = read_valid_image(&path) {
         return Ok(bytes);

@@ -12,7 +12,6 @@ varn-emit        = { path = "../varn-emit" }
 varn-tir         = { path = "../varn-tir" }
 varn-compiler    = { path = "../varn-compiler" }
 varn-vm          = { path = "../varn-vm" }
-varn-project     = { path = "../varn-project" }
 varn-modules     = { path = "../varn-modules" }
 varn-types       = { path = "../varn-types" }
 varn-sem         = { path = "../varn-sem" }

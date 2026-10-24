@@ -60,8 +60,7 @@ impl varn_vm::jit::code_cache::CodeStore for DiskCodeStore {
 }
 
 pub fn register() {
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let dir = artifact::get_cache_dir(&cwd).join("jit");
+    let dir = artifact::get_cache_dir().join("jit");
     varn_vm::jit::code_cache::register_code_store(Box::leak(Box::new(DiskCodeStore {
         dir,
         pruned: std::sync::Once::new(),

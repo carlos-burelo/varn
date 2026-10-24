@@ -3929,7 +3929,6 @@ dependencies = [
  "varn-lexer",
  "varn-modules",
  "varn-parser",
- "varn-project",
  "varn-resolver",
  "varn-sem",
  "varn-tir",
@@ -3977,7 +3976,6 @@ dependencies = [
  "varn-lexer",
  "varn-modules",
  "varn-parser",
- "varn-project",
  "varn-sem",
 ]
 

@@ -196,19 +196,19 @@ pub fn global_varn_dir() -> PathBuf {
     PathBuf::from(".varn")
 }
 
-pub fn get_cache_dir(_project_root: &Path) -> PathBuf {
+pub fn get_cache_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("VARN_CACHE_DIR") {
         return PathBuf::from(dir);
     }
     global_varn_dir().join(CACHE_DIR_NAME)
 }
 
-pub fn get_bytecode_cache_dir(project_root: &Path) -> PathBuf {
-    get_cache_dir(project_root).join(BYTECODE_DIR_NAME)
+pub fn get_bytecode_cache_dir() -> PathBuf {
+    get_cache_dir().join(BYTECODE_DIR_NAME)
 }
 
-pub fn get_types_cache_dir(project_root: &Path) -> PathBuf {
-    get_cache_dir(project_root).join(TYPES_DIR_NAME)
+pub fn get_types_cache_dir() -> PathBuf {
+    get_cache_dir().join(TYPES_DIR_NAME)
 }
 
 pub fn module_key(id: &ModuleId, fingerprint_of_source: u64) -> String {

@@ -1,5 +1,4 @@
 use rustc_hash::FxHashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 use varn_core::ModuleId;
 use varn_sem::bind::BindResult;
@@ -20,7 +19,6 @@ pub struct ModuleGraph {
     resolved_paths: FxHashMap<(String, String), String>,
 
     reverse_deps: FxHashMap<String, Vec<String>>,
-    project_root: Option<PathBuf>,
 }
 
 impl ModuleGraph {
@@ -79,13 +77,6 @@ impl ModuleGraph {
             .entry(imported.to_owned())
             .or_default()
             .push(importer.to_owned());
-    }
-
-    pub fn project_root_or_init(&mut self) -> &PathBuf {
-        self.project_root.get_or_insert_with(|| {
-            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            varn_project::nearest(&cwd).dir
-        })
     }
 
     pub fn invalidate(&mut self, id: &ModuleId) {
