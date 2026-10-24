@@ -50,6 +50,8 @@ pub enum DynReason {
 
     Range(TyId),
 
+    Interface,
+
     Shape(ShapeId),
 
     NotYetSupported,
@@ -179,6 +181,7 @@ pub struct TyTable {
     shape_names: Vec<Option<std::sync::Arc<str>>>,
     named_shapes: rustc_hash::FxHashMap<std::sync::Arc<str>, u32>,
     open_shapes: u32,
+    open_aliases: Vec<std::sync::Arc<str>>,
 }
 
 impl TyTable {
@@ -215,6 +218,18 @@ impl TyTable {
 
     pub fn contains_list(&self, id: TyListId) -> bool {
         (id.0 as usize) < self.lists.len()
+    }
+
+    pub fn enter_alias(&mut self, name: &str) -> bool {
+        if self.open_aliases.iter().any(|open| open.as_ref() == name) {
+            return false;
+        }
+        self.open_aliases.push(std::sync::Arc::from(name));
+        true
+    }
+
+    pub fn leave_alias(&mut self) {
+        self.open_aliases.pop();
     }
 
     pub fn enter_shape(&mut self) -> bool {

@@ -34,7 +34,11 @@ impl Checker<'_> {
         found.into_values().collect()
     }
 
-    pub(super) fn foreign_refs_in(&mut self, bind: &BindResult, ty: Type) -> Vec<(Arc<str>, Arc<str>)> {
+    pub(super) fn foreign_refs_in(
+        &mut self,
+        bind: &BindResult,
+        ty: Type,
+    ) -> Vec<(Arc<str>, Arc<str>)> {
         let mut out = Vec::new();
         self.collect_refs_in(bind, ty, &mut out);
         out

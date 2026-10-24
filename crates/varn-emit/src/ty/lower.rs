@@ -25,12 +25,15 @@ fn opaque() -> BackendTy {
     BackendTy::Dynamic(DynReason::NotYetSupported)
 }
 
-fn resolve_named(name: &str, names: &dyn NameResolver) -> BackendTy {
+fn interface() -> BackendTy {
+    BackendTy::Dynamic(DynReason::Interface)
+}
+
+fn resolve_named(name: &str, names: &dyn NameResolver) -> Option<BackendTy> {
     names
         .class_id(name)
         .map(BackendTy::Class)
         .or_else(|| names.enum_id(name).map(BackendTy::Enum))
-        .unwrap_or_else(opaque)
 }
 
 fn resolve_type_ref(
@@ -38,7 +41,7 @@ fn resolve_type_ref(
     origin: Option<varn_core::Atom>,
     interner: &AtomInterner,
     names: &dyn NameResolver,
-) -> BackendTy {
+) -> Option<BackendTy> {
     let name = interner.resolve(name);
     match origin
         .and_then(|o| interner.try_resolve(o))
@@ -47,8 +50,7 @@ fn resolve_type_ref(
         Some(origin) => names
             .foreign_class_id(name, origin)
             .map(BackendTy::Class)
-            .or_else(|| names.foreign_enum_id(name, origin).map(BackendTy::Enum))
-            .unwrap_or_else(opaque),
+            .or_else(|| names.foreign_enum_id(name, origin).map(BackendTy::Enum)),
         None => resolve_named(name, names),
     }
 }
@@ -66,9 +68,32 @@ fn lower_alias(
     if names.is_type_param(name) {
         return BackendTy::Dynamic(DynReason::Generic);
     }
-    let members = match names.alias(name).map(|target| table.get(target.0)) {
-        Some(TypeKind::Object(members)) => table.get_object_members(members),
-        Some(_) | None => return opaque(),
+    let Some(target) = names.alias(name) else {
+        return interface();
+    };
+    let members = match table.get(target.0) {
+        TypeKind::Object(members) => table.get_object_members(members),
+        TypeKind::Primitive(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Array(_)
+        | TypeKind::Union(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Named(..)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => {
+            return lower_through_alias(name, target, table, interner, tt, names);
+        }
     };
     if members.is_empty() || !is_plain_shape(members) {
         return opaque();
@@ -77,6 +102,22 @@ fn lower_alias(
     let fields = shape_fields(members, table, interner, tt, names);
     tt.fill_named_shape(id, fields);
     BackendTy::Dynamic(DynReason::Shape(id))
+}
+
+fn lower_through_alias(
+    name: &str,
+    target: Type,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &dyn NameResolver,
+) -> BackendTy {
+    if !tt.enter_alias(name) {
+        return BackendTy::Dynamic(DynReason::Union);
+    }
+    let lowered = lower_type(&target, table, interner, tt, names);
+    tt.leave_alias();
+    lowered
 }
 
 fn lower_kind(
@@ -109,33 +150,15 @@ fn lower_kind(
                 .and_then(|o| interner.try_resolve(o))
                 .is_none_or(|o| names.is_local_origin(o));
             match resolve_type_ref(name, origin, interner, names) {
-                BackendTy::Dynamic(_) if local => {
-                    lower_alias(interner.resolve(name), table, interner, tt, names)
-                }
-                resolved @ BackendTy::Int
-                | resolved @ BackendTy::Float
-                | resolved @ BackendTy::Bool
-                | resolved @ BackendTy::Char
-                | resolved @ BackendTy::Str
-                | resolved @ BackendTy::Bytes
-                | resolved @ BackendTy::Decimal
-                | resolved @ BackendTy::BigInt
-                | resolved @ BackendTy::Array(_)
-                | resolved @ BackendTy::Map(..)
-                | resolved @ BackendTy::Dict(_)
-                | resolved @ BackendTy::Set(_)
-                | resolved @ BackendTy::Tuple(_)
-                | resolved @ BackendTy::Class(_)
-                | resolved @ BackendTy::Enum(_)
-                | resolved @ BackendTy::Fn(_)
-                | resolved @ BackendTy::Nullable(_)
-                | resolved @ BackendTy::Void
-                | resolved @ BackendTy::Never
-                | resolved @ BackendTy::Dynamic(_) => resolved,
+                None if local => lower_alias(interner.resolve(name), table, interner, tt, names),
+                None => interface(),
+                Some(resolved) => resolved,
             }
         }
 
-        TypeKind::Generic(name, _, origin) => resolve_type_ref(name, origin, interner, names),
+        TypeKind::Generic(name, _, origin) => {
+            resolve_type_ref(name, origin, interner, names).unwrap_or_else(interface)
+        }
 
         TypeKind::EnumVariant { enum_name, .. } => names
             .enum_id(interner.resolve(enum_name))

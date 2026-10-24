@@ -79,7 +79,9 @@ impl<'a> FnEmitter<'a> {
                 untyped
                     || matches!(
                         reason,
-                        varn_tir::DynReason::NotYetSupported | varn_tir::DynReason::Generic
+                        varn_tir::DynReason::NotYetSupported
+                            | varn_tir::DynReason::Generic
+                            | varn_tir::DynReason::Interface
                     )
             }
             BackendTy::Dynamic(
@@ -90,6 +92,7 @@ impl<'a> FnEmitter<'a> {
                 | varn_tir::DynReason::Awaitable(_)
                 | varn_tir::DynReason::Yields(_)
                 | varn_tir::DynReason::Range(_)
+                | varn_tir::DynReason::Interface
                 | varn_tir::DynReason::NotYetSupported
                 | varn_tir::DynReason::Generic
                 | varn_tir::DynReason::Boxed
@@ -140,7 +143,8 @@ pub(super) fn untyped_reason(reason: varn_tir::DynReason) -> bool {
         | varn_tir::DynReason::Callable
         | varn_tir::DynReason::Awaitable(_)
         | varn_tir::DynReason::Yields(_)
-                | varn_tir::DynReason::Range(_)
+        | varn_tir::DynReason::Range(_)
+        | varn_tir::DynReason::Interface
         | varn_tir::DynReason::Shape(_)
         | varn_tir::DynReason::NotYetSupported
         | varn_tir::DynReason::Generic

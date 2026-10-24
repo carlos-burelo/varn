@@ -231,6 +231,7 @@ impl<'a> FnEmitter<'a> {
                                 | DynReason::Awaitable(_)
                                 | DynReason::Yields(_)
                                 | DynReason::Range(_)
+                                | DynReason::Interface
                                 | DynReason::NotYetSupported
                                 | DynReason::Generic
                                 | DynReason::Boxed
