@@ -1,6 +1,6 @@
 use super::recorder::Recorder;
 use super::Checker;
-use varn_core::ast::ExprKind;
+use varn_core::ast::{ExprKind, Pattern};
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
@@ -31,6 +31,10 @@ impl<'r> Checker<'r> {
                 .as_ref()
                 .filter(|node| self.check_type_names(node, bind));
             let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
+
+            if ann.is_none() {
+                self.declare_annotated_function(rec, d, bind);
+            }
 
             if let Some(init_expr) = d.init {
                 self.with_expected(ann_ty_opt, |c| c.check_expr(rec, init_expr, bind));
@@ -83,5 +87,55 @@ impl<'r> Checker<'r> {
                 }
             }
         }
+    }
+
+    fn declare_annotated_function(
+        &mut self,
+        rec: &mut Recorder,
+        d: &varn_core::ast::VarDeclarator,
+        bind: &BindResult,
+    ) {
+        let (Pattern::Identifier { name, .. }, Some(init)) = (&d.id, d.init) else {
+            return;
+        };
+        let kind = &self.ast_arena.expr(init).kind;
+        let (params, return_type, is_arrow) = if let ExprKind::Arrow {
+            params,
+            return_type: Some(ret),
+            ..
+        } = kind
+        {
+            (params, ret, true)
+        } else if let ExprKind::Function {
+            params,
+            return_type: Some(ret),
+            is_generator: false,
+            ..
+        } = kind
+        {
+            (params, ret, false)
+        } else {
+            return;
+        };
+        if params.iter().any(|p| p.type_ann.is_none()) {
+            return;
+        }
+        let Some(id) = bind
+            .scopes
+            .get(self.current_scope)
+            .resolve(*name, &bind.scopes)
+        else {
+            return;
+        };
+        let view = varn_sem::bind::BindView::new(bind, self.resolver).at(self.current_scope);
+        let ty = varn_sem::infer::build_fn_type(
+            params,
+            &Some(return_type.clone()),
+            is_arrow,
+            Some(&view),
+            std::sync::Arc::make_mut(&mut self.ty_table),
+            Type::Dynamic,
+        );
+        rec.symbol_types.insert(id, ty);
     }
 }
