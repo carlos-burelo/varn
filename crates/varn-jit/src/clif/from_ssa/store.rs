@@ -41,6 +41,7 @@ pub(super) fn define(
     v: u32,
     x: Value,
 ) {
+    ctx.views.forget_instance(b, v);
     match ctx.carried.get(&v) {
         Some(var) => b.def_var(*var, x),
         None => {

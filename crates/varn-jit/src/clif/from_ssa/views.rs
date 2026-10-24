@@ -39,11 +39,9 @@ impl Views {
             match &inst.op {
                 SsaOp::GetFixedField { object, .. } | SsaOp::SetFixedField { object, .. } => {
                     let c = canon(*object);
-                    if c & GLOBAL_CANON_BIT != 0 {
-                        instance_by_canon
-                            .entry(c)
-                            .or_insert_with(|| b.declare_var(types::I64));
-                    }
+                    instance_by_canon
+                        .entry(c)
+                        .or_insert_with(|| b.declare_var(types::I64));
                 }
                 SsaOp::ConstInt(_)
                 | SsaOp::ConstFloat(_)
@@ -276,12 +274,18 @@ impl Views {
     }
 
     pub(super) fn clear_instances(&self, b: &mut FunctionBuilder) {
-        if self.instance_by_canon.is_empty() {
-            return;
-        }
         let zero = b.ins().iconst(types::I64, 0);
-        for v in self.instance_by_canon.values() {
-            b.def_var(*v, zero);
+        for (canon, var) in &self.instance_by_canon {
+            if canon & GLOBAL_CANON_BIT != 0 {
+                b.def_var(*var, zero);
+            }
+        }
+    }
+
+    pub(super) fn forget_instance(&self, b: &mut FunctionBuilder, value: u32) {
+        if let Some(var) = self.instance_by_canon.get(&value) {
+            let zero = b.ins().iconst(types::I64, 0);
+            b.def_var(*var, zero);
         }
     }
 
