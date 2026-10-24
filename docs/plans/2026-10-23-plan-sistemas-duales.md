@@ -222,6 +222,11 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   opcode SSA nuevo toca ~70 archivos (pases, JIT, VM, portable); el camino barato para
   `size` es un native op `Map.size`/`Set.size` en el contrato (hoy es `readonly size: int`,
   sin op) y que `lower_length` lo emita como `CallNativeOp`.
+- HECHO (8634255d): las propiedades `readonly` de clases core (`size`, `start`, `end`, ...)
+  se leen por su native op (`core_ops` indexa Getter y Property readonly bajo `AccessorKind::Get`).
+  `Map.size` 100M: 7.0 s -> 1.0 s; `core member` por nombre 111 -> 85 en el corpus. Queda
+  `rawValue`, `slice` por rango y los estáticos de tipos core (`alloc`, `fromString`, `parse`).
+  Siguiente con ganancia medida: campos vía interfaz (26x).
 
 ## Fase D — higiene y release
 
