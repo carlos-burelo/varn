@@ -315,6 +315,15 @@ condicione el diseño (Ley 18: se rehace el test).
 - La semántica de unidades de `vn test` se conserva tal cual (el módulo corre una vez por
   unidad).
 
+## Decisión: el arranque se ancla en el cwd
+
+`.env` y el `std` de `varn.toml` se resuelven antes de analizar la línea de comandos
+(la std se registra y el entorno se aplica antes de que exista ningún `Session`), así
+que parten del cwd. `Session::open` parte, en cambio, del archivo de entrada. Un
+`vn run ../otro/main.vn` valida el manifiesto de `otro` y toma `.env` y `std` del
+proyecto del cwd. Anclar el arranque en la `Session` exigiría analizar los argumentos
+antes de registrar la std; queda como mejora, no como contrato.
+
 ## Pendiente de diseño: tests invocados por el runtime
 
 El runner de `vn test` sigue ejecutando cada `@test` con `Source::appended`

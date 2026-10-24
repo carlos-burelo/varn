@@ -65,8 +65,9 @@ Cada línea de una tarea es una línea de comando de `vn` (sin el `vn`); la prim
 falla corta la secuencia, `task otra` dentro de una tarea la encadena y un ciclo es un
 error. Los argumentos tras `--` se añaden a la última línea. La raíz del proyecto es el
 directorio con `varn.toml` más cercano al archivo (comandos con archivo) o al cwd
-(comandos de proyecto). Al arrancar se leen, en este orden de prioridad, `.env.local`,
-`.env` y `.vn/.env` del cwd y de la raíz del proyecto.
+(comandos de proyecto). Al arrancar, antes de interpretar el comando, se leen en este orden de prioridad `.env.local`,
+`.env` y `.vn/.env` del cwd y de la raíz del proyecto que contiene el cwd; lo mismo vale
+para el `std` de `varn.toml`. `vn task` entra en la raíz del proyecto después de eso.
 
 ## Herramientas de editor
 

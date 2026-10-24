@@ -21,7 +21,9 @@ Versionado: ver [`docs/STABILITY.md`](docs/STABILITY.md).
 - `vn` is always built with the language server, the debug adapter and the package manager; the `lsp`, `dap` and `pm` features no longer exist.
 - `VARN_DEBUG_OPS` is replaced by `vn debug --natives`.
 - A path given to `vn fmt` that does not exist is an error, and a standalone executable whose trailer cannot be read is an error instead of starting the normal CLI.
-- `vn pkg` installs dependencies in alphabetical order.
+- `vn pkg` installs dependencies in alphabetical order and reports an unreadable dependency manifest instead of skipping its dependencies.
+- `vn fmt` and `vn test` fail on a path that does not exist, and `vn fmt` fails on a directory it cannot read.
+- `varn.toml` accepts `description`, `license`, `repository`, `homepage`, `authors` and `keywords` besides the fields listed in the CLI reference; every other unknown key is an error.
 - `vn debug`, `vn eval`, `vn repl` and `vn test` accept the same `--allow-*` and `--sandbox` flags as `vn run`, and a bad `--phase` spec exits with the usage code.
 
 ### Added

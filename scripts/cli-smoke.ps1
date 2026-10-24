@@ -191,6 +191,30 @@ Check "debug-all-phases-on-a-generic-program" {
     $r.Code -eq 0 -and $r.Out -notmatch "panicked"
 }
 
+Check "package-manifest-metadata-is-accepted" {
+    $dir = Join-Path $work "pkgmeta"
+    $pkg = Join-Path $dir ".vn/packages/foo"
+    New-Item -ItemType Directory -Force $pkg | Out-Null
+    Set-Content (Join-Path $pkg "varn.toml") "name = `"foo`"`nversion = `"1.0.0`"`ndescription = `"metadata`"`nlicense = `"MIT`"" -Encoding utf8
+    Set-Content (Join-Path $pkg "index.vn") 'export const x: int = 41' -Encoding utf8
+    Set-Content (Join-Path $dir "varn.toml") "name = `"app`"`ndescription = `"demo`"" -Encoding utf8
+    $main = Join-Path $dir "main.vn"
+    Set-Content $main "import { x } from `"pkg:foo`"`nprint(x + 1)" -Encoding utf8
+    $r = Vn run $main
+    $r.Code -eq 0 -and $r.Out.Trim() -eq "42"
+}
+
+Check "exe-absurd-trailer-length-is-an-error" {
+    $bad = Join-Path $work "exe/absurd.exe"
+    Copy-Item $vn $bad
+    $tail = [byte[]](0xFE,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF) + [Text.Encoding]::ASCII.GetBytes("VEXE")
+    $stream = [IO.File]::Open($bad, [IO.FileMode]::Append)
+    $stream.Write($tail, 0, $tail.Length)
+    $stream.Close()
+    $out = & $bad 2>&1 | Out-String
+    $LASTEXITCODE -ne 0 -and $out -match "corrupt" -and $out -notmatch "panicked"
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null
