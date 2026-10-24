@@ -27,7 +27,7 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
     }
 
     if (node.kind === MarkdownNodeKind.Heading) {
-        let tag = "h" + node.level;
+        let tag = `h${node.level}`;
         let inner = "";
         for (let c of node.children) {
             inner = inner + renderAst(c, options);
@@ -64,7 +64,7 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
 
     if (node.kind === MarkdownNodeKind.List) {
         let tag = node.ordered ? "ol" : "ul";
-        let startAttr = (node.ordered && node.start !== 1) ? (" start=\"" + node.start + "\"") : "";
+        let startAttr = (node.ordered && node.start !== 1) ? (` start="${node.start}"`) : "";
         let inner = "";
         for (let c of node.children) {
             inner = inner + renderAst(c, options);

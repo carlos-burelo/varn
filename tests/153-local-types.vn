@@ -23,7 +23,7 @@ function ltShapes(i: int): str {
         Circle(r) => r * 10,
         Square(q) => q
     }
-    return new Kid().hello() + n
+    return `${new Kid().hello()}${n}`
 }
 
 // A local class using a local enum, both module-wide types.

@@ -192,7 +192,7 @@ let reqs: ReqContext[] = [];
 for (let i = 0; i < 100000; i = i + 1) {
     let idx = i % 10;
     let hdrs: { [key: str]: str } = {
-        "authorization": "Bearer token_secret_" + (i % 1000),
+        "authorization": `Bearer token_secret_${(i % 1000)}`,
         "content-type": "application/json",
         "user-agent": "VarnBench/1.0"
     };
@@ -211,4 +211,4 @@ for (let i = 0; i < reqs.length; i = i + 1) {
     totalBytes = totalBytes + res.body.length;
 }
 
-print("HTTP Routing: Processed " + reqs.length + " reqs, Success = " + successCount + ", Total Response Bytes = " + totalBytes);
+print(`HTTP Routing: Processed ${reqs.length} reqs, Success = ${successCount}, Total Response Bytes = ${totalBytes}`);

@@ -102,7 +102,7 @@ await describe("189 enum variant slots", async () => {
 
     await it("a variant reads as its name when turned into text", () => {
         expect(`${Color.Green}`).toBe("Color.Green")
-        expect("is " + Level.High).toBe("is Level.High")
+        expect(`is ${Level.High}`).toBe("is Level.High")
         expect(`${Shape.Circle(1.0)}`).toBe("Shape.Circle(..)")
     })
 

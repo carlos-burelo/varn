@@ -11,7 +11,7 @@ class Zebra {
         this.stripes = stripes
     }
     describe(): str {
-        return "stripes " + this.stripes
+        return `stripes ${this.stripes}`
     }
 }
 

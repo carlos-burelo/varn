@@ -29,7 +29,7 @@ class GcMixed {
         this.f = (i as float) * 0.5
         this.items = [i, i + 1, i + 2]
         this.flag = i % 2 == 0
-        this.label = "mixed-label-long-enough-for-the-heap-" + i
+        this.label = `mixed-label-long-enough-for-the-heap-${i}`
         this.any = new GcLeaf(i * 3)
         this.b = -i
     }
@@ -38,7 +38,7 @@ class GcMixed {
 function gcChurn(n: int): int {
     let junk: str[] = []
     for (let i = 0; i < n; i = i + 1) {
-        junk.push("churn-" + i)
+        junk.push(`churn-${i}`)
     }
     return junk.length
 }
@@ -51,7 +51,7 @@ function gcMixedChecksum(xs: GcMixed[]): int {
     for (const m of xs) {
         acc = acc + m.a + m.leaf.n + m.items[2] + m.b
         if (m.flag) { acc = acc + 1 }
-        if (m.label == "mixed-label-long-enough-for-the-heap-" + m.a) { acc = acc + 1 }
+        if (m.label == `mixed-label-long-enough-for-the-heap-${m.a}`) { acc = acc + 1 }
         acc = acc + (m.any as GcLeaf).n
     }
     return acc
@@ -87,7 +87,7 @@ gcChurn(60000)
 for (let round = 0; round < 20; round = round + 1) {
     gcOld.leaf = new GcLeaf(round)
     gcOld.items = [round, round, round]
-    gcOld.label = "rewritten-label-long-enough-for-the-heap-" + round
+    gcOld.label = `rewritten-label-long-enough-for-the-heap-${round}`
     gcOld.any = new GcLeaf(round * 10)
     gcChurn(5000)
 }

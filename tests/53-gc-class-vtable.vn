@@ -28,7 +28,7 @@ await describe("53 gc class vtable", async () => {
         // Enough string allocations to force several minor GC cycles.
         let gcJunk:str[] = []
         for (let i = 0; i < 20000; i = i + 1) {
-            gcJunk.push("gc_" + i)
+            gcJunk.push(`gc_${i}`)
         }
         
         let gcAccA = 0

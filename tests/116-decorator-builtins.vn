@@ -73,7 +73,7 @@ let shadowLog: str[] = [];
 let ctxLog: str[] = [];
 
 function ctxMethod(fn: FunctionRef, ctx: MethodContext): FunctionRef {
-    ctxLog.push("method:" + ctx.name + ":static=" + ctx.isStatic);
+    ctxLog.push(`method:${ctx.name}:static=${ctx.isStatic}`);
     return fn;
 }
 
@@ -93,7 +93,7 @@ function ctxCtor(fn: FunctionRef, ctx: ConstructorContext): FunctionRef {
 }
 
 function ctxProp(target: dynamic, ctx: PropertyContext): void {
-    ctxLog.push("prop:" + ctx.name + ":static=" + ctx.isStatic);
+    ctxLog.push(`prop:${ctx.name}:static=${ctx.isStatic}`);
 }
 
 class WithCtx {

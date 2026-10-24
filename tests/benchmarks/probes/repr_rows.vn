@@ -16,7 +16,7 @@ function row(name: str, f: () => int) {
         let d = now() - t;
         if (d < best) { best = d; }
     }
-    print(name + " " + best);
+    print(`${name} ${best}`);
 }
 
 row("loop_only", () => { let k: int[] = []; for (let i = 0; i < N; i = i + 1) { k.push(i); } return k.length; });
@@ -33,4 +33,4 @@ row("map_get_heapkey", () => {
 });
 row("strview", () => { let k: str[] = []; let base = "abcdefghijklmnopqrstuvwxyz0123456789"; for (let i = 0; i < N; i = i + 1) { k.push(base.slice(i % 10, 20)); } return k.length; });
 row("split5", () => { let k: str[][] = []; for (let i = 0; i < N / 2; i = i + 1) { k.push("/api/v1/orders/history/details".split("/")); } return k.length; });
-print("checksum " + checksum);
+print(`checksum ${checksum}`);

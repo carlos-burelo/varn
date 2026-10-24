@@ -13,8 +13,8 @@ function outcome(f: () => void): str {
 
 function size(m: Map<str, int>): int { return m.size }
 function pick(a: int, m: Map<str, int>?, b: str): str {
-    if (m == null) { return a + b + "-" }
-    return a + b + m.get("k")
+    if (m == null) { return `${a}${b}-`}
+    return `${a}${b}${m.get("k")}`
 }
 class Bag {
     constructor(public items: Map<str, int>) {}

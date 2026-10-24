@@ -165,7 +165,7 @@ export class HttpServer {
         let head = "HTTP/1.1 " + responseObj.status.toString() + " " + responseObj.statusText + "\r\n";
         let hdrs = responseObj.headers.toObject();
         for (let name in hdrs) {
-            head = head + name + ": " + hdrs[name] + "\r\n";
+            head = `${head}${name}: ${hdrs[name]}\r\n`;
         }
         for (let c of responseObj.cookies) {
             head = head + "Set-Cookie: " + c + "\r\n";

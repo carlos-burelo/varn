@@ -12,7 +12,7 @@ function outcome(f: () => void): str {
 
 class Creature { name: str = "a" }
 class Pebble {}
-function greet(who: str, times: int): str { return who + times }
+function greet(who: str, times: int): str { return `${who}${times}`}
 function pet(c: Creature): str { return c.name }
 function sum(label: str, ...xs: int[]): int {
     let t = 0
@@ -32,7 +32,7 @@ class Crate {
 
 class Base {
     constructor(public a: int, public b: str = "dflt") {}
-    tag(prefix: str, n: int): str { return prefix + n }
+    tag(prefix: str, n: int): str { return `${prefix}${n}`}
 }
 class Mid extends Base { extra: int = 7 }
 class Leaf extends Mid {}

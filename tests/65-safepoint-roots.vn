@@ -15,10 +15,10 @@ function spRefsSurviveConcat(n: int): int {
   let last = ""
   let hits = 0
   for (let i = 0; i < n; i = i + 1) {
-    last = "item-" + i
+    last = `item-${i}`
     if (keep === "anchor-string-long-enough-to-be-heap") { hits = hits + 1 }
   }
-  if (last === "item-" + (n - 1)) { hits = hits + 1 }
+  if (last === `item-${(n - 1)}`) { hits = hits + 1 }
   return hits
 }
 
@@ -29,7 +29,7 @@ function spIntsExactAcrossGc(n: int): int {
   let acc = 0
   let s = ""
   for (let i = 0; i < n; i = i + 1) {
-    s = "x" + i
+    s = `x${i}`
     acc = acc + (i % 7)
   }
   if (s === "") { return -1 }
@@ -42,7 +42,7 @@ class SpBox { v: int
   constructor(v: int) { this.v = v } }
 function spArraySurvives(n: int): int {
   const arr = []
-  for (let i = 0; i < n; i = i + 1) { arr.push(new SpBox(i)); arr.push("s" + i) }
+  for (let i = 0; i < n; i = i + 1) { arr.push(new SpBox(i)); arr.push(`s${i}`) }
   return arr.length + arr[0].v + arr[(n - 1) * 2].v
 }
 
@@ -52,8 +52,8 @@ function spNested(outer: int, inner: int): int {
   const tag = "outer-anchor-string"
   for (let i = 0; i < outer; i = i + 1) {
     let local = ""
-    for (let j = 0; j < inner; j = j + 1) { local = tag + j }
-    if (local === tag + (inner - 1)) { total = total + 1 }
+    for (let j = 0; j < inner; j = j + 1) { local = `${tag}${j}`}
+    if (local === `${tag}${(inner - 1)}`) { total = total + 1 }
   }
   return total
 }
@@ -81,7 +81,7 @@ function spRangeUnderPressure(n: int): int {
   let total = 0
   let junk = ""
   for (let i = 0; i < n; i = i + 1) {
-    junk = "r" + i
+    junk = `r${i}`
     const lo = i % 5
     const hi = lo + 3
     const r = lo..hi
@@ -96,7 +96,7 @@ function spSpreadUnderPressure(n: int): int {
   let total = 0
   let junk = ""
   for (let i = 0; i < n; i = i + 1) {
-    junk = "s" + i
+    junk = `s${i}`
     const args = [i % 3, i % 5, i % 7]
     total = total + spSum3(...args)
   }
@@ -110,7 +110,7 @@ function spNativeOpUnderPressure(n: int): int {
   const acc = []
   let junk = ""
   for (let i = 0; i < n; i = i + 1) {
-    junk = "n" + i
+    junk = `n${i}`
     acc.push(i % 11)
   }
   if (junk === "") { return -1 }
@@ -122,7 +122,7 @@ function spEnumUnderPressure(n: int): int {
   let total = 0
   let junk = ""
   for (let i = 0; i < n; i = i + 1) {
-    junk = "e" + i
+    junk = `e${i}`
     const v = i % 2 === 0 ? SpTag.A(i) : SpTag.B(i)
     total = total + match v {
       A(x) => 1,
@@ -152,7 +152,7 @@ function spTryUnderPressure(n: int): int {
   for (let i = 0; i < n; i = i + 1) {
     const depth = i % 13
     try {
-      junk = "t" + i
+      junk = `t${i}`
       if (i % 1000 === 999) { throw new Error("boom") }
       counter = counter + depth
     } catch (e) {

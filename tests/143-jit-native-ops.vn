@@ -53,8 +53,8 @@ let nWrapped = 0
 await describe("143 jit native ops", async () => {
         await it("group 1 part 1", async () => {
         for (let i = 0; i < 2000; i = i + 1) {
-        nUpper = nvUpper("abc-" + (i % 10))
-        nJoined = nvSplitJoin("a,b,c," + i)
+        nUpper = nvUpper(`abc-${(i % 10)}`)
+        nJoined = nvSplitJoin(`a,b,c,${i}`)
         nSliced = nvSlices("abcdefgh")
         nAffix = nAffix + nvAffixes(i % 2 == 0 ? "abxyz" : "zzz")
         nCodes = nCodes + nvCodes(i % 2 == 0 ? "hé😀llo-wörld" : "plain-ascii")

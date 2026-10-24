@@ -14,7 +14,7 @@ function outcome(f: () => void): str {
     }
 }
 
-function label(d: dynamic): str { const a: Account = d; return a.name + a.id }
+function label(d: dynamic): str { const a: Account = d; return `${a.name}${a.id}`}
 function inlineId(d: dynamic): int { const o: { id: int } = d; return o.id }
 function card(d: dynamic): Card { return d }
 function count(d: dynamic): int { const all: Account[] = d; return all.length }

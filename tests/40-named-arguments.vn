@@ -7,7 +7,7 @@ function describePerson(name: str, age: int, city: str | null = null): str {
     if (city == null) {
         city = "Unknown";
     }
-    return name + " is " + age.toString() + " years old and lives in " + city;
+    return `${name} is ${age.toString()} years old and lives in ${city}`;
 }
 
 // 5. Named arguments in methods

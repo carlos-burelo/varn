@@ -30,7 +30,7 @@ extension SlotOps on Slot {
     add(n: int): int { return this.value + n; }
 }
 extension SlotAccessor on Slot {
-    get label(): str { return "Slot(" + this.value + ")"; }
+    get label(): str { return `Slot(${this.value})`; }
     set label(s: str) { this.value = s.length; }
 }
 extension IntUtils on int {

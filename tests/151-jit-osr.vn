@@ -16,7 +16,7 @@ function osSingle(n: int): str {
         total = total + 0.5
         if (i % 10000 == 0) { text = text + "." }
     }
-    return count + "/" + total + "/" + text
+    return `${count}/${total}/${text}`
 }
 
 // The inner loop gets hot; `row` is defined by the outer loop, which the

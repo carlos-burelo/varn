@@ -27,7 +27,7 @@ let finite = 0
 await describe("147 jit globals", async () => {
     await it("globals loop", async () => {
         for (let i = 0; i < 2200; i = i + 1) {
-        bumped = glBump("run" + (i % 3))
+        bumped = glBump(`run${(i % 3)}`)
         finite = finite + glNative(i % 2 == 0 ? 1.5 : Infinity)
         }
     });

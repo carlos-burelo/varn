@@ -12,9 +12,9 @@ for (let i = 1; i <= 10000; i = i + 1) {
     let stat = statuses[i % 5];
     let amt = ((i * 17) % 1000) + 15;
     let tax = 0.16;
-    let cust = "CUST_" + (i % 800);
-    let date = "2026-08-" + ((i % 28) + 1);
-    csvLines.push(i + "," + cust + "," + cat + "," + amt + "," + tax + "," + stat + "," + date);
+    let cust = `CUST_${(i % 800)}`;
+    let date = `2026-08-${((i % 28) + 1)}`;
+    csvLines.push(`${i},${cust},${cat},${amt},${tax},${stat},${date}`);
 }
 
 let rawCsv = csvLines.join("\n");
@@ -56,8 +56,8 @@ for (let i = 0; i < parsedRows.length; i = i + 1) {
 let exportedCsv = Csv.stringify(enrichedRows);
 
 print("CSV ETL Benchmark:");
-print("  Total parsed rows: " + parsedRows.length);
-print("  Enriched completed rows: " + enrichedRows.length);
-print("  VIP Transactions: " + vipCount);
-print("  Total Completed Revenue: " + totalCompletedRevenue);
-print("  Exported CSV length: " + exportedCsv.length + " bytes");
+print(`  Total parsed rows: ${parsedRows.length}`);
+print(`  Enriched completed rows: ${enrichedRows.length}`);
+print(`  VIP Transactions: ${vipCount}`);
+print(`  Total Completed Revenue: ${totalCompletedRevenue}`);
+print(`  Exported CSV length: ${exportedCsv.length} bytes`);

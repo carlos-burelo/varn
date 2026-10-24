@@ -32,7 +32,7 @@ function processTypeof(val: dynamic): str {
     if (typeof val === "str") {
         return val.toUpperCase();
     } else if (typeof val === "int") {
-        return "number:" + val;
+        return `number:${val}`;
     }
     return "other";
 }

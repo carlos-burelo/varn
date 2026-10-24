@@ -2,7 +2,7 @@ import { describe, it, expect } from "std:test";
 
 function gcChurn(n: int): int {
     let junk: str[] = [];
-    for (let i = 0; i < n; i = i + 1) { junk.push("churn-" + i); }
+    for (let i = 0; i < n; i = i + 1) { junk.push(`churn-${i}`); }
     return junk.length;
 }
 
@@ -16,9 +16,9 @@ function buildMaps(n: int): { [key: str]: int }[] {
 
 function fillByIndex(n: int): int {
     let m: { [key: str]: int } = {};
-    for (let i = 0; i < n; i = i + 1) { m["slot-" + (i % 40)] = i; }
+    for (let i = 0; i < n; i = i + 1) { m[`slot-${(i % 40)}`] = i; }
     let total = 0;
-    for (let i = 0; i < 40; i = i + 1) { total = total + (m["slot-" + i] as int); }
+    for (let i = 0; i < 40; i = i + 1) { total = total + (m[`slot-${i}`] as int); }
     return total;
 }
 
@@ -35,7 +35,7 @@ await describe("160 Map/Set representation", async () => {
 
     await it("growth past the linear index keeps insertion order", () => {
         const m = new Map<str, int>();
-        for (let i = 0; i < 40; i = i + 1) { m.set("key-number-" + i, i); }
+        for (let i = 0; i < 40; i = i + 1) { m.set(`key-number-${i}`, i); }
         expect(m.size).toBe(40);
         expect(m.get("key-number-0")).toBe(0);
         expect(m.get("key-number-39")).toBe(39);
@@ -82,7 +82,7 @@ await describe("160 Map/Set representation", async () => {
 
     await it("sets dedupe, delete and mutate inside forEach", () => {
         const s = new Set<str>();
-        for (let i = 0; i < 30; i = i + 1) { s.add("value-" + (i % 12)); }
+        for (let i = 0; i < 30; i = i + 1) { s.add(`value-${(i % 12)}`); }
         expect(s.size).toBe(12);
         expect(s.has("value-11")).toBeTruthy();
         s.delete("value-0");

@@ -18,7 +18,7 @@ import { describe, it, expect } from "std:test";
 //   flight.
 
 function sscLabel(n: int): str {
-    return "label-long-enough-for-the-heap-" + n
+    return `label-long-enough-for-the-heap-${n}`
 }
 
 // Heap result of a call, read after the call.
@@ -69,10 +69,10 @@ function sscHeapParams(label: str, p: SscPoint, xs: int[]): int {
 // Frame-aware self-recursion carrying heap values.
 function sscChain(prefix: str, parts: str[], n: int): str {
     if (n == 0) {
-        return prefix + parts.length
+        return `${prefix}${parts.length}`
     }
-    parts.push("part-long-enough-for-the-heap-" + n)
-    return sscChain(prefix + n, parts, n - 1)
+    parts.push(`part-long-enough-for-the-heap-${n}`)
+    return sscChain(`${prefix}${n}`, parts, n - 1)
 }
 
 // `str.length` in a compiled body.

@@ -101,7 +101,7 @@ await describe("142 jit dynamic operators", async () => {
         for (let i = 0; i < 3000; i = i + 1) {
         dArith = dArith + (dynArith(i, 3) as int)
         dCompare = dCompare + dynCompare(i % 3, 1)
-        if (strEquals("key-" + (i % 2), "key-0")) { dStr = dStr + 1 }
+        if (strEquals(`key-${(i % 2)}`, "key-0")) { dStr = dStr + 1 }
         dBits = dBits + (dynBits(i % 8, 3) as int)
         if (dynNot(i % 3 == 0 ? null : i % 3)) { dNot = dNot + 1 }
         if (intNot(i % 3 == 0 ? null : i % 3)) { dIntNot = dIntNot + 1 }

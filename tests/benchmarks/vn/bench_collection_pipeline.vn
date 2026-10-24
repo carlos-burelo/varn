@@ -49,7 +49,7 @@ for (let i = 0; i < 100000; i = i + 1) {
     let disc = (i % 3) === 0;
     orders.push(new OrderItem(
         i,
-        "SKU_" + (i % 2000),
+        `SKU_${(i % 2000)}`,
         cat,
         qty,
         price,
@@ -113,4 +113,4 @@ for (let i = 0; i < highValueSummaries.length; i = i + 1) {
     }
 }
 
-print("Collection Pipeline: Processed " + orders.length + " orders -> " + highValueSummaries.length + " high value summaries, Total Net = $" + totalNet + ", Target Found = " + (foundItem != null));
+print(`Collection Pipeline: Processed ${orders.length} orders -> ${highValueSummaries.length} high value summaries, Total Net = $${totalNet}, Target Found = ${(foundItem != null)}`);

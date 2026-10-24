@@ -13,22 +13,22 @@ import { describe, it, expect } from "std:test";
 // where the string is on the right, and where the other operand is not a
 // number.
 
-function scLeft(n: int): str { return "n=" + n }
+function scLeft(n: int): str { return `n=${n}`}
 
-function scRight(n: int): str { return n + " items" }
+function scRight(n: int): str { return `${n} items`}
 
 function scBoth(a: str, b: str): str { return a + b }
 
 // Non-numeric right operands must stringify, not coerce.
-function scNull(): str { return "v=" + null }
+function scNull(): str { return `v=${null}`}
 
-function scBool(): str { return "b=" + true }
+function scBool(): str { return `b=${true}`}
 
-function scFloat(): str { return "f=" + 1.5 }
+function scFloat(): str { return `f=${1.5}`}
 
 // A float that happens to be integral prints without a fractional part —
 // pinned because `str_repr_into` has a dedicated branch for it.
-function scWholeFloat(): str { return "w=" + 3.0 }
+function scWholeFloat(): str { return `w=${3.0}`}
 
 // Accumulation in a loop — the shape `str_concat`'s extensible-buffer fast
 // path exists for. Length is checked through a dynamic binding because the
@@ -40,15 +40,15 @@ function scAccum(n: int): int {
 }
 
 // Chained concatenation mixing types, evaluated left to right.
-function scChain(n: int): str { return "a" + n + "b" + (n + 1) }
+function scChain(n: int): str { return `a${n}b${(n + 1)}`}
 
 // Inside a hot loop, where the fast path is actually reached: results stay
 // exact and comparable both to a literal and to a second concat.
 function scFastLoop(n: int): int {
   let hits = 0
   for (let i = 0; i < n; i = i + 1) {
-    const s = "a" + (i % 100)
-    if (s === ("a" + (i % 100))) { hits = hits + 1 }
+    const s = `a${(i % 100)}`
+    if (s === (`a${(i % 100)}`)) { hits = hits + 1 }
   }
   return hits
 }
@@ -58,7 +58,7 @@ function scFastLoop(n: int): int {
 function scStraddle(n: int): int {
   let hits = 0
   for (let i = 0; i < n; i = i + 1) {
-    const s = i % 2 === 0 ? ("a" + (i % 100)) : ("abcdefgh" + (i % 100))
+    const s = i % 2 === 0 ? (`a${(i % 100)}`) : (`abcdefgh${(i % 100)}`)
     if (s.length > 0) { hits = hits + 1 }
   }
   return hits
@@ -75,18 +75,18 @@ await describe("64 str concat typed", async () => {
         expect(scWholeFloat()).toBe("w=3")
         
         // Negative and zero through the itoa path.
-        expect(("x" + -5)).toBe("x-5")
-        expect(("x" + 0)).toBe("x0")
+        expect((`x${-5}`)).toBe("x-5")
+        expect((`x${0}`)).toBe("x0")
         
         // Empty string operands.
-        expect(("" + 9)).toBe("9")
+        expect((`${9}`)).toBe("9")
         expect(("9" + "")).toBe("9")
         
         // Results crossing the small-string-optimization boundary: <=5 bytes stays
         // inline in the value, longer ones become heap strings. Both must compare and
         // concatenate the same.
-        expect(("a" + 1)).toBe("a1")
-        expect(("abcdefgh" + 123456)).toBe("abcdefgh123456")
+        expect((`a${1}`)).toBe("a1")
+        expect((`abcdefgh${123456}`)).toBe("abcdefgh123456")
         expect(scAccum(1000)).toBe(2000)
         expect(scChain(1)).toBe("a1b2")
         
@@ -94,12 +94,12 @@ await describe("64 str concat typed", async () => {
         // falls back to the helper otherwise, so every boundary of "fits inline"
         // needs pinning: exactly at the limit, one past it, and non-ASCII (which the
         // SSO encoding refuses regardless of length).
-        expect(("ab" + 123)).toBe("ab123")
-        expect(("ab" + 1234)).toBe("ab1234")
+        expect((`ab${123}`)).toBe("ab123")
+        expect((`ab${1234}`)).toBe("ab1234")
         expect(("" + "")).toBe("")
-        expect(("é" + 1)).toBe("é1")
+        expect((`é${1}`)).toBe("é1")
         expect(("a" + "ñ")).toBe("añ")
-        expect(("日本" + 5)).toBe("日本5")
+        expect((`日本${5}`)).toBe("日本5")
         
         // Byte-order inside the packed result: `a`'s bytes must land before `b`'s, and
         // an asymmetric pair is the only thing that catches them swapped. Both operands

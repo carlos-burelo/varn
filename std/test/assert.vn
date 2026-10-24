@@ -45,7 +45,7 @@ function messageOf(e: Error | str | int | float | bool | null): str {
     if (e is Error) {
         return e.message;
     }
-    return "" + e;
+    return `${e}`;
 }
 
 export class Expectation<T> {
@@ -58,7 +58,7 @@ export class Expectation<T> {
     toBe(expected: T): void {
         if (!isEq(this.actual, expected)) {
             failedCount = failedCount + 1;
-            throw new Error("Expected " + expected + " but received " + this.actual);
+            throw new Error(`Expected ${expected} but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -66,7 +66,7 @@ export class Expectation<T> {
     toEqual(expected: T): void {
         if (!deepEq(this.actual, expected)) {
             failedCount = failedCount + 1;
-            throw new Error("Expected equal " + expected + " but received " + this.actual);
+            throw new Error(`Expected equal ${expected} but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -74,7 +74,7 @@ export class Expectation<T> {
     toBeTruthy(): void {
         if (!this.actual) {
             failedCount = failedCount + 1;
-            throw new Error("Expected truthy value but received " + this.actual);
+            throw new Error(`Expected truthy value but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -82,7 +82,7 @@ export class Expectation<T> {
     toBeFalsy(): void {
         if (this.actual) {
             failedCount = failedCount + 1;
-            throw new Error("Expected falsy value but received " + this.actual);
+            throw new Error(`Expected falsy value but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -90,7 +90,7 @@ export class Expectation<T> {
     toBeNull(): void {
         if (this.actual !== null) {
             failedCount = failedCount + 1;
-            throw new Error("Expected null but received " + this.actual);
+            throw new Error(`Expected null but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -109,7 +109,7 @@ export class Expectation<T> {
         if (diff < 0.0) diff = -diff;
         if (diff > epsilon) {
             failedCount = failedCount + 1;
-            throw new Error("Expected " + a + " to be close to " + expected + " within " + epsilon);
+            throw new Error(`Expected ${a} to be close to ${expected} within ${epsilon}`);
         }
         passedCount = passedCount + 1;
     }
@@ -229,7 +229,7 @@ export function assertCloseTo(a: float, b: float, epsilon: float = 0.00001, msg:
     if (diff < 0.0) diff = -diff;
     if (diff > epsilon) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + msg + " (" + a + " is not close to " + b + " within " + epsilon + ")");
+        throw new Error(`ASSERT FAIL: ${msg} (${a} is not close to ${b} within ${epsilon})`);
     }
     passedCount = passedCount + 1;
 }
@@ -263,8 +263,8 @@ export function fail(msg: str = "fail"): void {
 
 export function summary(): void {
     print("\n════════════════════════════════════════");
-    print("PASSED: " + passedCount);
-    print("FAILED: " + failedCount);
+    print(`PASSED: ${passedCount}`);
+    print(`FAILED: ${failedCount}`);
     if (failedCount === 0) {
         print("ALL TESTS PASSED");
     } else {

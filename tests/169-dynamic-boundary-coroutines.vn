@@ -29,7 +29,7 @@ function sum(d: dynamic): str {
     try {
         let total = 0
         for (const n of numbers(d)) { total = total + n }
-        return "sum " + total
+        return `sum ${total}`
     } catch (e) {
         return e.message
     }

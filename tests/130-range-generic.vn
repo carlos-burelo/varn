@@ -20,7 +20,7 @@ await describe("130 range generic", async () => {
         expect(letters.start === 'a' && letters.end).toBe('e');
         expect(letters.contains('c') && !letters.contains('z')).toBeTruthy();
         expect(letters.toArray().join("")).toBe("abcde");
-        for (const c of 'x'..='z') { word = word + c }
+        for (const c of 'x'..='z') { word = `${word}${c}`}
         expect(word).toBe("xyz");
     });
 

@@ -52,7 +52,7 @@ for (let round = 0; round < 20; round = round + 1) {
     nrLists.push(nrBuild(3000))
 }
 for (let i = 0; i < 60000; i = i + 1) {
-    nrJunk.push("junk-" + i)
+    nrJunk.push(`junk-${i}`)
 }
 for (const l of nrLists) {
     nrTotal = nrTotal + nrSum(l)

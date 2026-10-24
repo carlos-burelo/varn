@@ -67,7 +67,7 @@ function arStale(xs: int[], n: int): int {
 function arAlloc(n: int): int {
     let len = 0
     for (let i = 0; i < n; i = i + 1) {
-        const s = "item-" + i
+        const s = `item-${i}`
         len = len + s.length
     }
     return len

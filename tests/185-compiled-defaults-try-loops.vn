@@ -56,7 +56,7 @@ function shortArray(): int {
 
 class Refused extends Error {}
 function boom(n: int): int {
-    if (n % 3 == 0) { throw new Refused("no " + n) }
+    if (n % 3 == 0) { throw new Refused(`no ${n}`) }
     return n
 }
 function guarded(n: int): int {
@@ -131,7 +131,7 @@ await describe("185 compiled defaults, try/catch and fixed-bound loops", async (
         let wrapped = 0
         for (let i = 1; i <= 3000; i = i + 1) {
             try { rethrown(i) } catch (e) {
-                if ((e as Error).message == "envuelto: no " + i) { wrapped = wrapped + 1 }
+                if ((e as Error).message == `envuelto: no ${i}`) { wrapped = wrapped + 1 }
             }
         }
         expect(wrapped).toBe(1000)

@@ -79,7 +79,7 @@ await describe("145 jit closures", async () => {
         cAdd = cAdd + clAdder(i)
         cCount = cCount + clCounter(i % 5)
         cIter = cIter + clPerIteration(i % 4)
-        cNested = clNested("t" + (i % 3))
+        cNested = clNested(`t${(i % 3)}`)
         cParam = cParam + clParam(i)
         cStatic = cStatic + clStatic(i % 10)
         }

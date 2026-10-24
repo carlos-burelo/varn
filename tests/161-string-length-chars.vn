@@ -12,7 +12,7 @@ function lengths(xs: str[]): int[] {
 function builtLength(n: int): int {
     let t = 0;
     for (let i = 0; i < n; i = i + 1) {
-        let s = "ñ" + (i % 10);
+        let s = `ñ${(i % 10)}`;
         t = t + s.length + ("é" + "é").length;
     }
     return t;

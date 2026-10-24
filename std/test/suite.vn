@@ -59,7 +59,7 @@ export async function test(testName: str, body: () => void): Task<void> {
         await body();
         for (let fn of afterEachFns) await fn();
     } catch (err) {
-        logLine("  ✖ " + testName + ": " + err);
+        logLine(`  ✖ ${testName}: ${err}`);
         throw err;
     }
 }

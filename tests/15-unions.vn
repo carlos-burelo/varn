@@ -6,7 +6,7 @@ function processValue(v: StringOrInt): str {
     if (v instanceof str) {
         return "string: " + v;
     } else {
-        return "number: " + v;
+        return `number: ${v}`;
     }
 }
 function orNull(v: MaybeStr): int {

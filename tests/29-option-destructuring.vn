@@ -10,7 +10,7 @@ await describe("29 Option Destructuring", async () => {
             B(_) => -1,
         };
         if (v !== 42) {
-            throw new Error("DEBUG FAIL: v is not 42, it is: " + v);
+            throw new Error(`DEBUG FAIL: v is not 42, it is: ${v}`);
         }
         expect(v).toBe(42);
         let y = R.B("boom");

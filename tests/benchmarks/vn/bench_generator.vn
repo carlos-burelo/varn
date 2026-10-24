@@ -67,7 +67,7 @@ for (let i = 1; i <= PING_N; i = i + 1) {
     last = pp.next(i).value;
 }
 let t1 = now();
-print("pingpong checksum=" + last + " ms=" + (t1 - t0));
+print(`pingpong checksum=${last} ms=${(t1 - t0)}`);
 
 const MAP_N = 100000;
 t0 = now();
@@ -84,7 +84,7 @@ while (!step.done) {
     step = rg.next();
 }
 t1 = now();
-print("mapfilter map_sum=" + map_sum + " filt_sum=" + filt_sum + " ms=" + (t1 - t0));
+print(`mapfilter map_sum=${map_sum} filt_sum=${filt_sum} ms=${(t1 - t0)}`);
 
 const FIB_N = 80;
 t0 = now();
@@ -94,7 +94,7 @@ for (let i = 0; i < FIB_N; i = i + 1) {
     fib_carry = fg.next().value;
 }
 t1 = now();
-print("fibcarry checksum=" + fib_carry + " ms=" + (t1 - t0));
+print(`fibcarry checksum=${fib_carry} ms=${(t1 - t0)}`);
 
 t0 = now();
 let nest_sum = 0;
@@ -105,7 +105,7 @@ while (!nstep.done) {
     nstep = no.next();
 }
 t1 = now();
-print("nested checksum=" + nest_sum + " ms=" + (t1 - t0));
+print(`nested checksum=${nest_sum} ms=${(t1 - t0)}`);
 
 t0 = now();
 const counter = make_counter(3);
@@ -113,7 +113,7 @@ const c1 = counter();
 const c2 = counter();
 let cap_sum = c1.next().value + c1.next().value + c2.next().value;
 t1 = now();
-print("upvalue checksum=" + cap_sum + " ms=" + (t1 - t0));
+print(`upvalue checksum=${cap_sum} ms=${(t1 - t0)}`);
 
 t0 = now();
 let try_sum = 0;
@@ -125,4 +125,4 @@ try {
     try_sum = -1;
 }
 t1 = now();
-print("tryoutside checksum=" + try_sum + " ms=" + (t1 - t0));
+print(`tryoutside checksum=${try_sum} ms=${(t1 - t0)}`);

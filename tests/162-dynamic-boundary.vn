@@ -318,6 +318,6 @@ await describe("162 dynamic boundary", async () => {
         expect(seen).toBe(true)
         const xs: dynamic[] = [1, "x", null]
         expect(`${xs[0]}-${xs[1]}-${xs[2]}`).toBe("1-x-null")
-        expect("v=" + null).toBe("v=null")
+        expect(`v=${null}`).toBe("v=null")
     })
 })

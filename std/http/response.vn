@@ -134,10 +134,10 @@ export class Response {
         let cookieStr = name + "=" + value;
         if (options !== null) {
             if (options.maxAge !== null) {
-                cookieStr = cookieStr + "; Max-Age=" + options.maxAge;
+                cookieStr = `${cookieStr}; Max-Age=${options.maxAge}`;
             }
             if (options.path !== null) {
-                cookieStr = cookieStr + "; Path=" + options.path;
+                cookieStr = `${cookieStr}; Path=${options.path}`;
             } else {
                 cookieStr = cookieStr + "; Path=/";
             }
@@ -148,7 +148,7 @@ export class Response {
                 cookieStr = cookieStr + "; Secure";
             }
             if (options.sameSite !== null) {
-                cookieStr = cookieStr + "; SameSite=" + options.sameSite;
+                cookieStr = `${cookieStr}; SameSite=${options.sameSite}`;
             }
         }
         this.cookies.push(cookieStr);

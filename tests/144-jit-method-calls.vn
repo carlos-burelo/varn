@@ -59,7 +59,7 @@ function mcStatic(i: int): int {
 
 // An enum variant built through a method-call shape.
 function mcVariant(i: int): McToken {
-    const t = i % 2 == 0 ? McToken.Number(i) : McToken.Word("w" + i)
+    const t = i % 2 == 0 ? McToken.Number(i) : McToken.Word(`w${i}`)
     return t
 }
 

@@ -20,7 +20,7 @@ let t0 = now()
 
 let gcJunk = []
 for (let i = 0; i < 400000; i = i + 1) {
-    gcJunk.push("gc_" + i)
+    gcJunk.push(`gc_${i}`)
 }
 
 let t1 = now()
@@ -36,6 +36,6 @@ for (let i = 0; i < 100000; i = i + 1) {
 
 let t2 = now()
 
-print("junk_ms=" + (t1 - t0))
-print("alloc_ms=" + (t2 - t1))
-print("check=" + gcAccA + "/" + gcAccB + "/" + gcJunk.length)
+print(`junk_ms=${(t1 - t0)}`)
+print(`alloc_ms=${(t2 - t1)}`)
+print(`check=${gcAccA}/${gcAccB}/${gcJunk.length}`)

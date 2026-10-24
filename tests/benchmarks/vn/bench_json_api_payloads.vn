@@ -6,9 +6,9 @@ let rawPayloads: str[] = [];
 
 // 1. Generate 5,000 nested JSON documents
 for (let i = 0; i < 5000; i = i + 1) {
-    let orgId = "org_" + (i % 50);
+    let orgId = `org_${(i % 50)}`;
     let doc = {
-        "requestId": "req_" + i,
+        "requestId": `req_${i}`,
         "organization": {
             "id": orgId,
             "tier": (i % 2 === 0) ? "enterprise" : "pro",
@@ -18,8 +18,8 @@ for (let i = 0; i < 5000; i = i + 1) {
             }
         },
         "user": {
-            "id": "usr_" + (i % 500),
-            "email": "user" + i + "@company.com",
+            "id": `usr_${(i % 500)}`,
+            "email": `user${i}@company.com`,
             "roles": [
                 { "role": "admin", "scope": "global" },
                 { "role": "editor", "scope": "projects" }
@@ -27,7 +27,7 @@ for (let i = 0; i < 5000; i = i + 1) {
             "metadata": {
                 "lastLogin": "2026-08-21T12:00:00Z",
                 "loginCount": (i % 30) + 1,
-                "ip": "192.168.1." + (i % 254)
+                "ip": `192.168.1.${(i % 254)}`
             }
         },
         "auditEvents": [
@@ -66,8 +66,8 @@ for (let i = 0; i < rawPayloads.length; i = i + 1) {
 }
 
 print("JSON API Payloads Benchmark:");
-print("  Processed payloads: " + rawPayloads.length);
-print("  Enterprise Orgs: " + enterpriseCount);
-print("  Total User Logins: " + totalLogins);
-print("  Total Features Mapped: " + totalFeaturesCount);
-print("  Total Audit Events: " + totalAuditEvents);
+print(`  Processed payloads: ${rawPayloads.length}`);
+print(`  Enterprise Orgs: ${enterpriseCount}`);
+print(`  Total User Logins: ${totalLogins}`);
+print(`  Total Features Mapped: ${totalFeaturesCount}`);
+print(`  Total Audit Events: ${totalAuditEvents}`);

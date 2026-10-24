@@ -10,7 +10,7 @@ function outcome(f: () => void): str {
     }
 }
 
-function pair(a: int, b: str): str { return a + ":" + b }
+function pair(a: int, b: str): str { return `${a}:${b}`}
 function total(label: str, ...xs: int[]): int {
     let t = 0
     for (const x of xs) { t = t + x }

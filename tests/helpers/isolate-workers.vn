@@ -52,7 +52,7 @@ export async function replyThroughBox(box: { reply: Sender<int> }) {
 }
 
 export async function echoShape(shape: { __chanEndpoint: str, __chanId: int }, tx: Sender<str>) {
-    await tx.send(shape.__chanEndpoint + shape.__chanId)
+    await tx.send(`${shape.__chanEndpoint}${shape.__chanId}`)
     tx.close()
 }
 

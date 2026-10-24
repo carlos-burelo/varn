@@ -75,7 +75,7 @@ export class Duration {
     }
 
     toString(): str {
-        return "Duration(" + this.totalMilliseconds + "ms)";
+        return `Duration(${this.totalMilliseconds}ms)`;
     }
 
     toJSON(): str {
