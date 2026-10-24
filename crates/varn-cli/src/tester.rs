@@ -244,12 +244,12 @@ fn test_units(
 ) -> Vec<(String, Option<pipeline::TestEntry>)> {
     let mut units = vec![(display_name.to_owned(), None)];
     if let Ok(executable) = prepared {
-        units.extend(executable.tests.iter().map(|test| {
-            (
-                format!("{display_name}::{}", test.name),
-                Some(test.clone()),
-            )
-        }));
+        units.extend(
+            executable
+                .tests
+                .iter()
+                .map(|test| (format!("{display_name}::{}", test.name), Some(test.clone()))),
+        );
     }
     units
 }

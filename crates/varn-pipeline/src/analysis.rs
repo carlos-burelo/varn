@@ -14,8 +14,7 @@ pub struct Analysis {
 
 impl Session {
     pub fn analyze(&self, source: &Source) -> Analysis {
-        let (tokens, trivia, mut syntax) =
-            crate::lex::scan_tolerant(source.text(), source.path());
+        let (tokens, trivia, mut syntax) = crate::lex::scan_tolerant(source.text(), source.path());
         let (parsed, syntactic) = crate::parse::parse_tolerant(
             tokens.tokens.clone(),
             tokens.lexeme_buf.clone(),

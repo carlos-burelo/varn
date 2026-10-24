@@ -1,5 +1,5 @@
-pub mod cache;
 mod analysis;
+pub mod cache;
 mod check;
 mod class_link;
 mod compilation;
@@ -37,7 +37,7 @@ pub use policy::Policy;
 pub use request::{CachePolicy, Goal, Request};
 pub use session::Session;
 pub use source::Source;
-pub use varn_types::TestEntry;
 pub use varn_core::debug_flags::DebugFlags;
 pub use varn_project::Anchor;
 pub use varn_types::capabilities::CapabilitySet;
+pub use varn_types::TestEntry;

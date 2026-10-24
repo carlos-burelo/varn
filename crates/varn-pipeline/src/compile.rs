@@ -1,5 +1,5 @@
-use crate::lower::{lower_module, LowerInput, Lowered};
 use crate::executable::precompiled_modules;
+use crate::lower::{lower_module, LowerInput, Lowered};
 use crate::{Executable, Failure};
 use std::time::{Duration, Instant};
 use varn_core::ast::{AstArena, Program};
