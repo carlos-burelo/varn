@@ -324,23 +324,12 @@ que parten del cwd. `Session::open` parte, en cambio, del archivo de entrada. Un
 proyecto del cwd. Anclar el arranque en la `Session` exigiría analizar los argumentos
 antes de registrar la std; queda como mejora, no como contrato.
 
-## Pendiente de diseño: tests invocados por el runtime
+## Hecho: tests invocados por el runtime
 
-El runner de `vn test` sigue ejecutando cada `@test` con `Source::appended`
-(el módulo se compila con una llamada al final). Sustituirlo por
-`Executable.tests` + `Runtime::run_test` exige tres piezas que hoy no existen
-y que son un cimiento propio (Ley 14), no un detalle del CLI:
-
-1. `varn_sem::output::TestTarget` debe llevar el `slot_idx` del símbolo (el
-   checker ya lo conoce) para que el runtime ubique la función en la región de
-   globales del módulo de entrada.
-2. `Vm` necesita una llamada pública desde el host (`invoke` es `pub(crate)`)
-   que ejecute una función global y, si devuelve una tarea, la espere con
-   `settle_awaited`.
-3. Un valor lanzado por un test asíncrono (`Err(thrown)`) debe convertirse en
-   un `RuntimeError` con el mismo mensaje y pila que produce hoy el `await` de
-   nivel superior; esa conversión vive hoy dentro del bucle de `drive_main`.
-
-Verificación al implementarlo: mismas unidades aprobadas y fallidas en
-`vn test`, mismos mensajes de fallo, y menos compilaciones por archivo con
-`@test` (hoy 1 + N).
+El grafo de módulos lleva `tests` (nombre, si es asíncrona, índice de global del
+módulo de entrada, tomado de `TirModule::global_names`) y la VM ofrece
+`Vm::call_main_global`, que invoca esa función y, si es asíncrona, arranca la tarea
+perezosa y espera su resultado; un valor rechazado vuelve como `RuntimeError`.
+`execute_unit(session, &executable, policy, Unit::Module | Unit::Test(entry))` arranca
+una máquina nueva por unidad con el mismo `Executable`, de modo que `vn test` compila
+cada archivo una vez y `Source::appended` desapareció.

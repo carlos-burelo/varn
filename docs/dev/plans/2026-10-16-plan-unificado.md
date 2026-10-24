@@ -120,15 +120,6 @@ corregidos en el camino: `implements` de clase genérica sin verificar
 
 ## 2. Pendiente, por orden
 
-### 2.0 Tests invocados por el runtime
-
-`vn test` ejecuta cada `@test` compilando el archivo con una llamada añadida
-(`Source::appended`). Sustituirlo por `Executable.tests` + `Runtime::run_test`
-exige `slot_idx` en `TestTarget`, una llamada pública del host en `Vm` que espere
-tareas y la conversión de un valor lanzado en `RuntimeError`; detalle y
-verificación en el diseño (`2026-10-24-toolchain-pipeline-design.md`, «Pendiente
-de diseño»).
-
 ### 2.1 Representación: un bloque por valor
 
 Cada fase: re-medir filas del probe `repr_rows.vn` antes (paso 1),
