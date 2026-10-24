@@ -1,11 +1,11 @@
 use std::time::{Duration, Instant};
 
-use varn_core::{AtomInterner, Diagnostic, DiagnosticBag};
+use varn_core::{AtomInterner, Diagnostic};
 
 use crate::cache::CacheLookup;
 use crate::lex::Tokens;
 use crate::parse::Parsed;
-use crate::request::{CachePolicy, Goal, Mode, Request};
+use crate::request::{CachePolicy, Goal, Request};
 use crate::{Executable, Failure, ModuleResolver, Session, Source};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,7 +33,6 @@ pub struct Compilation {
     pub parsed: Option<Parsed>,
     pub checked: Option<varn_sem::output::CheckResult>,
     pub executable: Option<Executable>,
-    pub syntax: DiagnosticBag,
     pub failure: Option<Failure>,
     pub timings: Vec<(Stage, Duration)>,
     pub cache: CacheStatus,
@@ -47,7 +46,6 @@ impl Compilation {
             parsed: None,
             checked: None,
             executable: None,
-            syntax: DiagnosticBag::new(),
             failure: None,
             timings: Vec::new(),
             cache: CacheStatus::Bypassed,
@@ -81,53 +79,7 @@ impl Compilation {
         out
     }
 
-    fn advance_tolerant(
-        &mut self,
-        resolver: &ModuleResolver,
-        request: Request,
-    ) -> Result<(), Failure> {
-        if request.goal == Goal::Executable {
-            return Err(Failure::internal(
-                "a tooling compilation stops at the checker",
-            ));
-        }
-        let source = self.source.clone();
-        let (tokens, lexical) = self.timed(Stage::Lex, || {
-            crate::lex::scan_tolerant(source.text(), source.path())
-        });
-        self.syntax.extend(lexical);
-        let (token_vec, lexeme_buf) = (tokens.tokens.clone(), tokens.lexeme_buf.clone());
-        self.tokens = Some(tokens);
-        if request.goal == Goal::Tokens {
-            return Ok(());
-        }
-
-        let (parsed, syntactic) = self.timed(Stage::Parse, || {
-            crate::parse::parse_tolerant(token_vec, lexeme_buf, source.path())
-        });
-        self.syntax.extend(syntactic);
-        if request.goal == Goal::Ast {
-            self.parsed = Some(parsed);
-            return Ok(());
-        }
-
-        let checked = self.timed(Stage::Check, || {
-            crate::check::check_tolerant(
-                &parsed.program,
-                &parsed.arena,
-                parsed.interner.clone(),
-                resolver,
-            )
-        });
-        self.parsed = Some(parsed);
-        self.checked = Some(checked);
-        Ok(())
-    }
-
     fn advance(&mut self, resolver: &ModuleResolver, request: Request) -> Result<(), Failure> {
-        if request.mode == Mode::Tooling {
-            return self.advance_tolerant(resolver, request);
-        }
         let cacheable = request.goal == Goal::Executable
             && request.cache == CachePolicy::Use
             && matches!(self.source, Source::File { .. });

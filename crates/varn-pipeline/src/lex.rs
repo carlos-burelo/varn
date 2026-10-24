@@ -5,7 +5,6 @@ use varn_core::{DiagnosticBag, Token, Trivia};
 pub struct Tokens {
     pub tokens: Vec<Token>,
     pub lexeme_buf: Arc<[u8]>,
-    pub trivia: Vec<Trivia>,
 }
 
 pub(crate) fn scan(source: &str, path: &str) -> Result<Tokens, Failure> {
@@ -19,25 +18,14 @@ pub(crate) fn scan(source: &str, path: &str) -> Result<Tokens, Failure> {
         return Err(Failure::diagnostics(path, source, bag));
     }
 
-    Ok(Tokens {
-        tokens,
-        lexeme_buf,
-        trivia: Vec::new(),
-    })
+    Ok(Tokens { tokens, lexeme_buf })
 }
 
-pub(crate) fn scan_tolerant(source: &str, path: &str) -> (Tokens, DiagnosticBag) {
+pub(crate) fn scan_tolerant(source: &str, path: &str) -> (Tokens, Vec<Trivia>, DiagnosticBag) {
     let (tokens, lexeme_buf, errors, trivia) = varn_lexer::scan_with_trivia(source, path);
     let mut diagnostics = DiagnosticBag::new();
     for e in errors {
         diagnostics.push(e);
     }
-    (
-        Tokens {
-            tokens,
-            lexeme_buf,
-            trivia,
-        },
-        diagnostics,
-    )
+    (Tokens { tokens, lexeme_buf }, trivia, diagnostics)
 }

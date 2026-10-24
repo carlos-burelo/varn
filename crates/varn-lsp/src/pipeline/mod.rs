@@ -1,7 +1,7 @@
 mod params;
 
 use rustc_hash::FxHashMap;
-use varn_pipeline::{Request, Session, Source};
+use varn_pipeline::{Session, Source};
 
 use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
 use crate::document::{uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, TokenRecord};
@@ -14,22 +14,16 @@ pub fn run_pipeline(source: String, uri: String, session: &Session) -> DocumentA
     let path = uri_to_path(&uri);
     let resolver = session.shared_resolver();
 
-    let mut compilation =
-        session.compile(Source::virtual_source(&path, &source), Request::tooling());
-    let (Some(stage_tokens), Some(parsed), Some(result)) = (
-        compilation.tokens.take(),
-        compilation.parsed.take(),
-        compilation.checked.take(),
-    ) else {
-        unreachable!("a tooling compilation to the checker keeps every stage");
-    };
-    let raw_tokens = stage_tokens.tokens;
-    let trivia = stage_tokens.trivia;
-    let program = parsed.program;
-    let ast_arena = parsed.arena;
+    let analysis = session.analyze(&Source::virtual_source(&path, &source));
+    let raw_tokens = analysis.tokens.tokens;
+    let trivia = analysis.trivia;
+    let program = analysis.parsed.program;
+    let ast_arena = analysis.parsed.arena;
+    let result = analysis.checked;
+    let mut syntax = analysis.syntax;
 
     let mut diagnostics: Vec<LspDiag> = Vec::new();
-    for e in compilation.syntax.take() {
+    for e in syntax.take() {
         diagnostics.push(LspDiag {
             message: e.message,
             line: e.range.start.line.saturating_sub(1),

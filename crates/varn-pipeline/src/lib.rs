@@ -1,4 +1,5 @@
 pub mod cache;
+mod analysis;
 mod check;
 mod class_link;
 mod compilation;
@@ -24,6 +25,7 @@ pub mod stdlib_loader;
 
 pub use varn_resolver::ModuleResolver;
 
+pub use analysis::Analysis;
 pub use compilation::{CacheStatus, Compilation, Stage};
 pub use core::core_protos_owned;
 pub use error::{DiagnosticReport, Failure, RuntimeFailure};
@@ -32,7 +34,7 @@ pub use execute::{boot_machine, enter_main, execute, execute_unit, Unit};
 pub use lex::Tokens;
 pub use parse::Parsed;
 pub use policy::Policy;
-pub use request::{CachePolicy, Goal, Mode, Request};
+pub use request::{CachePolicy, Goal, Request};
 pub use session::Session;
 pub use source::Source;
 pub use varn_types::TestEntry;
