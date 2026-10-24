@@ -17,6 +17,7 @@ pub struct VmFactory {
     module_id: ModuleId,
     proto: Rc<FunctionProto>,
     print_silent: bool,
+    capabilities: varn_pipeline::CapabilitySet,
 }
 
 impl VmFactory {
@@ -27,6 +28,7 @@ impl VmFactory {
         module_id: ModuleId,
         proto: Rc<FunctionProto>,
         print_silent: bool,
+        capabilities: varn_pipeline::CapabilitySet,
     ) -> Result<Self, CliError> {
         let factory = Self {
             precompiled,
@@ -35,6 +37,7 @@ impl VmFactory {
             module_id,
             proto,
             print_silent,
+            capabilities,
         };
         factory.try_build().map_err(CliError::fatal)?;
         Ok(factory)
@@ -57,6 +60,7 @@ impl VmFactory {
             varn_vm::ExecSettings::from_env(false),
         )
         .with_loader(self.loader.clone());
+        machine.ctx.capabilities = Rc::new(self.capabilities.clone());
         machine.ctx.print_silent = true;
         let init = self.builtins.iter().try_for_each(|bp| {
             machine

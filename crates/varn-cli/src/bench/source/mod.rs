@@ -74,6 +74,7 @@ pub fn run(
         ModuleId::local_str(path),
         Rc::new(proto.clone()),
         !opts.show_output,
+        opts.capabilities.clone(),
     )?;
 
     varn_core::term::log(format!("  running {runs} runs..."));

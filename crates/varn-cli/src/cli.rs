@@ -172,6 +172,9 @@ pub struct ReplArgs {
 
 #[derive(Args)]
 pub struct BenchArgs {
+    #[command(flatten)]
+    pub permissions: PermissionArgs,
+
     pub file: Option<String>,
 
     #[arg(short, long, value_name = "CODE")]

@@ -13,6 +13,7 @@ pub struct BenchOpts {
     pub all_rows: bool,
 
     pub min_clif_coverage: Option<f64>,
+    pub capabilities: varn_pipeline::CapabilitySet,
 }
 
 pub fn run_bench(

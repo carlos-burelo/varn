@@ -39,6 +39,7 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
         ModuleId::local_str(path),
         Rc::new(compile_output.entry_proto.clone()),
         !opts.show_output,
+        opts.capabilities.clone(),
     )?;
 
     let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup(

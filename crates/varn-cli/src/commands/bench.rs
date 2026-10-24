@@ -20,6 +20,7 @@ pub fn execute(session: &varn_pipeline::Session, args: BenchArgs) -> Result<(), 
             verbose: args.verbose,
             all_rows: args.all_rows,
             min_clif_coverage: args.min_clif_coverage,
+            capabilities: crate::policy::capabilities(&args.permissions),
         },
     )
 }
