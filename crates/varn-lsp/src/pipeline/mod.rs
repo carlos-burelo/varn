@@ -1,6 +1,7 @@
 mod params;
 
 use rustc_hash::FxHashMap;
+use varn_pipeline::{Request, Session, Source};
 
 use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
 use crate::document::{uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, TokenRecord};
@@ -8,18 +9,27 @@ use varn_core::ast::{AstArena, Decl, StmtId, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind};
 use varn_sem::symbol::SymbolKind;
 
-pub fn run_pipeline(
-    source: String,
-    uri: String,
-    resolver: std::sync::Arc<varn_resolver::ModuleResolver>,
-) -> DocumentAnalysis {
+pub fn run_pipeline(source: String, uri: String, session: &Session) -> DocumentAnalysis {
     varn_builtins::register_provider();
     let path = uri_to_path(&uri);
+    let resolver = session.shared_resolver();
 
-    let (raw_tokens, lexeme_buf, lex_errs, trivia) = varn_lexer::scan_with_trivia(&source, &path);
+    let mut compilation =
+        session.compile(Source::virtual_source(&path, &source), Request::tooling());
+    let (Some(stage_tokens), Some(parsed), Some(result)) = (
+        compilation.tokens.take(),
+        compilation.parsed.take(),
+        compilation.checked.take(),
+    ) else {
+        unreachable!("a tooling compilation to the checker keeps every stage");
+    };
+    let raw_tokens = stage_tokens.tokens;
+    let trivia = stage_tokens.trivia;
+    let program = parsed.program;
+    let ast_arena = parsed.arena;
 
     let mut diagnostics: Vec<LspDiag> = Vec::new();
-    for e in lex_errs {
+    for e in compilation.syntax.take() {
         diagnostics.push(LspDiag {
             message: e.message,
             line: e.range.start.line.saturating_sub(1),
@@ -68,34 +78,6 @@ pub fn run_pipeline(
             }
         })
         .collect();
-
-    let (program, parse_errs, ast_arena, interner) = varn_parser::parse_partial(
-        raw_tokens,
-        lexeme_buf,
-        &path,
-        varn_core::AtomInterner::new(),
-    );
-    for e in parse_errs {
-        diagnostics.push(LspDiag {
-            message: e.message,
-            line: e.range.start.line.saturating_sub(1),
-            col: e.range.start.column,
-            end_line: e.range.end.line.saturating_sub(1),
-            end_col: e.range.end.column,
-            severity: SEVERITY_ERROR,
-            code: Some(e.code),
-            related: Vec::new(),
-            suggestions: Vec::new(),
-        });
-    }
-
-    let result = varn_checker::Checker::check_with(
-        &program,
-        &ast_arena,
-        interner,
-        resolver.as_ref(),
-        varn_sem::output::CheckOptions::tooling(),
-    );
 
     for d in &result.diagnostics {
         let severity = match d.kind {

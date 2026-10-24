@@ -3841,7 +3841,7 @@ dependencies = [
  "varn-debug",
  "varn-lsp",
  "varn-modules",
- "varn-resolver",
+ "varn-pipeline",
  "varn-sem",
 ]
 
@@ -3890,9 +3890,8 @@ dependencies = [
  "varn-compiler",
  "varn-core",
  "varn-emit",
- "varn-lexer",
  "varn-modules",
- "varn-parser",
+ "varn-pipeline",
  "varn-resolver",
  "varn-sem",
  "varn-tir",

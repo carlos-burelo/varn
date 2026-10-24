@@ -8,7 +8,7 @@ varn-core     = { path = "../varn-core" }
 varn-debug    = { path = "../varn-debug" }
 varn-lsp      = { path = "../varn-lsp" }
 varn-modules  = { path = "../varn-modules" }
-varn-resolver = { path = "../varn-resolver" }
+varn-pipeline = { path = "../varn-pipeline" }
 varn-sem      = { path = "../varn-sem" }
 rustc-hash    = { workspace = true }
 tower-lsp-f   = { workspace = true }

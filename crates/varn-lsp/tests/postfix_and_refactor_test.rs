@@ -8,8 +8,8 @@ use varn_lsp::features::completion::postfix::build_postfix_completions;
 use varn_lsp::features::formatting::build_formatting;
 use varn_lsp::pipeline::run_pipeline;
 
-fn test_resolver() -> std::sync::Arc<varn_resolver::ModuleResolver> {
-    std::sync::Arc::new(varn_resolver::ModuleResolver::new())
+fn test_resolver() -> varn_pipeline::Session {
+    varn_pipeline::Session::detached()
 }
 
 #[test]
@@ -18,7 +18,7 @@ fn test_postfix_completions() {
     let state = run_pipeline(
         src.to_string(),
         "file:///test.vn".to_string(),
-        test_resolver(),
+        &test_resolver(),
     );
     let items = build_postfix_completions(&state, 0, 18);
     assert!(
@@ -42,7 +42,7 @@ fn test_extract_variable_action() {
     let state = run_pipeline(
         src.to_string(),
         "file:///test.vn".to_string(),
-        test_resolver(),
+        &test_resolver(),
     );
     let uri = Uri::parse("file:///test.vn").unwrap();
     let range = Range {
@@ -65,7 +65,7 @@ fn test_extract_function_action() {
     let state = run_pipeline(
         src.to_string(),
         "file:///test.vn".to_string(),
-        test_resolver(),
+        &test_resolver(),
     );
     let uri = Uri::parse("file:///test.vn").unwrap();
     let range = Range {
@@ -88,7 +88,7 @@ fn test_generate_class_members() {
     let state = run_pipeline(
         src.to_string(),
         "file:///test.vn".to_string(),
-        test_resolver(),
+        &test_resolver(),
     );
     let uri = Uri::parse("file:///test.vn").unwrap();
     let actions = generate_class_member_actions(&state, &uri, 1);
@@ -124,7 +124,7 @@ fn test_reflection_colon_colon_completion() {
     let state = run_pipeline(
         src.to_string(),
         "file:///test.vn".to_string(),
-        test_resolver(),
+        &test_resolver(),
     );
     let receiver =
         varn_lsp::features::completion::reflection::colon_colon_receiver(&state, 4, 27, Some(":"));
@@ -160,7 +160,7 @@ fn test_root_scope_isolation_from_unreachable_type_parameters() {
     let state = run_pipeline(
         src.to_string(),
         "file:///test.vn".to_string(),
-        test_resolver(),
+        &test_resolver(),
     );
 
     let (root_items, _) = varn_lsp::features::completion::build_completions(&state, 4, 0);
@@ -199,7 +199,7 @@ fn test_get_cfg_graph_json() {
     let state = run_pipeline(
         src.to_string(),
         "file:///test.vn".to_string(),
-        test_resolver(),
+        &test_resolver(),
     );
 
     let cfg_json = varn_lsp::features::compiler_inspect::compile_and_get_cfg_json(&state);

@@ -9,6 +9,7 @@ use crate::pipeline::run_pipeline;
 use crate::query::exports::{ExportedSymbol, ModuleExports};
 use dashmap::DashMap;
 use std::sync::{Arc, RwLock};
+use varn_pipeline::Session;
 use varn_resolver::ModuleResolver;
 
 pub use revision::{Cached, Revision};
@@ -19,7 +20,7 @@ pub struct Workspace {
     pub db: Arc<Database>,
     pub index: RwLock<ProjectIndex>,
     revision: RwLock<Revision>,
-    resolver: Arc<ModuleResolver>,
+    session: Session,
 }
 
 impl Workspace {
@@ -30,20 +31,20 @@ impl Workspace {
             db: Arc::new(Database::new()),
             index: RwLock::new(ProjectIndex::new()),
             revision: RwLock::new(Revision::new()),
-            resolver: Arc::new(ModuleResolver::new()),
+            session: Session::detached(),
         }
     }
 
-    pub fn resolver(&self) -> &ModuleResolver {
-        &self.resolver
+    pub fn session(&self) -> &Session {
+        &self.session
     }
 
-    pub fn resolver_handle(&self) -> Arc<ModuleResolver> {
-        Arc::clone(&self.resolver)
+    pub fn resolver(&self) -> &ModuleResolver {
+        self.session.resolver()
     }
 
     pub fn invalidate(&self, id: &varn_core::ModuleId) {
-        self.resolver.invalidate(id);
+        self.session.resolver().invalidate(id);
     }
 
     pub fn update_source(&self, uri: &str, source: &str) -> (FileId, u64, CancellationToken) {
@@ -78,7 +79,7 @@ impl Workspace {
             self.db.set_source(file_id, source.clone());
         }
 
-        let state = Arc::new(run_pipeline(source, uri.clone(), self.resolver_handle()));
+        let state = Arc::new(run_pipeline(source, uri.clone(), self.session()));
 
         let current_exports = extract_exports(&state);
         let exports_changed = match self.exports.get(&file_id) {
@@ -110,7 +111,7 @@ impl Workspace {
             let dep_state = Arc::new(run_pipeline(
                 dep_source,
                 dep_uri.clone(),
-                self.resolver_handle(),
+                self.session(),
             ));
             {
                 let mut idx = self.index.write().unwrap_or_else(|e| e.into_inner());
@@ -134,7 +135,7 @@ impl Workspace {
     pub fn index_file(&self, uri: String, source: String) {
         self.invalidate(&Self::module_id_of(&uri));
         let file_id = self.db.intern(&uri);
-        let state = run_pipeline(source, uri.clone(), self.resolver_handle());
+        let state = run_pipeline(source, uri.clone(), self.session());
         let current_exports = extract_exports(&state);
         self.exports.insert(file_id, current_exports);
         {

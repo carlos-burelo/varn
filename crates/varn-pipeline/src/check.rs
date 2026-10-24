@@ -22,6 +22,21 @@ pub(crate) fn check_program(
     Ok(result)
 }
 
+pub(crate) fn check_tolerant(
+    program: &Program,
+    arena: &AstArena,
+    interner: AtomInterner,
+    resolver: &crate::ModuleResolver,
+) -> varn_sem::output::CheckResult {
+    Checker::check_with(
+        program,
+        arena,
+        interner,
+        resolver,
+        varn_sem::output::CheckOptions::tooling(),
+    )
+}
+
 pub(crate) fn reject_errors(
     diagnostics: &DiagnosticBag,
     filename: &str,

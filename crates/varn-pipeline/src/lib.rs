@@ -32,7 +32,7 @@ pub use executable::Executable;
 pub use lex::Tokens;
 pub use parse::Parsed;
 pub use policy::Policy;
-pub use request::{CachePolicy, Goal, Request};
+pub use request::{CachePolicy, Goal, Mode, Request};
 pub use session::Session;
 pub use source::Source;
 pub use varn_core::debug_flags::DebugFlags;

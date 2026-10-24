@@ -9,7 +9,7 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     let analysis = varn_lsp::pipeline::run_pipeline(
         source.to_owned(),
         uri,
-        std::sync::Arc::new(varn_resolver::ModuleResolver::new()),
+        &varn_pipeline::Session::detached(),
     );
     Section::new("type inference engine")
         .subtitle(path)

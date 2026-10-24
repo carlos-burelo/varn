@@ -6,8 +6,8 @@ use std::mem::size_of;
 use varn_lsp::pipeline::run_pipeline;
 use varn_sem::resolver::ImportResolver;
 
-fn test_resolver() -> std::sync::Arc<varn_resolver::ModuleResolver> {
-    std::sync::Arc::new(varn_resolver::ModuleResolver::new())
+fn test_resolver() -> varn_pipeline::Session {
+    varn_pipeline::Session::detached()
 }
 use varn_lsp::workspace::Workspace;
 
@@ -32,7 +32,7 @@ const b = acc.balance;
 #[test]
 fn h1_tokens_hold_no_lexeme_strings() {
     let uri = "file:///test/h1.vn".to_string();
-    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri, test_resolver());
+    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri, &test_resolver());
     assert!(!state.tokens.is_empty(), "la muestra debe producir tokens");
 
     assert_eq!(
@@ -53,7 +53,7 @@ fn h1_tokens_hold_no_lexeme_strings() {
 #[test]
 fn h2_document_keeps_single_arena_copy() {
     let uri = "file:///test/h2.vn".to_string();
-    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri, test_resolver());
+    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri, &test_resolver());
 
     assert!(
         !state.db.bind.arena.all().is_empty(),
@@ -76,7 +76,7 @@ fn h2_document_keeps_single_arena_copy() {
 #[test]
 fn h3_single_id_to_type_map() {
     let uri = "file:///test/h3.vn".to_string();
-    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri, test_resolver());
+    let state = run_pipeline(ACCOUNT_SRC.to_string(), uri, &test_resolver());
 
     let stored: HashSet<usize> = state.db.symbol_types.keys().copied().collect();
     assert!(!stored.is_empty(), "debe haber tipos resueltos");

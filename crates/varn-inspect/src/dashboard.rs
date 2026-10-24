@@ -12,7 +12,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
     let analysis = varn_lsp::pipeline::run_pipeline(
         source.to_string(),
         uri,
-        std::sync::Arc::new(varn_resolver::ModuleResolver::new()),
+        &varn_pipeline::Session::detached(),
     );
 
     if flags.lsp_symbols {

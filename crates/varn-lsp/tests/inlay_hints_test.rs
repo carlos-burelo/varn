@@ -3,8 +3,8 @@
 use varn_lsp::features::inlay_hints::build_inlay_hints;
 use varn_lsp::pipeline::run_pipeline;
 
-fn test_resolver() -> std::sync::Arc<varn_resolver::ModuleResolver> {
-    std::sync::Arc::new(varn_resolver::ModuleResolver::new())
+fn test_resolver() -> varn_pipeline::Session {
+    varn_pipeline::Session::detached()
 }
 
 #[test]
@@ -29,7 +29,7 @@ class SortedPair<T> {
 }
 "#;
     let uri = "file:///test/sorted_pair.vn".to_string();
-    let state = run_pipeline(source.to_string(), uri, test_resolver());
+    let state = run_pipeline(source.to_string(), uri, &test_resolver());
 
     let hints = build_inlay_hints(&state);
 
@@ -47,7 +47,7 @@ const num = 42;
 const greeting = "hello";
 "#;
     let uri = "file:///test/inferred.vn".to_string();
-    let state = run_pipeline(source.to_string(), uri, test_resolver());
+    let state = run_pipeline(source.to_string(), uri, &test_resolver());
 
     let hints = build_inlay_hints(&state);
 

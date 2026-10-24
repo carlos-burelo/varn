@@ -69,7 +69,7 @@ pub fn build_references(
         }
         scanned += 1;
         let temp_state =
-            crate::pipeline::run_pipeline(source, file_uri.clone(), workspace.resolver_handle());
+            crate::pipeline::run_pipeline(source, file_uri.clone(), workspace.session());
         collect_references_in_document(&temp_state, &target, target_name, &mut locs);
     }
 
