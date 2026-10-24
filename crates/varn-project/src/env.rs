@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::names::ENV_DIR_NAME;
 use crate::root::nearest;
 
 pub fn apply_from_cwd() {
@@ -16,6 +17,9 @@ pub fn apply_from_cwd() {
     }
     for dir in &dirs {
         apply_file(&dir.join(".env"));
+    }
+    for dir in &dirs {
+        apply_file(&dir.join(ENV_DIR_NAME).join(".env"));
     }
 }
 
