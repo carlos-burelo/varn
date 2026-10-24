@@ -17,6 +17,7 @@ pub struct ModuleGraphBuild {
 
     pub deps: HashMap<String, Vec<String>>,
     pub class_tables: HashMap<String, crate::class_link::ModuleClasses>,
+    pub warnings: Vec<crate::DiagnosticReport>,
 }
 
 pub fn build_module_graph(
@@ -193,6 +194,7 @@ pub fn build_module_graph(
     let mut modules: HashMap<String, FunctionProto> = HashMap::default();
     modules.insert(canonical_entry.clone(), entry_proto.clone());
     let mut class_tables: HashMap<String, crate::class_link::ModuleClasses> = HashMap::default();
+    let mut warnings: Vec<crate::DiagnosticReport> = Vec::new();
 
     for module_path in sorted.into_iter().rev() {
         if module_path == canonical_entry {
@@ -210,7 +212,11 @@ pub fn build_module_graph(
             varn_sem::output::CheckOptions::compile(),
         );
 
-        crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)?;
+        if let Some(report) =
+            crate::check::warnings_of(&check.diagnostics, &program.filename, module_source)?
+        {
+            warnings.push(report);
+        }
         let lowered = crate::lower::lower_module(crate::lower::LowerInput {
             program,
             arena,
@@ -243,6 +249,7 @@ pub fn build_module_graph(
         package_nodes: package_nodes.into_values().collect(),
         deps: graph,
         class_tables,
+        warnings,
     })
 }
 

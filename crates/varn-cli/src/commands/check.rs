@@ -1,21 +1,5 @@
 use crate::{cli::CheckArgs, error::CliError, pipeline};
-use varn_pipeline::RunOpts;
 
 pub fn execute(session: &pipeline::Session, args: CheckArgs) -> Result<(), CliError> {
-    pipeline::run(
-        session,
-        &RunOpts {
-            file_path: args.file,
-            eval: None,
-            append: None,
-            verbose: args.verbose,
-            no_run: true,
-            debug: Default::default(),
-            trace: false,
-            capabilities: Default::default(),
-            print_silent: false,
-        },
-        &crate::debug_sink::CliDebugSink,
-    )
-    .map_err(CliError::from)
+    crate::exec::load(session, &args.file, &Default::default(), args.verbose).map(|_| ())
 }

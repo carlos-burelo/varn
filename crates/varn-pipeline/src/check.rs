@@ -1,70 +1,50 @@
 use varn_checker::Checker;
 use varn_core::ast::{AstArena, Program};
+use varn_core::{AtomInterner, DiagnosticBag};
 
-use crate::Failure;
-use varn_core::debug_flags::DebugFlags;
+use crate::{DiagnosticReport, Failure};
 
-type PipelineResult<T> = Result<T, Failure>;
-
-pub struct CheckResult {
-    pub checker_result: varn_sem::output::CheckResult,
+pub fn check_program(
+    program: &Program,
+    arena: &AstArena,
+    interner: AtomInterner,
+    source: &str,
+    resolver: &crate::ModuleResolver,
+) -> Result<varn_sem::output::CheckResult, Failure> {
+    let result = Checker::check_with(
+        program,
+        arena,
+        interner,
+        resolver,
+        varn_sem::output::CheckOptions::compile(),
+    );
+    reject_errors(&result.diagnostics, &program.filename, source)?;
+    Ok(result)
 }
 
-pub fn report_diagnostics(
-    diagnostics: &varn_core::DiagnosticBag,
+pub(crate) fn reject_errors(
+    diagnostics: &DiagnosticBag,
     filename: &str,
     source: &str,
-) -> PipelineResult<()> {
-    if diagnostics.is_empty() {
-        return Ok(());
-    }
+) -> Result<(), Failure> {
     if diagnostics.has_errors() {
         return Err(Failure::diagnostics(filename, source, diagnostics.clone()));
-    }
-    for d in diagnostics.iter() {
-        varn_core::term::terminal::log(crate::fmt::format_diagnostic(d, source));
     }
     Ok(())
 }
 
-pub fn check(
-    program: &Program,
-    ast_arena: &AstArena,
-    interner: varn_core::AtomInterner,
+pub(crate) fn warnings_of(
+    diagnostics: &DiagnosticBag,
+    filename: &str,
     source: &str,
-    debug: &DebugFlags,
-    session: &crate::ModuleResolver,
-    sink: &dyn crate::debug_sink::DebugSink,
-) -> PipelineResult<CheckResult> {
-    let options = varn_sem::output::CheckOptions::compile();
-    let check_result = Checker::check_with(program, ast_arena, interner, session, options);
-    report_diagnostics(&check_result.diagnostics, &program.filename, source)?;
-
-    sink.check(program, source, &check_result, debug);
-
-    Ok(CheckResult {
-        checker_result: check_result,
-    })
-}
-
-pub fn collect_test_targets(
-    path: &str,
-    source: &str,
-    session: &crate::ModuleResolver,
-) -> PipelineResult<Vec<(String, bool)>> {
-    let debug = DebugFlags::default();
-    let sink = crate::debug_sink::NullSink;
-    let (tokens, lexeme_buf) = crate::lex::lex(source, path, false, &debug, &sink)?;
-    let (program, arena, interner) =
-        crate::parse::parse(tokens, lexeme_buf, source, path, false, &debug, &sink)?;
-    let options = varn_sem::output::CheckOptions::compile();
-    let checked = Checker::check_with(&program, &arena, interner, session, options);
-    if checked.diagnostics.has_errors() {
-        report_diagnostics(&checked.diagnostics, &program.filename, source)?;
+) -> Result<Option<DiagnosticReport>, Failure> {
+    reject_errors(diagnostics, filename, source)?;
+    if diagnostics.is_empty() {
+        return Ok(None);
     }
-    Ok(checked
-        .test_targets
-        .iter()
-        .map(|t| (t.name.to_string(), t.is_async))
-        .collect())
+    Ok(Some(DiagnosticReport {
+        file: filename.into(),
+        source: source.into(),
+        diagnostics: diagnostics.clone(),
+    }))
 }

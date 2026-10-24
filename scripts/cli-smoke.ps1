@@ -90,6 +90,13 @@ Check "manifest-unknown-key-is-named" {
     $r.Code -ne 0 -and $r.Out -match "nmae" -and $r.Out -match "varn.toml"
 }
 
+Check "cache-hit-on-second-run" {
+    $f = Write-Vn "cache\hello.vn" 'print("cached");'
+    $first = Vn run -v $f
+    $second = Vn run -v $f
+    $first.Out -match "compile cache miss" -and $second.Out -match "compile cache hit" -and $second.Code -eq 0
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null

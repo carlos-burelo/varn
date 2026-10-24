@@ -9,13 +9,12 @@ use std::process::Command;
 pub fn execute(session: &pipeline::Session, args: BuildArgs) -> Result<(), CliError> {
     let source = pipeline::Source::file(&args.file)?;
 
-    let compiled = pipeline::compile_source_for_build(
-        source.text(),
-        source.path(),
-        args.verbose,
+    let compiled = crate::exec::compile(
+        session,
+        source,
+        pipeline::CachePolicy::Bypass,
         &Default::default(),
-        session.resolver(),
-        &pipeline::NullSink,
+        args.verbose,
     )?;
 
     let is_native = args.native || args.target.eq_ignore_ascii_case("native");

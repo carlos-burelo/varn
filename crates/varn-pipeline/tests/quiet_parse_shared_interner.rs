@@ -42,18 +42,17 @@ fn build_module_graph_resolves_named_reexport_origin_module_without_panicking() 
     )
     .expect("write entry.vn");
 
-    let source = fs::read_to_string(&entry_path).expect("read entry.vn");
     let entry_str = entry_path.to_string_lossy().into_owned();
 
-    let session = varn_pipeline::ModuleResolver::new();
-    let compiled = varn_pipeline::compile_source_for_build(
-        &source,
-        &entry_str,
-        false,
-        &varn_pipeline::DebugFlags::default(),
-        &session,
-        &varn_pipeline::NullSink,
-    );
+    let session = varn_pipeline::Session::detached();
+    let compiled = varn_pipeline::Source::file(&entry_str).and_then(|source| {
+        session
+            .compile(
+                source,
+                varn_pipeline::Request::executable(varn_pipeline::CachePolicy::Bypass),
+            )
+            .into_executable()
+    });
 
     let _ = fs::remove_dir_all(&dir);
 

@@ -18,7 +18,7 @@ use crate::error::CliError;
 pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let runs = opts.runs;
     let compiled = crate::pipeline::portable::read_portable(path)?;
-    let compile_output = crate::pipeline::cache::compile_output_from_graph(compiled)?;
+    let compile_output = crate::pipeline::Executable::from_graph(compiled)?;
 
     let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 

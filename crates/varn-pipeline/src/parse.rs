@@ -1,41 +1,32 @@
 use crate::Failure;
 use std::sync::Arc;
-use varn_core::debug_flags::DebugFlags;
+use varn_core::ast::{AstArena, Program};
+use varn_core::{AtomInterner, Token};
 
-type PipelineResult<T> = Result<T, Failure>;
+pub struct Parsed {
+    pub program: Program,
+    pub arena: AstArena,
+    pub interner: AtomInterner,
+}
 
 pub fn parse(
-    tokens: Vec<varn_core::Token>,
+    tokens: Vec<Token>,
     lexeme_buf: Arc<[u8]>,
     source: &str,
     path: &str,
-    verbose: bool,
-    debug: &DebugFlags,
-    sink: &dyn crate::debug_sink::DebugSink,
-) -> PipelineResult<(
-    varn_core::ast::Program,
-    varn_core::ast::AstArena,
-    varn_core::AtomInterner,
-)> {
-    let (program, arena, interner) =
-        varn_parser::parse(tokens, lexeme_buf, path, varn_core::AtomInterner::new())
-            .map(|(program, interner, arena)| (program, arena, interner))
-            .map_err(|errs| {
-                let mut bag = varn_core::DiagnosticBag::new();
-                for e in errs {
-                    bag.push(e);
-                }
-                Failure::diagnostics(path, source, bag)
-            })?;
+) -> Result<Parsed, Failure> {
+    let (program, interner, arena) = varn_parser::parse(tokens, lexeme_buf, path, AtomInterner::new())
+        .map_err(|errs| {
+            let mut bag = varn_core::DiagnosticBag::new();
+            for e in errs {
+                bag.push(e);
+            }
+            Failure::diagnostics(path, source, bag)
+        })?;
 
-    if verbose {
-        varn_core::term::terminal::tagged(
-            "Varn",
-            format_args!("parsed {} top-level statements", program.body.len()),
-        );
-    }
-
-    sink.parse(&program, &arena, &interner, debug);
-
-    Ok((program, arena, interner))
+    Ok(Parsed {
+        program,
+        arena,
+        interner,
+    })
 }

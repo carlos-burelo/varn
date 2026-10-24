@@ -1,21 +1,19 @@
 use crate::{cli::EvalArgs, error::CliError, pipeline};
-use varn_pipeline::RunOpts;
 
 pub fn execute(session: &pipeline::Session, args: EvalArgs) -> Result<(), CliError> {
-    pipeline::run(
+    let debug = pipeline::DebugFlags::default();
+    let executable = crate::exec::compile(
         session,
-        &RunOpts {
-            file_path: crate::source_name::EVAL.to_owned(),
-            eval: Some(args.code),
-            append: None,
-            verbose: args.verbose,
-            no_run: false,
-            debug: Default::default(),
-            trace: false,
-            capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
-            print_silent: false,
-        },
-        &crate::debug_sink::CliDebugSink,
+        pipeline::Source::virtual_source(crate::source_name::EVAL, &args.code),
+        pipeline::CachePolicy::Bypass,
+        &debug,
+        args.verbose,
+    )?;
+    crate::exec::run(
+        session,
+        executable,
+        &debug,
+        pipeline::CapabilitySet::allow_all(),
+        false,
     )
-    .map_err(CliError::from)
 }

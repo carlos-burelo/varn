@@ -4,7 +4,6 @@ pub(super) fn measure_e2e(
     runs: usize,
     eval: Option<&str>,
     path: &str,
-    debug_flags: &varn_debug::flags::DebugFlags,
     factory: &VmFactory,
     session: &varn_pipeline::ModuleResolver,
 ) -> Result<Vec<Duration>, CliError> {
@@ -17,14 +16,8 @@ pub(super) fn measure_e2e(
                 .to_owned(),
         };
 
-        let (tokens, lexeme_buf) = crate::pipeline::phase_lex(
-            &source,
-            path,
-            false,
-            &debug_flags,
-            &varn_pipeline::NullSink,
-        )
-        .map_err(|e| e.to_string())?;
+        let varn_pipeline::Tokens { tokens, lexeme_buf } =
+            crate::pipeline::phase_lex(&source, path).map_err(|e| e.to_string())?;
 
         let (program, _, interner, arena) =
             parse_shared(tokens, lexeme_buf, path).map_err(|errs| {

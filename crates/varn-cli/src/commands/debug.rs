@@ -1,5 +1,4 @@
 use crate::{cli::DebugArgs, error::CliError, pipeline};
-use varn_pipeline::RunOpts;
 
 pub fn execute(session: &pipeline::Session, args: DebugArgs) -> Result<(), CliError> {
     if args.list_phases {
@@ -7,7 +6,7 @@ pub fn execute(session: &pipeline::Session, args: DebugArgs) -> Result<(), CliEr
         return Ok(());
     }
 
-    let mut debug = crate::debug_sink::parse_debug_opt(Some(&args.phase))?;
+    let mut debug = parse_debug_opt(&args.phase)?;
     debug.fn_filter = args.fn_filter;
 
     let (file_path, eval) = match (args.file, args.eval) {
@@ -23,22 +22,28 @@ pub fn execute(session: &pipeline::Session, args: DebugArgs) -> Result<(), CliEr
     #[cfg(feature = "lsp")]
     crate::inspect_lsp::run_for(&file_path, eval.as_deref(), &debug);
 
-    let no_run = !debug.needs_execution();
+    let executable = match eval {
+        Some(code) => crate::exec::compile(
+            session,
+            pipeline::Source::virtual_source(&file_path, &code),
+            pipeline::CachePolicy::Bypass,
+            &debug,
+            false,
+        )?,
+        None => crate::exec::load(session, &file_path, &debug, false)?,
+    };
+    if debug.needs_execution() {
+        crate::exec::run(
+            session,
+            executable,
+            &debug,
+            pipeline::CapabilitySet::allow_all(),
+            false,
+        )?;
+    }
+    Ok(())
+}
 
-    pipeline::run(
-        session,
-        &RunOpts {
-            file_path,
-            eval,
-            append: None,
-            verbose: false,
-            no_run,
-            debug,
-            trace: false,
-            capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
-            print_silent: false,
-        },
-        &crate::debug_sink::CliDebugSink,
-    )
-    .map_err(CliError::from)
+fn parse_debug_opt(spec: &str) -> Result<pipeline::DebugFlags, CliError> {
+    varn_debug::flags::parse_debug_flags(spec).map_err(|e| CliError::usage(e.message))
 }

@@ -1,5 +1,5 @@
 use crate::core;
-use crate::{Failure, RuntimeFailure, Session};
+use crate::{Executable, Failure, RuntimeFailure, Session};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_compiler::FunctionProto;
@@ -12,38 +12,15 @@ type PipelineResult<T> = Result<T, Failure>;
 
 pub fn execute(
     session: &Session,
-    proto: FunctionProto,
-    precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
-    source: &str,
-    path: &str,
+    executable: Executable,
     debug: &DebugFlags,
-) -> PipelineResult<()> {
-    execute_with_caps(
-        session,
-        proto,
-        precompiled,
-        source,
-        path,
-        debug,
-        CapabilitySet::allow_all(),
-        false,
-    )
-}
-
-pub fn execute_with_caps(
-    session: &Session,
-    proto: FunctionProto,
-    precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
-    _source: &str,
-    _path: &str,
-    _debug: &DebugFlags,
     capabilities: CapabilitySet,
     print_silent: bool,
-) -> PipelineResult<()> {
-    let mut machine = boot_machine(session, precompiled, capabilities, _debug.trace)?;
+) -> Result<(), Failure> {
+    let mut machine = boot_machine(session, executable.precompiled, capabilities, debug.trace)?;
     machine.ctx.print_silent = print_silent;
-    let main_proto = enter_main(&mut machine, proto);
-    if _debug.trace {
+    let main_proto = enter_main(&mut machine, executable.entry_proto);
+    if debug.trace {
         varn_core::term::terminal::tagged(
             "pipeline:execute",
             format_args!(
@@ -64,7 +41,7 @@ pub fn execute_with_caps(
             }));
         }
     }
-    if _debug.gc {
+    if debug.gc {
         eprintln!("{}", machine.gc_report());
     }
     machine.abandon_heap_at_exit();

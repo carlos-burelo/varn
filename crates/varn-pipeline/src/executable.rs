@@ -1,0 +1,41 @@
+use rustc_hash::FxHashMap;
+use std::rc::Rc;
+use varn_compiler::FunctionProto;
+use varn_core::ModuleId;
+use varn_types::ModuleGraphArtifact;
+
+use crate::{DiagnosticReport, Failure};
+
+pub struct Executable {
+    pub entry_proto: FunctionProto,
+    pub precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
+    pub graph_artifact: ModuleGraphArtifact,
+    pub deps: FxHashMap<String, Vec<String>>,
+    pub warnings: Vec<DiagnosticReport>,
+}
+
+impl Executable {
+    pub fn from_graph(graph: ModuleGraphArtifact) -> Result<Executable, Failure> {
+        let entry_path = graph.entry_path.clone();
+        let entry_proto = graph
+            .entry_proto()
+            .cloned()
+            .ok_or_else(|| Failure::internal("entry module not found in graph"))?;
+
+        let mut precompiled: FxHashMap<ModuleId, Rc<FunctionProto>> = FxHashMap::default();
+        for (path, proto) in &graph.modules {
+            if *path == entry_path {
+                continue;
+            }
+            precompiled.insert(ModuleId::from_canonical_str(path), Rc::new(proto.clone()));
+        }
+
+        Ok(Executable {
+            entry_proto,
+            precompiled: Rc::new(precompiled),
+            graph_artifact: graph,
+            deps: FxHashMap::default(),
+            warnings: Vec::new(),
+        })
+    }
+}

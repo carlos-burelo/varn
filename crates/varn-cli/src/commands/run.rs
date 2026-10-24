@@ -1,6 +1,6 @@
 use crate::{cli::RunArgs, error::CliError, pipeline};
 use std::path::PathBuf;
-use varn_pipeline::{CapabilitySet, RunOpts};
+use varn_pipeline::CapabilitySet;
 use varn_types::capabilities::*;
 
 pub fn execute(session: &pipeline::Session, args: RunArgs) -> Result<(), CliError> {
@@ -21,22 +21,20 @@ pub fn execute(session: &pipeline::Session, args: RunArgs) -> Result<(), CliErro
 
     let capabilities = build_capabilities(&args);
 
-    pipeline::run(
-        session,
-        &RunOpts {
-            file_path,
-            eval,
-            append: None,
-            verbose: args.verbose,
-            no_run: false,
-            debug: Default::default(),
-            trace: args.trace,
-            capabilities,
-            print_silent: false,
-        },
-        &crate::debug_sink::CliDebugSink,
-    )
-    .map_err(CliError::from)
+    let mut debug = varn_pipeline::DebugFlags::default();
+    debug.trace = args.trace;
+
+    let executable = match eval {
+        Some(code) => crate::exec::compile(
+            session,
+            varn_pipeline::Source::virtual_source(&file_path, &code),
+            varn_pipeline::CachePolicy::Bypass,
+            &debug,
+            args.verbose,
+        )?,
+        None => crate::exec::load(session, &file_path, &debug, args.verbose)?,
+    };
+    crate::exec::run(session, executable, &debug, capabilities, false)
 }
 
 pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {

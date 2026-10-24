@@ -6,7 +6,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use varn_core::term::{chalk, log, Section};
-use varn_pipeline::RunOpts;
 
 #[derive(Clone)]
 pub struct TestResult {
@@ -108,21 +107,7 @@ pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), 
                     break;
                 }
                 let t1 = Instant::now();
-                let run_res = pipeline::run(
-                    &session.isolated(),
-                    &RunOpts {
-                        file_path: path.to_string_lossy().to_string(),
-                        eval: None,
-                        append: append.clone(),
-                        verbose: false,
-                        no_run: false,
-                        debug: Default::default(),
-                        trace: false,
-                        capabilities: varn_pipeline::CapabilitySet::allow_all(),
-                        print_silent: quiet,
-                    },
-                    &crate::debug_sink::CliDebugSink,
-                );
+                let run_res = run_unit(&session, &path, append.as_deref(), quiet);
                 let elapsed = t1.elapsed();
 
                 let passed = run_res.is_ok();
@@ -218,6 +203,29 @@ pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), 
     }
 }
 
+fn run_unit(
+    session: &pipeline::Session,
+    path: &PathBuf,
+    append: Option<&str>,
+    quiet: bool,
+) -> Result<(), CliError> {
+    let unit_session = session.isolated();
+    let source = pipeline::Source::file(&path.to_string_lossy())?;
+    let (source, cache) = match append {
+        Some(extra) => (source.appended(extra), pipeline::CachePolicy::Bypass),
+        None => (source, pipeline::CachePolicy::Use),
+    };
+    let debug = pipeline::DebugFlags::default();
+    let executable = crate::exec::compile(&unit_session, source, cache, &debug, false)?;
+    crate::exec::run(
+        &unit_session,
+        executable,
+        &debug,
+        pipeline::CapabilitySet::allow_all(),
+        quiet,
+    )
+}
+
 fn test_units(
     session: &pipeline::Session,
     path: &PathBuf,
@@ -232,11 +240,11 @@ fn test_units(
     if !source.text().contains("@test") {
         return file_unit;
     }
-    let targets = match pipeline::collect_test_targets(source.path(), source.text(), session.resolver())
-    {
-        Ok(t) => t,
-        Err(_) => return file_unit,
-    };
+    let compilation = session.compile(source, pipeline::Request::checked());
+    if compilation.failure.is_some() {
+        return file_unit;
+    }
+    let targets = compilation.test_targets();
     if targets.is_empty() {
         return file_unit;
     }

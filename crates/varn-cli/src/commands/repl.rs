@@ -1,7 +1,7 @@
 use crate::{cli::ReplArgs, error::CliError};
 use std::io::{self, Write};
 use varn_core::term::terminal;
-use varn_pipeline::{DebugFlags, RunOpts};
+use varn_pipeline::DebugFlags;
 
 pub fn execute(session: &varn_pipeline::Session, _args: ReplArgs) -> Result<(), CliError> {
     println!("Varn {} — REPL interactivo", env!("CARGO_PKG_VERSION"));
@@ -56,18 +56,24 @@ pub fn execute(session: &varn_pipeline::Session, _args: ReplArgs) -> Result<(), 
 }
 
 fn run_snippet(session: &varn_pipeline::Session, source: &str) {
-    let opts = RunOpts {
-        file_path: crate::source_name::REPL.to_owned(),
-        eval: Some(source.to_owned()),
-        append: None,
-        verbose: false,
-        no_run: false,
-        debug: DebugFlags::default(),
-        trace: false,
-        capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
-        print_silent: false,
-    };
-    if let Err(e) = crate::pipeline::run(session, &opts, &crate::debug_sink::CliDebugSink) {
+    let debug = DebugFlags::default();
+    let result = crate::exec::compile(
+        session,
+        varn_pipeline::Source::virtual_source(crate::source_name::REPL, source),
+        varn_pipeline::CachePolicy::Bypass,
+        &debug,
+        false,
+    )
+    .and_then(|executable| {
+        crate::exec::run(
+            session,
+            executable,
+            &debug,
+            varn_types::capabilities::CapabilitySet::allow_all(),
+            false,
+        )
+    });
+    if let Err(e) = result {
         terminal::error(&e);
     }
 }

@@ -41,7 +41,6 @@ pub fn run(
     };
     let path = loaded.path();
     let source = loaded.text();
-    let debug_flags = varn_debug::flags::DebugFlags::default();
     let resolver = session.resolver();
 
     let read_samples = time_n(runs, || {
@@ -57,29 +56,20 @@ pub fn run(
     })?;
 
     let lex_samples = time_n(runs, || {
-        crate::pipeline::phase_lex(&source, path, false, &debug_flags, &varn_pipeline::NullSink)
+        crate::pipeline::phase_lex(&source, path)
             .map(|_| ())
             .map_err(|e| e.to_string())
     })?;
 
-    let (tokens, lexeme_buf) =
-        crate::pipeline::phase_lex(&source, path, false, &debug_flags, &varn_pipeline::NullSink)
-            .map_err(|e| CliError::fatal(e.to_string()))?;
+    let varn_pipeline::Tokens { tokens, lexeme_buf } = crate::pipeline::phase_lex(&source, path)
+        .map_err(|e| CliError::fatal(e.to_string()))?;
     let token_count = tokens.len();
 
     let tokens_ref = &tokens;
     let lexeme_buf_ref = lexeme_buf.clone();
     let parse_samples = time_n(runs, || {
-        crate::pipeline::phase_parse(
-            tokens_ref.clone(),
-            lexeme_buf_ref.clone(),
-            &source,
-            path,
-            false,
-            &debug_flags,
-            &varn_pipeline::NullSink,
-        )
-        .map(|_| ())
+        crate::pipeline::phase_parse(tokens_ref.clone(), lexeme_buf_ref.clone(), &source, path)
+            .map(|_| ())
         .map_err(|e| format!("{e}"))
     })?;
 
@@ -100,16 +90,8 @@ pub fn run(
     let program_ref = &program;
     let arena_ref = &arena;
     let check_samples = time_n(runs, || {
-        crate::pipeline::phase_check(
-            program_ref,
-            arena_ref,
-            interner.clone(),
-            &source,
-            &debug_flags,
-            resolver,
-            &varn_pipeline::NullSink,
-        )
-        .map(|_| ())
+        crate::pipeline::phase_check(program_ref, arena_ref, interner.clone(), &source, resolver)
+            .map(|_| ())
         .map_err(|e| format!("{e}"))
     })?;
 
@@ -206,7 +188,7 @@ pub fn run(
         |_done, _samples| {},
     )?;
 
-    let e2e_samples = e2e::measure_e2e(runs, eval, path, &debug_flags, &factory, resolver)?;
+    let e2e_samples = e2e::measure_e2e(runs, eval, path, &factory, resolver)?;
 
     let e2e_stats = PhaseStats::from_samples("e2e (cold)", |c| c.cyan(), &e2e_samples);
     let phases = vec![

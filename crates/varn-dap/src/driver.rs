@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use varn_pipeline::{
-    boot_machine, compile_source_for_build, enter_main, CapabilitySet, DebugFlags,
-};
+use varn_pipeline::{boot_machine, enter_main, CachePolicy, CapabilitySet, Request};
 use varn_types::FunctionProto;
 use varn_vm::debug::{self, BreakAction, StepKind, StepState};
 use varn_vm::Vm;
@@ -40,15 +38,10 @@ impl Driver {
             std::path::Path::new(&canonical),
         ))
         .map_err(|e| format!("cannot open project: {e}"))?;
-        let compiled = compile_source_for_build(
-            source.text(),
-            &canonical,
-            false,
-            &DebugFlags::default(),
-            session.resolver(),
-            &varn_pipeline::NullSink,
-        )
-        .map_err(|e| format!("compile failed: {e}"))?;
+        let compiled = session
+            .compile(source, Request::executable(CachePolicy::Bypass))
+            .into_executable()
+            .map_err(|e| format!("compile failed: {e}"))?;
         let mut machine = boot_machine(&session, compiled.precompiled, CapabilitySet::allow_all(), false)
             .map_err(|e| format!("boot failed: {e}"))?;
         machine.ctx.settings.no_jit = true;

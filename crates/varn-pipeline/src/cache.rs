@@ -1,8 +1,5 @@
-use super::compile::CompileOutput;
 use crate::Failure;
-use rustc_hash::FxHashMap;
 use std::path::Path;
-use std::rc::Rc;
 use varn_types::ModuleGraphArtifact;
 
 type PipelineResult<T> = Result<T, Failure>;
@@ -24,13 +21,15 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     ))
 }
 
-pub fn load_cached_graph(
-    cache_path: &Path,
-    entry_source: &str,
-    verbose: bool,
-) -> Result<Option<ModuleGraphArtifact>, String> {
+pub enum CacheLookup {
+    Hit(ModuleGraphArtifact),
+    Absent,
+    Stale(String),
+}
+
+pub fn load_cached_graph(cache_path: &Path, entry_source: &str) -> Result<CacheLookup, String> {
     if !cache_path.exists() {
-        return Ok(None);
+        return Ok(CacheLookup::Absent);
     }
     let bytes = std::fs::read(cache_path).map_err(|e| e.to_string())?;
     let payload = varn_modules::artifact::read_artifact(
@@ -38,11 +37,6 @@ pub fn load_cached_graph(
         &bytes,
     )
     .map_err(|e| e.to_string())?;
-    let reason = |what: std::fmt::Arguments<'_>| {
-        if verbose {
-            varn_core::term::terminal::tagged("Varn", format_args!("cache miss: {what}"));
-        }
-    };
 
     let graph: ModuleGraphArtifact = postcard::from_bytes(payload).map_err(|e| e.to_string())?;
 
@@ -50,13 +44,13 @@ pub fn load_cached_graph(
         Some(&cached_hash) => {
             let current_hash = varn_core::fingerprint::fingerprint(entry_source.as_bytes());
             if cached_hash != current_hash {
-                reason(format_args!("el fuente de entrada cambió"));
-                return Ok(None);
+                return Ok(CacheLookup::Stale("el fuente de entrada cambió".to_owned()));
             }
         }
         None => {
-            reason(format_args!("el artefacto no registra hash de la entrada"));
-            return Ok(None);
+            return Ok(CacheLookup::Stale(
+                "el artefacto no registra hash de la entrada".to_owned(),
+            ));
         }
     }
 
@@ -69,18 +63,18 @@ pub fn load_cached_graph(
             Ok(src) => {
                 let current_hash = varn_core::fingerprint::fingerprint(src.as_bytes());
                 if cached_hash != current_hash {
-                    reason(format_args!("la dependencia {path} cambió"));
-                    return Ok(None);
+                    return Ok(CacheLookup::Stale(format!("la dependencia {path} cambió")));
                 }
             }
             Err(e) => {
-                reason(format_args!("la dependencia {path} no se pudo leer: {e}"));
-                return Ok(None);
+                return Ok(CacheLookup::Stale(format!(
+                    "la dependencia {path} no se pudo leer: {e}"
+                )));
             }
         }
     }
 
-    Ok(Some(graph))
+    Ok(CacheLookup::Hit(graph))
 }
 
 pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> PipelineResult<()> {
@@ -120,34 +114,4 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
     })?;
     varn_modules::artifact::prune_superseded(cache_path);
     Ok(())
-}
-
-pub fn compile_output_from_graph(graph: ModuleGraphArtifact) -> PipelineResult<CompileOutput> {
-    let entry_path = graph.entry_path.clone();
-    let entry_proto = graph.entry_proto().cloned().ok_or_else(|| {
-        Failure::internal(format!(
-            "{}{}error[cache]{}: entry module not found in graph",
-            varn_core::term::colors::BOLD,
-            varn_core::term::colors::C_ERRORS,
-            varn_core::term::colors::R
-        ))
-    })?;
-
-    let mut precompiled: FxHashMap<varn_core::ModuleId, Rc<varn_compiler::FunctionProto>> =
-        FxHashMap::default();
-    for (path, proto) in &graph.modules {
-        if *path == entry_path {
-            continue;
-        }
-        precompiled.insert(
-            varn_core::ModuleId::from_canonical_str(path),
-            Rc::new(proto.clone()),
-        );
-    }
-
-    Ok(CompileOutput {
-        entry_proto,
-        precompiled: Rc::new(precompiled),
-        graph_artifact: graph,
-    })
 }

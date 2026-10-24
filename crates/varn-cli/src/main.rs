@@ -11,9 +11,10 @@ mod cli;
 mod code_store;
 mod commands;
 mod cpu_freq;
-mod debug_sink;
+mod debug_print;
 mod doctor_impl;
 mod error;
+mod exec;
 mod exit;
 mod formatter;
 #[cfg(feature = "lsp")]
@@ -281,18 +282,16 @@ fn try_run_standalone_executable() {
         return;
     };
 
-    let Ok(compiled) = pipeline::cache::compile_output_from_graph(artifact) else {
+    let Ok(executable) = pipeline::Executable::from_graph(artifact) else {
         return;
     };
 
-    let exe_str = exe_path.to_string_lossy();
     if let Err(e) = pipeline::execute(
         &Session::detached(),
-        compiled.entry_proto,
-        compiled.precompiled,
-        "",
-        &exe_str,
+        executable,
         &Default::default(),
+        pipeline::CapabilitySet::allow_all(),
+        false,
     ) {
         eprintln!("Standalone runtime error: {e}");
         process::exit(1);
