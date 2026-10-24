@@ -215,6 +215,32 @@ Check "exe-absurd-trailer-length-is-an-error" {
     $LASTEXITCODE -ne 0 -and $out -match "corrupt" -and $out -notmatch "panicked"
 }
 
+Check "test-units-report-each-test-function" {
+    $f = Write-Vn "units/units.vn" @'
+@test
+function passes(): void {
+    print("sync-ran")
+}
+
+@test
+async function async_passes(): void {
+    print("async-ran")
+}
+
+@test
+function fails_sync(): void {
+    throw new Error("boom-sync")
+}
+
+@test
+async function fails_async(): void {
+    throw new Error("boom-async")
+}
+'@
+    $r = Vn test $f
+    $r.Code -ne 0 -and $r.Out -match "ok units.vn::passes" -and $r.Out -match "ok units.vn::async_passes" -and $r.Out -match "FAILED units.vn::fails_sync" -and $r.Out -match "FAILED units.vn::fails_async"
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null

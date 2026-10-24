@@ -2,7 +2,8 @@ use crate::cli::PermissionArgs;
 use crate::debug_print;
 use crate::error::CliError;
 use varn_pipeline::{
-    portable, CachePolicy, DebugFlags, Executable, Policy, Request, Session, Source,
+    portable, CachePolicy, DebugFlags, Executable, Policy, Request, Session, Source, TestEntry,
+    Unit,
 };
 
 pub fn cache_policy(debug: &DebugFlags) -> CachePolicy {
@@ -46,6 +47,19 @@ pub fn policy(permissions: &PermissionArgs, debug: &DebugFlags, silent: bool) ->
         gc: debug.gc,
         silent,
     }
+}
+
+pub fn run_unit(
+    session: &Session,
+    executable: &Executable,
+    policy: Policy,
+    test: Option<&TestEntry>,
+) -> Result<(), CliError> {
+    let unit = match test {
+        Some(test) => Unit::Test(test),
+        None => Unit::Module,
+    };
+    varn_pipeline::execute_unit(session, executable, policy, unit).map_err(CliError::from)
 }
 
 pub fn run(session: &Session, executable: Executable, policy: Policy) -> Result<(), CliError> {

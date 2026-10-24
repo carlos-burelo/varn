@@ -104,13 +104,38 @@ pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), 
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| path.to_string_lossy().to_string());
 
-            let units = test_units(&session, &path, &display_name);
-            for (unit_name, append) in units {
+            let file_session = session.isolated();
+            let prepared = pipeline::Source::file(&path.to_string_lossy())
+                .map_err(CliError::from)
+                .and_then(|source| {
+                    crate::exec::compile(
+                        &file_session,
+                        source,
+                        pipeline::CachePolicy::Use,
+                        &pipeline::DebugFlags::default(),
+                        false,
+                    )
+                });
+            let units = test_units(&prepared, &display_name);
+            for (unit_name, test) in units {
                 if fail_fast && has_failure_flag.load(Ordering::SeqCst) {
                     break;
                 }
                 let t1 = Instant::now();
-                let run_res = run_unit(&session, &path, append.as_deref(), &capabilities, quiet);
+                let run_res = match &prepared {
+                    Ok(executable) => crate::exec::run_unit(
+                        &file_session,
+                        executable,
+                        pipeline::Policy {
+                            capabilities: capabilities.clone(),
+                            trace: false,
+                            gc: false,
+                            silent: quiet,
+                        },
+                        test.as_ref(),
+                    ),
+                    Err(e) => Err(CliError::fatal(e.to_string())),
+                };
                 let elapsed = t1.elapsed();
 
                 let passed = run_res.is_ok();
@@ -206,63 +231,18 @@ pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), 
     }
 }
 
-fn run_unit(
-    session: &pipeline::Session,
-    path: &PathBuf,
-    append: Option<&str>,
-    capabilities: &pipeline::CapabilitySet,
-    quiet: bool,
-) -> Result<(), CliError> {
-    let unit_session = session.isolated();
-    let source = pipeline::Source::file(&path.to_string_lossy())?;
-    let (source, cache) = match append {
-        Some(extra) => (source.appended(extra), pipeline::CachePolicy::Bypass),
-        None => (source, pipeline::CachePolicy::Use),
-    };
-    let debug = pipeline::DebugFlags::default();
-    let executable = crate::exec::compile(&unit_session, source, cache, &debug, false)?;
-    crate::exec::run(
-        &unit_session,
-        executable,
-        pipeline::Policy {
-            capabilities: capabilities.clone(),
-            trace: false,
-            gc: false,
-            silent: quiet,
-        },
-    )
-}
-
 fn test_units(
-    session: &pipeline::Session,
-    path: &PathBuf,
+    prepared: &Result<pipeline::Executable, CliError>,
     display_name: &str,
-) -> Vec<(String, Option<String>)> {
-    let session = session.isolated();
-    let file_unit = vec![(display_name.to_owned(), None)];
-    let source = match pipeline::Source::file(&path.to_string_lossy()) {
-        Ok(s) => s,
-        Err(_) => return file_unit,
-    };
-    if !source.text().contains("@test") {
-        return file_unit;
-    }
-    let compilation = session.compile(source, pipeline::Request::checked());
-    if compilation.failure.is_some() {
-        return file_unit;
-    }
-    let targets = compilation.test_targets();
-    if targets.is_empty() {
-        return file_unit;
-    }
-    let mut units = file_unit;
-    for (name, is_async) in targets {
-        let call = if is_async {
-            format!("await {name}();")
-        } else {
-            format!("{name}();")
-        };
-        units.push((format!("{display_name}::{name}"), Some(call)));
+) -> Vec<(String, Option<pipeline::TestEntry>)> {
+    let mut units = vec![(display_name.to_owned(), None)];
+    if let Ok(executable) = prepared {
+        units.extend(executable.tests.iter().map(|test| {
+            (
+                format!("{display_name}::{}", test.name),
+                Some(test.clone()),
+            )
+        }));
     }
     units
 }
