@@ -35,18 +35,12 @@ pub fn run(
     opts: &BenchOpts,
 ) -> Result<(), CliError> {
     let runs = opts.runs;
-    let canonical;
-    let path = if eval.is_some() {
-        "(eval)"
-    } else {
-        canonical = crate::pipeline::canonicalize_path(path)?;
-        canonical.as_str()
+    let loaded = match eval {
+        Some(code) => crate::pipeline::Source::virtual_source(crate::source_name::EVAL, code),
+        None => crate::pipeline::Source::file(path)?,
     };
-
-    let source = match eval {
-        Some(code) => code.to_owned(),
-        None => crate::pipeline::read_source_file(path)?,
-    };
+    let path = loaded.path();
+    let source = loaded.text();
     let debug_flags = varn_debug::flags::DebugFlags::default();
     let resolver = session.resolver();
 
@@ -56,7 +50,7 @@ pub fn run(
                 let _ = code.to_owned();
             }
             None => {
-                crate::pipeline::read_source_file(path).map_err(|e| e.to_string().clone())?;
+                crate::pipeline::Source::file(path).map_err(|e| e.to_string())?;
             }
         }
         Ok(())

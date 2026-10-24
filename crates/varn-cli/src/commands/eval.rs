@@ -5,7 +5,7 @@ pub fn execute(session: &pipeline::Session, args: EvalArgs) -> Result<(), CliErr
     pipeline::run(
         session,
         &RunOpts {
-            file_path: "(eval)".to_owned(),
+            file_path: crate::source_name::EVAL.to_owned(),
             eval: Some(args.code),
             append: None,
             verbose: args.verbose,

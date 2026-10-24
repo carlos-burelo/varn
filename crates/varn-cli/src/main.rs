@@ -19,6 +19,7 @@ mod formatter;
 #[cfg(feature = "lsp")]
 mod inspect_lsp;
 mod pipeline;
+mod source_name;
 mod std_source;
 mod tester;
 

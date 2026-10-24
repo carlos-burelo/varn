@@ -11,7 +11,10 @@ pub(super) fn measure_e2e(
     time_n(runs, || {
         let source = match eval {
             Some(code) => code.to_owned(),
-            None => crate::pipeline::read_source_file(path).map_err(|e| e.to_string().clone())?,
+            None => crate::pipeline::Source::file(path)
+                .map_err(|e| e.to_string())?
+                .text()
+                .to_owned(),
         };
 
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(

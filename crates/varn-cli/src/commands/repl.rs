@@ -57,7 +57,7 @@ pub fn execute(session: &varn_pipeline::Session, _args: ReplArgs) -> Result<(), 
 
 fn run_snippet(session: &varn_pipeline::Session, source: &str) {
     let opts = RunOpts {
-        file_path: "(repl)".to_owned(),
+        file_path: crate::source_name::REPL.to_owned(),
         eval: Some(source.to_owned()),
         append: None,
         verbose: false,

@@ -11,7 +11,7 @@ pub fn execute(session: &pipeline::Session, args: DebugArgs) -> Result<(), CliEr
     debug.fn_filter = args.fn_filter;
 
     let (file_path, eval) = match (args.file, args.eval) {
-        (_, Some(code)) => ("(eval)".to_owned(), Some(code)),
+        (_, Some(code)) => (crate::source_name::EVAL.to_owned(), Some(code)),
         (Some(file), None) => (file, None),
         (None, None) => {
             return Err(CliError::usage(

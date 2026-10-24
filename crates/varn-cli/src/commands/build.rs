@@ -7,12 +7,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub fn execute(session: &pipeline::Session, args: BuildArgs) -> Result<(), CliError> {
-    let source = std::fs::read_to_string(&args.file)
-        .map_err(|e| CliError::fatal(format!("cannot read '{}': {e}", args.file)))?;
+    let source = pipeline::Source::file(&args.file)?;
 
     let compiled = pipeline::compile_source_for_build(
-        &source,
-        &args.file,
+        source.text(),
+        source.path(),
         args.verbose,
         &Default::default(),
         session.resolver(),

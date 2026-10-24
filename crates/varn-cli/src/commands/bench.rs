@@ -6,7 +6,7 @@ pub fn execute(session: &varn_pipeline::Session, args: BenchArgs) -> Result<(), 
         return Err(CliError::usage("--runs must be at least 1"));
     }
     let (file_path, eval) = match (args.file, args.eval) {
-        (_, Some(code)) => ("(eval)".to_owned(), Some(code)),
+        (_, Some(code)) => (crate::source_name::EVAL.to_owned(), Some(code)),
         (Some(file), None) => (file, None),
         (None, None) => return Err(CliError::usage("Provide a file or inline code with --eval")),
     };

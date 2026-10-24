@@ -225,15 +225,15 @@ fn test_units(
 ) -> Vec<(String, Option<String>)> {
     let session = session.isolated();
     let file_unit = vec![(display_name.to_owned(), None)];
-    let source = match std::fs::read_to_string(path) {
+    let source = match pipeline::Source::file(&path.to_string_lossy()) {
         Ok(s) => s,
         Err(_) => return file_unit,
     };
-    if !source.contains("@test") {
+    if !source.text().contains("@test") {
         return file_unit;
     }
-    let path_str = path.to_string_lossy().to_string();
-    let targets = match pipeline::collect_test_targets(&path_str, &source, session.resolver()) {
+    let targets = match pipeline::collect_test_targets(source.path(), source.text(), session.resolver())
+    {
         Ok(t) => t,
         Err(_) => return file_unit,
     };

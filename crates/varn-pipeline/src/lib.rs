@@ -10,6 +10,7 @@ pub mod import_collector;
 pub mod module_precompile;
 mod opts;
 mod session;
+mod source;
 mod parse;
 pub mod portable;
 mod quiet_parse;
@@ -36,21 +37,11 @@ pub use layer_link::verify_synthetic_imports;
 pub use lex::lex as phase_lex;
 pub use opts::{CapabilitySet, DebugFlags, RunOpts};
 pub use session::Session;
+pub use source::Source;
 pub use varn_project::Anchor;
 pub use parse::parse as phase_parse;
 
 type PipelineResult<T> = Result<T, Failure>;
-
-pub fn canonicalize_path(path: &str) -> PipelineResult<String> {
-    std::path::Path::new(path)
-        .canonicalize()
-        .map(|p| p.to_string_lossy().into_owned())
-        .map_err(|e| Failure::io(format!("cannot resolve '{}': {}", path, e)))
-}
-
-pub fn read_source_file(path: &str) -> PipelineResult<String> {
-    read_source(path)
-}
 
 pub fn run(
     session: &Session,
@@ -62,21 +53,21 @@ pub fn run(
         return run_portable(session, opts);
     }
 
-    let source = if let Some(ref s) = opts.eval {
-        s.clone()
-    } else {
-        read_source(&opts.file_path)?
+    let loaded = match &opts.eval {
+        Some(code) => Source::virtual_source(&opts.file_path, code),
+        None => Source::file(&opts.file_path)?,
     };
+    let path = loaded.path();
     let source = match &opts.append {
-        Some(extra) => format!("{source}\n{extra}\n"),
-        None => source,
+        Some(extra) => format!("{}\n{extra}\n", loaded.text()),
+        None => loaded.text().to_owned(),
     };
     let compiled = if opts.eval.is_none() && opts.append.is_none() && !opts.debug.any() {
-        compile_source_cached(&source, &opts.file_path, opts.verbose, resolver, sink)?
+        compile_source_cached(&source, path, opts.verbose, resolver, sink)?
     } else {
         compile_source(
             &source,
-            &opts.file_path,
+            path,
             opts.verbose,
             &opts.debug,
             resolver,
@@ -146,11 +137,6 @@ fn compile_source(
     session: &ModuleResolver,
     sink: &dyn debug_sink::DebugSink,
 ) -> PipelineResult<CompileOutput> {
-    let canonical_path = std::path::Path::new(path)
-        .canonicalize()
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| path.to_owned());
-    let path = canonical_path.as_str();
     let (tokens, lexeme_buf) = lex::lex(source, path, verbose, debug, sink)?;
     let (program, arena, interner) =
         parse::parse(tokens, lexeme_buf, source, path, verbose, debug, sink)?;
@@ -207,13 +193,4 @@ fn compile_source_cached(
         varn_core::term::terminal::tagged("Varn", format_args!("compile cache write skipped: {e}"));
     }
     Ok(compiled)
-}
-
-fn read_source(path: &str) -> PipelineResult<String> {
-    use varn_modules::loader::ModuleLoader;
-    let id = varn_core::ModuleId::local_str(path);
-    varn_modules::loader::default_registry()
-        .source(&id)
-        .map(|s| s.text.to_string())
-        .map_err(|e| Failure::io(format!("error[io]: {e}")))
 }

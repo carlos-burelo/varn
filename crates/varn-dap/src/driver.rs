@@ -33,18 +33,15 @@ impl Driver {
         if self.machine.is_some() {
             return Err("already launched".to_string());
         }
-        let canonical = std::path::Path::new(program)
-            .canonicalize()
-            .map(|p| p.to_string_lossy().into_owned())
-            .map_err(|e| format!("cannot resolve '{program}': {e}"))?;
-        let source = std::fs::read_to_string(&canonical)
-            .map_err(|e| format!("cannot read '{canonical}': {e}"))?;
+        let source =
+            varn_pipeline::Source::file(program).map_err(|e| format!("cannot load '{program}': {e}"))?;
+        let canonical = source.path().to_owned();
         let session = varn_pipeline::Session::open(varn_pipeline::Anchor::File(
             std::path::Path::new(&canonical),
         ))
         .map_err(|e| format!("cannot open project: {e}"))?;
         let compiled = compile_source_for_build(
-            &source,
+            source.text(),
             &canonical,
             false,
             &DebugFlags::default(),

@@ -5,7 +5,7 @@ use varn_types::capabilities::*;
 
 pub fn execute(session: &pipeline::Session, args: RunArgs) -> Result<(), CliError> {
     let (file_path, eval) = match (args.file.as_ref(), args.eval.as_ref()) {
-        (_, Some(code)) => ("(eval)".to_owned(), Some(code.clone())),
+        (_, Some(code)) => (crate::source_name::EVAL.to_owned(), Some(code.clone())),
         (Some(file), None) => (file.clone(), None),
         (None, None) => return Err(CliError::usage("Provide a file or inline code with --eval")),
     };
