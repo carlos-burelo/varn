@@ -21,8 +21,8 @@ pub fn lower_type(
     }
 }
 
-fn opaque() -> BackendTy {
-    BackendTy::Dynamic(DynReason::NotYetSupported)
+fn bare() -> BackendTy {
+    BackendTy::Dynamic(DynReason::Declared)
 }
 
 fn interface() -> BackendTy {
@@ -96,7 +96,7 @@ fn lower_alias(
         }
     };
     if members.is_empty() || !is_plain_shape(members) {
-        return opaque();
+        return BackendTy::Dynamic(DynReason::IndexSignature);
     }
     let id = tt.reserve_named_shape(std::sync::Arc::from(name));
     let fields = shape_fields(members, table, interner, tt, names);
@@ -166,7 +166,7 @@ fn lower_kind(
         TypeKind::EnumVariant { enum_name, .. } => names
             .enum_id(interner.resolve(enum_name))
             .map(BackendTy::Enum)
-            .unwrap_or_else(opaque),
+            .unwrap_or_else(interface),
 
         TypeKind::Union(members) => lower_union(members, table, interner, tt, names),
 
@@ -185,16 +185,18 @@ fn lower_kind(
 
         TypeKind::Fn(_) => BackendTy::Dynamic(DynReason::Callable),
 
-        TypeKind::Intersection(_)
-        | TypeKind::This
-        | TypeKind::TemplateLiteral(_)
+        TypeKind::Intersection(_) => interface(),
+
+        TypeKind::TemplateLiteral(_) | TypeKind::KeyOf(_) => BackendTy::Str,
+
+        TypeKind::TypePredicate { .. } => BackendTy::Bool,
+
+        TypeKind::This
         | TypeKind::Typeof(_)
-        | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }
         | TypeKind::Mapped { .. }
         | TypeKind::Conditional { .. }
-        | TypeKind::Infer(_)
-        | TypeKind::TypePredicate { .. } => opaque(),
+        | TypeKind::Infer(_) => BackendTy::Dynamic(DynReason::Generic),
     }
 }
 
@@ -306,11 +308,11 @@ fn lower_builtin(
     match (b, args.as_slice()) {
         (BuiltinType::Map, [k, v]) => BackendTy::Map(lower(k, tt), lower(v, tt)),
         (BuiltinType::Map, _) => {
-            let d = tt.intern(opaque());
+            let d = tt.intern(bare());
             BackendTy::Map(d, d)
         }
         (BuiltinType::Set, [el]) => BackendTy::Set(lower(el, tt)),
-        (BuiltinType::Set, _) => BackendTy::Set(tt.intern(opaque())),
+        (BuiltinType::Set, _) => BackendTy::Set(tt.intern(bare())),
         (BuiltinType::Array, [el]) => BackendTy::Array(lower(el, tt)),
         (BuiltinType::Task, [result]) => {
             BackendTy::Dynamic(DynReason::Awaitable(lower(result, tt)))
@@ -331,7 +333,7 @@ fn lower_builtin(
             | BuiltinType::Generator
             | BuiltinType::AsyncGenerator,
             _,
-        ) => opaque(),
+        ) => bare(),
     }
 }
 

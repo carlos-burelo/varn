@@ -104,7 +104,7 @@ impl<'a> FnEmitter<'a> {
                             super::expr_closure::ClosureBody::Stmt(*body),
                             *is_async,
                             *is_generator,
-                            BackendTy::Dynamic(DynReason::NotYetSupported),
+                            BackendTy::Dynamic(DynReason::Callable),
                             None,
                             span,
                         );

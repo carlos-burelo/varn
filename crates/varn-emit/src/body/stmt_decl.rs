@@ -80,7 +80,7 @@ impl<'a> FnEmitter<'a> {
         }
 
         if let Decl::Namespace(ns) = unwrapped {
-            let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
+            let dyn_ty = BackendTy::Dynamic(DynReason::Declared);
             let local = self.bind_local(Arc::from(self.m.interner.resolve(ns.id)), dyn_ty);
             let mut entries: Vec<varn_tir::TirObjectEntry> = Vec::new();
             let mut pre: Vec<TirStmt> = Vec::new();
@@ -94,7 +94,7 @@ impl<'a> FnEmitter<'a> {
                         ClosureBody::Stmt(f.body),
                         f.modifiers.is_async,
                         f.modifiers.is_generator,
-                        dyn_ty,
+                        BackendTy::Dynamic(DynReason::Callable),
                         self.m.declared_types.get(&f.id_offset).copied(),
                         Span::EMPTY,
                     );
