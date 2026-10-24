@@ -127,20 +127,21 @@ if (Test-Path (Join-Path (Split-Path $vn) "varn_rt.lib")) {
 }
 
 Check "exe-runs-elsewhere" {
-    $f = Write-Vn "exe\hello.vn" 'print("standalone-ok");'
+    $f = Write-Vn "exe\hello.vn" 'import { sqrt } from "std:math"
+print("standalone-ok " + sqrt(16.0).toString());'
     $exe = Join-Path $work "exe\hello.exe"
     $built = Vn build $f --target exe -o $exe
     Push-Location (Join-Path $work "cache")
     try { $ran = & $exe 2>&1 | Out-String } finally { Pop-Location }
-    $built.Code -eq 0 -and $ran.Trim() -eq "standalone-ok"
+    $built.Code -eq 0 -and $ran.Trim() -eq "standalone-ok 4"
 }
 
 Check "exe-corrupt-trailer-is-an-error" {
     $exe = Join-Path $work "exe\hello.exe"
     $bad = Join-Path $work "exe\corrupt.exe"
     $bytes = [IO.File]::ReadAllBytes($exe)
-    $payload = [BitConverter]::ToUInt64($bytes, $bytes.Length - 12)
-    $start = [int]($bytes.Length - 12 - $payload)
+    $payload = [BitConverter]::ToUInt64($bytes, $bytes.Length - 20)
+    $start = [int]($bytes.Length - 20 - $payload)
     $bytes[$start + 40] = $bytes[$start + 40] -bxor 0xFF
     [IO.File]::WriteAllBytes($bad, $bytes)
     $out = & $bad 2>&1 | Out-String
@@ -207,7 +208,7 @@ Check "package-manifest-metadata-is-accepted" {
 Check "exe-absurd-trailer-length-is-an-error" {
     $bad = Join-Path $work "exe/absurd.exe"
     Copy-Item $vn $bad
-    $tail = [byte[]](0xFE,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF) + [Text.Encoding]::ASCII.GetBytes("VEXE")
+    $tail = [byte[]](0xFE,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0,0,0,0,0,0,0,0) + [Text.Encoding]::ASCII.GetBytes("VEXE")
     $stream = [IO.File]::Open($bad, [IO.FileMode]::Append)
     $stream.Write($tail, 0, $tail.Length)
     $stream.Close()

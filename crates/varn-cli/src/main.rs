@@ -58,11 +58,16 @@ fn main() {
 }
 
 fn run_cli() {
-    bootstrap::init();
-
-    if let Some(code) = standalone::try_run() {
-        process::exit(code);
+    match standalone::detect() {
+        Ok(Some(embedded)) => process::exit(standalone::run(embedded)),
+        Ok(None) => {}
+        Err(reason) => {
+            eprintln!("standalone executable is corrupt: {reason}");
+            process::exit(1);
+        }
     }
+
+    bootstrap::init();
 
     let cli = Cli::parse_from(cli::with_implicit_run(std::env::args().collect()));
 

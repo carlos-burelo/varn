@@ -12,6 +12,18 @@ pub fn register() {
     }
 }
 
+pub fn current_image() -> Result<&'static [u8], String> {
+    match select(false) {
+        Some(StdInput::Image { bytes, .. }) => Ok(bytes),
+        Some(StdInput::Unavailable(reason)) => Err(reason),
+        Some(StdInput::Tree { root, .. }) => Err(format!(
+            "the std tree {} has no image to embed",
+            root.display()
+        )),
+        None => Err("this vn has no standard library to embed".to_owned()),
+    }
+}
+
 fn select(building_image: bool) -> Option<StdInput> {
     let (source, provenance) = std_root::resolve();
     Some(match source {

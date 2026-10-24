@@ -43,8 +43,14 @@ pub fn execute(session: &pipeline::Session, args: BuildArgs) -> Result<(), CliEr
 fn build_exe(compiled: &pipeline::Executable, out_path: &str) -> Result<(), CliError> {
     let runtime = std::env::current_exe()
         .map_err(|e| CliError::fatal(format!("cannot locate the vn runtime: {e}")))?;
-    crate::standalone::write_executable(&runtime, Path::new(out_path), &compiled.graph_artifact)
-        .map_err(CliError::fatal)
+    let std_image = crate::std_source::current_image().map_err(CliError::fatal)?;
+    crate::standalone::write_executable(
+        &runtime,
+        Path::new(out_path),
+        &compiled.graph_artifact,
+        std_image,
+    )
+    .map_err(CliError::fatal)
 }
 
 fn build_native(
