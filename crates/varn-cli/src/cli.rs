@@ -222,6 +222,29 @@ pub struct LspArgs {
     pub stdio: bool,
 }
 
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Target {
+    Bytecode,
+    Native,
+}
+
+impl Target {
+    pub fn extension(self) -> &'static str {
+        match self {
+            Target::Bytecode => "vnc",
+            Target::Native if cfg!(windows) => "exe",
+            Target::Native => "",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Target::Bytecode => "bytecode",
+            Target::Native => "native machine code",
+        }
+    }
+}
+
 #[derive(Args)]
 pub struct BuildArgs {
     pub file: String,
@@ -229,11 +252,8 @@ pub struct BuildArgs {
     #[arg(short, long, value_name = "PATH")]
     pub output: Option<String>,
 
-    #[arg(short, long, default_value = "bytecode", value_name = "TARGET")]
-    pub target: String,
-
-    #[arg(long)]
-    pub native: bool,
+    #[arg(short, long, value_enum, default_value_t = Target::Bytecode)]
+    pub target: Target,
 
     #[arg(short, long)]
     pub verbose: bool,

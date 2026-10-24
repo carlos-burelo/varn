@@ -1,4 +1,5 @@
 mod emit;
+pub mod link;
 
 use cranelift_codegen::ir::{types, AbiParam, InstBuilder, UserFuncName};
 use cranelift_codegen::isa::OwnedTargetIsa;

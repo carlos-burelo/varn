@@ -113,6 +113,18 @@ Check "eval-honors-permissions" {
     $denied.Code -ne 0 -and $denied.Out -match "PERMISSION" -and $granted.Code -eq 0 -and $granted.Out -match "true"
 }
 
+if (Test-Path (Join-Path (Split-Path $vn) "varn_rt.lib")) {
+    Check "build-native-links-and-runs" {
+        $f = Write-Vn "native\hello.vn" 'print("native-ok");'
+        $out = Join-Path $work "native\hello.exe"
+        $built = Vn build $f --target native -o $out
+        $ran = & $out 2>&1 | Out-String
+        $built.Code -eq 0 -and $ran.Trim() -eq "native-ok"
+    }
+} else {
+    Write-Host "SKIP build-native-links-and-runs (varn_rt.lib not built)"
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null
