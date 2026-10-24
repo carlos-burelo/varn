@@ -292,6 +292,7 @@ fn lower_builtin(
         (BuiltinType::Generator | BuiltinType::AsyncGenerator, [yielded]) => {
             BackendTy::Dynamic(DynReason::Yields(lower(yielded, tt)))
         }
+        (BuiltinType::Range, [bound]) => BackendTy::Dynamic(DynReason::Range(lower(bound, tt))),
         (BuiltinType::Bytes, _) => BackendTy::Bytes,
         (
             BuiltinType::Array

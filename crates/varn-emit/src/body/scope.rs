@@ -352,6 +352,7 @@ impl<'a> FnEmitter<'a> {
             BackendTy::Decimal => T::Decimal,
             BackendTy::BigInt => T::BigInt,
             BackendTy::Dynamic(DynReason::Yields(_)) => T::Generator,
+            BackendTy::Dynamic(DynReason::Range(_)) => T::Range,
             BackendTy::Tuple(_)
             | BackendTy::Dict(_)
             | BackendTy::Class(_)

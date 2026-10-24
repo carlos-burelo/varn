@@ -48,6 +48,8 @@ pub enum DynReason {
 
     Yields(TyId),
 
+    Range(TyId),
+
     Shape(ShapeId),
 
     NotYetSupported,

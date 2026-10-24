@@ -136,6 +136,7 @@ impl<'m> Describer<'m> {
                 | DynReason::Declared
                 | DynReason::Awaitable(_)
                 | DynReason::Yields(_)
+                | DynReason::Range(_)
                 | DynReason::NotYetSupported
                 | DynReason::Generic
                 | DynReason::Boxed
