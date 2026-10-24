@@ -8,14 +8,14 @@ viva; esta página la resume.
 | Comando | Uso | Notas |
 |---|---|---|
 | `run` | `vn run [OPTIONS] [FILE] [-- ARGS...]` | `-e/--eval CODE`, `-v`, `--trace`, permisos (abajo), `--compare-tiers` (corre el programa en intérprete, JIT y JIT tier 1 y compara salidas) |
-| `check` | `vn check [-v] FILE` | Solo lex + parse + check; sale con error si hay diagnósticos de error |
-| `eval` | `vn eval [-v] CODE` | Evalúa una expresión/programa corto |
-| `repl` | `vn repl [--debug-bytecode]` | Bucle interactivo |
-| `test` | `vn test [PATH] [-f FILTER] [-j JOBS] [--fail-fast] [-v]` | Ejecuta cada `.vn` de PATH (por defecto `tests/`) |
+| `check` | `vn check [-v] FILE` | Compila el programa completo sin ejecutarlo (dependencias y enlace incluidos); sale con error si hay diagnósticos de error. Reutiliza la caché de compilación |
+| `eval` | `vn eval [-v] [permisos] CODE` | Evalúa una expresión/programa corto |
+| `repl` | `vn repl [--debug-bytecode] [permisos]` | Bucle interactivo; cada línea es un programa aparte |
+| `test` | `vn test [PATH] [-f FILTER] [-j JOBS] [--fail-fast] [-v] [permisos]` | Ejecuta cada `.vn` de PATH (por defecto `tests/`, un nivel) |
 | `bench` | `vn bench [FILE] [-e CODE] [--runs N=10] [--show-output] [-v] [--all-rows] [--min-clif-coverage PCT]` | Tiempos por fase; `--min-clif-coverage` falla si la cobertura JIT queda por debajo |
-| `debug` | `vn debug [FILE] [-e CODE] [-p PHASE=all] [--fn NAME] [--list-phases]` | Inspección por fase; ver [`CLI_INSPECT.md`](CLI_INSPECT.md) |
+| `debug` | `vn debug [FILE] [-e CODE] [-p PHASE=all] [--fn NAME] [--list-phases] [--natives] [permisos]` | Inspección por fase; `--natives` imprime la tabla de operaciones nativas; ver [`CLI_INSPECT.md`](CLI_INSPECT.md) |
 
-### Permisos (`run`)
+### Permisos (`run`, `eval`, `repl`, `test`, `debug`)
 
 Sin ningún `--allow-*` el programa corre con todos los permisos. Con alguno, solo
 lo pedido. `--sandbox` lo niega todo. Detalle en
@@ -29,7 +29,7 @@ lo pedido. `--sandbox` lo niega todo. Detalle en
 
 | Comando | Uso | Notas |
 |---|---|---|
-| `build` | `vn build FILE [-o PATH] [-t TARGET=bytecode] [--native] [-v]` | `bytecode` escribe un artefacto portable `.vnc` (grafo de módulos compilado; `vn run app.vnc` lo ejecuta). `native`/`--native` emite un ejecutable vía Cranelift + `lld-link` + `varn-rt` (prototipo AOT) |
+| `build` | `vn build FILE [-o PATH] [-t bytecode\|exe\|native] [-v]` | `bytecode` escribe un artefacto portable `.vnc` (grafo de módulos compilado; `vn run app.vnc` lo ejecuta). `exe` copia el `vn` en ejecución y le añade el grafo y un trailer `VEXE`: el resultado es autocontenido solo si ese `vn` lleva la std embebida (`embed-std`) o se le da `VARN_STD_BUNDLE`; un trailer ilegible es un error. `native` emite un ejecutable vía Cranelift + `lld-link` + `varn-rt` (prototipo AOT, solo x86_64 Windows/MSVC) |
 | `fmt` | `vn fmt [PATH] [--check] [-v]` | `--check` no escribe, falla si hay cambios |
 | `std-bundle` | `vn std-bundle [--std-dir std] [--out dist/std.vnb]` | Construye la imagen de la std |
 
@@ -39,8 +39,34 @@ lo pedido. `--sandbox` lo niega todo. Detalle en
 |---|---|
 | `init` | `vn init [DIR] [--name NAME]` |
 | `pkg` | `vn pkg add ALIAS ORIGIN` · `remove ALIAS` · `install` · `update` · `tree` · `doctor` · `clean` |
+| `task` | `vn task [NAME] [-- ARGS...]` — sin nombre lista las tareas de `varn.toml`; con nombre ejecuta sus líneas en orden desde la raíz del proyecto |
 | `cache` | `vn cache clean` |
 | `doctor` | `vn doctor` — diagnóstico de instalación y de la std resuelta |
+
+## El manifiesto `varn.toml`
+
+Un solo archivo, `varn.toml`, con campos planos: `name`, `version`, `main`, `std`,
+`exports`, `dependencies`, `dev_dependencies`, `peer_dependencies`, `workspaces` y
+`tasks`. Una clave desconocida es un error que nombra la clave y el archivo. Las
+secciones `[package]` y `[project]` y el nombre `vn.toml` ya no existen.
+
+```toml
+name = "app"
+version = "0.1.0"
+main = "main.vn"
+
+[dependencies]
+
+[tasks]
+dev = ["check main.vn", "run main.vn"]
+```
+
+Cada línea de una tarea es una línea de comando de `vn` (sin el `vn`); la primera que
+falla corta la secuencia, `task otra` dentro de una tarea la encadena y un ciclo es un
+error. Los argumentos tras `--` se añaden a la última línea. La raíz del proyecto es el
+directorio con `varn.toml` más cercano al archivo (comandos con archivo) o al cwd
+(comandos de proyecto). Al arrancar se leen, en este orden de prioridad, `.env.local`,
+`.env` y `.vn/.env` del cwd y de la raíz del proyecto.
 
 ## Herramientas de editor
 
