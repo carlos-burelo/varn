@@ -1,0 +1,3 @@
+// expect: error[VN3003]
+interface I { a: int }
+function f(x: I) { return x() }

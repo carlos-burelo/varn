@@ -340,7 +340,23 @@ impl Checker<'_> {
             Some(members) => members
                 .iter()
                 .any(|m| m.name.as_ref() == varn_core::MemberKey::Callable.as_str()),
-            None => true,
+            None => {
+                let origin_modules: Vec<String> =
+                    origin.iter().map(|o| o.to_string()).collect();
+                let interface = bind
+                    .get_interface_members_local(&name)
+                    .cloned()
+                    .or_else(|| {
+                        self.resolver
+                            .find_bind_for_type(&name, &origin_modules)
+                            .and_then(|b| b.get_interface_members_local(&name).cloned())
+                    });
+                interface.is_none_or(|members| {
+                    members
+                        .iter()
+                        .any(|m| m.name.as_ref() == varn_core::MemberKey::Callable.as_str())
+                })
+            }
         }
     }
 }
