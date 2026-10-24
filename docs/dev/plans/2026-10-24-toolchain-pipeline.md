@@ -412,3 +412,33 @@ Dos commits.
 - **No cubierto, por diseño:** `lint`, `doc`, `upgrade`, REPL con estado, permisos restrictivos por defecto.
 - **Riesgos que el plan mide, no supone:** determinismo del bytecode (T0), goldens de salida (T1, T6), tiempo de `vn test` (T9), memoria y latencia del LSP (T14).
 - **Dependencias entre tareas:** T1 antes que todo (tipo de error); T2 antes de T3; T3 antes de T4; T5 antes de T6; T6 antes de T7, T9, T10 y T13; T10 antes de T12.
+
+---
+
+## Estado final y desviaciones (2026-10-24)
+
+Todas las tareas están ejecutadas; los pasos marcados `[ ]` arriba son el texto original del
+plan. Lo que cambió respecto a él, con la razón (el ledger de ejecución no se versiona):
+
+- **El manifiesto es TOML.** El diseño asumía JSON por un mensaje obsoleto del LSP; el código
+  tenía tres parsers, el alias `vn.toml` y tres formas de nombre.
+- **Cache dirs sin raíz.** `get_cache_dir` ignoraba su argumento; se borró el argumento y la
+  raíz perezosa del grafo en vez de pasar un `Project` a `ModuleResolver::new`.
+- **`Source::file` sin `Session`** (no lo necesita); lee por el registro y canonicaliza una vez.
+- **`vn check`** sigue compilando todo (`Goal::Executable`): los errores de dependencias y de
+  enlace aparecen ahí. No hay `Goal::Tir` (sin consumidor).
+- **`Mode::Tooling` se sustituyó por `Session::analyze`**, que devuelve un `Analysis` tipado en
+  lugar de una `Compilation` con `Option` en cada etapa.
+- **El renderizado vive en `varn-core`** (`render_report`), con `Display` para `Failure`; el CLI
+  decide los exit codes.
+- **Medición del optimizador opt-in** (`Request::measured`), usada por `vn bench`.
+- **`varn-inspect`** como crate propio: el inspector usa `varn-lsp` y `varn-debug`.
+- **Ejecutable `--target exe`** lleva la imagen de la std que usa y no lee `.env`; el trailer es
+  `[graph_len u64][image_len u64][VEXE]`.
+- **Tests invocados por el runtime** (Tarea 9) se hicieron en una segunda pasada: grafo con
+  `tests`, `Vm::call_main_global`, `execute_unit`.
+- **Arranque anclado en el cwd** (`.env` y `std` de `varn.toml`), ver «Decisión» en el diseño.
+- **Deuda aceptada:** la fábrica de máquinas de `vn bench` repite parte de `boot_machine`; los
+  comandos `pkg` buscan el manifiesto con `project_manifest` (salta paquetes instalados) y no
+  reciben `Session`; el LSP usa `Session::detached()` (el `Project` no se usa en su análisis);
+  un manifiesto inválido en un directorio ancestro se ignora al resolver paquetes.

@@ -29,7 +29,7 @@ lo pedido. `--sandbox` lo niega todo. Detalle en
 
 | Comando | Uso | Notas |
 |---|---|---|
-| `build` | `vn build FILE [-o PATH] [-t bytecode\|exe\|native] [-v]` | `bytecode` escribe un artefacto portable `.vnc` (grafo de módulos compilado; `vn run app.vnc` lo ejecuta). `exe` copia el `vn` en ejecución y le añade el grafo y un trailer `VEXE`: el resultado es autocontenido solo si ese `vn` lleva la std embebida (`embed-std`) o se le da `VARN_STD_BUNDLE`; un trailer ilegible es un error. `native` emite un ejecutable vía Cranelift + `lld-link` + `varn-rt` (prototipo AOT, solo x86_64 Windows/MSVC) |
+| `build` | `vn build FILE [-o PATH] [-t bytecode\|exe\|native] [-v]` | `bytecode` escribe un artefacto portable `.vnc` (grafo de módulos compilado; `vn run app.vnc` lo ejecuta). `exe` copia el `vn` en ejecución y le añade la imagen de la std que usa, el grafo y un trailer `VEXE`: el resultado es autocontenido (no lee `.env` ni la std del entorno) y un trailer ilegible es un error. `native` emite un ejecutable vía Cranelift + `lld-link` + `varn-rt` (prototipo AOT, solo x86_64 Windows/MSVC) |
 | `fmt` | `vn fmt [PATH] [--check] [-v]` | `--check` no escribe, falla si hay cambios |
 | `std-bundle` | `vn std-bundle [--std-dir std] [--out dist/std.vnb]` | Construye la imagen de la std |
 

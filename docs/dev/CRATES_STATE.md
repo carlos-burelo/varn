@@ -1,6 +1,6 @@
 # Estado e Inventario de Crates del Workspace
 
-Matriz de estado y jerarquía de dependencias de los **29 members** declarados en `Cargo.toml` (raíz, `members`): `varn-core`, `varn-lexer`, `varn-parser`, `varn-checker`, `varn-emit`, `varn-types`, `varn-tir`, `varn-sem`, `varn-binder`, `varn-resolver`, `varn-macros`, `varn-modules`, `varn-builtins`, `varn-cli`, `varn-lsp`, `varn-vm`, `varn-debug`, `varn-pm`, `varn-jit`, `varn-jit-abi`, `varn-pipeline`, `varn-compiler`, `varn-gpu`, `varn-ui`, `varn-text`, `varn-rt`, `varn-shadow`, `varn-dap` y `xtask`. `default-members` excluye `varn-rt`, `varn-shadow` y `xtask`.
+Matriz de estado y jerarquía de dependencias de los **31 members** declarados en `Cargo.toml` (raíz, `members`): `varn-core`, `varn-lexer`, `varn-parser`, `varn-checker`, `varn-emit`, `varn-types`, `varn-tir`, `varn-sem`, `varn-binder`, `varn-resolver`, `varn-macros`, `varn-modules`, `varn-builtins`, `varn-cli`, `varn-lsp`, `varn-vm`, `varn-debug`, `varn-pm`, `varn-jit`, `varn-jit-abi`, `varn-pipeline`, `varn-compiler`, `varn-gpu`, `varn-ui`, `varn-text`, `varn-rt`, `varn-shadow`, `varn-dap`, `varn-project`, `varn-inspect` y `xtask`. `default-members` excluye `varn-rt`, `varn-shadow` y `xtask`.
 
 Los conteos (líneas, tests, asserts) viven en el código y no se copian aquí: se desincronizan. La prueba canónica de integridad es `tests/main.vn` (200+ imports) bajo las cuatro combinaciones de procedencia de std y JIT (más el cuadrante 5 de caché JIT en `verify.ps1`) descritas en [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
@@ -126,12 +126,21 @@ graph TD
     varn_vm["varn-vm"] --> varn_macros["varn-macros"]
     varn_vm["varn-vm"] --> varn_modules["varn-modules"]
     varn_vm["varn-vm"] --> varn_types["varn-types"]
+    varn_project["varn-project"]
+    varn_modules["varn-modules"] --> varn_project["varn-project"]
+    varn_pm["varn-pm"] --> varn_project["varn-project"]
+    varn_pipeline["varn-pipeline"] --> varn_project["varn-project"]
+    varn_cli["varn-cli"] --> varn_project["varn-project"]
+    varn_cli["varn-cli"] --> varn_inspect["varn-inspect"]
+    varn_inspect["varn-inspect"] --> varn_lsp["varn-lsp"]
+    varn_inspect["varn-inspect"] --> varn_debug["varn-debug"]
+    varn_lsp["varn-lsp"] --> varn_pipeline["varn-pipeline"]
     xtask["xtask"]
 ```
 
 Solo `[dependencies]` (sin dev/build). `varn-macros` parsea los contratos `.vn` en tiempo de expansión, por eso depende de `varn-lexer`/`varn-parser`; `varn-builtins` usa los mismos dos solo como build-dependencies (su `build.rs` genera `MODULE_REGISTRY`). La ejecución alcanza el frontend por `varn-vm → varn-macros` y `varn-vm → varn-builtins → varn-macros`.
 
-Las vistas de inspección que necesitan el análisis del LSP (`-p types`, `-p lsp`) viven en `varn-cli/src/inspect_lsp/`, no en el pipeline: solo requieren ruta y fuente, así que no justifican que el orquestador dependa del servidor de editor.
+Las vistas de inspección que necesitan el análisis del LSP (`-p types`, `-p lsp`) viven en el crate `varn-inspect` (depende de `varn-lsp` y `varn-debug`), no en el pipeline: solo requieren ruta y fuente, así que no justifican que el orquestador dependa del servidor de editor.
 
 ---
 
