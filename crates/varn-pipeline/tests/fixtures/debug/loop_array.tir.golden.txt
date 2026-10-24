@@ -26,6 +26,7 @@ TirModule {
         shape_names: [],
         named_shapes: {},
         open_shapes: 0,
+        open_aliases: [],
     },
     classes: [
         ClassInfo {
@@ -49,7 +50,14 @@ TirModule {
                 },
             ],
             statics: [],
-            vtable: [],
+            vtable: [
+                VtableEntry {
+                    name: "toString",
+                    sig: SigId(
+                        1,
+                    ),
+                },
+            ],
             layout: ClassLayout {
                 payload_size: 48,
                 alignment: 8,
@@ -110,7 +118,7 @@ TirModule {
             },
             constructor: Some(
                 SigId(
-                    1,
+                    2,
                 ),
             ),
             import_binding: None,
@@ -126,6 +134,11 @@ TirModule {
         Signature {
             params: [],
             return_ty: Void,
+            has_rest: false,
+        },
+        Signature {
+            params: [],
+            return_ty: Str,
             has_rest: false,
         },
         Signature {
@@ -201,7 +214,7 @@ TirModule {
         TirFunction {
             name: "sum",
             sig: SigId(
-                2,
+                3,
             ),
             params: [
                 Array(
@@ -378,8 +391,8 @@ TirModule {
                                         },
                                     },
                                     rhs: TirExpr {
-                                        kind: Field {
-                                            object: TirExpr {
+                                        kind: Length {
+                                            operand: TirExpr {
                                                 kind: Var,
                                                 ty: Array(
                                                     TyId(
@@ -396,13 +409,9 @@ TirModule {
                                                     end: 75,
                                                 },
                                             },
-                                            name: "length",
                                         },
                                         ty: Int,
-                                        res: ByName {
-                                            name: "length",
-                                            why: Unrecorded,
-                                        },
+                                        res: None,
                                         span: Span {
                                             start: 0,
                                             end: 0,
@@ -561,7 +570,7 @@ TirModule {
         TirFunction {
             name: "firstAbove",
             sig: SigId(
-                3,
+                4,
             ),
             params: [
                 Array(
@@ -644,8 +653,8 @@ TirModule {
                                 },
                             },
                             rhs: TirExpr {
-                                kind: Field {
-                                    object: TirExpr {
+                                kind: Length {
+                                    operand: TirExpr {
                                         kind: Var,
                                         ty: Array(
                                             TyId(
@@ -660,13 +669,9 @@ TirModule {
                                             end: 238,
                                         },
                                     },
-                                    name: "length",
                                 },
                                 ty: Int,
-                                res: ByName {
-                                    name: "length",
-                                    why: Unrecorded,
-                                },
+                                res: None,
                                 span: Span {
                                     start: 235,
                                     end: 245,

@@ -24,6 +24,7 @@ TirModule {
         shape_names: [],
         named_shapes: {},
         open_shapes: 0,
+        open_aliases: [],
     },
     classes: [
         ClassInfo {
@@ -33,7 +34,7 @@ TirModule {
                 FieldInfo {
                     name: "value",
                     ty: Dynamic(
-                        Unrecorded,
+                        Generic,
                     ),
                     slot: 0,
                 },
@@ -43,13 +44,13 @@ TirModule {
                 VtableEntry {
                     name: "get",
                     sig: SigId(
-                        3,
+                        4,
                     ),
                 },
                 VtableEntry {
                     name: "map",
                     sig: SigId(
-                        4,
+                        5,
                     ),
                 },
             ],
@@ -79,7 +80,7 @@ TirModule {
             },
             constructor: Some(
                 SigId(
-                    2,
+                    3,
                 ),
             ),
             import_binding: None,
@@ -105,7 +106,14 @@ TirModule {
                 },
             ],
             statics: [],
-            vtable: [],
+            vtable: [
+                VtableEntry {
+                    name: "toString",
+                    sig: SigId(
+                        1,
+                    ),
+                },
+            ],
             layout: ClassLayout {
                 payload_size: 48,
                 alignment: 8,
@@ -166,7 +174,7 @@ TirModule {
             },
             constructor: Some(
                 SigId(
-                    1,
+                    2,
                 ),
             ),
             import_binding: None,
@@ -186,6 +194,11 @@ TirModule {
             has_rest: false,
         },
         Signature {
+            params: [],
+            return_ty: Str,
+            has_rest: false,
+        },
+        Signature {
             params: [
                 Nullable(
                     TyId(
@@ -199,7 +212,7 @@ TirModule {
         Signature {
             params: [
                 Dynamic(
-                    Unrecorded,
+                    Generic,
                 ),
             ],
             return_ty: Void,
@@ -208,7 +221,7 @@ TirModule {
         Signature {
             params: [],
             return_ty: Dynamic(
-                Unrecorded,
+                Generic,
             ),
             has_rest: false,
         },
@@ -228,11 +241,11 @@ TirModule {
         Signature {
             params: [
                 Dynamic(
-                    Unrecorded,
+                    Generic,
                 ),
             ],
             return_ty: Dynamic(
-                Unrecorded,
+                Generic,
             ),
             has_rest: false,
         },
@@ -244,11 +257,11 @@ TirModule {
         Signature {
             params: [
                 Dynamic(
-                    Unrecorded,
+                    Generic,
                 ),
             ],
             return_ty: Dynamic(
-                Unrecorded,
+                Generic,
             ),
             has_rest: false,
         },
@@ -256,11 +269,6 @@ TirModule {
             params: [
                 Int,
             ],
-            return_ty: Str,
-            has_rest: false,
-        },
-        Signature {
-            params: [],
             return_ty: Str,
             has_rest: false,
         },
@@ -278,11 +286,11 @@ TirModule {
         Signature {
             params: [
                 Dynamic(
-                    Unrecorded,
+                    Generic,
                 ),
             ],
             return_ty: Dynamic(
-                Unrecorded,
+                Generic,
             ),
             has_rest: false,
         },
@@ -291,15 +299,15 @@ TirModule {
         TirFunction {
             name: "identity",
             sig: SigId(
-                5,
+                6,
             ),
             params: [
                 Dynamic(
-                    Unrecorded,
+                    Generic,
                 ),
             ],
             return_ty: Dynamic(
-                Unrecorded,
+                Generic,
             ),
             locals: [],
             body: [
@@ -308,7 +316,7 @@ TirModule {
                         TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                Unrecorded,
+                                Generic,
                             ),
                             res: Param(
                                 0,
@@ -331,7 +339,7 @@ TirModule {
         TirFunction {
             name: "<closure>",
             sig: SigId(
-                8,
+                9,
             ),
             params: [
                 Int,
@@ -420,11 +428,11 @@ TirModule {
         TirFunction {
             name: "Box.constructor",
             sig: SigId(
-                2,
+                3,
             ),
             params: [
                 Dynamic(
-                    Unrecorded,
+                    Generic,
                 ),
             ],
             return_ty: Void,
@@ -451,7 +459,7 @@ TirModule {
                                     name: "value",
                                 },
                                 ty: Dynamic(
-                                    Unrecorded,
+                                    Generic,
                                 ),
                                 res: FieldSlot(
                                     0,
@@ -464,7 +472,7 @@ TirModule {
                             value: TirExpr {
                                 kind: Var,
                                 ty: Dynamic(
-                                    Unrecorded,
+                                    Generic,
                                 ),
                                 res: Param(
                                     0,
@@ -476,7 +484,7 @@ TirModule {
                             },
                         },
                         ty: Dynamic(
-                            Unrecorded,
+                            Generic,
                         ),
                         res: None,
                         span: Span {
@@ -500,11 +508,11 @@ TirModule {
         TirFunction {
             name: "Box.get",
             sig: SigId(
-                3,
+                4,
             ),
             params: [],
             return_ty: Dynamic(
-                Unrecorded,
+                Generic,
             ),
             locals: [],
             body: [
@@ -528,7 +536,7 @@ TirModule {
                                 name: "value",
                             },
                             ty: Dynamic(
-                                Unrecorded,
+                                Generic,
                             ),
                             res: FieldSlot(
                                 0,
@@ -555,7 +563,7 @@ TirModule {
         TirFunction {
             name: "Box.map",
             sig: SigId(
-                4,
+                5,
             ),
             params: [
                 Dynamic(
@@ -613,7 +621,7 @@ TirModule {
                                                                 name: "value",
                                                             },
                                                             ty: Dynamic(
-                                                                Unrecorded,
+                                                                Generic,
                                                             ),
                                                             res: FieldSlot(
                                                                 0,
@@ -627,7 +635,7 @@ TirModule {
                                                 ],
                                             },
                                             ty: Dynamic(
-                                                Unrecorded,
+                                                Generic,
                                             ),
                                             res: None,
                                             span: Span {

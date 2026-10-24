@@ -2,9 +2,9 @@
   [1mtiers[0m [2m──────────────────────────────────────────── <module> · 5/5 ruteadas[0m
   [2mfunción                   [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                 [0m
   ───────────────────────────┼───────┼──────┼───────────────────────
-  <module>                   │   132 │ clif │  (native: alloc+boxed)
+  <module>                   │   138 │ clif │  (native: alloc+boxed)
   Temperature.constructor    │    12 │ clif │  (native: this+boxed) 
-  Temperature.get celsius    │    11 │ clif │  (native: this+boxed) 
+  Temperature.get celsius    │    11 │ clif │  (native: this)       
   Temperature.set celsius    │    12 │ clif │  (native: this+boxed) 
-  Temperature.get fahrenheit │    19 │ clif │  (native: this+boxed) 
+  Temperature.get fahrenheit │    19 │ clif │  (native: this)       
   [2m── end: tiers ──[0m

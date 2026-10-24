@@ -1,14 +1,22 @@
 
   [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
   [1m<module>[0m[2m (native)[0m
-    [2mkinds (19 regs):[0m
-  [2mblock  [0m │ [2mkinds                                                                                    [0m
-  ────────┼──────────────────────────────────────────────────────────────────────────────────────────
-  block@0 │ v0:Ref, v1:Ref, v2:Int, v3:Int, v4:Int, v6:Int, v7:Ref, v8:Ref, v9:Int, v10:Int, v11:Bool
-  block@1 │ v12:Ref, v13:Str, v14:Dynamic, v15:Ref                                                   
-  block@2 │ v16:Ref, v17:Int, v18:Int, v19:Int, v20:Bool                                             
-  block@3 │ v21:Ref, v22:Str, v23:Dynamic, v24:Ref                                                   
-  block@4 │ v25:Ref, v26:Str, v27:Dynamic, v28:Dynamic                                               
+    [2mkinds (20 regs):[0m
+  [2mblock   [0m │ [2mkinds                                                                 [0m
+  ─────────┼───────────────────────────────────────────────────────────────────────
+  block@0  │ v0:Ref, v1:Ref, v2:Int, v3:Int, v4:Int, v6:Int, v7:Ref, v8:Int, v9:Int
+  block@1  │ v11:Int, v18:Int, v12:Int, v13:Int, v15:Int, v16:Bool                 
+  block@2  │ v17:Int, v19:Int                                                      
+  block@3  │ v21:Int, v22:Bool                                                     
+  block@4  │ v23:Ref, v24:Str, v25:Dynamic, v26:Ref                                
+  block@5  │ v29:Int, v30:Int, v32:Int                                             
+  block@6  │ v33:Int, v35:Int, v36:Bool                                            
+  block@7  │ v37:Int, v39:Bool                                                     
+  block@8  │ v43:Int, v45:Int, v46:Bool                                            
+  block@9  │ v40:Int                                                               
+  block@10 │ v41:Int, v42:Int                                                      
+  block@11 │ v47:Ref, v48:Str, v49:Dynamic, v50:Ref                                
+  block@12 │ v51:Ref, v52:Str, v53:Dynamic, v54:Dynamic                            
   [1msum[0m[2m (native)[0m
     [2mkinds (8 regs):[0m
   [2mblock  [0m │ [2mkinds                                           [0m

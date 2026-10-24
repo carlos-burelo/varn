@@ -24,6 +24,7 @@ TirModule {
         shape_names: [],
         named_shapes: {},
         open_shapes: 0,
+        open_aliases: [],
     },
     classes: [
         ClassInfo {
@@ -47,7 +48,14 @@ TirModule {
                 },
             ],
             statics: [],
-            vtable: [],
+            vtable: [
+                VtableEntry {
+                    name: "toString",
+                    sig: SigId(
+                        1,
+                    ),
+                },
+            ],
             layout: ClassLayout {
                 payload_size: 48,
                 alignment: 8,
@@ -108,7 +116,7 @@ TirModule {
             },
             constructor: Some(
                 SigId(
-                    1,
+                    2,
                 ),
             ),
             import_binding: None,
@@ -124,6 +132,11 @@ TirModule {
         Signature {
             params: [],
             return_ty: Void,
+            has_rest: false,
+        },
+        Signature {
+            params: [],
+            return_ty: Str,
             has_rest: false,
         },
         Signature {
@@ -214,7 +227,7 @@ TirModule {
         TirFunction {
             name: "makeAdder",
             sig: SigId(
-                2,
+                3,
             ),
             params: [
                 Int,
@@ -259,7 +272,7 @@ TirModule {
         TirFunction {
             name: "makeCounter",
             sig: SigId(
-                4,
+                5,
             ),
             params: [],
             return_ty: Dynamic(
@@ -323,7 +336,7 @@ TirModule {
         TirFunction {
             name: "<closure>",
             sig: SigId(
-                3,
+                4,
             ),
             params: [
                 Int,
@@ -379,7 +392,7 @@ TirModule {
         TirFunction {
             name: "<closure>",
             sig: SigId(
-                5,
+                6,
             ),
             params: [],
             return_ty: Int,

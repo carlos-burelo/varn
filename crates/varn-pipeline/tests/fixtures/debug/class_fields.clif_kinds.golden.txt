@@ -8,9 +8,9 @@
   block@1 │ v11:Ref, v12:Str, v13:Dynamic, v14:Ref                                              
   block@2 │ v15:Float, v16:Float, v17:Bool                                                      
   block@3 │ v18:Ref, v19:Str, v20:Dynamic, v21:Ref                                              
-  block@4 │ v22:Float, v23:Float, v24:Float, v25:Bool                                           
-  block@5 │ v26:Ref, v27:Str, v28:Dynamic, v29:Ref                                              
-  block@6 │ v30:Ref, v31:Str, v32:Dynamic, v33:Dynamic                                          
+  block@4 │ v22:Float, v23:Dynamic, v24:Float, v25:Float, v26:Bool                              
+  block@5 │ v27:Ref, v28:Str, v29:Dynamic, v30:Ref                                              
+  block@6 │ v31:Ref, v32:Str, v33:Dynamic, v34:Dynamic                                          
   [1mTemperature.constructor[0m[2m (native)[0m
     [2mkinds (4 regs):[0m
   [2mblock  [0m │ [2mkinds           [0m
@@ -23,9 +23,9 @@
   block@0 │ v0:Ref, v1:Float
   [1mTemperature.set celsius[0m[2m (native)[0m
     [2mkinds (4 regs):[0m
-  [2mblock  [0m │ [2mkinds             [0m
-  ────────┼───────────────────
-  block@0 │ v0:Dynamic, v1:Ref
+  [2mblock  [0m │ [2mkinds           [0m
+  ────────┼─────────────────
+  block@0 │ v0:Float, v1:Ref
   [1mTemperature.get fahrenheit[0m[2m (native)[0m
     [2mkinds (6 regs):[0m
   [2mblock  [0m │ [2mkinds                                                   [0m

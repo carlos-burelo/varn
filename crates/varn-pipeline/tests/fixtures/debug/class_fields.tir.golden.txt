@@ -24,6 +24,7 @@ TirModule {
         shape_names: [],
         named_shapes: {},
         open_shapes: 0,
+        open_aliases: [],
     },
     classes: [
         ClassInfo {
@@ -41,19 +42,19 @@ TirModule {
                 VtableEntry {
                     name: "get celsius",
                     sig: SigId(
-                        3,
+                        4,
                     ),
                 },
                 VtableEntry {
                     name: "set celsius",
                     sig: SigId(
-                        4,
+                        5,
                     ),
                 },
                 VtableEntry {
                     name: "get fahrenheit",
                     sig: SigId(
-                        5,
+                        6,
                     ),
                 },
             ],
@@ -80,7 +81,7 @@ TirModule {
             },
             constructor: Some(
                 SigId(
-                    2,
+                    3,
                 ),
             ),
             import_binding: None,
@@ -106,7 +107,14 @@ TirModule {
                 },
             ],
             statics: [],
-            vtable: [],
+            vtable: [
+                VtableEntry {
+                    name: "toString",
+                    sig: SigId(
+                        1,
+                    ),
+                },
+            ],
             layout: ClassLayout {
                 payload_size: 48,
                 alignment: 8,
@@ -167,7 +175,7 @@ TirModule {
             },
             constructor: Some(
                 SigId(
-                    1,
+                    2,
                 ),
             ),
             import_binding: None,
@@ -184,6 +192,11 @@ TirModule {
         Signature {
             params: [],
             return_ty: Void,
+            has_rest: false,
+        },
+        Signature {
+            params: [],
+            return_ty: Str,
             has_rest: false,
         },
         Signature {
@@ -206,23 +219,19 @@ TirModule {
         },
         Signature {
             params: [],
-            return_ty: Dynamic(
-                Unrecorded,
-            ),
+            return_ty: Float,
+            has_rest: false,
+        },
+        Signature {
+            params: [
+                Float,
+            ],
+            return_ty: Void,
             has_rest: false,
         },
         Signature {
             params: [],
-            return_ty: Dynamic(
-                Unrecorded,
-            ),
-            has_rest: false,
-        },
-        Signature {
-            params: [],
-            return_ty: Dynamic(
-                Unrecorded,
-            ),
+            return_ty: Float,
             has_rest: false,
         },
         Signature {
@@ -236,37 +245,12 @@ TirModule {
             return_ty: Void,
             has_rest: true,
         },
-        Signature {
-            params: [],
-            return_ty: Dynamic(
-                Unrecorded,
-            ),
-            has_rest: false,
-        },
-        Signature {
-            params: [
-                Dynamic(
-                    Unrecorded,
-                ),
-            ],
-            return_ty: Dynamic(
-                Unrecorded,
-            ),
-            has_rest: false,
-        },
-        Signature {
-            params: [],
-            return_ty: Dynamic(
-                Unrecorded,
-            ),
-            has_rest: false,
-        },
     ],
     functions: [
         TirFunction {
             name: "Temperature.constructor",
             sig: SigId(
-                2,
+                3,
             ),
             params: [
                 Float,
@@ -338,12 +322,10 @@ TirModule {
         TirFunction {
             name: "Temperature.get celsius",
             sig: SigId(
-                7,
+                4,
             ),
             params: [],
-            return_ty: Dynamic(
-                Unrecorded,
-            ),
+            return_ty: Float,
             locals: [],
             body: [
                 Return(
@@ -391,16 +373,12 @@ TirModule {
         TirFunction {
             name: "Temperature.set celsius",
             sig: SigId(
-                8,
+                5,
             ),
             params: [
-                Dynamic(
-                    Unrecorded,
-                ),
+                Float,
             ],
-            return_ty: Dynamic(
-                Unrecorded,
-            ),
+            return_ty: Void,
             locals: [],
             body: [
                 Expr(
@@ -467,12 +445,10 @@ TirModule {
         TirFunction {
             name: "Temperature.get fahrenheit",
             sig: SigId(
-                9,
+                6,
             ),
             params: [],
-            return_ty: Dynamic(
-                Unrecorded,
-            ),
+            return_ty: Float,
             locals: [],
             body: [
                 Return(
@@ -647,6 +623,7 @@ TirModule {
         params: [],
         return_ty: Void,
         locals: [
+            Float,
             Class(
                 ClassId(
                     0,
@@ -669,7 +646,7 @@ TirModule {
                             ),
                             res: Local(
                                 LocalId(
-                                    0,
+                                    1,
                                 ),
                             ),
                             span: Span {
@@ -723,8 +700,8 @@ TirModule {
                     kind: Binary {
                         op: Ne,
                         lhs: TirExpr {
-                            kind: Field {
-                                object: TirExpr {
+                            kind: MethodCall {
+                                recv: TirExpr {
                                     kind: Var,
                                     ty: Class(
                                         ClassId(
@@ -733,7 +710,7 @@ TirModule {
                                     ),
                                     res: Local(
                                         LocalId(
-                                            0,
+                                            1,
                                         ),
                                     ),
                                     span: Span {
@@ -741,13 +718,13 @@ TirModule {
                                         end: 353,
                                     },
                                 },
-                                name: "celsius",
+                                name: "get celsius",
+                                args: [],
                             },
                             ty: Float,
-                            res: ByName {
-                                name: "celsius",
-                                why: Unrecorded,
-                            },
+                            res: VtableSlot(
+                                0,
+                            ),
                             span: Span {
                                 start: 352,
                                 end: 361,
@@ -841,8 +818,8 @@ TirModule {
                     kind: Binary {
                         op: Ne,
                         lhs: TirExpr {
-                            kind: Field {
-                                object: TirExpr {
+                            kind: MethodCall {
+                                recv: TirExpr {
                                     kind: Var,
                                     ty: Class(
                                         ClassId(
@@ -851,7 +828,7 @@ TirModule {
                                     ),
                                     res: Local(
                                         LocalId(
-                                            0,
+                                            1,
                                         ),
                                     ),
                                     span: Span {
@@ -859,13 +836,13 @@ TirModule {
                                         end: 410,
                                     },
                                 },
-                                name: "fahrenheit",
+                                name: "get fahrenheit",
+                                args: [],
                             },
                             ty: Float,
-                            res: ByName {
-                                name: "fahrenheit",
-                                why: Unrecorded,
-                            },
+                            res: VtableSlot(
+                                2,
+                            ),
                             span: Span {
                                 start: 409,
                                 end: 421,
@@ -956,44 +933,85 @@ TirModule {
             },
             Expr(
                 TirExpr {
-                    kind: Assign {
-                        target: TirExpr {
-                            kind: Field {
-                                object: TirExpr {
-                                    kind: Var,
-                                    ty: Class(
-                                        ClassId(
-                                            0,
+                    kind: Seq {
+                        stmts: [
+                            Let {
+                                local: LocalId(
+                                    0,
+                                ),
+                                ty: Float,
+                                init: Some(
+                                    TirExpr {
+                                        kind: FloatLit(
+                                            0.0,
                                         ),
-                                    ),
-                                    res: Local(
-                                        LocalId(
-                                            0,
-                                        ),
+                                        ty: Float,
+                                        res: None,
+                                        span: Span {
+                                            start: 478,
+                                            end: 481,
+                                        },
+                                    },
+                                ),
+                            },
+                            Expr(
+                                TirExpr {
+                                    kind: MethodCall {
+                                        recv: TirExpr {
+                                            kind: Var,
+                                            ty: Class(
+                                                ClassId(
+                                                    0,
+                                                ),
+                                            ),
+                                            res: Local(
+                                                LocalId(
+                                                    1,
+                                                ),
+                                            ),
+                                            span: Span {
+                                                start: 466,
+                                                end: 467,
+                                            },
+                                        },
+                                        name: "set celsius",
+                                        args: [
+                                            Expr(
+                                                TirExpr {
+                                                    kind: Var,
+                                                    ty: Float,
+                                                    res: Local(
+                                                        LocalId(
+                                                            0,
+                                                        ),
+                                                    ),
+                                                    span: Span {
+                                                        start: 478,
+                                                        end: 481,
+                                                    },
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                    ty: Void,
+                                    res: VtableSlot(
+                                        1,
                                     ),
                                     span: Span {
                                         start: 466,
-                                        end: 467,
+                                        end: 481,
                                     },
                                 },
-                                name: "celsius",
-                            },
-                            ty: Float,
-                            res: ByName {
-                                name: "celsius",
-                                why: Unrecorded,
-                            },
-                            span: Span {
-                                start: 466,
-                                end: 475,
-                            },
-                        },
-                        value: TirExpr {
-                            kind: FloatLit(
-                                0.0,
                             ),
+                        ],
+                        value: TirExpr {
+                            kind: Var,
                             ty: Float,
-                            res: None,
+                            res: Local(
+                                LocalId(
+                                    0,
+                                ),
+                            ),
                             span: Span {
                                 start: 478,
                                 end: 481,
@@ -1003,7 +1021,7 @@ TirModule {
                     ty: Float,
                     res: None,
                     span: Span {
-                        start: 466,
+                        start: 478,
                         end: 481,
                     },
                 },
@@ -1013,8 +1031,8 @@ TirModule {
                     kind: Binary {
                         op: Ne,
                         lhs: TirExpr {
-                            kind: Field {
-                                object: TirExpr {
+                            kind: MethodCall {
+                                recv: TirExpr {
                                     kind: Var,
                                     ty: Class(
                                         ClassId(
@@ -1023,7 +1041,7 @@ TirModule {
                                     ),
                                     res: Local(
                                         LocalId(
-                                            0,
+                                            1,
                                         ),
                                     ),
                                     span: Span {
@@ -1031,13 +1049,13 @@ TirModule {
                                         end: 487,
                                     },
                                 },
-                                name: "fahrenheit",
+                                name: "get fahrenheit",
+                                args: [],
                             },
                             ty: Float,
-                            res: ByName {
-                                name: "fahrenheit",
-                                why: Unrecorded,
-                            },
+                            res: VtableSlot(
+                                2,
+                            ),
                             span: Span {
                                 start: 486,
                                 end: 498,

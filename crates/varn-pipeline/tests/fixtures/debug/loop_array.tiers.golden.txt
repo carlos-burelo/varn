@@ -2,7 +2,7 @@
   [1mtiers[0m [2m──────────────────────────────────────────── <module> · 3/3 ruteadas[0m
   [2mfunción   [0m │ [2mwords[0m │ [2mtier[0m │ [2mrazón                 [0m
   ───────────┼───────┼──────┼───────────────────────
-  <module>   │   110 │ clif │  (native: alloc+boxed)
+  <module>   │   152 │ clif │  (native: alloc+boxed)
   sum        │    33 │ clif │  (native: boxed)      
   firstAbove │    37 │ clif │  (native: boxed)      
   [2m── end: tiers ──[0m
