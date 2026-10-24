@@ -157,6 +157,18 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   checker (tipar la declaración al primer uso, con detección de ciclos para la flecha
   recursiva `const fib = (n: int) => ... fib(n-1)`), y que `ModuleInterface` exporte el tipo
   final (namespaces entre módulos, tests 202). Es un rediseño del checker, no un recorte.
+- Medido (2026-10-24): cortar solo la inferencia de inicializadores de `const`/`let` en el
+  binder cambia 10 de 249 tests en `check:types`, y la causa dominante no es el checker sino
+  la frontera de módulo: `ModuleResolver::module_bind`/`stdlib_bind` solo parsean y bindean
+  las dependencias, nunca las tipan, así que un import (`Path.join`, `None`, miembros de
+  namespace) lee el tipo provisional del binder de la dependencia. `varn-resolver` no depende
+  de `varn-checker` (el checker está arriba). Cortar de verdad exige: (1) un trait
+  `ModuleChecker` inyectado en el resolver (Ley 1) que tipe cada dependencia una vez, en
+  orden topológico, con ciclos de import resueltos explícitamente; (2) cachear el bind ya
+  tipado (`try_load_cache`/`save_to_cache`) para que el costo sea una vez por módulo;
+  (3) recién entonces borrar `infer_expr_type_self` en `declarations.rs`, `object_members.rs`,
+  `namespace_struct.rs`, `patterns_sum.rs`, `binder_stmts.rs`, `binding_types.rs`. Hecho:
+  `extends` ya solo resuelve nombres (`heritage_type`, 6812a92c).
 - HECHO (paso a, 7abf324d): resolución de tipos e inferencia de expresiones viven en
   `varn-sem` (`resolve/`, `infer/`); binder y checker los importan de la capa baja. Matriz
   quick 3798/0. Falta (b) y (c).
