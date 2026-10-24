@@ -7,6 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use varn_core::term::{chalk, log, Section};
 
+const DEFAULT_TEST_DIR: &str = "tests";
+
 #[derive(Clone)]
 pub struct TestResult {
     pub idx: usize,
@@ -19,8 +21,13 @@ pub struct TestResult {
 pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), CliError> {
     let start_time = Instant::now();
 
-    let root = PathBuf::from(args.path.as_deref().unwrap_or("tests"));
-    let test_files = crate::discover::vn_files(&root, crate::discover::Depth::Direct)?;
+    let root = PathBuf::from(args.path.as_deref().unwrap_or(DEFAULT_TEST_DIR));
+    let test_files = crate::discover::vn_files(
+        &root,
+        crate::discover::Depth::Direct,
+        &session.project().manifest.test,
+        &session.project().root,
+    )?;
     if test_files.is_empty() {
         return Err(CliError::usage(
             "No test files (.vn) found matching the specified path",

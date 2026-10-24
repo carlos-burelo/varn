@@ -13,10 +13,15 @@ fn plural(count: usize) -> &'static str {
     }
 }
 
-pub fn run_fmt(args: FmtArgs) -> Result<(), CliError> {
+pub fn run_fmt(project: &varn_project::Project, args: FmtArgs) -> Result<(), CliError> {
     let start_time = Instant::now();
     let target = args.path.as_deref().unwrap_or(".");
-    let files = crate::discover::vn_files(Path::new(target), crate::discover::Depth::Recursive)?;
+    let files = crate::discover::vn_files(
+        Path::new(target),
+        crate::discover::Depth::Recursive,
+        &project.manifest.fmt,
+        &project.root,
+    )?;
 
     if files.is_empty() {
         if args.verbose {

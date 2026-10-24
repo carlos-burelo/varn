@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+use crate::filter::FileFilter;
 use crate::names::MANIFEST_FILE;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -49,6 +50,10 @@ pub struct Manifest {
     pub workspaces: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub tasks: BTreeMap<String, Vec<String>>,
+    #[serde(default, skip_serializing_if = "FileFilter::is_empty")]
+    pub fmt: FileFilter,
+    #[serde(default, skip_serializing_if = "FileFilter::is_empty")]
+    pub test: FileFilter,
 }
 
 #[derive(Debug)]

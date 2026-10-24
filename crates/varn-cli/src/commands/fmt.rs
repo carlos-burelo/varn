@@ -1,5 +1,5 @@
-use crate::{cli::FmtArgs, error::CliError, formatter};
+use crate::{cli::FmtArgs, error::CliError, formatter, pipeline};
 
-pub fn execute(args: FmtArgs) -> Result<(), CliError> {
-    formatter::run_fmt(args)
+pub fn execute(session: &pipeline::Session, args: FmtArgs) -> Result<(), CliError> {
+    formatter::run_fmt(session.project(), args)
 }

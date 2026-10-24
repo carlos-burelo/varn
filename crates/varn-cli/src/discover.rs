@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::error::CliError;
+use varn_project::FileFilter;
 
 const SKIPPED_DIRS: &[&str] = &["target", "node_modules"];
 
@@ -10,7 +11,12 @@ pub enum Depth {
     Recursive,
 }
 
-pub fn vn_files(path: &Path, depth: Depth) -> Result<Vec<PathBuf>, CliError> {
+pub fn vn_files(
+    path: &Path,
+    depth: Depth,
+    filter: &FileFilter,
+    root: &Path,
+) -> Result<Vec<PathBuf>, CliError> {
     if !path.exists() {
         return Err(CliError::usage(format!(
             "Path '{}' does not exist",
@@ -27,6 +33,7 @@ pub fn vn_files(path: &Path, depth: Depth) -> Result<Vec<PathBuf>, CliError> {
     }
 
     collect(path, depth, &mut files)?;
+    files.retain(|file| filter.admits(&relative_to(file, root)));
     files.sort();
     Ok(files)
 }
@@ -47,6 +54,15 @@ fn collect(dir: &Path, depth: Depth, out: &mut Vec<PathBuf>) -> Result<(), CliEr
         }
     }
     Ok(())
+}
+
+fn relative_to(file: &Path, root: &Path) -> String {
+    let absolute = std::path::absolute(file).unwrap_or_else(|_| file.to_path_buf());
+    absolute
+        .strip_prefix(root)
+        .unwrap_or(&absolute)
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn skipped(dir: &Path) -> bool {

@@ -63,7 +63,10 @@ pub fn run(cmd: Commands, shared: Option<&Arc<Session>>) -> Result<(), CliError>
             let session = session(Anchor::Cwd)?;
             commands::task::execute(&session, args)
         }
-        Commands::Fmt(args) => commands::fmt::execute(args),
+        Commands::Fmt(args) => {
+            let session = session(Anchor::Cwd)?;
+            commands::fmt::execute(&session, args)
+        }
         Commands::Doctor => commands::doctor::execute(),
         Commands::Cache(sub) => commands::cache::execute(sub),
         Commands::Lsp(args) => commands::lsp::execute(args),
