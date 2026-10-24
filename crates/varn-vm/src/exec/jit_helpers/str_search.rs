@@ -269,30 +269,34 @@ pub(crate) extern "C" fn jit_str_split(
                 }
             }
         };
-        let mut out = Vec::new();
+        let ranges = &mut ctx_ref.str_ranges;
+        ranges.clear();
         let base = text.as_ptr() as usize;
         match sep {
             Some(sep) if sep.len() == 1 => {
                 let byte = sep.as_bytes()[0];
+                let count = text.as_bytes().iter().filter(|&&b| b == byte).count() + 1;
+                ranges.reserve(count);
                 for p in text.split(byte as char) {
-                    out.push((p.as_ptr() as usize - base, p.len()));
+                    ranges.push((p.as_ptr() as usize - base, p.len()));
                 }
             }
             Some(sep) => {
                 for p in text.split(sep) {
-                    out.push((p.as_ptr() as usize - base, p.len()));
+                    ranges.push((p.as_ptr() as usize - base, p.len()));
                 }
             }
             None => {
+                ranges.reserve(text.len());
                 for (b, c) in text.char_indices() {
-                    out.push((b, c.len_utf8()));
+                    ranges.push((b, c.len_utf8()));
                 }
             }
         }
-        let mut vals = Vec::with_capacity(out.len());
+        let mut vals = Vec::with_capacity(ranges.len());
         ctx_ref
             .heap
-            .str_views_of(s_val, &out, |part| vals.push(part));
+            .str_views_of(s_val, &ctx_ref.str_ranges, |part| vals.push(part));
         ctx_ref.jit_native_result = ctx_ref
             .heap
             .alloc_array_repr(false, varn_types::vm_value::ArrayRepr::boxed(vals));
