@@ -21,6 +21,7 @@ mod expr_lit;
 mod functions;
 mod globals;
 mod infra;
+mod inline_body;
 mod ops;
 mod stmt;
 

@@ -1,5 +1,4 @@
 use super::context::{Builder, Result};
-use crate::hir::LocalId;
 use crate::ssa::ir::{InstKind, Terminator, Value, VarId};
 use crate::OptError;
 use varn_tir::{BackendTy, DynReason};
@@ -10,7 +9,7 @@ impl<'m> Builder<'m> {
         match &target.kind {
             TirExprKind::Var => match &target.res {
                 Resolution::Local(id) => {
-                    let var = VarId::Local(LocalId(id.0));
+                    let var = self.local_var(id.0);
                     let value = match self.var_ty.get(&var).copied() {
                         Some(declared) => self.coerce(value, declared),
                         None => value,
@@ -18,7 +17,8 @@ impl<'m> Builder<'m> {
                     self.store_var(var, value);
                 }
                 Resolution::Param(i) => {
-                    self.store_var(VarId::Param(*i), value);
+                    let var = self.inlined_param_var(*i).unwrap_or(VarId::Param(*i));
+                    self.store_var(var, value);
                 }
                 Resolution::Upvalue(uv) => {
                     self.emit_effect(InstKind::StoreUpvalue { index: *uv, value });
@@ -184,8 +184,11 @@ impl<'m> Builder<'m> {
 
     pub(super) fn lower_var(&mut self, res: &Resolution, ty: BackendTy) -> Result<Value> {
         match res {
-            Resolution::Local(id) => self.load_var(VarId::Local(LocalId(id.0)), ty),
+            Resolution::Local(id) => self.load_var(self.local_var(id.0), ty),
             Resolution::Param(i) => {
+                if let Some(var) = self.inlined_param_var(*i) {
+                    return self.load_var(var, ty);
+                }
                 if let Some(frame) = self.inlining.last()
                     && let Some(&arg_v) = frame.params.get(*i as usize)
                 {

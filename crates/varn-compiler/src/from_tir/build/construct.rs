@@ -184,6 +184,7 @@ impl<'m> Builder<'m> {
             func,
             params,
             this: Some(this),
+            body: None,
         });
         let lowered = ctor
             .body

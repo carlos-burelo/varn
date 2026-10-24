@@ -97,29 +97,11 @@ impl<'m> Builder<'m> {
             }
             return Ok(None);
         }
-        if !tf.locals.is_empty() {
-            if force {
-                return Err(crate::OptError::Unsupported(
-                    "`@inline` cannot apply to functions that declare locals",
-                ));
-            }
-            return Ok(None);
-        }
-        if tf.body.len() != 1 {
-            if force {
-                return Err(crate::OptError::Unsupported(
-                    "`@inline` requires a single-`return` body",
-                ));
-            }
-            return Ok(None);
+        if !tf.locals.is_empty() || tf.body.len() != 1 {
+            return self.try_inline_body_call(f, args, call_ty, force);
         }
         let TirStmt::Return(Some(ref ret_expr)) = tf.body[0] else {
-            if force {
-                return Err(crate::OptError::Unsupported(
-                    "`@inline` requires a single-`return` body",
-                ));
-            }
-            return Ok(None);
+            return self.try_inline_body_call(f, args, call_ty, force);
         };
         if args.len() != tf.params.len()
             || args
@@ -156,6 +138,7 @@ impl<'m> Builder<'m> {
             func: f,
             params: argv,
             this: None,
+            body: None,
         });
         let res = self.lower_expr(ret_expr);
         self.inlining.pop();

@@ -120,7 +120,7 @@ impl<'m> Builder<'m> {
         let v = self.lower_expr(value)?;
         let v = match (&target.kind, &target.res) {
             (varn_tir::TirExprKind::Var, Resolution::Local(id)) => {
-                match self.locals_bt.get(id.0 as usize).copied() {
+                match self.local_declared(id.0) {
                     Some(declared) => self.widen_exact(v, value.ty, declared),
                     None => v,
                 }

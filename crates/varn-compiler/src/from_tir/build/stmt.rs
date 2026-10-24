@@ -69,7 +69,7 @@ impl<'m> Builder<'m> {
             }
             TirStmt::Let { local, ty, init } => {
                 let declared = *ty;
-                let var = VarId::Local(LocalId(local.0));
+                let var = self.local_var(local.0);
                 self.var_ty.insert(var, declared);
                 let value = match init {
                     Some(e) => {
@@ -107,6 +107,17 @@ impl<'m> Builder<'m> {
                 {
                     self.set_term(Terminator::Unreachable);
                 }
+            }
+            TirStmt::Return(v) if self.inlining.last().is_some_and(|f| f.body.is_some()) => {
+                let val = match v {
+                    Some(e) => {
+                        let x = self.lower_expr(e)?;
+                        let ret_ty = self.return_bt.unwrap_or(e.ty);
+                        Some(self.widen_exact(x, e.ty, ret_ty))
+                    }
+                    None => None,
+                };
+                self.leave_inlined(val);
             }
             TirStmt::Return(v) => {
                 let val = match v {

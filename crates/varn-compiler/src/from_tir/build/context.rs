@@ -35,12 +35,23 @@ pub(crate) struct Builder<'m> {
     pub(super) inlining: Vec<InlineFrame>,
     pub(super) locals_bt: Vec<BackendTy>,
     pub(super) return_bt: Option<BackendTy>,
+    pub(super) inline_serial: u32,
 }
 
 pub(super) struct InlineFrame {
     pub(super) func: varn_tir::FnId,
     pub(super) params: Vec<Value>,
     pub(super) this: Option<Value>,
+    pub(super) body: Option<InlineBody>,
+}
+
+pub(super) struct InlineBody {
+    pub(super) func: varn_tir::FnId,
+    pub(super) base: u32,
+    pub(super) param_base: u32,
+    pub(super) exit: BlockId,
+    pub(super) result: VarId,
+    pub(super) ret_ty: BackendTy,
 }
 
 impl<'m> Builder<'m> {
@@ -66,6 +77,7 @@ impl<'m> Builder<'m> {
             inlining: Vec::new(),
             locals_bt: Vec::new(),
             return_bt: None,
+            inline_serial: 0,
         };
         let entry = b.new_block();
         b.sealed[entry.0 as usize] = true;
@@ -82,14 +94,14 @@ impl<'m> Builder<'m> {
     }
 
     pub(super) fn loop_body_pinned(&self, body: &[TirStmt]) -> Vec<VarId> {
-        fn walk(stmts: &[TirStmt], pinned: &FxHashSet<VarId>, out: &mut Vec<VarId>) {
+        fn walk(stmts: &[TirStmt], pinned: &FxHashSet<VarId>, base: u32, out: &mut Vec<VarId>) {
             for s in stmts {
                 for nested in crate::from_tir::tir_children::seq_bodies(s) {
-                    walk(nested, pinned, out);
+                    walk(nested, pinned, base, out);
                 }
                 match s {
                     TirStmt::Let { local, .. } => {
-                        let v = VarId::Local(LocalId(local.0));
+                        let v = VarId::Local(LocalId(local.0 + base));
                         if pinned.contains(&v) && !out.contains(&v) {
                             out.push(v);
                         }
@@ -99,14 +111,14 @@ impl<'m> Builder<'m> {
                         else_body,
                         ..
                     } => {
-                        walk(then_body, pinned, out);
-                        walk(else_body, pinned, out);
+                        walk(then_body, pinned, base, out);
+                        walk(else_body, pinned, base, out);
                     }
                     TirStmt::Try {
                         body, catch_body, ..
                     } => {
-                        walk(body, pinned, out);
-                        walk(catch_body, pinned, out);
+                        walk(body, pinned, base, out);
+                        walk(catch_body, pinned, base, out);
                     }
                     TirStmt::Expr(_)
                     | TirStmt::Return(_)
@@ -119,7 +131,12 @@ impl<'m> Builder<'m> {
             }
         }
         let mut out = Vec::new();
-        walk(body, &self.pinned, &mut out);
+        let base = self
+            .inlining
+            .last()
+            .and_then(|f| f.body.as_ref())
+            .map_or(0, |b| b.base);
+        walk(body, &self.pinned, base, &mut out);
         out
     }
 }
