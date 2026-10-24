@@ -3,12 +3,10 @@ use super::*;
 use super::number::fast_parse_f64;
 
 pub(super) fn fast_parse_json(ctx: &mut ExecCtx, text: &str) -> Option<VmValue> {
-    let cached_shape = None;
     let mut parser = FastJsonParser {
         bytes: text.as_bytes(),
         pos: 0,
         ctx,
-        cached_shape,
     };
     let val = parser.parse_value()?;
     parser.skip_whitespace();
@@ -23,7 +21,6 @@ pub(super) struct FastJsonParser<'a, 'ctx> {
     bytes: &'a [u8],
     pos: usize,
     ctx: &'ctx mut ExecCtx,
-    cached_shape: Option<CacheEntry>,
 }
 
 impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
@@ -233,9 +230,14 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         let mut spilled: Vec<VmValue> = Vec::new();
         let mut n = 0usize;
 
-        let mut matched: usize = 0;
-        let mut hot = self.cached_shape.is_some();
+        let known = self.ctx.json_shapes.len();
+        let mut candidates: u64 = if known >= 64 {
+            u64::MAX
+        } else {
+            (1u64 << known) - 1
+        };
         let mut owned_keys: Vec<String> = Vec::new();
+        let mut cold = candidates == 0;
 
         loop {
             self.skip_whitespace();
@@ -266,20 +268,30 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
                 }
                 spilled.push(val);
             }
-            n += 1;
 
-            if hot {
-                let keys = &self.cached_shape.as_ref().unwrap().0;
-                if matched < keys.len() && keys[matched].as_str() == key_str {
-                    matched += 1;
-                } else {
-                    owned_keys = key_prefix(&self.cached_shape, matched);
-                    owned_keys.push(key_str.to_owned());
-                    hot = false;
-                }
-            } else {
+            if cold {
                 owned_keys.push(key_str.to_owned());
+            } else {
+                let shapes = &self.ctx.json_shapes;
+                let mut next = 0u64;
+                let mut rest = candidates;
+                while rest != 0 {
+                    let i = rest.trailing_zeros() as usize;
+                    rest &= rest - 1;
+                    if shapes[i].0.get(n).map(String::as_str) == Some(key_str) {
+                        next |= 1u64 << i;
+                    }
+                }
+                if next == 0 {
+                    let pivot = candidates.trailing_zeros() as usize;
+                    owned_keys = shapes[pivot].0[..n].to_vec();
+                    owned_keys.push(key_str.to_owned());
+                    cold = true;
+                } else {
+                    candidates = next;
+                }
             }
+            n += 1;
 
             self.skip_whitespace();
             if self.pos < self.bytes.len() {
@@ -303,24 +315,31 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             &spilled
         };
 
-        if hot
-            && matched == n
-            && let Some((keys, shape)) = &self.cached_shape
-            && keys.len() == n
-        {
-            return Some(self.ctx.heap.alloc_object_with_shape_slice(shape, values));
-        }
-
-        if hot {
-            owned_keys = key_prefix(&self.cached_shape, matched);
+        if !cold {
+            let shapes = &self.ctx.json_shapes;
+            let mut rest = candidates;
+            while rest != 0 {
+                let i = rest.trailing_zeros() as usize;
+                rest &= rest - 1;
+                if shapes[i].0.len() == n {
+                    let shape = std::rc::Rc::clone(&shapes[i].1);
+                    return Some(self.ctx.heap.alloc_object_with_shape_slice(&shape, values));
+                }
+            }
+            let pivot = candidates.trailing_zeros() as usize;
+            owned_keys = shapes[pivot].0[..n].to_vec();
         }
         let obj = self.ctx.alloc_object();
         for (k, v) in owned_keys.iter().zip(values.iter()) {
             self.ctx.set_field(obj, k, *v);
         }
-        if let Some(shape) = self.ctx.get_object_shape(obj) {
-            let entry = (std::rc::Rc::new(owned_keys), shape);
-            self.cached_shape = Some(entry);
+        if self.ctx.json_shapes.len() < JSON_SHAPE_CAP
+            && let Some(shape) = self.ctx.get_object_shape(obj)
+            && shape.property_names.len() == owned_keys.len()
+        {
+            self.ctx
+                .json_shapes
+                .push((std::rc::Rc::new(owned_keys), shape));
         }
         Some(obj)
     }

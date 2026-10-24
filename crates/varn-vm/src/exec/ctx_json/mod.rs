@@ -35,9 +35,4 @@ mod stringify;
 
 pub(super) type CacheEntry = (std::rc::Rc<Vec<String>>, std::rc::Rc<varn_types::Shape>);
 
-pub(super) fn key_prefix(cached: &Option<CacheEntry>, n: usize) -> Vec<String> {
-    match cached {
-        Some((keys, _)) => keys.iter().take(n).cloned().collect(),
-        None => Vec::new(),
-    }
-}
+pub(super) const JSON_SHAPE_CAP: usize = 64;
