@@ -9,6 +9,7 @@ pub mod fmt;
 pub mod import_collector;
 pub mod module_precompile;
 mod opts;
+mod session;
 mod parse;
 pub mod portable;
 mod quiet_parse;
@@ -34,6 +35,8 @@ pub use execute::{boot_machine, enter_main, execute, execute_with_caps};
 pub use layer_link::verify_synthetic_imports;
 pub use lex::lex as phase_lex;
 pub use opts::{CapabilitySet, DebugFlags, RunOpts};
+pub use session::Session;
+pub use varn_project::Anchor;
 pub use parse::parse as phase_parse;
 
 type PipelineResult<T> = Result<T, Failure>;
@@ -49,10 +52,14 @@ pub fn read_source_file(path: &str) -> PipelineResult<String> {
     read_source(path)
 }
 
-pub fn run(opts: &RunOpts, sink: &dyn debug_sink::DebugSink) -> PipelineResult<()> {
-    let session = ModuleResolver::new();
+pub fn run(
+    session: &Session,
+    opts: &RunOpts,
+    sink: &dyn debug_sink::DebugSink,
+) -> PipelineResult<()> {
+    let resolver = session.resolver();
     if portable::is_portable(&opts.file_path) {
-        return run_portable(opts);
+        return run_portable(session, opts);
     }
 
     let source = if let Some(ref s) = opts.eval {
@@ -65,14 +72,14 @@ pub fn run(opts: &RunOpts, sink: &dyn debug_sink::DebugSink) -> PipelineResult<(
         None => source,
     };
     let compiled = if opts.eval.is_none() && opts.append.is_none() && !opts.debug.any() {
-        compile_source_cached(&source, &opts.file_path, opts.verbose, &session, sink)?
+        compile_source_cached(&source, &opts.file_path, opts.verbose, resolver, sink)?
     } else {
         compile_source(
             &source,
             &opts.file_path,
             opts.verbose,
             &opts.debug,
-            &session,
+            resolver,
             sink,
         )?
     };
@@ -85,6 +92,7 @@ pub fn run(opts: &RunOpts, sink: &dyn debug_sink::DebugSink) -> PipelineResult<(
     }
 
     execute_with_caps(
+        session,
         compiled.entry_proto,
         compiled.precompiled,
         &source,
@@ -95,7 +103,7 @@ pub fn run(opts: &RunOpts, sink: &dyn debug_sink::DebugSink) -> PipelineResult<(
     )
 }
 
-fn run_portable(opts: &RunOpts) -> PipelineResult<()> {
+fn run_portable(session: &Session, opts: &RunOpts) -> PipelineResult<()> {
     let artifact = portable::read_portable(&opts.file_path)?;
     let compiled = cache::compile_output_from_graph(artifact)?;
 
@@ -108,6 +116,7 @@ fn run_portable(opts: &RunOpts) -> PipelineResult<()> {
     }
 
     execute_with_caps(
+        session,
         compiled.entry_proto,
         compiled.precompiled,
         "",

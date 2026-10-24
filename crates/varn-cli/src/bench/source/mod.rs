@@ -28,7 +28,12 @@ mod e2e;
 
 use bench_pipeline::{export_names_of, exports_of, parse_shared, verbose_sections};
 
-pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliError> {
+pub fn run(
+    session: &varn_pipeline::Session,
+    path: &str,
+    eval: Option<&str>,
+    opts: &BenchOpts,
+) -> Result<(), CliError> {
     let runs = opts.runs;
     let canonical;
     let path = if eval.is_some() {
@@ -43,7 +48,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         None => crate::pipeline::read_source_file(path)?,
     };
     let debug_flags = varn_debug::flags::DebugFlags::default();
-    let session = varn_pipeline::ModuleResolver::new();
+    let resolver = session.resolver();
 
     let read_samples = time_n(runs, || {
         match eval {
@@ -107,7 +112,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             interner.clone(),
             &source,
             &debug_flags,
-            &session,
+            resolver,
             &varn_pipeline::NullSink,
         )
         .map(|_| ())
@@ -118,7 +123,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         &program,
         &arena,
         interner,
-        &session,
+        resolver,
         varn_sem::output::CheckOptions::compile(),
     );
 
@@ -127,12 +132,12 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         let mut tir = varn_pipeline::emit_tir(program_ref, arena_ref, &check_result);
         varn_pipeline::inject_star_reexports(
             &mut tir,
-            &exports_of(&program_ref.filename, &session),
+            &exports_of(&program_ref.filename, resolver),
         );
-        varn_pipeline::resolve_import_slots(&mut tir, &session, &program_ref.filename);
+        varn_pipeline::resolve_import_slots(&mut tir, resolver, &program_ref.filename);
         let (res, opt_dur) = varn_pipeline::compile_tir(
             &tir,
-            export_names_of(&program_ref.filename, &session),
+            export_names_of(&program_ref.filename, resolver),
             &source,
             true,
         );
@@ -149,11 +154,11 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .collect();
 
     let mut final_tir = varn_pipeline::emit_tir(&program, &arena, &check_result);
-    varn_pipeline::inject_star_reexports(&mut final_tir, &exports_of(&program.filename, &session));
-    varn_pipeline::resolve_import_slots(&mut final_tir, &session, &program.filename);
+    varn_pipeline::inject_star_reexports(&mut final_tir, &exports_of(&program.filename, resolver));
+    varn_pipeline::resolve_import_slots(&mut final_tir, resolver, &program.filename);
     let (final_result, _) = varn_pipeline::compile_tir(
         &final_tir,
-        export_names_of(&program.filename, &session),
+        export_names_of(&program.filename, resolver),
         &source,
         false,
     );
@@ -167,7 +172,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         path,
         &proto,
         &check_result.bind.interner,
-        &session,
+        resolver,
     )
     .map_err(|e| CliError::fatal(format!("module graph build error: {e}")))?;
     let precompile_dur = precompile_start.elapsed();
@@ -186,7 +191,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     );
 
     let builtin_protos: Vec<FunctionProto> = crate::pipeline::core_protos_owned()?;
-    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new());
+    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new(session.shared_resolver()));
     let factory = VmFactory::new(
         Rc::clone(&precompiled),
         builtin_protos,
@@ -207,7 +212,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         |_done, _samples| {},
     )?;
 
-    let e2e_samples = e2e::measure_e2e(runs, eval, path, &debug_flags, &factory, &session)?;
+    let e2e_samples = e2e::measure_e2e(runs, eval, path, &debug_flags, &factory, resolver)?;
 
     let e2e_stats = PhaseStats::from_samples("e2e (cold)", |c| c.cyan(), &e2e_samples);
     let phases = vec![

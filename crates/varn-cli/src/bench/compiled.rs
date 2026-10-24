@@ -15,7 +15,7 @@ use super::stats::PhaseStats;
 use super::BenchOpts;
 use crate::error::CliError;
 
-pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
+pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let runs = opts.runs;
     let compiled = crate::pipeline::portable::read_portable(path)?;
     let compile_output = crate::pipeline::cache::compile_output_from_graph(compiled)?;
@@ -29,7 +29,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     })?;
 
     let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;
-    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new());
+    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new(session.shared_resolver()));
     let factory = VmFactory::new(
         compile_output.precompiled.clone(),
         builtin_protos,

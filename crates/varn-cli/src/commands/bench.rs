@@ -1,7 +1,7 @@
 use crate::bench::{run_bench, BenchOpts};
 use crate::{cli::BenchArgs, error::CliError};
 
-pub fn execute(args: BenchArgs) -> Result<(), CliError> {
+pub fn execute(session: &varn_pipeline::Session, args: BenchArgs) -> Result<(), CliError> {
     if args.runs == 0 {
         return Err(CliError::usage("--runs must be at least 1"));
     }
@@ -11,6 +11,7 @@ pub fn execute(args: BenchArgs) -> Result<(), CliError> {
         (None, None) => return Err(CliError::usage("Provide a file or inline code with --eval")),
     };
     run_bench(
+        session,
         &file_path,
         eval.as_deref(),
         &BenchOpts {

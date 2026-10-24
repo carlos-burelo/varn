@@ -18,6 +18,7 @@ pub enum Failure {
     Runtime(RuntimeFailure),
     Io(String),
     Internal(String),
+    Project(varn_project::ManifestError),
 }
 
 impl Failure {
@@ -72,6 +73,7 @@ impl fmt::Display for Failure {
             ),
             Failure::Runtime(failure) => write!(f, "{failure}"),
             Failure::Io(message) | Failure::Internal(message) => write!(f, "{message}"),
+            Failure::Project(error) => write!(f, "{error}"),
         }
     }
 }

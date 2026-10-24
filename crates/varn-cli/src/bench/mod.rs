@@ -15,11 +15,16 @@ pub struct BenchOpts {
     pub min_clif_coverage: Option<f64>,
 }
 
-pub fn run_bench(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliError> {
+pub fn run_bench(
+    session: &varn_pipeline::Session,
+    path: &str,
+    eval: Option<&str>,
+    opts: &BenchOpts,
+) -> Result<(), CliError> {
     if eval.is_none() && crate::pipeline::portable::is_portable(path) {
-        return compiled::run(path, opts);
+        return compiled::run(session, path, opts);
     }
-    source::run(path, eval, opts)
+    source::run(session, path, eval, opts)
 }
 
 pub fn enforce_coverage_floor(

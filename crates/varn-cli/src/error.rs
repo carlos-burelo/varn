@@ -22,7 +22,10 @@ impl CliError {
         match self {
             CliError::Failure(Failure::Diagnostics(_)) => ExitCode::Diagnostics,
             CliError::Failure(
-                Failure::Runtime(_) | Failure::Io(_) | Failure::Internal(_),
+                Failure::Runtime(_)
+                | Failure::Io(_)
+                | Failure::Internal(_)
+                | Failure::Project(_),
             )
             | CliError::Fatal(_) => ExitCode::Fatal,
             CliError::Usage(_) => ExitCode::Usage,

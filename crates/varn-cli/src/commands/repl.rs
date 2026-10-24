@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use varn_core::term::terminal;
 use varn_pipeline::{DebugFlags, RunOpts};
 
-pub fn execute(_args: ReplArgs) -> Result<(), CliError> {
+pub fn execute(session: &varn_pipeline::Session, _args: ReplArgs) -> Result<(), CliError> {
     println!("Varn {} — REPL interactivo", env!("CARGO_PKG_VERSION"));
     println!("  .exit / .quit  → salir");
     println!("  .help          → ayuda");
@@ -47,7 +47,7 @@ pub fn execute(_args: ReplArgs) -> Result<(), CliError> {
         if depth <= 0 {
             depth = 0;
             let source = std::mem::take(&mut buf);
-            run_snippet(&source);
+            run_snippet(session, &source);
         }
     }
 
@@ -55,7 +55,7 @@ pub fn execute(_args: ReplArgs) -> Result<(), CliError> {
     Ok(())
 }
 
-fn run_snippet(source: &str) {
+fn run_snippet(session: &varn_pipeline::Session, source: &str) {
     let opts = RunOpts {
         file_path: "(repl)".to_owned(),
         eval: Some(source.to_owned()),
@@ -67,7 +67,7 @@ fn run_snippet(source: &str) {
         capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
         print_silent: false,
     };
-    if let Err(e) = crate::pipeline::run(&opts, &crate::debug_sink::CliDebugSink) {
+    if let Err(e) = crate::pipeline::run(session, &opts, &crate::debug_sink::CliDebugSink) {
         terminal::error(&e);
     }
 }

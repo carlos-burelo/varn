@@ -11,17 +11,17 @@ use varn_vm::loader::{ModuleError, ModuleLoader};
 pub struct PipelineLoader {
     registry: varn_modules::loader::ModuleRegistry,
     protos: Mutex<ProtoBytesCache>,
-    session: crate::ModuleResolver,
+    session: Arc<crate::ModuleResolver>,
 }
 
 type ProtoBytesCache = FxHashMap<String, (u64, Arc<[u8]>)>;
 
 impl PipelineLoader {
-    pub fn new() -> Self {
+    pub fn new(session: Arc<crate::ModuleResolver>) -> Self {
         Self {
             registry: varn_modules::loader::default_registry(),
             protos: Mutex::new(FxHashMap::default()),
-            session: crate::ModuleResolver::new(),
+            session,
         }
     }
 
@@ -48,12 +48,6 @@ impl PipelineLoader {
                 (fingerprint, Arc::from(bytes.into_boxed_slice())),
             );
         }
-    }
-}
-
-impl Default for PipelineLoader {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

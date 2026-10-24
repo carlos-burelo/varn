@@ -1,8 +1,9 @@
 use crate::{cli::CheckArgs, error::CliError, pipeline};
 use varn_pipeline::RunOpts;
 
-pub fn execute(args: CheckArgs) -> Result<(), CliError> {
+pub fn execute(session: &pipeline::Session, args: CheckArgs) -> Result<(), CliError> {
     pipeline::run(
+        session,
         &RunOpts {
             file_path: args.file,
             eval: None,

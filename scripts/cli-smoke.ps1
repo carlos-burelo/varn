@@ -81,6 +81,15 @@ Check "init-writes-a-manifest-pkg-reads" {
     $init.Code -eq 0 -and $tree.Code -eq 0
 }
 
+Check "manifest-unknown-key-is-named" {
+    $dir = Join-Path $work "badmanifest"
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    Set-Content (Join-Path $dir "varn.toml") 'nmae = "x"' -Encoding utf8
+    $f = Write-Vn "badmanifest\hello.vn" 'print("hi");'
+    $r = Vn run $f
+    $r.Code -ne 0 -and $r.Out -match "nmae" -and $r.Out -match "varn.toml"
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null

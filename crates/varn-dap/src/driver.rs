@@ -39,17 +39,20 @@ impl Driver {
             .map_err(|e| format!("cannot resolve '{program}': {e}"))?;
         let source = std::fs::read_to_string(&canonical)
             .map_err(|e| format!("cannot read '{canonical}': {e}"))?;
-        let session = varn_pipeline::ModuleResolver::new();
+        let session = varn_pipeline::Session::open(varn_pipeline::Anchor::File(
+            std::path::Path::new(&canonical),
+        ))
+        .map_err(|e| format!("cannot open project: {e}"))?;
         let compiled = compile_source_for_build(
             &source,
             &canonical,
             false,
             &DebugFlags::default(),
-            &session,
+            session.resolver(),
             &varn_pipeline::NullSink,
         )
         .map_err(|e| format!("compile failed: {e}"))?;
-        let mut machine = boot_machine(compiled.precompiled, CapabilitySet::allow_all(), false)
+        let mut machine = boot_machine(&session, compiled.precompiled, CapabilitySet::allow_all(), false)
             .map_err(|e| format!("boot failed: {e}"))?;
         machine.ctx.settings.no_jit = true;
         let main = enter_main(&mut machine, compiled.entry_proto);

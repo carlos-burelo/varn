@@ -8,6 +8,7 @@ pub enum Anchor<'a> {
     Cwd,
 }
 
+#[derive(Clone)]
 pub struct Project {
     pub root: PathBuf,
     pub manifest_path: Option<PathBuf>,
@@ -15,6 +16,14 @@ pub struct Project {
 }
 
 impl Project {
+    pub fn detached() -> Project {
+        Project {
+            root: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            manifest_path: None,
+            manifest: Manifest::default(),
+        }
+    }
+
     pub fn discover(anchor: Anchor<'_>) -> Result<Project, ManifestError> {
         let start = match anchor {
             Anchor::File(file) => std::path::absolute(file)

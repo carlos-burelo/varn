@@ -1,7 +1,7 @@
 use crate::{cli::DebugArgs, error::CliError, pipeline};
 use varn_pipeline::RunOpts;
 
-pub fn execute(args: DebugArgs) -> Result<(), CliError> {
+pub fn execute(session: &pipeline::Session, args: DebugArgs) -> Result<(), CliError> {
     if args.list_phases {
         varn_debug::print_phases();
         return Ok(());
@@ -26,6 +26,7 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
     let no_run = !debug.needs_execution();
 
     pipeline::run(
+        session,
         &RunOpts {
             file_path,
             eval,

@@ -17,7 +17,7 @@ pub struct TestResult {
     pub output: String,
 }
 
-pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
+pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), CliError> {
     let start_time = Instant::now();
 
     let test_files = discover_test_files(args.path.as_deref())?;
@@ -83,6 +83,7 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
         let results_store = Arc::clone(&results);
         let out_lock = Arc::clone(&print_lock);
         let fail_fast = args.fail_fast;
+        let session = Arc::clone(&session);
         let verbose = args.verbose;
 
         handles.push(std::thread::spawn(move || loop {
@@ -101,13 +102,14 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| path.to_string_lossy().to_string());
 
-            let units = test_units(&path, &display_name);
+            let units = test_units(&session, &path, &display_name);
             for (unit_name, append) in units {
                 if fail_fast && has_failure_flag.load(Ordering::SeqCst) {
                     break;
                 }
                 let t1 = Instant::now();
                 let run_res = pipeline::run(
+                    &session.isolated(),
                     &RunOpts {
                         file_path: path.to_string_lossy().to_string(),
                         eval: None,
@@ -216,8 +218,12 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
     }
 }
 
-fn test_units(path: &PathBuf, display_name: &str) -> Vec<(String, Option<String>)> {
-    let session = pipeline::ModuleResolver::new();
+fn test_units(
+    session: &pipeline::Session,
+    path: &PathBuf,
+    display_name: &str,
+) -> Vec<(String, Option<String>)> {
+    let session = session.isolated();
     let file_unit = vec![(display_name.to_owned(), None)];
     let source = match std::fs::read_to_string(path) {
         Ok(s) => s,
@@ -227,7 +233,7 @@ fn test_units(path: &PathBuf, display_name: &str) -> Vec<(String, Option<String>
         return file_unit;
     }
     let path_str = path.to_string_lossy().to_string();
-    let targets = match pipeline::collect_test_targets(&path_str, &source, &session) {
+    let targets = match pipeline::collect_test_targets(&path_str, &source, session.resolver()) {
         Ok(t) => t,
         Err(_) => return file_unit,
     };

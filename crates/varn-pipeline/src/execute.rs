@@ -1,5 +1,5 @@
 use crate::core;
-use crate::{Failure, RuntimeFailure};
+use crate::{Failure, RuntimeFailure, Session};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_compiler::FunctionProto;
@@ -11,6 +11,7 @@ use varn_vm::Vm;
 type PipelineResult<T> = Result<T, Failure>;
 
 pub fn execute(
+    session: &Session,
     proto: FunctionProto,
     precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     source: &str,
@@ -18,6 +19,7 @@ pub fn execute(
     debug: &DebugFlags,
 ) -> PipelineResult<()> {
     execute_with_caps(
+        session,
         proto,
         precompiled,
         source,
@@ -29,6 +31,7 @@ pub fn execute(
 }
 
 pub fn execute_with_caps(
+    session: &Session,
     proto: FunctionProto,
     precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     _source: &str,
@@ -37,7 +40,7 @@ pub fn execute_with_caps(
     capabilities: CapabilitySet,
     print_silent: bool,
 ) -> PipelineResult<()> {
-    let mut machine = boot_machine(precompiled, capabilities, _debug.trace)?;
+    let mut machine = boot_machine(session, precompiled, capabilities, _debug.trace)?;
     machine.ctx.print_silent = print_silent;
     let main_proto = enter_main(&mut machine, proto);
     if _debug.trace {
@@ -69,11 +72,12 @@ pub fn execute_with_caps(
 }
 
 pub fn boot_machine(
+    session: &Session,
     precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     capabilities: CapabilitySet,
     trace: bool,
 ) -> PipelineResult<Vm> {
-    let loader = std::sync::Arc::new(crate::stdlib_loader::PipelineLoader::new());
+    let loader = std::sync::Arc::new(crate::stdlib_loader::PipelineLoader::new(session.shared_resolver()));
     let settings = varn_vm::ExecSettings::from_env(trace);
     let mut machine = Vm::new(precompiled.clone(), settings).with_loader(loader);
     machine.ctx.capabilities = Rc::new(capabilities);

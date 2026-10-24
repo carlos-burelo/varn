@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use varn_pipeline::{CapabilitySet, RunOpts};
 use varn_types::capabilities::*;
 
-pub fn execute(args: RunArgs) -> Result<(), CliError> {
+pub fn execute(session: &pipeline::Session, args: RunArgs) -> Result<(), CliError> {
     let (file_path, eval) = match (args.file.as_ref(), args.eval.as_ref()) {
         (_, Some(code)) => ("(eval)".to_owned(), Some(code.clone())),
         (Some(file), None) => (file.clone(), None),
@@ -22,6 +22,7 @@ pub fn execute(args: RunArgs) -> Result<(), CliError> {
     let capabilities = build_capabilities(&args);
 
     pipeline::run(
+        session,
         &RunOpts {
             file_path,
             eval,

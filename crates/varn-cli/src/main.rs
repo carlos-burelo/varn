@@ -25,6 +25,7 @@ mod tester;
 use clap::Parser;
 use cli::{Cli, Commands};
 use exit::ExitCode;
+use pipeline::{Anchor, Session};
 
 use std::process;
 use varn_core::term::terminal;
@@ -114,16 +115,51 @@ fn run_cli() {
     }
 }
 
+fn anchor<'a>(file: Option<&'a str>, eval: Option<&str>) -> Anchor<'a> {
+    match (file, eval) {
+        (_, Some(_)) | (None, None) => Anchor::Cwd,
+        (Some(file), None) => Anchor::File(std::path::Path::new(file)),
+    }
+}
+
+fn open_session(anchor: Anchor<'_>) -> Result<Session, error::CliError> {
+    Session::open(anchor).map_err(error::CliError::from)
+}
+
 fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
     match cmd {
-        Commands::Run(args) => commands::run::execute(args),
-        Commands::Check(args) => commands::check::execute(args),
-        Commands::Eval(args) => commands::eval::execute(args),
-        Commands::Repl(args) => commands::repl::execute(args),
-        Commands::Bench(args) => commands::bench::execute(args),
-        Commands::Debug(args) => commands::debug::execute(args),
-        Commands::Build(args) => commands::build::execute(args),
-        Commands::Test(args) => commands::test::execute(args),
+        Commands::Run(args) => {
+            let session = open_session(anchor(args.file.as_deref(), args.eval.as_deref()))?;
+            commands::run::execute(&session, args)
+        }
+        Commands::Check(args) => {
+            let session = open_session(Anchor::File(std::path::Path::new(&args.file)))?;
+            commands::check::execute(&session, args)
+        }
+        Commands::Eval(args) => {
+            let session = open_session(Anchor::Cwd)?;
+            commands::eval::execute(&session, args)
+        }
+        Commands::Repl(args) => {
+            let session = open_session(Anchor::Cwd)?;
+            commands::repl::execute(&session, args)
+        }
+        Commands::Bench(args) => {
+            let session = open_session(anchor(args.file.as_deref(), args.eval.as_deref()))?;
+            commands::bench::execute(&session, args)
+        }
+        Commands::Debug(args) => {
+            let session = open_session(anchor(args.file.as_deref(), args.eval.as_deref()))?;
+            commands::debug::execute(&session, args)
+        }
+        Commands::Build(args) => {
+            let session = open_session(Anchor::File(std::path::Path::new(&args.file)))?;
+            commands::build::execute(&session, args)
+        }
+        Commands::Test(args) => {
+            let session = std::sync::Arc::new(open_session(Anchor::Cwd)?);
+            commands::test::execute(session, args)
+        }
         Commands::Fmt(args) => commands::fmt::execute(args),
         Commands::Doctor => commands::doctor::execute(),
         Commands::Cache(sub) => commands::cache::execute(sub),
@@ -148,7 +184,10 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         Commands::Pkg(_) => Err(error::CliError::fatal(
             "vn was built without the \"pm\" feature".to_string(),
         )),
-        Commands::StdBundle(args) => commands::std_bundle::execute(args),
+        Commands::StdBundle(args) => {
+            let session = open_session(Anchor::Cwd)?;
+            commands::std_bundle::execute(&session, args)
+        }
     }
 }
 
@@ -247,6 +286,7 @@ fn try_run_standalone_executable() {
 
     let exe_str = exe_path.to_string_lossy();
     if let Err(e) = pipeline::execute(
+        &Session::detached(),
         compiled.entry_proto,
         compiled.precompiled,
         "",
