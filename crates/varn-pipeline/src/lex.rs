@@ -7,7 +7,7 @@ pub struct Tokens {
     pub lexeme_buf: Arc<[u8]>,
 }
 
-pub fn scan(source: &str, path: &str) -> Result<Tokens, Failure> {
+pub(crate) fn scan(source: &str, path: &str) -> Result<Tokens, Failure> {
     let (tokens, lexeme_buf, errors) = varn_lexer::scan(source, path);
 
     if !errors.is_empty() {

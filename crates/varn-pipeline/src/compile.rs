@@ -2,9 +2,17 @@ use crate::lower::{lower_module, LowerInput, Lowered};
 use crate::{Executable, Failure};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 use varn_compiler::FunctionProto;
 use varn_core::ast::{AstArena, Program};
 use varn_types::ModuleGraphArtifact;
+
+pub(crate) struct Built {
+    pub executable: Executable,
+    pub lower: Duration,
+    pub optimize: Duration,
+    pub link: Duration,
+}
 
 pub(crate) fn build_executable(
     program: &Program,
@@ -12,14 +20,22 @@ pub(crate) fn build_executable(
     source: &str,
     check: &varn_sem::output::CheckResult,
     resolver: &crate::ModuleResolver,
-) -> Result<Executable, Failure> {
-    let Lowered { tir, proto } = lower_module(LowerInput {
+) -> Result<Built, Failure> {
+    let lowering = Instant::now();
+    let Lowered {
+        tir,
+        proto,
+        optimize,
+    } = lower_module(LowerInput {
         program,
         arena,
         check,
         resolver,
         source,
     })?;
+    let lower = lowering.elapsed().saturating_sub(optimize);
+
+    let linking = Instant::now();
     let graph_build = crate::module_precompile::build_module_graph(
         program,
         arena,
@@ -73,11 +89,16 @@ pub(crate) fn build_executable(
         package_nodes: graph_build.package_nodes,
     };
 
-    Ok(Executable {
-        entry_proto: proto,
-        precompiled: Rc::new(precompiled),
-        graph_artifact,
-        deps: graph_build.deps,
-        warnings: graph_build.warnings,
+    Ok(Built {
+        executable: Executable {
+            entry_proto: proto,
+            precompiled: Rc::new(precompiled),
+            graph_artifact,
+            deps: graph_build.deps,
+            warnings: graph_build.warnings,
+        },
+        lower,
+        optimize,
+        link: linking.elapsed(),
     })
 }

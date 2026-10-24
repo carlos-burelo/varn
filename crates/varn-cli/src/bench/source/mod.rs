@@ -1,10 +1,6 @@
 use std::rc::Rc;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
-use varn_sem::resolver::ImportResolver;
 
-use rustc_hash::FxHashMap;
-use varn_checker::Checker;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
 
@@ -26,7 +22,7 @@ use crate::error::CliError;
 mod bench_pipeline;
 mod e2e;
 
-use bench_pipeline::{export_names_of, exports_of, parse_shared, verbose_sections};
+use bench_pipeline::{profile_inputs, sample_stages, verbose_sections};
 
 pub fn run(
     session: &varn_pipeline::Session,
@@ -41,7 +37,6 @@ pub fn run(
     };
     let path = loaded.path();
     let source = loaded.text();
-    let resolver = session.resolver();
 
     let read_samples = time_n(runs, || {
         match eval {
@@ -55,116 +50,18 @@ pub fn run(
         Ok(())
     })?;
 
-    let lex_samples = time_n(runs, || {
-        crate::pipeline::phase_lex(&source, path)
-            .map(|_| ())
-            .map_err(|e| e.to_string())
-    })?;
-
-    let varn_pipeline::Tokens { tokens, lexeme_buf } = crate::pipeline::phase_lex(&source, path)
-        .map_err(|e| CliError::fatal(e.to_string()))?;
-    let token_count = tokens.len();
-
-    let tokens_ref = &tokens;
-    let lexeme_buf_ref = lexeme_buf.clone();
-    let parse_samples = time_n(runs, || {
-        crate::pipeline::phase_parse(tokens_ref.clone(), lexeme_buf_ref.clone(), &source, path)
-            .map(|_| ())
-        .map_err(|e| format!("{e}"))
-    })?;
-
-    let (program, parse_profile, interner, arena) = parse_shared(tokens, lexeme_buf, path)
-        .map_err(|errs| {
-            let msgs: Vec<String> = errs
-                .iter()
-                .map(|e| {
-                    format!(
-                        "{}:{}:{}: {}",
-                        path, e.range.start.line, e.range.start.column, e.to_string()
-                    )
-                })
-                .collect();
-            CliError::fatal(format!("parse errors:\n{}", msgs.join("\n")))
-        })?;
-
-    let program_ref = &program;
-    let arena_ref = &arena;
-    let check_samples = time_n(runs, || {
-        crate::pipeline::phase_check(program_ref, arena_ref, interner.clone(), &source, resolver)
-            .map(|_| ())
-        .map_err(|e| format!("{e}"))
-    })?;
-
-    let check_result = Checker::check_with(
-        &program,
-        &arena,
-        interner,
-        resolver,
-        varn_sem::output::CheckOptions::compile(),
-    );
-
-    let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
-    let compile_samples = time_n(runs, || {
-        let mut tir = varn_pipeline::emit_tir(program_ref, arena_ref, &check_result);
-        varn_pipeline::inject_star_reexports(
-            &mut tir,
-            &exports_of(&program_ref.filename, resolver),
-        );
-        varn_pipeline::resolve_import_slots(&mut tir, resolver, &program_ref.filename);
-        let (res, opt_dur) = varn_pipeline::compile_tir(
-            &tir,
-            export_names_of(&program_ref.filename, resolver),
-            &source,
-            true,
-        );
-        optimize_samples.borrow_mut().push(opt_dur);
-
-        res.map(|_| ()).map_err(|e| format!("compile failed: {e}"))
-    })?;
-
-    let optimize_samples = optimize_samples.into_inner();
-    let compile_only_samples: Vec<Duration> = compile_samples
-        .iter()
-        .zip(&optimize_samples)
-        .map(|(c, o)| c.saturating_sub(*o))
-        .collect();
-
-    let mut final_tir = varn_pipeline::emit_tir(&program, &arena, &check_result);
-    varn_pipeline::inject_star_reexports(&mut final_tir, &exports_of(&program.filename, resolver));
-    varn_pipeline::resolve_import_slots(&mut final_tir, resolver, &program.filename);
-    let (final_result, _) = varn_pipeline::compile_tir(
-        &final_tir,
-        export_names_of(&program.filename, resolver),
-        &source,
-        false,
-    );
-    let proto = final_result.map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
-
-    let precompile_start = Instant::now();
-    let graph_build = varn_pipeline::module_precompile::build_module_graph(
-        &program,
-        &arena,
-        &source,
-        path,
-        &proto,
-        &check_result.bind.interner,
-        resolver,
-    )
-    .map_err(|e| CliError::fatal(format!("module graph build error: {e}")))?;
-    let precompile_dur = precompile_start.elapsed();
-    let precompiled = Rc::new(
-        graph_build
-            .modules
-            .into_iter()
-            .filter(|(module_path, _)| module_path != &graph_build.entry_path)
-            .map(|(module_path, module_proto)| {
-                (
-                    ModuleId::from_canonical_str(&module_path),
-                    Rc::new(module_proto),
-                )
-            })
-            .collect::<FxHashMap<ModuleId, Rc<FunctionProto>>>(),
-    );
+    let (samples, mut last) = sample_stages(session, &loaded, runs)?;
+    let varn_pipeline::Executable {
+        entry_proto: proto,
+        precompiled,
+        ..
+    } = last
+        .executable
+        .take()
+        .ok_or_else(|| CliError::fatal("the compilation produced no executable"))?;
+    let token_count = last.tokens.as_ref().map_or(0, |t| t.tokens.len());
+    let (parse_profile, check_result) = profile_inputs(&last, path)?;
+    let precompile_dur = samples.link_cold;
 
     let builtin_protos: Vec<FunctionProto> = crate::pipeline::core_protos_owned()?;
     let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new(session.shared_resolver()));
@@ -188,16 +85,16 @@ pub fn run(
         |_done, _samples| {},
     )?;
 
-    let e2e_samples = e2e::measure_e2e(runs, eval, path, &factory, resolver)?;
+    let e2e_samples = e2e::measure_e2e(session, &loaded, runs, &factory)?;
 
     let e2e_stats = PhaseStats::from_samples("e2e (cold)", |c| c.cyan(), &e2e_samples);
     let phases = vec![
         PhaseStats::from_samples("read", |c| c.white(), &read_samples),
-        PhaseStats::from_samples("lex", |c| c.yellow(), &lex_samples),
-        PhaseStats::from_samples("parse", |c| c.green(), &parse_samples),
-        PhaseStats::from_samples("check", |c| c.red(), &check_samples),
-        PhaseStats::from_samples("compile", |c| c.magenta(), &compile_only_samples),
-        PhaseStats::from_samples("optimize", |c| c.yellow(), &optimize_samples),
+        PhaseStats::from_samples("lex", |c| c.yellow(), &samples.lex),
+        PhaseStats::from_samples("parse", |c| c.green(), &samples.parse),
+        PhaseStats::from_samples("check", |c| c.red(), &samples.check),
+        PhaseStats::from_samples("compile", |c| c.magenta(), &samples.lower),
+        PhaseStats::from_samples("optimize", |c| c.yellow(), &samples.optimize),
         PhaseStats::from_samples("execute (warm)", |c| c.blue(), &exec_samples),
     ];
     let total_p50: Duration = phases.iter().map(|p| p.p50).sum();

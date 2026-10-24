@@ -3,7 +3,7 @@ use varn_compiler::FunctionProto;
 use varn_core::ast::{AstArena, Program};
 use varn_sem::resolver::ImportResolver;
 
-pub fn sorted_export_names(exports: &varn_sem::exports::ExportMap) -> Vec<std::sync::Arc<str>> {
+pub(crate) fn sorted_export_names(exports: &varn_sem::exports::ExportMap) -> Vec<std::sync::Arc<str>> {
     let mut names: Vec<std::sync::Arc<str>> = exports
         .keys()
         .map(|k| std::sync::Arc::from(k.as_str()))
@@ -12,7 +12,7 @@ pub fn sorted_export_names(exports: &varn_sem::exports::ExportMap) -> Vec<std::s
     names
 }
 
-pub fn report_export_collisions(
+pub(crate) fn report_export_collisions(
     exports: &varn_sem::exports::ExportMap,
     module_path: &str,
 ) -> Result<(), String> {
@@ -37,7 +37,7 @@ pub fn report_export_collisions(
     ))
 }
 
-pub fn emit_tir(
+pub(crate) fn emit_tir(
     program: &Program,
     ast_arena: &AstArena,
     check: &varn_sem::output::CheckResult,
@@ -52,7 +52,7 @@ pub fn emit_tir(
     )
 }
 
-pub fn tir_import_sources(tir: &varn_tir::TirModule) -> Vec<std::sync::Arc<str>> {
+pub(crate) fn tir_import_sources(tir: &varn_tir::TirModule) -> Vec<std::sync::Arc<str>> {
     tir.imports
         .iter()
         .filter(|i| !i.is_type_only && !i.specs.is_empty())
@@ -60,7 +60,7 @@ pub fn tir_import_sources(tir: &varn_tir::TirModule) -> Vec<std::sync::Arc<str>>
         .collect()
 }
 
-pub fn resolve_import_slots(
+pub(crate) fn resolve_import_slots(
     tir: &mut varn_tir::TirModule,
     resolver: &dyn varn_sem::resolver::ImportResolver,
     module_path: &str,
@@ -101,7 +101,7 @@ pub fn resolve_import_slots(
     }
 }
 
-pub fn inject_star_reexports(
+pub(crate) fn inject_star_reexports(
     tir: &mut varn_tir::TirModule,
     exports: &varn_sem::exports::ExportMap,
 ) {
@@ -133,7 +133,7 @@ pub fn inject_star_reexports(
     }
 }
 
-pub fn compile_tir(
+pub(crate) fn compile_tir(
     tir: &varn_tir::TirModule,
     export_names: Vec<std::sync::Arc<str>>,
     source: &str,
@@ -144,20 +144,21 @@ pub fn compile_tir(
     (result.map_err(|e| format!("{e:?}")), opt_time)
 }
 
-pub struct LowerInput<'a> {
-    pub program: &'a Program,
-    pub arena: &'a AstArena,
-    pub check: &'a varn_sem::output::CheckResult,
-    pub resolver: &'a crate::ModuleResolver,
-    pub source: &'a str,
+pub(crate) struct LowerInput<'a> {
+    pub(crate) program: &'a Program,
+    pub(crate) arena: &'a AstArena,
+    pub(crate) check: &'a varn_sem::output::CheckResult,
+    pub(crate) resolver: &'a crate::ModuleResolver,
+    pub(crate) source: &'a str,
 }
 
-pub struct Lowered {
-    pub tir: varn_tir::TirModule,
-    pub proto: FunctionProto,
+pub(crate) struct Lowered {
+    pub(crate) tir: varn_tir::TirModule,
+    pub(crate) proto: FunctionProto,
+    pub(crate) optimize: std::time::Duration,
 }
 
-pub fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
+pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
     let LowerInput {
         program,
         arena,
@@ -186,7 +187,7 @@ pub fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
     .map_err(Failure::internal)?;
     inject_star_reexports(&mut tir, &exports);
     resolve_import_slots(&mut tir, resolver, path);
-    let (proto, _) = compile_tir(&tir, export_names, source, false);
+    let (proto, optimize) = compile_tir(&tir, export_names, source, true);
     let proto = proto.map_err(|e| {
         Failure::internal(format!(
             "{}: {e}",
@@ -195,5 +196,9 @@ pub fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
                 .bold()
         ))
     })?;
-    Ok(Lowered { tir, proto })
+    Ok(Lowered {
+        tir,
+        proto,
+        optimize,
+    })
 }

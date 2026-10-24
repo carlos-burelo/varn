@@ -4,7 +4,7 @@ use varn_core::{AtomInterner, DiagnosticBag};
 
 use crate::{DiagnosticReport, Failure};
 
-pub fn check_program(
+pub(crate) fn check_program(
     program: &Program,
     arena: &AstArena,
     interner: AtomInterner,

@@ -13,7 +13,9 @@ pub enum Stage {
     Lex,
     Parse,
     Check,
-    Executable,
+    Lower,
+    Optimize,
+    Link,
 }
 
 pub enum CacheStatus {
@@ -143,16 +145,17 @@ impl Compilation {
                 return Err(Failure::internal("the checked stage left no products"));
             }
         };
-        let start = Instant::now();
         let built = crate::compile::build_executable(
             &parsed.program,
             &parsed.arena,
             source.text(),
             checked,
             resolver,
-        );
-        self.timings.push((Stage::Executable, start.elapsed()));
-        let executable = built?;
+        )?;
+        self.timings.push((Stage::Lower, built.lower));
+        self.timings.push((Stage::Optimize, built.optimize));
+        self.timings.push((Stage::Link, built.link));
+        let executable = built.executable;
 
         if let Some(path) = &cache_path
             && let Err(e) = crate::cache::store_cached_graph(path, &executable.graph_artifact)

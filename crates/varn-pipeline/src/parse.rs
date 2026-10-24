@@ -9,7 +9,7 @@ pub struct Parsed {
     pub interner: AtomInterner,
 }
 
-pub fn parse(
+pub(crate) fn parse(
     tokens: Vec<Token>,
     lexeme_buf: Arc<[u8]>,
     source: &str,

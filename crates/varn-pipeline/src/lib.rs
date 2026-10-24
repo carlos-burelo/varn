@@ -24,20 +24,13 @@ pub mod stdlib_loader;
 
 pub use varn_resolver::ModuleResolver;
 
-pub use check::check_program as phase_check;
-pub use class_link::verify_foreign_layouts;
 pub use compilation::{CacheStatus, Compilation, Stage};
 pub use core::core_protos_owned;
 pub use error::{DiagnosticReport, Failure, RuntimeFailure};
 pub use execute::{boot_machine, enter_main, execute};
 pub use executable::Executable;
-pub use layer_link::verify_synthetic_imports;
-pub use lex::{scan as phase_lex, Tokens};
-pub use lower::{
-    compile_tir, emit_tir, inject_star_reexports, lower_module, report_export_collisions,
-    resolve_import_slots, sorted_export_names, tir_import_sources, LowerInput, Lowered,
-};
-pub use parse::{parse as phase_parse, Parsed};
+pub use lex::Tokens;
+pub use parse::Parsed;
 pub use policy::Policy;
 pub use request::{CachePolicy, Goal, Request};
 pub use session::Session;
