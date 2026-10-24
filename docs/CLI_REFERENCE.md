@@ -12,10 +12,10 @@ viva; esta página la resume.
 | `eval` | `vn eval [-v] [permisos] CODE` | Evalúa una expresión/programa corto |
 | `repl` | `vn repl [--debug-bytecode] [permisos]` | Bucle interactivo; cada línea es un programa aparte |
 | `test` | `vn test [PATH] [-f FILTER] [-j JOBS] [--fail-fast] [-v] [permisos]` | Ejecuta cada `.vn` de PATH (por defecto `tests/`, un nivel) |
-| `bench` | `vn bench [FILE] [-e CODE] [--runs N=10] [--show-output] [-v] [--all-rows] [--min-clif-coverage PCT]` | Tiempos por fase; `--min-clif-coverage` falla si la cobertura JIT queda por debajo |
+| `bench` | `vn bench [FILE] [-e CODE] [--runs N=10] [--show-output] [-v] [--all-rows] [--min-clif-coverage PCT] [permisos]` | Tiempos por fase; `--min-clif-coverage` falla si la cobertura JIT queda por debajo |
 | `debug` | `vn debug [FILE] [-e CODE] [-p PHASE=all] [--fn NAME] [--list-phases] [--natives] [permisos]` | Inspección por fase; `--natives` imprime la tabla de operaciones nativas; ver [`CLI_INSPECT.md`](CLI_INSPECT.md) |
 
-### Permisos (`run`, `eval`, `repl`, `test`, `debug`)
+### Permisos (`run`, `eval`, `repl`, `test`, `debug`, `bench`)
 
 Sin ningún `--allow-*` el programa corre con todos los permisos. Con alguno, solo
 lo pedido. `--sandbox` lo niega todo. Detalle en
@@ -47,7 +47,7 @@ lo pedido. `--sandbox` lo niega todo. Detalle en
 
 Un solo archivo, `varn.toml`, con campos planos: `name`, `version`, `main`, `std`,
 `exports`, `dependencies`, `dev_dependencies`, `peer_dependencies`, `workspaces` y
-`tasks`. Una clave desconocida es un error que nombra la clave y el archivo. Las
+`tasks`, `fmt` y `test`. Una clave desconocida es un error que nombra la clave y el archivo. Las
 secciones `[package]` y `[project]` y el nombre `vn.toml` ya no existen.
 
 ```toml
@@ -60,6 +60,10 @@ main = "main.vn"
 [tasks]
 dev = ["check main.vn", "run main.vn"]
 ```
+
+`[fmt]` y `[test]` aceptan `include` y `exclude`: patrones relativos a la raíz del
+proyecto con `*`, `?` y `**`, que limitan los archivos que `vn fmt` y `vn test` recorren
+(un archivo dado explícitamente no se filtra).
 
 Cada línea de una tarea es una línea de comando de `vn` (sin el `vn`); la primera que
 falla corta la secuencia, `task otra` dentro de una tarea la encadena y un ciclo es un

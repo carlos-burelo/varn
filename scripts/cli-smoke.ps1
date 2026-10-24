@@ -241,6 +241,29 @@ async function fails_async(): void {
     $r.Code -ne 0 -and $r.Out -match "ok units.vn::passes" -and $r.Out -match "ok units.vn::async_passes" -and $r.Out -match "FAILED units.vn::fails_sync" -and $r.Out -match "FAILED units.vn::fails_async"
 }
 
+Check "manifest-filters-limit-fmt-and-test" {
+    $dir = Join-Path $work "filters"
+    New-Item -ItemType Directory -Force (Join-Path $dir "gen"), (Join-Path $dir "src"), (Join-Path $dir "tests") | Out-Null
+    Set-Content (Join-Path $dir "gen/g.vn") 'let x = 1' -Encoding utf8
+    Set-Content (Join-Path $dir "src/s.vn") 'let x = 1' -Encoding utf8
+    Set-Content (Join-Path $dir "tests/a1.vn") 'print("t")' -Encoding utf8
+    Set-Content (Join-Path $dir "tests/b1.vn") 'print("t")' -Encoding utf8
+    Set-Content (Join-Path $dir "varn.toml") "[fmt]`nexclude = [`"gen/**`"]`n`n[test]`ninclude = [`"tests/a*.vn`"]" -Encoding utf8
+    Push-Location $dir
+    try {
+        $fmt = Vn fmt --check .
+        $test = Vn test
+    } finally { Pop-Location }
+    $fmt.Out -match "s.vn" -and $fmt.Out -notmatch "g.vn" -and $test.Code -eq 0 -and $test.Out -match "a1.vn" -and $test.Out -notmatch "b1.vn"
+}
+
+Check "bench-honors-permissions" {
+    $code = 'import { readText } from "std:fs"; print(readText("Cargo.toml").length)'
+    $denied = Vn bench --runs 1 --allow-net -e $code
+    $granted = Vn bench --runs 1 --allow-read -e $code
+    $denied.Code -ne 0 -and $granted.Code -eq 0
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null
