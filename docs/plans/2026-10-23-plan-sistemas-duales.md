@@ -228,6 +228,41 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   `rawValue`, `slice` por rango y los estáticos de tipos core (`alloc`, `fromString`, `parse`).
   Siguiente con ganancia medida: campos vía interfaz (26x).
 
+### C1.2 Lectura de campo vía interfaz (diseño, sin implementar)
+- Hallazgo (código, 2026-10-24): el costo no está en el checker ni en la TIR. Un campo de
+  interfaz sale como `GetProperty` por nombre; el intérprete ya tiene un IC polimórfico de 8
+  entradas con `INSTANCE_FIELD` (`id` = class_id, `slot` = índice de campo,
+  `reg_ops/get_property.rs`), pero `emit_get_property` del JIT
+  (`varn-jit/src/clif/from_ssa/props/get.rs`) solo inlinea el caso `SHAPE_PROP` (objetos con
+  shape) y para instancias de clase cae siempre a la ayuda `get_property_flat` (lookup por
+  nombre completo). Por eso `p.x` por clase vale 1 ns (`GetFixedField` con offset fijo) y por
+  interfaz 33 ns.
+- Por qué NO itables ni layout por interfaz: las interfaces son estructurales y el grafo de
+  módulos es abierto (compilación separada), así que ninguna fase puede conocer todas las
+  clases que cumplen una interfaz. Una tabla de offsets por (interfaz, clase) obligaría a
+  materializar en runtime lo que el IC ya materializa, y toca checker, TIR, SSA y JIT. El
+  mecanismo canónico es el IC, que ya existe y ya es monomórfico/polimórfico por class_id.
+- Diseño: (1) `CacheEntry` para `INSTANCE_FIELD` guarda además el byte-offset y la etiqueta
+  compacta del campo (`FieldAccess::Compact(tag)`), llenados por el intérprete al instalar la
+  entrada desde el layout de la clase; (2) `emit_get_property` añade la rama de instancia:
+  tag de heap == instancia, `class_id` de la instancia contra las entradas `INSTANCE_FIELD`,
+  y en acierto lee en `data_base + offset` según la etiqueta; el fallo sigue en la ayuda
+  actual; (3) cuando el destino SSA es `Int`/`Float`/`Bool` nativo, el acierto devuelve el
+  valor sin encajonar, igual que `emit_get_fixed_field_native`; la etiqueta de la entrada se
+  compara con la esperada por el tipo estático del miembro de interfaz y, si difiere, va al
+  camino lento (un campo `int?` de una clase frente a `int` de la interfaz no comparte
+  representación). (4) `SetProperty` por interfaz queda para después con el mismo patrón.
+- Alcance: `varn-types` (`CacheEntry`), `varn-vm` (llenado del IC), `varn-jit` (rama de
+  instancia). Sin cambios en checker, TIR, SSA ni bytecode. También cubre los accesos
+  `Declared`/`Unrecorded` sobre instancias de clase, no solo interfaces.
+- Verificación: microbenchmark de lectura por interfaz (200M: hoy 6.6 s; objetivo cercano a
+  los 0.25 s de la lectura por clase), caso polimórfico con dos clases, y la matriz completa
+  con `VARN_JIT_CACHE=verify` (el layout de `CacheEntry` entra en el código JIT cacheado).
+- Riesgos: el layout de `CacheEntry` es `#[repr(C)]` y el JIT lo lee por offsets fijos
+  (`id` 0, `slot` 4, `is_class` 6); ampliar la entrada cambia `poly_ic_slot_size` y debe
+  salir de una constante compartida. Campos de clase mutados por `SetProperty` mientras hay
+  entradas vivas: el offset es del layout de la clase, no del valor, así que no se invalida.
+
 ## Fase D — higiene y release
 
 ### D1. Flag muerto `FRAME_LAYOUT_V2_JIT_BAIL`
