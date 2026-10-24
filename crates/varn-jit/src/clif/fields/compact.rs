@@ -165,18 +165,8 @@ pub(crate) fn store_compact_native(
 ) {
     let slow = b.create_block();
     let cont = b.create_block();
-    let inline = b.create_block();
 
     let (obj_tag, obj_payload) = b.ins().isplit(obj);
-    let kind = b.ins().band_imm_u(obj_tag, emit::KIND_MASK);
-    let heap_ok = b.ins().icmp_imm_u(IntCC::Equal, kind, KIND_HEAP as i64);
-    let heap = b.create_block();
-    b.ins().brif(heap_ok, heap, &[], slow, &[]);
-    b.switch_to_block(heap);
-    let young = emit::is_young(b, obj_payload, &io.helpers.array_layout);
-    b.ins().brif(young, inline, &[], slow, &[]);
-
-    b.switch_to_block(inline);
     let data_base = cached_base(b, instance_var, io, obj, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::new();
