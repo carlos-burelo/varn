@@ -169,6 +169,17 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   (3) recién entonces borrar `infer_expr_type_self` en `declarations.rs`, `object_members.rs`,
   `namespace_struct.rs`, `patterns_sum.rs`, `binder_stmts.rs`, `binding_types.rs`. Hecho:
   `extends` ya solo resuelve nombres (`heritage_type`, 6812a92c).
+- HECHO (2026-10-24): `bind_and_cache` tipa cada dependencia con el checker y reemplaza el
+  bind provisional (`replace_bind`; `insert_bind` es `or_insert` y lo dejaba vivo); los
+  miembros `const` de namespace se asientan con `settle_members` (finalize y `BindView::settled`
+  para usos dentro del mismo archivo); las `const f = (n: int): int => ...` anotadas se tipan antes del
+  cuerpo (`declare_annotated_function`); `std:path` ya no sombrea sus imports. El binder ya no
+  infiere inicializadores de `const`/`let`, miembros de namespace ni patrones con default:
+  `check:types` idéntico en 249 tests y la suite 3798/0. Quedan en el binder:
+  `object_members.rs` (campos de literales: decide Method/Property por el tipo inferido) y
+  `binding_types.rs` (default de parámetro). Cortar este último pierde el error de
+  `f("s")` entre módulos porque la firma de una función exportada se arma en el binder y
+  `finalize` no la reconstruye con los parámetros que tipó el checker: pendiente.
 - HECHO (paso a, 7abf324d): resolución de tipos e inferencia de expresiones viven en
   `varn-sem` (`resolve/`, `infer/`); binder y checker los importan de la capa baja. Matriz
   quick 3798/0. Falta (b) y (c).
