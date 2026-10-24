@@ -60,7 +60,7 @@ impl<'r> Checker<'r> {
                     &self.ty_table,
                 );
             let valid = match op {
-                BinaryOp::Add => same_numeric || l_base == Type::Str || r_base == Type::Str,
+                BinaryOp::Add => same_numeric || (l_base == Type::Str && r_base == Type::Str),
                 BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
                     same_numeric
                 }
