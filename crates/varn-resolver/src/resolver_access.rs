@@ -12,6 +12,10 @@ impl ModuleResolver {
         self.graph.lock().insert_bind(key, bind);
     }
 
+    pub(super) fn replace_bind(&self, key: String, bind: Arc<BindResult>) {
+        self.graph.lock().replace_bind(key, bind);
+    }
+
     pub(super) fn cached_exports(&self, key: &str) -> Option<Arc<ExportMap>> {
         self.graph.lock().exports(key)
     }

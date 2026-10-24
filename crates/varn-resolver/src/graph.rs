@@ -36,6 +36,10 @@ impl ModuleGraph {
         self.binds.entry(key).or_insert(bind);
     }
 
+    pub fn replace_bind(&mut self, key: String, bind: Arc<BindResult>) {
+        self.binds.insert(key, bind);
+    }
+
     pub fn exports(&self, key: &str) -> Option<Arc<ExportMap>> {
         self.exports.get(key).map(Arc::clone)
     }

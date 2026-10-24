@@ -64,7 +64,7 @@ impl ModuleResolver {
         checked.diagnostics = provisional.diagnostics.clone();
         self.in_flight.lock().remove(key);
         let checked = Arc::new(checked);
-        self.store_bind(key.to_owned(), Arc::clone(&checked));
+        self.replace_bind(key.to_owned(), Arc::clone(&checked));
         checked
     }
 
