@@ -1,6 +1,10 @@
 use std::io::{Read, Seek, SeekFrom};
 
-use varn_modules::artifact::{read_artifact, ArtifactKind, MAGIC_VEXE};
+use std::path::Path;
+
+use varn_modules::artifact::{
+    read_artifact, write_artifact, ArtifactClass, ArtifactKind, MAGIC_VEXE,
+};
 use varn_pipeline::{CapabilitySet, Executable, Policy, Session};
 use varn_types::ModuleGraphArtifact;
 
@@ -61,4 +65,33 @@ fn read_embedded() -> Result<Option<ModuleGraphArtifact>, String> {
     postcard::from_bytes(payload)
         .map(Some)
         .map_err(|e| e.to_string())
+}
+
+pub fn write_executable(
+    runtime: &Path,
+    out: &Path,
+    graph: &ModuleGraphArtifact,
+) -> Result<(), String> {
+    let payload = postcard::to_allocvec(graph).map_err(|e| e.to_string())?;
+    let envelope = write_artifact(ArtifactKind::ModuleGraph, ArtifactClass::Distributable, &payload);
+
+    let mut bytes = std::fs::read(runtime)
+        .map_err(|e| format!("cannot read '{}': {e}", runtime.display()))?;
+    bytes.extend_from_slice(&envelope);
+    bytes.extend_from_slice(&(envelope.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(MAGIC_VEXE);
+    std::fs::write(out, bytes).map_err(|e| format!("cannot write '{}': {e}", out.display()))?;
+    make_executable(out)
+}
+
+#[cfg(unix)]
+fn make_executable(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| format!("cannot mark '{}' executable: {e}", path.display()))
+}
+
+#[cfg(not(unix))]
+fn make_executable(_path: &Path) -> Result<(), String> {
+    Ok(())
 }

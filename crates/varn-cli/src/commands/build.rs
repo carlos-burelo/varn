@@ -22,6 +22,7 @@ pub fn execute(session: &pipeline::Session, args: BuildArgs) -> Result<(), CliEr
 
     match args.target {
         Target::Bytecode => pipeline::portable::write_portable(&out_path, &compiled.graph_artifact)?,
+        Target::Exe => build_exe(&compiled, &out_path)?,
         Target::Native => build_native(&compiled, &out_path, args.verbose)?,
     }
 
@@ -35,6 +36,13 @@ pub fn execute(session: &pipeline::Session, args: BuildArgs) -> Result<(), CliEr
         args.target.label()
     ));
     Ok(())
+}
+
+fn build_exe(compiled: &pipeline::Executable, out_path: &str) -> Result<(), CliError> {
+    let runtime = std::env::current_exe()
+        .map_err(|e| CliError::fatal(format!("cannot locate the vn runtime: {e}")))?;
+    crate::standalone::write_executable(&runtime, Path::new(out_path), &compiled.graph_artifact)
+        .map_err(CliError::fatal)
 }
 
 fn build_native(

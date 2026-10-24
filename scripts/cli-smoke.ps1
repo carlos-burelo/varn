@@ -125,6 +125,27 @@ if (Test-Path (Join-Path (Split-Path $vn) "varn_rt.lib")) {
     Write-Host "SKIP build-native-links-and-runs (varn_rt.lib not built)"
 }
 
+Check "exe-runs-elsewhere" {
+    $f = Write-Vn "exe\hello.vn" 'print("standalone-ok");'
+    $exe = Join-Path $work "exe\hello.exe"
+    $built = Vn build $f --target exe -o $exe
+    Push-Location (Join-Path $work "cache")
+    try { $ran = & $exe 2>&1 | Out-String } finally { Pop-Location }
+    $built.Code -eq 0 -and $ran.Trim() -eq "standalone-ok"
+}
+
+Check "exe-corrupt-trailer-is-an-error" {
+    $exe = Join-Path $work "exe\hello.exe"
+    $bad = Join-Path $work "exe\corrupt.exe"
+    $bytes = [IO.File]::ReadAllBytes($exe)
+    $payload = [BitConverter]::ToUInt64($bytes, $bytes.Length - 12)
+    $start = [int]($bytes.Length - 12 - $payload)
+    $bytes[$start + 40] = $bytes[$start + 40] -bxor 0xFF
+    [IO.File]::WriteAllBytes($bad, $bytes)
+    $out = & $bad 2>&1 | Out-String
+    $LASTEXITCODE -ne 0 -and $out -match "corrupt"
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null

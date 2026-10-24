@@ -225,6 +225,7 @@ pub struct LspArgs {
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
     Bytecode,
+    Exe,
     Native,
 }
 
@@ -232,14 +233,15 @@ impl Target {
     pub fn extension(self) -> &'static str {
         match self {
             Target::Bytecode => "vnc",
-            Target::Native if cfg!(windows) => "exe",
-            Target::Native => "",
+            Target::Exe | Target::Native if cfg!(windows) => "exe",
+            Target::Exe | Target::Native => "",
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
             Target::Bytecode => "bytecode",
+            Target::Exe => "standalone executable",
             Target::Native => "native machine code",
         }
     }
