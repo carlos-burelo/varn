@@ -34,6 +34,7 @@ function Check($name, [scriptblock]$body) {
     try {
         $ok = & $body
     } catch {
+        Write-Host "  $($_.Exception.Message)"
         $ok = $false
     }
     if ($ok) {
@@ -144,6 +145,45 @@ Check "exe-corrupt-trailer-is-an-error" {
     [IO.File]::WriteAllBytes($bad, $bytes)
     $out = & $bad 2>&1 | Out-String
     $LASTEXITCODE -ne 0 -and $out -match "corrupt"
+}
+
+function Write-Tasks($dir, $toml) {
+    New-Item -ItemType Directory -Force (Join-Path $work $dir) | Out-Null
+    Set-Content (Join-Path (Join-Path $work $dir) "varn.toml") $toml -Encoding utf8
+    Join-Path $work $dir
+}
+
+Check "task-runs-in-order-from-the-project-root" {
+    $dir = Write-Tasks "tasks-order" @'
+[tasks]
+hello = ["eval 'print(1)'", "eval 'print(2)'"]
+'@
+    New-Item -ItemType Directory -Force (Join-Path $dir "sub") | Out-Null
+    Push-Location (Join-Path $dir "sub")
+    try { $r = Vn task hello } finally { Pop-Location }
+    $lines = @($r.Out -split "`r?`n" | Where-Object { $_ -match '^\d$' })
+    $r.Code -eq 0 -and $lines.Count -eq 2 -and $lines[0] -eq "1" -and $lines[1] -eq "2"
+}
+
+Check "task-stops-on-failure" {
+    $dir = Write-Tasks "tasks-stop" @'
+[tasks]
+broken = ["eval 'print(\"first-ran\")'", "eval 'let ='", "eval 'print(\"third-ran\")'"]
+'@
+    Push-Location $dir
+    try { $r = Vn task broken } finally { Pop-Location }
+    $r.Code -ne 0 -and $r.Out -match "first-ran" -and $r.Out -notmatch "third-ran"
+}
+
+Check "task-cycle-detected" {
+    $dir = Write-Tasks "tasks-cycle" @'
+[tasks]
+a = ["task b"]
+b = ["task a"]
+'@
+    Push-Location $dir
+    try { $r = Vn task a } finally { Pop-Location }
+    $r.Code -ne 0 -and $r.Out -match "task cycle"
 }
 
 Check "fmt-check-passes-on-formatted" {

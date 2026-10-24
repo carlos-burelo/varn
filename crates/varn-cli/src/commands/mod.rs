@@ -19,5 +19,6 @@ pub mod remove;
 pub mod repl;
 pub mod run;
 pub mod std_bundle;
+pub mod task;
 pub mod test;
 pub mod update;

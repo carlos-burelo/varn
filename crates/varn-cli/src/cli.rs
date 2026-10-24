@@ -46,6 +46,8 @@ pub enum Commands {
 
     Test(TestArgs),
 
+    Task(TaskArgs),
+
     Fmt(FmtArgs),
 
     #[command(subcommand)]
@@ -323,6 +325,14 @@ pub struct TestArgs {
 
     #[arg(short, long)]
     pub verbose: bool,
+}
+
+#[derive(Args)]
+pub struct TaskArgs {
+    pub name: Option<String>,
+
+    #[arg(last = true, value_name = "ARGS")]
+    pub args: Vec<String>,
 }
 
 #[derive(Args)]

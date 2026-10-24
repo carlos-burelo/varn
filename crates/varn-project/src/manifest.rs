@@ -35,6 +35,8 @@ pub struct Manifest {
     pub peer_dependencies: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub workspaces: Vec<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tasks: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Debug)]
