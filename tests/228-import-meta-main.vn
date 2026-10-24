@@ -1,12 +1,7 @@
 import { describe, it, expect } from "std:test";
 import { channel, spawnIsolate } from "std:task";
 import { reportMain } from "./helpers/isolate-workers.vn";
-
-const atLoad = import.meta.main
-
-function readInside(): bool {
-    return import.meta.main
-}
+import { atLoad, readInside } from "./helpers/meta-main-probe.vn";
 
 await describe("228 import.meta.main", async () => {
     await it("an imported module is not the entry", async () => {

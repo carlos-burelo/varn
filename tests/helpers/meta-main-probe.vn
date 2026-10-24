@@ -1,0 +1,5 @@
+export const atLoad = import.meta.main
+
+export function readInside(): bool {
+    return import.meta.main
+}
