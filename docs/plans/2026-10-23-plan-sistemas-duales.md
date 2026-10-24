@@ -98,6 +98,34 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 - Aparte: `Dynamic(Callable)` aparece 9491 veces; un `Fn(SigId)` estático es el
   mayor candidato a ganancia de rendimiento tras A2.
 
+- HECHO (3ra tanda, 2026-10-23, `tests/*.vn` con `vn debug -p tir:check`): NYS dinámicos
+  863 -> 0 y NYS por nombre 5583 -> 0; la variante se llama ahora `DynReason::Unrecorded`
+  (el checker no registró tipo para el sitio) y queda como alarma con cero aciertos en el
+  corpus. Cimientos corregidos, uno por commit:
+  - `Range<T>` -> `Dynamic(Range(T))`; `TaskHandle<T>` -> `Dynamic(TaskHandle(T))`.
+  - Alias no objeto se bajan por su destino (guarda `enter_alias`); tipos de nivel de tipo
+    (`TypePredicate` = Bool, `TemplateLiteral`/`KeyOf` = Str, resto = Generic).
+  - Nombre sin representación (interfaces, intersecciones) = `Dynamic(Interface)`, nombrado
+    y medible (232 nodos): el cimiento real es dar layout/itable a las interfaces.
+  - Enums foráneos: alcanzabilidad transitiva (firmas, objetos, miembros de clases),
+    payloads con sus tipos y parámetros de tipo (`Option`/`Result` -> `Generic`), miembros
+    (`ForeignEnumMember`) y llamadas a miembros por ranura.
+  - Clases foráneas: métodos con firma del checker y `statics` con el mismo layout que las
+    locales (`build_statics`); las llamadas estáticas a clases importadas resuelven.
+  - `TirExprKind::Length`: el backend ya no elige `ArrayLength`/`StrLength`/`BytesLength` por
+    el nombre del miembro (Ley 6/16); `a.length` sobre Array/Tuple/Str/Bytes es un nodo.
+  - Constantes de variante `Enum.Variant` cargan su slot global (`Resolution::EnumVariant`
+    sobre `Field`); `this` tipado en extensiones; campos tipados al desestructurar objetos.
+  - Razones por nombre: `CoreMember` (miembro de tipo builtin servido por la tabla core,
+    fuera del registro de ops: `Map.size`, `Bytes.alloc`, `Int.parse`, `slice`, `rawValue`) y
+    `Spread` (llamada con spread, aridad solo en runtime). Son la cola real de C1.
+  Gotcha: `DynReason::Runtime` es `SlotKind::Ref` (referencia a heap segura), no "valor
+  crudo"; usarlo para resultados que pueden ser enteros corrompe. Lo desconocido es
+  `Declared` (conservador: se verifica en runtime).
+- Abierto en A2: extensiones sobre tipos no clase siguen con firma `fresh_sig` toda
+  `Unrecorded` (falta `this_ty` en `TirFunction`); funciones sin tipo de checker y
+  placeholders de closures usan `Unrecorded` por construcción.
+
 ### A3. Inferencia solo en el checker
 - Experimento (2026-10-23): anular `infer_expr_type_self` rompe la std en el primer
   `extends` (`StdError` no resuelve a `Error`): el binder usa su inferencia como
@@ -170,7 +198,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 - Escribir 5 programas `.vn` reales; registrar fricciones; priorizar.
 
 ## Estado
-- [x] D1  - [x] A1  - [~] A2 (Generic, callables, bindings; falta representar clases core)
+- [x] D1  - [x] A1  - [x] A2 (corpus en 0 `Unrecorded`; cola: extensiones, interfaces, `CoreMember`)
 - [~] A3 (helpers movidos a varn-sem, widen_literal borrado; falta cortar la inferencia
   del binder a resolución de nombres)
 - [x] B1 (Session borrado, DiskResolver -> ModuleResolver; los tres caminos de
