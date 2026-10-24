@@ -42,44 +42,10 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
             && s.peek_kind(1) != TokenKind::Comma
             && s.peek_kind(1) != TokenKind::RBrace;
 
-        if is_getter {
-            s.advance();
-            let key = parse_prop_key(s)?;
-            s.expect(TokenKind::LParen)?;
-            s.expect(TokenKind::RParen)?;
-            let return_type = if s.eat(TokenKind::Colon) {
-                Some(parse_type(s)?)
-            } else {
-                None
-            };
-            let body = crate::parser::parse_block(s)?;
-            let full_prop_range = s.span_from(prop_range);
-            properties.push(ObjectProp::Getter {
-                key,
-                body,
-                return_type,
-                range: full_prop_range,
-            });
-            s.eat(TokenKind::Comma);
-            continue;
-        }
-
-        if is_setter {
-            s.advance();
-            let key = parse_prop_key(s)?;
-            s.expect(TokenKind::LParen)?;
-            let param = crate::parser::parse_single_param(s)?;
-            s.expect(TokenKind::RParen)?;
-            let body = crate::parser::parse_block(s)?;
-            let full_prop_range = s.span_from(prop_range);
-            properties.push(ObjectProp::Setter {
-                key,
-                param,
-                body,
-                range: full_prop_range,
-            });
-            s.eat(TokenKind::Comma);
-            continue;
+        if is_getter || is_setter {
+            return Err(String::from(
+                "getters and setters are not supported in object literals: declare a class",
+            ));
         }
 
         let is_async = s.check(TokenKind::Async)

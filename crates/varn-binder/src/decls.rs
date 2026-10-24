@@ -219,12 +219,6 @@ impl<'r> super::Binder<'r> {
                                 range,
                             );
                         }
-                        ObjectProp::Getter { body, .. } => {
-                            self.bind_stmt(*body);
-                        }
-                        ObjectProp::Setter { body, .. } => {
-                            self.bind_stmt(*body);
-                        }
                         ObjectProp::Spread { argument, .. } => self.bind_expr(*argument),
                     }
                 }
@@ -235,9 +229,7 @@ impl<'r> super::Binder<'r> {
                     match prop {
                         ObjectProp::Property { value, .. } => self.bind_expr(*value),
                         ObjectProp::Spread { argument, .. } => self.bind_expr(*argument),
-                        ObjectProp::Method { .. }
-                        | ObjectProp::Getter { .. }
-                        | ObjectProp::Setter { .. } => {}
+                        ObjectProp::Method { .. } => {}
                     }
                 }
             }

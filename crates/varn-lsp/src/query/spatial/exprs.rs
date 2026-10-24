@@ -197,23 +197,6 @@ pub(super) fn collect_object_prop(a: &AstArena, prop: &ObjectProp, out: &mut Vec
             }
             collect_stmt(a, body, out);
         }
-        ObjectProp::Getter { key, body, .. } => {
-            if let PropKey::Computed(e) = key {
-                collect_expr(a, e, out);
-            }
-            collect_stmt(a, body, out);
-        }
-        ObjectProp::Setter {
-            key, param, body, ..
-        } => {
-            if let PropKey::Computed(e) = key {
-                collect_expr(a, e, out);
-            }
-            if let Some(default) = &param.default {
-                collect_expr(a, default, out);
-            }
-            collect_stmt(a, body, out);
-        }
         ObjectProp::Spread { argument, .. } => {
             collect_expr(a, argument, out);
         }

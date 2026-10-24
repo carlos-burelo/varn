@@ -202,7 +202,6 @@ pub(crate) fn infer_object(
                     members.extend(table.get_object_members(mid).to_vec());
                 }
             }
-            ObjectProp::Getter { .. } | ObjectProp::Setter { .. } => {}
         }
     }
     Type::object(members, table)

@@ -60,9 +60,7 @@ pub(crate) fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(
                 match p {
                     ObjectProp::Property { value, .. } => f(*value),
                     ObjectProp::Spread { argument, .. } => f(*argument),
-                    ObjectProp::Method { .. }
-                    | ObjectProp::Getter { .. }
-                    | ObjectProp::Setter { .. } => {}
+                    ObjectProp::Method { .. } => {}
                 }
             }
         }

@@ -210,18 +210,6 @@ pub enum ObjectProp {
         is_generator: bool,
         range: SourceRange,
     },
-    Getter {
-        key: PropKey,
-        body: StmtId,
-        return_type: Option<super::types::TypeNode>,
-        range: SourceRange,
-    },
-    Setter {
-        key: PropKey,
-        param: super::pattern::Param,
-        body: StmtId,
-        range: SourceRange,
-    },
     Spread {
         argument: ExprId,
         range: SourceRange,
@@ -233,8 +221,6 @@ impl ObjectProp {
         match self {
             ObjectProp::Property { range, .. } => range,
             ObjectProp::Method { range, .. } => range,
-            ObjectProp::Getter { range, .. } => range,
-            ObjectProp::Setter { range, .. } => range,
             ObjectProp::Spread { range, .. } => range,
         }
     }

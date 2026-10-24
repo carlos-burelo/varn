@@ -231,7 +231,7 @@ fn prop_uses_receiver(arena: &AstArena, p: &ObjectProp) -> bool {
         ObjectProp::Property { key, value, .. } => {
             key_uses_receiver(arena, key) || expr_uses_receiver(arena, *value)
         }
-        ObjectProp::Method { .. } | ObjectProp::Getter { .. } | ObjectProp::Setter { .. } => false,
+        ObjectProp::Method { .. } => false,
         ObjectProp::Spread { argument, .. } => expr_uses_receiver(arena, *argument),
     }
 }

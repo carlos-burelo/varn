@@ -104,57 +104,7 @@ impl<'r> super::super::Binder<'r> {
                         ..Default::default()
                     })
                 }
-                ObjectProp::Getter { key, .. } => {
-                    let name = match key {
-                        PropKey::Identifier(s) | PropKey::Str(s) => Arc::from(s.as_str()),
-                        PropKey::Int(_) | PropKey::Computed(_) => continue,
-                    };
-                    Some(ClassMemberInfo {
-                        name,
-                        kind: ClassMemberKind::Getter,
-                        is_async: false,
-                        is_generator: false,
-                        is_static: false,
-                        is_optional: false,
-                        line: range.start.line.saturating_sub(1),
-                        col: range.start.column,
-                        offset: range.start.offset,
-                        ty: Type::Dynamic,
-                        members: Vec::new(),
-                        visibility: None,
-                        is_abstract: false,
-                        is_readonly: false,
-                        is_override: false,
-                        symbol_id: None,
-                        ..Default::default()
-                    })
-                }
-                ObjectProp::Setter { key, .. } => {
-                    let name = match key {
-                        PropKey::Identifier(s) | PropKey::Str(s) => Arc::from(s.as_str()),
-                        PropKey::Int(_) | PropKey::Computed(_) => continue,
-                    };
-                    Some(ClassMemberInfo {
-                        name,
-                        kind: ClassMemberKind::Setter,
-                        is_async: false,
-                        is_generator: false,
-                        is_static: false,
-                        is_optional: false,
-                        line: range.start.line.saturating_sub(1),
-                        col: range.start.column,
-                        offset: range.start.offset,
-                        ty: Type::Dynamic,
-                        members: Vec::new(),
-                        visibility: None,
-                        is_abstract: false,
-                        is_readonly: false,
-                        is_override: false,
-                        symbol_id: None,
-                        ..Default::default()
-                    })
-                }
-                _ => continue,
+                ObjectProp::Spread { .. } => continue,
             };
             if let Some(m) = member {
                 out.push(m);

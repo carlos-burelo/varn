@@ -320,20 +320,6 @@ impl<'r> Checker<'r> {
                     self.expected_return_type = saved_expected;
                 }
 
-                ObjectProp::Getter { body, range, .. } | ObjectProp::Setter { body, range, .. } => {
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::UnsupportedExpression,
-                            "getters and setters are not supported in object literals — \
-                             declare a class, or use a method"
-                                .to_string(),
-                        )
-                        .with_range(*range),
-                    );
-                    let saved_expected = self.expected_return_type.take();
-                    self.in_function_body(false, |c| c.check_stmt(rec, *body, bind));
-                    self.expected_return_type = saved_expected;
-                }
                 ObjectProp::Spread { argument, .. } => self.check_expr(rec, *argument, bind),
             }
         }

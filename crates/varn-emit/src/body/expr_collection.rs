@@ -55,10 +55,7 @@ impl<'a> FnEmitter<'a> {
                 ObjectProp::Property { key, value, .. } => {
                     Some((prop_key_name(key)?, self.lower_expr(*value)))
                 }
-                ObjectProp::Method { .. }
-                | ObjectProp::Getter { .. }
-                | ObjectProp::Setter { .. }
-                | ObjectProp::Spread { .. } => None,
+                ObjectProp::Method { .. } | ObjectProp::Spread { .. } => None,
             })
             .collect();
         TirExpr {
@@ -115,7 +112,6 @@ impl<'a> FnEmitter<'a> {
                     }
                 }
 
-                ObjectProp::Getter { .. } | ObjectProp::Setter { .. } => {}
             }
         }
         TirExpr {
