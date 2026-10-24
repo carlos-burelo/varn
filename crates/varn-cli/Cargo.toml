@@ -31,7 +31,7 @@ varn-vm       = { path = "../varn-vm", features = ["profiling"] }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-types    = { path = "../varn-types" }
 varn-sem      = { path = "../varn-sem" }
-varn-resolver = { path = "../varn-resolver" }
+varn-inspect  = { path = "../varn-inspect" }
 varn-debug    = { path = "../varn-debug" }
 varn-lsp      = { path = "../varn-lsp" }
 varn-dap      = { path = "../varn-dap" }
@@ -39,7 +39,6 @@ varn-pm       = { path = "../varn-pm" }
 varn-project  = { path = "../varn-project" }
 varn-modules  = { path = "../varn-modules" }
 varn-jit      = { path = "../varn-jit" }
-tower-lsp-f   = { workspace = true }
 postcard      = { workspace = true }
 clap          = { version = "4", features = ["derive"] }
 clap_complete = "4"

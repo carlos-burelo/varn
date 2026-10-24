@@ -3736,13 +3736,12 @@ dependencies = [
  "postcard",
  "rustc-hash 1.1.0",
  "shlex",
- "tower-lsp-f",
  "varn-builtins",
- "varn-checker",
  "varn-compiler",
  "varn-core",
  "varn-dap",
  "varn-debug",
+ "varn-inspect",
  "varn-jit",
  "varn-lexer",
  "varn-lsp",
@@ -3751,7 +3750,6 @@ dependencies = [
  "varn-pipeline",
  "varn-pm",
  "varn-project",
- "varn-resolver",
  "varn-sem",
  "varn-types",
  "varn-vm",
@@ -3831,6 +3829,20 @@ dependencies = [
  "pollster",
  "rustc-hash 1.1.0",
  "wgpu",
+]
+
+[[package]]
+name = "varn-inspect"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "tower-lsp-f",
+ "varn-core",
+ "varn-debug",
+ "varn-lsp",
+ "varn-modules",
+ "varn-resolver",
+ "varn-sem",
 ]
 
 [[package]]

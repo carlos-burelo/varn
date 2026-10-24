@@ -24,7 +24,7 @@ pub fn execute(session: &pipeline::Session, args: DebugArgs) -> Result<(), CliEr
         }
     };
 
-    crate::inspect_lsp::run_for(&file_path, eval.as_deref(), &debug);
+    varn_inspect::run_for(&file_path, eval.as_deref(), &debug);
 
     let executable = match eval {
         Some(code) => crate::exec::compile(

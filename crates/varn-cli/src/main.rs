@@ -20,7 +20,6 @@ mod error;
 mod exec;
 mod exit;
 mod formatter;
-mod inspect_lsp;
 mod pipeline;
 mod policy;
 mod source_name;

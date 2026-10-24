@@ -1,0 +1,17 @@
+[package]
+name = "varn-inspect"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+varn-core     = { path = "../varn-core" }
+varn-debug    = { path = "../varn-debug" }
+varn-lsp      = { path = "../varn-lsp" }
+varn-modules  = { path = "../varn-modules" }
+varn-resolver = { path = "../varn-resolver" }
+varn-sem      = { path = "../varn-sem" }
+rustc-hash    = { workspace = true }
+tower-lsp-f   = { workspace = true }
+
+[lints]
+workspace = true
