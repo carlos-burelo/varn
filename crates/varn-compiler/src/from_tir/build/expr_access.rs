@@ -1,5 +1,6 @@
 use super::context::{Builder, Result};
 use crate::ssa::ir::{InstKind, Value};
+use crate::OptError;
 use varn_tir::BackendTy;
 use varn_tir::{Resolution, TirExpr};
 
@@ -11,6 +12,9 @@ impl<'m> Builder<'m> {
         res: &Resolution,
         ty: BackendTy,
     ) -> Result<Value> {
+        if let Resolution::EnumVariant { enum_id, tag } = res {
+            return self.lower_variant_constant(*enum_id, *tag, ty);
+        }
         let obj = self.lower_expr(object)?;
         let kind = match res {
             Resolution::FieldSlot(slot) => match self.compact_field(object.ty, *slot) {
@@ -49,6 +53,22 @@ impl<'m> Builder<'m> {
             },
         };
         Ok(self.emit(kind, ty))
+    }
+
+    fn lower_variant_constant(
+        &mut self,
+        enum_id: varn_tir::EnumId,
+        tag: u16,
+        ty: BackendTy,
+    ) -> Result<Value> {
+        let unsupported = || OptError::Unsupported("from_tir: variant constant without a slot");
+        let info = self.tir.enum_info(enum_id).ok_or_else(unsupported)?;
+        let global = info
+            .variant_at(tag)
+            .and_then(|variant| info.variant_global(&variant.name))
+            .ok_or_else(unsupported)?;
+        let slot = self.gslot(&global).ok_or_else(unsupported)?;
+        Ok(self.emit(InstKind::LoadGlobalIdx(slot), ty))
     }
 
     pub(super) fn lower_length(&mut self, operand: &TirExpr, ty: BackendTy) -> Result<Value> {

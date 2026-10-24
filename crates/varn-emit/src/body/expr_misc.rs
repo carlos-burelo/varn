@@ -83,6 +83,8 @@ impl<'a> FnEmitter<'a> {
                             | varn_tir::DynReason::Generic
                             | varn_tir::DynReason::Interface
                             | varn_tir::DynReason::TaskHandle(_)
+                            | varn_tir::DynReason::CoreMember
+                            | varn_tir::DynReason::Spread
                     )
             }
             BackendTy::Dynamic(
@@ -95,6 +97,8 @@ impl<'a> FnEmitter<'a> {
                 | varn_tir::DynReason::Range(_)
                 | varn_tir::DynReason::Interface
                 | varn_tir::DynReason::TaskHandle(_)
+                | varn_tir::DynReason::CoreMember
+                | varn_tir::DynReason::Spread
                 | varn_tir::DynReason::NotYetSupported
                 | varn_tir::DynReason::Generic
                 | varn_tir::DynReason::Boxed
@@ -148,6 +152,8 @@ pub(super) fn untyped_reason(reason: varn_tir::DynReason) -> bool {
         | varn_tir::DynReason::Range(_)
         | varn_tir::DynReason::Interface
         | varn_tir::DynReason::TaskHandle(_)
+        | varn_tir::DynReason::CoreMember
+        | varn_tir::DynReason::Spread
         | varn_tir::DynReason::Shape(_)
         | varn_tir::DynReason::NotYetSupported
         | varn_tir::DynReason::Generic

@@ -3,7 +3,7 @@ use super::context::FnEmitter;
 use super::small_utils::{bin_op, int_lit};
 use std::sync::Arc;
 use varn_core::ast::ExprId;
-use varn_tir::{BackendTy, Resolution, Span, TirArg, TirExpr, TirExprKind, TirUnOp};
+use varn_tir::{BackendTy, DynReason, Resolution, Span, TirArg, TirExpr, TirExprKind, TirUnOp};
 
 impl<'a> FnEmitter<'a> {
     pub(super) fn member_call(
@@ -71,13 +71,25 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Never
             | BackendTy::Dynamic(_) => None,
         };
-        slotted
-            .and_then(|(slot, sig)| {
-                let sig = self.signatures.get(sig.0 as usize)?;
-                (all_positional && sig.params.len() == arg_count)
-                    .then_some(Resolution::VtableSlot(slot))
-            })
-            .unwrap_or_else(|| self.by_name(name.clone(), recv_ty))
+        if let Some((slot, sig)) = slotted {
+            if !all_positional {
+                return Resolution::ByName {
+                    name: name.clone(),
+                    why: DynReason::Spread,
+                };
+            }
+            if self
+                .signatures
+                .get(sig.0 as usize)
+                .is_some_and(|sig| sig.params.len() == arg_count)
+            {
+                return Resolution::VtableSlot(slot);
+            }
+        }
+        if let Some(field) = self.class_of(recv_ty).and_then(|ci| ci.field(name)) {
+            return Resolution::FieldSlot(field.slot);
+        }
+        self.by_name(name.clone(), recv_ty)
     }
 
     pub(super) fn method_call(

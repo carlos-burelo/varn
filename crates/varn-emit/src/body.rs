@@ -342,7 +342,7 @@ impl<'a> FnEmitter<'a> {
                     ty,
                     res: Resolution::ByName {
                         name: key,
-                        why: DynReason::NotYetSupported,
+                        why: DynReason::Declared,
                     },
                     span,
                 };

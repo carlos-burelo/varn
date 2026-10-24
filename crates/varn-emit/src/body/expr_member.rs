@@ -321,6 +321,31 @@ impl<'a> FnEmitter<'a> {
                 span,
             };
         }
+        if let BackendTy::Enum(id) = obj.ty.non_nullable(self.tt)
+            && let Some(info) = self.m.enums.get(id.0 as usize)
+            && Self::is_class_ref(
+                &obj,
+                info.binding.as_ref().unwrap_or(&info.name),
+                self.m.globals,
+            )
+            && let Some(variant) = info.variants.iter().find(|v| v.name == name)
+            && info
+                .variant_global(&variant.name)
+                .is_some_and(|global| self.m.globals.contains_key(&global))
+        {
+            return TirExpr {
+                kind: TirExprKind::Field {
+                    object: Box::new(obj),
+                    name,
+                },
+                ty,
+                res: Resolution::EnumVariant {
+                    enum_id: id,
+                    tag: variant.tag,
+                },
+                span,
+            };
+        }
         if let Some(ci) = self.class_of(obj.ty) {
             if Self::is_class_ref(&obj, &ci.name, self.m.globals) {
                 if let Some(slot) = ci.static_slot(&name) {

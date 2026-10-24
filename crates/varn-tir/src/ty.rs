@@ -52,6 +52,10 @@ pub enum DynReason {
 
     TaskHandle(TyId),
 
+    CoreMember,
+
+    Spread,
+
     Interface,
 
     Shape(ShapeId),

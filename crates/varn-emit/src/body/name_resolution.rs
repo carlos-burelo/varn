@@ -51,12 +51,12 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
-            | BackendTy::Class(_)
             | BackendTy::Enum(_)
             | BackendTy::Fn(_)
             | BackendTy::Nullable(_)
             | BackendTy::Void
-            | BackendTy::Never => DynReason::NotYetSupported,
+            | BackendTy::Never => DynReason::CoreMember,
+            BackendTy::Class(_) => DynReason::NotYetSupported,
         };
         Resolution::ByName { name, why }
     }
@@ -91,7 +91,7 @@ impl<'a> FnEmitter<'a> {
         }
         Resolution::ByName {
             name: Arc::from(name),
-            why: DynReason::NotYetSupported,
+            why: DynReason::Declared,
         }
     }
 
