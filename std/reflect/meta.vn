@@ -15,6 +15,7 @@ export interface ClassRef {
 export interface FunctionRef {
     name: str;
     length: int;
+    (...args: dynamic[]): dynamic;
 }
 
 export function defineMetadata<K, V, T>(metadataKey: K, metadataValue: V, target: T): void {
