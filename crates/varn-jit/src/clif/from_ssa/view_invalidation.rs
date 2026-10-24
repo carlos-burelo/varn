@@ -1,3 +1,5 @@
+use varn_core::intrinsic_ops::math::MathOp;
+use varn_types::register_meta::SlotKind;
 use varn_types::ssa::{SsaBinOp, SsaOp, SsaProto, SsaUnOp};
 
 pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
@@ -21,6 +23,13 @@ pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
         | SsaOp::StoreGlobal { .. }
         | SsaOp::AssertNotNull { .. }
         | SsaOp::ModuleSlot { .. } => true,
+
+        SsaOp::IntrinsicCall { args, wire, .. } => {
+            matches!(args.as_slice(), [arg] if ssa.value_ty(*arg) == SlotKind::Float)
+                && [MathOp::Abs, MathOp::Sqrt, MathOp::Floor, MathOp::Ceil]
+                    .iter()
+                    .any(|op| op.wire() == *wire)
+        }
 
         SsaOp::Binary { op, .. } => match op {
             SsaBinOp::IntAdd
@@ -71,7 +80,6 @@ pub(super) fn keeps_views(ssa: &SsaProto, op: &SsaOp) -> bool {
         | SsaOp::ConstBigInt(_)
         | SsaOp::ConstDecimal(_)
         | SsaOp::MakeEnumVariant { .. }
-        | SsaOp::IntrinsicCall { .. }
         | SsaOp::LoadNativeGlobalIdx(_)
         | SsaOp::Try { .. }
         | SsaOp::PopTry
