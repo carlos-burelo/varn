@@ -35,6 +35,32 @@ impl<'a> FnEmitter<'a> {
         scoped.or_else(|| self.m.fns.get(&name).copied())
     }
 
+    pub(super) fn by_name(&self, name: Arc<str>, receiver: BackendTy) -> Resolution {
+        let why = match receiver.non_nullable(self.tt) {
+            BackendTy::Dynamic(reason) => reason,
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never => DynReason::NotYetSupported,
+        };
+        Resolution::ByName { name, why }
+    }
+
     pub(super) fn resolve_name(&mut self, name: &str) -> Resolution {
         for scope in self.scopes.iter().rev() {
             if let Some(id) = scope.get(name) {

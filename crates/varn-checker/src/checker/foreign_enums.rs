@@ -2,7 +2,7 @@ use super::Checker;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use varn_sem::bind::BindResult;
-use varn_sem::output::ForeignEnum;
+use varn_sem::output::{ForeignEnum, ForeignEnumMember};
 use varn_sem::types::Type;
 
 impl Checker<'_> {
@@ -47,6 +47,22 @@ impl Checker<'_> {
                 })
                 .collect();
             let type_params = Self::declared_type_params(owner, &name);
+            let members = owner
+                .type_members
+                .enums
+                .get(name.as_ref())
+                .map(|members| {
+                    members
+                        .iter()
+                        .filter(|m| !m.is_static)
+                        .map(|m| ForeignEnumMember {
+                            kind: m.kind,
+                            name: m.name.clone(),
+                            ty: self.reintern_foreign_ty(owner, m.ty),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
             let binding = bind
                 .global_symbols()
                 .find(|s| {
@@ -64,6 +80,7 @@ impl Checker<'_> {
                     binding,
                     type_params,
                     variants,
+                    members,
                 },
             );
         }

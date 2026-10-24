@@ -263,7 +263,14 @@ pub fn build(
         EnumInfo {
             name: f.name.clone(),
             binding: f.binding.clone(),
-            members: Vec::new(),
+            members: super::enums::enum_members(
+                f.members.iter().map(|m| (m.kind, &m.name, &m.ty)),
+                &bind.ty_table,
+                &bind.interner,
+                tt,
+                &scoped,
+                &mut signatures,
+            ),
             variants: f
                 .variants
                 .iter()

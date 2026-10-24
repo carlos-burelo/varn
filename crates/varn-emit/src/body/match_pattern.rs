@@ -202,9 +202,13 @@ impl<'a> FnEmitter<'a> {
         bindings: &[MatchBinding],
     ) -> (TirExpr, Vec<TirStmt>) {
         let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
+        let why = match s.ty.non_nullable(self.tt) {
+            BackendTy::Dynamic(reason) => reason,
+            _ => DynReason::NotYetSupported,
+        };
         let by_name = |n: &str| Resolution::ByName {
             name: Arc::from(n),
-            why: DynReason::NotYetSupported,
+            why,
         };
         let field = |recv: TirExpr, name: &str, ty: BackendTy| TirExpr {
             kind: TirExprKind::Field {

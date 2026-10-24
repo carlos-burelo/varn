@@ -1,6 +1,7 @@
 use super::signatures::accessor_signature;
 use super::{intern_signature, NameIndex};
 use crate::ty::lower_type;
+use crate::ty::NameResolver;
 use std::sync::Arc;
 use varn_core::AtomInterner;
 use varn_sem::bind::BindResult;
@@ -21,7 +22,20 @@ pub(super) fn build_enums(
         .map(|name| EnumInfo {
             name: name.clone(),
             binding: Some(name.clone()),
-            members: enum_members(bind, name, table, interner, tt, names, signatures),
+            members: enum_members(
+                bind.type_members
+                    .enums
+                    .get(name)
+                    .into_iter()
+                    .flatten()
+                    .filter(|m| !m.is_static)
+                    .map(|m| (m.kind, &m.name, &m.ty)),
+                table,
+                interner,
+                tt,
+                names,
+                signatures,
+            ),
             variants: bind
                 .enum_layout(name)
                 .unwrap_or_default()
@@ -40,34 +54,27 @@ pub(super) fn build_enums(
         .collect()
 }
 
-fn enum_members(
-    bind: &BindResult,
-    name: &Arc<str>,
+pub(super) fn enum_members<'a>(
+    members: impl Iterator<Item = (ClassMemberKind, &'a Arc<str>, &'a varn_sem::types::Type)>,
     table: &CheckerTyTable,
     interner: &AtomInterner,
     tt: &mut TyTable,
-    names: &NameIndex,
+    names: &dyn NameResolver,
     signatures: &mut Vec<Signature>,
 ) -> Vec<VtableEntry> {
     use varn_core::AccessorKind;
-    let members = bind
-        .type_members
-        .enums
-        .get(name)
-        .map(Vec::as_slice)
-        .unwrap_or(&[]);
     let mut out: Vec<VtableEntry> = Vec::new();
-    for m in members.iter().filter(|m| !m.is_static) {
-        let (key, sig): (Arc<str>, _) = match m.kind {
+    for (kind, name, ty) in members {
+        let (key, sig): (Arc<str>, _) = match kind {
             ClassMemberKind::Method | ClassMemberKind::Function => (
-                m.name.clone(),
-                intern_signature(&m.ty, table, interner, tt, names, signatures),
+                name.clone(),
+                intern_signature(ty, table, interner, tt, names, signatures),
             ),
             ClassMemberKind::Getter => (
-                Arc::from(AccessorKind::Get.key(&m.name)),
+                Arc::from(AccessorKind::Get.key(name)),
                 accessor_signature(
                     AccessorKind::Get,
-                    &m.ty,
+                    ty,
                     table,
                     interner,
                     tt,
@@ -76,10 +83,10 @@ fn enum_members(
                 ),
             ),
             ClassMemberKind::Setter => (
-                Arc::from(AccessorKind::Set.key(&m.name)),
+                Arc::from(AccessorKind::Set.key(name)),
                 accessor_signature(
                     AccessorKind::Set,
-                    &m.ty,
+                    ty,
                     table,
                     interner,
                     tt,

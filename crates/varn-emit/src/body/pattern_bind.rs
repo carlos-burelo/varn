@@ -187,10 +187,7 @@ impl<'a> FnEmitter<'a> {
                             args: vec![TirArg::Expr(int_lit(elements.len() as i64))],
                         },
                         ty: src.ty,
-                        res: Resolution::ByName {
-                            name: Arc::from(varn_core::MemberKey::Slice.as_str()),
-                            why: DynReason::NotYetSupported,
-                        },
+                        res: self.by_name(Arc::from(varn_core::MemberKey::Slice.as_str()), src.ty),
                         span: src.span,
                     };
                     self.bind_pattern(rest_pat, tail, out);

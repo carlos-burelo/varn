@@ -27,17 +27,16 @@ impl<'a> FnEmitter<'a> {
     pub fn drain_dispose_frame(&mut self) -> Vec<TirStmt> {
         let mut out = Vec::new();
         for resource in self.disposables.pop().unwrap_or_default().into_iter().rev() {
+            let name: Arc<str> = Arc::from("dispose");
+            let res = self.method_resolution(resource.ty, &name, 0, true);
             out.push(TirStmt::Expr(TirExpr {
                 kind: TirExprKind::MethodCall {
                     recv: Box::new(resource),
-                    name: Arc::from("dispose"),
+                    name,
                     args: vec![],
                 },
                 ty: BackendTy::Void,
-                res: Resolution::ByName {
-                    name: Arc::from("dispose"),
-                    why: DynReason::NotYetSupported,
-                },
+                res,
                 span: Span::EMPTY,
             }));
         }

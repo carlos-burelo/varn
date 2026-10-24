@@ -43,6 +43,14 @@ pub struct ForeignEnum {
     pub binding: Option<Arc<str>>,
     pub type_params: Vec<Arc<str>>,
     pub variants: Vec<(Arc<str>, Vec<Type>)>,
+    pub members: Vec<ForeignEnumMember>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ForeignEnumMember {
+    pub kind: crate::types::ClassMemberKind,
+    pub name: Arc<str>,
+    pub ty: Type,
 }
 
 #[derive(Clone, Debug)]

@@ -3,7 +3,7 @@ use super::context::FnEmitter;
 use super::small_utils::{bin_op, int_lit};
 use std::sync::Arc;
 use varn_core::ast::ExprId;
-use varn_tir::{BackendTy, DynReason, Resolution, Span, TirArg, TirExpr, TirExprKind, TirUnOp};
+use varn_tir::{BackendTy, Resolution, Span, TirArg, TirExpr, TirExprKind, TirUnOp};
 
 impl<'a> FnEmitter<'a> {
     pub(super) fn member_call(
@@ -34,6 +34,24 @@ impl<'a> FnEmitter<'a> {
         }
 
         self.method_call(recv, name, targs, ty, checked, span)
+    }
+
+    pub(super) fn method_resolution(
+        &self,
+        recv_ty: BackendTy,
+        name: &Arc<str>,
+        arg_count: usize,
+        all_positional: bool,
+    ) -> Resolution {
+        self.class_of(recv_ty)
+            .and_then(|ci| ci.method_slot(name).map(|s| (s, ci)))
+            .and_then(|(slot, ci)| {
+                let entry = ci.method_at(slot)?;
+                let sig = self.signatures.get(entry.sig.0 as usize)?;
+                (all_positional && sig.params.len() == arg_count)
+                    .then_some(Resolution::VtableSlot(slot))
+            })
+            .unwrap_or_else(|| self.by_name(name.clone(), recv_ty))
     }
 
     pub(super) fn method_call(
@@ -90,19 +108,7 @@ impl<'a> FnEmitter<'a> {
             (target.into_expr(), targs)
         };
         let all_positional = targs.iter().all(|a| matches!(a, TirArg::Expr(_)));
-        let res = self
-            .class_of(recv.ty)
-            .and_then(|ci| ci.method_slot(&name).map(|s| (s, ci)))
-            .and_then(|(slot, ci)| {
-                let entry = ci.method_at(slot)?;
-                let sig = self.signatures.get(entry.sig.0 as usize)?;
-                (all_positional && sig.params.len() == targs.len())
-                    .then_some(Resolution::VtableSlot(slot))
-            })
-            .unwrap_or(Resolution::ByName {
-                name: name.clone(),
-                why: DynReason::NotYetSupported,
-            });
+        let res = self.method_resolution(recv.ty, &name, targs.len(), all_positional);
 
         TirExpr {
             kind: TirExprKind::MethodCall {

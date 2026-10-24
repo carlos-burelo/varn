@@ -3,7 +3,7 @@ use super::small_utils::int_lit;
 use std::sync::Arc;
 use varn_core::ast::{AstArena, ExprId, ExprKind};
 use varn_core::AtomInterner;
-use varn_tir::{BackendTy, DynReason, Resolution, Span, TirArg, TirBinOp, TirExpr, TirExprKind};
+use varn_tir::{BackendTy, Resolution, Span, TirArg, TirBinOp, TirExpr, TirExprKind};
 
 impl<'a> FnEmitter<'a> {
     pub(super) fn member_name(
@@ -129,6 +129,7 @@ impl<'a> FnEmitter<'a> {
                         span,
                     };
                 }
+                let recv_ty = obj.ty;
                 return TirExpr {
                     kind: TirExprKind::MethodCall {
                         recv: Box::new(obj),
@@ -136,10 +137,7 @@ impl<'a> FnEmitter<'a> {
                         args: vec![TirArg::Expr(s), TirArg::Expr(e)],
                     },
                     ty,
-                    res: Resolution::ByName {
-                        name: Arc::from(varn_core::MemberKey::Slice.as_str()),
-                        why: DynReason::NotYetSupported,
-                    },
+                    res: self.by_name(Arc::from(varn_core::MemberKey::Slice.as_str()), recv_ty),
                     span,
                 };
             }
@@ -286,6 +284,7 @@ impl<'a> FnEmitter<'a> {
         span: Span,
         read: bool,
     ) -> TirExpr {
+        let recv_ty = obj.ty;
         if read && let BackendTy::Enum(id) = obj.ty.non_nullable(self.tt) {
             let getter = varn_core::AccessorKind::Get.key(&name);
             let slot = self
@@ -347,10 +346,7 @@ impl<'a> FnEmitter<'a> {
                         name: name.clone(),
                     },
                     ty,
-                    res: Resolution::ByName {
-                        name,
-                        why: DynReason::NotYetSupported,
-                    },
+                    res: self.by_name(name, recv_ty),
                     span,
                 };
             }
@@ -390,10 +386,7 @@ impl<'a> FnEmitter<'a> {
                 name: name.clone(),
             },
             ty,
-            res: Resolution::ByName {
-                name,
-                why: DynReason::NotYetSupported,
-            },
+            res: self.by_name(name, recv_ty),
             span,
         }
     }

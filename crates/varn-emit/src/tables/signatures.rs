@@ -1,5 +1,5 @@
-use super::NameIndex;
 use crate::ty::lower_type;
+use crate::ty::NameResolver;
 use varn_core::{AtomInterner, TypeKind};
 use varn_sem::types::{CheckerTyTable, Type};
 use varn_tir::{BackendTy, Signature, TyTable};
@@ -17,7 +17,7 @@ pub(crate) fn intern_signature(
     table: &CheckerTyTable,
     interner: &AtomInterner,
     tt: &mut TyTable,
-    names: &NameIndex,
+    names: &dyn NameResolver,
     signatures: &mut Vec<Signature>,
 ) -> varn_tir::SigId {
     let (params, return_ty, has_rest) = match table.get(ty.0) {
@@ -95,7 +95,7 @@ pub(crate) fn accessor_signature(
     table: &CheckerTyTable,
     interner: &AtomInterner,
     tt: &mut TyTable,
-    names: &NameIndex,
+    names: &dyn NameResolver,
     signatures: &mut Vec<Signature>,
 ) -> varn_tir::SigId {
     let value = lower_type(property, table, interner, tt, names);
