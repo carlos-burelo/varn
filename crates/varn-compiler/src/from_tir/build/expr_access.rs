@@ -79,9 +79,11 @@ impl<'m> Builder<'m> {
         ) {
             return Ok(self.emit(InstKind::BytesLength { operand: obj }, ty));
         }
-        let inner = match self.value_ty(obj) {
-            BackendTy::Nullable(id) => self.tir.types.get(id),
-            t => t,
+        let value_ty = self.value_ty(obj);
+        let inner = if let BackendTy::Nullable(id) = value_ty {
+            self.tir.types.get(id)
+        } else {
+            value_ty
         };
         let kind = match inner {
             BackendTy::Str => InstKind::StrLength { operand: obj },

@@ -202,10 +202,7 @@ impl<'a> FnEmitter<'a> {
         bindings: &[MatchBinding],
     ) -> (TirExpr, Vec<TirStmt>) {
         let dyn_ty = BackendTy::Dynamic(DynReason::Unrecorded);
-        let why = match s.ty.non_nullable(self.tt) {
-            BackendTy::Dynamic(reason) => reason,
-            _ => DynReason::Unrecorded,
-        };
+        let why = self.by_name_reason(s.ty);
         let by_name = |n: &str| Resolution::ByName {
             name: Arc::from(n),
             why,

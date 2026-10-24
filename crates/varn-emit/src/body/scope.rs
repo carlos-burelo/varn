@@ -381,15 +381,26 @@ impl<'a> FnEmitter<'a> {
         let interner = self.m.interner;
         match self.expr_table.get(&e.index()) {
             Some(entry) => lower_type(&entry.ty, table, interner, self.tt, names),
-            None => match &self.ast_arena.expr(e).kind {
-                ExprKind::IntLiteral { .. } => BackendTy::Int,
-                ExprKind::FloatLiteral { .. } => BackendTy::Float,
-                ExprKind::BoolLiteral { .. } => BackendTy::Bool,
-                ExprKind::StrLiteral { .. } => BackendTy::Str,
-                ExprKind::CharLiteral { .. } => BackendTy::Char,
-                ExprKind::NullLiteral => crate::ty::NULL_TY,
-                _ => BackendTy::Dynamic(DynReason::Unrecorded),
-            },
+            None => literal_ty(&self.ast_arena.expr(e).kind)
+                .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded)),
         }
+    }
+}
+
+fn literal_ty(kind: &ExprKind) -> Option<BackendTy> {
+    if matches!(kind, ExprKind::IntLiteral { .. }) {
+        Some(BackendTy::Int)
+    } else if matches!(kind, ExprKind::FloatLiteral { .. }) {
+        Some(BackendTy::Float)
+    } else if matches!(kind, ExprKind::BoolLiteral { .. }) {
+        Some(BackendTy::Bool)
+    } else if matches!(kind, ExprKind::StrLiteral { .. }) {
+        Some(BackendTy::Str)
+    } else if matches!(kind, ExprKind::CharLiteral { .. }) {
+        Some(BackendTy::Char)
+    } else if matches!(kind, ExprKind::NullLiteral) {
+        Some(crate::ty::NULL_TY)
+    } else {
+        None
     }
 }

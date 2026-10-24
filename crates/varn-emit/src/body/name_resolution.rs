@@ -36,7 +36,14 @@ impl<'a> FnEmitter<'a> {
     }
 
     pub(super) fn by_name(&self, name: Arc<str>, receiver: BackendTy) -> Resolution {
-        let why = match receiver.non_nullable(self.tt) {
+        Resolution::ByName {
+            name,
+            why: self.by_name_reason(receiver),
+        }
+    }
+
+    pub(super) fn by_name_reason(&self, receiver: BackendTy) -> DynReason {
+        match receiver.non_nullable(self.tt) {
             BackendTy::Dynamic(reason) => reason,
             BackendTy::Int
             | BackendTy::Float
@@ -57,8 +64,7 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Void
             | BackendTy::Never => DynReason::CoreMember,
             BackendTy::Class(_) => DynReason::Unrecorded,
-        };
-        Resolution::ByName { name, why }
+        }
     }
 
     pub(super) fn resolve_name(&mut self, name: &str) -> Resolution {
