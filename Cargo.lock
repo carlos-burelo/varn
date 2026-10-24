@@ -3963,6 +3963,7 @@ dependencies = [
  "rustc-hash 1.1.0",
  "serde",
  "varn-binder",
+ "varn-checker",
  "varn-core",
  "varn-lexer",
  "varn-modules",

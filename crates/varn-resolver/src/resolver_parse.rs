@@ -51,17 +51,21 @@ impl ModuleResolver {
         self.in_flight.lock().insert(key.to_owned());
         let mut bind = match varn_binder::core::loader::module_globals(key, self) {
             Some(globals) => varn_binder::Binder::bind_with_global_refs(
-                program, ast_arena, interner, self, &globals,
+                program, ast_arena, interner.clone(), self, &globals,
             ),
-            None => varn_binder::Binder::bind(program, ast_arena, interner, self),
+            None => varn_binder::Binder::bind(program, ast_arena, interner.clone(), self),
         };
-        self.in_flight.lock().remove(key);
         for e in lex_errs {
             bind.diagnostics.emit(e);
         }
-        let bind = Arc::new(bind);
-        self.store_bind(key.to_owned(), Arc::clone(&bind));
-        bind
+        let provisional = Arc::new(bind);
+        self.store_bind(key.to_owned(), Arc::clone(&provisional));
+        let mut checked = varn_checker::Checker::check(program, ast_arena, interner, self).bind;
+        checked.diagnostics = provisional.diagnostics.clone();
+        self.in_flight.lock().remove(key);
+        let checked = Arc::new(checked);
+        self.store_bind(key.to_owned(), Arc::clone(&checked));
+        checked
     }
 
     pub(super) fn collect(
