@@ -13,6 +13,7 @@ mod code_store;
 mod commands;
 mod cpu_freq;
 mod debug_print;
+mod discover;
 mod dispatch;
 mod doctor_impl;
 mod error;

@@ -19,7 +19,8 @@ pub struct TestResult {
 pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), CliError> {
     let start_time = Instant::now();
 
-    let test_files = discover_test_files(args.path.as_deref())?;
+    let root = PathBuf::from(args.path.as_deref().unwrap_or("tests"));
+    let test_files = crate::discover::vn_files(&root, crate::discover::Depth::Direct)?;
     if test_files.is_empty() {
         return Err(CliError::usage(
             "No test files (.vn) found matching the specified path",
@@ -264,36 +265,4 @@ fn test_units(
         units.push((format!("{display_name}::{name}"), Some(call)));
     }
     units
-}
-
-fn discover_test_files(path: Option<&str>) -> Result<Vec<PathBuf>, CliError> {
-    let base = path
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("tests"));
-
-    if !base.exists() {
-        return Err(CliError::usage(format!(
-            "Path '{}' does not exist",
-            base.display()
-        )));
-    }
-
-    if base.is_file() {
-        return Ok(vec![base]);
-    }
-
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&base)
-        .map_err(|e| {
-            CliError::fatal(format!(
-                "Failed to read directory '{}': {e}",
-                base.display()
-            ))
-        })?
-        .filter_map(|entry| entry.ok())
-        .map(|e| e.path())
-        .filter(|p| p.extension().map(|ext| ext == "vn").unwrap_or(false))
-        .collect();
-
-    files.sort();
-    Ok(files)
 }
