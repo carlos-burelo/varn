@@ -35,9 +35,11 @@ pub(crate) fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
             out.push(lhs);
             out.push(rhs);
         }
-        Unary { operand, .. } | Cast { operand } | Checked { operand } | ObjectKeys { operand } => {
-            out.push(operand)
-        }
+        Unary { operand, .. }
+        | Cast { operand }
+        | Checked { operand }
+        | ObjectKeys { operand }
+        | Length { operand } => out.push(operand),
         Field { object, .. } => out.push(object),
         Index { object, index } => {
             out.push(object);

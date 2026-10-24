@@ -207,6 +207,7 @@ impl<'m> Builder<'m> {
             | varn_tir::TirExprKind::Select { .. }
             | varn_tir::TirExprKind::Seq { .. }
             | varn_tir::TirExprKind::ObjectKeys { .. }
+            | varn_tir::TirExprKind::Length { .. }
             | varn_tir::TirExprKind::SuperCall { .. }
             | varn_tir::TirExprKind::SuperMethodCall { .. }
             | varn_tir::TirExprKind::DecimalLit(_)

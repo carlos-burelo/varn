@@ -306,6 +306,22 @@ impl<'a> FnEmitter<'a> {
                 };
             }
         }
+        if read
+            && name.as_ref() == varn_core::MemberKey::Length.as_str()
+            && matches!(
+                obj.ty.non_nullable(self.tt),
+                BackendTy::Array(_) | BackendTy::Tuple(_) | BackendTy::Str | BackendTy::Bytes
+            )
+        {
+            return TirExpr {
+                kind: TirExprKind::Length {
+                    operand: Box::new(obj),
+                },
+                ty: BackendTy::Int,
+                res: Resolution::None,
+                span,
+            };
+        }
         if let Some(ci) = self.class_of(obj.ty) {
             if Self::is_class_ref(&obj, &ci.name, self.m.globals) {
                 if let Some(slot) = ci.static_slot(&name) {

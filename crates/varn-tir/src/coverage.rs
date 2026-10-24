@@ -277,7 +277,9 @@ impl Coverage {
                 }
                 self.walk_expr(value);
             }
-            TirExprKind::ObjectKeys { operand } => self.walk_expr(operand),
+            TirExprKind::ObjectKeys { operand } | TirExprKind::Length { operand } => {
+                self.walk_expr(operand)
+            }
             TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
                 for a in args {
                     self.walk_expr(a.value());

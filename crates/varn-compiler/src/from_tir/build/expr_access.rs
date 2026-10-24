@@ -31,46 +31,6 @@ impl<'m> Builder<'m> {
                 offset: 0,
                 tag: varn_core::FieldAccess::Slot,
             },
-            _ if name.as_ref() == varn_core::MemberKey::Length.as_str() => {
-                if matches!(
-                    object.ty.non_nullable(&self.tir.types),
-                    varn_tir::BackendTy::Bytes
-                ) {
-                    return Ok(self.emit(InstKind::BytesLength { operand: obj }, BackendTy::Int));
-                }
-                let inner = match self.value_ty(obj) {
-                    BackendTy::Nullable(id) => self.tir.types.get(id),
-                    t => t,
-                };
-                match inner {
-                    BackendTy::Str => {
-                        return Ok(self.emit(InstKind::StrLength { operand: obj }, BackendTy::Int))
-                    }
-                    BackendTy::Array(_) | BackendTy::Tuple(_) => {
-                        return Ok(self.emit(InstKind::ArrayLength { operand: obj }, BackendTy::Int))
-                    }
-                    BackendTy::Int
-                    | BackendTy::Float
-                    | BackendTy::Bool
-                    | BackendTy::Char
-                    | BackendTy::Bytes
-                    | BackendTy::Enum(_)
-                    | BackendTy::Fn(_)
-                    | BackendTy::Decimal
-                    | BackendTy::BigInt
-                    | BackendTy::Void
-                    | BackendTy::Never
-                    | BackendTy::Dynamic(_)
-                    | BackendTy::Map(..)
-                    | BackendTy::Dict(_)
-                    | BackendTy::Set(_)
-                    | BackendTy::Class(_)
-                    | BackendTy::Nullable(_) => InstKind::GetProperty {
-                        object: obj,
-                        name: name.clone(),
-                    },
-                }
-            }
             Resolution::None
             | Resolution::Local(_)
             | Resolution::Param(_)
@@ -86,6 +46,45 @@ impl<'m> Builder<'m> {
             | Resolution::ByName { .. } => InstKind::GetProperty {
                 object: obj,
                 name: name.clone(),
+            },
+        };
+        Ok(self.emit(kind, ty))
+    }
+
+    pub(super) fn lower_length(&mut self, operand: &TirExpr, ty: BackendTy) -> Result<Value> {
+        let obj = self.lower_expr(operand)?;
+        if matches!(
+            operand.ty.non_nullable(&self.tir.types),
+            varn_tir::BackendTy::Bytes
+        ) {
+            return Ok(self.emit(InstKind::BytesLength { operand: obj }, ty));
+        }
+        let inner = match self.value_ty(obj) {
+            BackendTy::Nullable(id) => self.tir.types.get(id),
+            t => t,
+        };
+        let kind = match inner {
+            BackendTy::Str => InstKind::StrLength { operand: obj },
+            BackendTy::Array(_) | BackendTy::Tuple(_) => InstKind::ArrayLength { operand: obj },
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Bytes
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Class(_)
+            | BackendTy::Nullable(_) => InstKind::GetProperty {
+                object: obj,
+                name: std::sync::Arc::from(varn_core::MemberKey::Length.as_str()),
             },
         };
         Ok(self.emit(kind, ty))

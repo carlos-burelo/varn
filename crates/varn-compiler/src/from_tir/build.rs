@@ -145,6 +145,8 @@ impl<'m> Builder<'m> {
                 ))
             }
 
+            TirExprKind::Length { operand } => self.lower_length(operand, ty),
+
             TirExprKind::ObjectKeys { operand } => {
                 let o = self.lower_expr(operand)?;
                 Ok(self.emit(InstKind::ObjectKeys { operand: o }, ty))

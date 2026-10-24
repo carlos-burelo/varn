@@ -208,6 +208,10 @@ pub enum TirExprKind {
         operand: Box<TirExpr>,
     },
 
+    Length {
+        operand: Box<TirExpr>,
+    },
+
     SuperCall {
         args: Vec<TirArg>,
     },

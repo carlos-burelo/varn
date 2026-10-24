@@ -274,6 +274,15 @@ fn check_expr(m: &TirModule, f: &TirFunction, e: &TirExpr, errors: &mut Vec<Veri
             check_expr(m, f, value, errors);
         }
         TirExprKind::ObjectKeys { operand } => check_expr(m, f, operand, errors),
+        TirExprKind::Length { operand } => {
+            if e.ty != BackendTy::Int {
+                errors.push(VerifyError::new(
+                    format!("Length must produce Int, node says {:?}", e.ty),
+                    e.span,
+                ));
+            }
+            check_expr(m, f, operand, errors)
+        }
         TirExprKind::SuperCall { args } | TirExprKind::SuperMethodCall { args, .. } => {
             for a in args {
                 check_expr(m, f, a.value(), errors);
