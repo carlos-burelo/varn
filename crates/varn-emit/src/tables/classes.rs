@@ -1,6 +1,6 @@
 use super::signatures::{accessor_signature, intern_signature};
 use super::NameIndex;
-use crate::ty::lower_type;
+use crate::ty::{lower_type, NameResolver};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_core::AtomInterner;
@@ -133,59 +133,17 @@ fn build_one_class(
         .map(|e| e.members.as_slice())
         .unwrap_or(&[]);
 
-    let mut statics: Vec<(Arc<str>, BackendTy, Option<varn_tir::SigId>)> = Vec::new();
-    for m in members {
-        if !m.is_static {
-            continue;
-        }
-        match m.kind {
-            ClassMemberKind::Property | ClassMemberKind::Variable => {
-                if statics.iter().any(|(n, _, _)| n == &m.name) {
-                    continue;
-                }
-                let static_bt = field_backend_ty(m.ty, m.is_optional, table, interner, tt, names);
-                statics.push((m.name.clone(), static_bt, None));
-            }
-            ClassMemberKind::Method
-            | ClassMemberKind::Function
-            | ClassMemberKind::Constructor
-            | ClassMemberKind::Getter
-            | ClassMemberKind::Setter
-            | ClassMemberKind::Class
-            | ClassMemberKind::Interface
-            | ClassMemberKind::Namespace
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => {}
-        }
-    }
-    for m in members {
-        if !m.is_static {
-            continue;
-        }
-        match m.kind {
-            ClassMemberKind::Method | ClassMemberKind::Function => {
-                if statics.iter().any(|(n, _, _)| n == &m.name) {
-                    continue;
-                }
-                let sig = intern_signature(&m.ty, table, interner, tt, names, signatures);
-                statics.push((
-                    m.name.clone(),
-                    BackendTy::Dynamic(DynReason::Declared),
-                    Some(sig),
-                ));
-            }
-            ClassMemberKind::Property
-            | ClassMemberKind::Variable
-            | ClassMemberKind::Constructor
-            | ClassMemberKind::Getter
-            | ClassMemberKind::Setter
-            | ClassMemberKind::Class
-            | ClassMemberKind::Interface
-            | ClassMemberKind::Namespace
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => {}
-        }
-    }
+    let statics = build_statics(
+        members
+            .iter()
+            .filter(|m| m.is_static)
+            .map(|m| (m.kind, &m.name, &m.ty, m.is_optional)),
+        table,
+        interner,
+        tt,
+        names,
+        signatures,
+    );
 
     let mut seen_field: FxHashMap<Arc<str>, ()> = FxHashMap::default();
     let mut method_names: Vec<Arc<str>> = Vec::new();
@@ -277,13 +235,78 @@ fn build_one_class(
     info
 }
 
+pub(super) type StaticMember<'a> = (
+    ClassMemberKind,
+    &'a Arc<str>,
+    &'a varn_sem::types::Type,
+    bool,
+);
+
+pub(super) fn build_statics<'a>(
+    members: impl Iterator<Item = StaticMember<'a>> + Clone,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &dyn NameResolver,
+    signatures: &mut Vec<Signature>,
+) -> Vec<(Arc<str>, BackendTy, Option<varn_tir::SigId>)> {
+    let mut statics: Vec<(Arc<str>, BackendTy, Option<varn_tir::SigId>)> = Vec::new();
+    for (kind, name, ty, optional) in members.clone() {
+        match kind {
+            ClassMemberKind::Property | ClassMemberKind::Variable => {
+                if statics.iter().any(|(n, _, _)| n == name) {
+                    continue;
+                }
+                let static_bt = field_backend_ty(*ty, optional, table, interner, tt, names);
+                statics.push((name.clone(), static_bt, None));
+            }
+            ClassMemberKind::Method
+            | ClassMemberKind::Function
+            | ClassMemberKind::Constructor
+            | ClassMemberKind::Getter
+            | ClassMemberKind::Setter
+            | ClassMemberKind::Class
+            | ClassMemberKind::Interface
+            | ClassMemberKind::Namespace
+            | ClassMemberKind::Enum
+            | ClassMemberKind::Struct => {}
+        }
+    }
+    for (kind, name, ty, _) in members {
+        match kind {
+            ClassMemberKind::Method | ClassMemberKind::Function => {
+                if statics.iter().any(|(n, _, _)| n == name) {
+                    continue;
+                }
+                let sig = intern_signature(ty, table, interner, tt, names, signatures);
+                statics.push((
+                    name.clone(),
+                    BackendTy::Dynamic(DynReason::Declared),
+                    Some(sig),
+                ));
+            }
+            ClassMemberKind::Property
+            | ClassMemberKind::Variable
+            | ClassMemberKind::Constructor
+            | ClassMemberKind::Getter
+            | ClassMemberKind::Setter
+            | ClassMemberKind::Class
+            | ClassMemberKind::Interface
+            | ClassMemberKind::Namespace
+            | ClassMemberKind::Enum
+            | ClassMemberKind::Struct => {}
+        }
+    }
+    statics
+}
+
 fn field_backend_ty(
     ty: varn_sem::types::Type,
     optional: bool,
     table: &CheckerTyTable,
     interner: &AtomInterner,
     tt: &mut TyTable,
-    names: &NameIndex,
+    names: &dyn NameResolver,
 ) -> BackendTy {
     let inner = lower_type(&ty, table, interner, tt, names);
     if optional && !matches!(inner, BackendTy::Nullable(_)) {

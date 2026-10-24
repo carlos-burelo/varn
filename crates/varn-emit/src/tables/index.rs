@@ -202,12 +202,22 @@ pub fn build(
                 (method.name.clone(), sig)
             })
             .collect();
+        let statics = super::classes::build_statics(
+            f.statics
+                .iter()
+                .map(|s| (s.kind, &s.name, &s.ty, s.optional)),
+            &bind.ty_table,
+            &bind.interner,
+            tt,
+            &names,
+            &mut signatures,
+        );
         let mut info = ClassInfo::new_with_methods(
             f.name.clone(),
             varn_tir::Ancestry::Root,
             fields,
             accessors.into_iter().chain(methods).collect(),
-            Vec::new(),
+            statics,
             tt,
         );
         info.constructor = f.constructor.map(|ctor| {

@@ -4,7 +4,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
-use varn_sem::output::{ForeignAccessor, ForeignClass, ForeignMethod, InheritedField};
+use varn_sem::output::{
+    ForeignAccessor, ForeignClass, ForeignMethod, ForeignStatic, InheritedField,
+};
 use varn_sem::types::{ClassMemberKind, ObjectTypeMember, Type};
 
 impl Checker<'_> {
@@ -235,6 +237,23 @@ impl Checker<'_> {
                 }
             }
         }
+        let statics: Vec<ForeignStatic> = chain
+            .first()
+            .and_then(|own| own.owner.get().get_class_entry(&own.name))
+            .map(|entry| {
+                entry
+                    .members
+                    .iter()
+                    .filter(|m| m.is_static)
+                    .map(|m| ForeignStatic {
+                        kind: m.kind,
+                        name: m.name.clone(),
+                        ty: self.reintern_foreign_ty(owner.as_ref(), m.ty),
+                        optional: m.is_optional,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let constructor =
             Some(self.effective_ctor_ty(name.as_ref(), OwnerRef::Foreign(owner.clone())));
         let decorated = owner
@@ -268,6 +287,7 @@ impl Checker<'_> {
             .map(|f| f.ty)
             .chain(accessors.iter().map(|a| a.ty))
             .chain(methods.iter().map(|m| m.ty))
+            .chain(statics.iter().map(|s| s.ty))
             .collect();
         Some((
             ForeignClass {
@@ -275,6 +295,7 @@ impl Checker<'_> {
                 origin: origin.clone(),
                 fields,
                 methods,
+                statics,
                 accessors,
                 constructor,
                 import_binding,

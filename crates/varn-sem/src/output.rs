@@ -74,11 +74,20 @@ pub struct ForeignMethod {
 }
 
 #[derive(Clone, Debug)]
+pub struct ForeignStatic {
+    pub kind: crate::types::ClassMemberKind,
+    pub name: Arc<str>,
+    pub ty: Type,
+    pub optional: bool,
+}
+
+#[derive(Clone, Debug)]
 pub struct ForeignClass {
     pub name: Arc<str>,
     pub origin: Arc<str>,
     pub fields: Vec<InheritedField>,
     pub methods: Vec<ForeignMethod>,
+    pub statics: Vec<ForeignStatic>,
     pub accessors: Vec<ForeignAccessor>,
     pub constructor: Option<Type>,
     pub import_binding: Option<Arc<str>>,
