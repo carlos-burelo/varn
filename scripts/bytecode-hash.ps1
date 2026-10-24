@@ -16,12 +16,21 @@
 
 .PARAMETER Profile
     Perfil del binario vn (por defecto quick).
+
+.PARAMETER Binary
+    Ruta de un binario vn concreto; reemplaza al del perfil. Sirve para registrar la base con el
+    binario del commit base.
+
+.NOTES
+    Los primeros 25 bytes del .vnc son la cabecera del artefacto, que lleva BUILD_FINGERPRINT y
+    cambia en cada recompilación. Solo el payload entra en el hash.
 #>
 
 param (
     [switch]$Record,
     [switch]$Compare,
-    [string]$Profile = "quick"
+    [string]$Profile = "quick",
+    [string]$Binary = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,7 +42,7 @@ if ($Record -eq $Compare) {
     exit 2
 }
 
-$vn = Join-Path $RootDir "target\$Profile\vn.exe"
+$vn = if ($Binary) { (Resolve-Path $Binary).Path } else { Join-Path $RootDir "target\$Profile\vn.exe" }
 if (-not (Test-Path $vn)) { $vn = Join-Path $RootDir "target\$Profile\vn" }
 
 $baseDir = Join-Path $RootDir "target\tmp\baseline"
@@ -51,7 +60,9 @@ $lines = $files | ForEach-Object -ThrottleLimit 8 -Parallel {
     $out = Join-Path $using:outDir ($rel.Replace('/', '__') + ".vnc")
     $text = & $using:vn build $rel -o $out 2>&1 | Out-String
     if ($LASTEXITCODE -eq 0 -and (Test-Path $out)) {
-        "$rel`t$((Get-FileHash $out -Algorithm SHA256).Hash)"
+        $all = [IO.File]::ReadAllBytes($out)
+        $payload = [byte[]]$all[25..($all.Length - 1)]
+        "$rel`t$([BitConverter]::ToString([Security.Cryptography.SHA256]::HashData($payload)).Replace('-', ''))"
     } else {
         $bytes = [Text.Encoding]::UTF8.GetBytes($text)
         $hash = [BitConverter]::ToString([Security.Cryptography.SHA256]::HashData($bytes)).Replace('-', '')
