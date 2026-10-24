@@ -115,6 +115,13 @@ pub(crate) fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult
             key
         )));
     }
+    if !obj.is_heap() {
+        return Err(RuntimeError::new(format!(
+            "cannot read property '{}' of {}",
+            key,
+            crate::exec::advanced::typeof_val(obj, heap)
+        )));
+    }
     Ok(VmValue::null())
 }
 

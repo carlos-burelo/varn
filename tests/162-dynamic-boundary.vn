@@ -320,4 +320,10 @@ await describe("162 dynamic boundary", async () => {
         expect(`${xs[0]}-${xs[1]}-${xs[2]}`).toBe("1-x-null")
         expect(`v=${null}`).toBe("v=null")
     })
+    await it("reading a property of a primitive dynamic value is an error, not null", () => {
+        const n: dynamic = 5
+        expect(() => {
+            const v = n.missing
+        }).toThrow("cannot read property")
+    })
 })
