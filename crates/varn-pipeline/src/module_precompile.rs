@@ -223,6 +223,7 @@ pub fn build_module_graph(
             check: &check,
             resolver: session,
             source: module_source,
+            measure: false,
         })
         .map_err(|e| crate::Failure::internal(format!("compile error in '{module_path}': {e}")))?;
         class_tables.insert(

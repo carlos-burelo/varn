@@ -26,7 +26,10 @@ pub(super) fn sample_stages(
     use varn_pipeline::{CachePolicy, Request, Stage};
 
     let compile = || {
-        let compilation = session.compile(source.clone(), Request::executable(CachePolicy::Bypass));
+        let compilation = session.compile(
+            source.clone(),
+            Request::executable(CachePolicy::Bypass).measured(),
+        );
         match &compilation.failure {
             Some(failure) => Err(CliError::fatal(format!("bench compile failed: {failure}"))),
             None => Ok(compilation),

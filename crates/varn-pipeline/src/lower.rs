@@ -150,6 +150,7 @@ pub(crate) struct LowerInput<'a> {
     pub(crate) check: &'a varn_sem::output::CheckResult,
     pub(crate) resolver: &'a crate::ModuleResolver,
     pub(crate) source: &'a str,
+    pub(crate) measure: bool,
 }
 
 pub(crate) struct Lowered {
@@ -165,6 +166,7 @@ pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
         check,
         resolver,
         source,
+        measure,
     } = input;
     let path = program.filename.as_ref();
 
@@ -187,7 +189,7 @@ pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
     .map_err(Failure::internal)?;
     inject_star_reexports(&mut tir, &exports);
     resolve_import_slots(&mut tir, resolver, path);
-    let (proto, optimize) = compile_tir(&tir, export_names, source, true);
+    let (proto, optimize) = compile_tir(&tir, export_names, source, measure);
     let proto = proto.map_err(|e| {
         Failure::internal(format!(
             "{}: {e}",

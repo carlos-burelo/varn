@@ -20,6 +20,7 @@ pub(crate) fn build_executable(
     source: &str,
     check: &varn_sem::output::CheckResult,
     resolver: &crate::ModuleResolver,
+    measure: bool,
 ) -> Result<Built, Failure> {
     let lowering = Instant::now();
     let Lowered {
@@ -32,6 +33,7 @@ pub(crate) fn build_executable(
         check,
         resolver,
         source,
+        measure,
     })?;
     let lower = lowering.elapsed().saturating_sub(optimize);
 

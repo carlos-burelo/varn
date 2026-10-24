@@ -16,6 +16,7 @@ pub enum CachePolicy {
 pub struct Request {
     pub goal: Goal,
     pub cache: CachePolicy,
+    pub measure_optimizer: bool,
 }
 
 impl Request {
@@ -23,6 +24,14 @@ impl Request {
         Request {
             goal: Goal::Executable,
             cache,
+            measure_optimizer: false,
+        }
+    }
+
+    pub fn measured(self) -> Request {
+        Request {
+            measure_optimizer: true,
+            ..self
         }
     }
 
@@ -30,6 +39,7 @@ impl Request {
         Request {
             goal: Goal::Checked,
             cache: CachePolicy::Bypass,
+            measure_optimizer: false,
         }
     }
 }

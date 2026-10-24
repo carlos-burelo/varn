@@ -151,6 +151,7 @@ impl Compilation {
             source.text(),
             checked,
             resolver,
+            request.measure_optimizer,
         )?;
         self.timings.push((Stage::Lower, built.lower));
         self.timings.push((Stage::Optimize, built.optimize));

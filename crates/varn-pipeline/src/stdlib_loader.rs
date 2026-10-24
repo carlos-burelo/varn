@@ -130,6 +130,7 @@ fn compile_source_inner(
         check: &check,
         resolver: session,
         source,
+        measure: false,
     })
     .map(|lowered| lowered.proto)
     .map_err(|e| e.to_string())
