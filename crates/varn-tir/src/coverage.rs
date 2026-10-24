@@ -153,6 +153,27 @@ impl Coverage {
         match &e.res {
             Resolution::None => {}
             Resolution::ByName { why, .. } => {
+                if matches!(why, DynReason::NotYetSupported) && std::env::var("NYS_TRACE").is_ok() {
+                    let (k, recv) = match &e.kind {
+                        TirExprKind::Field { object, .. } => ("Field", format!("{:?}", object.ty)),
+                        TirExprKind::MethodCall { recv, .. } => {
+                            ("Method", format!("{:?}", recv.ty))
+                        }
+                        other => (
+                            "Other",
+                            format!("{:?}", other)
+                                .split(|c: char| !c.is_alphanumeric())
+                                .next()
+                                .unwrap_or("")
+                                .to_string(),
+                        ),
+                    };
+                    let nm = match &e.res {
+                        Resolution::ByName { name, .. } => name.to_string(),
+                        _ => String::new(),
+                    };
+                    eprintln!("BYNAME {k} {nm} {recv}");
+                }
                 self.name_dispatch += 1;
                 self.by_name[reason_index(*why)] += 1;
             }

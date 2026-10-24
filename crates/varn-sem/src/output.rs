@@ -60,11 +60,17 @@ pub struct ForeignAccessor {
 }
 
 #[derive(Clone, Debug)]
+pub struct ForeignMethod {
+    pub name: Arc<str>,
+    pub ty: Type,
+}
+
+#[derive(Clone, Debug)]
 pub struct ForeignClass {
     pub name: Arc<str>,
     pub origin: Arc<str>,
     pub fields: Vec<InheritedField>,
-    pub methods: Vec<Arc<str>>,
+    pub methods: Vec<ForeignMethod>,
     pub accessors: Vec<ForeignAccessor>,
     pub constructor: Option<Type>,
     pub import_binding: Option<Arc<str>>,

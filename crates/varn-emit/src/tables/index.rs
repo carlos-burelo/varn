@@ -187,11 +187,26 @@ pub fn build(
                 (Arc::from(accessor.kind.key(&accessor.name)), sig)
             })
             .collect();
+        let methods: Vec<(Arc<str>, varn_tir::SigId)> = f
+            .methods
+            .iter()
+            .map(|method| {
+                let sig = super::intern_signature(
+                    &method.ty,
+                    &bind.ty_table,
+                    &bind.interner,
+                    tt,
+                    &names,
+                    &mut signatures,
+                );
+                (method.name.clone(), sig)
+            })
+            .collect();
         let mut info = ClassInfo::new_with_methods(
             f.name.clone(),
             varn_tir::Ancestry::Root,
             fields,
-            accessors,
+            accessors.into_iter().chain(methods).collect(),
             Vec::new(),
             tt,
         );

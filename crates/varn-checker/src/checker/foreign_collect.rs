@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
-use varn_sem::output::{ForeignAccessor, ForeignClass, InheritedField};
+use varn_sem::output::{ForeignAccessor, ForeignClass, ForeignMethod, InheritedField};
 use varn_sem::types::{ClassMemberKind, ObjectTypeMember, Type};
 
 impl Checker<'_> {
@@ -195,8 +195,16 @@ impl Checker<'_> {
                         });
                     }
                     ClassMemberKind::Method | ClassMemberKind::Function => {
-                        if !methods.contains(&m.name) {
-                            methods.push(m.name.clone());
+                        let method = ForeignMethod {
+                            name: m.name.clone(),
+                            ty: self.reintern_foreign_ty(level.owner.get(), m.ty),
+                        };
+                        match methods
+                            .iter_mut()
+                            .find(|k: &&mut ForeignMethod| k.name == m.name)
+                        {
+                            Some(slot) => *slot = method,
+                            None => methods.push(method),
                         }
                     }
                     ClassMemberKind::Constructor => {}
@@ -229,7 +237,6 @@ impl Checker<'_> {
         }
         let constructor =
             Some(self.effective_ctor_ty(name.as_ref(), OwnerRef::Foreign(owner.clone())));
-        methods.sort();
         let decorated = owner
             .interner
             .get(name.as_ref())
@@ -260,6 +267,7 @@ impl Checker<'_> {
             .iter()
             .map(|f| f.ty)
             .chain(accessors.iter().map(|a| a.ty))
+            .chain(methods.iter().map(|m| m.ty))
             .collect();
         Some((
             ForeignClass {
