@@ -1,95 +1,63 @@
 use super::Checker;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
 use varn_sem::output::ForeignEnum;
 use varn_sem::types::Type;
 
 impl Checker<'_> {
     pub(super) fn collect_foreign_enums<'t>(
-        &self,
+        &mut self,
         bind: &BindResult,
         types: impl Iterator<Item = &'t Type>,
     ) -> Vec<ForeignEnum> {
         let mut found: BTreeMap<(Arc<str>, Arc<str>), ForeignEnum> = BTreeMap::new();
-        for ty in types {
-            let members = match self.ty_table.get(ty.0) {
-                TypeKind::Union(list) => self.ty_table.get_list(list).to_vec(),
-                TypeKind::Primitive(_)
-                | TypeKind::Literal(_)
-                | TypeKind::This
-                | TypeKind::Array(_)
-                | TypeKind::Intersection(_)
-                | TypeKind::Tuple(_)
-                | TypeKind::Named(..)
-                | TypeKind::Generic(..)
-                | TypeKind::TemplateLiteral(_)
-                | TypeKind::Fn(_)
-                | TypeKind::Object(_)
-                | TypeKind::Typeof(_)
-                | TypeKind::KeyOf(_)
-                | TypeKind::IndexedAccess { .. }
-                | TypeKind::Mapped { .. }
-                | TypeKind::Conditional { .. }
-                | TypeKind::Infer(_)
-                | TypeKind::EnumVariant { .. }
-                | TypeKind::TypePredicate { .. } => vec![ty.0],
-            };
-            for id in members {
-                let (TypeKind::Named(name, Some(origin))
-                | TypeKind::Generic(name, _, Some(origin))) = self.ty_table.get(id)
-                else {
-                    continue;
-                };
-                let origin = self.resolve_bind_atom(bind, origin);
-                if origin.as_ref() == bind.source_file.as_ref() {
-                    continue;
-                }
-                let name = self.resolve_bind_atom(bind, name);
-                let key = (name.clone(), origin.clone());
-                if found.contains_key(&key) {
-                    continue;
-                }
-                let owner = self
-                    .resolver
-                    .module_bind(&origin)
-                    .or_else(|| self.resolver.stdlib_bind(&origin));
-                let Some(layout) = owner.as_deref().and_then(|b| {
-                    use varn_sem::bind::DeclKind;
-                    if !matches!(
-                        b.classify_decl(name.as_ref()),
-                        Some(DeclKind::Enum) | Some(DeclKind::SumType)
-                    ) {
-                        return None;
-                    }
-                    b.enum_layout(&name)
-                }) else {
-                    continue;
-                };
-                let variants = layout
-                    .into_iter()
-                    .map(|(v, fields)| (v, fields.len()))
-                    .collect();
-                let binding = bind
-                    .global_symbols()
-                    .find(|s| {
-                        s.origin_module
-                            .is_some_and(|m| self.resolve_bind_atom(bind, m) == origin)
-                            && s.original_name
-                                .is_some_and(|n| self.resolve_bind_atom(bind, n) == name)
-                    })
-                    .map(|s| self.resolve_bind_atom(bind, s.name));
-                found.insert(
-                    key,
-                    ForeignEnum {
-                        name,
-                        origin,
-                        binding,
-                        variants,
-                    },
-                );
+        let keys: Vec<(Arc<str>, Arc<str>)> = types
+            .flat_map(|ty| self.foreign_refs_in(bind, *ty))
+            .collect();
+        for key in keys {
+            let (name, origin) = key.clone();
+            if found.contains_key(&key) {
+                continue;
             }
+            let owner = self
+                .resolver
+                .module_bind(&origin)
+                .or_else(|| self.resolver.stdlib_bind(&origin));
+            let Some(layout) = owner.as_deref().and_then(|b| {
+                use varn_sem::bind::DeclKind;
+                if !matches!(
+                    b.classify_decl(name.as_ref()),
+                    Some(DeclKind::Enum) | Some(DeclKind::SumType)
+                ) {
+                    return None;
+                }
+                b.enum_layout(&name)
+            }) else {
+                continue;
+            };
+            let variants = layout
+                .into_iter()
+                .map(|(v, fields)| (v, fields.len()))
+                .collect();
+            let binding = bind
+                .global_symbols()
+                .find(|s| {
+                    s.origin_module
+                        .is_some_and(|m| self.resolve_bind_atom(bind, m) == origin)
+                        && s.original_name
+                            .is_some_and(|n| self.resolve_bind_atom(bind, n) == name)
+                })
+                .map(|s| self.resolve_bind_atom(bind, s.name));
+            found.insert(
+                key,
+                ForeignEnum {
+                    name,
+                    origin,
+                    binding,
+                    variants,
+                },
+            );
         }
         found.into_values().collect()
     }

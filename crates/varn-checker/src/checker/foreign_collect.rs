@@ -5,7 +5,7 @@ use std::sync::Arc;
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
 use varn_sem::output::{ForeignAccessor, ForeignClass, InheritedField};
-use varn_sem::types::{ClassMemberKind, Type};
+use varn_sem::types::{ClassMemberKind, ObjectTypeMember, Type};
 
 impl Checker<'_> {
     pub(super) fn collect_foreign_classes<'t>(
@@ -34,7 +34,7 @@ impl Checker<'_> {
         found.into_values().collect()
     }
 
-    fn foreign_refs_in(&mut self, bind: &BindResult, ty: Type) -> Vec<(Arc<str>, Arc<str>)> {
+    pub(super) fn foreign_refs_in(&mut self, bind: &BindResult, ty: Type) -> Vec<(Arc<str>, Arc<str>)> {
         let mut out = Vec::new();
         self.collect_refs_in(bind, ty, &mut out);
         out
@@ -69,13 +69,53 @@ impl Checker<'_> {
             TypeKind::Named(..) => {
                 self.collect_named_ref(bind, ty, out);
             }
+            TypeKind::Intersection(list) => {
+                for id in self.ty_table.get_list(list).to_vec() {
+                    self.collect_refs_in(bind, Type::resolved(id), out);
+                }
+            }
+            TypeKind::Fn(fid) => {
+                let f = self.ty_table.get_function(fid);
+                let (params, ret) = (f.params.clone(), f.return_type);
+                for p in params {
+                    self.collect_refs_in(bind, Type::resolved(p.ty), out);
+                }
+                self.collect_refs_in(bind, Type::resolved(ret), out);
+            }
+            TypeKind::Object(members) => {
+                for member in self.ty_table.get_object_members(members).to_vec() {
+                    match member {
+                        ObjectTypeMember::Property { ty, .. } => {
+                            self.collect_refs_in(bind, Type::resolved(ty), out);
+                        }
+                        ObjectTypeMember::Method {
+                            params,
+                            return_type,
+                            ..
+                        }
+                        | ObjectTypeMember::Callable {
+                            params,
+                            return_type,
+                            ..
+                        } => {
+                            for p in params {
+                                self.collect_refs_in(bind, Type::resolved(p.ty), out);
+                            }
+                            self.collect_refs_in(bind, Type::resolved(return_type), out);
+                        }
+                        ObjectTypeMember::Index {
+                            key_ty, value_ty, ..
+                        } => {
+                            self.collect_refs_in(bind, Type::resolved(key_ty), out);
+                            self.collect_refs_in(bind, Type::resolved(value_ty), out);
+                        }
+                    }
+                }
+            }
             TypeKind::Primitive(_)
             | TypeKind::Literal(_)
             | TypeKind::This
-            | TypeKind::Intersection(_)
             | TypeKind::TemplateLiteral(_)
-            | TypeKind::Fn(_)
-            | TypeKind::Object(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

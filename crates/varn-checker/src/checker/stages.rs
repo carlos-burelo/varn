@@ -89,9 +89,21 @@ pub(super) fn run_pass(
         .chain(bind.annotation_types.values().copied())
         .collect();
     rec.desugar.foreign_classes = checker.collect_foreign_classes(bind, reachable.iter());
+    let member_types: Vec<varn_sem::types::Type> = rec
+        .desugar
+        .foreign_classes
+        .iter()
+        .flat_map(|class| {
+            class
+                .fields
+                .iter()
+                .map(|f| f.ty)
+                .chain(class.accessors.iter().map(|a| a.ty))
+        })
+        .collect();
     rec.desugar.foreign_enums = checker.collect_foreign_enums(
         bind,
-        reachable.iter().chain(
+        reachable.iter().chain(member_types.iter()).chain(
             rec.desugar
                 .for_of_plans
                 .values()
