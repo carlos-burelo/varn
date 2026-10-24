@@ -7,8 +7,8 @@ use crate::{TirFunction, TirModule};
 pub struct Coverage {
     pub nodes: u32,
 
-    dynamics: [u32; 17],
-    by_name: [u32; 15],
+    dynamics: [u32; REASON_COUNT],
+    by_name: [u32; REASON_COUNT],
     pub static_dispatch: u32,
     pub name_dispatch: u32,
 }
@@ -35,7 +35,9 @@ fn reason_index(r: DynReason) -> usize {
     }
 }
 
-const REASON_LABELS: [&str; 17] = [
+const REASON_COUNT: usize = 17;
+
+const REASON_LABELS: [&str; REASON_COUNT] = [
     "host boundary",
     "union",
     "index signature",
