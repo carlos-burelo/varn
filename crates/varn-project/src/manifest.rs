@@ -16,6 +16,18 @@ pub struct Manifest {
     pub main: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub std: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub homepage: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub authors: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keywords: Vec<String>,
 
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub exports: BTreeMap<String, String>,

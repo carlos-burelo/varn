@@ -107,10 +107,10 @@ fn resolve_recursive(
 
         let installed_pkg_dir = cache::local_package_path(project_root, alias);
         let child_manifest_path = installed_pkg_dir.join(varn_project::MANIFEST_FILE);
-        if child_manifest_path.exists()
-            && let Ok(child_manifest) = varn_project::Manifest::load(&child_manifest_path)
-            && let Ok(child_deps) = parse_dependencies(&child_manifest.dependencies)
-        {
+        if child_manifest_path.exists() {
+            let child_manifest =
+                varn_project::Manifest::load(&child_manifest_path).map_err(|e| e.to_string())?;
+            let child_deps = parse_dependencies(&child_manifest.dependencies)?;
             resolve_recursive(
                 project_root,
                 &child_deps,
