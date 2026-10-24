@@ -267,8 +267,18 @@ impl<'r> Checker<'r> {
             | ExprKind::BoolLiteral { .. }
             | ExprKind::RegexLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::ImportMeta(_)
-            | ExprKind::This => {}
+            | ExprKind::ImportMeta(_) => {}
+            ExprKind::This => {
+                if self.current_class.is_none() && self.extension_self.is_none() {
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::ThisOutsideInstance,
+                            "'this' can only be used inside a class, an enum or an extension; an object literal has no receiver, declare a class",
+                        )
+                        .with_range(range),
+                    );
+                }
+            }
             ExprKind::Super => {
                 if !self.super_reachable {
                     self.emit(
