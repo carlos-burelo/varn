@@ -97,6 +97,15 @@ Check "cache-hit-on-second-run" {
     $first.Out -match "compile cache miss" -and $second.Out -match "compile cache hit" -and $second.Code -eq 0
 }
 
+Check "cache-concurrent-writers" {
+    $f = Write-Vn "concurrent\hello.vn" 'print("same");'
+    $runs = 1..8 | ForEach-Object -ThrottleLimit 8 -Parallel {
+        $out = & $using:vn run $using:f 2>&1 | Out-String
+        [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out.Trim() }
+    }
+    ($runs | Where-Object { $_.Code -ne 0 -or $_.Out -ne "same" }).Count -eq 0
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null
