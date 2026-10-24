@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+const a: int = 1
+const b: str = a is int

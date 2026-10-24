@@ -277,13 +277,16 @@ impl<'r> Checker<'r> {
             }
 
             ExprKind::Missing => Type::Dynamic,
+            ExprKind::Is { .. } => Type::Bool,
+            ExprKind::Sequence { expressions } => match expressions.last() {
+                Some(last) => self.infer_type(rec, *last, bind),
+                None => Type::Dynamic,
+            },
             ExprKind::RegexLiteral { .. }
-            | ExprKind::Sequence { .. }
             | ExprKind::Spawn { .. }
             | ExprKind::Yield { .. }
             | ExprKind::Spread { .. }
-            | ExprKind::ClassExpr { .. }
-            | ExprKind::Is { .. } => Type::Dynamic,
+            | ExprKind::ClassExpr { .. } => Type::Dynamic,
         }
     }
 }
