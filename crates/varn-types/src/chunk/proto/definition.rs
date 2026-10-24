@@ -6,6 +6,12 @@ use super::super::inline_cache::{FeedbackVector, PolyICSlot};
 use super::super::literal::opt_rc_str_serde;
 use super::super::Chunk;
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ImportLayout {
+    pub source: Arc<str>,
+    pub slots: Vec<(Arc<str>, u16)>,
+}
+
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct FunctionProto {
     #[serde(with = "opt_rc_str_serde")]
@@ -13,6 +19,9 @@ pub struct FunctionProto {
     pub arity: usize,
 
     pub export_names: Vec<Arc<str>>,
+
+    #[serde(default)]
+    pub import_layouts: Vec<ImportLayout>,
 
     pub register_count: u16,
     pub has_rest: bool,

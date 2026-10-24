@@ -189,6 +189,7 @@ pub(crate) fn emit_function_meta(
         name: Some(Arc::from(f.name.as_ref())),
         arity: 1 + nparams,
         export_names: Vec::new(),
+        import_layouts: Vec::new(),
         register_count,
         has_rest: f.has_rest,
         checks_params: false,

@@ -34,6 +34,9 @@ pub(crate) extern "C" fn jit_load_module(
             };
         if ctx_ref.vm_suspend.is_some() {
             jit_suspend_at(ctx_ref, self_idx, own_ip);
+        } else if let Err(e) = ctx_ref.check_import_layout(loaded, &spec, &closure_ref.proto) {
+            jit_propagate_error(ctx_ref, e);
+            return;
         }
         ctx_ref.jit_native_result = loaded;
     }

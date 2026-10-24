@@ -140,6 +140,27 @@ pub fn compile_module(
         Ok(p) => p,
         Err(e) => return (Err(e), Duration::ZERO),
     };
+    proto.import_layouts = tir
+        .imports
+        .iter()
+        .filter(|import| !import.is_type_only)
+        .map(|import| varn_types::chunk::ImportLayout {
+            source: import.source.clone(),
+            slots: import
+                .specs
+                .iter()
+                .filter_map(|spec| {
+                    let name: Arc<str> = match &spec.kind {
+                        varn_tir::TirImportKind::Namespace => return None,
+                        varn_tir::TirImportKind::Default => Arc::from("default"),
+                        varn_tir::TirImportKind::Named(name) => name.clone(),
+                    };
+                    Some((name, spec.slot?))
+                })
+                .collect(),
+        })
+        .filter(|layout| !layout.slots.is_empty())
+        .collect();
     proto.export_names = export_names
         .into_iter()
         .map(|s| Arc::from(s.as_ref()))

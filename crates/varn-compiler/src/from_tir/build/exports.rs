@@ -1,5 +1,4 @@
 use super::context::Builder;
-use crate::hir::HirBinOp;
 use crate::ssa::ir::{InstKind, Terminator, Value};
 use std::sync::Arc;
 use varn_tir::{BackendTy, DynReason};
@@ -61,24 +60,13 @@ impl<'m> Builder<'m> {
                     varn_tir::TirImportKind::Named(n) => Some(n.clone()),
                 };
                 let val = match (imported_name, spec.slot) {
-                    (Some(name), Some(slot)) => {
-                        let slot_v = self.emit(
-                            InstKind::ModuleSlot {
-                                object: mod_v,
-                                slot,
-                            },
-                            BackendTy::Dynamic(DynReason::Boxed),
-                        );
-                        let name_v = self.emit(
-                            InstKind::GetProperty {
-                                object: mod_v,
-                                name: name.clone(),
-                            },
-                            BackendTy::Dynamic(DynReason::Boxed),
-                        );
-                        self.emit_slot_guard(&imp.source, &name, slot, slot_v, name_v);
-                        slot_v
-                    }
+                    (Some(_), Some(slot)) => self.emit(
+                        InstKind::ModuleSlot {
+                            object: mod_v,
+                            slot,
+                        },
+                        BackendTy::Dynamic(DynReason::Boxed),
+                    ),
                     _ => {
                         let name: Arc<str> = match &spec.kind {
                             varn_tir::TirImportKind::Namespace => {
@@ -153,48 +141,6 @@ impl<'m> Builder<'m> {
         self.add_pred(join_blk, from);
         self.add_pred(join_blk, end);
         self.seal_block(join_blk);
-        self.current = join_blk;
-    }
-
-    fn emit_slot_guard(
-        &mut self,
-        source: &Arc<str>,
-        name: &Arc<str>,
-        slot: u16,
-        slot_v: Value,
-        name_v: Value,
-    ) {
-        let cond = self.emit(
-            InstKind::Binary {
-                op: HirBinOp::Eq,
-                lhs: slot_v,
-                rhs: name_v,
-                ty: BackendTy::Dynamic(DynReason::Boxed),
-            },
-            BackendTy::Bool,
-        );
-        let throw_blk = self.new_block();
-        let join_blk = self.new_block();
-        let from = self.current;
-        self.set_term(Terminator::Branch {
-            cond,
-            then_blk: join_blk,
-            then_args: vec![],
-            else_blk: throw_blk,
-            else_args: vec![],
-        });
-        self.add_pred(join_blk, from);
-        self.add_pred(throw_blk, from);
-        self.seal_block(join_blk);
-        self.seal_block(throw_blk);
-        self.current = throw_blk;
-        let msg = self.emit(
-            InstKind::ConstStr(Arc::from(format!(
-                "E_SLOT_MISMATCH: '{name}' from '{source}' is not at slot {slot} anymore"
-            ))),
-            BackendTy::Str,
-        );
-        self.set_term(Terminator::Throw(msg));
         self.current = join_blk;
     }
 }

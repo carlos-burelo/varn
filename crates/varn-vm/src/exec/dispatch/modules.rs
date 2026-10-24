@@ -27,6 +27,7 @@ impl ExecCtx {
             self.frames[frame_idx].ip = *ip;
             return Ok(());
         }
+        self.check_import_layout(module_nv, &spec, &closure.proto)?;
         let base = self.frames[frame_idx].base;
         self.stack.unbox_into_reg(base, dest_reg, module_nv)?;
         Ok(())

@@ -5,6 +5,7 @@ impl PartialEq for FunctionProto {
         self.name == other.name
             && self.arity == other.arity
             && self.export_names == other.export_names
+            && self.import_layouts == other.import_layouts
             && self.register_count == other.register_count
             && self.has_rest == other.has_rest
             && self.is_async == other.is_async
@@ -25,6 +26,7 @@ impl std::hash::Hash for FunctionProto {
         self.name.hash(state);
         self.arity.hash(state);
         self.export_names.hash(state);
+        self.import_layouts.hash(state);
         self.register_count.hash(state);
         self.has_rest.hash(state);
         self.is_async.hash(state);

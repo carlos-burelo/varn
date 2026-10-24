@@ -97,6 +97,38 @@ impl ExecCtx {
         self.load_module_from_source(specifier, source_file.as_ref())
     }
 
+    pub(crate) fn check_import_layout(
+        &self,
+        module: VmValue,
+        specifier: &str,
+        proto: &varn_types::FunctionProto,
+    ) -> VmResult<()> {
+        let Some(layout) = proto
+            .import_layouts
+            .iter()
+            .find(|l| l.source.as_ref() == specifier)
+        else {
+            return Ok(());
+        };
+        if !module.is_heap() {
+            return Ok(());
+        }
+        let Some(HeapObj::Module(loaded)) = self.heap.get(module.as_heap()) else {
+            return Ok(());
+        };
+        if loaded.export_map.is_empty() {
+            return Ok(());
+        }
+        for (name, slot) in &layout.slots {
+            if loaded.export_map.get(name) != Some(&usize::from(*slot)) {
+                return Err(RuntimeError::new(format!(
+                    "E_SLOT_MISMATCH: '{name}' from '{specifier}' is not at slot {slot} anymore"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn load_module_from_source(
         &mut self,
         specifier: &str,
