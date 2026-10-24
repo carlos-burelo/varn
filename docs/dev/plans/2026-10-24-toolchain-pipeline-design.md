@@ -314,3 +314,24 @@ condicione el diseño (Ley 18: se rehace el test).
 - Orden de los pasos: errores y sesión primero porque todo lo demás los consume.
 - La semántica de unidades de `vn test` se conserva tal cual (el módulo corre una vez por
   unidad).
+
+## Pendiente de diseño: tests invocados por el runtime
+
+El runner de `vn test` sigue ejecutando cada `@test` con `Source::appended`
+(el módulo se compila con una llamada al final). Sustituirlo por
+`Executable.tests` + `Runtime::run_test` exige tres piezas que hoy no existen
+y que son un cimiento propio (Ley 14), no un detalle del CLI:
+
+1. `varn_sem::output::TestTarget` debe llevar el `slot_idx` del símbolo (el
+   checker ya lo conoce) para que el runtime ubique la función en la región de
+   globales del módulo de entrada.
+2. `Vm` necesita una llamada pública desde el host (`invoke` es `pub(crate)`)
+   que ejecute una función global y, si devuelve una tarea, la espere con
+   `settle_awaited`.
+3. Un valor lanzado por un test asíncrono (`Err(thrown)`) debe convertirse en
+   un `RuntimeError` con el mismo mensaje y pila que produce hoy el `await` de
+   nivel superior; esa conversión vive hoy dentro del bucle de `drive_main`.
+
+Verificación al implementarlo: mismas unidades aprobadas y fallidas en
+`vn test`, mismos mensajes de fallo, y menos compilaciones por archivo con
+`@test` (hoy 1 + N).
