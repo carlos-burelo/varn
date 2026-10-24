@@ -2,7 +2,7 @@ use super::context::{FnEmitter, ModuleCtx};
 use crate::ty::lower_type;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
-use varn_core::ast::{AstArena, AstId, ExprId};
+use varn_core::ast::{AstArena, AstId, ExprId, ExprKind};
 use varn_sem::output::TypeEntry;
 use varn_tir::{
     BackendTy, ClassId, ClassInfo, DynReason, EnumId, LocalId, Resolution, Signature, Span,
@@ -381,7 +381,15 @@ impl<'a> FnEmitter<'a> {
         let interner = self.m.interner;
         match self.expr_table.get(&e.index()) {
             Some(entry) => lower_type(&entry.ty, table, interner, self.tt, names),
-            None => BackendTy::Dynamic(DynReason::NotYetSupported),
+            None => match &self.ast_arena.expr(e).kind {
+                ExprKind::IntLiteral { .. } => BackendTy::Int,
+                ExprKind::FloatLiteral { .. } => BackendTy::Float,
+                ExprKind::BoolLiteral { .. } => BackendTy::Bool,
+                ExprKind::StrLiteral { .. } => BackendTy::Str,
+                ExprKind::CharLiteral { .. } => BackendTy::Char,
+                ExprKind::NullLiteral => crate::ty::NULL_TY,
+                _ => BackendTy::Dynamic(DynReason::NotYetSupported),
+            },
         }
     }
 }

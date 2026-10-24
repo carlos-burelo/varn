@@ -59,7 +59,7 @@ pub(super) fn emit_namespace_object(
     top_body: &mut Vec<TirStmt>,
 ) {
     let path = scoped_name(outer, interner.resolve(ns.id));
-    let dyno = || BackendTy::Dynamic(DynReason::NotYetSupported);
+    let dyno = || BackendTy::Dynamic(DynReason::Declared);
     let global_ref = |slot: u32| TirExpr {
         kind: TirExprKind::Var,
         ty: dyno(),
