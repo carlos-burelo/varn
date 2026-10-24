@@ -74,3 +74,6 @@ graphify-out
 
 # tgrep index
 .tgrep/
+
+# MCP local (ruta relativa a un checkout personal)
+.mcp.json
