@@ -213,6 +213,15 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   y estáticos. Cada familia exige un mecanismo propio: itable/offset por interfaz (198),
   shape fija para tipos de objeto (161), opcodes tipados para propiedades core (111).
   Arreglado de paso: `coverage.rs` desbordaba `by_name` con las razones nuevas.
+- Costo real (2026-10-24, perfil `quick`, bucle de lecturas con JIT): campo por tipo de clase
+  200M lecturas 0.25 s; campo por tipo de interfaz 200M 6.6 s (26x, ~33 ns por lectura, igual
+  con dos clases polimórficas); campo de tipo de objeto anónimo 100M 0.23 s (ya rápido);
+  `.length` de array 100M 0.18 s contra `Map.size` 100M 7.0 s (40x). Conclusión: los dos
+  huecos con ganancia medible son campos vía interfaz (198 nodos) y propiedades `readonly` de
+  Map/Set; los tipos de objeto no son un problema. `Length` ya tiene SSA/opcode propios, pero un
+  opcode SSA nuevo toca ~70 archivos (pases, JIT, VM, portable); el camino barato para
+  `size` es un native op `Map.size`/`Set.size` en el contrato (hoy es `readonly size: int`,
+  sin op) y que `lower_length` lo emita como `CallNativeOp`.
 
 ## Fase D — higiene y release
 
