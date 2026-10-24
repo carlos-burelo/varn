@@ -1,7 +1,4 @@
 use crate::{cli::RunArgs, error::CliError, pipeline};
-use std::path::PathBuf;
-use varn_pipeline::CapabilitySet;
-use varn_types::capabilities::*;
 
 pub fn execute(session: &pipeline::Session, args: RunArgs) -> Result<(), CliError> {
     let (file_path, eval) = match (args.file.as_ref(), args.eval.as_ref()) {
@@ -19,8 +16,6 @@ pub fn execute(session: &pipeline::Session, args: RunArgs) -> Result<(), CliErro
         return crate::commands::compare_tiers::execute(&file_path, &args.script_args);
     }
 
-    let capabilities = build_capabilities(&args);
-
     let mut debug = varn_pipeline::DebugFlags::default();
     debug.trace = args.trace;
 
@@ -34,107 +29,9 @@ pub fn execute(session: &pipeline::Session, args: RunArgs) -> Result<(), CliErro
         )?,
         None => crate::exec::load(session, &file_path, &debug, args.verbose)?,
     };
-    crate::exec::run(session, executable, &debug, capabilities, false)
-}
-
-pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {
-    if args.sandbox {
-        return CapabilitySet::sandbox();
-    }
-
-    let has_any_allow_flag = args.allow_read.is_some()
-        || args.allow_write.is_some()
-        || args.allow_net.is_some()
-        || args.allow_env.is_some()
-        || args.allow_ffi
-        || args.allow_ui;
-
-    if args.allow_all || !has_any_allow_flag {
-        return CapabilitySet::allow_all();
-    }
-
-    let mut mask = 0u64;
-    let mut fs_read_paths = None;
-    let mut fs_write_paths = None;
-    let mut net_hosts: Option<Vec<String>> = None;
-    let mut net_ports: Option<Vec<i64>> = None;
-    let mut env_vars = None;
-
-    if let Some(ref read_spec) = args.allow_read {
-        mask |= CAP_FS_READ;
-        if read_spec != "*" && !read_spec.is_empty() {
-            fs_read_paths = Some(
-                read_spec
-                    .split(',')
-                    .map(|s| PathBuf::from(s.trim()))
-                    .collect(),
-            );
-        }
-    }
-
-    if let Some(ref write_spec) = args.allow_write {
-        mask |= CAP_FS_WRITE;
-        if write_spec != "*" && !write_spec.is_empty() {
-            fs_write_paths = Some(
-                write_spec
-                    .split(',')
-                    .map(|s| PathBuf::from(s.trim()))
-                    .collect(),
-            );
-        }
-    }
-
-    if let Some(ref net_spec) = args.allow_net {
-        mask |= CAP_NET_CLIENT | CAP_NET_SERVER;
-        if net_spec != "*" && !net_spec.is_empty() {
-            let mut hosts = Vec::new();
-            let mut ports = Vec::new();
-            for part in net_spec.split(',') {
-                let p = part.trim();
-                if p.is_empty() {
-                    continue;
-                }
-                if let Some((h, port_str)) = p.rsplit_once(':')
-                    && let Ok(port) = port_str.parse::<i64>()
-                {
-                    if !h.is_empty() {
-                        hosts.push(h.to_string());
-                    }
-                    ports.push(port);
-                    continue;
-                }
-                hosts.push(p.to_string());
-            }
-            if !hosts.is_empty() {
-                net_hosts = Some(hosts);
-            }
-            if !ports.is_empty() {
-                net_ports = Some(ports);
-            }
-        }
-    }
-
-    if let Some(ref env_spec) = args.allow_env {
-        mask |= CAP_SYS_ENV;
-        if env_spec != "*" && !env_spec.is_empty() {
-            env_vars = Some(env_spec.split(',').map(|s| s.trim().to_string()).collect());
-        }
-    }
-
-    if args.allow_ffi {
-        mask |= CAP_SYS_FFI;
-    }
-
-    if args.allow_ui {
-        mask |= CAP_UI;
-    }
-
-    CapabilitySet {
-        mask,
-        fs_read_paths,
-        fs_write_paths,
-        net_hosts,
-        net_ports,
-        env_vars,
-    }
+    crate::exec::run(
+        session,
+        executable,
+        crate::exec::policy(&args.permissions, &debug, false),
+    )
 }

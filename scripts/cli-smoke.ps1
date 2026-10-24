@@ -106,6 +106,13 @@ Check "cache-concurrent-writers" {
     ($runs | Where-Object { $_.Code -ne 0 -or $_.Out -ne "same" }).Count -eq 0
 }
 
+Check "eval-honors-permissions" {
+    $code = 'import { readText } from "std:fs"; print(readText("Cargo.toml").length > 0)'
+    $denied = Vn eval --allow-net $code
+    $granted = Vn eval --allow-read $code
+    $denied.Code -ne 0 -and $denied.Out -match "PERMISSION" -and $granted.Code -eq 0 -and $granted.Out -match "true"
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null

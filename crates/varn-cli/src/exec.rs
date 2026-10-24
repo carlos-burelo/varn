@@ -1,8 +1,7 @@
 use crate::debug_print;
+use crate::cli::PermissionArgs;
 use crate::error::CliError;
-use varn_pipeline::{
-    portable, CachePolicy, CapabilitySet, DebugFlags, Executable, Request, Session, Source,
-};
+use varn_pipeline::{portable, CachePolicy, DebugFlags, Executable, Policy, Request, Session, Source};
 
 pub fn cache_policy(debug: &DebugFlags) -> CachePolicy {
     if debug.any() {
@@ -38,12 +37,15 @@ pub fn load(
     compile(session, source, cache_policy(debug), debug, verbose)
 }
 
-pub fn run(
-    session: &Session,
-    executable: Executable,
-    debug: &DebugFlags,
-    capabilities: CapabilitySet,
-    silent: bool,
-) -> Result<(), CliError> {
-    varn_pipeline::execute(session, executable, debug, capabilities, silent).map_err(CliError::from)
+pub fn policy(permissions: &PermissionArgs, debug: &DebugFlags, silent: bool) -> Policy {
+    Policy {
+        capabilities: crate::policy::capabilities(permissions),
+        trace: debug.trace,
+        gc: debug.gc,
+        silent,
+    }
+}
+
+pub fn run(session: &Session, executable: Executable, policy: Policy) -> Result<(), CliError> {
+    varn_pipeline::execute(session, executable, policy).map_err(CliError::from)
 }

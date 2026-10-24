@@ -20,6 +20,7 @@ mod formatter;
 #[cfg(feature = "lsp")]
 mod inspect_lsp;
 mod pipeline;
+mod policy;
 mod source_name;
 mod std_source;
 mod tester;
@@ -289,9 +290,7 @@ fn try_run_standalone_executable() {
     if let Err(e) = pipeline::execute(
         &Session::detached(),
         executable,
-        &Default::default(),
-        pipeline::CapabilitySet::allow_all(),
-        false,
+        pipeline::Policy::new(pipeline::CapabilitySet::allow_all()),
     ) {
         eprintln!("Standalone runtime error: {e}");
         process::exit(1);

@@ -1,9 +1,8 @@
 use crate::core;
-use crate::{Executable, Failure, RuntimeFailure, Session};
+use crate::{Executable, Failure, Policy, RuntimeFailure, Session};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_compiler::FunctionProto;
-use varn_core::debug_flags::DebugFlags;
 use varn_core::ModuleId;
 use varn_types::capabilities::CapabilitySet;
 use varn_vm::Vm;
@@ -13,14 +12,17 @@ type PipelineResult<T> = Result<T, Failure>;
 pub fn execute(
     session: &Session,
     executable: Executable,
-    debug: &DebugFlags,
-    capabilities: CapabilitySet,
-    print_silent: bool,
+    policy: Policy,
 ) -> Result<(), Failure> {
-    let mut machine = boot_machine(session, executable.precompiled, capabilities, debug.trace)?;
-    machine.ctx.print_silent = print_silent;
+    let mut machine = boot_machine(
+        session,
+        executable.precompiled,
+        policy.capabilities,
+        policy.trace,
+    )?;
+    machine.ctx.print_silent = policy.silent;
     let main_proto = enter_main(&mut machine, executable.entry_proto);
-    if debug.trace {
+    if policy.trace {
         varn_core::term::terminal::tagged(
             "pipeline:execute",
             format_args!(
@@ -41,7 +43,7 @@ pub fn execute(
             }));
         }
     }
-    if debug.gc {
+    if policy.gc {
         eprintln!("{}", machine.gc_report());
     }
     machine.abandon_heap_at_exit();

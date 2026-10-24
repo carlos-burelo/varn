@@ -71,6 +71,7 @@ pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), 
     let print_lock: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
 
     let quiet = !args.verbose;
+    let capabilities = crate::policy::capabilities(&args.permissions);
 
     let mut handles = Vec::with_capacity(num_workers);
 
@@ -83,6 +84,7 @@ pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), 
         let out_lock = Arc::clone(&print_lock);
         let fail_fast = args.fail_fast;
         let session = Arc::clone(&session);
+        let capabilities = capabilities.clone();
         let verbose = args.verbose;
 
         handles.push(std::thread::spawn(move || loop {
@@ -107,7 +109,7 @@ pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), 
                     break;
                 }
                 let t1 = Instant::now();
-                let run_res = run_unit(&session, &path, append.as_deref(), quiet);
+                let run_res = run_unit(&session, &path, append.as_deref(), &capabilities, quiet);
                 let elapsed = t1.elapsed();
 
                 let passed = run_res.is_ok();
@@ -207,6 +209,7 @@ fn run_unit(
     session: &pipeline::Session,
     path: &PathBuf,
     append: Option<&str>,
+    capabilities: &pipeline::CapabilitySet,
     quiet: bool,
 ) -> Result<(), CliError> {
     let unit_session = session.isolated();
@@ -220,9 +223,12 @@ fn run_unit(
     crate::exec::run(
         &unit_session,
         executable,
-        &debug,
-        pipeline::CapabilitySet::allow_all(),
-        quiet,
+        pipeline::Policy {
+            capabilities: capabilities.clone(),
+            trace: false,
+            gc: false,
+            silent: quiet,
+        },
     )
 }
 

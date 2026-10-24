@@ -36,9 +36,7 @@ pub fn execute(session: &pipeline::Session, args: DebugArgs) -> Result<(), CliEr
         crate::exec::run(
             session,
             executable,
-            &debug,
-            pipeline::CapabilitySet::allow_all(),
-            false,
+            crate::exec::policy(&args.permissions, &debug, false),
         )?;
     }
     Ok(())

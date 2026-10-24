@@ -14,6 +14,7 @@ mod lex;
 mod lower;
 pub mod module_precompile;
 mod parse;
+mod policy;
 pub mod portable;
 mod quiet_parse;
 mod request;
@@ -37,6 +38,7 @@ pub use lower::{
     resolve_import_slots, sorted_export_names, tir_import_sources, LowerInput, Lowered,
 };
 pub use parse::{parse as phase_parse, Parsed};
+pub use policy::Policy;
 pub use request::{CachePolicy, Goal, Request};
 pub use session::Session;
 pub use source::Source;

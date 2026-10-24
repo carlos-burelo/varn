@@ -68,6 +68,15 @@ pub struct RunArgs {
     #[arg(long)]
     pub trace: bool,
 
+    #[command(flatten)]
+    pub permissions: PermissionArgs,
+
+    #[arg(long = "compare-tiers")]
+    pub compare_tiers: bool,
+}
+
+#[derive(Args)]
+pub struct PermissionArgs {
     #[arg(short = 'A', long = "allow-all")]
     pub allow_all: bool,
 
@@ -91,13 +100,13 @@ pub struct RunArgs {
 
     #[arg(long = "sandbox")]
     pub sandbox: bool,
-
-    #[arg(long = "compare-tiers")]
-    pub compare_tiers: bool,
 }
 
 #[derive(Args)]
 pub struct DebugArgs {
+    #[command(flatten)]
+    pub permissions: PermissionArgs,
+
     pub file: Option<String>,
 
     #[arg(short, long, value_name = "CODE")]
@@ -123,6 +132,9 @@ pub struct CheckArgs {
 
 #[derive(Args)]
 pub struct EvalArgs {
+    #[command(flatten)]
+    pub permissions: PermissionArgs,
+
     pub code: String,
 
     #[arg(short, long)]
@@ -131,6 +143,9 @@ pub struct EvalArgs {
 
 #[derive(Args)]
 pub struct ReplArgs {
+    #[command(flatten)]
+    pub permissions: PermissionArgs,
+
     #[arg(long)]
     pub debug_bytecode: bool,
 }
@@ -252,6 +267,9 @@ pub enum Shell {
 
 #[derive(Args)]
 pub struct TestArgs {
+    #[command(flatten)]
+    pub permissions: PermissionArgs,
+
     pub path: Option<String>,
 
     #[arg(short, long)]
