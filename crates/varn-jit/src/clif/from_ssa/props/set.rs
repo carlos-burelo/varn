@@ -40,6 +40,30 @@ pub(crate) fn emit_set_property(
     b.switch_to_block(chk);
 
     let young = is_young(b, op, alay);
+    let cell_kind = b.ins().uload8(types::I64, m, op, alay.kind_off as i32);
+    let is_instance = b.ins().icmp_imm_u(
+        IntCC::Equal,
+        cell_kind,
+        varn_types::cell::CELL_KIND_INSTANCE as i64,
+    );
+    let instance_blk = b.create_block();
+    let shaped_blk = b.create_block();
+    b.ins()
+        .brif(is_instance, instance_blk, &[], shaped_blk, &[]);
+    b.switch_to_block(instance_blk);
+    super::instance_ic::emit_instance_store(
+        b,
+        ctx,
+        op,
+        cell_kind,
+        frame.closure,
+        cs,
+        val,
+        young,
+        cont,
+        slow,
+    );
+    b.switch_to_block(shaped_blk);
     let res = b.create_block();
     b.ins().brif(young, res, &[], slow, &[]);
     b.switch_to_block(res);

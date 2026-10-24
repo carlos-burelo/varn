@@ -217,13 +217,15 @@ impl ExecCtx {
                 {
                     self.heap.write_barrier(obj.as_heap(), val);
                     if cs_idx < cache_len && !is_megamorphic {
+                        let (offset, access) = inst.field_placement(slot).unwrap_or((0, 0));
                         let entry = varn_types::chunk::CacheEntry {
                             id: inst.class_id,
                             slot: slot as u16,
                             is_class: ICKind::INSTANCE_FIELD,
                             vtable_ver: 0,
                             class: None,
-                            ..Default::default()
+                            offset,
+                            access,
                         };
                         closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                         closure.feedback.borrow_mut().observe(cs_idx, inst.class_id);
