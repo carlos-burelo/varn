@@ -204,6 +204,15 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 - Tras A1/A2, medir cuáles de `GetProperty`, `LoadGlobal`, `index_instance_fallback`,
   `fallback_method_call` siguen alcanzables (bails/tiers) y borrar las muertas.
   Las que sobrevivan se justifican como `dynamic` declarado (Ley 17).
+- Medido (2026-10-24, `tir:check` sobre `tests/*.vn`, nodos con `Resolution::ByName`): 617 en
+  total. `interface` 198 (lecturas de campo: `kind`, `text`, `x`, `w`, `name`), `object type`
+  161 (campos de tipos de objeto anónimos), `core member` 111 (`size` 26, `rawValue` 16, `slice`
+  9, `alloc` 7, `fromString` 6, `parse`, `fromCode`, estáticos de `Int`/`Bytes`/`Char`),
+  `declared` 107, `range` 35, `spread` 3, `union` 2. Los métodos de tipos core ya van por
+  `core_ops` (`NativeOp`); lo que queda son propiedades `readonly` de clases core (no tienen op)
+  y estáticos. Cada familia exige un mecanismo propio: itable/offset por interfaz (198),
+  shape fija para tipos de objeto (161), opcodes tipados para propiedades core (111).
+  Arreglado de paso: `coverage.rs` desbordaba `by_name` con las razones nuevas.
 
 ## Fase D — higiene y release
 
