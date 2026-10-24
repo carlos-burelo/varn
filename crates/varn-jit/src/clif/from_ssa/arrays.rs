@@ -71,6 +71,17 @@ pub(super) fn view(
     let data = b.use_var(v.data);
     let len = b.use_var(v.len);
     let disc = b.use_var(v.disc);
+    let pinned_here = ctx
+        .pinned_bodies
+        .borrow()
+        .get(&object)
+        .is_some_and(|body| body.contains(&ctx.emitting_block.get()));
+    if pinned_here {
+        let valid = b.create_block();
+        b.ins().brif(data, valid, &[], slow, &[]);
+        b.switch_to_block(valid);
+        return Ok((data, len, disc));
+    }
     let ready = b.create_block();
     for _ in 0..3 {
         b.append_block_param(ready, types::I64);
@@ -87,16 +98,9 @@ pub(super) fn view(
     b.switch_to_block(miss);
     let obj = heap::boxed_value(b, ctx, values, object)?;
     let (d, l, di) = resolve(b, ctx, obj, slow);
-    let pinned_here = ctx
-        .pinned_bodies
-        .borrow()
-        .get(&object)
-        .is_some_and(|body| body.contains(&ctx.emitting_block.get()));
-    if !pinned_here {
-        b.def_var(v.data, d);
-        b.def_var(v.len, l);
-        b.def_var(v.disc, di);
-    }
+    b.def_var(v.data, d);
+    b.def_var(v.len, l);
+    b.def_var(v.disc, di);
 
     super::store::drop_home_addrs(ctx);
     b.ins().jump(ready, &[d.into(), l.into(), di.into()]);
