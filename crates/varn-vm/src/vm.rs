@@ -48,10 +48,54 @@ impl Vm {
                 .ctx
                 .globals_mut()
                 .reserve_module_region(proto.global_count, true);
+            self.ctx.main_module_base.get_or_insert(entry.module_base);
             self.ctx.push_frame(Rc::new(entry))?;
         }
 
         self.ctx.run()
+    }
+
+    pub fn call_main_global(&mut self, global: u32) -> Result<(), crate::error::RuntimeError> {
+        let base = self
+            .ctx
+            .main_module_base
+            .ok_or_else(|| crate::error::RuntimeError::new("the main module has not run yet"))?;
+        let callee = self
+            .ctx
+            .globals_mut()
+            .get_by_index(base as usize + global as usize)
+            .ok_or_else(|| {
+                crate::error::RuntimeError::new(format!(
+                    "module global {global} is outside the main module region"
+                ))
+            })?;
+        let returned = self.ctx.invoke(callee, &[callee])?;
+        let lazy = returned
+            .is_heap()
+            .then(|| self.ctx.heap.get(returned.as_heap()))
+            .flatten()
+            .and_then(|obj| {
+                if let crate::heap::HeapObj::Task(lazy) = obj {
+                    Some(Rc::clone(lazy))
+                } else {
+                    None
+                }
+            });
+        let cell = match lazy {
+            Some(lazy) => Some(self.ctx.run_lazy_task_sync(lazy)),
+            None => self.ctx.task_cell(returned),
+        };
+        let Some(cell) = cell else {
+            return Ok(());
+        };
+        match self.ctx.settle_awaited(&cell) {
+            Ok(_) => Ok(()),
+            Err(thrown) => Err(exec::exceptions::build_thrown_error(
+                thrown,
+                &self.ctx.heap,
+                &[],
+            )),
+        }
     }
 
     pub fn enable_opcode_profiling(&mut self) {

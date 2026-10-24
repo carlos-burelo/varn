@@ -155,7 +155,7 @@ impl ExecCtx {
         res.map(Invoked::Value)
     }
 
-    pub(super) fn task_cell(&self, v: VmValue) -> Option<std::rc::Rc<crate::task::TaskCell>> {
+    pub(crate) fn task_cell(&self, v: VmValue) -> Option<std::rc::Rc<crate::task::TaskCell>> {
         if !v.is_heap() {
             return None;
         }
