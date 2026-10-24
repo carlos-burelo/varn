@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use varn_core::ast::TypeNode;
+use varn_core::ast::{ExprId, ExprKind, TypeNode};
 use varn_core::TypeKind;
 use varn_sem::bind::ClassParent;
 use varn_sem::types::Type;
@@ -12,6 +12,17 @@ impl<'r> super::Binder<'r> {
             .collect();
         if !edges.is_empty() {
             self.class_interfaces.insert(owner.clone(), edges);
+        }
+    }
+
+    pub(crate) fn heritage_type(&mut self, expr: ExprId) -> Type {
+        if matches!(
+            self.ast_arena.expr(expr).kind,
+            ExprKind::Identifier { .. } | ExprKind::Member { .. }
+        ) {
+            self.infer_expr_type_self(expr)
+        } else {
+            Type::Dynamic
         }
     }
 

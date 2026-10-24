@@ -59,7 +59,7 @@ impl<'r> super::Binder<'r> {
         self.mark_optional_fields(c, &mut members);
 
         let extends = c.super_class.as_ref().and_then(|e| {
-            let super_ty = self.infer_expr_type_self(*e);
+            let super_ty = self.heritage_type(*e);
             let args: Vec<Type> = c
                 .super_type_args
                 .iter()
