@@ -9,11 +9,8 @@ name = "vn"
 path = "src/main.rs"
 
 [features]
-default = ["lsp", "clif", "dap", "pm"]
-lsp = ["dep:varn-lsp", "dep:tower-lsp-f", "dep:varn-resolver"]
+default = ["clif"]
 clif = ["varn-jit/clif", "varn-vm/clif", "varn-debug/clif"]
-dap = ["dep:varn-dap"]
-pm = ["dep:varn-pm"]
 embed-std = []
 # Real heap profiling (dhat-rs), for when RSS doesn't add up to counted
 # structures — mimalloc retains freed pages instead of returning them to the
@@ -35,15 +32,15 @@ varn-vm       = { path = "../varn-vm", features = ["profiling"] }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-types    = { path = "../varn-types" }
 varn-sem      = { path = "../varn-sem" }
-varn-resolver = { path = "../varn-resolver", optional = true }
+varn-resolver = { path = "../varn-resolver" }
 varn-debug    = { path = "../varn-debug" }
-varn-lsp      = { path = "../varn-lsp", optional = true }
-varn-dap      = { path = "../varn-dap", optional = true }
-varn-pm       = { path = "../varn-pm", optional = true }
+varn-lsp      = { path = "../varn-lsp" }
+varn-dap      = { path = "../varn-dap" }
+varn-pm       = { path = "../varn-pm" }
 varn-project  = { path = "../varn-project" }
 varn-modules  = { path = "../varn-modules" }
 varn-jit      = { path = "../varn-jit" }
-tower-lsp-f   = { workspace = true, optional = true }
+tower-lsp-f   = { workspace = true }
 postcard      = { workspace = true }
 clap          = { version = "4", features = ["derive"] }
 clap_complete = "4"

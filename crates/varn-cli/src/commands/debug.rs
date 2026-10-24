@@ -6,6 +6,11 @@ pub fn execute(session: &pipeline::Session, args: DebugArgs) -> Result<(), CliEr
         return Ok(());
     }
 
+    if args.natives {
+        crate::debug_print::natives();
+        return Ok(());
+    }
+
     let mut debug = parse_debug_opt(&args.phase)?;
     debug.fn_filter = args.fn_filter;
 
@@ -19,7 +24,6 @@ pub fn execute(session: &pipeline::Session, args: DebugArgs) -> Result<(), CliEr
         }
     };
 
-    #[cfg(feature = "lsp")]
     crate::inspect_lsp::run_for(&file_path, eval.as_deref(), &debug);
 
     let executable = match eval {

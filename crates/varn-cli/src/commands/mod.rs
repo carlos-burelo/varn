@@ -1,4 +1,3 @@
-#[cfg(feature = "pm")]
 pub mod add;
 pub mod bench;
 pub mod build;
@@ -6,7 +5,6 @@ pub mod cache;
 pub mod check;
 pub mod compare_tiers;
 pub mod completions;
-#[cfg(feature = "dap")]
 pub mod dap;
 pub mod debug;
 pub mod doctor;
@@ -14,17 +12,12 @@ pub mod eval;
 pub mod fmt;
 pub mod init;
 
-#[cfg(feature = "pm")]
 pub mod install;
-#[cfg(feature = "lsp")]
 pub mod lsp;
-#[cfg(feature = "pm")]
 pub mod pkg;
-#[cfg(feature = "pm")]
 pub mod remove;
 pub mod repl;
 pub mod run;
 pub mod std_bundle;
 pub mod test;
-#[cfg(feature = "pm")]
 pub mod update;

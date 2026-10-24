@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(
@@ -11,6 +11,21 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
+}
+
+pub fn with_implicit_run(mut args: Vec<String>) -> Vec<String> {
+    let known: Vec<String> = Cli::command()
+        .get_subcommands()
+        .map(|c| c.get_name().to_owned())
+        .chain(std::iter::once("help".to_owned()))
+        .collect();
+    if let Some(first) = args.get(1)
+        && !known.contains(first)
+        && !first.starts_with('-')
+    {
+        args.insert(1, "run".to_owned());
+    }
+    args
 }
 
 #[derive(Subcommand)]
@@ -120,6 +135,9 @@ pub struct DebugArgs {
 
     #[arg(long)]
     pub list_phases: bool,
+
+    #[arg(long)]
+    pub natives: bool,
 }
 
 #[derive(Args)]
