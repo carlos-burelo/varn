@@ -47,8 +47,12 @@ Consecuencias observadas en el código, no supuestas:
 - La raíz del proyecto se busca por separado en seis sitios (`std_root`, `env_file`, `cache`,
   `pipeline/cache`, `resolver/graph`, `doctor`), unos partiendo del cwd y otros del directorio
   del archivo de entrada, así que pueden resolver raíces distintas en una misma ejecución.
-- `ProjectManifest` (en `varn-pm`) admite dos formas de decir lo mismo: la sección `package`
-  y los campos planos `name`, `version`, `main`.
+- El manifiesto es TOML y se parsea en tres sitios (`varn-pm::ProjectManifest`,
+  `varn-modules::package::RawManifest` y la mini estructura `StdKey` de `std_root`). Acepta
+  dos nombres de archivo (`varn.toml` y `vn.toml`, con las constantes repetidas en
+  `artifact.rs` e `ids.rs`) y hasta tres formas de declarar el nombre (`[package]`,
+  `[project]` y campos planos). Hay además tres buscadores de raíz (`find_project_root`,
+  `project_root_cached` y `find_project_manifest`) con reglas ligeramente distintas.
 
 Todo esto es una violación de la Ley 8 (varios caminos para el mismo hecho) y de la Ley 5
 (el pipeline guarda estado y formato que pertenecen a otra capa).
@@ -150,6 +154,9 @@ comparar números.
 
 ## Proyecto
 
+El formato es TOML (el que ya usa `varn-pm`); el diseño original asumía JSON por un mensaje de
+error desactualizado del LSP, y el código manda.
+
 Un toolchain es comandos sobre un proyecto, así que el proyecto es cimiento (Ley 14) y no un
 añadido posterior.
 
@@ -161,8 +168,8 @@ añadido posterior.
 - **Crate `varn-project`**, hoja: manifiesto, descubrimiento de raíz y lectura de `.env`.
   `varn-modules`, `varn-pm`, `varn-pipeline` y `varn-cli` dependen de él (Ley 1: la
   definición de proyecto no vive arriba, en `varn-pm`).
-- **Un solo manifiesto, `varn.json`.** Se borra la sección `package`; quedan los campos
-  planos (`name`, `version`, `main`, `exports`, `dependencies`, `dev_dependencies`,
+- **Un solo manifiesto, `varn.toml`.** Se borra el alias `vn.toml` y las secciones `[package]`
+  y `[project]`; quedan los campos planos (`name`, `version`, `main`, `exports`, `dependencies`, `dev_dependencies`,
   `peer_dependencies`, `workspaces`) más las secciones nuevas. Es un cambio incompatible: la
   ganancia es que un campo tiene una sola ubicación. Los manifiestos del repo (`std/`,
   `examples/`, `tests/`) se migran en el mismo paso.
@@ -243,7 +250,7 @@ proceso: `task` llama a `execute` de los demás con la misma `Session`.
 Cada paso es un commit verde y atómico (Ley 9), y cada uno forma parte del diseño final:
 
 1. `Failure` tipado y render en el borde; se borran las copias del pie de error.
-2. `varn-project`: manifiesto único, raíz única, `.env`; el repo no tiene ningún `varn.json` que migrar.
+2. `varn-project`: manifiesto único, raíz única, `.env`; el repo no contiene ningún manifiesto; solo `vn init` escribe la forma antigua y se corrige en el mismo paso.
 3. `Session` dueña del resolver y del `Project`; todos los `ModuleResolver::new()` y
    `find_project_root` pasan a recibirla.
 4. `Source` y lectura/canonicalización únicas.
@@ -270,7 +277,7 @@ nota de validación de `AGENTS.md`.
 
 - `vn lint`, `vn doc`, `vn upgrade`. Necesitan su propio motor (reglas, extracción de
   documentación, distribución de releases). Se añaden como un módulo de comando más, con su
-  sección en `varn.json`.
+  sección en `varn.toml`.
 - Cambiar la resolución de dependencias entre miembros de un workspace.
 - REPL con estado entre líneas. Hoy cada línea es un programa aparte y `let x = 1` seguido de
   `x` falla. Arreglarlo exige un entorno incremental en el checker; es otro diseño.
@@ -297,7 +304,7 @@ condicione el diseño (Ley 18: se rehace el test).
 
 - Features `lsp`, `dap`, `pm` fuera: un toolchain es un binario con todo.
 - Permisos por defecto sin cambio (todo concedido).
-- `varn.json` con campos planos y sin sección `package`.
+- `varn.toml` con campos planos y sin sección `package`.
 - Crate nuevo `varn-project` como hoja.
 - `Target::Exe` completa el trailer `VEXE`; el lector sin productor no se deja como está.
 - `vn task` entra en esta tanda; `lint`, `doc` y `upgrade` no.
