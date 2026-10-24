@@ -55,5 +55,6 @@ fn skipped(dir: &Path) -> bool {
 }
 
 fn is_vn(path: &Path) -> bool {
-    path.extension().is_some_and(|ext| ext == "vn")
+    path.extension()
+        .is_some_and(|ext| ext == varn_modules::VARN_FILE_EXTENSION)
 }

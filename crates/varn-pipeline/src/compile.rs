@@ -1,9 +1,7 @@
 use crate::lower::{lower_module, LowerInput, Lowered};
+use crate::executable::precompiled_modules;
 use crate::{Executable, Failure};
-use rustc_hash::FxHashMap;
-use std::rc::Rc;
 use std::time::{Duration, Instant};
-use varn_compiler::FunctionProto;
 use varn_core::ast::{AstArena, Program};
 use varn_types::ModuleGraphArtifact;
 
@@ -67,16 +65,6 @@ pub(crate) fn build_executable(
     );
     crate::class_link::verify_foreign_layouts(&class_tables).map_err(Failure::internal)?;
 
-    let mut precompiled: FxHashMap<varn_core::ModuleId, Rc<FunctionProto>> = FxHashMap::default();
-    for (path, module_proto) in graph_build.modules.iter() {
-        if path != &graph_build.entry_path {
-            precompiled.insert(
-                varn_core::ModuleId::from_canonical_str(path),
-                Rc::new(module_proto.clone()),
-            );
-        }
-    }
-
     let mut hash_keys: Vec<&String> = graph_build.source_hashes.keys().collect();
     hash_keys.sort();
     let graph_hash = hash_keys.iter().fold(0u64, |acc, k| {
@@ -94,7 +82,7 @@ pub(crate) fn build_executable(
     Ok(Built {
         executable: Executable {
             entry_proto: proto,
-            precompiled: Rc::new(precompiled),
+            precompiled: precompiled_modules(&graph_artifact),
             graph_artifact,
             deps: graph_build.deps,
             warnings: graph_build.warnings,

@@ -202,7 +202,9 @@ impl Compilation {
             request.measure_optimizer,
         )?;
         self.timings.push((Stage::Lower, built.lower));
-        self.timings.push((Stage::Optimize, built.optimize));
+        if request.measure_optimizer {
+            self.timings.push((Stage::Optimize, built.optimize));
+        }
         self.timings.push((Stage::Link, built.link));
         let executable = built.executable;
 
