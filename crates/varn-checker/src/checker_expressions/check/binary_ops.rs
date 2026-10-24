@@ -44,6 +44,13 @@ impl<'r> Checker<'r> {
             && !is_type_param_b(&l_base, self)
             && !is_type_param_b(&r_base, self)
         {
+            let is_scalar = |t: &Type| {
+                t.is_numeric()
+                    || *t == Type::Bool
+                    || *t == Type::Str
+                    || *t == Type::Char
+                    || *t == Type::Null
+            };
             let both_numeric = l_base.is_numeric() && r_base.is_numeric();
             let (l_eff, r_eff) = varn_sem::types::numeric_ops::adopt_literal_operands(
                 self.ast_arena,
@@ -85,7 +92,8 @@ impl<'r> Checker<'r> {
                             || self.value_fits(rec, &r_ty, &l_ty, Some(left), Some(bind))
                     }
                 }
-                BinaryOp::Instanceof | BinaryOp::In => true,
+                BinaryOp::Instanceof => true,
+                BinaryOp::In => !is_scalar(&r_base),
             };
             if !valid {
                 let l_ty_s = l_ty.display(&self.ty_table, &bind.interner);

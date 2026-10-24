@@ -1,0 +1,2 @@
+// expect: error[VN3010]
+const b = "a" in 5
