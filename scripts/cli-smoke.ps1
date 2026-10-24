@@ -68,6 +68,11 @@ Check "eval-runs" {
     $r.Code -eq 0 -and $r.Out -match "2"
 }
 
+Check "eval-syntax-error-renders-with-code-3" {
+    $r = Vn eval 'let ='
+    $r.Code -eq 3 -and $r.Out -match '\(eval\)' -and $r.Out -match 'could not compile'
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null

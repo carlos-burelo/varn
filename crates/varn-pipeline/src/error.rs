@@ -1,39 +1,89 @@
 use std::fmt;
+use std::sync::Arc;
+use varn_core::DiagnosticBag;
 
-pub struct PipelineError {
-    pub message: String,
-    pub exit_code: i32,
+pub struct DiagnosticReport {
+    pub file: Arc<str>,
+    pub source: Arc<str>,
+    pub diagnostics: DiagnosticBag,
 }
 
-impl PipelineError {
-    pub fn new(exit_code: i32, message: impl Into<String>) -> Self {
-        PipelineError {
-            message: message.into(),
-            exit_code,
+pub struct RuntimeFailure {
+    pub message: String,
+    pub frames: Vec<varn_vm::FrameInfo>,
+}
+
+pub enum Failure {
+    Diagnostics(DiagnosticReport),
+    Runtime(RuntimeFailure),
+    Io(String),
+    Internal(String),
+}
+
+impl Failure {
+    pub fn io(message: impl Into<String>) -> Self {
+        Failure::Io(message.into())
+    }
+
+    pub fn internal(message: impl Into<String>) -> Self {
+        Failure::Internal(message.into())
+    }
+
+    pub fn diagnostics(file: &str, source: &str, diagnostics: DiagnosticBag) -> Self {
+        Failure::Diagnostics(DiagnosticReport {
+            file: Arc::from(file),
+            source: Arc::from(source),
+            diagnostics,
+        })
+    }
+}
+
+impl fmt::Display for RuntimeFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)?;
+        let cwd = std::env::current_dir().ok();
+        for frame in &self.frames {
+            let mut file = frame.file.as_str();
+            if let Some(stripped) = file.strip_prefix(r"\\?\") {
+                file = stripped;
+            }
+            let relative = cwd
+                .as_deref()
+                .and_then(|root| std::path::Path::new(file).strip_prefix(root).ok())
+                .map(|p| p.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_else(|| file.replace('\\', "/"));
+            write!(f, "\n    at {} ({}:{})", frame.fn_name, relative, frame.line)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for Failure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Failure::Diagnostics(report) => write!(
+                f,
+                "{}",
+                varn_core::diagnostics::render_report(
+                    &report.file,
+                    &report.source,
+                    &report.diagnostics
+                )
+            ),
+            Failure::Runtime(failure) => write!(f, "{failure}"),
+            Failure::Io(message) | Failure::Internal(message) => write!(f, "{message}"),
         }
     }
-    pub fn fatal(message: impl Into<String>) -> Self {
-        PipelineError::new(1, message)
-    }
-    pub fn usage(message: impl Into<String>) -> Self {
-        PipelineError::new(2, message)
+}
+
+impl From<String> for Failure {
+    fn from(message: String) -> Self {
+        Failure::internal(message)
     }
 }
 
-impl fmt::Display for PipelineError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl From<String> for PipelineError {
-    fn from(s: String) -> Self {
-        PipelineError::fatal(s)
-    }
-}
-
-impl From<std::io::Error> for PipelineError {
-    fn from(e: std::io::Error) -> Self {
-        PipelineError::fatal(e.to_string())
+impl From<std::io::Error> for Failure {
+    fn from(error: std::io::Error) -> Self {
+        Failure::io(error.to_string())
     }
 }

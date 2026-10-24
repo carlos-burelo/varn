@@ -51,7 +51,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
                 let _ = code.to_owned();
             }
             None => {
-                crate::pipeline::read_source_file(path).map_err(|e| e.message.clone())?;
+                crate::pipeline::read_source_file(path).map_err(|e| e.to_string().clone())?;
             }
         }
         Ok(())
@@ -60,12 +60,12 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     let lex_samples = time_n(runs, || {
         crate::pipeline::phase_lex(&source, path, false, &debug_flags, &varn_pipeline::NullSink)
             .map(|_| ())
-            .map_err(|e| e.message)
+            .map_err(|e| e.to_string())
     })?;
 
     let (tokens, lexeme_buf) =
         crate::pipeline::phase_lex(&source, path, false, &debug_flags, &varn_pipeline::NullSink)
-            .map_err(|e| CliError::fatal(e.message))?;
+            .map_err(|e| CliError::fatal(e.to_string()))?;
     let token_count = tokens.len();
 
     let tokens_ref = &tokens;
@@ -91,7 +91,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
                 .map(|e| {
                     format!(
                         "{}:{}:{}: {}",
-                        path, e.range.start.line, e.range.start.column, e.message
+                        path, e.range.start.line, e.range.start.column, e.to_string()
                     )
                 })
                 .collect();

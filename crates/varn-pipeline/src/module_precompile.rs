@@ -28,7 +28,7 @@ pub fn build_module_graph(
     entry_proto: &FunctionProto,
     entry_interner: &varn_core::AtomInterner,
     session: &crate::ModuleResolver,
-) -> Result<ModuleGraphBuild, String> {
+) -> Result<ModuleGraphBuild, crate::Failure> {
     let canonical_entry = varn_modules::canonical_or_original(Path::new(entry_path));
 
     let mut graph: HashMap<String, Vec<String>> = HashMap::default();
@@ -179,15 +179,15 @@ pub fn build_module_graph(
             }
         }
         return if cycle_path.is_empty() {
-            Err(format!(
+            Err(crate::Failure::internal(format!(
                 "circular dependency detected involving: {}",
                 cycle_nodes.join(", ")
-            ))
+            )))
         } else {
-            Err(format!(
+            Err(crate::Failure::internal(format!(
                 "circular dependency detected: {}",
                 cycle_path.join(" → ")
-            ))
+            )))
         };
     }
 
@@ -211,8 +211,7 @@ pub fn build_module_graph(
             varn_sem::output::CheckOptions::compile(),
         );
 
-        crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)
-            .map_err(|e| e.message)?;
+        crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)?;
         let resolver = session;
         let exports = if varn_core::ModuleKind::of(&program.filename).is_some() {
             resolver.stdlib_exports(&program.filename)

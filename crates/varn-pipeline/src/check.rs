@@ -1,11 +1,10 @@
 use varn_checker::Checker;
 use varn_core::ast::{AstArena, Program};
 
-use crate::PipelineError;
+use crate::Failure;
 use varn_core::debug_flags::DebugFlags;
-use varn_core::term::chalk::chalk;
 
-type PipelineResult<T> = Result<T, PipelineError>;
+type PipelineResult<T> = Result<T, Failure>;
 
 pub struct CheckResult {
     pub checker_result: varn_sem::output::CheckResult,
@@ -19,30 +18,13 @@ pub fn report_diagnostics(
     if diagnostics.is_empty() {
         return Ok(());
     }
-    let error_count = diagnostics.iter().filter(|d| d.is_error()).count();
-    let msgs: Vec<String> = diagnostics
-        .iter()
-        .map(|d| crate::fmt::format_diagnostic(d, source))
-        .collect();
-
-    if error_count == 0 {
-        for m in msgs {
-            varn_core::term::terminal::log(m);
-        }
-        return Ok(());
+    if diagnostics.has_errors() {
+        return Err(Failure::diagnostics(filename, source, diagnostics.clone()));
     }
-
-    let footer = format!(
-        "\n{}: could not compile `{}` due to {} previous error{}",
-        chalk("error").red().bold(),
-        filename,
-        error_count,
-        if error_count > 1 { "s" } else { "" }
-    );
-    Err(PipelineError::new(
-        3,
-        format!("{}\n{}", msgs.join("\n"), footer),
-    ))
+    for d in diagnostics.iter() {
+        varn_core::term::terminal::log(crate::fmt::format_diagnostic(d, source));
+    }
+    Ok(())
 }
 
 pub fn check(

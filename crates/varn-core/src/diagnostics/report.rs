@@ -77,3 +77,17 @@ fn render_snippet(out: &mut String, source: &str, range: SourceRange, color: &st
 
     out.push_str(&format!("\n{gutter} {DIM}└─{RESET}"));
 }
+
+pub fn render_report(file: &str, source: &str, diagnostics: &super::DiagnosticBag) -> String {
+    let rendered: Vec<String> = diagnostics
+        .iter()
+        .map(|d| format_diagnostic(d, source))
+        .collect();
+    let error_count = diagnostics.iter().filter(|d| d.is_error()).count();
+    let plural = if error_count > 1 { "s" } else { "" };
+    let label = crate::term::chalk::chalk("error").red().bold();
+    format!(
+        "{}\n\n{label}: could not compile `{file}` due to {error_count} previous error{plural}",
+        rendered.join("\n"),
+    )
+}

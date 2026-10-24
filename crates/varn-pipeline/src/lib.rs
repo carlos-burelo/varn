@@ -29,20 +29,20 @@ pub use compile::{
 };
 pub use core::core_protos_owned;
 pub use debug_sink::{DebugSink, NullSink};
-pub use error::PipelineError;
+pub use error::{DiagnosticReport, Failure, RuntimeFailure};
 pub use execute::{boot_machine, enter_main, execute, execute_with_caps};
 pub use layer_link::verify_synthetic_imports;
 pub use lex::lex as phase_lex;
 pub use opts::{CapabilitySet, DebugFlags, RunOpts};
 pub use parse::parse as phase_parse;
 
-type PipelineResult<T> = Result<T, PipelineError>;
+type PipelineResult<T> = Result<T, Failure>;
 
 pub fn canonicalize_path(path: &str) -> PipelineResult<String> {
     std::path::Path::new(path)
         .canonicalize()
         .map(|p| p.to_string_lossy().into_owned())
-        .map_err(|e| PipelineError::fatal(format!("cannot resolve '{}': {}", path, e)))
+        .map_err(|e| Failure::io(format!("cannot resolve '{}': {}", path, e)))
 }
 
 pub fn read_source_file(path: &str) -> PipelineResult<String> {
@@ -206,5 +206,5 @@ fn read_source(path: &str) -> PipelineResult<String> {
     varn_modules::loader::default_registry()
         .source(&id)
         .map(|s| s.text.to_string())
-        .map_err(|e| PipelineError::fatal(format!("error[io]: {e}")))
+        .map_err(|e| Failure::io(format!("error[io]: {e}")))
 }

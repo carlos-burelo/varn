@@ -1,5 +1,5 @@
 use super::check::CheckResult;
-use crate::PipelineError;
+use crate::Failure;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_compiler::FunctionProto;
@@ -8,7 +8,7 @@ use varn_core::debug_flags::DebugFlags;
 use varn_sem::resolver::ImportResolver;
 use varn_types::ModuleGraphArtifact;
 
-type PipelineResult<T> = Result<T, PipelineError>;
+type PipelineResult<T> = Result<T, Failure>;
 
 pub fn sorted_export_names(exports: &varn_sem::exports::ExportMap) -> Vec<std::sync::Arc<str>> {
     let mut names: Vec<std::sync::Arc<str>> = exports
@@ -173,7 +173,7 @@ pub fn compile(
 
     let exports = session.module_exports(&program.filename, &mut vec![]);
     crate::compile::report_export_collisions(&exports, &program.filename)
-        .map_err(PipelineError::fatal)?;
+        .map_err(Failure::internal)?;
     let export_names = sorted_export_names(&exports);
 
     let mut tir = emit_tir(program, ast_arena, &check_result.checker_result);
@@ -184,12 +184,12 @@ pub fn compile(
         &check_result.checker_result.bind.interner,
         tir_import_sources(&tir).iter().map(|s| s.as_ref()),
     )
-    .map_err(PipelineError::fatal)?;
+    .map_err(Failure::internal)?;
     inject_star_reexports(&mut tir, &exports);
     resolve_import_slots(&mut tir, session, &program.filename);
     let (proto_result, _) = compile_tir(&tir, export_names, source, false);
     let proto = proto_result.map_err(|e| {
-        PipelineError::fatal(format!(
+        Failure::internal(format!(
             "{}: {e:?}",
             varn_core::term::chalk::chalk("error[emit:tir]")
                 .red()
@@ -208,7 +208,10 @@ pub fn compile(
         &check_result.checker_result.bind.interner,
         session,
     )
-    .map_err(|e| PipelineError::fatal(format!("module graph error: {e}")))?;
+    .map_err(|e| match e {
+        diagnostics @ Failure::Diagnostics(_) => diagnostics,
+        other => Failure::internal(format!("module graph error: {other}")),
+    })?;
 
     let mut class_tables = graph_build.class_tables.clone();
     class_tables.insert(
@@ -223,7 +226,7 @@ pub fn compile(
             types: tir.types.clone(),
         },
     );
-    crate::class_link::verify_foreign_layouts(&class_tables).map_err(PipelineError::fatal)?;
+    crate::class_link::verify_foreign_layouts(&class_tables).map_err(Failure::internal)?;
 
     sink.compile(
         program,

@@ -11,7 +11,7 @@ pub(super) fn measure_e2e(
     time_n(runs, || {
         let source = match eval {
             Some(code) => code.to_owned(),
-            None => crate::pipeline::read_source_file(path).map_err(|e| e.message.clone())?,
+            None => crate::pipeline::read_source_file(path).map_err(|e| e.to_string().clone())?,
         };
 
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(
@@ -21,7 +21,7 @@ pub(super) fn measure_e2e(
             &debug_flags,
             &varn_pipeline::NullSink,
         )
-        .map_err(|e| e.message)?;
+        .map_err(|e| e.to_string())?;
 
         let (program, _, interner, arena) =
             parse_shared(tokens, lexeme_buf, path).map_err(|errs| {
@@ -30,7 +30,7 @@ pub(super) fn measure_e2e(
                     .map(|e| {
                         format!(
                             "{}:{}:{}: {}",
-                            path, e.range.start.line, e.range.start.column, e.message
+                            path, e.range.start.line, e.range.start.column, e.to_string()
                         )
                     })
                     .collect();

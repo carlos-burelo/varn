@@ -1,11 +1,11 @@
 use super::compile::CompileOutput;
-use crate::PipelineError;
+use crate::Failure;
 use rustc_hash::FxHashMap;
 use std::path::Path;
 use std::rc::Rc;
 use varn_types::ModuleGraphArtifact;
 
-type PipelineResult<T> = Result<T, PipelineError>;
+type PipelineResult<T> = Result<T, Failure>;
 
 pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     let path = Path::new(file_path);
@@ -89,7 +89,7 @@ pub fn load_cached_graph(
 pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> PipelineResult<()> {
     if let Some(parent) = cache_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {
-            PipelineError::fatal(format!(
+            Failure::internal(format!(
                 "{}{}error[cache]{}: cannot create cache dir: {}",
                 varn_core::term::colors::BOLD,
                 varn_core::term::colors::C_ERRORS,
@@ -99,7 +99,7 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
         })?;
     }
     let payload = postcard::to_allocvec(graph).map_err(|e| {
-        PipelineError::fatal(format!(
+        Failure::internal(format!(
             "{}{}error[cache]{}: serialize failed: {}",
             varn_core::term::colors::BOLD,
             varn_core::term::colors::C_ERRORS,
@@ -113,7 +113,7 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
         &payload,
     );
     varn_modules::artifact::write_artifact_file(cache_path, &bytes).map_err(|e| {
-        PipelineError::fatal(format!(
+        Failure::internal(format!(
             "{}{}error[cache]{}: write failed: {}",
             varn_core::term::colors::BOLD,
             varn_core::term::colors::C_ERRORS,
@@ -128,7 +128,7 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
 pub fn compile_output_from_graph(graph: ModuleGraphArtifact) -> PipelineResult<CompileOutput> {
     let entry_path = graph.entry_path.clone();
     let entry_proto = graph.entry_proto().cloned().ok_or_else(|| {
-        PipelineError::fatal(format!(
+        Failure::internal(format!(
             "{}{}error[cache]{}: entry module not found in graph",
             varn_core::term::colors::BOLD,
             varn_core::term::colors::C_ERRORS,

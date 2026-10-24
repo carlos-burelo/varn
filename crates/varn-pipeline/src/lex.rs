@@ -1,9 +1,9 @@
-use crate::PipelineError;
+use crate::Failure;
 use std::sync::Arc;
 use varn_core::debug_flags::DebugFlags;
 use varn_core::Token;
 
-type PipelineResult<T> = Result<T, PipelineError>;
+type PipelineResult<T> = Result<T, Failure>;
 
 pub fn lex(
     source: &str,
@@ -15,22 +15,11 @@ pub fn lex(
     let (tokens, lexeme_buf, errors) = varn_lexer::scan(source, path);
 
     if !errors.is_empty() {
-        let msgs: Vec<String> = errors
-            .iter()
-            .map(|e| varn_core::diagnostics::format_diagnostic(e, source))
-            .collect();
-        let error_count = errors.len();
-        let footer = format!(
-            "\n{}: could not compile `{}` due to {} previous error{}",
-            varn_core::term::chalk::chalk("error").red().bold(),
-            path,
-            error_count,
-            if error_count > 1 { "s" } else { "" }
-        );
-        return Err(PipelineError::new(
-            3,
-            format!("{}\n{}", msgs.join("\n"), footer),
-        ));
+        let mut bag = varn_core::DiagnosticBag::new();
+        for e in errors {
+            bag.push(e);
+        }
+        return Err(Failure::diagnostics(path, source, bag));
     }
 
     if verbose {

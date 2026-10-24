@@ -39,4 +39,5 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
         },
         &crate::debug_sink::CliDebugSink,
     )
+    .map_err(CliError::from)
 }

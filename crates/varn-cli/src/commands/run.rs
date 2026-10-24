@@ -35,6 +35,7 @@ pub fn execute(args: RunArgs) -> Result<(), CliError> {
         },
         &crate::debug_sink::CliDebugSink,
     )
+    .map_err(CliError::from)
 }
 
 pub fn build_capabilities(args: &RunArgs) -> CapabilitySet {

@@ -6,7 +6,7 @@ use crate::error::CliError;
 pub fn parse_debug_opt(spec: Option<&str>) -> Result<DebugFlags, CliError> {
     match spec {
         Some(s) => varn_debug::flags::parse_debug_flags(s)
-            .map_err(|e| CliError::new(e.exit_code, e.message)),
+            .map_err(|e| CliError::usage(e.message)),
         None => Ok(DebugFlags::default()),
     }
 }

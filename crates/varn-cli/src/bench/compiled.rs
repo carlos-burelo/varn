@@ -25,7 +25,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let load_samples = time_n(runs, || {
         crate::pipeline::portable::read_portable(path)
             .map(|_| ())
-            .map_err(|e| e.message.clone())
+            .map_err(|e| e.to_string().clone())
     })?;
 
     let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;

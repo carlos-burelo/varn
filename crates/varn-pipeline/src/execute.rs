@@ -1,5 +1,5 @@
 use crate::core;
-use crate::PipelineError;
+use crate::{Failure, RuntimeFailure};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_compiler::FunctionProto;
@@ -8,7 +8,7 @@ use varn_core::ModuleId;
 use varn_types::capabilities::CapabilitySet;
 use varn_vm::Vm;
 
-type PipelineResult<T> = Result<T, PipelineError>;
+type PipelineResult<T> = Result<T, Failure>;
 
 pub fn execute(
     proto: FunctionProto,
@@ -54,9 +54,11 @@ pub fn execute_with_caps(
         varn_vm::debug::DriveResult::Done(_) => {}
         varn_vm::debug::DriveResult::Stopped => {}
         varn_vm::debug::DriveResult::Failed(e) => {
-            let msg = format_runtime_error(None, &e.message, &e.frames);
             machine.abandon_heap_at_exit();
-            return Err(PipelineError::fatal(msg));
+            return Err(Failure::Runtime(RuntimeFailure {
+                message: e.message,
+                frames: e.frames,
+            }));
         }
     }
     if _debug.gc {
@@ -92,7 +94,7 @@ pub fn boot_machine(
         let closure = Rc::new(builtin_proto);
         machine
             .run(closure)
-            .map_err(|e| PipelineError::fatal(format!("failed to run builtin: {}", e)))?;
+            .map_err(|e| Failure::internal(format!("failed to run builtin: {}", e)))?;
     }
     Ok(machine)
 }
@@ -112,37 +114,4 @@ pub fn enter_main(machine: &mut Vm, proto: FunctionProto) -> Rc<FunctionProto> {
     unsafe { &mut *machine.ctx.modules.get() }.insert(main_module_id, module_val);
     machine.ctx.module_exports.insert(0, module_val);
     main_proto
-}
-
-fn format_runtime_error(
-    prefix: Option<&str>,
-    message: &str,
-    frames: &[varn_vm::FrameInfo],
-) -> String {
-    let mut msg = match prefix {
-        Some(p) => format!("{p}: {message}"),
-        None => message.to_string(),
-    };
-    let cwd = std::env::current_dir().ok();
-    for frame in frames {
-        let mut file_display = frame.file.as_str();
-        if file_display.starts_with(r"\\?\") {
-            file_display = &file_display[4..];
-        }
-        let clean_path = if let Some(ref root) = cwd {
-            let p = std::path::Path::new(file_display);
-            if let Ok(rel) = p.strip_prefix(root) {
-                rel.to_string_lossy().replace('\\', "/")
-            } else {
-                file_display.replace('\\', "/")
-            }
-        } else {
-            file_display.replace('\\', "/")
-        };
-        msg.push_str(&format!(
-            "\n    at {} ({}:{})",
-            frame.fn_name, clean_path, frame.line
-        ));
-    }
-    msg
 }

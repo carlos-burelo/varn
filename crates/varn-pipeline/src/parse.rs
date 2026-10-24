@@ -1,8 +1,8 @@
-use crate::PipelineError;
+use crate::Failure;
 use std::sync::Arc;
 use varn_core::debug_flags::DebugFlags;
 
-type PipelineResult<T> = Result<T, PipelineError>;
+type PipelineResult<T> = Result<T, Failure>;
 
 pub fn parse(
     tokens: Vec<varn_core::Token>,
@@ -21,19 +21,11 @@ pub fn parse(
         varn_parser::parse(tokens, lexeme_buf, path, varn_core::AtomInterner::new())
             .map(|(program, interner, arena)| (program, arena, interner))
             .map_err(|errs| {
-                let msgs: Vec<String> = errs
-                    .iter()
-                    .map(|e| varn_core::diagnostics::format_diagnostic(e, source))
-                    .collect();
-                let error_count = errs.len();
-                let footer = format!(
-                    "\n{}: could not compile `{}` due to {} previous error{}",
-                    varn_core::term::chalk::chalk("error").red().bold(),
-                    path,
-                    error_count,
-                    if error_count > 1 { "s" } else { "" }
-                );
-                PipelineError::new(3, format!("{}\n{}", msgs.join("\n"), footer))
+                let mut bag = varn_core::DiagnosticBag::new();
+                for e in errs {
+                    bag.push(e);
+                }
+                Failure::diagnostics(path, source, bag)
             })?;
 
     if verbose {

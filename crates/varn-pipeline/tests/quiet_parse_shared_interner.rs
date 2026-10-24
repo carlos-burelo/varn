@@ -60,8 +60,7 @@ fn build_module_graph_resolves_named_reexport_origin_module_without_panicking() 
     match compiled {
         Ok(_) => {}
         Err(e) => panic!(
-            "expected the module graph to compile cleanly: {}",
-            e.message
+            "expected the module graph to compile cleanly: {e}"
         ),
     }
 }

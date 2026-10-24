@@ -15,6 +15,7 @@ mod debug_sink;
 mod doctor_impl;
 mod env_file;
 mod error;
+mod exit;
 mod formatter;
 #[cfg(feature = "lsp")]
 mod inspect_lsp;
@@ -24,6 +25,7 @@ mod tester;
 
 use clap::Parser;
 use cli::{Cli, Commands};
+use exit::ExitCode;
 
 use std::process;
 use varn_core::term::terminal;
@@ -96,7 +98,7 @@ fn run_cli() {
     {
         let e = error::CliError::fatal(reason);
         terminal::error(&e);
-        process::exit(e.exit_code);
+        process::exit(e.exit_code().code());
     }
 
     varn_vm::alloc_profile::init();
@@ -105,12 +107,11 @@ fn run_cli() {
     varn_vm::alloc_profile::report();
 
     if let Err(e) = result {
-        if e.exit_code == 3 {
-            eprintln!("{e}");
-        } else {
-            terminal::error(&e);
+        match e.exit_code() {
+            ExitCode::Diagnostics => eprintln!("{e}"),
+            ExitCode::Fatal | ExitCode::Usage => terminal::error(&e),
         }
-        process::exit(e.exit_code);
+        process::exit(e.exit_code().code());
     }
 }
 

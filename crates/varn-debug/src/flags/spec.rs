@@ -1,4 +1,4 @@
-use crate::error::CliError;
+use crate::error::FlagsError;
 use varn_core::debug_flags::DebugFlags;
 
 fn valid_names() -> Vec<&'static str> {
@@ -7,13 +7,13 @@ fn valid_names() -> Vec<&'static str> {
     names
 }
 
-pub fn parse_line_range(s: &str) -> Result<(u32, u32), CliError> {
+pub fn parse_line_range(s: &str) -> Result<(u32, u32), FlagsError> {
     if s == "all" {
         return Ok((0, u32::MAX));
     }
     if let Some((lo_str, hi_str)) = s.split_once('-') {
         let lo = lo_str.parse::<u32>().map_err(|_| {
-            CliError::usage(format!(
+            FlagsError::new(format!(
                 "invalid line range: '{s}' (expected N, N-M, or N-)"
             ))
         })?;
@@ -21,7 +21,7 @@ pub fn parse_line_range(s: &str) -> Result<(u32, u32), CliError> {
             u32::MAX
         } else {
             hi_str.parse::<u32>().map_err(|_| {
-                CliError::usage(format!(
+                FlagsError::new(format!(
                     "invalid line range: '{s}' (expected N, N-M, or N-)"
                 ))
             })?
@@ -30,12 +30,12 @@ pub fn parse_line_range(s: &str) -> Result<(u32, u32), CliError> {
     } else {
         let line = s
             .parse::<u32>()
-            .map_err(|_| CliError::usage(format!("invalid line number: '{s}'")))?;
+            .map_err(|_| FlagsError::new(format!("invalid line number: '{s}'")))?;
         Ok((line, line))
     }
 }
 
-pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
+pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, FlagsError> {
     let mut flags = DebugFlags::default();
     for part in spec.split(',') {
         let phase = part.trim();
@@ -46,7 +46,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
             match sub {
                 "check" => flags.tir_check = true,
                 unknown => {
-                    return Err(CliError::usage(format!(
+                    return Err(FlagsError::new(format!(
                         "unknown tir debug sub-phase: '{unknown}'\n\
                              Valid sub-phases: check"
                     )));
@@ -56,7 +56,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
             match sub {
                 "types" => flags.check_types = true,
                 unknown => {
-                    return Err(CliError::usage(format!(
+                    return Err(FlagsError::new(format!(
                         "unknown check debug sub-phase: '{unknown}'\n\
                              Valid sub-phases: types"
                     )));
@@ -94,7 +94,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
                     flags.lsp_interact = true;
                     if let Some(path) = body.strip_prefix("file:") {
                         let text = std::fs::read_to_string(path).map_err(|e| {
-                            CliError::usage(format!("cannot read interact file {path:?}: {e}"))
+                            FlagsError::new(format!("cannot read interact file {path:?}: {e}"))
                         })?;
                         for (idx, raw) in text.lines().enumerate() {
                             let raw = raw.trim();
@@ -104,7 +104,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
                             match varn_core::debug_flags::parse_step(raw) {
                                 Ok(step) => flags.lsp_cursors.push(step),
                                 Err(e) => {
-                                    return Err(CliError::usage(format!(
+                                    return Err(FlagsError::new(format!(
                                         "invalid interact step ({path}:{idx1}): {e}",
                                         idx1 = idx + 1
                                     )));
@@ -121,7 +121,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
                         match varn_core::debug_flags::parse_step(raw) {
                             Ok(step) => flags.lsp_cursors.push(step),
                             Err(e) => {
-                                return Err(CliError::usage(format!(
+                                return Err(FlagsError::new(format!(
                                         "invalid interact step {raw:?}: {e}\n\
                                          Step syntax: Ln:Col [type=TEXT] [ask=v] [expect=..] (1-based; quote values with spaces; repeat ask/expect keys)"
                                     )));
@@ -140,7 +140,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
                     "hints" => flags.lsp_hints = true,
                     "all" => flags.lsp_all(),
                     unknown => {
-                        return Err(CliError::usage(format!(
+                        return Err(FlagsError::new(format!(
                                 "unknown lsp debug sub-phase: '{unknown}'\n\
                                  Valid sub-phases: hovers, semantic, types, completions, symbols, colorize, hints, interact[@STEP[;STEP...]] (interact@ must be last), all"
                             )));
@@ -158,7 +158,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
                     "check" => flags.clif_check = true,
                     "all" => flags.clif_all(),
                     unknown => {
-                        return Err(CliError::usage(format!(
+                        return Err(FlagsError::new(format!(
                             "unknown clif debug sub-phase: '{unknown}'\n\
                                  Valid sub-phases: route, kinds, ir, asm, check, all"
                         )));
@@ -200,7 +200,7 @@ pub fn parse_debug_flags(spec: &str) -> Result<DebugFlags, CliError> {
                     Some(p) => apply_registered(&mut flags, p.id()),
                     None => {
                         let names = valid_names();
-                        return Err(CliError::usage(format!(
+                        return Err(FlagsError::new(format!(
                             "unknown debug phase: '{unknown}'\n\
                                  Valid phases: {}\n\
                                  Run with --list-phases for descriptions.",
