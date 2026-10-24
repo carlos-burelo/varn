@@ -5,19 +5,34 @@ use std::rc::Rc;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
 use varn_types::capabilities::CapabilitySet;
+use varn_types::TestEntry;
 use varn_vm::Vm;
 
 type PipelineResult<T> = Result<T, Failure>;
 
+pub enum Unit<'a> {
+    Module,
+    Test(&'a TestEntry),
+}
+
 pub fn execute(session: &Session, executable: Executable, policy: Policy) -> Result<(), Failure> {
+    execute_unit(session, &executable, policy, Unit::Module)
+}
+
+pub fn execute_unit(
+    session: &Session,
+    executable: &Executable,
+    policy: Policy,
+    unit: Unit<'_>,
+) -> Result<(), Failure> {
     let mut machine = boot_machine(
         session,
-        executable.precompiled,
+        Rc::clone(&executable.precompiled),
         policy.capabilities,
         policy.trace,
     )?;
     machine.ctx.print_silent = policy.silent;
-    let main_proto = enter_main(&mut machine, executable.entry_proto);
+    let main_proto = enter_main(&mut machine, executable.entry_proto.clone());
     if policy.trace {
         varn_core::term::terminal::tagged(
             "pipeline:execute",
@@ -38,6 +53,15 @@ pub fn execute(session: &Session, executable: Executable, policy: Policy) -> Res
                 frames: e.frames,
             }));
         }
+    }
+    if let Unit::Test(test) = unit
+        && let Err(e) = machine.call_main_global(test.global)
+    {
+        machine.abandon_heap_at_exit();
+        return Err(Failure::Runtime(RuntimeFailure {
+            message: e.message,
+            frames: e.frames,
+        }));
     }
     if policy.gc {
         eprintln!("{}", machine.gc_report());

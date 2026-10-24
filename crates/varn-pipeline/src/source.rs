@@ -32,20 +32,6 @@ impl Source {
         }
     }
 
-    pub fn appended(&self, extra: &str) -> Source {
-        let text: Arc<str> = Arc::from(format!("{}\n{extra}\n", self.text()));
-        match self {
-            Source::File { path, .. } => Source::File {
-                path: path.clone(),
-                text,
-            },
-            Source::Virtual { name, .. } => Source::Virtual {
-                name: name.clone(),
-                text,
-            },
-        }
-    }
-
     pub fn path(&self) -> &str {
         match self {
             Source::File { path, .. } => path,

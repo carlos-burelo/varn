@@ -43,15 +43,6 @@ impl Request {
         }
     }
 
-    pub fn checked() -> Request {
-        Request {
-            goal: Goal::Checked,
-            cache: CachePolicy::Bypass,
-            mode: Mode::Strict,
-            measure_optimizer: false,
-        }
-    }
-
     pub fn tooling() -> Request {
         Request {
             goal: Goal::Checked,

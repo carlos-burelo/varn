@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
-use varn_types::ModuleGraphArtifact;
+use varn_types::{ModuleGraphArtifact, TestEntry};
 
 use crate::{DiagnosticReport, Failure};
 
@@ -12,6 +12,7 @@ pub struct Executable {
     pub graph_artifact: ModuleGraphArtifact,
     pub deps: FxHashMap<String, Vec<String>>,
     pub warnings: Vec<DiagnosticReport>,
+    pub tests: Vec<TestEntry>,
 }
 
 pub(crate) fn precompiled_modules(
@@ -36,6 +37,7 @@ impl Executable {
         Ok(Executable {
             entry_proto,
             precompiled: precompiled_modules(&graph),
+            tests: graph.tests.clone(),
             graph_artifact: graph,
             deps: FxHashMap::default(),
             warnings: Vec::new(),

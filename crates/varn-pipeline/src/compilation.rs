@@ -66,14 +66,6 @@ impl Compilation {
         }
     }
 
-    pub fn test_targets(&self) -> Vec<(String, bool)> {
-        self.checked
-            .iter()
-            .flat_map(|c| c.test_targets.iter())
-            .map(|t| (t.name.to_string(), t.is_async))
-            .collect()
-    }
-
     pub fn into_executable(self) -> Result<Executable, Failure> {
         if let Some(failure) = self.failure {
             return Err(failure);

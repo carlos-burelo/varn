@@ -24,7 +24,7 @@ pub use chunk::{
     Chunk, FunctionProto, Literal, PoolEntry, FIRST_RESUME, STATE_DONE, STATE_YIELDED,
 };
 pub use marshal::{FromVm, IntoVm, VnArray, VnStr};
-pub use module_graph::{ModuleGraphArtifact, PackageNode};
+pub use module_graph::{ModuleGraphArtifact, PackageNode, TestEntry};
 pub use native::{
     call_static_with, ArgType, EntryKind, NativeFn, NativeOpEntry, NativeOpTarget,
     SignatureDescriptor,

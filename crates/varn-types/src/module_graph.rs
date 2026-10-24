@@ -13,6 +13,13 @@ pub struct PackageNode {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TestEntry {
+    pub name: String,
+    pub is_async: bool,
+    pub global: u32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModuleGraphArtifact {
     pub entry_path: String,
     pub graph_hash: u64,
@@ -20,6 +27,8 @@ pub struct ModuleGraphArtifact {
     pub modules: HashMap<String, FunctionProto>,
     #[serde(default)]
     pub package_nodes: Vec<PackageNode>,
+    #[serde(default)]
+    pub tests: Vec<TestEntry>,
 }
 
 impl ModuleGraphArtifact {

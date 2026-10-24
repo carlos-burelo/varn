@@ -3,13 +3,40 @@ use crate::executable::precompiled_modules;
 use crate::{Executable, Failure};
 use std::time::{Duration, Instant};
 use varn_core::ast::{AstArena, Program};
-use varn_types::ModuleGraphArtifact;
+use varn_types::{ModuleGraphArtifact, TestEntry};
 
 pub(crate) struct Built {
     pub executable: Executable,
     pub lower: Duration,
     pub optimize: Duration,
     pub link: Duration,
+}
+
+fn test_entries(
+    check: &varn_sem::output::CheckResult,
+    tir: &varn_tir::TirModule,
+) -> Result<Vec<TestEntry>, Failure> {
+    check
+        .test_targets
+        .iter()
+        .map(|target| {
+            let global = tir
+                .global_names
+                .iter()
+                .position(|name| name == &target.name)
+                .ok_or_else(|| {
+                    Failure::internal(format!(
+                        "test function '{}' has no module global",
+                        target.name
+                    ))
+                })?;
+            Ok(TestEntry {
+                name: target.name.to_string(),
+                is_async: target.is_async,
+                global: global as u32,
+            })
+        })
+        .collect()
 }
 
 pub(crate) fn build_executable(
@@ -71,18 +98,21 @@ pub(crate) fn build_executable(
         let h = graph_build.source_hashes[*k];
         acc.wrapping_mul(0x9e3779b97f4a7c15).wrapping_add(h)
     });
+    let tests = test_entries(check, &tir)?;
     let graph_artifact = ModuleGraphArtifact {
         entry_path: graph_build.entry_path.clone(),
         graph_hash,
         source_hashes: graph_build.source_hashes,
         modules: graph_build.modules,
         package_nodes: graph_build.package_nodes,
+        tests,
     };
 
     Ok(Built {
         executable: Executable {
             entry_proto: proto,
             precompiled: precompiled_modules(&graph_artifact),
+            tests: graph_artifact.tests.clone(),
             graph_artifact,
             deps: graph_build.deps,
             warnings: graph_build.warnings,
