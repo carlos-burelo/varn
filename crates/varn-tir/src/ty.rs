@@ -50,6 +50,8 @@ pub enum DynReason {
 
     Range(TyId),
 
+    TaskHandle(TyId),
+
     Interface,
 
     Shape(ShapeId),

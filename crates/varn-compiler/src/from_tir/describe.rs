@@ -138,6 +138,7 @@ impl<'m> Describer<'m> {
                 | DynReason::Yields(_)
                 | DynReason::Range(_)
                 | DynReason::Interface
+                | DynReason::TaskHandle(_)
                 | DynReason::NotYetSupported
                 | DynReason::Generic
                 | DynReason::Boxed

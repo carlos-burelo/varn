@@ -100,12 +100,9 @@ impl<'a> FnEmitter<'a> {
                 properties, rest, ..
             } => {
                 for prop in properties {
-                    let field = self.field_access(
-                        src.clone(),
-                        Arc::from(self.m.interner.resolve(prop.key)),
-                        BackendTy::Dynamic(DynReason::NotYetSupported),
-                        src.span,
-                    );
+                    let key = Arc::from(self.m.interner.resolve(prop.key));
+                    let ty = self.member_ty(src.ty, &key);
+                    let field = self.field_access(src.clone(), key, ty, src.span);
                     self.bind_pattern(&prop.value, field, out);
                 }
                 if let Some(rest_pat) = rest {
@@ -118,7 +115,7 @@ impl<'a> FnEmitter<'a> {
                             object: Box::new(src.clone()),
                             skip_keys: skip,
                         },
-                        ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                        ty: BackendTy::Dynamic(DynReason::Declared),
                         res: Resolution::None,
                         span: src.span,
                     };
@@ -224,6 +221,52 @@ impl<'a> FnEmitter<'a> {
             }
 
             Pattern::Rest { argument, .. } => self.bind_pattern(argument, src, out),
+        }
+    }
+
+    fn member_ty(&mut self, recv: BackendTy, name: &str) -> BackendTy {
+        match recv.non_nullable(self.tt) {
+            BackendTy::Dynamic(DynReason::Shape(id)) => {
+                let field = self
+                    .tt
+                    .get_shape(id)
+                    .iter()
+                    .find(|f| f.name.as_ref() == name)
+                    .map(|f| (f.ty, f.optional));
+                match field {
+                    Some((ty, true)) if !matches!(ty, BackendTy::Nullable(_)) => {
+                        BackendTy::Nullable(self.tt.intern(ty))
+                    }
+                    Some((ty, _)) => ty,
+                    None => BackendTy::Dynamic(DynReason::Declared),
+                }
+            }
+            BackendTy::Class(c) => self
+                .m
+                .classes
+                .get(c.0 as usize)
+                .and_then(|info| info.field(name))
+                .map(|f| f.ty)
+                .unwrap_or(BackendTy::Dynamic(DynReason::Declared)),
+            BackendTy::Dynamic(reason) => BackendTy::Dynamic(reason),
+            BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never => BackendTy::Dynamic(DynReason::Declared),
         }
     }
 

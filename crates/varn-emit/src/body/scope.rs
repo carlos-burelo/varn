@@ -33,6 +33,7 @@ impl<'a> FnEmitter<'a> {
             params,
             this_class: None,
             this_enum: None,
+            this_value: None,
             lexical_this: false,
             home_class: None,
             namespace: None,
@@ -262,6 +263,7 @@ impl<'a> FnEmitter<'a> {
             .this_enum
             .map(BackendTy::Enum)
             .or_else(|| self.this_class.map(BackendTy::Class))
+            .or(self.this_value)
             .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
         let res = if self.lexical_this {
             self.resolve_name(varn_core::TokenKind::This.as_str())
@@ -280,6 +282,11 @@ impl<'a> FnEmitter<'a> {
         self.this_class = Some(class);
         self.home_class = Some(class);
         self.namespace = crate::namespace_scope::enclosing(self.m.classes.get(class.0 as usize));
+        self
+    }
+
+    pub fn with_this_value(mut self, ty: BackendTy) -> Self {
+        self.this_value = Some(ty);
         self
     }
 

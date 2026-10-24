@@ -160,6 +160,8 @@ pub(super) fn emit_extensions(
                 );
                 if let Some(cid) = this_cid {
                     em = em.with_this(cid);
+                } else if !matches!(recv_ty, BackendTy::Dynamic(_)) {
+                    em = em.with_this_value(recv_ty);
                 }
                 let b = match &ast_arena.stmt(body).kind {
                     StmtKind::Block { stmts } => em.lower_block(stmts),
