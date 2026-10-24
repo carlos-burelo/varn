@@ -79,7 +79,7 @@ impl<'a> FnEmitter<'a> {
         spread: &str,
         span: Span,
     ) -> Vec<TirArg> {
-        let opaque = BackendTy::Dynamic(DynReason::NotYetSupported);
+        let opaque = BackendTy::Dynamic(DynReason::Declared);
         if args.iter().any(TirArg::is_spread) {
             let elements = args
                 .into_iter()
@@ -96,7 +96,9 @@ impl<'a> FnEmitter<'a> {
                 span,
             });
             lead.push(flat.clone());
-            if let Some(check) = self.call_runtime(spread, lead, span) {
+            if let Some(check) =
+                self.call_runtime(spread, lead, BackendTy::Dynamic(DynReason::Declared), span)
+            {
                 self.pending.push(TirStmt::Expr(check));
             }
             return vec![TirArg::Spread(flat)];
@@ -108,7 +110,12 @@ impl<'a> FnEmitter<'a> {
             })
             .collect();
         lead.extend(pinned.iter().cloned());
-        let Some(converted) = self.call_runtime(positional, lead, span) else {
+        let Some(converted) = self.call_runtime(
+            positional,
+            lead,
+            BackendTy::Dynamic(DynReason::Declared),
+            span,
+        ) else {
             return pinned.into_iter().map(TirArg::Expr).collect();
         };
         let converted = self.hoist(converted);
@@ -161,6 +168,7 @@ impl<'a> FnEmitter<'a> {
         &mut self,
         op: &str,
         args: Vec<TirExpr>,
+        ty: BackendTy,
         span: Span,
     ) -> Option<TirExpr> {
         let mut args = args.into_iter();
@@ -171,7 +179,7 @@ impl<'a> FnEmitter<'a> {
                 name: Arc::from(op),
                 args: args.map(TirArg::Expr).collect(),
             },
-            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            ty,
             res: Resolution::NativeOp(varn_core::runtime_ops::op_id(op)),
             span,
         })

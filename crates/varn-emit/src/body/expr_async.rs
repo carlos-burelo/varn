@@ -36,7 +36,7 @@ impl<'a> FnEmitter<'a> {
         TirExpr {
             kind: TirExprKind::Yield { value, delegate },
 
-            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            ty: BackendTy::Dynamic(DynReason::Declared),
             res: Resolution::None,
             span,
         }

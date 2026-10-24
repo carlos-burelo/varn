@@ -144,7 +144,7 @@ impl<'a> FnEmitter<'a> {
         let class_name = varn_core::RuntimeErrorKind::MatchError.class_name();
         let callee = TirExpr {
             kind: TirExprKind::Var,
-            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            ty: BackendTy::Dynamic(DynReason::Runtime),
             res: self.resolve_name(class_name),
             span,
         };
@@ -159,7 +159,7 @@ impl<'a> FnEmitter<'a> {
                 callee: Box::new(callee),
                 args: vec![TirArg::Expr(message)],
             },
-            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            ty: BackendTy::Dynamic(DynReason::Runtime),
             res: Resolution::None,
             span,
         })

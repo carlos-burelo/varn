@@ -54,7 +54,7 @@ impl<'a> FnEmitter<'a> {
                         target: Box::new(pvar()),
                         value: Box::new(value),
                     },
-                    ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                    ty: BackendTy::Void,
                     res: Resolution::None,
                     span: Span::EMPTY,
                 };

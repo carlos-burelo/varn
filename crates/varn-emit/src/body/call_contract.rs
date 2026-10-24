@@ -64,7 +64,7 @@ impl<'a> FnEmitter<'a> {
         let name: Arc<str> = Arc::from(method);
         let class = TirExpr {
             kind: TirExprKind::Var,
-            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            ty: BackendTy::Dynamic(DynReason::Runtime),
             res: self.resolve_name(&info.name),
             span,
         };
@@ -148,7 +148,7 @@ impl<'a> FnEmitter<'a> {
     ) -> Option<TirExpr> {
         let home = self.home_class?;
         let home_name = self.m.classes.get(home.0 as usize)?.name.clone();
-        let opaque = BackendTy::Dynamic(DynReason::NotYetSupported);
+        let opaque = BackendTy::Dynamic(DynReason::Runtime);
         let home = TirExpr {
             kind: TirExprKind::Var,
             ty: opaque,
@@ -167,6 +167,7 @@ impl<'a> FnEmitter<'a> {
         self.call_runtime(
             varn_core::runtime_ops::INHERITED,
             vec![home, this, name, accessor],
+            BackendTy::Dynamic(DynReason::Callable),
             span,
         )
     }

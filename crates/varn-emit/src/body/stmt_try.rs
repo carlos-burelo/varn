@@ -50,7 +50,7 @@ impl<'a> FnEmitter<'a> {
         }
         let rhs = TirExpr {
             kind: TirExprKind::Var,
-            ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            ty: BackendTy::Dynamic(DynReason::Runtime),
             res: self.resolve_name(name),
             span,
         };

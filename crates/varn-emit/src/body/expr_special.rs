@@ -108,7 +108,7 @@ impl<'a> FnEmitter<'a> {
                             lhs: Box::new(v.clone()),
                             rhs: Box::new(TirExpr {
                                 kind: TirExprKind::Var,
-                                ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                                ty: BackendTy::Dynamic(DynReason::Runtime),
                                 res,
                                 span,
                             }),

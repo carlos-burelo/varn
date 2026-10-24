@@ -131,7 +131,7 @@ impl<'a> FnEmitter<'a> {
             let ty = if is_cmp {
                 BackendTy::Bool
             } else {
-                BackendTy::Dynamic(DynReason::NotYetSupported)
+                BackendTy::Dynamic(DynReason::Declared)
             };
             return (lhs, rhs, ty);
         }
