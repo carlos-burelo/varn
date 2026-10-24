@@ -2,6 +2,7 @@ mod alloc_instance;
 mod arrays;
 mod block;
 mod boxed;
+mod branch_facts;
 mod build_object;
 mod bytes;
 mod call;

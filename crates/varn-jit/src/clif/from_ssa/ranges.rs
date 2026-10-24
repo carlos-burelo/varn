@@ -1,3 +1,4 @@
+use super::branch_facts::{per_block_facts, refine};
 use super::range_math::{
     add_range, header_check, is_one, mul_range, sub_range, Check, I64_HI, I64_LO,
 };
@@ -126,6 +127,14 @@ pub(super) fn analyze(
         }
     }
 
+    let consts = |v: u32| -> Option<i128> {
+        match def[v as usize] {
+            Some(SsaOp::ConstInt(c)) if ssa.value_ty(v) == SlotKind::Int => Some(*c as i128),
+            _ => None,
+        }
+    };
+    let facts = per_block_facts(ssa, &def, preds, rpo_pos, reached, &consts);
+
     let mut converged = false;
     for _ in 0..64 {
         let mut changed = false;
@@ -236,7 +245,10 @@ pub(super) fn analyze(
                 if ssa.value_ty(d) != SlotKind::Int {
                     continue;
                 }
-                let (Some(&a), Some(&c)) = (ranges.get(lhs), ranges.get(rhs)) else {
+                let (Some(a), Some(c)) = (
+                    refine(&facts[b], *lhs, ranges.get(lhs).copied()),
+                    refine(&facts[b], *rhs, ranges.get(rhs).copied()),
+                ) else {
                     continue;
                 };
                 let r = match op {
