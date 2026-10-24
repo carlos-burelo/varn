@@ -46,6 +46,7 @@ $vn = if ($Binary) { (Resolve-Path $Binary).Path } else { Join-Path $RootDir "ta
 if (-not (Test-Path $vn)) { $vn = Join-Path $RootDir "target\$Profile\vn" }
 
 $env:NO_COLOR = "1"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $baseDir = Join-Path $RootDir "target\tmp\baseline"
 $outDir = Join-Path $RootDir "target\tmp\bytecode"
 $baseFile = Join-Path $baseDir "bytecode.tsv"
