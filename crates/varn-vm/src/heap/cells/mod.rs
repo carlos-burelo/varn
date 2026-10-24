@@ -70,6 +70,7 @@ pub(crate) struct CellSpace {
     pub(crate) old_births: u64,
     pub(crate) old_growth: u64,
     pub(crate) survivors: usize,
+    pub(crate) abandon_objects: bool,
 }
 
 impl Default for CellSpace {
@@ -82,6 +83,7 @@ impl Default for CellSpace {
             old_births: 0,
             old_growth: 0,
             survivors: 0,
+            abandon_objects: false,
         }
     }
 }
@@ -252,12 +254,14 @@ impl CellSpace {
 
 impl Drop for CellSpace {
     fn drop(&mut self) {
-        let live: Vec<HeapRef> = self.refs().collect();
-        for r in live {
-            if header(r).kind == varn_types::cell::CELL_KIND_INSTANCE {
-                continue;
+        if !self.abandon_objects {
+            let live: Vec<HeapRef> = self.refs().collect();
+            for r in live {
+                if header(r).kind == varn_types::cell::CELL_KIND_INSTANCE {
+                    continue;
+                }
+                unsafe { Self::drop_object(r) };
             }
-            unsafe { Self::drop_object(r) };
         }
         for class in &self.classes {
             for block in &class.blocks {

@@ -75,6 +75,10 @@ impl Vm {
         self.ctx.heap.hotspot = Some(counters);
     }
 
+    pub fn abandon_heap_at_exit(&mut self) {
+        self.ctx.heap.cells.abandon_objects = true;
+    }
+
     pub fn gc_report(&self) -> crate::gc_report::GcReport {
         self.ctx.heap.gc_report()
     }

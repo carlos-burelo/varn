@@ -55,12 +55,14 @@ pub fn execute_with_caps(
         varn_vm::debug::DriveResult::Stopped => {}
         varn_vm::debug::DriveResult::Failed(e) => {
             let msg = format_runtime_error(None, &e.message, &e.frames);
+            machine.abandon_heap_at_exit();
             return Err(PipelineError::fatal(msg));
         }
     }
     if _debug.gc {
         eprintln!("{}", machine.gc_report());
     }
+    machine.abandon_heap_at_exit();
     Ok(())
 }
 
