@@ -1,4 +1,3 @@
-
 export {
     SEP,
     DELIMITER,
@@ -12,25 +11,25 @@ export {
 } from "std:path/utils";
 
 import {
-    SEP,
-    DELIMITER,
-    normalize,
-    dirname,
-    basename,
-    extname,
-    isAbsolute,
-    join,
-    resolve
+    SEP as SEPFn,
+    DELIMITER as DELIMITERFn,
+    normalize as normalizeFn,
+    dirname as dirnameFn,
+    basename as basenameFn,
+    extname as extnameFn,
+    isAbsolute as isAbsoluteFn,
+    join as joinFn,
+    resolve as resolveFn
 } from "std:path/utils";
 
 export namespace Path {
-    export const SEP = SEP;
-    export const DELIMITER = DELIMITER;
-    export const normalize = normalize;
-    export const dirname = dirname;
-    export const basename = basename;
-    export const extname = extname;
-    export const isAbsolute = isAbsolute;
-    export const join = join;
-    export const resolve = resolve;
+    export const SEP = SEPFn;
+    export const DELIMITER = DELIMITERFn;
+    export const normalize = normalizeFn;
+    export const dirname = dirnameFn;
+    export const basename = basenameFn;
+    export const extname = extnameFn;
+    export const isAbsolute = isAbsoluteFn;
+    export const join = joinFn;
+    export const resolve = resolveFn;
 }
