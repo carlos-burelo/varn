@@ -20,7 +20,7 @@ pub(super) fn parse_using_stmt(s: &mut TokenStream, is_await: bool) -> Result<St
             None
         };
         s.expect(TokenKind::Eq)?;
-        let init = Some(crate::expressions::parse_seq_expr(s)?);
+        let init = Some(crate::expressions::parse_expr(s)?);
         let decl_range = s.span_from(decl_start);
 
         declarations.push(VarDeclarator {

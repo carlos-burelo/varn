@@ -5,10 +5,14 @@ class Resource {
     dispose(): void {}
 }
 
-using held = new Resource();
+using held = new Resource(), second = new Resource();
 
 function readHeld(): int {
     return held.value;
+}
+
+function readSecond(): int {
+    return second.value;
 }
 
 function bumpHeld(): void {
@@ -20,5 +24,8 @@ await describe("247 top-level using", async () => {
         expect(readHeld()).toBe(7);
         bumpHeld();
         expect(readHeld()).toBe(8);
+    });
+    await it("one using statement binds several declarators", () => {
+        expect(readSecond()).toBe(7);
     });
 });
