@@ -28,12 +28,7 @@ impl<'r> Binder<'r> {
                 .type_ann
                 .as_ref()
                 .map(|ann| self.resolve_type(ann))
-                .or_else(|| {
-                    declarator
-                        .init
-                        .map(|expr| self.infer_expr_type_self(expr))
-                        .filter(|ty| !ty.is_dynamic())
-                });
+                ;
 
             self.bind_pattern(
                 &declarator.id,

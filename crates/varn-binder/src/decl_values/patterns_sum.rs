@@ -145,18 +145,8 @@ impl<'r> super::super::Binder<'r> {
                     self.bind_pattern(r, kind, line, doc.clone(), None, false);
                 }
             }
-            Pattern::Assignment { left, right, .. } => {
-                let resolved_ty = if ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()) {
-                    let inferred = self.infer_expr_type_self(*right);
-                    if inferred.is_dynamic() {
-                        ty
-                    } else {
-                        Some(inferred)
-                    }
-                } else {
-                    ty
-                };
-                self.bind_pattern(left, kind, line, doc, resolved_ty, false);
+            Pattern::Assignment { left, .. } => {
+                self.bind_pattern(left, kind, line, doc, ty, false);
             }
             Pattern::Rest { argument, .. } => {
                 self.bind_pattern(argument, kind, line, doc, ty, false);

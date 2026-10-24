@@ -142,12 +142,6 @@ impl<'r> super::super::Binder<'r> {
                             .type_ann
                             .as_ref()
                             .map(|ann| self.resolve_type(ann))
-                            .or_else(|| {
-                                d.init
-                                    .as_ref()
-                                    .map(|e| self.infer_expr_type_self(*e))
-                                    .filter(|t| !t.is_dynamic())
-                            })
                             .unwrap_or(Type::Dynamic);
                         let scope = self.scopes.get(self.current);
                         let symbol_id = self
