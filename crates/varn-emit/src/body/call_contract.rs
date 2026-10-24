@@ -205,7 +205,7 @@ impl<'a> FnEmitter<'a> {
                 | BackendTy::Enum(_)
                 | BackendTy::Fn(_)
                 | BackendTy::Void
-                | BackendTy::Never => BackendTy::Dynamic(DynReason::NotYetSupported),
+                | BackendTy::Never => BackendTy::Dynamic(DynReason::Unrecorded),
             };
             args.push(TirArg::Expr(TirExpr {
                 kind: TirExprKind::NullLit,

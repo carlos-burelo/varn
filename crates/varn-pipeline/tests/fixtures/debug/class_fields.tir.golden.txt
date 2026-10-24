@@ -207,21 +207,21 @@ TirModule {
         Signature {
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
         Signature {
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
         Signature {
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
@@ -239,25 +239,25 @@ TirModule {
         Signature {
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
         Signature {
             params: [
                 Dynamic(
-                    NotYetSupported,
+                    Unrecorded,
                 ),
             ],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
         Signature {
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
@@ -342,7 +342,7 @@ TirModule {
             ),
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             locals: [],
             body: [
@@ -395,11 +395,11 @@ TirModule {
             ),
             params: [
                 Dynamic(
-                    NotYetSupported,
+                    Unrecorded,
                 ),
             ],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             locals: [],
             body: [
@@ -471,7 +471,7 @@ TirModule {
             ),
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             locals: [],
             body: [
@@ -746,7 +746,7 @@ TirModule {
                             ty: Float,
                             res: ByName {
                                 name: "celsius",
-                                why: NotYetSupported,
+                                why: Unrecorded,
                             },
                             span: Span {
                                 start: 352,
@@ -864,7 +864,7 @@ TirModule {
                             ty: Float,
                             res: ByName {
                                 name: "fahrenheit",
-                                why: NotYetSupported,
+                                why: Unrecorded,
                             },
                             span: Span {
                                 start: 409,
@@ -981,7 +981,7 @@ TirModule {
                             ty: Float,
                             res: ByName {
                                 name: "celsius",
-                                why: NotYetSupported,
+                                why: Unrecorded,
                             },
                             span: Span {
                                 start: 466,
@@ -1036,7 +1036,7 @@ TirModule {
                             ty: Float,
                             res: ByName {
                                 name: "fahrenheit",
-                                why: NotYetSupported,
+                                why: Unrecorded,
                             },
                             span: Span {
                                 start: 486,

@@ -141,7 +141,7 @@ impl<'m> Describer<'m> {
                 | DynReason::TaskHandle(_)
                 | DynReason::CoreMember
                 | DynReason::Spread
-                | DynReason::NotYetSupported
+                | DynReason::Unrecorded
                 | DynReason::Generic
                 | DynReason::Boxed
                 | DynReason::Runtime,

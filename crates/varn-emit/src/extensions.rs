@@ -97,7 +97,7 @@ pub(super) fn emit_extensions(
             .map(|target| {
                 super::ty::lower_type(target, ctx.checker_table, ctx.interner, types, ctx.names)
             })
-            .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+            .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded));
         let this_cid = match recv_ty {
             BackendTy::Class(cid) => Some(cid),
             BackendTy::Int
@@ -190,8 +190,8 @@ pub(super) fn emit_extensions(
             out.push(TirFunction {
                 name: mangled,
                 sig,
-                params: vec![BackendTy::Dynamic(DynReason::NotYetSupported); arity],
-                return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+                params: vec![BackendTy::Dynamic(DynReason::Unrecorded); arity],
+                return_ty: BackendTy::Dynamic(DynReason::Unrecorded),
                 locals,
                 body: body_stmts,
                 has_this: true,

@@ -92,7 +92,7 @@ fn yield_in_a_non_generator_is_rejected() {
             value: Some(Box::new(int(1))),
             delegate: false,
         },
-        BackendTy::Dynamic(DynReason::NotYetSupported),
+        BackendTy::Dynamic(DynReason::Unrecorded),
         Resolution::None,
     ))];
     let m = module(func("<module>", false, false, body));

@@ -224,7 +224,7 @@ impl<'a> FnEmitter<'a> {
             } => self.lower_switch(*discriminant, cases),
 
             StmtKind::Using { declarations, .. } => {
-                let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
+                let dyn_ty = BackendTy::Dynamic(DynReason::Unrecorded);
                 let mut out = Vec::new();
                 for d in declarations {
                     let init = d.init.map(|e| self.lower_expr(e));

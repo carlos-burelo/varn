@@ -176,7 +176,7 @@ impl<'a> FnEmitter<'a> {
                                 let interner = self.m.interner;
                                 lower_type(&e.ty, table, interner, self.tt, names)
                             })
-                            .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+                            .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded));
                         let local = self.bind_local(Arc::from(name_str), ty);
                         out.push(TirStmt::Let {
                             local,
@@ -235,7 +235,7 @@ impl<'a> FnEmitter<'a> {
                                 | DynReason::TaskHandle(_)
                                 | DynReason::CoreMember
                                 | DynReason::Spread
-                                | DynReason::NotYetSupported
+                                | DynReason::Unrecorded
                                 | DynReason::Generic
                                 | DynReason::Boxed
                                 | DynReason::Runtime,
@@ -261,9 +261,9 @@ impl<'a> FnEmitter<'a> {
                             | BackendTy::Never => true,
                         })
                         .or_else(|| init.as_ref().map(|e| e.ty))
-                        .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+                        .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded));
                     let ty = match ty {
-                        BackendTy::Dynamic(DynReason::NotYetSupported) => {
+                        BackendTy::Dynamic(DynReason::Unrecorded) => {
                             self.declared_ty(d.id.range().start.offset).unwrap_or(ty)
                         }
                         _ => ty,

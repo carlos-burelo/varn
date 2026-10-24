@@ -173,7 +173,7 @@ pub(super) fn emit_class(
                 .map(|resolved| {
                     lower_type(resolved, ctx.checker_table, ctx.interner, types, ctx.names)
                 })
-                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported))
+                .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded))
         })
         .collect();
 
@@ -263,7 +263,7 @@ pub(super) fn emit_class(
                 let forwards = class.super_class.is_some() && primary.is_empty();
                 let sig = fresh_sig(signatures, primary.len());
                 let rest_ty =
-                    BackendTy::Array(types.intern(BackendTy::Dynamic(DynReason::NotYetSupported)));
+                    BackendTy::Array(types.intern(BackendTy::Dynamic(DynReason::Unrecorded)));
                 let inherited = def
                     .parent
                     .and_then(|parent| crate::tables::inherited_constructor(ctx.classes, parent))

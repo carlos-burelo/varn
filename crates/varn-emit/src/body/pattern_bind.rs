@@ -84,7 +84,7 @@ impl<'a> FnEmitter<'a> {
         match pat {
             Pattern::Identifier { name, range } => {
                 let ty = match src.ty {
-                    BackendTy::Dynamic(DynReason::NotYetSupported) => {
+                    BackendTy::Dynamic(DynReason::Unrecorded) => {
                         self.declared_ty(range.start.offset).unwrap_or(src.ty)
                     }
                     _ => src.ty,
@@ -150,7 +150,7 @@ impl<'a> FnEmitter<'a> {
                     | BackendTy::Nullable(_)
                     | BackendTy::Void
                     | BackendTy::Never
-                    | BackendTy::Dynamic(_) => BackendTy::Dynamic(DynReason::NotYetSupported),
+                    | BackendTy::Dynamic(_) => BackendTy::Dynamic(DynReason::Unrecorded),
                 };
                 for (i, slot) in elements.iter().enumerate() {
                     let Some(el) = slot else { continue };

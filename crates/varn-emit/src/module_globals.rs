@@ -106,7 +106,7 @@ pub(super) fn assign_global_slots(
             sym.ty
                 .as_ref()
                 .map(|t| lower_type(t, &bind.ty_table, interner, types, names))
-                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported)),
+                .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded)),
         );
         global_slots.insert(sym_name, slot);
     }
@@ -119,7 +119,7 @@ pub(super) fn assign_global_slots(
         extra.sort();
         for name in extra {
             let slot = globals.len() as u32;
-            globals.push(BackendTy::Dynamic(DynReason::NotYetSupported));
+            globals.push(BackendTy::Dynamic(DynReason::Unrecorded));
             global_slots.insert(name, slot);
         }
     }
@@ -139,7 +139,7 @@ pub(super) fn assign_global_slots(
     );
     for (name, slot) in nested.new_globals(&global_slots) {
         debug_assert_eq!(slot as usize, globals.len());
-        globals.push(BackendTy::Dynamic(DynReason::NotYetSupported));
+        globals.push(BackendTy::Dynamic(DynReason::Unrecorded));
         global_slots.insert(name, slot);
     }
     for (id, info) in enums.iter().enumerate() {

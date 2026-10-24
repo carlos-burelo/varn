@@ -19,7 +19,7 @@ fn reason_index(r: DynReason) -> usize {
         DynReason::Union => 1,
         DynReason::IndexSignature => 2,
         DynReason::Declared => 3,
-        DynReason::NotYetSupported => 4,
+        DynReason::Unrecorded => 4,
         DynReason::Callable => 5,
         DynReason::Awaitable(_) => 6,
         DynReason::Yields(_) => 7,
@@ -40,7 +40,7 @@ const REASON_LABELS: [&str; 17] = [
     "union",
     "index signature",
     "declared",
-    "not yet supported",
+    "unrecorded",
     "function type",
     "task",
     "generator",
@@ -153,13 +153,24 @@ impl Coverage {
         self.nodes += 1;
 
         if let BackendTy::Dynamic(r) = e.ty {
+            if matches!(r, DynReason::Unrecorded) && std::env::var("NYS_TRACE").is_ok() {
+                let k = format!("{:?}", e.kind);
+                let k = k.split(|c: char| !c.is_alphanumeric()).next().unwrap_or("");
+                let rs = format!("{:?}", e.res);
+                let head = rs
+                    .split(|c: char| !c.is_alphanumeric())
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
+                eprintln!("NYS {k} {head} {:?} RES {rs}", e.span);
+            }
             self.dynamics[reason_index(r)] += 1;
         }
 
         match &e.res {
             Resolution::None => {}
             Resolution::ByName { why, .. } => {
-                if matches!(why, DynReason::NotYetSupported) && std::env::var("NYS_TRACE").is_ok() {
+                if matches!(why, DynReason::Unrecorded) && std::env::var("NYS_TRACE").is_ok() {
                     let (k, recv) = match &e.kind {
                         TirExprKind::Field { object, .. } => ("Field", format!("{:?}", object.ty)),
                         TirExprKind::MethodCall { recv, .. } => {

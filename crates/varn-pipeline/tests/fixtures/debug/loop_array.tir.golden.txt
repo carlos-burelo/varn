@@ -401,7 +401,7 @@ TirModule {
                                         ty: Int,
                                         res: ByName {
                                             name: "length",
-                                            why: NotYetSupported,
+                                            why: Unrecorded,
                                         },
                                         span: Span {
                                             start: 0,
@@ -665,7 +665,7 @@ TirModule {
                                 ty: Int,
                                 res: ByName {
                                     name: "length",
-                                    why: NotYetSupported,
+                                    why: Unrecorded,
                                 },
                                 span: Span {
                                     start: 235,

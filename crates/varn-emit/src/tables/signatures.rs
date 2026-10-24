@@ -76,7 +76,7 @@ pub(crate) fn intern_signature(
         | TypeKind::EnumVariant { .. }
         | TypeKind::TypePredicate { .. } => (
             vec![],
-            BackendTy::Dynamic(varn_tir::DynReason::NotYetSupported),
+            BackendTy::Dynamic(varn_tir::DynReason::Unrecorded),
             false,
         ),
     };

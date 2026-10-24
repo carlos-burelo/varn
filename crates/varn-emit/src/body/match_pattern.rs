@@ -174,7 +174,7 @@ impl<'a> FnEmitter<'a> {
             let fty = payload
                 .get(i)
                 .copied()
-                .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+                .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded));
             let field = TirExpr {
                 kind: TirExprKind::VariantPayload {
                     value: Box::new(s.clone()),
@@ -201,10 +201,10 @@ impl<'a> FnEmitter<'a> {
         variant_name: &str,
         bindings: &[MatchBinding],
     ) -> (TirExpr, Vec<TirStmt>) {
-        let dyn_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
+        let dyn_ty = BackendTy::Dynamic(DynReason::Unrecorded);
         let why = match s.ty.non_nullable(self.tt) {
             BackendTy::Dynamic(reason) => reason,
-            _ => DynReason::NotYetSupported,
+            _ => DynReason::Unrecorded,
         };
         let by_name = |n: &str| Resolution::ByName {
             name: Arc::from(n),

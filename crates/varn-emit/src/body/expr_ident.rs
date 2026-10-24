@@ -19,7 +19,7 @@ impl<'a> FnEmitter<'a> {
             return make_variant(enum_id, tag, Vec::new(), span);
         }
         let ty = match (ty, &res) {
-            (BackendTy::Dynamic(DynReason::NotYetSupported), Resolution::NativeGlobal(idx)) => {
+            (BackendTy::Dynamic(DynReason::Unrecorded), Resolution::NativeGlobal(idx)) => {
                 native_global_ty(*idx)
             }
             (other, _) => other,
@@ -39,6 +39,6 @@ fn native_global_ty(idx: u32) -> BackendTy {
         Some(NativeValue::Function) => BackendTy::Dynamic(DynReason::Callable),
         Some(NativeValue::Class) => BackendTy::Dynamic(DynReason::Runtime),
         Some(NativeValue::Float) => BackendTy::Float,
-        None => BackendTy::Dynamic(DynReason::NotYetSupported),
+        None => BackendTy::Dynamic(DynReason::Unrecorded),
     }
 }

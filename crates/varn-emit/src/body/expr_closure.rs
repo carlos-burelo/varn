@@ -25,7 +25,7 @@ impl<'a> FnEmitter<'a> {
         let func_id = varn_tir::FnId(self.closure_base + self.out_closures.len() as u32);
         let (sig, param_tys, declared) = self.closure_signature(fn_ty, params.len());
         let return_ty = if is_async || is_generator {
-            BackendTy::Dynamic(DynReason::NotYetSupported)
+            BackendTy::Dynamic(DynReason::Unrecorded)
         } else {
             declared
         };
@@ -34,7 +34,7 @@ impl<'a> FnEmitter<'a> {
             name: Arc::from("<closure>"),
             sig: SigId(0),
             params: vec![],
-            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            return_ty: BackendTy::Dynamic(DynReason::Unrecorded),
             locals: vec![],
             body: vec![],
             has_this: false,
@@ -164,7 +164,7 @@ impl FnEmitter<'_> {
         fn_ty: Option<varn_sem::types::Type>,
         arity: usize,
     ) -> (SigId, Vec<BackendTy>, BackendTy) {
-        let dynamic = BackendTy::Dynamic(DynReason::NotYetSupported);
+        let dynamic = BackendTy::Dynamic(DynReason::Unrecorded);
         let fn_ty =
             fn_ty.filter(|t| matches!(self.m.checker_table.get(t.0), varn_core::TypeKind::Fn(_)));
         let sig = fn_ty.map(|t| {

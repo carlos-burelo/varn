@@ -78,11 +78,9 @@ impl<'a> FnEmitter<'a> {
                     why: DynReason::Spread,
                 };
             }
-            if self
-                .signatures
-                .get(sig.0 as usize)
-                .is_some_and(|sig| sig.params.len() == arg_count)
-            {
+            if self.signatures.get(sig.0 as usize).is_some_and(|sig| {
+                sig.params.len() == arg_count || (sig.has_rest && arg_count + 1 >= sig.params.len())
+            }) {
                 return Resolution::VtableSlot(slot);
             }
         }

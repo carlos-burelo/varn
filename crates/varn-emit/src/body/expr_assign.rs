@@ -13,7 +13,7 @@ impl<'a> FnEmitter<'a> {
         let target = self.field_place(
             this,
             field,
-            BackendTy::Dynamic(DynReason::NotYetSupported),
+            BackendTy::Dynamic(DynReason::Unrecorded),
             Span::EMPTY,
         );
         TirStmt::Expr(TirExpr {

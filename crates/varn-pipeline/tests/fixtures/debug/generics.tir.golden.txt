@@ -33,7 +33,7 @@ TirModule {
                 FieldInfo {
                     name: "value",
                     ty: Dynamic(
-                        NotYetSupported,
+                        Unrecorded,
                     ),
                     slot: 0,
                 },
@@ -199,7 +199,7 @@ TirModule {
         Signature {
             params: [
                 Dynamic(
-                    NotYetSupported,
+                    Unrecorded,
                 ),
             ],
             return_ty: Void,
@@ -208,7 +208,7 @@ TirModule {
         Signature {
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
@@ -228,11 +228,11 @@ TirModule {
         Signature {
             params: [
                 Dynamic(
-                    NotYetSupported,
+                    Unrecorded,
                 ),
             ],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
@@ -244,11 +244,11 @@ TirModule {
         Signature {
             params: [
                 Dynamic(
-                    NotYetSupported,
+                    Unrecorded,
                 ),
             ],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
@@ -278,11 +278,11 @@ TirModule {
         Signature {
             params: [
                 Dynamic(
-                    NotYetSupported,
+                    Unrecorded,
                 ),
             ],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             has_rest: false,
         },
@@ -295,11 +295,11 @@ TirModule {
             ),
             params: [
                 Dynamic(
-                    NotYetSupported,
+                    Unrecorded,
                 ),
             ],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             locals: [],
             body: [
@@ -308,7 +308,7 @@ TirModule {
                         TirExpr {
                             kind: Var,
                             ty: Dynamic(
-                                NotYetSupported,
+                                Unrecorded,
                             ),
                             res: Param(
                                 0,
@@ -424,7 +424,7 @@ TirModule {
             ),
             params: [
                 Dynamic(
-                    NotYetSupported,
+                    Unrecorded,
                 ),
             ],
             return_ty: Void,
@@ -451,7 +451,7 @@ TirModule {
                                     name: "value",
                                 },
                                 ty: Dynamic(
-                                    NotYetSupported,
+                                    Unrecorded,
                                 ),
                                 res: FieldSlot(
                                     0,
@@ -464,7 +464,7 @@ TirModule {
                             value: TirExpr {
                                 kind: Var,
                                 ty: Dynamic(
-                                    NotYetSupported,
+                                    Unrecorded,
                                 ),
                                 res: Param(
                                     0,
@@ -476,7 +476,7 @@ TirModule {
                             },
                         },
                         ty: Dynamic(
-                            NotYetSupported,
+                            Unrecorded,
                         ),
                         res: None,
                         span: Span {
@@ -504,7 +504,7 @@ TirModule {
             ),
             params: [],
             return_ty: Dynamic(
-                NotYetSupported,
+                Unrecorded,
             ),
             locals: [],
             body: [
@@ -528,7 +528,7 @@ TirModule {
                                 name: "value",
                             },
                             ty: Dynamic(
-                                NotYetSupported,
+                                Unrecorded,
                             ),
                             res: FieldSlot(
                                 0,
@@ -613,7 +613,7 @@ TirModule {
                                                                 name: "value",
                                                             },
                                                             ty: Dynamic(
-                                                                NotYetSupported,
+                                                                Unrecorded,
                                                             ),
                                                             res: FieldSlot(
                                                                 0,
@@ -627,7 +627,7 @@ TirModule {
                                                 ],
                                             },
                                             ty: Dynamic(
-                                                NotYetSupported,
+                                                Unrecorded,
                                             ),
                                             res: None,
                                             span: Span {

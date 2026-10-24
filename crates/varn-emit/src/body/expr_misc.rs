@@ -79,7 +79,7 @@ impl<'a> FnEmitter<'a> {
                 untyped
                     || matches!(
                         reason,
-                        varn_tir::DynReason::NotYetSupported
+                        varn_tir::DynReason::Unrecorded
                             | varn_tir::DynReason::Generic
                             | varn_tir::DynReason::Interface
                             | varn_tir::DynReason::TaskHandle(_)
@@ -99,7 +99,7 @@ impl<'a> FnEmitter<'a> {
                 | varn_tir::DynReason::TaskHandle(_)
                 | varn_tir::DynReason::CoreMember
                 | varn_tir::DynReason::Spread
-                | varn_tir::DynReason::NotYetSupported
+                | varn_tir::DynReason::Unrecorded
                 | varn_tir::DynReason::Generic
                 | varn_tir::DynReason::Boxed
                 | varn_tir::DynReason::Runtime,
@@ -155,7 +155,7 @@ pub(super) fn untyped_reason(reason: varn_tir::DynReason) -> bool {
         | varn_tir::DynReason::CoreMember
         | varn_tir::DynReason::Spread
         | varn_tir::DynReason::Shape(_)
-        | varn_tir::DynReason::NotYetSupported
+        | varn_tir::DynReason::Unrecorded
         | varn_tir::DynReason::Generic
         | varn_tir::DynReason::Boxed
         | varn_tir::DynReason::Runtime => false,

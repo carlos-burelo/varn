@@ -60,7 +60,7 @@ pub enum DynReason {
 
     Shape(ShapeId),
 
-    NotYetSupported,
+    Unrecorded,
 
     Generic,
 

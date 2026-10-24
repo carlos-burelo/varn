@@ -56,7 +56,7 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Nullable(_)
             | BackendTy::Void
             | BackendTy::Never => DynReason::CoreMember,
-            BackendTy::Class(_) => DynReason::NotYetSupported,
+            BackendTy::Class(_) => DynReason::Unrecorded,
         };
         Resolution::ByName { name, why }
     }

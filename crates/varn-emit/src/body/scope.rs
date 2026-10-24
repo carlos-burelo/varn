@@ -44,8 +44,8 @@ impl<'a> FnEmitter<'a> {
             captures: Vec::new(),
             captured_locals: FxHashSet::default(),
             pending: Vec::new(),
-            return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
-            yield_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+            return_ty: BackendTy::Dynamic(DynReason::Unrecorded),
+            yield_ty: BackendTy::Dynamic(DynReason::Unrecorded),
             disposables: Vec::new(),
             loops: Vec::new(),
             pending_label: None,
@@ -264,7 +264,7 @@ impl<'a> FnEmitter<'a> {
             .map(BackendTy::Enum)
             .or_else(|| self.this_class.map(BackendTy::Class))
             .or(self.this_value)
-            .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+            .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded));
         let res = if self.lexical_this {
             self.resolve_name(varn_core::TokenKind::This.as_str())
         } else {
@@ -388,7 +388,7 @@ impl<'a> FnEmitter<'a> {
                 ExprKind::StrLiteral { .. } => BackendTy::Str,
                 ExprKind::CharLiteral { .. } => BackendTy::Char,
                 ExprKind::NullLiteral => crate::ty::NULL_TY,
-                _ => BackendTy::Dynamic(DynReason::NotYetSupported),
+                _ => BackendTy::Dynamic(DynReason::Unrecorded),
             },
         }
     }

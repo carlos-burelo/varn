@@ -352,7 +352,7 @@ impl<'a> FnEmitter<'a> {
                 let sty = self
                     .this_class
                     .map(BackendTy::Class)
-                    .unwrap_or(BackendTy::Dynamic(DynReason::NotYetSupported));
+                    .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded));
                 return TirExpr {
                     kind: TirExprKind::Var,
                     ty: sty,

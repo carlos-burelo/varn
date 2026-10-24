@@ -111,8 +111,8 @@ pub(super) fn emit_member_fn(
 pub(super) fn fresh_sig(signatures: &mut Vec<Signature>, arity: usize) -> SigId {
     let id = SigId(signatures.len() as u32);
     signatures.push(Signature {
-        params: vec![BackendTy::Dynamic(DynReason::NotYetSupported); arity],
-        return_ty: BackendTy::Dynamic(DynReason::NotYetSupported),
+        params: vec![BackendTy::Dynamic(DynReason::Unrecorded); arity],
+        return_ty: BackendTy::Dynamic(DynReason::Unrecorded),
         has_rest: false,
     });
     id
@@ -213,8 +213,8 @@ pub(super) fn emit_function(
     };
 
     let arity = f.params.len();
-    let mut param_tys = vec![BackendTy::Dynamic(DynReason::NotYetSupported); arity];
-    let mut return_ty = BackendTy::Dynamic(DynReason::NotYetSupported);
+    let mut param_tys = vec![BackendTy::Dynamic(DynReason::Unrecorded); arity];
+    let mut return_ty = BackendTy::Dynamic(DynReason::Unrecorded);
     if let Some(TypeKind::Fn(fn_id)) = fn_ty.as_ref().map(|t| t.kind(ctx.checker_table)) {
         let ft = ctx.checker_table.get_function(fn_id);
         for (i, p) in ft.params.iter().take(arity).enumerate() {
@@ -249,7 +249,7 @@ pub(super) fn emit_function(
             };
         }
         return_ty = if ns.is_some() && f.return_type.is_none() {
-            BackendTy::Dynamic(DynReason::NotYetSupported)
+            BackendTy::Dynamic(DynReason::Unrecorded)
         } else {
             lower_type(
                 &varn_sem::types::Type::resolved(ft.return_type),

@@ -2,7 +2,7 @@
   [35mtir check[0m [2m──────────────────────────────────────── <fixtures>/generics.vn[0m
 nodes 56   static 22   by name 0   static 100%
   declared           dynamic     1   by name     0
-  not yet supported  dynamic     7   by name     0
+  unrecorded         dynamic     7   by name     0
   function type      dynamic     4   by name     0
   info from_tir(ssa): OK (6 ssa fn(s))
   info from_tir(proto): OK
