@@ -1,7 +1,8 @@
 use cranelift_codegen::ir::{condcodes::IntCC, types, Block, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
-use varn_core::{FieldAccess, RuntimeKind};
+use varn_core::layout::{ScalarRepr, COMPACT_REF_NULL};
 use varn_types::chunk::{CacheEntry, ICKind};
+use varn_types::vm_value::{KIND_HEAP, KIND_NULL};
 
 use super::super::super::emit::{box_bool, box_f64, box_int};
 use super::super::Ctx;
@@ -96,40 +97,54 @@ fn emit_scalar_read(
     slow: Block,
 ) {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
-    let tag = |kind: RuntimeKind| i64::from(FieldAccess::Compact(Some(kind)).encode());
-
-    let int_blk = b.create_block();
-    let not_int = b.create_block();
-    let is_int = b
-        .ins()
-        .icmp_imm_u(IntCC::Equal, access, tag(RuntimeKind::Int));
-    b.ins().brif(is_int, int_blk, &[], not_int, &[]);
-    b.switch_to_block(int_blk);
-    let v = b.ins().load(types::I64, m, addr, 0);
-    let boxed = box_int(b, v);
-    b.ins().jump(merge, &[boxed.into()]);
-
-    b.switch_to_block(not_int);
-    let float_blk = b.create_block();
-    let not_float = b.create_block();
-    let is_float = b
-        .ins()
-        .icmp_imm_u(IntCC::Equal, access, tag(RuntimeKind::Float));
-    b.ins().brif(is_float, float_blk, &[], not_float, &[]);
-    b.switch_to_block(float_blk);
-    let f = b.ins().load(types::F64, m, addr, 0);
-    let boxed = box_f64(b, f);
-    b.ins().jump(merge, &[boxed.into()]);
-
-    b.switch_to_block(not_float);
-    let bool_blk = b.create_block();
-    let is_bool = b
-        .ins()
-        .icmp_imm_u(IntCC::Equal, access, tag(RuntimeKind::Bool));
-    b.ins().brif(is_bool, bool_blk, &[], slow, &[]);
-    b.switch_to_block(bool_blk);
-    let b8 = b.ins().load(types::I8, m, addr, 0);
-    let v = b.ins().uextend(types::I64, b8);
-    let boxed = box_bool(b, v);
-    b.ins().jump(merge, &[boxed.into()]);
+    let reprs = [
+        ScalarRepr::I64,
+        ScalarRepr::F64,
+        ScalarRepr::Bool,
+        ScalarRepr::Ref,
+        ScalarRepr::Boxed,
+    ];
+    let mut next = b.create_block();
+    b.ins().jump(next, &[]);
+    for repr in reprs {
+        b.switch_to_block(next);
+        next = b.create_block();
+        let read = b.create_block();
+        let is_repr = b
+            .ins()
+            .icmp_imm_u(IntCC::Equal, access, i64::from(repr.ic_code()));
+        b.ins().brif(is_repr, read, &[], next, &[]);
+        b.switch_to_block(read);
+        let boxed = match repr {
+            ScalarRepr::I64 => {
+                let v = b.ins().load(types::I64, m, addr, 0);
+                box_int(b, v)
+            }
+            ScalarRepr::F64 => {
+                let f = b.ins().load(types::F64, m, addr, 0);
+                box_f64(b, f)
+            }
+            ScalarRepr::Bool => {
+                let b8 = b.ins().load(types::I8, m, addr, 0);
+                let v = b.ins().uextend(types::I64, b8);
+                box_bool(b, v)
+            }
+            ScalarRepr::Ref => {
+                let raw = b.ins().load(types::I64, m, addr, 0);
+                let is_null = b
+                    .ins()
+                    .icmp_imm_u(IntCC::Equal, raw, COMPACT_REF_NULL as i64);
+                let null_tag = b.ins().iconst(types::I64, KIND_NULL as i64);
+                let heap_tag = b.ins().iconst(types::I64, KIND_HEAP as i64);
+                let zero = b.ins().iconst(types::I64, 0);
+                let tag = b.ins().select(is_null, null_tag, heap_tag);
+                let payload = b.ins().select(is_null, zero, raw);
+                b.ins().iconcat(tag, payload)
+            }
+            ScalarRepr::Boxed => b.ins().load(types::I128, m, addr, 0),
+        };
+        b.ins().jump(merge, &[boxed.into()]);
+    }
+    b.switch_to_block(next);
+    b.ins().jump(slow, &[]);
 }

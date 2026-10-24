@@ -100,7 +100,9 @@ impl InstanceData {
         let field = layout.get_field_by_index(slot)?;
         Some((
             field.offset,
-            varn_core::FieldAccess::Compact(field.kind).encode(),
+            varn_core::layout::TypeLayout::of_field(field.kind)
+                .repr
+                .ic_code(),
         ))
     }
 

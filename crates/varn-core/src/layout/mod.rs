@@ -16,6 +16,18 @@ pub enum ScalarRepr {
     Boxed,
 }
 
+impl ScalarRepr {
+    pub const fn ic_code(self) -> u8 {
+        match self {
+            Self::Bool => 1,
+            Self::I64 => 2,
+            Self::F64 => 3,
+            Self::Ref => 4,
+            Self::Boxed => 5,
+        }
+    }
+}
+
 pub const COMPACT_REF_NULL: u64 = 0;
 
 impl ScalarRepr {
