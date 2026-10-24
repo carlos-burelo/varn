@@ -28,14 +28,32 @@ pub(super) fn core_method_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str
             continue;
         };
         for m in &info.members {
-            if matches!(m.kind, varn_sem::types::ClassMemberKind::Method)
-                && !m.is_static
-                && !m.is_async
-                && !m.is_generator
-                && let Some(id) =
-                    provider.native_op_id(varn_core::op_id::CORE_MODULE, cname, &m.name)
+            if m.is_static || m.is_async || m.is_generator {
+                continue;
+            }
+            let key: Arc<str> = match (m.kind, m.is_readonly) {
+                (varn_sem::types::ClassMemberKind::Method, _) => m.name.clone(),
+                (varn_sem::types::ClassMemberKind::Getter, _)
+                | (varn_sem::types::ClassMemberKind::Property, true) => {
+                    Arc::from(varn_core::AccessorKind::Get.key(&m.name))
+                }
+                (
+                    varn_sem::types::ClassMemberKind::Property
+                    | varn_sem::types::ClassMemberKind::Function
+                    | varn_sem::types::ClassMemberKind::Variable
+                    | varn_sem::types::ClassMemberKind::Constructor
+                    | varn_sem::types::ClassMemberKind::Setter
+                    | varn_sem::types::ClassMemberKind::Class
+                    | varn_sem::types::ClassMemberKind::Interface
+                    | varn_sem::types::ClassMemberKind::Namespace
+                    | varn_sem::types::ClassMemberKind::Enum
+                    | varn_sem::types::ClassMemberKind::Struct,
+                    _,
+                ) => continue,
+            };
+            if let Some(id) = provider.native_op_id(varn_core::op_id::CORE_MODULE, cname, &m.name)
             {
-                out.insert((Arc::from(cname), m.name.clone()), id);
+                out.insert((Arc::from(cname), key), id);
             }
         }
     }

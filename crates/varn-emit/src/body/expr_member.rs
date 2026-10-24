@@ -321,6 +321,25 @@ impl<'a> FnEmitter<'a> {
                 span,
             };
         }
+        if read
+            && obj.ty == obj.ty.non_nullable(self.tt)
+            && let Some(cls) = self.core_class_name(obj.ty)
+            && let Some(&op_id) = self.m.core_ops.get(&(
+                Arc::from(cls),
+                Arc::from(varn_core::AccessorKind::Get.key(&name)),
+            ))
+        {
+            return TirExpr {
+                kind: TirExprKind::MethodCall {
+                    recv: Box::new(obj),
+                    name,
+                    args: Vec::new(),
+                },
+                ty,
+                res: Resolution::NativeOp(op_id),
+                span,
+            };
+        }
         if let BackendTy::Enum(id) = obj.ty.non_nullable(self.tt)
             && let Some(info) = self.m.enums.get(id.0 as usize)
             && Self::is_class_ref(
