@@ -5,6 +5,7 @@ Documentación del lenguaje escrita **desde la suite**: cada rasgo cita el test 
 
 - [`overview.md`](overview.md) — panorama de la suite y rasgos probados.
 - [`specification.md`](specification.md) — índice por área con su test canónico.
+- [`grammar.md`](grammar.md) — gramática formal (EBNF) de léxico, sentencias, expresiones y tipos.
 - [`examples.md`](examples.md) — programas cortos que corren.
 - [`glossary.md`](glossary.md) — términos y palabras clave.
 

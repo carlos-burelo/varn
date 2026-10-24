@@ -80,7 +80,7 @@ una sola dirección. Mapa completo: [`docs/internals/ARCHITECTURE.md`](docs/inte
 
 | Para | Leer |
 |---|---|
-| Aprender el lenguaje | [`docs/lang/`](docs/lang/README.md) — cada rasgo citado con su test |
+| Aprender el lenguaje | [`docs/lang/`](docs/lang/README.md) — cada rasgo citado con su test; gramática en [`grammar.md`](docs/lang/grammar.md) |
 | Usar el CLI | [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md), [`docs/CLI_INSPECT.md`](docs/CLI_INSPECT.md) |
 | La biblioteca estándar | [`docs/lang/standard_library.md`](docs/lang/standard_library.md), [`docs/internals/STDLIB_ARCHITECTURE.md`](docs/internals/STDLIB_ARCHITECTURE.md) |
 | Entender el compilador y el runtime | [`docs/internals/`](docs/internals/README.md) |

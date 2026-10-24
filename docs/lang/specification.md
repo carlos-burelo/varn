@@ -14,11 +14,12 @@ Fuente única: `tests/*.vn` (220 archivos; `tests/main.vn` importa 218). Código
 | Async, isolates, canales | `async_concurrency.md` | `21-async.vn`, `33-globals-async-coherence.vn`, `77-async-generators.vn`, `47-isolates-multithread.vn`, `54-channels.vn` |
 | Generadores | `generators.md` | `20-generators.vn`, `77-async-generators.vn` |
 | Errores | `error_handling.md` | `11-errors.vn`, `109-try-operator.vn`, `90-multi-catch.vn` |
+| Gramática formal (EBNF) | `grammar.md` | derivada de `varn-lexer` y `varn-parser`; verificada con `vn debug -p ast` |
 | Léxico y literales | `lexical.md` | `01-arithmetic.vn`, `02-boolean.vn`, `03-strings.vn`, `04-templates.vn`, `34-char-type.vn`, `35-decimal-bigint.vn` |
 | Identificadores y keywords | `identifiers.md` | `crates/varn-lexer/src/keywords.rs` |
 | Glosario | `glossary.md` | términos con su test |
 | Ejemplos que corren | `examples.md` | cada bloque cita su `tests/*.vn` |
-| Runtime | `runtime_behavior.md` | links a `../VM_ARCHITECTURE.md`, `../RUNTIME_ARCHITECTURE.md` |
+| Runtime | `runtime_behavior.md` | links a `../internals/VM_ARCHITECTURE.md`, `../internals/RUNTIME_ARCHITECTURE.md` |
 | Núcleo y plataforma | `SPEC_NUCLEO_Y_PLATAFORMA.md` | índice, propuesta histórica parcial |
 
 Lo no citado con su `tests/*.vn` no es contrato.
