@@ -108,11 +108,7 @@ impl Workspace {
         self.files.insert(uri.clone(), state);
 
         for (dep_uri, dep_source) in dependents {
-            let dep_state = Arc::new(run_pipeline(
-                dep_source,
-                dep_uri.clone(),
-                self.session(),
-            ));
+            let dep_state = Arc::new(run_pipeline(dep_source, dep_uri.clone(), self.session()));
             {
                 let mut idx = self.index.write().unwrap_or_else(|e| e.into_inner());
                 idx.update_file(&dep_uri, &dep_state);

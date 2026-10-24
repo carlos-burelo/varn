@@ -19,7 +19,11 @@ pub fn resolve_version(origin: &DepOrigin) -> Result<ResolvedVersion, String> {
             }
             let version = if let Some(mpath) = varn_project::project_manifest(path) {
                 if let Ok(manifest) = varn_project::Manifest::load(&mpath) {
-                    manifest.version.as_deref().unwrap_or("0.0.0-local").to_owned()
+                    manifest
+                        .version
+                        .as_deref()
+                        .unwrap_or("0.0.0-local")
+                        .to_owned()
                 } else {
                     "0.0.0-local".to_owned()
                 }

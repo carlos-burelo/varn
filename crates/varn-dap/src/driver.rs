@@ -31,8 +31,8 @@ impl Driver {
         if self.machine.is_some() {
             return Err("already launched".to_string());
         }
-        let source =
-            varn_pipeline::Source::file(program).map_err(|e| format!("cannot load '{program}': {e}"))?;
+        let source = varn_pipeline::Source::file(program)
+            .map_err(|e| format!("cannot load '{program}': {e}"))?;
         let canonical = source.path().to_owned();
         let session = varn_pipeline::Session::open(varn_pipeline::Anchor::File(
             std::path::Path::new(&canonical),
@@ -42,8 +42,13 @@ impl Driver {
             .compile(source, Request::executable(CachePolicy::Bypass))
             .into_executable()
             .map_err(|e| format!("compile failed: {e}"))?;
-        let mut machine = boot_machine(&session, compiled.precompiled, CapabilitySet::allow_all(), false)
-            .map_err(|e| format!("boot failed: {e}"))?;
+        let mut machine = boot_machine(
+            &session,
+            compiled.precompiled,
+            CapabilitySet::allow_all(),
+            false,
+        )
+        .map_err(|e| format!("boot failed: {e}"))?;
         machine.ctx.settings.no_jit = true;
         let main = enter_main(&mut machine, compiled.entry_proto);
         self.protos = collect_protos(&main, &machine.ctx.precompiled);

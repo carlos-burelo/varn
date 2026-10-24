@@ -1,7 +1,9 @@
-use crate::debug_print;
 use crate::cli::PermissionArgs;
+use crate::debug_print;
 use crate::error::CliError;
-use varn_pipeline::{portable, CachePolicy, DebugFlags, Executable, Policy, Request, Session, Source};
+use varn_pipeline::{
+    portable, CachePolicy, DebugFlags, Executable, Policy, Request, Session, Source,
+};
 
 pub fn cache_policy(debug: &DebugFlags) -> CachePolicy {
     if debug.any() {

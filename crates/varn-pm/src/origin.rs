@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DepOrigin {
     Remote {

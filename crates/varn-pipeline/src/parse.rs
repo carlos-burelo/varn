@@ -32,8 +32,8 @@ pub(crate) fn parse(
     source: &str,
     path: &str,
 ) -> Result<Parsed, Failure> {
-    let (program, interner, arena) = varn_parser::parse(tokens, lexeme_buf, path, AtomInterner::new())
-        .map_err(|errs| {
+    let (program, interner, arena) =
+        varn_parser::parse(tokens, lexeme_buf, path, AtomInterner::new()).map_err(|errs| {
             let mut bag = varn_core::DiagnosticBag::new();
             for e in errs {
                 bag.push(e);

@@ -21,7 +21,9 @@ pub fn execute(session: &pipeline::Session, args: BuildArgs) -> Result<(), CliEr
     let out_path = resolve_output_path(&args.file, args.output.as_deref(), args.target.extension());
 
     match args.target {
-        Target::Bytecode => pipeline::portable::write_portable(&out_path, &compiled.graph_artifact)?,
+        Target::Bytecode => {
+            pipeline::portable::write_portable(&out_path, &compiled.graph_artifact)?
+        }
         Target::Exe => build_exe(&compiled, &out_path)?,
         Target::Native => build_native(&compiled, &out_path, args.verbose)?,
     }
@@ -72,11 +74,8 @@ fn build_native(
         terminal::tagged("AOT", format!("linking object file to '{out_path}'..."));
     }
 
-    let linked = varn_jit::aot::link::link_executable(
-        &obj_path,
-        Path::new(out_path),
-        &runtime_lib()?,
-    );
+    let linked =
+        varn_jit::aot::link::link_executable(&obj_path, Path::new(out_path), &runtime_lib()?);
     let _ = std::fs::remove_file(&obj_path);
     linked.map_err(|e| CliError::fatal(e.to_string()))
 }

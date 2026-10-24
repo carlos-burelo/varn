@@ -99,7 +99,10 @@ impl WorkingDir {
             return Ok(WorkingDir(None));
         }
         std::env::set_current_dir(dir).map_err(|e| {
-            CliError::fatal(format!("cannot enter project root '{}': {e}", dir.display()))
+            CliError::fatal(format!(
+                "cannot enter project root '{}': {e}",
+                dir.display()
+            ))
         })?;
         Ok(WorkingDir(previous))
     }

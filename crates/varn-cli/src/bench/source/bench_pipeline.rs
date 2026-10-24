@@ -72,10 +72,13 @@ pub(super) fn profile_inputs<'a>(
         .checked
         .as_ref()
         .ok_or_else(|| CliError::fatal("the compilation kept no check result"))?;
-    let (_, profile, _, _) =
-        parse_shared(tokens.tokens.clone(), tokens.lexeme_buf.clone(), path).map_err(|errs| {
-            CliError::fatal(format!("parse errors while profiling: {} found", errs.len()))
-        })?;
+    let (_, profile, _, _) = parse_shared(tokens.tokens.clone(), tokens.lexeme_buf.clone(), path)
+        .map_err(|errs| {
+        CliError::fatal(format!(
+            "parse errors while profiling: {} found",
+            errs.len()
+        ))
+    })?;
     Ok((profile, checked))
 }
 

@@ -29,7 +29,9 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
     })?;
 
     let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;
-    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new(session.shared_resolver()));
+    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new(
+        session.shared_resolver(),
+    ));
     let factory = VmFactory::new(
         compile_output.precompiled.clone(),
         builtin_protos,

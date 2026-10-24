@@ -341,8 +341,7 @@ impl Checker<'_> {
                 .iter()
                 .any(|m| m.name.as_ref() == varn_core::MemberKey::Callable.as_str()),
             None => {
-                let origin_modules: Vec<String> =
-                    origin.iter().map(|o| o.to_string()).collect();
+                let origin_modules: Vec<String> = origin.iter().map(|o| o.to_string()).collect();
                 let interface = bind
                     .get_interface_members_local(&name)
                     .cloned()

@@ -9,11 +9,7 @@ use varn_vm::Vm;
 
 type PipelineResult<T> = Result<T, Failure>;
 
-pub fn execute(
-    session: &Session,
-    executable: Executable,
-    policy: Policy,
-) -> Result<(), Failure> {
+pub fn execute(session: &Session, executable: Executable, policy: Policy) -> Result<(), Failure> {
     let mut machine = boot_machine(
         session,
         executable.precompiled,
@@ -56,7 +52,9 @@ pub fn boot_machine(
     capabilities: CapabilitySet,
     trace: bool,
 ) -> PipelineResult<Vm> {
-    let loader = std::sync::Arc::new(crate::stdlib_loader::PipelineLoader::new(session.shared_resolver()));
+    let loader = std::sync::Arc::new(crate::stdlib_loader::PipelineLoader::new(
+        session.shared_resolver(),
+    ));
     let settings = varn_vm::ExecSettings::from_env(trace);
     let mut machine = Vm::new(precompiled.clone(), settings).with_loader(loader);
     machine.ctx.capabilities = Rc::new(capabilities);

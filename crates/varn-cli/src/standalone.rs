@@ -73,10 +73,14 @@ pub fn write_executable(
     graph: &ModuleGraphArtifact,
 ) -> Result<(), String> {
     let payload = postcard::to_allocvec(graph).map_err(|e| e.to_string())?;
-    let envelope = write_artifact(ArtifactKind::ModuleGraph, ArtifactClass::Distributable, &payload);
+    let envelope = write_artifact(
+        ArtifactKind::ModuleGraph,
+        ArtifactClass::Distributable,
+        &payload,
+    );
 
-    let mut bytes = std::fs::read(runtime)
-        .map_err(|e| format!("cannot read '{}': {e}", runtime.display()))?;
+    let mut bytes =
+        std::fs::read(runtime).map_err(|e| format!("cannot read '{}': {e}", runtime.display()))?;
     bytes.extend_from_slice(&envelope);
     bytes.extend_from_slice(&(envelope.len() as u64).to_le_bytes());
     bytes.extend_from_slice(MAGIC_VEXE);

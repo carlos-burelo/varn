@@ -53,7 +53,11 @@ impl fmt::Display for RuntimeFailure {
                 .and_then(|root| std::path::Path::new(file).strip_prefix(root).ok())
                 .map(|p| p.to_string_lossy().replace('\\', "/"))
                 .unwrap_or_else(|| file.replace('\\', "/"));
-            write!(f, "\n    at {} ({}:{})", frame.fn_name, relative, frame.line)?;
+            write!(
+                f,
+                "\n    at {} ({}:{})",
+                frame.fn_name, relative, frame.line
+            )?;
         }
         Ok(())
     }

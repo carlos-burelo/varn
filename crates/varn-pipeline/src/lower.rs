@@ -3,7 +3,9 @@ use varn_compiler::FunctionProto;
 use varn_core::ast::{AstArena, Program};
 use varn_sem::resolver::ImportResolver;
 
-pub(crate) fn sorted_export_names(exports: &varn_sem::exports::ExportMap) -> Vec<std::sync::Arc<str>> {
+pub(crate) fn sorted_export_names(
+    exports: &varn_sem::exports::ExportMap,
+) -> Vec<std::sync::Arc<str>> {
     let mut names: Vec<std::sync::Arc<str>> = exports
         .keys()
         .map(|k| std::sync::Arc::from(k.as_str()))

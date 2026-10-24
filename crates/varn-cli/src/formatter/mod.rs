@@ -16,8 +16,7 @@ fn plural(count: usize) -> &'static str {
 pub fn run_fmt(args: FmtArgs) -> Result<(), CliError> {
     let start_time = Instant::now();
     let target = args.path.as_deref().unwrap_or(".");
-    let files =
-        crate::discover::vn_files(Path::new(target), crate::discover::Depth::Recursive)?;
+    let files = crate::discover::vn_files(Path::new(target), crate::discover::Depth::Recursive)?;
 
     if files.is_empty() {
         if args.verbose {
@@ -63,10 +62,7 @@ pub fn run_fmt(args: FmtArgs) -> Result<(), CliError> {
             for f in &unformatted {
                 eprintln!("  - {}", f.display());
             }
-            eprintln!(
-                "\nRun {} to format these files.\n",
-                chalk("vn fmt").bold()
-            );
+            eprintln!("\nRun {} to format these files.\n", chalk("vn fmt").bold());
             return Err(CliError::usage(format!(
                 "{} unformatted files found",
                 unformatted.len()

@@ -133,8 +133,8 @@ fn system_library_dirs() -> Vec<PathBuf> {
         }
     }
 
-    if let Some(studio) = std::env::var_os("ProgramFiles")
-        .map(|p| PathBuf::from(p).join("Microsoft Visual Studio"))
+    if let Some(studio) =
+        std::env::var_os("ProgramFiles").map(|p| PathBuf::from(p).join("Microsoft Visual Studio"))
     {
         for release in subdirectories_newest_first(&studio) {
             for edition in subdirectories_newest_first(&release) {

@@ -111,7 +111,6 @@ impl<'a> FnEmitter<'a> {
                         });
                     }
                 }
-
             }
         }
         TirExpr {

@@ -64,7 +64,9 @@ pub fn run(
     let precompile_dur = samples.link_cold;
 
     let builtin_protos: Vec<FunctionProto> = crate::pipeline::core_protos_owned()?;
-    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new(session.shared_resolver()));
+    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new(
+        session.shared_resolver(),
+    ));
     let factory = VmFactory::new(
         Rc::clone(&precompiled),
         builtin_protos,

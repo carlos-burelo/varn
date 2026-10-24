@@ -27,10 +27,7 @@ pub fn report(compilation: &Compilation, debug: &DebugFlags, verbose: bool) {
     if verbose {
         terminal::tagged(
             "Varn",
-            format_args!(
-                "parsed {} top-level statements",
-                parsed.program.body.len()
-            ),
+            format_args!("parsed {} top-level statements", parsed.program.body.len()),
         );
     }
     if let Some(interner) = compilation.interner() {
@@ -47,7 +44,9 @@ pub fn report(compilation: &Compilation, debug: &DebugFlags, verbose: bool) {
     };
     let source = compilation.source.text();
     for diagnostic in compilation.warnings() {
-        terminal::log(varn_core::diagnostics::format_diagnostic(diagnostic, source));
+        terminal::log(varn_core::diagnostics::format_diagnostic(
+            diagnostic, source,
+        ));
     }
     if debug.symbols {
         varn_debug::symbols::debug_symbols(checked, &parsed.program.filename, debug);
@@ -223,10 +222,7 @@ fn compiled(
     }
 }
 
-fn print_module_graph(
-    entry_path: &str,
-    deps: &rustc_hash::FxHashMap<String, Vec<String>>,
-) {
+fn print_module_graph(entry_path: &str, deps: &rustc_hash::FxHashMap<String, Vec<String>>) {
     use varn_core::term::colors::{BOLD, C_MODULES, R};
     println!("\n{BOLD}Module Dependency Graph{R}");
     println!("  Entry: {C_MODULES}{}{R}", shorten_path(entry_path));
@@ -281,10 +277,7 @@ fn shorten_path(path: &str) -> String {
 }
 
 pub fn natives() {
-    println!(
-        "std resolved: {:?}",
-        varn_modules::std_root::resolve()
-    );
+    println!("std resolved: {:?}", varn_modules::std_root::resolve());
     println!("--- NATIVE OPERATIONS ---");
     for entry in varn_builtins::dispatch::all_native_ops() {
         println!(

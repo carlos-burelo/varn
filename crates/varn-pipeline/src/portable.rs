@@ -19,8 +19,8 @@ pub fn write_portable(path: &str, artifact: &ModuleGraphArtifact) -> Result<(), 
 }
 
 pub fn read_portable(path: &str) -> Result<ModuleGraphArtifact, Failure> {
-    let bytes = std::fs::read(path)
-        .map_err(|e| Failure::io(format!("cannot read '{}': {e}", path)))?;
+    let bytes =
+        std::fs::read(path).map_err(|e| Failure::io(format!("cannot read '{}': {e}", path)))?;
 
     let payload = read_artifact(ArtifactKind::ModuleGraph, &bytes)
         .map_err(|e| Failure::internal(format!("'{}' no se puede ejecutar: {}", path, e)))?;
