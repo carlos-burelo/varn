@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+const base = { x: 1, y: 2 };
+const merged = { ...base, x: "s" };
+const x: int = merged.x;
