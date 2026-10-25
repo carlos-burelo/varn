@@ -11,7 +11,7 @@ function parsePartHeaders(block: str): { [key: str]: str } {
     let lines = block.split("\r\n");
     for (let line of lines) {
         let colon = line.indexOf(":");
-        if (colon > 0) {
+        if (colon !== null && colon > 0) {
             out[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
         }
     }
@@ -25,12 +25,12 @@ function partField(headers: { [key: str]: str }, attr: str): str? {
     }
     let needle = attr + "=\"";
     let idx = disp.indexOf(needle);
-    if (idx < 0) {
+    if (idx === null) {
         return null;
     }
     let rest = disp.slice(idx + needle.length);
     let end = rest.indexOf("\"");
-    if (end < 0) {
+    if (end === null) {
         return null;
     }
     return rest.slice(0, end);
@@ -53,7 +53,7 @@ export namespace Multipart {
                 chunk = chunk.slice(0, chunk.length - 2);
             }
             let headEnd = chunk.indexOf("\r\n\r\n");
-            if (headEnd < 0) {
+            if (headEnd === null) {
                 continue;
             }
             let headers = parsePartHeaders(chunk.slice(0, headEnd));
@@ -71,7 +71,7 @@ export namespace Multipart {
 
     export function boundaryOf(contentType: str): str? {
         let idx = contentType.indexOf("boundary=");
-        if (idx < 0) {
+        if (idx === null) {
             return null;
         }
         let rest = contentType.slice(idx + 9).trim();
@@ -79,7 +79,7 @@ export namespace Multipart {
             return rest.slice(1, rest.length - 1);
         }
         let semi = rest.indexOf(";");
-        if (semi >= 0) {
+        if (semi !== null) {
             return rest.slice(0, semi).trim();
         }
         return rest;

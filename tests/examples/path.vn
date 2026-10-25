@@ -14,7 +14,7 @@ await describe("example std:path", async () => {
         expect(normalize("a//b/../c")).toBe("a" + SEP + "c");
         expect(isAbsolute("/tmp/x")).toBe(true);
         expect(isAbsolute("relative/y")).toBe(false);
-        expect(resolve("src").indexOf("src") >= 0).toBe(true);
+        expect(resolve("src").indexOf("src") !== null).toBe(true);
     });
 
     await it("mirrors the Path namespace", () => {

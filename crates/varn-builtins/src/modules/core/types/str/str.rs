@@ -1,6 +1,6 @@
 use varn_macros::varn_contract;
 use varn_types::str_util::{
-    byte_to_char_idx, char_len, char_range_to_bytes, find_bytes, rfind_bytes,
+    char_len, char_range_to_bytes, find_bytes,
 };
 use varn_types::{NativeCtx, NativeFnResult, VmValue, VnStr};
 
@@ -101,15 +101,11 @@ varn_contract! {
         fn startsWith(_ctx: &mut dyn NativeCtx, this: &VnStr, search: &str) -> bool { this.starts_with(search) }
         fn endsWith(_ctx: &mut dyn NativeCtx, this: &VnStr, search: &str) -> bool { this.ends_with(search) }
 
-        fn indexOf(_ctx: &mut dyn NativeCtx, this: &VnStr, search: &str) -> i64 {
-            if search.is_empty() { return 0; }
-            let ascii = this.is_ascii();
-            find_bytes(this, search).map(|b| byte_to_char_idx(this, ascii, b)).unwrap_or(-1)
+        fn indexOf(_ctx: &mut dyn NativeCtx, this: &VnStr, search: &str) -> Option<i64> {
+            varn_types::str_util::char_index_of(this, search).map(|at| at as i64)
         }
-        fn lastIndexOf(_ctx: &mut dyn NativeCtx, this: &VnStr, search: &str) -> i64 {
-            let ascii = this.is_ascii();
-            if search.is_empty() { return char_len(this, ascii) as i64; }
-            rfind_bytes(this, search).map(|b| byte_to_char_idx(this, ascii, b)).unwrap_or(-1)
+        fn lastIndexOf(_ctx: &mut dyn NativeCtx, this: &VnStr, search: &str) -> Option<i64> {
+            varn_types::str_util::char_last_index_of(this, search).map(|at| at as i64)
         }
 
 

@@ -93,8 +93,8 @@ await describe("246 ui overlays", async () => {
         const tree = Toasts(toaster);
         render(win, fr, focus, tree, 0.0, 0.0, 400.0, 300.0);
         win.clear(0);
-        const texts = win.drawn().filter((c: DrawnItem): bool => c.kind == "text" && c.text.indexOf("saved") >= 0);
+        const texts = win.drawn().filter((c: DrawnItem): bool => c.kind == "text" && c.text.indexOf("saved") !== null);
         expect(texts.length).toBe(1);
-        expect(win.drawn().filter((c: DrawnItem): bool => c.kind == "text" && c.text.indexOf("gone") >= 0).length).toBe(0);
+        expect(win.drawn().filter((c: DrawnItem): bool => c.kind == "text" && c.text.indexOf("gone") !== null).length).toBe(0);
     });
 });

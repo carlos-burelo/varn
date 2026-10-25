@@ -34,7 +34,7 @@ await describe("example std:net", async () => {
         expect(url.host).toBe("example.com");
         expect(url.port).toBe(8080);
         expect(url.query.get("q")).toBe("varn");
-        expect(url.toString().indexOf("https://") >= 0).toBe(true);
+        expect(url.toString().indexOf("https://") !== null).toBe(true);
         let query = Query.parse("?a=1&a=2&b=3");
         expect(query.getAll("a").length).toBe(2);
         expect(query.get("b")).toBe("3");

@@ -43,7 +43,7 @@ export function toStdError(e: Error, fallback: str): StdError {
     }
     let msg = e.message;
     let sep = msg.indexOf("|");
-    if (sep < 0) {
+    if (sep === null) {
         return new StdError(fallback, msg);
     }
     let code = msg.slice(0, sep);

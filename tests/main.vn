@@ -261,6 +261,7 @@ import "./267-json-stringify-finite.vn"
 import "./268-str-strict-ranges.vn"
 import "./269-container-cast-validates.vn"
 import "./270-handled-task-rejections.vn"
+import "./271-index-of-is-optional.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

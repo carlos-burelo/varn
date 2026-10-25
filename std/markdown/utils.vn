@@ -15,7 +15,7 @@ export function findFrom(s: str, search: str, fromIdx: int): int {
     if (fromIdx >= s.length) return -1;
     let sub = s.slice(fromIdx);
     let idx = sub.indexOf(search);
-    if (idx === -1) return -1;
+    if (idx === null) return -1;
     return fromIdx + idx;
 }
 

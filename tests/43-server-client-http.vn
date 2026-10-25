@@ -38,7 +38,7 @@ async function runHttpVerification() {
     let resp = json({ success: true, count: 42 });
     expect(resp.status).toBe(200);
     expect(resp.ok).toBe(true);
-    expect(resp.text().indexOf('"success":true') >= 0).toBeTruthy();
+    expect(resp.text().indexOf('"success":true') !== null).toBeTruthy();
 
     let redir = redirect("https://varn.dev", 301);
     expect(redir.status).toBe(301);

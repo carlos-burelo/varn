@@ -1,0 +1,38 @@
+import { describe, it, expect } from "std:test";
+
+function where(text: str, needle: str): int? { return text.indexOf(needle) }
+function whereLast(items: int[], item: int): int? { return items.lastIndexOf(item) }
+
+await describe("271 indexOf is optional", async () => {
+    await it("a missing match is null, a match at 0 is 0", () => {
+        expect("abcabc".indexOf("c")).toBe(2);
+        expect("abcabc".indexOf("z")).toBe(null);
+        expect("abc".indexOf("")).toBe(0);
+        expect("abcabc".lastIndexOf("a")).toBe(3);
+        expect("abc".lastIndexOf("z")).toBe(null);
+        expect([4, 5, 4].indexOf(4)).toBe(0);
+        expect([4, 5, 4].lastIndexOf(4)).toBe(2);
+        expect([4, 5].indexOf(9)).toBe(null);
+        expect([4, 5].findIndex((n: int) => n > 4)).toBe(1);
+        expect([4, 5].findIndex((n: int) => n > 9)).toBe(null);
+    });
+
+    await it("the hot path agrees with the cold path", () => {
+        let found = 0;
+        let missing = 0;
+        for (let i = 0; i < 2000; i = i + 1) {
+            if (where("héllo wörld", "ö") !== null) { found = found + 1 }
+            if (where("héllo wörld", "zz") === null) { missing = missing + 1 }
+        }
+        expect(found).toBe(2000);
+        expect(missing).toBe(2000);
+        expect(whereLast([1, 2, 1], 1)).toBe(2);
+    });
+
+    await it("narrowing lets the index be used after a check", () => {
+        const at = "key=value".indexOf("=");
+        if (at !== null) {
+            expect("key=value".slice(at + 1)).toBe("value");
+        }
+    });
+});

@@ -75,20 +75,10 @@ impl ExecCtx {
         let result = match op {
             StrOp::StartsWith => VmValue::from_bool(s.starts_with(p)),
             StrOp::EndsWith => VmValue::from_bool(s.ends_with(p)),
-            StrOp::IndexOf => VmValue::from_int(char_index_of(s, p)),
+            StrOp::IndexOf => varn_types::str_util::char_index_of(s, p)
+                .map_or_else(VmValue::null, |at| VmValue::from_int(at as i64)),
         };
         self.record_ic_hit_callmethod();
         Some(result)
-    }
-}
-
-fn char_index_of(s: &str, p: &str) -> i64 {
-    if p.is_empty() {
-        return 0;
-    }
-    match s.find(p) {
-        Some(byte_idx) if s.is_ascii() => byte_idx as i64,
-        Some(byte_idx) => s[..byte_idx].chars().count() as i64,
-        None => -1,
     }
 }

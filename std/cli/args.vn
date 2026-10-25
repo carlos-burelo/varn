@@ -16,7 +16,7 @@ export namespace Cli {
             if (arg.startsWith("--")) {
                 let body = arg.slice(2);
                 let eqIdx = body.indexOf("=");
-                if (eqIdx > 0) {
+                if (eqIdx !== null && eqIdx > 0) {
                     let k = body.slice(0, eqIdx);
                     let v = body.slice(eqIdx + 1);
                     flags[k] = v;

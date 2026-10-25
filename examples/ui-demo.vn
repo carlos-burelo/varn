@@ -17,7 +17,7 @@ const GREEN = 4278255360;
 const WHITE = 4294967295;
 const GRAY = 4287137928;
 
-using win = UiWindow.open("varn ui demo", W, H, args().indexOf("--headless") >= 0);
+using win = UiWindow.open("varn ui demo", W, H, args().indexOf("--headless") !== null);
 print(`real window: ${win.real() ? "yes" : "no (headless: --headless flag)"}`);
 
 const fr = new UiFrame(W, H);

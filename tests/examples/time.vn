@@ -28,7 +28,7 @@ await describe("example std:time", async () => {
         let start = DateTime.now();
         let later = start.addDays(1).addHours(2);
         expect(later.diff(start)).toBe(26 * 3600 * 1000);
-        expect(start.toISOString().indexOf("T") >= 0).toBe(true);
+        expect(start.toISOString().indexOf("T") !== null).toBe(true);
         expect(DateTime.fromTimestamp(start.toMs).toMs).toBe(start.toMs);
     });
 });

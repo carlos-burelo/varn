@@ -32,7 +32,7 @@ function parseInteger(digits: str): int {
 
 function parseFloating(text: str): float {
     let dotIndex = text.indexOf(".");
-    if (dotIndex < 0) {
+    if (dotIndex === null) {
         return parseInteger(text) as float;
     }
     let wholePart = text.slice(0, dotIndex);
@@ -125,7 +125,7 @@ export namespace Toml {
                 continue;
             }
             let equalsIndex = line.indexOf("=");
-            if (equalsIndex > 0) {
+            if (equalsIndex !== null && equalsIndex > 0) {
                 let key = trimWhitespace(line.slice(0, equalsIndex));
                 let rawVal = line.slice(equalsIndex + 1);
                 let parsedVal = parseTomlValue(rawVal);

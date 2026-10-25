@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{box_bool, box_int, call_helper};
+use super::super::super::emit::{box_bool, box_found_index, call_helper};
 use super::super::{heap, props, store, Ctx, Out};
 use super::direct::{entry_out_slot, run_entered_or};
 use super::invoke::boxed_window;
@@ -130,7 +130,7 @@ pub(crate) fn emit_method_call(
             &[ectx, rt0, rp0, at, ap],
         )?;
         let boxed = match probe {
-            StrProbe::IndexOf => box_int(b, r),
+            StrProbe::IndexOf => box_found_index(b, r),
             StrProbe::StartsWith | StrProbe::EndsWith | StrProbe::Includes => box_bool(b, r),
         };
         b.ins().jump(merge, &[boxed.into()]);

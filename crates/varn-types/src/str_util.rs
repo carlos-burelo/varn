@@ -57,6 +57,22 @@ pub fn substring_bounds(
     }
 }
 
+pub fn char_index_of(haystack: &str, needle: &str) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    let ascii = haystack.is_ascii();
+    find_bytes(haystack, needle).map(|b| byte_to_char_idx(haystack, ascii, b) as usize)
+}
+
+pub fn char_last_index_of(haystack: &str, needle: &str) -> Option<usize> {
+    let ascii = haystack.is_ascii();
+    if needle.is_empty() {
+        return Some(char_len(haystack, ascii));
+    }
+    rfind_bytes(haystack, needle).map(|b| byte_to_char_idx(haystack, ascii, b) as usize)
+}
+
 pub fn split_ranges(text: &str, separator: Option<&str>, out: &mut Vec<(usize, usize)>) {
     let base = text.as_ptr() as usize;
     match separator {

@@ -75,10 +75,10 @@ await describe("73 str charcode json shape", async () => {
         
         const hay = "abcdefghij".repeat(50) + "needle"
         expect(hay.indexOf("needle")).toBe(500)
-        expect(hay.indexOf("nope")).toBe(-1)
+        expect(hay.indexOf("nope")).toBe(null)
         expect(hay.indexOf("")).toBe(0)
         expect(hay.lastIndexOf("abc")).toBe(490)
-        expect(hay.lastIndexOf("nope")).toBe(-1)
+        expect(hay.lastIndexOf("nope")).toBe(null)
         expect(hay.includes("efgh")).toBeTruthy()
         expect(hay.includes("zzz")).toBe(false)
         // Char index, not byte index, when the prefix is not ASCII.

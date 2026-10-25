@@ -67,14 +67,14 @@ class ReqContext {
         this.user = null;
 
         let qIdx = url.indexOf("?");
-        if (qIdx >= 0) {
+        if (qIdx !== null) {
             this.path = url.slice(0, qIdx);
             let qStr = url.slice(qIdx + 1);
             let pairs = qStr.split("&");
             for (let i = 0; i < pairs.length; i = i + 1) {
                 let p = pairs[i];
                 let eq = p.indexOf("=");
-                if (eq > 0) {
+                if (eq !== null && eq > 0) {
                     this.query[p.slice(0, eq)] = p.slice(eq + 1);
                 } else {
                     this.query[p] = "1";

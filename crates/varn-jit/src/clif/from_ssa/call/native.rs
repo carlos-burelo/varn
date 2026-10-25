@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::{types, InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 
-use super::super::super::emit::{box_bool, box_int};
+use super::super::super::emit::{box_bool, box_found_index, box_int};
 use super::super::{heap, Ctx};
 use super::invoke::boxed_window;
 
@@ -83,7 +83,7 @@ pub(crate) fn emit_call_native_op(
                 ctx.helpers.str_index_of,
                 &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
             )?;
-            return Ok(box_int(b, r));
+            return Ok(box_found_index(b, r));
         }
         if op_id == varn_core::op_id::KnownOp::StrIncludes.id() {
             let r = crate::clif::from_ssa::exceptions::call_checked_value(

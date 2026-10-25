@@ -20,7 +20,7 @@ function parseField(text: str, lo: int, hi: int): bool[] {
         let step = 1;
         let range = g;
         let slash = g.indexOf("/");
-        if (slash >= 0) {
+        if (slash !== null) {
             range = g.slice(0, slash);
             step = int.parse(g.slice(slash + 1));
             if (step <= 0) {
@@ -31,7 +31,7 @@ function parseField(text: str, lo: int, hi: int): bool[] {
         let to = hi;
         if (range !== "" && range !== "*") {
             let dash = range.indexOf("-");
-            if (dash >= 0) {
+            if (dash !== null) {
                 from = int.parse(range.slice(0, dash));
                 to = int.parse(range.slice(dash + 1));
             } else {

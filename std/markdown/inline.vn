@@ -42,10 +42,10 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
                     let url = urlAndTitle;
                     let title = "";
                     let quoteIdx = urlAndTitle.indexOf("\"");
-                    if (quoteIdx !== -1) {
+                    if (quoteIdx !== null) {
                         url = urlAndTitle.slice(0, quoteIdx).trim();
                         let endQuote = urlAndTitle.lastIndexOf("\"");
-                        if (endQuote > quoteIdx) {
+                        if (endQuote !== null && endQuote > quoteIdx) {
                             title = urlAndTitle.slice(quoteIdx + 1, endQuote);
                         }
                     }
@@ -70,10 +70,10 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
                     let url = urlAndTitle;
                     let title = "";
                     let quoteIdx = urlAndTitle.indexOf("\"");
-                    if (quoteIdx !== -1) {
+                    if (quoteIdx !== null) {
                         url = urlAndTitle.slice(0, quoteIdx).trim();
                         let endQuote = urlAndTitle.lastIndexOf("\"");
-                        if (endQuote > quoteIdx) {
+                        if (endQuote !== null && endQuote > quoteIdx) {
                             title = urlAndTitle.slice(quoteIdx + 1, endQuote);
                         }
                     }

@@ -58,7 +58,7 @@ export namespace Mime {
 
     export function detect(path: str): str {
         let dot = path.lastIndexOf(".");
-        if (dot < 0) {
+        if (dot === null) {
             return "application/octet-stream";
         }
         return lookup(path.slice(dot + 1));

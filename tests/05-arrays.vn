@@ -9,7 +9,7 @@ await describe("05 Arrays", async () => {
         const strs = ["banana", "apple", "cherry"];
         expect(nums.length).toBe(8);
         expect(nums.indexOf(5)).toBe(4);
-        expect(nums.indexOf(99)).toBe(-1);
+        expect(nums.indexOf(99)).toBe(null);
         expect(nums.includes(9)).toBeTruthy();
         expect(!nums.includes(99)).toBeTruthy();
         expect(nums.slice(2, 5).length).toBe(3);

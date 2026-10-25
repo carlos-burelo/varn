@@ -12,7 +12,7 @@ await describe("example std:log", async () => {
         log.info("dropped");
         log.error("kept");
         expect(lines.length).toBe(1);
-        expect(lines[0].indexOf("kept") >= 0).toBe(true);
+        expect(lines[0].indexOf("kept") !== null).toBe(true);
     });
 
     await it("child loggers inherit the sink", () => {
@@ -23,7 +23,7 @@ await describe("example std:log", async () => {
         let child = log.child("db");
         child.info("connected");
         expect(lines.length).toBe(1);
-        expect(lines[0].indexOf("svc.db") >= 0).toBe(true);
+        expect(lines[0].indexOf("svc.db") !== null).toBe(true);
     });
 
     await it("global helpers emit", () => {

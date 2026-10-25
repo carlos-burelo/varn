@@ -4,20 +4,20 @@ import { Markdown } from "std:markdown";
 await describe("example std:markdown", async () => {
     await it("renders markdown to html", () => {
         let html = Markdown.render("# Title\n\nHello **bold** and *italic*.");
-        expect(html.indexOf("<h1>") >= 0).toBe(true);
-        expect(html.indexOf("<strong>bold</strong>") >= 0).toBe(true);
+        expect(html.indexOf("<h1>") !== null).toBe(true);
+        expect(html.indexOf("<strong>bold</strong>") !== null).toBe(true);
     });
 
     await it("renders lists and code", () => {
         let html = Markdown.render("- one\n- two\n\n`code`");
-        expect(html.indexOf("<li>one</li>") >= 0).toBe(true);
-        expect(html.indexOf("<code>code</code>") >= 0).toBe(true);
+        expect(html.indexOf("<li>one</li>") !== null).toBe(true);
+        expect(html.indexOf("<code>code</code>") !== null).toBe(true);
     });
 
     await it("parses an ast and extracts structure", () => {
         let source = "# A\n## B\nSee [x](https://example.com).";
         let ast = Markdown.parse(source);
-        expect(Markdown.renderAst(ast).indexOf("<h1>") >= 0).toBe(true);
+        expect(Markdown.renderAst(ast).indexOf("<h1>") !== null).toBe(true);
         let headings = Markdown.extractHeadings(source);
         expect(headings.length).toBe(2);
         expect(headings[0].level).toBe(1);
@@ -28,7 +28,7 @@ await describe("example std:markdown", async () => {
     });
 
     await it("converts to plain text", () => {
-        expect(Markdown.toPlainText("# Hi **there**").indexOf("Hi") >= 0).toBe(true);
+        expect(Markdown.toPlainText("# Hi **there**").indexOf("Hi") !== null).toBe(true);
         expect(Markdown.slugify("Hello World!")).toBe("hello-world");
     });
 });

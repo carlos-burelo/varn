@@ -45,8 +45,8 @@ export class Query {
             }
 
             const eq = entry.indexOf("=");
-            const rawKey = eq >= 0 ? entry.slice(0, eq) : entry;
-            const rawValue = eq >= 0 ? entry.slice(eq + 1) : "";
+            const rawKey = eq !== null ? entry.slice(0, eq) : entry;
+            const rawValue = eq !== null ? entry.slice(eq + 1) : "";
 
             this.append(decodeURIComponent$(rawKey), decodeURIComponent$(rawValue));
         }

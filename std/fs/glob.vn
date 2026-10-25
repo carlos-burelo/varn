@@ -32,7 +32,7 @@ function matchFrom(seg: str, si: int, name: str, ni: int): bool {
         }
         if (c === "[") {
             let rel = seg.slice(si).indexOf("]");
-            if (rel < 0) {
+            if (rel === null) {
                 return false;
             }
             let close = si + rel;

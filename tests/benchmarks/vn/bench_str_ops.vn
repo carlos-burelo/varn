@@ -48,7 +48,7 @@ function benchSearch(): int {
     let total = 0;
     let i = 0;
     while (i < 2000) {
-        total = total + haystack.indexOf("needle");
+        total = total + (haystack.indexOf("needle") ?? 0 - 1);
         if (haystack.includes("efgh")) {
             total = total + 1;
         }

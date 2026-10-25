@@ -80,13 +80,13 @@ export namespace Semver {
         }
         let build = "";
         let plus = v.indexOf("+");
-        if (plus >= 0) {
+        if (plus !== null) {
             build = v.slice(plus + 1);
             v = v.slice(0, plus);
         }
         let pre: str[] = [];
         let dash = v.indexOf("-");
-        if (dash >= 0) {
+        if (dash !== null) {
             pre = parsePre(v.slice(dash + 1));
             v = v.slice(0, dash);
         }

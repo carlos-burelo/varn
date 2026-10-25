@@ -92,7 +92,7 @@ export class Request {
                 let pairs = cookieHdr.split(";");
                 for (let p of pairs) {
                     let eq = p.indexOf("=");
-                    if (eq > 0) {
+                    if (eq !== null && eq > 0) {
                         let k = p.slice(0, eq).trim();
                         let v = p.slice(eq + 1).trim();
                         this.cookies[k] = v;
@@ -117,7 +117,7 @@ export class Request {
         let pairs = this.body.split("&");
         for (let p of pairs) {
             let eq = p.indexOf("=");
-            if (eq > 0) {
+            if (eq !== null && eq > 0) {
                 let k = p.slice(0, eq);
                 let v = p.slice(eq + 1);
                 res[k] = v;

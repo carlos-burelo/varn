@@ -14,20 +14,20 @@ export class Url {
         let rest = url;
         
         let protoIdx = rest.indexOf("://");
-        if (protoIdx >= 0) {
+        if (protoIdx !== null) {
             out.protocol = rest.slice(0, protoIdx);
             rest = rest.slice(protoIdx + 3);
         }
         
         let fragIdx = rest.indexOf("#");
-        if (fragIdx >= 0) {
+        if (fragIdx !== null) {
             out.fragment = rest.slice(fragIdx + 1);
             rest = rest.slice(0, fragIdx);
         }
         
         let queryIdx = rest.indexOf("?");
         let queryStr = "";
-        if (queryIdx >= 0) {
+        if (queryIdx !== null) {
             queryStr = rest.slice(queryIdx + 1);
             rest = rest.slice(0, queryIdx);
         }
@@ -35,7 +35,7 @@ export class Url {
         
         let pathIdx = rest.indexOf("/");
         let hostAndPort = rest;
-        if (pathIdx >= 0) {
+        if (pathIdx !== null) {
             out.path = rest.slice(pathIdx);
             hostAndPort = rest.slice(0, pathIdx);
         } else {
@@ -43,7 +43,7 @@ export class Url {
         }
         
         let portIdx = hostAndPort.indexOf(":");
-        if (portIdx >= 0) {
+        if (portIdx !== null) {
             out.host = hostAndPort.slice(0, portIdx);
             let portStr = hostAndPort.slice(portIdx + 1);
             
@@ -95,12 +95,12 @@ export class Url {
         let fragPart = "";
         
         let hashIdx = pathPart.indexOf("#");
-        if (hashIdx >= 0) {
+        if (hashIdx !== null) {
             fragPart = pathPart.slice(hashIdx + 1);
             pathPart = pathPart.slice(0, hashIdx);
         }
         let qIdx = pathPart.indexOf("?");
-        if (qIdx >= 0) {
+        if (qIdx !== null) {
             queryPart = pathPart.slice(qIdx + 1);
             pathPart = pathPart.slice(0, qIdx);
         }
@@ -110,7 +110,7 @@ export class Url {
         } else {
             let baseDir = baseObj.path;
             let lastSlash = baseDir.lastIndexOf("/");
-            if (lastSlash >= 0) {
+            if (lastSlash !== null) {
                 baseDir = baseDir.slice(0, lastSlash + 1);
             } else {
                 baseDir = "/";

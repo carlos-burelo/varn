@@ -154,25 +154,25 @@ varn_contract! {
             }
             false
         }
-        fn indexOf(ctx: &mut dyn NativeCtx, this: VnArray, search: VmValue) -> i64 {
+        fn indexOf(ctx: &mut dyn NativeCtx, this: VnArray, search: VmValue) -> Option<i64> {
             let len = this.len(ctx);
             for i in 0..len {
                 if let Some(v) = this.get(ctx, i)
                     && vm_eq(ctx, v, search) {
-                        return i as i64;
+                        return Some(i as i64);
                     }
             }
-            -1
+            None
         }
-        fn lastIndexOf(ctx: &mut dyn NativeCtx, this: VnArray, search: VmValue) -> i64 {
+        fn lastIndexOf(ctx: &mut dyn NativeCtx, this: VnArray, search: VmValue) -> Option<i64> {
             let len = this.len(ctx);
             for i in (0..len).rev() {
                 if let Some(v) = this.get(ctx, i)
                     && vm_eq(ctx, v, search) {
-                        return i as i64;
+                        return Some(i as i64);
                     }
             }
-            -1
+            None
         }
 
 
@@ -248,16 +248,16 @@ varn_contract! {
             }
             Ok(None)
         }
-        fn findIndex(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> Result<i64, NativeError> {
+        fn findIndex(ctx: &mut dyn NativeCtx, this: VnArray, predicate: VmValue) -> Result<Option<i64>, NativeError> {
             let arr = this.raw();
             let len = this.len(ctx);
             for i in 0..len {
                 let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
                 if ctx.call_vm(predicate, &[v, VmValue::from_int(i as i64), arr])?.is_truthy() {
-                    return Ok(i as i64);
+                    return Ok(Some(i as i64));
                 }
             }
-            Ok(-1)
+            Ok(None)
         }
         fn forEach(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue) -> Result<(), NativeError> {
             let arr = this.raw();

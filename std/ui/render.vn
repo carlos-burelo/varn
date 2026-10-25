@@ -31,7 +31,7 @@ const HEADLESS_FRAMES: int = 5;
 const HEADLESS_FLAG: str = "--headless";
 
 export function run(title: str, build: (fr: UiFrame, focus: Focus) => Widget, w: int = 800, h: int = 600, bg: int = -1, maxFrames: int = 0): void {
-    const headless = args().indexOf(HEADLESS_FLAG) >= 0;
+    const headless = args().indexOf(HEADLESS_FLAG) !== null;
     const limit = maxFrames > 0 ? maxFrames : (headless ? HEADLESS_FRAMES : 0);
     using win = UiWindow.open(title, w, h, headless);
     const fr = new UiFrame(w, h);

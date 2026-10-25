@@ -218,7 +218,7 @@ export class HttpServer {
         let pathOnly = rawReq.path;
         let queryStr = "";
         let qIdx = rawReq.path.indexOf("?");
-        if (qIdx >= 0) {
+        if (qIdx !== null) {
             pathOnly = rawReq.path.slice(0, qIdx);
             queryStr = rawReq.path.slice(qIdx + 1);
         }
@@ -234,7 +234,7 @@ export class HttpServer {
             for (let i = 0; i < pairs.length; i = i + 1) {
                 let pair = pairs[i];
                 let eqIdx = pair.indexOf("=");
-                if (eqIdx > 0) {
+                if (eqIdx !== null && eqIdx > 0) {
                     queryObj[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
                 } else {
                     queryObj[pair] = "true";

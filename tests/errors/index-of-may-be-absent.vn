@@ -1,0 +1,3 @@
+// expect: error[VN3010]
+const text = "a=b";
+const rest = text.slice(text.indexOf("=") + 1);

@@ -33,7 +33,7 @@ await describe("example std:http", async () => {
         await delay(800);
         let res = await get("http://127.0.0.1:19882/hello");
         expect(res.status).toBe(200);
-        expect(res.text().indexOf("world") >= 0).toBe(true);
+        expect(res.text().indexOf("world") !== null).toBe(true);
         proc.kill();
     });
 

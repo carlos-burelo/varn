@@ -168,6 +168,8 @@ pub(crate) extern "C" fn jit_str_ends_with(
     }
 }
 
+pub(crate) const NOT_FOUND: i64 = -1;
+
 #[varn_macros::jit_slow(field = "str_index_of")]
 pub(crate) extern "C" fn jit_str_index_of(
     ctx: *mut ExecCtx,
@@ -186,20 +188,13 @@ pub(crate) extern "C" fn jit_str_index_of(
             borrow_str_fast(receiver, heap, &mut b1),
             borrow_str_fast(search, heap, &mut b2),
         ) {
-            use varn_types::str_util::{byte_to_char_idx, find_bytes};
-            if n.is_empty() {
-                return 0;
-            }
-            let ascii = s.is_ascii();
-            return find_bytes(s, n)
-                .map(|b| byte_to_char_idx(s, ascii, b))
-                .unwrap_or(-1);
+            return varn_types::str_util::char_index_of(s, n).map_or(NOT_FOUND, |at| at as i64);
         }
         jit_propagate_error(
             &mut *ctx,
             crate::error::RuntimeError::new("indexOf: receiver and argument must be strings"),
         );
-        -1
+        NOT_FOUND
     }
 }
 

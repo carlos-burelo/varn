@@ -100,6 +100,20 @@ pub(super) fn meta_is_float(meta: &[varn_types::register_meta::RegisterMeta], r:
     meta.get(r).is_some_and(|m| m.kind == SlotKind::Float)
 }
 
+pub(super) fn box_found_index(
+    b: &mut FunctionBuilder,
+    index: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let absent = b.ins().icmp_imm_u(
+        cranelift_codegen::ir::condcodes::IntCC::SignedLessThan,
+        index,
+        0,
+    );
+    let found = box_int(b, index);
+    let none = box_null(b);
+    b.ins().select(absent, none, found)
+}
+
 pub(super) fn box_null(b: &mut FunctionBuilder) -> cranelift_codegen::ir::Value {
     let tag = b
         .ins()

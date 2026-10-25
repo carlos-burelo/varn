@@ -24,7 +24,7 @@ export namespace Auth {
             return null;
         }
         let colon = decoded.indexOf(":");
-        if (colon < 0) {
+        if (colon === null) {
             return null;
         }
         return #{ user: decoded.slice(0, colon), pass: decoded.slice(colon + 1) };
