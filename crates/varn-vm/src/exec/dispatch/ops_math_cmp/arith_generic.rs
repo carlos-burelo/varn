@@ -27,9 +27,9 @@ impl ExecCtx {
             OpCode::BitAnd => crate::exec::arith::bit_and(a, b, &mut self.heap),
             OpCode::BitOr => crate::exec::arith::bit_or(a, b, &mut self.heap),
             OpCode::BitXor => crate::exec::arith::bit_xor(a, b, &mut self.heap),
-            OpCode::Shl => crate::exec::arith::shl(a, b, &mut self.heap),
-            OpCode::Shr => crate::exec::arith::shr(a, b, &mut self.heap),
-            OpCode::Ushr => crate::exec::arith::ushr(a, b, &mut self.heap),
+            OpCode::Shl => crate::exec::arith::shl(a, b, &mut self.heap)?,
+            OpCode::Shr => crate::exec::arith::shr(a, b, &mut self.heap)?,
+            OpCode::Ushr => crate::exec::arith::ushr(a, b, &mut self.heap)?,
             OpCode::LoadConst
             | OpCode::LoadNull
             | OpCode::LoadTrue

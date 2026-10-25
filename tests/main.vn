@@ -248,6 +248,7 @@ import "./254-ui-reactive.vn"
 import "./255-ui-wrap-bounds.vn"
 import "./256-array-pop-shift-nullable.vn"
 import "./257-str-split-empty-separator.vn"
+import "./258-shift-amount-range.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

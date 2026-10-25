@@ -32,18 +32,7 @@ pub(super) fn emit_bin(
         IntAnd => b.ins().band(a, c),
         IntOr => b.ins().bor(a, c),
         IntXor => b.ins().bxor(a, c),
-        IntShl => {
-            let sh = b.ins().band_imm_u(c, 0x3F);
-            b.ins().ishl(a, sh)
-        }
-        IntShr => {
-            let sh = b.ins().band_imm_u(c, 0x3F);
-            b.ins().sshr(a, sh)
-        }
-        IntUshr => {
-            let sh = b.ins().band_imm_u(c, 0x3F);
-            b.ins().ushr(a, sh)
-        }
+        IntShl | IntShr | IntUshr => checked_shift(b, ctx, op, a, c),
         IntEq => bool_i64(b, IntCC::Equal, a, c),
         IntNe => bool_i64(b, IntCC::NotEqual, a, c),
         IntLt => bool_i64(b, IntCC::SignedLessThan, a, c),
@@ -75,7 +64,6 @@ pub(super) fn checked_int(
     a: Value,
     c: Value,
 ) -> Value {
-    use super::super::emit::guard_overflow;
     let helpers = ctx.helpers;
     let (r, ovf, helper) = match op {
         SsaBinOp::IntAdd => {
@@ -123,6 +111,39 @@ pub(super) fn checked_int(
         }
     };
 
+    guarded(b, ctx, helper, r, ovf, a, c)
+}
+
+fn checked_shift(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    op: SsaBinOp,
+    a: Value,
+    c: Value,
+) -> Value {
+    let helpers = ctx.helpers;
+    let (r, helper) = match op {
+        SsaBinOp::IntShl => (b.ins().ishl(a, c), helpers.shl),
+        SsaBinOp::IntShr => (b.ins().sshr(a, c), helpers.shr),
+        _ => (b.ins().ushr(a, c), helpers.ushr),
+    };
+    let out_of_range = b
+        .ins()
+        .icmp_imm_u(IntCC::UnsignedGreaterThan, c, varn_core::SHIFT_MAX);
+    guarded(b, ctx, helper, r, out_of_range, a, c)
+}
+
+fn guarded(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    helper: usize,
+    r: Value,
+    fault: Value,
+    a: Value,
+    c: Value,
+) -> Value {
+    use super::super::emit::guard_overflow;
+    let helpers = ctx.helpers;
     let err_off = helpers.jit_error_flag_offset as i32;
     let res_off = helpers.jit_native_result_offset as i32;
     let (landing, err_ret) = {
@@ -136,7 +157,7 @@ pub(super) fn checked_int(
         ctx.exec_ctx,
         helper,
         r,
-        ovf,
+        fault,
         a,
         c,
         err_off,

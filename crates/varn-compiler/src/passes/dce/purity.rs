@@ -59,7 +59,15 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         Binary { op, ty, .. } => {
             let typed = matches!(ty, BackendTy::Int | BackendTy::Float | BackendTy::Bool);
             let int_can_overflow = *ty == BackendTy::Int
-                && matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul);
+                && matches!(
+                    op,
+                    HirBinOp::Add
+                        | HirBinOp::Sub
+                        | HirBinOp::Mul
+                        | HirBinOp::Shl
+                        | HirBinOp::Shr
+                        | HirBinOp::Ushr
+                );
 
             let never_traps = matches!(
                 op,

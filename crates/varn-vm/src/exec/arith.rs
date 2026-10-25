@@ -3,7 +3,10 @@ use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use bigdecimal::BigDecimal as Decimal;
 use num_traits::Zero;
-use varn_core::{add_int, mul_int, neg_int, pow_int, sub_int, INT_MAX, INT_MIN};
+use varn_core::{
+    add_int, mul_int, neg_int, pow_int, shl_int, shr_int, sub_int, ushr_int, INT_MAX, INT_MIN,
+    SHIFT_MAX,
+};
 
 #[cold]
 #[inline(never)]
@@ -276,24 +279,37 @@ pub(crate) fn bit_xor(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     heap.make_int(r)
 }
 
-#[inline(always)]
-pub(crate) fn shl(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    let r = heap
-        .as_int(a)
-        .wrapping_shl(heap.to_f64_val(b) as i32 as u32 & 63);
-    VmValue::from_int_wrapping(r)
+#[cold]
+#[inline(never)]
+fn shift_out_of_range(op: &str, a: i64, n: i64) -> RuntimeError {
+    RuntimeError::integer_overflow(format!(
+        "integer overflow: {a} {op} {n} has a shift amount outside 0..={SHIFT_MAX}"
+    ))
+}
+
+fn shift(
+    a: VmValue,
+    b: VmValue,
+    heap: &mut Heap,
+    op: &str,
+    apply: fn(i64, i64) -> Option<i64>,
+) -> VmResult<VmValue> {
+    let (lhs, count) = (heap.as_int(a), heap.as_int(b));
+    let r = apply(lhs, count).ok_or_else(|| shift_out_of_range(op, lhs, count))?;
+    Ok(VmValue::from_int_wrapping(r))
 }
 
 #[inline(always)]
-pub(crate) fn shr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    let r = heap
-        .as_int(a)
-        .wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63);
-    VmValue::from_int_wrapping(r)
+pub(crate) fn shl(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    shift(a, b, heap, "<<", shl_int)
 }
 
 #[inline(always)]
-pub(crate) fn ushr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    let r = ((heap.as_int(a) as u64).wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63)) as i64;
-    VmValue::from_int_wrapping(r)
+pub(crate) fn shr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    shift(a, b, heap, ">>", shr_int)
+}
+
+#[inline(always)]
+pub(crate) fn ushr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    shift(a, b, heap, ">>>", ushr_int)
 }

@@ -1,0 +1,42 @@
+import { describe, it, expect } from "std:test";
+
+function shl(a: int, n: int): int { return a << n }
+function shr(a: int, n: int): int { return a >> n }
+function ushr(a: int, n: int): int { return a >>> n }
+
+function faults(f: () => int): bool {
+    try {
+        f()
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+await describe("258 shift amount range", async () => {
+    await it("in-range amounts shift as bit operations", () => {
+        expect(shl(1, 0)).toBe(1);
+        expect(shl(1, 62)).toBe(4611686018427387904);
+        expect(shl(1, 63)).toBe(0 - 9223372036854775807 - 1);
+        expect(shr(0 - 8, 1)).toBe(0 - 4);
+        expect(shr(0 - 8, 63)).toBe(0 - 1);
+        expect(ushr(0 - 1, 63)).toBe(1);
+    });
+
+    await it("out-of-range amounts fault instead of wrapping", () => {
+        expect(faults(() => shl(1, 64))).toBeTruthy();
+        expect(faults(() => shl(1, 0 - 1))).toBeTruthy();
+        expect(faults(() => shr(8, 70))).toBeTruthy();
+        expect(faults(() => ushr(8, 64))).toBeTruthy();
+    });
+
+    await it("hot path faults like the cold path", () => {
+        let acc = 0;
+        for (let i = 0; i < 3000; i = i + 1) {
+            acc = acc + shl(1, i % 40);
+        }
+        expect(acc > 0).toBeTruthy();
+        expect(faults(() => shl(1, 64))).toBeTruthy();
+        expect(faults(() => shr(1, 0 - 1))).toBeTruthy();
+    });
+});

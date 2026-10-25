@@ -31,6 +31,26 @@ pub fn neg_int(a: i64) -> Option<i64> {
     a.checked_neg()
 }
 
+pub const SHIFT_MAX: i64 = 63;
+
+#[inline(always)]
+pub fn shl_int(a: i64, n: i64) -> Option<i64> {
+    u32::try_from(n).ok().and_then(|n| a.checked_shl(n))
+}
+
+#[inline(always)]
+pub fn shr_int(a: i64, n: i64) -> Option<i64> {
+    u32::try_from(n).ok().and_then(|n| a.checked_shr(n))
+}
+
+#[inline(always)]
+pub fn ushr_int(a: i64, n: i64) -> Option<i64> {
+    u32::try_from(n)
+        .ok()
+        .and_then(|n| (a as u64).checked_shr(n))
+        .map(|r| r as i64)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntDivFault {
     DivisionByZero,

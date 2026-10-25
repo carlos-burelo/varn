@@ -135,9 +135,13 @@ pub(crate) extern "C" fn jit_shl(
     b_payload: u64,
 ) {
     unsafe {
+        let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        (*ctx).jit_native_result = crate::exec::arith::shl(a, b, &mut (*ctx).heap);
+        match crate::exec::arith::shl(a, b, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
     }
 }
 
@@ -150,9 +154,13 @@ pub(crate) extern "C" fn jit_shr(
     b_payload: u64,
 ) {
     unsafe {
+        let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        (*ctx).jit_native_result = crate::exec::arith::shr(a, b, &mut (*ctx).heap);
+        match crate::exec::arith::shr(a, b, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
     }
 }
 
@@ -165,8 +173,12 @@ pub(crate) extern "C" fn jit_ushr(
     b_payload: u64,
 ) {
     unsafe {
+        let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        (*ctx).jit_native_result = crate::exec::arith::ushr(a, b, &mut (*ctx).heap);
+        match crate::exec::arith::ushr(a, b, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
     }
 }

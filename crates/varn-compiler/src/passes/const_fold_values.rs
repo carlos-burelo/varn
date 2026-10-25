@@ -60,13 +60,9 @@ pub(super) fn fold_binary(
             BitAnd => Some(InstKind::ConstInt(x & y)),
             BitOr => Some(InstKind::ConstInt(x | y)),
             BitXor => Some(InstKind::ConstInt(x ^ y)),
-            Shl => Some(InstKind::ConstInt(x.wrapping_shl(*y as u32))),
-            Shr => Some(InstKind::ConstInt(x.wrapping_shr(*y as u32))),
-            Ushr => {
-                let ux = *x as u64;
-                let uy = *y as u32;
-                Some(InstKind::ConstInt((ux >> uy) as i64))
-            }
+            Shl => varn_core::shl_int(*x, *y).map(InstKind::ConstInt),
+            Shr => varn_core::shr_int(*x, *y).map(InstKind::ConstInt),
+            Ushr => varn_core::ushr_int(*x, *y).map(InstKind::ConstInt),
             Instanceof | In => None,
         },
         (InstKind::ConstFloat(x), InstKind::ConstFloat(y)) => match op {
