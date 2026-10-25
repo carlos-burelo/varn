@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+import { max } from "std:math";
+const top = max();

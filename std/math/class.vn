@@ -62,26 +62,20 @@ export class Math {
         }
         return ceil$(x);
     }
-    static min(...args: float[]): float {
-        if (args.length === 0) {
-            throw new Error("min() requires at least one argument");
-        }
-        let current = args[0];
-        for (let i = 1; i < args.length; i = i + 1) {
-            let v = args[i];
+    static min(first: float, ...rest: float[]): float {
+        let current = first;
+        for (let i = 0; i < rest.length; i = i + 1) {
+            let v = rest[i];
             if (v < current) {
                 current = v;
             }
         }
         return current;
     }
-    static max(...args: float[]): float {
-        if (args.length === 0) {
-            throw new Error("max() requires at least one argument");
-        }
-        let current = args[0];
-        for (let i = 1; i < args.length; i = i + 1) {
-            let v = args[i];
+    static max(first: float, ...rest: float[]): float {
+        let current = first;
+        for (let i = 0; i < rest.length; i = i + 1) {
+            let v = rest[i];
             if (v > current) {
                 current = v;
             }
