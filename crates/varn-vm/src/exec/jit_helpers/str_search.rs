@@ -271,28 +271,7 @@ pub(crate) extern "C" fn jit_str_split(
         };
         let ranges = &mut ctx_ref.str_ranges;
         ranges.clear();
-        let base = text.as_ptr() as usize;
-        match sep {
-            Some(sep) if sep.len() == 1 => {
-                let byte = sep.as_bytes()[0];
-                let count = text.as_bytes().iter().filter(|&&b| b == byte).count() + 1;
-                ranges.reserve(count);
-                for p in text.split(byte as char) {
-                    ranges.push((p.as_ptr() as usize - base, p.len()));
-                }
-            }
-            Some(sep) => {
-                for p in text.split(sep) {
-                    ranges.push((p.as_ptr() as usize - base, p.len()));
-                }
-            }
-            None => {
-                ranges.reserve(text.len());
-                for (b, c) in text.char_indices() {
-                    ranges.push((b, c.len_utf8()));
-                }
-            }
-        }
+        varn_types::str_util::split_ranges(text, sep, ranges);
         let mut vals = Vec::with_capacity(ranges.len());
         ctx_ref
             .heap

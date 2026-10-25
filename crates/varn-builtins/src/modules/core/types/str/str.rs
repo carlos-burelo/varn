@@ -194,34 +194,9 @@ varn_contract! {
         }
 
         fn split(ctx: &mut dyn NativeCtx, this: &VnStr, separator: Option<&str>) -> Vec<VmValue> {
-            let s = this.as_str();
-            let base = s.as_ptr() as usize;
-            match separator {
-                Some(sep) => {
-                    if sep.len() == 1 {
-                        let byte = sep.as_bytes()[0];
-                        let count = this.as_bytes().iter().filter(|&&b| b == byte).count() + 1;
-                        let mut out = Vec::with_capacity(count);
-                        for p in s.split(byte as char) {
-                            out.push(ctx.str_sub(this, p.as_ptr() as usize - base, p.len()));
-                        }
-                        out
-                    } else {
-                        s.split(sep).map(|p| ctx.str_sub(this, p.as_ptr() as usize - base, p.len())).collect()
-                    }
-                }
-                None => {
-                    let count = this.chars().count();
-                    let mut out = Vec::with_capacity(count);
-                    let mut off = 0usize;
-                    for c in s.chars() {
-                        let l = c.len_utf8();
-                        out.push(ctx.str_sub(this, off, l));
-                        off += l;
-                    }
-                    out
-                }
-            }
+            let mut ranges = Vec::new();
+            varn_types::str_util::split_ranges(this.as_str(), separator, &mut ranges);
+            ranges.into_iter().map(|(off, len)| ctx.str_sub(this, off, len)).collect()
         }
         fn lines(ctx: &mut dyn NativeCtx, this: &VnStr) -> Vec<VmValue> {
             let s = this.as_str();

@@ -44,3 +44,27 @@ pub fn byte_to_char_idx(s: &str, ascii: bool, byte_idx: usize) -> i64 {
         s[..byte_idx].chars().count() as i64
     }
 }
+
+pub fn split_ranges(text: &str, separator: Option<&str>, out: &mut Vec<(usize, usize)>) {
+    let base = text.as_ptr() as usize;
+    match separator {
+        Some(sep) if sep.len() == 1 => {
+            let byte = sep.as_bytes()[0];
+            out.reserve(text.as_bytes().iter().filter(|&&b| b == byte).count() + 1);
+            for part in text.split(byte as char) {
+                out.push((part.as_ptr() as usize - base, part.len()));
+            }
+        }
+        Some(sep) if !sep.is_empty() => {
+            for part in text.split(sep) {
+                out.push((part.as_ptr() as usize - base, part.len()));
+            }
+        }
+        Some(_) | None => {
+            out.reserve(text.len());
+            for (offset, c) in text.char_indices() {
+                out.push((offset, c.len_utf8()));
+            }
+        }
+    }
+}
