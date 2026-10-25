@@ -118,6 +118,7 @@ pub(super) fn emit_inst(
                     b, ctx, values, args,
                 )?)));
             }
+            super::stack_exit::guard_headroom(b, ctx);
             let no_closure = b.ins().iconst(types::I64, 0);
             let null_tag = b
                 .ins()

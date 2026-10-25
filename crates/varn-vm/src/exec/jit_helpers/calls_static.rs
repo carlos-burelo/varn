@@ -12,9 +12,7 @@ pub(super) enum Handoff {
 
 pub(super) unsafe fn hand_off(ctx: &mut ExecCtx, caller_depth: usize, out: *mut usize) -> Handoff {
     if ctx.frames.len() > crate::frame::MAX_CALL_DEPTH {
-        return Handoff::Ran(Err(crate::error::RuntimeError::new(
-            "stack overflow: call depth exceeded 10000",
-        )));
+        return Handoff::Ran(Err(crate::frame::call_depth_exceeded()));
     }
     if ctx.frames.len() == caller_depth + 1
         && ctx
@@ -92,6 +90,17 @@ pub(crate) extern "C" fn jit_call_self_window(
     }
 }
 
+#[varn_macros::jit_slow(field = "stack_overflow")]
+pub(crate) extern "C" fn jit_stack_overflow(
+    ctx: *mut ExecCtx,
+    _lhs_tag: u64,
+    _lhs_payload: u64,
+    _rhs_tag: u64,
+    _rhs_payload: u64,
+) {
+    unsafe { jit_propagate_error(&mut *ctx, crate::frame::native_stack_exhausted()) }
+}
+
 #[varn_macros::jit_slow(field = "jit_push_native_frame")]
 pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *const VmClosure) {
     unsafe {
@@ -99,7 +108,7 @@ pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *cons
         if ctx_ref.frames.len() >= crate::frame::MAX_CALL_DEPTH {
             jit_propagate_error(
                 ctx_ref,
-                crate::error::RuntimeError::new("stack overflow: call depth exceeded 10000"),
+                crate::frame::call_depth_exceeded(),
             );
             return;
         }

@@ -58,6 +58,7 @@ pub struct ExecCtx {
     pub str_ranges: Vec<(usize, usize)>,
     pub(crate) json_shapes: Vec<super::ctx_json::CacheEntry>,
     pub jit_error_flag: u64,
+    pub jit_stack_floor: u64,
     pub jit_exit: varn_jit::stack_roots::JitExit,
     pub jit_exits_saved: Vec<varn_jit::stack_roots::JitExit>,
 
@@ -123,6 +124,7 @@ impl ExecCtx {
             str_ranges: Vec::new(),
             json_shapes: Vec::new(),
             jit_error_flag: 0,
+            jit_stack_floor: crate::frame::native_stack_floor(),
             osr_request: None,
             resources: Rc::new(std::cell::UnsafeCell::new(varn_types::ResourceStore::new())),
             entered_generators: Vec::new(),
@@ -301,6 +303,7 @@ impl ExecCtx {
             str_ranges: Vec::new(),
             json_shapes: Vec::new(),
             jit_error_flag: 0,
+            jit_stack_floor: self.jit_stack_floor,
             osr_request: None,
             resources: Rc::clone(&self.resources),
             entered_generators: Vec::new(),

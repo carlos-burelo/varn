@@ -322,9 +322,7 @@ impl ExecCtx {
                     .map_err(|e| crate::error::RuntimeError::new(e.message))?;
                 if let crate::exec::calls::PreparedCall::Frame(mut frame) = prepared {
                     if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
-                        return Err(crate::error::RuntimeError::new(
-                            "stack overflow: call depth exceeded 10000",
-                        ));
+                        return Err(crate::frame::call_depth_exceeded());
                     }
                     frame.return_reg = crate::frame::CallFrame::NO_RETURN_REG;
                     self.frames.push(frame);
@@ -368,9 +366,7 @@ impl ExecCtx {
                     match prepared {
                         crate::exec::calls::PreparedCall::Frame(mut frame) => {
                             if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
-                                return Err(crate::error::RuntimeError::new(
-                                    "stack overflow: call depth exceeded 10000",
-                                ));
+                                return Err(crate::frame::call_depth_exceeded());
                             }
                             frame.return_reg = dest as u16;
                             self.frames.push(frame);

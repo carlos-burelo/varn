@@ -255,6 +255,7 @@ import "./261-class-field-initialization.vn"
 import "./262-initialization-order.vn"
 import "./263-static-initializer-order.vn"
 import "./264-index-by-name.vn"
+import "./265-unbounded-recursion.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

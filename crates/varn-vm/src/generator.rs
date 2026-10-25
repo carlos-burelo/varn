@@ -110,9 +110,7 @@ impl ExecCtx {
             } => {
                 if depth >= crate::frame::MAX_CALL_DEPTH {
                     *generator.phase.borrow_mut() = Phase::Done;
-                    return Err(RuntimeError::new(
-                        "stack overflow: call depth exceeded 10000",
-                    ));
+                    return Err(crate::frame::call_depth_exceeded());
                 }
                 let alloc = self.stack.push_frame(&closure.proto);
                 let nregs = closure.proto.register_count as usize;

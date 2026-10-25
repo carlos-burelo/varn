@@ -24,9 +24,7 @@ impl ExecCtx {
             Some(HeapObj::Task(lazy)) => {
                 let lazy = Rc::clone(lazy);
                 if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
-                    return Err(crate::error::RuntimeError::new(
-                        "stack overflow: call depth exceeded 10000",
-                    ));
+                    return Err(crate::frame::call_depth_exceeded());
                 }
                 super::scheduler::mount(self, &lazy, dest_reg);
                 AwaitStep::Entered

@@ -1,0 +1,38 @@
+import { describe, it, expect } from "std:test";
+
+function selfLoop(n: int): int { return selfLoop(n + 1) + 1 }
+function ping(n: int): int { return pong(n + 1) + 1 }
+function pong(n: int): int { return ping(n + 1) + 1 }
+
+class Walker {
+    depth(n: int): int { return this.depth(n + 1) + 1 }
+}
+
+function overflows(f: () => int): bool {
+    try {
+        f()
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+function sumTo(n: int): int { return n == 0 ? 0 : sumTo(n - 1) + n }
+
+await describe("265 unbounded recursion", async () => {
+    await it("self recursion without a base case raises instead of crashing", () => {
+        expect(overflows(() => selfLoop(0))).toBeTruthy();
+    });
+
+    await it("mutual recursion raises", () => {
+        expect(overflows(() => ping(0))).toBeTruthy();
+    });
+
+    await it("a recursive method raises", () => {
+        expect(overflows(() => new Walker().depth(0))).toBeTruthy();
+    });
+
+    await it("bounded recursion is unaffected", () => {
+        expect(sumTo(5000)).toBe(12502500);
+    });
+});

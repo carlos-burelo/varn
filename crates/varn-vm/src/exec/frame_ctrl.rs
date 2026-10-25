@@ -78,9 +78,7 @@ impl ExecCtx {
             }
             PreparedCall::Frame(frame) => {
                 if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
-                    return Err(RuntimeError::new(
-                        "stack overflow: call depth exceeded 10000",
-                    ));
+                    return Err(crate::frame::call_depth_exceeded());
                 }
                 self.record_call_vm_fast();
 
@@ -96,9 +94,7 @@ impl ExecCtx {
             }
             PreparedCall::Constructor(frame, instance_nv) => {
                 if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
-                    return Err(RuntimeError::new(
-                        "stack overflow: call depth exceeded 10000",
-                    ));
+                    return Err(crate::frame::call_depth_exceeded());
                 }
                 self.record_call_vm_fast();
                 let ctor_frame_idx = self.frames.len();

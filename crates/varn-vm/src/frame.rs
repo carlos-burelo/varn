@@ -5,6 +5,24 @@ pub const MAX_CALL_DEPTH: usize = 10000;
 
 pub const VM_STACK_BYTES: usize = 64 << 20;
 
+const NATIVE_STACK_HEADROOM: usize = 8 << 20;
+
+pub fn call_depth_exceeded() -> crate::error::RuntimeError {
+    crate::error::RuntimeError::new(format!(
+        "stack overflow: call depth exceeded {MAX_CALL_DEPTH}"
+    ))
+}
+
+pub fn native_stack_exhausted() -> crate::error::RuntimeError {
+    crate::error::RuntimeError::new("stack overflow: native stack exhausted")
+}
+
+pub fn native_stack_floor() -> u64 {
+    let marker = 0u8;
+    let here = std::ptr::addr_of!(marker) as u64;
+    here.saturating_sub((VM_STACK_BYTES - NATIVE_STACK_HEADROOM) as u64)
+}
+
 #[repr(C)]
 pub struct CallFrame {
     pub closure_ptr: *const VmClosure,

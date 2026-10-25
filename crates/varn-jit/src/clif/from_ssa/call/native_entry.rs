@@ -106,6 +106,7 @@ pub(crate) fn emit(
     b.ins().jump(invoke, &[]);
 
     b.switch_to_block(invoke);
+    stack_exit::guard_headroom(b, ctx);
     let (rtag, rpayload) = b.ins().isplit(call.receiver);
     let mut argv = vec![ectx, closure, rtag, rpayload];
     for (v, class) in call.args.iter().zip(&shape.params[1..]) {
