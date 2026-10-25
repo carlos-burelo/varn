@@ -7,7 +7,7 @@ mod new_expr;
 mod object;
 mod template;
 
-use super::literal_text::{parse_int_radix, split_regex, unescape_string};
+use super::literal_text::{parse_int_radix, unescape_string};
 use super::{parse_seq_expr, try_parse_arrow};
 use crate::stream::TokenStream;
 use array_expr::parse_array_expr;
@@ -89,11 +89,10 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             s.advance();
             Ok(s.expr(range, ExprKind::NullLiteral))
         }
-        TokenKind::RegularExpression => {
-            let raw = s.consume_lexeme();
-            let (pattern, flags) = split_regex(s.interner.resolve(raw));
-            Ok(s.expr(range, ExprKind::RegexLiteral { pattern, flags }))
-        }
+        TokenKind::RegularExpression => Err(
+            "regular expression literals are not supported; use `Regex.compile(pattern)` from std:regex"
+                .to_owned(),
+        ),
 
         TokenKind::Template | TokenKind::TemplateHead => parse_template(s),
 

@@ -82,12 +82,3 @@ pub(crate) fn unescape_string(raw: &str) -> String {
     }
     result
 }
-
-pub(super) fn split_regex(raw: &str) -> (String, String) {
-    if let Some(stripped) = raw.strip_prefix('/')
-        && let Some(end) = stripped.rfind('/')
-    {
-        return (stripped[..end].to_owned(), stripped[end + 1..].to_owned());
-    }
-    (raw.to_owned(), String::new())
-}
