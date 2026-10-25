@@ -36,10 +36,10 @@ await describe("97 stdlib task combinators", async () => {
         tg.finally(() => {
         trackerArray[0] = true;
         });
-        tg.spawn((async () => {
+        _ = tg.spawn((async () => {
         return 1;
         })());
-        tg.spawn((async () => {
+        _ = tg.spawn((async () => {
         return 2;
         })());
         let groupResults = await tg.join();

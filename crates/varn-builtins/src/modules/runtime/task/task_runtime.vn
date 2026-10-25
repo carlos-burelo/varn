@@ -2,28 +2,28 @@
 
 export declare function spawn$<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T>;
 export declare function sleep$(ms: int): TaskHandle<void>;
-export declare function parallel$<T>(tasks: Array<Task<T> >): Task<Array<T> >;
+export declare function parallel$<T>(tasks: Array<Task<T> >): TaskHandle<Array<T> >;
 export declare function cancelTask$<T>(handle: TaskHandle<T>): void;
 export declare function yieldTask$(): TaskHandle<void>;
 
 export declare class IsolateHandle {
-    private done: Task<void>;
-    join(): Task<void>;
+    private done: TaskHandle<void>;
+    join(): TaskHandle<void>;
 }
 
-export declare function spawnIsolate$(fn: dynamic, args: Array<dynamic>): Task<IsolateHandle>;
+export declare function spawnIsolate$(fn: dynamic, args: Array<dynamic>): TaskHandle<IsolateHandle>;
 
 export declare class ChannelClosed extends Error {}
 
 export declare class Sender<T = dynamic> {
-    send(msg: T): Task<void>;
+    send(msg: T): TaskHandle<void>;
     close(): void;
     dispose(): void;
 }
 
 export declare class Receiver<T = dynamic> {
-    receive(): Task<T>;
-    @fallible next(): Task<Option<T>>;
+    receive(): TaskHandle<T>;
+    @fallible next(): TaskHandle<Option<T>>;
     dispose(): void;
 }
 

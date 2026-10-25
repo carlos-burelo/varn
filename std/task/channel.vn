@@ -17,6 +17,6 @@ export function channel<T>(capacity: int): Channel<T> {
 export function spawnIsolate(
     fn: dynamic,
     args: Array<dynamic>
-): Task<IsolateHandle> {
+): TaskHandle<IsolateHandle> {
     return spawnIsolate$(fn, args);
 }

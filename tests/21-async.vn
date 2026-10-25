@@ -50,8 +50,8 @@ async function runAsync(): void {
     expect(await g1).toBe(15);
     expect(await g2).toBe(19);
     using failGroup = new TaskGroup<int>();
-    failGroup.spawn(asyncAdd(2, 3));
-    failGroup.spawn(asyncBoom());
+    _ = failGroup.spawn(asyncAdd(2, 3));
+    _ = failGroup.spawn(asyncBoom());
     let joinThrew = false;
     try {
         await failGroup.join();

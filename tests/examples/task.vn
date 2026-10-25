@@ -50,8 +50,8 @@ await describe("example std:task", async () => {
 
     await it("groups tasks and guards with a mutex", async () => {
         let group = new TaskGroup<int>();
-        group.spawn(work(4));
-        group.spawn(work(5));
+        _ = group.spawn(work(4));
+        _ = group.spawn(work(5));
         let joined = await group.join();
         expect(joined.length).toBe(2);
         let mutex = new Mutex();
@@ -135,7 +135,7 @@ await describe("example std:task", async () => {
 
     await it("join honors timeouts", async () => {
         let group = new TaskGroup<int>();
-        group.spawn(slowWork(3));
+        _ = group.spawn(slowWork(3));
         let start = now();
         let timedOut = false;
         try {
@@ -150,7 +150,7 @@ await describe("example std:task", async () => {
 
     await it("cancel propagates through TaskGroup", async () => {
         let group = new TaskGroup<int>();
-        group.spawn(slowWork(4));
+        _ = group.spawn(slowWork(4));
         let canceller = (async (): Task<Array<int>> => {
             await sleep(50);
             group.cancel();

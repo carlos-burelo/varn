@@ -1,6 +1,6 @@
 import { spawn$, sleep$, parallel$, cancelTask$, yieldTask$, channel$, Channel } from "runtime:task";
 
-export function parallel<T>(tasks: Array<Task<T>>): Task<Array<T>> {
+export function parallel<T>(tasks: Array<Task<T>>): TaskHandle<Array<T>> {
     return parallel$(tasks);
 }
 
