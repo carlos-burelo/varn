@@ -7,6 +7,14 @@ pub struct SysRuntime;
 
 static START_TIME: OnceLock<Instant> = OnceLock::new();
 
+const FIRST_READ_OFFSET_MS: u64 = 1;
+
+fn clock_origin() -> Instant {
+    Instant::now()
+        .checked_sub(std::time::Duration::from_millis(FIRST_READ_OFFSET_MS))
+        .unwrap_or_else(Instant::now)
+}
+
 varn_contract! {
     module: "runtime:sys",
     contract: "src/modules/runtime/sys/sys_runtime.vn",
@@ -39,7 +47,7 @@ varn_contract! {
             Ok(())
         }
         fn now(_ctx: &mut dyn NativeCtx) -> Result<f64, String> {
-            let start = START_TIME.get_or_init(Instant::now);
+            let start = START_TIME.get_or_init(clock_origin);
             Ok(start.elapsed().as_secs_f64() * 1000.0)
         }
     }
