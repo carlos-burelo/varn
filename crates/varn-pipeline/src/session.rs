@@ -11,10 +11,14 @@ pub struct Session {
 impl Session {
     pub fn open(anchor: Anchor<'_>) -> Result<Session, Failure> {
         let project = Project::discover(anchor).map_err(Failure::Project)?;
-        Ok(Session {
+        Ok(Session::of(project))
+    }
+
+    pub fn of(project: Project) -> Session {
+        Session {
             project,
             resolver: Arc::new(ModuleResolver::new()),
-        })
+        }
     }
 
     pub fn detached() -> Session {

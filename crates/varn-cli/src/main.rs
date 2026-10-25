@@ -67,9 +67,17 @@ fn run_cli() {
         }
     }
 
-    bootstrap::init();
-
     let cli = Cli::parse_from(cli::with_implicit_run(std::env::args().collect()));
+
+    let project = match dispatch::project_for(&cli.command) {
+        Ok(project) => project,
+        Err(e) => {
+            terminal::error(&e);
+            process::exit(e.exit_code().code());
+        }
+    };
+    bootstrap::init(&project);
+    let session = std::sync::Arc::new(pipeline::Session::of(project));
 
     if let Err(e) = bootstrap::require_std(&cli.command) {
         terminal::error(&e);
@@ -78,7 +86,7 @@ fn run_cli() {
 
     varn_vm::alloc_profile::init();
     varn_vm::gc_trace::init();
-    let result = dispatch::dispatch(cli.command);
+    let result = dispatch::run(cli.command, &session);
     varn_vm::alloc_profile::report();
 
     if let Err(e) = result {

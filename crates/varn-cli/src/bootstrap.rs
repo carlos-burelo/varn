@@ -1,8 +1,9 @@
 use crate::cli::Commands;
 use crate::error::CliError;
 
-pub fn init() {
-    varn_project::apply_from_cwd();
+pub fn init(project: &varn_project::Project) {
+    varn_project::apply_env(project);
+    varn_modules::std_root::pin_project(project);
     crate::std_source::register();
     crate::code_store::register();
     varn_builtins::register_provider();

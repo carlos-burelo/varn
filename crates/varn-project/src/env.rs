@@ -1,15 +1,15 @@
 use std::path::{Path, PathBuf};
 
 use crate::names::ENV_DIR_NAME;
-use crate::root::nearest;
+use crate::project::Project;
 
-pub fn apply_from_cwd() {
+pub fn apply_env(project: &Project) {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let root = nearest(&cwd).dir;
+    let root = project.root.as_path();
 
     let mut dirs: Vec<&Path> = vec![cwd.as_path()];
     if root != cwd {
-        dirs.push(root.as_path());
+        dirs.push(root);
     }
 
     for dir in &dirs {

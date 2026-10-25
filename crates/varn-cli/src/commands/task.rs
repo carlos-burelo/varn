@@ -86,7 +86,7 @@ fn run_tokens(
                 Ok(())
             }
         },
-        other => crate::dispatch::run(other, Some(session)),
+        other => crate::dispatch::run(other, session),
     }
 }
 

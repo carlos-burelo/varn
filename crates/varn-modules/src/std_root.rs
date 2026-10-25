@@ -28,14 +28,18 @@ pub fn classify(path: &Path) -> Option<StdSource> {
         .then(|| StdSource::SourceTree(path.to_path_buf()))
 }
 
-pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
-    let rel = varn_project::Manifest::load_in(project_root).ok()??.std?;
-    let p = PathBuf::from(&rel);
-    Some(if p.is_absolute() {
-        p
-    } else {
-        project_root.join(p)
-    })
+static PROJECT_STD: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+
+pub fn pin_project(project: &varn_project::Project) {
+    let tree = project.manifest.std.as_ref().map(|rel| {
+        let p = PathBuf::from(rel);
+        if p.is_absolute() {
+            p
+        } else {
+            project.root.join(p)
+        }
+    });
+    let _ = PROJECT_STD.set(tree);
 }
 
 pub fn resolve() -> (StdSource, StdProvenance) {
@@ -44,10 +48,8 @@ pub fn resolve() -> (StdSource, StdProvenance) {
 }
 
 fn resolve_uncached() -> (StdSource, StdProvenance) {
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let project_root = varn_project::nearest(&cwd).dir;
-    if let Some(p) = project_std_override(&project_root)
-        && let Some(src) = classify(&p)
+    if let Some(p) = PROJECT_STD.get().and_then(Option::as_ref)
+        && let Some(src) = classify(p)
     {
         return (src, StdProvenance::ProjectOverride);
     }
