@@ -71,14 +71,6 @@ pub(super) fn try_print(
             terminal::log(format!("{indent}{marker}{}", chalk("null").yellow()));
             true
         }
-        ExprKind::RegexLiteral { pattern, flags } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(format!("/{pattern}/{flags}")).yellow(),
-                chalk("(regex)").dim()
-            ));
-            true
-        }
         ExprKind::Identifier { name } => {
             terminal::log(format!(
                 "{indent}{marker}{} {}",

@@ -158,7 +158,6 @@ impl<'a> FnEmitter<'a> {
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Identifier { .. }

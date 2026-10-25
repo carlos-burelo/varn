@@ -35,7 +35,6 @@ fn this_field_target(e: ExprId, arena: &AstArena, interner: &AtomInterner) -> Op
                 | ExprKind::CharLiteral { .. }
                 | ExprKind::BoolLiteral { .. }
                 | ExprKind::NullLiteral
-                | ExprKind::RegexLiteral { .. }
                 | ExprKind::Template { .. }
                 | ExprKind::TaggedTemplate { .. }
                 | ExprKind::Missing
@@ -84,7 +83,6 @@ fn this_field_target(e: ExprId, arena: &AstArena, interner: &AtomInterner) -> Op
         | ExprKind::CharLiteral { .. }
         | ExprKind::BoolLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Identifier { .. }

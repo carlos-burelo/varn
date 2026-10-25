@@ -59,10 +59,10 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 - [ ] `Json.parse` descarta campos desconocidos en silencio
 
 ### Limpieza
-- [ ] Eliminar `ExprKind::RegexLiteral` del AST y de sus `match`
+- [x] Eliminar `ExprKind::RegexLiteral` del AST y de sus `match`
 - [ ] Rango del error "let redeclara un parámetro" (hoy todo el cuerpo)
 - [ ] `clippy::wildcard_enum_match_arm` en código nuevo
-- [ ] `Array.shift` es O(n)
+- [x] `Array.shift` es O(n): solo rendimiento, sin primitiva de remoción en la representación; aceptado (Queue usa dos pilas)
 
 ### Sin auditar
 - [ ] Concurrencia entre isolates y data races

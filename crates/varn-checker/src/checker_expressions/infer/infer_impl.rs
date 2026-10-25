@@ -282,8 +282,7 @@ impl<'r> Checker<'r> {
                 Some(last) => self.infer_type(rec, *last, bind),
                 None => Type::Dynamic,
             },
-            ExprKind::RegexLiteral { .. }
-            | ExprKind::Spawn { .. }
+            ExprKind::Spawn { .. }
             | ExprKind::Yield { .. }
             | ExprKind::Spread { .. }
             | ExprKind::ClassExpr { .. } => Type::Dynamic,

@@ -30,10 +30,6 @@ pub enum ExprKind {
         value: bool,
     },
     NullLiteral,
-    RegexLiteral {
-        pattern: String,
-        flags: String,
-    },
     Template {
         parts: Vec<TemplatePart>,
     },

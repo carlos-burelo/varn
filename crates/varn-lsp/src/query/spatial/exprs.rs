@@ -166,7 +166,6 @@ pub(super) fn collect_expr(a: &AstArena, id: &ExprId, out: &mut Vec<SpatialEntry
         | ExprKind::CharLiteral { .. }
         | ExprKind::BoolLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Identifier { .. }
         | ExprKind::Missing
         | ExprKind::This

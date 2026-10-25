@@ -215,8 +215,7 @@ pub fn infer_expr_type(
             Type::range_over(&bound, table)
         }
         ExprKind::Pipeline { right, .. } => infer_expr_type(*right, arena, ctx, table),
-        ExprKind::RegexLiteral { .. }
-        | ExprKind::TaggedTemplate { .. }
+        ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing
         | ExprKind::Super
         | ExprKind::Record { .. }

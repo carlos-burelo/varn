@@ -28,7 +28,6 @@ pub(super) fn infer_invoke(
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing
@@ -76,7 +75,6 @@ pub(super) fn infer_invoke(
         | ExprKind::CharLiteral { .. }
         | ExprKind::BoolLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing

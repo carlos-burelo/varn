@@ -357,7 +357,6 @@ impl AstJson<'_> {
             }
             ExprKind::BigIntLiteral { .. }
             | ExprKind::DecimalLiteral { .. }
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing

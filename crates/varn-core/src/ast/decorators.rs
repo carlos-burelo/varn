@@ -30,7 +30,6 @@ pub fn decorator_head(arena: &AstArena, interner: &AtomInterner, d: &Decorator) 
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing
@@ -78,7 +77,6 @@ pub fn decorator_head(arena: &AstArena, interner: &AtomInterner, d: &Decorator) 
         | ExprKind::CharLiteral { .. }
         | ExprKind::BoolLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing
@@ -145,7 +143,6 @@ fn str_arg(arena: &AstArena, id: ExprId) -> Option<String> {
         | ExprKind::CharLiteral { .. }
         | ExprKind::BoolLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Identifier { .. }
@@ -218,7 +215,6 @@ pub fn match_builtin(
                 | ExprKind::CharLiteral { .. }
                 | ExprKind::BoolLiteral { .. }
                 | ExprKind::NullLiteral
-                | ExprKind::RegexLiteral { .. }
                 | ExprKind::Template { .. }
                 | ExprKind::TaggedTemplate { .. }
                 | ExprKind::Missing
@@ -272,7 +268,6 @@ pub fn match_builtin(
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing

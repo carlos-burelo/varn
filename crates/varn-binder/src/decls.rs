@@ -343,7 +343,6 @@ impl<'r> super::Binder<'r> {
             | ExprKind::StrLiteral { .. }
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::NullLiteral
             | ExprKind::ImportMeta(_)
             | ExprKind::Super

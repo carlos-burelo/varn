@@ -26,7 +26,6 @@ pub(super) fn prelude_imports(
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing

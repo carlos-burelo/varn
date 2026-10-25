@@ -198,7 +198,6 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
         | ExprKind::CharLiteral { .. }
         | ExprKind::BoolLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing
@@ -258,7 +257,6 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Identifier { .. }

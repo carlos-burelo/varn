@@ -22,7 +22,6 @@ pub(super) fn infer_member(c: &mut CallTypeCtx, object: ExprId, property: ExprId
         | ExprKind::CharLiteral { .. }
         | ExprKind::BoolLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing

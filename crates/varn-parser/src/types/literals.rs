@@ -24,7 +24,6 @@ pub(crate) fn parse_literal_type(
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Identifier { .. }
@@ -75,7 +74,6 @@ pub(crate) fn parse_literal_type(
         | ExprKind::BigIntLiteral { .. }
         | ExprKind::DecimalLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Identifier { .. }

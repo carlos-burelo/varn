@@ -97,7 +97,6 @@ impl<'a> CallTypeCtx<'a> {
             | ExprKind::DecimalLiteral { .. }
             | ExprKind::CharLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing

@@ -33,7 +33,6 @@ pub(crate) fn format_expr_short(
         | ExprKind::DecimalLiteral { .. }
         | ExprKind::CharLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing

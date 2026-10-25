@@ -27,7 +27,6 @@ pub fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
         | ExprKind::CharLiteral { .. }
         | ExprKind::BoolLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Identifier { .. }

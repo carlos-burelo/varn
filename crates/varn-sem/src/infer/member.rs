@@ -98,7 +98,6 @@ pub(crate) fn infer_member(
         | varn_core::ast::ExprKind::CharLiteral { .. }
         | varn_core::ast::ExprKind::BoolLiteral { .. }
         | varn_core::ast::ExprKind::NullLiteral
-        | varn_core::ast::ExprKind::RegexLiteral { .. }
         | varn_core::ast::ExprKind::Template { .. }
         | varn_core::ast::ExprKind::TaggedTemplate { .. }
         | varn_core::ast::ExprKind::Missing

@@ -141,7 +141,6 @@ fn get_literal_value_key(expr: ExprId, arena: &AstArena) -> Option<String> {
         varn_core::ast::ExprKind::NullLiteral => Some("null".to_owned()),
         varn_core::ast::ExprKind::BigIntLiteral { .. }
         | varn_core::ast::ExprKind::DecimalLiteral { .. }
-        | varn_core::ast::ExprKind::RegexLiteral { .. }
         | varn_core::ast::ExprKind::Template { .. }
         | varn_core::ast::ExprKind::TaggedTemplate { .. }
         | varn_core::ast::ExprKind::Identifier { .. }

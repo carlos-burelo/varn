@@ -114,7 +114,6 @@ pub(super) fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> Con
         | ExprKind::CharLiteral { .. }
         | ExprKind::BoolLiteral { .. }
         | ExprKind::NullLiteral
-        | ExprKind::RegexLiteral { .. }
         | ExprKind::Template { .. }
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Identifier { .. }

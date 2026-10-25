@@ -266,7 +266,6 @@ impl<'r> Checker<'r> {
             | ExprKind::StrLiteral { .. }
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::NullLiteral
             | ExprKind::ImportMeta(_) => {}
             ExprKind::This => {

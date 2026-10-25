@@ -85,7 +85,6 @@ impl<'r> Checker<'r> {
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing
@@ -209,7 +208,6 @@ impl<'r> Checker<'r> {
                 | ExprKind::CharLiteral { .. }
                 | ExprKind::BoolLiteral { .. }
                 | ExprKind::NullLiteral
-                | ExprKind::RegexLiteral { .. }
                 | ExprKind::Template { .. }
                 | ExprKind::TaggedTemplate { .. }
                 | ExprKind::Missing

@@ -322,16 +322,6 @@ impl<'a> FnEmitter<'a> {
 
             ExprKind::DecimalLiteral { raw } => self.lower_decimal_kind(*raw),
             ExprKind::BigIntLiteral { raw } => self.lower_bigint_kind(*raw),
-            ExprKind::RegexLiteral { pattern, flags } => {
-                let s = TirExpr {
-                    kind: TirExprKind::StrLit(Arc::from(format!("/{pattern}/{flags}"))),
-                    ty: BackendTy::Str,
-                    res: Resolution::None,
-                    span,
-                };
-                return self.cast_to(s, ty);
-            }
-
             ExprKind::Spawn { argument } => {
                 let inner = self.lower_expr(*argument);
                 return self.cast_to(inner, ty);

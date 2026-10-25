@@ -82,7 +82,6 @@ pub(super) fn parse_call_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                     | ExprKind::CharLiteral { .. }
                     | ExprKind::BoolLiteral { .. }
                     | ExprKind::NullLiteral
-                    | ExprKind::RegexLiteral { .. }
                     | ExprKind::Template { .. }
                     | ExprKind::TaggedTemplate { .. }
                     | ExprKind::Missing

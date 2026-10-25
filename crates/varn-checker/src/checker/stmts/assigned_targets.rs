@@ -183,7 +183,6 @@ pub(crate) fn static_path_atoms(expr: ExprId, arena: &AstArena) -> Option<(Membe
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::NullLiteral
-            | ExprKind::RegexLiteral { .. }
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing
