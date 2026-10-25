@@ -200,7 +200,6 @@ pub(super) fn nominal_arms(
                     && return_ok
                     && ft1.params.iter().zip(ft2.params.iter()).all(|(t1, t2)| {
                         t(t2.ty).is_dynamic()
-                            || matches!(table.get(t2.ty), TypeKind::Named(_, _))
                             || (types_compatible_impl(
                                 &t(t2.ty),
                                 &t(t1.ty),

@@ -1,0 +1,6 @@
+// expect: error[VN3001]
+class Animal {}
+class Dog extends Animal {
+    tricks: int = 1;
+}
+const describe: (animal: Animal) => int = (dog: Dog) => dog.tricks;
