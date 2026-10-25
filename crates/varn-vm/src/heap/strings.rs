@@ -230,13 +230,7 @@ impl HeapInner {
             let mut buf = [0u8; INT_MAX_DIGITS];
             let _ = out.write_str(itoa(nv.as_int(), &mut buf));
         } else if nv.is_f64() {
-            let f = nv.as_f64();
-            if f.fract() == 0.0 && f.abs() < 1e15 {
-                let mut buf = [0u8; INT_MAX_DIGITS];
-                let _ = out.write_str(itoa(f as i64, &mut buf));
-            } else {
-                let _ = write!(out, "{}", f);
-            }
+            let _ = out.write_str(&varn_core::float_to_string(nv.as_f64()));
         } else if nv.is_sso() {
             let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let _ = out.write_str(nv.sso_as_str(&mut buf));
@@ -249,84 +243,6 @@ impl HeapInner {
         } else {
             let _ = out.write_str(&self.str_repr(nv));
         }
-    }
-
-    pub(crate) fn str_repr(&self, nv: VmValue) -> String {
-        if nv.is_null() {
-            return "null".into();
-        }
-        if nv.is_bool() {
-            return nv.as_bool().to_string();
-        }
-        if nv.is_int() {
-            return nv.as_int().to_string();
-        }
-        if nv.is_f64() {
-            let f = nv.as_f64();
-            if f.fract() == 0.0 && f.abs() < 1e15 {
-                return format!("{}", f as i64);
-            }
-            return format!("{}", f);
-        }
-        if nv.is_sso() {
-            let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
-            return nv.sso_as_str(&mut buf).to_owned();
-        }
-        if nv.is_heap() {
-            return match self.get(nv.as_heap()) {
-                Some(HeapObj::Str(s)) => s.to_string(),
-                Some(HeapObj::Char(c)) => c.to_string(),
-                Some(HeapObj::Array(a)) => {
-                    let parts: Vec<_> = (0..a.len())
-                        .map(|i| self.str_repr(a.get_vm(i).unwrap()))
-                        .collect();
-                    format!("[{}]", parts.join(", "))
-                }
-                Some(HeapObj::Tuple(a)) if a.is_empty() => "()".into(),
-                Some(HeapObj::Tuple(a)) => {
-                    let parts: Vec<_> = (0..a.len())
-                        .map(|i| self.str_repr(a.get_vm(i).unwrap()))
-                        .collect();
-                    format!("#[{}]", parts.join(", "))
-                }
-                Some(HeapObj::Object(_)) => "[object Object]".into(),
-                Some(HeapObj::VmClosure(nc)) => format!(
-                    "[Function {}]",
-                    nc.proto.name.as_deref().unwrap_or("<anon>")
-                ),
-                Some(HeapObj::NativeFn(_, name)) => format!("[NativeFn: {}]", name),
-                Some(HeapObj::BoundMethod(method)) => match &method.target {
-                    varn_types::value::BoundMethodTarget::Native { name, .. } => {
-                        format!("[Function {}]", name)
-                    }
-                    varn_types::value::BoundMethodTarget::Vm { .. } => "[BoundMethod]".into(),
-                },
-                Some(HeapObj::Class(c)) => format!("[class {}]", c.name),
-                Some(HeapObj::BigInt(n)) => n.to_string(),
-                Some(HeapObj::Decimal(d)) => d.to_plain_string(),
-                Some(HeapObj::EnumVariant(v)) if v.def.fields.is_empty() => {
-                    format!("{}.{}", v.def.enum_name, v.def.variant_name)
-                }
-                Some(HeapObj::EnumVariant(v)) => {
-                    format!("{}.{}(..)", v.def.enum_name, v.def.variant_name)
-                }
-                Some(
-                    HeapObj::Record(_)
-                    | HeapObj::Buffer(_)
-                    | HeapObj::Module(_)
-                    | HeapObj::FrozenModule(_)
-                    | HeapObj::Map(_)
-                    | HeapObj::Set(_)
-                    | HeapObj::Task(_)
-                    | HeapObj::TaskHandle(_)
-                    | HeapObj::Range(_)
-                    | HeapObj::Generator(_)
-                    | HeapObj::Spread(_),
-                )
-                | None => "[object]".into(),
-            };
-        }
-        "null".into()
     }
 }
 

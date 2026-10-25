@@ -1,0 +1,42 @@
+import { describe, it, expect } from "std:test";
+
+class Point {
+    x: int = 1;
+    label: str = "p";
+}
+
+await describe("266 value display", async () => {
+    await it("objects and records show their fields", () => {
+        const o = { a: 1, b: "x", c: [1, 2] };
+        expect(`${o}`).toBe("{ a: 1, b: x, c: [1, 2] }");
+        expect(`${#{ k: 1 }}`).toBe("#{ k: 1 }");
+        expect(`${new Point()}`).toBe("Point { x: 1, label: p }");
+    });
+
+    await it("collections show their entries", () => {
+        const m: Map<str, int> = new Map();
+        m.set("a", 1);
+        m.set("b", 2);
+        const s: Set<int> = new Set();
+        s.add(3);
+        expect(`${m}`).toBe("Map { a => 1, b => 2 }");
+        expect(`${s}`).toBe("Set { 3 }");
+        expect(`${1..4}`).toBe("1..4");
+    });
+
+    await it("a cyclic value does not recurse forever", () => {
+        const loop: dynamic[] = [];
+        loop.push(loop);
+        expect(`${loop}`).toBe("[[Circular]]");
+    });
+
+    await it("floats print the same everywhere", () => {
+        const inf: float = 1.0 / 0.0;
+        const nan: float = 0.0 / 0.0;
+        expect(`${inf} ${0.0 - inf} ${nan}`).toBe("Infinity -Infinity NaN");
+        expect(inf.toString()).toBe("Infinity");
+        expect((0.0 - 0.0).toString()).toBe("0");
+        expect(`${1.5} ${2.0}`).toBe("1.5 2");
+        expect((1.0e300).toString()).toBe("1e300");
+    });
+});

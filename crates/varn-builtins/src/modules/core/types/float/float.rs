@@ -21,7 +21,7 @@ varn_contract! {
         fn isInfinite(_ctx: &mut dyn NativeCtx, this: f64) -> bool { this.is_infinite() }
 
 
-        fn toString(_ctx: &mut dyn NativeCtx, this: f64) -> String { this.to_string() }
+        fn toString(_ctx: &mut dyn NativeCtx, this: f64) -> String { varn_core::float_to_string(this) }
         fn valueOf(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this }
         fn toFixed(_ctx: &mut dyn NativeCtx, this: f64, digits: Option<i64>) -> String {
             let d = digits.unwrap_or(0).max(0) as usize;

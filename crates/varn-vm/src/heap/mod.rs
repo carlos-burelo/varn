@@ -3,6 +3,7 @@ pub(crate) mod aggregates;
 pub(crate) mod cells;
 pub(crate) mod children;
 pub(crate) mod core;
+pub(crate) mod display;
 pub(crate) mod gc;
 pub(crate) mod gc_report;
 pub(crate) mod intern;
