@@ -42,7 +42,7 @@ Dist (solo CI, no local salvo empaquetar):
 cargo build --profile dist --bin vn --target <triple>
 ```
 
-Binario: `target/<perfil>/vn` (+`.exe` Windows). CI cubre 5 targets (`ci.yml`): `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`.
+Binario: `target/<perfil>/vn` (+`.exe` Windows). CI cubre 3 targets (`ci.yml`): `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`. macOS no se publica ni se prueba por ahora.
 
 ## Binarios oficiales
 

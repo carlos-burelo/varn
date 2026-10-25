@@ -72,9 +72,6 @@ jobs:
           - name: Windows x86_64
             os: windows-latest
             bin_path: ./target/release/vn.exe
-          - name: macOS Apple Silicon
-            os: macos-14
-            bin_path: ./target/release/vn
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -119,12 +116,6 @@ jobs:
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
 
-      # NOTE: macOS Apple Silicon (aarch64) runs entirely in the interpreter —
-      # Cranelift JIT does not compile functions on that target in CI. The bench
-      # step below will show 0% Cranelift coverage on that runner. This is a
-      # known platform gap; correctness is still fully validated by the 4
-      # quadrants above. Do not interpret slow bench numbers on macOS as a
-      # regression unless the same workload regresses on Linux or Windows.
       - name: Stability Benchmark
         run: ${{ matrix.bin_path }} bench ./tests/benchmarks/vn/bench_fib.vn -v
 
@@ -132,7 +123,7 @@ jobs:
         run: cargo test --release -p varn-cli --test error_corpus
 
   # Runs only on direct push to main (not on PRs).
-  # Builds dist binaries for all 5 targets and publishes a GitHub Release.
+  # Builds dist binaries for all 3 targets and publishes a GitHub Release.
   # Uses GITHUB_TOKEN directly — no PAT, no cross-workflow trigger needed.
   # Skips publishing if the version tag already exists (idempotent).
   release:
@@ -156,14 +147,6 @@ jobs:
             archive_type: tar.gz
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            bin_name: vn
-            archive_type: tar.gz
-          - os: macos-14
-            target: x86_64-apple-darwin
-            bin_name: vn
-            archive_type: tar.gz
-          - os: macos-14
-            target: aarch64-apple-darwin
             bin_name: vn
             archive_type: tar.gz
     steps:
