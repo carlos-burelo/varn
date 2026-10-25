@@ -32,7 +32,7 @@ pub fn execute_unit(
         policy.trace,
     )?;
     machine.ctx.print_silent = policy.silent;
-    let main_proto = enter_main(&mut machine, executable.entry_proto.clone());
+    let main_proto = enter_main(&mut machine, Rc::new(executable.entry_proto.clone()));
     if policy.trace {
         varn_core::term::terminal::tagged(
             "pipeline:execute",
@@ -42,17 +42,9 @@ pub fn execute_unit(
             ),
         );
     }
-    let mut resume = |_: &mut Vm| varn_vm::debug::BreakAction::Resume;
-    match varn_vm::debug::drive_main(&mut machine, &main_proto, &mut resume) {
-        varn_vm::debug::DriveResult::Done(_) => {}
-        varn_vm::debug::DriveResult::Stopped => {}
-        varn_vm::debug::DriveResult::Failed(e) => {
-            machine.abandon_heap_at_exit();
-            return Err(Failure::Runtime(RuntimeFailure {
-                message: e.message,
-                frames: e.frames,
-            }));
-        }
+    if let Err(failure) = drive_entry(&mut machine, &main_proto) {
+        machine.abandon_heap_at_exit();
+        return Err(failure);
     }
     if let Unit::Test(test) = unit
         && let Err(e) = machine.call_main_global(test.global)
@@ -68,6 +60,17 @@ pub fn execute_unit(
     }
     machine.abandon_heap_at_exit();
     Ok(())
+}
+
+pub fn drive_entry(machine: &mut Vm, main_proto: &Rc<FunctionProto>) -> Result<(), Failure> {
+    let mut resume = |_: &mut Vm| varn_vm::debug::BreakAction::Resume;
+    match varn_vm::debug::drive_main(machine, main_proto, &mut resume) {
+        varn_vm::debug::DriveResult::Done(_) | varn_vm::debug::DriveResult::Stopped => Ok(()),
+        varn_vm::debug::DriveResult::Failed(e) => Err(Failure::Runtime(RuntimeFailure {
+            message: e.message,
+            frames: e.frames,
+        })),
+    }
 }
 
 pub fn boot_machine(
@@ -104,9 +107,7 @@ pub fn boot_machine(
     Ok(machine)
 }
 
-pub fn enter_main(machine: &mut Vm, proto: FunctionProto) -> Rc<FunctionProto> {
-    let main_proto = Rc::new(proto);
-
+pub fn enter_main(machine: &mut Vm, main_proto: Rc<FunctionProto>) -> Rc<FunctionProto> {
     let main_module_id = ModuleId::local_str(&main_proto.chunk.source_file);
     let mut export_map = FxHashMap::default();
     for (idx, name) in main_proto.export_names.iter().enumerate() {

@@ -50,7 +50,7 @@ impl Driver {
         )
         .map_err(|e| format!("boot failed: {e}"))?;
         machine.ctx.settings.no_jit = true;
-        let main = enter_main(&mut machine, compiled.entry_proto);
+        let main = enter_main(&mut machine, std::rc::Rc::new(compiled.entry_proto));
         self.protos = collect_protos(&main, &machine.ctx.precompiled);
         self.program = canonical;
         self.main = Some(main);
