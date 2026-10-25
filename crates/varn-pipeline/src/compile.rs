@@ -7,6 +7,7 @@ use varn_types::{ModuleGraphArtifact, TestEntry};
 
 pub(crate) struct Built {
     pub executable: Executable,
+    pub warnings: Vec<crate::DiagnosticReport>,
     pub lower: Duration,
     pub optimize: Duration,
     pub link: Duration,
@@ -115,8 +116,8 @@ pub(crate) fn build_executable(
             tests: graph_artifact.tests.clone(),
             graph_artifact,
             deps: graph_build.deps,
-            warnings: graph_build.warnings,
         },
+        warnings: graph_build.warnings,
         lower,
         optimize,
         link: linking.elapsed(),

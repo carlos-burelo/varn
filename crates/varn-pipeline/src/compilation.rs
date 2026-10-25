@@ -34,6 +34,7 @@ pub struct Compilation {
     pub checked: Option<varn_sem::output::CheckResult>,
     pub executable: Option<Executable>,
     pub failure: Option<Failure>,
+    pub dependency_warnings: Vec<crate::DiagnosticReport>,
     pub timings: Vec<(Stage, Duration)>,
     pub cache: CacheStatus,
 }
@@ -47,6 +48,7 @@ impl Compilation {
             checked: None,
             executable: None,
             failure: None,
+            dependency_warnings: Vec::new(),
             timings: Vec::new(),
             cache: CacheStatus::Bypassed,
         }
@@ -128,6 +130,21 @@ impl Compilation {
         self.parsed = Some(parsed);
         self.checked = Some(checked?);
         if request.goal == Goal::Checked {
+            let parsed = self
+                .parsed
+                .as_ref()
+                .ok_or_else(|| Failure::internal("the checked stage left no parse"))?;
+            let start = Instant::now();
+            let reports = crate::module_precompile::check_module_graph(
+                &parsed.program,
+                &parsed.arena,
+                source.text(),
+                &parsed.program.filename,
+                &parsed.interner,
+                resolver,
+            );
+            self.timings.push((Stage::Check, start.elapsed()));
+            self.dependency_warnings = reports?;
             return Ok(());
         }
 
@@ -145,6 +162,7 @@ impl Compilation {
             resolver,
             request.measure_optimizer,
         )?;
+        self.dependency_warnings = built.warnings;
         self.timings.push((Stage::Lower, built.lower));
         if request.measure_optimizer {
             self.timings.push((Stage::Optimize, built.optimize));

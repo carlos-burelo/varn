@@ -20,15 +20,22 @@ pub struct ModuleGraphBuild {
     pub warnings: Vec<crate::DiagnosticReport>,
 }
 
-pub fn build_module_graph(
+struct Discovered {
+    canonical_entry: String,
+    graph: HashMap<String, Vec<String>>,
+    source_hashes: HashMap<String, u64>,
+    node_sources: HashMap<String, (String, Program, AstArena, varn_core::AtomInterner)>,
+    package_nodes: HashMap<String, PackageNode>,
+    sorted: Vec<String>,
+}
+
+fn discover(
     entry_program: &Program,
     entry_arena: &AstArena,
     entry_source: &str,
     entry_path: &str,
-    entry_proto: &FunctionProto,
     entry_interner: &varn_core::AtomInterner,
-    session: &crate::ModuleResolver,
-) -> Result<ModuleGraphBuild, crate::Failure> {
+) -> Result<Discovered, crate::Failure> {
     let canonical_entry = varn_modules::canonical_or_original(Path::new(entry_path));
 
     let mut graph: HashMap<String, Vec<String>> = HashMap::default();
@@ -68,9 +75,7 @@ pub fn build_module_graph(
         enqueued.insert(module_path.clone());
 
         if let Some(provider) = varn_modules::provider::get()
-            && provider
-                .module(&module_path)
-                .is_some_and(|m| m.bytecode.is_some())
+            && provider.module(&module_path).is_some()
         {
             graph.insert(module_path.clone(), Vec::new());
             continue;
@@ -191,6 +196,90 @@ pub fn build_module_graph(
         };
     }
 
+    Ok(Discovered {
+        canonical_entry,
+        graph,
+        source_hashes,
+        node_sources,
+        package_nodes,
+        sorted,
+    })
+}
+
+pub fn check_module_graph(
+    entry_program: &Program,
+    entry_arena: &AstArena,
+    entry_source: &str,
+    entry_path: &str,
+    entry_interner: &varn_core::AtomInterner,
+    session: &crate::ModuleResolver,
+) -> Result<Vec<crate::DiagnosticReport>, crate::Failure> {
+    let found = discover(
+        entry_program,
+        entry_arena,
+        entry_source,
+        entry_path,
+        entry_interner,
+    )?;
+    let mut warnings: Vec<crate::DiagnosticReport> = Vec::new();
+    for module_path in found.sorted.iter().rev() {
+        if *module_path == found.canonical_entry {
+            continue;
+        }
+        let Some((module_source, program, arena, interner)) = found.node_sources.get(module_path)
+        else {
+            continue;
+        };
+        let check = check_node(program, arena, interner, session);
+        if let Some(report) =
+            crate::check::warnings_of(&check.diagnostics, &program.filename, module_source)?
+        {
+            warnings.push(report);
+        }
+        crate::lower::check_exports(program, session)?;
+    }
+    Ok(warnings)
+}
+
+fn check_node(
+    program: &Program,
+    arena: &AstArena,
+    interner: &varn_core::AtomInterner,
+    session: &crate::ModuleResolver,
+) -> varn_sem::output::CheckResult {
+    varn_checker::Checker::check_with(
+        program,
+        arena,
+        interner.clone(),
+        session,
+        varn_sem::output::CheckOptions::compile(),
+    )
+}
+
+pub fn build_module_graph(
+    entry_program: &Program,
+    entry_arena: &AstArena,
+    entry_source: &str,
+    entry_path: &str,
+    entry_proto: &FunctionProto,
+    entry_interner: &varn_core::AtomInterner,
+    session: &crate::ModuleResolver,
+) -> Result<ModuleGraphBuild, crate::Failure> {
+    let Discovered {
+        canonical_entry,
+        graph,
+        source_hashes,
+        node_sources,
+        package_nodes,
+        sorted,
+    } = discover(
+        entry_program,
+        entry_arena,
+        entry_source,
+        entry_path,
+        entry_interner,
+    )?;
+
     let mut modules: HashMap<String, FunctionProto> = HashMap::default();
     modules.insert(canonical_entry.clone(), entry_proto.clone());
     let mut class_tables: HashMap<String, crate::class_link::ModuleClasses> = HashMap::default();
@@ -204,13 +293,7 @@ pub fn build_module_graph(
             continue;
         };
 
-        let check = varn_checker::Checker::check_with(
-            program,
-            arena,
-            interner.clone(),
-            session,
-            varn_sem::output::CheckOptions::compile(),
-        );
+        let check = check_node(program, arena, interner, session);
 
         if let Some(report) =
             crate::check::warnings_of(&check.diagnostics, &program.filename, module_source)?

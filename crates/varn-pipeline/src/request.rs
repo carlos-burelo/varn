@@ -28,6 +28,14 @@ impl Request {
         }
     }
 
+    pub fn checked() -> Request {
+        Request {
+            goal: Goal::Checked,
+            cache: CachePolicy::Bypass,
+            measure_optimizer: false,
+        }
+    }
+
     pub fn measured(self) -> Request {
         Request {
             measure_optimizer: true,

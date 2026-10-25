@@ -4,14 +4,13 @@ use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
 use varn_types::{ModuleGraphArtifact, TestEntry};
 
-use crate::{DiagnosticReport, Failure};
+use crate::Failure;
 
 pub struct Executable {
     pub entry_proto: FunctionProto,
     pub precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     pub graph_artifact: ModuleGraphArtifact,
     pub deps: FxHashMap<String, Vec<String>>,
-    pub warnings: Vec<DiagnosticReport>,
     pub tests: Vec<TestEntry>,
 }
 
@@ -40,7 +39,6 @@ impl Executable {
             tests: graph.tests.clone(),
             graph_artifact: graph,
             deps: FxHashMap::default(),
-            warnings: Vec::new(),
         })
     }
 }

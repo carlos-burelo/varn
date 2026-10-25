@@ -161,6 +161,26 @@ pub(crate) struct Lowered {
     pub(crate) optimize: std::time::Duration,
 }
 
+fn exports_of(
+    program: &Program,
+    resolver: &crate::ModuleResolver,
+) -> std::sync::Arc<varn_sem::exports::ExportMap> {
+    let path = program.filename.as_ref();
+    if varn_core::ModuleKind::of(path).is_some() {
+        resolver.stdlib_exports(path)
+    } else {
+        resolver.module_exports(path, &mut vec![])
+    }
+}
+
+pub(crate) fn check_exports(
+    program: &Program,
+    resolver: &crate::ModuleResolver,
+) -> Result<(), Failure> {
+    let exports = exports_of(program, resolver);
+    report_export_collisions(&exports, program.filename.as_ref()).map_err(Failure::internal)
+}
+
 pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
     let LowerInput {
         program,
@@ -172,11 +192,7 @@ pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
     } = input;
     let path = program.filename.as_ref();
 
-    let exports = if varn_core::ModuleKind::of(path).is_some() {
-        resolver.stdlib_exports(path)
-    } else {
-        resolver.module_exports(path, &mut vec![])
-    };
+    let exports = exports_of(program, resolver);
     report_export_collisions(&exports, path).map_err(Failure::internal)?;
     let export_names = sorted_export_names(&exports);
 

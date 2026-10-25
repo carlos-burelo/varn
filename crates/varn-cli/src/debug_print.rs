@@ -48,6 +48,9 @@ pub fn report(compilation: &Compilation, debug: &DebugFlags, verbose: bool) {
             diagnostic, source,
         ));
     }
+    for report in &compilation.dependency_warnings {
+        dependency_warnings(report);
+    }
     if debug.symbols {
         varn_debug::symbols::debug_symbols(checked, &parsed.program.filename, debug);
     }
@@ -64,9 +67,6 @@ pub fn report(compilation: &Compilation, debug: &DebugFlags, verbose: bool) {
     if verbose {
         terminal::tagged("Varn", "generating bytecode...");
         terminal::tagged("Varn", "resolving module graph...");
-    }
-    for report in &executable.warnings {
-        dependency_warnings(report);
     }
     compiled(parsed, checked, executable, debug);
 
