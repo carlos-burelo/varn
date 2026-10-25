@@ -39,8 +39,7 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 ## Pendiente
 
 ### Soundness
-- [ ] Recursión nativa en Rust: marcado del GC, `drop` de estructuras anidadas, igualdad profunda,
-      `JSON.stringify` / `parse` anidados, display (ya limitado a 12 niveles)
+- [x] Recursión nativa en Rust: stringify acotado, igualdad iterativa (GC, drop, hash y marshalling probados sin fallo)
 - [ ] `Json.parse<T>` sobre `interface` (hoy no se valida)
 - [ ] `Json.parse<T>` sobre `class`: diagnóstico de compilación en lugar de error de runtime
 - [ ] `as T` con `T` genérico sin comprobación (`signals/reactive`, `ui/bound`, `reflect/meta`)
