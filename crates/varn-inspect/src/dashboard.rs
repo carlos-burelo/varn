@@ -3,17 +3,13 @@ use varn_core::term::terminal;
 use varn_debug::colors::{BLUE, BOLD, C_TYPES, DIM, GREEN, R, YELLOW};
 use varn_debug::flags::DebugFlags;
 
-pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
+pub fn debug_lsp(session: &varn_pipeline::Session, path: &str, source: &str, flags: &DebugFlags) {
     use varn_debug::colors::{footer, header};
     header(C_TYPES, "lsp analysis dashboard", path);
 
     let uri = varn_modules::resolver::path_to_uri(path);
 
-    let analysis = varn_lsp::pipeline::run_pipeline(
-        source.to_string(),
-        uri,
-        &varn_pipeline::Session::detached(),
-    );
+    let analysis = varn_lsp::pipeline::run_pipeline(source.to_string(), uri, session);
 
     if flags.lsp_symbols {
         terminal::log(format!(

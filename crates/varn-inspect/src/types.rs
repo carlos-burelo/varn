@@ -3,14 +3,10 @@ use varn_core::term::terminal::{Section, Table};
 use varn_debug::flags::DebugFlags;
 use varn_sem::symbol::SymbolKind;
 
-pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
+pub fn debug_types(session: &varn_pipeline::Session, path: &str, source: &str, flags: &DebugFlags) {
     let uri = varn_modules::resolver::path_to_uri(path);
 
-    let analysis = varn_lsp::pipeline::run_pipeline(
-        source.to_owned(),
-        uri,
-        &varn_pipeline::Session::detached(),
-    );
+    let analysis = varn_lsp::pipeline::run_pipeline(source.to_owned(), uri, session);
     Section::new("type inference engine")
         .subtitle(path)
         .color(|c| c.blue())

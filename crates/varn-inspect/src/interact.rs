@@ -8,15 +8,16 @@ use super::queries::{self, Ctx};
 
 const MAX_CURSORS: usize = 64;
 
-pub fn debug_interact(path: &str, source: &str, flags: &DebugFlags) {
+pub fn debug_interact(
+    session: &varn_pipeline::Session,
+    path: &str,
+    source: &str,
+    flags: &DebugFlags,
+) {
     header(C_TYPES, "lsp editor session", path);
 
     let uri = varn_modules::resolver::path_to_uri(path);
-    let analysis = varn_lsp::pipeline::run_pipeline(
-        source.to_string(),
-        uri.clone(),
-        &varn_pipeline::Session::detached(),
-    );
+    let analysis = varn_lsp::pipeline::run_pipeline(source.to_string(), uri.clone(), session);
     let mut index = varn_lsp::index::ProjectIndex::new();
     index.update_file(&uri, &analysis);
 
@@ -41,7 +42,7 @@ pub fn debug_interact(path: &str, source: &str, flags: &DebugFlags) {
     let mut ok = 0u32;
     let mut fail = 0u32;
     for step in steps.into_iter().take(MAX_CURSORS) {
-        if run_step(&analysis, &index, source, &uri, &step) {
+        if run_step(session, &analysis, &index, source, &uri, &step) {
             ok += 1;
         } else {
             fail += 1;
@@ -75,13 +76,21 @@ fn auto_cursors(analysis: &varn_lsp::document::DocumentAnalysis) -> Vec<Step> {
 }
 
 fn run_step(
+    session: &varn_pipeline::Session,
     analysis: &varn_lsp::document::DocumentAnalysis,
     index: &varn_lsp::index::ProjectIndex,
     source: &str,
     uri: &str,
     step: &Step,
 ) -> bool {
-    let stale = build_stale(source, uri, step.line, step.col, step.typed.as_deref());
+    let stale = build_stale(
+        session,
+        source,
+        uri,
+        step.line,
+        step.col,
+        step.typed.as_deref(),
+    );
     let (analysis, index, stale_mark): (
         &varn_lsp::document::DocumentAnalysis,
         &varn_lsp::index::ProjectIndex,
@@ -151,6 +160,7 @@ fn derive_trigger(prev: Option<char>) -> (Option<&'static str>, &'static str) {
 }
 
 fn build_stale(
+    session: &varn_pipeline::Session,
     source: &str,
     uri: &str,
     line: u32,
@@ -162,11 +172,7 @@ fn build_stale(
 )> {
     let typed = typed?;
     let stale_source = remove_typed(source, line, col, typed)?;
-    let analysis = varn_lsp::pipeline::run_pipeline(
-        stale_source,
-        uri.to_owned(),
-        &varn_pipeline::Session::detached(),
-    );
+    let analysis = varn_lsp::pipeline::run_pipeline(stale_source, uri.to_owned(), session);
     let mut index = varn_lsp::index::ProjectIndex::new();
     index.update_file(uri, &analysis);
     Some((analysis, index))

@@ -9,7 +9,7 @@ use crate::pipeline::run_pipeline;
 use crate::query::exports::{ExportedSymbol, ModuleExports};
 use dashmap::DashMap;
 use std::sync::{Arc, RwLock};
-use varn_pipeline::Session;
+use varn_pipeline::{Anchor, Failure, Session};
 use varn_resolver::ModuleResolver;
 
 pub use revision::{Cached, Revision};
@@ -33,6 +33,11 @@ impl Workspace {
             revision: RwLock::new(Revision::new()),
             session: Session::detached(),
         }
+    }
+
+    pub fn reopen(&mut self, anchor: Anchor<'_>) -> Result<(), Failure> {
+        self.session = Session::open(anchor)?;
+        Ok(())
     }
 
     pub fn session(&self) -> &Session {

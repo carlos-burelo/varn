@@ -39,6 +39,19 @@ impl LanguageServer for Backend {
             let _ = std::env::set_current_dir(path);
         }
 
+        let reopened = self
+            .analysis
+            .run(|analyzer| {
+                analyzer
+                    .workspace
+                    .reopen(varn_pipeline::Anchor::Cwd)
+                    .map_err(|failure| failure.to_string())
+            })
+            .await;
+        if let Some(Err(message)) = reopened {
+            self.client.log_message(MessageType::Error, &message).await;
+        }
+
         Ok(InitializeResult {
             server_info: Some(ServerInfo {
                 name: "varn-lsp".to_string(),
