@@ -1,0 +1,5 @@
+// expect: error[VN3029]
+const items = [1, 2, 3];
+for (const index in items) {
+    items[0] = items[0] + 1;
+}

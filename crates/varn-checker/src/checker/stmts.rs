@@ -7,6 +7,7 @@ mod dispatch;
 mod exception;
 mod iteration;
 mod jumps;
+mod keyed_receiver;
 pub(crate) mod reassignment;
 mod resource;
 mod sequence;

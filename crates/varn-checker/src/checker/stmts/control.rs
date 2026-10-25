@@ -146,6 +146,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         self.check_expr(rec, right, bind);
+        self.require_keyed_receiver(rec, right, bind);
         self.loop_depth += 1;
         self.with_next_child_scope_span(
             rec,
