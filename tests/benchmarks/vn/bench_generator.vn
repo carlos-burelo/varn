@@ -5,9 +5,10 @@
 import { now } from "std:time";
 
 function* pingpong() {
-    let x = yield 0;
+    let x = 0;
     while (true) {
-        x = yield x;
+        x = x + 1;
+        yield x;
     }
 }
 
@@ -62,9 +63,9 @@ function* guarded() {
 const PING_N = 100000;
 let t0 = now();
 const pp = pingpong();
-let last = pp.next().value;
+let last = pp.next().unwrap();
 for (let i = 1; i <= PING_N; i = i + 1) {
-    last = pp.next(i).value;
+    last = pp.next().unwrap();
 }
 let t1 = now();
 print(`pingpong checksum=${last} ms=${(t1 - t0)}`);
@@ -75,8 +76,8 @@ let map_sum = 0;
 let filt_sum = 0;
 const rg = range_gen(0, MAP_N);
 let step = rg.next();
-while (!step.done) {
-    const v = step.value;
+while (step.isSome()) {
+    const v = step.unwrap();
     map_sum = map_sum + v * 2;
     if ((v % 2) === 0) {
         filt_sum = filt_sum + v;
@@ -91,7 +92,7 @@ t0 = now();
 let fib_carry = 0;
 const fg = fib_gen();
 for (let i = 0; i < FIB_N; i = i + 1) {
-    fib_carry = fg.next().value;
+    fib_carry = fg.next().unwrap();
 }
 t1 = now();
 print(`fibcarry checksum=${fib_carry} ms=${(t1 - t0)}`);
@@ -100,8 +101,8 @@ t0 = now();
 let nest_sum = 0;
 const no = nested_outer();
 let nstep = no.next();
-while (!nstep.done) {
-    nest_sum = nest_sum + nstep.value;
+while (nstep.isSome()) {
+    nest_sum = nest_sum + nstep.unwrap();
     nstep = no.next();
 }
 t1 = now();

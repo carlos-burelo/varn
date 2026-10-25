@@ -38,7 +38,7 @@ await describe("example std:task", async () => {
         expect(all.length).toBe(2);
         let settled = await Task.allSettled([work(1), work(2)]);
         expect(settled.length).toBe(2);
-        expect(settled[0].status).toBe("fulfilled");
+        expect(settled[0].isOk()).toBe(true);
     });
 
     await it("passes messages through channels", async () => {
