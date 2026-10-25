@@ -4,6 +4,13 @@ use crate::OptError;
 use varn_tir::BackendTy;
 use varn_tir::TirStmt;
 
+fn creates_closure(e: &varn_tir::TirExpr) -> bool {
+    matches!(e.kind, varn_tir::TirExprKind::Closure { .. })
+        || crate::from_tir::tir_children::child_exprs(e)
+            .into_iter()
+            .any(creates_closure)
+}
+
 impl<'m> Builder<'m> {
     pub(super) fn lower_call(
         &mut self,
@@ -115,10 +122,10 @@ impl<'m> Builder<'m> {
             }
             return Ok(None);
         }
-        if matches!(ret_expr.kind, varn_tir::TirExprKind::Closure { .. }) {
+        if creates_closure(ret_expr) {
             if force {
                 return Err(crate::OptError::Unsupported(
-                    "`@inline` cannot apply to functions returning closures",
+                    "`@inline` cannot apply to functions that create closures",
                 ));
             }
             return Ok(None);
