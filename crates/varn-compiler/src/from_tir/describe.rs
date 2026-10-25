@@ -100,7 +100,7 @@ impl<'m> Describer<'m> {
                     TypeDesc::Nullable(Box::new(inner))
                 }
             }
-            BackendTy::Dynamic(DynReason::Shape(id)) => {
+            BackendTy::Dynamic(DynReason::Shape(id) | DynReason::Interface(id)) => {
                 if !self.tir.types.contains_shape(id) {
                     return TypeDesc::Any;
                 }
@@ -137,7 +137,6 @@ impl<'m> Describer<'m> {
                 | DynReason::Awaitable(_)
                 | DynReason::Yields(_)
                 | DynReason::Range(_)
-                | DynReason::Interface
                 | DynReason::TaskHandle(_)
                 | DynReason::CoreMember
                 | DynReason::Spread

@@ -1,0 +1,36 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+interface Address {
+    city: str;
+    zip?: int;
+}
+
+interface Person {
+    name: str;
+    address: Address;
+    tags: str[];
+}
+
+function decodeFails(decode: () => dynamic): bool {
+    try {
+        decode()
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+await describe("273 json decode interface", async () => {
+    await it("an interface shape is validated like a type alias", () => {
+        const p = Json.parse<Person>("{\"name\":\"ann\",\"address\":{\"city\":\"NY\"},\"tags\":[\"a\"],\"extra\":true}");
+        expect(p.name).toBe("ann");
+        expect(p.address.city).toBe("NY");
+        expect(p.tags.length).toBe(1);
+    });
+
+    await it("a missing or mistyped member is rejected", () => {
+        expect(decodeFails(() => Json.parse<Person>("{\"name\":1}"))).toBeTruthy();
+        expect(decodeFails(() => Json.parse<Person>("{\"name\":\"a\",\"address\":{\"city\":5},\"tags\":[]}"))).toBeTruthy();
+    });
+});

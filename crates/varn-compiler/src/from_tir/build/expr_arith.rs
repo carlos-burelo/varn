@@ -240,6 +240,14 @@ impl<'m> Builder<'m> {
         kind: varn_tir::CheckKind,
     ) -> Result<Value> {
         let v = self.lower_expr(operand)?;
+        if kind == varn_tir::CheckKind::Decode
+            && matches!(
+                node_ty,
+                varn_tir::BackendTy::Dynamic(varn_tir::DynReason::Interface(_))
+            )
+        {
+            return self.lower_conform(v, node_ty, ty, kind);
+        }
         match node_ty {
             varn_tir::BackendTy::Class(class) => {
                 return self.lower_checked_class(v, class, false, ty);
@@ -284,7 +292,7 @@ impl<'m> Builder<'m> {
                 | varn_tir::DynReason::Awaitable(_)
                 | varn_tir::DynReason::Yields(_)
                 | varn_tir::DynReason::Range(_)
-                | varn_tir::DynReason::Interface
+                | varn_tir::DynReason::Interface(_)
                 | varn_tir::DynReason::TaskHandle(_)
                 | varn_tir::DynReason::CoreMember
                 | varn_tir::DynReason::Spread

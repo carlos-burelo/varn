@@ -263,6 +263,7 @@ import "./269-container-cast-validates.vn"
 import "./270-handled-task-rejections.vn"
 import "./271-index-of-is-optional.vn"
 import "./272-deep-structures.vn"
+import "./273-json-decode-interface.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

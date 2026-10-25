@@ -81,7 +81,7 @@ impl<'a> FnEmitter<'a> {
                         reason,
                         varn_tir::DynReason::Unrecorded
                             | varn_tir::DynReason::Generic
-                            | varn_tir::DynReason::Interface
+                            | varn_tir::DynReason::Interface(_)
                             | varn_tir::DynReason::TaskHandle(_)
                             | varn_tir::DynReason::CoreMember
                             | varn_tir::DynReason::Spread
@@ -95,7 +95,7 @@ impl<'a> FnEmitter<'a> {
                 | varn_tir::DynReason::Awaitable(_)
                 | varn_tir::DynReason::Yields(_)
                 | varn_tir::DynReason::Range(_)
-                | varn_tir::DynReason::Interface
+                | varn_tir::DynReason::Interface(_)
                 | varn_tir::DynReason::TaskHandle(_)
                 | varn_tir::DynReason::CoreMember
                 | varn_tir::DynReason::Spread
@@ -119,7 +119,13 @@ impl<'a> FnEmitter<'a> {
     }
 
     fn guard_with(&self, e: TirExpr, ty: BackendTy, kind: CheckKind) -> TirExpr {
-        if !self.crosses_dynamic_boundary(&e, ty) {
+        let decodes_interface = kind == CheckKind::Decode
+            && matches!(
+                ty.non_nullable(self.tt),
+                BackendTy::Dynamic(varn_tir::DynReason::Interface(_))
+            )
+            && matches!(e.ty, BackendTy::Dynamic(_));
+        if !decodes_interface && !self.crosses_dynamic_boundary(&e, ty) {
             return e;
         }
         let span = e.span;
@@ -159,7 +165,7 @@ pub(super) fn untyped_reason(reason: varn_tir::DynReason) -> bool {
         | varn_tir::DynReason::Awaitable(_)
         | varn_tir::DynReason::Yields(_)
         | varn_tir::DynReason::Range(_)
-        | varn_tir::DynReason::Interface
+        | varn_tir::DynReason::Interface(_)
         | varn_tir::DynReason::TaskHandle(_)
         | varn_tir::DynReason::CoreMember
         | varn_tir::DynReason::Spread

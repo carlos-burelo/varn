@@ -1,7 +1,7 @@
 use super::classes::build_classes;
 use super::enums::build_enums;
 use super::signatures::seed_signatures;
-use crate::ty::{lower_type, NameResolver, ScopedTypeParams};
+use crate::ty::{lower_type, InterfaceProperty, NameResolver, ScopedTypeParams};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use varn_sem::bind::BindResult;
@@ -17,6 +17,7 @@ pub struct NameIndex {
     foreign_classes: FxHashMap<(Arc<str>, Arc<str>), ClassId>,
     aliases: FxHashMap<Arc<str>, varn_sem::types::Type>,
     type_params: rustc_hash::FxHashSet<Arc<str>>,
+    interfaces: FxHashMap<Arc<str>, Vec<InterfaceProperty>>,
 }
 
 impl NameResolver for NameIndex {
@@ -44,6 +45,9 @@ impl NameResolver for NameIndex {
     }
     fn is_type_param(&self, name: &str) -> bool {
         self.type_params.contains(name)
+    }
+    fn interface_properties(&self, name: &str) -> Option<&[InterfaceProperty]> {
+        self.interfaces.get(name).map(Vec::as_slice)
     }
 }
 
@@ -137,6 +141,18 @@ pub fn build(
                 .aliases
                 .insert(Arc::from(bind.interner.resolve(symbol.name)), target);
         }
+    }
+    for (name, members) in &bind.type_members.interfaces {
+        let properties = members
+            .iter()
+            .filter(|m| !m.is_static && m.kind == varn_sem::types::ClassMemberKind::Property)
+            .map(|m| InterfaceProperty {
+                name: m.name.clone(),
+                ty: m.ty,
+                optional: m.is_optional,
+            })
+            .collect();
+        names.interfaces.insert(name.clone(), properties);
     }
     for (i, f) in foreign.iter().enumerate() {
         names.foreign_enums.insert(

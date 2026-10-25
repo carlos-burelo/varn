@@ -1,5 +1,11 @@
 use varn_tir::{ClassId, EnumId};
 
+pub struct InterfaceProperty {
+    pub name: std::sync::Arc<str>,
+    pub ty: varn_sem::types::Type,
+    pub optional: bool,
+}
+
 pub trait NameResolver {
     fn class_id(&self, name: &str) -> Option<ClassId>;
     fn enum_id(&self, name: &str) -> Option<EnumId>;
@@ -8,6 +14,7 @@ pub trait NameResolver {
     fn is_local_origin(&self, origin: &str) -> bool;
     fn alias(&self, name: &str) -> Option<varn_sem::types::Type>;
     fn is_type_param(&self, name: &str) -> bool;
+    fn interface_properties(&self, name: &str) -> Option<&[InterfaceProperty]>;
 }
 
 pub struct ScopedTypeParams<'a> {
@@ -37,6 +44,9 @@ impl NameResolver for ScopedTypeParams<'_> {
     fn is_type_param(&self, name: &str) -> bool {
         self.params.iter().any(|p| p.as_ref() == name) || self.inner.is_type_param(name)
     }
+    fn interface_properties(&self, name: &str) -> Option<&[InterfaceProperty]> {
+        self.inner.interface_properties(name)
+    }
 }
 
 pub struct NoNames;
@@ -62,5 +72,8 @@ impl NameResolver for NoNames {
     }
     fn is_type_param(&self, _: &str) -> bool {
         false
+    }
+    fn interface_properties(&self, _: &str) -> Option<&[InterfaceProperty]> {
+        None
     }
 }

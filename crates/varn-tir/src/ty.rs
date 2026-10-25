@@ -56,7 +56,7 @@ pub enum DynReason {
 
     Spread,
 
-    Interface,
+    Interface(ShapeId),
 
     Shape(ShapeId),
 

@@ -26,7 +26,34 @@ fn bare() -> BackendTy {
 }
 
 fn interface() -> BackendTy {
-    BackendTy::Dynamic(DynReason::Interface)
+    BackendTy::Dynamic(DynReason::Declared)
+}
+
+fn lower_interface(
+    name: &str,
+    table: &CheckerTyTable,
+    interner: &AtomInterner,
+    tt: &mut TyTable,
+    names: &dyn NameResolver,
+) -> BackendTy {
+    let Some(properties) = names.interface_properties(name) else {
+        return interface();
+    };
+    let key = format!("interface {name}");
+    if let Some(id) = tt.named_shape(&key) {
+        return BackendTy::Dynamic(DynReason::Interface(id));
+    }
+    let id = tt.reserve_named_shape(std::sync::Arc::from(key.as_str()));
+    let fields = properties
+        .iter()
+        .map(|p| varn_tir::ShapeField {
+            name: p.name.clone(),
+            ty: lower_type(&p.ty, table, interner, tt, names),
+            optional: p.optional,
+        })
+        .collect();
+    tt.fill_named_shape(id, fields);
+    BackendTy::Dynamic(DynReason::Interface(id))
 }
 
 fn resolve_named(name: &str, names: &dyn NameResolver) -> Option<BackendTy> {
@@ -69,7 +96,7 @@ fn lower_alias(
         return BackendTy::Dynamic(DynReason::Generic);
     }
     let Some(target) = names.alias(name) else {
-        return interface();
+        return lower_interface(name, table, interner, tt, names);
     };
     let members = match table.get(target.0) {
         TypeKind::Object(members) => table.get_object_members(members),

@@ -40,8 +40,8 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 
 ### Soundness
 - [x] Recursión nativa en Rust: stringify acotado, igualdad iterativa (GC, drop, hash y marshalling probados sin fallo)
-- [ ] `Json.parse<T>` sobre `interface` (hoy no se valida)
-- [ ] `Json.parse<T>` sobre `class`: diagnóstico de compilación en lugar de error de runtime
+- [x] `Json.parse<T>` sobre `interface` (DynReason::Interface lleva su forma)
+- [x] `Json.parse<T>` sobre `class`: decisión: no decodificable; falla con TypeError en runtime (una clase puede ser un retorno legítimo de otras funciones genéricas, por eso no es error de compilación)
 - [ ] `as T` con `T` genérico sin comprobación (`signals/reactive`, `ui/bound`, `reflect/meta`)
 - [ ] Paridad de límites de recursión entre intérprete (10000 frames) y JIT (bytes de pila)
 - [ ] VN3031 entre módulos (los ids de símbolo no cruzan módulos)

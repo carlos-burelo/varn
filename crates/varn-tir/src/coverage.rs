@@ -28,7 +28,7 @@ fn reason_index(r: DynReason) -> usize {
         DynReason::Runtime => 10,
         DynReason::Generic => 11,
         DynReason::Range(_) => 12,
-        DynReason::Interface => 13,
+        DynReason::Interface(_) => 13,
         DynReason::TaskHandle(_) => 14,
         DynReason::CoreMember => 15,
         DynReason::Spread => 16,
