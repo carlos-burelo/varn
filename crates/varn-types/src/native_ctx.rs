@@ -135,6 +135,9 @@ pub trait NativeCtx: crate::Buffers {
     fn array_set(&mut self, arr: VmValue, idx: usize, val: VmValue);
     fn array_push(&mut self, arr: VmValue, val: VmValue);
     fn array_pop(&mut self, arr: VmValue) -> Option<VmValue>;
+    fn values_equal(&self, a: VmValue, b: VmValue) -> bool {
+        a == b
+    }
     fn array_for_each(&self, arr: VmValue, f: &mut dyn FnMut(VmValue, usize));
 
     fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue>;

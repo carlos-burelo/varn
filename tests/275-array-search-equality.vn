@@ -1,0 +1,21 @@
+import { describe, it, expect } from "std:test";
+
+await describe("275 array search equality", async () => {
+    await it("indexOf and includes agree with == on NaN", () => {
+        const nan = 0.0 / 0.0;
+        expect(nan == nan).toBeFalsy();
+        expect([nan].indexOf(nan)).toBe(null);
+        expect([nan].includes(nan)).toBeFalsy();
+    });
+
+    await it("structural values are found by value", () => {
+        expect([#[1, 2], #[3, 4]].indexOf(#[3, 4])).toBe(1);
+        expect([#{ k: 1 }].includes(#{ k: 1 })).toBeTruthy();
+    });
+
+    await it("plain values keep working", () => {
+        expect(["a", "b"].indexOf("b")).toBe(1);
+        expect([1.5, 2.5].lastIndexOf(2.5)).toBe(1);
+        expect([1, 2, 3].includes(4)).toBeFalsy();
+    });
+});

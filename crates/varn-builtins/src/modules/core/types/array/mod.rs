@@ -8,21 +8,7 @@ use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 pub struct Array;
 
 fn vm_eq(ctx: &dyn NativeCtx, a: VmValue, b: VmValue) -> bool {
-    if a == b {
-        return true;
-    }
-    if a.is_sso() && b.is_sso() {
-        let mut ba = [0u8; varn_types::vm_value::SSO_MAX_LEN];
-        let mut bb = [0u8; varn_types::vm_value::SSO_MAX_LEN];
-        return a.sso_as_str(&mut ba) == b.sso_as_str(&mut bb);
-    }
-    if ctx.is_string(a) && ctx.is_string(b) {
-        return ctx.str_owned(a) == ctx.str_owned(b);
-    }
-    if a.is_f64() && b.is_f64() {
-        return a.as_f64() == b.as_f64();
-    }
-    false
+    ctx.values_equal(a, b)
 }
 
 fn norm_idx(idx: i64, len: i64) -> usize {

@@ -44,12 +44,13 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 - [x] `Json.parse<T>` sobre `class`: decisión: no decodificable; falla con TypeError en runtime (una clase puede ser un retorno legítimo de otras funciones genéricas, por eso no es error de compilación)
 - [ ] `as T` con `T` genérico sin comprobación (`signals/reactive`, `ui/bound`, `reflect/meta`)
 - [ ] Paridad de límites de recursión entre intérprete (10000 frames) y JIT (bytes de pila)
-- [ ] VN3031 entre módulos (los ids de símbolo no cruzan módulos)
-- [ ] `Task` vs `TaskHandle`: separar tarea perezosa de operación nativa ya iniciada
-- [ ] Tareas lanzadas y nunca esperadas se descartan al salir sin ejecutarse
+- [x] VN3031 entre módulos (regla por tipo; descartar a propósito: `_ = llamada()`)
+- [x] `Task` (perezosa) vs `TaskHandle` (iniciada): contratos nativos retipados
+- [x] Tareas lanzadas y nunca ejecutadas se descartan al salir: decisión (como Go/tokio); los rechazos de las que corrieron sí se informan
 
 ### Semántica
-- [ ] Igualdad: `[1]==[1]` (identidad) vs `#{}` (valor); `NaN` en `indexOf` vs `==`
+- [x] `indexOf`/`includes` usan la igualdad del lenguaje (`NaN` no se encuentra; tuplas y records por valor)
+- [ ] Igualdad: `[1]==[1]` (identidad) vs `#{}` (valor): decidir si `==` sobre arrays/objetos mutables debe ser error
 - [x] Sombreado de predefinidos: `Infinity`/`NaN` y tipos primitivos no se redeclaran (módulos core exentos)
 - [x] `x instanceof int` es el test de tipo para uniones (la std lo usa y estrecha): decisión, sin cambio
 - [ ] `dynamic` sin autorización explícita (Ley 17): inventariar usos

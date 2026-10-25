@@ -120,6 +120,10 @@ impl NativeCtx for ExecCtx {
         crate::heap_array::array_pop(&self.heap, arr)
     }
 
+    fn values_equal(&self, a: VmValue, b: VmValue) -> bool {
+        crate::exec::compare::eq(a, b, &self.heap)
+    }
+
     fn array_for_each(&self, arr: VmValue, f: &mut dyn FnMut(VmValue, usize)) {
         crate::heap_array::array_for_each(&self.heap, arr, f)
     }
