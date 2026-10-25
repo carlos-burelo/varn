@@ -27,6 +27,7 @@ impl<'r> Checker<'r> {
             StmtKind::Expr { expression } => {
                 let expression = *expression;
                 self.check_expr(rec, expression, bind);
+                self.reject_discarded_task(rec, expression, bind);
             }
 
             StmtKind::Return { argument } => {

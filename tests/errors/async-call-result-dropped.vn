@@ -1,0 +1,5 @@
+// expect: error[VN3031]
+async function load(): Task<int> {
+    return 1;
+}
+load();

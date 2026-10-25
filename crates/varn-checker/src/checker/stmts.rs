@@ -2,6 +2,7 @@ pub(crate) mod assigned_targets;
 pub(crate) mod closure_effects;
 mod completion;
 mod control;
+mod discarded_task;
 mod dispatch;
 mod exception;
 mod iteration;
