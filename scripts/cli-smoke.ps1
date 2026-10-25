@@ -88,6 +88,39 @@ Check "check-without-arguments-needs-main" {
     $r.Code -eq 2 -and $r.Out -match "main"
 }
 
+Check "env-and-project-follow-the-file-not-the-cwd" {
+    $proj = Join-Path $work "anchor"
+    New-Item -ItemType Directory -Force (Join-Path $proj "sub"), (Join-Path $work "elsewhere") | Out-Null
+    Set-Content (Join-Path $proj "varn.toml") 'name = "anchor"'
+    Set-Content (Join-Path $proj ".env") 'ANCHOR_PROBE=from-project'
+    Set-Content (Join-Path $proj "sub\probe.vn") 'import { Env } from "std:env"; print(Env.get("ANCHOR_PROBE", "unset"));'
+    Push-Location (Join-Path $work "elsewhere")
+    try { $r = Vn run (Join-Path $proj "sub\probe.vn") } finally { Pop-Location }
+    $r.Code -eq 0 -and $r.Out -match "from-project"
+}
+
+Check "pkg-commands-use-the-project-that-owns-installed-packages" {
+    $proj = Join-Path $work "owner"
+    $dep = Join-Path $proj ".vn\packages\dep"
+    New-Item -ItemType Directory -Force $dep | Out-Null
+    Set-Content (Join-Path $proj "varn.toml") 'name = "owner-project"'
+    Set-Content (Join-Path $dep "varn.toml") 'name = "dep"'
+    Push-Location $dep
+    try { $r = Vn pkg tree } finally { Pop-Location }
+    $r.Code -eq 0 -and $r.Out -match "owner-project"
+}
+
+Check "invalid-ancestor-manifest-is-reported-when-resolving-a-package" {
+    $root = Join-Path $work "ancestor"
+    New-Item -ItemType Directory -Force (Join-Path $root "sub") | Out-Null
+    Set-Content (Join-Path $root "varn.toml") 'bogus = 1'
+    Set-Content (Join-Path $root "sub\varn.toml") 'name = "sub"'
+    $f = Join-Path $root "sub\a.vn"
+    Set-Content $f 'import { x } from "nopkg"; print(x);'
+    $r = Vn run $f
+    $r.Code -eq 3 -and $r.Out -match "invalid" -and $r.Out -match "bogus"
+}
+
 Check "eval-runs" {
     $r = Vn eval 'print(1 + 1);'
     $r.Code -eq 0 -and $r.Out -match "2"

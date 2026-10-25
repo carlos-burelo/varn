@@ -438,10 +438,12 @@ plan. Lo que cambió respecto a él, con la razón (el ledger de ejecución no s
   `[graph_len u64][image_len u64][VEXE]`.
 - **Tests invocados por el runtime** (Tarea 9) se hicieron en una segunda pasada: grafo con
   `tests`, `Vm::call_main_global`, `execute_unit`.
-- **Arranque anclado en el cwd** (`.env` y `std` de `varn.toml`), ver «Decisión» en el diseño.
 - **`vn bench` arranca con `boot_machine`/`enter_main`/`drive_entry`** (sin fábrica propia) y mide el mismo
   arranque que `run`.
-- **Deuda aceptada:** los
-  comandos `pkg` buscan el manifiesto con `project_manifest` (salta paquetes instalados) y no
-  reciben `Session`; el LSP usa `Session::detached()` (el `Project` no se usa en su análisis);
-  un manifiesto inválido en un directorio ancestro se ignora al resolver paquetes.
+- **El proyecto lo fija el argumento del comando, no el cwd.** `dispatch::project_for` descubre el
+  `Project` (archivo, directorio o cwd según el comando) antes de `bootstrap::init`, que carga los `.env`
+  y fija el `std` de `varn.toml` desde ese proyecto. `Project::owning` (salta `.vn/packages`) es el
+  alcance de `vn pkg`; `varn-modules` y `varn-pm` ya no tienen buscadores de manifiesto propios y un
+  manifiesto inválido en un ancestro es un error con su causa. El LSP reabre su `Session` sobre la
+  raíz del workspace en `initialize` y `varn-inspect` recibe la `Session` del comando.
+
