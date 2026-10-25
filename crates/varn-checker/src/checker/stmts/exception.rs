@@ -37,6 +37,7 @@ impl<'r> Checker<'r> {
             );
         }
         if let Some(fin) = finally {
+            self.reject_return_in_finally(fin);
             self.check_stmt(rec, fin, bind);
         }
     }

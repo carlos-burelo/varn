@@ -1,0 +1,8 @@
+// expect: error[VN4023]
+function pick(): int {
+    try {
+        return 1;
+    } finally {
+        return 2;
+    }
+}

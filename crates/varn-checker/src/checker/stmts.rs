@@ -5,6 +5,7 @@ mod control;
 mod discarded_task;
 mod dispatch;
 mod exception;
+mod finally_exit;
 mod iteration;
 mod jumps;
 mod keyed_receiver;
