@@ -160,7 +160,25 @@ pub(super) fn check_res(
                                 .enum_info(en)
                                 .and_then(|info| info.member_at(*slot))
                                 .is_some(),
-                            _ => false,
+                            BackendTy::Int
+                            | BackendTy::Float
+                            | BackendTy::Bool
+                            | BackendTy::Char
+                            | BackendTy::Str
+                            | BackendTy::Bytes
+                            | BackendTy::Decimal
+                            | BackendTy::BigInt
+                            | BackendTy::Array(_)
+                            | BackendTy::Map(..)
+                            | BackendTy::Dict(_)
+                            | BackendTy::Set(_)
+                            | BackendTy::Tuple(_)
+                            | BackendTy::Class(_)
+                            | BackendTy::Fn(_)
+                            | BackendTy::Nullable(_)
+                            | BackendTy::Void
+                            | BackendTy::Never
+                            | BackendTy::Dynamic(_) => false,
                         };
                         if !ok {
                             errors.push(VerifyError::new(

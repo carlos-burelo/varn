@@ -281,7 +281,10 @@ fn emit_scalar_write(
                 let want = match repr {
                     ScalarRepr::I64 => KIND_INT,
                     ScalarRepr::F64 => KIND_FLOAT,
-                    _ => KIND_BOOL,
+                    ScalarRepr::Bool => KIND_BOOL,
+                    ScalarRepr::Ref | ScalarRepr::Boxed => {
+                        unreachable!("the enclosing arm only admits scalar reprs")
+                    }
                 };
                 let kind_ok = b.ins().icmp_imm_u(IntCC::Equal, value_kind, want as i64);
                 let store = b.create_block();

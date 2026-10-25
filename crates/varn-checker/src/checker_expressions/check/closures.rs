@@ -165,7 +165,25 @@ impl<'r> Checker<'r> {
                         .map(|m| Type::resolved(*m))
                         .collect(),
                 ),
-                _ => None,
+                varn_core::TypeKind::Primitive(_)
+                | varn_core::TypeKind::Literal(_)
+                | varn_core::TypeKind::This
+                | varn_core::TypeKind::Array(_)
+                | varn_core::TypeKind::Intersection(_)
+                | varn_core::TypeKind::Tuple(_)
+                | varn_core::TypeKind::Named(..)
+                | varn_core::TypeKind::Generic(..)
+                | varn_core::TypeKind::TemplateLiteral(_)
+                | varn_core::TypeKind::Fn(_)
+                | varn_core::TypeKind::Object(_)
+                | varn_core::TypeKind::Typeof(_)
+                | varn_core::TypeKind::KeyOf(_)
+                | varn_core::TypeKind::IndexedAccess { .. }
+                | varn_core::TypeKind::Mapped { .. }
+                | varn_core::TypeKind::Conditional { .. }
+                | varn_core::TypeKind::Infer(_)
+                | varn_core::TypeKind::EnumVariant { .. }
+                | varn_core::TypeKind::TypePredicate { .. } => None,
             }
         };
         if let Some(members) = members_of(self, &source_base) {

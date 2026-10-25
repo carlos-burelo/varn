@@ -71,7 +71,36 @@ fn compare_fact(
                 SsaBinOp::IntLe => SsaBinOp::IntGe,
                 SsaBinOp::IntGt => SsaBinOp::IntLt,
                 SsaBinOp::IntGe => SsaBinOp::IntLe,
-                other => *other,
+                other @ (SsaBinOp::IntAdd
+                | SsaBinOp::IntSub
+                | SsaBinOp::IntMul
+                | SsaBinOp::IntDiv
+                | SsaBinOp::IntMod
+                | SsaBinOp::IntPow
+                | SsaBinOp::IntEq
+                | SsaBinOp::IntNe
+                | SsaBinOp::IntAnd
+                | SsaBinOp::IntOr
+                | SsaBinOp::IntXor
+                | SsaBinOp::IntShl
+                | SsaBinOp::IntShr
+                | SsaBinOp::IntUshr
+                | SsaBinOp::FloatAdd
+                | SsaBinOp::FloatSub
+                | SsaBinOp::FloatMul
+                | SsaBinOp::FloatDiv
+                | SsaBinOp::FloatMod
+                | SsaBinOp::FloatPow
+                | SsaBinOp::FloatEq
+                | SsaBinOp::FloatNe
+                | SsaBinOp::FloatLt
+                | SsaBinOp::FloatLe
+                | SsaBinOp::FloatGt
+                | SsaBinOp::FloatGe
+                | SsaBinOp::StrConcat
+                | SsaBinOp::StrEq
+                | SsaBinOp::StrNe
+                | SsaBinOp::Dyn(_)) => *other,
             },
         ),
         _ => return None,

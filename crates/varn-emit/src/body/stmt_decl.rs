@@ -266,7 +266,26 @@ impl<'a> FnEmitter<'a> {
                         BackendTy::Dynamic(DynReason::Unrecorded) => {
                             self.declared_ty(d.id.range().start.offset).unwrap_or(ty)
                         }
-                        _ => ty,
+                        BackendTy::Int
+                        | BackendTy::Float
+                        | BackendTy::Bool
+                        | BackendTy::Char
+                        | BackendTy::Str
+                        | BackendTy::Bytes
+                        | BackendTy::Decimal
+                        | BackendTy::BigInt
+                        | BackendTy::Array(_)
+                        | BackendTy::Map(..)
+                        | BackendTy::Dict(_)
+                        | BackendTy::Set(_)
+                        | BackendTy::Tuple(_)
+                        | BackendTy::Class(_)
+                        | BackendTy::Enum(_)
+                        | BackendTy::Fn(_)
+                        | BackendTy::Nullable(_)
+                        | BackendTy::Void
+                        | BackendTy::Never
+                        | BackendTy::Dynamic(_) => ty,
                     };
                     let init = init.map(|e| self.guard_dynamic(e, ty));
                     out.extend(std::mem::take(&mut self.pending));

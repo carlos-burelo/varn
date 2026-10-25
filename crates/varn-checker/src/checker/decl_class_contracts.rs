@@ -279,9 +279,7 @@ impl<'r> Checker<'r> {
             return None;
         }
         let view = BindView::new(bind, self.resolver);
-        let Some(members) = view.get_class_members(&name, origin.as_deref()) else {
-            return None;
-        };
+        let members = view.get_class_members(&name, origin.as_deref())?;
         let args: Vec<varn_sem::types::Type> = self
             .ty_table
             .get_list(args_list)

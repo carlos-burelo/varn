@@ -282,7 +282,7 @@ impl<'a> FnEmitter<'a> {
                         | pat @ Pattern::Object { .. }
                         | pat @ Pattern::Assignment { .. }
                         | pat @ Pattern::Rest { .. } => {
-                            let src = init.unwrap_or_else(|| placeholder());
+                            let src = init.unwrap_or_else(placeholder);
                             out.extend(std::mem::take(&mut self.pending));
                             let src = self.hoist(src);
                             out.extend(std::mem::take(&mut self.pending));
