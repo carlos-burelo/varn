@@ -4,7 +4,7 @@ pub fn is_known_module(specifier: &str) -> bool {
     varn_modules::resolver::is_known_module(specifier)
 }
 
-pub fn resolve_package_specifier_path(base_dir: &Path, specifier: &str) -> Option<String> {
+pub fn resolve_package_specifier_path(base_dir: &Path, specifier: &str) -> Result<String, String> {
     varn_modules::resolve_pkg_specifier(base_dir, specifier)
 }
 
@@ -16,7 +16,7 @@ pub fn resolve_relative(
     let raw = match varn_core::ImportSpecifier::parse(specifier) {
         varn_core::ImportSpecifier::Package(_) => {
             resolve_package_specifier_path(base_dir, specifier)
-                .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned())
+                .unwrap_or_else(|_| base_dir.join(specifier).to_string_lossy().into_owned())
         }
         varn_core::ImportSpecifier::Relative(_)
         | varn_core::ImportSpecifier::Stdlib(_)

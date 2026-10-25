@@ -1,7 +1,7 @@
 use super::ids::{DEFAULT_PACKAGE_VERSION, PKG_PREFIX, RELATIVE_EXPORT_PREFIX};
 use semver::{Version, VersionReq};
 use std::path::{Path, PathBuf};
-use varn_project::{Manifest, ENV_DIR_NAME, MANIFEST_FILE, MODULES_DIR_NAME};
+use varn_project::{Anchor, Manifest, Project, ENV_DIR_NAME, MANIFEST_FILE, MODULES_DIR_NAME};
 
 pub fn is_pkg_specifier(specifier: &str) -> bool {
     specifier.starts_with(PKG_PREFIX)
@@ -44,10 +44,8 @@ pub fn split_pkg_specifier(specifier: &str) -> Option<(String, Option<String>)> 
     Some((package.to_owned(), subpath))
 }
 
-pub fn resolve_pkg_specifier(base_dir: &Path, specifier: &str) -> Option<String> {
-    resolve_pkg_specifier_detailed(base_dir, specifier)
-        .ok()
-        .map(|r| r.resolved_path)
+pub fn resolve_pkg_specifier(base_dir: &Path, specifier: &str) -> Result<String, String> {
+    resolve_pkg_specifier_detailed(base_dir, specifier).map(|r| r.resolved_path)
 }
 
 #[derive(Clone, Debug)]
@@ -66,7 +64,7 @@ pub fn resolve_pkg_specifier_detailed(
 ) -> Result<PackageResolution, String> {
     let (package_name, subpath) = split_pkg_specifier(specifier)
         .ok_or_else(|| format!("invalid package specifier '{specifier}'"))?;
-    let package_root = find_package_root(base_dir, &package_name).ok_or_else(|| {
+    let package_root = find_package_root(base_dir, &package_name)?.ok_or_else(|| {
         format!(
             "package '{package_name}' not found from {}",
             base_dir.display()
@@ -177,23 +175,22 @@ fn resolve_export_target(
     ))
 }
 
-fn find_package_root(base_dir: &Path, package_name: &str) -> Option<PathBuf> {
+fn find_package_root(base_dir: &Path, package_name: &str) -> Result<Option<PathBuf>, String> {
     for dir in base_dir.ancestors() {
         let env_modules = dir
             .join(ENV_DIR_NAME)
             .join(MODULES_DIR_NAME)
             .join(package_name);
         if env_modules.exists() {
-            return Some(env_modules);
+            return Ok(Some(env_modules));
         }
 
-        if let Ok(manifest) = load_package_manifest(dir)
-            && manifest.name.as_deref() == Some(package_name)
-        {
-            return Some(dir.to_path_buf());
+        let manifest = Manifest::load_in(dir).map_err(|e| e.to_string())?;
+        if manifest.is_some_and(|m| m.name.as_deref() == Some(package_name)) {
+            return Ok(Some(dir.to_path_buf()));
         }
     }
-    None
+    Ok(None)
 }
 
 fn load_package_manifest(package_root: &Path) -> Result<Manifest, String> {
@@ -241,10 +238,8 @@ fn enforce_dependency_constraint(
     package_name: &str,
     resolved_version: &str,
 ) -> Result<(), String> {
-    let Some(owner_manifest) = nearest_owner_manifest(base_dir) else {
-        return Ok(());
-    };
-    let Some(required) = owner_manifest.dependencies.get(package_name) else {
+    let owner = Project::discover(Anchor::Dir(base_dir)).map_err(|e| e.to_string())?;
+    let Some(required) = owner.manifest.dependencies.get(package_name) else {
         return Ok(());
     };
 
@@ -277,18 +272,6 @@ fn enforce_dependency_constraint(
         ));
     }
     Ok(())
-}
-
-fn nearest_owner_manifest(base_dir: &Path) -> Option<Manifest> {
-    for dir in base_dir.ancestors() {
-        if dir.ends_with(Path::new(ENV_DIR_NAME).join(MODULES_DIR_NAME)) {
-            continue;
-        }
-        if let Ok(manifest) = load_package_manifest(dir) {
-            return Some(manifest);
-        }
-    }
-    None
 }
 
 pub fn canonical_or_original(path: &Path) -> String {

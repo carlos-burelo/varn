@@ -18,12 +18,15 @@ impl<'r> super::Binder<'r> {
         let is_relative = source_str.starts_with('.') || source_str.starts_with('/');
         let is_package = varn_modules::is_pkg_specifier(&source_str);
 
+        let mut package_failure = None;
         let resolved_target = if (is_relative || is_package) && !self.source_file.is_empty() {
             let base_path = std::path::Path::new(self.source_file.as_ref())
                 .parent()
                 .unwrap_or(std::path::Path::new("."));
             if is_package {
                 crate::paths::resolve_package_specifier_path(base_path, &source_str)
+                    .map_err(|reason| package_failure = Some(reason))
+                    .ok()
             } else {
                 self.resolver.resolve_specifier(base_path, &source_str)
             }
@@ -69,12 +72,12 @@ impl<'r> super::Binder<'r> {
 
         if is_relative || is_package {
             if resolved_target.is_none() {
+                let message = match &package_failure {
+                    Some(reason) => format!("cannot resolve module '{source_str}': {reason}"),
+                    None => format!("cannot resolve module '{source_str}'"),
+                };
                 self.emit(
-                    Diagnostic::error(
-                        ErrorCode::InvalidImportPath,
-                        format!("cannot resolve module '{}'", source_str),
-                    )
-                    .with_range(i.range),
+                    Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(i.range),
                 );
             }
         } else if !is_stdlib {

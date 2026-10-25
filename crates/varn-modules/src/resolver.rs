@@ -44,7 +44,7 @@ pub fn resolve_in(spec: &str, base_dir: &Path) -> Result<ModuleId, String> {
         }
         ImportSpecifier::Package(s) => super::resolve_pkg_specifier(base_dir, s.as_ref())
             .map(|p| ModuleId::local_str(&canonical_or_original(Path::new(&p))))
-            .ok_or_else(|| format!("cannot resolve package '{spec}'")),
+            .map_err(|reason| format!("cannot resolve package '{spec}': {reason}")),
     }
 }
 

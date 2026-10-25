@@ -1,10 +1,11 @@
 use std::path::{Path, PathBuf};
 
 use crate::manifest::{Manifest, ManifestError};
-use crate::root::nearest;
+use crate::root::{locate, Scope};
 
 pub enum Anchor<'a> {
     File(&'a Path),
+    Dir(&'a Path),
     Cwd,
 }
 
@@ -25,14 +26,23 @@ impl Project {
     }
 
     pub fn discover(anchor: Anchor<'_>) -> Result<Project, ManifestError> {
+        Project::find(anchor, Scope::Nearest)
+    }
+
+    pub fn owning(anchor: Anchor<'_>) -> Result<Project, ManifestError> {
+        Project::find(anchor, Scope::Owner)
+    }
+
+    fn find(anchor: Anchor<'_>, scope: Scope) -> Result<Project, ManifestError> {
         let start = match anchor {
             Anchor::File(file) => std::path::absolute(file)
                 .unwrap_or_else(|_| file.to_path_buf())
                 .parent()
                 .map_or_else(|| PathBuf::from("."), Path::to_path_buf),
+            Anchor::Dir(dir) => dir.to_path_buf(),
             Anchor::Cwd => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         };
-        let located = nearest(&start);
+        let located = locate(&start, scope);
         let manifest = match &located.manifest {
             Some(path) => Manifest::load(path)?,
             None => Manifest::default(),

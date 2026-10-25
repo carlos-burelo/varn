@@ -1,26 +1,31 @@
 use crate::{cli::PkgCommands, error::CliError};
+use std::path::Path;
 use varn_core::term::terminal;
+use varn_project::Project;
 
-pub fn execute(cmd: PkgCommands) -> Result<(), CliError> {
+pub fn manifest_path(project: &Project) -> Result<&Path, CliError> {
+    project
+        .manifest_path
+        .as_deref()
+        .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first"))
+}
+
+pub fn execute(project: &Project, cmd: PkgCommands) -> Result<(), CliError> {
     match cmd {
-        PkgCommands::Add(args) => super::add::execute(args),
-        PkgCommands::Remove(args) => super::remove::execute(args),
-        PkgCommands::Install => super::install::execute(),
-        PkgCommands::Update => super::update::execute(),
-        PkgCommands::Tree => execute_tree(),
-        PkgCommands::Doctor => execute_doctor(),
+        PkgCommands::Add(args) => super::add::execute(project, args),
+        PkgCommands::Remove(args) => super::remove::execute(project, args),
+        PkgCommands::Install => super::install::execute(project),
+        PkgCommands::Update => super::update::execute(project),
+        PkgCommands::Tree => execute_tree(project),
+        PkgCommands::Doctor => execute_doctor(project),
         PkgCommands::Clean => execute_clean(),
     }
 }
 
-fn execute_tree() -> Result<(), CliError> {
-    let cwd =
-        std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
-    let manifest_path = varn_project::project_manifest(&cwd)
-        .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first".to_owned()))?;
-    let project_root = manifest_path.parent().unwrap_or(&cwd);
-
-    let manifest = varn_project::Manifest::load(&manifest_path)?;
+fn execute_tree(project: &Project) -> Result<(), CliError> {
+    manifest_path(project)?;
+    let project_root = project.root.as_path();
+    let manifest = &project.manifest;
     let project_name = manifest.name.as_deref().unwrap_or("project");
     let version = manifest.version.as_deref().unwrap_or("0.0.0");
 
@@ -56,12 +61,9 @@ fn execute_tree() -> Result<(), CliError> {
     Ok(())
 }
 
-fn execute_doctor() -> Result<(), CliError> {
-    let cwd =
-        std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
-    let manifest_path = varn_project::project_manifest(&cwd)
-        .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first".to_owned()))?;
-    let project_root = manifest_path.parent().unwrap_or(&cwd);
+fn execute_doctor(project: &Project) -> Result<(), CliError> {
+    manifest_path(project)?;
+    let project_root = project.root.as_path();
 
     terminal::log("Auditing project package integrity...");
 

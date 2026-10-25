@@ -17,19 +17,10 @@ pub fn resolve_version(origin: &DepOrigin) -> Result<ResolvedVersion, String> {
                     path.display()
                 ));
             }
-            let version = if let Some(mpath) = varn_project::project_manifest(path) {
-                if let Ok(manifest) = varn_project::Manifest::load(&mpath) {
-                    manifest
-                        .version
-                        .as_deref()
-                        .unwrap_or("0.0.0-local")
-                        .to_owned()
-                } else {
-                    "0.0.0-local".to_owned()
-                }
-            } else {
-                "0.0.0-local".to_owned()
-            };
+            let manifest = varn_project::Manifest::load_in(path).map_err(|e| e.to_string())?;
+            let version = manifest
+                .and_then(|m| m.version)
+                .unwrap_or_else(|| "0.0.0-local".to_owned());
             Ok(ResolvedVersion {
                 version,
                 commit: "local".to_owned(),

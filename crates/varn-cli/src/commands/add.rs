@@ -2,23 +2,20 @@ use crate::cli::AddArgs;
 use crate::error::CliError;
 use varn_core::term::terminal;
 use varn_pm::{installer, lockfile, DepOrigin};
+use varn_project::Project;
 
-pub fn execute(args: AddArgs) -> Result<(), CliError> {
-    let cwd =
-        std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
-
-    let manifest_path = varn_project::project_manifest(&cwd)
-        .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first".to_owned()))?;
-    let project_root = manifest_path.parent().unwrap_or(&cwd).to_path_buf();
+pub fn execute(project: &Project, args: AddArgs) -> Result<(), CliError> {
+    let manifest_path = super::pkg::manifest_path(project)?;
+    let project_root = project.root.as_path();
 
     DepOrigin::parse(&args.origin).map_err(CliError::fatal)?;
 
-    let mut manifest = varn_project::Manifest::load(&manifest_path)?;
+    let mut manifest = project.manifest.clone();
 
     manifest
         .dependencies
         .insert(args.alias.clone(), args.origin.clone());
-    manifest.save(&manifest_path)?;
+    manifest.save(manifest_path)?;
 
     let deps = varn_pm::parse_dependencies(&manifest.dependencies).map_err(CliError::fatal)?;
 
