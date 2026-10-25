@@ -31,6 +31,7 @@ Versionado: ver [`docs/STABILITY.md`](docs/STABILITY.md).
 - `[fmt]` and `[test]` sections in `varn.toml` with `include`/`exclude` patterns for the files `vn fmt` and `vn test` visit; `vn bench` accepts the permission flags.
 - `vn task`: run the command lines declared under `[tasks]` in `varn.toml`.
 - `vn build --target exe`: a self-contained executable made of the running `vn`, the std image it uses and the compiled module graph.
+- `vn check` takes any number of files and directories (none: the `main` of `varn.toml`) and type-checks each one with all its dependencies without generating code; emission errors only show up in `vn run` and `vn build`.
 - `.vn/.env`, the file `vn init` creates, is now read with the other `.env` files.
 
 ### Fixed

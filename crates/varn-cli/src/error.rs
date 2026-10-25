@@ -7,6 +7,7 @@ pub enum CliError {
     Failure(Failure),
     Fatal(String),
     Usage(String),
+    Summary { message: String, exit: ExitCode },
 }
 
 impl CliError {
@@ -26,6 +27,7 @@ impl CliError {
             )
             | CliError::Fatal(_) => ExitCode::Fatal,
             CliError::Usage(_) => ExitCode::Usage,
+            CliError::Summary { exit, .. } => *exit,
         }
     }
 }
@@ -34,7 +36,9 @@ impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CliError::Failure(failure) => write!(f, "{failure}"),
-            CliError::Fatal(message) | CliError::Usage(message) => write!(f, "{message}"),
+            CliError::Fatal(message)
+            | CliError::Usage(message)
+            | CliError::Summary { message, .. } => write!(f, "{message}"),
         }
     }
 }

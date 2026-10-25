@@ -144,7 +144,7 @@ pub struct DebugArgs {
 
 #[derive(Args)]
 pub struct CheckArgs {
-    pub file: String,
+    pub files: Vec<String>,
 
     #[arg(short, long)]
     pub verbose: bool,

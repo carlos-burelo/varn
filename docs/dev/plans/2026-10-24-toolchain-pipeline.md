@@ -425,8 +425,9 @@ plan. Lo que cambió respecto a él, con la razón (el ledger de ejecución no s
 - **Cache dirs sin raíz.** `get_cache_dir` ignoraba su argumento; se borró el argumento y la
   raíz perezosa del grafo en vez de pasar un `Project` a `ModuleResolver::new`.
 - **`Source::file` sin `Session`** (no lo necesita); lee por el registro y canonicaliza una vez.
-- **`vn check`** sigue compilando todo (`Goal::Executable`): los errores de dependencias y de
-  enlace aparecen ahí. No hay `Goal::Tir` (sin consumidor).
+- **`vn check`** usa `Goal::Checked`: tipos de la entrada y de todas sus dependencias
+  (`check_module_graph`), sin generar código; los errores de emisión y de enlace quedan en
+  `run`/`build`. Acepta varios archivos y directorios. No hay `Goal::Tir` (sin consumidor).
 - **`Mode::Tooling` se sustituyó por `Session::analyze`**, que devuelve un `Analysis` tipado en
   lugar de una `Compilation` con `Option` en cada etapa.
 - **El renderizado vive en `varn-core`** (`render_report`), con `Display` para `Failure`; el CLI

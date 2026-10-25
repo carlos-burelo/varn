@@ -32,7 +32,7 @@ pub fn run(cmd: Commands, shared: Option<&Arc<Session>>) -> Result<(), CliError>
             commands::run::execute(&session, args)
         }
         Commands::Check(args) => {
-            let session = session(Anchor::File(std::path::Path::new(&args.file)))?;
+            let session = session(Anchor::Cwd)?;
             commands::check::execute(&session, args)
         }
         Commands::Eval(args) => {

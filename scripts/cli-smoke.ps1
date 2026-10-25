@@ -64,6 +64,30 @@ Check "check-reports-error-with-code-3" {
     $r.Code -eq 3 -and $r.Out -match "could not compile"
 }
 
+Check "check-finds-dependency-error-without-codegen" {
+    $dep = Write-Vn "chk_dep.vn" 'export function f(): int { return "x"; }'
+    $main = Write-Vn "chk_main.vn" 'import { f } from "./chk_dep.vn"; print(f());'
+    $r = Vn check $main
+    $r.Code -eq 3 -and $r.Out -match "chk_dep.vn"
+}
+
+Check "check-accepts-directory-and-several-files" {
+    $dir = Join-Path $work "chkdir"
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    Set-Content (Join-Path $dir "a.vn") 'print(1);'
+    Set-Content (Join-Path $dir "b.vn") 'let x: int = "t";'
+    $r = Vn check $dir
+    $ok = $r.Code -eq 3 -and $r.Out -match "Checked 2 files" -and $r.Out -match "1 of 2 files failed"
+    $r = Vn check (Join-Path $dir "a.vn") (Join-Path $dir "b.vn")
+    $ok -and $r.Code -eq 3
+}
+
+Check "check-without-arguments-needs-main" {
+    Push-Location $work
+    try { $r = Vn check } finally { Pop-Location }
+    $r.Code -eq 2 -and $r.Out -match "main"
+}
+
 Check "eval-runs" {
     $r = Vn eval 'print(1 + 1);'
     $r.Code -eq 0 -and $r.Out -match "2"

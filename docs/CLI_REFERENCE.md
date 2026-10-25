@@ -8,7 +8,7 @@ viva; esta página la resume.
 | Comando | Uso | Notas |
 |---|---|---|
 | `run` | `vn run [OPTIONS] [FILE] [-- ARGS...]` | `-e/--eval CODE`, `-v`, `--trace`, permisos (abajo), `--compare-tiers` (corre el programa en intérprete, JIT y JIT tier 1 y compara salidas) |
-| `check` | `vn check [-v] FILE` | Compila el programa completo sin ejecutarlo (dependencias y enlace incluidos); sale con error si hay diagnósticos de error. Reutiliza la caché de compilación |
+| `check` | `vn check [-v] [PATH...]` | Verifica tipos de cada archivo y de todas sus dependencias sin generar código; los directorios se recorren recursivamente y sin argumentos se usa `main` de `varn.toml`. Sale con 3 si algún archivo tiene diagnósticos. Los errores de emisión (p. ej. demasiadas constantes) solo aparecen en `run`/`build` |
 | `eval` | `vn eval [-v] [permisos] CODE` | Evalúa una expresión/programa corto |
 | `repl` | `vn repl [--debug-bytecode] [permisos]` | Bucle interactivo; cada línea es un programa aparte |
 | `test` | `vn test [PATH] [-f FILTER] [-j JOBS] [--fail-fast] [-v] [permisos]` | Ejecuta cada `.vn` de PATH (por defecto `tests/`, un nivel) |
