@@ -1,0 +1,16 @@
+import { describe, it, expect } from "std:test";
+
+await describe("256 array pop shift nullable", async () => {
+    await it("empty array yields null", () => {
+        const items: int[] = [];
+        expect(items.pop()).toBe(null);
+        expect(items.shift()).toBe(null);
+    });
+
+    await it("non-empty array yields the element", () => {
+        const items: int[] = [1, 2, 3];
+        expect(items.pop()).toBe(3);
+        expect(items.shift()).toBe(1);
+        expect(items.length).toBe(1);
+    });
+});

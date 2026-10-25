@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+const items: int[] = [];
+const last: int = items.pop();

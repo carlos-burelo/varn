@@ -59,13 +59,13 @@ varn_contract! {
         fn push(ctx: &mut dyn NativeCtx, this: VnArray, item: VmValue) {
             this.push(ctx, item);
         }
-        fn pop(ctx: &mut dyn NativeCtx, this: VnArray) -> VmValue {
-            this.pop(ctx).unwrap_or_else(VmValue::null)
+        fn pop(ctx: &mut dyn NativeCtx, this: VnArray) -> Option<VmValue> {
+            this.pop(ctx)
         }
-        fn shift(ctx: &mut dyn NativeCtx, this: VnArray) -> VmValue {
+        fn shift(ctx: &mut dyn NativeCtx, this: VnArray) -> Option<VmValue> {
             let len = this.len(ctx);
             if len == 0 {
-                return VmValue::null();
+                return None;
             }
             let first = this.get(ctx, 0).unwrap_or_else(VmValue::null);
             for i in 1..len {
@@ -73,7 +73,7 @@ varn_contract! {
                 this.set(ctx, i - 1, v);
             }
             this.pop(ctx);
-            first
+            Some(first)
         }
         fn unshift(ctx: &mut dyn NativeCtx, this: VnArray, item: VmValue) {
             let len = this.len(ctx);

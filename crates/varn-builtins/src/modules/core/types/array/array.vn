@@ -4,8 +4,8 @@
 export declare class Array<T> {
     readonly length: int;
     push(item: T): void;
-    pop(): T;
-    shift(): T;
+    pop(): T?;
+    shift(): T?;
     unshift(item: T): void;
     join(separator?: str): str;
     slice(start?: int, end?: int): T[];
