@@ -1,0 +1,26 @@
+import { describe, it, expect } from "std:test";
+
+class Animal {
+    name: str = "rex";
+    toString(): str { return `Animal(${this.name})` }
+}
+
+class Puppy extends Animal {
+    override toString(): str { return `Puppy(${this.name})` }
+}
+
+class Plain {
+    v: int = 1;
+}
+
+await describe("277 template uses toString", async () => {
+    await it("a class with toString is interpolated through it", () => {
+        const a = new Animal();
+        expect(`${a}`).toBe("Animal(rex)");
+        expect(`<${new Puppy()}>`).toBe("<Puppy(rex)>");
+    });
+
+    await it("a class without toString shows its fields", () => {
+        expect(`${new Plain()}`).toBe("Plain { v: 1 }");
+    });
+});

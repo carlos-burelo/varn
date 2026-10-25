@@ -114,7 +114,7 @@ impl<'a> FnEmitter<'a> {
     }
 
     pub(super) fn coerce_binary_operands(
-        &self,
+        &mut self,
         op: TirBinOp,
         lhs: TirExpr,
         rhs: TirExpr,

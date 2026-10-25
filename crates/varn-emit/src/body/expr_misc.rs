@@ -1,4 +1,5 @@
 use super::context::FnEmitter;
+use std::sync::Arc;
 use varn_core::ast::ExprId;
 use varn_tir::{BackendTy, CheckKind, TirExpr, TirExprKind};
 
@@ -28,9 +29,25 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    pub(super) fn to_str(&self, e: TirExpr) -> TirExpr {
+    pub(super) fn to_str(&mut self, e: TirExpr) -> TirExpr {
         if e.ty == BackendTy::Str {
             return e;
+        }
+        if let BackendTy::Class(id) = e.ty
+            && self.m.classes.get(id.0 as usize).is_some_and(|info| {
+                info.method_slot(varn_core::MemberKey::ToString.as_str())
+                    .is_some()
+            })
+        {
+            let span = e.span;
+            return self.method_call(
+                e,
+                Arc::from(varn_core::MemberKey::ToString.as_str()),
+                Vec::new(),
+                BackendTy::Str,
+                None,
+                span,
+            );
         }
         let span = e.span;
         TirExpr {
