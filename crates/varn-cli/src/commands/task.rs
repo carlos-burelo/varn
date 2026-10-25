@@ -78,15 +78,15 @@ fn run_tokens(
 ) -> Result<(), CliError> {
     let argv = with_implicit_run(std::iter::once("vn".to_owned()).chain(tokens).collect());
     let cli = Cli::try_parse_from(argv).map_err(|e| CliError::usage(e.to_string()))?;
-    match cli.command {
-        Commands::Task(inner) => match inner.name {
-            Some(name) => run_task(session, &name, &inner.args, stack),
-            None => {
-                list(&session.project().manifest.tasks);
-                Ok(())
-            }
-        },
-        other => crate::dispatch::run(other, session),
+    let Commands::Task(inner) = cli.command else {
+        return crate::dispatch::run(cli.command, session);
+    };
+    match inner.name {
+        Some(name) => run_task(session, &name, &inner.args, stack),
+        None => {
+            list(&session.project().manifest.tasks);
+            Ok(())
+        }
     }
 }
 

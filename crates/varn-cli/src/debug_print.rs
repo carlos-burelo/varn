@@ -30,10 +30,10 @@ pub fn report(compilation: &Compilation, debug: &DebugFlags, verbose: bool) {
             format_args!("parsed {} top-level statements", parsed.program.body.len()),
         );
     }
-    if let Some(interner) = compilation.interner() {
-        if debug.ast {
-            varn_debug::ast::debug_ast(&parsed.program, &parsed.arena, interner);
-        }
+    if debug.ast
+        && let Some(interner) = compilation.interner()
+    {
+        varn_debug::ast::debug_ast(&parsed.program, &parsed.arena, interner);
     }
     if debug.modules {
         varn_debug::modules::debug_modules(&parsed.program, &parsed.arena);

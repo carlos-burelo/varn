@@ -75,7 +75,10 @@ pub(crate) fn build_executable(
     )
     .map_err(|e| match e {
         diagnostics @ Failure::Diagnostics(_) => diagnostics,
-        other => Failure::internal(format!("module graph error: {other}")),
+        other @ (Failure::Runtime(_)
+        | Failure::Io(_)
+        | Failure::Internal(_)
+        | Failure::Project(_)) => Failure::internal(format!("module graph error: {other}")),
     })?;
 
     let mut class_tables = graph_build.class_tables.clone();

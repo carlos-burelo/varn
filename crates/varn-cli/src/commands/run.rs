@@ -16,8 +16,10 @@ pub fn execute(session: &pipeline::Session, args: RunArgs) -> Result<(), CliErro
         return crate::commands::compare_tiers::execute(&file_path, &args.script_args);
     }
 
-    let mut debug = varn_pipeline::DebugFlags::default();
-    debug.trace = args.trace;
+    let debug = varn_pipeline::DebugFlags {
+        trace: args.trace,
+        ..Default::default()
+    };
 
     let executable = match eval {
         Some(code) => crate::exec::compile(
