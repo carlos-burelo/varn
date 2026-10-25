@@ -50,7 +50,7 @@ pub(super) fn parse_return_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     let argument = if !s.check(TokenKind::Semicolon) && !s.check(TokenKind::RBrace) && !s.is_eof() {
-        Some(crate::expressions::parse_seq_expr(s)?)
+        Some(crate::expressions::parse_expr(s)?)
     } else {
         None
     };
@@ -96,7 +96,7 @@ pub(super) fn parse_continue_stmt(s: &mut TokenStream) -> Result<StmtId, String>
 pub(super) fn parse_throw_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
-    let argument = crate::expressions::parse_seq_expr(s)?;
+    let argument = crate::expressions::parse_expr(s)?;
     s.eat_semicolon();
     let range = s.span_from(start_range);
     Ok(s.stmt(range, StmtKind::Throw { argument }))

@@ -21,7 +21,7 @@ pub(crate) fn parse_template(s: &mut TokenStream) -> Result<ExprId, String> {
     }
 
     loop {
-        let interp = super::super::parse_seq_expr(s)?;
+        let interp = super::super::parse_expr(s)?;
         parts.push(TemplatePart::Interpolation(interp));
 
         let raw_cont = s.consume_lexeme();

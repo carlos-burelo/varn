@@ -218,7 +218,7 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<StmtId, String> {
         | TokenKind::Start
         | TokenKind::RawStr => {
             let start_range = s.range();
-            let expr = crate::expressions::parse_seq_expr(s)?;
+            let expr = crate::expressions::parse_expr(s)?;
             s.eat_semicolon();
             let range = s.span_from(start_range);
             Ok(s.stmt(range, StmtKind::Expr { expression: expr }))

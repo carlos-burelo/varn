@@ -8,7 +8,7 @@ pub(super) fn parse_if_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
-    let test = crate::expressions::parse_seq_expr(s)?;
+    let test = crate::expressions::parse_expr(s)?;
     s.expect(TokenKind::RParen)?;
     let consequent = parse_stmt_or_decl_inner(s)?;
     let alternate = if s.eat(TokenKind::Else) {
@@ -31,7 +31,7 @@ pub(super) fn parse_while_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
-    let test = crate::expressions::parse_seq_expr(s)?;
+    let test = crate::expressions::parse_expr(s)?;
     s.expect(TokenKind::RParen)?;
     let body = parse_stmt_or_decl_inner(s)?;
     let range = s.span_from(start_range);
@@ -44,7 +44,7 @@ pub(super) fn parse_do_while_stmt(s: &mut TokenStream) -> Result<StmtId, String>
     let body = parse_stmt_or_decl_inner(s)?;
     s.expect(TokenKind::While)?;
     s.expect(TokenKind::LParen)?;
-    let test = crate::expressions::parse_seq_expr(s)?;
+    let test = crate::expressions::parse_expr(s)?;
     s.expect(TokenKind::RParen)?;
     s.eat_semicolon();
     let range = s.span_from(start_range);
@@ -236,7 +236,7 @@ pub(super) fn parse_for_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
         let pat = super::super::patterns::parse_pattern(s)?;
 
         if s.eat(TokenKind::In) {
-            let right = crate::expressions::parse_seq_expr(s)?;
+            let right = crate::expressions::parse_expr(s)?;
             s.expect(TokenKind::RParen)?;
             let body = parse_stmt_or_decl_inner(s)?;
             let range = s.span_from(start_range);
@@ -285,7 +285,7 @@ pub(super) fn parse_for_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let test = if s.check(TokenKind::Semicolon) {
         None
     } else {
-        Some(crate::expressions::parse_seq_expr(s)?)
+        Some(crate::expressions::parse_expr(s)?)
     };
     s.expect(TokenKind::Semicolon)?;
     let update = if s.check(TokenKind::RParen) {
@@ -312,7 +312,7 @@ pub(super) fn parse_switch_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
-    let discriminant = crate::expressions::parse_seq_expr(s)?;
+    let discriminant = crate::expressions::parse_expr(s)?;
     s.expect(TokenKind::RParen)?;
     s.expect(TokenKind::LBrace)?;
 
@@ -320,7 +320,7 @@ pub(super) fn parse_switch_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
         let case_start = s.range();
         let test = if s.eat(TokenKind::Case) {
-            Some(crate::expressions::parse_seq_expr(s)?)
+            Some(crate::expressions::parse_expr(s)?)
         } else {
             s.expect(TokenKind::Default)?;
             None

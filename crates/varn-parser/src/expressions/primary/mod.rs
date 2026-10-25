@@ -8,7 +8,7 @@ mod object;
 mod template;
 
 use super::literal_text::{parse_int_radix, unescape_string};
-use super::{parse_seq_expr, try_parse_arrow};
+use super::{parse_expr, try_parse_arrow};
 use crate::stream::TokenStream;
 use array_expr::parse_array_expr;
 use class_expr::parse_class_expr;
@@ -128,7 +128,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                 let full_range = s.span_from(start_range);
                 return Ok(s.expr(full_range, ExprKind::Tuple { elements: vec![] }));
             }
-            let expr = parse_seq_expr(s)?;
+            let expr = parse_expr(s)?;
             s.expect(TokenKind::RParen)?;
             let full_range = s.span_from(start_range);
             Ok(s.expr(full_range, ExprKind::Paren { expression: expr }))
