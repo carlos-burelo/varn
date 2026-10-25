@@ -19,7 +19,37 @@ impl<'a> FnEmitter<'a> {
                 span,
             );
         }
+        if inner.ty != ty && self.reshapes_elements(inner.ty, ty) {
+            return self.guard_elements(inner, ty);
+        }
         self.assert_type(inner, ty)
+    }
+
+    fn reshapes_elements(&self, from: BackendTy, to: BackendTy) -> bool {
+        let container = |t: BackendTy| {
+            matches!(
+                t.non_nullable(self.tt),
+                BackendTy::Array(_)
+                    | BackendTy::Map(..)
+                    | BackendTy::Dict(_)
+                    | BackendTy::Set(_)
+                    | BackendTy::Tuple(_)
+            )
+        };
+        container(from) && container(to)
+    }
+
+    fn guard_elements(&self, inner: TirExpr, ty: BackendTy) -> TirExpr {
+        let span = inner.span;
+        TirExpr {
+            kind: TirExprKind::Checked {
+                operand: Box::new(inner),
+                kind: varn_tir::CheckKind::Conform,
+            },
+            ty,
+            res: Resolution::None,
+            span,
+        }
     }
 
     pub(super) fn lower_sequence(&mut self, expressions: &[ExprId], span: Span) -> TirExpr {

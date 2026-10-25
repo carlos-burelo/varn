@@ -259,6 +259,7 @@ import "./265-unbounded-recursion.vn"
 import "./266-value-display.vn"
 import "./267-json-stringify-finite.vn"
 import "./268-str-strict-ranges.vn"
+import "./269-container-cast-validates.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {
