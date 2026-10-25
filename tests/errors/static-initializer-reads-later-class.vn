@@ -1,0 +1,7 @@
+// expect: error[VN4003]
+class Registry {
+    static first: int = Defaults.size;
+}
+class Defaults {
+    static size: int = 4;
+}

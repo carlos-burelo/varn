@@ -1,0 +1,6 @@
+// expect: error[VN4003]
+function readLimit(): int {
+    return limit;
+}
+const current = readLimit();
+const limit: int = 10;

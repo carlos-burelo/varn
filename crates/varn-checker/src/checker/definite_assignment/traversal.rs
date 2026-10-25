@@ -1,8 +1,8 @@
 use super::flow::Flow;
+use super::hoist::block_bindings;
 use super::patterns::{pattern_names, walk_expr_children};
 use crate::checker::Checker;
-use rustc_hash::FxHashSet;
-use varn_core::ast::{Decl, ExprId, ExprKind, Program, StmtId, StmtKind};
+use varn_core::ast::{ClassMember, Decl, ExportDecl, ExprId, ExprKind, Program, StmtId, StmtKind};
 use varn_core::{Atom, Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
 
@@ -15,30 +15,38 @@ impl<'r> Checker<'r> {
     fn da_expr(&mut self, e: ExprId, flow: &mut Flow, bind: &BindResult) {
         let arena = self.ast_arena;
         match &arena.expr(e).kind {
-            ExprKind::Identifier { name } => {
-                let name = *name;
-                if flow.pending.contains(&name) && !flow.assigned.contains(&name) {
-                    let name_str = bind.interner.resolve(name);
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::UseBeforeAssignment,
-                            format!("'{name_str}' is used before it is assigned a value"),
-                        )
-                        .with_range(arena.expr(e).range),
-                    );
-
-                    flow.assigned.insert(name);
-                }
-            }
+            ExprKind::Identifier { name } => self.da_read(*name, e, flow, bind),
 
             ExprKind::Assign { target, value, .. } => {
                 let (target, value) = (*target, *value);
                 self.da_expr(value, flow, bind);
                 if let ExprKind::Identifier { name } = &arena.expr(target).kind {
+                    if flow.undeclared.contains(name) {
+                        self.da_read(*name, target, flow, bind);
+                    }
                     flow.assign(name);
                 } else {
                     self.da_expr(target, flow, bind);
                 }
+            }
+
+            ExprKind::Member {
+                object,
+                property,
+                computed,
+                ..
+            } => {
+                self.da_expr(*object, flow, bind);
+                if *computed {
+                    self.da_expr(*property, flow, bind);
+                }
+            }
+
+            ExprKind::Call { callee, .. } => {
+                if let ExprKind::Identifier { name } = &arena.expr(*callee).kind {
+                    self.da_call(*name, e, flow, bind);
+                }
+                walk_expr_children(e, arena, &mut |c| self.da_expr(c, flow, bind))
             }
 
             ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::ClassExpr { .. } => {}
@@ -67,8 +75,6 @@ impl<'r> Checker<'r> {
             | ExprKind::Binary { .. }
             | ExprKind::Logical { .. }
             | ExprKind::Conditional { .. }
-            | ExprKind::Member { .. }
-            | ExprKind::Call { .. }
             | ExprKind::New { .. }
             | ExprKind::Sequence { .. }
             | ExprKind::Paren { .. }
@@ -88,6 +94,91 @@ impl<'r> Checker<'r> {
             | ExprKind::MetaAccess { .. } => {
                 walk_expr_children(e, arena, &mut |c| self.da_expr(c, flow, bind))
             }
+        }
+    }
+
+    fn da_read(&mut self, name: Atom, at: ExprId, flow: &mut Flow, bind: &BindResult) {
+        let range = self.ast_arena.expr(at).range;
+        let text = bind.interner.resolve(name);
+        if flow.undeclared.remove(&name) {
+            flow.assigned.insert(name);
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::UseBeforeDeclaration,
+                    format!("'{text}' is used before its declaration"),
+                )
+                .with_range(range),
+            );
+        } else if flow.pending.contains(&name) && !flow.assigned.contains(&name) {
+            flow.assigned.insert(name);
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::UseBeforeAssignment,
+                    format!("'{text}' is used before it is assigned a value"),
+                )
+                .with_range(range),
+            );
+        }
+    }
+
+    fn da_call(&mut self, callee: Atom, at: ExprId, flow: &Flow, bind: &BindResult) {
+        let Some(reads) = flow.callee_reads(&callee) else {
+            return;
+        };
+        let mut unready: Vec<Atom> = reads.into_iter().filter(|n| flow.unready(n)).collect();
+        unready.sort_by_key(|n| bind.interner.resolve(*n).to_string());
+        if let Some(first) = unready.first() {
+            let (callee, first) = (bind.interner.resolve(callee), bind.interner.resolve(*first));
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::UseBeforeDeclaration,
+                    format!("calling '{callee}' reads '{first}' before it is declared"),
+                )
+                .with_range(self.ast_arena.expr(at).range),
+            );
+        }
+    }
+
+    fn da_declared(&mut self, decl: &Decl, flow: &mut Flow, bind: &BindResult) {
+        match decl {
+            Decl::Class(c) => {
+                if let Some(id) = c.id {
+                    flow.declare(&id, true);
+                }
+                for member in &c.body {
+                    match member {
+                        ClassMember::Property {
+                            init: Some(init),
+                            modifiers,
+                            ..
+                        } if modifiers.is_static => self.da_expr(*init, flow, bind),
+                        ClassMember::StaticBlock { body, .. } => {
+                            let mut inner = flow.clone();
+                            self.da_stmt(*body, &mut inner, bind);
+                        }
+                        ClassMember::Constructor { .. }
+                        | ClassMember::Destructor { .. }
+                        | ClassMember::Method { .. }
+                        | ClassMember::Property { .. }
+                        | ClassMember::Getter { .. }
+                        | ClassMember::Setter { .. } => {}
+                    }
+                }
+            }
+            Decl::Enum(e) => flow.declare(&e.id, true),
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => {
+                self.da_declared(declaration, flow, bind)
+            }
+            Decl::Variable(_)
+            | Decl::Function(_)
+            | Decl::Interface(_)
+            | Decl::TypeAlias(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Export(_)
+            | Decl::Extension(_)
+            | Decl::Struct(_)
+            | Decl::SumType(_) => {}
         }
     }
 
@@ -140,15 +231,14 @@ impl<'r> Checker<'r> {
     }
 
     fn da_block(&mut self, stmts: &[StmtId], flow: &mut Flow, bind: &BindResult) {
-        let outer_pending: FxHashSet<Atom> = flow.pending.clone();
+        let saved = flow.enter(block_bindings(self.ast_arena, stmts));
         for &s in stmts {
             if flow.diverged {
                 break;
             }
             self.da_stmt(s, flow, bind);
         }
-
-        flow.pending.retain(|n| outer_pending.contains(n));
+        flow.leave(saved);
     }
 
     fn da_stmt(&mut self, stmt: StmtId, flow: &mut Flow, bind: &BindResult) {
@@ -168,18 +258,13 @@ impl<'r> Checker<'r> {
                             self.da_expr(init, flow, bind);
                         }
                         for name in pattern_names(&d.id) {
-                            if d.init.is_some() {
-                                flow.assigned.insert(name);
-                                flow.pending.remove(&name);
-                            } else {
-                                flow.pending.insert(name);
-                                flow.assigned.remove(&name);
-                            }
+                            flow.declare(&name, d.init.is_some());
                         }
                     }
                 }
 
                 self.da_nested_decl(&decl, bind);
+                self.da_declared(&decl, flow, bind);
             }
 
             StmtKind::Return { argument } => {
