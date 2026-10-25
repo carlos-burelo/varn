@@ -1,6 +1,6 @@
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
-use crate::checker_generics::{build_call_mapping, check_call_type_arg_arity};
+use crate::checker_generics::{build_call_mapping, check_call_type_arg_arity, fn_type_param_names};
 use crate::generic_substitution::map_generics_cached;
 use varn_core::ast::{Arg, ExprId, ExprKind, TypeNode};
 use varn_core::source::SourceRange;
@@ -146,6 +146,10 @@ impl<'r> Checker<'r> {
             let ft = self.ty_table.get_function(fid).clone();
             check_call_type_arg_arity(callee, type_args, &ft, self, range, bind);
             let mapping = build_call_mapping(callee, type_args, args, &ft, self, rec, bind);
+            let type_params = fn_type_param_names(callee, &ft, self, bind);
+            if self.returns_caller_chosen_type(&ft, &type_params, &mapping) {
+                rec.desugar.decoded_calls.insert(call_id);
+            }
             if type_args.is_empty() {
                 self.check_inferred_constraints(callee, &mapping, range, bind);
             }

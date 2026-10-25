@@ -15,17 +15,38 @@ pub(crate) fn mismatch(message: String) -> NativeError {
     NativeError::rethrow(RuntimeErrorKind::TypeError, message, None)
 }
 
-pub(crate) fn conform_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-    let [value, desc, witnesses @ ..] = args else {
+fn descriptor_args(
+    ctx: &mut dyn NativeCtx,
+    args: &[VmValue],
+) -> Result<(VmValue, String), NativeError> {
+    let [value, desc, ..] = args else {
         return Err(mismatch("conform: missing type descriptor".to_string()));
     };
     let text = ctx
         .str_owned(*desc)
         .ok_or_else(|| mismatch("conform: type descriptor is not a string".to_string()))?;
+    Ok((*value, text))
+}
+
+pub(crate) fn conform_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
+    let (value, text) = descriptor_args(ctx, args)?;
     match ctx.boundary_mut() {
-        Some(boundary) => boundary.conform(*value, &text, witnesses),
+        Some(boundary) => boundary.conform(value, &text, &args[2..]),
         None => Err(mismatch("conform: this context has no heap".to_string())),
     }
+}
+
+pub(crate) fn decode_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
+    let (value, text) = descriptor_args(ctx, args)?;
+    match ctx.boundary_mut() {
+        Some(boundary) => boundary.decode(value, &text, &args[2..]),
+        None => Err(mismatch("decode: this context has no heap".to_string())),
+    }
+}
+
+fn parse_descriptor(text: &str) -> Result<TypeDesc, NativeError> {
+    TypeDesc::decode(text)
+        .ok_or_else(|| mismatch(format!("conform: malformed type descriptor '{text}'")))
 }
 
 pub(crate) fn conform(
@@ -34,10 +55,28 @@ pub(crate) fn conform(
     text: &str,
     witnesses: &[VmValue],
 ) -> NativeFnResult {
-    let desc = TypeDesc::decode(text)
-        .ok_or_else(|| mismatch(format!("conform: malformed type descriptor '{text}'")))?;
-    let normal = crate::exec::normalize::normalize(heap, value, &desc);
-    match fit(heap, normal, &desc, witnesses) {
+    conform_to(heap, value, &parse_descriptor(text)?, witnesses)
+}
+
+pub(crate) fn decode(
+    heap: &mut Heap,
+    value: VmValue,
+    text: &str,
+    witnesses: &[VmValue],
+) -> NativeFnResult {
+    let desc = parse_descriptor(text)?;
+    let projected = crate::exec::decode::project(heap, value, &desc);
+    conform_to(heap, projected, &desc, witnesses)
+}
+
+fn conform_to(
+    heap: &mut Heap,
+    value: VmValue,
+    desc: &TypeDesc,
+    witnesses: &[VmValue],
+) -> NativeFnResult {
+    let normal = crate::exec::normalize::normalize(heap, value, desc);
+    match fit(heap, normal, desc, witnesses) {
         Some(Fit::Exact) => Ok(normal),
         Some(Fit::Widened(widened)) => Ok(widened),
         None => Err(mismatch(format!(

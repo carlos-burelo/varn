@@ -10,8 +10,8 @@ pub use resolution::Resolution;
 
 mod node;
 pub use node::{
-    Span, TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirObjectEntry, TirStmt, TirUnOp,
-    TirUpvalue,
+    CheckKind, Span, TirArg, TirArrayEl, TirBinOp, TirExpr, TirExprKind, TirObjectEntry, TirStmt,
+    TirUnOp, TirUpvalue,
 };
 
 mod module;

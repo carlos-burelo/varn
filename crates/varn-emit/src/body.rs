@@ -159,7 +159,15 @@ impl<'a> FnEmitter<'a> {
                 type_args: _,
             } => {
                 let callee = *callee;
-                return self.lower_call(e.index(), callee, args, ty, span);
+                let call = self.lower_call(e.index(), callee, args, ty, span);
+                if !self.m.desugar.decoded_calls.contains(&e.index()) {
+                    return call;
+                }
+                let untrusted = TirExpr {
+                    ty: BackendTy::Dynamic(varn_tir::DynReason::Generic),
+                    ..call
+                };
+                return self.decode_dynamic(untrusted, ty);
             }
 
             ExprKind::Array { elements } => {

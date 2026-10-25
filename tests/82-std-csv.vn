@@ -35,15 +35,18 @@ let jsonObj = Json.parse("{\"message\": \"hello\", \"status\": 200}");
 let jsonStr = Json.stringify(jsonObj);
 
 // 9. Generic Typed Json.parse<T> & Csv.parse<T>
-class UserDto {
-    id: int;
-    name: str;
+type UserDto = {
+    id: int,
+    name: str,
+    age: int,
+    active: bool,
+    score: float
 }
 let typedUsers = Csv.parse<UserDto>(csvBasic);
 
-class ApiResponse {
-    message: str;
-    status: int;
+type ApiResponse = {
+    message: str,
+    status: int
 }
 let typedJson = Json.parse<ApiResponse>("{\"message\": \"hello\", \"status\": 200}");
 await describe("82 std csv", async () => {

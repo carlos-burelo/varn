@@ -7,6 +7,7 @@ pub(crate) mod closures;
 pub(crate) mod collections;
 pub(crate) mod compare;
 pub(crate) mod conform;
+pub(crate) mod decode;
 pub(crate) mod contract;
 mod contract_natives;
 pub(crate) mod convert;

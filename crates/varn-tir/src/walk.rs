@@ -99,7 +99,7 @@ pub fn expr_mut(expr: &mut TirExpr, f: &mut impl FnMut(&mut TirExpr)) {
         }
         TirExprKind::Unary { operand, .. }
         | TirExprKind::Cast { operand }
-        | TirExprKind::Checked { operand }
+        | TirExprKind::Checked { operand, .. }
         | TirExprKind::ObjectKeys { operand }
         | TirExprKind::Length { operand } => expr_mut(operand, f),
         TirExprKind::Field { object, .. } | TirExprKind::ObjectRest { object, .. } => {

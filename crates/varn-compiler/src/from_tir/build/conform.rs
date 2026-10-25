@@ -29,7 +29,12 @@ impl<'m> Builder<'m> {
         v: Value,
         node_ty: BackendTy,
         ty: BackendTy,
+        kind: varn_tir::CheckKind,
     ) -> Result<Value> {
+        let op = match kind {
+            varn_tir::CheckKind::Conform => varn_core::runtime_ops::CONFORM,
+            varn_tir::CheckKind::Decode => varn_core::runtime_ops::DECODE,
+        };
         let mut describer = Describer::new(self.tir);
         let desc = describer.describe(node_ty);
         let text = self.emit(InstKind::ConstStr(Arc::from(desc.encode())), BackendTy::Str);
@@ -44,7 +49,7 @@ impl<'m> Builder<'m> {
             InstKind::CallNativeOp {
                 object: v,
                 args,
-                op_id: varn_core::runtime_ops::op_id(varn_core::runtime_ops::CONFORM),
+                op_id: varn_core::runtime_ops::op_id(op),
             },
             BackendTy::Dynamic(DynReason::Boxed),
         );

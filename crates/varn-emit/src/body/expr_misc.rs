@@ -1,6 +1,6 @@
 use super::context::FnEmitter;
 use varn_core::ast::ExprId;
-use varn_tir::{BackendTy, TirExpr, TirExprKind};
+use varn_tir::{BackendTy, CheckKind, TirExpr, TirExprKind};
 
 impl<'a> FnEmitter<'a> {
     pub(super) fn lower_cond(&mut self, e: ExprId) -> TirExpr {
@@ -111,6 +111,14 @@ impl<'a> FnEmitter<'a> {
     }
 
     pub(super) fn guard_dynamic(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
+        self.guard_with(e, ty, CheckKind::Conform)
+    }
+
+    pub(super) fn decode_dynamic(&self, e: TirExpr, ty: BackendTy) -> TirExpr {
+        self.guard_with(e, ty, CheckKind::Decode)
+    }
+
+    fn guard_with(&self, e: TirExpr, ty: BackendTy, kind: CheckKind) -> TirExpr {
         if !self.crosses_dynamic_boundary(&e, ty) {
             return e;
         }
@@ -118,6 +126,7 @@ impl<'a> FnEmitter<'a> {
         TirExpr {
             kind: TirExprKind::Checked {
                 operand: Box::new(e),
+                kind,
             },
             ty,
             res: varn_tir::Resolution::None,

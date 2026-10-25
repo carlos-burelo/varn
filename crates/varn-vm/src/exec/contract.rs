@@ -14,10 +14,14 @@ use varn_types::chunk::ContractWitness;
 use varn_types::value::BoundMethodTarget;
 use varn_types::{Boundary, ClassObj, NativeCtx, NativeError, NativeFn, NativeFnResult};
 
-const RUNTIME_OPS: [(&str, NativeFn); 9] = [
+const RUNTIME_OPS: [(&str, NativeFn); varn_core::runtime_ops::ALL.len()] = [
     (
         varn_core::runtime_ops::CONFORM,
         crate::exec::conform::conform_native,
+    ),
+    (
+        varn_core::runtime_ops::DECODE,
+        crate::exec::conform::decode_native,
     ),
     (varn_core::runtime_ops::VERIFY_CALL, verify_call_native),
     (varn_core::runtime_ops::VERIFY_SPREAD, verify_spread_native),
@@ -67,7 +71,7 @@ fn str_index_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult
 }
 
 pub(crate) fn runtime_op(op_id: u64) -> Option<NativeFn> {
-    static BY_ID: std::sync::OnceLock<[NativeFn; 9]> = std::sync::OnceLock::new();
+    static BY_ID: std::sync::OnceLock<[NativeFn; varn_core::runtime_ops::ALL.len()]> = std::sync::OnceLock::new();
     let by_id = BY_ID.get_or_init(|| {
         varn_core::runtime_ops::ALL.map(|name| {
             RUNTIME_OPS
@@ -244,6 +248,10 @@ pub(crate) fn verify_call(
 impl Boundary for ExecCtx {
     fn conform(&mut self, value: VmValue, desc: &str, witnesses: &[VmValue]) -> NativeFnResult {
         crate::exec::conform::conform(&mut self.heap, value, desc, witnesses)
+    }
+
+    fn decode(&mut self, value: VmValue, desc: &str, witnesses: &[VmValue]) -> NativeFnResult {
+        crate::exec::conform::decode(&mut self.heap, value, desc, witnesses)
     }
 
     fn verify_call(

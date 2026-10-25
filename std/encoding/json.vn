@@ -7,9 +7,9 @@ export namespace Json {
         return parse$(text) as T;
     }
 
-    export function tryParse<T = JsonValue>(text: str): T? {
+    export function tryParse(text: str): JsonValue? {
         try {
-            return parse$(text) as T;
+            return parse$(text) as JsonValue;
         } catch {
             return null;
         }

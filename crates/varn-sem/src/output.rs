@@ -100,6 +100,7 @@ pub struct Desugarings {
     pub extension_members: FxHashMap<u32, Arc<str>>,
     pub extension_set_members: FxHashMap<u32, Arc<str>>,
     pub operator_calls: FxHashSet<varn_core::ast::AstId>,
+    pub decoded_calls: FxHashSet<varn_core::ast::AstId>,
     pub foreign_enums: Vec<ForeignEnum>,
     pub call_params: FxHashMap<varn_core::ast::AstId, Vec<CheckedParam>>,
     pub inherited_getters: FxHashSet<u32>,

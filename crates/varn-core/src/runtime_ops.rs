@@ -1,4 +1,5 @@
 pub const CONFORM: &str = "conform";
+pub const DECODE: &str = "decode";
 pub const VERIFY_CALL: &str = "verify-call";
 pub const VERIFY_SPREAD: &str = "verify-spread";
 pub const VERIFY_METHOD: &str = "verify-method";
@@ -8,8 +9,9 @@ pub const VERIFY_SUPER_SPREAD: &str = "verify-super-spread";
 pub const STR_INDEX: &str = "str-index";
 pub const INHERITED: &str = "inherited";
 
-pub const ALL: [&str; 9] = [
+pub const ALL: [&str; 10] = [
     CONFORM,
+    DECODE,
     VERIFY_CALL,
     VERIFY_SPREAD,
     VERIFY_METHOD,

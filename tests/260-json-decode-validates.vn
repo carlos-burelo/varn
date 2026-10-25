@@ -1,0 +1,51 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+type Profile = { name: str, age: int, tags: str[] };
+
+function decodeFails(decode: () => dynamic): bool {
+    try {
+        decode()
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+await describe("260 json decode validates", async () => {
+    await it("a value of the declared shape decodes", () => {
+        const p = Json.parse<Profile>("{\"name\":\"ann\",\"age\":7,\"tags\":[\"a\",\"b\"]}");
+        expect(p.name).toBe("ann");
+        expect(p.age + 1).toBe(8);
+        expect(p.tags.length).toBe(2);
+    });
+
+    await it("unknown fields are dropped and key order does not matter", () => {
+        const p = Json.parse<Profile>("{\"tags\":[],\"extra\":true,\"age\":3,\"name\":\"bo\"}");
+        expect(p.name).toBe("bo");
+        expect(p.age).toBe(3);
+    });
+
+    await it("a missing or mistyped field is rejected", () => {
+        expect(decodeFails(() => Json.parse<Profile>("{}"))).toBeTruthy();
+        expect(decodeFails(() => Json.parse<Profile>("{\"name\":1,\"age\":3,\"tags\":[]}"))).toBeTruthy();
+        expect(decodeFails(() => Json.parse<Profile>("{\"name\":\"a\",\"age\":3,\"tags\":[1]}"))).toBeTruthy();
+    });
+
+    await it("arrays and scalars are validated element by element", () => {
+        expect(Json.parse<int[]>("[1,2,3]").length).toBe(3);
+        expect(decodeFails(() => Json.parse<int[]>("[1,\"x\"]"))).toBeTruthy();
+        expect(decodeFails(() => Json.parse<str[]>("[5]"))).toBeTruthy();
+        expect(Json.parse<float>("1")).toBe(1.0);
+    });
+
+    await it("numbers that do not fit int are rejected", () => {
+        expect(decodeFails(() => Json.parse<int>("1.5"))).toBeTruthy();
+        expect(decodeFails(() => Json.parse<int>("99999999999999999999"))).toBeTruthy();
+    });
+
+    await it("tryParse returns null for invalid text", () => {
+        expect(Json.tryParse("not json {")).toBe(null);
+        expect(Json.tryParse("[1]")).toEqual([1]);
+    });
+});

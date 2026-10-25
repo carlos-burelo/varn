@@ -69,7 +69,7 @@ impl<'m> Builder<'m> {
             TirExprKind::Binary { op, lhs, rhs } => self.lower_binary(*op, lhs, rhs, ty),
             TirExprKind::Unary { op, operand } => self.lower_unary(*op, operand, ty),
             TirExprKind::Cast { operand } => self.lower_cast(operand, e.ty, ty),
-            TirExprKind::Checked { operand } => self.lower_checked(operand, e.ty, ty),
+            TirExprKind::Checked { operand, kind } => self.lower_checked(operand, e.ty, ty, *kind),
             TirExprKind::Select {
                 cond,
                 then_val,

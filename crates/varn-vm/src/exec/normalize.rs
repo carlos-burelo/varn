@@ -71,7 +71,7 @@ pub(crate) fn object_entries(heap: &Heap, v: VmValue) -> Option<Vec<(String, VmV
     )
 }
 
-fn elements(heap: &Heap, v: VmValue) -> Option<Vec<VmValue>> {
+pub(crate) fn elements(heap: &Heap, v: VmValue) -> Option<Vec<VmValue>> {
     if !v.is_heap() {
         return None;
     }
@@ -81,7 +81,7 @@ fn elements(heap: &Heap, v: VmValue) -> Option<Vec<VmValue>> {
     Some((0..arr.len()).filter_map(|i| arr.get_vm(i)).collect())
 }
 
-fn store_element(heap: &Heap, v: VmValue, index: usize, item: VmValue) {
+pub(crate) fn store_element(heap: &Heap, v: VmValue, index: usize, item: VmValue) {
     if let Some(HeapObj::Array(arr) | HeapObj::Tuple(arr)) = heap.get(v.as_heap()) {
         arr.set_vm(index, item);
     }

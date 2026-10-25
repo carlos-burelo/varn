@@ -237,6 +237,7 @@ impl<'m> Builder<'m> {
         operand: &TirExpr,
         node_ty: varn_tir::BackendTy,
         ty: BackendTy,
+        kind: varn_tir::CheckKind,
     ) -> Result<Value> {
         let v = self.lower_expr(operand)?;
         match node_ty {
@@ -249,7 +250,7 @@ impl<'m> Builder<'m> {
                     return self.lower_checked_class(v, class, true, ty);
                 }
                 if super::conform::is_structural(inner) {
-                    return self.lower_conform(v, node_ty, ty);
+                    return self.lower_conform(v, node_ty, ty, kind);
                 }
             }
             varn_tir::BackendTy::Array(_)
@@ -266,7 +267,7 @@ impl<'m> Builder<'m> {
             | varn_tir::BackendTy::Dynamic(
                 varn_tir::DynReason::Callable | varn_tir::DynReason::Shape(_),
             ) => {
-                return self.lower_conform(v, node_ty, ty);
+                return self.lower_conform(v, node_ty, ty, kind);
             }
             varn_tir::BackendTy::Int
             | varn_tir::BackendTy::Float

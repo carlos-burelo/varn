@@ -21,6 +21,12 @@ pub struct TirExpr {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckKind {
+    Conform,
+    Decode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TirBinOp {
     Add,
     Sub,
@@ -178,6 +184,7 @@ pub enum TirExprKind {
 
     Checked {
         operand: Box<TirExpr>,
+        kind: CheckKind,
     },
 
     Closure {
