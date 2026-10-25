@@ -1,0 +1,41 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+function chain(depth: int): dynamic {
+    let head: dynamic = #{ next: null };
+    for (let i = 0; i < depth; i = i + 1) { head = #{ next: head } }
+    return head
+}
+
+function nest(depth: int): dynamic {
+    let head: dynamic = { next: null };
+    for (let i = 0; i < depth; i = i + 1) { head = { next: head } }
+    return head
+}
+
+function stringifyFails(value: dynamic): bool {
+    try {
+        Json.stringify(value)
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+await describe("272 deep structures", async () => {
+    await it("equality of very deep records does not exhaust the native stack", () => {
+        expect(chain(500000) == chain(500000)).toBeTruthy();
+        expect(chain(500000) == chain(499999)).toBeFalsy();
+    });
+
+    await it("stringify refuses a value nested deeper than the limit", () => {
+        expect(stringifyFails(nest(1000000))).toBeTruthy();
+        expect(Json.stringify(nest(3))).toBe("{\"next\":{\"next\":{\"next\":{\"next\":null}}}}");
+    });
+
+    await it("stringify refuses a cycle", () => {
+        const loop: dynamic[] = [];
+        loop.push(loop);
+        expect(stringifyFails(loop)).toBeTruthy();
+    });
+});

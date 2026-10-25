@@ -16,19 +16,29 @@ pub(super) fn value_estimate_capacity(ctx: &ExecCtx, val: VmValue) -> usize {
     }
 }
 
+const MAX_NESTING: usize = 128;
+
 thread_local! {
-    static NON_FINITE_SEEN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static FAULT: std::cell::Cell<Option<&'static str>> = const { std::cell::Cell::new(None) };
 }
 
-pub(super) fn take_non_finite() -> bool {
-    NON_FINITE_SEEN.with(|seen| seen.replace(false))
+pub(super) fn take_fault() -> Option<&'static str> {
+    FAULT.with(|fault| fault.take())
+}
+
+fn raise(message: &'static str) {
+    FAULT.with(|fault| {
+        if fault.get().is_none() {
+            fault.set(Some(message));
+        }
+    });
 }
 
 fn write_json_float(f: f64, out: &mut String) {
     if f.is_finite() {
         out.push_str(ryu::Buffer::new().format(f));
     } else {
-        NON_FINITE_SEEN.with(|seen| seen.set(true));
+        raise("NaN and Infinity have no JSON form");
         out.push_str("null");
     }
 }
@@ -40,7 +50,7 @@ pub(super) fn write_int(n: i64, out: &mut String) {
     out.push_str(s);
 }
 
-pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
+pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String, depth: usize) {
     if val.is_null() {
         out.push_str("null");
         return;
@@ -64,6 +74,11 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
         return;
     }
     if val.is_heap() {
+        if depth >= MAX_NESTING {
+            raise("nesting is deeper than 128 levels or the value contains a cycle");
+            out.push_str("null");
+            return;
+        }
         match ctx.heap.get(val.as_heap()) {
             Some(HeapObj::Str(h)) => {
                 write_json_str(h.as_str(), out);
@@ -78,7 +93,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
                             if i > 0 {
                                 out.push(',');
                             }
-                            write_json_vm(ctx, elem, out);
+                            write_json_vm(ctx, elem, out, depth + 1);
                         }
                     }
                     varn_types::ArrayRepr::I64(items) => {
@@ -110,12 +125,17 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
                 if inline.len() >= prefixes.len() {
                     for (slot, prefix) in prefixes.iter().enumerate() {
                         out.push_str(prefix);
-                        write_json_vm(ctx, inline[slot].get(), out);
+                        write_json_vm(ctx, inline[slot].get(), out, depth + 1);
                     }
                 } else {
                     for (slot, prefix) in prefixes.iter().enumerate() {
                         out.push_str(prefix);
-                        write_json_vm(ctx, obj.field_at(slot).unwrap_or_else(VmValue::null), out);
+                        write_json_vm(
+                            ctx,
+                            obj.field_at(slot).unwrap_or_else(VmValue::null),
+                            out,
+                            depth + 1,
+                        );
                     }
                 }
                 out.push('}');
@@ -133,7 +153,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
                     let key_s = ctx.heap.str_repr(k.0);
                     write_json_str(&key_s, out);
                     out.push(':');
-                    write_json_vm(ctx, v, out);
+                    write_json_vm(ctx, v, out, depth + 1);
                 }
                 out.push('}');
                 return;

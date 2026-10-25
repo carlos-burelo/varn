@@ -23,9 +23,9 @@ impl ExecCtx {
 
     pub(crate) fn json_stringify(&self, value: VmValue) -> Result<String, String> {
         let mut out = String::with_capacity(value_estimate_capacity(self, value));
-        write_json_vm(self, value, &mut out);
-        if stringify::take_non_finite() {
-            return Err("JSON.stringify: NaN and Infinity have no JSON form".to_owned());
+        write_json_vm(self, value, &mut out, 0);
+        if let Some(fault) = stringify::take_fault() {
+            return Err(format!("JSON.stringify: {fault}"));
         }
         Ok(out)
     }

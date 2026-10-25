@@ -63,40 +63,14 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
             (Some(HeapObj::Char(ca)), Some(HeapObj::Char(cb))) => return ca == cb,
             (Some(HeapObj::BigInt(a)), Some(HeapObj::BigInt(b))) => return a == b,
             (Some(HeapObj::Decimal(da)), Some(HeapObj::Decimal(db))) => return da == db,
-            (Some(HeapObj::EnumVariant(ea)), Some(HeapObj::EnumVariant(eb))) => {
-                return variant_eq(ea, eb, heap);
+            (Some(HeapObj::EnumVariant(_)), Some(HeapObj::EnumVariant(_))) => {
+                return composite_eq(a, b, heap);
             }
             (Some(HeapObj::Array(_)), Some(HeapObj::Array(_))) => return false,
             (Some(HeapObj::Object(_)), Some(HeapObj::Object(_))) => return false,
-            (Some(HeapObj::Tuple(arr_a)), Some(HeapObj::Tuple(arr_b))) => {
-                if arr_a.len() != arr_b.len() {
-                    return false;
-                }
-                for i in 0..arr_a.len() {
-                    let va = arr_a.get_vm(i).unwrap_or(VmValue::null());
-                    let vb = arr_b.get_vm(i).unwrap_or(VmValue::null());
-                    if !member_eq(va, vb, heap) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-            (Some(HeapObj::Record(obj_a)), Some(HeapObj::Record(obj_b))) => {
-                let keys_a: Vec<_> = obj_a.keys().collect();
-                let keys_b: Vec<_> = obj_b.keys().collect();
-                if keys_a.len() != keys_b.len() {
-                    return false;
-                }
-                for k in &keys_a {
-                    let k_str = k.as_ref();
-                    let (Some(va), Some(vb)) = (obj_a.get(k_str), obj_b.get(k_str)) else {
-                        return false;
-                    };
-                    if !member_eq(va, vb, heap) {
-                        return false;
-                    }
-                }
-                return true;
+            (Some(HeapObj::Tuple(_)), Some(HeapObj::Tuple(_)))
+            | (Some(HeapObj::Record(_)), Some(HeapObj::Record(_))) => {
+                return composite_eq(a, b, heap);
             }
             _ => return false,
         }
@@ -177,41 +151,88 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     false
 }
 
-fn member_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    if a.is_heap()
-        && b.is_heap()
-        && let (Some(HeapObj::Array(x)), Some(HeapObj::Array(y))) =
-            (heap.get(a.as_heap()), heap.get(b.as_heap()))
-    {
-        return x.len() == y.len()
-            && (0..x.len()).all(|i| {
-                member_eq(
-                    x.get_vm(i).unwrap_or(VmValue::null()),
-                    y.get_vm(i).unwrap_or(VmValue::null()),
-                    heap,
-                )
-            });
+fn composite_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
+    let mut pending = vec![(a, b, false)];
+    while let Some((x, y, member)) = pending.pop() {
+        match expand(x, y, member, heap, &mut pending) {
+            Some(true) => {}
+            Some(false) => return false,
+            None => {
+                if !eq(x, y, heap) {
+                    return false;
+                }
+            }
+        }
     }
-    eq(a, b, heap)
+    true
 }
 
-fn variant_eq(
-    a: &varn_types::value::EnumVariantData,
-    b: &varn_types::value::EnumVariantData,
+fn expand(
+    a: VmValue,
+    b: VmValue,
+    member: bool,
     heap: &Heap,
-) -> bool {
-    let same_enum = match (a.enum_class_id, b.enum_class_id) {
-        (Some(x), Some(y)) => x == y,
+    pending: &mut Vec<(VmValue, VmValue, bool)>,
+) -> Option<bool> {
+    if !(a.is_heap() && b.is_heap()) {
+        return None;
+    }
+    let null = VmValue::null();
+    match (heap.get(a.as_heap())?, heap.get(b.as_heap())?) {
+        (HeapObj::Tuple(x), HeapObj::Tuple(y)) => Some(push_elements(x, y, pending, null)),
+        (HeapObj::Array(x), HeapObj::Array(y)) if member => {
+            Some(push_elements(x, y, pending, null))
+        }
+        (HeapObj::Record(x), HeapObj::Record(y)) => {
+            let keys: Vec<_> = x.keys().collect();
+            if keys.len() != y.keys().count() {
+                return Some(false);
+            }
+            for key in &keys {
+                let (Some(va), Some(vb)) = (x.get(key.as_ref()), y.get(key.as_ref())) else {
+                    return Some(false);
+                };
+                pending.push((va, vb, true));
+            }
+            Some(true)
+        }
+        (HeapObj::EnumVariant(x), HeapObj::EnumVariant(y)) => {
+            let same_enum = match (x.enum_class_id, y.enum_class_id) {
+                (Some(p), Some(q)) => p == q,
+                _ => x.def.enum_name == y.def.enum_name,
+            };
+            if !(same_enum && x.tag() == y.tag() && x.slots.len() == y.slots.len()) {
+                return Some(false);
+            }
+            pending.extend(
+                x.slots
+                    .iter()
+                    .zip(y.slots.iter())
+                    .map(|(p, q)| (*p, *q, true)),
+            );
+            Some(true)
+        }
+        _ => None,
+    }
+}
 
-        _ => a.def.enum_name == b.def.enum_name,
-    };
-    same_enum
-        && a.tag() == b.tag()
-        && a.slots.len() == b.slots.len()
-        && a.slots
-            .iter()
-            .zip(b.slots.iter())
-            .all(|(x, y)| member_eq(*x, *y, heap))
+fn push_elements(
+    x: &varn_types::VmArray,
+    y: &varn_types::VmArray,
+    pending: &mut Vec<(VmValue, VmValue, bool)>,
+    null: VmValue,
+) -> bool {
+    if x.len() != y.len() {
+        return false;
+    }
+    for i in 0..x.len() {
+        pending.push((
+            x.get_vm(i).unwrap_or(null),
+            y.get_vm(i).unwrap_or(null),
+            true,
+        ));
+    }
+    true
 }
 
 #[inline(always)]
