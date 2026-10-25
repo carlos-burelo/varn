@@ -1,0 +1,61 @@
+import { describe, it, expect } from "std:test";
+
+class Branches {
+    x: int;
+    constructor(flag: bool) {
+        if (flag) {
+            this.x = 1;
+        } else {
+            this.x = 2;
+        }
+    }
+}
+
+class EarlyReturn {
+    x: int;
+    constructor(flag: bool) {
+        if (flag) {
+            this.x = 10;
+            return;
+        }
+        this.x = 20;
+    }
+}
+
+class Optional {
+    label: str?;
+    count: int = 4;
+}
+
+class Ordered {
+    first: int = 3;
+    second: int = this.first * 2;
+}
+
+class Derived extends Ordered {
+    third: int;
+    constructor() {
+        super();
+        this.third = this.second + 1;
+    }
+}
+
+await describe("261 class field initialization", async () => {
+    await it("every path of the constructor assigns the field", () => {
+        expect(new Branches(true).x).toBe(1);
+        expect(new Branches(false).x).toBe(2);
+        expect(new EarlyReturn(true).x).toBe(10);
+        expect(new EarlyReturn(false).x).toBe(20);
+    });
+
+    await it("a nullable field starts as null", () => {
+        const o = new Optional();
+        expect(o.label).toBe(null);
+        expect(o.count).toBe(4);
+    });
+
+    await it("initializers see the fields declared before them", () => {
+        expect(new Ordered().second).toBe(6);
+        expect(new Derived().third).toBe(7);
+    });
+});

@@ -251,6 +251,7 @@ import "./257-str-split-empty-separator.vn"
 import "./258-shift-amount-range.vn"
 import "./259-object-spread-override.vn"
 import "./260-json-decode-validates.vn"
+import "./261-class-field-initialization.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

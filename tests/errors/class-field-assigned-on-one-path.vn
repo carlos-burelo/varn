@@ -1,0 +1,9 @@
+// expect: error[VN4022]
+class Account {
+    balance: int;
+    constructor(funded: bool) {
+        if (funded) {
+            this.balance = 10;
+        }
+    }
+}

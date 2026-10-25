@@ -1,0 +1,5 @@
+// expect: error[VN4017]
+class Counter {
+    total: int = this.step * 2;
+    step: int = 1;
+}

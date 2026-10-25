@@ -15,7 +15,7 @@ class Kid extends Root {
 }
 
 class Box2<T> {
-    v: T
+    v: T?
 }
 
 await describe("206 new without a written constructor", async () => {

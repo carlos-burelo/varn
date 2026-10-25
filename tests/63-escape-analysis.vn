@@ -61,7 +61,7 @@ function eaComputedSum(): int { const c = new EaComputed(10); return c.v }
 // A field the constructor never assigns reads null, not the argument.
 class EaPartial {
   a: int
-  b: int
+  b: int?
   constructor(a: int) { this.a = a }
 }
 function eaPartialB(): bool { const p = new EaPartial(4); return p.b === null }

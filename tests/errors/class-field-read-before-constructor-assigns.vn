@@ -1,0 +1,8 @@
+// expect: error[VN4017]
+class Account {
+    balance: int;
+    constructor() {
+        const copy = this.balance;
+        this.balance = 1;
+    }
+}

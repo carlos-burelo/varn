@@ -93,6 +93,7 @@ pub enum ErrorCode {
     InvalidSwitchCase = 4019,
     NamespaceAsValue = 4020,
     MutableExport = 4021,
+    UninitializedField = 4022,
 
     MissingOverride = 4101,
     SpuriousOverride = 4102,
@@ -223,6 +224,7 @@ impl ErrorCode {
             ErrorCode::InvalidSwitchCase => "invalid-switch-case",
             ErrorCode::NamespaceAsValue => "namespace-as-value",
             ErrorCode::MutableExport => "mutable-export",
+            ErrorCode::UninitializedField => "uninitialized-field",
             ErrorCode::IncompatibleOverride => "incompatible-override",
             ErrorCode::InterfaceNotSatisfied => "interface-not-satisfied",
 

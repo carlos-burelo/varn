@@ -1,0 +1,5 @@
+// expect: error[VN4022]
+class Account {
+    balance: int;
+}
+const a = new Account();

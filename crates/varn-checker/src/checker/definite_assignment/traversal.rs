@@ -98,6 +98,7 @@ impl<'r> Checker<'r> {
                 self.da_stmt(f.body, &mut flow, bind);
             }
             Decl::Class(c) => {
+                self.check_class_fields(c, bind);
                 for m in &c.body {
                     use varn_core::ast::ClassMember;
                     let body = match m {
@@ -121,11 +122,15 @@ impl<'r> Checker<'r> {
             Decl::Export(varn_core::ast::ExportDecl::Decl { declaration, .. }) => {
                 self.da_nested_decl(declaration, bind);
             }
+            Decl::Namespace(ns) => {
+                for inner in &ns.body {
+                    self.da_nested_decl(inner, bind);
+                }
+            }
             Decl::Variable(_)
             | Decl::Interface(_)
             | Decl::TypeAlias(_)
             | Decl::Enum(_)
-            | Decl::Namespace(_)
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
