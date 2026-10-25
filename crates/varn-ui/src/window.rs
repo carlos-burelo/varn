@@ -74,7 +74,21 @@ fn new_event_loop() -> Option<EventLoop<()>> {
     EventLoop::builder().with_any_thread(true).build().ok()
 }
 
-#[cfg(not(windows))]
+#[cfg(all(unix, not(target_os = "macos")))]
+fn new_event_loop() -> Option<EventLoop<()>> {
+    use winit::platform::x11::EventLoopBuilderExtX11;
+    EventLoop::builder().with_any_thread(true).build().ok()
+}
+
+#[cfg(target_os = "macos")]
+fn new_event_loop() -> Option<EventLoop<()>> {
+    if std::thread::current().name() != Some("main") {
+        return None;
+    }
+    EventLoop::new().ok()
+}
+
+#[cfg(not(any(windows, unix)))]
 fn new_event_loop() -> Option<EventLoop<()>> {
     None
 }
@@ -85,15 +99,7 @@ pub fn try_open(title: &str, w: u32, h: u32) -> Option<u64> {
     }
     let idx = with_ui(|ui| {
         if ui.eloop.is_none() {
-            let eloop = std::panic::catch_unwind(new_event_loop)
-                .ok()
-                .and_then(|r| r)
-                .or_else(|| {
-                    std::panic::catch_unwind(EventLoop::new)
-                        .ok()
-                        .and_then(|r| r.ok())
-                })?;
-            ui.eloop = Some(eloop);
+            ui.eloop = Some(new_event_loop()?);
         }
         let idx = ui.free.pop().unwrap_or_else(|| {
             ui.wins.push(None);
