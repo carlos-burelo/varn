@@ -210,6 +210,10 @@ impl TaskCell {
         self.value.get()
     }
 
+    pub(crate) fn acknowledge(&self) {
+        self.observed.set(true);
+    }
+
     pub(crate) fn rejection_unobserved(&self) -> bool {
         self.status.get() == Status::Rejected && !self.observed.get()
     }

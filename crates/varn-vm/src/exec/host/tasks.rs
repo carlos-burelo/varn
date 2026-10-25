@@ -50,8 +50,12 @@ impl ExecCtx {
         if let Some(promise) = cell.host_promise() {
             promise.reject_msg("Task cancelled");
         }
-        let reason = self.heap.alloc_str("Task cancelled");
+        let reason = crate::exec::exceptions::thrown_value_for(
+            &crate::error::RuntimeError::new("Task cancelled"),
+            &mut self.heap,
+        );
         crate::task::settle(&mut self.heap, &cell, Err(reason));
+        cell.acknowledge();
         Ok(())
     }
 }
