@@ -1,0 +1,30 @@
+import { describe, it, expect } from "std:test";
+
+class Counter {
+    static start: int = 10;
+    static next: int = Counter.start + 1;
+    value: int = 0;
+}
+
+class Registry {
+    static shared: Registry = new Registry();
+    static created: int = Registry.shared.total() + 1;
+    items: int[] = [1, 2, 3];
+    total(): int {
+        let sum = 0;
+        for (const x of this.items) { sum = sum + x }
+        return sum;
+    }
+}
+
+await describe("263 static initializer order", async () => {
+    await it("a static initializer reads the statics declared before it", () => {
+        expect(Counter.next).toBe(11);
+        expect(new Counter().value).toBe(0);
+    });
+
+    await it("a static initializer can build an instance of its own class", () => {
+        expect(Registry.shared.total()).toBe(6);
+        expect(Registry.created).toBe(7);
+    });
+});

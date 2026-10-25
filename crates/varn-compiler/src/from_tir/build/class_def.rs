@@ -58,25 +58,36 @@ impl<'m> Builder<'m> {
             });
         }
 
-        for (sname, init) in &def.statics {
-            let val = match init {
-                Some(e) => self.lower_expr(e)?,
-                None => self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Runtime)),
-            };
+        for (sname, _) in &def.statics {
+            let reserved =
+                self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Runtime));
             self.emit_effect(InstKind::DefineStatic {
                 class: class_v,
                 name: sname.clone(),
-                value: val,
+                value: reserved,
             });
         }
 
         self.build_class_methods(def, class_v)?;
         self.build_class_accessors(def, class_v)?;
         self.build_property_decorators(def, class_v)?;
+        let defined = class_v;
         class_v = self.build_class_decorators(def, class_v)?;
 
         let store = self.global_store(&def.name, class_v);
         self.emit_effect(store);
+
+        for (sname, init) in &def.statics {
+            let Some(e) = init else {
+                continue;
+            };
+            let value = self.lower_expr(e)?;
+            self.emit_effect(InstKind::SetProperty {
+                object: defined,
+                name: sname.clone(),
+                value,
+            });
+        }
 
         for blk in &def.static_blocks {
             let fv = self.emit(
