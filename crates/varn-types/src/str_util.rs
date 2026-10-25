@@ -45,6 +45,14 @@ pub fn byte_to_char_idx(s: &str, ascii: bool, byte_idx: usize) -> i64 {
     }
 }
 
+pub fn substring_bounds(len: usize, start: i64, end: Option<i64>) -> Result<(usize, usize), String> {
+    let end = end.unwrap_or(len as i64);
+    match (usize::try_from(start), usize::try_from(end)) {
+        (Ok(s), Ok(e)) if s <= e && e <= len => Ok((s, e)),
+        _ => Err(format!("substring: {start}..{end} is outside 0..{len}")),
+    }
+}
+
 pub fn split_ranges(text: &str, separator: Option<&str>, out: &mut Vec<(usize, usize)>) {
     let base = text.as_ptr() as usize;
     match separator {

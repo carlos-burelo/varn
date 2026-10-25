@@ -113,21 +113,14 @@ varn_contract! {
         }
 
 
-        fn substring(ctx: &mut dyn NativeCtx, this: &VnStr, start: i64, end: Option<i64>) -> VmValue {
-            let b = this.as_bytes();
-            let st = start.max(0) as usize;
-            let en = end.map(|e| e.max(0) as usize).unwrap_or(b.len());
-            let (s, e) = if st <= en { (st, en) } else { (en, st) };
-            if this.is_ascii() {
-                let s = s.min(b.len());
-                let e = e.min(b.len());
-                return ctx.str_sub(this, s, e - s);
-            }
-            let len = char_len(this, false);
-            let si = s.min(len);
-            let ei = e.min(len);
-            let (bs, be) = char_range_to_bytes(this, false, si, ei);
-            ctx.str_sub(this, bs, be - bs)
+        fn substring(ctx: &mut dyn NativeCtx, this: &VnStr, start: i64, end: Option<i64>) -> Result<VmValue, varn_types::NativeError> {
+            let ascii = this.is_ascii();
+            let len = char_len(this, ascii);
+            let (s, e) = varn_types::str_util::substring_bounds(len, start, end).map_err(|message| {
+                varn_types::NativeError::rethrow(varn_core::RuntimeErrorKind::RangeError, message, None)
+            })?;
+            let (bs, be) = char_range_to_bytes(this, ascii, s, e);
+            Ok(ctx.str_sub(this, bs, be - bs))
         }
         fn slice(ctx: &mut dyn NativeCtx, this: &VnStr, start: i64, end: Option<i64>) -> VmValue {
             let b = this.as_bytes();
@@ -221,8 +214,15 @@ varn_contract! {
         }
 
 
-        fn repeat(_ctx: &mut dyn NativeCtx, this: &VnStr, n: i64) -> String {
-            this.repeat(n.max(0) as usize)
+        fn repeat(_ctx: &mut dyn NativeCtx, this: &VnStr, n: i64) -> Result<String, varn_types::NativeError> {
+            let count = usize::try_from(n).map_err(|_| {
+                varn_types::NativeError::rethrow(
+                    varn_core::RuntimeErrorKind::RangeError,
+                    format!("repeat: count {n} is negative"),
+                    None,
+                )
+            })?;
+            Ok(this.repeat(count))
         }
         fn padStart(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> String {
             pad_start(this, target, pad)

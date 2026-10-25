@@ -1,0 +1,39 @@
+import { describe, it, expect } from "std:test";
+
+function fails(f: () => str): bool {
+    try {
+        f()
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+function cut(text: str, start: int, end: int): str { return text.substring(start, end) }
+
+await describe("268 str strict ranges", async () => {
+    await it("substring takes an ordered range inside the string", () => {
+        expect("héllo".substring(1, 3)).toBe("él");
+        expect("abc".substring(0, 3)).toBe("abc");
+        expect("abc".substring(2)).toBe("c");
+    });
+
+    await it("substring rejects swapped and out-of-range bounds", () => {
+        expect(fails(() => "hello".substring(3, 1))).toBeTruthy();
+        expect(fails(() => "hello".substring(0 - 2, 3))).toBeTruthy();
+        expect(fails(() => "hello".substring(0, 9))).toBeTruthy();
+    });
+
+    await it("the hot path agrees with the cold path", () => {
+        let total = 0;
+        for (let i = 0; i < 2000; i = i + 1) { total = total + cut("héllo", 1, 3).length }
+        expect(total).toBe(4000);
+        expect(fails(() => cut("hello", 3, 1))).toBeTruthy();
+    });
+
+    await it("repeat rejects a negative count", () => {
+        expect("ab".repeat(2)).toBe("abab");
+        expect("ab".repeat(0)).toBe("");
+        expect(fails(() => "a".repeat(0 - 1))).toBeTruthy();
+    });
+});

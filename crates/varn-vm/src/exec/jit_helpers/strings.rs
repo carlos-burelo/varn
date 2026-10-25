@@ -105,21 +105,15 @@ pub(crate) extern "C" fn jit_str_substring(
             jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg));
             return;
         };
-        let total = if ascii {
-            text.len()
-        } else {
-            varn_types::str_util::char_len(text, false)
+        let total = varn_types::str_util::char_len(text, ascii);
+        let (s, e) = match varn_types::str_util::substring_bounds(total, start, end_opt) {
+            Ok(range) => range,
+            Err(message) => {
+                jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(message));
+                return;
+            }
         };
-        let st = start.max(0) as usize;
-        let en = end_opt.map(|e| e.max(0) as usize).unwrap_or(total);
-        let (s, e) = if st <= en { (st, en) } else { (en, st) };
-        let (bs, be) = if ascii {
-            (s.min(total), e.min(total))
-        } else {
-            let si = s.min(total);
-            let ei = e.min(total);
-            varn_types::str_util::char_range_to_bytes(text, false, si, ei)
-        };
+        let (bs, be) = varn_types::str_util::char_range_to_bytes(text, ascii, s, e);
         ctx_ref.jit_native_result = ctx_ref.heap.alloc_str_view_of(s_val, bs, be - bs);
     }
 }
