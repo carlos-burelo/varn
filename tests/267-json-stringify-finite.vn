@@ -1,0 +1,23 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+function stringifyFails(value: float): bool {
+    try {
+        Json.stringify(value)
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+await describe("267 json stringify finite", async () => {
+    await it("NaN and Infinity have no JSON form", () => {
+        expect(stringifyFails(0.0 / 0.0)).toBeTruthy();
+        expect(stringifyFails(1.0 / 0.0)).toBeTruthy();
+    });
+
+    await it("finite numbers keep their text", () => {
+        expect(Json.stringify([1.5, 2])).toBe("[1.5,2]");
+        expect(Json.stringify(0.25)).toBe("0.25");
+    });
+});

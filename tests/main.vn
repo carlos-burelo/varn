@@ -257,6 +257,7 @@ import "./263-static-initializer-order.vn"
 import "./264-index-by-name.vn"
 import "./265-unbounded-recursion.vn"
 import "./266-value-display.vn"
+import "./267-json-stringify-finite.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

@@ -16,6 +16,23 @@ pub(super) fn value_estimate_capacity(ctx: &ExecCtx, val: VmValue) -> usize {
     }
 }
 
+thread_local! {
+    static NON_FINITE_SEEN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+pub(super) fn take_non_finite() -> bool {
+    NON_FINITE_SEEN.with(|seen| seen.replace(false))
+}
+
+fn write_json_float(f: f64, out: &mut String) {
+    if f.is_finite() {
+        out.push_str(ryu::Buffer::new().format(f));
+    } else {
+        NON_FINITE_SEEN.with(|seen| seen.set(true));
+        out.push_str("null");
+    }
+}
+
 #[inline(always)]
 pub(super) fn write_int(n: i64, out: &mut String) {
     let mut buf = [0u8; crate::strbuf::INT_MAX_DIGITS];
@@ -38,11 +55,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
     }
     if val.is_f64() {
         let f = val.as_f64();
-        if f.is_finite() {
-            out.push_str(ryu::Buffer::new().format(f));
-        } else {
-            out.push_str("null");
-        }
+        write_json_float(f, out);
         return;
     }
     if val.is_sso() {
@@ -81,11 +94,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
                             if i > 0 {
                                 out.push(',');
                             }
-                            if elem.is_finite() {
-                                out.push_str(ryu::Buffer::new().format(elem));
-                            } else {
-                                out.push_str("null");
-                            }
+                            write_json_float(elem, out);
                         }
                     }
                 }
