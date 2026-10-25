@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
-use varn_core::ModuleId;
 
 use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
 use super::report::coverage::{print_coverage, top_blocker};
@@ -28,15 +27,9 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
             .map_err(|e| e.to_string().clone())
     })?;
 
-    let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;
-    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new(
-        session.shared_resolver(),
-    ));
     let factory = VmFactory::new(
+        session,
         compile_output.precompiled.clone(),
-        builtin_protos,
-        loader.clone(),
-        ModuleId::local_str(path),
         Rc::new(compile_output.entry_proto.clone()),
         !opts.show_output,
         opts.capabilities.clone(),
@@ -49,6 +42,7 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
             factory.build()
         },
         |machine| run_vm_to_completion(machine, factory.entry_proto()),
+        |_, _| {},
     )?;
 
     let phases = vec![

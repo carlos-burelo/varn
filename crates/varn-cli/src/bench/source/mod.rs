@@ -1,13 +1,10 @@
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use varn_compiler::FunctionProto;
-use varn_core::ModuleId;
-
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 
-use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup_progress, VmFactory};
+use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
 use super::report::coverage::{print_coverage, top_blocker};
 use super::report::headline::{ExecSplit, Headline};
 use super::report::hotspots::print_hotspots;
@@ -63,22 +60,16 @@ pub fn run(
     let (parse_profile, check_result) = profile_inputs(&last, path)?;
     let precompile_dur = samples.link_cold;
 
-    let builtin_protos: Vec<FunctionProto> = crate::pipeline::core_protos_owned()?;
-    let loader = std::sync::Arc::new(varn_pipeline::stdlib_loader::PipelineLoader::new(
-        session.shared_resolver(),
-    ));
     let factory = VmFactory::new(
+        session,
         Rc::clone(&precompiled),
-        builtin_protos,
-        loader.clone(),
-        ModuleId::local_str(path),
         Rc::new(proto.clone()),
         !opts.show_output,
         opts.capabilities.clone(),
     )?;
 
     varn_core::term::log(format!("  running {runs} runs..."));
-    let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup_progress(
+    let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup(
         runs,
         || {
             varn_builtins::reset_testing_counters();
