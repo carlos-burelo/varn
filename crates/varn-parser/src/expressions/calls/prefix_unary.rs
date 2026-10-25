@@ -4,6 +4,15 @@ use varn_core::ast::operators::{UnaryOp, UpdateOp};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TokenKind;
 
+fn reject_unary_power(s: &TokenStream) -> Result<(), String> {
+    if s.kind() == TokenKind::StarStar {
+        return Err(
+            "a sign before `**` is ambiguous: write `(-a) ** b` or `-(a ** b)`".to_owned(),
+        );
+    }
+    Ok(())
+}
+
 pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     let start_range = s.range();
 
@@ -45,6 +54,7 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             }
 
             let o = parse_unary_expr(s)?;
+            reject_unary_power(s)?;
             let full_range = s.span_from(start_range);
             Ok(s.expr(
                 full_range,
@@ -55,7 +65,20 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                 },
             ))
         }
-        TokenKind::Plus => prefix_unary!(UnaryOp::Plus),
+        TokenKind::Plus => {
+            s.advance();
+            let o = parse_unary_expr(s)?;
+            reject_unary_power(s)?;
+            let full_range = s.span_from(start_range);
+            Ok(s.expr(
+                full_range,
+                ExprKind::Unary {
+                    op: UnaryOp::Plus,
+                    prefix: true,
+                    operand: o,
+                },
+            ))
+        }
         TokenKind::Typeof => prefix_unary!(UnaryOp::Typeof),
         TokenKind::Void => Err("`void` is not supported; use `_` to discard values".to_owned()),
         TokenKind::Delete => Err("`delete` is not supported".to_owned()),
