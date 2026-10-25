@@ -1,0 +1,2 @@
+// expect: error[VN4002]
+const Infinity = 5;

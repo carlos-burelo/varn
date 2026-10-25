@@ -50,7 +50,7 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 
 ### Semántica
 - [ ] Igualdad: `[1]==[1]` (identidad) vs `#{}` (valor); `NaN` en `indexOf` vs `==`
-- [ ] Sombreado de predefinidos (`const Infinity = 5`, `class int {}`)
+- [x] Sombreado de predefinidos: `Infinity`/`NaN` y tipos primitivos no se redeclaran (módulos core exentos)
 - [ ] `5 instanceof int` es `true`; `dynamic` sin autorización explícita
 - [ ] `print(1.0)` muestra `1`; strings sin comillas dentro de contenedores
 - [ ] `max()` sin argumentos: ruta de la intrínseca vs la de la std

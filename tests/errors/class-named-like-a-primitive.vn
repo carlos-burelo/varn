@@ -1,0 +1,4 @@
+// expect: error[VN4002]
+class int {
+    value: str = "x";
+}

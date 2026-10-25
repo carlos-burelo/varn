@@ -128,3 +128,5 @@ const _: () = {
     assert!(offset_of!(AbiFrame, bases) == 20, "AbiFrame.bases");
     assert!(size_of::<AbiFrame>() == 40, "AbiFrame: tamaño fijo");
 };
+
+pub const FLOAT_CONSTANTS: [&str; 2] = ["Infinity", "NaN"];

@@ -27,7 +27,48 @@ impl<'r> super::Binder<'r> {
         }
     }
 
+    fn reject_reserved_name(&mut self, name: varn_core::Atom, sym: &Symbol) {
+        let in_core = self
+            .source_file
+            .starts_with(varn_core::ModuleKind::Core.prefix());
+        if in_core
+            || sym.origin_module.is_some()
+            || (sym.line == 0 && sym.full_range.start.line == 0)
+        {
+            return;
+        }
+        let text = self.interner.resolve(name);
+        let declares_type = matches!(
+            sym.kind,
+            varn_sem::symbol::SymbolKind::Class
+                | varn_sem::symbol::SymbolKind::Interface
+                | varn_sem::symbol::SymbolKind::TypeAlias
+                | varn_sem::symbol::SymbolKind::Enum
+                | varn_sem::symbol::SymbolKind::Struct
+        );
+        let reserved = if declares_type {
+            varn_core::LangPrimitive::from_str(text).is_some()
+        } else {
+            matches!(
+                sym.kind,
+                varn_sem::symbol::SymbolKind::Let
+                    | varn_sem::symbol::SymbolKind::Const
+                    | varn_sem::symbol::SymbolKind::Var
+                    | varn_sem::symbol::SymbolKind::Function
+            ) && varn_core::abi::FLOAT_CONSTANTS.contains(&text)
+        };
+        if !reserved {
+            return;
+        }
+        let msg = format!("'{text}' is a built-in name and cannot be redeclared");
+        let diag = Diagnostic::error(ErrorCode::DuplicateDeclaration, msg)
+            .with_file(self.source_file.clone())
+            .with_range(sym.full_range);
+        self.emit(diag);
+    }
+
     pub(super) fn define(&mut self, name: varn_core::Atom, sym: Symbol) -> SymbolId {
+        self.reject_reserved_name(name, &sym);
         let scope = self.scopes.get(self.current);
         if let Some(existing_id) = scope.lookup(name) {
             let existing_sym = self.arena.get(existing_id);
