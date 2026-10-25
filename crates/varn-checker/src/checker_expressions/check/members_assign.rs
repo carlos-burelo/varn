@@ -24,13 +24,16 @@ impl<'r> Checker<'r> {
         } = &arena.expr(target).kind
         {
             let obj_ty = self.infer_type(rec, *object, bind);
-            if matches!(self.ty_table.get(obj_ty.0), TypeKind::Tuple(_)) {
+            let immutable = match self.ty_table.get(obj_ty.0) {
+                TypeKind::Tuple(_) => Some("cannot assign to a tuple element: tuples are immutable"),
+                TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::Literal(_) => {
+                    Some("cannot assign to a character of a string: strings are immutable")
+                }
+                _ => None,
+            };
+            if let Some(message) = immutable {
                 self.emit(
-                    Diagnostic::error(
-                        ErrorCode::NotAssignable,
-                        "cannot assign to a tuple element: tuples are immutable",
-                    )
-                    .with_range(target_range),
+                    Diagnostic::error(ErrorCode::NotAssignable, message).with_range(target_range),
                 );
             }
             return;

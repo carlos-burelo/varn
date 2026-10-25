@@ -201,13 +201,16 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> bool {
         let owner = owner.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-        let (TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin)) =
-            self.ty_table.get(owner.0)
-        else {
-            return false;
+        let (name, origin) = match self.ty_table.get(owner.0) {
+            TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => (
+                self.resolve_bind_atom(bind, name),
+                origin.map(|o| self.resolve_bind_atom(bind, o)),
+            ),
+            TypeKind::Array(_) | TypeKind::Tuple(_) | TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
+                return member == varn_core::MemberKey::Length.as_str();
+            }
+            _ => return false,
         };
-        let name = self.resolve_bind_atom(bind, name);
-        let origin = origin.map(|o| self.resolve_bind_atom(bind, o));
         let view = varn_sem::bind::BindView::new(bind, self.resolver);
         view.get_interface_members(&name, origin.as_deref())
             .is_some_and(|members| {

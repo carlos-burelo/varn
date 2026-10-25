@@ -1,0 +1,3 @@
+// expect: error[VN3005]
+let word = "abc";
+word[0] = "x";
