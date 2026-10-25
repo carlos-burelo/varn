@@ -128,6 +128,7 @@ pub struct TaskCell {
     status: Cell<Status>,
     yielded: bool,
     value: Cell<VmValue>,
+    observed: Cell<bool>,
     waiters: RefCell<Waiters>,
     extra: Option<Box<Extra>>,
 }
@@ -144,6 +145,7 @@ impl TaskCell {
             status: Cell::new(Status::Pending),
             yielded,
             value: Cell::new(value),
+            observed: Cell::new(false),
             waiters: RefCell::new(Waiters::default()),
             extra: extra.map(Box::new),
         }
@@ -204,7 +206,12 @@ impl TaskCell {
 
     #[inline]
     pub(crate) fn value(&self) -> VmValue {
+        self.observed.set(true);
         self.value.get()
+    }
+
+    pub(crate) fn rejection_unobserved(&self) -> bool {
+        self.status.get() == Status::Rejected && !self.observed.get()
     }
 
     pub(crate) fn take_host(&self) -> Option<(HostPromise, HostOpen)> {
@@ -273,6 +280,14 @@ pub(crate) fn settle(heap: &mut HeapInner, cell: &Rc<TaskCell>, outcome: Outcome
     cell.value.set(value);
     track_cell(heap, cell);
     let waiters = std::mem::take(&mut *cell.waiters.borrow_mut());
+    if status == Status::Rejected {
+        if waiters.first.is_some() {
+            cell.observed.set(true);
+        } else {
+            let text = rejection_text(heap, value);
+            heap.unobserved_rejections.push((Rc::clone(cell), text));
+        }
+    }
     for waiter in waiters.drain() {
         match waiter {
             Waiter::Resume { inbox, token } => inbox.borrow_mut().push_back(token),
@@ -283,8 +298,8 @@ pub(crate) fn settle(heap: &mut HeapInner, cell: &Rc<TaskCell>, outcome: Outcome
 
 fn outcome_of(cell: &TaskCell) -> Outcome {
     match cell.status.get() {
-        Status::Resolved => Ok(cell.value.get()),
-        Status::Rejected | Status::Pending => Err(cell.value.get()),
+        Status::Resolved => Ok(cell.value()),
+        Status::Rejected | Status::Pending => Err(cell.value()),
     }
 }
 
@@ -374,4 +389,21 @@ pub(crate) fn alloc_handle(heap: &mut HeapInner, cell: Rc<TaskCell>) -> VmValue 
 
 pub(crate) fn outcome_of_cell(cell: &TaskCell) -> Outcome {
     outcome_of(cell)
+}
+
+fn rejection_text(heap: &HeapInner, thrown: VmValue) -> String {
+    if let Some(inst) = thrown.is_heap().then(|| heap.instance(thrown.as_heap())).flatten()
+        && let Some(class) = ClassObj::find_by_id(inst.class_id)
+    {
+        let message = class
+            .layout()
+            .fields
+            .iter()
+            .find(|f| f.name.as_ref() == "message")
+            .and_then(|f| inst.read_field(f))
+            .map(|m| heap.str_repr(m))
+            .unwrap_or_default();
+        return format!("{}: {message}", class.name);
+    }
+    heap.str_repr(thrown)
 }

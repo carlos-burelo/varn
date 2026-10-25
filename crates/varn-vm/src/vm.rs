@@ -52,7 +52,20 @@ impl Vm {
             self.ctx.push_frame(Rc::new(entry))?;
         }
 
-        self.ctx.run()
+        let returned = self.ctx.run()?;
+        let rejected = self
+            .ctx
+            .heap
+            .unobserved_rejections
+            .iter()
+            .find(|(cell, _)| cell.rejection_unobserved())
+            .map(|(_, text)| text.clone());
+        match rejected {
+            Some(text) => Err(crate::error::RuntimeError::new(format!(
+                "unhandled task rejection: {text}"
+            ))),
+            None => Ok(returned),
+        }
     }
 
     pub fn call_main_global(&mut self, global: u32) -> Result<(), crate::error::RuntimeError> {

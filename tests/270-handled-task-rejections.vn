@@ -1,0 +1,26 @@
+import { describe, it, expect } from "std:test";
+import { spawn, sleep } from "std:task";
+
+async function boom(): Task<int> { throw new Error("boom") }
+async function fine(): Task<int> { return 7 }
+
+await describe("270 handled task rejections", async () => {
+    await it("an awaited rejection is not reported again", async () => {
+        const handle = spawn(boom());
+        let seen = "";
+        try { await handle } catch (e) { seen = "caught" }
+        expect(seen).toBe("caught");
+    });
+
+    await it("a rejection observed after the task ran is handled", async () => {
+        const handle = spawn(boom());
+        await sleep(5);
+        let seen = "";
+        try { await handle } catch (e) { seen = "late" }
+        expect(seen).toBe("late");
+    });
+
+    await it("a resolved task is silent", async () => {
+        expect(await spawn(fine())).toBe(7);
+    });
+});
