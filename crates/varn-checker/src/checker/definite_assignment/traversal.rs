@@ -139,6 +139,30 @@ impl<'r> Checker<'r> {
         }
     }
 
+    fn reject_param_redeclaration(
+        &mut self,
+        params: &[varn_core::ast::Param],
+        body: StmtId,
+        bind: &BindResult,
+    ) {
+        let StmtKind::Block { stmts } = &self.ast_arena.stmt(body).kind else {
+            return;
+        };
+        let names: Vec<Atom> = params.iter().flat_map(|p| pattern_names(&p.pattern)).collect();
+        for hoisted in block_bindings(self.ast_arena, stmts) {
+            if hoisted.is_binding && names.contains(&hoisted.name) {
+                let text = bind.interner.resolve(hoisted.name);
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::DuplicateDeclaration,
+                        format!("'{text}' is already declared as a parameter of this function"),
+                    )
+                    .with_range(self.ast_arena.stmt(body).range),
+                );
+            }
+        }
+    }
+
     fn da_declared(&mut self, decl: &Decl, flow: &mut Flow, bind: &BindResult) {
         match decl {
             Decl::Class(c) => {
@@ -185,6 +209,7 @@ impl<'r> Checker<'r> {
     fn da_nested_decl(&mut self, decl: &Decl, bind: &BindResult) {
         match decl {
             Decl::Function(f) => {
+                self.reject_param_redeclaration(&f.params, f.body, bind);
                 let mut flow = Flow::default();
                 self.da_stmt(f.body, &mut flow, bind);
             }
@@ -205,6 +230,11 @@ impl<'r> Checker<'r> {
                         | ClassMember::Setter { .. } => None,
                     };
                     if let Some(b) = body {
+                        if let ClassMember::Method { params, .. }
+                        | ClassMember::Constructor { params, .. } = m
+                        {
+                            self.reject_param_redeclaration(params, b, bind);
+                        }
                         let mut flow = Flow::default();
                         self.da_stmt(b, &mut flow, bind);
                     }
