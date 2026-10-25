@@ -10,6 +10,10 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Code Quality & Linting
@@ -68,10 +72,10 @@ jobs:
         include:
           - name: Linux x86_64
             os: ubuntu-latest
-            bin_path: ./target/release/vn
+            bin_path: ./target/quick/vn
           - name: Windows x86_64
             os: windows-latest
-            bin_path: ./target/release/vn.exe
+            bin_path: ./target/quick/vn.exe
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -84,8 +88,8 @@ jobs:
         with:
           workspaces: "."
 
-      - name: Build Release Binary
-        run: cargo build --release --bin vn
+      - name: Build binary (quick profile)
+        run: cargo build --profile quick --bin vn
 
       - name: Install system fonts (Linux text suite)
         if: runner.os == 'Linux'
@@ -120,7 +124,7 @@ jobs:
         run: ${{ matrix.bin_path }} bench ./tests/benchmarks/vn/bench_fib.vn -v
 
       - name: Error Corpus (negative suite)
-        run: cargo test --release -p varn-cli --test error_corpus
+        run: cargo test --profile quick -p varn-cli --test error_corpus
 
   # Runs only on direct push to main (not on PRs).
   # Builds dist binaries for all 3 targets and publishes a GitHub Release.
@@ -129,7 +133,6 @@ jobs:
   release:
     name: Release (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    needs: [lint, test-matrix]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
@@ -243,7 +246,7 @@ jobs:
   publish-release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    needs: release
+    needs: [lint, test-matrix, release]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
