@@ -163,9 +163,7 @@ impl Collector<'_> {
             | ExprKind::Satisfies { .. }
             | ExprKind::Is { .. }
             | ExprKind::With { .. }
-            | ExprKind::MetaAccess { .. } => {
-                walk_expr_children(e, arena, &mut |c| self.expr(c))
-            }
+            | ExprKind::MetaAccess { .. } => walk_expr_children(e, arena, &mut |c| self.expr(c)),
         }
     }
 

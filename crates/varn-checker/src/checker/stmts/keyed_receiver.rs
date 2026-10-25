@@ -15,9 +15,10 @@ impl<'r> Checker<'r> {
         let ty = ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let builtin = ty.builtin_of(&self.ty_table);
         let keyed = match self.ty_table.get(ty.0) {
-            TypeKind::Array(_) | TypeKind::Tuple(_) | TypeKind::Primitive(_) | TypeKind::Literal(_) => {
-                false
-            }
+            TypeKind::Array(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::Primitive(_)
+            | TypeKind::Literal(_) => false,
             TypeKind::Named(..) | TypeKind::Generic(..) => !matches!(
                 builtin,
                 Some(

@@ -25,7 +25,9 @@ impl<'r> Checker<'r> {
         {
             let obj_ty = self.infer_type(rec, *object, bind);
             let immutable = match self.ty_table.get(obj_ty.0) {
-                TypeKind::Tuple(_) => Some("cannot assign to a tuple element: tuples are immutable"),
+                TypeKind::Tuple(_) => {
+                    Some("cannot assign to a tuple element: tuples are immutable")
+                }
                 TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::Literal(_) => {
                     Some("cannot assign to a character of a string: strings are immutable")
                 }

@@ -206,7 +206,9 @@ impl<'r> Checker<'r> {
                 self.resolve_bind_atom(bind, name),
                 origin.map(|o| self.resolve_bind_atom(bind, o)),
             ),
-            TypeKind::Array(_) | TypeKind::Tuple(_) | TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
+            TypeKind::Array(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
                 return member == varn_core::MemberKey::Length.as_str();
             }
             _ => return false,

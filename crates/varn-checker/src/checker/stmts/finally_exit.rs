@@ -13,7 +13,9 @@ impl<'r> Checker<'r> {
                 )
                 .with_range(arena.stmt(finally).range),
             ),
-            StmtKind::Block { stmts } => stmts.iter().for_each(|&s| self.reject_return_in_finally(s)),
+            StmtKind::Block { stmts } => {
+                stmts.iter().for_each(|&s| self.reject_return_in_finally(s))
+            }
             StmtKind::If {
                 consequent,
                 alternate,
@@ -32,7 +34,9 @@ impl<'r> Checker<'r> {
             | StmtKind::Labeled { body, .. } => self.reject_return_in_finally(*body),
             StmtKind::Switch { cases, .. } => {
                 for case in cases {
-                    case.body.iter().for_each(|&s| self.reject_return_in_finally(s));
+                    case.body
+                        .iter()
+                        .for_each(|&s| self.reject_return_in_finally(s));
                 }
             }
             StmtKind::Try {
@@ -41,7 +45,9 @@ impl<'r> Checker<'r> {
                 finally,
             } => {
                 self.reject_return_in_finally(*block);
-                catches.iter().for_each(|c| self.reject_return_in_finally(c.body));
+                catches
+                    .iter()
+                    .for_each(|c| self.reject_return_in_finally(c.body));
                 if let Some(f) = finally {
                     self.reject_return_in_finally(*f);
                 }

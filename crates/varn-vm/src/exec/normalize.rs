@@ -48,7 +48,10 @@ pub(crate) fn normalize(heap: &mut Heap, value: VmValue, desc: &TypeDesc) -> VmV
     walk(heap, value, desc, None, &mut visiting)
 }
 
-pub(crate) fn object_entries(heap: &crate::heap::structs::HeapInner, v: VmValue) -> Option<Vec<(String, VmValue)>> {
+pub(crate) fn object_entries(
+    heap: &crate::heap::structs::HeapInner,
+    v: VmValue,
+) -> Option<Vec<(String, VmValue)>> {
     if !v.is_heap() {
         return None;
     }

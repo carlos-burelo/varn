@@ -156,7 +156,9 @@ impl<'r> Checker<'r> {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::UseBeforeAssignment,
-                            format!("field '{text}' is read in an initializer before it is initialized"),
+                            format!(
+                                "field '{text}' is read in an initializer before it is initialized"
+                            ),
                         )
                         .with_range(range),
                     );

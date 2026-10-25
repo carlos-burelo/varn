@@ -9,9 +9,12 @@ pub(super) fn guard_headroom(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
     let helpers = ctx.helpers;
     let m = MemFlagsData::trusted();
     let sp = b.ins().get_stack_pointer(types::I64);
-    let floor = b
-        .ins()
-        .load(types::I64, m, ctx.exec_ctx, helpers.jit_stack_floor_offset as i32);
+    let floor = b.ins().load(
+        types::I64,
+        m,
+        ctx.exec_ctx,
+        helpers.jit_stack_floor_offset as i32,
+    );
     let exhausted = b.ins().icmp(IntCC::UnsignedLessThan, sp, floor);
     let raise = b.create_block();
     let cont = b.create_block();

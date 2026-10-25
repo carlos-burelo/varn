@@ -396,7 +396,10 @@ pub(crate) fn outcome_of_cell(cell: &TaskCell) -> Outcome {
 }
 
 fn rejection_text(heap: &HeapInner, thrown: VmValue) -> String {
-    if let Some(inst) = thrown.is_heap().then(|| heap.instance(thrown.as_heap())).flatten()
+    if let Some(inst) = thrown
+        .is_heap()
+        .then(|| heap.instance(thrown.as_heap()))
+        .flatten()
         && let Some(class) = ClassObj::find_by_id(inst.class_id)
     {
         let message = class

@@ -59,8 +59,7 @@ impl<'m> Builder<'m> {
         }
 
         for (sname, _) in &def.statics {
-            let reserved =
-                self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Runtime));
+            let reserved = self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Runtime));
             self.emit_effect(InstKind::DefineStatic {
                 class: class_v,
                 name: sname.clone(),

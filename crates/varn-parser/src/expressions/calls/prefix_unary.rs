@@ -6,9 +6,7 @@ use varn_core::TokenKind;
 
 fn reject_unary_power(s: &TokenStream) -> Result<(), String> {
     if s.kind() == TokenKind::StarStar {
-        return Err(
-            "a sign before `**` is ambiguous: write `(-a) ** b` or `-(a ** b)`".to_owned(),
-        );
+        return Err("a sign before `**` is ambiguous: write `(-a) ** b` or `-(a ** b)`".to_owned());
     }
     Ok(())
 }

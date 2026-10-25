@@ -57,7 +57,12 @@ fn walk(
             };
             let pairs: Vec<(Arc<str>, VmValue)> = entries
                 .into_iter()
-                .map(|(name, x)| (Arc::from(name.as_str()), walk(heap, x, inner, scope, visiting)))
+                .map(|(name, x)| {
+                    (
+                        Arc::from(name.as_str()),
+                        walk(heap, x, inner, scope, visiting),
+                    )
+                })
                 .collect();
             heap.alloc_object_pairs(pairs)
         }

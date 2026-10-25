@@ -148,7 +148,10 @@ impl<'r> Checker<'r> {
         let StmtKind::Block { stmts } = &self.ast_arena.stmt(body).kind else {
             return;
         };
-        let names: Vec<Atom> = params.iter().flat_map(|p| pattern_names(&p.pattern)).collect();
+        let names: Vec<Atom> = params
+            .iter()
+            .flat_map(|p| pattern_names(&p.pattern))
+            .collect();
         for hoisted in block_bindings(self.ast_arena, stmts) {
             if hoisted.is_binding && names.contains(&hoisted.name) {
                 let text = bind.interner.resolve(hoisted.name);

@@ -1,8 +1,6 @@
 use super::patterns::walk_expr_children;
 use rustc_hash::FxHashSet;
-use varn_core::ast::{
-    AssignOp, AstArena, Decl, ExprId, ExprKind, ForInit, StmtId, StmtKind,
-};
+use varn_core::ast::{AssignOp, AstArena, Decl, ExprId, ExprKind, ForInit, StmtId, StmtKind};
 use varn_core::source::SourceRange;
 use varn_core::Atom;
 

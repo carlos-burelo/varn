@@ -106,10 +106,7 @@ pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *cons
     unsafe {
         let ctx_ref = &mut *ctx;
         if ctx_ref.frames.len() >= crate::frame::MAX_CALL_DEPTH {
-            jit_propagate_error(
-                ctx_ref,
-                crate::frame::call_depth_exceeded(),
-            );
+            jit_propagate_error(ctx_ref, crate::frame::call_depth_exceeded());
             return;
         }
         std::rc::Rc::increment_strong_count(closure);

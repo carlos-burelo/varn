@@ -31,7 +31,8 @@ impl<'r> Checker<'r> {
                 ExprKind::Identifier { name } => {
                     let member = bind.interner.resolve(*name);
                     let owner = self.infer_type(rec, *object, bind);
-                    let owner = owner.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                    let owner =
+                        owner.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                     let found = self
                         .find_member_info(&owner, member, bind)
                         .and_then(|(_, symbol)| symbol);
@@ -45,7 +46,9 @@ impl<'r> Checker<'r> {
             symbol < bind.arena.len()
                 && bind.interner.get(callee_name) == Some(bind.arena.get(symbol).name)
         };
-        if callee_symbol.is_some_and(|symbol| declared_here(symbol) && bind.arena.get(symbol).is_async) {
+        if callee_symbol
+            .is_some_and(|symbol| declared_here(symbol) && bind.arena.get(symbol).is_async)
+        {
             self.emit(
                 Diagnostic::error(
                     ErrorCode::UnusedTask,
