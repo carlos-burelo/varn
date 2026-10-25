@@ -17,6 +17,11 @@ pub fn native_stack_exhausted() -> crate::error::RuntimeError {
     crate::error::RuntimeError::new("stack overflow: native stack exhausted")
 }
 
+pub fn native_stack_low(floor: u64) -> bool {
+    let marker = 0u8;
+    (std::ptr::addr_of!(marker) as u64) < floor
+}
+
 pub fn native_stack_floor() -> u64 {
     let marker = 0u8;
     let here = std::ptr::addr_of!(marker) as u64;

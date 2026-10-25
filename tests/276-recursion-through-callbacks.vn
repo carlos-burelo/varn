@@ -1,0 +1,25 @@
+import { describe, it, expect } from "std:test";
+
+function viaMap(n: int): int { return [n].map((x: int): int => viaMap(x + 1))[0] }
+function viaFilter(n: int): int { return [n].filter((x: int): bool => viaFilter(x + 1) > 0).length }
+function bounded(n: int): int { return n >= 3 ? n : [n].map((x: int): int => bounded(x + 1))[0] }
+
+function raises(f: () => int): bool {
+    try {
+        f()
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+await describe("276 recursion through callbacks", async () => {
+    await it("a closure that calls its own enclosing function compiles and runs", () => {
+        expect(bounded(0)).toBe(3);
+    });
+
+    await it("unbounded recursion through a native callback raises", () => {
+        expect(raises(() => viaMap(0))).toBeTruthy();
+        expect(raises(() => viaFilter(0))).toBeTruthy();
+    });
+});

@@ -15,6 +15,9 @@ impl ExecCtx {
         callee: VmValue,
         window: &[VmValue],
     ) -> crate::error::VmResult<VmValue> {
+        if crate::frame::native_stack_low(self.jit_stack_floor) {
+            return Err(crate::frame::native_stack_exhausted());
+        }
         let was_native = self.heap.cells.suspend_native();
         let result = match self.invoke_pushing(callee, window) {
             Ok(Invoked::Value(v)) => Ok(v),
