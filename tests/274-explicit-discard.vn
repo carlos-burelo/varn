@@ -1,0 +1,28 @@
+import { describe, it, expect } from "std:test";
+
+let calls = 0;
+
+function bump(): int {
+    calls = calls + 1;
+    return calls;
+}
+
+async function lazy(): Task<int> {
+    calls = calls + 100;
+    return 1;
+}
+
+await describe("274 explicit discard", async () => {
+    await it("_ = expr evaluates the expression and drops the value", () => {
+        _ = bump();
+        _ = bump();
+        expect(calls).toBe(2);
+    });
+
+    await it("a dropped lazy Task never runs", async () => {
+        _ = lazy();
+        expect(calls).toBe(2);
+        expect(await lazy()).toBe(1);
+        expect(calls).toBe(102);
+    });
+});

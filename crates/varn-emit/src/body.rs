@@ -242,6 +242,18 @@ impl<'a> FnEmitter<'a> {
                 let (target, value) = (*target, *value);
                 return self.lower_extension_assign(target, value, ty, span);
             }
+            ExprKind::Assign {
+                op: varn_core::ast::operators::AssignOp::Assign,
+                target,
+                value,
+            } if matches!(
+                &self.ast_arena.expr(*target).kind,
+                ExprKind::Identifier { name }
+                    if self.m.interner.resolve(*name) == varn_core::TokenKind::Placeholder.as_str()
+            ) =>
+            {
+                return self.lower_expr(*value);
+            }
             ExprKind::Assign { op, target, value }
                 if matches!(
                     &self.ast_arena.expr(*target).kind,
