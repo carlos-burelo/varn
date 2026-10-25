@@ -51,7 +51,8 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 ### Semántica
 - [ ] Igualdad: `[1]==[1]` (identidad) vs `#{}` (valor); `NaN` en `indexOf` vs `==`
 - [x] Sombreado de predefinidos: `Infinity`/`NaN` y tipos primitivos no se redeclaran (módulos core exentos)
-- [ ] `5 instanceof int` es `true`; `dynamic` sin autorización explícita
+- [x] `x instanceof int` es el test de tipo para uniones (la std lo usa y estrecha): decisión, sin cambio
+- [ ] `dynamic` sin autorización explícita (Ley 17): inventariar usos
 - [ ] `print(1.0)` muestra `1`; strings sin comillas dentro de contenedores
 - [ ] `max()` sin argumentos: ruta de la intrínseca vs la de la std
 - [ ] `Json.parse` descarta campos desconocidos en silencio
