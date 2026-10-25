@@ -1,0 +1,7 @@
+// expect: error[VN3006]
+class Box {
+    value: int = 1;
+}
+const box = new Box();
+const key = "value";
+const read = box[key];

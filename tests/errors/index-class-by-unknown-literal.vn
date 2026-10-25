@@ -1,0 +1,5 @@
+// expect: error[VN3006]
+class Box {
+    value: int = 1;
+}
+const read = new Box()["missing"];

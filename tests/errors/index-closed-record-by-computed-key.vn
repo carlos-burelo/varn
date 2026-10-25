@@ -1,0 +1,4 @@
+// expect: error[VN3006]
+const point = { x: 1, y: 2 };
+const axis = "z";
+const read = point[axis];

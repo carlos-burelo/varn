@@ -238,8 +238,17 @@ impl<'r> Checker<'r> {
             );
         }
 
-        let obj_kind = self.ty_table.get(obj_ty.0);
-        let class_name = match obj_kind {
+        self.check_member_access_rights(&obj_ty, prop_name, range, bind);
+    }
+
+    pub(super) fn check_member_access_rights(
+        &mut self,
+        owner: &Type,
+        prop_name: &str,
+        range: &SourceRange,
+        bind: &BindResult,
+    ) {
+        let class_name = match self.ty_table.get(owner.0) {
             TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => {
                 Some(self.resolve_bind_atom(bind, n).to_string())
             }

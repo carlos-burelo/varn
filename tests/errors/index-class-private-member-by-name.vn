@@ -1,0 +1,5 @@
+// expect: error[VN4104]
+class Vault {
+    private secret: int = 7;
+}
+const leaked = new Vault()["secret"];

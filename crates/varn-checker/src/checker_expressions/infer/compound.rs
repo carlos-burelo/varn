@@ -68,6 +68,19 @@ impl<'r> Checker<'r> {
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => false,
         };
+        if !keyed
+            && matches!(
+                obj_kind,
+                TypeKind::Object(_) | TypeKind::Named(..) | TypeKind::Generic(..)
+            )
+            && builtin != Some(varn_core::BuiltinType::Bytes)
+            && let varn_core::ast::ExprKind::StrLiteral { value } = &arena.expr(property).kind
+        {
+            let owner = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+            if let Some((member_ty, _)) = self.find_member_info(&owner, value, bind) {
+                return (member_ty, false);
+            }
+        }
         let slot = match obj_kind {
             TypeKind::Array(inner) if prop_ty.is_int() => Type::resolved(inner),
             TypeKind::Tuple(slots) if prop_ty.is_int() => {
@@ -106,6 +119,11 @@ impl<'r> Checker<'r> {
                 if builtin == Some(varn_core::BuiltinType::Map) =>
             {
                 obj_ty.builtin_arg(1, &self.ty_table)
+            }
+            TypeKind::Generic(..) | TypeKind::Named(..)
+                if builtin == Some(varn_core::BuiltinType::Range) && prop_ty.is_int() =>
+            {
+                obj_ty.builtin_arg(0, &self.ty_table)
             }
             TypeKind::Object(mid) => self
                 .ty_table
