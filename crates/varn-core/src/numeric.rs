@@ -184,6 +184,10 @@ pub fn float_to_string(f: f64) -> String {
     } else if f != 0.0 && (f.abs() >= 1e21 || f.abs() < 1e-6) {
         format!("{f:e}")
     } else {
-        f.to_string()
+        let mut text = f.to_string();
+        if !text.contains('.') {
+            text.push_str(".0");
+        }
+        text
     }
 }

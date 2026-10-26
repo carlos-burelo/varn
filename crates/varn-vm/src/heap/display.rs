@@ -24,7 +24,7 @@ impl HeapInner {
             out.push_str(&varn_core::float_to_string(nv.as_f64()));
         } else if nv.is_sso() {
             let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
-            out.push_str(nv.sso_as_str(&mut buf));
+            Self::write_text(nv.sso_as_str(&mut buf), out, !path.is_empty());
         } else if nv.is_heap() {
             self.write_heap_repr(nv, out, path);
         } else {
@@ -42,8 +42,9 @@ impl HeapInner {
             out.push('…');
             return;
         }
+        let nested = !path.is_empty();
         path.push(id);
-        self.write_heap_body(nv, out, path);
+        self.write_heap_body(nv, out, path, nested);
         path.pop();
     }
 
@@ -84,7 +85,15 @@ impl HeapInner {
         out.push_str(if any { " }" } else { "}" });
     }
 
-    fn write_heap_body(&self, nv: VmValue, out: &mut String, path: &mut Vec<u64>) {
+    fn write_text(text: &str, out: &mut String, nested: bool) {
+        if nested {
+            varn_core::text_repr::write_quoted_str(text, out);
+        } else {
+            out.push_str(text);
+        }
+    }
+
+    fn write_heap_body(&self, nv: VmValue, out: &mut String, path: &mut Vec<u64>, nested: bool) {
         if let Some(inst) = self.instance(nv.as_heap()) {
             let class = ClassObj::find_by_id(inst.class_id);
             let name = class.as_ref().map_or("Object", |c| c.name.as_str());
@@ -107,8 +116,14 @@ impl HeapInner {
             return;
         };
         match obj {
-            HeapObj::Str(s) => out.push_str(s.as_ref()),
-            HeapObj::Char(c) => out.push(*c),
+            HeapObj::Str(s) => Self::write_text(s.as_ref(), out, nested),
+            HeapObj::Char(c) => {
+                if nested {
+                    let _ = write!(out, "{c:?}");
+                } else {
+                    out.push(*c);
+                }
+            }
             HeapObj::Array(a) => {
                 let items: Vec<VmValue> = (0..a.len()).filter_map(|i| a.get_vm(i)).collect();
                 self.write_list("[", "]", items.into_iter(), out, path);

@@ -26,8 +26,6 @@ function scBool(): str { return `b=${true}`}
 
 function scFloat(): str { return `f=${1.5}`}
 
-// A float that happens to be integral prints without a fractional part —
-// pinned because `str_repr_into` has a dedicated branch for it.
 function scWholeFloat(): str { return `w=${3.0}`}
 
 // Accumulation in a loop — the shape `str_concat`'s extensible-buffer fast
@@ -72,7 +70,7 @@ await describe("64 str concat typed", async () => {
         expect(scNull()).toBe("v=null")
         expect(scBool()).toBe("b=true")
         expect(scFloat()).toBe("f=1.5")
-        expect(scWholeFloat()).toBe("w=3")
+        expect(scWholeFloat()).toBe("w=3.0")
         
         // Negative and zero through the itoa path.
         expect((`x${-5}`)).toBe("x-5")

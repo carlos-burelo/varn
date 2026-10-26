@@ -67,11 +67,15 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 
 ### Semántica
 - [x] `indexOf`/`includes` usan la igualdad del lenguaje (`NaN` no se encuentra; tuplas y records por valor)
-- [ ] Igualdad: `[1]==[1]` (identidad) vs `#{}` (valor): decidir si `==` sobre arrays/objetos mutables debe ser error
+- [ ] Igualdad: decisión autorizada (2026-10-26): rechazar `==` / `!=` sobre
+  arrays, objetos y colecciones mutables; exigir comparación explícita.
 - [x] Sombreado de predefinidos: `Infinity`/`NaN` y tipos primitivos no se redeclaran (módulos core exentos)
 - [x] `x instanceof int` es el test de tipo para uniones (la std lo usa y estrecha): decisión, sin cambio
 - [ ] `dynamic` sin autorización explícita (Ley 17): inventariar usos
-- [ ] `print(1.0)` muestra `1`; strings sin comillas dentro de contenedores
+- [x] Presentación conserva `.0` en floats enteros (incluido `-0.0`); strings
+  y chars anidados llevan delimitadores. JSON y presentación comparten escapes
+  de cadenas, incluidos todos los controles U+0000..U+001F. Los seis consumidores
+  de la suite que fijaban el formato anterior se migraron.
 - [x] `max()` / `min()` sin argumentos: error de compilación (primer argumento obligatorio)
 - [ ] `Json.parse` descarta campos desconocidos en silencio
 

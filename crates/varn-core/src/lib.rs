@@ -26,6 +26,7 @@ pub mod runtime_kind;
 pub mod runtime_ops;
 pub mod source;
 pub mod term;
+pub mod text_repr;
 pub mod token;
 pub mod trivia;
 pub mod type_desc;

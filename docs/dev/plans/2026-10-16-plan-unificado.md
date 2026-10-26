@@ -45,6 +45,11 @@ límite lógico de 10000; se elimina su bypass. La protección física de pila s
 independiente. ABI JIT 11 invalida imágenes anteriores; salidas normales y suspensión
 restauran la profundidad del tramo nativo. Suite de recursión y callbacks verde.
 
+Presentación (2026-10-26): floats enteros muestran `.0`; strings y chars
+anidados conservan sus delimitadores. Se elimina el escape JSON separado: una
+función de core escribe cadenas entre comillas y escapa todos los controles C0.
+Consumidores de snapshots de la suite migrados, sin cambiar los datos JSON.
+
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
 destructuring de tupla por posición (`e8e1717d`); local `dynamic`

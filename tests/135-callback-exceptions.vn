@@ -47,7 +47,7 @@ await describe("135 callback exceptions", async () => {
     });
 
     await it("group 1 part 3", async () => {
-        expect([2.5, 10.0, 1.0].sort().join(",")).toBe("1,2.5,10");
+        expect([2.5, 10.0, 1.0].sort().join(",")).toBe("1.0,2.5,10.0");
         expect(["b", "a", "c"].sort().join("")).toBe("abc");
         expect([#[1, "a"], #[0, "b"], #[1, "c"]].sort((x: #[int, str], y: #[int, str]) => x[0] - y[0]).map((t: #[int, str]) => t[1]).join("")).toBe("bac");
         expect([new Ver(3), new Ver(1), new Ver(2)].sort().map((v: Ver) => v.n).join(",")).toBe("1,2,3");

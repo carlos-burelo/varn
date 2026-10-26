@@ -64,7 +64,7 @@ const m = 60
 const trm = m * (m - 1) / 2
 await describe("151 jit osr", async () => {
         await it("group 1 part 1", async () => {
-        expect(single == "60000/15000/...").toBeTruthy();
+        expect(single == "60000/15000.0/...").toBeTruthy();
         expect(osNested(n)).toBe(tri * tri + tri);
     });
 

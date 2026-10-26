@@ -1,3 +1,5 @@
+use varn_core::text_repr::write_quoted_str;
+
 use super::*;
 
 pub(super) fn value_estimate_capacity(ctx: &ExecCtx, val: VmValue) -> usize {
@@ -70,7 +72,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String, depth
     }
     if val.is_sso() {
         let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
-        write_json_str(val.sso_as_str(&mut buf), out);
+        write_quoted_str(val.sso_as_str(&mut buf), out);
         return;
     }
     if val.is_heap() {
@@ -81,7 +83,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String, depth
         }
         match ctx.heap.get(val.as_heap()) {
             Some(HeapObj::Str(h)) => {
-                write_json_str(h.as_str(), out);
+                write_quoted_str(h.as_str(), out);
                 return;
             }
             Some(HeapObj::Array(a) | HeapObj::Tuple(a)) => {
@@ -151,7 +153,7 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String, depth
                     }
                     first = false;
                     let key_s = ctx.heap.str_repr(k.0);
-                    write_json_str(&key_s, out);
+                    write_quoted_str(&key_s, out);
                     out.push(':');
                     write_json_vm(ctx, v, out, depth + 1);
                 }
@@ -181,37 +183,4 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String, depth
         }
     }
     out.push_str("null");
-}
-
-pub(super) fn write_json_str(s: &str, out: &mut String) {
-    out.push('"');
-    let bytes = s.as_bytes();
-
-    if !bytes.iter().any(|&b| b == b'"' || b == b'\\' || b < 0x20) {
-        out.push_str(s);
-        out.push('"');
-        return;
-    }
-    let mut start = 0;
-    for (i, &b) in bytes.iter().enumerate() {
-        let escaped = match b {
-            b'"' => "\\\"",
-            b'\\' => "\\\\",
-            b'\x08' => "\\b",
-            b'\x0c' => "\\f",
-            b'\n' => "\\n",
-            b'\r' => "\\r",
-            b'\t' => "\\t",
-            _ => continue,
-        };
-        if start < i {
-            out.push_str(&s[start..i]);
-        }
-        out.push_str(escaped);
-        start = i + 1;
-    }
-    if start < bytes.len() {
-        out.push_str(&s[start..]);
-    }
-    out.push('"');
 }
