@@ -16,6 +16,7 @@ mod definite_assignment;
 pub(crate) mod foreign_classes;
 pub(crate) mod foreign_collect;
 mod foreign_enums;
+mod generic_boundaries;
 mod interface_shapes;
 mod literal_fit;
 mod param_defaults;

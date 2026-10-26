@@ -1,59 +1,6 @@
-import { Computed, Owner, Signal, SlotKind, computed, withOwner } from "std:signals";
+import { Computed, Scope, Signal, computed, withOwner } from "std:signals";
 
-class Held {
-    kind: SlotKind;
-
-    constructor(kind: SlotKind) {
-        this.kind = kind;
-    }
-}
-
-class Boxed<T> extends Held {
-    value: T;
-
-    constructor(kind: SlotKind, value: T) {
-        super(kind);
-        this.value = value;
-    }
-}
-
-export class ComponentScope extends Owner {
-    private _slots: Held[] = [];
-    private _cleanups: (() => void)[] = [];
-    private _cursor: int = 0;
-
-    override adopt<T>(kind: SlotKind, make: () => T): T {
-        if (this._cursor < this._slots.length) {
-            const held = this._slots[this._cursor];
-            if (held.kind != kind) {
-                throw new Error("ui: a component created its state in a different order than on the previous frame");
-            }
-            this._cursor = this._cursor + 1;
-            return (held as Boxed<T>).value;
-        }
-        const created = make();
-        this._slots.push(new Boxed<T>(kind, created));
-        this._cursor = this._cursor + 1;
-        return created;
-    }
-
-    override onDispose(fn: () => void): void {
-        this._cleanups.push(fn);
-    }
-
-    rewind(): void {
-        this._cursor = 0;
-    }
-
-    dispose(): void {
-        const pending = this._cleanups;
-        this._cleanups = [];
-        this._slots = [];
-        for (let at = pending.length - 1; at >= 0; at = at - 1) {
-            pending[at]();
-        }
-    }
-}
+export class ComponentScope extends Scope {}
 
 const owners = new Map<str, ComponentScope>();
 let touched = new Set<str>();
@@ -135,12 +82,14 @@ export class View<T> {
     }
 
     private produce(): T {
-        const body = this._body.value as () => T;
+        const body = this._body.value;
+        if (body === null) {
+            throw new Error("ui: a view has no body");
+        }
         const scope = this._scope;
         if (scope === null) {
             return body();
         }
-        scope.rewind();
         return withOwner(scope, body);
     }
 }

@@ -2,7 +2,7 @@ import {
     Column, Row, Text, Title, Headline, Caption, Card, Box, Button, ButtonKind, Checkbox, Switch, Slider, Field,
     Segmented, Tabs, Select, Dialog, Toaster, Toasts, Scroll, Each, Grid, Table, Progress, Divider, Spacer,
     Padding, Stack, Expanded, MainAxis, Theme, Colors, UiFrame, Focus, Widget,
-    signal, computed, effect, component, run
+    State, Signal, Effect, signal, computed, effect, component, run
 } from "std:ui";
 
 type Task = { id: int, title: str, done: bool };
@@ -114,10 +114,13 @@ function overlays(): Widget {
     ]);
 }
 
+const galleryEffect = new State<Effect>();
+const galleryScroll = new State<Signal<float>>();
+
 @component()
 function Gallery(): Widget {
-    effect(() => print(`tasks left: ${remaining.value}`));
-    return Scroll(overlays(), signal(0.0));
+    galleryEffect.get(() => effect(() => print(`tasks left: ${remaining.value}`)));
+    return Scroll(overlays(), galleryScroll.get(() => signal(0.0)));
 }
 
 run("varn all components", build: (fr: UiFrame, focus: Focus): Widget => Gallery(), w: 640, h: 800);

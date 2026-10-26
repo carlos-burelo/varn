@@ -1,0 +1,29 @@
+import { Owner, currentOwner } from "std:signals/owner";
+
+class StateValue<T> {
+    value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+}
+
+export class State<T> {
+    private values: Map<Owner, StateValue<T>> = new Map<Owner, StateValue<T>>();
+
+    get(make: () => T): T {
+        const owner = currentOwner();
+        if (owner === null) {
+            throw new Error("signals: State.get needs an active owner");
+        }
+        const host: Owner = owner;
+        const existing = this.values.get(host);
+        if (existing !== null) {
+            return existing.value;
+        }
+        const value = make();
+        this.values.set(host, new StateValue<T>(value));
+        host.onDispose(() => { this.values.delete(host); });
+        return value;
+    }
+}

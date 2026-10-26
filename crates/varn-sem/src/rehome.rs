@@ -10,17 +10,22 @@ pub fn rehome_ty(ty: Type, from: &CheckerTyTable, to: &mut CheckerTyTable) -> Ty
 
 pub fn rehome_ty_with_origin(
     ty: Type,
-    from: &CheckerTyTable,
-    from_source_file: &str,
+    from: &crate::bind::BindResult,
     to: &mut CheckerTyTable,
 ) -> Type {
-    let ty = rehome_ty(ty, from, to);
-    if matches!(
-        to.get(ty.0),
-        varn_core::TypeKind::Named(_, None) | varn_core::TypeKind::Generic(_, _, None)
-    ) {
-        let origin = to.intern_name(from_source_file);
-        return ty.with_origin(origin, to);
+    let ty = rehome_ty(ty, &from.ty_table, to);
+    if let varn_core::TypeKind::Named(name, None) | varn_core::TypeKind::Generic(name, _, None) =
+        to.get(ty.0)
+    {
+        let nominal = from
+            .ty_table
+            .names()
+            .try_resolve(name)
+            .is_some_and(|name| from.classify_decl(name).is_some());
+        if nominal {
+            let origin = to.intern_name(from.source_file.as_ref());
+            return ty.with_origin(origin, to);
+        }
     }
     ty
 }

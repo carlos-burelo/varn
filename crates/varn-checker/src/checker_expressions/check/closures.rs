@@ -76,6 +76,7 @@ impl<'r> Checker<'r> {
         for tp in &injected_type_params {
             self.active_type_params.remove(tp.as_ref());
         }
+        self.mark_infer_env_dirty();
     }
 
     pub(super) fn check_function_expr(
@@ -146,6 +147,8 @@ impl<'r> Checker<'r> {
         let source_base = source.apparent(&self.ty_table);
         let target_base = target.apparent(&self.ty_table);
         if source_base.is_dynamic()
+            || (!self.open_parameters(*source, bind).is_empty()
+                && self.open_parameters(*target, bind).is_empty())
             || target_base.is_dynamic()
             || (source_base.is_numeric() && target_base.is_numeric())
             || (source_base.is_int() && self.is_enum_type_of(&target_base, bind))
@@ -208,6 +211,7 @@ impl<'r> Checker<'r> {
     pub(super) fn check_as_cast(
         &mut self,
         rec: &mut Recorder,
+        at: ExprId,
         expression: ExprId,
         type_ann: &varn_core::ast::TypeNode,
         range: varn_core::SourceRange,
@@ -215,6 +219,19 @@ impl<'r> Checker<'r> {
     ) {
         let target = self.resolve_type_node_cached(type_ann, bind);
         let source = self.infer_type(rec, expression, bind);
+        if !self.open_parameters(target, bind).is_empty() {
+            if source.0 == target.0
+                || source == Type::Never
+                || self.value_fits(rec, &target, &source, Some(expression), Some(bind))
+                || rec.decoder_returns.contains(&at.index())
+            {
+                return;
+            }
+            self.emit(Diagnostic::error(ErrorCode::InvalidAsCast,
+                "cannot check a cast to an unresolved type parameter; preserve its type or decode at a concrete call site")
+                .with_range(range));
+            return;
+        }
         if self.cast_related(rec, &source, &target, Some(expression), bind) {
             return;
         }

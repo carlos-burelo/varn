@@ -29,6 +29,9 @@ impl<'r> Checker<'r> {
         inferred: &Type,
         bind: Option<&BindResult>,
     ) -> bool {
+        if bind.is_some_and(|b| self.unchecked_generic_conversion(*declared, *inferred, b)) {
+            return false;
+        }
         if let Some(fits) = self.fits_open_parameter(declared, inferred, bind) {
             return fits;
         }
@@ -52,36 +55,13 @@ impl<'r> Checker<'r> {
         inferred: &Type,
         bind: Option<&BindResult>,
     ) -> Option<bool> {
-        let varn_core::TypeKind::Named(name, _) = self.ty_table.get(declared.0) else {
+        let varn_core::TypeKind::Named(_, None) = self.ty_table.get(declared.0) else {
             return None;
         };
-        let name = self.resolve_bind_atom(bind?, name);
-        if !self.active_type_params.contains(name.as_ref()) {
+        if self.open_parameters(*declared, bind?).is_empty() {
             return None;
         }
-        let same_parameter = match self.ty_table.get(inferred.0) {
-            varn_core::TypeKind::Named(given, _) => self.resolve_bind_atom(bind?, given) == name,
-            varn_core::TypeKind::Primitive(_)
-            | varn_core::TypeKind::Literal(_)
-            | varn_core::TypeKind::This
-            | varn_core::TypeKind::Array(_)
-            | varn_core::TypeKind::Union(_)
-            | varn_core::TypeKind::Intersection(_)
-            | varn_core::TypeKind::Tuple(_)
-            | varn_core::TypeKind::Generic(..)
-            | varn_core::TypeKind::TemplateLiteral(_)
-            | varn_core::TypeKind::Fn(_)
-            | varn_core::TypeKind::Object(_)
-            | varn_core::TypeKind::Typeof(_)
-            | varn_core::TypeKind::KeyOf(_)
-            | varn_core::TypeKind::IndexedAccess { .. }
-            | varn_core::TypeKind::Mapped { .. }
-            | varn_core::TypeKind::Conditional { .. }
-            | varn_core::TypeKind::Infer(_)
-            | varn_core::TypeKind::EnumVariant { .. }
-            | varn_core::TypeKind::TypePredicate { .. } => false,
-        };
-        Some(same_parameter || inferred.is_dynamic() || *inferred == Type::Never)
+        Some(declared.0 == inferred.0 || *inferred == Type::Never)
     }
 
     fn instantiate_interface(
@@ -145,6 +125,9 @@ impl<'r> Checker<'r> {
         init_expr: Option<varn_core::ast::ExprId>,
         bind: Option<&BindResult>,
     ) -> bool {
+        if bind.is_some_and(|b| self.unchecked_generic_conversion(*target_ty, *init_ty, b)) {
+            return false;
+        }
         if self.types_compatible_cached(target_ty, init_ty, bind) {
             return true;
         }
@@ -182,12 +165,7 @@ impl<'r> Checker<'r> {
 
     pub(crate) fn reintern_foreign_ty(&mut self, bind: &BindResult, ty: Type) -> Type {
         let table = std::sync::Arc::make_mut(&mut self.ty_table);
-        varn_sem::rehome::rehome_ty_with_origin(
-            ty,
-            &bind.ty_table,
-            bind.source_file.as_ref(),
-            table,
-        )
+        varn_sem::rehome::rehome_ty_with_origin(ty, bind, table)
     }
 
     pub(crate) fn mark_infer_env_dirty(&mut self) {

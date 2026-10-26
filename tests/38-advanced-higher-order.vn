@@ -39,14 +39,12 @@ function expensiveDouble(n: int): int {
 
 // ── once: run function at most once ──────────────────────────────
 function once<T>(f: () => T): () => T {
-    let ran = false
-    let result: T | null = null
+    let result: Option<T> = Option.None
     return () => {
-        if (!ran) {
-            result = f()
-            ran = true
+        if (result.isNone()) {
+            result = Option.Some(f())
         }
-        return result as T
+        return result.unwrap()
     }
 }
 

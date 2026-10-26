@@ -25,6 +25,15 @@ impl<'r> Checker<'r> {
 
         let actual = if let Some(arg) = argument {
             let expected_ret = self.expected_return_type;
+            if expected_ret.is_some_and(|ty| self.can_defer_decoder_return(ty, bind)) {
+                let mut tail = arg;
+                while let varn_core::ast::ExprKind::Paren { expression } =
+                    &self.ast_arena.expr(tail).kind
+                {
+                    tail = *expression;
+                }
+                rec.decoder_returns.insert(tail.index());
+            }
             self.with_expected(expected_ret, |c| c.check_expr(rec, arg, bind));
             self.infer_type(rec, arg, bind)
         } else {
@@ -40,7 +49,10 @@ impl<'r> Checker<'r> {
             } else {
                 expected
             };
-            if !self.value_fits(rec, &check_expected, &actual, argument, Some(bind)) {
+            let deferred = argument.is_some()
+                && actual.is_dynamic()
+                && self.can_defer_decoder_return(check_expected, bind);
+            if !deferred && !self.value_fits(rec, &check_expected, &actual, argument, Some(bind)) {
                 let expected_s = expected.display(&self.ty_table, &bind.interner);
                 let actual_s = actual.display(&self.ty_table, &bind.interner);
                 self.emit(

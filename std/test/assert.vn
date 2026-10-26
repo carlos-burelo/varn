@@ -120,8 +120,8 @@ export class Expectation<T> {
         if (actual is str) {
             found = item is str && actual.includes(item);
         } else {
-            for (let elem of (actual as dynamic) as E[]) {
-                if (isEq(elem, item)) {
+            for (let elem of (actual as dynamic) as dynamic[]) {
+                if (isEq<dynamic>(elem, item)) {
                     found = true;
                     break;
                 }

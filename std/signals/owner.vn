@@ -1,7 +1,4 @@
-export class SlotKind {}
-
 export abstract class Owner {
-    abstract adopt<T>(kind: SlotKind, make: () => T): T;
     abstract onDispose(fn: () => void): void;
 }
 
@@ -27,10 +24,6 @@ export class Scope extends Owner {
 
     get alive(): bool {
         return this._alive;
-    }
-
-    override adopt<T>(kind: SlotKind, make: () => T): T {
-        return make();
     }
 
     override onDispose(fn: () => void): void {

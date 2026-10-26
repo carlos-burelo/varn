@@ -32,6 +32,13 @@ como `IntUshr`.
 Interfaces: el checker entrega formas instanciadas por identidad semántica
 (origen y argumentos incluidos); se elimina el índice de propiedades por
 nombre del emitter. Decode conserva miembros heredados y recursivos.
+Parámetros abiertos (2026-10-26): conversiones internas requieren prueba estática;
+decode se difiere solo desde retornos síncronos directos con tipo elegido por el
+llamador. Se corrigen scopes de firmas, origen de parámetros, inferencia de retornos
+de closures y varianza de sumas; las variantes ausentes usan `never`. `unwrapOr<U>`
+devuelve `T | U`. Signals conserva ausencia con `Option<T>`, metadata con mapas
+tipados y UI con handles `State<T>`; se borra `Owner.adopt` y el almacenamiento
+heterogéneo por posición. Ruptura autorizada por el dueño; consumidores migrados.
 
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);

@@ -1,8 +1,6 @@
 import { Observer, Source, batch, changed, currentObserver, enqueue, runCleanups, runTracked, unlink } from "std:signals/graph";
-import { Owner, SlotKind, currentOwner } from "std:signals/owner";
+import { currentOwner } from "std:signals/owner";
 import { Scheduler } from "std:signals/scheduler";
-
-const EFFECT = new SlotKind();
 
 export class Effect implements Observer {
     sources: Source[] = [];
@@ -73,20 +71,12 @@ export class Effect implements Observer {
 
 export function effect(body: () => void, scheduler: Scheduler? = null): Effect {
     const owner = currentOwner();
-    const start = (): Effect => {
-        const fx = new Effect(body, scheduler);
-        fx.run();
-        return fx;
-    };
-    if (owner === null) {
-        return start();
+    const fx = new Effect(body, scheduler);
+    fx.run();
+    if (owner !== null) {
+        owner.onDispose(() => fx.dispose());
     }
-    const host: Owner = owner;
-    return host.adopt<Effect>(EFFECT, () => {
-        const fx = start();
-        host.onDispose(() => fx.dispose());
-        return fx;
-    });
+    return fx;
 }
 
 export function onCleanup(fn: () => void): void {

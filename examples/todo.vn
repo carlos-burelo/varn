@@ -1,6 +1,6 @@
 import {
     Column, Row, Text, Title, Caption, Button, ButtonKind, Checkbox, Field, Each, Expanded, Spacer,
-    signal, effect, component, run, Widget, Theme, UiFrame, Focus
+    State, Signal, signal, effect, component, run, Widget, Theme, UiFrame, Focus
 } from "std:ui";
 import { readText, writeText, exists } from "std:fs";
 import { Json } from "std:encoding";
@@ -22,10 +22,11 @@ function loadTodos(): Todo[] {
 
 const todos = signal<Todo[]>(loadTodos());
 effect(() => writeText(FILE, Json.stringify(todos.value)));
+const draftState = new State<Signal<str>>();
 
 @component()
 function App(): Widget {
-    const draft = signal("");
+    const draft = draftState.get(() => signal(""));
 
     const add = (): void => {
         const clean = draft.value.trim();

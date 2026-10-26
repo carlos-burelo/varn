@@ -2,18 +2,18 @@ import { Signal } from "std:signals";
 
 export function current<T>(source: T | Signal<T>): T {
     if (source is Signal<T>) {
-        return (source as Signal<T>).value;
+        return source.value;
     }
-    return source as T;
+    return source;
 }
 
 export function writer<T>(source: T | Signal<T>, change: ((next: T) => void)?): (next: T) => void {
     if (source is Signal<T>) {
-        const bound = source as Signal<T>;
+        const bound = source;
         return (next: T) => bound.set(next);
     }
     if (change === null) {
         throw new Error("a widget given a plain value needs its change callback");
     }
-    return change as (next: T) => void;
+    return change;
 }

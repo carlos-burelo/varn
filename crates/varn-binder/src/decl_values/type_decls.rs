@@ -49,6 +49,12 @@ impl<'r> super::super::Binder<'r> {
         self.define(e.id, sym);
 
         self.declare_kind(id_rc.clone(), varn_sem::bind::DeclKind::Enum);
+        let child = self
+            .scopes
+            .child(varn_sem::scope::ScopeKind::Class, self.current);
+        let saved = self.current;
+        self.current = child;
+        self.bind_type_params(&e.type_params, line);
         self.sum_type_variants.insert(
             id_rc.clone(),
             e.members
@@ -87,7 +93,7 @@ impl<'r> super::super::Binder<'r> {
                 let variant_ty = if type_param_names.is_empty() {
                     Type::named_with_origin(id_rc.clone(), Some(origin.clone()), table)
                 } else {
-                    let unknown = vec![Type::Dynamic; type_param_names.len()];
+                    let unknown = vec![Type::Never; type_param_names.len()];
                     Type::generic_with_origin(id_rc.clone(), unknown, Some(origin.clone()), table)
                 };
                 let v_sym = Symbol::new(SymbolKind::EnumMember, member.id, member.range.start.line)
@@ -109,7 +115,19 @@ impl<'r> super::super::Binder<'r> {
                 } else {
                     let params: Vec<Type> = type_param_names
                         .iter()
-                        .map(|tp| Type::named(tp.clone(), table))
+                        .map(|tp| {
+                            let name = varn_core::Atom::of(tp);
+                            let mut pending: Vec<Type> = fields.iter().map(|(_, ty)| *ty).collect();
+                            let mut used = false;
+                            while let Some(ty) = pending.pop() {
+                                if matches!(table.get(ty.0), varn_core::TypeKind::Named(n, None) if n == name) {
+                                    used = true;
+                                    break;
+                                }
+                                pending.extend(ty.components(table));
+                            }
+                            if used { Type::named(tp.clone(), table) } else { Type::Never }
+                        })
                         .collect();
                     Type::generic_with_origin(id_rc.clone(), params, Some(origin.clone()), table)
                 };
@@ -147,14 +165,6 @@ impl<'r> super::super::Binder<'r> {
                 ..Default::default()
             });
         }
-
-        let child = self
-            .scopes
-            .child(varn_sem::scope::ScopeKind::Class, self.current);
-        let saved = self.current;
-        self.current = child;
-
-        self.bind_type_params(&e.type_params, line);
 
         let mut methods: rustc_hash::FxHashMap<Arc<str>, Type> = rustc_hash::FxHashMap::default();
         let mut members: Vec<ClassMemberInfo> = Vec::new();

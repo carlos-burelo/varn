@@ -1,36 +1,13 @@
 import { describe, it, expect } from "std:test";
 import {
     Readable, Signal, Computed, Effect, signal, computed, effect, batch, untracked, onCleanup,
-    Owner, Scope, SlotKind, scope, withOwner, ManualScheduler
+    Owner, Scope, State, scope, withOwner, ManualScheduler
 } from "std:signals";
 
 function twice(source: Readable<int>): int { return source.value * 2 }
 
-class Held {}
-
-class Boxed<T> extends Held {
-    value: T;
-    constructor(value: T) {
-        super();
-        this.value = value;
-    }
-}
-
 class Slots extends Owner {
-    kept: Held[] = [];
-    cursor: int = 0;
     cleanups: (() => void)[] = [];
-    override adopt<T>(kind: SlotKind, make: () => T): T {
-        if (this.cursor < this.kept.length) {
-            const held = this.kept[this.cursor] as Boxed<T>;
-            this.cursor = this.cursor + 1;
-            return held.value;
-        }
-        const created = make();
-        this.kept.push(new Boxed<T>(created));
-        this.cursor = this.cursor + 1;
-        return created;
-    }
     override onDispose(fn: () => void): void { this.cleanups.push(fn) }
 }
 
@@ -198,12 +175,12 @@ await describe("235 signals", async () => {
         expect(runs).toBe(2)
     })
 
-    await it("an owner decides what outlives a rebuild", () => {
+    await it("typed handles retain state within an owner", () => {
         const slots = new Slots()
-        const build = (): Signal<int> => withOwner(slots, () => signal(7))
+        const retained = new State<Signal<int>>()
+        const build = (): Signal<int> => withOwner(slots, () => retained.get(() => signal(7)))
         const first = build()
         first.value = 8
-        slots.cursor = 0
         const second = build()
         expect(second.value).toBe(8)
         expect(second === first).toBe(true)

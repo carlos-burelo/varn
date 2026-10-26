@@ -13,15 +13,6 @@ impl<'r> Checker<'r> {
     ) {
         self.check_signature_type_names(&f.type_params, &f.params, f.return_type.as_ref(), bind);
         let saved_expected = self.expected_return_type.take();
-        self.expected_return_type = f.return_type.as_ref().map(|rt| {
-            let ty = self.resolve_type_node_cached(rt, bind);
-            if f.modifiers.is_async {
-                varn_sem::types::awaited(&ty, &self.ty_table)
-            } else {
-                ty
-            }
-        });
-
         let saved_scope = self.current_scope;
         let next_scope = self.next_child_scope(bind);
         if let Some(fn_scope) = next_scope {
@@ -34,6 +25,14 @@ impl<'r> Checker<'r> {
             self.active_type_params.insert(tp_name.clone());
             injected_tps.push(tp_name);
         }
+        self.expected_return_type = f.return_type.as_ref().map(|rt| {
+            let ty = self.resolve_type_node_cached(rt, bind);
+            if f.modifiers.is_async {
+                varn_sem::types::awaited(&ty, &self.ty_table)
+            } else {
+                ty
+            }
+        });
 
         let is_gen = f.modifiers.is_generator;
         let declared_yield = f.return_type.as_ref().filter(|_| is_gen).map(|ann| {

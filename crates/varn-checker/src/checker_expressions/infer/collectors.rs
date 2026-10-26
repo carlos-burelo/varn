@@ -23,9 +23,11 @@ pub(crate) fn arrow_body_return_type(
         ArrowBody::Block(block) => {
             let mut returns = Returns::default();
             collect_returns(block, checker, rec, bind, &mut returns);
+            if returns.dynamic {
+                return Type::Dynamic;
+            }
             let mut return_tys = returns.typed;
             match return_tys.len() {
-                0 if returns.dynamic => Type::Dynamic,
                 0 if !crate::checker::completion::can_complete_normally(
                     block,
                     checker.ast_arena,
@@ -67,7 +69,10 @@ fn collect_returns(
         StmtKind::Return {
             argument: Some(e), ..
         } => {
-            let ty = checker.infer_type(rec, *e, bind);
+            let ty = match rec.expr_table.get(&e.index()) {
+                Some(entry) => entry.ty,
+                None => checker.infer_type(rec, *e, bind),
+            };
             if ty.is_dynamic() {
                 out.dynamic = true;
             } else {

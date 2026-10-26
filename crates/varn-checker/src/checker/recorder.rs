@@ -6,6 +6,7 @@ use varn_sem::symbol::SymbolId;
 use varn_sem::types::Type;
 
 pub(crate) struct Recorder {
+    pub(crate) decoder_returns: rustc_hash::FxHashSet<varn_core::ast::AstId>,
     pub(crate) enabled: bool,
     pub(crate) expr_types: FxHashMap<u32, ExprInfo>,
     pub(crate) symbol_types: FxHashMap<SymbolId, Type>,
@@ -23,6 +24,7 @@ pub(crate) struct Recorder {
 impl Recorder {
     pub(crate) fn new(enabled: bool) -> Self {
         Self {
+            decoder_returns: rustc_hash::FxHashSet::default(),
             enabled,
             expr_types: FxHashMap::default(),
             symbol_types: FxHashMap::default(),

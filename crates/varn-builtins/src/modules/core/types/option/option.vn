@@ -29,7 +29,7 @@ export enum Option<T> {
         };
     }
 
-    unwrapOr(fallback: T): T {
+    unwrapOr<U>(fallback: U): T | U {
         return match (this) {
             Some(value) => value,
             None => fallback

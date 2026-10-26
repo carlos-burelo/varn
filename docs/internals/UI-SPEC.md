@@ -3,13 +3,14 @@
 Version: 1.0-draft
 Module: `std:ui`
 
-> **Estado de implementación (2026-10-22, verificado en `std/ui/` y `std/signals/`).**
+> **Estado de implementación (2026-10-26, verificado en `std/ui/` y `std/signals/`).**
 > El grafo reactivo vive en `std:signals`, independiente de la UI: `Readable<T>`
 > (`Signal<T>`, `Computed<T>`), `effect`, `batch`, `untracked`, `onCleanup`, `Scope`,
 > `Scheduler`, `until`, `next`, `changes`, `resource`. `std:ui` lo reexporta.
 > `@component()` (con paréntesis; sin ellos es error de compilación) monta su cuerpo
-> de forma perezosa, durante el layout. Su estado (`signal`, `computed`, `effect`)
-> pertenece al nodo montado, identificado por ruta de montaje y definición, y se libera
+> de forma perezosa, durante el layout. El estado retenido se obtiene mediante handles
+> `State<T>` declarados fuera del cuerpo, usando `handle.get(() => signal(initial))`.
+> Cada handle conserva un valor de su tipo por owner del montaje, y se libera
 > cuando un fotograma completo no lo monta. La raíz y cada componente se reconstruyen
 > solo cuando cambia una señal que leyeron (`View`, `std/ui/state.vn`).
 > Catálogo público (`widget/*.vn`, sin prefijo): `Text`/`Title`/`Headline`/`Caption`,

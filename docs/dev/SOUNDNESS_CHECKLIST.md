@@ -46,7 +46,15 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
   Sondas de `Box<int>`, imports renombrados, miembros anidados, herencia y
   recursión rechazan tipos incorrectos; `Box<str>` y `Envelope<int>` válidos pasan.
 - [x] `Json.parse<T>` sobre `class`: decisión: no decodificable; falla con TypeError en runtime (una clase puede ser un retorno legítimo de otras funciones genéricas, por eso no es error de compilación)
-- [ ] `as T` con `T` genérico sin comprobación (`signals/reactive`, `ui/bound`, `reflect/meta`)
+- [x] `as T` exige prueba estática dentro de cuerpos genéricos; la conversión implícita
+  de `dynamic` a un parámetro abierto también se rechaza. Solo el retorno directo de
+  un decoder síncrono con parámetros elegidos por el llamador se difiere al contrato
+  concreto del sitio de llamada. Signals usa `Option<T>` para distinguir ausencia
+  de un `T` nulo; UI usa handles `State<T>` por owner y elimina slots heterogéneos;
+  `MetaKey<T>` conserva almacenamiento tipado. Colas, ejemplos y consumidores migrados.
+  Se eliminaron 15 casts a tipos abiertos de std y consumidores; los tres ejemplos
+  declarativos y las dos suites que dependían de slots implícitos usan 14 handles
+  tipados. Se migró además el memoizador `once` de la suite de orden superior.
 - [ ] Paridad de límites de recursión entre intérprete (10000 frames) y JIT (bytes de pila)
 - [x] VN3031 entre módulos (regla por tipo; descartar a propósito: `_ = llamada()`)
 - [x] `Task` (perezosa) vs `TaskHandle` (iniciada): contratos nativos retipados

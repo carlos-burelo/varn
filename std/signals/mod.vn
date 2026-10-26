@@ -1,6 +1,7 @@
 export { Readable, Signal, Computed, signal, computed } from "std:signals/reactive";
 export { Effect, effect, onCleanup } from "std:signals/effect";
 export { batch, untracked } from "std:signals/graph";
-export { Owner, Scope, SlotKind, scope, currentOwner, withOwner } from "std:signals/owner";
+export { Owner, Scope, scope, currentOwner, withOwner } from "std:signals/owner";
+export { State } from "std:signals/state";
 export { Scheduler, ManualScheduler } from "std:signals/scheduler";
 export { until, next, changes, Changes, Resource, resource } from "std:signals/task";

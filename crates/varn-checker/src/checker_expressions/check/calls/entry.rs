@@ -147,6 +147,14 @@ impl<'r> Checker<'r> {
             let mapping = build_call_mapping(callee, type_args, args, &ft, self, rec, bind);
             let type_params = fn_type_param_names(callee, &ft, self, bind);
             if self.returns_caller_chosen_type(&ft, &type_params, &mapping) {
+                let result = map_generics_cached(self, &Type::resolved(ft.return_type), &mapping);
+                if !self.open_parameters(result, bind).is_empty()
+                    && !rec.decoder_returns.contains(&call_id)
+                {
+                    self.emit(Diagnostic::error(ErrorCode::InvalidAsCast,
+                        "decoding requires a concrete result type; an unresolved type parameter has no runtime contract")
+                        .with_range(*range));
+                }
                 rec.desugar.decoded_calls.insert(call_id);
             }
             if type_args.is_empty() {

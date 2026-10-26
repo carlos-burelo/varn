@@ -38,7 +38,7 @@ pub(crate) fn reintern_member_type(
     if !b.ty_table.contains(ty.0) {
         return ty;
     }
-    crate::rehome::rehome_ty_with_origin(ty, &b.ty_table, b.source_file.as_ref(), table)
+    crate::rehome::rehome_ty_with_origin(ty, &b, table)
 }
 
 pub(crate) fn infer_member(

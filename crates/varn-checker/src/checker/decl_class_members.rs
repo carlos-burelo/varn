@@ -93,6 +93,18 @@ impl<'r> Checker<'r> {
                     ..
                 } => {
                     let body = *body;
+                    let saved_scope = self.current_scope;
+                    let body_range = self.ast_arena.stmt(body).range;
+                    if let Some(m_scope) = self.next_child_scope(bind) {
+                        self.current_scope = m_scope;
+                        self.record_scope_span(
+                            rec,
+                            body_range.start.offset,
+                            body_range.end.offset,
+                            m_scope,
+                        );
+                    }
+
                     let declared_yield = return_type
                         .as_ref()
                         .filter(|_| modifiers.is_generator)
@@ -111,19 +123,6 @@ impl<'r> Checker<'r> {
                             ty
                         }
                     });
-
-                    let saved_scope = self.current_scope;
-                    let body_range = self.ast_arena.stmt(body).range;
-                    if let Some(m_scope) = self.next_child_scope(bind) {
-                        self.current_scope = m_scope;
-                        self.record_scope_span(
-                            rec,
-                            body_range.start.offset,
-                            body_range.end.offset,
-                            m_scope,
-                        );
-                    }
-
                     let saved_caps = self
                         .enclosing_caps
                         .replace(super::decorator_purity::caps_of(

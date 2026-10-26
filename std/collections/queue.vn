@@ -14,7 +14,9 @@ export class Queue<Q> {
     dequeue(): Q? {
         if (this.outbox.length === 0) {
             while (this.inbox.length > 0) {
-                this.outbox.push(this.inbox.pop() as Q);
+                const value = this.inbox[this.inbox.length - 1];
+                this.inbox.pop();
+                this.outbox.push(value);
             }
         }
         return this.outbox.pop();
@@ -23,7 +25,9 @@ export class Queue<Q> {
     peek(): Q? {
         if (this.outbox.length === 0) {
             while (this.inbox.length > 0) {
-                this.outbox.push(this.inbox.pop() as Q);
+                const value = this.inbox[this.inbox.length - 1];
+                this.inbox.pop();
+                this.outbox.push(value);
             }
         }
         if (this.outbox.length === 0) {

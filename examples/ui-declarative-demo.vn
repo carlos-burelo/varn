@@ -1,14 +1,18 @@
 import {
     Column, Row, Text, Title, Headline, Caption, Card, Button, ButtonKind, Checkbox, Each, Progress, Divider, Spacer,
-    signal, computed, effect, component, run, Widget, MainAxis, Theme, UiFrame, Focus
+    State, Signal, Computed, Effect, signal, computed, effect, component, run, Widget, MainAxis, Theme, UiFrame, Focus
 } from "std:ui";
 
 type Todo = { id: int, title: str, done: bool };
+const counterState = new State<Signal<int>>();
+const counterEffect = new State<Effect>();
+const todosState = new State<Signal<Todo[]>>();
+const remainingState = new State<Computed<int>>();
 
 @component()
 function Counter(start: int = 0): Widget {
-    const count = signal(start);
-    effect(() => print(`count is now ${count.value}`));
+    const count = counterState.get(() => signal(start));
+    counterEffect.get(() => effect(() => print(`count is now ${count.value}`)));
 
     return Card([
         Row([Text(`${count.value}`, size: 40.0), Caption(`x2 = ${count.value * 2}`)], mainAxis: MainAxis.spaceBetween),
@@ -23,12 +27,12 @@ function Counter(start: int = 0): Widget {
 
 @component()
 function TodoList(): Widget {
-    const todos = signal<Todo[]>([
+    const todos = todosState.get(() => signal<Todo[]>([
         { id: 1, title: "write a component", done: true },
         { id: 2, title: "keep its state between frames", done: false },
         { id: 3, title: "ship it", done: false }
-    ]);
-    const remaining = computed(() => todos.value.filter((t: Todo) => !t.done).length);
+    ]));
+    const remaining = remainingState.get(() => computed(() => todos.value.filter((t: Todo) => !t.done).length));
 
     const toggle = (id: int): void => todos.update((all: Todo[]): Todo[] =>
         all.map((t: Todo): Todo => t.id == id ? { id: t.id, title: t.title, done: !t.done } : t)

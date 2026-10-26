@@ -98,7 +98,7 @@ pub(super) fn generic_arms(
         (TypeKind::Generic(n1, a1, o1), TypeKind::Generic(n2, a2, o2)) => {
             let declared = table.get_list(a1).to_vec();
             let given = table.get_list(a2).to_vec();
-            if n1 == n2 {
+            if n1 == n2 && o1 == o2 {
                 return Some(args_fit(
                     bind,
                     n1,

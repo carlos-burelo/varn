@@ -29,7 +29,7 @@ export enum Result<T, E> {
         };
     }
 
-    unwrapOr(fallback: T): T {
+    unwrapOr<U>(fallback: U): T | U {
         return match (this) {
             Ok(value) => value,
             Err(_) => fallback

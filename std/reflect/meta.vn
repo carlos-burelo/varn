@@ -51,28 +51,22 @@ export function getMetadataKeys<T>(target: T): str[] {
 }
 
 export class MetaKey<T> {
-    private metaId: str;
-
-    constructor(metaId: str) {
-        this.metaId = metaId;
-    }
+    private values: Map<dynamic, T> = new Map<dynamic, T>();
 
     static create<R>(): MetaKey<R> {
-        let id = createMetaKey();
-        return new MetaKey<R>(id);
+        return new MetaKey<R>();
     }
 
     set(target: dynamic, value: T): void {
-        setMetaKey(this.metaId, target, value);
+        this.values.set(target, value);
     }
 
     get(target: dynamic): T? {
-        let val = getMetaKey(this.metaId, target);
-        return val as T;
+        return this.values.get(target);
     }
 
     has(target: dynamic): bool {
-        return hasMetaKey(this.metaId, target);
+        return this.values.has(target);
     }
 
     keys(target: dynamic): dynamic[] {

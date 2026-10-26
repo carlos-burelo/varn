@@ -1,9 +1,6 @@
 import { Observer, Source, changed, invalidate, notifyObservers, runTracked, track, unlink, untracked } from "std:signals/graph";
-import { Owner, SlotKind, currentOwner } from "std:signals/owner";
+import { currentOwner } from "std:signals/owner";
 import { Effect, effect } from "std:signals/effect";
-
-const SIGNAL = new SlotKind();
-const COMPUTED = new SlotKind();
 
 export abstract class Readable<T> {
     abstract get value(): T;
@@ -73,9 +70,8 @@ export class Computed<T> extends Readable<T> implements Observer {
     private _derive: () => T;
     private _equals: ((a: T, b: T) => bool)?;
     private _source: Source = new Source();
-    private _cached: T? = null;
+    private _cached: Option<T> = Option.None;
     private _stale: bool = true;
-    private _computed: bool = false;
     private _computing: bool = false;
 
     constructor(derive: () => T, equals: ((a: T, b: T) => bool)? = null) {
@@ -98,12 +94,12 @@ export class Computed<T> extends Readable<T> implements Observer {
     override get value(): T {
         this.settle();
         track(this._source);
-        return this._cached as T;
+        return this._cached.unwrap();
     }
 
     override peek(): T {
         this.settle();
-        return this._cached as T;
+        return this._cached.unwrap();
     }
 
     dispose(): void {
@@ -115,7 +111,7 @@ export class Computed<T> extends Readable<T> implements Observer {
         if (!this._stale || !this.alive) {
             return;
         }
-        if (this._computed && !changed(this)) {
+        if (this._cached.isSome() && !changed(this)) {
             this._stale = false;
             return;
         }
@@ -127,9 +123,8 @@ export class Computed<T> extends Readable<T> implements Observer {
             unlink(this);
             const next = runTracked(this, this._derive);
             const equals = this._equals;
-            const unchanged = this._computed && (equals === null ? next == this._cached : equals(this._cached as T, next));
-            this._cached = next;
-            this._computed = true;
+            const unchanged = this._cached.isSome() && (equals === null ? next == this._cached.unwrap() : equals(this._cached.unwrap(), next));
+            this._cached = Option.Some(next);
             this._stale = false;
             if (!unchanged) {
                 this._source.version = this._source.version + 1;
@@ -141,22 +136,14 @@ export class Computed<T> extends Readable<T> implements Observer {
 }
 
 export function signal<T>(initial: T, equals: ((a: T, b: T) => bool)? = null): Signal<T> {
-    const owner = currentOwner();
-    if (owner === null) {
-        return new Signal<T>(initial, equals);
-    }
-    return owner.adopt<Signal<T>>(SIGNAL, () => new Signal<T>(initial, equals));
+    return new Signal<T>(initial, equals);
 }
 
 export function computed<T>(derive: () => T, equals: ((a: T, b: T) => bool)? = null): Computed<T> {
     const owner = currentOwner();
-    if (owner === null) {
-        return new Computed<T>(derive, equals);
+    const made = new Computed<T>(derive, equals);
+    if (owner !== null) {
+        owner.onDispose(() => made.dispose());
     }
-    const host: Owner = owner;
-    return host.adopt<Computed<T>>(COMPUTED, () => {
-        const made = new Computed<T>(derive, equals);
-        host.onDispose(() => made.dispose());
-        return made;
-    });
+    return made;
 }
