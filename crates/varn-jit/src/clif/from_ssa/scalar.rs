@@ -119,6 +119,7 @@ pub(super) fn emit_inst(
                 )?)));
             }
             super::stack_exit::guard_headroom(b, ctx);
+            super::stack_exit::enter_frameless(b, ctx);
             let no_closure = b.ins().iconst(types::I64, 0);
             let null_tag = b
                 .ins()
@@ -129,7 +130,9 @@ pub(super) fn emit_inst(
                 a.push(load_value(b, ctx, values, *v)?);
             }
             let call = b.ins().call(ctx.self_ref, &a);
-            b.inst_results(call)[0]
+            let result = b.inst_results(call)[0];
+            super::stack_exit::leave_frameless(b, ctx);
+            result
         }
         SsaOp::MethodCall {
             recv,

@@ -40,6 +40,11 @@ devuelve `T | U`. Signals conserva ausencia con `Option<T>`, metadata con mapas
 tipados y UI con handles `State<T>`; se borra `Owner.adopt` y el almacenamiento
 heterogéneo por posición. Ruptura autorizada por el dueño; consumidores migrados.
 
+Recursión (2026-10-26): VM y JIT cuentan las llamadas sin frame contra el mismo
+límite lógico de 10000; se elimina su bypass. La protección física de pila sigue
+independiente. ABI JIT 11 invalida imágenes anteriores; salidas normales y suspensión
+restauran la profundidad del tramo nativo. Suite de recursión y callbacks verde.
+
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
 destructuring de tupla por posición (`e8e1717d`); local `dynamic`

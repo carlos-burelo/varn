@@ -165,7 +165,7 @@ impl ExecCtx {
             self.record_hotspot_method(&method_key, is_jit);
         }
 
-        if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+        if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
             return Err(crate::frame::call_depth_exceeded());
         }
         let alloc = if !nc.proto.has_rest {

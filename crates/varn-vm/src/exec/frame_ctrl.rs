@@ -77,7 +77,7 @@ impl ExecCtx {
                 self.stage.push(value);
             }
             PreparedCall::Frame(frame) => {
-                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                     return Err(crate::frame::call_depth_exceeded());
                 }
                 self.record_call_vm_fast();
@@ -93,7 +93,7 @@ impl ExecCtx {
                 }
             }
             PreparedCall::Constructor(frame, instance_nv) => {
-                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                     return Err(crate::frame::call_depth_exceeded());
                 }
                 self.record_call_vm_fast();

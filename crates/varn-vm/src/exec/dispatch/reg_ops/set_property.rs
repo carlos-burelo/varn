@@ -321,7 +321,7 @@ impl ExecCtx {
                     .prepare_call(setter_nv, 2)
                     .map_err(|e| crate::error::RuntimeError::new(e.message))?;
                 if let crate::exec::calls::PreparedCall::Frame(mut frame) = prepared {
-                    if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                    if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                         return Err(crate::frame::call_depth_exceeded());
                     }
                     frame.return_reg = crate::frame::CallFrame::NO_RETURN_REG;
@@ -365,7 +365,7 @@ impl ExecCtx {
                         .map_err(|e| crate::error::RuntimeError::new(e.message))?;
                     match prepared {
                         crate::exec::calls::PreparedCall::Frame(mut frame) => {
-                            if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                            if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                                 return Err(crate::frame::call_depth_exceeded());
                             }
                             frame.return_reg = dest as u16;

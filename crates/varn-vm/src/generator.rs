@@ -108,7 +108,7 @@ impl ExecCtx {
                 args,
                 current_class,
             } => {
-                if depth >= crate::frame::MAX_CALL_DEPTH {
+                if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                     *generator.phase.borrow_mut() = Phase::Done;
                     return Err(crate::frame::call_depth_exceeded());
                 }

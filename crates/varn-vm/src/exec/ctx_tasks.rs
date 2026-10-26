@@ -23,7 +23,7 @@ impl ExecCtx {
         let step = match self.heap.get(value.as_heap()) {
             Some(HeapObj::Task(lazy)) => {
                 let lazy = Rc::clone(lazy);
-                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                     return Err(crate::frame::call_depth_exceeded());
                 }
                 super::scheduler::mount(self, &lazy, dest_reg);

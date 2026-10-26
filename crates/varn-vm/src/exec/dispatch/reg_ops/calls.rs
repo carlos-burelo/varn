@@ -27,7 +27,7 @@ impl ExecCtx {
                         let is_jit = nc.jit_fn().is_some();
                         self.record_hotspot_fn(fn_name, is_jit);
                     }
-                    if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                    if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                         return Err(crate::frame::call_depth_exceeded());
                     }
 
@@ -77,7 +77,7 @@ impl ExecCtx {
                             {
                                 let nc = nc.clone();
                                 let owner = owner_class.clone();
-                                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                                if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                                     return Err(crate::frame::call_depth_exceeded());
                                 }
 
@@ -129,7 +129,7 @@ impl ExecCtx {
                                 let is_jit = nc.jit_fn().is_some();
                                 self.record_hotspot_fn(fn_name, is_jit);
                             }
-                            if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                            if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                                 return Err(crate::frame::call_depth_exceeded());
                             }
                             let alloc =
@@ -144,7 +144,7 @@ impl ExecCtx {
                             let fn_name2 = nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
                             let is_jit2 = nc.jit_fn().is_some();
                             self.record_hotspot_fn(&fn_name2, is_jit2);
-                            if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                            if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                                 return Err(crate::frame::call_depth_exceeded());
                             }
                             let alloc = self.stack.push_frame(&nc.proto);
@@ -275,7 +275,7 @@ impl ExecCtx {
                 let is_jit = closure_ref.jit_fn().is_some();
                 self.record_hotspot_fn(fn_name, is_jit);
             }
-            if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+            if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                 return Err(crate::frame::call_depth_exceeded());
             }
             let owned = self.frames[frame_idx]._owned_closure.clone();
@@ -295,7 +295,7 @@ impl ExecCtx {
                 .to_owned();
             let is_jit2 = closure_ref.jit_fn().is_some();
             self.record_hotspot_fn(&fn_name2, is_jit2);
-            if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+            if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                 return Err(crate::frame::call_depth_exceeded());
             }
             let owned = self.frames[frame_idx]._owned_closure.clone();

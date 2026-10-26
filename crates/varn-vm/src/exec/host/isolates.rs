@@ -69,7 +69,7 @@ impl ExecCtx {
         let value = match prepared {
             PreparedCall::Async(parts) => {
                 self.stage.clear();
-                if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+                if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
                     return Err(crate::frame::call_depth_exceeded());
                 }
                 crate::exec::scheduler::mount_parts(

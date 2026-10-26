@@ -11,7 +11,7 @@ pub(super) enum Handoff {
 }
 
 pub(super) unsafe fn hand_off(ctx: &mut ExecCtx, caller_depth: usize, out: *mut usize) -> Handoff {
-    if ctx.frames.len() > crate::frame::MAX_CALL_DEPTH {
+    if ctx.call_depth() > crate::frame::MAX_CALL_DEPTH {
         return Handoff::Ran(Err(crate::frame::call_depth_exceeded()));
     }
     if ctx.frames.len() == caller_depth + 1
@@ -70,6 +70,17 @@ pub(crate) extern "C" fn jit_call_self_window(
 ) -> usize {
     unsafe {
         let ctx_ref = &mut *ctx;
+        let error = if ctx_ref.call_depth() >= crate::frame::MAX_CALL_DEPTH {
+            Some(crate::frame::call_depth_exceeded())
+        } else if crate::frame::native_stack_low(ctx_ref.jit_stack_floor) {
+            Some(crate::frame::native_stack_exhausted())
+        } else {
+            None
+        };
+        if let Some(error) = error {
+            jit_propagate_error(ctx_ref, error);
+            return 0;
+        }
         let caller_depth = ctx_ref.frames.len();
         let closure_ref = &*ctx_ref.frames[caller_depth - 1].closure_ptr;
         let proto = closure_ref.proto.clone();
@@ -90,6 +101,17 @@ pub(crate) extern "C" fn jit_call_self_window(
     }
 }
 
+#[varn_macros::jit_slow(field = "call_depth_overflow")]
+pub(crate) extern "C" fn jit_call_depth_overflow(
+    ctx: *mut ExecCtx,
+    _lhs_tag: u64,
+    _lhs_payload: u64,
+    _rhs_tag: u64,
+    _rhs_payload: u64,
+) {
+    unsafe { jit_propagate_error(&mut *ctx, crate::frame::call_depth_exceeded()) }
+}
+
 #[varn_macros::jit_slow(field = "stack_overflow")]
 pub(crate) extern "C" fn jit_stack_overflow(
     ctx: *mut ExecCtx,
@@ -105,7 +127,7 @@ pub(crate) extern "C" fn jit_stack_overflow(
 pub(crate) extern "C" fn jit_push_native_frame(ctx: *mut ExecCtx, closure: *const VmClosure) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        if ctx_ref.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+        if ctx_ref.call_depth() >= crate::frame::MAX_CALL_DEPTH {
             jit_propagate_error(ctx_ref, crate::frame::call_depth_exceeded());
             return;
         }

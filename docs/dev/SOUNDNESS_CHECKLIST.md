@@ -55,7 +55,12 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
   Se eliminaron 15 casts a tipos abiertos de std y consumidores; los tres ejemplos
   declarativos y las dos suites que dependían de slots implícitos usan 14 handles
   tipados. Se migró además el memoizador `once` de la suite de orden superior.
-- [ ] Paridad de límites de recursión entre intérprete (10000 frames) y JIT (bytes de pila)
+- [x] Intérprete y JIT comparten el límite lógico de 10000 llamadas; las llamadas
+  JIT sin frame participan en el contador. La guarda de pila nativa sigue siendo
+  un límite físico adicional. El contador se restaura también al suspender;
+  desbordamientos consecutivos se capturan y permiten continuar con recursión acotada.
+  La ruta de self-call con frame rechaza antes de reservarlo: se elimina el frame
+  sobrante que hacía repetir el bucle del llamador tras capturar el error.
 - [x] VN3031 entre módulos (regla por tipo; descartar a propósito: `_ = llamada()`)
 - [x] `Task` (perezosa) vs `TaskHandle` (iniciada): contratos nativos retipados
 - [x] Tareas lanzadas y nunca ejecutadas se descartan al salir: decisión (como Go/tokio); los rechazos de las que corrieron sí se informan

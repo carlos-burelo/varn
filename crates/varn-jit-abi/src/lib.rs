@@ -1,6 +1,6 @@
 use varn_types::{NativeOpTarget, VmValue};
 
-pub const JIT_HELPERS_VERSION: u32 = 10;
+pub const JIT_HELPERS_VERSION: u32 = 11;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
@@ -104,6 +104,7 @@ pub struct JitCallLayout {
 
     pub frames_ptr_off: usize,
     pub frames_len_off: usize,
+    pub frameless_depth_off: usize,
     pub frames_cap_off: usize,
 
     pub frame_size: usize,
@@ -229,6 +230,7 @@ pub struct JitHelpers {
     pub shr: usize,
     pub spawn: usize,
     pub stack_overflow: usize,
+    pub call_depth_overflow: usize,
     pub store_global_by_name: usize,
     pub store_module_slot: usize,
     pub store_upvalue: usize,

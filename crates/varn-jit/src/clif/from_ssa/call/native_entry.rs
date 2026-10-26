@@ -95,18 +95,23 @@ pub(crate) fn emit(
     b.ins().brif(enter, entered, &[], slow_blk, &[]);
 
     b.switch_to_block(entered);
+    stack_exit::guard_headroom(b, ctx);
     let frameless_bit = b.ins().band_imm_u(sig, NATIVE_FRAMELESS as i64);
     let frameless = b.ins().icmp_imm_u(IntCC::NotEqual, frameless_bit, 0);
     let push = b.create_block();
     let invoke = b.create_block();
-    b.ins().brif(frameless, invoke, &[], push, &[]);
+    let push_frameless = b.create_block();
+    b.ins().brif(frameless, push_frameless, &[], push, &[]);
+
+    b.switch_to_block(push_frameless);
+    stack_exit::enter_frameless(b, ctx);
+    b.ins().jump(invoke, &[]);
 
     b.switch_to_block(push);
     push_frame(b, ctx, ectx, closure)?;
     b.ins().jump(invoke, &[]);
 
     b.switch_to_block(invoke);
-    stack_exit::guard_headroom(b, ctx);
     let (rtag, rpayload) = b.ins().isplit(call.receiver);
     let mut argv = vec![ectx, closure, rtag, rpayload];
     for (v, class) in call.args.iter().zip(&shape.params[1..]) {
@@ -126,7 +131,12 @@ pub(crate) fn emit(
     let res = b.inst_results(inst).to_vec();
     let pop = b.create_block();
     let after = b.create_block();
-    b.ins().brif(frameless, after, &[], pop, &[]);
+    let pop_frameless = b.create_block();
+    b.ins().brif(frameless, pop_frameless, &[], pop, &[]);
+
+    b.switch_to_block(pop_frameless);
+    stack_exit::leave_frameless(b, ctx);
+    b.ins().jump(after, &[]);
 
     b.switch_to_block(pop);
     pop_frame(b, ctx, ectx);
@@ -167,9 +177,13 @@ fn push_frame(
     let len = b.ins().load(types::I64, m, ectx, lay.frames_len_off as i32);
     let cap = b.ins().load(types::I64, m, ectx, lay.frames_cap_off as i32);
     let full = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, len, cap);
+    let frameless = b
+        .ins()
+        .load(types::I64, m, ectx, lay.frameless_depth_off as i32);
+    let depth = b.ins().iadd(len, frameless);
     let deep = b.ins().icmp_imm_u(
         IntCC::UnsignedGreaterThanOrEqual,
-        len,
+        depth,
         lay.max_call_depth as i64,
     );
     let out_of_line = b.ins().bor(full, deep);

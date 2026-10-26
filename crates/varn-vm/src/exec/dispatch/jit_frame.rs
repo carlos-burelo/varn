@@ -31,6 +31,7 @@ unsafe fn execute_jit_frame(
     base: usize,
 ) -> Result<VmValue, i32> {
     let exits_len = unsafe { (*ctx).jit_exits_saved.len() };
+    let frameless_depth = unsafe { (*ctx).jit_frameless_depth };
     unsafe { (*ctx).jit_exits_saved.push((*ctx).jit_exit) };
     unsafe { (*ctx).jit_exit = varn_jit::stack_roots::JitExit::default() };
     let mut jmp_buf = crate::exec::ctx::JmpBuf::default();
@@ -52,12 +53,14 @@ unsafe fn execute_jit_frame(
         };
         std::hint::black_box(ctx);
         unsafe { restore_exit(ctx, exits_len) };
+        unsafe { (*ctx).jit_frameless_depth = frameless_depth };
         if is_outer {
             unsafe { (*ctx).jit_suspend_buf = saved_suspend };
         }
         Ok(val)
     } else {
         unsafe { restore_exit(ctx, exits_len) };
+        unsafe { (*ctx).jit_frameless_depth = frameless_depth };
         unsafe { (*ctx).jit_suspend_buf = std::ptr::null_mut() };
         Err(jmp_res)
     }

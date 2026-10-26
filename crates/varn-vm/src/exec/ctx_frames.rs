@@ -9,6 +9,10 @@ use super::calls::PreparedCall;
 use super::ctx::ExecCtx;
 
 impl ExecCtx {
+    pub(crate) fn call_depth(&self) -> usize {
+        self.frames.len() + self.jit_frameless_depth
+    }
+
     #[inline(always)]
     pub(crate) fn prepare_call(
         &mut self,
@@ -68,7 +72,7 @@ impl ExecCtx {
     }
 
     pub(crate) fn push_frame(&mut self, closure: Rc<VmClosure>) -> crate::error::VmResult<()> {
-        if self.frames.len() >= crate::frame::MAX_CALL_DEPTH {
+        if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
             return Err(crate::frame::call_depth_exceeded());
         }
         let alloc = self.stack.push_frame(&closure.proto);

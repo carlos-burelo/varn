@@ -91,6 +91,7 @@ pub(crate) fn probe() -> varn_jit::JitCallLayout {
         proto_epoch_off: std::mem::offset_of!(FunctionProto, jit_epoch),
         frames_ptr_off: frames_off + vec_ptr_off,
         frames_len_off: frames_off + vec_len_off,
+        frameless_depth_off: std::mem::offset_of!(ExecCtx, jit_frameless_depth),
         frames_cap_off: frames_off + vec_cap_off,
         frame_size: std::mem::size_of::<CallFrame>(),
         frame_closure_ptr_off: std::mem::offset_of!(CallFrame, closure_ptr),

@@ -16,6 +16,41 @@ pub(super) fn guard_headroom(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
         helpers.jit_stack_floor_offset as i32,
     );
     let exhausted = b.ins().icmp(IntCC::UnsignedLessThan, sp, floor);
+    guard_limit(b, ctx, exhausted, helpers.stack_overflow);
+}
+
+pub(super) fn enter_frameless(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
+    let lay = &ctx.helpers.call_layout;
+    let m = MemFlagsData::trusted();
+    let frames = b
+        .ins()
+        .load(types::I64, m, ctx.exec_ctx, lay.frames_len_off as i32);
+    let frameless = b
+        .ins()
+        .load(types::I64, m, ctx.exec_ctx, lay.frameless_depth_off as i32);
+    let depth = b.ins().iadd(frames, frameless);
+    let exhausted = b.ins().icmp_imm_u(
+        IntCC::UnsignedGreaterThanOrEqual,
+        depth,
+        lay.max_call_depth as i64,
+    );
+    guard_limit(b, ctx, exhausted, ctx.helpers.call_depth_overflow);
+    let next = b.ins().iadd_imm_u(frameless, 1);
+    b.ins()
+        .store(m, next, ctx.exec_ctx, lay.frameless_depth_off as i32);
+}
+
+pub(super) fn leave_frameless(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
+    let off = ctx.helpers.call_layout.frameless_depth_off as i32;
+    let m = MemFlagsData::trusted();
+    let depth = b.ins().load(types::I64, m, ctx.exec_ctx, off);
+    let next = b.ins().iadd_imm_s(depth, -1);
+    b.ins().store(m, next, ctx.exec_ctx, off);
+}
+
+fn guard_limit(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exhausted: Value, helper: usize) {
+    let helpers = ctx.helpers;
+    let m = MemFlagsData::trusted();
     let raise = b.create_block();
     let cont = b.create_block();
     b.set_cold_block(raise);
@@ -25,12 +60,7 @@ pub(super) fn guard_headroom(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
     let zero = b.ins().iconst(types::I64, 0);
     let err_off = helpers.jit_error_flag_offset as i32;
     b.ins().store(m, zero, ctx.exec_ctx, err_off);
-    call_helper_void(
-        b,
-        ctx.cc,
-        helpers.stack_overflow,
-        &[ctx.exec_ctx, zero, zero, zero, zero],
-    );
+    call_helper_void(b, ctx.cc, helper, &[ctx.exec_ctx, zero, zero, zero, zero]);
     let (landing, err_ret) = {
         let st = ctx.pure_try.borrow();
         let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
