@@ -159,7 +159,7 @@ impl<'r> Checker<'r> {
                         ErrorCode::DuplicateDeclaration,
                         format!("'{text}' is already declared as a parameter of this function"),
                     )
-                    .with_range(self.ast_arena.stmt(body).range),
+                    .with_range(hoisted.range),
                 );
             }
         }

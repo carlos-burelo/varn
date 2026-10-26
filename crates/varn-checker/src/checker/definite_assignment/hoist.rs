@@ -34,6 +34,7 @@ fn hoist_decl(arena: &AstArena, decl: &Decl, out: &mut Vec<Hoisted>) {
                         name,
                         is_binding: true,
                         reads: reads.clone(),
+                        range: d.range,
                     });
                 }
             }
@@ -42,6 +43,7 @@ fn hoist_decl(arena: &AstArena, decl: &Decl, out: &mut Vec<Hoisted>) {
             name: f.id,
             is_binding: false,
             reads: Some(free_reads(arena, &f.params, Body::Stmt(f.body))),
+            range: f.range,
         }),
         Decl::Class(c) => {
             if let Some(name) = c.id {
@@ -49,6 +51,7 @@ fn hoist_decl(arena: &AstArena, decl: &Decl, out: &mut Vec<Hoisted>) {
                     name,
                     is_binding: true,
                     reads: None,
+                    range: c.range,
                 });
             }
         }
@@ -56,6 +59,7 @@ fn hoist_decl(arena: &AstArena, decl: &Decl, out: &mut Vec<Hoisted>) {
             name: e.id,
             is_binding: true,
             reads: None,
+            range: e.range,
         }),
         Decl::Export(ExportDecl::Decl { declaration, .. }) => hoist_decl(arena, declaration, out),
         Decl::Interface(_)

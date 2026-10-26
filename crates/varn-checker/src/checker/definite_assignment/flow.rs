@@ -18,6 +18,7 @@ pub(super) struct Hoisted {
     pub(super) name: Atom,
     pub(super) is_binding: bool,
     pub(super) reads: Option<FxHashSet<Atom>>,
+    pub(super) range: varn_core::source::SourceRange,
 }
 
 pub(super) struct Shadowed {

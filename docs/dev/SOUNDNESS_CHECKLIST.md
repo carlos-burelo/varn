@@ -60,7 +60,7 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 
 ### Limpieza
 - [x] Eliminar `ExprKind::RegexLiteral` del AST y de sus `match`
-- [ ] Rango del error "let redeclara un parámetro" (hoy todo el cuerpo)
+- [x] Rango del error "let redeclara un parámetro": señala el declarador que colisiona
 - [ ] `clippy::wildcard_enum_match_arm` en código nuevo
 - [x] `Array.shift` es O(n): solo rendimiento, sin primitiva de remoción en la representación; aceptado (Queue usa dos pilas)
 
