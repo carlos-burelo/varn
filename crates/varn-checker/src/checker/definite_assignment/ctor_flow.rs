@@ -53,7 +53,52 @@ impl<'a> CtorFlow<'a> {
         }
         match &self.arena.expr(*property).kind {
             ExprKind::Identifier { name } => Some(*name),
-            _ => None,
+            ExprKind::IntLiteral { .. }
+            | ExprKind::FloatLiteral { .. }
+            | ExprKind::BigIntLiteral { .. }
+            | ExprKind::DecimalLiteral { .. }
+            | ExprKind::StrLiteral { .. }
+            | ExprKind::CharLiteral { .. }
+            | ExprKind::BoolLiteral { .. }
+            | ExprKind::NullLiteral
+            | ExprKind::Template { .. }
+            | ExprKind::TaggedTemplate { .. }
+            | ExprKind::Missing
+            | ExprKind::This
+            | ExprKind::Super
+            | ExprKind::ImportMeta(_)
+            | ExprKind::Array { .. }
+            | ExprKind::Object { .. }
+            | ExprKind::Tuple { .. }
+            | ExprKind::Record { .. }
+            | ExprKind::Unary { .. }
+            | ExprKind::Update { .. }
+            | ExprKind::Binary { .. }
+            | ExprKind::Logical { .. }
+            | ExprKind::Assign { .. }
+            | ExprKind::Conditional { .. }
+            | ExprKind::Member { .. }
+            | ExprKind::Call { .. }
+            | ExprKind::New { .. }
+            | ExprKind::Function { .. }
+            | ExprKind::Arrow { .. }
+            | ExprKind::Sequence { .. }
+            | ExprKind::Paren { .. }
+            | ExprKind::Await { .. }
+            | ExprKind::Spawn { .. }
+            | ExprKind::Yield { .. }
+            | ExprKind::Spread { .. }
+            | ExprKind::Pipeline { .. }
+            | ExprKind::Range { .. }
+            | ExprKind::NonNull { .. }
+            | ExprKind::Try { .. }
+            | ExprKind::As { .. }
+            | ExprKind::Satisfies { .. }
+            | ExprKind::ClassExpr { .. }
+            | ExprKind::Match { .. }
+            | ExprKind::Is { .. }
+            | ExprKind::With { .. }
+            | ExprKind::MetaAccess { .. } => None,
         }
     }
 

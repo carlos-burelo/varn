@@ -32,7 +32,18 @@ pub(super) fn emit_bin(
         IntAnd => b.ins().band(a, c),
         IntOr => b.ins().bor(a, c),
         IntXor => b.ins().bxor(a, c),
-        IntShl | IntShr | IntUshr => checked_shift(b, ctx, op, a, c),
+        IntShl => {
+            let r = b.ins().ishl(a, c);
+            checked_shift(b, ctx, r, ctx.helpers.shl, a, c)
+        }
+        IntShr => {
+            let r = b.ins().sshr(a, c);
+            checked_shift(b, ctx, r, ctx.helpers.shr, a, c)
+        }
+        IntUshr => {
+            let r = b.ins().ushr(a, c);
+            checked_shift(b, ctx, r, ctx.helpers.ushr, a, c)
+        }
         IntEq => bool_i64(b, IntCC::Equal, a, c),
         IntNe => bool_i64(b, IntCC::NotEqual, a, c),
         IntLt => bool_i64(b, IntCC::SignedLessThan, a, c),
@@ -117,16 +128,11 @@ pub(super) fn checked_int(
 fn checked_shift(
     b: &mut FunctionBuilder,
     ctx: &Ctx<'_>,
-    op: SsaBinOp,
+    r: Value,
+    helper: usize,
     a: Value,
     c: Value,
 ) -> Value {
-    let helpers = ctx.helpers;
-    let (r, helper) = match op {
-        SsaBinOp::IntShl => (b.ins().ishl(a, c), helpers.shl),
-        SsaBinOp::IntShr => (b.ins().sshr(a, c), helpers.shr),
-        _ => (b.ins().ushr(a, c), helpers.ushr),
-    };
     let out_of_range = b
         .ins()
         .icmp_imm_u(IntCC::UnsignedGreaterThan, c, varn_core::SHIFT_MAX);

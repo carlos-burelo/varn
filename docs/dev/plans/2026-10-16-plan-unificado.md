@@ -25,6 +25,10 @@ las produce la auditoría, no se copian).
 
 Soundness (2026-10-25): VN4002 al redeclarar un parámetro conserva
 el rango del declarador desde el hoisting; ya no señala todo el cuerpo.
+Exhaustividad: `wildcard_enum_match_arm` pasa de aviso a error;
+checker enumera los casos restantes y el JIT elige cada shift en
+el dispatch SSA, sin un segundo match que trate cualquier operación
+como `IntUshr`.
 
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);

@@ -181,7 +181,52 @@ impl<'r> Checker<'r> {
                     out.push((*name, arena.expr(e).range));
                 }
             }
-            _ => walk_expr_children(e, arena, &mut |c| self.collect_this_reads(c, out)),
+            ExprKind::IntLiteral { .. }
+            | ExprKind::FloatLiteral { .. }
+            | ExprKind::BigIntLiteral { .. }
+            | ExprKind::DecimalLiteral { .. }
+            | ExprKind::StrLiteral { .. }
+            | ExprKind::CharLiteral { .. }
+            | ExprKind::BoolLiteral { .. }
+            | ExprKind::NullLiteral
+            | ExprKind::Template { .. }
+            | ExprKind::TaggedTemplate { .. }
+            | ExprKind::Identifier { .. }
+            | ExprKind::Missing
+            | ExprKind::This
+            | ExprKind::Super
+            | ExprKind::ImportMeta(_)
+            | ExprKind::Array { .. }
+            | ExprKind::Object { .. }
+            | ExprKind::Tuple { .. }
+            | ExprKind::Record { .. }
+            | ExprKind::Unary { .. }
+            | ExprKind::Update { .. }
+            | ExprKind::Binary { .. }
+            | ExprKind::Logical { .. }
+            | ExprKind::Assign { .. }
+            | ExprKind::Conditional { .. }
+            | ExprKind::Member { .. }
+            | ExprKind::Call { .. }
+            | ExprKind::New { .. }
+            | ExprKind::Sequence { .. }
+            | ExprKind::Paren { .. }
+            | ExprKind::Await { .. }
+            | ExprKind::Spawn { .. }
+            | ExprKind::Yield { .. }
+            | ExprKind::Spread { .. }
+            | ExprKind::Pipeline { .. }
+            | ExprKind::Range { .. }
+            | ExprKind::NonNull { .. }
+            | ExprKind::Try { .. }
+            | ExprKind::As { .. }
+            | ExprKind::Satisfies { .. }
+            | ExprKind::Match { .. }
+            | ExprKind::Is { .. }
+            | ExprKind::With { .. }
+            | ExprKind::MetaAccess { .. } => {
+                walk_expr_children(e, arena, &mut |c| self.collect_this_reads(c, out))
+            }
         }
     }
 }

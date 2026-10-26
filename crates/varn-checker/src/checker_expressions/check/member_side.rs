@@ -210,7 +210,22 @@ impl<'r> Checker<'r> {
             | TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
                 return member == varn_core::MemberKey::Length.as_str();
             }
-            _ => return false,
+            TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Object(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => return false,
         };
         let view = varn_sem::bind::BindView::new(bind, self.resolver);
         view.get_interface_members(&name, origin.as_deref())

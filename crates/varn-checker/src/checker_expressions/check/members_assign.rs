@@ -31,7 +31,24 @@ impl<'r> Checker<'r> {
                 TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::Literal(_) => {
                     Some("cannot assign to a character of a string: strings are immutable")
                 }
-                _ => None,
+                TypeKind::Primitive(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Union(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Fn(_)
+                | TypeKind::Object(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Conditional { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => None,
             };
             if let Some(message) = immutable {
                 self.emit(
