@@ -1,5 +1,6 @@
 mod async_fn;
 mod class_member_impl;
+mod components;
 mod context;
 mod core_nominal;
 mod display;

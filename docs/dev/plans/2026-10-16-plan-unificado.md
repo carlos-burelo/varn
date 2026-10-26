@@ -29,6 +29,9 @@ Exhaustividad: `wildcard_enum_match_arm` pasa de aviso a error;
 checker enumera los casos restantes y el JIT elige cada shift en
 el dispatch SSA, sin un segundo match que trate cualquier operación
 como `IntUshr`.
+Interfaces: el checker entrega formas instanciadas por identidad semántica
+(origen y argumentos incluidos); se elimina el índice de propiedades por
+nombre del emitter. Decode conserva miembros heredados y recursivos.
 
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
@@ -295,9 +298,6 @@ dentro del `try`; GC dentro del `try` con vivo heap.
 
 ### 2.5 Tipos: restante con causa
 
-- **Interfaces en decode**: `Interface(ShapeId)` cubre las locales sin parámetros;
-  `lower_kind` aún degrada interfaces genéricas e importadas a `Declared`.
-  Localización y repros pendientes de ejecución en `SOUNDNESS_CHECKLIST.md`.
 - **P3 enum-Eq / P4 Decimal-BigInt**: aparcados con medición
   (mismo helper, ~5ns; P4 pide SlotKind+VM+GC).
 - **2.3 DynReason**: no graduar (decoración; el backend solo

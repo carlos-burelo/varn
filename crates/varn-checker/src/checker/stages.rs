@@ -78,17 +78,37 @@ pub(super) fn run_pass(
     }
 
     rec.desugar.foreign_inherited_fields = checker.collect_foreign_inherited_fields(bind);
-    std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&checker.ty_table);
-    bind.interner.absorb(checker.ty_table.names());
-
-    let reachable: Vec<varn_sem::types::Type> = rec
+    let mut reachable: Vec<varn_sem::types::Type> = rec
         .expr_table
         .values()
         .map(|entry| entry.ty)
         .chain(rec.symbol_types.values().copied())
         .chain(bind.annotation_types.values().copied())
         .collect();
-    rec.desugar.foreign_classes = checker.collect_foreign_classes(bind, reachable.iter());
+    loop {
+        reachable.sort_by_key(|ty| ty.0);
+        reachable.dedup_by_key(|ty| ty.0);
+        let count = reachable.len();
+        rec.desugar.interfaces = checker.collect_interface_shapes(bind, &reachable);
+        reachable.extend(
+            rec.desugar
+                .interfaces
+                .iter()
+                .flat_map(|s| s.fields.iter().map(|f| f.ty)),
+        );
+        rec.desugar.foreign_classes = checker.collect_foreign_classes(bind, reachable.iter());
+        reachable.extend(
+            rec.desugar
+                .foreign_classes
+                .iter()
+                .flat_map(|c| c.fields.iter().map(|f| f.ty)),
+        );
+        reachable.sort_by_key(|ty| ty.0);
+        reachable.dedup_by_key(|ty| ty.0);
+        if reachable.len() == count || checker.diagnostics.has_errors() {
+            break;
+        }
+    }
     let member_types: Vec<varn_sem::types::Type> = rec
         .desugar
         .foreign_classes
@@ -110,6 +130,8 @@ pub(super) fn run_pass(
                 .filter_map(|plan| plan.step()),
         ),
     );
+    std::sync::Arc::make_mut(&mut bind.ty_table).absorb(&checker.ty_table);
+    bind.interner.absorb(checker.ty_table.names());
 }
 
 pub(super) fn assemble(

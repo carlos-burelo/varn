@@ -96,6 +96,7 @@ pub struct ForeignClass {
 
 #[derive(Clone, Debug, Default)]
 pub struct Desugarings {
+    pub interfaces: Vec<ResolvedInterface>,
     pub extension_calls: FxHashMap<u32, Arc<str>>,
     pub extension_members: FxHashMap<u32, Arc<str>>,
     pub extension_set_members: FxHashMap<u32, Arc<str>>,
@@ -109,6 +110,13 @@ pub struct Desugarings {
     pub foreign_inherited_fields: std::collections::BTreeMap<Arc<str>, Vec<InheritedField>>,
     pub match_arm_subjects: FxHashMap<varn_core::ast::AstId, Vec<Type>>,
     pub for_of_plans: FxHashMap<varn_core::ast::AstId, ForOfPlan>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ResolvedInterface {
+    pub ty: Type,
+    pub name: Arc<str>,
+    pub fields: Vec<ClassMemberInfo>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

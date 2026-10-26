@@ -15,6 +15,9 @@ pub fn lower_type(
     tt: &mut TyTable,
     names: &dyn NameResolver,
 ) -> BackendTy {
+    if let Some((index, shape)) = names.interface_shape(*ty) {
+        return lower_interface(index, shape, table, interner, tt, names);
+    }
     match ty.builtin_of(table) {
         Some(b) if b != BuiltinType::Array => lower_builtin(b, ty, table, interner, tt, names),
         Some(_) | None => lower_kind(&table.get(ty.0), table, interner, tt, names),
@@ -30,26 +33,25 @@ fn interface() -> BackendTy {
 }
 
 fn lower_interface(
-    name: &str,
+    index: usize,
+    shape: &varn_sem::output::ResolvedInterface,
     table: &CheckerTyTable,
     interner: &AtomInterner,
     tt: &mut TyTable,
     names: &dyn NameResolver,
 ) -> BackendTy {
-    let Some(properties) = names.interface_properties(name) else {
-        return interface();
-    };
-    let key = format!("interface {name}");
+    let key = format!("interface {index}:{}", shape.name);
     if let Some(id) = tt.named_shape(&key) {
         return BackendTy::Dynamic(DynReason::Interface(id));
     }
     let id = tt.reserve_named_shape(std::sync::Arc::from(key.as_str()));
-    let fields = properties
+    let fields = shape
+        .fields
         .iter()
         .map(|p| varn_tir::ShapeField {
             name: p.name.clone(),
             ty: lower_type(&p.ty, table, interner, tt, names),
-            optional: p.optional,
+            optional: p.is_optional,
         })
         .collect();
     tt.fill_named_shape(id, fields);
@@ -96,7 +98,7 @@ fn lower_alias(
         return BackendTy::Dynamic(DynReason::Generic);
     }
     let Some(target) = names.alias(name) else {
-        return lower_interface(name, table, interner, tt, names);
+        return interface();
     };
     let members = match table.get(target.0) {
         TypeKind::Object(members) => table.get_object_members(members),
