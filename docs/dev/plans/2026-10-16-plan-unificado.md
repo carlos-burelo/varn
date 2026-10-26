@@ -295,6 +295,9 @@ dentro del `try`; GC dentro del `try` con vivo heap.
 
 ### 2.5 Tipos: restante con causa
 
+- **Interfaces en decode**: `Interface(ShapeId)` cubre las locales sin parámetros;
+  `lower_kind` aún degrada interfaces genéricas e importadas a `Declared`.
+  Localización y repros pendientes de ejecución en `SOUNDNESS_CHECKLIST.md`.
 - **P3 enum-Eq / P4 Decimal-BigInt**: aparcados con medición
   (mismo helper, ~5ns; P4 pide SlotKind+VM+GC).
 - **2.3 DynReason**: no graduar (decoración; el backend solo

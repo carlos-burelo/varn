@@ -40,7 +40,18 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 
 ### Soundness
 - [x] Recursión nativa en Rust: stringify acotado, igualdad iterativa (GC, drop, hash y marshalling probados sin fallo)
-- [x] `Json.parse<T>` sobre `interface` (DynReason::Interface lleva su forma)
+- [x] `Json.parse<T>` sobre interfaces locales sin parámetros (`DynReason::Interface` lleva su forma)
+- [ ] Completar la forma de interfaces genéricas e importadas.
+  En `varn-emit/src/ty/lower.rs::lower_kind`, `Generic(name, _, origin)` ignora
+  los argumentos y solo resuelve clases/enums; `Named` con origen externo sin
+  clase/enum cae en `interface()` (`Declared`). `NameIndex` solo carga propiedades
+  de `bind.type_members.interfaces`, indexadas por nombre.
+  Repros mínimos pendientes de incorporar a la suite:
+  `interface Box<T> { value: T; }` con `Json.parse<Box<int>>("{\"value\":\"x\"}")`;
+  y `Json.parse<Box>("{\"value\":\"x\"}")` importando
+  `export interface Box { value: int; }` de otro módulo.
+  Deben rechazar el campo `str`. Pérdida verificada por lectura del lowering;
+  estos repros no se han ejecutado.
 - [x] `Json.parse<T>` sobre `class`: decisión: no decodificable; falla con TypeError en runtime (una clase puede ser un retorno legítimo de otras funciones genéricas, por eso no es error de compilación)
 - [ ] `as T` con `T` genérico sin comprobación (`signals/reactive`, `ui/bound`, `reflect/meta`)
 - [ ] Paridad de límites de recursión entre intérprete (10000 frames) y JIT (bytes de pila)
