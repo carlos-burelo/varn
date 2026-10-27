@@ -20,8 +20,9 @@ await describe("260 json decode validates", async () => {
         expect(p.tags.length).toBe(2);
     });
 
-    await it("unknown fields are dropped and key order does not matter", () => {
-        const p = Json.parse<Profile>("{\"tags\":[],\"extra\":true,\"age\":3,\"name\":\"bo\"}");
+    await it("unknown fields are rejected and key order does not matter", () => {
+        expect(decodeFails(() => Json.parse<Profile>("{\"tags\":[],\"extra\":true,\"age\":3,\"name\":\"bo\"}"))).toBeTruthy();
+        const p = Json.parse<Profile>("{\"tags\":[],\"age\":3,\"name\":\"bo\"}");
         expect(p.name).toBe("bo");
         expect(p.age).toBe(3);
     });

@@ -88,7 +88,9 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
   de cadenas, incluidos todos los controles U+0000..U+001F. Los seis consumidores
   de la suite que fijaban el formato anterior se migraron.
 - [x] `max()` / `min()` sin argumentos: error de compilación (primer argumento obligatorio)
-- [ ] `Json.parse` descarta campos desconocidos en silencio
+- [x] `Json.parse<T>` rechaza campos desconocidos en formas cerradas, también
+  anidadas, interfaces y records. Se elimina la proyección que los borraba;
+  diccionarios y mapas mantienen sus claves. Dos suites existentes migradas.
 
 ### Limpieza
 - [x] Eliminar `ExprKind::RegexLiteral` del AST y de sus `match`

@@ -63,6 +63,11 @@ funciones, `dynamic` y tipos abiertos exigen comparación explícita. Se añade
 `sameValue` y se elimina la invocación implícita de `equals` para esos operadores.
 Once suites y cinco consumidores de std migrados; JWT estrecha su algoritmo.
 
+JSON (2026-10-26): decode rechaza claves desconocidas de formas cerradas antes
+de proyectar; ya no oculta datos descartándolos. La regla se aplica a miembros
+anidados, interfaces y records; mapas y diccionarios conservan sus claves.
+Dos suites que dependían del descarte migradas.
+
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
 destructuring de tupla por posición (`e8e1717d`); local `dynamic`

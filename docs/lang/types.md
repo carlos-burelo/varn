@@ -84,6 +84,11 @@ identidad para referencias mutables. Las comparaciones contra `null` se permiten
 `dynamic` y parámetros de tipo abiertos también requieren comparación explícita.
 Los alias y las uniones deben demostrar que todos sus miembros admiten igualdad.
 
+`Json.parse<T>` construye y valida el tipo elegido por el llamador. Las formas
+cerradas, incluidas interfaces y records, rechazan campos desconocidos y valores
+incompatibles en cualquier nivel. Para claves abiertas se declara un diccionario
+`{ [key: str]: T }` o `Map<str, T>`.
+
 ### 2.4 Diccionarios (`{ [key: K]: V }`) y mapas (`Map<K, V>`)
 
 Contenedores asociativos dinámicos mutables (`tests/17-map-set.vn`,

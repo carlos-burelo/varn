@@ -118,6 +118,12 @@ fn walk(
             let Some(entries) = object_entries(heap, v) else {
                 return v;
             };
+            if entries
+                .iter()
+                .any(|(name, _)| !fields.iter().any(|field| field.name == *name))
+            {
+                return v;
+            }
             let inner = Scope {
                 desc,
                 parent: scope,
