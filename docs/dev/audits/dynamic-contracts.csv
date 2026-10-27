@@ -1,0 +1,59 @@
+file,line,source
+crates/varn-builtins/src/modules/core/globals/globals.vn,2,export declare function print(...args: dynamic[]): void;
+crates/varn-builtins/src/modules/core/globals/globals.vn,3,export declare function debug(...args: dynamic[]): void;
+crates/varn-builtins/src/modules/core/globals/globals.vn,11,    declare function log(...args: dynamic[]): void
+crates/varn-builtins/src/modules/core/globals/globals.vn,12,    declare function error(...args: dynamic[]): void
+crates/varn-builtins/src/modules/core/globals/globals.vn,13,    declare function warn(...args: dynamic[]): void
+crates/varn-builtins/src/modules/core/globals/globals.vn,14,    declare function info(...args: dynamic[]): void
+crates/varn-builtins/src/modules/core/globals/globals.vn,15,    declare function debug(...args: dynamic[]): void
+crates/varn-builtins/src/modules/core/types/aliases/aliases.vn,45,export type ReturnType<T> = T extends (...args: dynamic[]) => infer R ? R : never
+crates/varn-builtins/src/modules/core/types/array/array.vn,18,    flat(depth?: int): dynamic[];
+crates/varn-builtins/src/modules/core/types/iteration/iteration.vn,47,export interface TaskHandle<T = dynamic> {
+crates/varn-builtins/src/modules/runtime/csv/csv_runtime.vn,3,"export declare function parse$(text: str, delimiter: str, hasHeader: bool, trim: bool): dynamic;"
+crates/varn-builtins/src/modules/runtime/csv/csv_runtime.vn,4,"export declare function stringify$(data: dynamic, delimiter: str): str;"
+crates/varn-builtins/src/modules/runtime/io/io_runtime.vn,3,export declare function write$(...args: dynamic[]): void;
+crates/varn-builtins/src/modules/runtime/io/io_runtime.vn,4,export declare function writeln$(...args: dynamic[]): void;
+crates/varn-builtins/src/modules/runtime/json/json_runtime.vn,3,export declare function parse$(text: str): dynamic;
+crates/varn-builtins/src/modules/runtime/json/json_runtime.vn,4,export declare function stringify$(value: dynamic): str;
+crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,3,"export declare function defineMetadata$(metadataKey: dynamic, metadataValue: dynamic, target: dynamic): void;"
+crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,4,"export declare function getMetadata$(metadataKey: dynamic, target: dynamic): dynamic;"
+crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,5,"export declare function hasMetadata$(metadataKey: dynamic, target: dynamic): bool;"
+crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,8,"export declare function setMetaKey$(metaId: str, target: dynamic, value: dynamic): void;"
+crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,9,"export declare function getMetaKey$(metaId: str, target: dynamic): dynamic;"
+crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,10,"export declare function hasMetaKey$(metaId: str, target: dynamic): bool;"
+crates/varn-builtins/src/modules/runtime/sqlite/sqlite_runtime.vn,6,"export declare function queryAll$(dbId: int, sql: str, params: dynamic[]): dynamic[];"
+crates/varn-builtins/src/modules/runtime/sqlite/sqlite_runtime.vn,7,"export declare function queryOne$(dbId: int, sql: str, params: dynamic[]): dynamic;"
+crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,3,"export declare function spawn$<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T>;"
+crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,14,"export declare function spawnIsolate$(fn: dynamic, args: Array<dynamic>): TaskHandle<IsolateHandle>;"
+crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,18,export declare class Sender<T = dynamic> {
+crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,24,export declare class Receiver<T = dynamic> {
+crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,30,export declare class Channel<T = dynamic> {
+crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,35,export declare function channel$<T = dynamic>(capacity: int): Channel<T>;
+std/encoding/csv.vn,10,"    export function parse<T = dynamic>(text: str, options?: CsvOptions): T[] {"
+std/encoding/toml.vn,52,function parseTomlValue(valueText: str): dynamic {
+std/encoding/toml.vn,68,        let items: dynamic[] = [];
+std/encoding/toml.vn,84,function formatTomlValue(val: dynamic): str {
+std/encoding/toml.vn,100,        let arr = val as dynamic[];
+std/encoding/toml.vn,110,    export function parse(content: str): { [key: str]: dynamic } {
+std/encoding/toml.vn,111,        let root: { [key: str]: dynamic } = {};
+std/encoding/toml.vn,122,                let sectionObj: { [key: str]: dynamic } = {};
+std/encoding/toml.vn,138,    export function tryParse(content: str): { [key: str]: dynamic }? {
+std/encoding/toml.vn,146,    export function stringify(value: { [key: str]: dynamic }): str {
+std/encoding/toml.vn,167,            let sectionObj = value[sectionName] as { [key: str]: dynamic };
+std/reflect/introspect.vn,2,    static keys(target: dynamic): str[] {
+std/reflect/introspect.vn,7,    static values(target: dynamic): dynamic[] {
+std/reflect/introspect.vn,12,    static entries(target: dynamic): dynamic[] {
+std/reflect/introspect.vn,17,"    static hasOwn(target: dynamic, key: str): bool {"
+std/reflect/introspect.vn,22,    static typeOf(target: dynamic): str {
+std/reflect/introspect.vn,27,    static classOf(target: dynamic): dynamic {
+std/reflect/meta.vn,18,    (...args: dynamic[]): dynamic;
+std/reflect/meta.vn,54,"    private values: Map<dynamic, T> = new Map<dynamic, T>();"
+std/reflect/meta.vn,60,"    set(target: dynamic, value: T): void {"
+std/reflect/meta.vn,64,    get(target: dynamic): T? {
+std/reflect/meta.vn,68,    has(target: dynamic): bool {
+std/reflect/meta.vn,72,    keys(target: dynamic): dynamic[] {
+std/task/channel.vn,18,"    fn: dynamic,"
+std/task/channel.vn,19,    args: Array<dynamic>
+std/test/assert.vn,107,        let a = (this.actual as dynamic) as float;
+std/test/assert.vn,123,            for (let elem of (actual as dynamic) as dynamic[]) {
+std/test/assert.vn,124,"                if (isEq<dynamic>(elem, item)) {"

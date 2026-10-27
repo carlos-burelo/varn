@@ -9,7 +9,8 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 - [x] `split("")` devuelve caracteres (una sola implementación en `str_util::split_ranges`)
 - [x] Shifts fuera de 0..63 lanzan error (VM, plegado de constantes y JIT)
 - [x] El spread con override reemplaza el miembro y su tipo
-- [x] `Json.parse<T>` valida en el sitio de llamada (`decoded_calls`, `CheckKind::Decode`)
+- [x] `Json.parse<T>` instala validación en el sitio de llamada (`decoded_calls`,
+  `CheckKind::Decode`); los contratos todavía borrados figuran como pendientes.
 - [x] `Json.tryParse` sin parámetro de tipo
 - [x] Campos de clase no nulos deben quedar asignados en cada ruta del constructor
 - [x] Lectura de un campo antes de asignarlo / initializer que lee un campo posterior
@@ -100,13 +101,27 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
   el tipo de su algoritmo antes de compararlo con texto.
 - [x] Sombreado de predefinidos: `Infinity`/`NaN` y tipos primitivos no se redeclaran (módulos core exentos)
 - [x] `x instanceof int` es el test de tipo para uniones (la std lo usa y estrecha): decisión, sin cambio
-- [ ] `dynamic` sin autorización explícita (Ley 17): inventariar usos
+- [x] Inventario de `dynamic` basado en fuentes y ejecución:
+  [mediciones, CSV y reproducciones](audits/DYNAMIC_INVENTORY.md).
+  58 líneas en 16 archivos de contratos/std; 307 referencias explícitas a razones
+  backend y 158 a las tres formas semánticas buscadas. No implica autorización.
+- [ ] Migrar usos heterogéneos inventariados a contratos estáticos; cualquier
+  camino dinámico nuevo requiere autorización explícita (Ley 17).
+- [ ] Conservar miembros de uniones en TIR y descriptors: hoy una unión de
+  records acepta objetos incompatibles desde JSON y desde `dynamic`.
+- [ ] Conservar restricciones de literales: `Json.parse<"yes">('"no"')` pasa.
+- [ ] Comprobar firmas completas al convertir funciones: un callback que devuelve
+  `str` se acepta como `()=>int`; el consumo inválido ya produce TypeError.
+- [ ] Conservar campos fijos de formas con índice y el tipo de la clave: hoy
+  se aceptan campos incorrectos y claves incompatibles desde JSON.
+- [ ] Resolver el meet de records con vistas de objeto sin perder la obligación
+  de ser record: una intersección mixta aún acepta un objeto mutable.
 - [x] Presentación conserva `.0` en floats enteros (incluido `-0.0`); strings
   y chars anidados llevan delimitadores. JSON y presentación comparten escapes
   de cadenas, incluidos todos los controles U+0000..U+001F. Los seis consumidores
   de la suite que fijaban el formato anterior se migraron.
 - [x] `max()` / `min()` sin argumentos: error de compilación (primer argumento obligatorio)
-- [x] `Json.parse<T>` rechaza campos desconocidos en formas cerradas, también
+- [x] `Json.parse<T>` rechaza campos desconocidos en formas cerradas individuales, también
   anidadas, interfaces y records. Se elimina la proyección que los borraba;
   diccionarios y mapas mantienen sus claves. Dos suites existentes migradas.
 

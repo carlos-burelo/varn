@@ -186,6 +186,14 @@ corregidos en el camino: `implements` de clase genérica sin verificar
 (`3ac6f3b1`), pánico del hover con miembros de clase foránea (`003aa267`),
 `.vn/.env` que `vn init` creaba y nadie leía.
 
+Inventario de fronteras (2026-10-26): [evidencia y reproducciones](../audits/DYNAMIC_INVENTORY.md).
+58 líneas con `dynamic` en 16 archivos de contratos/std; referencias Rust
+separadas de nodos TIR y sin presumir autorización. Pendiente prioritario:
+transportar literales, miembros de uniones, firmas completas e índices; resolver
+el meet mixto Record/Object. Ganancia: rechazar los valores incompatibles
+reproducidos en VM/JIT. Verificación: esas reproducciones y matriz completa.
+Se borran los borrados de contrato correspondientes; no se añaden rutas paralelas.
+
 ## 2. Pendiente, por orden
 
 ### 2.1 Representación: un bloque por valor
