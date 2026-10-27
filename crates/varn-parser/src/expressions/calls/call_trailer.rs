@@ -1,6 +1,6 @@
 use super::super::parse_expr;
 use super::super::primary::{parse_object_body, parse_primary_expr, parse_template};
-use super::generic_args::{looks_like_generic_call, parse_call_args, try_parse_generic_call};
+use super::generic_args::{parse_call_args, try_parse_generic_call};
 use super::property_name::parse_property_name;
 use crate::stream::TokenStream;
 use varn_core::ast::{ExprId, ExprKind};
@@ -181,9 +181,6 @@ pub(super) fn parse_call_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                 );
             }
             TokenKind::LAngle => {
-                if !looks_like_generic_call(s) {
-                    break;
-                }
                 let save = s.save();
                 let start_range = s.expr_range(expr);
                 match try_parse_generic_call(s, expr, start_range) {

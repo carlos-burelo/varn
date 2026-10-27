@@ -14,7 +14,7 @@ function decodeFails(decode: () => dynamic): bool {
 
 await describe("260 json decode validates", async () => {
     await it("a value of the declared shape decodes", () => {
-        const p = Json.parse<Profile>("{\"name\":\"ann\",\"age\":7,\"tags\":[\"a\",\"b\"]}");
+        const p = Json.parse<{ name: str, age: int, tags: str[] }>("{\"name\":\"ann\",\"age\":7,\"tags\":[\"a\",\"b\"]}");
         expect(p.name).toBe("ann");
         expect(p.age + 1).toBe(8);
         expect(p.tags.length).toBe(2);

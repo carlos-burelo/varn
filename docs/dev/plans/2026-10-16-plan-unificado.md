@@ -68,6 +68,11 @@ de proyectar; ya no oculta datos descartándolos. La regla se aplica a miembros
 anidados, interfaces y records; mapas y diccionarios conservan sus claves.
 Dos suites que dependían del descarte migradas.
 
+Llamadas genéricas (2026-10-26): se elimina la segunda gramática de lookahead
+léxico. La ruta especulativa existente usa `parse_type_args` como única fuente
+para distinguir tipos de comparaciones, igual que las llamadas de constructor.
+Admite contratos inline de objetos, records y funciones; suite JSON migrada.
+
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
 destructuring de tupla por posición (`e8e1717d`); local `dynamic`

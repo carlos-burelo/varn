@@ -52,6 +52,10 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
   Conform valida sin mutar datos; decode construye contenedores nuevos. Se borran
   el normalizador mutante y el protocolo de reemplazo de argumentos. Tres suites
   existentes migran las conversiones implícitas a decoders tipados explícitos.
+- [x] Argumentos de tipo inline en llamadas genéricas usan el parser canónico,
+  también objetos, records, firmas de función y firmas de índice. Se elimina la
+  heurística léxica que los confundía con comparaciones. La suite JSON ejercita
+  una forma inline; sondas de records anidados y diccionarios pasan con y sin JIT.
 - [x] `Json.parse<T>` sobre `class`: decisión: no decodificable; falla con TypeError en runtime (una clase puede ser un retorno legítimo de otras funciones genéricas, por eso no es error de compilación)
 - [x] `as T` exige prueba estática dentro de cuerpos genéricos; la conversión implícita
   de `dynamic` a un parámetro abierto también se rechaza. Solo el retorno directo de
