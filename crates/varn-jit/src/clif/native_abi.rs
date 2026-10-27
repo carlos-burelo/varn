@@ -42,18 +42,18 @@ pub(crate) const CALL_CONV: CallConv = CallConv::Tail;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct NativeShape {
-    pub params: Vec<NativeClass>,
-    pub ret: NativeClass,
+    pub params: Vec<SlotKind>,
+    pub ret: SlotKind,
 }
 
 impl NativeShape {
     pub(crate) fn new(param_kinds: &[SlotKind], return_kind: SlotKind) -> Self {
         let mut params = Vec::with_capacity(param_kinds.len() + 1);
-        params.push(NativeClass::Boxed);
-        params.extend(param_kinds.iter().map(|k| NativeClass::of(*k)));
+        params.push(SlotKind::Dynamic);
+        params.extend_from_slice(param_kinds);
         NativeShape {
             params,
-            ret: NativeClass::of(return_kind),
+            ret: return_kind,
         }
     }
 
@@ -66,24 +66,25 @@ impl NativeShape {
         sig.params.push(AbiParam::new(types::I64));
         sig.params.push(AbiParam::new(types::I64));
         for c in &self.params {
-            c.push(&mut sig.params);
+            NativeClass::of(*c).push(&mut sig.params);
         }
-        self.ret.push(&mut sig.returns);
+        NativeClass::of(self.ret).push(&mut sig.returns);
         sig
     }
 }
 
 pub const NATIVE_FRAMELESS: u64 = 1 << 63;
 
-const MAX_ID_PARAMS: usize = 27;
+const MAX_ID_PARAMS: usize = 18;
 
-impl NativeClass {
-    fn code(self) -> u64 {
-        match self {
-            NativeClass::Word => 0,
-            NativeClass::Float => 1,
-            NativeClass::Boxed => 2,
-        }
+fn kind_code(kind: SlotKind) -> u64 {
+    match kind {
+        SlotKind::Int => 0,
+        SlotKind::Float => 1,
+        SlotKind::Bool => 2,
+        SlotKind::Str => 3,
+        SlotKind::Ref => 4,
+        SlotKind::Dynamic => 5,
     }
 }
 
@@ -92,9 +93,9 @@ impl NativeShape {
         if self.params.len() > MAX_ID_PARAMS {
             return None;
         }
-        let mut id = self.ret.code() | ((self.params.len() as u64) << 2);
+        let mut id = kind_code(self.ret) | ((self.params.len() as u64) << 3);
         for (i, c) in self.params.iter().enumerate() {
-            id |= c.code() << (8 + 2 * i);
+            id |= kind_code(*c) << (8 + 3 * i);
         }
         Some(id)
     }

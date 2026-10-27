@@ -317,7 +317,7 @@ fn entry_param(
         || format!("from_ssa: parameter {k} is {kind:?} in the SSA but {declared:?} in the ABI");
     match ctx.activation {
         Activation::Native => {
-            let class = shape.params[1 + k];
+            let class = crate::clif::native_abi::NativeClass::of(shape.params[1 + k]);
             let at = *word;
             *word += class.words();
             match class {

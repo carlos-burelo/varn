@@ -95,6 +95,12 @@ await describe("167 dynamic boundary: collections", async () => {
     await it("a function type only accepts something callable", () => {
         expect(apply((x: int) => x * 2)).toBe(4)
         expect(outcome(() => { apply(3) })).toBe("type mismatch: expected 'function', got 'int'")
+        let rejectedReturns = 0
+        for (let i = 0; i < 2000; i = i + 1) {
+            if (outcome(() => { if (apply((x: int) => "wrong") > 0) { throw new Error("unexpected return") } }) == "type mismatch: expected 'int', got 'str'") { rejectedReturns = rejectedReturns + 1 }
+            if (outcome(() => { if (apply((x: int) => true) > 0) { throw new Error("unexpected return") } }) == "type mismatch: expected 'int', got 'bool'") { rejectedReturns = rejectedReturns + 1 }
+        }
+        expect(rejectedReturns).toBe(4000)
     })
 
     await it("nullable and nested collections", () => {

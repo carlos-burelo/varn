@@ -82,8 +82,18 @@ pub(super) fn emit_convert(
         let a = load_value(b, ctx, values, operand)?;
         return Ok(Out::Native(b.ins().fcvt_from_sint(types::F64, a)));
     }
+    let boxed = heap::boxed_value(b, ctx, values, operand)?;
+    Ok(Out::Boxed(convert_boxed(b, ctx, boxed, conv)?))
+}
+
+pub(super) fn convert_boxed(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    boxed: Value,
+    conv: ValueConv,
+) -> Result<Value, String> {
     let ectx = exec_ctx(ctx);
-    let (tag, payload) = heap::boxed_parts(b, ctx, values, operand)?;
+    let (tag, payload) = b.ins().isplit(boxed);
     let Some(expected) = Expected::of(conv) else {
         let conv_v = b.ins().iconst(types::I64, conv as i64);
         super::exceptions::call_checked(
@@ -92,7 +102,7 @@ pub(super) fn emit_convert(
             ctx.helpers.convert,
             &[ectx, conv_v, tag, payload],
         )?;
-        return Ok(Out::Boxed(native_result(b, ctx, ectx)));
+        return Ok(native_result(b, ctx, ectx));
     };
 
     let pass = b.create_block();
@@ -143,7 +153,7 @@ pub(super) fn emit_convert(
     b.ins().jump(merge, &[converted.into()]);
 
     b.switch_to_block(merge);
-    Ok(Out::Boxed(b.block_params(merge)[0]))
+    Ok(b.block_params(merge)[0])
 }
 
 enum ExpectedKind {
@@ -168,6 +178,7 @@ impl Expected {
             ValueConv::ExpectIntOrNull => (ExpectedKind::Tag(KIND_INT), true),
             ValueConv::ExpectFloat => (ExpectedKind::Tag(KIND_FLOAT), false),
             ValueConv::ExpectFloatOrNull => (ExpectedKind::Tag(KIND_FLOAT), true),
+            ValueConv::ExpectRef => (ExpectedKind::Tag(varn_types::vm_value::KIND_HEAP), true),
             ValueConv::IntToFloat
             | ValueConv::FloatToInt
             | ValueConv::IntToBigInt

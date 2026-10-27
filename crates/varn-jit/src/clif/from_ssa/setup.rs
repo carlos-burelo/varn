@@ -194,7 +194,13 @@ pub(super) fn enter(
 
     let entry_params = b.block_params(entry_blk).to_vec();
     let expected = match activation {
-        Activation::Native => 2 + shape.params.iter().map(|c| c.words()).sum::<usize>(),
+        Activation::Native => {
+            2 + shape
+                .params
+                .iter()
+                .map(|c| super::super::native_abi::NativeClass::of(*c).words())
+                .sum::<usize>()
+        }
         Activation::Framed => 4 + abi_params,
     };
     if entry_params.len() != expected {

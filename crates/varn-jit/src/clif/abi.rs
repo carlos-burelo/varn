@@ -118,11 +118,22 @@ pub(super) fn build_wrapper(
             let mut args = vec![exec_ctx, closure];
             for (r, class) in shape.params.iter().enumerate() {
                 let boxed = homes.load(&mut b, r);
-                push_native_arg(&mut b, &mut args, *class, kind_of(proto, r), boxed);
+                push_native_arg(
+                    &mut b,
+                    &mut args,
+                    NativeClass::of(*class),
+                    kind_of(proto, r),
+                    boxed,
+                );
             }
             let call = b.ins().call(raw_ref, &args);
             let res = b.inst_results(call).to_vec();
-            native_result_boxed(&mut b, shape.ret, proto.return_kind, &res)
+            native_result_boxed(
+                &mut b,
+                crate::clif::native_abi::NativeClass::of(shape.ret),
+                proto.return_kind,
+                &res,
+            )
         }
         Activation::Framed => {
             let mut args = vec![stack_ptr, closure, base, exec_ctx];

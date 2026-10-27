@@ -257,7 +257,7 @@ pub(crate) fn convert_result_ty(conv: varn_core::ValueConv) -> BackendTy {
         | DecimalToBigInt => BackendTy::Dynamic(DynReason::Boxed),
         ExpectStr => BackendTy::Str,
         ExpectBool => BackendTy::Bool,
-        ExpectStrOrNull | ExpectBoolOrNull | ExpectIntOrNull | ExpectFloatOrNull => {
+        ExpectStrOrNull | ExpectBoolOrNull | ExpectIntOrNull | ExpectFloatOrNull | ExpectRef => {
             BackendTy::Dynamic(DynReason::Boxed)
         }
         ExpectInt => BackendTy::Int,
@@ -273,6 +273,6 @@ fn convert_operand_ty(conv: varn_core::ValueConv) -> Option<BackendTy> {
         IntToBigInt | IntToDecimal | BigIntToInt | DecimalToInt | DynToInt | DynToFloat
         | BigIntToFloat | DecimalToFloat | BigIntToDecimal | DecimalToBigInt | ExpectStr
         | ExpectBool | ExpectStrOrNull | ExpectBoolOrNull | ExpectInt | ExpectFloat
-        | ExpectIntOrNull | ExpectFloatOrNull => None,
+        | ExpectIntOrNull | ExpectFloatOrNull | ExpectRef => None,
     }
 }

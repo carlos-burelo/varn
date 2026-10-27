@@ -13,6 +13,20 @@ pub enum SlotKind {
     Dynamic,
 }
 
+impl SlotKind {
+    pub fn checked_conversion(self) -> Option<varn_core::ValueConv> {
+        use varn_core::ValueConv;
+        match self {
+            SlotKind::Int => Some(ValueConv::ExpectInt),
+            SlotKind::Float => Some(ValueConv::ExpectFloat),
+            SlotKind::Bool => Some(ValueConv::ExpectBool),
+            SlotKind::Str => Some(ValueConv::ExpectStr),
+            SlotKind::Ref => Some(ValueConv::ExpectRef),
+            SlotKind::Dynamic => None,
+        }
+    }
+}
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]

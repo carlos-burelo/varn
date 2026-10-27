@@ -9,10 +9,11 @@ impl ExecCtx {
         op: OpCode,
         code: &[u16],
         ip: &mut usize,
-        base: usize,
+        frame_idx: usize,
         first_reg: usize,
         closure: &crate::closure::VmClosure,
     ) -> VmResult<()> {
+        let base = self.frames[frame_idx].base;
         match op {
             OpCode::Intrinsic => {
                 let w1 = code[*ip];
@@ -33,7 +34,7 @@ impl ExecCtx {
                     let boxed = self.stack.box_range(base, args_start, arg_count);
                     (crate::exec::intrinsics::dispatch(wire_byte, &boxed))?
                 };
-                (self.stack.unbox_into_reg(base, first_reg, result))?;
+                (self.store_call_result(frame_idx, first_reg, result))?;
             }
 
             OpCode::IntrinsicDirect => {
@@ -43,7 +44,7 @@ impl ExecCtx {
                 let wire_byte = (w1 & 0xFF) as u8;
                 let x = self.stack.box_reg(base, src);
                 let result = (crate::exec::intrinsics::dispatch_unary(wire_byte, x))?;
-                (self.stack.unbox_into_reg(base, first_reg, result))?;
+                (self.store_call_result(frame_idx, first_reg, result))?;
             }
 
             OpCode::CallNativeOp => {
@@ -88,7 +89,7 @@ impl ExecCtx {
                         count: total - 1,
                     },
                 ))?;
-                (self.stack.unbox_into_reg(base, first_reg, result))?;
+                (self.store_call_result(frame_idx, first_reg, result))?;
             }
 
             OpCode::LoadConst

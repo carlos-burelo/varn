@@ -32,7 +32,7 @@ impl ExecCtx {
         }
 
         let result = self.stage_pop();
-        self.stack.unbox_into_reg(base, dest, result)?;
+        self.store_call_result(frame_idx, dest, result)?;
         Ok(false)
     }
 }

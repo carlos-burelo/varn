@@ -81,6 +81,12 @@ Retorno transaccional (2026-10-26): VM/JIT comparten finalización. La escritura
 al llamador puede fallar con el frame todavía vivo; luego se libera almacenamiento.
 La propagación común conserva captura y traza en lugar de indexar un frame retirado.
 
+Resultados boxed (2026-10-26): una conversión canónica por `SlotKind` valida
+valores de retorno antes de consumir payloads. La ABI nativa identifica los seis
+tipos de slot, en lugar de fusionar bool/int o todos los boxed por disposición.
+Se elimina la extracción sin prueba en la ruta boxed; la ruta nativa probada
+conserva sus valores sin reboxear. ABI JIT 12; 4000 rechazos en caliente en la suite.
+
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
 destructuring de tupla por posición (`e8e1717d`); local `dynamic`

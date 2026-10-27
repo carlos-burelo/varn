@@ -61,7 +61,7 @@ impl ExecCtx {
                         let result = self
                             .invoke_native(f, &args)
                             .map_err(crate::error::RuntimeError::from)?;
-                        self.stack.unbox_into_reg(base, dest, result)?;
+                        self.store_call_result(frame_idx, dest, result)?;
                         return Ok(false);
                     }
                     varn_types::value::BoundMethodTarget::Vm {
@@ -114,7 +114,7 @@ impl ExecCtx {
                         let result = self
                             .invoke_native(f, slice)
                             .map_err(crate::error::RuntimeError::from)?;
-                        self.stack.unbox_into_reg(base, dest, result)?;
+                        self.store_call_result(frame_idx, dest, result)?;
                         return Ok(false);
                     }
                     Some(crate::heap::HeapObj::VmClosure(nc))
@@ -246,7 +246,7 @@ impl ExecCtx {
         }
 
         let result = self.stage_pop();
-        self.stack.unbox_into_reg(base, dest, result)?;
+        self.store_call_result(frame_idx, dest, result)?;
         Ok(false)
     }
 
@@ -356,7 +356,7 @@ impl ExecCtx {
             return Ok(true);
         }
         let result = self.stage_pop();
-        self.stack.unbox_into_reg(base, dest, result)?;
+        self.store_call_result(frame_idx, dest, result)?;
         Ok(false)
     }
 }

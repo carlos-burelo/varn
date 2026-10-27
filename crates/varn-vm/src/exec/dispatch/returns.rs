@@ -14,9 +14,7 @@ impl ExecCtx {
             crate::exec::frame_ctrl::resolve_constructor_return(self, returning_frame_idx, val);
         let return_reg = self.frames[returning_frame_idx].return_reg;
         if return_reg != crate::frame::CallFrame::NO_RETURN_REG && returning_frame_idx > 0 {
-            let caller_base = self.frames[returning_frame_idx - 1].base;
-            self.stack
-                .unbox_into_reg(caller_base, return_reg as usize, final_val)?;
+            self.store_call_result(returning_frame_idx - 1, return_reg as usize, final_val)?;
         }
         let frame = self.frames.pop().unwrap();
         self.drop_frame_storage(frame.base);
@@ -33,6 +31,28 @@ impl ExecCtx {
         }
 
         Ok(final_val)
+    }
+
+    pub(super) fn store_call_result(
+        &mut self,
+        frame_idx: usize,
+        dest: usize,
+        value: VmValue,
+    ) -> VmResult<()> {
+        let caller = &self.frames[frame_idx];
+        let base = caller.base;
+        let kind = caller
+            .closure()
+            .proto
+            .register_meta
+            .get(dest)
+            .map(|meta| meta.kind)
+            .unwrap_or_default();
+        let value = match kind.checked_conversion() {
+            Some(conv) => crate::exec::convert::convert(conv, value, &mut self.heap)?,
+            None => value,
+        };
+        self.stack.unbox_into_reg(base, dest, value)
     }
 
     pub(crate) fn exec_typeof(&self, v: VmValue) -> &'static str {

@@ -34,10 +34,11 @@ pub enum ValueConv {
     ExpectFloat = 19,
     ExpectIntOrNull = 20,
     ExpectFloatOrNull = 21,
+    ExpectRef = 22,
 }
 
 impl ValueConv {
-    pub const ALL: [Self; 22] = [
+    pub const ALL: [Self; 23] = [
         Self::IntToFloat,
         Self::FloatToInt,
         Self::IntToBigInt,
@@ -60,6 +61,7 @@ impl ValueConv {
         Self::ExpectFloat,
         Self::ExpectIntOrNull,
         Self::ExpectFloatOrNull,
+        Self::ExpectRef,
     ];
 
     pub const fn from_u8(raw: u8) -> Option<Self> {
@@ -105,6 +107,7 @@ impl ValueConv {
                 | Self::ExpectFloat
                 | Self::ExpectIntOrNull
                 | Self::ExpectFloatOrNull
+                | Self::ExpectRef
                 | Self::FloatToBigInt
                 | Self::FloatToDecimal
         )

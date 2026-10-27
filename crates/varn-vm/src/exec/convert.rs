@@ -133,6 +133,17 @@ fn not_a(expected: LangPrimitive, nullable: bool, v: VmValue, heap: &Heap) -> Ru
 
 pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     match conv {
+        ValueConv::ExpectRef => {
+            return if v.is_heap() || v.is_null() {
+                Ok(v)
+            } else {
+                Err(RuntimeError::type_error(format!(
+                    "type mismatch: expected '{}', got '{}'",
+                    varn_core::RuntimeKind::Object.name(),
+                    crate::exec::advanced::typeof_val(v, heap)
+                )))
+            };
+        }
         ValueConv::ExpectStr | ValueConv::ExpectStrOrNull => {
             let nullable = conv == ValueConv::ExpectStrOrNull;
             return if heap.is_string(v) || (nullable && v.is_null()) {
@@ -191,7 +202,8 @@ pub(crate) fn convert(conv: ValueConv, v: VmValue, heap: &mut Heap) -> VmResult<
         | ValueConv::ExpectInt
         | ValueConv::ExpectFloat
         | ValueConv::ExpectIntOrNull
-        | ValueConv::ExpectFloatOrNull => Ok(v),
+        | ValueConv::ExpectFloatOrNull
+        | ValueConv::ExpectRef => Ok(v),
         ValueConv::FloatToInt
         | ValueConv::BigIntToInt
         | ValueConv::DecimalToInt

@@ -249,7 +249,7 @@ pub(super) fn emit_placeholder_return(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
         },
         Activation::Native => {
             let shape = NativeShape::of_proto(ctx.proto);
-            match shape.ret {
+            match crate::clif::native_abi::NativeClass::of(shape.ret) {
                 NativeClass::Word => {
                     let z = b.ins().iconst(types::I64, 0);
                     b.ins().return_(&[z]);

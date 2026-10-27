@@ -72,6 +72,11 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 - [x] Un retorno inválido se valida antes de retirar el frame. VM y JIT usan
   la misma finalización y ruta de propagación del error; se elimina el panic
   por intentar anotar un frame ya retirado y se conserva la captura del error.
+- [x] Resultados boxed se comprueban antes de consumirlos como tipos concretos.
+  VM/JIT comparten la conversión canónica por `SlotKind`; el JIT conserva la
+  ruta nativa probada y valida la ruta boxed. La firma ABI distingue `int` de
+  `bool` y los tipos boxed, sin confundir disposición física con identidad.
+  ABI JIT 12 invalida cachés anteriores; la suite ejercita 4000 rechazos en caliente.
 - [x] Intérprete y JIT comparten el límite lógico de 10000 llamadas; las llamadas
   JIT sin frame participan en el contador. La guarda de pila nativa sigue siendo
   un límite físico adicional. El contador se restaura también al suspender;

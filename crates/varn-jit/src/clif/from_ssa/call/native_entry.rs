@@ -4,7 +4,7 @@ use varn_types::register_meta::SlotKind;
 
 use super::super::super::emit::{call_helper_void, HEAP_KIND, KIND_MASK};
 use super::super::super::native_abi::{NativeClass, NativeShape, NATIVE_FRAMELESS};
-use super::super::store::{clif_ty, drop_home_addrs, is_heap};
+use super::super::store::{clif_ty, drop_home_addrs};
 use super::super::{heap, load_value, stack_exit, Ctx, Out};
 
 pub(crate) struct NativeCall<'a> {
@@ -115,7 +115,7 @@ pub(crate) fn emit(
     let (rtag, rpayload) = b.ins().isplit(call.receiver);
     let mut argv = vec![ectx, closure, rtag, rpayload];
     for (v, class) in call.args.iter().zip(&shape.params[1..]) {
-        match class {
+        match crate::clif::native_abi::NativeClass::of(*class) {
             NativeClass::Word | NativeClass::Float => argv.push(load_value(b, ctx, values, *v)?),
             NativeClass::Boxed => {
                 let boxed = heap::boxed_value(b, ctx, values, *v)?;
@@ -145,7 +145,7 @@ pub(crate) fn emit(
     b.switch_to_block(after);
     stack_exit::publish(b, ctx.helpers, ectx);
     crate::clif::from_ssa::exceptions::check_error_branch(b, ctx)?;
-    let direct = match shape.ret {
+    let direct = match crate::clif::native_abi::NativeClass::of(shape.ret) {
         NativeClass::Word | NativeClass::Float => res[0],
         NativeClass::Boxed => b.ins().iconcat(res[0], res[1]),
     };
@@ -154,11 +154,7 @@ pub(crate) fn emit(
 
     b.switch_to_block(slow_blk);
     let boxed = slow(b)?;
-    let fallback = if is_heap(dest_kind) {
-        boxed
-    } else {
-        heap::unbox_dest(b, dest_kind, boxed)?
-    };
+    let fallback = heap::unbox_checked(b, ctx, dest_kind, boxed)?;
     drop_home_addrs(ctx);
     b.ins().jump(merge, &[fallback.into()]);
 

@@ -346,7 +346,7 @@ impl ExecCtx {
                     }
                     OpCode::Intrinsic | OpCode::IntrinsicDirect | OpCode::CallNativeOp => {
                         tryv!(unsafe {
-                            (*ctx).exec_native_op(op, code, &mut ip, base, first_reg, closure)
+                            (*ctx).exec_native_op(op, code, &mut ip, frame_idx, first_reg, closure)
                         });
                     }
 

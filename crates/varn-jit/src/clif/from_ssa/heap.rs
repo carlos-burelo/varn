@@ -177,3 +177,16 @@ fn emit_window_boxed(
         ctx.helpers.jit_native_result_offset as i32,
     ))
 }
+
+pub(super) fn unbox_checked(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    dest: varn_types::register_meta::SlotKind,
+    boxed: Value,
+) -> Result<Value, String> {
+    let Some(conv) = dest.checked_conversion() else {
+        return Ok(boxed);
+    };
+    let checked = super::numeric::convert_boxed(b, ctx, boxed, conv)?;
+    unbox_dest(b, dest, checked)
+}

@@ -23,8 +23,7 @@ pub(super) fn land(
     let kind = ctx.ssa.value_ty(d);
     let native = match out {
         Out::Native(v) => v,
-        Out::Boxed(v) if is_heap(kind) => v,
-        Out::Boxed(v) => heap::unbox_dest(b, kind, v)?,
+        Out::Boxed(v) => heap::unbox_checked(b, ctx, kind, v)?,
     };
     define(b, ctx, values, d, native);
     Ok(())
