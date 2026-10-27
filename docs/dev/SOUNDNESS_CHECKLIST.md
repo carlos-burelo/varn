@@ -56,6 +56,9 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
   también objetos, records, firmas de función y firmas de índice. Se elimina la
   heurística léxica que los confundía con comparaciones. La suite JSON ejercita
   una forma inline; sondas de records anidados y diccionarios pasan con y sin JIT.
+- [x] La normalización de intersecciones directas de records conserva `Record`;
+  no las convierte en objetos mutables. El caso de records anidados de la suite
+  usa una anotación de intersección y conserva igualdad por valor.
 - [x] `Json.parse<T>` sobre `class`: decisión: no decodificable; falla con TypeError en runtime (una clase puede ser un retorno legítimo de otras funciones genéricas, por eso no es error de compilación)
 - [x] `as T` exige prueba estática dentro de cuerpos genéricos; la conversión implícita
   de `dynamic` a un parámetro abierto también se rechaza. Solo el retorno directo de

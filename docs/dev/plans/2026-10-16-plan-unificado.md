@@ -87,6 +87,10 @@ tipos de slot, en lugar de fusionar bool/int o todos los boxed por disposición.
 Se elimina la extracción sin prueba en la ruta boxed; la ruta nativa probada
 conserva sus valores sin reboxear. ABI JIT 12; 4000 rechazos en caliente en la suite.
 
+Intersecciones de records (2026-10-26): el meet directo de tipos Record mantiene
+su identidad después de fusionar campos. Se elimina su normalización a Object;
+el caso existente de records anidados en la suite ahora usa una intersección.
+
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
 destructuring de tupla por posición (`e8e1717d`); local `dynamic`

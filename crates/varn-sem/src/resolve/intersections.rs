@@ -67,7 +67,15 @@ pub(super) fn resolve_intersection_type(
         .collect();
 
     if let Some(parts) = parts_opt {
-        return Type::object(merge_members(parts.into_iter().flatten(), table), table);
+        let record_only = resolved
+            .iter()
+            .all(|ty| matches!(table.get(ty.0), TypeKind::Record(_)));
+        let fields = merge_members(parts.into_iter().flatten(), table);
+        return if record_only {
+            Type::record(fields, table)
+        } else {
+            Type::object(fields, table)
+        };
     }
     let ids: Vec<crate::types::CheckerTyId> = resolved.iter().map(|t| t.0).collect();
     let list = table.intern_list(&ids);

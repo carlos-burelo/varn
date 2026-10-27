@@ -36,7 +36,7 @@ await describe("69 tuples records", async () => {
         
         // 6. Nested Tuples and Records deep equality
         let nested1 = #{ point: #[10, 20], meta: #{ active: true } }
-        let nested2 = #{ point: #[10, 20], meta: #{ active: true } }
+        let nested2: #{ point: #[int, int] } & #{ meta: #{ active: bool } } = #{ point: #[10, 20], meta: #{ active: true } }
         let nested3 = #{ point: #[10, 99], meta: #{ active: true } }
         expect(nested1 == nested2).toBeTruthy()
         expect(nested1 != nested3).toBeTruthy()
