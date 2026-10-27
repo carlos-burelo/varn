@@ -7,6 +7,7 @@ mod logical;
 pub(crate) mod member_binary;
 mod meta;
 mod new_ty;
+mod object_ty;
 
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;

@@ -43,6 +43,7 @@ impl<'r> Checker<'r> {
                         | varn_core::TypeKind::TemplateLiteral(_)
                         | varn_core::TypeKind::Fn(_)
                         | varn_core::TypeKind::Object(_)
+                        | varn_core::TypeKind::Record(_)
                         | varn_core::TypeKind::Typeof(_)
                         | varn_core::TypeKind::KeyOf(_)
                         | varn_core::TypeKind::IndexedAccess { .. }
@@ -117,34 +118,6 @@ impl<'r> Checker<'r> {
         Type::resolved(
             std::sync::Arc::make_mut(&mut self.ty_table).intern(varn_core::TypeKind::Tuple(list)),
         )
-    }
-
-    pub(super) fn infer_record(
-        &mut self,
-        rec: &mut Recorder,
-        properties: &[varn_core::ast::ObjectProp],
-        bind: &BindResult,
-    ) -> Type {
-        let mut members = Vec::new();
-        for prop in properties {
-            if let varn_core::ast::ObjectProp::Property { key, value, .. } = prop {
-                let ty = self.infer_type(rec, *value, bind);
-                let name: std::sync::Arc<str> = match &key {
-                    varn_core::ast::PropKey::Identifier(s) | varn_core::ast::PropKey::Str(s) => {
-                        std::sync::Arc::from(s.as_str())
-                    }
-                    varn_core::ast::PropKey::Int(n) => std::sync::Arc::from(n.to_string().as_str()),
-                    varn_core::ast::PropKey::Computed(_) => std::sync::Arc::from("<computed>"),
-                };
-                members.push(varn_sem::types::ObjectTypeMember::Property {
-                    name,
-                    ty: ty.0,
-                    optional: false,
-                    readonly: true,
-                });
-            }
-        }
-        Type::object(members, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
     }
 
     pub(super) fn infer_match(

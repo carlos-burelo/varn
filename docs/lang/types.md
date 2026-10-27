@@ -63,7 +63,9 @@ assertTrue("tuple eq true", t1 == t2)   // igualdad estructural profunda
 
 ### 2.3 Records (`#{…}`)
 
-Objetos inmutables con igualdad estructural:
+Objetos inmutables con igualdad estructural. Su tipo se escribe `#{ campo: Tipo }`;
+una vista `{ readonly campo: Tipo }` sigue siendo un tipo de objeto y no convierte
+el valor en record:
 
 ```varn
 let r1 = #{ name: "Varn", version: 1 }   // tests/69-tuples-records.vn

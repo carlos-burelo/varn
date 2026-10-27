@@ -172,6 +172,9 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                 let ExprKind::Object { properties } = s.arena.expr(obj).kind.clone() else {
                     unreachable!()
                 };
+                if properties.iter().any(|p| !matches!(p, varn_core::ast::ObjectProp::Property { key: varn_core::ast::PropKey::Identifier(_) | varn_core::ast::PropKey::Str(_) | varn_core::ast::PropKey::Int(_), .. })) {
+                    return Err("records require named fields; spread, methods and computed keys are not supported".into());
+                }
                 Ok(s.expr(full_range, ExprKind::Record { properties }))
             } else {
                 Err(format!("Unexpected `#` at {}:{}", s.line(), s.column()))

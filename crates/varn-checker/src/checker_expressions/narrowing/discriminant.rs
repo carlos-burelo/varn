@@ -103,6 +103,7 @@ impl<'r> Checker<'r> {
                             | TypeKind::TemplateLiteral(_)
                             | TypeKind::Fn(_)
                             | TypeKind::Object(_)
+                            | TypeKind::Record(_)
                             | TypeKind::Typeof(_)
                             | TypeKind::KeyOf(_)
                             | TypeKind::IndexedAccess { .. }
@@ -124,7 +125,7 @@ impl<'r> Checker<'r> {
                             for m in members.iter() {
                                 let m_kind = self.ty_table.get(m.0);
                                 let hits = match m_kind {
-                                    TypeKind::Object(mid) => self
+                                    TypeKind::Object(mid) | TypeKind::Record(mid) => self
                                         .ty_table
                                         .get_object_members(mid)
                                         .iter()
@@ -271,19 +272,18 @@ impl<'r> Checker<'r> {
         let prop_name = bind.interner.resolve(*prop_name);
 
         match self.ty_table.get(m.0) {
-            TypeKind::Object(mid) => {
-                self.ty_table
-                    .get_object_members(mid)
-                    .iter()
-                    .any(|f| match f {
-                        ObjectTypeMember::Property { name, ty, .. } => {
-                            name.as_ref() == prop_name && *ty == disc_ty.0
-                        }
-                        ObjectTypeMember::Method { .. }
-                        | ObjectTypeMember::Index { .. }
-                        | ObjectTypeMember::Callable { .. } => false,
-                    })
-            }
+            TypeKind::Object(mid) | TypeKind::Record(mid) => self
+                .ty_table
+                .get_object_members(mid)
+                .iter()
+                .any(|f| match f {
+                    ObjectTypeMember::Property { name, ty, .. } => {
+                        name.as_ref() == prop_name && *ty == disc_ty.0
+                    }
+                    ObjectTypeMember::Method { .. }
+                    | ObjectTypeMember::Index { .. }
+                    | ObjectTypeMember::Callable { .. } => false,
+                }),
             TypeKind::Named(cn, _) => {
                 let cn_str = bind.interner.resolve(cn).to_string();
                 bind.get_interface_members_local(&cn_str)

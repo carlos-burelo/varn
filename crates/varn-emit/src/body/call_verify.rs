@@ -110,58 +110,10 @@ impl<'a> FnEmitter<'a> {
             })
             .collect();
         lead.extend(pinned.iter().cloned());
-        let Some(converted) = self.call_runtime(
-            positional,
-            lead,
-            BackendTy::Dynamic(DynReason::Declared),
-            span,
-        ) else {
-            return pinned.into_iter().map(TirArg::Expr).collect();
-        };
-        let converted = self.hoist(converted);
-        let unchanged = TirExpr {
-            kind: TirExprKind::Unary {
-                op: varn_tir::TirUnOp::IsNull,
-                operand: Box::new(converted.clone()),
-            },
-            ty: BackendTy::Bool,
-            res: Resolution::None,
-            span,
-        };
-        pinned
-            .into_iter()
-            .enumerate()
-            .map(|(i, arg)| {
-                if !matches!(arg.ty, BackendTy::Dynamic(_)) {
-                    return TirArg::Expr(arg);
-                }
-                let ty = arg.ty;
-                let replaced = TirExpr {
-                    kind: TirExprKind::Index {
-                        object: Box::new(converted.clone()),
-                        index: Box::new(TirExpr {
-                            kind: TirExprKind::IntLit(i as i64),
-                            ty: BackendTy::Int,
-                            res: Resolution::None,
-                            span,
-                        }),
-                    },
-                    ty,
-                    res: Resolution::None,
-                    span,
-                };
-                TirArg::Expr(TirExpr {
-                    kind: TirExprKind::Select {
-                        cond: Box::new(unchanged.clone()),
-                        then_val: Box::new(arg),
-                        else_val: Box::new(replaced),
-                    },
-                    ty,
-                    res: Resolution::None,
-                    span,
-                })
-            })
-            .collect()
+        if let Some(check) = self.call_runtime(positional, lead, BackendTy::Void, span) {
+            self.pending.push(TirStmt::Expr(check));
+        }
+        pinned.into_iter().map(TirArg::Expr).collect()
     }
 
     pub(super) fn call_runtime(

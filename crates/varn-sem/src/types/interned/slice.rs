@@ -97,7 +97,7 @@ impl Reach {
             | TypeKind::TemplateLiteral(c)
             | TypeKind::Generic(_, c, _) => self.visit_list(table, c),
             TypeKind::Fn(f) => self.visit_function(table, f),
-            TypeKind::Object(o) => self.visit_object(table, o),
+            TypeKind::Object(o) | TypeKind::Record(o) => self.visit_object(table, o),
             TypeKind::IndexedAccess { object, index } => {
                 self.pending.push(object);
                 self.pending.push(index);
@@ -154,6 +154,7 @@ fn kind_atoms(kind: &InternedTypeKind, out: &mut Vec<Atom>) {
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
+        | TypeKind::Record(_)
         | TypeKind::Typeof(())
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

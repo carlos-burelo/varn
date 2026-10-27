@@ -37,7 +37,7 @@ export function bytesConcat(a: Bytes, b: Bytes): Bytes {
     return out;
 }
 
-export async function readHttpHead(connId: int): Task<{ head: str, rest: Bytes }> {
+export async function readHttpHead(connId: int): Task<#{ head: str, rest: Bytes }> {
     let buf = Bytes.alloc(0);
     while (true) {
         let end = findHeadEnd(buf);

@@ -158,6 +158,7 @@ fn resolve_witnesses(
 
 fn check_args(
     heap: &crate::heap::Heap,
+    stack_floor: u64,
     args: &[VmValue],
     given: &[VmValue],
     fixed: &[TypeDesc],
@@ -168,7 +169,11 @@ fn check_args(
         let Some(expected) = fixed.get(i).or(rest) else {
             break;
         };
-        if fit(heap, *arg, expected, witnesses).is_none() {
+        let scalar_float = matches!(expected, TypeDesc::Float)
+            || matches!(expected, TypeDesc::Nullable(inner) if matches!(**inner, TypeDesc::Float));
+        if !(scalar_float && arg.is_int())
+            && fit(heap, stack_floor, *arg, expected, witnesses).is_none()
+        {
             return Err(mismatch(format!(
                 "type mismatch: argument {} expected '{expected}', got '{}'",
                 i + 1,
@@ -177,33 +182,6 @@ fn check_args(
         }
     }
     Ok(())
-}
-
-fn convert_args(
-    ctx: &mut ExecCtx,
-    closure: &VmClosure,
-    args: &[VmValue],
-) -> Result<Option<Vec<VmValue>>, NativeError> {
-    let Some(contract) = &closure.proto.param_contract else {
-        return Ok(None);
-    };
-    let Some(Some(TypeDesc::Args { fixed, rest })) = closure.proto.param_types.get() else {
-        return Ok(None);
-    };
-    let witnesses = resolve_witnesses(ctx, closure, &contract.witnesses);
-    let mut converted: Option<Vec<VmValue>> = None;
-    for (i, arg) in args.iter().enumerate() {
-        let Some(expected) = fixed.get(i).or(rest.as_deref()) else {
-            break;
-        };
-        let normal = crate::exec::normalize::normalize(&mut ctx.heap, *arg, expected);
-        if normal != *arg {
-            converted.get_or_insert_with(|| args.to_vec())[i] = normal;
-        }
-    }
-    let actual = converted.as_deref().unwrap_or(args);
-    check_args(&ctx.heap, actual, args, fixed, rest.as_deref(), &witnesses)?;
-    Ok(converted)
 }
 
 #[inline]
@@ -215,51 +193,48 @@ pub(crate) fn verify_call(
     ctx: &mut ExecCtx,
     callee: VmValue,
     args: &[VmValue],
-) -> Result<Option<Vec<VmValue>>, NativeError> {
+) -> Result<(), NativeError> {
     let Some(closure) =
         target_closure(&ctx.heap, callee).filter(|closure| closure.proto.checks_params)
     else {
-        return Ok(None);
+        return Ok(());
     };
     let proto = &closure.proto;
     let Some(contract) = &proto.param_contract else {
-        return Ok(None);
+        return Ok(());
     };
     let Some(desc) = proto
         .param_types
         .get_or_init(|| TypeDesc::decode(&contract.desc))
     else {
-        return Ok(None);
+        return Ok(());
     };
     let TypeDesc::Args { fixed, rest } = desc else {
-        return Ok(None);
+        return Ok(());
     };
-    let converts = *proto
-        .param_converts
-        .get_or_init(|| crate::exec::normalize::converts(desc));
-    if converts {
-        let closure = Rc::clone(closure);
-        return convert_args(ctx, &closure, args);
-    }
     let witnesses = resolve_witnesses(ctx, closure, &contract.witnesses);
-    check_args(&ctx.heap, args, args, fixed, rest.as_deref(), &witnesses)?;
-    Ok(None)
+    check_args(
+        &ctx.heap,
+        ctx.jit_stack_floor,
+        args,
+        args,
+        fixed,
+        rest.as_deref(),
+        &witnesses,
+    )?;
+    Ok(())
 }
 
 impl Boundary for ExecCtx {
     fn conform(&mut self, value: VmValue, desc: &str, witnesses: &[VmValue]) -> NativeFnResult {
-        crate::exec::conform::conform(&mut self.heap, value, desc, witnesses)
+        crate::exec::conform::conform(&mut self.heap, self.jit_stack_floor, value, desc, witnesses)
     }
 
     fn decode(&mut self, value: VmValue, desc: &str, witnesses: &[VmValue]) -> NativeFnResult {
-        crate::exec::conform::decode(&mut self.heap, value, desc, witnesses)
+        crate::exec::conform::decode(&mut self.heap, self.jit_stack_floor, value, desc, witnesses)
     }
 
-    fn verify_call(
-        &mut self,
-        callee: VmValue,
-        args: &[VmValue],
-    ) -> Result<Option<Vec<VmValue>>, NativeError> {
+    fn verify_call(&mut self, callee: VmValue, args: &[VmValue]) -> Result<(), NativeError> {
         verify_call(self, callee, args)
     }
 

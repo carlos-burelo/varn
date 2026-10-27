@@ -39,6 +39,7 @@ pub enum TypeKind<T, N, C, F, O, E = ()> {
     TemplateLiteral(C),
     Fn(F),
     Object(O),
+    Record(O),
     Typeof(E),
 
     KeyOf(T),
@@ -97,6 +98,7 @@ impl<T, N, C, F, O, E> TypeKind<T, N, C, F, O, E> {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

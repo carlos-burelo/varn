@@ -25,7 +25,7 @@ export function isAvailable(): bool {
     return true;
 }
 
-export type GpuInfo = { backend: str, deviceCount: int, accelerated: bool };
+export type GpuInfo = #{ backend: str, deviceCount: int, accelerated: bool };
 
 export function getInfo(): GpuInfo {
     const b = backend$();

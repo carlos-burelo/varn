@@ -92,7 +92,11 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Bytes
             | BackendTy::Decimal
             | BackendTy::BigInt
-            | BackendTy::Dynamic(varn_tir::DynReason::Callable | varn_tir::DynReason::Shape(_)) => {
+            | BackendTy::Dynamic(
+                varn_tir::DynReason::Callable
+                | varn_tir::DynReason::Shape(_)
+                | varn_tir::DynReason::Record(_),
+            ) => {
                 untyped
                     || matches!(
                         reason,
@@ -136,13 +140,17 @@ impl<'a> FnEmitter<'a> {
     }
 
     fn guard_with(&self, e: TirExpr, ty: BackendTy, kind: CheckKind) -> TirExpr {
-        let decodes_interface = kind == CheckKind::Decode
+        let decodes_shape = kind == CheckKind::Decode
             && matches!(
                 ty.non_nullable(self.tt),
-                BackendTy::Dynamic(varn_tir::DynReason::Interface(_))
+                BackendTy::Dynamic(
+                    varn_tir::DynReason::Interface(_)
+                        | varn_tir::DynReason::Shape(_)
+                        | varn_tir::DynReason::Record(_)
+                )
             )
             && matches!(e.ty, BackendTy::Dynamic(_));
-        if !decodes_interface && !self.crosses_dynamic_boundary(&e, ty) {
+        if !decodes_shape && !self.crosses_dynamic_boundary(&e, ty) {
             return e;
         }
         let span = e.span;
@@ -187,6 +195,7 @@ pub(super) fn untyped_reason(reason: varn_tir::DynReason) -> bool {
         | varn_tir::DynReason::CoreMember
         | varn_tir::DynReason::Spread
         | varn_tir::DynReason::Shape(_)
+        | varn_tir::DynReason::Record(_)
         | varn_tir::DynReason::Unrecorded
         | varn_tir::DynReason::Generic
         | varn_tir::DynReason::Boxed

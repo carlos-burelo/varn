@@ -42,7 +42,7 @@ await describe("171 dynamic boundary: object types", async () => {
     })
 
     await it("nested fields, arrays and optional fields", () => {
-        const full = card(Json.parse("{\"owner\": {\"id\": 2, \"name\": \"bo\"}, \"tags\": [\"a\"], \"score\": 3}"))
+        const full = card(Json.parse<Card>("{\"owner\": {\"id\": 2, \"name\": \"bo\"}, \"tags\": [\"a\"], \"score\": 3}"))
         expect(full.owner.name).toBe("bo")
         expect(full.tags.length).toBe(1)
         expect(full.score).toBe(3.0)

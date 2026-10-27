@@ -81,6 +81,7 @@ pub(super) fn literal_expr_admitted(
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -100,6 +101,7 @@ pub(super) fn literal_expr_admitted(
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
+        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }
@@ -125,6 +127,7 @@ pub(super) fn array_element_type(ty: &Type, table: &CheckerTyTable) -> Option<Ty
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
+        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

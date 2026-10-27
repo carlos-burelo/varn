@@ -3,6 +3,20 @@ use std::sync::Arc;
 use varn_sem::bind::BindResult;
 
 impl Checker<'_> {
+    pub(super) fn member_input(
+        &self,
+        ty: varn_sem::types::Type,
+        bind: &BindResult,
+    ) -> varn_sem::types::Type {
+        let view = varn_sem::bind::BindView::new(bind, self.resolver);
+        let view = if bind.source_file.as_ref() == self.source_file.as_ref() {
+            view.at(self.current_scope)
+        } else {
+            view
+        };
+        varn_sem::resolve::expand_alias(ty, Some(&view), &self.ty_table)
+    }
+
     pub(crate) fn parent_type(
         &mut self,
         parent: &varn_sem::bind::ClassParent,

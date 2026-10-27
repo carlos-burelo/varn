@@ -40,3 +40,25 @@ pub fn resolve_primitive(
         .map(|s| table.intern_name(s));
     Type::named_with_origin_atom(name_atom, origin, table)
 }
+
+pub fn expand_alias(mut ty: Type, ctx: Option<&dyn TypeContext>, table: &CheckerTyTable) -> Type {
+    let Some(ctx) = ctx else { return ty };
+    let mut seen = std::collections::BTreeSet::new();
+    while seen.insert(ty.0) {
+        let TypeKind::Named(name, origin) = table.get(ty.0) else {
+            break;
+        };
+        let Some(name) = table.names().try_resolve(name) else {
+            break;
+        };
+        let origin = origin.and_then(|o| table.names().try_resolve(o));
+        let Some(alias) = ctx.resolve_type_alias(name, origin) else {
+            break;
+        };
+        if !table.contains(alias.0) {
+            break;
+        }
+        ty = alias;
+    }
+    ty
+}

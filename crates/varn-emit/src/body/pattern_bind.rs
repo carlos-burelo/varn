@@ -225,7 +225,7 @@ impl<'a> FnEmitter<'a> {
 
     fn member_ty(&mut self, recv: BackendTy, name: &str) -> BackendTy {
         match recv.non_nullable(self.tt) {
-            BackendTy::Dynamic(DynReason::Shape(id)) => {
+            BackendTy::Dynamic(DynReason::Shape(id) | DynReason::Record(id)) => {
                 let field = self
                     .tt
                     .get_shape(id)

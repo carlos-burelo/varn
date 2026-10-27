@@ -19,13 +19,13 @@ impl<'a> FnEmitter<'a> {
                 span,
             );
         }
-        if inner.ty != ty && self.reshapes_elements(inner.ty, ty) {
-            return self.guard_elements(inner, ty);
+        if inner.ty != ty && self.checks_structure(inner.ty, ty) {
+            return self.check_structure(inner, ty);
         }
         self.assert_type(inner, ty)
     }
 
-    fn reshapes_elements(&self, from: BackendTy, to: BackendTy) -> bool {
+    fn checks_structure(&self, from: BackendTy, to: BackendTy) -> bool {
         let container = |t: BackendTy| {
             matches!(
                 t.non_nullable(self.tt),
@@ -34,12 +34,17 @@ impl<'a> FnEmitter<'a> {
                     | BackendTy::Dict(_)
                     | BackendTy::Set(_)
                     | BackendTy::Tuple(_)
+                    | BackendTy::Dynamic(
+                        varn_tir::DynReason::Shape(_)
+                            | varn_tir::DynReason::Record(_)
+                            | varn_tir::DynReason::Interface(_)
+                    )
             )
         };
         container(from) && container(to)
     }
 
-    fn guard_elements(&self, inner: TirExpr, ty: BackendTy) -> TirExpr {
+    fn check_structure(&self, inner: TirExpr, ty: BackendTy) -> TirExpr {
         let span = inner.span;
         TirExpr {
             kind: TirExprKind::Checked {

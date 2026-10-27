@@ -9,7 +9,7 @@ pub(super) fn resolve_keyof(
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
-    if let TypeKind::Object(mid) = table.get(ty.0) {
+    if let TypeKind::Object(mid) | TypeKind::Record(mid) = table.get(ty.0) {
         let mut key_types: Vec<CheckerTyId> = vec![];
         for member in table.get_object_members(mid).to_vec() {
             if let ObjectTypeMember::Index { key_ty, .. } = member
@@ -42,7 +42,7 @@ pub(super) fn collect_type_keys(
     table: &CheckerTyTable,
 ) -> Vec<Arc<str>> {
     match table.get(ty.0) {
-        TypeKind::Object(mid) => table
+        TypeKind::Object(mid) | TypeKind::Record(mid) => table
             .get_object_members(mid)
             .iter()
             .filter_map(|m| match m {
@@ -128,6 +128,7 @@ pub(super) fn resolve_indexed_access(
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
+        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }
@@ -139,7 +140,7 @@ pub(super) fn resolve_indexed_access(
     };
     let key_name = key_name_atom.and_then(|a| ctx.and_then(|c| c.interner()).map(|i| i.resolve(a)));
 
-    if let TypeKind::Object(mid) = table.get(obj.0) {
+    if let TypeKind::Object(mid) | TypeKind::Record(mid) = table.get(obj.0) {
         let members = table.get_object_members(mid).to_vec();
         if let Some(key_name) = key_name {
             for m in &members {
@@ -198,6 +199,7 @@ pub(super) fn resolve_indexed_access(
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -273,6 +275,7 @@ pub(super) fn resolve_indexed_access(
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
+        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

@@ -36,7 +36,7 @@ impl Checker<'_> {
                 let elem = Type::union(members, std::sync::Arc::make_mut(&mut self.ty_table));
                 return Some((ForOfPlan::Collection { method: None, elem }, elem));
             }
-            TypeKind::Object(members) => {
+            TypeKind::Object(members) | TypeKind::Record(members) => {
                 if let [varn_sem::types::ObjectTypeMember::Index {
                     key_ty, value_ty, ..
                 }] = self.ty_table.get_object_members(members)
@@ -150,6 +150,7 @@ impl Checker<'_> {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

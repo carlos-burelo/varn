@@ -23,7 +23,7 @@ use keyed_access::{resolve_indexed_access, resolve_keyof};
 use mapped::resolve_mapped_type;
 use template::resolve_template_literal_type;
 
-pub use aliases::resolve_primitive;
+pub use aliases::{expand_alias, resolve_primitive};
 
 pub use qualified::qualified_type;
 
@@ -57,7 +57,14 @@ pub fn resolve_type_node(
         TypeKind::Fn((params, ret)) => {
             functions::resolve_fn_type(params, ret, ctx, interner, table)
         }
-        TypeKind::Object(members) => objects::resolve_object_type(members, ctx, interner, table),
+        TypeKind::Object(members) => {
+            let members = objects::resolve_object_members(members, ctx, interner, table);
+            Type::object(members, table)
+        }
+        TypeKind::Record(members) => {
+            let members = objects::resolve_object_members(members, ctx, interner, table);
+            Type::record(members, table)
+        }
         TypeKind::TemplateLiteral(parts) => resolve_template_literal_type(parts, ctx, table),
         TypeKind::Typeof(expr) => match ctx.and_then(|c| c.ast_arena()) {
             Some(arena) => crate::infer::infer_expr_type(*expr, arena, ctx, table),

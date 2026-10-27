@@ -46,6 +46,7 @@ impl SemanticDB {
             | TypeKind::Generic(_, _, _)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -71,6 +72,7 @@ impl SemanticDB {
             | TypeKind::Generic(_, _, _)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -123,6 +125,7 @@ impl SemanticDB {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

@@ -15,8 +15,8 @@ pub fn lower_type(
     tt: &mut TyTable,
     names: &dyn NameResolver,
 ) -> BackendTy {
-    if let Some((index, shape)) = names.interface_shape(*ty) {
-        return lower_interface(index, shape, table, interner, tt, names);
+    if let Some((index, shape)) = names.nominal_shape(*ty) {
+        return lower_nominal_shape(index, shape, table, interner, tt, names);
     }
     match ty.builtin_of(table) {
         Some(b) if b != BuiltinType::Array => lower_builtin(b, ty, table, interner, tt, names),
@@ -32,19 +32,23 @@ fn interface() -> BackendTy {
     BackendTy::Dynamic(DynReason::Declared)
 }
 
-fn lower_interface(
+fn lower_nominal_shape(
     index: usize,
-    shape: &varn_sem::output::ResolvedInterface,
+    shape: &varn_sem::output::ResolvedShape,
     table: &CheckerTyTable,
     interner: &AtomInterner,
     tt: &mut TyTable,
     names: &dyn NameResolver,
 ) -> BackendTy {
-    let key = format!("interface {index}:{}", shape.name);
-    if let Some(id) = tt.named_shape(&key) {
-        return BackendTy::Dynamic(DynReason::Interface(id));
+    let shape_kind: fn(varn_tir::ShapeId) -> DynReason = match shape.kind {
+        varn_sem::output::ShapeKind::Interface => DynReason::Interface,
+        varn_sem::output::ShapeKind::Object => DynReason::Shape,
+        varn_sem::output::ShapeKind::Record => DynReason::Record,
+    };
+    if let Some(id) = tt.named_shape(index) {
+        return BackendTy::Dynamic(shape_kind(id));
     }
-    let id = tt.reserve_named_shape(std::sync::Arc::from(key.as_str()));
+    let id = tt.reserve_named_shape(index, shape.name.clone());
     let fields = shape
         .fields
         .iter()
@@ -52,10 +56,11 @@ fn lower_interface(
             name: p.name.clone(),
             ty: lower_type(&p.ty, table, interner, tt, names),
             optional: p.is_optional,
+            readonly: p.is_readonly,
         })
         .collect();
     tt.fill_named_shape(id, fields);
-    BackendTy::Dynamic(DynReason::Interface(id))
+    BackendTy::Dynamic(shape_kind(id))
 }
 
 fn resolve_named(name: &str, names: &dyn NameResolver) -> Option<BackendTy> {
@@ -91,46 +96,13 @@ fn lower_alias(
     tt: &mut TyTable,
     names: &dyn NameResolver,
 ) -> BackendTy {
-    if let Some(id) = tt.named_shape(name) {
-        return BackendTy::Dynamic(DynReason::Shape(id));
-    }
     if names.is_type_param(name) {
         return BackendTy::Dynamic(DynReason::Generic);
     }
     let Some(target) = names.alias(name) else {
         return interface();
     };
-    let members = match table.get(target.0) {
-        TypeKind::Object(members) => table.get_object_members(members),
-        TypeKind::Primitive(_)
-        | TypeKind::Literal(_)
-        | TypeKind::This
-        | TypeKind::Array(_)
-        | TypeKind::Union(_)
-        | TypeKind::Intersection(_)
-        | TypeKind::Tuple(_)
-        | TypeKind::Named(..)
-        | TypeKind::Generic(..)
-        | TypeKind::TemplateLiteral(_)
-        | TypeKind::Fn(_)
-        | TypeKind::Typeof(_)
-        | TypeKind::KeyOf(_)
-        | TypeKind::IndexedAccess { .. }
-        | TypeKind::Mapped { .. }
-        | TypeKind::Conditional { .. }
-        | TypeKind::Infer(_)
-        | TypeKind::EnumVariant { .. }
-        | TypeKind::TypePredicate { .. } => {
-            return lower_through_alias(name, target, table, interner, tt, names);
-        }
-    };
-    if members.is_empty() || !is_plain_shape(members) {
-        return BackendTy::Dynamic(DynReason::IndexSignature);
-    }
-    let id = tt.reserve_named_shape(std::sync::Arc::from(name));
-    let fields = shape_fields(members, table, interner, tt, names);
-    tt.fill_named_shape(id, fields);
-    BackendTy::Dynamic(DynReason::Shape(id))
+    lower_through_alias(name, target, table, interner, tt, names)
 }
 
 fn lower_through_alias(
@@ -209,8 +181,16 @@ fn lower_kind(
                 let v = lower_type(&Type::resolved(*value_ty), table, interner, tt, names);
                 return BackendTy::Dict(tt.intern(v));
             }
-            lower_shape(members, table, interner, tt, names)
+            lower_shape(members, table, interner, tt, names, DynReason::Shape)
         }
+        TypeKind::Record(members) => lower_shape(
+            table.get_object_members(members),
+            table,
+            interner,
+            tt,
+            names,
+            DynReason::Record,
+        ),
 
         TypeKind::Fn(_) => BackendTy::Dynamic(DynReason::Callable),
 
@@ -249,16 +229,21 @@ fn shape_fields(
     for member in members {
         match member {
             Member::Property {
-                name, ty, optional, ..
+                name,
+                ty,
+                optional,
+                readonly,
             } => fields.push(varn_tir::ShapeField {
                 name: name.clone(),
                 ty: lower_type(&Type::resolved(*ty), table, interner, tt, names),
                 optional: *optional,
+                readonly: *readonly,
             }),
             Member::Method { name, optional, .. } => fields.push(varn_tir::ShapeField {
                 name: name.clone(),
                 ty: BackendTy::Dynamic(DynReason::Callable),
                 optional: *optional,
+                readonly: true,
             }),
             Member::Index { .. } | Member::Callable { .. } => {}
         }
@@ -272,12 +257,13 @@ fn lower_shape(
     interner: &AtomInterner,
     tt: &mut TyTable,
     names: &dyn NameResolver,
+    shape_kind: fn(varn_tir::ShapeId) -> DynReason,
 ) -> BackendTy {
-    if members.is_empty() || !is_plain_shape(members) || !tt.enter_shape() {
+    if !is_plain_shape(members) {
         return BackendTy::Dynamic(DynReason::IndexSignature);
     }
     let fields = shape_fields(members, table, interner, tt, names);
-    BackendTy::Dynamic(DynReason::Shape(tt.leave_shape(fields)))
+    BackendTy::Dynamic(shape_kind(tt.intern_shape(fields)))
 }
 
 fn lower_primitive(p: LangPrimitive) -> BackendTy {
@@ -321,6 +307,7 @@ fn lower_builtin(
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
+        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

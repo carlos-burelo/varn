@@ -4,8 +4,6 @@ use varn_core::TypeDesc;
 use varn_tir::{BackendTy, DynReason, ShapeId, TirFunction, TirModule, TyId};
 use varn_types::chunk::{ContractWitness, ParamContract};
 
-const DEPTH_LIMIT: usize = 32;
-
 pub(crate) struct Describer<'m> {
     tir: &'m TirModule,
     pub witnesses: Vec<Arc<str>>,
@@ -22,12 +20,12 @@ impl<'m> Describer<'m> {
     }
 
     pub(crate) fn describe(&mut self, ty: BackendTy) -> TypeDesc {
-        self.at(ty, 0)
+        self.at(ty)
     }
 
-    fn of(&mut self, id: TyId, depth: usize) -> TypeDesc {
+    fn of(&mut self, id: TyId) -> TypeDesc {
         if self.tir.types.contains(id) {
-            self.at(self.tir.types.get(id), depth + 1)
+            self.at(self.tir.types.get(id))
         } else {
             TypeDesc::Any
         }
@@ -43,10 +41,7 @@ impl<'m> Describer<'m> {
         }
     }
 
-    fn at(&mut self, ty: BackendTy, depth: usize) -> TypeDesc {
-        if depth >= DEPTH_LIMIT {
-            return TypeDesc::Any;
-        }
+    fn at(&mut self, ty: BackendTy) -> TypeDesc {
         match ty {
             BackendTy::Int => TypeDesc::Int,
             BackendTy::Float => TypeDesc::Float,
@@ -56,20 +51,20 @@ impl<'m> Describer<'m> {
             BackendTy::Bytes => TypeDesc::Bytes,
             BackendTy::Decimal => TypeDesc::Decimal,
             BackendTy::BigInt => TypeDesc::BigInt,
-            BackendTy::Array(el) => TypeDesc::Array(Box::new(self.of(el, depth))),
-            BackendTy::Dict(v) => TypeDesc::Dict(Box::new(self.of(v, depth))),
+            BackendTy::Array(el) => TypeDesc::Array(Box::new(self.of(el))),
+            BackendTy::Dict(v) => TypeDesc::Dict(Box::new(self.of(v))),
             BackendTy::Map(k, v) => {
-                let key = self.of(k, depth);
-                let val = self.of(v, depth);
+                let key = self.of(k);
+                let val = self.of(v);
                 TypeDesc::Map(Box::new(key), Box::new(val))
             }
-            BackendTy::Set(el) => TypeDesc::Set(Box::new(self.of(el, depth))),
+            BackendTy::Set(el) => TypeDesc::Set(Box::new(self.of(el))),
             BackendTy::Tuple(list) => {
                 if !self.tir.types.contains_list(list) {
                     return TypeDesc::Any;
                 }
                 let els = self.tir.types.get_list(list).to_vec();
-                TypeDesc::Tuple(els.into_iter().map(|el| self.at(el, depth + 1)).collect())
+                TypeDesc::Tuple(els.into_iter().map(|el| self.at(el)).collect())
             }
             BackendTy::Class(class) => match self.tir.class(class) {
                 Some(info) => {
@@ -93,14 +88,16 @@ impl<'m> Describer<'m> {
             },
             BackendTy::Fn(_) | BackendTy::Dynamic(DynReason::Callable) => TypeDesc::Callable,
             BackendTy::Nullable(inner) => {
-                let inner = self.of(inner, depth);
+                let inner = self.of(inner);
                 if inner.is_any() {
                     TypeDesc::Any
                 } else {
                     TypeDesc::Nullable(Box::new(inner))
                 }
             }
-            BackendTy::Dynamic(DynReason::Shape(id) | DynReason::Interface(id)) => {
+            BackendTy::Dynamic(
+                DynReason::Shape(id) | DynReason::Interface(id) | DynReason::Record(id),
+            ) => {
                 if !self.tir.types.contains_shape(id) {
                     return TypeDesc::Any;
                 }
@@ -120,12 +117,17 @@ impl<'m> Describer<'m> {
                     .into_iter()
                     .map(|field| FieldDesc {
                         name: field.name.to_string(),
-                        ty: self.at(field.ty, depth + 1),
+                        ty: self.at(field.ty),
                         optional: field.optional,
+                        readonly: field.readonly,
                     })
                     .collect();
                 self.open.pop();
-                TypeDesc::Object(fields)
+                if matches!(ty, BackendTy::Dynamic(DynReason::Record(_))) {
+                    TypeDesc::Record(fields)
+                } else {
+                    TypeDesc::Object(fields)
+                }
             }
             BackendTy::Void
             | BackendTy::Never
@@ -185,6 +187,7 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Option<ParamCo
                 | required @ TypeDesc::Enum { .. }
                 | required @ TypeDesc::Args { .. }
                 | required @ TypeDesc::Object(_)
+                | required @ TypeDesc::Record(_)
                 | required @ TypeDesc::Enclosing { .. }
                     if *defaulted =>
                 {
@@ -208,6 +211,7 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Option<ParamCo
                 | required @ TypeDesc::Enum { .. }
                 | required @ TypeDesc::Args { .. }
                 | required @ TypeDesc::Object(_)
+                | required @ TypeDesc::Record(_)
                 | required @ TypeDesc::Enclosing { .. } => required,
             }
         })
@@ -215,7 +219,7 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Option<ParamCo
     let rest = match (f.has_rest, f.params.last()) {
         (true, Some(BackendTy::Array(el))) => {
             fixed.pop();
-            Some(describer.of(*el, 0))
+            Some(describer.of(*el))
         }
         (true, Some(_)) => {
             fixed.pop();

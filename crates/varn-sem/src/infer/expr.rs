@@ -1,5 +1,5 @@
 use super::member::infer_member;
-use super::ops::{infer_binary, infer_new, infer_object};
+use super::ops::{infer_binary, infer_new, infer_object_members};
 use super::signature::build_fn_type;
 use crate::types::{CheckerTyTable, Type};
 use varn_core::ast::operators::{LogicalOp, UnaryOp};
@@ -48,6 +48,7 @@ pub fn infer_expr_type(
                 | TypeKind::TemplateLiteral(_)
                 | TypeKind::Fn(_)
                 | TypeKind::Object(_)
+                | TypeKind::Record(_)
                 | TypeKind::Typeof(_)
                 | TypeKind::KeyOf(_)
                 | TypeKind::IndexedAccess { .. }
@@ -117,6 +118,7 @@ pub fn infer_expr_type(
                     | TypeKind::TemplateLiteral(_)
                     | TypeKind::Fn(_)
                     | TypeKind::Object(_)
+                    | TypeKind::Record(_)
                     | TypeKind::Typeof(_)
                     | TypeKind::KeyOf(_)
                     | TypeKind::IndexedAccess { .. }
@@ -209,7 +211,14 @@ pub fn infer_expr_type(
             }
             expr_arm_ty.unwrap_or(Type::Dynamic)
         }
-        ExprKind::Object { properties } => infer_object(properties, arena, ctx, table),
+        ExprKind::Object { properties } => {
+            let members = infer_object_members(properties, arena, ctx, table);
+            Type::object(members, table)
+        }
+        ExprKind::Record { properties } => {
+            let members = infer_object_members(properties, arena, ctx, table);
+            Type::record(members, table)
+        }
         ExprKind::Range { start, .. } => {
             let bound = infer_expr_type(*start, arena, ctx, table);
             Type::range_over(&bound, table)
@@ -218,7 +227,6 @@ pub fn infer_expr_type(
         ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing
         | ExprKind::Super
-        | ExprKind::Record { .. }
         | ExprKind::Update { .. }
         | ExprKind::Assign { .. }
         | ExprKind::Conditional { .. }

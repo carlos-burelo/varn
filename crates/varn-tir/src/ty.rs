@@ -12,6 +12,7 @@ pub struct ShapeField {
     pub name: std::sync::Arc<str>,
     pub ty: BackendTy,
     pub optional: bool,
+    pub readonly: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -59,6 +60,8 @@ pub enum DynReason {
     Interface(ShapeId),
 
     Shape(ShapeId),
+
+    Record(ShapeId),
 
     Unrecorded,
 
@@ -185,8 +188,7 @@ pub struct TyTable {
     lists: Vec<Vec<BackendTy>>,
     shapes: Vec<Vec<ShapeField>>,
     shape_names: Vec<Option<std::sync::Arc<str>>>,
-    named_shapes: rustc_hash::FxHashMap<std::sync::Arc<str>, u32>,
-    open_shapes: u32,
+    named_shapes: rustc_hash::FxHashMap<usize, u32>,
     open_aliases: Vec<std::sync::Arc<str>>,
 }
 
@@ -238,17 +240,7 @@ impl TyTable {
         self.open_aliases.pop();
     }
 
-    pub fn enter_shape(&mut self) -> bool {
-        const NESTING_LIMIT: u32 = 6;
-        if self.open_shapes >= NESTING_LIMIT {
-            return false;
-        }
-        self.open_shapes += 1;
-        true
-    }
-
-    pub fn leave_shape(&mut self, fields: Vec<ShapeField>) -> ShapeId {
-        self.open_shapes -= 1;
+    pub fn intern_shape(&mut self, fields: Vec<ShapeField>) -> ShapeId {
         let structural = self
             .shapes
             .iter()
@@ -262,15 +254,15 @@ impl TyTable {
         ShapeId(self.shapes.len() as u32 - 1)
     }
 
-    pub fn named_shape(&self, name: &str) -> Option<ShapeId> {
-        self.named_shapes.get(name).map(|&i| ShapeId(i))
+    pub fn named_shape(&self, key: usize) -> Option<ShapeId> {
+        self.named_shapes.get(&key).map(|&i| ShapeId(i))
     }
 
-    pub fn reserve_named_shape(&mut self, name: std::sync::Arc<str>) -> ShapeId {
+    pub fn reserve_named_shape(&mut self, key: usize, name: std::sync::Arc<str>) -> ShapeId {
         let id = self.shapes.len() as u32;
         self.shapes.push(Vec::new());
-        self.shape_names.push(Some(name.clone()));
-        self.named_shapes.insert(name, id);
+        self.shape_names.push(Some(name));
+        self.named_shapes.insert(key, id);
         ShapeId(id)
     }
 

@@ -8,10 +8,10 @@ pub trait NameResolver {
     fn is_local_origin(&self, origin: &str) -> bool;
     fn alias(&self, name: &str) -> Option<varn_sem::types::Type>;
     fn is_type_param(&self, name: &str) -> bool;
-    fn interface_shape(
+    fn nominal_shape(
         &self,
         ty: varn_sem::types::Type,
-    ) -> Option<(usize, &varn_sem::output::ResolvedInterface)>;
+    ) -> Option<(usize, &varn_sem::output::ResolvedShape)>;
 }
 
 pub struct ScopedTypeParams<'a> {
@@ -41,11 +41,11 @@ impl NameResolver for ScopedTypeParams<'_> {
     fn is_type_param(&self, name: &str) -> bool {
         self.params.iter().any(|p| p.as_ref() == name) || self.inner.is_type_param(name)
     }
-    fn interface_shape(
+    fn nominal_shape(
         &self,
         ty: varn_sem::types::Type,
-    ) -> Option<(usize, &varn_sem::output::ResolvedInterface)> {
-        self.inner.interface_shape(ty)
+    ) -> Option<(usize, &varn_sem::output::ResolvedShape)> {
+        self.inner.nominal_shape(ty)
     }
 }
 
@@ -73,10 +73,10 @@ impl NameResolver for NoNames {
     fn is_type_param(&self, _: &str) -> bool {
         false
     }
-    fn interface_shape(
+    fn nominal_shape(
         &self,
         _: varn_sem::types::Type,
-    ) -> Option<(usize, &varn_sem::output::ResolvedInterface)> {
+    ) -> Option<(usize, &varn_sem::output::ResolvedShape)> {
         None
     }
 }

@@ -32,17 +32,16 @@ impl<'r> Checker<'r> {
                     None
                 }
             }
-            TypeKind::Object(mid) => {
-                self.ty_table
-                    .get_object_members(mid)
-                    .iter()
-                    .find_map(|m| match m {
-                        ObjectTypeMember::Index { key_ty, .. } => Some(Type::resolved(*key_ty)),
-                        ObjectTypeMember::Property { .. }
-                        | ObjectTypeMember::Method { .. }
-                        | ObjectTypeMember::Callable { .. } => None,
-                    })
-            }
+            TypeKind::Object(mid) | TypeKind::Record(mid) => self
+                .ty_table
+                .get_object_members(mid)
+                .iter()
+                .find_map(|m| match m {
+                    ObjectTypeMember::Index { key_ty, .. } => Some(Type::resolved(*key_ty)),
+                    ObjectTypeMember::Property { .. }
+                    | ObjectTypeMember::Method { .. }
+                    | ObjectTypeMember::Callable { .. } => None,
+                }),
             TypeKind::Array(_) => Some(Type::Int),
             TypeKind::Named(..) if builtin == Some(varn_core::BuiltinType::Bytes) => {
                 Some(Type::Int)
@@ -114,7 +113,7 @@ impl<'r> Checker<'r> {
             }
         } else if matches!(
             check_kind,
-            TypeKind::Object(_) | TypeKind::Named(..) | TypeKind::Generic(..)
+            TypeKind::Object(_) | TypeKind::Record(_) | TypeKind::Named(..) | TypeKind::Generic(..)
         ) {
             self.check_named_index(rec, object, property, &check_ty, property_range, bind);
         } else {

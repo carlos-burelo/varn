@@ -23,6 +23,7 @@ pub(super) fn infer_await(c: &mut CallTypeCtx, argument: ExprId) -> Option<Type>
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
+        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

@@ -1,6 +1,6 @@
 import { udpBind$, udpSendTo$, udpRecvFrom$, udpClose$ } from "runtime:net";
 
-export type UdpPacket = {
+export type UdpPacket = #{
     data: Bytes,
     host: str,
     port: int

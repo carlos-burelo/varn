@@ -17,7 +17,7 @@ pub struct NameIndex {
     foreign_classes: FxHashMap<(Arc<str>, Arc<str>), ClassId>,
     aliases: FxHashMap<Arc<str>, varn_sem::types::Type>,
     type_params: rustc_hash::FxHashSet<Arc<str>>,
-    interfaces: FxHashMap<varn_sem::types::Type, (usize, varn_sem::output::ResolvedInterface)>,
+    shapes: FxHashMap<varn_sem::types::Type, (usize, varn_sem::output::ResolvedShape)>,
 }
 
 impl NameResolver for NameIndex {
@@ -46,13 +46,11 @@ impl NameResolver for NameIndex {
     fn is_type_param(&self, name: &str) -> bool {
         self.type_params.contains(name)
     }
-    fn interface_shape(
+    fn nominal_shape(
         &self,
         ty: varn_sem::types::Type,
-    ) -> Option<(usize, &varn_sem::output::ResolvedInterface)> {
-        self.interfaces
-            .get(&ty)
-            .map(|(index, shape)| (*index, shape))
+    ) -> Option<(usize, &varn_sem::output::ResolvedShape)> {
+        self.shapes.get(&ty).map(|(index, shape)| (*index, shape))
     }
 }
 
@@ -147,8 +145,8 @@ pub fn build(
                 .insert(Arc::from(bind.interner.resolve(symbol.name)), target);
         }
     }
-    for (index, shape) in desugar.interfaces.iter().enumerate() {
-        names.interfaces.insert(shape.ty, (index, shape.clone()));
+    for (index, shape) in desugar.shapes.iter().enumerate() {
+        names.shapes.insert(shape.ty, (index, shape.clone()));
     }
     for (i, f) in foreign.iter().enumerate() {
         names.foreign_enums.insert(

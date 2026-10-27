@@ -1,4 +1,4 @@
-export type FormPart = {
+export type FormPart = #{
     name: str,
     filename: str?,
     contentType?: str,

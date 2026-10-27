@@ -38,9 +38,12 @@ pub fn get_members_of_type(
         }
     };
 
+    let view = varn_sem::bind::BindView::new(bind, resolver);
+    let resolved = varn_sem::resolve::expand_alias(*ty, Some(&view), table);
+    let ty = &resolved;
     let ty_kind = table.get(ty.0);
     match ty_kind {
-        TypeKind::Object(mid) => {
+        TypeKind::Object(mid) | TypeKind::Record(mid) => {
             for m in table.get_object_members(mid).to_vec() {
                 match m {
                     ObjectTypeMember::Property {

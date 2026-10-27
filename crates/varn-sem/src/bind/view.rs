@@ -201,7 +201,7 @@ impl TypeContext for BindView<'_> {
             let foreign_view = BindView::new(&foreign_bind, self.resolver);
             return foreign_view.resolve_type_alias(name, None);
         }
-        let scope = self.bind.scopes.get(self.bind.global_scope);
+        let scope = self.bind.scopes.get(self.scope);
         let atom = self.bind.interner.get(name)?;
         let id = scope.resolve(atom, &self.bind.scopes)?;
         let sym = self.bind.arena.get(id);

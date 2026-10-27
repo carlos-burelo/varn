@@ -5,12 +5,12 @@ use varn_core::ast::InterfaceMember;
 use super::names::resolve_atom_name;
 use super::resolve_type_node;
 
-pub(super) fn resolve_object_type(
+pub(super) fn resolve_object_members(
     members: &[InterfaceMember],
     ctx: Option<&dyn TypeContext>,
     interner: &varn_core::AtomInterner,
     table: &mut CheckerTyTable,
-) -> Type {
+) -> Vec<ObjectTypeMember> {
     let resolved_members: Vec<ObjectTypeMember> = members
         .iter()
         .map(|m| match m {
@@ -135,5 +135,5 @@ pub(super) fn resolve_object_type(
             }
         })
         .collect();
-    Type::object(resolved_members, table)
+    resolved_members
 }

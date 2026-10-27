@@ -22,10 +22,10 @@ class Bag {
 }
 type Config = { name: str, limits: Map<str, int> }
 
-await describe("179 dynamic boundary: object to Map", async () => {
-    await it("a parsed object becomes a Map where a Map is declared", () => {
+await describe("179 explicit collection decoding", async () => {
+    await it("a typed decoder constructs a Map without changing its source", () => {
         const parsed: dynamic = Json.parse("{\"a\":1,\"b\":2}")
-        const m: Map<str, int> = parsed
+        const m = Json.parse<Map<str, int>>(Json.stringify(parsed))
         expect(typeof m).toBe("Map")
         expect(m.get("a")).toBe(1)
         expect(m.size).toBe(2)
@@ -51,35 +51,35 @@ await describe("179 dynamic boundary: object to Map", async () => {
         expect(caught).toBe("type mismatch: expected '{ [key: str]: int }', got 'object'")
     })
 
-    await it("values are checked and nested objects are converted", () => {
+    await it("typed decoders check values and construct nested collections", () => {
         expect(outcome(() => { const m: Map<str, int> = Json.parse("{\"a\":\"x\"}") }))
             .toBe("type mismatch: expected 'Map<str, int>', got 'object'")
-        const nested: Map<str, Map<str, int>> = Json.parse("{\"x\":{\"y\":1}}")
+        const nested = Json.parse<Map<str, Map<str, int>>>("{\"x\":{\"y\":1}}")
         expect(nested.get("x")?.get("y")).toBe(1)
-        const cfg: Config = Json.parse("{\"name\":\"n\",\"limits\":{\"cpu\":4}}")
+        const cfg = Json.parse<Config>("{\"name\":\"n\",\"limits\":{\"cpu\":4}}")
         expect(cfg.limits.get("cpu")).toBe(4)
-        const many: Map<str, int>[] = Json.parse("[{\"a\":1},{\"b\":2}]")
+        const many = Json.parse<Map<str, int>[]>("[{\"a\":1},{\"b\":2}]")
         expect(many[1].get("b")).toBe(2)
     })
 
-    await it("arguments of an unproven call are converted too", () => {
+    await it("unproven calls require the declared collection kind", () => {
         const f: dynamic = size
         const o: dynamic = { k: 1, j: 2 }
-        expect(f(o)).toBe(2)
+        expect(outcome(() => { f(o) })).toBe("type mismatch: argument 1 expected 'Map<str, int>', got 'object'")
         const p: dynamic = pick
-        expect(p(1, { k: 7 }, "x")).toBe("1x7")
+        expect(p(1, Json.parse<Map<str, int>>('{"k":7}'), "x")).toBe("1x7")
         expect(p(2, null, "y")).toBe("2y-")
         const B: dynamic = Bag
-        const bag: dynamic = new B({ a: 1 })
-        expect(bag.count({ z: 1, y: 2 })).toBe(3)
-        expect(bag.count(...[{ q: 1 }])).toBe(2)
+        const bag: dynamic = new B(Json.parse<Map<str, int>>('{"a":1}'))
+        expect(bag.count(Json.parse<Map<str, int>>('{"z":1,"y":2}'))).toBe(3)
+        expect(bag.count(...[Json.parse<Map<str, int>>('{"q":1}')])).toBe(2)
         expect(outcome(() => { f({ k: "bad" }) }))
             .toBe("type mismatch: argument 1 expected 'Map<str, int>', got 'object'")
     })
 
     await it("holds in a hot loop", () => {
         const f: dynamic = size
-        const o: dynamic = { k: 1, j: 2 }
+        const o: dynamic = Json.parse<Map<str, int>>('{"k":1,"j":2}')
         let n = 0
         for (let i = 0; i < 5000; i = i + 1) { n = n + f(o) }
         expect(n).toBe(10000)

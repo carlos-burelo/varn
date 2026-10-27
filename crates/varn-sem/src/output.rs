@@ -96,7 +96,7 @@ pub struct ForeignClass {
 
 #[derive(Clone, Debug, Default)]
 pub struct Desugarings {
-    pub interfaces: Vec<ResolvedInterface>,
+    pub shapes: Vec<ResolvedShape>,
     pub extension_calls: FxHashMap<u32, Arc<str>>,
     pub extension_members: FxHashMap<u32, Arc<str>>,
     pub extension_set_members: FxHashMap<u32, Arc<str>>,
@@ -112,9 +112,17 @@ pub struct Desugarings {
     pub for_of_plans: FxHashMap<varn_core::ast::AstId, ForOfPlan>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum ShapeKind {
+    Interface,
+    Object,
+    Record,
+}
+
 #[derive(Clone, Debug)]
-pub struct ResolvedInterface {
+pub struct ResolvedShape {
     pub ty: Type,
+    pub kind: ShapeKind,
     pub name: Arc<str>,
     pub fields: Vec<ClassMemberInfo>,
 }

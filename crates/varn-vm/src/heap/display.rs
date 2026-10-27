@@ -134,11 +134,13 @@ impl HeapInner {
                 self.write_list("#[", "]", items.into_iter(), out, path);
             }
             HeapObj::Object(_) => {
-                let entries = crate::exec::normalize::object_entries(self, nv).unwrap_or_default();
+                let entries =
+                    crate::exec::value_views::object_entries(self, nv).unwrap_or_default();
                 self.write_fields("{", entries.into_iter(), out, path);
             }
             HeapObj::Record(_) => {
-                let entries = crate::exec::normalize::object_entries(self, nv).unwrap_or_default();
+                let entries =
+                    crate::exec::value_views::object_entries(self, nv).unwrap_or_default();
                 self.write_fields("#{", entries.into_iter(), out, path);
             }
             HeapObj::Map(m) => {

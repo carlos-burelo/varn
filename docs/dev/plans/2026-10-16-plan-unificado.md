@@ -50,6 +50,14 @@ anidados conservan sus delimitadores. Se elimina el escape JSON separado: una
 función de core escribe cadenas entre comillas y escapa todos los controles C0.
 Consumidores de snapshots de la suite migrados, sin cambiar los datos JSON.
 
+Contratos de valor (2026-10-26): record tiene tipo propio `#{...}`; el catálogo
+nominal del checker resuelve alias e interfaces con origen y argumentos. Se
+transportan formas recursivas y `readonly` sin borrarlas por profundidad. Conform
+comprueba sin modificar aliases; decode construye valores nuevos. Se eliminan el
+normalizador mutante y el reemplazo de argumentos; tres suites migran a decode
+explícito. Retornos inferidos conservan tuplas/records y guardas de match se
+comprueban después de tipar el patrón, una sola vez.
+
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
 destructuring de tupla por posición (`e8e1717d`); local `dynamic`

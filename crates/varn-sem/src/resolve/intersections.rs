@@ -28,7 +28,9 @@ pub(super) fn resolve_intersection_type(
     let parts_opt: Option<Vec<Vec<ObjectTypeMember>>> = resolved
         .iter()
         .map(|m| match table.get(m.0) {
-            TypeKind::Object(mid) => Some(table.get_object_members(mid).to_vec()),
+            TypeKind::Object(mid) | TypeKind::Record(mid) => {
+                Some(table.get_object_members(mid).to_vec())
+            }
             TypeKind::Named(name, origin) => {
                 let ctx = ctx?;
                 let name_str = ctx.atom_text(name)?;

@@ -153,6 +153,21 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
             super::composite::parse_tuple_type(s, range)
         }
         TokenKind::LBracket => super::composite::parse_tuple_type(s, range),
+        TokenKind::Hash if s.peek_kind(1) == TokenKind::LBrace => {
+            s.advance();
+            let object = parse_primary_type(s)?;
+            let TypeKind::Object(members) = object.kind else {
+                return Err("a record type requires declared fields".into());
+            };
+            if members
+                .iter()
+                .any(|m| !matches!(m, varn_core::ast::InterfaceMember::Property { .. }))
+            {
+                return Err("record types require named fields".into());
+            }
+            let full_range = s.span_from(range);
+            Ok(s.type_node(full_range, TypeKind::Record(members)))
+        }
 
         TokenKind::LBrace => {
             s.advance();

@@ -1,4 +1,4 @@
-export type SemVer = {
+export type SemVer = #{
     major: int,
     minor: int,
     patch: int,

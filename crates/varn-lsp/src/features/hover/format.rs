@@ -32,6 +32,7 @@ pub fn format_type_params_str(state: &DocumentState, ty: &varn_sem::types::Type)
         | varn_core::TypeKind::TemplateLiteral(_)
         | varn_core::TypeKind::Fn(_)
         | varn_core::TypeKind::Object(_)
+        | varn_core::TypeKind::Record(_)
         | varn_core::TypeKind::Typeof(_)
         | varn_core::TypeKind::KeyOf(_)
         | varn_core::TypeKind::IndexedAccess { .. }

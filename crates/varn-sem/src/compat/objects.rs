@@ -28,15 +28,19 @@ pub(super) fn object_arm(
                     ObjectTypeMember::Property {
                         name: iname,
                         ty: ity,
+                        readonly: source_readonly,
                         ..
-                    } if iname == name => Some(*ity),
+                    } if iname == name => Some((*ity, *source_readonly)),
                     ObjectTypeMember::Property { .. }
                     | ObjectTypeMember::Method { .. }
                     | ObjectTypeMember::Index { .. }
                     | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
-                    Some(inf_ty) => {
+                    Some((inf_ty, source_readonly)) => {
+                        if source_readonly && !*readonly {
+                            return false;
+                        }
                         let fits = if *readonly {
                             types_compatible_impl(
                                 &t(*ty),

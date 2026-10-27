@@ -16,7 +16,7 @@ impl Type {
                 ids.extend(f.params.iter().map(|p| p.ty));
                 ids.push(f.return_type);
             }
-            TypeKind::Object(id) => {
+            TypeKind::Object(id) | TypeKind::Record(id) => {
                 for member in table.get_object_members(id) {
                     match member {
                         ObjectTypeMember::Property { ty, .. } => ids.push(*ty),

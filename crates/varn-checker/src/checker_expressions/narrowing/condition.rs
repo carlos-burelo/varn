@@ -78,6 +78,7 @@ impl<'r> Checker<'r> {
             | TypeKind::Tuple(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::EnumVariant { .. } => true,
             TypeKind::Union(list) => self

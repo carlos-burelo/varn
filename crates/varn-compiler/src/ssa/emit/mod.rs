@@ -228,7 +228,6 @@ pub(crate) fn emit_function_meta(
         suspend_live,
         param_contract: None,
         param_types: std::cell::OnceCell::new(),
-        param_converts: std::cell::OnceCell::new(),
     })
 }
 

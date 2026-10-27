@@ -88,7 +88,7 @@ impl Checker<'_> {
                 }
                 self.collect_refs_in(bind, Type::resolved(ret), out);
             }
-            TypeKind::Object(members) => {
+            TypeKind::Object(members) | TypeKind::Record(members) => {
                 for member in self.ty_table.get_object_members(members).to_vec() {
                     match member {
                         ObjectTypeMember::Property { ty, .. } => {

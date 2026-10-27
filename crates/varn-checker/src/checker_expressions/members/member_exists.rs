@@ -73,6 +73,8 @@ impl<'r> Checker<'r> {
     }
 
     pub(crate) fn member_exists(&mut self, ty: &Type, key: &str, bind: &BindResult) -> bool {
+        let resolved = self.member_input(*ty, bind);
+        let ty = &resolved;
         let ty_kind = self.ty_table.get(ty.0);
         let res = match ty_kind {
             TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => true,
@@ -245,7 +247,7 @@ impl<'r> Checker<'r> {
                 );
                 self.member_exists(&ty, key, bind)
             }
-            TypeKind::Object(mid) => self
+            TypeKind::Object(mid) | TypeKind::Record(mid) => self
                 .ty_table
                 .get_object_members(mid)
                 .iter()

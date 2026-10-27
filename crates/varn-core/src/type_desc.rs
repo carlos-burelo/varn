@@ -31,6 +31,7 @@ pub enum TypeDesc {
         rest: Option<Box<TypeDesc>>,
     },
     Object(Vec<FieldDesc>),
+    Record(Vec<FieldDesc>),
     Enclosing {
         up: u32,
         name: String,
@@ -42,6 +43,7 @@ pub struct FieldDesc {
     pub name: String,
     pub ty: TypeDesc,
     pub optional: bool,
+    pub readonly: bool,
 }
 
 impl TypeDesc {
@@ -132,15 +134,24 @@ impl TypeDesc {
                 out.push_str(name);
                 out.push(';');
             }
-            TypeDesc::Object(fields) => {
-                out.push('O');
+            TypeDesc::Object(fields) | TypeDesc::Record(fields) => {
+                out.push(if matches!(self, TypeDesc::Record(_)) {
+                    'Q'
+                } else {
+                    'O'
+                });
                 out.push_str(&fields.len().to_string());
                 out.push(';');
                 for field in fields {
                     out.push_str(&field.name.len().to_string());
                     out.push(':');
                     out.push_str(&field.name);
-                    out.push(if field.optional { '~' } else { '!' });
+                    out.push(match (field.optional, field.readonly) {
+                        (false, false) => '!',
+                        (true, false) => '~',
+                        (false, true) => '^',
+                        (true, true) => '?',
+                    });
                     field.ty.encode_into(out);
                 }
             }
@@ -222,7 +233,7 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
             let name = take_until(rest, ';')?.to_string();
             TypeDesc::Enclosing { up, name }
         }
-        'O' => {
+        'O' | 'Q' => {
             let count: usize = take_until(rest, ';')?.parse().ok()?;
             let mut fields = Vec::with_capacity(count);
             for _ in 0..count {
@@ -232,17 +243,22 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
                 let marker = rest.chars().next()?;
                 *rest = &rest[marker.len_utf8()..];
                 let optional = match marker {
-                    '~' => true,
-                    '!' => false,
+                    '~' | '?' => true,
+                    '!' | '^' => false,
                     _ => return None,
                 };
                 fields.push(FieldDesc {
                     name,
                     ty: decode_one(rest)?,
+                    readonly: matches!(marker, '^' | '?'),
                     optional,
                 });
             }
-            TypeDesc::Object(fields)
+            if tag == 'Q' {
+                TypeDesc::Record(fields)
+            } else {
+                TypeDesc::Object(fields)
+            }
         }
         _ => return None,
     })
@@ -295,8 +311,12 @@ impl fmt::Display for TypeDesc {
                 f.write_str(")")
             }
             TypeDesc::Enclosing { name, .. } => f.write_str(name),
-            TypeDesc::Object(fields) => {
-                f.write_str("{ ")?;
+            TypeDesc::Object(fields) | TypeDesc::Record(fields) => {
+                f.write_str(if matches!(self, TypeDesc::Record(_)) {
+                    "#{ "
+                } else {
+                    "{ "
+                })?;
                 for (i, field) in fields.iter().enumerate() {
                     if i > 0 {
                         f.write_str(", ")?;

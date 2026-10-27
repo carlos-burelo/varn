@@ -7,9 +7,11 @@ use varn_sem::types::{ObjectTypeMember, Type};
 
 impl<'r> Checker<'r> {
     pub(crate) fn collect_member_names(&self, ty: &Type, bind: &BindResult) -> Vec<Arc<str>> {
+        let resolved = self.member_input(*ty, bind);
+        let ty = &resolved;
         let ty_kind = self.ty_table.get(ty.0);
         match ty_kind {
-            TypeKind::Object(mid) => self
+            TypeKind::Object(mid) | TypeKind::Record(mid) => self
                 .ty_table
                 .get_object_members(mid)
                 .iter()

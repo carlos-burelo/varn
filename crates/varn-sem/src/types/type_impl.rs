@@ -60,6 +60,7 @@ impl Type {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -106,6 +107,7 @@ impl Type {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -180,6 +182,16 @@ impl Type {
         Type::resolved(table.intern(TypeKind::Generic(name, list, origin)))
     }
 
+    pub fn record(mut members: Vec<ObjectTypeMember>, table: &mut CheckerTyTable) -> Self {
+        for member in &mut members {
+            if let ObjectTypeMember::Property { readonly, .. } = member {
+                *readonly = true;
+            }
+        }
+        let mid = table.intern_object_members(members);
+        Type::resolved(table.intern(TypeKind::Record(mid)))
+    }
+
     pub fn object(members: Vec<ObjectTypeMember>, table: &mut CheckerTyTable) -> Self {
         let mid = table.intern_object_members(members);
         Type::resolved(table.intern(TypeKind::Object(mid)))
@@ -230,6 +242,7 @@ impl Type {
                 | TypeKind::TemplateLiteral(_)
                 | TypeKind::Fn(_)
                 | TypeKind::Object(_)
+                | TypeKind::Record(_)
                 | TypeKind::Typeof(_)
                 | TypeKind::KeyOf(_)
                 | TypeKind::IndexedAccess { .. }
@@ -310,6 +323,7 @@ impl Type {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -341,6 +355,7 @@ impl Type {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
+            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

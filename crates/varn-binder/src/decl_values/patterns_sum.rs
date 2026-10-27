@@ -38,6 +38,7 @@ impl<'r> super::super::Binder<'r> {
                     | varn_core::TypeKind::TemplateLiteral(_)
                     | varn_core::TypeKind::Fn(_)
                     | varn_core::TypeKind::Object(_)
+                    | varn_core::TypeKind::Record(_)
                     | varn_core::TypeKind::Typeof(_)
                     | varn_core::TypeKind::KeyOf(_)
                     | varn_core::TypeKind::IndexedAccess { .. }
@@ -62,7 +63,9 @@ impl<'r> super::super::Binder<'r> {
                     let key_str = self.interner.resolve(prop.key).to_string();
                     let ty_kind = ty.map(|t| self.ty_table.get(t.0));
                     let prop_ty = match ty_kind {
-                        Some(varn_core::TypeKind::Object(mid)) => self
+                        Some(
+                            varn_core::TypeKind::Object(mid) | varn_core::TypeKind::Record(mid),
+                        ) => self
                             .ty_table
                             .get_object_members(mid)
                             .to_vec()

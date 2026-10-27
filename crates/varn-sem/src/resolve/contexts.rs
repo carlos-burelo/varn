@@ -95,12 +95,16 @@ pub(super) fn is_member_optional(
     table: &CheckerTyTable,
 ) -> bool {
     match table.get(ty.0) {
-        TypeKind::Object(mid) => table.get_object_members(mid).iter().any(|m| match m {
-            ObjectTypeMember::Property { name, optional, .. } => name.as_ref() == key && *optional,
-            ObjectTypeMember::Method { .. }
-            | ObjectTypeMember::Index { .. }
-            | ObjectTypeMember::Callable { .. } => false,
-        }),
+        TypeKind::Object(mid) | TypeKind::Record(mid) => {
+            table.get_object_members(mid).iter().any(|m| match m {
+                ObjectTypeMember::Property { name, optional, .. } => {
+                    name.as_ref() == key && *optional
+                }
+                ObjectTypeMember::Method { .. }
+                | ObjectTypeMember::Index { .. }
+                | ObjectTypeMember::Callable { .. } => false,
+            })
+        }
         TypeKind::Named(name, _) => {
             let name = ctx.and_then(|c| c.interner()).map(|i| i.resolve(name));
             name.and_then(|name| {

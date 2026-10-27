@@ -7,6 +7,7 @@ use varn_tir::{TirExpr, TirExprKind};
 
 mod assign;
 mod call;
+mod checked_values;
 mod class_def;
 mod classdef_methods;
 mod conform;

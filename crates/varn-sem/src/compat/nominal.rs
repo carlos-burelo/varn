@@ -78,7 +78,46 @@ pub(super) fn nominal_arms(
             }
             Some(true)
         }
-        (TypeKind::Generic(..), TypeKind::Object(_)) => Some(false),
+        (TypeKind::Generic(..), TypeKind::Object(_) | TypeKind::Record(_)) => Some(false),
+        (TypeKind::Named(dn, origin_d), TypeKind::Record(inf_fields)) => {
+            use crate::types::TypeContext;
+            let bind = bind?;
+            let name = resolve_atom(Some(bind), dn)?;
+            let origin = origin_d.and_then(|o| resolve_atom(Some(bind), o));
+            if let Some(members) = bind.get_interface_members(&name, origin.as_deref()) {
+                Some(class_members_match_object(
+                    &members,
+                    table.get_object_members(inf_fields),
+                    bind,
+                    cache,
+                    in_progress,
+                    table,
+                ))
+            } else {
+                Some(named_fallback(
+                    declared,
+                    inferred,
+                    dn,
+                    origin_d,
+                    Some(bind),
+                    cache,
+                    in_progress,
+                    table,
+                    true,
+                ))
+            }
+        }
+        (TypeKind::Record(_), TypeKind::Named(name, origin)) => Some(named_fallback(
+            declared,
+            inferred,
+            name,
+            origin,
+            bind,
+            cache,
+            in_progress,
+            table,
+            false,
+        )),
         (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields)) => Some(
             if let (Some(bind), Some(dn_s)) = (bind, resolve_atom(bind, dn)) {
                 let origin_d_s = origin_d.and_then(|o| resolve_atom(Some(bind), o));
@@ -110,7 +149,7 @@ pub(super) fn nominal_arms(
                 true
             },
         ),
-        (TypeKind::Object(_), TypeKind::Generic(..)) => Some(false),
+        (TypeKind::Object(_) | TypeKind::Record(_), TypeKind::Generic(..)) => Some(false),
         (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i)) => Some(
             if let (Some(bind), Some(in_s)) = (bind, resolve_atom(bind, in_)) {
                 let origin_i_s = origin_i.and_then(|o| resolve_atom(Some(bind), o));

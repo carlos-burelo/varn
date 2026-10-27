@@ -45,6 +45,13 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
   el emitter conserva `Interface(ShapeId)` sin re-resolver por nombre.
   Sondas de `Box<int>`, imports renombrados, miembros anidados, herencia y
   recursión rechazan tipos incorrectos; `Box<str>` y `Envelope<int>` válidos pasan.
+- [x] Records conservan identidad estática propia (`#{ campo: Tipo }`) desde AST
+  hasta el contrato runtime, incluidos alias genéricos/importados y recursión.
+  Las formas llevan `readonly`; no se acepta un objeto como record ni un record
+  como vista mutable. Se eliminan los borrados de forma a 6/32 niveles.
+  Conform valida sin mutar datos; decode construye contenedores nuevos. Se borran
+  el normalizador mutante y el protocolo de reemplazo de argumentos. Tres suites
+  existentes migran las conversiones implícitas a decoders tipados explícitos.
 - [x] `Json.parse<T>` sobre `class`: decisión: no decodificable; falla con TypeError en runtime (una clase puede ser un retorno legítimo de otras funciones genéricas, por eso no es error de compilación)
 - [x] `as T` exige prueba estática dentro de cuerpos genéricos; la conversión implícita
   de `dynamic` a un parámetro abierto también se rechaza. Solo el retorno directo de

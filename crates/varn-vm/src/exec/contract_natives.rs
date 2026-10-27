@@ -11,10 +11,10 @@ pub(super) fn verify(
     ctx: &mut dyn NativeCtx,
     callee: VmValue,
     args: &[VmValue],
-) -> Result<Option<Vec<VmValue>>, NativeError> {
+) -> Result<(), NativeError> {
     match ctx.boundary_mut() {
         Some(boundary) => boundary.verify_call(callee, args),
-        None => Ok(None),
+        None => Ok(()),
     }
 }
 
@@ -23,10 +23,8 @@ pub(super) fn verify_positional(
     callee: VmValue,
     args: &[VmValue],
 ) -> NativeFnResult {
-    Ok(match verify(ctx, callee, args)? {
-        Some(converted) => ctx.alloc_array(converted),
-        None => VmValue::null(),
-    })
+    verify(ctx, callee, args)?;
+    Ok(VmValue::null())
 }
 
 pub(super) fn verify_flat(
@@ -35,11 +33,7 @@ pub(super) fn verify_flat(
     flat: VmValue,
 ) -> NativeFnResult {
     let items = spread_items(ctx, flat);
-    if let Some(converted) = verify(ctx, callee, &items)? {
-        for (i, item) in converted.into_iter().enumerate() {
-            ctx.array_set(flat, i, item);
-        }
-    }
+    verify(ctx, callee, &items)?;
     Ok(VmValue::null())
 }
 

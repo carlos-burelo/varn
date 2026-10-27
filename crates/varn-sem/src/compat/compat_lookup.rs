@@ -126,9 +126,12 @@ fn class_members_compatible(
                 let found = inf_members
                     .iter()
                     .find(|im| im.name == dm.name)
-                    .map(|m| m.ty);
+                    .map(|m| (m.ty, m.is_readonly || m.kind == ClassMemberKind::Getter));
                 match found {
-                    Some(inf_ty) => {
+                    Some((inf_ty, readonly)) => {
+                        if readonly && !dm.is_readonly && dm.kind != ClassMemberKind::Getter {
+                            return false;
+                        }
                         if !member_fits(dm, &inf_ty, bind, cache, in_progress, table) {
                             return false;
                         }
@@ -177,14 +180,19 @@ pub(super) fn class_members_match_object(
         match dm.kind {
             ClassMemberKind::Property | ClassMemberKind::Getter | ClassMemberKind::Setter => {
                 let found = inf_fields.iter().find_map(|im| match im {
-                    ObjectTypeMember::Property { name, ty, .. } if name == &dm.name => Some(*ty),
+                    ObjectTypeMember::Property {
+                        name, ty, readonly, ..
+                    } if name == &dm.name => Some((*ty, *readonly)),
                     ObjectTypeMember::Property { .. }
                     | ObjectTypeMember::Method { .. }
                     | ObjectTypeMember::Index { .. }
                     | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
-                    Some(inf_ty) => {
+                    Some((inf_ty, readonly)) => {
+                        if readonly && !dm.is_readonly && dm.kind != ClassMemberKind::Getter {
+                            return false;
+                        }
                         if !member_fits(dm, &t(inf_ty), bind, cache, in_progress, table) {
                             return false;
                         }

@@ -89,10 +89,10 @@ pub(super) fn run_pass(
         reachable.sort_by_key(|ty| ty.0);
         reachable.dedup_by_key(|ty| ty.0);
         let count = reachable.len();
-        rec.desugar.interfaces = checker.collect_interface_shapes(bind, &reachable);
+        rec.desugar.shapes = checker.collect_nominal_shapes(bind, &reachable);
         reachable.extend(
             rec.desugar
-                .interfaces
+                .shapes
                 .iter()
                 .flat_map(|s| s.fields.iter().map(|f| f.ty)),
         );
@@ -210,6 +210,7 @@ pub(super) fn assemble(
                             | varn_core::TypeKind::Generic(..)
                             | varn_core::TypeKind::TemplateLiteral(_)
                             | varn_core::TypeKind::Object(_)
+                            | varn_core::TypeKind::Record(_)
                             | varn_core::TypeKind::Typeof(_)
                             | varn_core::TypeKind::KeyOf(_)
                             | varn_core::TypeKind::IndexedAccess { .. }
