@@ -87,37 +87,51 @@ impl<'r> Checker<'r> {
         self.pure_scope = saved_pure;
         self.enclosing_caps = saved_caps;
 
-        if is_gen {
+        let inferred = if is_gen {
             let yields = self.yielded_types.take().unwrap_or_default();
-            if f.return_type.is_none() {
-                let inferred_yield = if yields.is_empty() {
+            self.yielded_types = old_yields;
+            f.return_type.is_none().then(|| {
+                let yielded = if yields.is_empty() {
                     Type::Void
                 } else {
-                    Type::union(yields, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+                    Type::union(yields, Arc::make_mut(&mut self.ty_table))
                 };
-                let scope = bind.scopes.get(saved_scope);
-                if let Some(sym_id) = scope.resolve(f.id, &bind.scopes)
-                    && let Some(fn_ty) = rec
-                        .symbol_types
-                        .get(&sym_id)
-                        .cloned()
-                        .or_else(|| bind.arena.get(sym_id).ty)
-                    && let varn_core::TypeKind::Fn(fid) = self.ty_table.get(fn_ty.0)
-                {
-                    let new_ret = varn_sem::types::generator_of(
-                        inferred_yield,
-                        f.modifiers.is_async,
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    );
-                    let mut ft = self.ty_table.get_function(fid).clone();
-                    ft.return_type = new_ret.0;
-                    let new_fn_ty =
-                        Type::fn_(ft, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                    rec.symbol_types.insert(sym_id, new_fn_ty);
-                    self.record_type_with_symbol(rec, f.id_offset, new_fn_ty, sym_id);
-                }
+                varn_sem::types::generator_of(
+                    yielded,
+                    f.modifiers.is_async,
+                    Arc::make_mut(&mut self.ty_table),
+                )
+            })
+        } else if f.return_type.is_none() && has_body {
+            let returned = crate::checker_expressions::infer::arrow_body_return_type(
+                varn_core::ast::ArrowBody::Block(f.body),
+                self,
+                rec,
+                bind,
+            );
+            Some(varn_sem::types::async_fn_return(
+                returned,
+                f.modifiers.is_async,
+                Arc::make_mut(&mut self.ty_table),
+            ))
+        } else {
+            None
+        };
+        if let Some(returned) = inferred {
+            let scope = bind.scopes.get(saved_scope);
+            if let Some(sym_id) = scope.resolve(f.id, &bind.scopes)
+                && let Some(fn_ty) = rec
+                    .symbol_types
+                    .get(&sym_id)
+                    .copied()
+                    .or_else(|| bind.arena.get(sym_id).ty)
+                && let varn_core::TypeKind::Fn(fid) = self.ty_table.get(fn_ty.0)
+            {
+                let mut ft = self.ty_table.get_function(fid).clone();
+                ft.return_type = returned.0;
+                let new_fn_ty = Type::fn_(ft, Arc::make_mut(&mut self.ty_table));
+                self.record_type_with_symbol(rec, f.id_offset, new_fn_ty, sym_id);
             }
-            self.yielded_types = old_yields;
         }
 
         self.declared_yield = old_declared_yield;

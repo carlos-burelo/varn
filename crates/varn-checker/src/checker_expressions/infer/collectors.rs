@@ -27,6 +27,11 @@ pub(crate) fn arrow_body_return_type(
                 return Type::Dynamic;
             }
             let mut return_tys = returns.typed;
+            if !return_tys.is_empty()
+                && crate::checker::completion::can_complete_normally(block, checker.ast_arena)
+            {
+                return_tys.push(Type::Void);
+            }
             match return_tys.len() {
                 0 if !crate::checker::completion::can_complete_normally(
                     block,
@@ -79,6 +84,7 @@ fn collect_returns(
                 out.typed.push(ty);
             }
         }
+        StmtKind::Return { argument: None } => out.typed.push(Type::Void),
         StmtKind::If {
             consequent,
             alternate,
@@ -126,7 +132,6 @@ fn collect_returns(
         | StmtKind::Expr { .. }
         | StmtKind::Decl(_)
         | StmtKind::Error
-        | StmtKind::Return { .. }
         | StmtKind::Break { .. }
         | StmtKind::Continue { .. }
         | StmtKind::Throw { .. }
