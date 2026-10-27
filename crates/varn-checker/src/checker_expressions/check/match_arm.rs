@@ -30,10 +30,6 @@ impl<'r> Checker<'r> {
                 self.current_scope = arm_scope;
             }
 
-            if let Some(g) = &case.guard {
-                self.check_expr(rec, *g, bind);
-            }
-
             let arm_disc_ty = match &case.pattern {
                 varn_core::ast::MatchPattern::Literal(e) => match &arena.expr(*e).kind {
                     varn_core::ast::ExprKind::StrLiteral { .. } => Some(varn_sem::types::Type::Str),
@@ -128,10 +124,6 @@ impl<'r> Checker<'r> {
                 };
 
             self.with_narrowings(&narrowing_vec, |checker| {
-                if let Some(g) = &case.guard {
-                    checker.check_expr(rec, *g, bind);
-                }
-
                 let subject_ty = checker.infer_type(rec, subject, bind);
                 let subject_ty = if null_handled {
                     subject_ty.non_nullified(std::sync::Arc::make_mut(&mut checker.ty_table))
@@ -139,11 +131,21 @@ impl<'r> Checker<'r> {
                     subject_ty
                 };
                 checker.check_pattern_match(rec, &case.pattern, &subject_ty, bind);
-
-                match &case.body {
+                let guard_narrowings = if let Some(g) = case.guard {
+                    checker.check_expr(rec, g, bind);
+                    checker.require_condition(rec, g, bind);
+                    if checker.can_extract_narrowings(g) {
+                        checker.extract_narrowings(rec, g, bind, true)
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    Vec::new()
+                };
+                checker.with_narrowings(&guard_narrowings, |checker| match &case.body {
                     varn_core::ast::MatchBody::Expr(e) => checker.check_expr(rec, *e, bind),
                     varn_core::ast::MatchBody::Block(stmt) => checker.check_stmt(rec, *stmt, bind),
-                }
+                });
             });
             self.current_scope = saved_scope;
             null_handled |= case.guard.is_none()
