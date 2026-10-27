@@ -58,6 +58,11 @@ normalizador mutante y el reemplazo de argumentos; tres suites migran a decode
 explícito. Retornos inferidos conservan tuplas/records y guardas de match se
 comprueban después de tipar el patrón, una sola vez.
 
+Igualdad (2026-10-26): operadores requieren tipos por valor; referencias mutables,
+funciones, `dynamic` y tipos abiertos exigen comparación explícita. Se añade
+`sameValue` y se elimina la invocación implícita de `equals` para esos operadores.
+Once suites y cinco consumidores de std migrados; JWT estrecha su algoritmo.
+
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
 destructuring de tupla por posición (`e8e1717d`); local `dynamic`

@@ -84,6 +84,6 @@ await describe("250 layout parity", async () => {
         const tree = Column([Box(w: 100.0, h: 40.0, color: 0xFFFF0000)], gap: 4.0);
         const first = tree.layout(Constraints.tight(800.0, 600.0));
         const second = tree.layout(Constraints.tight(800.0, 600.0));
-        expect(first === second).toBe(true);
+        expect(sameValue(first, second)).toBe(true);
     });
 });

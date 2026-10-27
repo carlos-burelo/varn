@@ -54,6 +54,9 @@ impl<'r> Checker<'r> {
             self.report_int_overflow(expr);
         }
 
+        if self.reject_reference_equality(rec, op, left, right, range, bind) {
+            return;
+        }
         if !self.check_binary_capability(rec, expr, op, left, right, bind) {
             self.check_binary_operands(rec, op, left, right, range, bind);
         }

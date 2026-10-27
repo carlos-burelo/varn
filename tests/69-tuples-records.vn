@@ -18,10 +18,9 @@ await describe("69 tuples records", async () => {
         expect(t1 == t2).toBeTruthy()
         expect(t1 != t3).toBeTruthy()
         
-        // 3. Mutable array referential equality (==) vs Tuple structural equality
         let a1 = [1, 2]
         let a2 = [1, 2]
-        expect(a1 != a2).toBeTruthy()
+        expect(!sameValue(a1, a2)).toBeTruthy()
         
         // 4. Record creation and field access
         let r1 = #{ name: "Varn", version: 1 }

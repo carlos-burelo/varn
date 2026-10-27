@@ -183,7 +183,7 @@ await describe("235 signals", async () => {
         first.value = 8
         const second = build()
         expect(second.value).toBe(8)
-        expect(second === first).toBe(true)
+        expect(sameValue(second, first)).toBe(true)
     })
 
     await it("a scheduler defers effect runs", () => {

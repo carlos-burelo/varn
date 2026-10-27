@@ -188,7 +188,7 @@ export class UiFrame {
 
     static contains(xs: int[], v: int): bool {
         for (let i = 0; i < xs.length; i = i + 1) {
-            if (xs[i] == v) {
+            if (sameValue(xs[i], v)) {
                 return true;
             }
         }
@@ -197,7 +197,7 @@ export class UiFrame {
 
     static drop(xs: int[], v: int): void {
         for (let i = 0; i < xs.length; i = i + 1) {
-            if (xs[i] == v) {
+            if (sameValue(xs[i], v)) {
                 xs.splice(i, 1);
                 return;
             }

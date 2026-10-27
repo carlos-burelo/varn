@@ -22,7 +22,7 @@ await describe("136 enum identity", async () => {
         await it("group 1 part 1", async () => {
         expect(a.label() == "a").toBeTruthy();
         expect(b.label() == "b").toBeTruthy();
-        expect((a as dynamic) != (b as dynamic)).toBeTruthy();
+        expect(!sameValue(a as dynamic, b as dynamic)).toBeTruthy();
         expect(a == ShadeA.Light).toBeTruthy();
     });
 

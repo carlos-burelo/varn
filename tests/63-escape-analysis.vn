@@ -41,12 +41,10 @@ function eaEscapeArray(n: int): int {
 function eaTakes(p: EaPoint): int { return p.x + p.y }
 function eaEscapeArg(v: int): int { return eaTakes(new EaPoint(v, v)) }
 
-// Identity is observable: `===` on objects is the address, so two separately
-// constructed instances must stay distinct even with identical fields.
 function eaIdentity(): bool {
   const a = new EaPoint(1, 2)
   const b = new EaPoint(1, 2)
-  return a === b
+  return sameValue(a, b)
 }
 
 // --- shapes the summary must refuse -------------------------------------

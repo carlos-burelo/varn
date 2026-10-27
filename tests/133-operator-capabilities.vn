@@ -36,15 +36,15 @@ await describe("133 operator capabilities", async () => {
         expect((b % 2).x === 1 && (b % 2).y).toBe(0);
         expect((b ** 2).x === 9 && (b ** 2).y).toBe(16);
         expect((a + b - a).equals(b)).toBeTruthy();
-        expect(a + b == new Vec2(4, 6)).toBeTruthy();
-        expect(a != b).toBeTruthy();
+        expect((a + b).equals(new Vec2(4, 6))).toBeTruthy();
+        expect(!a.equals(b)).toBeTruthy();
     });
 
     await it("group 1 part 3", async () => {
         expect(a < b && !(b < a)).toBeTruthy();
         expect(a <= a && b >= a).toBeTruthy();
         expect(maybe == null).toBeTruthy();
-        expect(p == p && !(p == new Plain(1))).toBeTruthy();
+        expect(sameValue(p, p) && !(sameValue(p, new Plain(1)))).toBeTruthy();
     });
 
 

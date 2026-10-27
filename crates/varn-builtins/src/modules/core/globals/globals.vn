@@ -1,3 +1,4 @@
+export declare function sameValue<T>(left: T, right: T): bool;
 export declare function print(...args: dynamic[]): void;
 export declare function debug(...args: dynamic[]): void;
 export declare function assertSummary(): void;

@@ -49,7 +49,7 @@ export class Signal<T> extends Readable<T> {
 
     set(next: T): void {
         const equals = this._equals;
-        const same = equals === null ? next == this._value : equals(this._value, next);
+        const same = equals === null ? sameValue(next, this._value) : equals(this._value, next);
         if (same) {
             return;
         }
@@ -123,7 +123,7 @@ export class Computed<T> extends Readable<T> implements Observer {
             unlink(this);
             const next = runTracked(this, this._derive);
             const equals = this._equals;
-            const unchanged = this._cached.isSome() && (equals === null ? next == this._cached.unwrap() : equals(this._cached.unwrap(), next));
+            const unchanged = this._cached.isSome() && (equals === null ? sameValue(next, this._cached.unwrap()) : equals(this._cached.unwrap(), next));
             this._cached = Option.Some(next);
             this._stale = false;
             if (!unchanged) {

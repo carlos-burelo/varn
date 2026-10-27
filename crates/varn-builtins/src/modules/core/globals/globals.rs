@@ -7,6 +7,10 @@ varn_contract! {
     module: "globals",
     contract: "src/modules/core/globals/globals.vn",
     impl Globals {
+        fn sameValue(ctx: &mut dyn NativeCtx, left: VmValue, right: VmValue) -> Result<bool, String> {
+            Ok(ctx.values_equal(left, right))
+        }
+
         fn print(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<(), String> {
             if !ctx.print_silent() {
                 use std::io::Write;

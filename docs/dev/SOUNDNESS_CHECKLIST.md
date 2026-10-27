@@ -74,8 +74,12 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 
 ### Semántica
 - [x] `indexOf`/`includes` usan la igualdad del lenguaje (`NaN` no se encuentra; tuplas y records por valor)
-- [ ] Igualdad: decisión autorizada (2026-10-26): rechazar `==` / `!=` sobre
-  arrays, objetos y colecciones mutables; exigir comparación explícita.
+- [x] Igualdad: decisión autorizada (2026-10-26): `==` / `!=` rechazan arrays,
+  objetos, clases, funciones, colecciones mutables, `dynamic` y tipos abiertos
+  (VN3010). Se conservan comprobaciones de nulidad y tipos por valor. `sameValue`
+  ofrece comparación explícita; los métodos `equals` se invocan explícitamente.
+  Once suites y cinco consumidores de std migran sus comparaciones; JWT estrecha
+  el tipo de su algoritmo antes de compararlo con texto.
 - [x] Sombreado de predefinidos: `Infinity`/`NaN` y tipos primitivos no se redeclaran (módulos core exentos)
 - [x] `x instanceof int` es el test de tipo para uniones (la std lo usa y estrecha): decisión, sin cambio
 - [ ] `dynamic` sin autorización explícita (Ley 17): inventariar usos

@@ -109,6 +109,7 @@ pub const NATIVE_GLOBALS: &[NativeGlobal] = {
         native("input", Function),
         native(P::Int.name(), Class),
         native(P::Str.name(), Class),
+        native("sameValue", Function),
     ]
 };
 

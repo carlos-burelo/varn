@@ -24,8 +24,8 @@ function stringifyFails(value: dynamic): bool {
 
 await describe("272 deep structures", async () => {
     await it("equality of very deep records does not exhaust the native stack", () => {
-        expect(chain(500000) == chain(500000)).toBeTruthy();
-        expect(chain(500000) == chain(499999)).toBeFalsy();
+        expect(sameValue(chain(500000), chain(500000))).toBeTruthy();
+        expect(sameValue(chain(500000), chain(499999))).toBeFalsy();
     });
 
     await it("stringify refuses a value nested deeper than the limit", () => {

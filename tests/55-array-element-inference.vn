@@ -158,7 +158,7 @@ function rule4ReturnPosition(): str {
 function rule4MemberExists(): int {
     let a = []
     a.push(1)
-    return a[0].toUpperCase() == "" ? 0 : 1
+    return sameValue(a[0].toUpperCase(), "") ? 0 : 1
 }
 
 // --- `Array<T>` and `T[]` are one type --------------------------------

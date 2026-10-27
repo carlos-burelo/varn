@@ -51,7 +51,7 @@ export function track(source: Source): void {
 export function unlink(ob: Observer): void {
     for (let source of ob.sources) {
         for (let at = source.observers.length - 1; at >= 0; at = at - 1) {
-            if (source.observers[at] == ob) {
+            if (sameValue(source.observers[at], ob)) {
                 source.observers.splice(at, 1);
             }
         }
@@ -104,7 +104,7 @@ export function notifyObservers(source: Source): void {
     const writer = currentObserver();
     const snapshot = source.observers.slice(0, source.observers.length);
     for (let ob of snapshot) {
-        if (ob.alive && ob != writer) {
+        if (ob.alive && !sameValue(ob, writer)) {
             ob.notify();
         }
     }

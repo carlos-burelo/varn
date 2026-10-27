@@ -76,6 +76,14 @@ let r2 = #{ name: "Varn", version: 1 }
 assertTrue("record eq true", r1 == r2)       // igualdad estructural
 ```
 
+`==` y `!=` requieren tipos con igualdad por valor: primitivos, enums, tuplas y
+records. Arrays, objetos, clases, funciones y colecciones mutables requieren
+`sameValue(a, b)` para identidad o una llamada explícita a su método `equals`.
+`sameValue` usa igualdad por valor para primitivos, tuplas y records; conserva
+identidad para referencias mutables. Las comparaciones contra `null` se permiten.
+`dynamic` y parámetros de tipo abiertos también requieren comparación explícita.
+Los alias y las uniones deben demostrar que todos sus miembros admiten igualdad.
+
 ### 2.4 Diccionarios (`{ [key: K]: V }`) y mapas (`Map<K, V>`)
 
 Contenedores asociativos dinámicos mutables (`tests/17-map-set.vn`,
@@ -113,11 +121,11 @@ assertTrue("map size", m.size === 1)
 
 | Tipo | Sintaxis de Creación | Sintaxis de Acceso | Igualdad | Mutabilidad |
 |---|---|---|---|---|
-| **`Object`** | `{ name: "Alice", age: 30 }` | `obj.name` (offset de compilación fijo) | Referencia (`===`) | Mutable |
+| **`Object`** | `{ name: "Alice", age: 30 }` | `obj.name` (offset de compilación fijo) | Explícita (`sameValue(a, b)`) | Mutable |
 | **`Record`** | `#{ name: "Alice", age: 30 }` | `rec.name` | Estructural profunda (`==`) | Inmutable |
 | **`Tuple`** | `#[ 1, "hello" ]` | `tup[0]` | Estructural profunda (`==`) | Inmutable |
-| **`Map<K, V>`** | `new Map<K, V>()` | `m[k]`, `m.get(k)`, `m.set(k, v)` | Referencia (`===`) | Mutable |
-| **`{ [key: K]: V }`** | `{ "a": 1 }` | `d[k]` | Referencia (`===`) | Mutable |
+| **`Map<K, V>`** | `new Map<K, V>()` | `m[k]`, `m.get(k)`, `m.set(k, v)` | Explícita (`sameValue(a, b)`) | Mutable |
+| **`{ [key: K]: V }`** | `{ "a": 1 }` | `d[k]` | Explícita (`sameValue(a, b)`) | Mutable |
 
 ### 2.6 Set
 

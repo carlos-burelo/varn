@@ -13,15 +13,15 @@ function dynArith(a: dynamic, b: dynamic): dynamic {
 
 function dynCompare(a: dynamic, b: dynamic): int {
     let n = 0
-    if (a == b) { n = n + 1 }
-    if (a != b) { n = n + 10 }
+    if (sameValue(a, b)) { n = n + 1 }
+    if (!sameValue(a, b)) { n = n + 10 }
     if (a < b) { n = n + 100 }
     if (a >= b) { n = n + 1000 }
     return n
 }
 
 function strEquals(a: str, b: str): bool {
-    const r = a == b
+    const r = sameValue(a, b)
     return r
 }
 
