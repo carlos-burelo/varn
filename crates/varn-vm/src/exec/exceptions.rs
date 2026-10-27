@@ -199,3 +199,19 @@ pub(crate) unsafe fn raise(
         Err(err)
     }
 }
+
+pub(crate) unsafe fn handle_runtime_error(
+    ctx: *mut crate::exec::ctx::ExecCtx,
+    mut err: RuntimeError,
+    depth: usize,
+) -> crate::error::VmResult<()> {
+    if err.frames.is_empty() {
+        err.frames = collect_frames(unsafe { &(*ctx).frames });
+    }
+    let thrown = thrown_value_for(&err, unsafe { &mut (*ctx).heap });
+    if unsafe { dispatch_to_handler(ctx, thrown, depth) } {
+        Ok(())
+    } else {
+        Err(err)
+    }
+}

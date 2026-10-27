@@ -1,7 +1,6 @@
 use super::ExecCtx;
 use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
-use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::value::VmValue;
 
 pub(super) enum JitFrameOutcome {
@@ -175,34 +174,15 @@ pub(super) unsafe fn run_compiled_frame(
 
 #[allow(dangerous_implicit_autorefs)]
 unsafe fn finish_compiled_frame(ctx: *mut ExecCtx, depth: usize, res: VmValue) -> JitFrameOutcome {
-    let returning_frame_idx = unsafe { (*ctx).frames.len() }.saturating_sub(1);
-    let frame = unsafe { (*ctx).frames.pop() }.unwrap();
-    unsafe { (*ctx).drop_frame_storage(frame.base) };
-    let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
-        && !frame.closure().proto.chunk.source_file.is_empty();
-
-    let final_val = resolve_constructor_return(unsafe { &mut *ctx }, returning_frame_idx, res);
-
-    if is_module_frame {
-        let source_file = frame.closure().proto.chunk.source_file.to_string();
-        let module_exports = unsafe { (*ctx).module_exports.remove(&returning_frame_idx) };
-        let cached = module_exports.unwrap_or(final_val);
-        let module_id = varn_core::ModuleId::from_canonical_str(&source_file);
-        unsafe { &mut *(*ctx).modules.get() }.insert(module_id, cached);
-    }
-
-    if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG
-        && let Some(caller) = unsafe { (*ctx).frames.last() }
-    {
-        let caller_base = caller.base;
-        if let Err(e) = unsafe {
-            (*ctx)
-                .stack
-                .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)
-        } {
-            return JitFrameOutcome::Failed(e);
+    let final_val = match unsafe { (*ctx).complete_return(res) } {
+        Ok(value) => value,
+        Err(err) => {
+            return match unsafe { crate::exec::exceptions::handle_runtime_error(ctx, err, depth) } {
+                Ok(()) => JitFrameOutcome::Continue,
+                Err(err) => JitFrameOutcome::Failed(err),
+            }
         }
-    }
+    };
 
     if unsafe { (*ctx).frames.len() } == depth {
         JitFrameOutcome::Done(final_val)

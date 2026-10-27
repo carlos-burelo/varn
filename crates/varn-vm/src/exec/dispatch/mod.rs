@@ -72,21 +72,12 @@ impl ExecCtx {
                         Ok(v) => v,
                         Err(err) => {
                             unsafe { (*ctx).frames[frame_idx].ip = ip };
-                            let mut err: crate::error::RuntimeError = err;
-                            if err.frames.is_empty() {
-                                err.frames = crate::exec::exceptions::collect_frames(unsafe {
-                                    &(*ctx).frames
-                                });
-                            }
-                            let tv = crate::exec::exceptions::thrown_value_for(&err, unsafe {
-                                &mut (*ctx).heap
-                            });
-                            if unsafe {
-                                crate::exec::exceptions::dispatch_to_handler(ctx, tv, depth)
+                            match unsafe {
+                                crate::exec::exceptions::handle_runtime_error(ctx, err, depth)
                             } {
-                                continue 'frame_loop;
+                                Ok(()) => continue 'frame_loop,
+                                Err(err) => return Err(err),
                             }
-                            return Err(err);
                         }
                     }
                 };

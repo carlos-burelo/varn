@@ -77,6 +77,10 @@ Conversiones SSA (2026-10-26): `ToStr` usa `ToString`; la conversión de
 condición nullable produce `bool` en vez de etiquetar el valor original.
 Se borran reinterpretaciones que mentían sobre los valores de strings y bools.
 
+Retorno transaccional (2026-10-26): VM/JIT comparten finalización. La escritura
+al llamador puede fallar con el frame todavía vivo; luego se libera almacenamiento.
+La propagación común conserva captura y traza en lugar de indexar un frame retirado.
+
 Tipos checker→JIT (sesión 2026-10-15/16): EqStr/NeqStr nativo
 (`3ee1d01d`); narrowing conserva Tuple/Array (`004ce48f`);
 destructuring de tupla por posición (`e8e1717d`); local `dynamic`

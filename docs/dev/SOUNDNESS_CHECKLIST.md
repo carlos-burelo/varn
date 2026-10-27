@@ -69,6 +69,9 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
 - [x] `ToStr` produce una cadena real en SSA; las condiciones sobre `bool?`
   producen un booleano real. Se eliminan casts que solo cambiaban el tipo sin
   transformar el valor y dependían de coerciones posteriores de la VM/JIT.
+- [x] Un retorno inválido se valida antes de retirar el frame. VM y JIT usan
+  la misma finalización y ruta de propagación del error; se elimina el panic
+  por intentar anotar un frame ya retirado y se conserva la captura del error.
 - [x] Intérprete y JIT comparten el límite lógico de 10000 llamadas; las llamadas
   JIT sin frame participan en el contador. La guarda de pila nativa sigue siendo
   un límite físico adicional. El contador se restaura también al suspender;

@@ -5,15 +5,24 @@ use crate::value::VmValue;
 impl ExecCtx {
     pub(super) fn reg_return(&mut self, base: usize, src: usize) -> VmResult<VmValue> {
         let val = self.stack.box_reg(base, src);
-        let returning_frame_idx = self.frames.len().saturating_sub(1);
+        self.complete_return(val)
+    }
+
+    pub(super) fn complete_return(&mut self, val: VmValue) -> VmResult<VmValue> {
+        let returning_frame_idx = self.frames.len() - 1;
+        let final_val =
+            crate::exec::frame_ctrl::resolve_constructor_return(self, returning_frame_idx, val);
+        let return_reg = self.frames[returning_frame_idx].return_reg;
+        if return_reg != crate::frame::CallFrame::NO_RETURN_REG && returning_frame_idx > 0 {
+            let caller_base = self.frames[returning_frame_idx - 1].base;
+            self.stack
+                .unbox_into_reg(caller_base, return_reg as usize, final_val)?;
+        }
         let frame = self.frames.pop().unwrap();
         self.drop_frame_storage(frame.base);
 
         let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
             && !frame.closure().proto.chunk.source_file.is_empty();
-
-        let final_val =
-            crate::exec::frame_ctrl::resolve_constructor_return(self, returning_frame_idx, val);
 
         if is_module_frame {
             let source_file = frame.closure().proto.chunk.source_file.to_string();
@@ -23,13 +32,6 @@ impl ExecCtx {
             unsafe { &mut *self.modules.get() }.insert(module_id, cached);
         }
 
-        if frame.return_reg != crate::frame::CallFrame::NO_RETURN_REG
-            && let Some(caller) = self.frames.last()
-        {
-            let caller_base = caller.base;
-            self.stack
-                .unbox_into_reg(caller_base, frame.return_reg as usize, final_val)?;
-        }
         Ok(final_val)
     }
 
