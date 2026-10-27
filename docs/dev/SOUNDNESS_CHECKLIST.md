@@ -66,6 +66,9 @@ lleva su commit atómico, su test en `tests/` o su fixture en `tests/errors/`.
   Se eliminaron 15 casts a tipos abiertos de std y consumidores; los tres ejemplos
   declarativos y las dos suites que dependían de slots implícitos usan 14 handles
   tipados. Se migró además el memoizador `once` de la suite de orden superior.
+- [x] `ToStr` produce una cadena real en SSA; las condiciones sobre `bool?`
+  producen un booleano real. Se eliminan casts que solo cambiaban el tipo sin
+  transformar el valor y dependían de coerciones posteriores de la VM/JIT.
 - [x] Intérprete y JIT comparten el límite lógico de 10000 llamadas; las llamadas
   JIT sin frame participan en el contador. La guarda de pila nativa sigue siendo
   un límite físico adicional. El contador se restaura también al suspender;

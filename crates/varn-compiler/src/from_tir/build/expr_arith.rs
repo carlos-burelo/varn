@@ -85,13 +85,7 @@ impl<'m> Builder<'m> {
                 self.emit_effect(InstKind::AssertNotNull { operand: v });
                 Ok(v)
             }
-            TirUnOp::ToStr => Ok(self.emit(
-                InstKind::Cast {
-                    operand: v,
-                    ty: BackendTy::Str,
-                },
-                BackendTy::Str,
-            )),
+            TirUnOp::ToStr => Ok(self.emit(InstKind::ToString { operand: v }, BackendTy::Str)),
             TirUnOp::Neg | TirUnOp::Not | TirUnOp::BitNot | TirUnOp::Typeof => {
                 let result = self.emit(
                     InstKind::Unary {
@@ -170,10 +164,26 @@ impl<'m> Builder<'m> {
     ) -> Result<Value> {
         use varn_core::NumericDomain as D;
         let v = self.lower_expr(operand)?;
-        if ty == BackendTy::Bool
-            && let Some(holds) = self.static_truthiness(v)
-        {
-            return Ok(holds);
+        if ty == BackendTy::Bool {
+            if let Some(holds) = self.static_truthiness(v) {
+                return Ok(holds);
+            }
+            let absent = self.emit(
+                InstKind::Unary {
+                    op: crate::hir::HirUnOp::Not,
+                    operand: v,
+                    ty: BackendTy::Bool,
+                },
+                BackendTy::Bool,
+            );
+            return Ok(self.emit(
+                InstKind::Unary {
+                    op: crate::hir::HirUnOp::Not,
+                    operand: absent,
+                    ty: BackendTy::Bool,
+                },
+                BackendTy::Bool,
+            ));
         }
         let from = match self.value_ty(v) {
             BackendTy::Int => Some(D::Int),
